@@ -28,13 +28,28 @@ export default function TaskManager() {
       const response = await apiRequest("PUT", `/api/tasks/${taskId}/priority`, { priority });
       return response.json();
     },
-    onSuccess: () => {
+    onSuccess: (updatedTask) => {
       queryClient.invalidateQueries({ queryKey: ["/api/tasks"] });
+      
+      console.log("Mutation success - showing toast for task:", updatedTask);
+      
+      // Enhanced notification with task details
+      const priorityLabel = updatedTask.priority === "early-out" ? "Early Out" :
+                           updatedTask.priority === "high" ? "Alta Priorità" :
+                           updatedTask.priority === "low" ? "Bassa Priorità" : "Non Assegnato";
+      
+      const isUnassigned = updatedTask.priority === null;
+      const title = isUnassigned ? "📥 Task Spostato" : "✅ Task Assegnato";
+      
+      toast({
+        title,
+        description: `"${updatedTask.name}" → ${priorityLabel}${updatedTask.assignedTo ? ' (Assegnato automaticamente)' : ''}`,
+      });
     },
     onError: () => {
       toast({
-        title: "Errore",
-        description: "Impossibile aggiornare la priorità del task",
+        title: "❌ Errore Assegnazione",
+        description: "Impossibile aggiornare la priorità del task. Riprova.",
         variant: "destructive",
       });
     },
@@ -45,17 +60,38 @@ export default function TaskManager() {
       const response = await apiRequest("POST", "/api/tasks/auto-assign");
       return response.json();
     },
-    onSuccess: () => {
+    onSuccess: (updatedTasks) => {
       queryClient.invalidateQueries({ queryKey: ["/api/tasks"] });
-      toast({
-        title: "Successo",
-        description: "Task assegnati automaticamente",
-      });
+      
+      // Count assignments by priority
+      const assignments = updatedTasks.filter((task: any) => task.priority && task.assignedTo);
+      const byPriority = assignments.reduce((acc: any, task: any) => {
+        acc[task.priority] = (acc[task.priority] || 0) + 1;
+        return acc;
+      }, {});
+      
+      const summary = Object.entries(byPriority).map(([priority, count]) => {
+        const label = priority === "early-out" ? "Early Out" :
+                     priority === "high" ? "Alta" : "Bassa";
+        return `${label}: ${count}`;
+      }).join(", ");
+      
+      if (assignments.length === 0) {
+        toast({
+          title: "🚀 Assegnazione Automatica Completata",
+          description: "Nessun task disponibile per l'assegnazione",
+        });
+      } else {
+        toast({
+          title: "🚀 Assegnazione Automatica Completata",
+          description: `${assignments.length} task assegnati - ${summary}`,
+        });
+      }
     },
     onError: () => {
       toast({
-        title: "Errore",
-        description: "Impossibile assegnare automaticamente i task",
+        title: "❌ Errore Assegnazione Automatica",
+        description: "Impossibile completare l'assegnazione automatica. Verifica la connessione.",
         variant: "destructive",
       });
     },
@@ -66,17 +102,19 @@ export default function TaskManager() {
       const response = await apiRequest("POST", "/api/tasks/clear-assignments");
       return response.json();
     },
-    onSuccess: () => {
+    onSuccess: (updatedTasks) => {
       queryClient.invalidateQueries({ queryKey: ["/api/tasks"] });
+      
+      const resetCount = updatedTasks.length;
       toast({
-        title: "Successo",
-        description: "Tutte le assegnazioni sono state azzerate",
+        title: "🔄 Assegnazioni Azzerate",
+        description: `${resetCount} task riportati nella sezione "Non Assegnati"`,
       });
     },
     onError: () => {
       toast({
-        title: "Errore",
-        description: "Impossibile azzerare le assegnazioni",
+        title: "❌ Errore Reset",
+        description: "Impossibile azzerare le assegnazioni. Riprova tra qualche momento.",
         variant: "destructive",
       });
     },
@@ -94,6 +132,8 @@ export default function TaskManager() {
     else if (destination.droppableId === "high") newPriority = "high";
     else if (destination.droppableId === "low") newPriority = "low";
     else if (destination.droppableId === "unassigned") newPriority = null;
+
+    console.log("Drag ended - calling mutation with:", { taskId: draggableId, priority: newPriority });
 
     updateTaskPriorityMutation.mutate({
       taskId: draggableId,
@@ -132,6 +172,7 @@ export default function TaskManager() {
       year: "numeric",
     });
   };
+
 
   if (tasksLoading) {
     return (
