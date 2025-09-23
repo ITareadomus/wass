@@ -110,13 +110,46 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Bulk update task priority (for drag and drop)
+  // Bulk update task priority and assignment (for drag and drop)
   app.put("/api/tasks/:id/priority", async (req, res) => {
     try {
       const { id } = req.params;
       const { priority } = req.body;
       
-      const task = await storage.updateTask(id, { priority });
+      let assignedTo: string | null = null;
+      
+      // Auto-assign to personnel when moving to priority column
+      if (priority && priority !== null) {
+        const personnel = await storage.getPersonnel();
+        const tasks = await storage.getTasks();
+        
+        // Simple round-robin assignment based on current workload
+        const workloadMap = new Map<string, number>();
+        
+        // Initialize workload counter
+        personnel.forEach(person => {
+          workloadMap.set(person.id, 0);
+        });
+        
+        // Count current assignments
+        tasks.forEach(task => {
+          if (task.assignedTo && task.priority) {
+            const currentCount = workloadMap.get(task.assignedTo) || 0;
+            workloadMap.set(task.assignedTo, currentCount + 1);
+          }
+        });
+        
+        // Find person with least workload
+        let minWorkload = Infinity;
+        for (const [personId, workload] of Array.from(workloadMap.entries())) {
+          if (workload < minWorkload) {
+            minWorkload = workload;
+            assignedTo = personId;
+          }
+        }
+      }
+      
+      const task = await storage.updateTask(id, { priority, assignedTo });
       
       if (!task) {
         res.status(404).json({ message: "Task not found" });
@@ -129,17 +162,48 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Auto-assign tasks endpoint
+  // Auto-assign tasks endpoint  
   app.post("/api/tasks/auto-assign", async (req, res) => {
     try {
       const tasks = await storage.getTasks();
+      const personnel = await storage.getPersonnel();
       const unassignedTasks = tasks.filter(task => !task.priority);
       
-      // Simple auto-assignment logic - distribute evenly across priorities
+      // Initialize workload counter
+      const workloadMap = new Map<string, number>();
+      personnel.forEach(person => {
+        workloadMap.set(person.id, 0);
+      });
+      
+      // Count current assignments
+      tasks.forEach(task => {
+        if (task.assignedTo && task.priority) {
+          const currentCount = workloadMap.get(task.assignedTo) || 0;
+          workloadMap.set(task.assignedTo, currentCount + 1);
+        }
+      });
+      
+      // Assign each unassigned task
       for (let i = 0; i < unassignedTasks.length; i++) {
         const priorities = ['early-out', 'high', 'low'];
         const priority = priorities[i % priorities.length];
-        await storage.updateTask(unassignedTasks[i].id, { priority });
+        
+        // Find person with least workload
+        let minWorkload = Infinity;
+        let assignedTo: string | null = null;
+        
+        for (const [personId, workload] of Array.from(workloadMap.entries())) {
+          if (workload < minWorkload) {
+            minWorkload = workload;
+            assignedTo = personId;
+          }
+        }
+        
+        // Update task and increment workload counter
+        await storage.updateTask(unassignedTasks[i].id, { priority, assignedTo });
+        if (assignedTo) {
+          workloadMap.set(assignedTo, (workloadMap.get(assignedTo) || 0) + 1);
+        }
       }
       
       const updatedTasks = await storage.getTasks();

@@ -17,13 +17,20 @@ export default function TimelineView({ personnel, tasks }: TimelineViewProps) {
   };
 
   const getAssignmentForPersonnel = (personId: string, timeSlot: string) => {
-    // This is a simplified version - in a real app you'd have proper time slot assignments
-    const assignedTasks = tasks.filter(task => task.assignedTo === personId);
+    // Find tasks assigned to this person with priorities
+    const assignedTasks = tasks.filter(task => 
+      task.assignedTo === personId && task.priority !== null
+    );
+    
     if (assignedTasks.length > 0) {
+      // For now, show the first assigned task across time slots
+      // In a real system, you'd have proper time slot mapping
       const task = assignedTasks[0];
       return {
         task,
-        isActive: Math.random() > 0.7, // Simplified for demo
+        priority: task.priority,
+        name: task.name,
+        duration: task.duration,
       };
     }
     return null;
@@ -110,12 +117,13 @@ export default function TimelineView({ personnel, tasks }: TimelineViewProps) {
 
               {/* Time Slot Cells */}
               {timeSlots.map((slot, slotIndex) => {
-                // Simplified assignment logic for demo
-                const hasAssignment = personIndex < 4 && slotIndex >= personIndex && slotIndex < personIndex + 3;
-                const priority = hasAssignment ? 
-                  (personIndex === 0 ? "early-out" : 
-                   personIndex === 1 ? "high" : 
-                   personIndex === 2 ? "low" : "early-out") : null;
+                // Get real assignment for this person and time slot
+                const assignment = getAssignmentForPersonnel(person.id, slot);
+                const hasAssignment = assignment !== null;
+                const priority = assignment?.priority || null;
+                
+                // Show assignment bar for first few time slots if person has assignments
+                const showAssignmentBar = hasAssignment && slotIndex <= 2;
                 
                 return (
                   <div 
@@ -123,10 +131,11 @@ export default function TimelineView({ personnel, tasks }: TimelineViewProps) {
                     className={`timeline-cell border border-border relative ${getTimelineBgClass(priority)}`}
                     data-testid={`timeline-cell-${person.id}-${slotIndex}`}
                   >
-                    {hasAssignment && slotIndex === personIndex && (
+                    {showAssignmentBar && (
                       <div className={`assignment-bar ${getAssignmentBarClass(priority)} rounded text-xs p-1 m-1`}>
-                        {priority === "early-out" ? "EARLY" : 
-                         priority === "high" ? "HIGH" : "LOW"}
+                        {assignment?.name?.substring(0, 8) || 
+                         (priority === "early-out" ? "EARLY" : 
+                          priority === "high" ? "HIGH" : "LOW")}
                       </div>
                     )}
                   </div>
