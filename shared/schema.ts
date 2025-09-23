@@ -1,0 +1,56 @@
+import { sql } from "drizzle-orm";
+import { pgTable, text, varchar, timestamp, integer } from "drizzle-orm/pg-core";
+import { createInsertSchema } from "drizzle-zod";
+import { z } from "zod";
+
+export const tasks = pgTable("tasks", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  type: text("type").notNull(), // PREMIUM, STANDARD, PREMIUM - STRADE
+  duration: text("duration").notNull(), // e.g. "6.30", "4.00"
+  priority: text("priority"), // early-out, high, low, null for unassigned
+  assignedTo: varchar("assigned_to"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const personnel = pgTable("personnel", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  type: text("type").notNull(), // PREMIUM - STRADE, STANDARD, PREMIUM
+  color: text("color").notNull(), // hex color for avatar
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const assignments = pgTable("assignments", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  taskId: varchar("task_id").notNull(),
+  personnelId: varchar("personnel_id").notNull(),
+  priority: text("priority").notNull(), // early-out, high, low
+  startTime: text("start_time"), // e.g. "10:00"
+  endTime: text("end_time"), // e.g. "16:30"
+  assignedAt: timestamp("assigned_at").defaultNow(),
+});
+
+export const insertTaskSchema = createInsertSchema(tasks).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertPersonnelSchema = createInsertSchema(personnel).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertAssignmentSchema = createInsertSchema(assignments).omit({
+  id: true,
+  assignedAt: true,
+});
+
+export type InsertTask = z.infer<typeof insertTaskSchema>;
+export type Task = typeof tasks.$inferSelect;
+
+export type InsertPersonnel = z.infer<typeof insertPersonnelSchema>;
+export type Personnel = typeof personnel.$inferSelect;
+
+export type InsertAssignment = z.infer<typeof insertAssignmentSchema>;
+export type Assignment = typeof assignments.$inferSelect;

@@ -1,0 +1,170 @@
+import type { Express } from "express";
+import { createServer, type Server } from "http";
+import { storage } from "./storage";
+import { insertTaskSchema, insertPersonnelSchema, insertAssignmentSchema } from "@shared/schema";
+import { z } from "zod";
+
+export async function registerRoutes(app: Express): Promise<Server> {
+  // Task routes
+  app.get("/api/tasks", async (req, res) => {
+    try {
+      const tasks = await storage.getTasks();
+      res.json(tasks);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch tasks" });
+    }
+  });
+
+  app.post("/api/tasks", async (req, res) => {
+    try {
+      const taskData = insertTaskSchema.parse(req.body);
+      const task = await storage.createTask(taskData);
+      res.status(201).json(task);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        res.status(400).json({ message: "Invalid task data", errors: error.errors });
+      } else {
+        res.status(500).json({ message: "Failed to create task" });
+      }
+    }
+  });
+
+  app.put("/api/tasks/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const updates = req.body;
+      const task = await storage.updateTask(id, updates);
+      
+      if (!task) {
+        res.status(404).json({ message: "Task not found" });
+        return;
+      }
+      
+      res.json(task);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to update task" });
+    }
+  });
+
+  app.delete("/api/tasks/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const deleted = await storage.deleteTask(id);
+      
+      if (!deleted) {
+        res.status(404).json({ message: "Task not found" });
+        return;
+      }
+      
+      res.status(204).send();
+    } catch (error) {
+      res.status(500).json({ message: "Failed to delete task" });
+    }
+  });
+
+  // Personnel routes
+  app.get("/api/personnel", async (req, res) => {
+    try {
+      const personnel = await storage.getPersonnel();
+      res.json(personnel);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch personnel" });
+    }
+  });
+
+  app.post("/api/personnel", async (req, res) => {
+    try {
+      const personnelData = insertPersonnelSchema.parse(req.body);
+      const person = await storage.createPersonnel(personnelData);
+      res.status(201).json(person);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        res.status(400).json({ message: "Invalid personnel data", errors: error.errors });
+      } else {
+        res.status(500).json({ message: "Failed to create personnel" });
+      }
+    }
+  });
+
+  // Assignment routes
+  app.get("/api/assignments", async (req, res) => {
+    try {
+      const assignments = await storage.getAssignments();
+      res.json(assignments);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch assignments" });
+    }
+  });
+
+  app.post("/api/assignments", async (req, res) => {
+    try {
+      const assignmentData = insertAssignmentSchema.parse(req.body);
+      const assignment = await storage.createAssignment(assignmentData);
+      res.status(201).json(assignment);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        res.status(400).json({ message: "Invalid assignment data", errors: error.errors });
+      } else {
+        res.status(500).json({ message: "Failed to create assignment" });
+      }
+    }
+  });
+
+  // Bulk update task priority (for drag and drop)
+  app.put("/api/tasks/:id/priority", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { priority } = req.body;
+      
+      const task = await storage.updateTask(id, { priority });
+      
+      if (!task) {
+        res.status(404).json({ message: "Task not found" });
+        return;
+      }
+      
+      res.json(task);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to update task priority" });
+    }
+  });
+
+  // Auto-assign tasks endpoint
+  app.post("/api/tasks/auto-assign", async (req, res) => {
+    try {
+      const tasks = await storage.getTasks();
+      const unassignedTasks = tasks.filter(task => !task.priority);
+      
+      // Simple auto-assignment logic - distribute evenly across priorities
+      for (let i = 0; i < unassignedTasks.length; i++) {
+        const priorities = ['early-out', 'high', 'low'];
+        const priority = priorities[i % priorities.length];
+        await storage.updateTask(unassignedTasks[i].id, { priority });
+      }
+      
+      const updatedTasks = await storage.getTasks();
+      res.json(updatedTasks);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to auto-assign tasks" });
+    }
+  });
+
+  // Clear all assignments
+  app.post("/api/tasks/clear-assignments", async (req, res) => {
+    try {
+      const tasks = await storage.getTasks();
+      
+      for (const task of tasks) {
+        await storage.updateTask(task.id, { priority: null, assignedTo: null });
+      }
+      
+      const updatedTasks = await storage.getTasks();
+      res.json(updatedTasks);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to clear assignments" });
+    }
+  });
+
+  const httpServer = createServer(app);
+  return httpServer;
+}

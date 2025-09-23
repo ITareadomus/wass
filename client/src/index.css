@@ -1,0 +1,146 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: hsl(0 0% 100%);
+  --foreground: hsl(222.2 84% 4.9%);
+  --card: hsl(0 0% 100%);
+  --card-foreground: hsl(222.2 84% 4.9%);
+  --popover: hsl(0 0% 100%);
+  --popover-foreground: hsl(222.2 84% 4.9%);
+  --primary: hsl(221.2 83.2% 53.3%);
+  --primary-foreground: hsl(210 40% 98%);
+  --secondary: hsl(210 40% 96%);
+  --secondary-foreground: hsl(222.2 84% 4.9%);
+  --muted: hsl(210 40% 96%);
+  --muted-foreground: hsl(215.4 16.3% 46.9%);
+  --accent: hsl(210 40% 96%);
+  --accent-foreground: hsl(222.2 84% 4.9%);
+  --destructive: hsl(0 84.2% 60.2%);
+  --destructive-foreground: hsl(210 40% 98%);
+  --border: hsl(214.3 31.8% 91.4%);
+  --input: hsl(214.3 31.8% 91.4%);
+  --ring: hsl(221.2 83.2% 53.3%);
+  --radius: 0.5rem;
+  
+  /* Task-specific colors */
+  --task-early-out-bg: hsl(38 92% 50%);
+  --task-early-out-fg: hsl(0 0% 100%);
+  --task-high-priority-bg: hsl(142 76% 36%);
+  --task-high-priority-fg: hsl(0 0% 100%);
+  --task-low-priority-bg: hsl(82 84% 47%);
+  --task-low-priority-fg: hsl(0 0% 100%);
+  --task-unassigned-bg: hsl(220 13% 91%);
+  --task-unassigned-fg: hsl(220 9% 46%);
+  
+  /* Priority column colors */
+  --priority-column-early-bg: hsl(45 93% 89%);
+  --priority-column-high-bg: hsl(142 52% 96%);
+  --priority-column-low-bg: hsl(82 61% 95%);
+  
+  /* Timeline colors */
+  --timeline-early-bg: hsl(38 68% 84%);
+  --timeline-high-bg: hsl(142 52% 84%);
+  --timeline-low-bg: hsl(82 61% 84%);
+  
+  --font-sans: Open Sans, sans-serif;
+  --font-serif: Georgia, serif;
+  --font-mono: Menlo, monospace;
+}
+
+.dark {
+  --background: hsl(222.2 84% 4.9%);
+  --foreground: hsl(210 40% 98%);
+  --card: hsl(222.2 84% 4.9%);
+  --card-foreground: hsl(210 40% 98%);
+  --popover: hsl(222.2 84% 4.9%);
+  --popover-foreground: hsl(210 40% 98%);
+  --primary: hsl(217.2 91.2% 59.8%);
+  --primary-foreground: hsl(222.2 84% 4.9%);
+  --secondary: hsl(217.2 32.6% 17.5%);
+  --secondary-foreground: hsl(210 40% 98%);
+  --muted: hsl(217.2 32.6% 17.5%);
+  --muted-foreground: hsl(215 20.2% 65.1%);
+  --accent: hsl(217.2 32.6% 17.5%);
+  --accent-foreground: hsl(210 40% 98%);
+  --destructive: hsl(0 62.8% 30.6%);
+  --destructive-foreground: hsl(210 40% 98%);
+  --border: hsl(217.2 32.6% 17.5%);
+  --input: hsl(217.2 32.6% 17.5%);
+  --ring: hsl(224.3 76.3% 94.1%);
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply font-sans antialiased bg-background text-foreground;
+  }
+}
+
+@layer components {
+  /* Task styling */
+  .task-early-out {
+    background-color: var(--task-early-out-bg);
+    color: var(--task-early-out-fg);
+  }
+  
+  .task-high-priority {
+    background-color: var(--task-high-priority-bg);
+    color: var(--task-high-priority-fg);
+  }
+  
+  .task-low-priority {
+    background-color: var(--task-low-priority-bg);
+    color: var(--task-low-priority-fg);
+  }
+  
+  .task-unassigned {
+    background-color: var(--task-unassigned-bg);
+    color: var(--task-unassigned-fg);
+  }
+
+  /* Priority column styling */
+  .priority-column-early {
+    background-color: var(--priority-column-early-bg);
+  }
+  
+  .priority-column-high {
+    background-color: var(--priority-column-high-bg);
+  }
+  
+  .priority-column-low {
+    background-color: var(--priority-column-low-bg);
+  }
+
+  /* Drop zone effects */
+  .drop-zone-active {
+    border-color: hsl(221.2 83.2% 53.3%);
+    background-color: hsl(221.2 83.2% 53.3% / 0.05);
+  }
+
+  /* Timeline styling */
+  .timeline-cell {
+    border: 1px solid hsl(214.3 31.8% 91.4%);
+    min-height: 40px;
+  }
+  
+  .assignment-bar {
+    border-radius: 4px;
+    margin: 2px 0;
+    padding: 2px 6px;
+    font-size: 0.75rem;
+    display: flex;
+    align-items: center;
+  }
+  
+  /* Map container */
+  .map-container {
+    background-color: hsl(210 40% 98%);
+    border: 1px solid hsl(214.3 31.8% 91.4%);
+    border-radius: 8px;
+  }
+}
