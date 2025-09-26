@@ -2,9 +2,11 @@ import { Draggable } from "react-beautiful-dnd";
 import { Task } from "@shared/schema";
 import { GripVertical, Calendar } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useState } from "react";
 
 interface TaskCardProps {
   task: Task;
@@ -13,6 +15,7 @@ interface TaskCardProps {
 
 export default function TaskCard({ task, index }: TaskCardProps) {
   const { toast } = useToast();
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
   const scheduleTaskMutation = useMutation({
     mutationFn: async (taskId: string) => {
@@ -40,6 +43,10 @@ export default function TaskCard({ task, index }: TaskCardProps) {
     e.preventDefault();
     scheduleTaskMutation.mutate(task.id);
   };
+
+  const handleCardClick = () => {
+    setIsModalOpen(true);
+  };
   const getTaskClassByPriority = (priority: string | null) => {
     switch (priority) {
       case "early-out":
@@ -54,20 +61,22 @@ export default function TaskCard({ task, index }: TaskCardProps) {
   };
 
   return (
-    <Draggable draggableId={task.id} index={index}>
-      {(provided, snapshot) => (
-        <div
-          ref={provided.innerRef}
-          {...provided.draggableProps}
-          {...provided.dragHandleProps}
-          className={`
-            ${getTaskClassByPriority(task.priority)} 
-            rounded-md p-3 shadow-sm border transition-all duration-200
-            ${snapshot.isDragging ? "rotate-2 scale-105 shadow-lg" : ""}
-            hover:scale-105 hover:shadow-md cursor-move
-          `}
-          data-testid={`task-card-${task.id}`}
-        >
+    <>
+      <Draggable draggableId={task.id} index={index}>
+        {(provided, snapshot) => (
+          <div
+            ref={provided.innerRef}
+            {...provided.draggableProps}
+            {...provided.dragHandleProps}
+            className={`
+              ${getTaskClassByPriority(task.priority)} 
+              rounded-md p-3 shadow-sm border transition-all duration-200
+              ${snapshot.isDragging ? "rotate-2 scale-105 shadow-lg" : ""}
+              hover:scale-105 hover:shadow-md cursor-pointer
+            `}
+            data-testid={`task-card-${task.id}`}
+            onClick={handleCardClick}
+          >
           <div className="font-medium text-sm" data-testid={`task-name-${task.id}`}>
             {task.name}
           </div>
@@ -92,8 +101,20 @@ export default function TaskCard({ task, index }: TaskCardProps) {
               <GripVertical className="w-3 h-3 opacity-50" />
             </div>
           </div>
-        </div>
-      )}
-    </Draggable>
+          </div>
+        )}
+      </Draggable>
+
+      <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Dettagli Task</DialogTitle>
+          </DialogHeader>
+          <div className="p-4">
+            {/* Empty content as requested */}
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
