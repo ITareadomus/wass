@@ -40,16 +40,17 @@ export default function TaskCard({ task, index }: TaskCardProps) {
     e.preventDefault();
     scheduleTaskMutation.mutate(task.id);
   };
-  const getTaskClassByPriority = (priority: string | null) => {
-    switch (priority) {
-      case "early-out":
-        return "task-early-out";
-      case "high":
-        return "task-high-priority";
-      case "low":
-        return "task-low-priority";
-      default:
-        return "task-unassigned";
+  const getTaskClassByDuration = (duration: string) => {
+    const durationNum = parseFloat(duration);
+    
+    if (durationNum <= 3.0) {
+      return "task-duration-short"; // Verde - task brevi
+    } else if (durationNum <= 5.0) {
+      return "task-duration-medium"; // Arancione - task medi
+    } else if (durationNum <= 7.0) {
+      return "task-duration-long"; // Viola - task lunghi
+    } else {
+      return "task-duration-extra-long"; // Rosso - task extra lunghi
     }
   };
 
@@ -61,35 +62,35 @@ export default function TaskCard({ task, index }: TaskCardProps) {
           {...provided.draggableProps}
           {...provided.dragHandleProps}
           className={`
-            ${getTaskClassByPriority(task.priority)} 
-            rounded-md p-3 shadow-sm border transition-all duration-200
+            ${task.priority ? getTaskClassByDuration(task.duration) : "task-unassigned"}
+            rounded p-2 shadow-sm border transition-all duration-200 text-xs
             ${snapshot.isDragging ? "rotate-2 scale-105 shadow-lg" : ""}
             hover:scale-105 hover:shadow-md cursor-move
           `}
           data-testid={`task-card-${task.id}`}
         >
-          <div className="font-medium text-sm" data-testid={`task-name-${task.id}`}>
+          <div className="font-medium text-xs" data-testid={`task-name-${task.id}`}>
             {task.name}
           </div>
-          <div className="text-xs opacity-75" data-testid={`task-type-${task.id}`}>
+          <div className="text-xs opacity-75 mt-1" data-testid={`task-type-${task.id}`}>
             {task.type}
           </div>
-          <div className="flex items-center justify-between mt-2">
-            <span className="text-xs" data-testid={`task-duration-${task.id}`}>
-              {task.duration}
+          <div className="flex items-center justify-between mt-1">
+            <span className="text-xs font-medium" data-testid={`task-duration-${task.id}`}>
+              {task.duration}h
             </span>
             <div className="flex items-center gap-1">
               <Button
                 size="sm"
                 variant="ghost"
-                className="h-6 w-6 p-0 hover:bg-background/20"
+                className="h-4 w-4 p-0 hover:bg-background/20"
                 onClick={handleScheduleTask}
                 disabled={scheduleTaskMutation.isPending}
                 data-testid={`button-schedule-${task.id}`}
               >
-                <Calendar className="w-3 h-3" />
+                <Calendar className="w-2.5 h-2.5" />
               </Button>
-              <GripVertical className="w-3 h-3 opacity-50" />
+              <GripVertical className="w-2.5 h-2.5 opacity-50" />
             </div>
           </div>
         </div>

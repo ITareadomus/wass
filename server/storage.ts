@@ -69,7 +69,7 @@ export class MemStorage implements IStorage {
         id: "1",
         name: generateApartmentNumber(),
         type: "1536",
-        duration: "8.15",
+        duration: "8.30", // Extra Long - Rosso
         priority: "early-out",
         assignedTo: null,
         createdAt: new Date(),
@@ -78,7 +78,7 @@ export class MemStorage implements IStorage {
         id: "eo2",
         name: generateApartmentNumber(),
         type: "PREMIUM",
-        duration: "7.30",
+        duration: "2.30", // Short - Verde
         priority: "early-out",
         assignedTo: null,
         createdAt: new Date(),
@@ -87,7 +87,7 @@ export class MemStorage implements IStorage {
         id: "eo3",
         name: generateApartmentNumber(),
         type: "STANDARD",
-        duration: "6.45",
+        duration: "6.45", // Long - Viola
         priority: "early-out",
         assignedTo: null,
         createdAt: new Date(),
@@ -96,7 +96,7 @@ export class MemStorage implements IStorage {
         id: "eo4",
         name: generateApartmentNumber(),
         type: "PREMIUM - STRADE",
-        duration: "8.00",
+        duration: "4.00", // Medium - Arancione
         priority: "early-out",
         assignedTo: null,
         createdAt: new Date(),
@@ -105,7 +105,7 @@ export class MemStorage implements IStorage {
         id: "eo5",
         name: generateApartmentNumber(),
         type: "1536",
-        duration: "7.15",
+        duration: "7.15", // Long - Viola
         priority: "early-out",
         assignedTo: null,
         createdAt: new Date(),
@@ -114,7 +114,7 @@ export class MemStorage implements IStorage {
         id: "eo6",
         name: generateApartmentNumber(),
         type: "PREMIUM",
-        duration: "6.30",
+        duration: "1.30", // Short - Verde
         priority: "early-out",
         assignedTo: null,
         createdAt: new Date(),
@@ -123,7 +123,7 @@ export class MemStorage implements IStorage {
         id: "eo7",
         name: generateApartmentNumber(),
         type: "STANDARD",
-        duration: "7.45",
+        duration: "4.45", // Medium - Arancione
         priority: "early-out",
         assignedTo: null,
         createdAt: new Date(),
@@ -132,7 +132,7 @@ export class MemStorage implements IStorage {
         id: "eo8",
         name: generateApartmentNumber(),
         type: "PREMIUM - STRADE",
-        duration: "8.30",
+        duration: "9.30", // Extra Long - Rosso
         priority: "early-out",
         assignedTo: null,
         createdAt: new Date(),
@@ -141,7 +141,7 @@ export class MemStorage implements IStorage {
         id: "eo9",
         name: generateApartmentNumber(),
         type: "1536",
-        duration: "6.00",
+        duration: "6.00", // Long - Viola
         priority: "early-out",
         assignedTo: null,
         createdAt: new Date(),
@@ -150,7 +150,7 @@ export class MemStorage implements IStorage {
         id: "eo10",
         name: generateApartmentNumber(),
         type: "PREMIUM",
-        duration: "7.00",
+        duration: "2.00", // Short - Verde
         priority: "early-out",
         assignedTo: null,
         createdAt: new Date(),
@@ -159,7 +159,7 @@ export class MemStorage implements IStorage {
         id: "eo11",
         name: generateApartmentNumber(),
         type: "STANDARD",
-        duration: "6.15",
+        duration: "5.15", // Long - Viola
         priority: "early-out",
         assignedTo: null,
         createdAt: new Date(),
@@ -168,7 +168,7 @@ export class MemStorage implements IStorage {
         id: "eo12",
         name: generateApartmentNumber(),
         type: "PREMIUM - STRADE",
-        duration: "8.45",
+        duration: "8.45", // Extra Long - Rosso
         priority: "early-out",
         assignedTo: null,
         createdAt: new Date(),
@@ -177,7 +177,7 @@ export class MemStorage implements IStorage {
         id: "eo13",
         name: generateApartmentNumber(),
         type: "1536",
-        duration: "7.30",
+        duration: "3.30", // Medium - Arancione
         priority: "early-out",
         assignedTo: null,
         createdAt: new Date(),
@@ -186,7 +186,7 @@ export class MemStorage implements IStorage {
         id: "eo14",
         name: generateApartmentNumber(),
         type: "PREMIUM",
-        duration: "6.45",
+        duration: "1.45", // Short - Verde
         priority: "early-out",
         assignedTo: null,
         createdAt: new Date(),
@@ -195,7 +195,7 @@ export class MemStorage implements IStorage {
         id: "eo15",
         name: generateApartmentNumber(),
         type: "STANDARD",
-        duration: "7.15",
+        duration: "7.15", // Long - Viola
         priority: "early-out",
         assignedTo: null,
         createdAt: new Date(),
@@ -206,7 +206,7 @@ export class MemStorage implements IStorage {
         id: "2", 
         name: generateApartmentNumber(),
         type: "PREMIUM",
-        duration: "4.15",
+        duration: "3.15", // Medium - Arancione
         priority: "high",
         assignedTo: null,
         createdAt: new Date(),
@@ -215,7 +215,7 @@ export class MemStorage implements IStorage {
         id: "hp2",
         name: generateApartmentNumber(),
         type: "STANDARD",
-        duration: "5.30",
+        duration: "2.30", // Short - Verde
         priority: "high",
         assignedTo: null,
         createdAt: new Date(),
@@ -224,7 +224,7 @@ export class MemStorage implements IStorage {
         id: "hp3",
         name: generateApartmentNumber(),
         type: "PREMIUM - STRADE",
-        duration: "4.45",
+        duration: "6.45", // Long - Viola
         priority: "high",
         assignedTo: null,
         createdAt: new Date(),
@@ -233,7 +233,7 @@ export class MemStorage implements IStorage {
         id: "hp4",
         name: generateApartmentNumber(),
         type: "1536",
-        duration: "5.00",
+        duration: "8.00", // Extra Long - Rosso
         priority: "high",
         assignedTo: null,
         createdAt: new Date(),
@@ -242,7 +242,7 @@ export class MemStorage implements IStorage {
         id: "hp5",
         name: generateApartmentNumber(),
         type: "PREMIUM",
-        duration: "4.30",
+        duration: "4.30", // Medium - Arancione
         priority: "high",
         assignedTo: null,
         createdAt: new Date(),
@@ -251,7 +251,7 @@ export class MemStorage implements IStorage {
         id: "hp6",
         name: generateApartmentNumber(),
         type: "STANDARD",
-        duration: "5.15",
+        duration: "1.15", // Short - Verde
         priority: "high",
         assignedTo: null,
         createdAt: new Date(),
@@ -260,7 +260,7 @@ export class MemStorage implements IStorage {
         id: "hp7",
         name: generateApartmentNumber(),
         type: "PREMIUM - STRADE",
-        duration: "4.00",
+        duration: "5.00", // Medium - Arancione
         priority: "high",
         assignedTo: null,
         createdAt: new Date(),
@@ -269,7 +269,7 @@ export class MemStorage implements IStorage {
         id: "hp8",
         name: generateApartmentNumber(),
         type: "1536",
-        duration: "5.45",
+        duration: "7.45", // Long - Viola
         priority: "high",
         assignedTo: null,
         createdAt: new Date(),
@@ -278,7 +278,7 @@ export class MemStorage implements IStorage {
         id: "hp9",
         name: generateApartmentNumber(),
         type: "PREMIUM",
-        duration: "4.15",
+        duration: "2.15", // Short - Verde
         priority: "high",
         assignedTo: null,
         createdAt: new Date(),
@@ -287,7 +287,7 @@ export class MemStorage implements IStorage {
         id: "hp10",
         name: generateApartmentNumber(),
         type: "STANDARD",
-        duration: "5.30",
+        duration: "8.30", // Extra Long - Rosso
         priority: "high",
         assignedTo: null,
         createdAt: new Date(),
@@ -296,7 +296,7 @@ export class MemStorage implements IStorage {
         id: "hp11",
         name: generateApartmentNumber(),
         type: "PREMIUM - STRADE",
-        duration: "4.45",
+        duration: "3.45", // Medium - Arancione
         priority: "high",
         assignedTo: null,
         createdAt: new Date(),
@@ -305,7 +305,7 @@ export class MemStorage implements IStorage {
         id: "hp12",
         name: generateApartmentNumber(),
         type: "1536",
-        duration: "5.00",
+        duration: "6.00", // Long - Viola
         priority: "high",
         assignedTo: null,
         createdAt: new Date(),
@@ -314,7 +314,7 @@ export class MemStorage implements IStorage {
         id: "hp13",
         name: generateApartmentNumber(),
         type: "PREMIUM",
-        duration: "4.30",
+        duration: "1.30", // Short - Verde
         priority: "high",
         assignedTo: null,
         createdAt: new Date(),
@@ -323,7 +323,7 @@ export class MemStorage implements IStorage {
         id: "hp14",
         name: generateApartmentNumber(),
         type: "STANDARD",
-        duration: "5.15",
+        duration: "9.15", // Extra Long - Rosso
         priority: "high",
         assignedTo: null,
         createdAt: new Date(),
@@ -332,7 +332,7 @@ export class MemStorage implements IStorage {
         id: "hp15",
         name: generateApartmentNumber(),
         type: "PREMIUM - STRADE",
-        duration: "4.00",
+        duration: "4.00", // Medium - Arancione
         priority: "high",
         assignedTo: null,
         createdAt: new Date(),
@@ -341,7 +341,7 @@ export class MemStorage implements IStorage {
         id: "hp16",
         name: generateApartmentNumber(),
         type: "1536",
-        duration: "5.45",
+        duration: "7.45", // Long - Viola
         priority: "high",
         assignedTo: null,
         createdAt: new Date(),
@@ -350,7 +350,7 @@ export class MemStorage implements IStorage {
         id: "hp17",
         name: generateApartmentNumber(),
         type: "PREMIUM",
-        duration: "4.15",
+        duration: "2.15", // Short - Verde
         priority: "high",
         assignedTo: null,
         createdAt: new Date(),
@@ -359,7 +359,7 @@ export class MemStorage implements IStorage {
         id: "hp18",
         name: generateApartmentNumber(),
         type: "STANDARD",
-        duration: "5.30",
+        duration: "4.30", // Medium - Arancione
         priority: "high",
         assignedTo: null,
         createdAt: new Date(),
@@ -368,7 +368,7 @@ export class MemStorage implements IStorage {
         id: "hp19",
         name: generateApartmentNumber(),
         type: "PREMIUM - STRADE",
-        duration: "4.45",
+        duration: "8.45", // Extra Long - Rosso
         priority: "high",
         assignedTo: null,
         createdAt: new Date(),
@@ -377,7 +377,7 @@ export class MemStorage implements IStorage {
         id: "hp20",
         name: generateApartmentNumber(),
         type: "1536",
-        duration: "5.00",
+        duration: "5.00", // Medium - Arancione
         priority: "high",
         assignedTo: null,
         createdAt: new Date(),
@@ -388,7 +388,7 @@ export class MemStorage implements IStorage {
         id: "3",
         name: generateApartmentNumber(),
         type: "STANDARD",
-        duration: "6.30",
+        duration: "6.30", // Long - Viola
         priority: "low",
         assignedTo: null,
         createdAt: new Date(),
@@ -397,7 +397,7 @@ export class MemStorage implements IStorage {
         id: "lp2",
         name: generateApartmentNumber(),
         type: "PREMIUM",
-        duration: "3.30",
+        duration: "2.30", // Short - Verde
         priority: "low",
         assignedTo: null,
         createdAt: new Date(),
@@ -406,7 +406,7 @@ export class MemStorage implements IStorage {
         id: "lp3",
         name: generateApartmentNumber(),
         type: "STANDARD",
-        duration: "3.45",
+        duration: "4.45", // Medium - Arancione
         priority: "low",
         assignedTo: null,
         createdAt: new Date(),
@@ -415,7 +415,7 @@ export class MemStorage implements IStorage {
         id: "lp4",
         name: generateApartmentNumber(),
         type: "PREMIUM - STRADE",
-        duration: "3.15",
+        duration: "8.15", // Extra Long - Rosso
         priority: "low",
         assignedTo: null,
         createdAt: new Date(),
@@ -424,7 +424,7 @@ export class MemStorage implements IStorage {
         id: "lp5",
         name: generateApartmentNumber(),
         type: "1536",
-        duration: "4.00",
+        duration: "3.00", // Short - Verde
         priority: "low",
         assignedTo: null,
         createdAt: new Date(),
@@ -433,7 +433,7 @@ export class MemStorage implements IStorage {
         id: "lp6",
         name: generateApartmentNumber(),
         type: "PREMIUM",
-        duration: "3.30",
+        duration: "5.30", // Long - Viola
         priority: "low",
         assignedTo: null,
         createdAt: new Date(),
@@ -442,7 +442,7 @@ export class MemStorage implements IStorage {
         id: "lp7",
         name: generateApartmentNumber(),
         type: "STANDARD",
-        duration: "3.45",
+        duration: "1.45", // Short - Verde
         priority: "low",
         assignedTo: null,
         createdAt: new Date(),
@@ -451,7 +451,7 @@ export class MemStorage implements IStorage {
         id: "lp8",
         name: generateApartmentNumber(),
         type: "PREMIUM - STRADE",
-        duration: "3.15",
+        duration: "9.15", // Extra Long - Rosso
         priority: "low",
         assignedTo: null,
         createdAt: new Date(),
@@ -460,7 +460,7 @@ export class MemStorage implements IStorage {
         id: "lp9",
         name: generateApartmentNumber(),
         type: "1536",
-        duration: "4.00",
+        duration: "4.00", // Medium - Arancione
         priority: "low",
         assignedTo: null,
         createdAt: new Date(),
@@ -469,7 +469,7 @@ export class MemStorage implements IStorage {
         id: "lp10",
         name: generateApartmentNumber(),
         type: "PREMIUM",
-        duration: "3.30",
+        duration: "7.30", // Long - Viola
         priority: "low",
         assignedTo: null,
         createdAt: new Date(),
@@ -480,7 +480,7 @@ export class MemStorage implements IStorage {
         id: "4",
         name: generateApartmentNumber(),
         type: "PREMIUM - STRADE",
-        duration: "5.45",
+        duration: "3.45", // Medium - Arancione (ma sarà grigio perché unassigned)
         priority: null,
         assignedTo: null,
         createdAt: new Date(),
