@@ -57,12 +57,17 @@ export class MemStorage implements IStorage {
       await this.createPersonnel(person);
     }
 
+    // Helper function to generate 4-digit apartment numbers
+    const generateApartmentNumber = () => {
+      return Math.floor(1000 + Math.random() * 9000).toString();
+    };
+
     // Sample tasks (some unassigned)
     const sampleTasks: Task[] = [
       // Early Out Tasks (15 tasks)
       {
         id: "1",
-        name: "A.D.G",
+        name: generateApartmentNumber(),
         type: "1536",
         duration: "8.15",
         priority: "early-out",
@@ -71,7 +76,7 @@ export class MemStorage implements IStorage {
       },
       {
         id: "eo2",
-        name: "MARCO ROSSI",
+        name: generateApartmentNumber(),
         type: "PREMIUM",
         duration: "7.30",
         priority: "early-out",
@@ -80,7 +85,7 @@ export class MemStorage implements IStorage {
       },
       {
         id: "eo3",
-        name: "GIULIA BIANCHI",
+        name: generateApartmentNumber(),
         type: "STANDARD",
         duration: "6.45",
         priority: "early-out",
@@ -89,7 +94,7 @@ export class MemStorage implements IStorage {
       },
       {
         id: "eo4",
-        name: "FRANCESCO VERDE",
+        name: generateApartmentNumber(),
         type: "PREMIUM - STRADE",
         duration: "8.00",
         priority: "early-out",
@@ -98,7 +103,7 @@ export class MemStorage implements IStorage {
       },
       {
         id: "eo5",
-        name: "SARA NERI",
+        name: generateApartmentNumber(),
         type: "1536",
         duration: "7.15",
         priority: "early-out",
@@ -107,7 +112,7 @@ export class MemStorage implements IStorage {
       },
       {
         id: "eo6",
-        name: "DAVIDE COSTA",
+        name: generateApartmentNumber(),
         type: "PREMIUM",
         duration: "6.30",
         priority: "early-out",
@@ -116,7 +121,7 @@ export class MemStorage implements IStorage {
       },
       {
         id: "eo7",
-        name: "ELENA FERRARI",
+        name: generateApartmentNumber(),
         type: "STANDARD",
         duration: "7.45",
         priority: "early-out",
@@ -125,7 +130,7 @@ export class MemStorage implements IStorage {
       },
       {
         id: "eo8",
-        name: "LUCA MARINI",
+        name: generateApartmentNumber(),
         type: "PREMIUM - STRADE",
         duration: "8.30",
         priority: "early-out",
@@ -134,7 +139,7 @@ export class MemStorage implements IStorage {
       },
       {
         id: "eo9",
-        name: "CHIARA RICCI",
+        name: generateApartmentNumber(),
         type: "1536",
         duration: "6.00",
         priority: "early-out",
@@ -143,7 +148,7 @@ export class MemStorage implements IStorage {
       },
       {
         id: "eo10",
-        name: "MATTEO GALLI",
+        name: generateApartmentNumber(),
         type: "PREMIUM",
         duration: "7.00",
         priority: "early-out",
@@ -152,7 +157,7 @@ export class MemStorage implements IStorage {
       },
       {
         id: "eo11",
-        name: "VALENTINA CONTI",
+        name: generateApartmentNumber(),
         type: "STANDARD",
         duration: "6.15",
         priority: "early-out",
@@ -161,7 +166,7 @@ export class MemStorage implements IStorage {
       },
       {
         id: "eo12",
-        name: "ANDREA MORO",
+        name: generateApartmentNumber(),
         type: "PREMIUM - STRADE",
         duration: "8.45",
         priority: "early-out",
@@ -170,7 +175,7 @@ export class MemStorage implements IStorage {
       },
       {
         id: "eo13",
-        name: "FEDERICA LEONE",
+        name: generateApartmentNumber(),
         type: "1536",
         duration: "7.30",
         priority: "early-out",
@@ -179,7 +184,7 @@ export class MemStorage implements IStorage {
       },
       {
         id: "eo14",
-        name: "SIMONE ROMANO",
+        name: generateApartmentNumber(),
         type: "PREMIUM",
         duration: "6.45",
         priority: "early-out",
@@ -188,7 +193,7 @@ export class MemStorage implements IStorage {
       },
       {
         id: "eo15",
-        name: "LAURA FONTANA",
+        name: generateApartmentNumber(),
         type: "STANDARD",
         duration: "7.15",
         priority: "early-out",
@@ -199,7 +204,7 @@ export class MemStorage implements IStorage {
       // High Priority Tasks (20 tasks)
       {
         id: "2", 
-        name: "ANDRESSA",
+        name: generateApartmentNumber(),
         type: "PREMIUM",
         duration: "4.15",
         priority: "high",
@@ -208,7 +213,7 @@ export class MemStorage implements IStorage {
       },
       {
         id: "hp2",
-        name: "ROBERTO SILVA",
+        name: generateApartmentNumber(),
         type: "STANDARD",
         duration: "5.30",
         priority: "high",
@@ -217,7 +222,7 @@ export class MemStorage implements IStorage {
       },
       {
         id: "hp3",
-        name: "PAOLA GRECO",
+        name: generateApartmentNumber(),
         type: "PREMIUM - STRADE",
         duration: "4.45",
         priority: "high",
@@ -226,7 +231,7 @@ export class MemStorage implements IStorage {
       },
       {
         id: "hp4",
-        name: "GIOVANNI VILLA",
+        name: generateApartmentNumber(),
         type: "1536",
         duration: "5.00",
         priority: "high",
@@ -235,7 +240,7 @@ export class MemStorage implements IStorage {
       },
       {
         id: "hp5",
-        name: "MONICA SANNA",
+        name: generateApartmentNumber(),
         type: "PREMIUM",
         duration: "4.30",
         priority: "high",
@@ -244,7 +249,7 @@ export class MemStorage implements IStorage {
       },
       {
         id: "hp6",
-        name: "ALESSANDRO PIRAS",
+        name: generateApartmentNumber(),
         type: "STANDARD",
         duration: "5.15",
         priority: "high",
@@ -253,7 +258,7 @@ export class MemStorage implements IStorage {
       },
       {
         id: "hp7",
-        name: "CRISTINA TESTA",
+        name: generateApartmentNumber(),
         type: "PREMIUM - STRADE",
         duration: "4.00",
         priority: "high",
@@ -262,7 +267,7 @@ export class MemStorage implements IStorage {
       },
       {
         id: "hp8",
-        name: "FABIO MARTINI",
+        name: generateApartmentNumber(),
         type: "1536",
         duration: "5.45",
         priority: "high",
@@ -271,7 +276,7 @@ export class MemStorage implements IStorage {
       },
       {
         id: "hp9",
-        name: "SILVIA MONTI",
+        name: generateApartmentNumber(),
         type: "PREMIUM",
         duration: "4.15",
         priority: "high",
@@ -280,7 +285,7 @@ export class MemStorage implements IStorage {
       },
       {
         id: "hp10",
-        name: "DIEGO CARUSO",
+        name: generateApartmentNumber(),
         type: "STANDARD",
         duration: "5.30",
         priority: "high",
@@ -289,7 +294,7 @@ export class MemStorage implements IStorage {
       },
       {
         id: "hp11",
-        name: "ANNA VITALI",
+        name: generateApartmentNumber(),
         type: "PREMIUM - STRADE",
         duration: "4.45",
         priority: "high",
@@ -298,7 +303,7 @@ export class MemStorage implements IStorage {
       },
       {
         id: "hp12",
-        name: "MICHELE BRUNO",
+        name: generateApartmentNumber(),
         type: "1536",
         duration: "5.00",
         priority: "high",
@@ -307,7 +312,7 @@ export class MemStorage implements IStorage {
       },
       {
         id: "hp13",
-        name: "TERESA AMATO",
+        name: generateApartmentNumber(),
         type: "PREMIUM",
         duration: "4.30",
         priority: "high",
@@ -316,7 +321,7 @@ export class MemStorage implements IStorage {
       },
       {
         id: "hp14",
-        name: "NICOLA PELLEGRINI",
+        name: generateApartmentNumber(),
         type: "STANDARD",
         duration: "5.15",
         priority: "high",
@@ -325,7 +330,7 @@ export class MemStorage implements IStorage {
       },
       {
         id: "hp15",
-        name: "CARMEN LOMBARDI",
+        name: generateApartmentNumber(),
         type: "PREMIUM - STRADE",
         duration: "4.00",
         priority: "high",
@@ -334,7 +339,7 @@ export class MemStorage implements IStorage {
       },
       {
         id: "hp16",
-        name: "ENRICO GATTI",
+        name: generateApartmentNumber(),
         type: "1536",
         duration: "5.45",
         priority: "high",
@@ -343,7 +348,7 @@ export class MemStorage implements IStorage {
       },
       {
         id: "hp17",
-        name: "PATRIZIA LONGO",
+        name: generateApartmentNumber(),
         type: "PREMIUM",
         duration: "4.15",
         priority: "high",
@@ -352,7 +357,7 @@ export class MemStorage implements IStorage {
       },
       {
         id: "hp18",
-        name: "STEFANO GIORGI",
+        name: generateApartmentNumber(),
         type: "STANDARD",
         duration: "5.30",
         priority: "high",
@@ -361,7 +366,7 @@ export class MemStorage implements IStorage {
       },
       {
         id: "hp19",
-        name: "MANUELA FIORE",
+        name: generateApartmentNumber(),
         type: "PREMIUM - STRADE",
         duration: "4.45",
         priority: "high",
@@ -370,7 +375,7 @@ export class MemStorage implements IStorage {
       },
       {
         id: "hp20",
-        name: "ANTONIO MORETTI",
+        name: generateApartmentNumber(),
         type: "1536",
         duration: "5.00",
         priority: "high",
@@ -381,7 +386,7 @@ export class MemStorage implements IStorage {
       // Low Priority Tasks (10 tasks)
       {
         id: "3",
-        name: "ANTONIO",
+        name: generateApartmentNumber(),
         type: "STANDARD",
         duration: "6.30",
         priority: "low",
@@ -390,7 +395,7 @@ export class MemStorage implements IStorage {
       },
       {
         id: "lp2",
-        name: "FRANCESCA RIVA",
+        name: generateApartmentNumber(),
         type: "PREMIUM",
         duration: "3.30",
         priority: "low",
@@ -399,7 +404,7 @@ export class MemStorage implements IStorage {
       },
       {
         id: "lp3",
-        name: "MASSIMO BARBIERI",
+        name: generateApartmentNumber(),
         type: "STANDARD",
         duration: "3.45",
         priority: "low",
@@ -408,7 +413,7 @@ export class MemStorage implements IStorage {
       },
       {
         id: "lp4",
-        name: "DANIELA MARCHETTI",
+        name: generateApartmentNumber(),
         type: "PREMIUM - STRADE",
         duration: "3.15",
         priority: "low",
@@ -417,7 +422,7 @@ export class MemStorage implements IStorage {
       },
       {
         id: "lp5",
-        name: "CLAUDIO PAGANO",
+        name: generateApartmentNumber(),
         type: "1536",
         duration: "4.00",
         priority: "low",
@@ -426,7 +431,7 @@ export class MemStorage implements IStorage {
       },
       {
         id: "lp6",
-        name: "ROSSANA CATTANEO",
+        name: generateApartmentNumber(),
         type: "PREMIUM",
         duration: "3.30",
         priority: "low",
@@ -435,7 +440,7 @@ export class MemStorage implements IStorage {
       },
       {
         id: "lp7",
-        name: "MAURIZIO FERRETTI",
+        name: generateApartmentNumber(),
         type: "STANDARD",
         duration: "3.45",
         priority: "low",
@@ -444,7 +449,7 @@ export class MemStorage implements IStorage {
       },
       {
         id: "lp8",
-        name: "GIOVANNA GUERRA",
+        name: generateApartmentNumber(),
         type: "PREMIUM - STRADE",
         duration: "3.15",
         priority: "low",
@@ -453,7 +458,7 @@ export class MemStorage implements IStorage {
       },
       {
         id: "lp9",
-        name: "CARLO MARINO",
+        name: generateApartmentNumber(),
         type: "1536",
         duration: "4.00",
         priority: "low",
@@ -462,7 +467,7 @@ export class MemStorage implements IStorage {
       },
       {
         id: "lp10",
-        name: "LUCIA BENEDETTI",
+        name: generateApartmentNumber(),
         type: "PREMIUM",
         duration: "3.30",
         priority: "low",
@@ -473,7 +478,7 @@ export class MemStorage implements IStorage {
       // Unassigned Tasks
       {
         id: "4",
-        name: "BARBARA",
+        name: generateApartmentNumber(),
         type: "PREMIUM - STRADE",
         duration: "5.45",
         priority: null,
