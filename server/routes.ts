@@ -229,6 +229,89 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Schedule task to timeline (create assignment entry)
+  app.put("/api/tasks/:id/schedule", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const tasks = await storage.getTasks();
+      const task = tasks.find(t => t.id === id);
+      
+      console.log(`[Schedule] Task ${id} found:`, { name: task?.name, priority: task?.priority, assignedTo: task?.assignedTo });
+      
+      if (!task) {
+        console.log(`[Schedule] Task ${id} not found`);
+        res.status(404).json({ message: "Task not found" });
+        return;
+      }
+
+      if (!task.priority) {
+        console.log(`[Schedule] Task ${id} missing priority`, { priority: task.priority, assignedTo: task.assignedTo });
+        res.status(400).json({ message: "Task must have priority before scheduling" });
+        return;
+      }
+
+      // Auto-assign if not already assigned
+      let assignedTo = task.assignedTo;
+      if (!assignedTo) {
+        console.log(`[Schedule] Auto-assigning task ${id}`);
+        const personnel = await storage.getPersonnel();
+        const tasks = await storage.getTasks();
+        
+        // Initialize workload counter
+        const workloadMap = new Map<string, number>();
+        personnel.forEach(person => {
+          workloadMap.set(person.id, 0);
+        });
+        
+        // Count current assignments
+        tasks.forEach(t => {
+          if (t.assignedTo && t.priority) {
+            const currentCount = workloadMap.get(t.assignedTo) || 0;
+            workloadMap.set(t.assignedTo, currentCount + 1);
+          }
+        });
+        
+        // Find person with least workload
+        let minWorkload = Infinity;
+        for (const [personId, workload] of Array.from(workloadMap.entries())) {
+          if (workload < minWorkload) {
+            minWorkload = workload;
+            assignedTo = personId;
+          }
+        }
+        
+        if (assignedTo) {
+          // Update task with assignment
+          await storage.updateTask(id, { assignedTo });
+          console.log(`[Schedule] Task ${id} assigned to ${assignedTo}`);
+        } else {
+          console.log(`[Schedule] No personnel available for assignment`);
+          res.status(400).json({ message: "No personnel available for assignment" });
+          return;
+        }
+      }
+
+      // Create assignment entry for timeline visibility
+      if (!assignedTo) {
+        console.log(`[Schedule] Critical error: assignedTo is still null after assignment attempt`);
+        res.status(500).json({ message: "Failed to assign task to personnel" });
+        return;
+      }
+
+      await storage.createAssignment({
+        taskId: task.id,
+        personnelId: assignedTo,
+        priority: task.priority,
+        startTime: "10:00", // Default start time
+        endTime: "16:30", // Default end time  
+      });
+
+      res.json(task);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to schedule task" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }

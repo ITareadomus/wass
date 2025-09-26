@@ -4,7 +4,6 @@ import { queryClient } from "@/lib/queryClient";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Task, Personnel } from "@shared/schema";
-import UnassignedTasks from "@/components/drag-drop/unassigned-tasks";
 import PriorityColumn from "@/components/drag-drop/priority-column";
 import TimelineView from "@/components/timeline/timeline-view";
 import MapSection from "@/components/map/map-section";
@@ -131,7 +130,7 @@ export default function TaskManager() {
     if (destination.droppableId === "early-out") newPriority = "early-out";
     else if (destination.droppableId === "high") newPriority = "high";
     else if (destination.droppableId === "low") newPriority = "low";
-    else if (destination.droppableId === "unassigned") newPriority = null;
+    else return; // Solo permettiamo drag tra le tre colonne di priorità
 
     console.log("Drag ended - calling mutation with:", { taskId: draggableId, priority: newPriority });
 
@@ -182,7 +181,7 @@ export default function TaskManager() {
     );
   }
 
-  const unassignedTasks = tasks.filter(task => !task.priority);
+  // Filtra solo i task con priorità assegnata
   const earlyOutTasks = tasks.filter(task => task.priority === "early-out");
   const highPriorityTasks = tasks.filter(task => task.priority === "high");
   const lowPriorityTasks = tasks.filter(task => task.priority === "low");
@@ -216,8 +215,7 @@ export default function TaskManager() {
 
         <DragDropContext onDragEnd={onDragEnd}>
           {/* Task Assignment Section */}
-          <div className="grid grid-cols-1 xl:grid-cols-4 gap-6 mb-8">
-            <UnassignedTasks tasks={unassignedTasks} />
+          <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 mb-8">
             <PriorityColumn
               title="EARLY OUT"
               priority="early-out"

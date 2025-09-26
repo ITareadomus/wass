@@ -1,7 +1,7 @@
 import { Droppable } from "react-beautiful-dnd";
 import { Task } from "@shared/schema";
 import TaskCard from "./task-card";
-import { Clock, AlertCircle, ArrowDown, Check } from "lucide-react";
+import { Clock, AlertCircle, ArrowDown } from "lucide-react";
 
 interface PriorityColumnProps {
   title: string;
@@ -60,7 +60,6 @@ export default function PriorityColumn({
       <h3 className={`font-semibold mb-4 ${getHeaderClass(priority)} flex items-center`}>
         {renderIcon()}
         {title}
-        <Check className="w-5 h-5 ml-auto text-green-600" />
       </h3>
       
       <Droppable droppableId={droppableId}>

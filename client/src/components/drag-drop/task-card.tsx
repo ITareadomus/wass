@@ -1,6 +1,10 @@
 import { Draggable } from "react-beautiful-dnd";
 import { Task } from "@shared/schema";
-import { GripVertical } from "lucide-react";
+import { GripVertical, Calendar } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { useMutation } from "@tanstack/react-query";
+import { queryClient, apiRequest } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 
 interface TaskCardProps {
   task: Task;
@@ -8,6 +12,34 @@ interface TaskCardProps {
 }
 
 export default function TaskCard({ task, index }: TaskCardProps) {
+  const { toast } = useToast();
+
+  const scheduleTaskMutation = useMutation({
+    mutationFn: async (taskId: string) => {
+      const response = await apiRequest("PUT", `/api/tasks/${taskId}/schedule`);
+      return response.json();
+    },
+    onSuccess: (updatedTask) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/tasks"] });
+      toast({
+        title: "📅 Task Posizionato nella Timeline",
+        description: `"${updatedTask.name}" è ora visibile nella timeline`,
+      });
+    },
+    onError: () => {
+      toast({
+        title: "❌ Errore Schedulazione",
+        description: "Impossibile posizionare il task nella timeline. Riprova.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleScheduleTask = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+    scheduleTaskMutation.mutate(task.id);
+  };
   const getTaskClassByPriority = (priority: string | null) => {
     switch (priority) {
       case "early-out":
@@ -46,7 +78,19 @@ export default function TaskCard({ task, index }: TaskCardProps) {
             <span className="text-xs" data-testid={`task-duration-${task.id}`}>
               {task.duration}
             </span>
-            <GripVertical className="w-3 h-3 opacity-50" />
+            <div className="flex items-center gap-1">
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-6 w-6 p-0 hover:bg-background/20"
+                onClick={handleScheduleTask}
+                disabled={scheduleTaskMutation.isPending}
+                data-testid={`button-schedule-${task.id}`}
+              >
+                <Calendar className="w-3 h-3" />
+              </Button>
+              <GripVertical className="w-3 h-3 opacity-50" />
+            </div>
           </div>
         </div>
       )}
