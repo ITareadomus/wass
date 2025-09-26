@@ -24,15 +24,13 @@
   --ring: hsl(221.2 83.2% 53.3%);
   --radius: 0.5rem;
   
-  /* Task duration colors */
-  --task-duration-short-bg: hsl(142 76% 36%);
-  --task-duration-short-fg: hsl(0 0% 100%);
-  --task-duration-medium-bg: hsl(38 92% 50%);
-  --task-duration-medium-fg: hsl(0 0% 100%);
-  --task-duration-long-bg: hsl(262 83% 58%);
-  --task-duration-long-fg: hsl(0 0% 100%);
-  --task-duration-extra-long-bg: hsl(0 84% 60%);
-  --task-duration-extra-long-fg: hsl(0 0% 100%);
+  /* Task-specific colors */
+  --task-early-out-bg: hsl(38 92% 50%);
+  --task-early-out-fg: hsl(0 0% 100%);
+  --task-high-priority-bg: hsl(142 76% 36%);
+  --task-high-priority-fg: hsl(0 0% 100%);
+  --task-low-priority-bg: hsl(82 84% 47%);
+  --task-low-priority-fg: hsl(0 0% 100%);
   --task-unassigned-bg: hsl(220 13% 91%);
   --task-unassigned-fg: hsl(220 9% 46%);
   
@@ -84,25 +82,20 @@
 }
 
 @layer components {
-  /* Task styling by duration */
-  .task-duration-short {
-    background-color: var(--task-duration-short-bg);
-    color: var(--task-duration-short-fg);
+  /* Task styling */
+  .task-early-out {
+    background-color: var(--task-early-out-bg);
+    color: var(--task-early-out-fg);
   }
   
-  .task-duration-medium {
-    background-color: var(--task-duration-medium-bg);
-    color: var(--task-duration-medium-fg);
+  .task-high-priority {
+    background-color: var(--task-high-priority-bg);
+    color: var(--task-high-priority-fg);
   }
   
-  .task-duration-long {
-    background-color: var(--task-duration-long-bg);
-    color: var(--task-duration-long-fg);
-  }
-  
-  .task-duration-extra-long {
-    background-color: var(--task-duration-extra-long-bg);
-    color: var(--task-duration-extra-long-fg);
+  .task-low-priority {
+    background-color: var(--task-low-priority-bg);
+    color: var(--task-low-priority-fg);
   }
   
   .task-unassigned {
