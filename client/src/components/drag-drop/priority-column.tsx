@@ -1,87 +1,66 @@
-
 import { Droppable } from "react-beautiful-dnd";
 import { Task } from "@shared/schema";
 import TaskCard from "./task-card";
-import { Clock, AlertCircle, ArrowDown, Calendar } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Clock, AlertCircle, ArrowDown } from "lucide-react";
 
 interface PriorityColumnProps {
   title: string;
   priority: string;
   tasks: Task[];
   droppableId: string;
-  icon: string;
+  icon: "clock" | "alert-circle" | "arrow-down";
 }
 
-export default function PriorityColumn({ 
-  title, 
-  priority, 
-  tasks, 
-  droppableId, 
-  icon 
+export default function PriorityColumn({
+  title,
+  priority,
+  tasks,
+  droppableId,
+  icon,
 }: PriorityColumnProps) {
-  const getIcon = () => {
-    switch (icon) {
-      case "clock":
-        return <Clock className="w-5 h-5" />;
-      case "alert-circle":
-        return <AlertCircle className="w-5 h-5" />;
-      case "arrow-down":
-        return <ArrowDown className="w-5 h-5" />;
+  const getColumnClass = (priority: string) => {
+    switch (priority) {
+      case "early-out":
+        return "priority-column-early border-orange-200";
+      case "high":
+        return "priority-column-high border-green-200";
+      case "low":
+        return "priority-column-low border-lime-200";
       default:
-        return <Clock className="w-5 h-5" />;
+        return "bg-muted border-border";
     }
   };
 
-  const handleScheduleAllTasks = () => {
-    // Per adesso non fa nulla come richiesto
-    console.log(`Smistamento automatico timeline per ${title} - ${tasks.length} task`);
-  };
-
-  const getPriorityColor = () => {
+  const getHeaderClass = (priority: string) => {
     switch (priority) {
       case "early-out":
-        return "border-orange-300 bg-orange-50";
+        return "text-orange-800";
       case "high":
-        return "border-green-300 bg-green-50";
+        return "text-green-800";
       case "low":
-        return "border-lime-300 bg-lime-50";
+        return "text-lime-800";
       default:
-        return "border-gray-300 bg-gray-50";
+        return "text-foreground";
+    }
+  };
+
+  const renderIcon = () => {
+    switch (icon) {
+      case "clock":
+        return <Clock className="w-5 h-5 mr-2" />;
+      case "alert-circle":
+        return <AlertCircle className="w-5 h-5 mr-2" />;
+      case "arrow-down":
+        return <ArrowDown className="w-5 h-5 mr-2" />;
     }
   };
 
   return (
-    <div className={`rounded-lg border-2 ${getPriorityColor()}`}>
-      <div className="p-4 border-b border-border">
-        <div className="flex items-center justify-between mb-2">
-          <h3 className="font-semibold text-foreground flex items-center">
-            <div className="text-primary mr-2">
-              {getIcon()}
-            </div>
-            {title}
-            <span 
-              className="ml-2 bg-primary text-primary-foreground text-xs px-2 py-1 rounded-full"
-              data-testid={`${priority}-count`}
-            >
-              {tasks.length}
-            </span>
-          </h3>
-        </div>
-        
-        {/* Pulsante per smistamento automatico timeline */}
-        <Button
-          size="sm"
-          variant="outline"
-          className="w-full flex items-center justify-center gap-2"
-          onClick={handleScheduleAllTasks}
-          disabled={tasks.length === 0}
-          data-testid={`button-schedule-all-${priority}`}
-        >
-          <Calendar className="w-4 h-4" />
-          <span className="text-xs">Smista su Timeline ({tasks.length})</span>
-        </Button>
-      </div>
+    <div className={`${getColumnClass(priority)} rounded-lg p-4 border-2`}>
+      <h3 className={`font-semibold mb-4 ${getHeaderClass(priority)} flex items-center`}>
+        {renderIcon()}
+        {title}
+      </h3>
       
       <Droppable droppableId={droppableId}>
         {(provided, snapshot) => (
@@ -89,10 +68,10 @@ export default function PriorityColumn({
             ref={provided.innerRef}
             {...provided.droppableProps}
             className={`
-              p-4 space-y-2 min-h-64 transition-colors duration-200
+              space-y-2 min-h-48 transition-colors duration-200
               ${snapshot.isDraggingOver ? "drop-zone-active" : ""}
             `}
-            data-testid={`${priority}-tasks-container`}
+            data-testid={`priority-column-${droppableId}`}
           >
             {tasks.map((task, index) => (
               <TaskCard key={task.id} task={task} index={index} />
