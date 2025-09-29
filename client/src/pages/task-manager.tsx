@@ -164,13 +164,7 @@ export default function TaskManager() {
     });
   };
 
-  const getCurrentDate = () => {
-    return new Date().toLocaleDateString("it-IT", {
-      day: "numeric",
-      month: "long",
-      year: "numeric",
-    });
-  };
+  
 
 
   if (tasksLoading) {
@@ -207,9 +201,6 @@ export default function TaskManager() {
               <Save className="w-4 h-4 mr-2" />
               Salva Automatico: ON
             </Button>
-            <span className="text-sm text-muted-foreground ml-auto" data-testid="text-current-date">
-              Oggi: {getCurrentDate()}
-            </span>
           </div>
         </div>
 
