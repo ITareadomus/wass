@@ -1,7 +1,8 @@
 import { Droppable } from "react-beautiful-dnd";
 import { Task } from "@shared/schema";
 import TaskCard from "./task-card";
-import { Clock, AlertCircle, ArrowDown } from "lucide-react";
+import { Clock, AlertCircle, ArrowDown, Calendar } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 interface PriorityColumnProps {
   title: string;
@@ -55,12 +56,29 @@ export default function PriorityColumn({
     }
   };
 
+  const handleTimelineAssignment = () => {
+    // Per ora non fa nulla - implementazione futura
+    console.log(`Smistamento task ${priority} sulla timeline`);
+  };
+
   return (
     <div className={`${getColumnClass(priority)} rounded-lg p-4 border-2`}>
-      <h3 className={`font-semibold mb-4 ${getHeaderClass(priority)} flex items-center`}>
-        {renderIcon()}
-        {title}
-      </h3>
+      <div className="flex items-center justify-between mb-4">
+        <h3 className={`font-semibold ${getHeaderClass(priority)} flex items-center`}>
+          {renderIcon()}
+          {title}
+        </h3>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handleTimelineAssignment}
+          className="text-xs px-2 py-1 h-7"
+          disabled={tasks.length === 0}
+        >
+          <Calendar className="w-3 h-3 mr-1" />
+          Smista
+        </Button>
+      </div>
       
       <Droppable droppableId={droppableId}>
         {(provided, snapshot) => (
