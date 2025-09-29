@@ -10,7 +10,6 @@ interface PriorityColumnProps {
   tasks: Task[];
   droppableId: string;
   icon: "clock" | "alert-circle" | "arrow-down";
-  totalTasks?: number;
 }
 
 export default function PriorityColumn({
@@ -19,7 +18,6 @@ export default function PriorityColumn({
   tasks,
   droppableId,
   icon,
-  totalTasks = 0,
 }: PriorityColumnProps) {
   const getColumnClass = (priority: string) => {
     switch (priority) {
@@ -72,7 +70,7 @@ export default function PriorityColumn({
             {title}
           </h3>
           <div className="text-xs text-muted-foreground mt-1">
-            {tasks.length} di {totalTasks} task
+            {tasks.length} task
           </div>
         </div>
         <Button

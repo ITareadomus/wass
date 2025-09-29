@@ -213,7 +213,6 @@ export default function TaskManager() {
               tasks={earlyOutTasks}
               droppableId="early-out"
               icon="clock"
-              totalTasks={tasks.length}
             />
             <PriorityColumn
               title="HIGH PRIORITY"
@@ -221,7 +220,6 @@ export default function TaskManager() {
               tasks={highPriorityTasks}
               droppableId="high"
               icon="alert-circle"
-              totalTasks={tasks.length}
             />
             <PriorityColumn
               title="LOW PRIORITY"
@@ -229,7 +227,6 @@ export default function TaskManager() {
               tasks={lowPriorityTasks}
               droppableId="low"
               icon="arrow-down"
-              totalTasks={tasks.length}
             />
           </div>
         </DragDropContext>
