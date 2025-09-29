@@ -29,17 +29,17 @@ export default function TaskManager() {
     },
     onSuccess: (updatedTask) => {
       queryClient.invalidateQueries({ queryKey: ["/api/tasks"] });
-      
+
       console.log("Mutation success - showing toast for task:", updatedTask);
-      
+
       // Enhanced notification with task details
       const priorityLabel = updatedTask.priority === "early-out" ? "Early Out" :
                            updatedTask.priority === "high" ? "Alta Priorità" :
                            updatedTask.priority === "low" ? "Bassa Priorità" : "Non Assegnato";
-      
+
       const isUnassigned = updatedTask.priority === null;
       const title = isUnassigned ? "📥 Task Spostato" : "✅ Task Assegnato";
-      
+
       toast({
         title,
         description: `"${updatedTask.name}" → ${priorityLabel}${updatedTask.assignedTo ? ' (Assegnato automaticamente)' : ''}`,
@@ -61,20 +61,20 @@ export default function TaskManager() {
     },
     onSuccess: (updatedTasks) => {
       queryClient.invalidateQueries({ queryKey: ["/api/tasks"] });
-      
+
       // Count assignments by priority
       const assignments = updatedTasks.filter((task: any) => task.priority && task.assignedTo);
       const byPriority = assignments.reduce((acc: any, task: any) => {
         acc[task.priority] = (acc[task.priority] || 0) + 1;
         return acc;
       }, {});
-      
+
       const summary = Object.entries(byPriority).map(([priority, count]) => {
         const label = priority === "early-out" ? "Early Out" :
                      priority === "high" ? "Alta" : "Bassa";
         return `${label}: ${count}`;
       }).join(", ");
-      
+
       if (assignments.length === 0) {
         toast({
           title: "🚀 Assegnazione Automatica Completata",
@@ -103,7 +103,7 @@ export default function TaskManager() {
     },
     onSuccess: (updatedTasks) => {
       queryClient.invalidateQueries({ queryKey: ["/api/tasks"] });
-      
+
       const resetCount = updatedTasks.length;
       toast({
         title: "🔄 Assegnazioni Azzerate",
@@ -164,7 +164,7 @@ export default function TaskManager() {
     });
   };
 
-  
+
 
 
   if (tasksLoading) {
@@ -206,6 +206,12 @@ export default function TaskManager() {
 
         <DragDropContext onDragEnd={onDragEnd}>
           {/* Task Assignment Section */}
+          <div className="mb-4 flex justify-end">
+            <div className="bg-card rounded-lg border shadow-sm px-4 py-2">
+              <div className="text-sm text-muted-foreground">Totale Task</div>
+              <div className="text-2xl font-bold text-primary">{tasks.length}</div>
+            </div>
+          </div>
           <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 mb-8">
             <PriorityColumn
               title="EARLY OUT"
@@ -213,6 +219,7 @@ export default function TaskManager() {
               tasks={earlyOutTasks}
               droppableId="early-out"
               icon="clock"
+              totalTasks={tasks.length}
             />
             <PriorityColumn
               title="HIGH PRIORITY"
@@ -220,6 +227,7 @@ export default function TaskManager() {
               tasks={highPriorityTasks}
               droppableId="high"
               icon="alert-circle"
+              totalTasks={tasks.length}
             />
             <PriorityColumn
               title="LOW PRIORITY"
@@ -227,6 +235,7 @@ export default function TaskManager() {
               tasks={lowPriorityTasks}
               droppableId="low"
               icon="arrow-down"
+              totalTasks={tasks.length}
             />
           </div>
         </DragDropContext>
