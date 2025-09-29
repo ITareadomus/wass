@@ -64,10 +64,15 @@ export default function PriorityColumn({
   return (
     <div className={`${getColumnClass(priority)} rounded-lg p-4 border-2`}>
       <div className="flex items-center justify-between mb-4">
-        <h3 className={`font-semibold ${getHeaderClass(priority)} flex items-center`}>
-          {renderIcon()}
-          {title}
-        </h3>
+        <div>
+          <h3 className={`font-semibold ${getHeaderClass(priority)} flex items-center`}>
+            {renderIcon()}
+            {title}
+          </h3>
+          <div className="text-xs text-muted-foreground mt-1">
+            {tasks.length} task
+          </div>
+        </div>
         <Button
           variant="outline"
           size="sm"
