@@ -240,7 +240,7 @@ export default function TaskManager() {
 
         {/* Timeline and Personnel View */}
         <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 mb-8">
-          <div className="xl:col-span-2 max-h-[600px]">
+          <div className="xl:col-span-2">
             <TimelineView personnel={personnel} tasks={tasks} />
           </div>
           <div className="space-y-6">

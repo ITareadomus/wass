@@ -1,6 +1,5 @@
 import { Personnel, Task } from "@shared/schema";
 import { Calendar } from "lucide-react";
-import React from "react"; // Import React
 
 interface TimelineViewProps {
   personnel: Personnel[];
@@ -13,15 +12,6 @@ export default function TimelineView({ personnel, tasks }: TimelineViewProps) {
     "13:00", "13:30", "14:00", "14:30", "15:00", "15:30"
   ];
 
-  // Helper function to get tasks for a specific time slot (assuming it's defined elsewhere or needs to be added)
-  // For this example, let's assume it's a placeholder and would need proper implementation.
-  const getTasksForTimeSlot = (personTasks: Task[], slot: string): Task[] => {
-    // This is a placeholder function. A real implementation would need to parse the slot and check task times.
-    // For now, it returns all tasks for the person, which isn't accurate for a specific time slot.
-    // A more robust solution would involve matching the 'slot' string to a time range.
-    return personTasks; 
-  };
-
   const getPersonnelInitials = (name: string) => {
     return name.split(" ").map(n => n[0]).join("").substring(0, 2);
   };
@@ -31,7 +21,7 @@ export default function TimelineView({ personnel, tasks }: TimelineViewProps) {
     const assignedTasks = tasks.filter(task => 
       task.assignedTo === personId && task.priority !== null
     );
-
+    
     if (assignedTasks.length > 0) {
       // For now, show the first assigned task across time slots
       // In a real system, you'd have proper time slot mapping
@@ -80,56 +70,79 @@ export default function TimelineView({ personnel, tasks }: TimelineViewProps) {
           Timeline Assegnazioni
         </h3>
       </div>
-
-      <div className="max-h-[500px] overflow-hidden">
-        <div className="min-w-[800px]">
-          <div className="grid grid-cols-[200px_repeat(8,_1fr)] gap-1">
-            {/* Header Row */}
-            <div className="font-semibold p-2 bg-muted text-muted-foreground border border-border">
-              Personale
-            </div>
-            {timeSlots.map((slot) => (
-              <div
-                key={slot}
-                className="font-semibold p-2 bg-muted text-muted-foreground text-center border border-border text-xs"
-              >
-                {slot}
-              </div>
-            ))}
-
-            {/* Personnel Rows - Limitato a 6 persone per evitare scroll */}
-            {personnel.slice(0, 6).map((person) => {
-              const personTasks = tasks.filter(task => task.assignedTo === person.name);
-              return (
-                <React.Fragment key={person.name}>
-                  <div className="p-2 bg-card border border-border font-medium text-sm">
-                    <div className="truncate">{person.name}</div>
-                    <div className="text-xs text-muted-foreground">{person.type}</div>
-                  </div>
-                  {timeSlots.map((slot) => {
-                    const slotTasks = getTasksForTimeSlot(personTasks, slot);
-                    return (
-                      <div key={`${person.name}-${slot}`} className="p-1 bg-card border border-border h-[50px]">
-                        {slotTasks.slice(0, 2).map((task) => (
-                          <div
-                            key={task.id}
-                            className={`assignment-bar text-xs truncate ${
-                              task.priority === "early-out" ? "bg-amber-500 text-white" :
-                              task.priority === "high" ? "bg-green-600 text-white" :
-                              task.priority === "low" ? "bg-lime-500 text-white" :
-                              "bg-gray-400 text-white"
-                            }`}
-                          >
-                            {task.name}
-                          </div>
-                        ))}
-                      </div>
-                    );
-                  })}
-                </React.Fragment>
-              );
-            })}
+      
+      <div className="overflow-x-auto">
+        <div 
+          className="grid min-w-max"
+          style={{ gridTemplateColumns: "150px repeat(12, 80px)" }}
+          data-testid="timeline-grid"
+        >
+          {/* Header Row */}
+          <div className="timeline-cell p-2 bg-secondary font-semibold text-sm border border-border">
+            PERSONA
           </div>
+          {timeSlots.map((slot, index) => (
+            <div 
+              key={slot}
+              className="timeline-cell p-2 bg-secondary text-center text-xs font-medium border border-border"
+              data-testid={`time-slot-${index}`}
+            >
+              {slot}
+            </div>
+          ))}
+
+          {/* Personnel Rows */}
+          {personnel.slice(0, 8).map((person, personIndex) => (
+            <div key={person.id} className="contents">
+              {/* Personnel Info Cell */}
+              <div className="timeline-cell p-2 bg-card flex items-center border border-border">
+                <div className="flex items-center">
+                  <div 
+                    className="w-6 h-6 rounded-full flex items-center justify-center text-white text-xs mr-2"
+                    style={{ backgroundColor: person.color }}
+                    data-testid={`person-avatar-${person.id}`}
+                  >
+                    {getPersonnelInitials(person.name)}
+                  </div>
+                  <div>
+                    <div className="text-sm font-medium" data-testid={`person-name-${person.id}`}>
+                      {person.name}
+                    </div>
+                    <div className="text-xs text-muted-foreground" data-testid={`person-type-${person.id}`}>
+                      {person.type}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Time Slot Cells */}
+              {timeSlots.map((slot, slotIndex) => {
+                // Get real assignment for this person and time slot
+                const assignment = getAssignmentForPersonnel(person.id, slot);
+                const hasAssignment = assignment !== null;
+                const priority = assignment?.priority || null;
+                
+                // Show assignment bar for first few time slots if person has assignments
+                const showAssignmentBar = hasAssignment && slotIndex <= 2;
+                
+                return (
+                  <div 
+                    key={`${person.id}-${slot}`}
+                    className={`timeline-cell border border-border relative ${getTimelineBgClass(priority)}`}
+                    data-testid={`timeline-cell-${person.id}-${slotIndex}`}
+                  >
+                    {showAssignmentBar && (
+                      <div className={`assignment-bar ${getAssignmentBarClass(priority)} rounded text-xs p-1 m-1`}>
+                        {assignment?.name?.substring(0, 8) || 
+                         (priority === "early-out" ? "EARLY" : 
+                          priority === "high" ? "HIGH" : "LOW")}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          ))}
         </div>
       </div>
     </div>
