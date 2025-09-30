@@ -183,30 +183,28 @@ export default function TaskManager() {
   return (
     <div className="bg-background text-foreground min-h-screen">
       <div className="container mx-auto p-4 max-w-screen-2xl">
-        {/* Header */}
-        <div className="mb-6">
-          <h1 className="text-3xl font-bold text-foreground mb-2" data-testid="page-title">
-            Gestione Assegnazione Task
-          </h1>
-          <div className="flex gap-4 items-center flex-wrap">
-            <Button data-testid="button-new-task" className="bg-primary text-primary-foreground hover:bg-primary/90">
-              <Plus className="w-4 h-4 mr-2" />
-              Nuovo Task
-            </Button>
-            <Button data-testid="button-add-person" variant="secondary">
-              <UserPlus className="w-4 h-4 mr-2" />
-              Aggiungi Persona
-            </Button>
-            <Button data-testid="button-auto-save" variant="outline">
-              <Save className="w-4 h-4 mr-2" />
-              Salva Automatico: ON
-            </Button>
-          </div>
-        </div>
-
         <DragDropContext onDragEnd={onDragEnd}>
           {/* Task Assignment Section */}
-          <div className="mb-4 flex justify-end">
+          <div className="mb-4 flex justify-between items-center">
+            <div className="flex flex-col">
+              <h1 className="text-3xl font-bold text-foreground mb-2" data-testid="page-title">
+                Gestione Assegnazione Task
+              </h1>
+              <div className="flex gap-4 items-center flex-wrap">
+                <Button data-testid="button-new-task" className="bg-primary text-primary-foreground hover:bg-primary/90">
+                  <Plus className="w-4 h-4 mr-2" />
+                  Nuovo Task
+                </Button>
+                <Button data-testid="button-add-person" variant="secondary">
+                  <UserPlus className="w-4 h-4 mr-2" />
+                  Aggiungi Persona
+                </Button>
+                <Button data-testid="button-auto-save" variant="outline">
+                  <Save className="w-4 h-4 mr-2" />
+                  Salva Automatico: ON
+                </Button>
+              </div>
+            </div>
             <div className="bg-card rounded-lg border shadow-sm px-4 py-2">
               <div className="text-sm text-muted-foreground">Totale Task</div>
               <div className="text-2xl font-bold text-primary">{tasks.length}</div>
