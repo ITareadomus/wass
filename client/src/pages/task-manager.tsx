@@ -190,25 +190,25 @@ export default function TaskManager() {
               <h1 className="text-3xl font-bold text-foreground mb-2" data-testid="page-title">
                 Gestione Assegnazione Task
               </h1>
+              <div className="flex gap-4 items-center flex-wrap">
+                <Button data-testid="button-new-task" className="bg-primary text-primary-foreground hover:bg-primary/90">
+                  <Plus className="w-4 h-4 mr-2" />
+                  Nuovo Task
+                </Button>
+                <Button data-testid="button-add-person" variant="secondary">
+                  <UserPlus className="w-4 h-4 mr-2" />
+                  Aggiungi Persona
+                </Button>
+                <Button data-testid="button-auto-save" variant="outline">
+                  <Save className="w-4 h-4 mr-2" />
+                  Salva Automatico: ON
+                </Button>
+              </div>
             </div>
             <div className="bg-card rounded-lg border shadow-sm px-4 py-2">
               <div className="text-sm text-muted-foreground">Totale Task</div>
               <div className="text-2xl font-bold text-primary">{tasks.length}</div>
             </div>
-          </div>
-          <div className="mb-6 flex gap-4 items-center flex-wrap">
-            <Button data-testid="button-new-task" className="bg-primary text-primary-foreground hover:bg-primary/90">
-              <Plus className="w-4 h-4 mr-2" />
-              Nuovo Task
-            </Button>
-            <Button data-testid="button-add-person" variant="secondary">
-              <UserPlus className="w-4 h-4 mr-2" />
-              Aggiungi Persona
-            </Button>
-            <Button data-testid="button-auto-save" variant="outline">
-              <Save className="w-4 h-4 mr-2" />
-              Salva Automatico: ON
-            </Button>
           </div>
           <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 mb-8">
             <PriorityColumn
