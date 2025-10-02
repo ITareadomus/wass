@@ -7,9 +7,10 @@ import { useState } from "react";
 interface TaskCardProps {
   task: Task;
   index: number;
+  dynamicWidth?: number;
 }
 
-export default function TaskCard({ task, index }: TaskCardProps) {
+export default function TaskCard({ task, index, dynamicWidth }: TaskCardProps) {
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   const handleCardClick = () => {
@@ -29,8 +30,14 @@ export default function TaskCard({ task, index }: TaskCardProps) {
     }
   };
 
-  // Calcola la larghezza in base alla durata (ogni 30 minuti = 40px)
+  // Calcola la larghezza in base alla durata con fattore dinamico
   const calculateWidth = (duration: string) => {
+    if (dynamicWidth) {
+      // Usa la larghezza dinamica basata sul numero di task
+      return `${dynamicWidth}px`;
+    }
+    
+    // Fallback: calcolo basato sulla durata
     const parts = duration.split(".");
     const hours = parseInt(parts[0] || "0");
     const minutes = parts[1] ? parseInt(parts[1]) : 0;
@@ -38,11 +45,11 @@ export default function TaskCard({ task, index }: TaskCardProps) {
     
     // Caso eccezionale: 30 minuti = larghezza di 1 ora
     if (totalMinutes === 30) {
-      return "80px"; // Larghezza di 1 ora (2 * 40px)
+      return "80px";
     }
     
     const halfHours = Math.ceil(totalMinutes / 30);
-    const width = halfHours * 40; // 40px per ogni mezza ora (ridotto)
+    const width = halfHours * 40;
     return `${width}px`;
   };
 

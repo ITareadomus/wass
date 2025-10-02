@@ -12,6 +12,7 @@ interface PriorityColumnProps {
   droppableId: string;
   icon: "clock" | "alert-circle" | "arrow-down";
   syncedHeight?: number;
+  maxTaskCount?: number;
 }
 
 export default function PriorityColumn({
@@ -21,7 +22,27 @@ export default function PriorityColumn({
   droppableId,
   icon,
   syncedHeight,
+  maxTaskCount = 1,
 }: PriorityColumnProps) {
+  // Calcola la larghezza dinamica delle task in base al numero massimo
+  const calculateDynamicTaskWidth = () => {
+    if (maxTaskCount <= 0) return 80; // fallback
+    
+    // Larghezza disponibile per le task (considerando padding e gap)
+    const containerWidth = 400; // larghezza approssimativa del container
+    const gap = 8; // gap tra le task
+    const padding = 16; // padding del container
+    
+    // Calcola quante task stanno per riga
+    const tasksPerRow = Math.ceil(Math.sqrt(maxTaskCount));
+    const availableWidth = containerWidth - (padding * 2) - (gap * (tasksPerRow - 1));
+    const taskWidth = Math.floor(availableWidth / tasksPerRow);
+    
+    // Limiti min/max per leggibilità
+    return Math.max(60, Math.min(taskWidth, 120));
+  };
+
+  const dynamicTaskWidth = calculateDynamicTaskWidth();
   // Calcola altezza minima dinamica: ogni task occupa circa 48px (40px + gap)
   const calculateMinHeight = () => {
     if (syncedHeight) return `${syncedHeight}px`;
@@ -113,7 +134,7 @@ export default function PriorityColumn({
             data-testid={`priority-column-${droppableId}`}
           >
             {tasks.map((task, index) => (
-              <TaskCard key={task.id} task={task} index={index} />
+              <TaskCard key={task.id} task={task} index={index} dynamicWidth={dynamicTaskWidth} />
             ))}
             {provided.placeholder}
           </div>
