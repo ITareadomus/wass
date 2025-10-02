@@ -11,6 +11,7 @@ interface PriorityColumnProps {
   tasks: Task[];
   droppableId: string;
   icon: "clock" | "alert-circle" | "arrow-down";
+  syncedHeight?: number;
 }
 
 export default function PriorityColumn({
@@ -19,7 +20,19 @@ export default function PriorityColumn({
   tasks,
   droppableId,
   icon,
+  syncedHeight,
 }: PriorityColumnProps) {
+  // Calcola altezza minima dinamica: ogni task occupa circa 48px (40px + gap)
+  const calculateMinHeight = () => {
+    if (syncedHeight) return `${syncedHeight}px`;
+    if (tasks.length === 0) return '100px';
+    const taskHeight = 48; // altezza task + gap
+    const headerHeight = 100; // circa l'altezza dell'header
+    const padding = 16; // padding del contenitore
+    const totalHeight = (tasks.length * taskHeight) + headerHeight + padding;
+    return `${totalHeight}px`;
+  };
+
   const getColumnClass = (priority: string) => {
     switch (priority) {
       case "early-out":
@@ -91,9 +104,12 @@ export default function PriorityColumn({
             ref={provided.innerRef}
             {...provided.droppableProps}
             className={`
-              flex flex-wrap gap-2 min-h-[500px] transition-colors duration-200 content-start p-2
+              flex flex-wrap gap-2 transition-all duration-300 content-start p-2
               ${snapshot.isDraggingOver ? "drop-zone-active" : ""}
             `}
+            style={{
+              minHeight: calculateMinHeight()
+            }}
             data-testid={`priority-column-${droppableId}`}
           >
             {tasks.map((task, index) => (
