@@ -551,13 +551,6 @@ export default function GenerateAssignments() {
     ...lowPriorityTasks,
   ]);
 
-  // Calcola il numero massimo di task tra tutte le colonne
-  const maxTaskCount = Math.max(
-    earlyOutTasks.length,
-    highPriorityTasks.length,
-    lowPriorityTasks.length
-  );
-
   // Calcola l'altezza massima necessaria tra tutte le colonne
   useEffect(() => {
     const taskHeight = 48; // Altezza stimata per una card task
@@ -593,7 +586,6 @@ export default function GenerateAssignments() {
               droppableId="early-out"
               icon="clock"
               syncedHeight={maxColumnHeight}
-              maxTaskCount={maxTaskCount}
             />
             <PriorityColumn
               title="HIGH PRIORITY"
@@ -602,7 +594,6 @@ export default function GenerateAssignments() {
               droppableId="high"
               icon="alert-circle"
               syncedHeight={maxColumnHeight}
-              maxTaskCount={maxTaskCount}
             />
             <PriorityColumn
               title="LOW PRIORITY"
@@ -611,7 +602,6 @@ export default function GenerateAssignments() {
               droppableId="low"
               icon="arrow-down"
               syncedHeight={maxColumnHeight}
-              maxTaskCount={maxTaskCount}
             />
           </div>
         </DragDropContext>
