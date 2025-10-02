@@ -1,7 +1,6 @@
 
 import { Draggable } from "react-beautiful-dnd";
 import { Task } from "@shared/schema";
-import { GripVertical } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useState } from "react";
 
@@ -64,7 +63,7 @@ export default function TaskCard({ task, index }: TaskCardProps) {
             data-testid={`task-card-${task.id}`}
             onClick={handleCardClick}
           >
-            <div className="flex items-center justify-between h-full">
+            <div className="flex items-center h-full">
               <div className="flex items-center gap-1 truncate">
                 <span className="font-medium text-[10px] leading-none" data-testid={`task-name-${task.id}`}>
                   {task.name}
@@ -73,7 +72,6 @@ export default function TaskCard({ task, index }: TaskCardProps) {
                   ({task.duration.replace(".", ":")}h)
                 </span>
               </div>
-              <GripVertical className="w-2 h-2 opacity-50 ml-1 flex-shrink-0" />
             </div>
           </div>
         )}
