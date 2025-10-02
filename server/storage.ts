@@ -65,3 +65,61 @@ export function clearAllAssignments(): Task[] {
   assignments = [];
   return tasks;
 }
+
+export function createTask(taskData: Omit<Task, 'id' | 'createdAt'>): Task {
+  const newTask: Task = {
+    ...taskData,
+    id: String(tasks.length + 1),
+    createdAt: new Date(),
+  };
+  tasks.push(newTask);
+  return newTask;
+}
+
+export function updateTask(id: string, updates: Partial<Task>): Task | undefined {
+  const taskIndex = tasks.findIndex(t => t.id === id);
+  if (taskIndex === -1) return undefined;
+  
+  tasks[taskIndex] = { ...tasks[taskIndex], ...updates };
+  return tasks[taskIndex];
+}
+
+export function deleteTask(id: string): boolean {
+  const initialLength = tasks.length;
+  tasks = tasks.filter(t => t.id !== id);
+  return tasks.length < initialLength;
+}
+
+export function createPersonnel(personnelData: Omit<Personnel, 'id' | 'createdAt'>): Personnel {
+  const newPersonnel: Personnel = {
+    ...personnelData,
+    id: String(personnel.length + 1),
+    createdAt: new Date(),
+  };
+  personnel.push(newPersonnel);
+  return newPersonnel;
+}
+
+export function createAssignment(assignmentData: Omit<Assignment, 'id' | 'createdAt'>): Assignment {
+  const newAssignment: Assignment = {
+    ...assignmentData,
+    id: String(assignments.length + 1),
+    createdAt: new Date(),
+  };
+  assignments.push(newAssignment);
+  return newAssignment;
+}
+
+export const storage = {
+  getTasks,
+  getPersonnel,
+  getAssignments,
+  createTask,
+  updateTask,
+  deleteTask,
+  createPersonnel,
+  createAssignment,
+  updateTaskPriority,
+  updateTaskAssignment,
+  clearAllAssignments,
+};
