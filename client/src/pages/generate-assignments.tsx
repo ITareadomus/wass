@@ -5,11 +5,35 @@ import { Task } from "@shared/schema";
 
 export default function GenerateAssignments() {
   const [maxColumnHeight, setMaxColumnHeight] = useState<number>(0);
+  const [maxColumnWidth, setMaxColumnWidth] = useState<number>(0);
   const columnRefs = useRef<(HTMLDivElement | null)[]>([]);
 
   const onDragEnd = (result: DropResult) => {
     // Per ora vuoto
     console.log(result);
+  };
+
+  // Calcola larghezza per un array di task
+  const calculateColumnWidth = (tasks: Task[]) => {
+    if (tasks.length === 0) return 200;
+    
+    let totalWidth = 0;
+    tasks.forEach(task => {
+      const parts = task.duration.split(".");
+      const hours = parseInt(parts[0] || "0");
+      const minutes = parts[1] ? parseInt(parts[1]) : 0;
+      const totalMinutes = hours * 60 + minutes;
+      
+      if (totalMinutes === 30) {
+        totalWidth += 80;
+      } else {
+        const halfHours = Math.ceil(totalMinutes / 30);
+        totalWidth += halfHours * 40;
+      }
+      totalWidth += 8;
+    });
+    
+    return totalWidth + 32;
   };
 
   // Task per Early Out (8 task)
@@ -551,11 +575,11 @@ export default function GenerateAssignments() {
     ...lowPriorityTasks,
   ]);
 
-  // Calcola l'altezza massima necessaria tra tutte le colonne
+  // Calcola l'altezza e larghezza massima necessaria tra tutte le colonne
   useEffect(() => {
-    const taskHeight = 48; // Altezza stimata per una card task
-    const headerHeight = 60; // Altezza stimata per l'header della colonna
-    const padding = 32; // Padding interno della colonna
+    const taskHeight = 48;
+    const headerHeight = 60;
+    const padding = 32;
 
     const calculateHeight = (tasks: Task[]) => (tasks.length * taskHeight) + headerHeight + padding;
 
@@ -563,8 +587,16 @@ export default function GenerateAssignments() {
     const highPriorityHeight = calculateHeight(highPriorityTasks);
     const lowPriorityHeight = calculateHeight(lowPriorityTasks);
 
-    const maxHeight = Math.max(earlyOutHeight, highPriorityHeight, lowPriorityHeight, 300); // Minimo 300px per evitare colonne troppo piccole
+    const maxHeight = Math.max(earlyOutHeight, highPriorityHeight, lowPriorityHeight, 300);
     setMaxColumnHeight(maxHeight);
+
+    // Calcola larghezza massima
+    const earlyOutWidth = calculateColumnWidth(earlyOutTasks);
+    const highPriorityWidth = calculateColumnWidth(highPriorityTasks);
+    const lowPriorityWidth = calculateColumnWidth(lowPriorityTasks);
+
+    const maxWidth = Math.max(earlyOutWidth, highPriorityWidth, lowPriorityWidth);
+    setMaxColumnWidth(maxWidth);
   }, [earlyOutTasks.length, highPriorityTasks.length, lowPriorityTasks.length]);
 
 
@@ -586,6 +618,7 @@ export default function GenerateAssignments() {
               droppableId="early-out"
               icon="clock"
               syncedHeight={maxColumnHeight}
+              syncedWidth={maxColumnWidth}
             />
             <PriorityColumn
               title="HIGH PRIORITY"
@@ -594,6 +627,7 @@ export default function GenerateAssignments() {
               droppableId="high"
               icon="alert-circle"
               syncedHeight={maxColumnHeight}
+              syncedWidth={maxColumnWidth}
             />
             <PriorityColumn
               title="LOW PRIORITY"
@@ -602,6 +636,7 @@ export default function GenerateAssignments() {
               droppableId="low"
               icon="arrow-down"
               syncedHeight={maxColumnHeight}
+              syncedWidth={maxColumnWidth}
             />
           </div>
         </DragDropContext>
