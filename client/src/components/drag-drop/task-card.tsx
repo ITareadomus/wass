@@ -38,24 +38,24 @@ export default function TaskCard({ task, index }: TaskCardProps) {
             {...provided.dragHandleProps}
             className={`
               ${getTaskClassByPriority(task.priority)} 
-              rounded-sm p-1.5 shadow-sm border transition-all duration-200
+              rounded-sm p-1 shadow-sm border transition-all duration-200
               ${snapshot.isDragging ? "rotate-2 scale-105 shadow-lg" : ""}
               hover:scale-105 hover:shadow-md cursor-pointer
             `}
             data-testid={`task-card-${task.id}`}
             onClick={handleCardClick}
           >
-          <div className="font-medium text-xs leading-tight" data-testid={`task-name-${task.id}`}>
+          <div className="font-medium text-[10px] leading-tight" data-testid={`task-name-${task.id}`}>
             {task.name}
           </div>
-          <div className="text-xs opacity-75 leading-tight" data-testid={`task-type-${task.id}`}>
+          <div className="text-[10px] opacity-75 leading-tight" data-testid={`task-type-${task.id}`}>
             {task.type}
           </div>
-          <div className="flex items-center justify-between mt-1">
-            <span className="text-xs" data-testid={`task-duration-${task.id}`}>
+          <div className="flex items-center justify-between mt-0.5">
+            <span className="text-[10px]" data-testid={`task-duration-${task.id}`}>
               {task.duration}
             </span>
-            <GripVertical className="w-2.5 h-2.5 opacity-50" />
+            <GripVertical className="w-2 h-2 opacity-50" />
           </div>
           </div>
         )}
