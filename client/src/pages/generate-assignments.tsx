@@ -3,545 +3,93 @@ import { Task } from "@shared/schema";
 import PriorityColumn from "@/components/drag-drop/priority-column";
 import { useState, useEffect } from "react";
 
+interface RawTask {
+  task_id: number;
+  structure_id: number;
+  logistic_code: number;
+  client_id: number;
+  premium: boolean;
+  address: string;
+  lat: string;
+  lng: string;
+  cleaning_time: number;
+  checkin: string;
+  checkout: string;
+  checkin_time: string | null;
+  checkout_time: string | null;
+  pax_in: number;
+  pax_out: number;
+  small_equipment: boolean;
+  operation_id: number;
+  is_straordinaria: boolean;
+  zone: number;
+  reasons?: string[];
+}
+
 export default function GenerateAssignments() {
   const [earlyOutTasks, setEarlyOutTasks] = useState<Task[]>([]);
   const [highPriorityTasks, setHighPriorityTasks] = useState<Task[]>([]);
   const [lowPriorityTasks, setLowPriorityTasks] = useState<Task[]>([]);
 
   useEffect(() => {
-    const initialEarlyOut: Task[] = [
-    {
-      id: "ea1",
-      name: "TASK1",
-      type: "PREMIUM",
-      duration: "1.00",
-      priority: "early-out",
-      assignedTo: null,
-      status: "pending",
-      scheduledTime: null,
-      address: "",
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
-    },
-    {
-      id: "ea2",
-      name: "TASK2",
-      type: "STANDARD",
-      duration: "2.00",
-      priority: "early-out",
-      assignedTo: null,
-      status: "pending",
-      scheduledTime: null,
-      address: "",
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
-    },
-    {
-      id: "ea3",
-      name: "TASK3",
-      type: "PREMIUM",
-      duration: "0.30",
-      priority: "early-out",
-      assignedTo: null,
-      status: "pending",
-      scheduledTime: null,
-      address: "",
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
-    },
-    {
-      id: "ea4",
-      name: "TASK4",
-      type: "STANDARD",
-      duration: "1.30",
-      priority: "early-out",
-      assignedTo: null,
-      status: "pending",
-      scheduledTime: null,
-      address: "",
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
-    },
-    {
-      id: "ea5",
-      name: "TASK5",
-      type: "PREMIUM",
-      duration: "3.00",
-      priority: "early-out",
-      assignedTo: null,
-      status: "pending",
-      scheduledTime: null,
-      address: "",
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
-    },
-    {
-      id: "ea6",
-      name: "TASK6",
-      type: "STANDARD",
-      duration: "1.00",
-      priority: "early-out",
-      assignedTo: null,
-      status: "pending",
-      scheduledTime: null,
-      address: "",
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
-    },
-    {
-      id: "ea7",
-      name: "TASK7",
-      type: "PREMIUM",
-      duration: "2.30",
-      priority: "early-out",
-      assignedTo: null,
-      status: "pending",
-      scheduledTime: null,
-      address: "",
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
-    },
-    {
-      id: "ea8",
-      name: "TASK8",
-      type: "STANDARD",
-      duration: "1.00",
-      priority: "early-out",
-      assignedTo: null,
-      status: "pending",
-      scheduledTime: null,
-      address: "",
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
-    }
-    ];
-    setEarlyOutTasks(initialEarlyOut);
+    // Funzione per convertire cleaning_time (minuti) in formato ore.minuti
+    const formatDuration = (minutes: number): string => {
+      const hours = Math.floor(minutes / 60);
+      const mins = minutes % 60;
+      return `${hours}.${mins.toString().padStart(2, '0')}`;
+    };
 
-    const initialHigh: Task[] = [
-    {
-      id: "hp1",
-      name: "TASK9",
-      type: "PREMIUM",
-      duration: "2.00",
-      priority: "high",
-      assignedTo: null,
-      status: "pending",
-      scheduledTime: null,
-      address: "",
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
-    },
-    {
-      id: "hp2",
-      name: "TASK10",
-      type: "STANDARD",
-      duration: "1.30",
-      priority: "high",
-      assignedTo: null,
-      status: "pending",
-      scheduledTime: null,
-      address: "",
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
-    },
-    {
-      id: "hp3",
-      name: "TASK11",
-      type: "PREMIUM",
-      duration: "3.00",
-      priority: "high",
-      assignedTo: null,
-      status: "pending",
-      scheduledTime: null,
-      address: "",
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
-    },
-    {
-      id: "hp4",
-      name: "TASK12",
-      type: "STANDARD",
-      duration: "2.00",
-      priority: "high",
-      assignedTo: null,
-      status: "pending",
-      scheduledTime: null,
-      address: "",
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
-    },
-    {
-      id: "hp5",
-      name: "TASK13",
-      type: "PREMIUM",
-      duration: "1.00",
-      priority: "high",
-      assignedTo: null,
-      status: "pending",
-      scheduledTime: null,
-      address: "",
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
-    },
-    {
-      id: "hp6",
-      name: "TASK14",
-      type: "STANDARD",
-      duration: "0.30",
-      priority: "high",
-      assignedTo: null,
-      status: "pending",
-      scheduledTime: null,
-      address: "",
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
-    },
-    {
-      id: "hp7",
-      name: "TASK15",
-      type: "PREMIUM",
-      duration: "2.30",
-      priority: "high",
-      assignedTo: null,
-      status: "pending",
-      scheduledTime: null,
-      address: "",
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
-    },
-    {
-      id: "hp8",
-      name: "TASK16",
-      type: "STANDARD",
-      duration: "1.00",
-      priority: "high",
-      assignedTo: null,
-      status: "pending",
-      scheduledTime: null,
-      address: "",
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
-    },
-    {
-      id: "hp9",
-      name: "TASK17",
-      type: "PREMIUM",
-      duration: "3.30",
-      priority: "high",
-      assignedTo: null,
-      status: "pending",
-      scheduledTime: null,
-      address: "",
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
-    },
-    {
-      id: "hp10",
-      name: "TASK18",
-      type: "STANDARD",
-      duration: "2.00",
-      priority: "high",
-      assignedTo: null,
-      status: "pending",
-      scheduledTime: null,
-      address: "",
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
-    },
-    {
-      id: "hp11",
-      name: "TASK19",
-      type: "PREMIUM",
-      duration: "1.30",
-      priority: "high",
-      assignedTo: null,
-      status: "pending",
-      scheduledTime: null,
-      address: "",
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
-    },
-    {
-      id: "hp12",
-      name: "TASK20",
-      type: "STANDARD",
-      duration: "1.00",
-      priority: "high",
-      assignedTo: null,
-      status: "pending",
-      scheduledTime: null,
-      address: "",
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
-    }
-    ];
-    setHighPriorityTasks(initialHigh);
+    // Funzione per convertire un task raw in Task
+    const convertRawTask = (rawTask: RawTask, priority: string): Task => {
+      return {
+        id: rawTask.task_id.toString(),
+        name: rawTask.logistic_code.toString(),
+        type: `Client ${rawTask.client_id}`,
+        duration: formatDuration(rawTask.cleaning_time),
+        priority: priority as any,
+        assignedTo: null,
+        status: "pending",
+        scheduledTime: null,
+        address: rawTask.address,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      };
+    };
 
-    const initialLow: Task[] = [
-    {
-      id: "lp1",
-      name: "TASK21",
-      type: "STANDARD",
-      duration: "1.00",
-      priority: "low",
-      assignedTo: null,
-      status: "pending",
-      scheduledTime: null,
-      address: "",
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
-    },
-    {
-      id: "lp2",
-      name: "TASK22",
-      type: "PREMIUM",
-      duration: "2.00",
-      priority: "low",
-      assignedTo: null,
-      status: "pending",
-      scheduledTime: null,
-      address: "",
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
-    },
-    {
-      id: "lp3",
-      name: "TASK23",
-      type: "STANDARD",
-      duration: "0.30",
-      priority: "low",
-      assignedTo: null,
-      status: "pending",
-      scheduledTime: null,
-      address: "",
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
-    },
-    {
-      id: "lp4",
-      name: "TASK24",
-      type: "PREMIUM",
-      duration: "3.00",
-      priority: "low",
-      assignedTo: null,
-      status: "pending",
-      scheduledTime: null,
-      address: "",
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
-    },
-    {
-      id: "lp5",
-      name: "TASK25",
-      type: "STANDARD",
-      duration: "1.30",
-      priority: "low",
-      assignedTo: null,
-      status: "pending",
-      scheduledTime: null,
-      address: "",
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
-    },
-    {
-      id: "lp6",
-      name: "TASK26",
-      type: "PREMIUM",
-      duration: "1.00",
-      priority: "low",
-      assignedTo: null,
-      status: "pending",
-      scheduledTime: null,
-      address: "",
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
-    },
-    {
-      id: "lp7",
-      name: "TASK27",
-      type: "STANDARD",
-      duration: "2.30",
-      priority: "low",
-      assignedTo: null,
-      status: "pending",
-      scheduledTime: null,
-      address: "",
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
-    },
-    {
-      id: "lp8",
-      name: "TASK28",
-      type: "PREMIUM",
-      duration: "1.00",
-      priority: "low",
-      assignedTo: null,
-      status: "pending",
-      scheduledTime: null,
-      address: "",
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
-    },
-    {
-      id: "lp9",
-      name: "TASK29",
-      type: "STANDARD",
-      duration: "0.30",
-      priority: "low",
-      assignedTo: null,
-      status: "pending",
-      scheduledTime: null,
-      address: "",
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
-    },
-    {
-      id: "lp10",
-      name: "TASK30",
-      type: "PREMIUM",
-      duration: "2.00",
-      priority: "low",
-      assignedTo: null,
-      status: "pending",
-      scheduledTime: null,
-      address: "",
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
-    },
-    {
-      id: "lp11",
-      name: "TASK31",
-      type: "STANDARD",
-      duration: "1.30",
-      priority: "low",
-      assignedTo: null,
-      status: "pending",
-      scheduledTime: null,
-      address: "",
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
-    },
-    {
-      id: "lp12",
-      name: "TASK32",
-      type: "PREMIUM",
-      duration: "3.00",
-      priority: "low",
-      assignedTo: null,
-      status: "pending",
-      scheduledTime: null,
-      address: "",
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
-    },
-    {
-      id: "lp13",
-      name: "TASK33",
-      type: "STANDARD",
-      duration: "1.00",
-      priority: "low",
-      assignedTo: null,
-      status: "pending",
-      scheduledTime: null,
-      address: "",
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
-    },
-    {
-      id: "lp14",
-      name: "TASK34",
-      type: "PREMIUM",
-      duration: "2.00",
-      priority: "low",
-      assignedTo: null,
-      status: "pending",
-      scheduledTime: null,
-      address: "",
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
-    },
-    {
-      id: "lp15",
-      name: "TASK35",
-      type: "STANDARD",
-      duration: "0.30",
-      priority: "low",
-      assignedTo: null,
-      status: "pending",
-      scheduledTime: null,
-      address: "",
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
-    },
-    {
-      id: "lp16",
-      name: "TASK36",
-      type: "PREMIUM",
-      duration: "1.30",
-      priority: "low",
-      assignedTo: null,
-      status: "pending",
-      scheduledTime: null,
-      address: "",
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
-    },
-    {
-      id: "lp17",
-      name: "TASK37",
-      type: "STANDARD",
-      duration: "1.00",
-      priority: "low",
-      assignedTo: null,
-      status: "pending",
-      scheduledTime: null,
-      address: "",
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
-    },
-    {
-      id: "lp18",
-      name: "TASK38",
-      type: "PREMIUM",
-      duration: "2.30",
-      priority: "low",
-      assignedTo: null,
-      status: "pending",
-      scheduledTime: null,
-      address: "",
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
-    },
-    {
-      id: "lp19",
-      name: "TASK39",
-      type: "STANDARD",
-      duration: "3.00",
-      priority: "low",
-      assignedTo: null,
-      status: "pending",
-      scheduledTime: null,
-      address: "",
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
-    },
-    {
-      id: "lp20",
-      name: "TASK40",
-      type: "PREMIUM",
-      duration: "1.00",
-      priority: "low",
-      assignedTo: null,
-      status: "pending",
-      scheduledTime: null,
-      address: "",
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
-    }
-    ];
-    setEarlyOutTasks(initialEarlyOut);
-    setHighPriorityTasks(initialHigh);
-    setLowPriorityTasks(initialLow);
+    // Carica i task dai file JSON
+    const loadTasks = async () => {
+      try {
+        const [earlyOutResponse, highPriorityResponse, lowPriorityResponse] = await Promise.all([
+          fetch('/data/early_out.json'),
+          fetch('/data/high_priority.json'),
+          fetch('/data/low_priority.json')
+        ]);
+
+        const earlyOutData = await earlyOutResponse.json();
+        const highPriorityData = await highPriorityResponse.json();
+        const lowPriorityData = await lowPriorityResponse.json();
+
+        const initialEarlyOut: Task[] = earlyOutData.early_out_tasks.map((task: RawTask) => 
+          convertRawTask(task, "early-out")
+        );
+
+        const initialHigh: Task[] = highPriorityData.high_priority_tasks.map((task: RawTask) => 
+          convertRawTask(task, "high")
+        );
+
+        const initialLow: Task[] = lowPriorityData.low_priority_tasks.map((task: RawTask) => 
+          convertRawTask(task, "low")
+        );
+
+        setEarlyOutTasks(initialEarlyOut);
+        setHighPriorityTasks(initialHigh);
+        setLowPriorityTasks(initialLow);
+      } catch (error) {
+        console.error("Errore nel caricamento dei task:", error);
+      }
+    };
+
+    loadTasks();
   }, []);
 
   const onDragEnd = (result: DropResult) => {
@@ -553,6 +101,7 @@ export default function GenerateAssignments() {
 
     let taskToMove: Task | undefined;
     let sourceTasks: Task[] = [];
+    
     
     if (source.droppableId === "early-out") {
       sourceTasks = earlyOutTasks;
