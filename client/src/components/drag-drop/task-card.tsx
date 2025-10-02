@@ -30,12 +30,14 @@ export default function TaskCard({ task, index }: TaskCardProps) {
     }
   };
 
-  // Calcola la larghezza in base alla durata (ogni 30 minuti = 60px)
+  // Calcola la larghezza in base alla durata (ogni 30 minuti = 80px)
   const calculateWidth = (duration: string) => {
-    const [hours, minutes] = duration.split(".").map(Number);
+    const parts = duration.split(".");
+    const hours = parseInt(parts[0] || "0");
+    const minutes = parts[1] ? parseInt(parts[1]) : 0;
     const totalMinutes = hours * 60 + minutes;
     const halfHours = Math.ceil(totalMinutes / 30);
-    const width = halfHours * 60; // 60px per ogni mezza ora
+    const width = halfHours * 80; // 80px per ogni mezza ora
     return `${width}px`;
   };
 
@@ -70,10 +72,10 @@ export default function TaskCard({ task, index }: TaskCardProps) {
                 {task.type}
               </div>
               <div className="flex items-center justify-between mt-1">
-                <span className="text-xs font-semibold" data-testid={`task-duration-${task.id}`}>
-                  {task.duration}h
+                <span className="text-[10px] font-semibold" data-testid={`task-duration-${task.id}`}>
+                  {task.duration.replace(".", ":")}h
                 </span>
-                <GripVertical className="w-3 h-3 opacity-50" />
+                <GripVertical className="w-2.5 h-2.5 opacity-50" />
               </div>
             </div>
           </div>
