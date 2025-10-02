@@ -585,7 +585,7 @@ export default function GenerateAssignments() {
               tasks={earlyOutTasks}
               droppableId="early-out"
               icon="clock"
-              columnHeight={maxColumnHeight}
+              syncedHeight={maxColumnHeight}
             />
             <PriorityColumn
               title="HIGH PRIORITY"
@@ -593,7 +593,7 @@ export default function GenerateAssignments() {
               tasks={highPriorityTasks}
               droppableId="high"
               icon="alert-circle"
-              columnHeight={maxColumnHeight}
+              syncedHeight={maxColumnHeight}
             />
             <PriorityColumn
               title="LOW PRIORITY"
@@ -601,7 +601,7 @@ export default function GenerateAssignments() {
               tasks={lowPriorityTasks}
               droppableId="low"
               icon="arrow-down"
-              columnHeight={maxColumnHeight}
+              syncedHeight={maxColumnHeight}
             />
           </div>
         </DragDropContext>
