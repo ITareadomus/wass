@@ -65,6 +65,10 @@ export default function GenerateAssignments() {
           fetch('/data/low_priority.json')
         ]);
 
+        if (!earlyOutResponse.ok || !highPriorityResponse.ok || !lowPriorityResponse.ok) {
+          throw new Error('Errore nel caricamento dei file JSON');
+        }
+
         const earlyOutData = await earlyOutResponse.json();
         const highPriorityData = await highPriorityResponse.json();
         const lowPriorityData = await lowPriorityResponse.json();
