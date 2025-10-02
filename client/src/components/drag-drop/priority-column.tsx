@@ -1,3 +1,4 @@
+
 import { Droppable } from "react-beautiful-dnd";
 import { Task } from "@shared/schema";
 import TaskCard from "./task-card";
@@ -57,7 +58,6 @@ export default function PriorityColumn({
   };
 
   const handleTimelineAssignment = () => {
-    // Per ora non fa nulla - implementazione futura
     console.log(`Smistamento task ${priority} sulla timeline`);
   };
 
@@ -91,7 +91,7 @@ export default function PriorityColumn({
             ref={provided.innerRef}
             {...provided.droppableProps}
             className={`
-              space-y-0.5 min-h-96 transition-colors duration-200
+              flex flex-wrap gap-1 min-h-96 transition-colors duration-200 content-start
               ${snapshot.isDraggingOver ? "drop-zone-active" : ""}
             `}
             data-testid={`priority-column-${droppableId}`}
