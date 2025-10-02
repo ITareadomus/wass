@@ -58,12 +58,12 @@ export default function TaskCard({ task, index }: TaskCardProps) {
             style={{
               ...provided.draggableProps.style,
               width: calculateWidth(task.duration),
-              minHeight: '24px',
+              minHeight: '40px',
             }}
             data-testid={`task-card-${task.id}`}
             onClick={handleCardClick}
           >
-            <div className="flex items-center h-full">
+            <div className="flex flex-col justify-center h-full gap-0.5">
               <div className="flex items-center gap-1 truncate">
                 <span className="font-medium text-[10px] leading-none" data-testid={`task-name-${task.id}`}>
                   {task.name}
@@ -71,6 +71,9 @@ export default function TaskCard({ task, index }: TaskCardProps) {
                 <span className="text-[8px] opacity-60 leading-none">
                   ({task.duration.replace(".", ":")}h)
                 </span>
+              </div>
+              <div className="text-[8px] opacity-50 leading-none truncate">
+                {task.type?.substring(0, 4).toUpperCase() || "N/A"}
               </div>
             </div>
           </div>
