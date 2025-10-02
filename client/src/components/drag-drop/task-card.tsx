@@ -63,6 +63,7 @@ export default function TaskCard({ task, index }: TaskCardProps) {
             `}
             style={{
               ...provided.draggableProps.style,
+              width: calculateWidth(task.duration),
               minHeight: '40px',
             }}
             data-testid={`task-card-${task.id}`}
