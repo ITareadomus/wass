@@ -12,7 +12,6 @@ interface PriorityColumnProps {
   droppableId: string;
   icon: "clock" | "alert-circle" | "arrow-down";
   syncedHeight?: number;
-  syncedWidth?: number;
 }
 
 export default function PriorityColumn({
@@ -22,7 +21,6 @@ export default function PriorityColumn({
   droppableId,
   icon,
   syncedHeight,
-  syncedWidth,
 }: PriorityColumnProps) {
   // Calcola altezza minima dinamica: ogni task occupa circa 48px (40px + gap)
   const calculateMinHeight = () => {
@@ -33,30 +31,6 @@ export default function PriorityColumn({
     const padding = 16; // padding del contenitore
     const totalHeight = (tasks.length * taskHeight) + headerHeight + padding;
     return `${totalHeight}px`;
-  };
-
-  // Calcola larghezza totale necessaria per le task
-  const calculateTotalWidth = () => {
-    if (tasks.length === 0) return 200; // Larghezza minima
-    
-    let totalWidth = 0;
-    tasks.forEach(task => {
-      const parts = task.duration.split(".");
-      const hours = parseInt(parts[0] || "0");
-      const minutes = parts[1] ? parseInt(parts[1]) : 0;
-      const totalMinutes = hours * 60 + minutes;
-      
-      // Caso eccezionale: 30 minuti = larghezza di 1 ora
-      if (totalMinutes === 30) {
-        totalWidth += 80;
-      } else {
-        const halfHours = Math.ceil(totalMinutes / 30);
-        totalWidth += halfHours * 40;
-      }
-      totalWidth += 8; // gap tra le task
-    });
-    
-    return totalWidth + 32; // padding del contenitore
   };
 
   const getColumnClass = (priority: string) => {
@@ -100,10 +74,8 @@ export default function PriorityColumn({
     console.log(`Smistamento task ${priority} sulla timeline`);
   };
 
-  const containerWidth = syncedWidth || calculateTotalWidth();
-
   return (
-    <div className={`${getColumnClass(priority)} rounded-lg p-4 border-2`} style={{ minWidth: `${containerWidth}px` }}>
+    <div className={`${getColumnClass(priority)} rounded-lg p-4 border-2`}>
       <div className="flex items-center justify-between mb-4">
         <div>
           <h3 className={`font-semibold ${getHeaderClass(priority)} flex items-center`}>
