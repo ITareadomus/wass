@@ -65,8 +65,13 @@ export default function TaskCard({ task, index }: TaskCardProps) {
             onClick={handleCardClick}
           >
             <div className="flex items-center justify-between h-full">
-              <div className="font-medium text-[10px] leading-none truncate" data-testid={`task-name-${task.id}`}>
-                {task.name}
+              <div className="flex items-center gap-1 truncate">
+                <span className="font-medium text-[10px] leading-none" data-testid={`task-name-${task.id}`}>
+                  {task.name}
+                </span>
+                <span className="text-[8px] opacity-60 leading-none">
+                  ({task.duration.replace(".", ":")}h)
+                </span>
               </div>
               <GripVertical className="w-2 h-2 opacity-50 ml-1 flex-shrink-0" />
             </div>
