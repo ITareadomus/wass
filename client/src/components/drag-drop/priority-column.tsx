@@ -91,7 +91,7 @@ export default function PriorityColumn({
             ref={provided.innerRef}
             {...provided.droppableProps}
             className={`
-              flex flex-wrap gap-2 min-h-96 transition-colors duration-200 content-start p-1
+              flex flex-wrap gap-2 min-h-[500px] transition-colors duration-200 content-start p-2
               ${snapshot.isDraggingOver ? "drop-zone-active" : ""}
             `}
             data-testid={`priority-column-${droppableId}`}
