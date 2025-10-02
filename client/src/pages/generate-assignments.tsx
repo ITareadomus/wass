@@ -4,9 +4,6 @@ import PriorityColumn from "@/components/drag-drop/priority-column";
 import { Task } from "@shared/schema";
 
 export default function GenerateAssignments() {
-  const [maxColumnHeight, setMaxColumnHeight] = useState<number>(0);
-  const columnRefs = useRef<(HTMLDivElement | null)[]>([]);
-
   const onDragEnd = (result: DropResult) => {
     // Per ora vuoto
     console.log(result);
@@ -544,28 +541,7 @@ export default function GenerateAssignments() {
     }
   ];
 
-  // Aggiunge lo stato per gestire le task e un effetto per aggiornare l'altezza massima
-  const [allTasks, setAllTasks] = useState<Task[]>([
-    ...earlyOutTasks,
-    ...highPriorityTasks,
-    ...lowPriorityTasks,
-  ]);
-
-  // Calcola l'altezza massima necessaria tra tutte le colonne
-  useEffect(() => {
-    const taskHeight = 48; // Altezza stimata per una card task
-    const headerHeight = 60; // Altezza stimata per l'header della colonna
-    const padding = 32; // Padding interno della colonna
-
-    const calculateHeight = (tasks: Task[]) => (tasks.length * taskHeight) + headerHeight + padding;
-
-    const earlyOutHeight = calculateHeight(earlyOutTasks);
-    const highPriorityHeight = calculateHeight(highPriorityTasks);
-    const lowPriorityHeight = calculateHeight(lowPriorityTasks);
-
-    const maxHeight = Math.max(earlyOutHeight, highPriorityHeight, lowPriorityHeight, 300); // Minimo 300px per evitare colonne troppo piccole
-    setMaxColumnHeight(maxHeight);
-  }, [earlyOutTasks.length, highPriorityTasks.length, lowPriorityTasks.length]);
+  
 
 
   return (
@@ -585,7 +561,6 @@ export default function GenerateAssignments() {
               tasks={earlyOutTasks}
               droppableId="early-out"
               icon="clock"
-              columnHeight={maxColumnHeight}
             />
             <PriorityColumn
               title="HIGH PRIORITY"
@@ -593,7 +568,6 @@ export default function GenerateAssignments() {
               tasks={highPriorityTasks}
               droppableId="high"
               icon="alert-circle"
-              columnHeight={maxColumnHeight}
             />
             <PriorityColumn
               title="LOW PRIORITY"
@@ -601,7 +575,6 @@ export default function GenerateAssignments() {
               tasks={lowPriorityTasks}
               droppableId="low"
               icon="arrow-down"
-              columnHeight={maxColumnHeight}
             />
           </div>
         </DragDropContext>
