@@ -132,7 +132,7 @@ export default function PriorityColumn({
             ref={provided.innerRef}
             {...provided.droppableProps}
             className={`
-              flex flex-wrap gap-2 transition-all duration-300 content-start p-2
+              flex flex-col gap-2 transition-all duration-300 p-2
               ${snapshot.isDraggingOver ? "drop-zone-active" : ""}
             `}
             style={{
