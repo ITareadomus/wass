@@ -30,14 +30,14 @@ export default function TaskCard({ task, index }: TaskCardProps) {
     }
   };
 
-  // Calcola la larghezza in base alla durata (ogni 30 minuti = 80px)
+  // Calcola la larghezza in base alla durata (ogni 30 minuti = 40px)
   const calculateWidth = (duration: string) => {
     const parts = duration.split(".");
     const hours = parseInt(parts[0] || "0");
     const minutes = parts[1] ? parseInt(parts[1]) : 0;
     const totalMinutes = hours * 60 + minutes;
     const halfHours = Math.ceil(totalMinutes / 30);
-    const width = halfHours * 80; // 80px per ogni mezza ora
+    const width = halfHours * 40; // 40px per ogni mezza ora (ridotto)
     return `${width}px`;
   };
 
@@ -51,7 +51,7 @@ export default function TaskCard({ task, index }: TaskCardProps) {
             {...provided.dragHandleProps}
             className={`
               ${getTaskClassByPriority(task.priority)} 
-              rounded-sm p-2 shadow-sm border transition-all duration-200
+              rounded-sm px-2 py-1 shadow-sm border transition-all duration-200
               ${snapshot.isDragging ? "rotate-2 scale-105 shadow-lg" : ""}
               hover:scale-105 hover:shadow-md cursor-pointer
               flex-shrink-0
@@ -59,24 +59,16 @@ export default function TaskCard({ task, index }: TaskCardProps) {
             style={{
               ...provided.draggableProps.style,
               width: calculateWidth(task.duration),
-              minHeight: '60px',
+              minHeight: '24px',
             }}
             data-testid={`task-card-${task.id}`}
             onClick={handleCardClick}
           >
-            <div className="flex flex-col h-full justify-between">
-              <div className="font-medium text-xs leading-tight" data-testid={`task-name-${task.id}`}>
+            <div className="flex items-center justify-between h-full">
+              <div className="font-medium text-[10px] leading-none truncate" data-testid={`task-name-${task.id}`}>
                 {task.name}
               </div>
-              <div className="text-xs opacity-75 leading-tight" data-testid={`task-type-${task.id}`}>
-                {task.type}
-              </div>
-              <div className="flex items-center justify-between mt-1">
-                <span className="text-[10px] font-semibold" data-testid={`task-duration-${task.id}`}>
-                  {task.duration.replace(".", ":")}h
-                </span>
-                <GripVertical className="w-2.5 h-2.5 opacity-50" />
-              </div>
+              <GripVertical className="w-2 h-2 opacity-50 ml-1 flex-shrink-0" />
             </div>
           </div>
         )}
