@@ -1,64 +1,14 @@
 import { DragDropContext, DropResult } from "react-beautiful-dnd";
 import { Task } from "@shared/schema";
 import PriorityColumn from "@/components/drag-drop/priority-column";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 export default function GenerateAssignments() {
   const [earlyOutTasks, setEarlyOutTasks] = useState<Task[]>([]);
   const [highPriorityTasks, setHighPriorityTasks] = useState<Task[]>([]);
   const [lowPriorityTasks, setLowPriorityTasks] = useState<Task[]>([]);
 
-  const onDragEnd = (result: DropResult) => {
-    const { destination, source, draggableId } = result;
-
-    // Se non c'è destinazione o la destinazione è uguale alla sorgente, non fare nulla
-    if (!destination || destination.droppableId === source.droppableId) {
-      return;
-    }
-
-    // Trova il task da spostare
-    let taskToMove: Task | undefined;
-    let sourceTasks: Task[] = [];
-    
-    if (source.droppableId === "early-out") {
-      sourceTasks = earlyOutTasks;
-    } else if (source.droppableId === "high") {
-      sourceTasks = highPriorityTasks;
-    } else if (source.droppableId === "low") {
-      sourceTasks = lowPriorityTasks;
-    }
-
-    taskToMove = sourceTasks.find(task => task.id === draggableId);
-    
-    if (!taskToMove) return;
-
-    // Rimuovi il task dalla lista di origine
-    const newSourceTasks = sourceTasks.filter(task => task.id !== draggableId);
-
-    // Aggiorna il task con la nuova priorità
-    const updatedTask = { ...taskToMove, priority: destination.droppableId as any };
-
-    // Aggiungi il task alla lista di destinazione
-    if (destination.droppableId === "early-out") {
-      setEarlyOutTasks([...earlyOutTasks, updatedTask]);
-    } else if (destination.droppableId === "high") {
-      setHighPriorityTasks([...highPriorityTasks, updatedTask]);
-    } else if (destination.droppableId === "low") {
-      setLowPriorityTasks([...lowPriorityTasks, updatedTask]);
-    }
-
-    // Aggiorna la lista di origine
-    if (source.droppableId === "early-out") {
-      setEarlyOutTasks(newSourceTasks);
-    } else if (source.droppableId === "high") {
-      setHighPriorityTasks(newSourceTasks);
-    } else if (source.droppableId === "low") {
-      setLowPriorityTasks(newSourceTasks);
-    }
-  };
-
-  // Inizializza le liste di task nello useState al primo render
-  useState(() => {
+  useEffect(() => {
     const initialEarlyOut: Task[] = [
     {
       id: "ea1",
@@ -589,8 +539,52 @@ export default function GenerateAssignments() {
       updatedAt: new Date().toISOString()
     }
     ];
+    setEarlyOutTasks(initialEarlyOut);
+    setHighPriorityTasks(initialHigh);
     setLowPriorityTasks(initialLow);
-  });
+  }, []);
+
+  const onDragEnd = (result: DropResult) => {
+    const { destination, source, draggableId } = result;
+
+    if (!destination || destination.droppableId === source.droppableId) {
+      return;
+    }
+
+    let taskToMove: Task | undefined;
+    let sourceTasks: Task[] = [];
+    
+    if (source.droppableId === "early-out") {
+      sourceTasks = earlyOutTasks;
+    } else if (source.droppableId === "high") {
+      sourceTasks = highPriorityTasks;
+    } else if (source.droppableId === "low") {
+      sourceTasks = lowPriorityTasks;
+    }
+
+    taskToMove = sourceTasks.find(task => task.id === draggableId);
+    
+    if (!taskToMove) return;
+
+    const newSourceTasks = sourceTasks.filter(task => task.id !== draggableId);
+    const updatedTask = { ...taskToMove, priority: destination.droppableId as any };
+
+    if (destination.droppableId === "early-out") {
+      setEarlyOutTasks([...earlyOutTasks, updatedTask]);
+    } else if (destination.droppableId === "high") {
+      setHighPriorityTasks([...highPriorityTasks, updatedTask]);
+    } else if (destination.droppableId === "low") {
+      setLowPriorityTasks([...lowPriorityTasks, updatedTask]);
+    }
+
+    if (source.droppableId === "early-out") {
+      setEarlyOutTasks(newSourceTasks);
+    } else if (source.droppableId === "high") {
+      setHighPriorityTasks(newSourceTasks);
+    } else if (source.droppableId === "low") {
+      setLowPriorityTasks(newSourceTasks);
+    }
+  };
 
   return (
     <div className="bg-background text-foreground min-h-screen">
