@@ -1,7 +1,6 @@
 import { DragDropContext, DropResult } from "react-beautiful-dnd";
-import { useState, useEffect, useRef } from "react";
-import PriorityColumn from "@/components/drag-drop/priority-column";
 import { Task } from "@shared/schema";
+import PriorityColumn from "@/components/drag-drop/priority-column";
 
 export default function GenerateAssignments() {
   const onDragEnd = (result: DropResult) => {
@@ -540,9 +539,6 @@ export default function GenerateAssignments() {
       updatedAt: new Date().toISOString()
     }
   ];
-
-  
-
 
   return (
     <div className="bg-background text-foreground min-h-screen">
