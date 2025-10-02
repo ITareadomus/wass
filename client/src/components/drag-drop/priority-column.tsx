@@ -22,11 +22,11 @@ export default function PriorityColumn({
   icon,
   syncedHeight,
 }: PriorityColumnProps) {
-  // Calcola altezza minima dinamica: ogni task occupa circa 48px (40px + gap)
+  // Calcola altezza minima dinamica: ogni task occupa circa 50px (44px + gap)
   const calculateMinHeight = () => {
-    if (tasks.length === 0) return '100px';
-    const taskHeight = 48; // altezza task + gap
-    const padding = 16; // padding del contenitore
+    if (tasks.length === 0) return '80px';
+    const taskHeight = 50; // altezza task + gap
+    const padding = 8; // padding del contenitore ridotto
     const totalHeight = (tasks.length * taskHeight) + padding;
     return `${totalHeight}px`;
   };
