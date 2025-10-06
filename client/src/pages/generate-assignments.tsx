@@ -25,6 +25,7 @@ interface RawTask {
   is_straordinaria: boolean;
   zone: number;
   reasons?: string[];
+  alias?: string; // Added alias field
 }
 
 export default function GenerateAssignments() {
@@ -46,21 +47,18 @@ export default function GenerateAssignments() {
     };
 
     // Funzione per convertire un task raw in Task
-    const convertRawTask = (rawTask: RawTask, priority: string): Task => {
-      return {
-        id: rawTask.task_id.toString(),
-        name: rawTask.logistic_code.toString(),
-        type: `Client ${rawTask.client_id}`,
-        duration: formatDuration(rawTask.cleaning_time),
-        priority: priority as any,
-        assignedTo: null,
-        status: "pending",
-        scheduledTime: null,
-        address: rawTask.address,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-      };
-    };
+    const convertRawTask = (raw: RawTask, priority: string): Task => ({
+      id: `task-${raw.task_id}`,
+      name: `CLIENT-${raw.client_id}`,
+      alias: raw.alias, // Use the alias field
+      type: raw.premium ? 'PREMIUM' : 'STANDARD',
+      duration: formatDuration(raw.cleaning_time),
+      priority,
+      assignedTo: null,
+      address: raw.address,
+      lat: parseFloat(raw.lat),
+      lng: parseFloat(raw.lng),
+    });
 
     // Carica i task dai file JSON
     const loadTasks = async () => {
