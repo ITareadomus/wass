@@ -83,9 +83,26 @@ export default function AssignmentsTimeline({
                       style={{ height: '60px' }}
                     >
                       {group.tasks.map((task, index) => {
-                        // Calcola la posizione left in base all'indice
-                        // Assumiamo che le task siano in ordine e partano dalle 8:00
-                        const leftPosition = index * 80; // 80px per colonna
+                        // Calcola la larghezza della task corrente
+                        const calculateWidth = (duration: string) => {
+                          const parts = duration.split(".");
+                          const hours = parseInt(parts[0] || "0");
+                          const minutes = parts[1] ? parseInt(parts[1]) : 0;
+                          const totalMinutes = hours * 60 + minutes;
+                          
+                          if (totalMinutes === 30) {
+                            return 80; // 30 minuti = 1 ora nella timeline
+                          }
+                          
+                          const halfHours = Math.ceil(totalMinutes / 30);
+                          return halfHours * 40; // 40px per ogni mezza ora
+                        };
+                        
+                        // Calcola la posizione left sommando le larghezze delle task precedenti
+                        let leftPosition = 0;
+                        for (let i = 0; i < index; i++) {
+                          leftPosition += calculateWidth(group.tasks[i].duration);
+                        }
                         
                         return (
                           <div
