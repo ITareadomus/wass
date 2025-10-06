@@ -68,9 +68,9 @@ export default function GenerateAssignments() {
     const loadTasks = async () => {
       try {
         const [earlyOutResponse, highPriorityResponse, lowPriorityResponse] = await Promise.all([
-          fetch('/data/early_out.json'),
-          fetch('/data/high_priority.json'),
-          fetch('/data/low_priority.json')
+          fetch('/public/data/early_out.json'),
+          fetch('/public/data/high_priority.json'),
+          fetch('/public/data/low_priority.json')
         ]);
 
         if (!earlyOutResponse.ok || !highPriorityResponse.ok || !lowPriorityResponse.ok) {
