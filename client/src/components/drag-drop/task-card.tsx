@@ -29,6 +29,23 @@ export default function TaskCard({ task, index }: TaskCardProps) {
     }
   };
 
+  // Calcola la larghezza in base alla durata (ogni 30 minuti = 40px)
+  const calculateWidth = (duration: string) => {
+    const parts = duration.split(".");
+    const hours = parseInt(parts[0] || "0");
+    const minutes = parts[1] ? parseInt(parts[1]) : 0;
+    const totalMinutes = hours * 60 + minutes;
+    
+    // Caso eccezionale: 30 minuti = larghezza di 1 ora
+    if (totalMinutes === 30) {
+      return "80px"; // Larghezza di 1 ora (2 * 40px)
+    }
+    
+    const halfHours = Math.ceil(totalMinutes / 30);
+    const width = halfHours * 40; // 40px per ogni mezza ora (ridotto)
+    return `${width}px`;
+  };
+
   return (
     <>
       <Draggable draggableId={task.id} index={index}>
@@ -46,6 +63,7 @@ export default function TaskCard({ task, index }: TaskCardProps) {
             `}
             style={{
               ...provided.draggableProps.style,
+              width: calculateWidth(task.duration),
               minHeight: '40px',
             }}
             data-testid={`task-card-${task.id}`}
