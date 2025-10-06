@@ -20,10 +20,10 @@ export default function AssignmentsTimeline({
     "17:00", "17:30"
   ];
 
-  const priorityGroups = [
-    { name: "Early Out", tasks: earlyOutTasks, bgClass: "bg-orange-100", barClass: "bg-orange-400" },
-    { name: "High Priority", tasks: highPriorityTasks, bgClass: "bg-green-100", barClass: "bg-green-500" },
-    { name: "Low Priority", tasks: lowPriorityTasks, bgClass: "bg-lime-100", barClass: "bg-lime-500" }
+  const cleanerGroups = [
+    { name: "LOPEZ ERNESTO", tasks: earlyOutTasks, bgClass: "bg-orange-100", barClass: "bg-orange-400" },
+    { name: "GARCIA MARIA", tasks: highPriorityTasks, bgClass: "bg-green-100", barClass: "bg-green-500" },
+    { name: "ROSSI PAOLO", tasks: lowPriorityTasks, bgClass: "bg-lime-100", barClass: "bg-lime-500" }
   ];
 
   return (
@@ -42,7 +42,7 @@ export default function AssignmentsTimeline({
         >
           {/* Header Row */}
           <div className="timeline-cell p-2 bg-secondary font-semibold text-sm border border-border">
-            PRIORITÀ
+            CLEANER
           </div>
           {timeSlots.map((slot, index) => (
             <div 
@@ -53,10 +53,10 @@ export default function AssignmentsTimeline({
             </div>
           ))}
 
-          {/* Priority Group Rows */}
-          {priorityGroups.map((group, groupIndex) => (
+          {/* Cleaner Rows */}
+          {cleanerGroups.map((group, groupIndex) => (
             <div key={groupIndex} className="contents">
-              {/* Priority Group Info Cell */}
+              {/* Cleaner Info Cell */}
               <div className="timeline-cell p-2 bg-card flex items-center border border-border">
                 <div>
                   <div className="text-sm font-medium">
