@@ -7,10 +7,9 @@ import { useState } from "react";
 interface TaskCardProps {
   task: Task;
   index: number;
-  isInTimeline?: boolean;
 }
 
-export default function TaskCard({ task, index, isInTimeline = false }: TaskCardProps) {
+export default function TaskCard({ task, index }: TaskCardProps) {
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   const handleCardClick = () => {
@@ -28,27 +27,6 @@ export default function TaskCard({ task, index, isInTimeline = false }: TaskCard
       default:
         return "task-unassigned";
     }
-  };
-
-  // Calcola la larghezza in base alla durata (solo per contenitori superiori)
-  const calculateWidth = () => {
-    if (isInTimeline) {
-      return undefined; // La larghezza nella timeline viene gestita dal parent
-    }
-    
-    const parts = task.duration.split(".");
-    const hours = parseInt(parts[0] || "0");
-    const minutes = parts[1] ? parseInt(parts[1]) : 0;
-    const totalMinutes = hours * 60 + minutes;
-    
-    // Task da 30 minuti hanno la stessa larghezza di quelle da 1 ora
-    if (totalMinutes <= 30) {
-      return "120px";
-    }
-    
-    // Altre task: 120px per ogni ora
-    const totalHours = totalMinutes / 60;
-    return `${Math.ceil(totalHours * 120)}px`;
   };
 
   return (
@@ -69,7 +47,6 @@ export default function TaskCard({ task, index, isInTimeline = false }: TaskCard
             style={{
               ...provided.draggableProps.style,
               minHeight: '40px',
-              width: calculateWidth(),
             }}
             data-testid={`task-card-${task.id}`}
             onClick={handleCardClick}

@@ -97,7 +97,7 @@ export default function PriorityColumn({
             data-testid={`priority-column-${droppableId}`}
           >
             {tasks.map((task, index) => (
-              <TaskCard key={task.id} task={task} index={index} isInTimeline={false} />
+              <TaskCard key={task.id} task={task} index={index} />
             ))}
             {provided.placeholder}
           </div>
