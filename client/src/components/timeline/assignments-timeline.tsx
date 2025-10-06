@@ -76,14 +76,30 @@ export default function AssignmentsTimeline({
                       ref={provided.innerRef}
                       {...provided.droppableProps}
                       className={`
-                        flex gap-1 p-2 min-h-[60px] items-center
+                        relative p-2 min-h-[60px]
                         ${snapshot.isDraggingOver ? "bg-blue-50" : group.bgClass}
                         transition-colors duration-200
                       `}
+                      style={{ height: '60px' }}
                     >
-                      {group.tasks.map((task, index) => (
-                        <TaskCard key={task.id} task={task} index={index} />
-                      ))}
+                      {group.tasks.map((task, index) => {
+                        // Calcola la posizione left in base all'indice
+                        // Assumiamo che le task siano in ordine e partano dalle 8:00
+                        const leftPosition = index * 80; // 80px per colonna
+                        
+                        return (
+                          <div
+                            key={task.id}
+                            style={{
+                              position: 'absolute',
+                              left: `${leftPosition}px`,
+                              top: '8px'
+                            }}
+                          >
+                            <TaskCard task={task} index={index} />
+                          </div>
+                        );
+                      })}
                       {provided.placeholder}
                     </div>
                   )}
