@@ -62,9 +62,6 @@ export default function AssignmentsTimeline({
                   <div className="text-sm font-medium">
                     {group.name}
                   </div>
-                  <div className="text-xs text-muted-foreground">
-                    {group.tasks.length} task
-                  </div>
                 </div>
               </div>
 
