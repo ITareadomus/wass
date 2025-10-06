@@ -1,3 +1,4 @@
+
 {
   "high_priority_tasks": [
     {
@@ -17,6 +18,7 @@
       "pax_out": 1,
       "small_equipment": false,
       "operation_id": 2,
+      "confirmed_operation": true,
       "straordinaria": false,
       "type": "B",
       "alias": "ITW",
@@ -41,6 +43,7 @@
       "pax_out": 2,
       "small_equipment": true,
       "operation_id": 2,
+      "confirmed_operation": true,
       "straordinaria": false,
       "type": "A",
       "alias": "SFRSRT",
@@ -65,6 +68,7 @@
       "pax_out": 2,
       "small_equipment": true,
       "operation_id": 2,
+      "confirmed_operation": true,
       "straordinaria": false,
       "type": "A",
       "alias": "RELSTAY",
@@ -90,6 +94,7 @@
       "pax_out": 2,
       "small_equipment": true,
       "operation_id": 2,
+      "confirmed_operation": true,
       "straordinaria": false,
       "type": "A",
       "alias": "RELSTAY",
@@ -115,6 +120,7 @@
       "pax_out": 3,
       "small_equipment": false,
       "operation_id": 2,
+      "confirmed_operation": true,
       "straordinaria": false,
       "type": "C",
       "alias": "CO99",
@@ -140,13 +146,140 @@
       "pax_out": 1,
       "small_equipment": false,
       "operation_id": 2,
+      "confirmed_operation": true,
       "straordinaria": false,
       "type": "B",
       "alias": "ITW",
       "reasons": [
         "same_day_checkin_between_eo_hp"
       ]
+    },
+    {
+      "task_id": 216953,
+      "logistic_code": 579,
+      "client_id": 2,
+      "premium": false,
+      "address": "VIA ATTO VANNUCCI 15",
+      "lat": "45.4495699",
+      "lng": "9.199613",
+      "cleaning_time": 60,
+      "checkin_date": "2025-10-07",
+      "checkout_date": "2025-10-07",
+      "checkin_time": "15:00",
+      "checkout_time": null,
+      "pax_in": 1,
+      "pax_out": 0,
+      "small_equipment": true,
+      "operation_id": 2,
+      "confirmed_operation": true,
+      "straordinaria": false,
+      "type": "A",
+      "alias": "ITW",
+      "reasons": [
+        "same_day_checkin_between_eo_hp"
+      ]
+    },
+    {
+      "task_id": 216957,
+      "logistic_code": 738,
+      "client_id": 3,
+      "premium": true,
+      "address": "Via Gian Giacomo Mora 12",
+      "lat": "45.4591723",
+      "lng": "9.1803896",
+      "cleaning_time": null,
+      "checkin_date": "2025-10-07",
+      "checkout_date": "2025-10-07",
+      "checkin_time": "18:00",
+      "checkout_time": null,
+      "pax_in": 3,
+      "pax_out": 2,
+      "small_equipment": false,
+      "operation_id": 2,
+      "confirmed_operation": false,
+      "straordinaria": false,
+      "type": "B",
+      "alias": "TBR",
+      "reasons": [
+        "premium"
+      ]
+    },
+    {
+      "task_id": 216962,
+      "logistic_code": 1236,
+      "client_id": 3,
+      "premium": true,
+      "address": "VIA DEI PIATTI, 5",
+      "lat": "45.460737",
+      "lng": "9.1853527",
+      "cleaning_time": 90,
+      "checkin_date": "2025-10-07",
+      "checkout_date": "2025-10-07",
+      "checkin_time": null,
+      "checkout_time": null,
+      "pax_in": 2,
+      "pax_out": 2,
+      "small_equipment": true,
+      "operation_id": 2,
+      "confirmed_operation": true,
+      "straordinaria": false,
+      "type": "A",
+      "alias": "TBR",
+      "reasons": [
+        "premium"
+      ]
+    },
+    {
+      "task_id": 216964,
+      "logistic_code": 1363,
+      "client_id": 3,
+      "premium": true,
+      "address": "VIA AMEDEI, 2",
+      "lat": "45.4597298",
+      "lng": "9.186577",
+      "cleaning_time": 270,
+      "checkin_date": "2025-10-08",
+      "checkout_date": "2025-10-07",
+      "checkin_time": null,
+      "checkout_time": null,
+      "pax_in": 1,
+      "pax_out": 1,
+      "small_equipment": false,
+      "operation_id": 2,
+      "confirmed_operation": true,
+      "straordinaria": false,
+      "type": "E",
+      "alias": "TBR",
+      "reasons": [
+        "premium"
+      ]
+    },
+    {
+      "task_id": 216968,
+      "logistic_code": 1483,
+      "client_id": 3,
+      "premium": true,
+      "address": "Via Santa Croce,8",
+      "lat": "45.4560183",
+      "lng": "9.1835278",
+      "cleaning_time": null,
+      "checkin_date": "2025-10-07",
+      "checkout_date": "2025-10-07",
+      "checkin_time": "15:00",
+      "checkout_time": null,
+      "pax_in": 4,
+      "pax_out": 6,
+      "small_equipment": false,
+      "operation_id": 2,
+      "confirmed_operation": false,
+      "straordinaria": false,
+      "type": "E",
+      "alias": "TBR",
+      "reasons": [
+        "same_day_checkin_between_eo_hp",
+        "premium"
+      ]
     }
   ],
-  "total_apartments": 6
+  "total_apartments": 11
 }
