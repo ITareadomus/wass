@@ -54,3 +54,18 @@ export type Personnel = typeof personnel.$inferSelect;
 
 export type InsertAssignment = z.infer<typeof insertAssignmentSchema>;
 export type Assignment = typeof assignments.$inferSelect;
+
+export const taskSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  alias: z.string().optional(),
+  type: z.string(),
+  duration: z.string(),
+  priority: z.enum(["early-out", "high", "low"]).nullable(),
+  assignedTo: z.string().nullable(),
+  status: z.enum(["pending", "assigned", "in-progress", "completed"]).default("pending"),
+  scheduledTime: z.string().nullable(),
+  address: z.string().optional(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});

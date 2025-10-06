@@ -25,6 +25,7 @@ interface RawTask {
   is_straordinaria: boolean;
   zone: number;
   reasons?: string[];
+  alias?: string;
 }
 
 export default function GenerateAssignments() {
@@ -50,6 +51,7 @@ export default function GenerateAssignments() {
       return {
         id: rawTask.task_id.toString(),
         name: rawTask.logistic_code.toString(),
+        alias: rawTask.alias,
         type: `Client ${rawTask.client_id}`,
         duration: formatDuration(rawTask.cleaning_time),
         priority: priority as any,
