@@ -17,7 +17,7 @@ export default function AssignmentsTimeline({
 }: AssignmentsTimelineProps) {
   const timeSlots = [
     "08:00", "09:00", "10:00", "11:00", "12:00", 
-    "13:00", "14:00", "15:00", "16:00", "17:00"
+    "13:00", "14:00", "15:00", "16:00", "17:00", "18:00", "19:00"
   ];
 
   const cleanerGroups = [
@@ -38,7 +38,7 @@ export default function AssignmentsTimeline({
       <div className="overflow-x-auto">
         <div 
           className="grid min-w-max"
-          style={{ gridTemplateColumns: "150px repeat(10, 80px)" }}
+          style={{ gridTemplateColumns: "150px repeat(12, 80px)" }}
         >
           {/* Header Row */}
           <div className="timeline-cell p-2 bg-secondary font-semibold text-sm border border-border">
@@ -67,7 +67,7 @@ export default function AssignmentsTimeline({
 
               {/* Time Slot Cells - Area Droppable */}
               <div 
-                className="col-span-10 border border-border relative"
+                className="col-span-12 border border-border relative"
                 style={{ gridColumn: "2 / -1" }}
               >
                 <Droppable droppableId={group.droppableId} direction="horizontal">
