@@ -36,13 +36,13 @@ export default function TaskCard({ task, index }: TaskCardProps) {
     const minutes = parts[1] ? parseInt(parts[1]) : 0;
     const totalMinutes = hours * 60 + minutes;
     
-    // Caso eccezionale: 30 minuti = larghezza di 1 ora
-    if (totalMinutes === 30) {
-      return "80px"; // Larghezza di 1 ora (2 * 40px)
+    // Se 0 minuti, usa almeno 30 minuti
+    if (totalMinutes === 0) {
+      return "40px";
     }
     
-    const halfHours = Math.ceil(totalMinutes / 30);
-    const width = halfHours * 40; // 40px per ogni mezza ora (ridotto)
+    // Calcola in base ai 30 minuti = 40px
+    const width = Math.ceil(totalMinutes / 30) * 40;
     return `${width}px`;
   };
 
