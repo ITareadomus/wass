@@ -72,7 +72,7 @@ export default function TaskCard({ task, index }: TaskCardProps) {
             <div className="flex flex-col justify-center h-full gap-0.5">
               <div className="flex items-center gap-1 truncate">
                 <span className="font-medium text-[10px] leading-none" data-testid={`task-name-${task.id}`}>
-                  {task.name}
+                  {task.alias || task.name}
                 </span>
                 <span className="text-[8px] opacity-60 leading-none">
                   ({task.duration.replace(".", ":")}h)
