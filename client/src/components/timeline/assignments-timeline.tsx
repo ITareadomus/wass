@@ -96,7 +96,7 @@ export default function AssignmentsTimeline({
                           key={task.id}
                           style={{ width: `${calculateTaskWidth(task.duration)}px` }}
                         >
-                          <TaskCard task={task} index={index} />
+                          <TaskCard task={task} index={index} isInTimeline={true} />
                         </div>
                       ))}
                       {provided.placeholder}
