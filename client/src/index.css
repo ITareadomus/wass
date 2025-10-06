@@ -82,7 +82,25 @@
 }
 
 @layer components {
-  /* Task styling */
+  /* Task styling basato su premium e straordinaria */
+  .task-straordinaria {
+    background-color: #fca5a5;
+    color: #7f1d1d;
+    border-color: #ef4444;
+  }
+  
+  .task-premium {
+    background-color: #fcd34d;
+    color: #78350f;
+    border-color: #f59e0b;
+  }
+  
+  .task-standard {
+    background-color: #86efac;
+    color: #14532d;
+    border-color: #22c55e;
+  }
+  
   .task-early-out {
     background-color: var(--task-early-out-bg);
     color: var(--task-early-out-fg);

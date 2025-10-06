@@ -26,6 +26,8 @@ interface RawTask {
   zone: number;
   reasons?: string[];
   alias?: string;
+  premium?: boolean;
+  is_straordinaria?: boolean;
 }
 
 export default function GenerateAssignments() {
@@ -59,6 +61,8 @@ export default function GenerateAssignments() {
         status: "pending",
         scheduledTime: null,
         address: rawTask.address,
+        premium: rawTask.premium,
+        is_straordinaria: rawTask.is_straordinaria,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
       };

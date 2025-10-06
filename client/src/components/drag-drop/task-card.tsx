@@ -16,17 +16,17 @@ export default function TaskCard({ task, index }: TaskCardProps) {
     setIsModalOpen(true);
   };
 
-  const getTaskClassByPriority = (priority: string | null) => {
-    switch (priority) {
-      case "early-out":
-        return "task-early-out";
-      case "high":
-        return "task-high-priority";
-      case "low":
-        return "task-low-priority";
-      default:
-        return "task-unassigned";
+  const getTaskClassByPriority = (task: Task) => {
+    // Se is_straordinaria è true, sempre rosso
+    if (task.is_straordinaria) {
+      return "task-straordinaria";
     }
+    // Se premium è true, dorato
+    if (task.premium) {
+      return "task-premium";
+    }
+    // Se premium è false o non presente, verde
+    return "task-standard";
   };
 
   // Calcola la larghezza in base alla durata (ogni 30 minuti = 40px)
@@ -55,7 +55,7 @@ export default function TaskCard({ task, index }: TaskCardProps) {
             {...provided.draggableProps}
             {...provided.dragHandleProps}
             className={`
-              ${getTaskClassByPriority(task.priority)} 
+              ${getTaskClassByPriority(task)} 
               rounded-sm px-2 py-1 shadow-sm border transition-all duration-200
               ${snapshot.isDragging ? "rotate-2 scale-105 shadow-lg" : ""}
               hover:scale-105 hover:shadow-md cursor-pointer

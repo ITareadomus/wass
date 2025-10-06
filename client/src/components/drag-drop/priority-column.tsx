@@ -20,17 +20,21 @@ export default function PriorityColumn({
   droppableId,
   icon,
 }: PriorityColumnProps) {
-  const getColumnClass = (priority: string) => {
-    switch (priority) {
-      case "early-out":
-        return "priority-column-early border-orange-200";
-      case "high":
-        return "priority-column-high border-green-200";
-      case "low":
-        return "priority-column-low border-lime-200";
-      default:
-        return "bg-muted border-border";
+  const getColumnClass = (priority: string, tasks: Task[]) => {
+    // Controlla se ci sono task straordinarie
+    const hasStraordinaria = tasks.some(task => task.is_straordinaria);
+    if (hasStraordinaria) {
+      return "bg-red-50 border-red-300";
     }
+    
+    // Controlla se ci sono task premium
+    const hasPremium = tasks.some(task => task.premium);
+    if (hasPremium) {
+      return "bg-yellow-50 border-yellow-300";
+    }
+    
+    // Altrimenti verde (standard)
+    return "bg-green-50 border-green-300";
   };
 
   const getHeaderClass = (priority: string) => {
@@ -62,7 +66,7 @@ export default function PriorityColumn({
   };
 
   return (
-    <div className={`${getColumnClass(priority)} rounded-lg p-4 border-2`}>
+    <div className={`${getColumnClass(priority, tasks)} rounded-lg p-4 border-2`}>
       <div className="flex items-center justify-between mb-4">
         <div>
           <h3 className={`font-semibold ${getHeaderClass(priority)} flex items-center`}>
