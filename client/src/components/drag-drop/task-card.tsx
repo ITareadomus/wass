@@ -59,10 +59,11 @@ export default function TaskCard({ task, index }: TaskCardProps) {
               rounded-sm px-2 py-1 shadow-sm border transition-all duration-200
               ${snapshot.isDragging ? "rotate-2 scale-105 shadow-lg" : ""}
               hover:scale-105 hover:shadow-md cursor-pointer
-              flex-shrink-0 w-full
+              flex-shrink-0
             `}
             style={{
               ...provided.draggableProps.style,
+              width: calculateWidth(task.duration),
               minHeight: '40px',
             }}
             data-testid={`task-card-${task.id}`}

@@ -28,16 +28,6 @@ export default function AssignmentsTimeline({
     { name: "ROSSI PAOLO", tasks: rossiTasks, bgClass: "bg-lime-100", barClass: "bg-lime-500", droppableId: "rossi" }
   ];
 
-  // Calcola la larghezza in base alla durata (ogni slot = 80px)
-  const calculateTaskWidth = (duration: string) => {
-    const parts = duration.split(".");
-    const hours = parseInt(parts[0] || "0");
-    const minutes = parts[1] ? parseInt(parts[1]) : 0;
-    const totalMinutes = hours * 60 + minutes;
-    const slots = totalMinutes / 30; // Ogni slot è 30 minuti
-    return slots * 80; // 80px per slot
-  };
-
   return (
     <div className="bg-card rounded-lg border shadow-sm mt-8">
       <div className="p-4 border-b border-border">
@@ -80,7 +70,7 @@ export default function AssignmentsTimeline({
               {/* Time Slot Cells - Area Droppable */}
               <div 
                 className="col-span-20 border border-border relative"
-                style={{ gridColumn: "2 / -1", height: "60px" }}
+                style={{ gridColumn: "2 / -1" }}
               >
                 <Droppable droppableId={group.droppableId} direction="horizontal">
                   {(provided, snapshot) => (
@@ -88,23 +78,13 @@ export default function AssignmentsTimeline({
                       ref={provided.innerRef}
                       {...provided.droppableProps}
                       className={`
-                        absolute inset-0 p-2
+                        flex gap-1 p-2 min-h-[60px] items-center
                         ${snapshot.isDraggingOver ? "bg-blue-50" : group.bgClass}
                         transition-colors duration-200
                       `}
                     >
                       {group.tasks.map((task, index) => (
-                        <div
-                          key={task.id}
-                          className="absolute top-2"
-                          style={{
-                            left: `${index * 10}px`, // Offset per vedere le task sovrapposte
-                            width: `${calculateTaskWidth(task.duration)}px`,
-                            zIndex: group.tasks.length - index
-                          }}
-                        >
-                          <TaskCard task={task} index={index} />
-                        </div>
+                        <TaskCard key={task.id} task={task} index={index} />
                       ))}
                       {provided.placeholder}
                     </div>
