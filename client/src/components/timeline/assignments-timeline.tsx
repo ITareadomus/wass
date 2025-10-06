@@ -28,6 +28,16 @@ export default function AssignmentsTimeline({
     { name: "ROSSI PAOLO", tasks: rossiTasks, bgClass: "bg-lime-100", barClass: "bg-lime-500", droppableId: "rossi" }
   ];
 
+  // Calcola la larghezza in base alla durata (ogni slot = 80px, ogni slot è 30 minuti)
+  const calculateTaskWidth = (duration: string) => {
+    const parts = duration.split(".");
+    const hours = parseInt(parts[0] || "0");
+    const minutes = parts[1] ? parseInt(parts[1]) : 0;
+    const totalMinutes = hours * 60 + minutes;
+    const slots = totalMinutes / 30; // Ogni slot è 30 minuti
+    return slots * 80; // 80px per slot
+  };
+
   return (
     <div className="bg-card rounded-lg border shadow-sm mt-8">
       <div className="p-4 border-b border-border">
@@ -84,7 +94,12 @@ export default function AssignmentsTimeline({
                       `}
                     >
                       {group.tasks.map((task, index) => (
-                        <TaskCard key={task.id} task={task} index={index} />
+                        <div 
+                          key={task.id}
+                          style={{ width: `${calculateTaskWidth(task.duration)}px` }}
+                        >
+                          <TaskCard task={task} index={index} />
+                        </div>
                       ))}
                       {provided.placeholder}
                     </div>
