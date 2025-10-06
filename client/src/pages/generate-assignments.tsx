@@ -32,6 +32,11 @@ export default function GenerateAssignments() {
   const [highPriorityTasks, setHighPriorityTasks] = useState<Task[]>([]);
   const [lowPriorityTasks, setLowPriorityTasks] = useState<Task[]>([]);
 
+  // Task assegnati per ogni cleaner
+  const [lopezTasks, setLopezTasks] = useState<Task[]>([]);
+  const [garciaTasks, setGarciaTasks] = useState<Task[]>([]);
+  const [rossiTasks, setRossiTasks] = useState<Task[]>([]);
+
   useEffect(() => {
     // Funzione per convertire cleaning_time (minuti) in formato ore.minuti
     const formatDuration = (minutes: number): string => {
@@ -74,15 +79,15 @@ export default function GenerateAssignments() {
         const highPriorityData = await highPriorityResponse.json();
         const lowPriorityData = await lowPriorityResponse.json();
 
-        const initialEarlyOut: Task[] = earlyOutData.early_out_tasks.map((task: RawTask) => 
+        const initialEarlyOut: Task[] = earlyOutData.early_out_tasks.map((task: RawTask) =>
           convertRawTask(task, "early-out")
         );
 
-        const initialHigh: Task[] = highPriorityData.high_priority_tasks.map((task: RawTask) => 
+        const initialHigh: Task[] = highPriorityData.high_priority_tasks.map((task: RawTask) =>
           convertRawTask(task, "high")
         );
 
-        const initialLow: Task[] = lowPriorityData.low_priority_tasks.map((task: RawTask) => 
+        const initialLow: Task[] = lowPriorityData.low_priority_tasks.map((task: RawTask) =>
           convertRawTask(task, "low")
         );
 
@@ -106,38 +111,53 @@ export default function GenerateAssignments() {
 
     let taskToMove: Task | undefined;
     let sourceTasks: Task[] = [];
-    
-    
+    let setSourceTasks: React.Dispatch<React.SetStateAction<Task[]>> = () => {};
+
+    // Determine the source list and its setter function
     if (source.droppableId === "early-out") {
       sourceTasks = earlyOutTasks;
+      setSourceTasks = setEarlyOutTasks;
     } else if (source.droppableId === "high") {
       sourceTasks = highPriorityTasks;
+      setSourceTasks = setHighPriorityTasks;
     } else if (source.droppableId === "low") {
       sourceTasks = lowPriorityTasks;
+      setSourceTasks = setLowPriorityTasks;
+    } else if (source.droppableId === "lopez") {
+      sourceTasks = lopezTasks;
+      setSourceTasks = setLopezTasks;
+    } else if (source.droppableId === "garcia") {
+      sourceTasks = garciaTasks;
+      setSourceTasks = setGarciaTasks;
+    } else if (source.droppableId === "rossi") {
+      sourceTasks = rossiTasks;
+      setSourceTasks = setRossiTasks;
     }
 
     taskToMove = sourceTasks.find(task => task.id === draggableId);
-    
+
     if (!taskToMove) return;
 
+    // Remove the task from the source list
     const newSourceTasks = sourceTasks.filter(task => task.id !== draggableId);
-    const updatedTask = { ...taskToMove, priority: destination.droppableId as any };
 
-    if (destination.droppableId === "early-out") {
-      setEarlyOutTasks([...earlyOutTasks, updatedTask]);
+    // Add the task to the destination list
+    if (destination.droppableId === "lopez") {
+      setLopezTasks([...lopezTasks, taskToMove]);
+    } else if (destination.droppableId === "garcia") {
+      setGarciaTasks([...garciaTasks, taskToMove]);
+    } else if (destination.droppableId === "rossi") {
+      setRossiTasks([...rossiTasks, taskToMove]);
+    } else if (destination.droppableId === "early-out") {
+      setEarlyOutTasks([...earlyOutTasks, taskToMove]);
     } else if (destination.droppableId === "high") {
-      setHighPriorityTasks([...highPriorityTasks, updatedTask]);
+      setHighPriorityTasks([...highPriorityTasks, taskToMove]);
     } else if (destination.droppableId === "low") {
-      setLowPriorityTasks([...lowPriorityTasks, updatedTask]);
+      setLowPriorityTasks([...lowPriorityTasks, taskToMove]);
     }
 
-    if (source.droppableId === "early-out") {
-      setEarlyOutTasks(newSourceTasks);
-    } else if (source.droppableId === "high") {
-      setHighPriorityTasks(newSourceTasks);
-    } else if (source.droppableId === "low") {
-      setLowPriorityTasks(newSourceTasks);
-    }
+    // Update the source list state
+    setSourceTasks(newSourceTasks);
   };
 
   return (
@@ -173,13 +193,13 @@ export default function GenerateAssignments() {
               icon="arrow-down"
             />
           </div>
-        </DragDropContext>
 
-        <AssignmentsTimeline 
-          earlyOutTasks={earlyOutTasks}
-          highPriorityTasks={highPriorityTasks}
-          lowPriorityTasks={lowPriorityTasks}
-        />
+          <AssignmentsTimeline
+            lopezTasks={lopezTasks}
+            garciaTasks={garciaTasks}
+            rossiTasks={rossiTasks}
+          />
+        </DragDropContext>
       </div>
     </div>
   );

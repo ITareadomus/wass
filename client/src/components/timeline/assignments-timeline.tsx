@@ -1,17 +1,19 @@
 
 import { Task } from "@shared/schema";
 import { Calendar } from "lucide-react";
+import { Droppable } from "react-beautiful-dnd";
+import TaskCard from "@/components/drag-drop/task-card";
 
 interface AssignmentsTimelineProps {
-  earlyOutTasks: Task[];
-  highPriorityTasks: Task[];
-  lowPriorityTasks: Task[];
+  lopezTasks: Task[];
+  garciaTasks: Task[];
+  rossiTasks: Task[];
 }
 
 export default function AssignmentsTimeline({ 
-  earlyOutTasks, 
-  highPriorityTasks, 
-  lowPriorityTasks 
+  lopezTasks, 
+  garciaTasks, 
+  rossiTasks 
 }: AssignmentsTimelineProps) {
   const timeSlots = [
     "08:00", "08:30", "09:00", "09:30", "10:00", "10:30",
@@ -21,9 +23,9 @@ export default function AssignmentsTimeline({
   ];
 
   const cleanerGroups = [
-    { name: "LOPEZ ERNESTO", tasks: earlyOutTasks, bgClass: "bg-orange-100", barClass: "bg-orange-400" },
-    { name: "GARCIA MARIA", tasks: highPriorityTasks, bgClass: "bg-green-100", barClass: "bg-green-500" },
-    { name: "ROSSI PAOLO", tasks: lowPriorityTasks, bgClass: "bg-lime-100", barClass: "bg-lime-500" }
+    { name: "LOPEZ ERNESTO", tasks: lopezTasks, bgClass: "bg-orange-100", barClass: "bg-orange-400", droppableId: "lopez" },
+    { name: "GARCIA MARIA", tasks: garciaTasks, bgClass: "bg-green-100", barClass: "bg-green-500", droppableId: "garcia" },
+    { name: "ROSSI PAOLO", tasks: rossiTasks, bgClass: "bg-lime-100", barClass: "bg-lime-500", droppableId: "rossi" }
   ];
 
   return (
@@ -65,25 +67,30 @@ export default function AssignmentsTimeline({
                 </div>
               </div>
 
-              {/* Time Slot Cells */}
-              {timeSlots.map((slot, slotIndex) => {
-                const hasTask = group.tasks.length > 0;
-                const showTaskBar = hasTask && slotIndex <= 3;
-                const task = group.tasks[0];
-                
-                return (
-                  <div 
-                    key={`${groupIndex}-${slot}`}
-                    className={`timeline-cell border border-border relative ${group.bgClass}`}
-                  >
-                    {showTaskBar && task && (
-                      <div className={`assignment-bar ${group.barClass} text-white rounded text-xs p-1 m-1`}>
-                        {task.name.substring(0, 6)}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
+              {/* Time Slot Cells - Area Droppable */}
+              <div 
+                className="col-span-20 border border-border relative"
+                style={{ gridColumn: "2 / -1" }}
+              >
+                <Droppable droppableId={group.droppableId} direction="horizontal">
+                  {(provided, snapshot) => (
+                    <div
+                      ref={provided.innerRef}
+                      {...provided.droppableProps}
+                      className={`
+                        flex gap-1 p-2 min-h-[60px] items-center
+                        ${snapshot.isDraggingOver ? "bg-blue-50" : group.bgClass}
+                        transition-colors duration-200
+                      `}
+                    >
+                      {group.tasks.map((task, index) => (
+                        <TaskCard key={task.id} task={task} index={index} />
+                      ))}
+                      {provided.placeholder}
+                    </div>
+                  )}
+                </Droppable>
+              </div>
             </div>
           ))}
         </div>
