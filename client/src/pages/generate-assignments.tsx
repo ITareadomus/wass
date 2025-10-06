@@ -1,6 +1,7 @@
 import { DragDropContext, DropResult } from "react-beautiful-dnd";
 import { Task } from "@shared/schema";
 import PriorityColumn from "@/components/drag-drop/priority-column";
+import AssignmentsTimeline from "@/components/timeline/assignments-timeline";
 import { useState, useEffect } from "react";
 
 interface RawTask {
@@ -173,6 +174,12 @@ export default function GenerateAssignments() {
             />
           </div>
         </DragDropContext>
+
+        <AssignmentsTimeline 
+          earlyOutTasks={earlyOutTasks}
+          highPriorityTasks={highPriorityTasks}
+          lowPriorityTasks={lowPriorityTasks}
+        />
       </div>
     </div>
   );
