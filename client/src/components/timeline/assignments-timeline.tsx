@@ -16,10 +16,8 @@ export default function AssignmentsTimeline({
   rossiTasks 
 }: AssignmentsTimelineProps) {
   const timeSlots = [
-    "08:00", "08:30", "09:00", "09:30", "10:00", "10:30",
-    "11:00", "11:30", "12:00", "12:30", "13:00", "13:30",
-    "14:00", "14:30", "15:00", "15:30", "16:00", "16:30",
-    "17:00", "17:30"
+    "08:00", "09:00", "10:00", "11:00", "12:00", 
+    "13:00", "14:00", "15:00", "16:00", "17:00"
   ];
 
   const cleanerGroups = [
@@ -40,7 +38,7 @@ export default function AssignmentsTimeline({
       <div className="overflow-x-auto">
         <div 
           className="grid min-w-max"
-          style={{ gridTemplateColumns: "150px repeat(20, 80px)" }}
+          style={{ gridTemplateColumns: "150px repeat(10, 80px)" }}
         >
           {/* Header Row */}
           <div className="timeline-cell p-2 bg-secondary font-semibold text-sm border border-border">
@@ -69,7 +67,7 @@ export default function AssignmentsTimeline({
 
               {/* Time Slot Cells - Area Droppable */}
               <div 
-                className="col-span-20 border border-border relative"
+                className="col-span-10 border border-border relative"
                 style={{ gridColumn: "2 / -1" }}
               >
                 <Droppable droppableId={group.droppableId} direction="horizontal">
