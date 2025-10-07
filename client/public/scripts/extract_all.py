@@ -15,6 +15,8 @@ HP_JSON = OUTPUT_DIR / "high_priority.json"
 LP_JSON = OUTPUT_DIR / "low_priority.json"
 DEBUG_JSON = OUTPUT_DIR / "extract_all_debug.json"
 
+# Crea le directory se non esistono
+INPUT_DIR.mkdir(parents=True, exist_ok=True)
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
 def parse_time(t):

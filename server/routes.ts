@@ -3,8 +3,60 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { insertTaskSchema, insertPersonnelSchema, insertAssignmentSchema } from "@shared/schema";
 import { z } from "zod";
+import { exec } from "child_process";
+import { promisify } from "util";
+import path from "path";
+
+const execAsync = promisify(exec);
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Endpoint per eseguire l'estrazione dei dati
+  app.post("/api/extract-data", async (req, res) => {
+    try {
+      const scriptsDir = path.join(process.cwd(), "client/public/scripts");
+
+      // Step 1: Esegui task_extractor.py
+      console.log("Eseguendo task_extractor.py...");
+      const { stdout: stdout1, stderr: stderr1 } = await execAsync(
+        `cd ${scriptsDir} && python3 task_extractor.py`,
+        { maxBuffer: 1024 * 1024 * 10 }
+      );
+
+      if (stderr1 && !stderr1.includes('Browserslist')) {
+        console.error("Errore task_extractor:", stderr1);
+      }
+      console.log("task_extractor output:", stdout1);
+
+      // Step 2: Esegui extract_all.py
+      console.log("Eseguendo extract_all.py...");
+      const { stdout: stdout2, stderr: stderr2 } = await execAsync(
+        `cd ${scriptsDir} && python3 extract_all.py`,
+        { maxBuffer: 1024 * 1024 * 10 }
+      );
+
+      if (stderr2 && !stderr2.includes('Browserslist')) {
+        console.error("Errore extract_all:", stderr2);
+      }
+      console.log("extract_all output:", stdout2);
+
+      res.json({
+        success: true,
+        message: "Dati estratti con successo",
+        outputs: {
+          task_extractor: stdout1,
+          extract_all: stdout2
+        }
+      });
+    } catch (error: any) {
+      console.error("Errore durante l'estrazione:", error);
+      res.status(500).json({
+        success: false,
+        error: error.message,
+        stderr: error.stderr
+      });
+    }
+  });
+
   // Task routes
   app.get("/api/tasks", async (req, res) => {
     try {
@@ -34,12 +86,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { id } = req.params;
       const updates = req.body;
       const task = await storage.updateTask(id, updates);
-      
+
       if (!task) {
         res.status(404).json({ message: "Task not found" });
         return;
       }
-      
+
       res.json(task);
     } catch (error) {
       res.status(500).json({ message: "Failed to update task" });
@@ -50,12 +102,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { id } = req.params;
       const deleted = await storage.deleteTask(id);
-      
+
       if (!deleted) {
         res.status(404).json({ message: "Task not found" });
         return;
       }
-      
+
       res.status(204).send();
     } catch (error) {
       res.status(500).json({ message: "Failed to delete task" });
@@ -115,22 +167,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { id } = req.params;
       const { priority } = req.body;
-      
+
       let assignedTo: string | null = null;
-      
+
       // Auto-assign to personnel when moving to priority column
       if (priority && priority !== null) {
         const personnel = await storage.getPersonnel();
         const tasks = await storage.getTasks();
-        
+
         // Simple round-robin assignment based on current workload
         const workloadMap = new Map<string, number>();
-        
+
         // Initialize workload counter
         personnel.forEach(person => {
           workloadMap.set(person.id, 0);
         });
-        
+
         // Count current assignments
         tasks.forEach(task => {
           if (task.assignedTo && task.priority) {
@@ -138,7 +190,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             workloadMap.set(task.assignedTo, currentCount + 1);
           }
         });
-        
+
         // Find person with least workload
         let minWorkload = Infinity;
         for (const [personId, workload] of Array.from(workloadMap.entries())) {
@@ -148,33 +200,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
         }
       }
-      
+
       const task = await storage.updateTask(id, { priority, assignedTo });
-      
+
       if (!task) {
         res.status(404).json({ message: "Task not found" });
         return;
       }
-      
+
       res.json(task);
     } catch (error) {
       res.status(500).json({ message: "Failed to update task priority" });
     }
   });
 
-  // Auto-assign tasks endpoint  
+  // Auto-assign tasks endpoint
   app.post("/api/tasks/auto-assign", async (req, res) => {
     try {
       const tasks = await storage.getTasks();
       const personnel = await storage.getPersonnel();
       const unassignedTasks = tasks.filter(task => !task.priority);
-      
+
       // Initialize workload counter
       const workloadMap = new Map<string, number>();
       personnel.forEach(person => {
         workloadMap.set(person.id, 0);
       });
-      
+
       // Count current assignments
       tasks.forEach(task => {
         if (task.assignedTo && task.priority) {
@@ -182,30 +234,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
           workloadMap.set(task.assignedTo, currentCount + 1);
         }
       });
-      
+
       // Assign each unassigned task
       for (let i = 0; i < unassignedTasks.length; i++) {
         const priorities = ['early-out', 'high', 'low'];
         const priority = priorities[i % priorities.length];
-        
+
         // Find person with least workload
         let minWorkload = Infinity;
         let assignedTo: string | null = null;
-        
+
         for (const [personId, workload] of Array.from(workloadMap.entries())) {
           if (workload < minWorkload) {
             minWorkload = workload;
             assignedTo = personId;
           }
         }
-        
+
         // Update task and increment workload counter
         await storage.updateTask(unassignedTasks[i].id, { priority, assignedTo });
         if (assignedTo) {
           workloadMap.set(assignedTo, (workloadMap.get(assignedTo) || 0) + 1);
         }
       }
-      
+
       const updatedTasks = await storage.getTasks();
       res.json(updatedTasks);
     } catch (error) {
@@ -217,11 +269,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/tasks/clear-assignments", async (req, res) => {
     try {
       const tasks = await storage.getTasks();
-      
+
       for (const task of tasks) {
         await storage.updateTask(task.id, { priority: null, assignedTo: null });
       }
-      
+
       const updatedTasks = await storage.getTasks();
       res.json(updatedTasks);
     } catch (error) {
@@ -235,9 +287,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { id } = req.params;
       const tasks = await storage.getTasks();
       const task = tasks.find(t => t.id === id);
-      
+
       console.log(`[Schedule] Task ${id} found:`, { name: task?.name, priority: task?.priority, assignedTo: task?.assignedTo });
-      
+
       if (!task) {
         console.log(`[Schedule] Task ${id} not found`);
         res.status(404).json({ message: "Task not found" });
@@ -256,13 +308,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.log(`[Schedule] Auto-assigning task ${id}`);
         const personnel = await storage.getPersonnel();
         const tasks = await storage.getTasks();
-        
+
         // Initialize workload counter
         const workloadMap = new Map<string, number>();
         personnel.forEach(person => {
           workloadMap.set(person.id, 0);
         });
-        
+
         // Count current assignments
         tasks.forEach(t => {
           if (t.assignedTo && t.priority) {
@@ -270,7 +322,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             workloadMap.set(t.assignedTo, currentCount + 1);
           }
         });
-        
+
         // Find person with least workload
         let minWorkload = Infinity;
         for (const [personId, workload] of Array.from(workloadMap.entries())) {
@@ -279,7 +331,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             assignedTo = personId;
           }
         }
-        
+
         if (assignedTo) {
           // Update task with assignment
           await storage.updateTask(id, { assignedTo });
@@ -303,7 +355,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         personnelId: assignedTo,
         priority: task.priority,
         startTime: "10:00", // Default start time
-        endTime: "16:30", // Default end time  
+        endTime: "16:30", // Default end time
       });
 
       res.json(task);
