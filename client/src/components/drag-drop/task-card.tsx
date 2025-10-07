@@ -1,7 +1,11 @@
-
 import { Draggable } from "react-beautiful-dnd";
 import { Task } from "@shared/schema";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { useState } from "react";
 import { HelpCircle } from "lucide-react";
@@ -12,7 +16,11 @@ interface TaskCardProps {
   isInTimeline?: boolean;
 }
 
-export default function TaskCard({ task, index, isInTimeline = false }: TaskCardProps) {
+export default function TaskCard({
+  task,
+  index,
+  isInTimeline = false,
+}: TaskCardProps) {
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   const handleCardClick = () => {
@@ -38,17 +46,17 @@ export default function TaskCard({ task, index, isInTimeline = false }: TaskCard
     const hours = parseInt(parts[0] || "0");
     const minutes = parts[1] ? parseInt(parts[1]) : 0;
     const totalMinutes = hours * 60 + minutes;
-    
+
     // Se 0 minuti, usa almeno 30 minuti
     if (totalMinutes === 0) {
       return "40px";
     }
-    
+
     // Se la task dura meno di 1 ora e non è sulla timeline, mostrala come 1 ora
     if (totalMinutes < 60 && !forTimeline) {
       return "80px"; // 1 ora = 80px
     }
-    
+
     // Calcola in base ai 30 minuti = 40px
     const width = Math.ceil(totalMinutes / 30) * 40;
     return `${width}px`;
@@ -72,19 +80,25 @@ export default function TaskCard({ task, index, isInTimeline = false }: TaskCard
             style={{
               ...provided.draggableProps.style,
               width: calculateWidth(task.duration, isInTimeline),
-              minHeight: '40px',
+              minHeight: "40px",
             }}
             data-testid={`task-card-${task.id}`}
             onClick={handleCardClick}
           >
             {task.confirmed_operation === false && (
               <div className="absolute top-0.5 right-0.5 z-50">
-                <HelpCircle className="w-3 h-3 text-gray-900" strokeWidth={2.5} />
+                <HelpCircle
+                  className="w-3 h-3 text-gray-900"
+                  strokeWidth={2.5}
+                />
               </div>
             )}
             <div className="flex flex-col items-center justify-center h-full gap-0.5">
               <div className="flex items-center gap-1">
-                <span className="font-medium text-[10px] leading-none" data-testid={`task-name-${task.id}`}>
+                <span
+                  className="font-medium text-[10px] leading-none"
+                  data-testid={`task-name-${task.id}`}
+                >
                   {task.name}
                 </span>
                 <span className="text-[8px] opacity-60 leading-none">
@@ -115,9 +129,7 @@ export default function TaskCard({ task, index, isInTimeline = false }: TaskCard
                   Premium
                 </Badge>
               ) : (
-                <Badge className="bg-green-500 text-white">
-                  Standard
-                </Badge>
+                <Badge className="bg-green-500 text-white">Standard</Badge>
               )}
             </DialogTitle>
           </DialogHeader>
@@ -125,47 +137,71 @@ export default function TaskCard({ task, index, isInTimeline = false }: TaskCard
             {/* Informazioni Base */}
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <p className="text-sm font-semibold text-muted-foreground">Codice ADAM</p>
+                <p className="text-sm font-semibold text-muted-foreground">
+                  Codice ADAM
+                </p>
                 <p className="text-sm">{task.name}</p>
               </div>
               <div>
-                <p className="text-sm font-semibold text-muted-foreground">Cliente</p>
-                <p className="text-sm">{task.customer_name || 'N/A'}</p>
+                <p className="text-sm font-semibold text-muted-foreground">
+                  Cliente
+                </p>
+                <p className="text-sm">{task.customer_name || "N/A"}</p>
               </div>
               <div>
-                <p className="text-sm font-semibold text-muted-foreground">Tipologia</p>
-                <p className="text-sm">{(task as any).type ?? 'N/A'}</p>
+                <p className="text-sm font-semibold text-muted-foreground">
+                  Tipologia
+                </p>
+                <p className="text-sm">{(task as any).type_apt ?? "N/A"}</p>
               </div>
               <div>
-                <p className="text-sm font-semibold text-muted-foreground">Durata di pulizia</p>
+                <p className="text-sm font-semibold text-muted-foreground">
+                  Durata di pulizia
+                </p>
                 <p className="text-sm">{task.duration.replace(".", ":")} ore</p>
               </div>
             </div>
 
             {/* Indirizzo */}
             <div>
-              <p className="text-sm font-semibold text-muted-foreground">Indirizzo</p>
-              <p className="text-sm">{task.address || 'N/A'}</p>
+              <p className="text-sm font-semibold text-muted-foreground">
+                Indirizzo
+              </p>
+              <p className="text-sm">{task.address || "N/A"}</p>
             </div>
 
             {/* Date e orari */}
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <p className="text-sm font-semibold text-muted-foreground">Checkout</p>
+                <p className="text-sm font-semibold text-muted-foreground">
+                  Checkout
+                </p>
                 <p className="text-sm">
-                  {(task as any).checkout_date 
-                    ? new Date((task as any).checkout_date).toLocaleDateString('it-IT', {day: '2-digit', month: '2-digit', year: 'numeric'}) 
-                    : 'N/A'}
-                  {(task as any).checkout_time ? ` - ${(task as any).checkout_time}` : ''}
+                  {(task as any).checkout_date
+                    ? new Date((task as any).checkout_date).toLocaleDateString(
+                        "it-IT",
+                        { day: "2-digit", month: "2-digit", year: "numeric" },
+                      )
+                    : "N/A"}
+                  {(task as any).checkout_time
+                    ? ` - ${(task as any).checkout_time}`
+                    : ""}
                 </p>
               </div>
               <div>
-                <p className="text-sm font-semibold text-muted-foreground">Checkin</p>
+                <p className="text-sm font-semibold text-muted-foreground">
+                  Checkin
+                </p>
                 <p className="text-sm">
-                  {(task as any).checkin_date 
-                    ? new Date((task as any).checkin_date).toLocaleDateString('it-IT', {day: '2-digit', month: '2-digit', year: 'numeric'}) 
-                    : 'N/A'}
-                  {(task as any).checkin_time ? ` - ${(task as any).checkin_time}` : ''}
+                  {(task as any).checkin_date
+                    ? new Date((task as any).checkin_date).toLocaleDateString(
+                        "it-IT",
+                        { day: "2-digit", month: "2-digit", year: "numeric" },
+                      )
+                    : "N/A"}
+                  {(task as any).checkin_time
+                    ? ` - ${(task as any).checkin_time}`
+                    : ""}
                 </p>
               </div>
             </div>
@@ -173,19 +209,25 @@ export default function TaskCard({ task, index, isInTimeline = false }: TaskCard
             {/* Pax */}
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <p className="text-sm font-semibold text-muted-foreground">Pax-In</p>
-                <p className="text-sm">{(task as any).pax_in ?? 'N/A'}</p>
+                <p className="text-sm font-semibold text-muted-foreground">
+                  Pax-In
+                </p>
+                <p className="text-sm">{(task as any).pax_in ?? "N/A"}</p>
               </div>
               <div>
-                <p className="text-sm font-semibold text-muted-foreground">Pax-Out</p>
-                <p className="text-sm">{(task as any).pax_out ?? 'N/A'}</p>
+                <p className="text-sm font-semibold text-muted-foreground">
+                  Pax-Out
+                </p>
+                <p className="text-sm">{(task as any).pax_out ?? "N/A"}</p>
               </div>
             </div>
 
             {/* Tipologia intervento */}
             <div>
-              <p className="text-sm font-semibold text-muted-foreground">Tipologia intervento</p>
-              <p className="text-sm">{(task as any).operation_id ?? 'N/A'}</p>
+              <p className="text-sm font-semibold text-muted-foreground">
+                Tipologia intervento
+              </p>
+              <p className="text-sm">{(task as any).operation_id ?? "N/A"}</p>
             </div>
           </div>
         </DialogContent>
