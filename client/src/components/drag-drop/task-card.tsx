@@ -134,7 +134,7 @@ export default function TaskCard({ task, index, isInTimeline = false }: TaskCard
               </div>
               <div>
                 <p className="text-sm font-semibold text-muted-foreground">Tipologia</p>
-                <p className="text-sm">{(task as any).type || 'N/A'}</p>
+                <p className="text-sm">{(task as any).type ?? 'N/A'}</p>
               </div>
               <div>
                 <p className="text-sm font-semibold text-muted-foreground">Durata di pulizia</p>
