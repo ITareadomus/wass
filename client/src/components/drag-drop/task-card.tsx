@@ -71,8 +71,8 @@ export default function TaskCard({ task, index }: TaskCardProps) {
             onClick={handleCardClick}
           >
             {task.confirmed_operation === false && (
-              <div className="absolute top-0.5 right-0.5 z-10">
-                <HelpCircle className="w-3 h-3 text-gray-700" />
+              <div className="absolute top-0.5 right-0.5 z-50">
+                <HelpCircle className="w-3 h-3 text-gray-900 opacity-100" strokeWidth={2.5} />
               </div>
             )}
             <div className="flex items-center justify-center h-full gap-1">
