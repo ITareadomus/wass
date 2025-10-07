@@ -4,8 +4,7 @@ from pathlib import Path
 
 # --- PATH ---
 # Use a project-relative data folder so the script works on Windows and UNIX
-# BASE_DIR previously pointed to a Linux-style mount; make it relative to the
-# repository root (parent of this script's parent directory)
+# BASE_DIR points to client/public/data
 BASE_DIR = Path(__file__).resolve().parent.parent / "data"
 INPUT_DIR = BASE_DIR / "input"
 OUTPUT_DIR = BASE_DIR / "output"
@@ -14,7 +13,7 @@ SETTINGS_PATH = INPUT_DIR / "settings.json"
 EO_JSON = OUTPUT_DIR / "early_out.json"
 HP_JSON = OUTPUT_DIR / "high_priority.json"
 LP_JSON = OUTPUT_DIR / "low_priority.json"
-DEBUG_JSON = BASE_DIR / "extract_all_debug.json"
+DEBUG_JSON = OUTPUT_DIR / "extract_all_debug.json"
 
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
