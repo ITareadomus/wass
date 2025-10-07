@@ -101,12 +101,88 @@ export default function TaskCard({ task, index, isInTimeline = false }: TaskCard
       </Draggable>
 
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-2xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Dettagli Task</DialogTitle>
+            <DialogTitle>Dettagli Task #{task.name}</DialogTitle>
           </DialogHeader>
-          <div className="p-4">
-            {/* Empty content as requested */}
+          <div className="space-y-4">
+            {/* Informazioni Base */}
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <p className="text-sm font-semibold text-muted-foreground">ID Task</p>
+                <p className="text-sm">{task.id}</p>
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-muted-foreground">Codice Logistico</p>
+                <p className="text-sm">{task.name}</p>
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-muted-foreground">Alias</p>
+                <p className="text-sm">{task.alias || 'N/A'}</p>
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-muted-foreground">Cliente</p>
+                <p className="text-sm">{task.type}</p>
+              </div>
+            </div>
+
+            {/* Indirizzo */}
+            <div>
+              <p className="text-sm font-semibold text-muted-foreground">Indirizzo</p>
+              <p className="text-sm">{task.address}</p>
+            </div>
+
+            {/* Durata e Tempo */}
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <p className="text-sm font-semibold text-muted-foreground">Durata Pulizia</p>
+                <p className="text-sm">{task.duration.replace(".", ":")} ore</p>
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-muted-foreground">Priorità</p>
+                <p className="text-sm capitalize">{task.priority || 'Non assegnata'}</p>
+              </div>
+            </div>
+
+            {/* Status Flags */}
+            <div className="grid grid-cols-3 gap-4">
+              <div>
+                <p className="text-sm font-semibold text-muted-foreground">Premium</p>
+                <p className="text-sm">{task.premium ? '✅ Sì' : '❌ No'}</p>
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-muted-foreground">Straordinaria</p>
+                <p className="text-sm">{task.is_straordinaria ? '✅ Sì' : '❌ No'}</p>
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-muted-foreground">Operazione Confermata</p>
+                <p className="text-sm">{task.confirmed_operation === false ? '❓ Da Confermare' : task.confirmed_operation ? '✅ Confermata' : '❌ No'}</p>
+              </div>
+            </div>
+
+            {/* Assegnazione */}
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <p className="text-sm font-semibold text-muted-foreground">Assegnato a</p>
+                <p className="text-sm">{task.assignedTo || 'Non assegnato'}</p>
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-muted-foreground">Stato</p>
+                <p className="text-sm capitalize">{task.status}</p>
+              </div>
+            </div>
+
+            {/* Timestamp */}
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <p className="text-sm font-semibold text-muted-foreground">Creato il</p>
+                <p className="text-sm">{new Date(task.createdAt).toLocaleString('it-IT')}</p>
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-muted-foreground">Ultimo aggiornamento</p>
+                <p className="text-sm">{new Date(task.updatedAt).toLocaleString('it-IT')}</p>
+              </div>
+            </div>
           </div>
         </DialogContent>
       </Dialog>
