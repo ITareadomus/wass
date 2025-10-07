@@ -112,7 +112,7 @@ export default function AssignmentsTimeline({
                               top: '8px'
                             }}
                           >
-                            <TaskCard task={task} index={index} />
+                            <TaskCard task={task} index={index} isInTimeline={true} />
                           </div>
                         );
                       })}

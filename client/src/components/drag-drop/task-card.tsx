@@ -8,9 +8,10 @@ import { HelpCircle } from "lucide-react";
 interface TaskCardProps {
   task: Task;
   index: number;
+  isInTimeline?: boolean;
 }
 
-export default function TaskCard({ task, index }: TaskCardProps) {
+export default function TaskCard({ task, index, isInTimeline = false }: TaskCardProps) {
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   const handleCardClick = () => {
@@ -31,7 +32,7 @@ export default function TaskCard({ task, index }: TaskCardProps) {
   };
 
   // Calcola la larghezza in base alla durata (ogni 30 minuti = 40px)
-  const calculateWidth = (duration: string) => {
+  const calculateWidth = (duration: string, forTimeline: boolean) => {
     const parts = duration.split(".");
     const hours = parseInt(parts[0] || "0");
     const minutes = parts[1] ? parseInt(parts[1]) : 0;
@@ -40,6 +41,11 @@ export default function TaskCard({ task, index }: TaskCardProps) {
     // Se 0 minuti, usa almeno 30 minuti
     if (totalMinutes === 0) {
       return "40px";
+    }
+    
+    // Se la task dura meno di 1 ora e non è sulla timeline, mostrala come 1 ora
+    if (totalMinutes < 60 && !forTimeline) {
+      return "80px"; // 1 ora = 80px
     }
     
     // Calcola in base ai 30 minuti = 40px
@@ -64,7 +70,7 @@ export default function TaskCard({ task, index }: TaskCardProps) {
             `}
             style={{
               ...provided.draggableProps.style,
-              width: calculateWidth(task.duration),
+              width: calculateWidth(task.duration, isInTimeline),
               minHeight: '40px',
             }}
             data-testid={`task-card-${task.id}`}
