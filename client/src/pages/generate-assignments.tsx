@@ -177,27 +177,33 @@ export default function GenerateAssignments() {
 
         <DragDropContext onDragEnd={onDragEnd}>
           <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-            <PriorityColumn
-              title="EARLY OUT"
-              priority="early-out"
-              tasks={earlyOutTasks}
-              droppableId="early-out"
-              icon="clock"
-            />
-            <PriorityColumn
-              title="HIGH PRIORITY"
-              priority="high"
-              tasks={highPriorityTasks}
-              droppableId="high"
-              icon="alert-circle"
-            />
-            <PriorityColumn
-              title="LOW PRIORITY"
-              priority="low"
-              tasks={lowPriorityTasks}
-              droppableId="low"
-              icon="arrow-down"
-            />
+            <div className="bg-blue-100 rounded-lg p-4">
+              <PriorityColumn
+                title="EARLY OUT"
+                priority="early-out"
+                tasks={earlyOutTasks}
+                droppableId="early-out"
+                icon="clock"
+              />
+            </div>
+            <div className="bg-blue-200 rounded-lg p-4">
+              <PriorityColumn
+                title="HIGH PRIORITY"
+                priority="high"
+                tasks={highPriorityTasks}
+                droppableId="high"
+                icon="alert-circle"
+              />
+            </div>
+            <div className="bg-blue-300 rounded-lg p-4">
+              <PriorityColumn
+                title="LOW PRIORITY"
+                priority="low"
+                tasks={lowPriorityTasks}
+                droppableId="low"
+                icon="arrow-down"
+              />
+            </div>
           </div>
 
           <AssignmentsTimeline
