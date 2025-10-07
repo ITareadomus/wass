@@ -35,7 +35,7 @@
   --task-unassigned-fg: hsl(220 9% 46%);
   
   /* Priority column colors */
-  --priority-column-early-bg: hsl(200 80% 90%);
+  --priority-column-early-bg: hsl(45 93% 89%);
   --priority-column-high-bg: hsl(142 52% 96%);
   --priority-column-low-bg: hsl(82 61% 95%);
   
