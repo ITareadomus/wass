@@ -75,13 +75,20 @@ export default function TaskCard({ task, index }: TaskCardProps) {
                 <HelpCircle className="w-3 h-3 text-gray-900" strokeWidth={2.5} />
               </div>
             )}
-            <div className="flex items-center justify-center h-full gap-1">
-              <span className="font-medium text-[10px] leading-none" data-testid={`task-name-${task.id}`}>
-                {task.name}
-              </span>
-              <span className="text-[8px] opacity-60 leading-none">
-                ({task.duration.replace(".", ":")}h)
-              </span>
+            <div className="flex flex-col items-center justify-center h-full gap-0.5">
+              <div className="flex items-center gap-1">
+                <span className="font-medium text-[10px] leading-none" data-testid={`task-name-${task.id}`}>
+                  {task.name}
+                </span>
+                <span className="text-[8px] opacity-60 leading-none">
+                  ({task.duration.replace(".", ":")}h)
+                </span>
+              </div>
+              {task.alias && (
+                <span className="text-[8px] opacity-70 leading-none">
+                  {task.alias}
+                </span>
+              )}
             </div>
           </div>
         )}
