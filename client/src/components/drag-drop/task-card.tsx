@@ -130,11 +130,11 @@ export default function TaskCard({ task, index, isInTimeline = false }: TaskCard
               </div>
               <div>
                 <p className="text-sm font-semibold text-muted-foreground">Cliente</p>
-                <p className="text-sm">{task.type}</p>
+                <p className="text-sm">{task.customer_name || 'N/A'}</p>
               </div>
               <div>
                 <p className="text-sm font-semibold text-muted-foreground">Tipologia</p>
-                <p className="text-sm">{task.alias || 'N/A'}</p>
+                <p className="text-sm">{task.type || 'N/A'}</p>
               </div>
               <div>
                 <p className="text-sm font-semibold text-muted-foreground">Durata di pulizia</p>
@@ -145,7 +145,7 @@ export default function TaskCard({ task, index, isInTimeline = false }: TaskCard
             {/* Indirizzo */}
             <div>
               <p className="text-sm font-semibold text-muted-foreground">Indirizzo</p>
-              <p className="text-sm">{task.address}</p>
+              <p className="text-sm">{task.address || 'N/A'}</p>
             </div>
 
             {/* Date e orari */}
@@ -168,11 +168,11 @@ export default function TaskCard({ task, index, isInTimeline = false }: TaskCard
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <p className="text-sm font-semibold text-muted-foreground">Pax-In</p>
-                <p className="text-sm">{(task as any).pax_in || 'N/A'}</p>
+                <p className="text-sm">{(task as any).pax_in ?? 'N/A'}</p>
               </div>
               <div>
                 <p className="text-sm font-semibold text-muted-foreground">Pax-Out</p>
-                <p className="text-sm">{(task as any).pax_out || 'N/A'}</p>
+                <p className="text-sm">{(task as any).pax_out ?? 'N/A'}</p>
               </div>
             </div>
 
