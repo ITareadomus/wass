@@ -70,7 +70,7 @@ export default function TaskCard({ task, index }: TaskCardProps) {
             data-testid={`task-card-${task.id}`}
             onClick={handleCardClick}
           >
-            {task.confirmed_operation && (
+            {task.confirmed_operation === false && (
               <div className="absolute top-0.5 right-0.5">
                 <HelpCircle className="w-3 h-3 text-gray-600" />
               </div>
