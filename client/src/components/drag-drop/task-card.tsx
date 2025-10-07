@@ -153,13 +153,19 @@ export default function TaskCard({ task, index, isInTimeline = false }: TaskCard
               <div>
                 <p className="text-sm font-semibold text-muted-foreground">Checkout</p>
                 <p className="text-sm">
-                  {(task as any).checkout_date || 'N/A'}{(task as any).checkout_time ? ` - ${(task as any).checkout_time}` : ''}
+                  {(task as any).checkout_date 
+                    ? new Date((task as any).checkout_date).toLocaleDateString('it-IT', {day: '2-digit', month: '2-digit', year: 'numeric'}) 
+                    : 'N/A'}
+                  {(task as any).checkout_time ? ` - ${(task as any).checkout_time}` : ''}
                 </p>
               </div>
               <div>
                 <p className="text-sm font-semibold text-muted-foreground">Checkin</p>
                 <p className="text-sm">
-                  {(task as any).checkin_date || 'N/A'}{(task as any).checkin_time ? ` - ${(task as any).checkin_time}` : ''}
+                  {(task as any).checkin_date 
+                    ? new Date((task as any).checkin_date).toLocaleDateString('it-IT', {day: '2-digit', month: '2-digit', year: 'numeric'}) 
+                    : 'N/A'}
+                  {(task as any).checkin_time ? ` - ${(task as any).checkin_time}` : ''}
                 </p>
               </div>
             </div>
@@ -179,14 +185,7 @@ export default function TaskCard({ task, index, isInTimeline = false }: TaskCard
             {/* Tipologia intervento */}
             <div>
               <p className="text-sm font-semibold text-muted-foreground">Tipologia intervento</p>
-              <p className="text-sm">
-                {(task as any).operation_id === 1 ? 'Arrivo' :
-                 (task as any).operation_id === 2 ? 'Partenza' :
-                 (task as any).operation_id === 3 ? 'Straordinaria' :
-                 (task as any).operation_id === 4 ? 'Manutenzione' :
-                 (task as any).operation_id === 7 ? 'Ordinaria' :
-                 'N/A'}
-              </p>
+              <p className="text-sm">{(task as any).operation_id ?? 'N/A'}</p>
             </div>
           </div>
         </DialogContent>
