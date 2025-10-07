@@ -76,11 +76,11 @@ export default function AssignmentsTimeline({
                       ref={provided.innerRef}
                       {...provided.droppableProps}
                       className={`
-                        relative p-2 min-h-[60px]
+                        relative p-2 min-h-[40px]
                         ${snapshot.isDraggingOver ? "bg-blue-50" : group.bgClass}
                         transition-colors duration-200
                       `}
-                      style={{ height: '60px' }}
+                      style={{ height: '40px' }}
                     >
                       {group.tasks.map((task, index) => {
                         // Calcola la larghezza della task corrente
@@ -110,7 +110,7 @@ export default function AssignmentsTimeline({
                             style={{
                               position: 'absolute',
                               left: `${leftPosition}px`,
-                              top: '8px'
+                              top: '4px'
                             }}
                           >
                             <TaskCard task={task} index={index} />
