@@ -27,7 +27,7 @@ export default function AssignmentsTimeline({
   ];
 
   return (
-    <div className="bg-card rounded-lg border shadow-sm mt-8 max-w-4xl">
+    <div className="bg-card rounded-lg border shadow-sm mt-8">
       <div className="p-4 border-b border-border">
         <h3 className="font-semibold text-foreground flex items-center">
           <Calendar className="w-5 h-5 mr-2 text-primary" />
@@ -38,7 +38,7 @@ export default function AssignmentsTimeline({
       <div className="overflow-x-auto">
         <div 
           className="grid min-w-max"
-          style={{ gridTemplateColumns: "120px repeat(12, 60px)" }}
+          style={{ gridTemplateColumns: "150px repeat(12, 80px)" }}
         >
           {/* Header Row */}
           <div className="timeline-cell p-2 bg-secondary font-semibold text-sm border border-border">
@@ -76,11 +76,11 @@ export default function AssignmentsTimeline({
                       ref={provided.innerRef}
                       {...provided.droppableProps}
                       className={`
-                        relative p-2 min-h-[40px]
+                        relative p-2 min-h-[60px]
                         ${snapshot.isDraggingOver ? "bg-blue-50" : group.bgClass}
                         transition-colors duration-200
                       `}
-                      style={{ height: '40px' }}
+                      style={{ height: '60px' }}
                     >
                       {group.tasks.map((task, index) => {
                         // Calcola la larghezza della task corrente
@@ -110,7 +110,7 @@ export default function AssignmentsTimeline({
                             style={{
                               position: 'absolute',
                               left: `${leftPosition}px`,
-                              top: '4px'
+                              top: '8px'
                             }}
                           >
                             <TaskCard task={task} index={index} />
