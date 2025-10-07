@@ -41,74 +41,118 @@ export default function GenerateAssignments() {
   const [garciaTasks, setGarciaTasks] = useState<Task[]>([]);
   const [rossiTasks, setRossiTasks] = useState<Task[]>([]);
 
+  // Stati di caricamento
+  const [isExtracting, setIsExtracting] = useState(true);
+  const [extractionStep, setExtractionStep] = useState<string>("Inizializzazione...");
+  const [isLoadingTasks, setIsLoadingTasks] = useState(false);
+
   useEffect(() => {
-    // Funzione per convertire cleaning_time (minuti) in formato ore.minuti
-    const formatDuration = (minutes: number): string => {
-      const hours = Math.floor(minutes / 60);
-      const mins = minutes % 60;
-      return `${hours}.${mins.toString().padStart(2, '0')}`;
-    };
-
-    // Funzione per convertire un task raw in Task
-    const convertRawTask = (rawTask: RawTask, priority: string): Task => {
-      return {
-        id: rawTask.task_id.toString(),
-        name: rawTask.logistic_code.toString(),
-        alias: rawTask.alias,
-        type: `Client ${rawTask.client_id}`,
-        duration: formatDuration(rawTask.cleaning_time),
-        priority: priority as any,
-        assignedTo: null,
-        status: "pending",
-        scheduledTime: null,
-        address: rawTask.address,
-        premium: rawTask.premium,
-        is_straordinaria: rawTask.is_straordinaria,
-        confirmed_operation: rawTask.confirmed_operation,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-      };
-    };
-
-    // Carica i task dai file JSON
-    const loadTasks = async () => {
+    // Esegui l'estrazione dei dati all'avvio
+    const extractData = async () => {
       try {
-        const [earlyOutResponse, highPriorityResponse, lowPriorityResponse] = await Promise.all([
-          fetch('/public/data/early_out.json'),
-          fetch('/public/data/high_priority.json'),
-          fetch('/public/data/low_priority.json')
-        ]);
-
-        if (!earlyOutResponse.ok || !highPriorityResponse.ok || !lowPriorityResponse.ok) {
-          throw new Error('Errore nel caricamento dei file JSON');
+        setIsExtracting(true);
+        setExtractionStep("Estrazione dati dal database...");
+        
+        const response = await fetch('/api/extract-data', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' }
+        });
+        
+        if (!response.ok) {
+          throw new Error('Errore durante l\'estrazione dei dati');
         }
-
-        const earlyOutData = await earlyOutResponse.json();
-        const highPriorityData = await highPriorityResponse.json();
-        const lowPriorityData = await lowPriorityResponse.json();
-
-        const initialEarlyOut: Task[] = earlyOutData.early_out_tasks.map((task: RawTask) =>
-          convertRawTask(task, "early-out")
-        );
-
-        const initialHigh: Task[] = highPriorityData.high_priority_tasks.map((task: RawTask) =>
-          convertRawTask(task, "high")
-        );
-
-        const initialLow: Task[] = lowPriorityData.low_priority_tasks.map((task: RawTask) =>
-          convertRawTask(task, "low")
-        );
-
-        setEarlyOutTasks(initialEarlyOut);
-        setHighPriorityTasks(initialHigh);
-        setLowPriorityTasks(initialLow);
+        
+        const result = await response.json();
+        console.log("Estrazione completata:", result);
+        
+        setExtractionStep("Elaborazione task completata!");
+        setIsExtracting(false);
+        
+        // Carica i task dopo l'estrazione
+        loadTasks();
       } catch (error) {
-        console.error("Errore nel caricamento dei task:", error);
+        console.error("Errore nell'estrazione:", error);
+        setExtractionStep("Errore durante l'estrazione. Caricamento task esistenti...");
+        setIsExtracting(false);
+        // Prova comunque a caricare i task esistenti
+        loadTasks();
       }
     };
 
-    loadTasks();
+    extractData();
   }, []);
+
+  // Funzione per convertire cleaning_time (minuti) in formato ore.minuti
+  const formatDuration = (minutes: number): string => {
+    const hours = Math.floor(minutes / 60);
+    const mins = minutes % 60;
+    return `${hours}.${mins.toString().padStart(2, '0')}`;
+  };
+
+  // Funzione per convertire un task raw in Task
+  const convertRawTask = (rawTask: RawTask, priority: string): Task => {
+    return {
+      id: rawTask.task_id.toString(),
+      name: rawTask.logistic_code.toString(),
+      alias: rawTask.alias,
+      type: `Client ${rawTask.client_id}`,
+      duration: formatDuration(rawTask.cleaning_time),
+      priority: priority as any,
+      assignedTo: null,
+      status: "pending",
+      scheduledTime: null,
+      address: rawTask.address,
+      premium: rawTask.premium,
+      is_straordinaria: rawTask.is_straordinaria,
+      confirmed_operation: rawTask.confirmed_operation,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+  };
+
+  // Carica i task dai file JSON
+  const loadTasks = async () => {
+    try {
+      setIsLoadingTasks(true);
+      setExtractionStep("Caricamento task nei contenitori...");
+      
+      const [earlyOutResponse, highPriorityResponse, lowPriorityResponse] = await Promise.all([
+        fetch('/data/output/early_out.json'),
+        fetch('/data/output/high_priority.json'),
+        fetch('/data/output/low_priority.json')
+      ]);
+
+      if (!earlyOutResponse.ok || !highPriorityResponse.ok || !lowPriorityResponse.ok) {
+        throw new Error('Errore nel caricamento dei file JSON');
+      }
+
+      const earlyOutData = await earlyOutResponse.json();
+      const highPriorityData = await highPriorityResponse.json();
+      const lowPriorityData = await lowPriorityResponse.json();
+
+      const initialEarlyOut: Task[] = earlyOutData.early_out_tasks.map((task: RawTask) =>
+        convertRawTask(task, "early-out")
+      );
+
+      const initialHigh: Task[] = highPriorityData.high_priority_tasks.map((task: RawTask) =>
+        convertRawTask(task, "high")
+      );
+
+      const initialLow: Task[] = lowPriorityData.low_priority_tasks.map((task: RawTask) =>
+        convertRawTask(task, "low")
+      );
+
+      setEarlyOutTasks(initialEarlyOut);
+      setHighPriorityTasks(initialHigh);
+      setLowPriorityTasks(initialLow);
+      setIsLoadingTasks(false);
+      setExtractionStep("Task caricati con successo!");
+    } catch (error) {
+      console.error("Errore nel caricamento dei task:", error);
+      setIsLoadingTasks(false);
+      setExtractionStep("Errore nel caricamento dei task");
+    }
+  };
 
   const onDragEnd = (result: DropResult) => {
     const { destination, source, draggableId } = result;
@@ -169,6 +213,37 @@ export default function GenerateAssignments() {
   };
 
   const allTasks = [...earlyOutTasks, ...highPriorityTasks, ...lowPriorityTasks, ...lopezTasks, ...garciaTasks, ...rossiTasks];
+
+  // Mostra loader durante l'estrazione
+  if (isExtracting || isLoadingTasks) {
+    return (
+      <div className="bg-background text-foreground min-h-screen flex items-center justify-center">
+        <div className="text-center space-y-4">
+          <div className="flex justify-center">
+            <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-primary"></div>
+          </div>
+          <h2 className="text-2xl font-bold text-foreground">
+            {isExtracting ? "Estrazione Dati in Corso" : "Caricamento Task"}
+          </h2>
+          <p className="text-muted-foreground">{extractionStep}</p>
+          <div className="flex items-center justify-center space-x-2 text-sm text-muted-foreground">
+            {isExtracting && (
+              <>
+                <span className="inline-block w-2 h-2 bg-primary rounded-full animate-pulse"></span>
+                <span>Step 1/2: Estrazione dal database</span>
+              </>
+            )}
+            {isLoadingTasks && (
+              <>
+                <span className="inline-block w-2 h-2 bg-primary rounded-full animate-pulse"></span>
+                <span>Step 2/2: Caricamento nei contenitori</span>
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="bg-background text-foreground min-h-screen">
