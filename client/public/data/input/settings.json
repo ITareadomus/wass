@@ -1,0 +1,7 @@
+{
+  "eo_time": "10:00",
+  "eo_clients": [61, 87],
+  "hp_time": "15:30",
+  "hp_clients": [64],
+  "dedupe_strategy": "eo_wins"
+}
