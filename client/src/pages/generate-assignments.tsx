@@ -95,7 +95,7 @@ export default function GenerateAssignments() {
       id: rawTask.task_id.toString(),
       name: rawTask.logistic_code.toString(),
       alias: rawTask.alias,
-      type: `Client ${rawTask.client_id}`,
+      type: rawTask.customer_name || `Client ${rawTask.client_id}`,
       duration: formatDuration(rawTask.cleaning_time),
       priority: priority as any,
       assignedTo: null,
@@ -105,6 +105,14 @@ export default function GenerateAssignments() {
       premium: rawTask.premium,
       is_straordinaria: rawTask.is_straordinaria,
       confirmed_operation: rawTask.confirmed_operation,
+      checkout_date: rawTask.checkout_date,
+      checkout_time: rawTask.checkout_time,
+      checkin_date: rawTask.checkin_date,
+      checkin_time: rawTask.checkin_time,
+      pax_in: rawTask.pax_in,
+      pax_out: rawTask.pax_out,
+      operation_id: rawTask.operation_id,
+      customer_name: rawTask.customer_name,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     };

@@ -125,20 +125,20 @@ export default function TaskCard({ task, index, isInTimeline = false }: TaskCard
             {/* Informazioni Base */}
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <p className="text-sm font-semibold text-muted-foreground">ID Task</p>
-                <p className="text-sm">{task.id}</p>
-              </div>
-              <div>
-                <p className="text-sm font-semibold text-muted-foreground">Codice Logistico</p>
+                <p className="text-sm font-semibold text-muted-foreground">Codice ADAM</p>
                 <p className="text-sm">{task.name}</p>
-              </div>
-              <div>
-                <p className="text-sm font-semibold text-muted-foreground">Alias</p>
-                <p className="text-sm">{task.alias || 'N/A'}</p>
               </div>
               <div>
                 <p className="text-sm font-semibold text-muted-foreground">Cliente</p>
                 <p className="text-sm">{task.type}</p>
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-muted-foreground">Tipologia</p>
+                <p className="text-sm">{task.alias || 'N/A'}</p>
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-muted-foreground">Durata di pulizia</p>
+                <p className="text-sm">{task.duration.replace(".", ":")} ore</p>
               </div>
             </div>
 
@@ -148,56 +148,45 @@ export default function TaskCard({ task, index, isInTimeline = false }: TaskCard
               <p className="text-sm">{task.address}</p>
             </div>
 
-            {/* Durata e Tempo */}
+            {/* Date e orari */}
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <p className="text-sm font-semibold text-muted-foreground">Durata Pulizia</p>
-                <p className="text-sm">{task.duration.replace(".", ":")} ore</p>
+                <p className="text-sm font-semibold text-muted-foreground">Checkout</p>
+                <p className="text-sm">
+                  {(task as any).checkout_date || 'N/A'}{(task as any).checkout_time ? ` - ${(task as any).checkout_time}` : ''}
+                </p>
               </div>
               <div>
-                <p className="text-sm font-semibold text-muted-foreground">Priorità</p>
-                <p className="text-sm capitalize">{task.priority || 'Non assegnata'}</p>
+                <p className="text-sm font-semibold text-muted-foreground">Checkin</p>
+                <p className="text-sm">
+                  {(task as any).checkin_date || 'N/A'}{(task as any).checkin_time ? ` - ${(task as any).checkin_time}` : ''}
+                </p>
               </div>
             </div>
 
-            {/* Status Flags */}
-            <div className="grid grid-cols-3 gap-4">
+            {/* Pax */}
+            <div className="grid grid-cols-2 gap-4">
               <div>
-                <p className="text-sm font-semibold text-muted-foreground">Premium</p>
-                <p className="text-sm">{task.premium ? '✅ Sì' : '❌ No'}</p>
+                <p className="text-sm font-semibold text-muted-foreground">Pax-In</p>
+                <p className="text-sm">{(task as any).pax_in || 'N/A'}</p>
               </div>
               <div>
-                <p className="text-sm font-semibold text-muted-foreground">Straordinaria</p>
-                <p className="text-sm">{task.is_straordinaria ? '✅ Sì' : '❌ No'}</p>
-              </div>
-              <div>
-                <p className="text-sm font-semibold text-muted-foreground">Operazione Confermata</p>
-                <p className="text-sm">{task.confirmed_operation === false ? '❓ Da Confermare' : task.confirmed_operation ? '✅ Confermata' : '❌ No'}</p>
+                <p className="text-sm font-semibold text-muted-foreground">Pax-Out</p>
+                <p className="text-sm">{(task as any).pax_out || 'N/A'}</p>
               </div>
             </div>
 
-            {/* Assegnazione */}
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <p className="text-sm font-semibold text-muted-foreground">Assegnato a</p>
-                <p className="text-sm">{task.assignedTo || 'Non assegnato'}</p>
-              </div>
-              <div>
-                <p className="text-sm font-semibold text-muted-foreground">Stato</p>
-                <p className="text-sm capitalize">{task.status}</p>
-              </div>
-            </div>
-
-            {/* Timestamp */}
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <p className="text-sm font-semibold text-muted-foreground">Creato il</p>
-                <p className="text-sm">{new Date(task.createdAt).toLocaleString('it-IT')}</p>
-              </div>
-              <div>
-                <p className="text-sm font-semibold text-muted-foreground">Ultimo aggiornamento</p>
-                <p className="text-sm">{new Date(task.updatedAt).toLocaleString('it-IT')}</p>
-              </div>
+            {/* Tipologia intervento */}
+            <div>
+              <p className="text-sm font-semibold text-muted-foreground">Tipologia intervento</p>
+              <p className="text-sm">
+                {(task as any).operation_id === 1 ? 'Arrivo' :
+                 (task as any).operation_id === 2 ? 'Partenza' :
+                 (task as any).operation_id === 3 ? 'Straordinaria' :
+                 (task as any).operation_id === 4 ? 'Manutenzione' :
+                 (task as any).operation_id === 7 ? 'Ordinaria' :
+                 'N/A'}
+              </p>
             </div>
           </div>
         </DialogContent>
