@@ -168,13 +168,19 @@ export default function GenerateAssignments() {
     setSourceTasks(newSourceTasks);
   };
 
+  const allTasks = [...earlyOutTasks, ...highPriorityTasks, ...lowPriorityTasks, ...lopezTasks, ...garciaTasks, ...rossiTasks];
+
   return (
     <div className="bg-background text-foreground min-h-screen">
       <div className="container mx-auto p-4 max-w-screen-2xl">
-        <div className="mb-8">
+        <div className="mb-6 flex justify-between items-center">
           <h1 className="text-3xl font-bold text-foreground">
             Genera Assegnazioni
           </h1>
+          <div className="bg-card rounded-lg border shadow-sm px-4 py-2">
+            <div className="text-sm text-muted-foreground">Task Totali</div>
+            <div className="text-2xl font-bold text-primary">{allTasks.length}</div>
+          </div>
         </div>
 
         <DragDropContext onDragEnd={onDragEnd}>
