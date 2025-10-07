@@ -27,7 +27,7 @@ export default function AssignmentsTimeline({
   ];
 
   return (
-    <div className="bg-card rounded-lg border shadow-sm mt-8">
+    <div className="bg-card rounded-lg border shadow-sm mt-8 max-w-4xl">
       <div className="p-4 border-b border-border">
         <h3 className="font-semibold text-foreground flex items-center">
           <Calendar className="w-5 h-5 mr-2 text-primary" />
@@ -38,7 +38,7 @@ export default function AssignmentsTimeline({
       <div className="overflow-x-auto">
         <div 
           className="grid min-w-max"
-          style={{ gridTemplateColumns: "150px repeat(12, 80px)" }}
+          style={{ gridTemplateColumns: "120px repeat(12, 60px)" }}
         >
           {/* Header Row */}
           <div className="timeline-cell p-2 bg-secondary font-semibold text-sm border border-border">
