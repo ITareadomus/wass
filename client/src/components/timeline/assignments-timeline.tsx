@@ -1,3 +1,4 @@
+
 import { Task } from "@shared/schema";
 import { Calendar } from "lucide-react";
 import { Droppable } from "react-beautiful-dnd";
@@ -33,11 +34,11 @@ export default function AssignmentsTimeline({
           Timeline Temporale (8:00 - 18:00)
         </h3>
       </div>
-
-      <div>
+      
+      <div className="overflow-x-auto">
         <div 
-          className="grid"
-          style={{ gridTemplateColumns: "120px repeat(12, 1fr)" }}
+          className="grid min-w-max"
+          style={{ gridTemplateColumns: "150px repeat(12, 80px)" }}
         >
           {/* Header Row */}
           <div className="timeline-cell p-2 bg-secondary font-semibold text-sm border border-border">
@@ -88,21 +89,21 @@ export default function AssignmentsTimeline({
                           const hours = parseInt(parts[0] || "0");
                           const minutes = parts[1] ? parseInt(parts[1]) : 0;
                           const totalMinutes = hours * 60 + minutes;
-
+                          
                           if (totalMinutes === 30) {
                             return 80; // 30 minuti = 1 ora nella timeline
                           }
-
+                          
                           const halfHours = Math.ceil(totalMinutes / 30);
                           return halfHours * 40; // 40px per ogni mezza ora
                         };
-
+                        
                         // Calcola la posizione left sommando le larghezze delle task precedenti
                         let leftPosition = 0;
                         for (let i = 0; i < index; i++) {
                           leftPosition += calculateWidth(group.tasks[i].duration);
                         }
-
+                        
                         return (
                           <div
                             key={task.id}
