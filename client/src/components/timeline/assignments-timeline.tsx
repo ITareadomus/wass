@@ -82,17 +82,18 @@ export default function AssignmentsTimeline({
                       style={{ height: '60px' }}
                     >
                       {group.tasks.map((task, index) => {
-                        // Calcola la larghezza della task corrente
+                        // Calcola la larghezza della task sulla timeline (stessa logica di TaskCard)
                         const calculateWidth = (duration: string) => {
                           const parts = duration.split(".");
                           const hours = parseInt(parts[0] || "0");
                           const minutes = parts[1] ? parseInt(parts[1]) : 0;
                           const totalMinutes = hours * 60 + minutes;
 
-                          if (totalMinutes === 30) {
-                            return 80; // 30 minuti = 1 ora nella timeline
+                          if (totalMinutes === 0) {
+                            return 40;
                           }
 
+                          // Sulla timeline, usa sempre la larghezza effettiva
                           const halfHours = Math.ceil(totalMinutes / 30);
                           return halfHours * 40; // 40px per ogni mezza ora
                         };
