@@ -3,6 +3,7 @@ import { Draggable } from "react-beautiful-dnd";
 import { Task } from "@shared/schema";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useState } from "react";
+import { HelpCircle } from "lucide-react";
 
 interface TaskCardProps {
   task: Task;
@@ -69,6 +70,11 @@ export default function TaskCard({ task, index }: TaskCardProps) {
             data-testid={`task-card-${task.id}`}
             onClick={handleCardClick}
           >
+            {task.confirmed_operation && (
+              <div className="absolute top-0.5 right-0.5">
+                <HelpCircle className="w-3 h-3 text-gray-600" />
+              </div>
+            )}
             <div className="flex items-center justify-center h-full gap-1">
               <span className="font-medium text-[10px] leading-none" data-testid={`task-name-${task.id}`}>
                 {task.name}

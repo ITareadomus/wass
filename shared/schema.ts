@@ -68,6 +68,7 @@ export const taskSchema = z.object({
   address: z.string().optional(),
   premium: z.boolean().optional(),
   is_straordinaria: z.boolean().optional(),
+  confirmed_operation: z.boolean().optional(),
   createdAt: z.string(),
   updatedAt: z.string(),
 });

@@ -28,6 +28,7 @@ interface RawTask {
   alias?: string;
   premium?: boolean;
   is_straordinaria?: boolean;
+  confirmed_operation?: boolean;
 }
 
 export default function GenerateAssignments() {
@@ -63,6 +64,7 @@ export default function GenerateAssignments() {
         address: rawTask.address,
         premium: rawTask.premium,
         is_straordinaria: rawTask.is_straordinaria,
+        confirmed_operation: rawTask.confirmed_operation,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
       };
