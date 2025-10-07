@@ -13,12 +13,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Endpoint per eseguire l'estrazione dei dati
   app.post("/api/extract-data", async (req, res) => {
     try {
-      const scriptsDir = path.join(process.cwd(), "client/public/scripts");
-
       // Step 1: Esegui task_extractor.py
       console.log("Eseguendo task_extractor.py...");
       const { stdout: stdout1, stderr: stderr1 } = await execAsync(
-        `cd ${scriptsDir} && python3 task_extractor.py`,
+        `python3 client/public/scripts/task_extractor.py`,
         { maxBuffer: 1024 * 1024 * 10 }
       );
 
@@ -30,7 +28,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Step 2: Esegui extract_all.py
       console.log("Eseguendo extract_all.py...");
       const { stdout: stdout2, stderr: stderr2 } = await execAsync(
-        `cd ${scriptsDir} && python3 extract_all.py`,
+        `python3 client/public/scripts/extract_all.py`,
         { maxBuffer: 1024 * 1024 * 10 }
       );
 

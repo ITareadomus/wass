@@ -4,8 +4,8 @@ from pathlib import Path
 
 # --- PATH ---
 # Use a project-relative data folder so the script works on Windows and UNIX
-# BASE_DIR points to client/public/data
-BASE_DIR = Path(__file__).resolve().parent.parent / "data"
+# BASE_DIR points to client/public/data (from workspace root)
+BASE_DIR = Path("client/public/data")
 INPUT_DIR = BASE_DIR / "input"
 OUTPUT_DIR = BASE_DIR / "output"
 INPUT_PATH = INPUT_DIR / "daily_tasks.json"
