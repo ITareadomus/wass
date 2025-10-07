@@ -113,6 +113,7 @@ export default function GenerateAssignments() {
       pax_out: rawTask.pax_out,
       operation_id: rawTask.operation_id,
       customer_name: rawTask.customer_name,
+      type_apt: (rawTask as any).type_apt,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     };
