@@ -2,6 +2,7 @@
 import { Draggable } from "react-beautiful-dnd";
 import { Task } from "@shared/schema";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Badge } from "@/components/ui/badge";
 import { useState } from "react";
 import { HelpCircle } from "lucide-react";
 
@@ -103,7 +104,22 @@ export default function TaskCard({ task, index, isInTimeline = false }: TaskCard
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
         <DialogContent className="sm:max-w-2xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Dettagli Task #{task.name}</DialogTitle>
+            <DialogTitle className="flex items-center gap-2">
+              Dettagli Task #{task.name}
+              {task.is_straordinaria ? (
+                <Badge className="bg-red-500 text-white border-2 border-black">
+                  Straordinaria
+                </Badge>
+              ) : task.premium ? (
+                <Badge className="bg-yellow-400 text-black border-2 border-black">
+                  Premium
+                </Badge>
+              ) : (
+                <Badge className="bg-green-500 text-white">
+                  Standard
+                </Badge>
+              )}
+            </DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
             {/* Informazioni Base */}
