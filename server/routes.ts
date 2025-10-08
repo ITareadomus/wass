@@ -6,6 +6,7 @@ import { z } from "zod";
 import { exec } from "child_process";
 import { promisify } from "util";
 import path from "path";
+import * as fs from 'fs/promises'; // Import fs/promises for async file operations
 
 const execAsync = promisify(exec);
 
@@ -14,30 +15,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/update-assignments", async (req, res) => {
     try {
       const { cleanerId, tasks } = req.body;
-      
-      const fs = await import('fs/promises');
-      
+
+      // Use await import('fs/promises') within the route handler
+      // const fs = await import('fs/promises');
+
       const assignmentsPath = path.join(process.cwd(), 'client/public/data/output/assignments.json');
       const cleanersPath = path.join(process.cwd(), 'client/public/data/cleaners/selected_cleaners.json');
-      
+
       // Carica i dati dei cleaners
       const cleanersData = await fs.readFile(cleanersPath, 'utf8').then(JSON.parse);
-      
+
       // Trova il cleaner corrispondente (per ora usa un mapping, poi sarà dinamico)
       const cleanerMapping: { [key: string]: number } = {
         'lopez': 24,  // ID del primo cleaner
         'garcia': 249, // ID del secondo cleaner
         'rossi': 287   // ID del terzo cleaner
       };
-      
+
       const cleanerRealId = cleanerMapping[cleanerId];
       const cleaner = cleanersData.cleaners.find((c: any) => c.id === cleanerRealId);
-      
+
       if (!cleaner) {
         res.status(404).json({ success: false, message: "Cleaner non trovato" });
         return;
       }
-      
+
       // Carica o crea assignments.json
       let assignmentsData: any = { assignments: [] };
       try {
@@ -46,19 +48,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       } catch (error) {
         // File non esiste, usa struttura vuota
       }
-      
+
       // Rimuovi eventuali assegnazioni precedenti per questo cleaner
       assignmentsData.assignments = assignmentsData.assignments.filter(
         (a: any) => a.cleaner_id !== cleanerRealId
       );
-      
+
       // Calcola cleaning_time totale
       const totalCleaningTime = tasks.reduce((sum: number, task: any) => {
         const duration = task.duration || "0.0";
         const [hours, minutes] = duration.split('.').map(Number);
         return sum + (hours * 60) + (minutes || 0);
       }, 0);
-      
+
       // Crea i task con i nuovi campi
       const assignedTasks = tasks.map((task: any, index: number) => ({
         // Dati del task
@@ -78,12 +80,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         operation_id: task.operation_id,
         customer_name: task.customer_name,
         type_apt: task.type_apt,
-        
+
         // Nuovi campi di assegnazione
         sequence: index + 1,
         assignment_reason: "manually_assigned"
       }));
-      
+
       // Crea l'assegnazione completa
       const assignment = {
         cleaner_id: cleanerRealId,
@@ -92,21 +94,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
         cleaner_role: cleaner.role,
         cleaner_contract_type: cleaner.contract_type,
         cleaner_start_time: cleaner.start_time,
-        
+
         // Campi specifici dell'assegnazione
         total_tasks: tasks.length,
         complessive_time: totalCleaningTime,
-        
+
         // Lista dei task assegnati
         assigned_tasks: assignedTasks
       };
-      
+
       // Aggiungi la nuova assegnazione
       assignmentsData.assignments.push(assignment);
-      
+
       // Salva il file
       await fs.writeFile(assignmentsPath, JSON.stringify(assignmentsData, null, 2));
-      
+
       res.json({ success: true, message: "Assignments aggiornato con successo" });
     } catch (error: any) {
       console.error("Errore nell'aggiornamento di assignments:", error);
@@ -118,23 +120,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/update-task-json", async (req, res) => {
     try {
       const { taskId, fromContainer, toContainer } = req.body;
-      
+
       // Leggi i file JSON usando import ESM
-      const fs = await import('fs/promises');
-      
+      // const fs = await import('fs/promises');
+
       const earlyOutPath = path.join(process.cwd(), 'client/public/data/output/early_out.json');
       const highPriorityPath = path.join(process.cwd(), 'client/public/data/output/high_priority.json');
       const lowPriorityPath = path.join(process.cwd(), 'client/public/data/output/low_priority.json');
-      
+
       const [earlyOutData, highPriorityData, lowPriorityData] = await Promise.all([
         fs.readFile(earlyOutPath, 'utf8').then(JSON.parse),
         fs.readFile(highPriorityPath, 'utf8').then(JSON.parse),
         fs.readFile(lowPriorityPath, 'utf8').then(JSON.parse)
       ]);
-      
+
       // Trova e rimuovi il task dal container di origine
       let taskToMove = null;
-      
+
       if (fromContainer === 'early-out') {
         const index = earlyOutData.early_out_tasks.findIndex((t: any) => t.task_id === taskId);
         if (index !== -1) {
@@ -154,15 +156,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
           lowPriorityData.total_apartments = lowPriorityData.low_priority_tasks.length;
         }
       }
-      
+
       if (!taskToMove) {
         res.status(404).json({ success: false, message: "Task non trovato" });
         return;
       }
-      
+
       // Aggiorna il reason a "manually_forced"
       taskToMove.reasons = ["manually_forced"];
-      
+
       // Aggiungi il task al container di destinazione
       if (toContainer === 'early-out') {
         earlyOutData.early_out_tasks.push(taskToMove);
@@ -174,14 +176,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         lowPriorityData.low_priority_tasks.push(taskToMove);
         lowPriorityData.total_apartments = lowPriorityData.low_priority_tasks.length;
       }
-      
+
       // Scrivi i file aggiornati
       await Promise.all([
         fs.writeFile(earlyOutPath, JSON.stringify(earlyOutData, null, 2)),
         fs.writeFile(highPriorityPath, JSON.stringify(highPriorityData, null, 2)),
         fs.writeFile(lowPriorityPath, JSON.stringify(lowPriorityData, null, 2))
       ]);
-      
+
       res.json({ success: true, message: "Task aggiornato con successo" });
     } catch (error: any) {
       console.error("Errore nell'aggiornamento del task:", error);

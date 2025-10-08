@@ -36,10 +36,13 @@ export default function GenerateAssignments() {
   const [highPriorityTasks, setHighPriorityTasks] = useState<Task[]>([]);
   const [lowPriorityTasks, setLowPriorityTasks] = useState<Task[]>([]);
 
-  // Task assegnati per ogni cleaner
+  // Task assegnati per ogni cleaner (non più usati, le task restano nelle liste originali)
   const [lopezTasks, setLopezTasks] = useState<Task[]>([]);
   const [garciaTasks, setGarciaTasks] = useState<Task[]>([]);
   const [rossiTasks, setRossiTasks] = useState<Task[]>([]);
+  
+  // Stato per tracciare tutte le task con le loro assegnazioni
+  const [allTasksWithAssignments, setAllTasksWithAssignments] = useState<Task[]>([]);
 
   // Stati di caricamento
   const [isExtracting, setIsExtracting] = useState(true);
@@ -154,6 +157,10 @@ export default function GenerateAssignments() {
       setEarlyOutTasks(initialEarlyOut);
       setHighPriorityTasks(initialHigh);
       setLowPriorityTasks(initialLow);
+      
+      // Inizializza anche lo stato unificato
+      setAllTasksWithAssignments([...initialEarlyOut, ...initialHigh, ...initialLow]);
+      
       setIsLoadingTasks(false);
       setExtractionStep("Task caricati con successo!");
     } catch (error) {
@@ -199,27 +206,74 @@ export default function GenerateAssignments() {
 
     if (!taskToMove) return;
 
-    // Remove the task from the source list
-    const newSourceTasks = sourceTasks.filter(task => task.id !== draggableId);
-
-    // Add the task to the destination list
-    let updatedDestinationTasks: Task[] = [];
-    
     // Check if destination is a cleaner timeline slot (format: cleaner-{id}-slot-{slotIndex})
     if (destination.droppableId.startsWith("cleaner-")) {
       const parts = destination.droppableId.split('-');
-      const cleanerId = parts[1];
-      const slotIndex = parts[3];
+      const cleanerId = parseInt(parts[1]);
+      const slotIndex = parseInt(parts[3]);
       
       console.log(`Task ${taskToMove.name} assegnata al cleaner ${cleanerId}, slot ${slotIndex}`);
       
-      // Aggiorna la task con i dati di assegnazione
-      (taskToMove as any).assignedCleaner = parseInt(cleanerId);
-      (taskToMove as any).assignedSlot = parseInt(slotIndex);
+      // Crea una copia della task con i dati di assegnazione
+      const updatedTask = {
+        ...taskToMove,
+        assignedCleaner: cleanerId,
+        assignedSlot: slotIndex
+      } as any;
       
-      // La task rimane nello stato attuale e verrà visualizzata nella timeline
-      // Non viene aggiunta a nessuna lista di destinazione perché resta nelle liste di priorità
-    } else if (destination.droppableId === "lopez") {
+      // Rimuovi la task dalla lista di origine
+      const newSourceTasks = sourceTasks.filter(task => task.id !== draggableId);
+      setSourceTasks(newSourceTasks);
+      
+      // Aggiorna lo stato unificato
+      const updatedAllTasks = allTasksWithAssignments.map(task => 
+        task.id === draggableId ? updatedTask : task
+      );
+      setAllTasksWithAssignments(updatedAllTasks);
+      
+      // Prepara i dati per l'API
+      const assignmentsData = {
+        cleanerId: cleanerId,
+        slotIndex: slotIndex,
+        task: {
+          id: taskToMove.id,
+          name: taskToMove.name,
+          alias: taskToMove.alias,
+          customer_name: taskToMove.customer_name,
+          address: taskToMove.address,
+          cleaning_time: taskToMove.duration,
+          priority: taskToMove.priority,
+          premium: taskToMove.premium,
+          is_straordinaria: taskToMove.is_straordinaria
+        }
+      };
+      
+      // Salva su assignments.json
+      fetch('/api/update-assignments', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(assignmentsData)
+      })
+      .then(response => response.json())
+      .then(result => {
+        if (result.success) {
+          console.log('Assegnazione salvata con successo');
+        } else {
+          console.error('Errore salvataggio assegnazione:', result.message);
+        }
+      })
+      .catch(error => {
+        console.error('Errore nella chiamata API:', error);
+      });
+      
+      return; // Esce qui per le assegnazioni ai cleaner
+    }
+    
+    // Gestione spostamenti tra colonne di priorità
+    const newSourceTasks = sourceTasks.filter(task => task.id !== draggableId);
+    let updatedDestinationTasks: Task[] = [];
+    
+    if (destination.droppableId === "lopez") {
       updatedDestinationTasks = [...lopezTasks, taskToMove];
       setLopezTasks(updatedDestinationTasks);
     } else if (destination.droppableId === "garcia") {
@@ -239,7 +293,7 @@ export default function GenerateAssignments() {
     // Update the source list state
     setSourceTasks(newSourceTasks);
 
-    // Aggiorna i JSON solo se si sposta tra i contenitori di priorità (non verso cleaners)
+    // Aggiorna i JSON solo se si sposta tra i contenitori di priorità
     if (
       ['early-out', 'high', 'low'].includes(source.droppableId) &&
       ['early-out', 'high', 'low'].includes(destination.droppableId)
@@ -258,40 +312,14 @@ export default function GenerateAssignments() {
         const result = await response.json();
         if (!result.success) {
           console.error('Errore aggiornamento JSON:', result.error);
-          // Ripristina lo stato precedente in caso di errore
           setSourceTasks(sourceTasks);
         } else {
           console.log('JSON aggiornato con successo');
-          // Ricarica i task dai file JSON aggiornati per sincronizzare lo stato
           await loadTasks();
         }
       } catch (error) {
         console.error('Errore nella chiamata API:', error);
-        // Ripristina lo stato precedente in caso di errore
         setSourceTasks(sourceTasks);
-      }
-    }
-
-    // Se il task viene spostato verso un cleaner, aggiorna assignments.json
-    if (destination.droppableId.startsWith('cleaner-')) {
-      try {
-        const response = await fetch('/api/update-assignments', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            cleanerId: destination.droppableId,
-            tasks: updatedDestinationTasks
-          })
-        });
-
-        const result = await response.json();
-        if (!result.success) {
-          console.error('Errore aggiornamento assignments.json:', result.error);
-        } else {
-          console.log('assignments.json aggiornato con successo');
-        }
-      } catch (error) {
-        console.error('Errore nella chiamata API per assignments:', error);
       }
     }
   };
@@ -370,7 +398,7 @@ export default function GenerateAssignments() {
           <div className="mt-6">
             <TimelineView
               personnel={[]}
-              tasks={[...earlyOutTasks, ...highPriorityTasks, ...lowPriorityTasks]}
+              tasks={allTasksWithAssignments}
             />
           </div>
         </DragDropContext>
