@@ -10,6 +10,82 @@ import path from "path";
 const execAsync = promisify(exec);
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Endpoint per aggiornare i file JSON quando un task viene spostato
+  app.post("/api/update-task-json", async (req, res) => {
+    try {
+      const { taskId, fromContainer, toContainer } = req.body;
+      
+      // Leggi i file JSON
+      const fs = require('fs').promises;
+      const path = require('path');
+      
+      const earlyOutPath = path.join(process.cwd(), 'client/public/data/output/early_out.json');
+      const highPriorityPath = path.join(process.cwd(), 'client/public/data/output/high_priority.json');
+      const lowPriorityPath = path.join(process.cwd(), 'client/public/data/output/low_priority.json');
+      
+      const [earlyOutData, highPriorityData, lowPriorityData] = await Promise.all([
+        fs.readFile(earlyOutPath, 'utf8').then(JSON.parse),
+        fs.readFile(highPriorityPath, 'utf8').then(JSON.parse),
+        fs.readFile(lowPriorityPath, 'utf8').then(JSON.parse)
+      ]);
+      
+      // Trova e rimuovi il task dal container di origine
+      let taskToMove = null;
+      
+      if (fromContainer === 'early-out') {
+        const index = earlyOutData.early_out_tasks.findIndex((t: any) => t.task_id === taskId);
+        if (index !== -1) {
+          taskToMove = earlyOutData.early_out_tasks.splice(index, 1)[0];
+          earlyOutData.total_apartments = earlyOutData.early_out_tasks.length;
+        }
+      } else if (fromContainer === 'high') {
+        const index = highPriorityData.high_priority_tasks.findIndex((t: any) => t.task_id === taskId);
+        if (index !== -1) {
+          taskToMove = highPriorityData.high_priority_tasks.splice(index, 1)[0];
+          highPriorityData.total_apartments = highPriorityData.high_priority_tasks.length;
+        }
+      } else if (fromContainer === 'low') {
+        const index = lowPriorityData.low_priority_tasks.findIndex((t: any) => t.task_id === taskId);
+        if (index !== -1) {
+          taskToMove = lowPriorityData.low_priority_tasks.splice(index, 1)[0];
+          lowPriorityData.total_apartments = lowPriorityData.low_priority_tasks.length;
+        }
+      }
+      
+      if (!taskToMove) {
+        res.status(404).json({ success: false, message: "Task non trovato" });
+        return;
+      }
+      
+      // Aggiorna il reason a "manually_forced"
+      taskToMove.reasons = ["manually_forced"];
+      
+      // Aggiungi il task al container di destinazione
+      if (toContainer === 'early-out') {
+        earlyOutData.early_out_tasks.push(taskToMove);
+        earlyOutData.total_apartments = earlyOutData.early_out_tasks.length;
+      } else if (toContainer === 'high') {
+        highPriorityData.high_priority_tasks.push(taskToMove);
+        highPriorityData.total_apartments = highPriorityData.high_priority_tasks.length;
+      } else if (toContainer === 'low') {
+        lowPriorityData.low_priority_tasks.push(taskToMove);
+        lowPriorityData.total_apartments = lowPriorityData.low_priority_tasks.length;
+      }
+      
+      // Scrivi i file aggiornati
+      await Promise.all([
+        fs.writeFile(earlyOutPath, JSON.stringify(earlyOutData, null, 2)),
+        fs.writeFile(highPriorityPath, JSON.stringify(highPriorityData, null, 2)),
+        fs.writeFile(lowPriorityPath, JSON.stringify(lowPriorityData, null, 2))
+      ]);
+      
+      res.json({ success: true, message: "Task aggiornato con successo" });
+    } catch (error: any) {
+      console.error("Errore nell'aggiornamento del task:", error);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
   // Endpoint per eseguire l'estrazione dei dati
   app.post("/api/extract-data", async (req, res) => {
     try {

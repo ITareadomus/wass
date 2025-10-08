@@ -163,7 +163,7 @@ export default function GenerateAssignments() {
     }
   };
 
-  const onDragEnd = (result: DropResult) => {
+  const onDragEnd = async (result: DropResult) => {
     const { destination, source, draggableId } = result;
 
     if (!destination || destination.droppableId === source.droppableId) {
@@ -219,6 +219,33 @@ export default function GenerateAssignments() {
 
     // Update the source list state
     setSourceTasks(newSourceTasks);
+
+    // Aggiorna i JSON solo se si sposta tra i contenitori di priorità (non verso cleaners)
+    if (
+      ['early-out', 'high', 'low'].includes(source.droppableId) &&
+      ['early-out', 'high', 'low'].includes(destination.droppableId)
+    ) {
+      try {
+        const response = await fetch('/api/update-task-json', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            taskId: parseInt(draggableId),
+            fromContainer: source.droppableId,
+            toContainer: destination.droppableId
+          })
+        });
+
+        const result = await response.json();
+        if (!result.success) {
+          console.error('Errore aggiornamento JSON:', result.error);
+        } else {
+          console.log('JSON aggiornato con successo');
+        }
+      } catch (error) {
+        console.error('Errore nella chiamata API:', error);
+      }
+    }
   };
 
   const allTasks = [...earlyOutTasks, ...highPriorityTasks, ...lowPriorityTasks, ...lopezTasks, ...garciaTasks, ...rossiTasks];

@@ -148,11 +148,10 @@ export default function TimelineView({
                         backgroundColor: `${color.bg}10` // 10% opacity dello stesso colore
                       }}
                     />
-                  ))}</div>
+                  ))}
+                </div>
               );
             })}
-              </div>
-            ))}
           </div>
         </div>
       </div>
