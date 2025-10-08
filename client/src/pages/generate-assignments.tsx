@@ -239,11 +239,17 @@ export default function GenerateAssignments() {
         const result = await response.json();
         if (!result.success) {
           console.error('Errore aggiornamento JSON:', result.error);
+          // Ripristina lo stato precedente in caso di errore
+          setSourceTasks(sourceTasks);
         } else {
           console.log('JSON aggiornato con successo');
+          // Ricarica i task dai file JSON aggiornati per sincronizzare lo stato
+          await loadTasks();
         }
       } catch (error) {
         console.error('Errore nella chiamata API:', error);
+        // Ripristina lo stato precedente in caso di errore
+        setSourceTasks(sourceTasks);
       }
     }
   };

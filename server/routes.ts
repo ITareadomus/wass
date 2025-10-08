@@ -15,9 +15,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { taskId, fromContainer, toContainer } = req.body;
       
-      // Leggi i file JSON
-      const fs = require('fs').promises;
-      const path = require('path');
+      // Leggi i file JSON usando import ESM
+      const fs = await import('fs/promises');
       
       const earlyOutPath = path.join(process.cwd(), 'client/public/data/output/early_out.json');
       const highPriorityPath = path.join(process.cwd(), 'client/public/data/output/high_priority.json');
