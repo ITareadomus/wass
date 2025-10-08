@@ -171,6 +171,10 @@ export default function TimelineView({
                       <div className="relative z-10 flex items-center h-full">
                         {tasks
                           .filter((task) => (task as any).assignedCleaner === cleaner.id)
+                          .filter((task, index, self) => 
+                            // Rimuovi duplicati basandoti sull'id della task
+                            index === self.findIndex((t) => t.id === task.id)
+                          )
                           .sort((a, b) => ((a as any).assignedSlot || 0) - ((b as any).assignedSlot || 0))
                           .map((task, index) => (
                             <TaskCard 
