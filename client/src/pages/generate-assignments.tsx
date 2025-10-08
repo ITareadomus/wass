@@ -170,120 +170,89 @@ export default function GenerateAssignments() {
     }
   };
 
-  const onDragEnd = async (result: DropResult) => {
+  const saveTaskAssignments = async (tasks: Task[]) => {
+    try {
+      const response = await fetch('/api/save-assignments', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(tasks),
+      });
+      if (!response.ok) {
+        console.error('Errore nel salvataggio delle assegnazioni');
+      } else {
+        console.log('Assegnazioni salvate con successo');
+      }
+    } catch (error) {
+      console.error('Errore nella chiamata API di salvataggio:', error);
+    }
+  };
+
+  const onDragEnd = (result: DropResult) => {
     const { source, destination, draggableId } = result;
 
     if (!destination) return;
 
-    const sourceColumn = source.droppableId;
-    const destColumn = destination.droppableId;
-
-    // Trova la task
-    const taskId = draggableId;
-    const task = allTasksWithAssignments.find((t) => t.id === taskId);
-    if (!task) return;
-
-    let newTasks = [...allTasksWithAssignments];
-
-    // Se è droppata sulla timeline (area unica del cleaner)
-    if (destColumn.startsWith("timeline-")) {
-      const cleanerId = parseInt(destColumn.split("-")[1]);
-
-      // Calcola la durata della nuova task in minuti
-      const duration = task.duration;
-      const durationParts = duration.split(".");
-      const hours = parseInt(durationParts[0] || "0");
-      const minutes = parseInt(durationParts[1]) ? parseInt(durationParts[1]) : 0;
-      const taskDurationMinutes = hours * 60 + minutes;
-
-      // Trova tutte le task già assegnate a questo cleaner (escludendo quella corrente se già assegnata)
-      const cleanerTasks = allTasksWithAssignments
-        .filter(t => (t as any).assignedCleaner === cleanerId && t.id !== taskId)
-        .sort((a, b) => ((a as any).assignedStartMinute || 0) - ((b as any).assignedStartMinute || 0));
-
-      // Calcola il minuto di inizio: dopo l'ultima task
-      let startMinute = 0;
-      if (cleanerTasks.length > 0) {
-        const lastTask = cleanerTasks[cleanerTasks.length - 1];
-        const lastTaskStart = (lastTask as any).assignedStartMinute || 0;
-        const lastTaskParts = lastTask.duration.split(".");
-        const lastTaskHours = parseInt(lastTaskParts[0] || "0");
-        const lastTaskMins = lastTaskParts[1] ? parseInt(lastTaskParts[1]) : 0;
-        const lastTaskDuration = lastTaskHours * 60 + lastTaskMins;
-        startMinute = lastTaskStart + lastTaskDuration;
-      }
-
-      // Assegna la task
-      const updatedTask = {
-        ...task,
-        assignedCleaner: cleanerId,
-        assignedStartMinute: startMinute,
-        assignedDurationMinutes: taskDurationMinutes
-      };
-
-      // Aggiorna lo stato unificato
-      newTasks = newTasks.map((t) => (t.id === taskId ? updatedTask : t));
-
-      // Rimuovi la task dalle colonne di priorità
-      setEarlyOutTasks(prev => prev.filter(t => t.id !== taskId));
-      setHighPriorityTasks(prev => prev.filter(t => t.id !== taskId));
-      setLowPriorityTasks(prev => prev.filter(t => t.id !== taskId));
-
-      setAllTasksWithAssignments(newTasks);
+    // Se droppo nella stessa posizione, non fare nulla
+    if (
+      source.droppableId === destination.droppableId &&
+      source.index === destination.index
+    ) {
       return;
     }
 
-    // Gestione per spostamento dalla timeline alle colonne di priorità
-    const newTask = { ...task };
-    delete (newTask as any).assignedCleaner;
-    delete (newTask as any).assignedStartMinute;
-    delete (newTask as any).assignedDurationMinutes;
+    const taskId = draggableId;
 
-    // Aggiorna lo stato unificato
-    newTasks = newTasks.map((t) => (t.id === taskId ? newTask : t));
+    // Se sto muovendo verso una timeline di un cleaner
+    if (destination.droppableId.startsWith('timeline-')) {
+      const cleanerId = parseInt(destination.droppableId.replace('timeline-', ''));
 
-    // Aggiorna le liste di priorità
-    if (destColumn === "early-out") {
-      setEarlyOutTasks(prev => [...prev.filter(t => t.id !== taskId), newTask]);
-      setHighPriorityTasks(prev => prev.filter(t => t.id !== taskId));
-      setLowPriorityTasks(prev => prev.filter(t => t.id !== taskId));
-    } else if (destColumn === "high") {
-      setHighPriorityTasks(prev => [...prev.filter(t => t.id !== taskId), newTask]);
-      setEarlyOutTasks(prev => prev.filter(t => t.id !== taskId));
-      setLowPriorityTasks(prev => prev.filter(t => t.id !== taskId));
-    } else if (destColumn === "low") {
-      setLowPriorityTasks(prev => [...prev.filter(t => t.id !== taskId), newTask]);
-      setEarlyOutTasks(prev => prev.filter(t => t.id !== taskId));
-      setHighPriorityTasks(prev => prev.filter(t => t.id !== taskId));
-    }
+      setAllTasksWithAssignments((prevTasks) => {
+        const updatedTasks = prevTasks.map((task) => {
+          if (task.id === taskId) {
+            // Calcola la posizione oraria in base alle task già presenti per questo cleaner
+            const existingTasks = prevTasks
+              .filter(t => (t as any).assignedCleaner === cleanerId && t.id !== taskId)
+              .sort((a, b) => ((a as any).assignedSlot || 0) - ((b as any).assignedSlot || 0));
 
-    setAllTasksWithAssignments(newTasks);
+            let startMinutes = 0; // Partenza alle 8:00 = 0 minuti
+            for (const existingTask of existingTasks) {
+              const [hours, mins] = existingTask.duration.split('.').map(Number);
+              const taskDuration = (hours || 0) * 60 + (mins || 0);
+              startMinutes += taskDuration;
+            }
 
-    // Aggiorna i JSON se cambio priorità tra colonne
-    if (
-      ['early-out', 'high', 'low'].includes(sourceColumn) &&
-      ['early-out', 'high', 'low'].includes(destColumn)
-    ) {
-      try {
-        const response = await fetch('/api/update-task-json', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            taskId: parseInt(draggableId),
-            fromContainer: sourceColumn,
-            toContainer: destColumn
-          })
+            return {
+              ...task,
+              assignedCleaner: cleanerId,
+              assignedSlot: destination.index,
+              startTime: startMinutes, // Salviamo i minuti dall'inizio (8:00)
+            };
+          }
+          return task;
         });
 
-        const result = await response.json();
-        if (!result.success) {
-          console.error('Errore aggiornamento JSON:', result.error);
-        } else {
-          console.log('JSON aggiornato con successo');
-        }
-      } catch (error) {
-        console.error('Errore nella chiamata API:', error);
-      }
+        saveTaskAssignments(updatedTasks);
+        return updatedTasks;
+      });
+    }
+    // Se sto muovendo da una timeline verso una colonna di priorità
+    else {
+      setAllTasksWithAssignments((prevTasks) => {
+        const updatedTasks = prevTasks.map((task) => {
+          if (task.id === taskId) {
+            return {
+              ...task,
+              assignedCleaner: undefined,
+              assignedSlot: undefined,
+              startTime: undefined,
+            };
+          }
+          return task;
+        });
+
+        saveTaskAssignments(updatedTasks);
+        return updatedTasks;
+      });
     }
   };
 
