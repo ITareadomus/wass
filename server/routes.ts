@@ -10,6 +10,110 @@ import path from "path";
 const execAsync = promisify(exec);
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Endpoint per aggiornare assignments.json quando un task viene assegnato a un cleaner
+  app.post("/api/update-assignments", async (req, res) => {
+    try {
+      const { cleanerId, tasks } = req.body;
+      
+      const fs = await import('fs/promises');
+      
+      const assignmentsPath = path.join(process.cwd(), 'client/public/data/output/assignments.json');
+      const cleanersPath = path.join(process.cwd(), 'client/public/data/cleaners/selected_cleaners.json');
+      
+      // Carica i dati dei cleaners
+      const cleanersData = await fs.readFile(cleanersPath, 'utf8').then(JSON.parse);
+      
+      // Trova il cleaner corrispondente (per ora usa un mapping, poi sarà dinamico)
+      const cleanerMapping: { [key: string]: number } = {
+        'lopez': 24,  // ID del primo cleaner
+        'garcia': 249, // ID del secondo cleaner
+        'rossi': 287   // ID del terzo cleaner
+      };
+      
+      const cleanerRealId = cleanerMapping[cleanerId];
+      const cleaner = cleanersData.cleaners.find((c: any) => c.id === cleanerRealId);
+      
+      if (!cleaner) {
+        res.status(404).json({ success: false, message: "Cleaner non trovato" });
+        return;
+      }
+      
+      // Carica o crea assignments.json
+      let assignmentsData: any = { assignments: [] };
+      try {
+        const existingData = await fs.readFile(assignmentsPath, 'utf8');
+        assignmentsData = JSON.parse(existingData);
+      } catch (error) {
+        // File non esiste, usa struttura vuota
+      }
+      
+      // Rimuovi eventuali assegnazioni precedenti per questo cleaner
+      assignmentsData.assignments = assignmentsData.assignments.filter(
+        (a: any) => a.cleaner_id !== cleanerRealId
+      );
+      
+      // Calcola cleaning_time totale
+      const totalCleaningTime = tasks.reduce((sum: number, task: any) => {
+        const duration = task.duration || "0.0";
+        const [hours, minutes] = duration.split('.').map(Number);
+        return sum + (hours * 60) + (minutes || 0);
+      }, 0);
+      
+      // Crea i task con i nuovi campi
+      const assignedTasks = tasks.map((task: any, index: number) => ({
+        // Dati del task
+        task_id: parseInt(task.id),
+        logistic_code: parseInt(task.name),
+        address: task.address,
+        cleaning_time: task.duration,
+        checkin_date: task.checkin_date,
+        checkout_date: task.checkout_date,
+        checkin_time: task.checkin_time,
+        checkout_time: task.checkout_time,
+        premium: task.premium,
+        is_straordinaria: task.is_straordinaria,
+        confirmed_operation: task.confirmed_operation,
+        pax_in: task.pax_in,
+        pax_out: task.pax_out,
+        operation_id: task.operation_id,
+        customer_name: task.customer_name,
+        type_apt: task.type_apt,
+        
+        // Nuovi campi di assegnazione
+        sequence: index + 1,
+        assignment_reason: "manually_assigned"
+      }));
+      
+      // Crea l'assegnazione completa
+      const assignment = {
+        cleaner_id: cleanerRealId,
+        cleaner_name: cleaner.name,
+        cleaner_lastname: cleaner.lastname,
+        cleaner_role: cleaner.role,
+        cleaner_contract_type: cleaner.contract_type,
+        cleaner_start_time: cleaner.start_time,
+        
+        // Campi specifici dell'assegnazione
+        total_tasks: tasks.length,
+        complessive_time: totalCleaningTime,
+        
+        // Lista dei task assegnati
+        assigned_tasks: assignedTasks
+      };
+      
+      // Aggiungi la nuova assegnazione
+      assignmentsData.assignments.push(assignment);
+      
+      // Salva il file
+      await fs.writeFile(assignmentsPath, JSON.stringify(assignmentsData, null, 2));
+      
+      res.json({ success: true, message: "Assignments aggiornato con successo" });
+    } catch (error: any) {
+      console.error("Errore nell'aggiornamento di assignments:", error);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
   // Endpoint per aggiornare i file JSON quando un task viene spostato
   app.post("/api/update-task-json", async (req, res) => {
     try {

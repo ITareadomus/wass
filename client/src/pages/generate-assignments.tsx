@@ -203,12 +203,16 @@ export default function GenerateAssignments() {
     const newSourceTasks = sourceTasks.filter(task => task.id !== draggableId);
 
     // Add the task to the destination list
+    let updatedDestinationTasks: Task[] = [];
     if (destination.droppableId === "lopez") {
-      setLopezTasks([...lopezTasks, taskToMove]);
+      updatedDestinationTasks = [...lopezTasks, taskToMove];
+      setLopezTasks(updatedDestinationTasks);
     } else if (destination.droppableId === "garcia") {
-      setGarciaTasks([...garciaTasks, taskToMove]);
+      updatedDestinationTasks = [...garciaTasks, taskToMove];
+      setGarciaTasks(updatedDestinationTasks);
     } else if (destination.droppableId === "rossi") {
-      setRossiTasks([...rossiTasks, taskToMove]);
+      updatedDestinationTasks = [...rossiTasks, taskToMove];
+      setRossiTasks(updatedDestinationTasks);
     } else if (destination.droppableId === "early-out") {
       setEarlyOutTasks([...earlyOutTasks, taskToMove]);
     } else if (destination.droppableId === "high") {
@@ -250,6 +254,30 @@ export default function GenerateAssignments() {
         console.error('Errore nella chiamata API:', error);
         // Ripristina lo stato precedente in caso di errore
         setSourceTasks(sourceTasks);
+      }
+    }
+
+    // Se il task viene spostato verso un cleaner, aggiorna assignments.json
+    const cleanerIds = ["lopez", "garcia", "rossi"]; // Aggiungi qui gli ID dei cleaners dinamici
+    if (cleanerIds.includes(destination.droppableId)) {
+      try {
+        const response = await fetch('/api/update-assignments', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            cleanerId: destination.droppableId,
+            tasks: updatedDestinationTasks
+          })
+        });
+
+        const result = await response.json();
+        if (!result.success) {
+          console.error('Errore aggiornamento assignments.json:', result.error);
+        } else {
+          console.log('assignments.json aggiornato con successo');
+        }
+      } catch (error) {
+        console.error('Errore nella chiamata API per assignments:', error);
       }
     }
   };
