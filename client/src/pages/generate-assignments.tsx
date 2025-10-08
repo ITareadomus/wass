@@ -187,41 +187,36 @@ export default function GenerateAssignments() {
     if (destColumn.startsWith("cleaner-")) {
       const cleanerId = parseInt(destColumn.split("-")[1]);
 
-      // Calcola lo slot iniziale in base alle task già presenti
-      const cleanerTasks = allTasksWithAssignments.filter(t => 
-        (t as any).assignedCleaner === cleanerId
-      );
-
-      // Trova il primo slot libero (dopo tutte le task già assegnate a questo cleaner)
-      let nextSlot = 0;
-      cleanerTasks.forEach(t => {
-        const taskSlot = (t as any).assignedSlot || 0;
-        const taskDuration = t.duration;
-        const parts = taskDuration.split(".");
-        const hours = parseInt(parts[0] || "0");
-        const minutes = parts[1] ? parseInt(parts[1]) : 0;
-        const totalMinutes = hours * 60 + minutes;
-        const slotCount = Math.ceil(totalMinutes / 60); // Ogni slot = 1 ora
-        const taskEndSlot = taskSlot + slotCount;
-        if (taskEndSlot > nextSlot) {
-          nextSlot = taskEndSlot;
-        }
-      });
-
-      // Calcola la durata della nuova task in slot
+      // Calcola la durata della nuova task in minuti
       const duration = task.duration;
       const durationParts = duration.split(".");
       const hours = parseInt(durationParts[0] || "0");
       const minutes = durationParts[1] ? parseInt(durationParts[1]) : 0;
-      const totalMinutes = hours * 60 + minutes;
-      const slotCount = Math.ceil(totalMinutes / 60);
+      const taskDurationMinutes = hours * 60 + minutes;
 
-      // Assegna la task al primo slot libero
+      // Trova tutte le task già assegnate a questo cleaner (escludendo quella corrente se già assegnata)
+      const cleanerTasks = allTasksWithAssignments
+        .filter(t => (t as any).assignedCleaner === cleanerId && t.id !== taskId)
+        .sort((a, b) => ((a as any).assignedStartMinute || 0) - ((b as any).assignedStartMinute || 0));
+
+      // Calcola il minuto di inizio: dopo l'ultima task
+      let startMinute = 0;
+      if (cleanerTasks.length > 0) {
+        const lastTask = cleanerTasks[cleanerTasks.length - 1];
+        const lastTaskStart = (lastTask as any).assignedStartMinute || 0;
+        const lastTaskParts = lastTask.duration.split(".");
+        const lastTaskHours = parseInt(lastTaskParts[0] || "0");
+        const lastTaskMins = lastTaskParts[1] ? parseInt(lastTaskParts[1]) : 0;
+        const lastTaskDuration = lastTaskHours * 60 + lastTaskMins;
+        startMinute = lastTaskStart + lastTaskDuration;
+      }
+
+      // Assegna la task
       const updatedTask = {
         ...task,
         assignedCleaner: cleanerId,
-        assignedSlot: nextSlot,
-        assignedSlotCount: slotCount
+        assignedStartMinute: startMinute,
+        assignedDurationMinutes: taskDurationMinutes
       };
 
       // Aggiorna lo stato unificato
@@ -240,8 +235,8 @@ export default function GenerateAssignments() {
     // Gestione normale per le colonne di priorità (rimuovi assegnazione)
     const newTask = { ...task };
     delete (newTask as any).assignedCleaner;
-    delete (newTask as any).assignedSlot;
-    delete (newTask as any).assignedSlotCount;
+    delete (newTask as any).assignedStartMinute;
+    delete (newTask as any).assignedDurationMinutes;
 
     // Aggiorna lo stato unificato
     setAllTasksWithAssignments(prev =>

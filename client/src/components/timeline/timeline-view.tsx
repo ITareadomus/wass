@@ -173,34 +173,37 @@ export default function TimelineView({
 
                       {/* Task droppate */}
                       <div className="relative z-10 flex items-center gap-1 p-1">
-                        {cleanerTasks.map((task, taskIndex) => {
-                          const taskSlot = (task as any).assignedSlot || 0;
-                          const taskDuration = task.duration;
-                          const parts = taskDuration.split(".");
-                          const hours = parseInt(parts[0] || "0");
-                          const minutes = parts[1] ? parseInt(parts[1]) : 0;
-                          const totalMinutes = hours * 60 + minutes;
-                          const slotWidth = 100 / timeSlots.length;
-                          const taskWidth = (totalMinutes / 60) * slotWidth;
-                          const leftPosition = taskSlot * slotWidth;
+                        {cleanerTasks
+                          .sort((a, b) => ((a as any).assignedStartMinute || 0) - ((b as any).assignedStartMinute || 0))
+                          .map((task, taskIndex) => {
+                            const startMinute = (task as any).assignedStartMinute || 0;
+                            const durationMinutes = (task as any).assignedDurationMinutes || 60;
+                            
+                            // Timeline va da 8:00 a 19:00 = 11 ore = 660 minuti
+                            const timelineStartMinute = 8 * 60; // 8:00
+                            const timelineTotalMinutes = 11 * 60; // 11 ore
+                            
+                            // Calcola posizione e larghezza in percentuale
+                            const leftPosition = ((startMinute - timelineStartMinute) / timelineTotalMinutes) * 100;
+                            const taskWidth = (durationMinutes / timelineTotalMinutes) * 100;
 
-                          return (
-                            <div
-                              key={task.id}
-                              className="absolute"
-                              style={{
-                                left: `${leftPosition}%`,
-                                width: `${taskWidth}%`,
-                              }}
-                            >
-                              <TaskCard 
-                                task={task} 
-                                index={taskIndex}
-                                isInTimeline={true}
-                              />
-                            </div>
-                          );
-                        })}
+                            return (
+                              <div
+                                key={task.id}
+                                className="absolute"
+                                style={{
+                                  left: `${Math.max(0, leftPosition)}%`,
+                                  width: `${taskWidth}%`,
+                                }}
+                              >
+                                <TaskCard 
+                                  task={task} 
+                                  index={taskIndex}
+                                  isInTimeline={true}
+                                />
+                              </div>
+                            );
+                          })}
                       </div>
                       
                       {provided.placeholder}
