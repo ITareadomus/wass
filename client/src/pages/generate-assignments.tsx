@@ -186,7 +186,7 @@ export default function GenerateAssignments() {
     let newTasks = [...allTasksWithAssignments];
 
     // Se è droppata sulla timeline (area unica del cleaner)
-    if (destColumn.startsWith("cleaner-")) {
+    if (destColumn.startsWith("timeline-")) {
       const cleanerId = parseInt(destColumn.split("-")[1]);
 
       // Calcola la durata della nuova task in minuti
@@ -224,16 +224,16 @@ export default function GenerateAssignments() {
       // Aggiorna lo stato unificato
       newTasks = newTasks.map((t) => (t.id === taskId ? updatedTask : t));
 
-      // Rimuovi la task dalle colonne di priorità se era presente
+      // Rimuovi la task dalle colonne di priorità
       setEarlyOutTasks(prev => prev.filter(t => t.id !== taskId));
       setHighPriorityTasks(prev => prev.filter(t => t.id !== taskId));
       setLowPriorityTasks(prev => prev.filter(t => t.id !== taskId));
 
-      setAllTasksWithAssignments(newTasks); // Aggiorna lo stato unificato
+      setAllTasksWithAssignments(newTasks);
       return;
     }
 
-    // Gestione normale per le colonne di priorità (rimuovi assegnazione)
+    // Gestione per spostamento dalla timeline alle colonne di priorità
     const newTask = { ...task };
     delete (newTask as any).assignedCleaner;
     delete (newTask as any).assignedStartMinute;
@@ -242,8 +242,7 @@ export default function GenerateAssignments() {
     // Aggiorna lo stato unificato
     newTasks = newTasks.map((t) => (t.id === taskId ? newTask : t));
 
-
-    // Aggiorna anche le liste di priorità
+    // Aggiorna le liste di priorità
     if (destColumn === "early-out") {
       setEarlyOutTasks(prev => [...prev.filter(t => t.id !== taskId), newTask]);
       setHighPriorityTasks(prev => prev.filter(t => t.id !== taskId));
@@ -258,7 +257,7 @@ export default function GenerateAssignments() {
       setHighPriorityTasks(prev => prev.filter(t => t.id !== taskId));
     }
 
-    setAllTasksWithAssignments(newTasks); // Aggiorna lo stato unificato
+    setAllTasksWithAssignments(newTasks);
 
     // Aggiorna i JSON se cambio priorità tra colonne
     if (
