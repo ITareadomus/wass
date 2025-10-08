@@ -70,7 +70,7 @@ export default function TaskCard({
     <>
       <Draggable draggableId={task.id} index={index}>
         {(provided, snapshot) => {
-          const cardWidth = isInTimeline ? '100%' : calculateWidth(task.duration, isInTimeline);
+          const cardWidth = calculateWidth(task.duration, isInTimeline);
           
           return (
             <div
@@ -80,7 +80,7 @@ export default function TaskCard({
               className={`
                 ${getTaskClassByPriority(task)} 
                 rounded-sm px-2 py-1 shadow-sm border transition-all duration-200
-                ${snapshot.isDragging ? "shadow-lg" : ""}
+                ${snapshot.isDragging ? "shadow-lg scale-105" : ""}
                 hover:shadow-md cursor-pointer
                 flex-shrink-0 relative
               `}
@@ -118,6 +118,7 @@ export default function TaskCard({
                 </span>
               )}
             </div>
+          </div>
             );
           }}
       </Draggable>
