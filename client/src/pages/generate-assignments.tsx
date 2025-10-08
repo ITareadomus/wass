@@ -209,23 +209,10 @@ export default function GenerateAssignments() {
       setAllTasksWithAssignments((prevTasks) => {
         const updatedTasks = prevTasks.map((task) => {
           if (task.id === taskId) {
-            // Calcola la posizione oraria in base alle task già presenti per questo cleaner
-            const existingTasks = prevTasks
-              .filter(t => (t as any).assignedCleaner === cleanerId && t.id !== taskId)
-              .sort((a, b) => ((a as any).assignedSlot || 0) - ((b as any).assignedSlot || 0));
-
-            let startMinutes = 0; // Partenza alle 8:00 = 0 minuti
-            for (const existingTask of existingTasks) {
-              const [hours, mins] = existingTask.duration.split('.').map(Number);
-              const taskDuration = (hours || 0) * 60 + (mins || 0);
-              startMinutes += taskDuration;
-            }
-
             return {
               ...task,
               assignedCleaner: cleanerId,
               assignedSlot: destination.index,
-              startTime: startMinutes, // Salviamo i minuti dall'inizio (8:00)
             };
           }
           return task;
