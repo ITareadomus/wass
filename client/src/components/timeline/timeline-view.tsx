@@ -168,7 +168,7 @@ export default function TimelineView({
                       </div>
 
                       {/* Task posizionate in sequenza */}
-                      <div className="relative z-10 flex items-center gap-2 flex-wrap">
+                      <div className="relative z-10 flex items-center flex-wrap">
                         {tasks
                           .filter((task) => (task as any).assignedCleaner === cleaner.id)
                           .sort((a, b) => ((a as any).assignedSlot || 0) - ((b as any).assignedSlot || 0))
