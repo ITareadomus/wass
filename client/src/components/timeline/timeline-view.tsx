@@ -151,7 +151,7 @@ export default function TimelineView({
                     <div
                       ref={provided.innerRef}
                       {...provided.droppableProps}
-                      className={`relative border-t border-border transition-colors p-2 min-h-[60px] flex-1 ${
+                      className={`relative border-t border-border transition-colors min-h-[60px] flex-1 ${
                         snapshot.isDraggingOver ? 'bg-primary/20 ring-2 ring-primary' : ''
                       }`}
                       style={{ 
