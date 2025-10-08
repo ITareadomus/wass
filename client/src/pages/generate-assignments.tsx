@@ -258,8 +258,7 @@ export default function GenerateAssignments() {
     }
 
     // Se il task viene spostato verso un cleaner, aggiorna assignments.json
-    const cleanerIds = ["lopez", "garcia", "rossi"]; // Aggiungi qui gli ID dei cleaners dinamici
-    if (cleanerIds.includes(destination.droppableId)) {
+    if (destination.droppableId.startsWith('cleaner-')) {
       try {
         const response = await fetch('/api/update-assignments', {
           method: 'POST',
