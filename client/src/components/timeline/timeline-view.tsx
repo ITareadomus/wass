@@ -64,57 +64,6 @@ export default function TimelineView({
     setIsModalOpen(true);
   };
 
-  const getPersonnelInitials = (name: string) => {
-    return name.split(" ").map(n => n[0]).join("").substring(0, 2);
-  };
-
-  const getAssignmentForPersonnel = (personId: string, timeSlot: string) => {
-    // Find tasks assigned to this person with priorities
-    const assignedTasks = tasks.filter(task =>
-      task.assignedTo === personId && task.priority !== null
-    );
-
-    if (assignedTasks.length > 0) {
-      // For now, show the first assigned task across time slots
-      // In a real system, you'd have proper time slot mapping
-      const task = assignedTasks[0];
-      return {
-        task,
-        priority: task.priority,
-        name: task.name,
-        duration: task.duration,
-      };
-    }
-    return null;
-  };
-
-  const getTimelineBgClass = (priority: string | null) => {
-    switch (priority) {
-      case "early-out":
-        return "bg-orange-200";
-      case "high":
-        return "bg-green-200";
-      case "low":
-        return "bg-lime-200";
-      default:
-        return "bg-card";
-    }
-  };
-
-  const getAssignmentBarClass = (priority: string | null) => {
-    switch (priority) {
-      case "early-out":
-        return "bg-orange-400 text-white";
-      case "high":
-        return "bg-green-500 text-white";
-      case "low":
-        return "bg-lime-500 text-white";
-      default:
-        return "bg-gray-400 text-white";
-    }
-  };
-
-
   return (
     <>
       <div className="bg-card rounded-lg border shadow-sm">
@@ -169,56 +118,6 @@ export default function TimelineView({
                 ))}
               </div>
             ))}
-
-            {/* Personnel Rows (Existing logic if needed, currently commented out for cleaner focus) */}
-            {/*
-            {personnel.slice(0, 8).map((person, personIndex) => (
-              <div key={person.id} className="contents">
-                <div className="timeline-cell p-2 bg-card flex items-center border border-border">
-                  <div className="flex items-center">
-                    <div
-                      className="w-6 h-6 rounded-full flex items-center justify-center text-white text-xs mr-2"
-                      style={{ backgroundColor: person.color }}
-                      data-testid={`person-avatar-${person.id}`}
-                    >
-                      {getPersonnelInitials(person.name)}
-                    </div>
-                    <div>
-                      <div className="text-sm font-medium" data-testid={`person-name-${person.id}`}>
-                        {person.name}
-                      </div>
-                      <div className="text-xs text-muted-foreground" data-testid={`person-type-${person.id}`}>
-                        {person.type}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {timeSlots.map((slot, slotIndex) => {
-                  const assignment = getAssignmentForPersonnel(person.id, slot);
-                  const hasAssignment = assignment !== null;
-                  const priority = assignment?.priority || null;
-                  const showAssignmentBar = hasAssignment && slotIndex <= 2;
-
-                  return (
-                    <div
-                      key={`${person.id}-${slot}`}
-                      className={`timeline-cell border border-border relative ${getTimelineBgClass(priority)}`}
-                      data-testid={`timeline-cell-${person.id}-${slotIndex}`}
-                    >
-                      {showAssignmentBar && (
-                        <div className={`assignment-bar ${getAssignmentBarClass(priority)} rounded text-xs p-1 m-1`}>
-                          {assignment?.name?.substring(0, 8) ||
-                           (priority === "early-out" ? "EARLY" :
-                            priority === "high" ? "HIGH" : "LOW")}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            ))}
-            */}
           </div>
         </div>
       </div>
