@@ -1,0 +1,66 @@
+
+{
+  "cleaners": [
+    {
+      "id": 24,
+      "name": "HUSSAIN",
+      "lastname": "SYED SHUJIAHAT",
+      "role": "Standard",
+      "active": true,
+      "ranking": 0,
+      "counter_hours": 1.5,
+      "counter_days": 4,
+      "available": true,
+      "contract_type": "B",
+      "preferred_customers": [2, 67, 72, 80, 84, 94, 115],
+      "telegram_id": null,
+      "start_time": "10:00"
+    },
+    {
+      "id": 249,
+      "name": "Ogbodo Chidi",
+      "lastname": "Igwe",
+      "role": "Premium",
+      "active": true,
+      "ranking": 0,
+      "counter_hours": 0,
+      "counter_days": 2,
+      "available": true,
+      "contract_type": "a chiamata",
+      "preferred_customers": [2, 3, 61, 64, 72, 80, 84, 94, 113, 115, 118, 119, 120, 123],
+      "telegram_id": 6481457174,
+      "start_time": "10:00"
+    },
+    {
+      "id": 287,
+      "name": "BAH",
+      "lastname": "ISMAILA",
+      "role": "Standard",
+      "active": true,
+      "ranking": 0,
+      "counter_hours": 0,
+      "counter_days": 4,
+      "available": true,
+      "contract_type": "B",
+      "preferred_customers": [75, 80, 2, 3, 64, 84, 115, 119, 72, 94],
+      "telegram_id": 5173164898,
+      "start_time": "10:00"
+    },
+    {
+      "id": 404,
+      "name": "RASEL",
+      "lastname": "MOLLA",
+      "role": "Standard",
+      "active": true,
+      "ranking": 0,
+      "counter_hours": 0,
+      "counter_days": 2,
+      "available": true,
+      "contract_type": "B",
+      "preferred_customers": [2, 3, 61, 72, 75, 80, 84, 94, 115, 118, 119],
+      "telegram_id": 7559507853,
+      "start_time": "10:00"
+    }
+  ],
+  "total_selected": 4
+}
