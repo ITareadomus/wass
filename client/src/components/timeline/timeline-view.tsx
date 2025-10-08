@@ -100,104 +100,116 @@ export default function TimelineView({
           </h3>
         </div>
         <div className="p-4 overflow-x-auto">
-          <div
-            className="grid"
-            style={{ gridTemplateColumns: "200px repeat(12, 80px)" }}
-          >
-            {/* Header Row */}
-            <div className="timeline-cell p-2 bg-secondary font-semibold text-sm border border-border">
-              CLEANER
+          {/* Header con orari */}
+          <div className="flex mb-2">
+            <div className="w-48 flex-shrink-0"></div>
+            <div className="flex-1 flex">
+              {timeSlots.map((slot) => (
+                <div
+                  key={slot}
+                  className="flex-1 text-center text-xs font-medium text-muted-foreground border-l border-border first:border-l-0 py-1"
+                >
+                  {slot}
+                </div>
+              ))}
             </div>
-            {timeSlots.map((slot) => (
-              <div
-                key={slot}
-                className="timeline-cell p-2 bg-secondary text-center text-xs font-medium border border-border"
-              >
-                {slot}
-              </div>
-            ))}
+          </div>
 
-            {/* Cleaner Rows */}
-            {cleaners.map((cleaner, index) => {
-              const color = getCleanerColor(index);
-              const droppableId = `cleaner-${cleaner.id}`;
-              
-              return (
-                <div key={cleaner.id} className="contents">
-                  {/* Cleaner Info Cell */}
-                  <div
-                    className="timeline-cell p-2 flex items-center border border-border cursor-pointer hover:opacity-90 transition-opacity"
-                    style={{ 
-                      backgroundColor: color.bg,
-                      color: color.text
-                    }}
-                    onClick={() => handleCleanerClick(cleaner)}
-                  >
-                    <div>
-                      <div className="text-sm font-medium">
-                        {cleaner.name} {cleaner.lastname}
-                      </div>
-                      <div className="text-xs opacity-80">
-                        {cleaner.role}
-                      </div>
+          {/* Righe dei cleaners */}
+          {cleaners.map((cleaner, index) => {
+            const color = getCleanerColor(index);
+            const droppableId = `cleaner-${cleaner.id}`;
+            
+            // Trova tutte le task assegnate a questo cleaner
+            const cleanerTasks = tasks.filter(task => 
+              (task as any).assignedCleaner === cleaner.id
+            );
+
+            return (
+              <div key={cleaner.id} className="flex mb-1">
+                {/* Info cleaner */}
+                <div
+                  className="w-48 flex-shrink-0 p-2 flex items-center border border-border cursor-pointer hover:opacity-90 transition-opacity"
+                  style={{ 
+                    backgroundColor: color.bg,
+                    color: color.text
+                  }}
+                  onClick={() => handleCleanerClick(cleaner)}
+                >
+                  <div>
+                    <div className="text-sm font-medium">
+                      {cleaner.name} {cleaner.lastname}
+                    </div>
+                    <div className="text-xs opacity-80">
+                      {cleaner.role}
                     </div>
                   </div>
-
-                  {/* Time Slots - Droppable Area */}
-                  {timeSlots.map((slot, slotIndex) => {
-                    const cellDroppableId = `${droppableId}-slot-${slotIndex}`;
-                    
-                    // Trova le task assegnate a questo cleaner in questo slot
-                    const slotTasks = tasks.filter(task => 
-                      (task as any).assignedCleaner === cleaner.id && 
-                      (task as any).assignedSlot === slotIndex
-                    );
-
-                    return (
-                      <Droppable key={cellDroppableId} droppableId={cellDroppableId}>
-                        {(provided, snapshot) => (
-                          <div
-                            ref={provided.innerRef}
-                            {...provided.droppableProps}
-                            className={`timeline-cell border-r border-border transition-colors p-1 min-h-[60px] relative ${
-                              snapshot.isDraggingOver ? 'bg-primary/20 ring-2 ring-primary' : ''
-                            }`}
-                            style={{ 
-                              backgroundColor: snapshot.isDraggingOver 
-                                ? `${color.bg}30` 
-                                : `${color.bg}10`
-                            }}
-                          >
-                            {slotTasks.length > 0 && (
-                              <div className="absolute inset-0 flex items-center" style={{
-                                width: `${((slotTasks[0] as any).assignedSlotCount || 1) * 100}%`,
-                                zIndex: 10
-                              }}>
-                                {slotTasks.map((task, taskIndex) => (
-                                  <TaskCard 
-                                    key={task.id} 
-                                    task={task} 
-                                    index={taskIndex}
-                                    isInTimeline={true}
-                                  />
-                                ))}
-                              </div>
-                            )}
-                            {slotTasks.length === 0 && (
-                              <div className="text-xs text-muted-foreground opacity-30 text-center">
-                                {slot}
-                              </div>
-                            )}
-                            {provided.placeholder}
-                          </div>
-                        )}
-                      </Droppable>
-                    );
-                  })}
                 </div>
-              );
-            })}
-          </div>
+
+                {/* Area droppabile unica - con riferimenti visivi orari */}
+                <Droppable droppableId={droppableId} direction="horizontal">
+                  {(provided, snapshot) => (
+                    <div
+                      ref={provided.innerRef}
+                      {...provided.droppableProps}
+                      className={`flex-1 relative min-h-[60px] transition-colors ${
+                        snapshot.isDraggingOver ? 'bg-primary/20 ring-2 ring-primary' : ''
+                      }`}
+                      style={{ 
+                        backgroundColor: snapshot.isDraggingOver 
+                          ? `${color.bg}30` 
+                          : `${color.bg}10`
+                      }}
+                    >
+                      {/* Riferimenti visivi orari (sfondo) */}
+                      <div className="absolute inset-0 flex pointer-events-none">
+                        {timeSlots.map((_, idx) => (
+                          <div
+                            key={idx}
+                            className="flex-1 border-l border-border/30 first:border-l-0"
+                          />
+                        ))}
+                      </div>
+
+                      {/* Task droppate */}
+                      <div className="relative z-10 flex items-center gap-1 p-1">
+                        {cleanerTasks.map((task, taskIndex) => {
+                          const taskSlot = (task as any).assignedSlot || 0;
+                          const taskDuration = task.duration;
+                          const parts = taskDuration.split(".");
+                          const hours = parseInt(parts[0] || "0");
+                          const minutes = parts[1] ? parseInt(parts[1]) : 0;
+                          const totalMinutes = hours * 60 + minutes;
+                          const slotWidth = 100 / timeSlots.length;
+                          const taskWidth = (totalMinutes / 60) * slotWidth;
+                          const leftPosition = taskSlot * slotWidth;
+
+                          return (
+                            <div
+                              key={task.id}
+                              className="absolute"
+                              style={{
+                                left: `${leftPosition}%`,
+                                width: `${taskWidth}%`,
+                              }}
+                            >
+                              <TaskCard 
+                                task={task} 
+                                index={taskIndex}
+                                isInTimeline={true}
+                              />
+                            </div>
+                          );
+                        })}
+                      </div>
+                      
+                      {provided.placeholder}
+                    </div>
+                  )}
+                </Droppable>
+              </div>
+            );
+          })}
         </div>
       </div>
 

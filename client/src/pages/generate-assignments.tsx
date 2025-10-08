@@ -40,7 +40,7 @@ export default function GenerateAssignments() {
   const [lopezTasks, setLopezTasks] = useState<Task[]>([]);
   const [garciaTasks, setGarciaTasks] = useState<Task[]>([]);
   const [rossiTasks, setRossiTasks] = useState<Task[]>([]);
-  
+
   // Stato per tracciare tutte le task con le loro assegnazioni
   const [allTasksWithAssignments, setAllTasksWithAssignments] = useState<Task[]>([]);
 
@@ -55,22 +55,22 @@ export default function GenerateAssignments() {
       try {
         setIsExtracting(true);
         setExtractionStep("Estrazione dati dal database...");
-        
+
         const response = await fetch('/api/extract-data', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' }
         });
-        
+
         if (!response.ok) {
           throw new Error('Errore durante l\'estrazione dei dati');
         }
-        
+
         const result = await response.json();
         console.log("Estrazione completata:", result);
-        
+
         setExtractionStep("Elaborazione task completata!");
         setIsExtracting(false);
-        
+
         // Carica i task dopo l'estrazione
         loadTasks();
       } catch (error) {
@@ -127,7 +127,7 @@ export default function GenerateAssignments() {
     try {
       setIsLoadingTasks(true);
       setExtractionStep("Caricamento task nei contenitori...");
-      
+
       const [earlyOutResponse, highPriorityResponse, lowPriorityResponse] = await Promise.all([
         fetch('/data/output/early_out.json'),
         fetch('/data/output/high_priority.json'),
@@ -157,10 +157,10 @@ export default function GenerateAssignments() {
       setEarlyOutTasks(initialEarlyOut);
       setHighPriorityTasks(initialHigh);
       setLowPriorityTasks(initialLow);
-      
+
       // Inizializza anche lo stato unificato
       setAllTasksWithAssignments([...initialEarlyOut, ...initialHigh, ...initialLow]);
-      
+
       setIsLoadingTasks(false);
       setExtractionStep("Task caricati con successo!");
     } catch (error) {
@@ -171,100 +171,102 @@ export default function GenerateAssignments() {
   };
 
   const onDragEnd = async (result: DropResult) => {
-    const { destination, source, draggableId } = result;
+    const { source, destination, draggableId } = result;
 
-    if (!destination || destination.droppableId === source.droppableId) {
-      return;
-    }
+    if (!destination) return;
 
-    // Trova la task da spostare nell'array unificato
-    let taskToMove = allTasksWithAssignments.find(task => task.id === draggableId);
-    
-    if (!taskToMove) return;
+    const sourceColumn = source.droppableId;
+    const destColumn = destination.droppableId;
 
-    // Se la source è una timeline slot, rimuovi i dati di assegnazione
-    if (source.droppableId.startsWith("cleaner-")) {
-      taskToMove = {
-        ...taskToMove,
-        assignedCleaner: undefined,
-        assignedSlot: undefined,
-        assignedSlotCount: undefined
-      } as any;
-    }
+    // Trova la task
+    const taskId = draggableId;
+    const task = allTasksWithAssignments.find((t) => t.id === taskId);
+    if (!task) return;
 
-    // DESTINAZIONE: Timeline slot
-    if (destination.droppableId.startsWith("cleaner-")) {
-      const parts = destination.droppableId.split('-');
-      const cleanerId = parseInt(parts[1]);
-      const startSlotIndex = parseInt(parts[3]);
-      
-      // Calcola quanti slot occupa la task (ogni slot = 1 ora)
-      const durationParts = taskToMove.duration.split('.');
-      const hours = parseInt(durationParts[0]);
-      const minutes = parseInt(durationParts[1]);
-      const slotCount = Math.ceil(hours + minutes / 60);
-      
-      console.log(`Task ${taskToMove.name} (durata ${taskToMove.duration}h = ${slotCount} slot) assegnata al cleaner ${cleanerId}, partendo dallo slot ${startSlotIndex}`);
-      
-      // Aggiorna la task con i nuovi dati di assegnazione
-      const updatedTask = {
-        ...taskToMove,
-        assignedCleaner: cleanerId,
-        assignedSlot: startSlotIndex,
-        assignedSlotCount: slotCount
-      } as any;
-      
-      // Aggiorna lo stato unificato
-      const updatedAllTasks = allTasksWithAssignments.map(task => 
-        task.id === draggableId ? updatedTask : task
+    // Se è droppata sulla timeline (area unica del cleaner)
+    if (destColumn.startsWith("cleaner-")) {
+      const cleanerId = parseInt(destColumn.split("-")[1]);
+
+      // Calcola lo slot iniziale in base alle task già presenti
+      const cleanerTasks = allTasksWithAssignments.filter(t => 
+        (t as any).assignedCleaner === cleanerId
       );
-      setAllTasksWithAssignments(updatedAllTasks);
-      
-      // Rimuovi la task dalle colonne di priorità
-      setEarlyOutTasks(prev => prev.filter(t => t.id !== draggableId));
-      setHighPriorityTasks(prev => prev.filter(t => t.id !== draggableId));
-      setLowPriorityTasks(prev => prev.filter(t => t.id !== draggableId));
-      
+
+      // Trova il primo slot libero (dopo tutte le task già assegnate a questo cleaner)
+      let nextSlot = 0;
+      cleanerTasks.forEach(t => {
+        const taskSlot = (t as any).assignedSlot || 0;
+        const taskDuration = t.duration;
+        const parts = taskDuration.split(".");
+        const hours = parseInt(parts[0] || "0");
+        const minutes = parts[1] ? parseInt(parts[1]) : 0;
+        const totalMinutes = hours * 60 + minutes;
+        const slotCount = Math.ceil(totalMinutes / 60); // Ogni slot = 1 ora
+        const taskEndSlot = taskSlot + slotCount;
+        if (taskEndSlot > nextSlot) {
+          nextSlot = taskEndSlot;
+        }
+      });
+
+      // Calcola la durata della nuova task in slot
+      const duration = task.duration;
+      const durationParts = duration.split(".");
+      const hours = parseInt(durationParts[0] || "0");
+      const minutes = durationParts[1] ? parseInt(durationParts[1]) : 0;
+      const totalMinutes = hours * 60 + minutes;
+      const slotCount = Math.ceil(totalMinutes / 60);
+
+      // Assegna la task al primo slot libero
+      const updatedTask = {
+        ...task,
+        assignedCleaner: cleanerId,
+        assignedSlot: nextSlot,
+        assignedSlotCount: slotCount
+      };
+
+      // Aggiorna lo stato unificato
+      setAllTasksWithAssignments(prev =>
+        prev.map((t) => (t.id === taskId ? updatedTask : t))
+      );
+
+      // Rimuovi la task dalle colonne di priorità se era presente
+      setEarlyOutTasks(prev => prev.filter(t => t.id !== taskId));
+      setHighPriorityTasks(prev => prev.filter(t => t.id !== taskId));
+      setLowPriorityTasks(prev => prev.filter(t => t.id !== taskId));
+
       return;
     }
-    
-    // DESTINAZIONE: Colonna di priorità
-    const destinationPriority = destination.droppableId;
-    
-    // Rimuovi assegnazione cleaner se presente
-    const updatedTask = {
-      ...taskToMove,
-      assignedCleaner: undefined,
-      assignedSlot: undefined,
-      assignedSlotCount: undefined,
-      priority: destinationPriority as any
-    } as any;
-    
+
+    // Gestione normale per le colonne di priorità (rimuovi assegnazione)
+    const newTask = { ...task };
+    delete (newTask as any).assignedCleaner;
+    delete (newTask as any).assignedSlot;
+    delete (newTask as any).assignedSlotCount;
+
     // Aggiorna lo stato unificato
-    const updatedAllTasks = allTasksWithAssignments.map(task => 
-      task.id === draggableId ? updatedTask : task
+    setAllTasksWithAssignments(prev =>
+      prev.map((t) => (t.id === taskId ? newTask : t))
     );
-    setAllTasksWithAssignments(updatedAllTasks);
-    
+
     // Aggiorna anche le liste di priorità
-    if (destinationPriority === "early-out") {
-      setEarlyOutTasks(prev => [...prev.filter(t => t.id !== draggableId), updatedTask]);
-      setHighPriorityTasks(prev => prev.filter(t => t.id !== draggableId));
-      setLowPriorityTasks(prev => prev.filter(t => t.id !== draggableId));
-    } else if (destinationPriority === "high") {
-      setHighPriorityTasks(prev => [...prev.filter(t => t.id !== draggableId), updatedTask]);
-      setEarlyOutTasks(prev => prev.filter(t => t.id !== draggableId));
-      setLowPriorityTasks(prev => prev.filter(t => t.id !== draggableId));
-    } else if (destinationPriority === "low") {
-      setLowPriorityTasks(prev => [...prev.filter(t => t.id !== draggableId), updatedTask]);
-      setEarlyOutTasks(prev => prev.filter(t => t.id !== draggableId));
-      setHighPriorityTasks(prev => prev.filter(t => t.id !== draggableId));
+    if (destColumn === "early-out") {
+      setEarlyOutTasks(prev => [...prev.filter(t => t.id !== taskId), newTask]);
+      setHighPriorityTasks(prev => prev.filter(t => t.id !== taskId));
+      setLowPriorityTasks(prev => prev.filter(t => t.id !== taskId));
+    } else if (destColumn === "high") {
+      setHighPriorityTasks(prev => [...prev.filter(t => t.id !== taskId), newTask]);
+      setEarlyOutTasks(prev => prev.filter(t => t.id !== taskId));
+      setLowPriorityTasks(prev => prev.filter(t => t.id !== taskId));
+    } else if (destColumn === "low") {
+      setLowPriorityTasks(prev => [...prev.filter(t => t.id !== taskId), newTask]);
+      setEarlyOutTasks(prev => prev.filter(t => t.id !== taskId));
+      setHighPriorityTasks(prev => prev.filter(t => t.id !== taskId));
     }
-    
+
     // Aggiorna i JSON se cambio priorità tra colonne
     if (
-      ['early-out', 'high', 'low'].includes(source.droppableId) &&
-      ['early-out', 'high', 'low'].includes(destination.droppableId)
+      ['early-out', 'high', 'low'].includes(sourceColumn) &&
+      ['early-out', 'high', 'low'].includes(destColumn)
     ) {
       try {
         const response = await fetch('/api/update-task-json', {
@@ -272,8 +274,8 @@ export default function GenerateAssignments() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             taskId: parseInt(draggableId),
-            fromContainer: source.droppableId,
-            toContainer: destination.droppableId
+            fromContainer: sourceColumn,
+            toContainer: destColumn
           })
         });
 
