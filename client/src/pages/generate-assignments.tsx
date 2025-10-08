@@ -294,21 +294,21 @@ export default function GenerateAssignments() {
             <PriorityColumn
               title="EARLY OUT"
               priority="early-out"
-              tasks={earlyOutTasks}
+              tasks={earlyOutTasks.filter(task => !(task as any).assignedCleaner)}
               droppableId="early-out"
               icon="clock"
             />
             <PriorityColumn
               title="HIGH PRIORITY"
               priority="high"
-              tasks={highPriorityTasks}
+              tasks={highPriorityTasks.filter(task => !(task as any).assignedCleaner)}
               droppableId="high"
               icon="alert-circle"
             />
             <PriorityColumn
               title="LOW PRIORITY"
               priority="low"
-              tasks={lowPriorityTasks}
+              tasks={lowPriorityTasks.filter(task => !(task as any).assignedCleaner)}
               droppableId="low"
               icon="arrow-down"
             />
