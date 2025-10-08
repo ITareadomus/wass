@@ -28,33 +28,6 @@
       ]
     },
     {
-      "task_id": 216936,
-      "logistic_code": 1032,
-      "client_id": 64,
-      "premium": false,
-      "address": "VIA PIETRO MASCAGNI, 2",
-      "lat": "45.4662468",
-      "lng": "9.2045849",
-      "cleaning_time": 60,
-      "checkin_date": "2025-10-09",
-      "checkout_date": "2025-10-09",
-      "checkin_time": "14:00",
-      "checkout_time": "11:00",
-      "pax_in": 2,
-      "pax_out": 2,
-      "small_equipment": true,
-      "operation_id": 2,
-      "confirmed_operation": true,
-      "straordinaria": false,
-      "type_apt": "A",
-      "alias": "RELSTAY",
-      "customer_name": "RELSTAY - FERRARA GIULIA",
-      "reasons": [
-        "same_day_checkin_between_eo_hp",
-        "client_forced_hp"
-      ]
-    },
-    {
       "task_id": 216937,
       "logistic_code": 1372,
       "client_id": 64,
@@ -263,7 +236,61 @@
       "reasons": [
         "premium"
       ]
+    },
+    {
+      "task_id": 217113,
+      "logistic_code": 782,
+      "client_id": 64,
+      "premium": false,
+      "address": "Via Melchiorre Gioia 1",
+      "lat": "45.4813881",
+      "lng": "9.1910586",
+      "cleaning_time": 60,
+      "checkin_date": "2025-10-09",
+      "checkout_date": "2025-10-09",
+      "checkin_time": "14:00",
+      "checkout_time": "11:00",
+      "pax_in": 4,
+      "pax_out": 4,
+      "small_equipment": true,
+      "operation_id": 2,
+      "confirmed_operation": true,
+      "straordinaria": false,
+      "type_apt": "A",
+      "alias": "RELSTAY",
+      "customer_name": "RELSTAY - FERRARA GIULIA",
+      "reasons": [
+        "same_day_checkin_between_eo_hp",
+        "client_forced_hp"
+      ]
+    },
+    {
+      "task_id": 217114,
+      "logistic_code": 986,
+      "client_id": 64,
+      "premium": false,
+      "address": "VIA WASHINGTON, 54",
+      "lat": "45.4623642",
+      "lng": "9.1543891",
+      "cleaning_time": 60,
+      "checkin_date": "2025-10-09",
+      "checkout_date": "2025-10-09",
+      "checkin_time": "14:00",
+      "checkout_time": "11:00",
+      "pax_in": 2,
+      "pax_out": 2,
+      "small_equipment": true,
+      "operation_id": 2,
+      "confirmed_operation": true,
+      "straordinaria": false,
+      "type_apt": "A",
+      "alias": "RELSTAY",
+      "customer_name": "RELSTAY - FERRARA GIULIA",
+      "reasons": [
+        "same_day_checkin_between_eo_hp",
+        "client_forced_hp"
+      ]
     }
   ],
-  "total_apartments": 10
+  "total_apartments": 11
 }

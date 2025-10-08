@@ -1,11 +1,11 @@
 {
     "metadata": {
-        "last_updated": "2025-10-08T14:54:39.995161",
+        "last_updated": "2025-10-08T14:55:53.896069",
         "schema_version": "1.0"
     },
     "dates": {
         "2025-10-09": {
-            "timestamp": "2025-10-08T14:54:39.995173",
+            "timestamp": "2025-10-08T14:55:53.896078",
             "apt": [
                 {
                     "task_id": 212451,
@@ -788,9 +788,55 @@
                     "type_apt": "B",
                     "alias": "EXPRDS",
                     "customer_name": "EXPERIENCE DESIGN BED & SHOW"
+                },
+                {
+                    "task_id": 217113,
+                    "logistic_code": 782,
+                    "client_id": 64,
+                    "premium": false,
+                    "address": "Via Melchiorre Gioia 1",
+                    "lat": "45.4813881",
+                    "lng": "9.1910586",
+                    "cleaning_time": 60,
+                    "checkin_date": "2025-10-09",
+                    "checkout_date": "2025-10-09",
+                    "checkin_time": "14:00",
+                    "checkout_time": "11:00",
+                    "pax_in": 4,
+                    "pax_out": 4,
+                    "small_equipment": true,
+                    "operation_id": 2,
+                    "confirmed_operation": true,
+                    "straordinaria": false,
+                    "type_apt": "A",
+                    "alias": "RELSTAY",
+                    "customer_name": "RELSTAY - FERRARA GIULIA"
+                },
+                {
+                    "task_id": 217114,
+                    "logistic_code": 986,
+                    "client_id": 64,
+                    "premium": false,
+                    "address": "VIA WASHINGTON, 54",
+                    "lat": "45.4623642",
+                    "lng": "9.1543891",
+                    "cleaning_time": 60,
+                    "checkin_date": "2025-10-09",
+                    "checkout_date": "2025-10-09",
+                    "checkin_time": "14:00",
+                    "checkout_time": "11:00",
+                    "pax_in": 2,
+                    "pax_out": 2,
+                    "small_equipment": true,
+                    "operation_id": 2,
+                    "confirmed_operation": true,
+                    "straordinaria": false,
+                    "type_apt": "A",
+                    "alias": "RELSTAY",
+                    "customer_name": "RELSTAY - FERRARA GIULIA"
                 }
             ],
-            "total_apartments": 34,
+            "total_apartments": 36,
             "date": "2025-10-09"
         }
     }
