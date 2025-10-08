@@ -167,19 +167,36 @@ export default function TimelineView({
                         ))}
                       </div>
 
-                      {/* Task posizionate in sequenza */}
-                      <div className="relative z-10 flex items-center flex-wrap">
+                      {/* Task posizionate in modo assoluto rispetto alla griglia oraria */}
+                      <div className="relative z-10 h-full">
                         {tasks
                           .filter((task) => (task as any).assignedCleaner === cleaner.id)
                           .sort((a, b) => ((a as any).assignedSlot || 0) - ((b as any).assignedSlot || 0))
-                          .map((task, index) => (
-                            <TaskCard 
-                              key={task.id} 
-                              task={task} 
-                              index={index}
-                              isInTimeline={true}
-                            />
-                          ))}
+                          .map((task, index) => {
+                            // Calcola la posizione left in base ai minuti dall'inizio (8:00)
+                            const startMinutes = (task as any).startTime || 0;
+                            // La timeline è divisa in 12 ore (8:00-20:00) = 720 minuti
+                            // Ogni ora = 8.333% della larghezza totale
+                            const leftPercentage = (startMinutes / 720) * 100;
+
+                            return (
+                              <div
+                                key={task.id}
+                                style={{
+                                  position: 'absolute',
+                                  left: `${leftPercentage}%`,
+                                  top: '50%',
+                                  transform: 'translateY(-50%)',
+                                }}
+                              >
+                                <TaskCard 
+                                  task={task} 
+                                  index={index}
+                                  isInTimeline={true}
+                                />
+                              </div>
+                            );
+                          })}
                         {provided.placeholder}
                       </div>
                     </div>

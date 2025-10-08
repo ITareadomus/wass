@@ -44,7 +44,7 @@ export default function TaskCard({
     return "task-standard";
   };
 
-  // Calcola la larghezza in base alla durata (ogni 30 minuti = 40px)
+  // Calcola la larghezza in base alla durata
   const calculateWidth = (duration: string, forTimeline: boolean) => {
     const parts = duration.split(".");
     const hours = parseInt(parts[0] || "0");
@@ -53,7 +53,7 @@ export default function TaskCard({
 
     // Se 0 minuti, usa almeno 30 minuti
     if (totalMinutes === 0) {
-      return "40px";
+      return forTimeline ? "4.166%" : "40px"; // 30 min = 4.166% di 720 min (12 ore)
     }
 
     // Se la task dura meno di 1 ora e non è sulla timeline, mostrala come 1 ora
@@ -61,9 +61,16 @@ export default function TaskCard({
       return "80px"; // 1 ora = 80px
     }
 
-    // Calcola in base ai 30 minuti = 40px
-    const width = Math.ceil(totalMinutes / 30) * 40;
-    return `${width}px`;
+    if (forTimeline) {
+      // La timeline copre 12 ore (720 minuti)
+      // Calcola la percentuale della durata rispetto ai 720 minuti
+      const widthPercentage = (totalMinutes / 720) * 100;
+      return `${widthPercentage}%`;
+    } else {
+      // Per le colonne di priorità, usa i pixel
+      const width = Math.ceil(totalMinutes / 30) * 40;
+      return `${width}px`;
+    }
   };
 
   return (
