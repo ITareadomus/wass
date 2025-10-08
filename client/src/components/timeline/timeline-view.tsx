@@ -1,3 +1,4 @@
+
 import { Personnel, Task } from "@shared/schema";
 import { Calendar } from "lucide-react";
 import { useState, useEffect } from "react";
@@ -50,7 +51,7 @@ export default function TimelineView({
           throw new Error(`HTTP error! status: ${response.status}`);
         }
         const data = await response.json();
-        console.log("Cleaners caricati:", data);
+        console.log("Cleaners caricati da selected_cleaners.json:", data);
         setCleaners(data.cleaners || []);
       } catch (error) {
         console.error("Errore nel caricamento dei cleaners:", error);
@@ -70,7 +71,7 @@ export default function TimelineView({
         <div className="p-4 border-b border-border">
           <h3 className="font-semibold text-foreground flex items-center">
             <Calendar className="w-5 h-5 mr-2 text-primary" />
-            Timeline Assegnazioni - {cleaners.length} Cleaners
+            Timeline Assegnazioni - {cleaners.length} Cleaners da selected_cleaners.json
           </h3>
         </div>
         <div className="p-4 overflow-x-auto">
