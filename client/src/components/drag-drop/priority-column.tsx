@@ -21,30 +21,26 @@ export default function PriorityColumn({
   icon,
 }: PriorityColumnProps) {
   const getColumnClass = (priority: string, tasks: Task[]) => {
-    // Controlla se ci sono task straordinarie
-    const hasStraordinaria = tasks.some(task => task.is_straordinaria);
-    if (hasStraordinaria) {
-      return "bg-red-50 border-red-300";
+    switch (priority) {
+      case "early-out":
+        return "bg-blue-50 border-blue-300";
+      case "high":
+        return "bg-purple-50 border-purple-300";
+      case "low":
+        return "bg-orange-50 border-orange-300";
+      default:
+        return "bg-gray-50 border-gray-300";
     }
-    
-    // Controlla se ci sono task premium
-    const hasPremium = tasks.some(task => task.premium);
-    if (hasPremium) {
-      return "bg-yellow-50 border-yellow-300";
-    }
-    
-    // Altrimenti verde (standard)
-    return "bg-green-50 border-green-300";
   };
 
   const getHeaderClass = (priority: string) => {
     switch (priority) {
       case "early-out":
-        return "text-orange-800";
+        return "text-blue-800";
       case "high":
-        return "text-green-800";
+        return "text-purple-800";
       case "low":
-        return "text-lime-800";
+        return "text-orange-800";
       default:
         return "text-foreground";
     }
