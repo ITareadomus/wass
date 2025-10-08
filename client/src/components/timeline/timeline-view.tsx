@@ -2,6 +2,7 @@
 import { Personnel, Task } from "@shared/schema";
 import { Calendar } from "lucide-react";
 import { useState, useEffect } from "react";
+import { Droppable } from "react-beautiful-dnd";
 import {
   Dialog,
   DialogContent,
@@ -118,6 +119,8 @@ export default function TimelineView({
             {/* Cleaner Rows */}
             {cleaners.map((cleaner, index) => {
               const color = getCleanerColor(index);
+              const droppableId = `cleaner-${cleaner.id}`;
+              
               return (
                 <div key={cleaner.id} className="contents">
                   {/* Cleaner Info Cell */}
@@ -139,16 +142,31 @@ export default function TimelineView({
                     </div>
                   </div>
 
-                  {/* Time Slots */}
-                  {timeSlots.map((slot) => (
-                    <div
-                      key={`${cleaner.id}-${slot}`}
-                      className="timeline-cell border border-border"
-                      style={{ 
-                        backgroundColor: `${color.bg}10` // 10% opacity dello stesso colore
-                      }}
-                    />
-                  ))}
+                  {/* Time Slots - Droppable Area */}
+                  <Droppable droppableId={droppableId} direction="horizontal">
+                    {(provided, snapshot) => (
+                      <div
+                        ref={provided.innerRef}
+                        {...provided.droppableProps}
+                        className="contents"
+                      >
+                        {timeSlots.map((slot) => (
+                          <div
+                            key={`${cleaner.id}-${slot}`}
+                            className={`timeline-cell border border-border transition-colors ${
+                              snapshot.isDraggingOver ? 'bg-primary/20' : ''
+                            }`}
+                            style={{ 
+                              backgroundColor: snapshot.isDraggingOver 
+                                ? `${color.bg}30` 
+                                : `${color.bg}10`
+                            }}
+                          />
+                        ))}
+                        {provided.placeholder}
+                      </div>
+                    )}
+                  </Droppable>
                 </div>
               );
             })}
