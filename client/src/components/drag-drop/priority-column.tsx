@@ -23,9 +23,9 @@ export default function PriorityColumn({
   const getColumnClass = (priority: string, tasks: Task[]) => {
     switch (priority) {
       case "early-out":
-        return "bg-blue-50 border-blue-300";
-      case "high":
         return "bg-purple-50 border-purple-300";
+      case "high":
+        return "bg-red-50 border-red-300";
       case "low":
         return "bg-orange-50 border-orange-300";
       default:
@@ -36,9 +36,9 @@ export default function PriorityColumn({
   const getHeaderClass = (priority: string) => {
     switch (priority) {
       case "early-out":
-        return "text-blue-800";
-      case "high":
         return "text-purple-800";
+      case "high":
+        return "text-red-800";
       case "low":
         return "text-orange-800";
       default:
