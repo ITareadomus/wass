@@ -183,6 +183,8 @@ export default function GenerateAssignments() {
     const task = allTasksWithAssignments.find((t) => t.id === taskId);
     if (!task) return;
 
+    let newTasks = [...allTasksWithAssignments];
+
     // Se è droppata sulla timeline (area unica del cleaner)
     if (destColumn.startsWith("cleaner-")) {
       const cleanerId = parseInt(destColumn.split("-")[1]);
@@ -191,7 +193,7 @@ export default function GenerateAssignments() {
       const duration = task.duration;
       const durationParts = duration.split(".");
       const hours = parseInt(durationParts[0] || "0");
-      const minutes = durationParts[1] ? parseInt(durationParts[1]) : 0;
+      const minutes = parseInt(durationParts[1]) ? parseInt(durationParts[1]) : 0;
       const taskDurationMinutes = hours * 60 + minutes;
 
       // Trova tutte le task già assegnate a questo cleaner (escludendo quella corrente se già assegnata)
@@ -220,15 +222,14 @@ export default function GenerateAssignments() {
       };
 
       // Aggiorna lo stato unificato
-      setAllTasksWithAssignments(prev =>
-        prev.map((t) => (t.id === taskId ? updatedTask : t))
-      );
+      newTasks = newTasks.map((t) => (t.id === taskId ? updatedTask : t));
 
       // Rimuovi la task dalle colonne di priorità se era presente
       setEarlyOutTasks(prev => prev.filter(t => t.id !== taskId));
       setHighPriorityTasks(prev => prev.filter(t => t.id !== taskId));
       setLowPriorityTasks(prev => prev.filter(t => t.id !== taskId));
 
+      setAllTasksWithAssignments(newTasks); // Aggiorna lo stato unificato
       return;
     }
 
@@ -239,9 +240,8 @@ export default function GenerateAssignments() {
     delete (newTask as any).assignedDurationMinutes;
 
     // Aggiorna lo stato unificato
-    setAllTasksWithAssignments(prev =>
-      prev.map((t) => (t.id === taskId ? newTask : t))
-    );
+    newTasks = newTasks.map((t) => (t.id === taskId ? newTask : t));
+
 
     // Aggiorna anche le liste di priorità
     if (destColumn === "early-out") {
@@ -257,6 +257,8 @@ export default function GenerateAssignments() {
       setEarlyOutTasks(prev => prev.filter(t => t.id !== taskId));
       setHighPriorityTasks(prev => prev.filter(t => t.id !== taskId));
     }
+
+    setAllTasksWithAssignments(newTasks); // Aggiorna lo stato unificato
 
     // Aggiorna i JSON se cambio priorità tra colonne
     if (

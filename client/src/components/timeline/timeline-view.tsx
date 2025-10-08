@@ -1,4 +1,3 @@
-
 import { Personnel, Task } from "@shared/schema";
 import { Calendar } from "lucide-react";
 import { useState, useEffect } from "react";
@@ -119,7 +118,7 @@ export default function TimelineView({
           {cleaners.map((cleaner, index) => {
             const color = getCleanerColor(index);
             const droppableId = `cleaner-${cleaner.id}`;
-            
+
             // Trova tutte le task assegnate a questo cleaner
             const cleanerTasks = tasks.filter(task => 
               (task as any).assignedCleaner === cleaner.id
@@ -146,67 +145,45 @@ export default function TimelineView({
                   </div>
                 </div>
 
-                {/* Area droppabile unica - con riferimenti visivi orari */}
-                <Droppable droppableId={droppableId} direction="horizontal">
+                {/* Timeline per questo cleaner - area unica droppable */}
+                <Droppable droppableId={`timeline-${cleaner.id}`} direction="horizontal">
                   {(provided, snapshot) => (
                     <div
                       ref={provided.innerRef}
                       {...provided.droppableProps}
-                      className={`flex-1 relative min-h-[60px] transition-colors ${
+                      className={`relative border-t border-border transition-colors p-2 min-h-[60px] ${
                         snapshot.isDraggingOver ? 'bg-primary/20 ring-2 ring-primary' : ''
                       }`}
                       style={{ 
                         backgroundColor: snapshot.isDraggingOver 
-                          ? `${color.bg}30` 
+                          ? `${color.bg}40`
                           : `${color.bg}10`
                       }}
                     >
-                      {/* Riferimenti visivi orari (sfondo) */}
-                      <div className="absolute inset-0 flex pointer-events-none">
-                        {timeSlots.map((_, idx) => (
-                          <div
-                            key={idx}
-                            className="flex-1 border-l border-border/30 first:border-l-0"
-                          />
+                      {/* Griglia oraria di sfondo (solo visiva) */}
+                      <div className="absolute inset-0 grid grid-cols-12 pointer-events-none opacity-20">
+                        {timeSlots.map((slot, idx) => (
+                          <div key={idx} className="border-r border-border flex items-center justify-center">
+                            <span className="text-xs text-muted-foreground">{slot}</span>
+                          </div>
                         ))}
                       </div>
 
-                      {/* Task droppate */}
-                      <div className="relative z-10 flex items-center gap-1 p-1">
-                        {cleanerTasks
-                          .sort((a, b) => ((a as any).assignedStartMinute || 0) - ((b as any).assignedStartMinute || 0))
-                          .map((task, taskIndex) => {
-                            const startMinute = (task as any).assignedStartMinute || 0;
-                            const durationMinutes = (task as any).assignedDurationMinutes || 60;
-                            
-                            // Timeline va da 8:00 a 19:00 = 11 ore = 660 minuti
-                            const timelineStartMinute = 8 * 60; // 8:00
-                            const timelineTotalMinutes = 11 * 60; // 11 ore
-                            
-                            // Calcola posizione e larghezza in percentuale
-                            const leftPosition = ((startMinute - timelineStartMinute) / timelineTotalMinutes) * 100;
-                            const taskWidth = (durationMinutes / timelineTotalMinutes) * 100;
-
-                            return (
-                              <div
-                                key={task.id}
-                                className="absolute"
-                                style={{
-                                  left: `${Math.max(0, leftPosition)}%`,
-                                  width: `${taskWidth}%`,
-                                }}
-                              >
-                                <TaskCard 
-                                  task={task} 
-                                  index={taskIndex}
-                                  isInTimeline={true}
-                                />
-                              </div>
-                            );
-                          })}
+                      {/* Task posizionate in sequenza */}
+                      <div className="relative z-10 flex items-center gap-2 flex-wrap">
+                        {tasks
+                          .filter((task) => (task as any).assignedCleaner === cleaner.id)
+                          .sort((a, b) => ((a as any).assignedSlot || 0) - ((b as any).assignedSlot || 0))
+                          .map((task, index) => (
+                            <TaskCard 
+                              key={task.id} 
+                              task={task} 
+                              index={index}
+                              isInTimeline={true}
+                            />
+                          ))}
+                        {provided.placeholder}
                       </div>
-                      
-                      {provided.placeholder}
                     </div>
                   )}
                 </Droppable>
