@@ -69,26 +69,29 @@ export default function TaskCard({
   return (
     <>
       <Draggable draggableId={task.id} index={index}>
-        {(provided, snapshot) => (
-          <div
-            ref={provided.innerRef}
-            {...provided.draggableProps}
-            {...provided.dragHandleProps}
-            className={`
-              ${getTaskClassByPriority(task)} 
-              rounded-sm px-2 py-1 shadow-sm border transition-all duration-200
-              ${snapshot.isDragging ? "rotate-2 scale-105 shadow-lg" : ""}
-              hover:scale-105 hover:shadow-md cursor-pointer
-              flex-shrink-0 relative
-            `}
-            style={{
-              ...provided.draggableProps.style,
-              width: isInTimeline ? '100%' : calculateWidth(task.duration, isInTimeline),
-              minHeight: "40px",
-            }}
-            data-testid={`task-card-${task.id}`}
-            onClick={handleCardClick}
-          >
+        {(provided, snapshot) => {
+          const cardWidth = isInTimeline ? '100%' : calculateWidth(task.duration, isInTimeline);
+          
+          return (
+            <div
+              ref={provided.innerRef}
+              {...provided.draggableProps}
+              {...provided.dragHandleProps}
+              className={`
+                ${getTaskClassByPriority(task)} 
+                rounded-sm px-2 py-1 shadow-sm border transition-all duration-200
+                ${snapshot.isDragging ? "shadow-lg" : ""}
+                hover:shadow-md cursor-pointer
+                flex-shrink-0 relative
+              `}
+              style={{
+                ...provided.draggableProps.style,
+                width: cardWidth,
+                minHeight: "40px",
+              }}
+              data-testid={`task-card-${task.id}`}
+              onClick={handleCardClick}
+            >
             {task.confirmed_operation === false && (
               <div className="absolute top-0.5 right-0.5 z-50">
                 <HelpCircle
@@ -115,8 +118,8 @@ export default function TaskCard({
                 </span>
               )}
             </div>
-          </div>
-        )}
+            );
+          }}
       </Draggable>
 
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
