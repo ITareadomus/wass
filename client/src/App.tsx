@@ -3,15 +3,13 @@ import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import TaskManager from "@/pages/task-manager";
 import GenerateAssignments from "@/pages/generate-assignments";
 import NotFound from "@/pages/not-found";
 
 function Router() {
   return (
     <Switch>
-      <Route path="/" component={TaskManager} />
-      <Route path="/generate-assignments" component={GenerateAssignments} />
+      <Route path="/" component={GenerateAssignments} />
       <Route component={NotFound} />
     </Switch>
   );
