@@ -23,7 +23,11 @@ export default function TaskCard({
 }: TaskCardProps) {
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  const handleCardClick = () => {
+  const handleCardClick = (e: React.MouseEvent) => {
+    // Previeni apertura modale durante drag
+    if ((e.target as HTMLElement).closest('[data-rbd-draggable-id]')) {
+      return;
+    }
     setIsModalOpen(true);
   };
 

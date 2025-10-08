@@ -158,7 +158,7 @@ export default function TimelineView({
                           <div
                             ref={provided.innerRef}
                             {...provided.droppableProps}
-                            className={`timeline-cell border border-border transition-colors p-1 min-h-[60px] ${
+                            className={`timeline-cell border border-border transition-colors p-1 min-h-[60px] flex items-center gap-1 ${
                               snapshot.isDraggingOver ? 'bg-primary/20 ring-2 ring-primary' : ''
                             }`}
                             style={{ 
@@ -167,14 +167,20 @@ export default function TimelineView({
                                 : `${color.bg}10`
                             }}
                           >
-                            {slotTasks.map((task, taskIndex) => (
-                              <TaskCard 
-                                key={task.id} 
-                                task={task} 
-                                index={taskIndex}
-                                isInTimeline={true}
-                              />
-                            ))}
+                            {slotTasks.length > 0 ? (
+                              slotTasks.map((task, taskIndex) => (
+                                <TaskCard 
+                                  key={task.id} 
+                                  task={task} 
+                                  index={taskIndex}
+                                  isInTimeline={true}
+                                />
+                              ))
+                            ) : (
+                              <div className="text-xs text-muted-foreground opacity-50">
+                                Trascina qui
+                              </div>
+                            )}
                             {provided.placeholder}
                           </div>
                         )}
