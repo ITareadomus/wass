@@ -365,32 +365,6 @@
       ]
     },
     {
-      "task_id": 217105,
-      "logistic_code": 618,
-      "client_id": 67,
-      "premium": false,
-      "address": "VIA VOGHERA, 4",
-      "lat": "45.454632",
-      "lng": "9.168536",
-      "cleaning_time": 30,
-      "checkin_date": "2025-10-09",
-      "checkout_date": "2025-10-09",
-      "checkin_time": null,
-      "checkout_time": "09:30",
-      "pax_in": 1,
-      "pax_out": 0,
-      "small_equipment": true,
-      "operation_id": 2,
-      "confirmed_operation": true,
-      "straordinaria": false,
-      "type_apt": "A",
-      "alias": "EXPRDS",
-      "customer_name": "EXPERIENCE DESIGN BED & SHOW",
-      "reasons": [
-        "checkout_time<=eo_time"
-      ]
-    },
-    {
       "task_id": 217106,
       "logistic_code": 619,
       "client_id": 67,
@@ -443,5 +417,5 @@
       ]
     }
   ],
-  "total_apartments": 17
+  "total_apartments": 16
 }
