@@ -1,7 +1,7 @@
 import { DragDropContext, DropResult } from "react-beautiful-dnd";
 import { Task } from "@shared/schema";
 import PriorityColumn from "@/components/drag-drop/priority-column";
-import TimelineView from "@/components/timeline/timeline-view";
+// import TimelineView from "@/components/timeline/timeline-view";
 import { useState, useEffect } from "react";
 
 interface RawTask {
@@ -353,10 +353,10 @@ export default function GenerateAssignments() {
             />
           </div>
 
-          <TimelineView
+          {/* <TimelineView
             personnel={[]}
             tasks={[...earlyOutTasks, ...highPriorityTasks, ...lowPriorityTasks]}
-          />
+          /> */}
         </DragDropContext>
       </div>
     </div>
