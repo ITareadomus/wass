@@ -204,7 +204,14 @@ export default function GenerateAssignments() {
 
     // Add the task to the destination list
     let updatedDestinationTasks: Task[] = [];
-    if (destination.droppableId === "lopez") {
+    
+    // Check if destination is a cleaner timeline (format: cleaner-{id})
+    if (destination.droppableId.startsWith("cleaner-")) {
+      console.log(`Task ${taskToMove.name} assegnata al cleaner ${destination.droppableId}`);
+      // Per ora logghiamo solo, in futuro qui si gestirà l'assegnazione alla timeline
+      // La task viene rimossa dalla sorgente ma non ancora visualizzata sulla timeline
+      // TODO: implementare la visualizzazione delle task assegnate sulla timeline
+    } else if (destination.droppableId === "lopez") {
       updatedDestinationTasks = [...lopezTasks, taskToMove];
       setLopezTasks(updatedDestinationTasks);
     } else if (destination.droppableId === "garcia") {

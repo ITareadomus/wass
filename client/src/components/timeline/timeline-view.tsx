@@ -3,6 +3,7 @@ import { Personnel, Task } from "@shared/schema";
 import { Calendar } from "lucide-react";
 import { useState, useEffect } from "react";
 import { Droppable } from "react-beautiful-dnd";
+import TaskCard from "@/components/drag-drop/task-card";
 import {
   Dialog,
   DialogContent,
@@ -150,19 +151,36 @@ export default function TimelineView({
                         {...provided.droppableProps}
                         className="contents"
                       >
-                        {timeSlots.map((slot) => (
-                          <div
-                            key={`${cleaner.id}-${slot}`}
-                            className={`timeline-cell border border-border transition-colors ${
-                              snapshot.isDraggingOver ? 'bg-primary/20' : ''
-                            }`}
-                            style={{ 
-                              backgroundColor: snapshot.isDraggingOver 
-                                ? `${color.bg}30` 
-                                : `${color.bg}10`
-                            }}
-                          />
-                        ))}
+                        {timeSlots.map((slot, slotIndex) => {
+                          // Trova le task assegnate a questo cleaner in questo slot
+                          const slotTasks = tasks.filter(task => 
+                            (task as any).assignedCleaner === cleaner.id && 
+                            (task as any).assignedSlot === slotIndex
+                          );
+
+                          return (
+                            <div
+                              key={`${cleaner.id}-${slot}`}
+                              className={`timeline-cell border border-border transition-colors p-1 ${
+                                snapshot.isDraggingOver ? 'bg-primary/20' : ''
+                              }`}
+                              style={{ 
+                                backgroundColor: snapshot.isDraggingOver 
+                                  ? `${color.bg}30` 
+                                  : `${color.bg}10`
+                              }}
+                            >
+                              {slotTasks.map((task, taskIndex) => (
+                                <TaskCard 
+                                  key={task.id} 
+                                  task={task} 
+                                  index={taskIndex}
+                                  isInTimeline={true}
+                                />
+                              ))}
+                            </div>
+                          );
+                        })}
                         {provided.placeholder}
                       </div>
                     )}
