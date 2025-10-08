@@ -146,11 +146,42 @@ export default function TimelineView({
                   {/* Time Slots - Droppable Area */}
                   {timeSlots.map((slot, slotIndex) => {
                     const cellDroppableId = `${droppableId}-slot-${slotIndex}`;
+                    
                     // Trova le task assegnate a questo cleaner in questo slot
                     const slotTasks = tasks.filter(task => 
                       (task as any).assignedCleaner === cleaner.id && 
                       (task as any).assignedSlot === slotIndex
                     );
+
+                    // Verifica se questo slot è occupato da una task che inizia prima
+                    const isOccupiedByPreviousTask = tasks.some(task => {
+                      const taskData = task as any;
+                      if (taskData.assignedCleaner !== cleaner.id) return false;
+                      
+                      const taskStartSlot = taskData.assignedSlot;
+                      const taskSlotCount = taskData.assignedSlotCount || 1;
+                      const taskEndSlot = taskStartSlot + taskSlotCount;
+                      
+                      return slotIndex >= taskStartSlot && slotIndex < taskEndSlot && taskStartSlot < slotIndex;
+                    });
+
+                    // Se lo slot è occupato da una task precedente, mostra uno slot vuoto non droppable
+                    if (isOccupiedByPreviousTask) {
+                      return (
+                        <div
+                          key={`occupied-${slotIndex}`}
+                          className="timeline-cell border border-border transition-colors p-1 min-h-[60px] bg-gray-200"
+                          style={{ 
+                            backgroundColor: `${color.bg}20`,
+                            opacity: 0.5
+                          }}
+                        >
+                          <div className="text-xs text-muted-foreground opacity-50 text-center">
+                            occupato
+                          </div>
+                        </div>
+                      );
+                    }
 
                     return (
                       <Droppable key={cellDroppableId} droppableId={cellDroppableId}>

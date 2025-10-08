@@ -187,7 +187,8 @@ export default function GenerateAssignments() {
       taskToMove = {
         ...taskToMove,
         assignedCleaner: undefined,
-        assignedSlot: undefined
+        assignedSlot: undefined,
+        assignedSlotCount: undefined
       } as any;
     }
 
@@ -195,15 +196,22 @@ export default function GenerateAssignments() {
     if (destination.droppableId.startsWith("cleaner-")) {
       const parts = destination.droppableId.split('-');
       const cleanerId = parseInt(parts[1]);
-      const slotIndex = parseInt(parts[3]);
+      const startSlotIndex = parseInt(parts[3]);
       
-      console.log(`Task ${taskToMove.name} spostata al cleaner ${cleanerId}, slot ${slotIndex}`);
+      // Calcola quanti slot occupa la task (ogni slot = 1 ora)
+      const durationParts = taskToMove.duration.split('.');
+      const hours = parseInt(durationParts[0]);
+      const minutes = parseInt(durationParts[1]);
+      const slotCount = Math.ceil(hours + minutes / 60);
+      
+      console.log(`Task ${taskToMove.name} (durata ${taskToMove.duration}h = ${slotCount} slot) assegnata al cleaner ${cleanerId}, partendo dallo slot ${startSlotIndex}`);
       
       // Aggiorna la task con i nuovi dati di assegnazione
       const updatedTask = {
         ...taskToMove,
         assignedCleaner: cleanerId,
-        assignedSlot: slotIndex
+        assignedSlot: startSlotIndex,
+        assignedSlotCount: slotCount
       } as any;
       
       // Aggiorna lo stato unificato
@@ -211,6 +219,11 @@ export default function GenerateAssignments() {
         task.id === draggableId ? updatedTask : task
       );
       setAllTasksWithAssignments(updatedAllTasks);
+      
+      // Rimuovi la task dalle colonne di priorità
+      setEarlyOutTasks(prev => prev.filter(t => t.id !== draggableId));
+      setHighPriorityTasks(prev => prev.filter(t => t.id !== draggableId));
+      setLowPriorityTasks(prev => prev.filter(t => t.id !== draggableId));
       
       return;
     }
@@ -223,6 +236,7 @@ export default function GenerateAssignments() {
       ...taskToMove,
       assignedCleaner: undefined,
       assignedSlot: undefined,
+      assignedSlotCount: undefined,
       priority: destinationPriority as any
     } as any;
     
