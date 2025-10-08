@@ -151,7 +151,7 @@ export default function TimelineView({
                     <div
                       ref={provided.innerRef}
                       {...provided.droppableProps}
-                      className={`relative border-t border-border transition-colors p-2 min-h-[60px] ${
+                      className={`relative border-t border-border transition-colors p-2 min-h-[60px] flex-1 ${
                         snapshot.isDraggingOver ? 'bg-primary/20 ring-2 ring-primary' : ''
                       }`}
                       style={{ 
@@ -161,11 +161,9 @@ export default function TimelineView({
                       }}
                     >
                       {/* Griglia oraria di sfondo (solo visiva) */}
-                      <div className="absolute inset-0 grid grid-cols-12 pointer-events-none opacity-20">
+                      <div className="absolute inset-0 grid grid-cols-12 pointer-events-none opacity-10">
                         {timeSlots.map((slot, idx) => (
-                          <div key={idx} className="border-r border-border flex items-center justify-center">
-                            <span className="text-xs text-muted-foreground">{slot}</span>
-                          </div>
+                          <div key={idx} className="border-r border-border"></div>
                         ))}
                       </div>
 
