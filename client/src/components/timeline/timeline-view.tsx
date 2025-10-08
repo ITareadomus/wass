@@ -144,47 +144,43 @@ export default function TimelineView({
                   </div>
 
                   {/* Time Slots - Droppable Area */}
-                  <Droppable droppableId={droppableId} direction="horizontal">
-                    {(provided, snapshot) => (
-                      <div
-                        ref={provided.innerRef}
-                        {...provided.droppableProps}
-                        className="contents"
-                      >
-                        {timeSlots.map((slot, slotIndex) => {
-                          // Trova le task assegnate a questo cleaner in questo slot
-                          const slotTasks = tasks.filter(task => 
-                            (task as any).assignedCleaner === cleaner.id && 
-                            (task as any).assignedSlot === slotIndex
-                          );
+                  {timeSlots.map((slot, slotIndex) => {
+                    const cellDroppableId = `${droppableId}-slot-${slotIndex}`;
+                    // Trova le task assegnate a questo cleaner in questo slot
+                    const slotTasks = tasks.filter(task => 
+                      (task as any).assignedCleaner === cleaner.id && 
+                      (task as any).assignedSlot === slotIndex
+                    );
 
-                          return (
-                            <div
-                              key={`${cleaner.id}-${slot}`}
-                              className={`timeline-cell border border-border transition-colors p-1 ${
-                                snapshot.isDraggingOver ? 'bg-primary/20' : ''
-                              }`}
-                              style={{ 
-                                backgroundColor: snapshot.isDraggingOver 
-                                  ? `${color.bg}30` 
-                                  : `${color.bg}10`
-                              }}
-                            >
-                              {slotTasks.map((task, taskIndex) => (
-                                <TaskCard 
-                                  key={task.id} 
-                                  task={task} 
-                                  index={taskIndex}
-                                  isInTimeline={true}
-                                />
-                              ))}
-                            </div>
-                          );
-                        })}
-                        {provided.placeholder}
-                      </div>
-                    )}
-                  </Droppable>
+                    return (
+                      <Droppable key={cellDroppableId} droppableId={cellDroppableId}>
+                        {(provided, snapshot) => (
+                          <div
+                            ref={provided.innerRef}
+                            {...provided.droppableProps}
+                            className={`timeline-cell border border-border transition-colors p-1 min-h-[60px] ${
+                              snapshot.isDraggingOver ? 'bg-primary/20 ring-2 ring-primary' : ''
+                            }`}
+                            style={{ 
+                              backgroundColor: snapshot.isDraggingOver 
+                                ? `${color.bg}30` 
+                                : `${color.bg}10`
+                            }}
+                          >
+                            {slotTasks.map((task, taskIndex) => (
+                              <TaskCard 
+                                key={task.id} 
+                                task={task} 
+                                index={taskIndex}
+                                isInTimeline={true}
+                              />
+                            ))}
+                            {provided.placeholder}
+                          </div>
+                        )}
+                      </Droppable>
+                    );
+                  })}
                 </div>
               );
             })}
