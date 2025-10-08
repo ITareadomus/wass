@@ -153,43 +153,13 @@ export default function TimelineView({
                       (task as any).assignedSlot === slotIndex
                     );
 
-                    // Verifica se questo slot è occupato da una task che inizia prima
-                    const isOccupiedByPreviousTask = tasks.some(task => {
-                      const taskData = task as any;
-                      if (taskData.assignedCleaner !== cleaner.id) return false;
-                      
-                      const taskStartSlot = taskData.assignedSlot;
-                      const taskSlotCount = taskData.assignedSlotCount || 1;
-                      const taskEndSlot = taskStartSlot + taskSlotCount;
-                      
-                      return slotIndex >= taskStartSlot && slotIndex < taskEndSlot && taskStartSlot < slotIndex;
-                    });
-
-                    // Se lo slot è occupato da una task precedente, mostra uno slot vuoto non droppable
-                    if (isOccupiedByPreviousTask) {
-                      return (
-                        <div
-                          key={`occupied-${slotIndex}`}
-                          className="timeline-cell border border-border transition-colors p-1 min-h-[60px] bg-gray-200"
-                          style={{ 
-                            backgroundColor: `${color.bg}20`,
-                            opacity: 0.5
-                          }}
-                        >
-                          <div className="text-xs text-muted-foreground opacity-50 text-center">
-                            occupato
-                          </div>
-                        </div>
-                      );
-                    }
-
                     return (
                       <Droppable key={cellDroppableId} droppableId={cellDroppableId}>
                         {(provided, snapshot) => (
                           <div
                             ref={provided.innerRef}
                             {...provided.droppableProps}
-                            className={`timeline-cell border border-border transition-colors p-1 min-h-[60px] flex items-center gap-1 ${
+                            className={`timeline-cell border-r border-border transition-colors p-1 min-h-[60px] relative ${
                               snapshot.isDraggingOver ? 'bg-primary/20 ring-2 ring-primary' : ''
                             }`}
                             style={{ 
@@ -198,18 +168,24 @@ export default function TimelineView({
                                 : `${color.bg}10`
                             }}
                           >
-                            {slotTasks.length > 0 ? (
-                              slotTasks.map((task, taskIndex) => (
-                                <TaskCard 
-                                  key={task.id} 
-                                  task={task} 
-                                  index={taskIndex}
-                                  isInTimeline={true}
-                                />
-                              ))
-                            ) : (
-                              <div className="text-xs text-muted-foreground opacity-50">
-                                Trascina qui
+                            {slotTasks.length > 0 && (
+                              <div className="absolute inset-0 flex items-center" style={{
+                                width: `${((slotTasks[0] as any).assignedSlotCount || 1) * 100}%`,
+                                zIndex: 10
+                              }}>
+                                {slotTasks.map((task, taskIndex) => (
+                                  <TaskCard 
+                                    key={task.id} 
+                                    task={task} 
+                                    index={taskIndex}
+                                    isInTimeline={true}
+                                  />
+                                ))}
+                              </div>
+                            )}
+                            {slotTasks.length === 0 && (
+                              <div className="text-xs text-muted-foreground opacity-30 text-center">
+                                {slot}
                               </div>
                             )}
                             {provided.placeholder}
