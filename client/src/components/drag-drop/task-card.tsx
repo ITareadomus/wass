@@ -85,6 +85,9 @@ export default function TaskCard({
               ...provided.draggableProps.style,
               width: calculateWidth(task.duration, isInTimeline),
               minHeight: "40px",
+              gridColumn: isInTimeline && (task as any).assignedSlotCount 
+                ? `span ${(task as any).assignedSlotCount}` 
+                : undefined,
             }}
             data-testid={`task-card-${task.id}`}
             onClick={handleCardClick}
