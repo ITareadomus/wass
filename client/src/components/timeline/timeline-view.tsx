@@ -43,6 +43,24 @@ export default function TimelineView({
     "13:00", "14:00", "15:00", "16:00", "17:00", "18:00", "19:00"
   ];
 
+  // Palette di colori distintivi per i cleaners
+  const cleanerColors = [
+    { bg: '#3B82F6', text: '#FFFFFF' }, // Blu
+    { bg: '#10B981', text: '#FFFFFF' }, // Verde
+    { bg: '#F59E0B', text: '#FFFFFF' }, // Arancione
+    { bg: '#8B5CF6', text: '#FFFFFF' }, // Viola
+    { bg: '#EC4899', text: '#FFFFFF' }, // Rosa
+    { bg: '#14B8A6', text: '#FFFFFF' }, // Teal
+    { bg: '#F97316', text: '#FFFFFF' }, // Arancione scuro
+    { bg: '#6366F1', text: '#FFFFFF' }, // Indaco
+    { bg: '#EF4444', text: '#FFFFFF' }, // Rosso
+    { bg: '#06B6D4', text: '#FFFFFF' }, // Ciano
+  ];
+
+  const getCleanerColor = (index: number) => {
+    return cleanerColors[index % cleanerColors.length];
+  };
+
   useEffect(() => {
     const loadCleaners = async () => {
       try {
@@ -98,30 +116,41 @@ export default function TimelineView({
             ))}
 
             {/* Cleaner Rows */}
-            {cleaners.map((cleaner) => (
-              <div key={cleaner.id} className="contents">
-                {/* Cleaner Info Cell */}
-                <div
-                  className="timeline-cell p-2 bg-card flex items-center border border-border cursor-pointer hover:bg-accent"
-                  onClick={() => handleCleanerClick(cleaner)}
-                >
-                  <div>
-                    <div className="text-sm font-medium">
-                      {cleaner.name} {cleaner.lastname}
-                    </div>
-                    <div className="text-xs text-muted-foreground">
-                      {cleaner.role}
+            {cleaners.map((cleaner, index) => {
+              const color = getCleanerColor(index);
+              return (
+                <div key={cleaner.id} className="contents">
+                  {/* Cleaner Info Cell */}
+                  <div
+                    className="timeline-cell p-2 flex items-center border border-border cursor-pointer hover:opacity-90 transition-opacity"
+                    style={{ 
+                      backgroundColor: color.bg,
+                      color: color.text
+                    }}
+                    onClick={() => handleCleanerClick(cleaner)}
+                  >
+                    <div>
+                      <div className="text-sm font-medium">
+                        {cleaner.name} {cleaner.lastname}
+                      </div>
+                      <div className="text-xs opacity-80">
+                        {cleaner.role}
+                      </div>
                     </div>
                   </div>
-                </div>
 
-                {/* Time Slots */}
-                {timeSlots.map((slot) => (
-                  <div
-                    key={`${cleaner.id}-${slot}`}
-                    className="timeline-cell border border-border bg-card"
-                  />
-                ))}
+                  {/* Time Slots */}
+                  {timeSlots.map((slot) => (
+                    <div
+                      key={`${cleaner.id}-${slot}`}
+                      className="timeline-cell border border-border"
+                      style={{ 
+                        backgroundColor: `${color.bg}10` // 10% opacity dello stesso colore
+                      }}
+                    />
+                  ))}</div>
+              );
+            })}
               </div>
             ))}
           </div>
