@@ -46,7 +46,7 @@ def get_active_operations():
     operation_ids = [row['id'] for row in results]
     return operation_ids
 
-def save_operations_to_file(operation_ids, output_file="data/operations.json"):
+def save_operations_to_file(operation_ids, output_file="client/public/data/input/operations.json"):
     """
     Salva gli operation_id validi in un file JSON
     """
@@ -71,18 +71,18 @@ def refresh_operations_list():
 
 def load_valid_operation_ids():
     """
-    Carica gli operation_id validi dal file data/operations.json.
+    Carica gli operation_id validi dal file client/public/data/input/operations.json.
     Se il file manca/non è valido, lo rigenera interrogando il DB.
     """
     try:
-        with open("data/operations.json", "r", encoding="utf-8") as f:
+        with open("client/public/data/input/operations.json", "r", encoding="utf-8") as f:
             operations_data = json.load(f)
         return operations_data.get("active_operation_ids", [])
     except (FileNotFoundError, json.JSONDecodeError):
         print("operations.json assente/non valido. Lo rigenero dal DB...")
         refresh_operations_list()
         try:
-            with open("data/operations.json", "r", encoding="utf-8") as f:
+            with open("client/public/data/input/operations.json", "r", encoding="utf-8") as f:
                 operations_data = json.load(f)
             return operations_data.get("active_operation_ids", [])
         except Exception as e2:
@@ -239,7 +239,7 @@ def main():
         }
     }
 
-    with open("data/input/daily_tasks.json", "w", encoding="utf-8") as f:
+    with open("client/public/data/input/daily_tasks.json", "w", encoding="utf-8") as f:
         json.dump(output, f, indent=4, ensure_ascii=False)
 
     print(f"Aggiornato daily_tasks.json con {len(apt_data)} appartamenti per la data {selected_date}.")

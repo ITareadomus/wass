@@ -65,13 +65,18 @@ export default function TimelineView({
     setIsModalOpen(true);
   };
 
+  // Non mostrare nulla se non ci sono cleaners
+  if (cleaners.length === 0) {
+    return null;
+  }
+
   return (
     <>
       <div className="bg-card rounded-lg border shadow-sm">
         <div className="p-4 border-b border-border">
           <h3 className="font-semibold text-foreground flex items-center">
             <Calendar className="w-5 h-5 mr-2 text-primary" />
-            Timeline Assegnazioni - {cleaners.length} Cleaners da selected_cleaners.json
+            Timeline Assegnazioni - {cleaners.length} Cleaners
           </h3>
         </div>
         <div className="p-4 overflow-x-auto">
