@@ -77,8 +77,8 @@ export default function PriorityColumn({
       const result = await response.json();
       console.log('Assegnazione early-out completata:', result);
       
-      // TODO: Ricaricare le assegnazioni e aggiornare la timeline
-      alert('Early-out tasks assegnati con successo!');
+      // Ricarica la pagina per aggiornare la timeline con le nuove assegnazioni
+      window.location.reload();
     } catch (error) {
       console.error('Errore nell\'assegnazione early-out:', error);
       alert('Errore durante l\'assegnazione dei task early-out');
