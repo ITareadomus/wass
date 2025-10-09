@@ -191,6 +191,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Endpoint per eseguire assign_eo.py
+  app.post("/api/assign-early-out", async (req, res) => {
+    try {
+      console.log("Eseguendo assign_eo.py...");
+      const { stdout, stderr } = await execAsync(
+        `python3 client/public/scripts/assign_eo.py`,
+        { maxBuffer: 1024 * 1024 * 10 }
+      );
+
+      if (stderr && !stderr.includes('Browserslist')) {
+        console.error("Errore assign_eo:", stderr);
+      }
+      console.log("assign_eo output:", stdout);
+
+      res.json({
+        success: true,
+        message: "Early-out tasks assegnati con successo",
+        output: stdout
+      });
+    } catch (error: any) {
+      console.error("Errore durante l'assegnazione early-out:", error);
+      res.status(500).json({
+        success: false,
+        error: error.message,
+        stderr: error.stderr
+      });
+    }
+  });
+
   // Endpoint per eseguire l'estrazione dei dati
   app.post("/api/extract-data", async (req, res) => {
     try {

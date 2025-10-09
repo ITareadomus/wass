@@ -57,8 +57,32 @@ export default function PriorityColumn({
     }
   };
 
-  const handleTimelineAssignment = () => {
-    console.log(`Smistamento task ${priority} sulla timeline`);
+  const handleTimelineAssignment = async () => {
+    if (priority !== 'early-out') {
+      console.log(`Smistamento task ${priority} sulla timeline - non implementato`);
+      return;
+    }
+
+    try {
+      console.log('Esecuzione assign_eo.py...');
+      const response = await fetch('/api/assign-early-out', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      });
+
+      if (!response.ok) {
+        throw new Error('Errore durante l\'assegnazione early-out');
+      }
+
+      const result = await response.json();
+      console.log('Assegnazione early-out completata:', result);
+      
+      // TODO: Ricaricare le assegnazioni e aggiornare la timeline
+      alert('Early-out tasks assegnati con successo!');
+    } catch (error) {
+      console.error('Errore nell\'assegnazione early-out:', error);
+      alert('Errore durante l\'assegnazione dei task early-out');
+    }
   };
 
   return (
