@@ -65,15 +65,48 @@ export default function TimelineView({
   useEffect(() => {
     const loadCleaners = async () => {
       try {
-        const response = await fetch('/data/cleaners/selected_cleaners.json');
+        const response = await fetch('/data/output/early_out_assignments.json');
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
         }
-        const data = await response.json();
-        console.log("Cleaners caricati da selected_cleaners.json:", data);
-        setCleaners(data.cleaners || []);
+        const assignments = await response.json();
+        console.log("Assignments caricati da early_out_assignments.json:", assignments);
+        
+        // Estrai cleaners unici dalle assegnazioni
+        const uniqueCleaners = new Map<number, Cleaner>();
+        
+        assignments.forEach((assignment: any) => {
+          if (assignment.assigned_cleaner_id) {
+            const cleanerId = assignment.assigned_cleaner_id;
+            if (!uniqueCleaners.has(cleanerId)) {
+              // Estrai nome e cognome dal nome completo
+              const fullName = assignment.assigned_cleaner_name || '';
+              const nameParts = fullName.trim().split(' ');
+              const lastname = nameParts.pop() || '';
+              const name = nameParts.join(' ') || '';
+              
+              uniqueCleaners.set(cleanerId, {
+                id: cleanerId,
+                name: name,
+                lastname: lastname,
+                role: assignment.assigned_cleaner_role || 'Standard',
+                active: true,
+                ranking: 0,
+                counter_hours: 0,
+                counter_days: 0,
+                available: true,
+                contract_type: 'B',
+                preferred_customers: [],
+                telegram_id: null,
+                start_time: assignment.start_time || '10:00'
+              });
+            }
+          }
+        });
+        
+        setCleaners(Array.from(uniqueCleaners.values()));
       } catch (error) {
-        console.error("Errore nel caricamento dei cleaners:", error);
+        console.error("Errore nel caricamento degli assignments:", error);
       }
     };
     loadCleaners();
