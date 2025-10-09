@@ -78,14 +78,10 @@ export default function GenerateAssignments() {
   // Carica le assegnazioni early-out quando i task sono pronti
   useEffect(() => {
     const loadEarlyOutAssignments = async () => {
-      if (allTasksWithAssignments.length === 0 && (earlyOutTasks.length > 0 || highPriorityTasks.length > 0 || lowPriorityTasks.length > 0)) {
-        // If allTasksWithAssignments is empty but individual task lists are populated,
-        // it means we've loaded tasks but haven't unified them yet.
-        // We need to unify them first before loading assignments.
-        setAllTasksWithAssignments([...earlyOutTasks, ...highPriorityTasks, ...lowPriorityTasks]);
+      // Aspetta che i task siano caricati
+      if (earlyOutTasks.length === 0 && highPriorityTasks.length === 0 && lowPriorityTasks.length === 0) {
+        return;
       }
-
-      if (allTasksWithAssignments.length === 0) return;
 
       try {
         const response = await fetch('/data/output/early_out_assignments.json');
@@ -102,29 +98,33 @@ export default function GenerateAssignments() {
           assignmentMap.set(assignment.task_id, assignment);
         });
 
-        // Aggiorna le task con le assegnazioni
-        setAllTasksWithAssignments((prevTasks) => {
-          return prevTasks.map((task) => {
+        // Crea una lista di task assegnati basandosi su tutte le task disponibili
+        const allCurrentTasks = [...earlyOutTasks, ...highPriorityTasks, ...lowPriorityTasks];
+        
+        const assignedTasks = allCurrentTasks
+          .map((task) => {
             const assignment = assignmentMap.get(parseInt(task.id));
             if (assignment && assignment.assigned_cleaner_id) {
               return {
                 ...task,
                 assignedCleaner: assignment.assigned_cleaner_id,
-                assignedSlot: 0, // Le task saranno ordinate automaticamente nella timeline
+                assignedSlot: 0,
                 startTime: assignment.start_time,
                 endTime: assignment.end_time,
               };
             }
-            return task;
-          });
-        });
+            return null;
+          })
+          .filter(task => task !== null) as Task[];
+
+        setAllTasksWithAssignments(assignedTasks);
       } catch (error) {
         console.error('Errore nel caricamento delle assegnazioni early-out:', error);
       }
     };
 
     loadEarlyOutAssignments();
-  }, [earlyOutTasks, highPriorityTasks, lowPriorityTasks, allTasksWithAssignments]); // Aggiunto allTasksWithAssignments alle dipendenze
+  }, [earlyOutTasks, highPriorityTasks, lowPriorityTasks]);
 
   // Funzione per convertire cleaning_time (minuti) in formato ore.minuti
   const formatDuration = (minutes: number): string => {
