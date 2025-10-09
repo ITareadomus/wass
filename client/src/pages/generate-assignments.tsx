@@ -50,15 +50,11 @@ export default function GenerateAssignments() {
   const [isLoadingTasks, setIsLoadingTasks] = useState(false);
 
   useEffect(() => {
-    // Esegui l'estrazione dei dati all'avvio
     const extractData = async () => {
       try {
-        setIsExtracting(true);
-        setExtractionStep("Estrazione dati dal database...");
-
+        setExtractionStep("Estrazione dati in corso...");
         const response = await fetch('/api/extract-data', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' }
         });
 
         if (!response.ok) {
@@ -66,24 +62,69 @@ export default function GenerateAssignments() {
         }
 
         const result = await response.json();
-        console.log("Estrazione completata:", result);
-
-        setExtractionStep("Elaborazione task completata!");
-        setIsExtracting(false);
-
-        // Carica i task dopo l'estrazione
-        loadTasks();
+        console.log('Estrazione completata:', result);
+        setExtractionStep("Estrazione completata");
       } catch (error) {
-        console.error("Errore nell'estrazione:", error);
-        setExtractionStep("Errore durante l'estrazione. Caricamento task esistenti...");
+        console.error('Errore nell\'estrazione:', error);
+        setExtractionStep("Errore durante l'estrazione");
+      } finally {
         setIsExtracting(false);
-        // Prova comunque a caricare i task esistenti
-        loadTasks();
       }
     };
 
     extractData();
   }, []);
+
+  // Carica le assegnazioni early-out quando i task sono pronti
+  useEffect(() => {
+    const loadEarlyOutAssignments = async () => {
+      if (allTasksWithAssignments.length === 0 && (earlyOutTasks.length > 0 || highPriorityTasks.length > 0 || lowPriorityTasks.length > 0)) {
+        // If allTasksWithAssignments is empty but individual task lists are populated,
+        // it means we've loaded tasks but haven't unified them yet.
+        // We need to unify them first before loading assignments.
+        setAllTasksWithAssignments([...earlyOutTasks, ...highPriorityTasks, ...lowPriorityTasks]);
+      }
+
+      if (allTasksWithAssignments.length === 0) return;
+
+      try {
+        const response = await fetch('/data/output/early_out_assignments.json');
+        if (!response.ok) {
+          console.warn("File early_out_assignments.json non trovato o errore nel caricamento.");
+          return;
+        }
+
+        const assignments = await response.json();
+
+        // Crea una mappa task_id -> assignment
+        const assignmentMap = new Map();
+        assignments.forEach((assignment: any) => {
+          assignmentMap.set(assignment.task_id, assignment);
+        });
+
+        // Aggiorna le task con le assegnazioni
+        setAllTasksWithAssignments((prevTasks) => {
+          return prevTasks.map((task) => {
+            const assignment = assignmentMap.get(parseInt(task.id));
+            if (assignment && assignment.assigned_cleaner_id) {
+              return {
+                ...task,
+                assignedCleaner: assignment.assigned_cleaner_id,
+                assignedSlot: 0, // Le task saranno ordinate automaticamente nella timeline
+                startTime: assignment.start_time,
+                endTime: assignment.end_time,
+              };
+            }
+            return task;
+          });
+        });
+      } catch (error) {
+        console.error('Errore nel caricamento delle assegnazioni early-out:', error);
+      }
+    };
+
+    loadEarlyOutAssignments();
+  }, [earlyOutTasks, highPriorityTasks, lowPriorityTasks, allTasksWithAssignments]); // Aggiunto allTasksWithAssignments alle dipendenze
 
   // Funzione per convertire cleaning_time (minuti) in formato ore.minuti
   const formatDuration = (minutes: number): string => {
