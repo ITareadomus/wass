@@ -196,7 +196,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       console.log("Eseguendo assign_eo.py...");
       const { stdout, stderr } = await execAsync(
-        `python3 client/public/scripts/assign_eo.py`,
+        `python3 client/public/scripts/assign_eo.py --cleaners client/public/data/output/cleaners.json`,
         { maxBuffer: 1024 * 1024 * 10 }
       );
 
