@@ -1,6 +1,6 @@
 {
     "metadata": {
-        "last_updated": "2025-10-07T16:03:55.114605",
+        "last_updated": "2025-10-10T13:12:33.564208",
         "db_config": {
             "host": "139.59.132.41",
             "user": "admin",
@@ -10,8 +10,8 @@
         "schema_version": "1.0"
     },
     "dates": {
-        "2025-10-08": {
-            "timestamp": "2025-10-07T16:03:55.114646",
+        "2025-10-11": {
+            "timestamp": "2025-10-10T13:12:33.564222",
             "cleaners": [
                 {
                     "id": 24,
@@ -20,8 +20,8 @@
                     "role": "Standard",
                     "active": true,
                     "ranking": 0,
-                    "counter_hours": 5.0,
-                    "counter_days": 3,
+                    "counter_hours": 14.75,
+                    "counter_days": 0,
                     "available": true,
                     "contract_type": "B",
                     "preferred_customers": [
@@ -43,8 +43,8 @@
                     "role": "Premium",
                     "active": true,
                     "ranking": 0,
-                    "counter_hours": 8.5,
-                    "counter_days": 5,
+                    "counter_hours": 20.5,
+                    "counter_days": 1,
                     "available": true,
                     "contract_type": "C",
                     "preferred_customers": [
@@ -82,8 +82,8 @@
                     "role": "Premium",
                     "active": true,
                     "ranking": 0,
-                    "counter_hours": 2.0,
-                    "counter_days": 0,
+                    "counter_hours": 11.0,
+                    "counter_days": 1,
                     "available": true,
                     "contract_type": "a chiamata",
                     "preferred_customers": [
@@ -111,8 +111,8 @@
                     "role": "Standard",
                     "active": true,
                     "ranking": 0,
-                    "counter_hours": 2.0,
-                    "counter_days": 0,
+                    "counter_hours": 7.5,
+                    "counter_days": 1,
                     "available": true,
                     "contract_type": "B",
                     "preferred_customers": [
@@ -137,7 +137,7 @@
                     "role": "Standard",
                     "active": true,
                     "ranking": 0,
-                    "counter_hours": 5.0,
+                    "counter_hours": 7.0,
                     "counter_days": 0,
                     "available": true,
                     "contract_type": "B",
@@ -146,8 +146,7 @@
                         3,
                         75,
                         94,
-                        115,
-                        119
+                        115
                     ],
                     "telegram_id": 7895288780,
                     "start_time": "10:00"
@@ -159,8 +158,8 @@
                     "role": "Standard",
                     "active": true,
                     "ranking": 0,
-                    "counter_hours": 6.0,
-                    "counter_days": 4,
+                    "counter_hours": 13.0,
+                    "counter_days": 0,
                     "available": true,
                     "contract_type": "B",
                     "preferred_customers": [
@@ -186,8 +185,8 @@
                     "role": "Premium",
                     "active": true,
                     "ranking": 0,
-                    "counter_hours": 3.5,
-                    "counter_days": 0,
+                    "counter_hours": 11.0,
+                    "counter_days": 3,
                     "available": true,
                     "contract_type": "B",
                     "preferred_customers": [
@@ -219,8 +218,8 @@
                     "role": "Standard",
                     "active": true,
                     "ranking": 0,
-                    "counter_hours": 3.0,
-                    "counter_days": 0,
+                    "counter_hours": 12.0,
+                    "counter_days": 3,
                     "available": true,
                     "contract_type": "B",
                     "preferred_customers": [
@@ -256,8 +255,8 @@
                     "role": "Premium",
                     "active": true,
                     "ranking": 0,
-                    "counter_hours": 3.5,
-                    "counter_days": 4,
+                    "counter_hours": 17.75,
+                    "counter_days": 2,
                     "available": true,
                     "contract_type": "B",
                     "preferred_customers": [
@@ -292,8 +291,8 @@
                     "role": "Premium",
                     "active": true,
                     "ranking": 0,
-                    "counter_hours": 10.0,
-                    "counter_days": 1,
+                    "counter_hours": 25.75,
+                    "counter_days": 4,
                     "available": true,
                     "contract_type": "B",
                     "preferred_customers": [
@@ -330,9 +329,9 @@
                     "role": "Premium",
                     "active": true,
                     "ranking": 0,
-                    "counter_hours": 5.0,
-                    "counter_days": 6,
-                    "available": true,
+                    "counter_hours": 15.0,
+                    "counter_days": 2,
+                    "available": false,
                     "contract_type": "B",
                     "preferred_customers": [
                         80,
@@ -359,8 +358,8 @@
                     "role": "Premium",
                     "active": true,
                     "ranking": 0,
-                    "counter_hours": 4.5,
-                    "counter_days": 3,
+                    "counter_hours": 11.0,
+                    "counter_days": 0,
                     "available": true,
                     "contract_type": "B",
                     "preferred_customers": [
@@ -396,8 +395,8 @@
                     "role": "Standard",
                     "active": true,
                     "ranking": 0,
-                    "counter_hours": 2.0,
-                    "counter_days": 2,
+                    "counter_hours": 5.0,
+                    "counter_days": 0,
                     "available": true,
                     "contract_type": "a chiamata",
                     "preferred_customers": [
@@ -420,8 +419,8 @@
                     "role": "Premium",
                     "active": true,
                     "ranking": 0,
-                    "counter_hours": 6.5,
-                    "counter_days": 2,
+                    "counter_hours": 22.5,
+                    "counter_days": 5,
                     "available": true,
                     "contract_type": "B",
                     "preferred_customers": [
@@ -458,8 +457,8 @@
                     "role": "Premium",
                     "active": true,
                     "ranking": 0,
-                    "counter_hours": 8.0,
-                    "counter_days": 2,
+                    "counter_hours": 21.0,
+                    "counter_days": 5,
                     "available": true,
                     "contract_type": "B",
                     "preferred_customers": [
@@ -492,8 +491,8 @@
                     "role": "Premium",
                     "active": true,
                     "ranking": 0,
-                    "counter_hours": 7.5,
-                    "counter_days": 2,
+                    "counter_hours": 16.0,
+                    "counter_days": 1,
                     "available": true,
                     "contract_type": "B",
                     "preferred_customers": [
@@ -520,8 +519,8 @@
                     "role": "Standard",
                     "active": true,
                     "ranking": 0,
-                    "counter_hours": 4.0,
-                    "counter_days": 4,
+                    "counter_hours": 21.5,
+                    "counter_days": 2,
                     "available": true,
                     "contract_type": "a chiamata",
                     "preferred_customers": [
@@ -537,8 +536,8 @@
                     "role": "Premium",
                     "active": true,
                     "ranking": 0,
-                    "counter_hours": 8.0,
-                    "counter_days": 2,
+                    "counter_hours": 22.0,
+                    "counter_days": 5,
                     "available": true,
                     "contract_type": "a chiamata",
                     "preferred_customers": [
@@ -628,8 +627,8 @@
                     "role": "Standard",
                     "active": true,
                     "ranking": 0,
-                    "counter_hours": 4.0,
-                    "counter_days": 10,
+                    "counter_hours": 10.5,
+                    "counter_days": 2,
                     "available": true,
                     "contract_type": "a chiamata",
                     "preferred_customers": [
@@ -645,7 +644,7 @@
                     "role": "Standard",
                     "active": true,
                     "ranking": 0,
-                    "counter_hours": 0.0,
+                    "counter_hours": 2.5,
                     "counter_days": 0,
                     "available": true,
                     "contract_type": "a chiamata",
@@ -720,8 +719,8 @@
                     "role": "Standard",
                     "active": true,
                     "ranking": 0,
-                    "counter_hours": 6.5,
-                    "counter_days": 1,
+                    "counter_hours": 14.5,
+                    "counter_days": 4,
                     "available": true,
                     "contract_type": "a chiamata",
                     "preferred_customers": [],
@@ -735,8 +734,53 @@
                     "role": "Standard",
                     "active": true,
                     "ranking": 0,
-                    "counter_hours": 4.5,
-                    "counter_days": 1,
+                    "counter_hours": 6.0,
+                    "counter_days": 0,
+                    "available": true,
+                    "contract_type": "a chiamata",
+                    "preferred_customers": [],
+                    "telegram_id": null,
+                    "start_time": null
+                },
+                {
+                    "id": 1050,
+                    "name": "CHRISTOPHER IMARIA",
+                    "lastname": "OMOROGIEVA",
+                    "role": "Standard",
+                    "active": true,
+                    "ranking": 0,
+                    "counter_hours": 0.0,
+                    "counter_days": 0,
+                    "available": true,
+                    "contract_type": "a chiamata",
+                    "preferred_customers": [],
+                    "telegram_id": null,
+                    "start_time": null
+                },
+                {
+                    "id": 1051,
+                    "name": "RAFIQUL",
+                    "lastname": "ISLAM",
+                    "role": "Standard",
+                    "active": true,
+                    "ranking": 0,
+                    "counter_hours": 0.0,
+                    "counter_days": 0,
+                    "available": true,
+                    "contract_type": "a chiamata",
+                    "preferred_customers": [],
+                    "telegram_id": null,
+                    "start_time": null
+                },
+                {
+                    "id": 1052,
+                    "name": "JUAN CARLOS",
+                    "lastname": "EVARISTO FELIPE",
+                    "role": "Standard",
+                    "active": true,
+                    "ranking": 0,
+                    "counter_hours": 0.0,
+                    "counter_days": 0,
                     "available": true,
                     "contract_type": "a chiamata",
                     "preferred_customers": [],
@@ -744,8 +788,8 @@
                     "start_time": null
                 }
             ],
-            "total_cleaners": 29,
-            "date": "2025-10-08",
+            "total_cleaners": 32,
+            "date": "2025-10-11",
             "data_source": "database_query"
         }
     }
