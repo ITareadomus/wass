@@ -106,7 +106,7 @@ export default function GenerateAssignments() {
       scheduledTime: null,
       address: rawTask.address,
       premium: rawTask.premium,
-      is_straordinaria: rawTask.is_straordinaria,
+      is_straordinaria: (rawTask as any).straordinaria || rawTask.is_straordinaria,
       confirmed_operation: rawTask.confirmed_operation,
       checkout_date: rawTask.checkout_date,
       checkout_time: rawTask.checkout_time,
