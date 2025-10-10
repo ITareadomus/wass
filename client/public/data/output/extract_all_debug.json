@@ -300,6 +300,16 @@
       "reasons": [
         "checkout_time<=eo_time"
       ]
+    },
+    {
+      "task_id": 217188,
+      "client_id": 2,
+      "premium": false,
+      "final_class": "LP",
+      "reasons": [
+        "not_eo",
+        "not_hp"
+      ]
     }
   ]
 }
