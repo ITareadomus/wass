@@ -183,7 +183,7 @@ export default function Convocazioni() {
                   key={cleaner.id}
                   className={`flex items-center justify-between p-4 border-2 rounded-lg hover:opacity-80 transition-all ${borderColor} ${bgColor}`}
                 >
-                  <div className="flex items-start gap-4">
+                  <div className="flex items-start gap-4 flex-1">
                     <div className="flex flex-col gap-2">
                       <span className="font-semibold text-foreground text-lg">
                         {cleaner.name} {cleaner.lastname}
@@ -209,11 +209,16 @@ export default function Convocazioni() {
                       </div>
                     </div>
                   </div>
-                  <Switch
-                    checked={selectedCleaners.has(cleaner.id)}
-                    onCheckedChange={() => toggleCleanerSelection(cleaner.id)}
-                    className="scale-150"
-                  />
+                  <div 
+                    onClick={() => toggleCleanerSelection(cleaner.id)}
+                    className="cursor-pointer p-4 -m-4 flex items-center justify-center"
+                  >
+                    <Switch
+                      checked={selectedCleaners.has(cleaner.id)}
+                      onCheckedChange={() => toggleCleanerSelection(cleaner.id)}
+                      className="scale-150 pointer-events-none"
+                    />
+                  </div>
                 </div>
               );
             })}
