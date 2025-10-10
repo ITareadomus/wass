@@ -123,13 +123,14 @@ export default function Convocazioni() {
   return (
     <div className="bg-background text-foreground min-h-screen">
       <div className="container mx-auto p-4 max-w-screen-xl">
-        <div className="mb-6 flex justify-between items-center flex-wrap gap-4">
-          <h1 className="text-3xl font-bold text-foreground flex items-center gap-2">
-            <Users className="w-8 h-8 text-primary" />
-            CONVOCAZIONI
-          </h1>
-          
-          <div className="flex items-center gap-4">
+        <div className="mb-6 space-y-4">
+          {/* Header con titolo e selettore data */}
+          <div className="flex justify-between items-center flex-wrap gap-4">
+            <h1 className="text-3xl font-bold text-foreground flex items-center gap-2">
+              <Users className="w-8 h-8 text-primary" />
+              CONVOCAZIONI
+            </h1>
+            
             {/* Selettore Data */}
             <Popover>
               <PopoverTrigger asChild>
@@ -154,14 +155,18 @@ export default function Convocazioni() {
                 />
               </PopoverContent>
             </Popover>
+          </div>
 
-            {/* Contatore Cleaners */}
-            <div className="bg-card rounded-lg border shadow-sm px-4 py-2 text-center">
-              <div className="text-sm text-muted-foreground">Selezionati / Disponibili</div>
-              <div className="text-2xl font-bold">
-                <span className="text-primary">{selectedCleaners.size}</span>
-                <span className="text-muted-foreground"> / </span>
-                <span className="text-foreground">{cleaners.length}</span>
+          {/* Barra Contatore Centrale */}
+          <div className="bg-gradient-to-r from-primary/10 via-primary/20 to-primary/10 rounded-xl border-2 border-primary/30 shadow-lg p-6">
+            <div className="flex items-center justify-center gap-4">
+              <div className="text-center">
+                <div className="text-lg font-semibold text-muted-foreground mb-2">CLEANERS SELEZIONATI</div>
+                <div className="text-5xl font-bold">
+                  <span className="text-primary">{selectedCleaners.size}</span>
+                  <span className="text-muted-foreground mx-3">/</span>
+                  <span className="text-foreground">{cleaners.length}</span>
+                </div>
               </div>
             </div>
           </div>
@@ -209,6 +214,7 @@ export default function Convocazioni() {
                   <Switch
                     checked={selectedCleaners.has(cleaner.id)}
                     onCheckedChange={() => toggleCleanerSelection(cleaner.id)}
+                    className="scale-150"
                   />
                 </div>
               );
