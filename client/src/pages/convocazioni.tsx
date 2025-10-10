@@ -185,27 +185,25 @@ export default function Convocazioni() {
                 >
                   <div className="flex items-center gap-2">
                     <div className="flex flex-col gap-1">
-                      <span className="font-semibold text-foreground text-sm">
-                        {cleaner.name} {cleaner.lastname}
-                      </span>
-                      <div className="flex gap-1 text-xs text-muted-foreground">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-semibold text-foreground text-sm">
+                          {cleaner.name} {cleaner.lastname}
+                        </span>
                         <span className={`px-1 py-0.5 rounded border font-medium text-xs ${badgeColor}`}>
                           {cleaner.role}
                         </span>
-                      </div>
-                      <div className="grid grid-cols-2 gap-x-2 gap-y-0.5 text-xs text-foreground/80">
-                        <div>
-                          <span className="font-semibold">Ore settimana:</span> {cleaner.counter_hours}h
-                        </div>
-                        <div>
-                          <span className="font-semibold">Giorni consecutivi:</span> {cleaner.counter_days}
-                        </div>
-                        <div>
-                          <span className="font-semibold">Contratto:</span> {cleaner.contract_type}
-                        </div>
-                        <div>
-                          <span className="font-semibold">Start Time:</span> {cleaner.start_time || "10:00"}
-                        </div>
+                        <span className="text-xs text-foreground/80">
+                          Ore: {cleaner.counter_hours}h
+                        </span>
+                        <span className="text-xs text-foreground/80">
+                          Giorni: {cleaner.counter_days}
+                        </span>
+                        <span className="text-xs text-foreground/80">
+                          Contratto: {cleaner.contract_type}
+                        </span>
+                        <span className="text-xs text-foreground/80">
+                          Start: {cleaner.start_time || "10:00"}
+                        </span>
                       </div>
                     </div>
                   </div>
