@@ -157,9 +157,9 @@ export default function Convocazioni() {
             </Popover>
           </div>
 
-          {/* Barra Contatore Centrale */}
+          {/* Barra Contatore */}
           <div className="bg-gradient-to-r from-primary/10 via-primary/20 to-primary/10 rounded-xl border-2 border-primary/30 shadow-lg p-6">
-            <div className="flex items-center justify-center gap-4">
+            <div className="flex items-center gap-4">
               <div className="text-lg font-semibold text-muted-foreground">CLEANERS SELEZIONATI</div>
               <div className="text-lg font-bold">
                 <span className="text-primary">{selectedCleaners.size}</span>
@@ -183,7 +183,7 @@ export default function Convocazioni() {
                   key={cleaner.id}
                   className={`flex items-center justify-between p-4 border-2 rounded-lg hover:opacity-80 transition-all ${borderColor} ${bgColor}`}
                 >
-                  <div className="flex items-center gap-4">
+                  <div className="flex items-start gap-4">
                     <div className="flex flex-col gap-2">
                       <span className="font-semibold text-foreground text-lg">
                         {cleaner.name} {cleaner.lastname}
@@ -220,7 +220,7 @@ export default function Convocazioni() {
           </div>
         </Card>
 
-        <div className="flex justify-end">
+        <div className="flex justify-start">
           <Button
             onClick={handleConfirm}
             size="lg"
