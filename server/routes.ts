@@ -6,8 +6,12 @@ import { z } from "zod";
 import { exec } from "child_process";
 import { promisify } from "util";
 import path from "path";
+import { fileURLToPath } from "url";
+import { dirname } from "path";
 import * as fs from 'fs/promises'; // Import fs/promises for async file operations
 
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 const execAsync = promisify(exec);
 
 export async function registerRoutes(app: Express): Promise<Server> {
