@@ -125,31 +125,50 @@ export default function Convocazioni() {
 
         <Card className="p-6 mb-6">
           <div className="space-y-3">
-            {cleaners.map((cleaner) => (
-              <div
-                key={cleaner.id}
-                className="flex items-center justify-between p-4 bg-card border rounded-lg hover:bg-accent/50 transition-colors"
-              >
-                <div className="flex items-center gap-4">
-                  <div className="flex flex-col">
-                    <span className="font-semibold text-foreground">
-                      {cleaner.name} {cleaner.lastname}
-                    </span>
-                    <div className="flex gap-2 text-sm text-muted-foreground">
-                      <span className="bg-primary/10 text-primary px-2 py-0.5 rounded">
-                        {cleaner.role}
+            {cleaners.map((cleaner) => {
+              const isPremium = cleaner.role === "Premium";
+              const borderColor = isPremium ? "border-yellow-500" : "border-green-500";
+              const bgColor = isPremium ? "bg-yellow-500/10" : "bg-green-500/10";
+              const badgeColor = isPremium ? "bg-yellow-500/20 text-yellow-700 border-yellow-500" : "bg-green-500/20 text-green-700 border-green-500";
+              
+              return (
+                <div
+                  key={cleaner.id}
+                  className={`flex items-center justify-between p-4 border-2 rounded-lg hover:opacity-80 transition-all ${borderColor} ${bgColor}`}
+                >
+                  <div className="flex items-center gap-4">
+                    <div className="flex flex-col gap-2">
+                      <span className="font-semibold text-foreground text-lg">
+                        {cleaner.name} {cleaner.lastname}
                       </span>
-                      <span>ID: {cleaner.id}</span>
-                      <span>Contratto: {cleaner.contract_type}</span>
+                      <div className="flex gap-2 text-sm text-muted-foreground">
+                        <span className={`px-2 py-0.5 rounded border font-medium ${badgeColor}`}>
+                          {cleaner.role}
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm text-foreground/80">
+                        <div>
+                          <span className="font-semibold">Ore questa settimana:</span> {cleaner.counter_hours}h
+                        </div>
+                        <div>
+                          <span className="font-semibold">Giorni consecutivi:</span> {cleaner.counter_days}
+                        </div>
+                        <div>
+                          <span className="font-semibold">Contratto:</span> {cleaner.contract_type}
+                        </div>
+                        <div>
+                          <span className="font-semibold">Start Time:</span> {cleaner.start_time || "10:00"}
+                        </div>
+                      </div>
                     </div>
                   </div>
+                  <Switch
+                    checked={selectedCleaners.has(cleaner.id)}
+                    onCheckedChange={() => toggleCleanerSelection(cleaner.id)}
+                  />
                 </div>
-                <Switch
-                  checked={selectedCleaners.has(cleaner.id)}
-                  onCheckedChange={() => toggleCleanerSelection(cleaner.id)}
-                />
-              </div>
-            ))}
+              );
+            })}
           </div>
         </Card>
 
