@@ -189,23 +189,15 @@ export default function Convocazioni() {
                         <span className="font-semibold text-foreground text-sm">
                           {cleaner.name} {cleaner.lastname}
                         </span>
-                        <span className="text-xs text-foreground/80">
-                          Ore settimana: {cleaner.counter_hours}h
-                        </span>
-                        <span className="text-xs text-foreground/80">
-                          Giorni consecutivi: {cleaner.counter_days}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-2">
                         <span className={`px-1 py-0.5 rounded border font-medium text-xs ${badgeColor}`}>
                           {cleaner.role}
                         </span>
-                        <span className="text-xs text-foreground/80">
-                          Contratto: {cleaner.contract_type}
-                        </span>
-                        <span className="text-xs text-foreground/80">
-                          Start Time: {cleaner.start_time || "10:00"}
-                        </span>
+                      </div>
+                      <div className="flex items-center gap-2 text-xs text-foreground/80">
+                        <span>Ore settimana: {cleaner.counter_hours}h</span>
+                        <span>Giorni consecutivi: {cleaner.counter_days}</span>
+                        <span>Contratto: {cleaner.contract_type}</span>
+                        <span>Start Time: {cleaner.start_time || "10:00"}</span>
                       </div>
                     </div>
                   </div>
