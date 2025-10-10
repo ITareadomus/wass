@@ -122,7 +122,7 @@ export default function Convocazioni() {
 
   return (
     <div className="bg-background text-foreground min-h-screen">
-      <div className="container mx-auto p-4 max-w-screen-md">
+      <div className="container p-4 max-w-screen-md ml-0">
         <div className="mb-6 space-y-4">
           {/* Header con titolo e selettore data */}
           <div className="flex justify-between items-center flex-wrap gap-4">
