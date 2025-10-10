@@ -412,10 +412,7 @@ fresh_data = {
 }
 
 # Sovrascrive completamente il file cleaners.json con solo i dati della data corrente
-# Sovrascrive completamente il file cleaners.json con solo i dati della data corrente
-# Scriviamo il file nella cartella richiesta (percorso assoluto su Windows) e creiamo
-# la directory se non esiste per evitare FileNotFoundError e problemi di escape.
-output_path = Path(r"C:\Users\IT\Desktop\Backend WASS 2.0\data\output\cleaners.json")
+output_path = Path(__file__).resolve().parents[1] / "data" / "cleaners" / "cleaners.json"
 output_path.parent.mkdir(parents=True, exist_ok=True)
 with output_path.open("w", encoding="utf-8") as f:
     json.dump(fresh_data, f, indent=4)
@@ -425,4 +422,4 @@ print(f"📅 DATA NEL JSON: {target_date_str}")
 print(f"👥 CLEANERS TROVATI: {len(results)}")
 print(f"🔄 RESET COMPLETATO - Il file contiene SOLO i dati per {target_date_str}")
 
-print(f"Aggiornato data/modello_cleaners.json con {len(results)} cleaners per la data {target_date_str}.")
+print(f"Aggiornato data/cleaners/cleaners.json con {len(results)} cleaners per la data {target_date_str}.")

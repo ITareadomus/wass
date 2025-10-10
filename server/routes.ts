@@ -191,6 +191,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Endpoint per eseguire extract_cleaners.py
+  app.post("/api/extract-cleaners", async (req, res) => {
+    try {
+      console.log("Eseguendo extract_cleaners.py...");
+      const { stdout, stderr } = await execAsync(
+        `python3 client/public/scripts/extract_cleaners.py`,
+        { maxBuffer: 1024 * 1024 * 10 }
+      );
+
+      if (stderr && !stderr.includes('Browserslist')) {
+        console.error("Errore extract_cleaners:", stderr);
+      }
+      console.log("extract_cleaners output:", stdout);
+
+      res.json({
+        success: true,
+        message: "Cleaners estratti con successo",
+        output: stdout
+      });
+    } catch (error: any) {
+      console.error("Errore durante l'estrazione cleaners:", error);
+      res.status(500).json({
+        success: false,
+        error: error.message,
+        stderr: error.stderr
+      });
+    }
+  });
+
   // Endpoint per eseguire assign_eo.py
   app.post("/api/assign-early-out", async (req, res) => {
     try {

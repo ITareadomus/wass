@@ -4,12 +4,14 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import GenerateAssignments from "@/pages/generate-assignments";
+import Convocazioni from "@/pages/convocazioni";
 import NotFound from "@/pages/not-found";
 
 function Router() {
   return (
     <Switch>
       <Route path="/" component={GenerateAssignments} />
+      <Route path="/convocazioni" component={Convocazioni} />
       <Route component={NotFound} />
     </Switch>
   );
