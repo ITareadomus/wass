@@ -1,11 +1,11 @@
 {
     "metadata": {
-        "last_updated": "2025-10-10T13:44:29.320984",
+        "last_updated": "2025-10-10T13:28:17.895702",
         "schema_version": "1.0"
     },
     "dates": {
         "2025-10-11": {
-            "timestamp": "2025-10-10T13:44:29.320997",
+            "timestamp": "2025-10-10T13:28:17.895711",
             "apt": [
                 {
                     "task_id": 208089,
@@ -823,7 +823,7 @@
                     "cleaning_time": 270,
                     "checkin_date": "2025-10-11",
                     "checkout_date": "2025-10-11",
-                    "checkin_time": "15:00",
+                    "checkin_time": null,
                     "checkout_time": null,
                     "pax_in": 6,
                     "pax_out": 6,
