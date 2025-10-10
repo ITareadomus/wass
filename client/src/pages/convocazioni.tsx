@@ -3,7 +3,12 @@ import { useState, useEffect } from "react";
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Users } from "lucide-react";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Users, CalendarIcon } from "lucide-react";
+import { format } from "date-fns";
+import { it } from "date-fns/locale";
+import { cn } from "@/lib/utils";
 
 interface Cleaner {
   id: number;
@@ -26,6 +31,7 @@ export default function Convocazioni() {
   const [selectedCleaners, setSelectedCleaners] = useState<Set<number>>(new Set());
   const [isLoading, setIsLoading] = useState(true);
   const [loadingMessage, setLoadingMessage] = useState("Inizializzazione...");
+  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
 
   useEffect(() => {
     const extractCleaners = async () => {
@@ -33,10 +39,14 @@ export default function Convocazioni() {
         setIsLoading(true);
         setLoadingMessage("Estrazione cleaners dal database...");
 
-        // Esegui lo script extract_cleaners.py
+        // Formatta la data nel formato YYYY-MM-DD
+        const formattedDate = format(selectedDate, "yyyy-MM-dd");
+
+        // Esegui lo script extract_cleaners.py con la data selezionata
         const response = await fetch('/api/extract-cleaners', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' }
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ date: formattedDate })
         });
 
         if (!response.ok) {
@@ -66,6 +76,7 @@ export default function Convocazioni() {
         }
 
         setCleaners(cleanersList);
+        setSelectedCleaners(new Set()); // Reset selezioni quando cambia la data
         setIsLoading(false);
         setLoadingMessage("Cleaners caricati con successo!");
       } catch (error) {
@@ -76,7 +87,7 @@ export default function Convocazioni() {
     };
 
     extractCleaners();
-  }, []);
+  }, [selectedDate]);
 
   const toggleCleanerSelection = (cleanerId: number) => {
     setSelectedCleaners(prev => {
@@ -112,14 +123,47 @@ export default function Convocazioni() {
   return (
     <div className="bg-background text-foreground min-h-screen">
       <div className="container mx-auto p-4 max-w-screen-xl">
-        <div className="mb-6 flex justify-between items-center">
+        <div className="mb-6 flex justify-between items-center flex-wrap gap-4">
           <h1 className="text-3xl font-bold text-foreground flex items-center gap-2">
             <Users className="w-8 h-8 text-primary" />
             CONVOCAZIONI
           </h1>
-          <div className="bg-card rounded-lg border shadow-sm px-4 py-2 text-center">
-            <div className="text-sm text-muted-foreground">Cleaners Disponibili</div>
-            <div className="text-2xl font-bold text-primary">{cleaners.length}</div>
+          
+          <div className="flex items-center gap-4">
+            {/* Selettore Data */}
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  className={cn(
+                    "w-[240px] justify-start text-left font-normal",
+                    !selectedDate && "text-muted-foreground"
+                  )}
+                >
+                  <CalendarIcon className="mr-2 h-4 w-4" />
+                  {selectedDate ? format(selectedDate, "PPP", { locale: it }) : <span>Seleziona data</span>}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="end">
+                <Calendar
+                  mode="single"
+                  selected={selectedDate}
+                  onSelect={(date) => date && setSelectedDate(date)}
+                  initialFocus
+                  locale={it}
+                />
+              </PopoverContent>
+            </Popover>
+
+            {/* Contatore Cleaners */}
+            <div className="bg-card rounded-lg border shadow-sm px-4 py-2 text-center">
+              <div className="text-sm text-muted-foreground">Selezionati / Disponibili</div>
+              <div className="text-2xl font-bold">
+                <span className="text-primary">{selectedCleaners.size}</span>
+                <span className="text-muted-foreground"> / </span>
+                <span className="text-foreground">{cleaners.length}</span>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -172,19 +216,13 @@ export default function Convocazioni() {
           </div>
         </Card>
 
-        <div className="flex justify-end gap-4">
-          <div className="text-sm text-muted-foreground flex items-center gap-2">
-            <span className="font-semibold">Selezionati:</span>
-            <span className="bg-primary text-primary-foreground px-3 py-1 rounded">
-              {selectedCleaners.size}
-            </span>
-          </div>
+        <div className="flex justify-end">
           <Button
             onClick={handleConfirm}
             size="lg"
             disabled={selectedCleaners.size === 0}
           >
-            Conferma
+            Conferma ({selectedCleaners.size})
           </Button>
         </div>
       </div>

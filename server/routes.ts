@@ -194,28 +194,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Endpoint per eseguire extract_cleaners.py
   app.post("/api/extract-cleaners", async (req, res) => {
     try {
-      console.log("Eseguendo extract_cleaners.py...");
-      const { stdout, stderr } = await execAsync(
-        `python3 client/public/scripts/extract_cleaners.py`,
-        { maxBuffer: 1024 * 1024 * 10 }
-      );
+      const { date } = req.body;
+      const scriptPath = path.join(__dirname, '../client/public/scripts/extract_cleaners.py');
 
-      if (stderr && !stderr.includes('Browserslist')) {
-        console.error("Errore extract_cleaners:", stderr);
-      }
-      console.log("extract_cleaners output:", stdout);
+      // Se la data è fornita, passala come argomento allo script
+      const command = date
+        ? `python3 ${scriptPath} ${date}`
+        : `python3 ${scriptPath}`;
 
-      res.json({
-        success: true,
-        message: "Cleaners estratti con successo",
-        output: stdout
+      exec(command, (error, stdout, stderr) => {
+        if (error) {
+          console.error('Errore esecuzione script:', error);
+          return res.status(500).json({
+            success: false,
+            message: 'Errore durante l\'estrazione dei cleaners',
+            error: error.message
+          });
+        }
+
+        if (stderr) {
+          console.error('Stderr:', stderr);
+        }
+
+        console.log('Output script:', stdout);
+
+        res.json({
+          success: true,
+          message: 'Cleaner estratti con successo',
+          output: stdout
+        });
       });
-    } catch (error: any) {
-      console.error("Errore durante l'estrazione cleaners:", error);
+    } catch (error) {
       res.status(500).json({
         success: false,
-        error: error.message,
-        stderr: error.stderr
+        message: 'Errore server',
+        error: error instanceof Error ? error.message : 'Unknown error'
       });
     }
   });
