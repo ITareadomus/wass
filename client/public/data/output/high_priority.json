@@ -222,7 +222,7 @@
       "cleaning_time": 270,
       "checkin_date": "2025-10-11",
       "checkout_date": "2025-10-11",
-      "checkin_time": null,
+      "checkin_time": "15:00",
       "checkout_time": null,
       "pax_in": 6,
       "pax_out": 6,
@@ -234,6 +234,7 @@
       "alias": "TBR",
       "customer_name": "THE BEST RENT S.r.l.",
       "reasons": [
+        "same_day_checkin_between_eo_hp",
         "premium"
       ]
     },
