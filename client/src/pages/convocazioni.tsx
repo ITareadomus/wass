@@ -122,25 +122,25 @@ export default function Convocazioni() {
 
   return (
     <div className="bg-background text-foreground min-h-screen">
-      <div className="container mx-auto p-4 max-w-screen-xl">
-        <div className="mb-6 flex justify-between items-center flex-wrap gap-4">
-          <h1 className="text-3xl font-bold text-foreground flex items-center gap-2">
-            <Users className="w-8 h-8 text-primary" />
+      <div className="container mx-auto p-2 max-w-screen-xl">
+        <div className="mb-3 flex justify-between items-center flex-wrap gap-2">
+          <h1 className="text-lg font-bold text-foreground flex items-center gap-1">
+            <Users className="w-4 h-4 text-primary" />
             CONVOCAZIONI
           </h1>
           
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2">
             {/* Selettore Data */}
             <Popover>
               <PopoverTrigger asChild>
                 <Button
                   variant="outline"
                   className={cn(
-                    "w-[240px] justify-start text-left font-normal",
+                    "w-[120px] justify-start text-left font-normal text-xs h-7",
                     !selectedDate && "text-muted-foreground"
                   )}
                 >
-                  <CalendarIcon className="mr-2 h-4 w-4" />
+                  <CalendarIcon className="mr-1 h-3 w-3" />
                   {selectedDate ? format(selectedDate, "PPP", { locale: it }) : <span>Seleziona data</span>}
                 </Button>
               </PopoverTrigger>
@@ -156,9 +156,9 @@ export default function Convocazioni() {
             </Popover>
 
             {/* Contatore Cleaners */}
-            <div className="bg-card rounded-lg border shadow-sm px-4 py-2 text-center">
-              <div className="text-sm text-muted-foreground">Selezionati / Disponibili</div>
-              <div className="text-2xl font-bold">
+            <div className="bg-card rounded-lg border shadow-sm px-2 py-1 text-center">
+              <div className="text-xs text-muted-foreground">Selezionati / Disponibili</div>
+              <div className="text-base font-bold">
                 <span className="text-primary">{selectedCleaners.size}</span>
                 <span className="text-muted-foreground"> / </span>
                 <span className="text-foreground">{cleaners.length}</span>
@@ -167,8 +167,8 @@ export default function Convocazioni() {
           </div>
         </div>
 
-        <Card className="p-6 mb-6">
-          <div className="space-y-3">
+        <Card className="p-3 mb-3">
+          <div className="space-y-1.5">
             {cleaners.map((cleaner) => {
               const isPremium = cleaner.role === "Premium";
               const borderColor = isPremium ? "border-yellow-500" : "border-green-500";
@@ -178,21 +178,21 @@ export default function Convocazioni() {
               return (
                 <div
                   key={cleaner.id}
-                  className={`flex items-center justify-between p-4 border-2 rounded-lg hover:opacity-80 transition-all ${borderColor} ${bgColor}`}
+                  className={`flex items-center justify-between p-2 border rounded-lg hover:opacity-80 transition-all ${borderColor} ${bgColor}`}
                 >
-                  <div className="flex items-center gap-4">
-                    <div className="flex flex-col gap-2">
-                      <span className="font-semibold text-foreground text-lg">
+                  <div className="flex items-center gap-2">
+                    <div className="flex flex-col gap-1">
+                      <span className="font-semibold text-foreground text-sm">
                         {cleaner.name} {cleaner.lastname}
                       </span>
-                      <div className="flex gap-2 text-sm text-muted-foreground">
-                        <span className={`px-2 py-0.5 rounded border font-medium ${badgeColor}`}>
+                      <div className="flex gap-1 text-xs text-muted-foreground">
+                        <span className={`px-1 py-0.5 rounded border font-medium text-xs ${badgeColor}`}>
                           {cleaner.role}
                         </span>
                       </div>
-                      <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm text-foreground/80">
+                      <div className="grid grid-cols-2 gap-x-2 gap-y-0.5 text-xs text-foreground/80">
                         <div>
-                          <span className="font-semibold">Ore questa settimana:</span> {cleaner.counter_hours}h
+                          <span className="font-semibold">Ore settimana:</span> {cleaner.counter_hours}h
                         </div>
                         <div>
                           <span className="font-semibold">Giorni consecutivi:</span> {cleaner.counter_days}
@@ -219,7 +219,7 @@ export default function Convocazioni() {
         <div className="flex justify-end">
           <Button
             onClick={handleConfirm}
-            size="lg"
+            size="sm"
             disabled={selectedCleaners.size === 0}
           >
             Conferma ({selectedCleaners.size})
