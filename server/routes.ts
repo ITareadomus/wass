@@ -202,33 +202,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ? `python3 ${scriptPath} ${date}`
         : `python3 ${scriptPath}`;
 
-      exec(command, (error, stdout, stderr) => {
-        if (error) {
-          console.error('Errore esecuzione script:', error);
-          return res.status(500).json({
-            success: false,
-            message: 'Errore durante l\'estrazione dei cleaners',
-            error: error.message
-          });
-        }
+      console.log("Eseguendo extract_cleaners.py con comando:", command);
+      
+      const { stdout, stderr } = await execAsync(command, { maxBuffer: 1024 * 1024 * 10 });
 
-        if (stderr) {
-          console.error('Stderr:', stderr);
-        }
+      if (stderr && !stderr.includes('Browserslist')) {
+        console.error("Errore extract_cleaners:", stderr);
+      }
+      
+      console.log("extract_cleaners output:", stdout);
 
-        console.log('Output script:', stdout);
-
-        res.json({
-          success: true,
-          message: 'Cleaner estratti con successo',
-          output: stdout
-        });
+      res.json({
+        success: true,
+        message: 'Cleaner estratti con successo',
+        output: stdout
       });
-    } catch (error) {
+    } catch (error: any) {
+      console.error("Errore durante l'estrazione dei cleaners:", error);
       res.status(500).json({
         success: false,
-        message: 'Errore server',
-        error: error instanceof Error ? error.message : 'Unknown error'
+        message: 'Errore durante l\'estrazione dei cleaners',
+        error: error.message,
+        stderr: error.stderr
       });
     }
   });
