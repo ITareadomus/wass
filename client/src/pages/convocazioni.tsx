@@ -184,25 +184,27 @@ export default function Convocazioni() {
                   className={`flex items-center justify-between p-2 border rounded-lg hover:opacity-80 transition-all ${borderColor} ${bgColor}`}
                 >
                   <div className="flex items-center gap-2">
-                    <div className="flex flex-col gap-1">
-                      <div className="flex items-center gap-2 flex-wrap">
+                    <div className="flex flex-col gap-0.5">
+                      <div className="flex items-center gap-2">
                         <span className="font-semibold text-foreground text-sm">
                           {cleaner.name} {cleaner.lastname}
                         </span>
+                        <span className="text-xs text-foreground/80">
+                          Ore settimana: {cleaner.counter_hours}h
+                        </span>
+                        <span className="text-xs text-foreground/80">
+                          Giorni consecutivi: {cleaner.counter_days}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
                         <span className={`px-1 py-0.5 rounded border font-medium text-xs ${badgeColor}`}>
                           {cleaner.role}
-                        </span>
-                        <span className="text-xs text-foreground/80">
-                          Ore: {cleaner.counter_hours}h
-                        </span>
-                        <span className="text-xs text-foreground/80">
-                          Giorni: {cleaner.counter_days}
                         </span>
                         <span className="text-xs text-foreground/80">
                           Contratto: {cleaner.contract_type}
                         </span>
                         <span className="text-xs text-foreground/80">
-                          Start: {cleaner.start_time || "10:00"}
+                          Start Time: {cleaner.start_time || "10:00"}
                         </span>
                       </div>
                     </div>
