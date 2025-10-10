@@ -118,13 +118,11 @@ def save_json(obj: Any, path: Path) -> None:
         json.dump(obj, f, ensure_ascii=False, indent=2)
 
 def main() -> None:
-    # Path relativo alla struttura Replit: client/public/scripts -> client/public
-    script_dir = Path(__file__).resolve().parent
-    public_dir = script_dir.parent
+    repo_root = Path(__file__).resolve().parents[1]
     
-    eo_path = public_dir / "data" / "output" / "early_out_assignments.json"
-    hp_path = public_dir / "data" / "output" / "high_priority.json"
-    output_path = public_dir / "data" / "output" / "combined_assignments.json"
+    eo_path = repo_root / "data" / "output" / "early_out_assignments.json"
+    hp_path = repo_root / "data" / "output" / "high_priority.json"
+    output_path = repo_root / "data" / "output" / "combined_assignments.json"
     
     # Carica dati
     eo_assignments = load_early_out_assignments(eo_path)
