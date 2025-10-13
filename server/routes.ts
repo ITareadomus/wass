@@ -195,6 +195,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Endpoint per salvare i cleaners selezionati
+  app.post("/api/save-selected-cleaners", async (req, res) => {
+    try {
+      const selectedCleanersPath = path.join(process.cwd(), 'client/public/data/cleaners/selected_cleaners.json');
+      const dataToSave = req.body;
+
+      await fs.writeFile(selectedCleanersPath, JSON.stringify(dataToSave, null, 2));
+
+      res.json({
+        success: true,
+        message: `Salvati ${dataToSave.total_selected} cleaners in selected_cleaners.json`,
+        total_selected: dataToSave.total_selected
+      });
+    } catch (error: any) {
+      console.error("Errore nel salvataggio dei cleaners selezionati:", error);
+      res.status(500).json({
+        success: false,
+        message: 'Errore nel salvataggio dei cleaners selezionati',
+        error: error.message
+      });
+    }
+  });
+
   // Endpoint per estrarre i cleaners
   app.post("/api/extract-cleaners", async (req, res) => {
     try {
