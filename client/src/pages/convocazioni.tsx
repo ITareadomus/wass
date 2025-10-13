@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Users, CalendarIcon } from "lucide-react";
 import { format } from "date-fns";
 import { it } from "date-fns/locale";
@@ -33,6 +34,7 @@ export default function Convocazioni() {
   const [isLoading, setIsLoading] = useState(true);
   const [loadingMessage, setLoadingMessage] = useState("Inizializzazione...");
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+  const [confirmDialog, setConfirmDialog] = useState<{ open: boolean; cleanerId: number | null }>({ open: false, cleanerId: null });
 
   useEffect(() => {
     const loadCleaners = async () => {
@@ -87,7 +89,12 @@ export default function Convocazioni() {
     loadCleaners();
   }, [selectedDate]);
 
-  const toggleCleanerSelection = (cleanerId: number) => {
+  const toggleCleanerSelection = (cleanerId: number, isAvailable: boolean) => {
+    if (!isAvailable) {
+      setConfirmDialog({ open: true, cleanerId });
+      return;
+    }
+
     setSelectedCleaners(prev => {
       const newSet = new Set(prev);
       if (newSet.has(cleanerId)) {
@@ -97,6 +104,21 @@ export default function Convocazioni() {
       }
       return newSet;
     });
+  };
+
+  const handleConfirmUnavailable = () => {
+    if (confirmDialog.cleanerId !== null) {
+      setSelectedCleaners(prev => {
+        const newSet = new Set(prev);
+        if (newSet.has(confirmDialog.cleanerId!)) {
+          newSet.delete(confirmDialog.cleanerId!);
+        } else {
+          newSet.add(confirmDialog.cleanerId!);
+        }
+        return newSet;
+      });
+    }
+    setConfirmDialog({ open: false, cleanerId: null });
   };
 
   const handleConfirm = async () => {
@@ -221,11 +243,11 @@ export default function Convocazioni() {
               return (
                 <div
                   key={cleaner.id}
-                  onClick={() => isAvailable && toggleCleanerSelection(cleaner.id)}
+                  onClick={() => toggleCleanerSelection(cleaner.id, isAvailable)}
                   className={`flex items-center justify-between p-4 border-2 rounded-lg transition-all ${borderColor} ${bgColor} ${
-                    isAvailable 
-                      ? 'hover:opacity-80 cursor-pointer' 
-                      : 'opacity-60 cursor-not-allowed'
+                    !isAvailable 
+                      ? 'opacity-60 cursor-pointer hover:opacity-70' 
+                      : 'hover:opacity-80 cursor-pointer'
                   }`}
                 >
                   <div className="flex items-start gap-4 flex-1">
@@ -256,14 +278,32 @@ export default function Convocazioni() {
                   </div>
                   <Switch
                     checked={selectedCleaners.has(cleaner.id)}
-                    onCheckedChange={() => toggleCleanerSelection(cleaner.id)}
-                    disabled={!isAvailable}
+                    onCheckedChange={() => toggleCleanerSelection(cleaner.id, isAvailable)}
                     className="scale-150 pointer-events-none"
                   />
                 </div>
               );
             })}
           </div>
+
+          <Dialog open={confirmDialog.open} onOpenChange={(open) => setConfirmDialog({ open, cleanerId: null })}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Cleaner Non Disponibile</DialogTitle>
+                <DialogDescription>
+                  Questo cleaner risulta non disponibile. Sei sicuro di volerlo selezionare?
+                </DialogDescription>
+              </DialogHeader>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setConfirmDialog({ open: false, cleanerId: null })}>
+                  Annulla
+                </Button>
+                <Button onClick={handleConfirmUnavailable}>
+                  Conferma
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
           <div className="flex justify-start mt-4 pt-4 border-t">
             <Button
               onClick={handleConfirm}
