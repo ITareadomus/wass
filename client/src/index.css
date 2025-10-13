@@ -25,24 +25,24 @@
   --radius: 0.5rem;
   
   /* Task-specific colors */
-  --task-early-out-bg: hsl(38 92% 50%);
+  --task-early-out-bg: hsl(199 89% 48%);
   --task-early-out-fg: hsl(0 0% 100%);
-  --task-high-priority-bg: hsl(142 76% 36%);
+  --task-high-priority-bg: hsl(199 89% 48%);
   --task-high-priority-fg: hsl(0 0% 100%);
-  --task-low-priority-bg: hsl(82 84% 47%);
+  --task-low-priority-bg: hsl(199 89% 48%);
   --task-low-priority-fg: hsl(0 0% 100%);
   --task-unassigned-bg: hsl(220 13% 91%);
   --task-unassigned-fg: hsl(220 9% 46%);
   
   /* Priority column colors */
-  --priority-column-early-bg: hsl(45 93% 89%);
-  --priority-column-high-bg: hsl(142 52% 96%);
-  --priority-column-low-bg: hsl(82 61% 95%);
+  --priority-column-early-bg: hsl(199 89% 88%);
+  --priority-column-high-bg: hsl(199 89% 88%);
+  --priority-column-low-bg: hsl(199 89% 88%);
   
   /* Timeline colors */
-  --timeline-early-bg: hsl(38 68% 84%);
-  --timeline-high-bg: hsl(142 52% 84%);
-  --timeline-low-bg: hsl(82 61% 84%);
+  --timeline-early-bg: hsl(199 89% 84%);
+  --timeline-high-bg: hsl(199 89% 84%);
+  --timeline-low-bg: hsl(199 89% 84%);
   
   --font-sans: Open Sans, sans-serif;
   --font-serif: Georgia, serif;
