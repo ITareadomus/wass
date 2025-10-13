@@ -20,9 +20,9 @@ from typing import Any, Dict, List, Optional
 DEFAULT_START_TIME = "10:00"
 DEFAULT_EO_TIME = "10:00"
 
-CLEANERS_PATH = r"C:/Users/IT/Desktop/Backend WASS 2.0/data/cleaners/selected_cleaners.json"
-TASKS_PATH    = r"C:/Users/IT/Desktop/Backend WASS 2.0/data/output/early_out.json"
-OUTPUT_PATH   = r"C:/Users/IT/Desktop/Backend WASS 2.0/data/output/early_out_assigned.json"
+CLEANERS_PATH = "client/public/data/cleaners/selected_cleaners.json"
+TASKS_PATH    = "client/public/data/output/early_out.json"
+OUTPUT_PATH   = "client/public/data/output/early_out_assignments.json"
 
 def load_json(path: str) -> Any:
     with open(path, "r", encoding="utf-8") as f:
