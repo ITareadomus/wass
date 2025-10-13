@@ -42,8 +42,8 @@ export default function Convocazioni() {
         // Formatta la data nel formato YYYY-MM-DD
         const formattedDate = format(selectedDate, "yyyy-MM-dd");
 
-        // Esegui lo script extract_cleaners.py con la data selezionata
-        const response = await fetch('/api/extract-cleaners', {
+        // Esegui lo script extract_cleaners_optimized.py con la data selezionata
+        const response = await fetch('/api/extract-cleaners-optimized', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ date: formattedDate })

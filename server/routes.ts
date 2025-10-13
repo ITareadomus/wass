@@ -195,11 +195,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Endpoint per eseguire extract_cleaners.py
+  // Endpoint per estrarre i cleaners
   app.post("/api/extract-cleaners", async (req, res) => {
     try {
       const { date } = req.body;
-      const scriptPath = path.join(__dirname, '../client/public/scripts/extract_cleaners.py');
+      const scriptPath = path.join(process.cwd(), 'client', 'public', 'scripts', 'extract_cleaners.py');
 
       // Se la data è fornita, passala come argomento allo script
       const command = date
@@ -207,13 +207,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         : `python3 ${scriptPath}`;
 
       console.log("Eseguendo extract_cleaners.py con comando:", command);
-      
+
       const { stdout, stderr } = await execAsync(command, { maxBuffer: 1024 * 1024 * 10 });
 
       if (stderr && !stderr.includes('Browserslist')) {
         console.error("Errore extract_cleaners:", stderr);
       }
-      
+
       console.log("extract_cleaners output:", stdout);
 
       res.json({
@@ -226,6 +226,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({
         success: false,
         message: 'Errore durante l\'estrazione dei cleaners',
+        error: error.message,
+        stderr: error.stderr
+      });
+    }
+  });
+
+  // Endpoint per estrarre i cleaners (versione ottimizzata)
+  app.post("/api/extract-cleaners-optimized", async (req, res) => {
+    try {
+      const { date } = req.body;
+      const scriptPath = path.join(process.cwd(), 'client', 'public', 'scripts', 'extract_cleaners_optimized.py');
+
+      // Se la data è fornita, passala come argomento allo script
+      const command = date
+        ? `python3 ${scriptPath} ${date}`
+        : `python3 ${scriptPath}`;
+
+      console.log("Eseguendo extract_cleaners_optimized.py con comando:", command);
+
+      const { stdout, stderr } = await execAsync(command, { maxBuffer: 1024 * 1024 * 10 });
+
+      if (stderr && !stderr.includes('Browserslist')) {
+        console.error("Errore extract_cleaners_optimized:", stderr);
+      }
+
+      console.log("extract_cleaners_optimized output:", stdout);
+
+      res.json({
+        success: true,
+        message: 'Cleaner estratti con successo (ottimizzato)',
+        output: stdout
+      });
+    } catch (error: any) {
+      console.error("Errore durante l'estrazione dei cleaners (ottimizzato):", error);
+      res.status(500).json({
+        success: false,
+        message: 'Errore durante l\'estrazione dei cleaners (ottimizzato)',
         error: error.message,
         stderr: error.stderr
       });
