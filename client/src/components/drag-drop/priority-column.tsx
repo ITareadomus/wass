@@ -23,11 +23,11 @@ export default function PriorityColumn({
   const getColumnClass = (priority: string, tasks: Task[]) => {
     switch (priority) {
       case "early-out":
-        return "bg-purple-50 border-purple-300";
+        return "bg-sky-100 border-sky-400";
       case "high":
-        return "bg-red-50 border-red-300";
+        return "bg-sky-100 border-sky-400";
       case "low":
-        return "bg-orange-50 border-orange-300";
+        return "bg-sky-100 border-sky-400";
       default:
         return "bg-gray-50 border-gray-300";
     }
@@ -36,11 +36,11 @@ export default function PriorityColumn({
   const getHeaderClass = (priority: string) => {
     switch (priority) {
       case "early-out":
-        return "text-purple-800";
+        return "text-sky-800";
       case "high":
-        return "text-red-800";
+        return "text-sky-800";
       case "low":
-        return "text-orange-800";
+        return "text-sky-800";
       default:
         return "text-foreground";
     }
