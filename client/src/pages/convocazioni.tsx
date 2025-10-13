@@ -34,59 +34,62 @@ export default function Convocazioni() {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
 
   useEffect(() => {
-    const extractCleaners = async () => {
+    const loadCleaners = async () => {
       try {
         setIsLoading(true);
-        setLoadingMessage("Estrazione cleaners dal database...");
-
-        // Formatta la data nel formato YYYY-MM-DD
-        const formattedDate = format(selectedDate, "yyyy-MM-dd");
-
-        // Esegui lo script extract_cleaners_optimized.py con la data selezionata
-        const response = await fetch('/api/extract-cleaners-optimized', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ date: formattedDate })
-        });
-
-        if (!response.ok) {
-          throw new Error('Errore durante l\'estrazione dei cleaners');
-        }
-
-        const result = await response.json();
-        console.log("Estrazione cleaners completata:", result);
-
         setLoadingMessage("Caricamento cleaners...");
 
-        // Carica il file cleaners.json generato
-        const cleanersResponse = await fetch('/data/cleaners/cleaners.json');
-        if (!cleanersResponse.ok) {
-          throw new Error('Errore nel caricamento di cleaners.json');
+        const response = await fetch('/data/output/early_out_assignments.json');
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
         }
-
-        const cleanersData = await cleanersResponse.json();
+        const assignments = await response.json();
+        console.log("Assignments caricati da early_out_assignments.json:", assignments);
         
-        // Estrai i cleaners dalla struttura nested
-        let cleanersList: Cleaner[] = [];
-        if (cleanersData.dates) {
-          const latestDate = Object.keys(cleanersData.dates).sort().reverse()[0];
-          cleanersList = cleanersData.dates[latestDate]?.cleaners || [];
-        } else if (cleanersData.cleaners) {
-          cleanersList = cleanersData.cleaners;
-        }
-
-        setCleaners(cleanersList);
+        // Estrai cleaners unici dalle assegnazioni
+        const uniqueCleaners = new Map<number, Cleaner>();
+        
+        assignments.forEach((assignment: any) => {
+          if (assignment.assigned_cleaner_id) {
+            const cleanerId = assignment.assigned_cleaner_id;
+            if (!uniqueCleaners.has(cleanerId)) {
+              // Estrai nome e cognome dal nome completo
+              const fullName = assignment.assigned_cleaner_name || '';
+              const nameParts = fullName.trim().split(' ');
+              const lastname = nameParts.pop() || '';
+              const name = nameParts.join(' ') || '';
+              
+              uniqueCleaners.set(cleanerId, {
+                id: cleanerId,
+                name: name,
+                lastname: lastname,
+                role: assignment.assigned_cleaner_role || 'Standard',
+                active: true,
+                ranking: 0,
+                counter_hours: 0,
+                counter_days: 0,
+                available: true,
+                contract_type: 'B',
+                preferred_customers: [],
+                telegram_id: null,
+                start_time: assignment.start_time || '10:00'
+              });
+            }
+          }
+        });
+        
+        setCleaners(Array.from(uniqueCleaners.values()));
         setSelectedCleaners(new Set()); // Reset selezioni quando cambia la data
         setIsLoading(false);
         setLoadingMessage("Cleaners caricati con successo!");
       } catch (error) {
-        console.error("Errore nell'estrazione dei cleaners:", error);
-        setLoadingMessage("Errore durante l'estrazione dei cleaners");
+        console.error("Errore nel caricamento degli assignments:", error);
+        setLoadingMessage("Errore nel caricamento dei cleaners");
         setIsLoading(false);
       }
     };
-
-    extractCleaners();
+    
+    loadCleaners();
   }, [selectedDate]);
 
   const toggleCleanerSelection = (cleanerId: number) => {
