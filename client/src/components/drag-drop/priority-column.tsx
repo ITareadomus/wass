@@ -1,4 +1,3 @@
-
 import { Droppable } from "react-beautiful-dnd";
 import { Task } from "@shared/schema";
 import TaskCard from "./task-card";
@@ -58,30 +57,33 @@ export default function PriorityColumn({
   };
 
   const handleTimelineAssignment = async () => {
-    if (priority !== 'early-out') {
-      console.log(`Smistamento task ${priority} sulla timeline - non implementato`);
-      return;
-    }
+    if (priority === 'early-out') {
+      // Esegui assign_eo.py per early-out
+      try {
+        console.log('Esecuzione assign_eo.py...');
+        const response = await fetch('/api/assign-early-out', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' }
+        });
 
-    try {
-      console.log('Esecuzione assign_eo.py...');
-      const response = await fetch('/api/assign-early-out', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' }
-      });
+        if (!response.ok) {
+          throw new Error('Errore durante l\'assegnazione early-out');
+        }
 
-      if (!response.ok) {
-        throw new Error('Errore durante l\'assegnazione early-out');
+        const result = await response.json();
+        console.log('Assegnazione early-out completata:', result);
+
+        alert('Early-out tasks assegnati con successo!');
+
+        // Ricarica la pagina per mostrare le nuove assegnazioni
+        window.location.reload();
+      } catch (error) {
+        console.error('Errore nell\'assegnazione early-out:', error);
+        alert('Errore durante l\'assegnazione dei task early-out');
       }
-
-      const result = await response.json();
-      console.log('Assegnazione early-out completata:', result);
-      
-      // TODO: Ricaricare le assegnazioni e aggiornare la timeline
-      alert('Early-out tasks assegnati con successo!');
-    } catch (error) {
-      console.error('Errore nell\'assegnazione early-out:', error);
-      alert('Errore durante l\'assegnazione dei task early-out');
+    } else {
+      // Logica originale per high e low priority
+      alert(`Auto-assign per ${priority} non ancora implementato`);
     }
   };
 
@@ -108,7 +110,7 @@ export default function PriorityColumn({
           Smista
         </Button>
       </div>
-      
+
       <Droppable droppableId={droppableId}>
         {(provided, snapshot) => (
           <div
