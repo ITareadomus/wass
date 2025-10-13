@@ -205,7 +205,7 @@ def diagnostics_from(assignments: List[Dict[str, Any]], tasks: List[Dict[str, An
 def main() -> None:
     ap = argparse.ArgumentParser(description="Assign early-out tasks to cleaners (with diagnostics).")
     repo_root = Path(__file__).resolve().parents[1]
-    default_cleaners = repo_root / "data" / "output" / "cleaners.json"
+    default_cleaners = repo_root / "data" / "cleaners" / "selected_cleaners.json"
     default_tasks = repo_root / "data" / "output" / "early_out.json"
     default_out = repo_root / "data" / "output" / "early_out_assignments.json"
 
