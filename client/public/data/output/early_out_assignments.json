@@ -298,26 +298,32 @@
         "client_forced_eo"
       ],
       "assigned_cleaner": {
-        "id": 24,
-        "name": "HUSSAIN",
-        "lastname": "SYED SHUJIAHAT",
-        "role": "Standard",
+        "id": 249,
+        "name": "Ogbodo Chidi",
+        "lastname": "Igwe",
+        "role": "Premium",
         "active": true,
         "ranking": 0,
         "counter_hours": 0,
-        "counter_days": 3,
+        "counter_days": 4,
         "available": true,
-        "contract_type": "B",
+        "contract_type": "a chiamata",
         "preferred_customers": [
           2,
-          67,
+          3,
+          61,
+          64,
           72,
           80,
           84,
           94,
-          115
+          113,
+          115,
+          118,
+          120,
+          123
         ],
-        "telegram_id": null,
+        "telegram_id": 6481457174,
         "start_time": "10:00",
         "end_time": "11:00"
       },
@@ -349,24 +355,36 @@
         "client_forced_eo"
       ],
       "assigned_cleaner": {
-        "id": 326,
-        "name": "FESTUS OSARO",
-        "lastname": "AIHIVBERE",
-        "role": "Standard",
+        "id": 445,
+        "name": "IBRAHIM",
+        "lastname": "SANYANG",
+        "role": "Premium",
         "active": true,
         "ranking": 0,
         "counter_hours": 0,
-        "counter_days": 3,
+        "counter_days": 0,
         "available": true,
         "contract_type": "B",
         "preferred_customers": [
           2,
-          3,
+          61,
+          72,
           75,
+          80,
+          84,
+          87,
+          91,
           94,
-          115
+          101,
+          113,
+          115,
+          118,
+          120,
+          121,
+          123,
+          124
         ],
-        "telegram_id": 7895288780,
+        "telegram_id": null,
         "start_time": "10:00",
         "end_time": "12:00"
       },
@@ -398,30 +416,39 @@
         "client_forced_eo"
       ],
       "assigned_cleaner": {
-        "id": 404,
-        "name": "RASEL",
-        "lastname": "MOLLA",
-        "role": "Standard",
+        "id": 495,
+        "name": "EL HADJI",
+        "lastname": "BA",
+        "role": "Premium",
         "active": true,
         "ranking": 0,
         "counter_hours": 0,
-        "counter_days": 3,
+        "counter_days": 1,
         "available": true,
         "contract_type": "B",
         "preferred_customers": [
           2,
           3,
+          9,
           61,
-          72,
+          64,
           75,
           80,
           84,
+          85,
+          87,
+          91,
           94,
+          101,
+          113,
           115,
           118,
-          119
+          119,
+          120,
+          121,
+          123
         ],
-        "telegram_id": 7559507853,
+        "telegram_id": 8035270407,
         "start_time": "10:00",
         "end_time": "11:30"
       },
@@ -453,21 +480,23 @@
         "client_forced_eo"
       ],
       "assigned_cleaner": {
-        "id": 469,
-        "name": "LAMIN",
-        "lastname": "SOLY",
-        "role": "Standard",
+        "id": 596,
+        "name": "TRACY",
+        "lastname": "OKE",
+        "role": "Premium",
         "active": true,
         "ranking": 0,
-        "counter_hours": 0,
-        "counter_days": 2,
+        "counter_hours": 2,
+        "counter_days": 0,
         "available": true,
         "contract_type": "B",
         "preferred_customers": [
+          1,
           2,
           3,
           61,
           64,
+          67,
           72,
           75,
           80,
@@ -476,7 +505,6 @@
           91,
           94,
           101,
-          102,
           113,
           115,
           118,
@@ -486,7 +514,7 @@
           123,
           124
         ],
-        "telegram_id": null,
+        "telegram_id": 6339409386,
         "start_time": "10:00",
         "end_time": "11:00"
       },
@@ -585,27 +613,32 @@
         "checkout_time<=eo_time"
       ],
       "assigned_cleaner": {
-        "id": 771,
-        "name": "PRECIOUS",
-        "lastname": "GYABAAH",
-        "role": "Standard",
+        "id": 644,
+        "name": "HENRY",
+        "lastname": "CHIDUBEM",
+        "role": "Premium",
         "active": true,
         "ranking": 0,
         "counter_hours": 0,
-        "counter_days": 3,
+        "counter_days": 1,
         "available": true,
-        "contract_type": "a chiamata",
+        "contract_type": "B",
         "preferred_customers": [
           3,
           61,
+          64,
           72,
           75,
           80,
           84,
+          91,
           94,
-          115
+          101,
+          113,
+          115,
+          119
         ],
-        "telegram_id": 5775694043,
+        "telegram_id": 6658049814,
         "start_time": "10:00",
         "end_time": "12:30"
       },
@@ -636,31 +669,8 @@
       "reasons": [
         "checkout_time<=eo_time"
       ],
-      "assigned_cleaner": {
-        "id": 24,
-        "name": "HUSSAIN",
-        "lastname": "SYED SHUJIAHAT",
-        "role": "Standard",
-        "active": true,
-        "ranking": 0,
-        "counter_hours": 0,
-        "counter_days": 3,
-        "available": true,
-        "contract_type": "B",
-        "preferred_customers": [
-          2,
-          67,
-          72,
-          80,
-          84,
-          94,
-          115
-        ],
-        "telegram_id": null,
-        "start_time": "10:00",
-        "end_time": "10:40"
-      },
-      "assignment_status": "assigned"
+      "assigned_cleaner": null,
+      "assignment_status": "unassigned_no_cleaners"
     },
     {
       "task_id": 217310,
@@ -687,43 +697,24 @@
       "reasons": [
         "checkout_time<=eo_time"
       ],
-      "assigned_cleaner": {
-        "id": 326,
-        "name": "FESTUS OSARO",
-        "lastname": "AIHIVBERE",
-        "role": "Standard",
-        "active": true,
-        "ranking": 0,
-        "counter_hours": 0,
-        "counter_days": 3,
-        "available": true,
-        "contract_type": "B",
-        "preferred_customers": [
-          2,
-          3,
-          75,
-          94,
-          115
-        ],
-        "telegram_id": 7895288780,
-        "start_time": "10:00",
-        "end_time": "10:30"
-      },
-      "assignment_status": "assigned"
+      "assigned_cleaner": null,
+      "assignment_status": "unassigned_no_cleaners"
     }
   ],
   "meta": {
     "total_tasks": 13,
+    "total_cleaners_available": 11,
     "premium_tasks": 1,
     "nonpremium_tasks": 12,
-    "assigned": 13,
-    "unassigned": 0,
+    "assigned": 11,
+    "unassigned": 2,
+    "one_task_per_cleaner": true,
+    "unused_cleaners": [],
     "notes": [
-      "checkout_time defaulted to 10:00 where missing/null",
-      "start_time/end_time appear only once and only inside assigned_cleaner, right after telegram_id",
-      "end_time = start_time + cleaning_time (minutes)",
-      "premium tasks assigned only to premium cleaners first; then others",
-      "priority: premium tasks first, then non-premium (balanced reuse)"
+      "premium tasks assigned first to premium cleaners",
+      "each cleaner used at most once",
+      "start/end only inside assigned_cleaner after telegram_id",
+      "checkout_time default 10:00"
     ]
   }
 }
