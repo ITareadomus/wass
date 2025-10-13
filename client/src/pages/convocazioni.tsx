@@ -253,7 +253,7 @@ export default function Convocazioni() {
               size="lg"
               disabled={selectedCleaners.size === 0}
             >
-              Conferma ({selectedCleaners.size})
+              Conferma
             </Button>
           </div>
         </Card>
