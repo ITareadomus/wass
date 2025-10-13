@@ -71,7 +71,7 @@ export default function TimelineView({
         }
         const selectedData = await response.json();
         console.log("Cleaners caricati da selected_cleaners.json:", selectedData);
-        
+
         // I cleaners sono già nel formato corretto
         const cleanersList = selectedData.cleaners || [];
         setCleaners(cleanersList);
@@ -102,99 +102,101 @@ export default function TimelineView({
           </h3>
         </div>
         <div className="p-4 overflow-x-auto">
-          {/* Header con orari */}
-          <div className="flex mb-2">
-            <div className="w-32 flex-shrink-0"></div>
-            <div className="flex-1 flex">
-              {timeSlots.map((slot) => (
-                <div
-                  key={slot}
-                  className="flex-1 text-center text-sm font-medium text-muted-foreground border-l border-border first:border-l-0 py-1"
-                >
-                  {slot}
-                </div>
-              ))}
+          <div className="min-w-[1600px]">
+            {/* Header con orari */}
+            <div className="flex mb-2">
+              <div className="w-32 flex-shrink-0"></div>
+              <div className="flex-1 flex">
+                {timeSlots.map((slot) => (
+                  <div
+                    key={slot}
+                    className="flex-1 text-center text-xl font-bold text-muted-foreground border-l border-border first:border-l-0 py-3 min-w-[120px]"
+                  >
+                    {slot}
+                  </div>
+                ))}
+              </div>
             </div>
-          </div>
 
           {/* Righe dei cleaners */}
-          {cleaners.map((cleaner, index) => {
-            const color = getCleanerColor(index);
-            const droppableId = `cleaner-${cleaner.id}`;
+            {cleaners.map((cleaner, index) => {
+              const color = getCleanerColor(index);
+              const droppableId = `cleaner-${cleaner.id}`;
 
-            // Trova tutte le task assegnate a questo cleaner
-            const cleanerTasks = tasks.filter(task => 
-              (task as any).assignedCleaner === cleaner.id
-            );
+              // Trova tutte le task assegnate a questo cleaner
+              const cleanerTasks = tasks.filter(task =>
+                (task as any).assignedCleaner === cleaner.id
+              );
 
-            return (
-              <div key={cleaner.id} className="flex mb-1">
-                {/* Info cleaner */}
-                <div
-                  className="w-32 flex-shrink-0 p-2 flex items-center border border-border cursor-pointer hover:opacity-90 transition-opacity"
-                  style={{ 
-                    backgroundColor: color.bg,
-                    color: color.text
-                  }}
-                  onClick={() => handleCleanerClick(cleaner)}
-                >
-                  <div className="w-full">
-                    <div className="text-xs font-medium break-words leading-tight">
-                      {cleaner.name} {cleaner.lastname}
-                    </div>
-                    <div className="text-xs opacity-80 mt-0.5">
-                      {cleaner.role}
+              return (
+                <div key={cleaner.id} className="flex mb-1">
+                  {/* Info cleaner */}
+                  <div
+                    className="w-32 flex-shrink-0 p-2 flex items-center border border-border cursor-pointer hover:opacity-90 transition-opacity"
+                    style={{
+                      backgroundColor: color.bg,
+                      color: color.text
+                    }}
+                    onClick={() => handleCleanerClick(cleaner)}
+                  >
+                    <div className="w-full">
+                      <div className="text-xs font-medium break-words leading-tight">
+                        {cleaner.name} {cleaner.lastname}
+                      </div>
+                      <div className="text-xs opacity-80 mt-0.5">
+                        {cleaner.role}
+                      </div>
                     </div>
                   </div>
-                </div>
 
-                {/* Timeline per questo cleaner - area unica droppable */}
-                <Droppable droppableId={`timeline-${cleaner.id}`} direction="horizontal">
-                  {(provided, snapshot) => (
-                    <div
-                      ref={provided.innerRef}
-                      {...provided.droppableProps}
-                      className={`relative border-t border-border transition-colors min-h-[60px] flex-1 ${
-                        snapshot.isDraggingOver ? 'bg-primary/20 ring-2 ring-primary' : ''
-                      }`}
-                      style={{ 
-                        backgroundColor: snapshot.isDraggingOver 
-                          ? `${color.bg}40`
-                          : `${color.bg}10`
-                      }}
-                    >
-                      {/* Griglia oraria di sfondo (solo visiva) */}
-                      <div className="absolute inset-0 grid grid-cols-12 pointer-events-none opacity-10">
-                        {timeSlots.map((slot, idx) => (
-                          <div key={idx} className="border-r border-border"></div>
-                        ))}
-                      </div>
-
-                      {/* Task posizionate in sequenza */}
-                      <div className="relative z-10 flex items-center h-full">
-                        {tasks
-                          .filter((task) => (task as any).assignedCleaner === cleaner.id)
-                          .filter((task, index, self) => 
-                            // Rimuovi duplicati basandoti sull'id della task
-                            index === self.findIndex((t) => t.id === task.id)
-                          )
-                          .sort((a, b) => ((a as any).assignedSlot || 0) - ((b as any).assignedSlot || 0))
-                          .map((task, index) => (
-                            <TaskCard 
-                              key={task.id}
-                              task={task} 
-                              index={index}
-                              isInTimeline={true}
-                            />
+                  {/* Timeline per questo cleaner - area unica droppable */}
+                  <Droppable droppableId={`timeline-${cleaner.id}`} direction="horizontal">
+                    {(provided, snapshot) => (
+                      <div
+                        ref={provided.innerRef}
+                        {...provided.droppableProps}
+                        className={`relative border-t border-border transition-colors min-h-[60px] flex-1 ${
+                          snapshot.isDraggingOver ? 'bg-primary/20 ring-2 ring-primary' : ''
+                        }`}
+                        style={{
+                          backgroundColor: snapshot.isDraggingOver
+                            ? `${color.bg}40`
+                            : `${color.bg}10`
+                        }}
+                      >
+                        {/* Griglia oraria di sfondo (solo visiva) */}
+                        <div className="absolute inset-0 grid grid-cols-12 pointer-events-none opacity-10">
+                          {timeSlots.map((slot, idx) => (
+                            <div key={idx} className="border-r border-border"></div>
                           ))}
-                        {provided.placeholder}
+                        </div>
+
+                        {/* Task posizionate in sequenza */}
+                        <div className="relative z-10 flex items-center h-full">
+                          {tasks
+                            .filter((task) => (task as any).assignedCleaner === cleaner.id)
+                            .filter((task, index, self) =>
+                              // Rimuovi duplicati basandoti sull'id della task
+                              index === self.findIndex((t) => t.id === task.id)
+                            )
+                            .sort((a, b) => ((a as any).assignedSlot || 0) - ((b as any).assignedSlot || 0))
+                            .map((task, index) => (
+                              <TaskCard
+                                key={task.id}
+                                task={task}
+                                index={index}
+                                isInTimeline={true}
+                              />
+                            ))}
+                          {provided.placeholder}
+                        </div>
                       </div>
-                    </div>
-                  )}
-                </Droppable>
-              </div>
-            );
-          })}
+                    )}
+                  </Droppable>
+                </div>
+              );
+            })}
+          </div>
         </div>
       </div>
 
