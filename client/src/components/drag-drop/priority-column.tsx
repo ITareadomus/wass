@@ -73,6 +73,31 @@ export default function PriorityColumn({
         const result = await response.json();
         console.log('Assegnazione early-out completata:', result);
 
+        // Carica le assegnazioni dal file generato
+        const assignmentsResponse = await fetch('/data/output/early_out_assignments.json');
+        if (!assignmentsResponse.ok) {
+          throw new Error('Errore nel caricamento delle assegnazioni');
+        }
+
+        const assignmentsData = await assignmentsResponse.json();
+        const assignments = assignmentsData.early_out_tasks_assigned || [];
+
+        // Aggiorna lo stato delle task tramite API
+        for (const assignment of assignments) {
+          if (assignment.assigned_cleaner && assignment.assignment_status === 'assigned') {
+            await fetch('/api/save-assignments', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify([{
+                id: String(assignment.task_id),
+                assignedCleaner: assignment.assigned_cleaner.id,
+                assignedSlot: 0,
+                startTime: assignment.assigned_cleaner.start_time
+              }])
+            });
+          }
+        }
+
         alert('Early-out tasks assegnati con successo!');
 
         // Ricarica la pagina per mostrare le nuove assegnazioni

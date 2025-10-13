@@ -83,6 +83,7 @@ export default function GenerateAssignments() {
     };
 
     extractData();
+    loadEarlyOutAssignments();
   }, []);
 
   // Funzione per convertire cleaning_time (minuti) in formato ore.minuti
@@ -167,6 +168,39 @@ export default function GenerateAssignments() {
       console.error("Errore nel caricamento dei task:", error);
       setIsLoadingTasks(false);
       setExtractionStep("Errore nel caricamento dei task");
+    }
+  };
+
+  const loadEarlyOutAssignments = async () => {
+    try {
+      const response = await fetch('/data/output/early_out_assignments.json');
+      if (!response.ok) {
+        console.log('Nessuna assegnazione early-out trovata');
+        return;
+      }
+
+      const assignmentsData = await response.json();
+      const assignments = assignmentsData.early_out_tasks_assigned || [];
+
+      console.log('Assegnazioni early-out caricate:', assignments);
+
+      // Aggiorna le task con le assegnazioni
+      setAllTasksWithAssignments(prevTasks => {
+        return prevTasks.map(task => {
+          const assignment = assignments.find((a: any) => String(a.task_id) === task.id);
+          if (assignment && assignment.assigned_cleaner) {
+            return {
+              ...task,
+              assignedCleaner: assignment.assigned_cleaner.id,
+              assignedSlot: 0,
+              startTime: assignment.assigned_cleaner.start_time
+            };
+          }
+          return task;
+        });
+      });
+    } catch (error) {
+      console.error('Errore nel caricamento delle assegnazioni early-out:', error);
     }
   };
 
