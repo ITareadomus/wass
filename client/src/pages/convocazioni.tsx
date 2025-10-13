@@ -179,10 +179,10 @@ export default function Convocazioni() {
         </div>
 
         {/* Grid con lista cleaners e statistiche affiancate */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 min-h-[calc(100vh-300px)]">
           {/* Lista Cleaners - 2/3 dello spazio */}
-          <Card className="p-6 lg:col-span-2">
-          <div className="space-y-3">
+          <Card className="p-6 lg:col-span-2 flex flex-col">
+          <div className="space-y-3 flex-1 overflow-y-auto">
             {cleaners.map((cleaner) => {
               const isPremium = cleaner.role === "Premium";
               const isAvailable = cleaner.available !== false;
@@ -243,7 +243,7 @@ export default function Convocazioni() {
               );
             })}
           </div>
-          <div className="flex justify-start mt-4">
+          <div className="flex justify-start mt-4 pt-4 border-t">
             <Button
               onClick={handleConfirm}
               size="lg"
@@ -255,10 +255,10 @@ export default function Convocazioni() {
         </Card>
 
         {/* Pannello Statistiche - 1/3 dello spazio */}
-        <Card className="p-6 border-2 h-fit sticky top-4">
-          <div className="space-y-3">
+        <Card className="p-6 border-2 flex flex-col">
+          <div className="space-y-3 flex-1 flex flex-col">
             <h3 className="text-lg font-semibold text-foreground mb-4">Statistiche Cleaners</h3>
-            <div className="space-y-3 text-sm">
+            <div className="space-y-3 text-sm flex-1">
               <div className="flex justify-between items-center">
                 <span className="text-muted-foreground">Disponibili:</span>
                 <span className="font-bold text-green-600">
