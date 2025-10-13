@@ -104,12 +104,12 @@ export default function TimelineView({
         <div className="p-4 overflow-x-auto">
           {/* Header con orari */}
           <div className="flex mb-2">
-            <div className="w-48 flex-shrink-0"></div>
+            <div className="w-32 flex-shrink-0"></div>
             <div className="flex-1 flex">
               {timeSlots.map((slot) => (
                 <div
                   key={slot}
-                  className="flex-1 text-center text-xs font-medium text-muted-foreground border-l border-border first:border-l-0 py-1"
+                  className="flex-1 text-center text-sm font-medium text-muted-foreground border-l border-border first:border-l-0 py-1"
                 >
                   {slot}
                 </div>
@@ -131,18 +131,18 @@ export default function TimelineView({
               <div key={cleaner.id} className="flex mb-1">
                 {/* Info cleaner */}
                 <div
-                  className="w-48 flex-shrink-0 p-2 flex items-center border border-border cursor-pointer hover:opacity-90 transition-opacity"
+                  className="w-32 flex-shrink-0 p-2 flex items-center border border-border cursor-pointer hover:opacity-90 transition-opacity"
                   style={{ 
                     backgroundColor: color.bg,
                     color: color.text
                   }}
                   onClick={() => handleCleanerClick(cleaner)}
                 >
-                  <div>
-                    <div className="text-sm font-medium">
+                  <div className="w-full">
+                    <div className="text-xs font-medium break-words leading-tight">
                       {cleaner.name} {cleaner.lastname}
                     </div>
-                    <div className="text-xs opacity-80">
+                    <div className="text-xs opacity-80 mt-0.5">
                       {cleaner.role}
                     </div>
                   </div>
