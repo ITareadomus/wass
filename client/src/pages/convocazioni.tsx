@@ -38,6 +38,23 @@ export default function Convocazioni() {
     const loadCleaners = async () => {
       try {
         setIsLoading(true);
+        setLoadingMessage("Estrazione cleaners dal database...");
+
+        // Esegui extract_cleaners_optimized.py
+        const dateStr = format(selectedDate, "yyyy-MM-dd");
+        const extractResponse = await fetch('/api/extract-cleaners-optimized', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ date: dateStr })
+        });
+
+        if (!extractResponse.ok) {
+          throw new Error('Errore durante l\'estrazione dei cleaners');
+        }
+
+        const extractResult = await extractResponse.json();
+        console.log("Estrazione cleaners completata:", extractResult);
+
         setLoadingMessage("Caricamento cleaners...");
 
         const response = await fetch('/data/cleaners/cleaners.json');
