@@ -309,6 +309,7 @@
       "premium": true,
       "final_class": "HP",
       "reasons": [
+        "same_day_checkin_between_eo_hp",
         "premium"
       ]
     },
