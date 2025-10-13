@@ -39,51 +39,28 @@ export default function Convocazioni() {
         setIsLoading(true);
         setLoadingMessage("Caricamento cleaners...");
 
-        const response = await fetch('/data/output/early_out_assignments.json');
+        const response = await fetch('/data/cleaners/cleaners.json');
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
         }
-        const assignments = await response.json();
-        console.log("Assignments caricati da early_out_assignments.json:", assignments);
+        const cleanersData = await response.json();
+        console.log("Cleaners caricati da cleaners.json:", cleanersData);
         
-        // Estrai cleaners unici dalle assegnazioni
-        const uniqueCleaners = new Map<number, Cleaner>();
+        // Estrai i cleaners dalla struttura del file
+        let cleanersList: Cleaner[] = [];
+        if (cleanersData.dates) {
+          const latestDate = Object.keys(cleanersData.dates).sort().reverse()[0];
+          cleanersList = cleanersData.dates[latestDate]?.cleaners || [];
+        } else if (cleanersData.cleaners) {
+          cleanersList = cleanersData.cleaners;
+        }
         
-        assignments.forEach((assignment: any) => {
-          if (assignment.assigned_cleaner_id) {
-            const cleanerId = assignment.assigned_cleaner_id;
-            if (!uniqueCleaners.has(cleanerId)) {
-              // Estrai nome e cognome dal nome completo
-              const fullName = assignment.assigned_cleaner_name || '';
-              const nameParts = fullName.trim().split(' ');
-              const lastname = nameParts.pop() || '';
-              const name = nameParts.join(' ') || '';
-              
-              uniqueCleaners.set(cleanerId, {
-                id: cleanerId,
-                name: name,
-                lastname: lastname,
-                role: assignment.assigned_cleaner_role || 'Standard',
-                active: true,
-                ranking: 0,
-                counter_hours: 0,
-                counter_days: 0,
-                available: true,
-                contract_type: 'B',
-                preferred_customers: [],
-                telegram_id: null,
-                start_time: assignment.start_time || '10:00'
-              });
-            }
-          }
-        });
-        
-        setCleaners(Array.from(uniqueCleaners.values()));
+        setCleaners(cleanersList);
         setSelectedCleaners(new Set()); // Reset selezioni quando cambia la data
         setIsLoading(false);
         setLoadingMessage("Cleaners caricati con successo!");
       } catch (error) {
-        console.error("Errore nel caricamento degli assignments:", error);
+        console.error("Errore nel caricamento dei cleaners:", error);
         setLoadingMessage("Errore nel caricamento dei cleaners");
         setIsLoading(false);
       }
