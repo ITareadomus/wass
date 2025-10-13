@@ -135,7 +135,7 @@ export default function Convocazioni() {
               <Users className="w-8 h-8 text-primary" />
               CONVOCAZIONI
               <span className="text-2xl font-normal text-muted-foreground ml-4">
-                {format(selectedDate, "dd/MM/yyyy", { locale: it })}
+                del {format(selectedDate, "dd/MM/yyyy", { locale: it })}
               </span>
             </h1>
             
