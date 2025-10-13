@@ -117,13 +117,49 @@ def pick_cleaner(task: Dict[str, Any], cleaners: List[Dict[str, Any]], max_tasks
     pool.sort(key=sort_key)
     return pool[0]
 
+def calculate_travel_time(task: Dict[str, Any], cleaner: Dict[str, Any]) -> timedelta:
+    """Calcola il tempo di spostamento necessario basato sulla distanza tra task."""
+    # Se il cleaner non ha una task precedente, non serve tempo di spostamento
+    if "_last_task_lat" not in cleaner or "_last_task_lng" not in cleaner:
+        return timedelta(0)
+    
+    # Calcola la distanza approssimativa (formula di Haversine semplificata)
+    try:
+        lat1 = float(cleaner["_last_task_lat"])
+        lng1 = float(cleaner["_last_task_lng"])
+        lat2 = float(task.get("lat", 0))
+        lng2 = float(task.get("lng", 0))
+        
+        # Distanza euclidea approssimativa (1 grado ≈ 111 km)
+        distance_km = ((lat2 - lat1)**2 + (lng2 - lng1)**2)**0.5 * 111
+        
+        # Tempo di spostamento: ~30 minuti per ogni 5 km (assumendo trasporto pubblico/auto)
+        if distance_km > 0.5:  # Se la distanza > 500m, aggiungi buffer
+            travel_minutes = min(int(distance_km * 6), 30)  # Max 30 minuti
+            return timedelta(minutes=travel_minutes)
+    except (ValueError, TypeError):
+        pass
+    
+    return timedelta(0)
+
 def schedule_task_for_cleaner(task: Dict[str, Any], cleaner: Dict[str, Any]) -> Tuple[Optional[str], Optional[str]]:
     if cleaner is None:
         return None, None
-    start_dt = max(task["_checkout_dt"], cleaner["_available_from"])
+    
+    # Calcola tempo di spostamento dalla task precedente
+    travel_time = calculate_travel_time(task, cleaner)
+    
+    # L'inizio è il massimo tra checkout e disponibilità cleaner + tempo spostamento
+    earliest_start = cleaner["_available_from"] + travel_time
+    start_dt = max(task["_checkout_dt"], earliest_start)
     end_dt = start_dt + task["_cleaning_td"]
+    
+    # Aggiorna la posizione dell'ultima task del cleaner
+    cleaner["_last_task_lat"] = task.get("lat")
+    cleaner["_last_task_lng"] = task.get("lng")
     cleaner["_available_from"] = end_dt
     cleaner["_assigned_count"] += 1
+    
     return fmt_time(start_dt), fmt_time(end_dt)
 
 def assign(cleaners: List[Dict[str, Any]], tasks: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
