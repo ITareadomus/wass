@@ -58,9 +58,9 @@ export default function PriorityColumn({
 
   const handleTimelineAssignment = async () => {
     if (priority === 'early-out') {
-      // Esegui assign_eo.py per early-out
+      // Esegui assign_early_out.py per early-out
       try {
-        console.log('Esecuzione assign_eo.py...');
+        console.log('Esecuzione assign_early_out.py...');
         const response = await fetch('/api/assign-early-out', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' }
