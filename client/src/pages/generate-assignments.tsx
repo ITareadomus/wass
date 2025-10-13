@@ -3,6 +3,7 @@ import { Task } from "@shared/schema";
 import PriorityColumn from "@/components/drag-drop/priority-column";
 import TimelineView from "@/components/timeline/timeline-view";
 import { useState, useEffect } from "react";
+import { ThemeToggle } from "@/components/theme-toggle";
 
 interface RawTask {
   task_id: number;
@@ -329,9 +330,12 @@ export default function GenerateAssignments() {
           <h1 className="text-3xl font-bold text-foreground">
             Genera Assegnazioni
           </h1>
-          <div className="bg-card rounded-lg border shadow-sm px-4 py-2 text-center">
-            <div className="text-sm text-muted-foreground">Task Totali</div>
-            <div className="text-2xl font-bold text-primary">{allTasks.length}</div>
+          <div className="flex items-center gap-4">
+            <ThemeToggle />
+            <div className="bg-card rounded-lg border shadow-sm px-4 py-2 text-center">
+              <div className="text-sm text-muted-foreground">Task Totali</div>
+              <div className="text-2xl font-bold text-primary">{allTasks.length}</div>
+            </div>
           </div>
         </div>
 
