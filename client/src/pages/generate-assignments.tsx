@@ -186,7 +186,7 @@ export default function GenerateAssignments() {
 
       // Aggiorna le task con le assegnazioni
       setAllTasksWithAssignments(prevTasks => {
-        return prevTasks.map(task => {
+        const updatedTasks = prevTasks.map(task => {
           const assignment = assignments.find((a: any) => String(a.task_id) === task.id);
           if (assignment && assignment.assigned_cleaner) {
             return {
@@ -198,11 +198,23 @@ export default function GenerateAssignments() {
           }
           return task;
         });
+        return updatedTasks;
+      });
+
+      // Aggiorna anche earlyOutTasks per rimuovere quelle assegnate
+      setEarlyOutTasks(prevTasks => {
+        return prevTasks.filter(task => {
+          const assignment = assignments.find((a: any) => String(a.task_id) === task.id);
+          return !assignment || !assignment.assigned_cleaner;
+        });
       });
     } catch (error) {
       console.error('Errore nel caricamento delle assegnazioni early-out:', error);
     }
   };
+
+  // Esponi la funzione per poterla chiamare da altri componenti
+  (window as any).reloadEarlyOutAssignments = loadEarlyOutAssignments;
 
   const saveTaskAssignments = async (tasks: Task[]) => {
     try {
