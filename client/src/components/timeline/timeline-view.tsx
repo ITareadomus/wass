@@ -140,7 +140,7 @@ export default function TimelineView({
                 >
                   <div>
                     <div className="text-sm font-medium">
-                      {cleaner.name.charAt(0)}. {cleaner.lastname}
+                      {cleaner.name} {cleaner.lastname}
                     </div>
                     <div className="text-xs opacity-80">
                       {cleaner.role}
