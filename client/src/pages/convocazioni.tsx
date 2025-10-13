@@ -134,6 +134,9 @@ export default function Convocazioni() {
             <h1 className="text-3xl font-bold text-foreground flex items-center gap-2">
               <Users className="w-8 h-8 text-primary" />
               CONVOCAZIONI
+              <span className="text-2xl font-normal text-muted-foreground ml-4">
+                {format(selectedDate, "dd/MM/yyyy", { locale: it })}
+              </span>
             </h1>
             
             {/* Selettore Data */}
