@@ -169,14 +169,16 @@ export default function Convocazioni() {
             </div>
           </div>
 
-          {/* Barra Contatore */}
-          <div className="bg-gradient-to-r from-primary/10 via-primary/20 to-primary/10 rounded-xl border-2 border-primary/30 shadow-lg p-6">
-            <div className="flex items-center gap-4">
-              <div className="text-lg font-semibold text-muted-foreground">CLEANERS SELEZIONATI</div>
-              <div className="text-lg font-bold">
-                <span className="text-primary">{selectedCleaners.size}</span>
-                <span className="text-muted-foreground mx-1">/</span>
-                <span className="text-foreground">{cleaners.length}</span>
+          {/* Barra Contatore Sticky */}
+          <div className="sticky top-0 z-10 bg-background pb-4">
+            <div className="bg-gradient-to-r from-primary/10 via-primary/20 to-primary/10 rounded-xl border-2 border-primary/30 shadow-lg p-6">
+              <div className="flex items-center gap-4">
+                <div className="text-lg font-semibold text-muted-foreground">CLEANERS SELEZIONATI</div>
+                <div className="text-lg font-bold">
+                  <span className="text-primary">{selectedCleaners.size}</span>
+                  <span className="text-muted-foreground mx-1">/</span>
+                  <span className="text-foreground">{cleaners.length}</span>
+                </div>
               </div>
             </div>
           </div>
