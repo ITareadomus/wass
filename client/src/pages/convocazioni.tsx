@@ -9,6 +9,7 @@ import { Users, CalendarIcon } from "lucide-react";
 import { format } from "date-fns";
 import { it } from "date-fns/locale";
 import { cn } from "@/lib/utils";
+import { ThemeToggle } from "@/components/theme-toggle";
 
 interface Cleaner {
   id: number;
@@ -139,8 +140,10 @@ export default function Convocazioni() {
               </span>
             </h1>
             
-            {/* Selettore Data */}
-            <Popover>
+            {/* Selettore Data e Dark Mode Toggle */}
+            <div className="flex items-center gap-3">
+              <ThemeToggle />
+              <Popover>
               <PopoverTrigger asChild>
                 <Button
                   variant="outline"
@@ -163,6 +166,7 @@ export default function Convocazioni() {
                 />
               </PopoverContent>
             </Popover>
+            </div>
           </div>
 
           {/* Barra Contatore */}
