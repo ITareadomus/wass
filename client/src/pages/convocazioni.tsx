@@ -169,22 +169,17 @@ export default function Convocazioni() {
             </div>
           </div>
 
-          {/* Barra Contatore Fissa */}
-          <div className="fixed top-0 left-0 right-0 z-50 bg-background px-4 py-4 shadow-md">
-            <div className="bg-gradient-to-r from-primary/10 via-primary/20 to-primary/10 rounded-xl border-2 border-primary/30 shadow-lg p-6">
-              <div className="flex items-center gap-4">
-                <div className="text-lg font-semibold text-muted-foreground">CLEANERS SELEZIONATI</div>
-                <div className="text-lg font-bold">
-                  <span className="text-primary">{selectedCleaners.size}</span>
-                  <span className="text-muted-foreground mx-1">/</span>
-                  <span className="text-foreground">{cleaners.length}</span>
-                </div>
+          {/* Barra Contatore */}
+          <div className="bg-gradient-to-r from-primary/10 via-primary/20 to-primary/10 rounded-xl border-2 border-primary/30 shadow-lg p-6">
+            <div className="flex items-center gap-4">
+              <div className="text-lg font-semibold text-muted-foreground">CLEANERS SELEZIONATI</div>
+              <div className="text-lg font-bold">
+                <span className="text-primary">{selectedCleaners.size}</span>
+                <span className="text-muted-foreground mx-1">/</span>
+                <span className="text-foreground">{cleaners.length}</span>
               </div>
             </div>
           </div>
-
-          {/* Spacer per compensare la barra fissa */}
-          <div className="h-24"></div>
         </div>
 
         {/* Grid con lista cleaners e statistiche affiancate */}
