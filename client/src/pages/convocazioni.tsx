@@ -81,9 +81,34 @@ export default function Convocazioni() {
     });
   };
 
-  const handleConfirm = () => {
-    console.log("Cleaners selezionati:", Array.from(selectedCleaners));
-    // Logica da implementare
+  const handleConfirm = async () => {
+    try {
+      const selectedCleanersData = cleaners.filter(c => selectedCleaners.has(c.id));
+      
+      const dataToSave = {
+        cleaners: selectedCleanersData,
+        total_selected: selectedCleanersData.length
+      };
+
+      const response = await fetch('/api/save-selected-cleaners', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(dataToSave),
+      });
+
+      if (!response.ok) {
+        throw new Error('Errore nel salvataggio dei cleaners');
+      }
+
+      const result = await response.json();
+      console.log("Cleaners salvati con successo:", result);
+      alert(`${selectedCleanersData.length} cleaners salvati con successo in selected_cleaners.json`);
+    } catch (error) {
+      console.error("Errore nel salvataggio:", error);
+      alert("Errore nel salvataggio dei cleaners selezionati");
+    }
   };
 
   if (isLoading) {
