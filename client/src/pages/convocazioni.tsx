@@ -182,15 +182,27 @@ export default function Convocazioni() {
           <div className="space-y-3">
             {cleaners.map((cleaner) => {
               const isPremium = cleaner.role === "Premium";
-              const borderColor = isPremium ? "border-yellow-500" : "border-green-500";
-              const bgColor = isPremium ? "bg-yellow-500/10" : "bg-green-500/10";
-              const badgeColor = isPremium ? "bg-yellow-500/20 text-yellow-700 border-yellow-500" : "bg-green-500/20 text-green-700 border-green-500";
+              const isAvailable = cleaner.available !== false;
+              
+              const borderColor = !isAvailable 
+                ? "border-gray-400" 
+                : isPremium ? "border-yellow-500" : "border-green-500";
+              const bgColor = !isAvailable 
+                ? "bg-gray-300/30" 
+                : isPremium ? "bg-yellow-500/10" : "bg-green-500/10";
+              const badgeColor = !isAvailable
+                ? "bg-gray-400/20 text-gray-600 border-gray-400"
+                : isPremium ? "bg-yellow-500/20 text-yellow-700 border-yellow-500" : "bg-green-500/20 text-green-700 border-green-500";
               
               return (
                 <div
                   key={cleaner.id}
-                  onClick={() => toggleCleanerSelection(cleaner.id)}
-                  className={`flex items-center justify-between p-4 border-2 rounded-lg hover:opacity-80 transition-all cursor-pointer ${borderColor} ${bgColor}`}
+                  onClick={() => isAvailable && toggleCleanerSelection(cleaner.id)}
+                  className={`flex items-center justify-between p-4 border-2 rounded-lg transition-all ${borderColor} ${bgColor} ${
+                    isAvailable 
+                      ? 'hover:opacity-80 cursor-pointer' 
+                      : 'opacity-60 cursor-not-allowed'
+                  }`}
                 >
                   <div className="flex items-start gap-4 flex-1">
                     <div className="flex flex-col gap-2">
@@ -221,6 +233,7 @@ export default function Convocazioni() {
                   <Switch
                     checked={selectedCleaners.has(cleaner.id)}
                     onCheckedChange={() => toggleCleanerSelection(cleaner.id)}
+                    disabled={!isAvailable}
                     className="scale-150 pointer-events-none"
                   />
                 </div>
