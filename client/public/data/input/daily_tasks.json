@@ -1,11 +1,11 @@
 {
     "metadata": {
-        "last_updated": "2025-10-13T13:03:00.457694",
+        "last_updated": "2025-10-13T13:32:32.497983",
         "schema_version": "1.0"
     },
     "dates": {
         "2025-10-14": {
-            "timestamp": "2025-10-13T13:03:00.457703",
+            "timestamp": "2025-10-13T13:32:32.497993",
             "apt": [
                 {
                     "task_id": 210846,
@@ -754,7 +754,7 @@
                     "cleaning_time": 150,
                     "checkin_date": "2025-10-14",
                     "checkout_date": "2025-10-14",
-                    "checkin_time": null,
+                    "checkin_time": "12:00",
                     "checkout_time": null,
                     "pax_in": 2,
                     "pax_out": 3,
