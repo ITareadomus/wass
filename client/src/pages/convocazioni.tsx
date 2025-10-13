@@ -226,13 +226,11 @@ export default function Convocazioni() {
           </div>
         </Card>
 
-        {/* Pulsante Conferma fisso in basso */}
-        <div className="fixed bottom-6 left-6 z-50">
+        <div className="flex justify-start">
           <Button
             onClick={handleConfirm}
             size="lg"
             disabled={selectedCleaners.size === 0}
-            className="shadow-xl"
           >
             Conferma ({selectedCleaners.size})
           </Button>
