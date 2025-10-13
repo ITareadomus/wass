@@ -401,7 +401,7 @@ export default function GenerateAssignments() {
                   loading="lazy"
                   allowFullScreen
                   referrerPolicy="no-referrer-when-downgrade"
-                  src="https://www.google.com/maps/embed/v1/view?key=YOUR_API_KEY&center=45.4642,9.1900&zoom=12&maptype=roadmap"
+                  src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d89506.83160109393!2d9.14000405!3d45.4642035!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x4786c1493f1275e7%3A0x3cffcd13c6740e8d!2sMilano%20MI!5e1!3m2!1sit!2sit!4v1234567890&gestureHandling=greedy&disableDefaultUI=true&zoomControl=true"
                 ></iframe>
               </div>
             </div>
