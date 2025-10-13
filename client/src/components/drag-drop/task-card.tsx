@@ -119,14 +119,9 @@ export default function TaskCard({
                   ({task.duration.replace(".", ":")}h)
                 </span>
               </div>
-              {(task as any).type_apt && (
-                <span className="text-[9px] font-semibold opacity-80 leading-none">
-                  Tipo {(task as any).type_apt}
-                </span>
-              )}
               {task.alias && (
                 <span className="text-[8px] opacity-70 leading-none">
-                  {task.alias}
+                  {task.alias}{(task as any).type_apt ? ` ${(task as any).type_apt}` : ''}
                 </span>
               )}
             </div>
