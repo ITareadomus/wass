@@ -364,11 +364,38 @@ export default function GenerateAssignments() {
             />
           </div>
 
-          <div className="mt-6">
-            <TimelineView
-              personnel={[]}
-              tasks={allTasksWithAssignments}
-            />
+          <div className="mt-6 grid grid-cols-1 xl:grid-cols-3 gap-6">
+            <div className="xl:col-span-2">
+              <TimelineView
+                personnel={[]}
+                tasks={allTasksWithAssignments}
+              />
+            </div>
+            
+            <div className="bg-card rounded-lg border shadow-sm">
+              <div className="p-4 border-b border-border">
+                <h3 className="font-semibold text-foreground flex items-center">
+                  <svg className="w-5 h-5 mr-2 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                  </svg>
+                  Mappa Milano
+                </h3>
+              </div>
+              <div className="p-4">
+                <div className="relative w-full h-[600px] rounded-lg overflow-hidden">
+                  <iframe
+                    width="100%"
+                    height="100%"
+                    style={{ border: 0 }}
+                    loading="lazy"
+                    allowFullScreen
+                    referrerPolicy="no-referrer-when-downgrade"
+                    src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d89506.83160109393!2d9.14000405!3d45.4642035!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x4786c1493f1275e7%3A0x3cffcd13c6740e8d!2sMilano%20MI!5e0!3m2!1sit!2sit!4v1234567890"
+                  ></iframe>
+                </div>
+              </div>
+            </div>
           </div>
         </DragDropContext>
       </div>
