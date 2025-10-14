@@ -187,26 +187,37 @@ def main() -> None:
     for task in assigned_sorted:
         if task.get("assignment_status") == "assigned" and task.get("assigned_cleaner"):
             # Calcola la posizione nella timeline
+            # Timeline: 11 ore (8:00-19:00)
+            # Ogni ora = 100 unità (dove ogni minuto = 100/60 ≈ 1.67 unità)
+            # Timeline totale = 11 * 100 = 1100 unità
+            
             cleaner = task["assigned_cleaner"]
             start_time = cleaner.get("start_time", DEFAULT_START_TIME)
             end_time = cleaner.get("end_time")
             
-            # Calcola left e width in percentuale (assumendo timeline 8:00-19:00 = 11 ore)
             try:
                 start_dt = parse(start_time)
-                start_hour = start_dt.hour + start_dt.minute / 60.0
-                left_percent = ((start_hour - 8) / 11) * 100
+                # Calcola minuti dall'inizio della timeline (8:00)
+                start_minutes_from_8am = (start_dt.hour - 8) * 60 + start_dt.minute
+                
+                # Normalizza: ogni minuto = 100/60 unità
+                units_per_minute = 100 / 60.0
+                total_units = 11 * 100  # 1100 unità totali
+                
+                start_units = start_minutes_from_8am * units_per_minute
+                left_percent = (start_units / total_units) * 100
                 
                 if end_time:
                     end_dt = parse(end_time)
-                    end_hour = end_dt.hour + end_dt.minute / 60.0
-                    duration_hours = end_hour - start_hour
-                    width_percent = (duration_hours / 11) * 100
+                    end_minutes_from_8am = (end_dt.hour - 8) * 60 + end_dt.minute
+                    duration_minutes = end_minutes_from_8am - start_minutes_from_8am
                 else:
                     # Se non c'è end_time, usa cleaning_time
                     duration_minutes = task.get("cleaning_time", 60)
-                    duration_hours = duration_minutes / 60.0
-                    width_percent = (duration_hours / 11) * 100
+                
+                # Converti durata in unità normalizzate
+                width_units = duration_minutes * units_per_minute
+                width_percent = (width_units / total_units) * 100
             except:
                 left_percent = 0
                 width_percent = 10
