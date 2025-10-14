@@ -36,12 +36,18 @@ def normalize_checkout_time(val: Optional[str]) -> str:
 def is_premium_cleaner(cleaner: Dict[str, Any]) -> bool:
     return str(cleaner.get("role", "")).strip().lower() == "premium"
 
+def is_formatore(cleaner: Dict[str, Any]) -> bool:
+    return str(cleaner.get("role", "")).strip().lower() == "formatore"
+
 def is_premium_task(task: Dict[str, Any]) -> bool:
     if bool(task.get("premium")):
         return True
     return str(task.get("task_type", "")).strip().lower() == "premium"
 
 def is_available(cleaner: Dict[str, Any]) -> bool:
+    # I Formatori non possono ricevere task early-out
+    if is_formatore(cleaner):
+        return False
     return cleaner.get("active", True) and cleaner.get("available", True)
 
 def ident(cleaner: Dict[str, Any]) -> str:
