@@ -168,38 +168,45 @@ def main() -> None:
 
     save_json(OUTPUT_PATH, output)
     print(f"✅ File salvato: {OUTPUT_PATH}")
-
+    
     # Aggiorna anche timeline_assignments.json
     timeline_assignments = {"assignments": []}
     try:
         timeline_assignments = load_json(TIMELINE_ASSIGNMENTS_PATH)
     except:
         pass
-
+    
     # Rimuovi vecchie assegnazioni early-out (mantieni solo quelle manuali)
     assigned_logistic_codes = set(str(t.get("logistic_code")) for t in assigned_sorted if t.get("assignment_status") == "assigned")
     timeline_assignments["assignments"] = [
         a for a in timeline_assignments.get("assignments", [])
         if str(a.get("logistic_code")) not in assigned_logistic_codes
     ]
-
+    
     # Aggiungi le nuove assegnazioni early-out
     for task in assigned_sorted:
         if task.get("assignment_status") == "assigned" and task.get("assigned_cleaner"):
+            # Calcola la posizione nella timeline
+            # Timeline: 11 ore (8:00-19:00)
+            # Ogni ora = 100 unità (dove ogni minuto = 100/60 ≈ 1.67 unità)
+            # Timeline totale = 11 * 100 = 1100 unità
+            
             cleaner = task["assigned_cleaner"]
             start_time = cleaner.get("start_time", DEFAULT_START_TIME)
             end_time = cleaner.get("end_time")
-
-            # Calcola posizione e dimensione nella timeline usando pixel
-            # Timeline usa 16.67 pixel per minuto
+            
             try:
-                PIXELS_PER_MINUTE = 16.67
                 start_dt = parse(start_time)
+                # Calcola minuti dall'inizio della timeline (8:00)
                 start_minutes_from_8am = (start_dt.hour - 8) * 60 + start_dt.minute
-
-                # Calcola left in pixel
-                left_pixels = start_minutes_from_8am * PIXELS_PER_MINUTE
-
+                
+                # Normalizza: ogni minuto = 100/60 unità
+                units_per_minute = 100 / 60.0
+                total_units = 11 * 100  # 1100 unità totali
+                
+                start_units = start_minutes_from_8am * units_per_minute
+                left_percent = (start_units / total_units) * 100
+                
                 if end_time:
                     end_dt = parse(end_time)
                     end_minutes_from_8am = (end_dt.hour - 8) * 60 + end_dt.minute
@@ -207,13 +214,14 @@ def main() -> None:
                 else:
                     # Se non c'è end_time, usa cleaning_time
                     duration_minutes = task.get("cleaning_time", 60)
-
-                # Calcola width in pixel
-                width_pixels = duration_minutes * PIXELS_PER_MINUTE
+                
+                # Converti durata in unità normalizzate
+                width_units = duration_minutes * units_per_minute
+                width_percent = (width_units / total_units) * 100
             except:
-                left_pixels = 0
-                width_pixels = PIXELS_PER_MINUTE * 60  # default 60 minuti
-
+                left_percent = 0
+                width_percent = 10
+            
             timeline_assignments["assignments"].append({
                 "task_id": task.get("task_id"),
                 "logistic_code": str(task.get("logistic_code")),
@@ -222,14 +230,14 @@ def main() -> None:
                 "start_time": start_time,
                 "end_time": end_time,
                 "position": {
-                    "left": round(left_pixels, 2),
-                    "width": round(width_pixels, 2)
+                    "left": round(left_percent, 2),
+                    "width": round(width_percent, 2)
                 }
             })
-
+    
     save_json(TIMELINE_ASSIGNMENTS_PATH, timeline_assignments)
     print(f"✅ File salvato: {TIMELINE_ASSIGNMENTS_PATH}")
-
+    
     if unused:
         print("ℹ️ Cleaners non usati (numero task inferiore al numero di cleaners):", ", ".join(unused))
 

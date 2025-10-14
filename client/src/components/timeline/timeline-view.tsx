@@ -137,12 +137,12 @@ export default function TimelineView({
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
             {cleaners.map((cleaner, index) => {
               const color = getCleanerColor(index);
-
+              
               return (
                 <div
                   key={cleaner.id}
                   className="p-3 border border-border cursor-pointer hover:opacity-90 transition-opacity rounded-lg"
-                  style={{
+                  style={{ 
                     backgroundColor: color.bg,
                     color: color.text
                   }}
@@ -229,119 +229,6 @@ export default function TimelineView({
           )}
         </DialogContent>
       </Dialog>
-
-      {/* Timeline Section */}
-      <div className="relative w-full h-96 overflow-x-auto bg-background p-4 rounded-lg border shadow-sm mt-6">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="font-semibold text-foreground flex items-center">
-            <Calendar className="w-5 h-5 mr-2 text-primary" />
-            Timeline
-          </h3>
-        </div>
-
-        {/* Time Slots Header */}
-        <div className="flex h-10 border-b border-border">
-          <div className="w-40 flex-shrink-0 border-r border-border flex items-center justify-center font-medium text-sm">
-            Cleaner
-          </div>
-          <div className="flex flex-grow relative">
-            {timeSlots.map((slot, index) => (
-              <div
-                key={slot}
-                className="text-center text-xs text-muted-foreground absolute top-0 bottom-0 flex items-center justify-center"
-                style={{
-                  left: `${index * (100 / timeSlots.length)}%`,
-                  width: `${100 / timeSlots.length}%`,
-                }}
-              >
-                {slot}
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Tasks Rows */}
-        <div className="relative">
-          {cleaners.map((cleaner, cleanerIndex) => {
-            // Filtra i task per il cleaner corrente
-            const cleanerTasks = tasks.filter(task => (task as any).cleaner_id === cleaner.id);
-
-            // Ordina i task per start_time
-            cleanerTasks.sort((a, b) => {
-              const aStart = (a as any).start_time || "00:00";
-              const bStart = (b as any).start_time || "00:00";
-              return aStart.localeCompare(bStart);
-            });
-
-            return (
-              <Droppable droppableId={`cleaner-${cleaner.id}`} key={cleaner.id}>
-                {(provided) => (
-                  <div
-                    ref={provided.innerRef}
-                    {...provided.droppableProps}
-                    className="flex items-center relative h-24 border-b border-border last:border-b-0"
-                    style={{ width: 'calc(11 * 16.67 * 12px)' }} // 11 hours * 16.67 px/min * 60 min/hr = ~11002px
-                  >
-                    {/* Cleaner Info */}
-                    <div className="w-40 flex-shrink-0 border-r border-border flex items-center justify-center font-medium text-sm p-2">
-                      <div
-                        className="p-2 rounded-md text-center w-full"
-                        style={{
-                          backgroundColor: getCleanerColor(cleanerIndex).bg,
-                          color: getCleanerColor(cleanerIndex).text
-                        }}
-                      >
-                        {cleaner.name} {cleaner.lastname}
-                      </div>
-                    </div>
-
-                    {/* Tasks for this cleaner */}
-                    <div className="flex-grow relative">
-                      {cleanerTasks.map((task, index) => {
-                        const taskData = (task as any);
-
-                        // Timeline usa 16.67 pixel per minuto
-                        const PIXELS_PER_MINUTE = 16.67;
-                        const TIMELINE_START_HOUR = 8;
-
-                        // Estrai start_time
-                        let startTime = taskData.start_time || "10:00";
-                        const [startHour, startMinute] = startTime.split(":").map(Number);
-
-                        // Calcola minuti dall'inizio della timeline (8:00)
-                        const startMinutesFromTimelineStart = (startHour * 60 + startMinute) - (TIMELINE_START_HOUR * 60);
-
-                        // Calcola left in pixel: minuti × 16.67
-                        const leftPixels = startMinutesFromTimelineStart * PIXELS_PER_MINUTE;
-
-                        // Estrai cleaning_time in minuti
-                        const cleaningTimeMinutes = taskData.cleaning_time || 60;
-
-                        // Calcola width in pixel: cleaning_time × 16.67
-                        const widthPixels = cleaningTimeMinutes * PIXELS_PER_MINUTE;
-
-                        return (
-                          <div
-                            key={task.id}
-                            className="absolute top-0"
-                            style={{
-                              left: `${leftPixels}px`,
-                              width: `${widthPixels}px`,
-                            }}
-                          >
-                            <TaskCard task={task} />
-                          </div>
-                        );
-                      })}
-                      {provided.placeholder}
-                    </div>
-                  </div>
-                )}
-              </Droppable>
-            );
-          })}
-        </div>
-      </div>
     </>
   );
 }
