@@ -53,21 +53,20 @@ export default function TaskCard({
 
     // Se 0 minuti, usa almeno 30 minuti
     if (totalMinutes === 0) {
-      return forTimeline ? "4.166%" : "50px"; // 30 min = 4.166% di 720 min (12 ore)
+      return forTimeline ? "60px" : "50px"; // 30 min = 60px (2px/min)
     }
 
     // Se la task dura meno di 1 ora e non è sulla timeline, mostrala come 1 ora
     if (totalMinutes < 60 && !forTimeline) {
-      return "100px"; // 1 ora = 100px (aumentato da 80px)
+      return "100px"; // 1 ora = 100px
     }
 
     if (forTimeline) {
-      // La timeline copre 12 ore (720 minuti)
-      // Calcola la percentuale della durata rispetto ai 720 minuti
-      const widthPercentage = (totalMinutes / 720) * 100;
-      return `${widthPercentage}%`;
+      // 1 ora = 120px, quindi 1 minuto = 2px
+      const widthPixels = totalMinutes * 2;
+      return `${widthPixels}px`;
     } else {
-      // Per le colonne di priorità, usa i pixel (aumentato da 40px a 50px per ogni mezz'ora)
+      // Per le colonne di priorità, usa i pixel (50px per ogni mezz'ora)
       const width = Math.ceil(totalMinutes / 30) * 50;
       return `${width}px`;
     }
@@ -77,7 +76,7 @@ export default function TaskCard({
     <>
       <Draggable draggableId={task.id} index={index}>
         {(provided, snapshot) => {
-          const cardWidth = isInTimeline ? '100%' : calculateWidth(task.duration, false);
+          const cardWidth = calculateWidth(task.duration, isInTimeline);
           
           return (
             <div
