@@ -15,31 +15,31 @@ const __dirname = dirname(__filename);
 const execAsync = promisify(exec);
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  // Endpoint per resettare le assegnazioni manuali
-  app.post("/api/reset-manual-assignments", async (req, res) => {
+  // Endpoint per resettare le assegnazioni della timeline
+  app.post("/api/reset-timeline-assignments", async (req, res) => {
     try {
-      const manualAssignmentsPath = path.join(process.cwd(), 'client/public/data/output/manual_assignments.json');
+      const timelineAssignmentsPath = path.join(process.cwd(), 'client/public/data/output/timeline_assignments.json');
       
       // Svuota il file
-      await fs.writeFile(manualAssignmentsPath, JSON.stringify({ assignments: [] }, null, 2));
+      await fs.writeFile(timelineAssignmentsPath, JSON.stringify({ assignments: [] }, null, 2));
 
-      res.json({ success: true, message: "Assegnazioni manuali resettate con successo" });
+      res.json({ success: true, message: "Assegnazioni della timeline resettate con successo" });
     } catch (error: any) {
-      console.error("Errore nel reset delle assegnazioni manuali:", error);
+      console.error("Errore nel reset delle assegnazioni della timeline:", error);
       res.status(500).json({ success: false, error: error.message });
     }
   });
 
-  // Endpoint per salvare un'assegnazione manuale
-  app.post("/api/save-manual-assignment", async (req, res) => {
+  // Endpoint per salvare un'assegnazione nella timeline
+  app.post("/api/save-timeline-assignment", async (req, res) => {
     try {
       const { taskId, cleanerId, slot } = req.body;
-      const manualAssignmentsPath = path.join(process.cwd(), 'client/public/data/output/manual_assignments.json');
+      const timelineAssignmentsPath = path.join(process.cwd(), 'client/public/data/output/timeline_assignments.json');
 
-      // Carica o crea manual_assignments.json
+      // Carica o crea timeline_assignments.json
       let assignmentsData: any = { assignments: [] };
       try {
-        const existingData = await fs.readFile(manualAssignmentsPath, 'utf8');
+        const existingData = await fs.readFile(timelineAssignmentsPath, 'utf8');
         assignmentsData = JSON.parse(existingData);
       } catch (error) {
         // File non esiste, usa struttura vuota
@@ -58,11 +58,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       // Salva il file
-      await fs.writeFile(manualAssignmentsPath, JSON.stringify(assignmentsData, null, 2));
+      await fs.writeFile(timelineAssignmentsPath, JSON.stringify(assignmentsData, null, 2));
 
-      res.json({ success: true, message: "Assegnazione manuale salvata con successo" });
+      res.json({ success: true, message: "Assegnazione salvata nella timeline con successo" });
     } catch (error: any) {
-      console.error("Errore nel salvataggio dell'assegnazione manuale:", error);
+      console.error("Errore nel salvataggio dell'assegnazione nella timeline:", error);
       res.status(500).json({ success: false, error: error.message });
     }
   });
