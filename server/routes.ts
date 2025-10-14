@@ -33,7 +33,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Endpoint per salvare un'assegnazione nella timeline
   app.post("/api/save-timeline-assignment", async (req, res) => {
     try {
-      const { taskId, cleanerId } = req.body;
+      const { taskId, cleanerId, logisticCode } = req.body;
       const timelineAssignmentsPath = path.join(process.cwd(), 'client/public/data/output/timeline_assignments.json');
 
       // Carica o crea timeline_assignments.json
@@ -45,14 +45,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // File non esiste, usa struttura vuota
       }
 
-      // Rimuovi eventuali assegnazioni precedenti per questo task
+      // Rimuovi eventuali assegnazioni precedenti per questo task (usa logistic_code se disponibile)
       assignmentsData.assignments = assignmentsData.assignments.filter(
-        (a: any) => a.taskId !== taskId
+        (a: any) => a.logistic_code !== logisticCode && a.taskId !== taskId
       );
 
       // Aggiungi la nuova assegnazione
       assignmentsData.assignments.push({
-        taskId,
+        logistic_code: logisticCode,
         cleanerId,
         assignment_type: "manual_drag"
       });
