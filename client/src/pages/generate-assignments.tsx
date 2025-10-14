@@ -39,7 +39,10 @@ interface RawTask {
 }
 
 export default function GenerateAssignments() {
-  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+  // Inizializza con domani (come task_extractor.py)
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  const [selectedDate, setSelectedDate] = useState<Date>(tomorrow);
   const [earlyOutTasks, setEarlyOutTasks] = useState<Task[]>([]);
   const [highPriorityTasks, setHighPriorityTasks] = useState<Task[]>([]);
   const [lowPriorityTasks, setLowPriorityTasks] = useState<Task[]>([]);
