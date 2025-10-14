@@ -53,7 +53,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Aggiungi la nuova assegnazione
       assignmentsData.assignments.push({
         taskId,
-        cleanerId
+        cleanerId,
+        assignment_type: "manual_drag"
       });
 
       // Salva il file
