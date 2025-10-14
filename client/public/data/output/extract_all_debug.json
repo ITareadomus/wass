@@ -384,6 +384,71 @@
         "not_eo",
         "not_hp"
       ]
+    },
+    {
+      "task_id": 217381,
+      "client_id": 3,
+      "premium": true,
+      "final_class": "HP",
+      "reasons": [
+        "premium"
+      ]
+    },
+    {
+      "task_id": 217382,
+      "client_id": 3,
+      "premium": false,
+      "final_class": "LP",
+      "reasons": [
+        "not_eo",
+        "not_hp"
+      ]
+    },
+    {
+      "task_id": 217383,
+      "client_id": 3,
+      "premium": true,
+      "final_class": "HP",
+      "reasons": [
+        "premium"
+      ]
+    },
+    {
+      "task_id": 217384,
+      "client_id": 3,
+      "premium": true,
+      "final_class": "HP",
+      "reasons": [
+        "premium"
+      ]
+    },
+    {
+      "task_id": 217385,
+      "client_id": 3,
+      "premium": true,
+      "final_class": "HP",
+      "reasons": [
+        "premium"
+      ]
+    },
+    {
+      "task_id": 217387,
+      "client_id": 3,
+      "premium": false,
+      "final_class": "LP",
+      "reasons": [
+        "not_eo",
+        "not_hp"
+      ]
+    },
+    {
+      "task_id": 217388,
+      "client_id": 3,
+      "premium": true,
+      "final_class": "HP",
+      "reasons": [
+        "premium"
+      ]
     }
   ]
 }
