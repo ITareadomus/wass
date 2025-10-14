@@ -188,7 +188,8 @@ def main() -> None:
         if task.get("assignment_status") == "assigned" and task.get("assigned_cleaner"):
             timeline_assignments["assignments"].append({
                 "taskId": str(tid(task)),
-                "cleanerId": task["assigned_cleaner"]["id"]
+                "cleanerId": task["assigned_cleaner"]["id"],
+                "assignment_type": "smista_button"
             })
     
     save_json(TIMELINE_ASSIGNMENTS_PATH, timeline_assignments)
