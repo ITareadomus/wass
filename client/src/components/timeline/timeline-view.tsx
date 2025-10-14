@@ -206,13 +206,13 @@ export default function TimelineView({
                         {tasks
                           .filter((task) => (task as any).assignedCleaner === cleaner.id)
                           .filter((task, index, self) => 
-                            // Rimuovi duplicati basandoti sull'id della task
-                            index === self.findIndex((t) => t.id === task.id)
+                            // Rimuovi duplicati basandoti sul logistic_code (task.name)
+                            index === self.findIndex((t) => t.name === task.name)
                           )
                           .sort((a, b) => ((a as any).assignedSlot || 0) - ((b as any).assignedSlot || 0))
                           .map((task, index) => (
                             <TaskCard 
-                              key={task.id}
+                              key={`${task.name}-${cleaner.id}`}
                               task={task} 
                               index={index}
                               isInTimeline={true}

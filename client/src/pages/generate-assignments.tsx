@@ -177,13 +177,37 @@ export default function GenerateAssignments() {
 
       // Crea un Set di logistic_code assegnati nella timeline
       const assignedInTimelineCodes = new Set(
-        timelineAssignmentsData.assignments.map((a: any) => a.logistic_code || a.taskId)
+        timelineAssignmentsData.assignments.map((a: any) => String(a.logistic_code))
       );
 
+      console.log("Task assegnate nella timeline (logistic_code):", Array.from(assignedInTimelineCodes));
+
       // Filtra le task già presenti nella timeline dai container
-      const filteredEarlyOut = initialEarlyOut.filter(task => !assignedInTimelineCodes.has(task.name));
-      const filteredHigh = initialHigh.filter(task => !assignedInTimelineCodes.has(task.name));
-      const filteredLow = initialLow.filter(task => !assignedInTimelineCodes.has(task.name));
+      const filteredEarlyOut = initialEarlyOut.filter(task => {
+        const isAssigned = assignedInTimelineCodes.has(String(task.name));
+        if (isAssigned) {
+          console.log(`Task ${task.name} filtrata da Early Out (è nella timeline)`);
+        }
+        return !isAssigned;
+      });
+      
+      const filteredHigh = initialHigh.filter(task => {
+        const isAssigned = assignedInTimelineCodes.has(String(task.name));
+        if (isAssigned) {
+          console.log(`Task ${task.name} filtrata da High Priority (è nella timeline)`);
+        }
+        return !isAssigned;
+      });
+      
+      const filteredLow = initialLow.filter(task => {
+        const isAssigned = assignedInTimelineCodes.has(String(task.name));
+        if (isAssigned) {
+          console.log(`Task ${task.name} filtrata da Low Priority (è nella timeline)`);
+        }
+        return !isAssigned;
+      });
+
+      console.log("Task dopo filtro - Early:", filteredEarlyOut.length, "High:", filteredHigh.length, "Low:", filteredLow.length);
 
       setEarlyOutTasks(filteredEarlyOut);
       setHighPriorityTasks(filteredHigh);
