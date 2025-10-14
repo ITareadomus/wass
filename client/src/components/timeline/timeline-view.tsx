@@ -213,30 +213,40 @@ export default function TimelineView({
                             return aStart.localeCompare(bStart);
                           })
                           .map((task, index) => {
-                            // Ottieni start_time dalla task o usa default
-                            let startTime = (task as any).start_time || "10:00";
+                            // Usa i dati di posizione da timeline_assignments.json se disponibili
+                            const taskData = (task as any);
+                            let leftPercentage = 0;
+                            let widthPercentage = 10;
                             
-                            // Calcola la durata in minuti dalla proprietà duration
-                            const durationParts = task.duration.split(".");
-                            const hours = parseInt(durationParts[0] || "0");
-                            const minutes = durationParts[1] ? parseInt(durationParts[1]) : 0;
-                            const taskDurationMinutes = hours * 60 + minutes;
-                            
-                            // Calcola end_time basandoti su start_time + duration
-                            const [startHour, startMinute] = startTime.split(":").map(Number);
-                            const startMinutesFromMidnight = startHour * 60 + startMinute;
-                            const endMinutesFromMidnight = startMinutesFromMidnight + taskDurationMinutes;
-                            
-                            // La timeline va dalle 08:00 alle 19:00 = 11 ore = 660 minuti
-                            const timelineStartMinutes = 8 * 60; // 08:00 = 480 min
-                            const timelineTotalMinutes = 11 * 60; // 660 min
-                            
-                            // Calcola posizione (left) in percentuale
-                            const offsetMinutes = startMinutesFromMidnight - timelineStartMinutes;
-                            const leftPercentage = (offsetMinutes / timelineTotalMinutes) * 100;
-                            
-                            // Calcola larghezza in percentuale basata sulla durata
-                            const widthPercentage = (taskDurationMinutes / timelineTotalMinutes) * 100;
+                            if (taskData.position) {
+                              // Usa la posizione salvata dallo script Python
+                              // Converti da timeline 12 ore (8:00-20:00) a 11 ore (8:00-19:00)
+                              const originalLeft = taskData.position.left;
+                              const originalWidth = taskData.position.width;
+                              
+                              // Ricalcola per timeline 11 ore
+                              // left: ((start_hour - 8) / 11) * 100
+                              // width: (duration_hours / 11) * 100
+                              leftPercentage = (originalLeft / 12) * 11;
+                              widthPercentage = (originalWidth / 12) * 11;
+                            } else if (taskData.start_time) {
+                              // Fallback: calcola dalla start_time e duration
+                              const startTime = taskData.start_time;
+                              const durationParts = task.duration.split(".");
+                              const hours = parseInt(durationParts[0] || "0");
+                              const minutes = durationParts[1] ? parseInt(durationParts[1]) : 0;
+                              const taskDurationMinutes = hours * 60 + minutes;
+                              
+                              const [startHour, startMinute] = startTime.split(":").map(Number);
+                              const startMinutesFromMidnight = startHour * 60 + startMinute;
+                              
+                              const timelineStartMinutes = 8 * 60;
+                              const timelineTotalMinutes = 11 * 60;
+                              
+                              const offsetMinutes = startMinutesFromMidnight - timelineStartMinutes;
+                              leftPercentage = (offsetMinutes / timelineTotalMinutes) * 100;
+                              widthPercentage = (taskDurationMinutes / timelineTotalMinutes) * 100;
+                            }
                             
                             return (
                               <div

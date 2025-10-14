@@ -191,22 +191,22 @@ def main() -> None:
             start_time = cleaner.get("start_time", DEFAULT_START_TIME)
             end_time = cleaner.get("end_time")
             
-            # Calcola left e width in percentuale (assumendo timeline 8:00-20:00 = 12 ore)
+            # Calcola left e width in percentuale (assumendo timeline 8:00-19:00 = 11 ore)
             try:
                 start_dt = parse(start_time)
                 start_hour = start_dt.hour + start_dt.minute / 60.0
-                left_percent = ((start_hour - 8) / 12) * 100
+                left_percent = ((start_hour - 8) / 11) * 100
                 
                 if end_time:
                     end_dt = parse(end_time)
                     end_hour = end_dt.hour + end_dt.minute / 60.0
                     duration_hours = end_hour - start_hour
-                    width_percent = (duration_hours / 12) * 100
+                    width_percent = (duration_hours / 11) * 100
                 else:
                     # Se non c'è end_time, usa cleaning_time
                     duration_minutes = task.get("cleaning_time", 60)
                     duration_hours = duration_minutes / 60.0
-                    width_percent = (duration_hours / 12) * 100
+                    width_percent = (duration_hours / 11) * 100
             except:
                 left_percent = 0
                 width_percent = 10
