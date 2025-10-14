@@ -186,10 +186,41 @@ def main() -> None:
     # Aggiungi le nuove assegnazioni early-out
     for task in assigned_sorted:
         if task.get("assignment_status") == "assigned" and task.get("assigned_cleaner"):
+            # Calcola la posizione nella timeline
+            cleaner = task["assigned_cleaner"]
+            start_time = cleaner.get("start_time", DEFAULT_START_TIME)
+            end_time = cleaner.get("end_time")
+            
+            # Calcola left e width in percentuale (assumendo timeline 8:00-20:00 = 12 ore)
+            try:
+                start_dt = parse(start_time)
+                start_hour = start_dt.hour + start_dt.minute / 60.0
+                left_percent = ((start_hour - 8) / 12) * 100
+                
+                if end_time:
+                    end_dt = parse(end_time)
+                    end_hour = end_dt.hour + end_dt.minute / 60.0
+                    duration_hours = end_hour - start_hour
+                    width_percent = (duration_hours / 12) * 100
+                else:
+                    # Se non c'è end_time, usa cleaning_time
+                    duration_minutes = task.get("cleaning_time", 60)
+                    duration_hours = duration_minutes / 60.0
+                    width_percent = (duration_hours / 12) * 100
+            except:
+                left_percent = 0
+                width_percent = 10
+            
             timeline_assignments["assignments"].append({
                 "logistic_code": str(task.get("logistic_code")),
                 "cleanerId": task["assigned_cleaner"]["id"],
-                "assignment_type": "smista_button"
+                "assignment_type": "smista_button",
+                "start_time": start_time,
+                "end_time": end_time,
+                "position": {
+                    "left": round(left_percent, 2),
+                    "width": round(width_percent, 2)
+                }
             })
     
     save_json(TIMELINE_ASSIGNMENTS_PATH, timeline_assignments)
