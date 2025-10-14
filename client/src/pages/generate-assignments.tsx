@@ -284,6 +284,15 @@ export default function GenerateAssignments() {
         saveTaskAssignments(updatedTasks);
         return updatedTasks;
       });
+
+      // Rimuovi la task dal container originale
+      if (source.droppableId === 'early-out') {
+        setEarlyOutTasks(prev => prev.filter(t => t.id !== taskId));
+      } else if (source.droppableId === 'high') {
+        setHighPriorityTasks(prev => prev.filter(t => t.id !== taskId));
+      } else if (source.droppableId === 'low') {
+        setLowPriorityTasks(prev => prev.filter(t => t.id !== taskId));
+      }
     }
     // Se sto muovendo da una timeline verso una colonna di priorità
     else {
@@ -303,6 +312,18 @@ export default function GenerateAssignments() {
         saveTaskAssignments(updatedTasks);
         return updatedTasks;
       });
+
+      // Ri-aggiungi la task al container di destinazione
+      const taskToAdd = allTasksWithAssignments.find(t => t.id === taskId);
+      if (taskToAdd) {
+        if (destination.droppableId === 'early-out') {
+          setEarlyOutTasks(prev => [...prev, taskToAdd]);
+        } else if (destination.droppableId === 'high') {
+          setHighPriorityTasks(prev => [...prev, taskToAdd]);
+        } else if (destination.droppableId === 'low') {
+          setLowPriorityTasks(prev => [...prev, taskToAdd]);
+        }
+      }
     }
   };
 
@@ -386,21 +407,21 @@ export default function GenerateAssignments() {
             <PriorityColumn
               title="EARLY OUT"
               priority="early-out"
-              tasks={earlyOutTasks.filter(task => !(task as any).assignedCleaner)}
+              tasks={earlyOutTasks}
               droppableId="early-out"
               icon="clock"
             />
             <PriorityColumn
               title="HIGH PRIORITY"
               priority="high"
-              tasks={highPriorityTasks.filter(task => !(task as any).assignedCleaner)}
+              tasks={highPriorityTasks}
               droppableId="high"
               icon="alert-circle"
             />
             <PriorityColumn
               title="LOW PRIORITY"
               priority="low"
-              tasks={lowPriorityTasks.filter(task => !(task as any).assignedCleaner)}
+              tasks={lowPriorityTasks}
               droppableId="low"
               icon="arrow-down"
             />
