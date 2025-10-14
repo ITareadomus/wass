@@ -188,7 +188,8 @@ export default function TimelineView({
                       style={{ 
                         backgroundColor: snapshot.isDraggingOver 
                           ? `${color.bg}40`
-                          : `${color.bg}10`
+                          : `${color.bg}10`,
+                        minWidth: '1200px'
                       }}
                     >
                       {/* Griglia oraria di sfondo (solo visiva) */}

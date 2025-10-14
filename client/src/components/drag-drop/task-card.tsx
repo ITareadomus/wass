@@ -44,65 +44,45 @@ export default function TaskCard({
     return "task-standard";
   };
 
-  // Calcola la larghezza in base alla durata con breakpoint responsive
-  const calculateWidth = (duration: string, forTimeline: boolean) => {
+  // Calcola la larghezza in pixel fissi (1 minuto = 1.667px, basato su timeline di 1200px per 12 ore)
+  const calculateWidth = (duration: string) => {
     const parts = duration.split(".");
     const hours = parseInt(parts[0] || "0");
     const minutes = parts[1] ? parseInt(parts[1]) : 0;
     const totalMinutes = hours * 60 + minutes;
 
-    // Se 0 minuti, usa almeno 30 minuti
-    if (totalMinutes === 0) {
-      return forTimeline ? "4.166%" : "w-[50px] sm:w-[60px] md:w-[70px]";
-    }
+    // 12 ore (720 minuti) = 1200px nella timeline
+    // Quindi 1 minuto = 1.667px
+    const pixelsPerMinute = 1200 / 720;
+    const widthInPixels = totalMinutes === 0
+      ? pixelsPerMinute * 30  // Se 0 minuti, usa almeno 30 minuti (50px)
+      : pixelsPerMinute * totalMinutes;
 
-    // Se la task dura meno di 1 ora e non è sulla timeline, mostrala come 1 ora
-    if (totalMinutes < 60 && !forTimeline) {
-      return "w-[80px] sm:w-[90px] md:w-[100px]"; // Responsive per task < 1h
-    }
-
-    if (forTimeline) {
-      // La timeline copre 12 ore (720 minuti)
-      // Calcola la percentuale della durata rispetto ai 720 minuti
-      const widthPercentage = (totalMinutes / 720) * 100;
-      return `${widthPercentage}%`;
-    } else {
-      // Per le colonne di priorità, calcola con breakpoint responsive
-      const halfHours = Math.ceil(totalMinutes / 30);
-      
-      // Mobile: 40px per mezz'ora
-      // Tablet (sm): 45px per mezz'ora
-      // Desktop (md): 50px per mezz'ora
-      const mobileWidth = halfHours * 40;
-      const tabletWidth = halfHours * 45;
-      const desktopWidth = halfHours * 50;
-      
-      return `w-[${mobileWidth}px] sm:w-[${tabletWidth}px] md:w-[${desktopWidth}px]`;
-    }
+    return `${Math.round(widthInPixels)}px`;
   };
 
   return (
     <>
       <Draggable draggableId={task.id} index={index}>
         {(provided, snapshot) => {
-          const cardWidth = calculateWidth(task.duration, isInTimeline);
-          
+          const cardWidth = calculateWidth(task.duration);
+
           return (
             <div
               ref={provided.innerRef}
               {...provided.draggableProps}
               {...provided.dragHandleProps}
               className={`
-                ${getTaskClassByPriority(task)} 
+                ${getTaskClassByPriority(task)}
                 rounded-sm px-2 py-1 shadow-sm border transition-all duration-200
                 ${snapshot.isDragging ? "shadow-lg scale-105" : ""}
                 hover:shadow-md cursor-pointer
                 flex-shrink-0 relative
-                ${!isInTimeline && cardWidth.startsWith('w-') ? cardWidth : ''}
+                ${!isInTimeline ? `w-[${cardWidth}]` : ''}
               `}
               style={{
                 ...provided.draggableProps.style,
-                width: cardWidth.startsWith('w-') ? undefined : cardWidth,
+                width: isInTimeline ? cardWidth : undefined,
                 minHeight: "40px",
               }}
               data-testid={`task-card-${task.id}`}
