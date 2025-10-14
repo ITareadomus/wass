@@ -186,53 +186,10 @@ def main() -> None:
     # Aggiungi le nuove assegnazioni early-out
     for task in assigned_sorted:
         if task.get("assignment_status") == "assigned" and task.get("assigned_cleaner"):
-            # Calcola la posizione nella timeline
-            # Timeline: 11 ore (8:00-19:00)
-            # Ogni ora = 100 unità (dove ogni minuto = 100/60 ≈ 1.67 unità)
-            # Timeline totale = 11 * 100 = 1100 unità
-            
-            cleaner = task["assigned_cleaner"]
-            start_time = cleaner.get("start_time", DEFAULT_START_TIME)
-            end_time = cleaner.get("end_time")
-            
-            try:
-                start_dt = parse(start_time)
-                # Calcola minuti dall'inizio della timeline (8:00)
-                start_minutes_from_8am = (start_dt.hour - 8) * 60 + start_dt.minute
-                
-                # Normalizza: ogni minuto = 100/60 unità
-                units_per_minute = 100 / 60.0
-                total_units = 11 * 100  # 1100 unità totali
-                
-                start_units = start_minutes_from_8am * units_per_minute
-                left_percent = (start_units / total_units) * 100
-                
-                if end_time:
-                    end_dt = parse(end_time)
-                    end_minutes_from_8am = (end_dt.hour - 8) * 60 + end_dt.minute
-                    duration_minutes = end_minutes_from_8am - start_minutes_from_8am
-                else:
-                    # Se non c'è end_time, usa cleaning_time
-                    duration_minutes = task.get("cleaning_time", 60)
-                
-                # Converti durata in unità normalizzate
-                width_units = duration_minutes * units_per_minute
-                width_percent = (width_units / total_units) * 100
-            except:
-                left_percent = 0
-                width_percent = 10
-            
             timeline_assignments["assignments"].append({
-                "task_id": task.get("task_id"),
                 "logistic_code": str(task.get("logistic_code")),
                 "cleanerId": task["assigned_cleaner"]["id"],
-                "assignment_type": "smista_button",
-                "start_time": start_time,
-                "end_time": end_time,
-                "position": {
-                    "left": round(left_percent, 2),
-                    "width": round(width_percent, 2)
-                }
+                "assignment_type": "smista_button"
             })
     
     save_json(TIMELINE_ASSIGNMENTS_PATH, timeline_assignments)

@@ -213,33 +213,22 @@ export default function GenerateAssignments() {
       setHighPriorityTasks(filteredHigh);
       setLowPriorityTasks(filteredLow);
 
-      // Crea la mappa di assegnazioni dalla timeline con position
-      const timelineAssignmentMap = new Map<string, any>();
-      timelineAssignmentsData.assignments.forEach((assignment: any) => {
-        timelineAssignmentMap.set(String(assignment.logistic_code), {
-          cleanerId: assignment.cleanerId,
-          start_time: assignment.start_time,
-          end_time: assignment.end_time,
-          position: assignment.position
-        });
-      });
-
-      // Aggiungi le assegnazioni dalla timeline a allTasksWithAssignments
-      const tasksWithTimelineAssignments = [...initialEarlyOut, ...initialHigh, ...initialLow].map(task => {
-        const assignmentData = timelineAssignmentMap.get(String(task.name));
-        if (assignmentData) {
+      // Crea l'array unificato con le assegnazioni della timeline
+      const allTasks = [...initialEarlyOut, ...initialHigh, ...initialLow];
+      const tasksWithAssignments = allTasks.map(task => {
+        const timelineAssignment = timelineAssignmentsData.assignments.find(
+          (a: any) => a.logistic_code === task.name || a.taskId === task.id
+        );
+        if (timelineAssignment) {
           return {
             ...task,
-            assignedCleaner: assignmentData.cleanerId,
-            start_time: assignmentData.start_time,
-            end_time: assignmentData.end_time,
-            position: assignmentData.position
+            assignedCleaner: timelineAssignment.cleanerId,
           };
         }
         return task;
       });
 
-      setAllTasksWithAssignments(tasksWithTimelineAssignments);
+      setAllTasksWithAssignments(tasksWithAssignments);
 
       setIsLoadingTasks(false);
       setExtractionStep("Task caricati con successo!");
@@ -271,8 +260,7 @@ export default function GenerateAssignments() {
             return {
               ...task,
               assignedCleaner: assignment.assigned_cleaner.id,
-              start_time: assignment.assigned_cleaner.start_time,
-              end_time: assignment.assigned_cleaner.end_time
+              startTime: assignment.assigned_cleaner.start_time
             };
           }
           return task;
@@ -349,51 +337,11 @@ export default function GenerateAssignments() {
       const cleanerId = parseInt(destination.droppableId.replace('timeline-', ''));
 
       setAllTasksWithAssignments((prevTasks) => {
-        // 1) Accertati che ci siano elementi già presenti
-        const existingTasksForCleaner = prevTasks.filter(
-          t => (t as any).assignedCleaner === cleanerId
-        );
-
-        // 2) Calcola start_time e end_time basandoti sull'ultima task presente
-        let calculatedStartTime = "10:00"; // Default se non ci sono task
-        let calculatedEndTime = "10:00";
-
-        const taskToAssign = prevTasks.find(t => t.id === taskId);
-        if (!taskToAssign) return prevTasks;
-
-        // Calcola la durata in minuti della task da assegnare
-        const durationParts = taskToAssign.duration.split(".");
-        const hours = parseInt(durationParts[0] || "0");
-        const minutes = durationParts[1] ? parseInt(durationParts[1]) : 0;
-        const taskDurationMinutes = hours * 60 + minutes;
-
-        if (existingTasksForCleaner.length > 0) {
-          // Trova l'ultima end_time tra le task esistenti
-          const lastTask = existingTasksForCleaner.reduce((latest, current) => {
-            const currentEndTime = (current as any).end_time || "10:00";
-            const latestEndTime = (latest as any).end_time || "10:00";
-            return currentEndTime > latestEndTime ? current : latest;
-          });
-
-          calculatedStartTime = (lastTask as any).end_time || "10:00";
-        }
-
-        // Calcola end_time aggiungendo la durata allo start_time
-        const [startHour, startMinute] = calculatedStartTime.split(":").map(Number);
-        const startMinutes = startHour * 60 + startMinute;
-        const endMinutes = startMinutes + taskDurationMinutes;
-        const endHour = Math.floor(endMinutes / 60);
-        const endMinute = endMinutes % 60;
-        calculatedEndTime = `${endHour.toString().padStart(2, '0')}:${endMinute.toString().padStart(2, '0')}`;
-
-        // 3) Aggiorna la task con cleaner, start_time e end_time
         const updatedTasks = prevTasks.map((task) => {
           if (task.id === taskId) {
             return {
               ...task,
               assignedCleaner: cleanerId,
-              start_time: calculatedStartTime,
-              end_time: calculatedEndTime,
             };
           }
           return task;
