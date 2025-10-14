@@ -213,22 +213,33 @@ export default function GenerateAssignments() {
       setHighPriorityTasks(filteredHigh);
       setLowPriorityTasks(filteredLow);
 
-      // Crea l'array unificato con le assegnazioni della timeline
-      const allTasks = [...initialEarlyOut, ...initialHigh, ...initialLow];
-      const tasksWithAssignments = allTasks.map(task => {
-        const timelineAssignment = timelineAssignmentsData.assignments.find(
-          (a: any) => a.logistic_code === task.name || a.taskId === task.id
-        );
-        if (timelineAssignment) {
+      // Crea la mappa di assegnazioni dalla timeline con position
+      const timelineAssignmentMap = new Map<string, any>();
+      timelineAssignmentsData.assignments.forEach((assignment: any) => {
+        timelineAssignmentMap.set(String(assignment.logistic_code), {
+          cleanerId: assignment.cleanerId,
+          start_time: assignment.start_time,
+          end_time: assignment.end_time,
+          position: assignment.position
+        });
+      });
+
+      // Aggiungi le assegnazioni dalla timeline a allTasksWithAssignments
+      const tasksWithTimelineAssignments = [...initialEarlyOut, ...initialHigh, ...initialLow].map(task => {
+        const assignmentData = timelineAssignmentMap.get(String(task.name));
+        if (assignmentData) {
           return {
             ...task,
-            assignedCleaner: timelineAssignment.cleanerId,
+            assignedCleaner: assignmentData.cleanerId,
+            start_time: assignmentData.start_time,
+            end_time: assignmentData.end_time,
+            position: assignmentData.position
           };
         }
         return task;
       });
 
-      setAllTasksWithAssignments(tasksWithAssignments);
+      setAllTasksWithAssignments(tasksWithTimelineAssignments);
 
       setIsLoadingTasks(false);
       setExtractionStep("Task caricati con successo!");
@@ -346,7 +357,7 @@ export default function GenerateAssignments() {
         // 2) Calcola start_time e end_time basandoti sull'ultima task presente
         let calculatedStartTime = "10:00"; // Default se non ci sono task
         let calculatedEndTime = "10:00";
-        
+
         const taskToAssign = prevTasks.find(t => t.id === taskId);
         if (!taskToAssign) return prevTasks;
 
