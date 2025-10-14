@@ -169,9 +169,12 @@ export default function TimelineView({
                   }}
                   onClick={() => handleCleanerClick(cleaner)}
                 >
-                  <div className="w-full">
-                    <div className="text-[9px] font-medium break-words leading-tight">
+                  <div className="w-full flex items-center gap-1">
+                    <div className="text-[9px] font-medium break-words leading-tight flex-1">
                       {cleaner.name.toUpperCase()} {cleaner.lastname.toUpperCase()}
+                    </div>
+                    <div className="text-[8px] opacity-80 whitespace-nowrap">
+                      {cleaner.role === "Premium" ? "P" : "S"}
                     </div>
                   </div>
                 </div>
