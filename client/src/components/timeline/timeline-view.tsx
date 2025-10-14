@@ -198,48 +198,23 @@ export default function TimelineView({
                         ))}
                       </div>
 
-                      {/* Task posizionate in base allo start_time */}
-                      <div className="relative z-10 h-full">
+                      {/* Task posizionate in sequenza */}
+                      <div className="relative z-10 flex items-center h-full">
                         {tasks
                           .filter((task) => (task as any).assignedCleaner === cleaner.id)
                           .filter((task, index, self) => 
                             // Rimuovi duplicati basandoti sul logistic_code (task.name)
                             index === self.findIndex((t) => t.name === task.name)
                           )
-                          .map((task, index) => {
-                            // Calcola la posizione in base allo start_time
-                            const startTime = (task as any).start_time || "08:00";
-                            
-                            const [startHour, startMinute] = startTime.split(":").map(Number);
-                            const startMinutesFromMidnight = startHour * 60 + startMinute;
-                            
-                            // La timeline va dalle 08:00 alle 19:00 = 11 ore = 660 minuti
-                            const timelineStartMinutes = 8 * 60; // 08:00 = 480 min
-                            const timelineEndMinutes = 19 * 60; // 19:00 = 1140 min
-                            const timelineTotalMinutes = timelineEndMinutes - timelineStartMinutes; // 660 min
-                            
-                            // Calcola offset dall'inizio della timeline
-                            const offsetMinutes = startMinutesFromMidnight - timelineStartMinutes;
-                            const leftPercentage = (offsetMinutes / timelineTotalMinutes) * 100;
-                            
-                            return (
-                              <div
-                                key={`${task.name}-${cleaner.id}`}
-                                className="absolute"
-                                style={{ 
-                                  left: `${Math.max(0, leftPercentage)}%`,
-                                  top: '50%',
-                                  transform: 'translateY(-50%)'
-                                }}
-                              >
-                                <TaskCard 
-                                  task={task} 
-                                  index={index}
-                                  isInTimeline={true}
-                                />
-                              </div>
-                            );
-                          })}
+                          .sort((a, b) => ((a as any).assignedSlot || 0) - ((b as any).assignedSlot || 0))
+                          .map((task, index) => (
+                            <TaskCard 
+                              key={`${task.name}-${cleaner.id}`}
+                              task={task} 
+                              index={index}
+                              isInTimeline={true}
+                            />
+                          ))}
                         {provided.placeholder}
                       </div>
                     </div>

@@ -1,4 +1,3 @@
-
 import { Draggable } from "react-beautiful-dnd";
 import { Task } from "@shared/schema";
 import {
@@ -8,7 +7,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
-import { useState, useMemo } from "react";
+import { useState } from "react";
 import { HelpCircle } from "lucide-react";
 
 interface TaskCardProps {
@@ -45,36 +44,40 @@ export default function TaskCard({
     return "task-standard";
   };
 
-  // Calcola la larghezza in base alla durata usando useMemo
-  const cardWidth = useMemo(() => {
-    if (isInTimeline) {
-      return "100%";
-    }
-
-    const parts = task.duration.split(".");
+  // Calcola la larghezza in base alla durata
+  const calculateWidth = (duration: string, forTimeline: boolean) => {
+    const parts = duration.split(".");
     const hours = parseInt(parts[0] || "0");
     const minutes = parts[1] ? parseInt(parts[1]) : 0;
     const totalMinutes = hours * 60 + minutes;
 
     // Se 0 minuti, usa almeno 30 minuti
     if (totalMinutes === 0) {
-      return "50px";
+      return forTimeline ? "4.166%" : "50px"; // 30 min = 4.166% di 720 min (12 ore)
     }
 
-    // Se la task dura meno di 1 ora, mostrala come 1 ora
-    if (totalMinutes < 60) {
-      return "100px";
+    // Se la task dura meno di 1 ora e non è sulla timeline, mostrala come 1 ora
+    if (totalMinutes < 60 && !forTimeline) {
+      return "100px"; // 1 ora = 100px (aumentato da 80px)
     }
 
-    // Per le colonne di priorità, usa i pixel (50px per ogni mezz'ora)
-    const width = Math.ceil(totalMinutes / 30) * 50;
-    return `${width}px`;
-  }, [task.duration, isInTimeline]);
+    if (forTimeline) {
+      // La timeline copre 12 ore (720 minuti)
+      // Calcola la percentuale della durata rispetto ai 720 minuti
+      const widthPercentage = (totalMinutes / 720) * 100;
+      return `${widthPercentage}%`;
+    } else {
+      // Per le colonne di priorità, usa i pixel (aumentato da 40px a 50px per ogni mezz'ora)
+      const width = Math.ceil(totalMinutes / 30) * 50;
+      return `${width}px`;
+    }
+  };
 
   return (
     <>
       <Draggable draggableId={task.id} index={index}>
         {(provided, snapshot) => {
+          const cardWidth = calculateWidth(task.duration, isInTimeline);
           
           return (
             <div
