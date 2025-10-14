@@ -258,7 +258,7 @@ export default function Convocazioni() {
                     <div className="flex flex-col gap-2">
                       <div className="flex items-center gap-2">
                         <span className="font-semibold text-foreground text-lg">
-                          {cleaner.name} {cleaner.lastname}
+                          {cleaner.name.toUpperCase()} {cleaner.lastname.toUpperCase()}
                         </span>
                         <span className={`px-2 py-0.5 rounded border font-medium text-sm ${badgeColor}`}>
                           {cleaner.role}
