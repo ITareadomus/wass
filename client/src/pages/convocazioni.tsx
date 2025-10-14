@@ -260,19 +260,14 @@ export default function Convocazioni() {
                           {cleaner.role}
                         </span>
                       </div>
-                      <div className="flex flex-wrap gap-x-6 gap-y-1 text-xs text-foreground/80">
-                        <div>
-                          <span className="font-semibold">Ore questa settimana:</span> {cleaner.counter_hours}h
-                        </div>
-                        <div>
-                          <span className="font-semibold">Giorni consecutivi:</span> {cleaner.counter_days}
-                        </div>
-                        <div>
-                          <span className="font-semibold">Contratto:</span> {cleaner.contract_type}
-                        </div>
-                        <div>
-                          <span className="font-semibold">Start Time:</span> {cleaner.start_time || "10:00"}
-                        </div>
+                      <div className="text-xs text-foreground/80">
+                        <span className="font-semibold">Ore questa settimana:</span> {cleaner.counter_hours}h 
+                        <span className="mx-2">|</span>
+                        <span className="font-semibold">Giorni consecutivi:</span> {cleaner.counter_days}
+                        <span className="mx-2">|</span>
+                        <span className="font-semibold">Contratto:</span> {cleaner.contract_type}
+                        <span className="mx-2">|</span>
+                        <span className="font-semibold">Start Time:</span> {cleaner.start_time || "10:00"}
                       </div>
                     </div>
                   </div>
