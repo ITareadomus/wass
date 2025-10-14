@@ -260,7 +260,7 @@ export default function Convocazioni() {
                           {cleaner.role}
                         </span>
                       </div>
-                      <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm text-foreground/80">
+                      <div className="flex flex-wrap gap-x-6 gap-y-1 text-sm text-foreground/80">
                         <div>
                           <span className="font-semibold">Ore questa settimana:</span> {cleaner.counter_hours}h
                         </div>
