@@ -162,6 +162,29 @@
       "customer_name": "YOUHOSTY"
     },
     {
+      "task_id": 217316,
+      "logistic_code": 1535,
+      "client_id": 2,
+      "premium": false,
+      "address": "Via Gallura 9",
+      "lat": "45.4373695",
+      "lng": "9.1993307",
+      "cleaning_time": 270,
+      "checkin_date": "2025-10-17",
+      "checkout_date": "2025-10-15",
+      "checkin_time": null,
+      "checkout_time": null,
+      "pax_in": 0,
+      "pax_out": 0,
+      "small_equipment": false,
+      "operation_id": 3,
+      "confirmed_operation": true,
+      "straordinaria": true,
+      "type_apt": "C",
+      "alias": "ITW",
+      "customer_name": "ITALIANWAY SRL"
+    },
+    {
       "task_id": 217375,
       "logistic_code": 723,
       "client_id": 67,
@@ -231,5 +254,5 @@
       "customer_name": "THE BEST RENT S.r.l."
     }
   ],
-  "total_apartments": 10
+  "total_apartments": 11
 }
