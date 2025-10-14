@@ -159,10 +159,10 @@ export default function TimelineView({
             );
 
             return (
-              <div key={cleaner.id} className="flex mb-1">
+              <div key={cleaner.id} className="flex mb-0.5">
                 {/* Info cleaner */}
                 <div
-                  className="w-24 flex-shrink-0 p-1.5 flex items-center border border-border cursor-pointer hover:opacity-90 transition-opacity"
+                  className="w-24 flex-shrink-0 p-1 flex items-center border border-border cursor-pointer hover:opacity-90 transition-opacity"
                   style={{ 
                     backgroundColor: color.bg,
                     color: color.text
@@ -170,7 +170,7 @@ export default function TimelineView({
                   onClick={() => handleCleanerClick(cleaner)}
                 >
                   <div className="w-full">
-                    <div className="text-[10px] font-medium break-words leading-tight">
+                    <div className="text-[9px] font-medium break-words leading-tight">
                       {cleaner.name.toUpperCase()} {cleaner.lastname.toUpperCase()}
                     </div>
                   </div>
@@ -182,7 +182,7 @@ export default function TimelineView({
                     <div
                       ref={provided.innerRef}
                       {...provided.droppableProps}
-                      className={`relative border-t border-border transition-colors min-h-[60px] flex-1 ${
+                      className={`relative border-t border-border transition-colors min-h-[45px] flex-1 ${
                         snapshot.isDraggingOver ? 'bg-primary/20 ring-2 ring-primary' : ''
                       }`}
                       style={{ 
