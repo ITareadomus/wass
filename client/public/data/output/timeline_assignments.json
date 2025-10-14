@@ -1,3 +1,201 @@
 {
-  "assignments": []
+  "assignments": [
+    {
+      "task_id": 217228,
+      "logistic_code": "1642",
+      "cleanerId": 132,
+      "assignment_type": "smista_button",
+      "start_time": "10:00",
+      "end_time": "13:00",
+      "position": {
+        "left": 16.67,
+        "width": 25
+      }
+    },
+    {
+      "task_id": 217229,
+      "logistic_code": "1640",
+      "cleanerId": 24,
+      "assignment_type": "smista_button",
+      "start_time": "10:00",
+      "end_time": "12:30",
+      "position": {
+        "left": 16.67,
+        "width": 20.83
+      }
+    },
+    {
+      "task_id": 217230,
+      "logistic_code": "961",
+      "cleanerId": 249,
+      "assignment_type": "smista_button",
+      "start_time": "10:00",
+      "end_time": "12:30",
+      "position": {
+        "left": 16.67,
+        "width": 20.83
+      }
+    },
+    {
+      "task_id": 217231,
+      "logistic_code": "1641",
+      "cleanerId": 445,
+      "assignment_type": "smista_button",
+      "start_time": "10:00",
+      "end_time": "12:00",
+      "position": {
+        "left": 16.67,
+        "width": 16.67
+      }
+    },
+    {
+      "task_id": 217232,
+      "logistic_code": "1644",
+      "cleanerId": 287,
+      "assignment_type": "smista_button",
+      "start_time": "10:00",
+      "end_time": "11:00",
+      "position": {
+        "left": 16.67,
+        "width": 8.33
+      }
+    },
+    {
+      "task_id": 217233,
+      "logistic_code": "1646",
+      "cleanerId": 326,
+      "assignment_type": "smista_button",
+      "start_time": "10:00",
+      "end_time": "11:00",
+      "position": {
+        "left": 16.67,
+        "width": 8.33
+      }
+    },
+    {
+      "task_id": 217234,
+      "logistic_code": "609",
+      "cleanerId": 404,
+      "assignment_type": "smista_button",
+      "start_time": "10:00",
+      "end_time": "11:00",
+      "position": {
+        "left": 16.67,
+        "width": 8.33
+      }
+    },
+    {
+      "task_id": 217235,
+      "logistic_code": "1009",
+      "cleanerId": 469,
+      "assignment_type": "smista_button",
+      "start_time": "10:00",
+      "end_time": "11:00",
+      "position": {
+        "left": 16.67,
+        "width": 8.33
+      }
+    },
+    {
+      "task_id": 217244,
+      "logistic_code": "843",
+      "cleanerId": 771,
+      "assignment_type": "smista_button",
+      "start_time": "10:00",
+      "end_time": "11:30",
+      "position": {
+        "left": 16.67,
+        "width": 12.5
+      }
+    },
+    {
+      "task_id": 217248,
+      "logistic_code": "1063",
+      "cleanerId": 845,
+      "assignment_type": "smista_button",
+      "start_time": "10:00",
+      "end_time": "11:00",
+      "position": {
+        "left": 16.67,
+        "width": 8.33
+      }
+    },
+    {
+      "task_id": 217249,
+      "logistic_code": "504",
+      "cleanerId": 596,
+      "assignment_type": "smista_button",
+      "start_time": "10:00",
+      "end_time": "11:00",
+      "position": {
+        "left": 16.67,
+        "width": 8.33
+      }
+    },
+    {
+      "task_id": 217250,
+      "logistic_code": "1084",
+      "cleanerId": 644,
+      "assignment_type": "smista_button",
+      "start_time": "10:00",
+      "end_time": "11:00",
+      "position": {
+        "left": 16.67,
+        "width": 8.33
+      }
+    },
+    {
+      "task_id": 217251,
+      "logistic_code": "1240",
+      "cleanerId": 785,
+      "assignment_type": "smista_button",
+      "start_time": "10:00",
+      "end_time": "11:00",
+      "position": {
+        "left": 16.67,
+        "width": 8.33
+      }
+    },
+    {
+      "task_id": 217252,
+      "logistic_code": "1487",
+      "cleanerId": 829,
+      "assignment_type": "smista_button",
+      "start_time": "10:00",
+      "end_time": "11:00",
+      "position": {
+        "left": 16.67,
+        "width": 8.33
+      }
+    },
+    {
+      "task_id": 217269,
+      "logistic_code": "1647",
+      "cleanerId": 495,
+      "assignment_type": "smista_button",
+      "start_time": "10:00",
+      "end_time": "13:00",
+      "position": {
+        "left": 16.67,
+        "width": 25
+      }
+    },
+    {
+      "task_id": 217307,
+      "logistic_code": "839",
+      "cleanerId": 937,
+      "assignment_type": "smista_button",
+      "start_time": "10:00",
+      "end_time": "11:00",
+      "position": {
+        "left": 16.67,
+        "width": 8.33
+      }
+    },
+    {
+      "logistic_code": "1384",
+      "cleanerId": 24,
+      "assignment_type": "manual_drag"
+    }
+  ]
 }

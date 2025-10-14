@@ -132,32 +132,147 @@ export default function TimelineView({
             </Button>
           </div>
         </div>
-        <div className="p-4">
-          {/* Blocco cleaners */}
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
-            {cleaners.map((cleaner, index) => {
-              const color = getCleanerColor(index);
-              
-              return (
+        <div className="p-4 overflow-x-auto">
+          {/* Header con orari */}
+          <div className="flex mb-2">
+            <div className="w-24 flex-shrink-0"></div>
+            <div className="flex-1 flex">
+              {timeSlots.map((slot) => (
                 <div
-                  key={cleaner.id}
-                  className="p-3 border border-border cursor-pointer hover:opacity-90 transition-opacity rounded-lg"
+                  key={slot}
+                  className="flex-1 text-center text-sm font-medium text-muted-foreground border-l border-border first:border-l-0 py-1"
+                >
+                  {slot}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Righe dei cleaners */}
+          {cleaners.map((cleaner, index) => {
+            const color = getCleanerColor(index);
+            const droppableId = `cleaner-${cleaner.id}`;
+
+            // Trova tutte le task assegnate a questo cleaner
+            const cleanerTasks = tasks.filter(task => 
+              (task as any).assignedCleaner === cleaner.id
+            );
+
+            return (
+              <div key={cleaner.id} className="flex mb-0.5">
+                {/* Info cleaner */}
+                <div
+                  className="w-24 flex-shrink-0 p-1 flex items-center border border-border cursor-pointer hover:opacity-90 transition-opacity resize-none"
                   style={{ 
                     backgroundColor: color.bg,
-                    color: color.text
+                    color: color.text,
+                    resize: 'none'
                   }}
                   onClick={() => handleCleanerClick(cleaner)}
                 >
-                  <div className="text-sm font-medium break-words">
-                    {cleaner.name.toUpperCase()} {cleaner.lastname.toUpperCase()}
-                  </div>
-                  <div className="text-xs opacity-80 mt-1">
-                    {cleaner.role}
+                  <div className="w-full">
+                    <div className="text-[9px] font-medium break-words leading-tight">
+                      {cleaner.name.toUpperCase()} {cleaner.lastname.toUpperCase()}
+                    </div>
                   </div>
                 </div>
-              );
-            })}
-          </div>
+
+                {/* Timeline per questo cleaner - area unica droppable */}
+                <Droppable droppableId={`timeline-${cleaner.id}`} direction="horizontal">
+                  {(provided, snapshot) => (
+                    <div
+                      ref={provided.innerRef}
+                      {...provided.droppableProps}
+                      className={`relative border-t border-border transition-colors min-h-[45px] flex-1 ${
+                        snapshot.isDraggingOver ? 'bg-primary/20 ring-2 ring-primary' : ''
+                      }`}
+                      style={{ 
+                        backgroundColor: snapshot.isDraggingOver 
+                          ? `${color.bg}40`
+                          : `${color.bg}10`
+                      }}
+                    >
+                      {/* Griglia oraria di sfondo (solo visiva) */}
+                      <div className="absolute inset-0 grid grid-cols-12 pointer-events-none opacity-10">
+                        {timeSlots.map((slot, idx) => (
+                          <div key={idx} className="border-r border-border"></div>
+                        ))}
+                      </div>
+
+                      {/* Task posizionate e dimensionate in base a start_time/end_time */}
+                      <div className="relative z-10 h-full">
+                        {tasks
+                          .filter((task) => (task as any).assignedCleaner === cleaner.id)
+                          .filter((task, index, self) => 
+                            // Rimuovi duplicati basandoti sul logistic_code (task.name)
+                            index === self.findIndex((t) => t.name === task.name)
+                          )
+                          .sort((a, b) => {
+                            const aStart = (a as any).start_time || "10:00";
+                            const bStart = (b as any).start_time || "10:00";
+                            return aStart.localeCompare(bStart);
+                          })
+                          .map((task, index) => {
+                            const taskData = (task as any);
+
+                            // Calcola posizione e larghezza normalizzando i minuti
+                            // Timeline: 11 ore (8:00-19:00)
+                            // Ogni ora = 100 unità (dove ogni minuto = 100/60 ≈ 1.67 unità)
+                            // Timeline totale = 11 * 100 = 1100 unità
+
+                            const timelineStartHour = 8;
+                            const timelineTotalHours = 11;
+                            const unitsPerHour = 100; // Ogni ora = 100 unità
+                            const unitsPerMinute = unitsPerHour / 60; // 1.67 unità per minuto
+                            const totalUnits = timelineTotalHours * unitsPerHour; // 1100 unità totali
+
+                            // Estrai start_time
+                            let startTime = taskData.start_time || "10:00";
+                            const [startHour, startMinute] = startTime.split(":").map(Number);
+                            const startMinutesFromTimelineStart = (startHour * 60 + startMinute) - (timelineStartHour * 60);
+
+                            // Converti minuti in unità normalizzate
+                            const startUnits = startMinutesFromTimelineStart * unitsPerMinute;
+
+                            // Calcola left in percentuale
+                            const leftPercentage = (startUnits / totalUnits) * 100;
+
+                            // Estrai cleaning_time in minuti
+                            const cleaningTimeMinutes = taskData.cleaning_time || 60;
+
+                            // Converti cleaning_time in unità normalizzate
+                            const widthUnits = cleaningTimeMinutes * unitsPerMinute;
+
+                            // Calcola width in percentuale
+                            const widthPercentage = (widthUnits / totalUnits) * 100;
+
+                            return (
+                              <div
+                                key={`${task.name}-${cleaner.id}`}
+                                className="absolute"
+                                style={{ 
+                                  left: `${Math.max(0, leftPercentage)}%`,
+                                  width: `${widthPercentage}%`,
+                                  top: '50%',
+                                  transform: 'translateY(-50%)'
+                                }}
+                              >
+                                <TaskCard 
+                                  task={task} 
+                                  index={index}
+                                  isInTimeline={true}
+                                />
+                              </div>
+                            );
+                          })}
+                        {provided.placeholder}
+                      </div>
+                    </div>
+                  )}
+                </Droppable>
+              </div>
+            );
+          })}
         </div>
       </div>
 
