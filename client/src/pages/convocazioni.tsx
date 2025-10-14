@@ -234,10 +234,10 @@ export default function Convocazioni() {
                 ? "border-gray-400" 
                 : isPremium ? "border-yellow-500" : "border-green-500";
               const bgColor = !isAvailable 
-                ? "bg-gray-300/30" 
+                ? "bg-gray-300/30 dark:bg-gray-700/30" 
                 : isPremium ? "bg-yellow-500/10" : "bg-green-500/10";
               const badgeColor = !isAvailable
-                ? "bg-gray-400/20 text-gray-600 border-gray-400"
+                ? "bg-gray-400/20 text-gray-700 dark:text-gray-200 border-gray-400 dark:border-gray-500"
                 : isPremium ? "bg-yellow-500/20 text-yellow-700 border-yellow-500" : "bg-green-500/20 text-green-700 border-green-500";
               
               return (
