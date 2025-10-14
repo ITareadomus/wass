@@ -9,7 +9,7 @@
       "end_time": "13:00",
       "position": {
         "left": 16.67,
-        "width": 25.0
+        "width": 25
       }
     },
     {
@@ -177,7 +177,7 @@
       "end_time": "13:00",
       "position": {
         "left": 16.67,
-        "width": 25.0
+        "width": 25
       }
     },
     {
@@ -191,6 +191,11 @@
         "left": 16.67,
         "width": 8.33
       }
+    },
+    {
+      "logistic_code": "1384",
+      "cleanerId": 24,
+      "assignment_type": "manual_drag"
     }
   ]
 }
