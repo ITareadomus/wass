@@ -209,15 +209,26 @@ export default function TimelineView({
                           .map((task, index) => {
                             // Calcola la posizione in base allo start_time
                             const startTime = (task as any).start_time || "08:00";
+                            const endTime = (task as any).end_time || "08:00";
+                            
                             const [startHour, startMinute] = startTime.split(":").map(Number);
+                            const [endHour, endMinute] = endTime.split(":").map(Number);
+                            
                             const startMinutesFromMidnight = startHour * 60 + startMinute;
+                            const endMinutesFromMidnight = endHour * 60 + endMinute;
                             
-                            // La timeline va dalle 08:00 (480 min) alle 20:00 (1200 min) = 720 minuti totali
-                            const timelineStartMinutes = 8 * 60; // 08:00
-                            const timelineTotalMinutes = 12 * 60; // 12 ore
+                            // La timeline va dalle 08:00 alle 19:00 = 11 ore = 660 minuti
+                            const timelineStartMinutes = 8 * 60; // 08:00 = 480 min
+                            const timelineEndMinutes = 19 * 60; // 19:00 = 1140 min
+                            const timelineTotalMinutes = timelineEndMinutes - timelineStartMinutes; // 660 min
                             
+                            // Calcola offset dall'inizio della timeline
                             const offsetMinutes = startMinutesFromMidnight - timelineStartMinutes;
                             const leftPercentage = (offsetMinutes / timelineTotalMinutes) * 100;
+                            
+                            // Calcola la larghezza in base alla durata effettiva
+                            const durationMinutes = endMinutesFromMidnight - startMinutesFromMidnight;
+                            const widthPercentage = (durationMinutes / timelineTotalMinutes) * 100;
                             
                             return (
                               <div
@@ -225,15 +236,18 @@ export default function TimelineView({
                                 className="absolute"
                                 style={{ 
                                   left: `${Math.max(0, leftPercentage)}%`,
+                                  width: `${widthPercentage}%`,
                                   top: '50%',
                                   transform: 'translateY(-50%)'
                                 }}
                               >
-                                <TaskCard 
-                                  task={task} 
-                                  index={index}
-                                  isInTimeline={true}
-                                />
+                                <div style={{ width: '100%' }}>
+                                  <TaskCard 
+                                    task={task} 
+                                    index={index}
+                                    isInTimeline={true}
+                                  />
+                                </div>
                               </div>
                             );
                           })}
