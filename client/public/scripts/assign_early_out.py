@@ -16,6 +16,7 @@ DEFAULT_EO_TIME = "10:00"
 CLEANERS_PATH = "client/public/data/cleaners/selected_cleaners.json"
 TASKS_PATH    = "client/public/data/output/early_out.json"
 OUTPUT_PATH   = "client/public/data/output/early_out_assignments.json"
+MANUAL_ASSIGNMENTS_PATH = "client/public/data/output/manual_assignments.json"
 
 def load_json(path: str) -> Any:
     with open(path, "r", encoding="utf-8") as f:
@@ -167,6 +168,33 @@ def main() -> None:
 
     save_json(OUTPUT_PATH, output)
     print(f"✅ File salvato: {OUTPUT_PATH}")
+    
+    # Aggiorna anche manual_assignments.json
+    manual_assignments = {"assignments": []}
+    try:
+        manual_assignments = load_json(MANUAL_ASSIGNMENTS_PATH)
+    except:
+        pass
+    
+    # Rimuovi vecchie assegnazioni early-out (mantieni solo quelle manuali)
+    assigned_task_ids = set(str(tid(t)) for t in assigned_sorted if t.get("assignment_status") == "assigned")
+    manual_assignments["assignments"] = [
+        a for a in manual_assignments.get("assignments", [])
+        if str(a.get("taskId")) not in assigned_task_ids
+    ]
+    
+    # Aggiungi le nuove assegnazioni early-out
+    for task in assigned_sorted:
+        if task.get("assignment_status") == "assigned" and task.get("assigned_cleaner"):
+            manual_assignments["assignments"].append({
+                "taskId": str(tid(task)),
+                "cleanerId": task["assigned_cleaner"]["id"],
+                "slot": 0  # Default slot per early-out
+            })
+    
+    save_json(MANUAL_ASSIGNMENTS_PATH, manual_assignments)
+    print(f"✅ File salvato: {MANUAL_ASSIGNMENTS_PATH}")
+    
     if unused:
         print("ℹ️ Cleaners non usati (numero task inferiore al numero di cleaners):", ", ".join(unused))
 
