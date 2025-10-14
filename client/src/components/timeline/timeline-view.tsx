@@ -212,8 +212,26 @@ export default function TimelineView({
                             return aStart.localeCompare(bStart);
                           })
                           .map((task, index) => {
-                            const startTime = (task as any).start_time || "10:00";
-                            const endTime = (task as any).end_time || "10:00";
+                            // Ottieni start_time e end_time dalla task
+                            let startTime = (task as any).start_time || "10:00";
+                            let endTime = (task as any).end_time || "10:00";
+                            
+                            // Se non ci sono start_time/end_time, calcolali dalla durata
+                            if (!((task as any).start_time && (task as any).end_time)) {
+                              // Calcola dalla durata della task
+                              const durationParts = task.duration.split(".");
+                              const hours = parseInt(durationParts[0] || "0");
+                              const minutes = durationParts[1] ? parseInt(durationParts[1]) : 0;
+                              const taskDurationMinutes = hours * 60 + minutes;
+                              
+                              startTime = "10:00"; // Default
+                              const [startHour, startMinute] = startTime.split(":").map(Number);
+                              const startMinutes = startHour * 60 + startMinute;
+                              const endMinutes = startMinutes + taskDurationMinutes;
+                              const endHour = Math.floor(endMinutes / 60);
+                              const endMinute = endMinutes % 60;
+                              endTime = `${endHour.toString().padStart(2, '0')}:${endMinute.toString().padStart(2, '0')}`;
+                            }
                             
                             const [startHour, startMinute] = startTime.split(":").map(Number);
                             const [endHour, endMinute] = endTime.split(":").map(Number);

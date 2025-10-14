@@ -260,7 +260,8 @@ export default function GenerateAssignments() {
             return {
               ...task,
               assignedCleaner: assignment.assigned_cleaner.id,
-              startTime: assignment.assigned_cleaner.start_time
+              start_time: assignment.assigned_cleaner.start_time,
+              end_time: assignment.assigned_cleaner.end_time
             };
           }
           return task;
