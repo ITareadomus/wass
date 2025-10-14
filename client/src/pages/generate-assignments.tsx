@@ -98,10 +98,10 @@ export default function GenerateAssignments() {
   const convertRawTask = (rawTask: RawTask, priority: string): Task => {
     return {
       id: rawTask.task_id.toString(),
-      name: rawTask.logistic_code.toString(),
+      name: rawTask.logistic_code?.toString() || 'N/A',
       alias: rawTask.alias,
-      type: rawTask.customer_name || `Client ${rawTask.client_id}`,
-      duration: formatDuration(rawTask.cleaning_time),
+      type: (rawTask as any).customer_name || `Client ${rawTask.client_id}`,
+      duration: formatDuration(rawTask.cleaning_time || 0),
       priority: priority as any,
       assignedTo: null,
       status: "pending",
@@ -110,14 +110,14 @@ export default function GenerateAssignments() {
       premium: rawTask.premium,
       is_straordinaria: (rawTask as any).straordinaria || rawTask.is_straordinaria,
       confirmed_operation: rawTask.confirmed_operation,
-      checkout_date: rawTask.checkout_date,
+      checkout_date: (rawTask as any).checkout_date,
       checkout_time: rawTask.checkout_time,
-      checkin_date: rawTask.checkin_date,
+      checkin_date: (rawTask as any).checkin_date,
       checkin_time: rawTask.checkin_time,
       pax_in: rawTask.pax_in,
       pax_out: rawTask.pax_out,
       operation_id: rawTask.operation_id,
-      customer_name: rawTask.customer_name,
+      customer_name: (rawTask as any).customer_name,
       type_apt: (rawTask as any).type_apt,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
@@ -144,17 +144,23 @@ export default function GenerateAssignments() {
       const highPriorityData = await highPriorityResponse.json();
       const lowPriorityData = await lowPriorityResponse.json();
 
-      const initialEarlyOut: Task[] = earlyOutData.early_out_tasks.map((task: RawTask) =>
+      console.log("Early out data:", earlyOutData);
+      console.log("High priority data:", highPriorityData);
+      console.log("Low priority data:", lowPriorityData);
+
+      const initialEarlyOut: Task[] = (earlyOutData.early_out_tasks || []).map((task: RawTask) =>
         convertRawTask(task, "early-out")
       );
 
-      const initialHigh: Task[] = highPriorityData.high_priority_tasks.map((task: RawTask) =>
+      const initialHigh: Task[] = (highPriorityData.high_priority_tasks || []).map((task: RawTask) =>
         convertRawTask(task, "high")
       );
 
-      const initialLow: Task[] = lowPriorityData.low_priority_tasks.map((task: RawTask) =>
+      const initialLow: Task[] = (lowPriorityData.low_priority_tasks || []).map((task: RawTask) =>
         convertRawTask(task, "low")
       );
+
+      console.log("Tasks convertiti - Early:", initialEarlyOut.length, "High:", initialHigh.length, "Low:", initialLow.length);
 
       setEarlyOutTasks(initialEarlyOut);
       setHighPriorityTasks(initialHigh);
