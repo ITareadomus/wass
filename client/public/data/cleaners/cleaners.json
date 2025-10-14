@@ -1,6 +1,6 @@
 {
     "metadata": {
-        "last_updated": "2025-10-14T14:04:40.867713",
+        "last_updated": "2025-10-14T14:14:18.328370",
         "db_config": {
             "host": "139.59.132.41",
             "user": "admin",
@@ -11,7 +11,7 @@
     },
     "dates": {
         "2025-10-15": {
-            "timestamp": "2025-10-14T14:04:40.867722",
+            "timestamp": "2025-10-14T14:14:18.328381",
             "cleaners": [
                 {
                     "id": 24,
@@ -254,7 +254,7 @@
                     "role": "Premium",
                     "active": true,
                     "ranking": 0,
-                    "counter_hours": 0.0,
+                    "counter_hours": 4.0,
                     "counter_days": 0,
                     "available": true,
                     "contract_type": "B",
@@ -317,6 +317,21 @@
                         124
                     ],
                     "telegram_id": 6339409386,
+                    "start_time": "10:00"
+                },
+                {
+                    "id": 626,
+                    "name": "DORA PATRICIA",
+                    "lastname": "JIMENEZ",
+                    "role": "Formatore",
+                    "active": true,
+                    "ranking": 0,
+                    "counter_hours": 10.5,
+                    "counter_days": 1,
+                    "available": true,
+                    "contract_type": "B",
+                    "preferred_customers": [],
+                    "telegram_id": null,
                     "start_time": "10:00"
                 },
                 {
@@ -819,7 +834,7 @@
                     "start_time": null
                 }
             ],
-            "total_cleaners": 35,
+            "total_cleaners": 36,
             "date": "2025-10-15",
             "data_source": "database_query"
         }
