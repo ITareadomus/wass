@@ -177,17 +177,17 @@ def main() -> None:
         pass
     
     # Rimuovi vecchie assegnazioni early-out (mantieni solo quelle manuali)
-    assigned_task_ids = set(str(tid(t)) for t in assigned_sorted if t.get("assignment_status") == "assigned")
+    assigned_logistic_codes = set(str(t.get("logistic_code")) for t in assigned_sorted if t.get("assignment_status") == "assigned")
     timeline_assignments["assignments"] = [
         a for a in timeline_assignments.get("assignments", [])
-        if str(a.get("taskId")) not in assigned_task_ids
+        if str(a.get("logistic_code")) not in assigned_logistic_codes
     ]
     
     # Aggiungi le nuove assegnazioni early-out
     for task in assigned_sorted:
         if task.get("assignment_status") == "assigned" and task.get("assigned_cleaner"):
             timeline_assignments["assignments"].append({
-                "taskId": str(tid(task)),
+                "logistic_code": str(task.get("logistic_code")),
                 "cleanerId": task["assigned_cleaner"]["id"],
                 "assignment_type": "smista_button"
             })

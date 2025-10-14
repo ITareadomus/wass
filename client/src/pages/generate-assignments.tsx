@@ -175,15 +175,15 @@ export default function GenerateAssignments() {
 
       console.log("Tasks convertiti - Early:", initialEarlyOut.length, "High:", initialHigh.length, "Low:", initialLow.length);
 
-      // Crea un Set di task IDs assegnate nella timeline
-      const assignedInTimelineIds = new Set(
-        timelineAssignmentsData.assignments.map((a: any) => a.taskId)
+      // Crea un Set di logistic_code assegnati nella timeline
+      const assignedInTimelineCodes = new Set(
+        timelineAssignmentsData.assignments.map((a: any) => a.logistic_code || a.taskId)
       );
 
       // Filtra le task già presenti nella timeline dai container
-      const filteredEarlyOut = initialEarlyOut.filter(task => !assignedInTimelineIds.has(task.id));
-      const filteredHigh = initialHigh.filter(task => !assignedInTimelineIds.has(task.id));
-      const filteredLow = initialLow.filter(task => !assignedInTimelineIds.has(task.id));
+      const filteredEarlyOut = initialEarlyOut.filter(task => !assignedInTimelineCodes.has(task.name));
+      const filteredHigh = initialHigh.filter(task => !assignedInTimelineCodes.has(task.name));
+      const filteredLow = initialLow.filter(task => !assignedInTimelineCodes.has(task.name));
 
       setEarlyOutTasks(filteredEarlyOut);
       setHighPriorityTasks(filteredHigh);
@@ -192,7 +192,9 @@ export default function GenerateAssignments() {
       // Crea l'array unificato con le assegnazioni della timeline
       const allTasks = [...initialEarlyOut, ...initialHigh, ...initialLow];
       const tasksWithAssignments = allTasks.map(task => {
-        const timelineAssignment = timelineAssignmentsData.assignments.find((a: any) => a.taskId === task.id);
+        const timelineAssignment = timelineAssignmentsData.assignments.find(
+          (a: any) => a.logistic_code === task.name || a.taskId === task.id
+        );
         if (timelineAssignment) {
           return {
             ...task,
@@ -274,12 +276,12 @@ export default function GenerateAssignments() {
     }
   };
 
-  const saveTimelineAssignment = async (taskId: string, cleanerId: number) => {
+  const saveTimelineAssignment = async (taskId: string, cleanerId: number, logisticCode?: string) => {
     try {
       const response = await fetch('/api/save-timeline-assignment', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ taskId, cleanerId }),
+        body: JSON.stringify({ taskId, cleanerId, logisticCode }),
       });
       if (!response.ok) {
         console.error('Errore nel salvataggio dell\'assegnazione nella timeline');
@@ -325,8 +327,12 @@ export default function GenerateAssignments() {
         return updatedTasks;
       });
 
+      // Trova il logistic_code della task
+      const task = allTasksWithAssignments.find(t => t.id === taskId);
+      const logisticCode = task?.name; // name contiene il logistic_code
+
       // Salva l'assegnazione nella timeline
-      saveTimelineAssignment(taskId, cleanerId);
+      saveTimelineAssignment(taskId, cleanerId, logisticCode);
 
       // Rimuovi la task dal container originale
       if (source.droppableId === 'early-out') {
