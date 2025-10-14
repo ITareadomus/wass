@@ -138,12 +138,13 @@ export default function TimelineView({
             <div className="w-24 flex-shrink-0 flex items-center justify-center">
               <span className="text-xs text-muted-foreground">Cleaner</span>
             </div>
-            <div className="flex-1 flex relative">
+            <div className="flex relative" style={{ width: '1440px' }}>
               {timeSlots.map((slot, idx) => (
                 <div
                   key={slot}
-                  className="flex-1 text-center text-sm font-semibold border-l first:border-l-0 py-2 relative"
+                  className="text-center text-sm font-semibold border-l first:border-l-0 py-2 relative"
                   style={{ 
+                    width: '120px',
                     borderColor: idx % 2 === 0 ? 'rgba(0,0,0,0.3)' : 'rgba(0,0,0,0.15)',
                     borderLeftWidth: idx % 2 === 0 ? '2px' : '1px',
                     backgroundColor: idx % 2 === 0 ? 'rgba(0,0,0,0.02)' : 'transparent'
@@ -152,7 +153,7 @@ export default function TimelineView({
                   <div className="text-foreground">{slot}</div>
                   {idx === 0 && (
                     <div className="text-[10px] text-muted-foreground mt-0.5">
-                      1h = {Math.floor(window.innerWidth * 0.75 / 12)}px
+                      1h = 120px
                     </div>
                   )}
                 </div>
@@ -194,10 +195,11 @@ export default function TimelineView({
                     <div
                       ref={provided.innerRef}
                       {...provided.droppableProps}
-                      className={`relative border-t border-border transition-colors min-h-[45px] flex-1 ${
+                      className={`relative border-t border-border transition-colors min-h-[45px] ${
                         snapshot.isDraggingOver ? 'bg-primary/20 ring-2 ring-primary' : ''
                       }`}
                       style={{ 
+                        width: '1440px',
                         backgroundColor: snapshot.isDraggingOver 
                           ? `${color.bg}40`
                           : `${color.bg}10`
@@ -258,25 +260,24 @@ export default function TimelineView({
                             const startMinutesFromMidnight = startHour * 60 + startMinute;
                             const endMinutesFromMidnight = endHour * 60 + endMinute;
                             
-                            // La timeline va dalle 08:00 alle 19:00 = 11 ore = 660 minuti
+                            // La timeline va dalle 08:00 alle 19:00 = 12 ore = 720 minuti
                             const timelineStartMinutes = 8 * 60; // 08:00 = 480 min
-                            const timelineTotalMinutes = 11 * 60; // 660 min
                             
-                            // Calcola posizione (left) in percentuale
+                            // Calcola posizione (left) in pixel: 1 minuto = 2px (120px / 60min)
                             const offsetMinutes = startMinutesFromMidnight - timelineStartMinutes;
-                            const leftPercentage = (offsetMinutes / timelineTotalMinutes) * 100;
+                            const leftPixels = offsetMinutes * 2; // 2px per minuto
                             
-                            // Calcola larghezza in percentuale basata sulla durata effettiva
+                            // Calcola larghezza in pixel basata sulla durata effettiva
                             const durationMinutes = endMinutesFromMidnight - startMinutesFromMidnight;
-                            const widthPercentage = (durationMinutes / timelineTotalMinutes) * 100;
+                            const widthPixels = durationMinutes * 2; // 2px per minuto
                             
                             return (
                               <div
                                 key={`${task.name}-${cleaner.id}`}
                                 className="absolute"
                                 style={{ 
-                                  left: `${Math.max(0, leftPercentage)}%`,
-                                  width: `${widthPercentage}%`,
+                                  left: `${Math.max(0, leftPixels)}px`,
+                                  width: `${widthPixels}px`,
                                   top: '50%',
                                   transform: 'translateY(-50%)'
                                 }}
