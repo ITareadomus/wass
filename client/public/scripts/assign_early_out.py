@@ -212,6 +212,7 @@ def main() -> None:
                 width_percent = 10
             
             timeline_assignments["assignments"].append({
+                "task_id": task.get("task_id"),
                 "logistic_code": str(task.get("logistic_code")),
                 "cleanerId": task["assigned_cleaner"]["id"],
                 "assignment_type": "smista_button",
