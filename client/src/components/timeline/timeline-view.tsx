@@ -135,14 +135,26 @@ export default function TimelineView({
         <div className="p-4 overflow-x-auto">
           {/* Header con orari */}
           <div className="flex mb-2">
-            <div className="w-24 flex-shrink-0"></div>
-            <div className="flex-1 flex">
-              {timeSlots.map((slot) => (
+            <div className="w-24 flex-shrink-0 flex items-center justify-center">
+              <span className="text-xs text-muted-foreground">Cleaner</span>
+            </div>
+            <div className="flex-1 flex relative">
+              {timeSlots.map((slot, idx) => (
                 <div
                   key={slot}
-                  className="flex-1 text-center text-sm font-medium text-muted-foreground border-l border-border first:border-l-0 py-1"
+                  className="flex-1 text-center text-sm font-semibold border-l first:border-l-0 py-2 relative"
+                  style={{ 
+                    borderColor: idx % 2 === 0 ? 'rgba(0,0,0,0.3)' : 'rgba(0,0,0,0.15)',
+                    borderLeftWidth: idx % 2 === 0 ? '2px' : '1px',
+                    backgroundColor: idx % 2 === 0 ? 'rgba(0,0,0,0.02)' : 'transparent'
+                  }}
                 >
-                  {slot}
+                  <div className="text-foreground">{slot}</div>
+                  {idx === 0 && (
+                    <div className="text-[10px] text-muted-foreground mt-0.5">
+                      1h = {Math.floor(window.innerWidth * 0.75 / 12)}px
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
@@ -192,9 +204,16 @@ export default function TimelineView({
                       }}
                     >
                       {/* Griglia oraria di sfondo (solo visiva) */}
-                      <div className="absolute inset-0 grid grid-cols-12 pointer-events-none opacity-10">
+                      <div className="absolute inset-0 grid grid-cols-12 pointer-events-none">
                         {timeSlots.map((slot, idx) => (
-                          <div key={idx} className="border-r border-border"></div>
+                          <div 
+                            key={idx} 
+                            className="border-r border-border"
+                            style={{ 
+                              borderColor: idx % 2 === 0 ? 'rgba(0,0,0,0.2)' : 'rgba(0,0,0,0.1)',
+                              borderRightWidth: idx % 2 === 0 ? '2px' : '1px'
+                            }}
+                          ></div>
                         ))}
                       </div>
 
