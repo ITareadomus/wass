@@ -213,32 +213,19 @@ export default function TimelineView({
                             return aStart.localeCompare(bStart);
                           })
                           .map((task, index) => {
-                            // Ottieni start_time e end_time dalla task
+                            // Ottieni start_time dalla task o usa default
                             let startTime = (task as any).start_time || "10:00";
-                            let endTime = (task as any).end_time || "10:00";
                             
-                            // Se non ci sono start_time/end_time, calcolali dalla durata
-                            if (!((task as any).start_time && (task as any).end_time)) {
-                              // Calcola dalla durata della task
-                              const durationParts = task.duration.split(".");
-                              const hours = parseInt(durationParts[0] || "0");
-                              const minutes = durationParts[1] ? parseInt(durationParts[1]) : 0;
-                              const taskDurationMinutes = hours * 60 + minutes;
-                              
-                              startTime = "10:00"; // Default
-                              const [startHour, startMinute] = startTime.split(":").map(Number);
-                              const startMinutes = startHour * 60 + startMinute;
-                              const endMinutes = startMinutes + taskDurationMinutes;
-                              const endHour = Math.floor(endMinutes / 60);
-                              const endMinute = endMinutes % 60;
-                              endTime = `${endHour.toString().padStart(2, '0')}:${endMinute.toString().padStart(2, '0')}`;
-                            }
+                            // Calcola la durata in minuti dalla proprietà duration
+                            const durationParts = task.duration.split(".");
+                            const hours = parseInt(durationParts[0] || "0");
+                            const minutes = durationParts[1] ? parseInt(durationParts[1]) : 0;
+                            const taskDurationMinutes = hours * 60 + minutes;
                             
+                            // Calcola end_time basandoti su start_time + duration
                             const [startHour, startMinute] = startTime.split(":").map(Number);
-                            const [endHour, endMinute] = endTime.split(":").map(Number);
-                            
                             const startMinutesFromMidnight = startHour * 60 + startMinute;
-                            const endMinutesFromMidnight = endHour * 60 + endMinute;
+                            const endMinutesFromMidnight = startMinutesFromMidnight + taskDurationMinutes;
                             
                             // La timeline va dalle 08:00 alle 19:00 = 11 ore = 660 minuti
                             const timelineStartMinutes = 8 * 60; // 08:00 = 480 min
@@ -248,9 +235,8 @@ export default function TimelineView({
                             const offsetMinutes = startMinutesFromMidnight - timelineStartMinutes;
                             const leftPercentage = (offsetMinutes / timelineTotalMinutes) * 100;
                             
-                            // Calcola larghezza in percentuale basata sulla durata effettiva
-                            const durationMinutes = endMinutesFromMidnight - startMinutesFromMidnight;
-                            const widthPercentage = (durationMinutes / timelineTotalMinutes) * 100;
+                            // Calcola larghezza in percentuale basata sulla durata
+                            const widthPercentage = (taskDurationMinutes / timelineTotalMinutes) * 100;
                             
                             return (
                               <div
