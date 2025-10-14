@@ -252,11 +252,11 @@ export default function Convocazioni() {
                 >
                   <div className="flex items-start gap-4 flex-1">
                     <div className="flex flex-col gap-2">
-                      <span className="font-semibold text-foreground text-lg">
-                        {cleaner.name} {cleaner.lastname}
-                      </span>
-                      <div className="flex gap-2 text-sm text-muted-foreground">
-                        <span className={`px-2 py-0.5 rounded border font-medium ${badgeColor}`}>
+                      <div className="flex items-center gap-2">
+                        <span className="font-semibold text-foreground text-lg">
+                          {cleaner.name} {cleaner.lastname}
+                        </span>
+                        <span className={`px-2 py-0.5 rounded border font-medium text-sm ${badgeColor}`}>
                           {cleaner.role}
                         </span>
                       </div>
