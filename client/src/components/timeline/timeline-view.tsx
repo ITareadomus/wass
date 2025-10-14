@@ -162,11 +162,10 @@ export default function TimelineView({
               <div key={cleaner.id} className="flex mb-0.5">
                 {/* Info cleaner */}
                 <div
-                  className="w-24 flex-shrink-0 p-1 flex items-center border border-border cursor-pointer hover:opacity-90 transition-opacity resize-none"
+                  className="w-24 flex-shrink-0 p-1 flex items-center border border-border cursor-pointer hover:opacity-90 transition-opacity"
                   style={{ 
                     backgroundColor: color.bg,
-                    color: color.text,
-                    resize: 'none'
+                    color: color.text
                   }}
                   onClick={() => handleCleanerClick(cleaner)}
                 >
@@ -199,64 +198,23 @@ export default function TimelineView({
                         ))}
                       </div>
 
-                      {/* Task posizionate e dimensionate in base a start_time/end_time */}
-                      <div className="relative z-10 h-full">
+                      {/* Task posizionate in sequenza */}
+                      <div className="relative z-10 flex items-center h-full">
                         {tasks
                           .filter((task) => (task as any).assignedCleaner === cleaner.id)
                           .filter((task, index, self) => 
                             // Rimuovi duplicati basandoti sul logistic_code (task.name)
                             index === self.findIndex((t) => t.name === task.name)
                           )
-                          .sort((a, b) => {
-                            const aStart = (a as any).start_time || "10:00";
-                            const bStart = (b as any).start_time || "10:00";
-                            return aStart.localeCompare(bStart);
-                          })
-                          .map((task, index) => {
-                            const taskData = (task as any);
-
-                            // Timeline: 11 ore (8:00-19:00)
-                            // 1 minuto = 1.67 pixel
-                            // Esempio: task alle 10:15 = 135 minuti dall'inizio (8:00) = 135 × 1.67 = 225px
-
-                            const PIXELS_PER_MINUTE = 1.67;
-                            const timelineStartHour = 8; // La timeline inizia alle 8:00
-
-                            // Estrai start_time
-                            let startTime = taskData.start_time || "10:00";
-                            const [startHour, startMinute] = startTime.split(":").map(Number);
-                            
-                            // Calcola minuti dall'inizio della timeline (8:00)
-                            const startMinutesFromTimelineStart = (startHour * 60 + startMinute) - (timelineStartHour * 60);
-
-                            // Converti minuti in pixel
-                            const leftPixels = startMinutesFromTimelineStart * PIXELS_PER_MINUTE;
-
-                            // Estrai cleaning_time in minuti
-                            const cleaningTimeMinutes = taskData.cleaning_time || 60;
-
-                            // Converti cleaning_time in pixel
-                            const widthPixels = cleaningTimeMinutes * PIXELS_PER_MINUTE;
-
-                            return (
-                              <div
-                                key={`${task.name}-${cleaner.id}`}
-                                className="absolute"
-                                style={{ 
-                                  left: `${Math.max(0, leftPixels)}px`,
-                                  width: `${widthPixels}px`,
-                                  top: '50%',
-                                  transform: 'translateY(-50%)'
-                                }}
-                              >
-                                <TaskCard 
-                                  task={task} 
-                                  index={index}
-                                  isInTimeline={true}
-                                />
-                              </div>
-                            );
-                          })}
+                          .sort((a, b) => ((a as any).assignedSlot || 0) - ((b as any).assignedSlot || 0))
+                          .map((task, index) => (
+                            <TaskCard 
+                              key={`${task.name}-${cleaner.id}`}
+                              task={task} 
+                              index={index}
+                              isInTimeline={true}
+                            />
+                          ))}
                         {provided.placeholder}
                       </div>
                     </div>
