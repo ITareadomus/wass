@@ -1,11 +1,11 @@
 {
     "metadata": {
-        "last_updated": "2025-10-14T06:56:14.962397",
+        "last_updated": "2025-10-14T07:09:23.026726",
         "schema_version": "1.0"
     },
     "dates": {
         "2025-10-15": {
-            "timestamp": "2025-10-14T06:56:14.962410",
+            "timestamp": "2025-10-14T07:09:23.026739",
             "apt": [
                 {
                     "task_id": 213365,
@@ -501,7 +501,7 @@
                     "cleaning_time": 60,
                     "checkin_date": "2025-10-15",
                     "checkout_date": "2025-10-15",
-                    "checkin_time": null,
+                    "checkin_time": "13:00",
                     "checkout_time": null,
                     "pax_in": 1,
                     "pax_out": 1,
@@ -903,9 +903,32 @@
                     "type_apt": "B",
                     "alias": "EXPRDS",
                     "customer_name": "EXPERIENCE DESIGN BED & SHOW"
+                },
+                {
+                    "task_id": 217368,
+                    "logistic_code": 609,
+                    "client_id": 61,
+                    "premium": false,
+                    "address": "VIALE STELVIO 53",
+                    "lat": "45.494052",
+                    "lng": "9.186503",
+                    "cleaning_time": 60,
+                    "checkin_date": "2025-10-15",
+                    "checkout_date": "2025-10-15",
+                    "checkin_time": "15:00",
+                    "checkout_time": null,
+                    "pax_in": 2,
+                    "pax_out": 2,
+                    "small_equipment": true,
+                    "operation_id": 2,
+                    "confirmed_operation": false,
+                    "straordinaria": false,
+                    "type_apt": "A",
+                    "alias": "NTM",
+                    "customer_name": "NOTA-MI"
                 }
             ],
-            "total_apartments": 39,
+            "total_apartments": 40,
             "date": "2025-10-15"
         }
     }
