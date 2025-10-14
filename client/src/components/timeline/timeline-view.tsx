@@ -162,10 +162,11 @@ export default function TimelineView({
               <div key={cleaner.id} className="flex mb-0.5">
                 {/* Info cleaner */}
                 <div
-                  className="w-24 flex-shrink-0 p-1 flex items-center border border-border cursor-pointer hover:opacity-90 transition-opacity"
+                  className="w-24 flex-shrink-0 p-1 flex items-center border border-border cursor-pointer hover:opacity-90 transition-opacity resize-none"
                   style={{ 
                     backgroundColor: color.bg,
-                    color: color.text
+                    color: color.text,
+                    resize: 'none'
                   }}
                   onClick={() => handleCleanerClick(cleaner)}
                 >
