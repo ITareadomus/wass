@@ -15,6 +15,58 @@ const __dirname = dirname(__filename);
 const execAsync = promisify(exec);
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Endpoint per resettare le assegnazioni manuali
+  app.post("/api/reset-manual-assignments", async (req, res) => {
+    try {
+      const manualAssignmentsPath = path.join(process.cwd(), 'client/public/data/output/manual_assignments.json');
+      
+      // Svuota il file
+      await fs.writeFile(manualAssignmentsPath, JSON.stringify({ assignments: [] }, null, 2));
+
+      res.json({ success: true, message: "Assegnazioni manuali resettate con successo" });
+    } catch (error: any) {
+      console.error("Errore nel reset delle assegnazioni manuali:", error);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  // Endpoint per salvare un'assegnazione manuale
+  app.post("/api/save-manual-assignment", async (req, res) => {
+    try {
+      const { taskId, cleanerId, slot } = req.body;
+      const manualAssignmentsPath = path.join(process.cwd(), 'client/public/data/output/manual_assignments.json');
+
+      // Carica o crea manual_assignments.json
+      let assignmentsData: any = { assignments: [] };
+      try {
+        const existingData = await fs.readFile(manualAssignmentsPath, 'utf8');
+        assignmentsData = JSON.parse(existingData);
+      } catch (error) {
+        // File non esiste, usa struttura vuota
+      }
+
+      // Rimuovi eventuali assegnazioni precedenti per questo task
+      assignmentsData.assignments = assignmentsData.assignments.filter(
+        (a: any) => a.taskId !== taskId
+      );
+
+      // Aggiungi la nuova assegnazione
+      assignmentsData.assignments.push({
+        taskId,
+        cleanerId,
+        slot
+      });
+
+      // Salva il file
+      await fs.writeFile(manualAssignmentsPath, JSON.stringify(assignmentsData, null, 2));
+
+      res.json({ success: true, message: "Assegnazione manuale salvata con successo" });
+    } catch (error: any) {
+      console.error("Errore nel salvataggio dell'assegnazione manuale:", error);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
   // Endpoint per aggiornare assignments.json quando un task viene assegnato a un cleaner
   app.post("/api/update-assignments", async (req, res) => {
     try {

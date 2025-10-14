@@ -90,11 +90,10 @@ export default function TimelineView({
 
   const handleResetAssignments = async () => {
     try {
-      // Rimuovi tutte le assegnazioni salvate
-      const response = await fetch('/api/save-assignments', {
+      // Svuota manual_assignments.json
+      const response = await fetch('/api/reset-manual-assignments', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([]),
       });
 
       if (response.ok) {
