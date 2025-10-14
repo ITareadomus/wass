@@ -1,11 +1,11 @@
 {
     "metadata": {
-        "last_updated": "2025-10-14T12:25:12.500196",
+        "last_updated": "2025-10-14T12:42:43.957258",
         "schema_version": "1.0"
     },
     "dates": {
         "2025-10-15": {
-            "timestamp": "2025-10-14T12:25:12.500205",
+            "timestamp": "2025-10-14T12:42:43.957269",
             "apt": [
                 {
                     "task_id": 213365,
@@ -813,6 +813,29 @@
                     "customer_name": "NOTA-MI"
                 },
                 {
+                    "task_id": 217316,
+                    "logistic_code": 1535,
+                    "client_id": 2,
+                    "premium": false,
+                    "address": "Via Gallura 9",
+                    "lat": "45.4373695",
+                    "lng": "9.1993307",
+                    "cleaning_time": 270,
+                    "checkin_date": "2025-10-17",
+                    "checkout_date": "2025-10-15",
+                    "checkin_time": null,
+                    "checkout_time": null,
+                    "pax_in": 0,
+                    "pax_out": 0,
+                    "small_equipment": false,
+                    "operation_id": 3,
+                    "confirmed_operation": true,
+                    "straordinaria": true,
+                    "type_apt": "C",
+                    "alias": "ITW",
+                    "customer_name": "ITALIANWAY SRL"
+                },
+                {
                     "task_id": 217346,
                     "logistic_code": 795,
                     "client_id": 64,
@@ -1112,7 +1135,7 @@
                     "customer_name": "THE BEST RENT S.r.l."
                 }
             ],
-            "total_apartments": 48,
+            "total_apartments": 49,
             "date": "2025-10-15"
         }
     }
