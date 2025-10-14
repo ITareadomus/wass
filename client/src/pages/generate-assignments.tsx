@@ -197,7 +197,6 @@ export default function GenerateAssignments() {
           return {
             ...task,
             assignedCleaner: timelineAssignment.cleanerId,
-            assignedSlot: timelineAssignment.slot,
           };
         }
         return task;
@@ -235,7 +234,6 @@ export default function GenerateAssignments() {
             return {
               ...task,
               assignedCleaner: assignment.assigned_cleaner.id,
-              assignedSlot: 0,
               startTime: assignment.assigned_cleaner.start_time
             };
           }
@@ -276,12 +274,12 @@ export default function GenerateAssignments() {
     }
   };
 
-  const saveTimelineAssignment = async (taskId: string, cleanerId: number, slot: number) => {
+  const saveTimelineAssignment = async (taskId: string, cleanerId: number) => {
     try {
       const response = await fetch('/api/save-timeline-assignment', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ taskId, cleanerId, slot }),
+        body: JSON.stringify({ taskId, cleanerId }),
       });
       if (!response.ok) {
         console.error('Errore nel salvataggio dell\'assegnazione nella timeline');
@@ -318,7 +316,6 @@ export default function GenerateAssignments() {
             return {
               ...task,
               assignedCleaner: cleanerId,
-              assignedSlot: destination.index,
             };
           }
           return task;
@@ -329,7 +326,7 @@ export default function GenerateAssignments() {
       });
 
       // Salva l'assegnazione nella timeline
-      saveTimelineAssignment(taskId, cleanerId, destination.index);
+      saveTimelineAssignment(taskId, cleanerId);
 
       // Rimuovi la task dal container originale
       if (source.droppableId === 'early-out') {
@@ -348,7 +345,6 @@ export default function GenerateAssignments() {
             return {
               ...task,
               assignedCleaner: undefined,
-              assignedSlot: undefined,
               startTime: undefined,
             };
           }
