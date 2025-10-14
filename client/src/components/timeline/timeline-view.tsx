@@ -198,23 +198,45 @@ export default function TimelineView({
                         ))}
                       </div>
 
-                      {/* Task posizionate in sequenza */}
-                      <div className="relative z-10 flex items-center h-full">
+                      {/* Task posizionate in base a start_time e end_time */}
+                      <div className="relative z-10 h-full">
                         {tasks
                           .filter((task) => (task as any).assignedCleaner === cleaner.id)
                           .filter((task, index, self) => 
                             // Rimuovi duplicati basandoti sul logistic_code (task.name)
                             index === self.findIndex((t) => t.name === task.name)
                           )
-                          .sort((a, b) => ((a as any).assignedSlot || 0) - ((b as any).assignedSlot || 0))
-                          .map((task, index) => (
-                            <TaskCard 
-                              key={`${task.name}-${cleaner.id}`}
-                              task={task} 
-                              index={index}
-                              isInTimeline={true}
-                            />
-                          ))}
+                          .map((task, index) => {
+                            // Calcola la posizione in base allo start_time
+                            const startTime = (task as any).start_time || "08:00";
+                            const [startHour, startMinute] = startTime.split(":").map(Number);
+                            const startMinutesFromMidnight = startHour * 60 + startMinute;
+                            
+                            // La timeline va dalle 08:00 (480 min) alle 20:00 (1200 min) = 720 minuti totali
+                            const timelineStartMinutes = 8 * 60; // 08:00
+                            const timelineTotalMinutes = 12 * 60; // 12 ore
+                            
+                            const offsetMinutes = startMinutesFromMidnight - timelineStartMinutes;
+                            const leftPercentage = (offsetMinutes / timelineTotalMinutes) * 100;
+                            
+                            return (
+                              <div
+                                key={`${task.name}-${cleaner.id}`}
+                                className="absolute"
+                                style={{ 
+                                  left: `${Math.max(0, leftPercentage)}%`,
+                                  top: '50%',
+                                  transform: 'translateY(-50%)'
+                                }}
+                              >
+                                <TaskCard 
+                                  task={task} 
+                                  index={index}
+                                  isInTimeline={true}
+                                />
+                              </div>
+                            );
+                          })}
                         {provided.placeholder}
                       </div>
                     </div>
