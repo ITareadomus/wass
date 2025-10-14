@@ -1,11 +1,11 @@
 {
     "metadata": {
-        "last_updated": "2025-10-14T09:36:50.500155",
+        "last_updated": "2025-10-14T09:45:22.998447",
         "schema_version": "1.0"
     },
     "dates": {
         "2025-10-15": {
-            "timestamp": "2025-10-14T09:36:50.500166",
+            "timestamp": "2025-10-14T09:45:22.998457",
             "apt": [
                 {
                     "task_id": 213365,
@@ -926,9 +926,32 @@
                     "type_apt": "A",
                     "alias": "NTM",
                     "customer_name": "NOTA-MI"
+                },
+                {
+                    "task_id": 217375,
+                    "logistic_code": 723,
+                    "client_id": 67,
+                    "premium": false,
+                    "address": "VIA TORTONA, 10",
+                    "lat": "45.4542397",
+                    "lng": "9.1686792",
+                    "cleaning_time": 15,
+                    "checkin_date": "2025-10-15",
+                    "checkout_date": "2025-10-15",
+                    "checkin_time": null,
+                    "checkout_time": null,
+                    "pax_in": 0,
+                    "pax_out": 0,
+                    "small_equipment": false,
+                    "operation_id": 4,
+                    "confirmed_operation": true,
+                    "straordinaria": false,
+                    "type_apt": "B",
+                    "alias": "EXPRDS",
+                    "customer_name": "EXPERIENCE DESIGN BED & SHOW"
                 }
             ],
-            "total_apartments": 40,
+            "total_apartments": 41,
             "date": "2025-10-15"
         }
     }

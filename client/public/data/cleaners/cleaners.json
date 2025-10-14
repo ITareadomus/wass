@@ -1,6 +1,6 @@
 {
     "metadata": {
-        "last_updated": "2025-10-14T09:33:22.228043",
+        "last_updated": "2025-10-14T09:38:41.130812",
         "db_config": {
             "host": "139.59.132.41",
             "user": "admin",
@@ -11,7 +11,7 @@
     },
     "dates": {
         "2025-10-15": {
-            "timestamp": "2025-10-14T09:33:22.228053",
+            "timestamp": "2025-10-14T09:38:41.130826",
             "cleaners": [
                 {
                     "id": 24,
@@ -20,7 +20,7 @@
                     "role": "Standard",
                     "active": true,
                     "ranking": 0,
-                    "counter_hours": 5.75,
+                    "counter_hours": 6.25,
                     "counter_days": 4,
                     "available": true,
                     "contract_type": "B",
@@ -457,7 +457,6 @@
                         64,
                         72,
                         75,
-                        80,
                         84,
                         87,
                         91,
@@ -466,7 +465,6 @@
                         113,
                         115,
                         118,
-                        119,
                         120,
                         121,
                         123
@@ -491,13 +489,11 @@
                         64,
                         72,
                         75,
-                        80,
                         84,
                         91,
                         94,
                         113,
-                        115,
-                        119
+                        115
                     ],
                     "telegram_id": 7108751314,
                     "start_time": "10:00"
