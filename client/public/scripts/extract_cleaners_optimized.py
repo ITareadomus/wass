@@ -54,10 +54,10 @@ week_end_excl = week_start + timedelta(days=7)  # [week_start, week_end_excl)
 conn = mysql.connector.connect(**db_config)
 cur = conn.cursor(dictionary=True)
 
-# 1) Lista cleaners (come da originale)
+# 1) Lista cleaners (7=Standard, 13=Formatore, 15=Premium)
 cur.execute("""        SELECT id, name, lastname, user_role_id, active, contract_type_id, telegram_id, tw_start
     FROM app_users 
-    WHERE user_role_id IN (7, 15) AND active = 1;
+    WHERE user_role_id IN (7, 13, 15) AND active = 1;
 """)
 cleaners = cur.fetchall()
 
@@ -134,7 +134,13 @@ contract_map = {1: "A", 2: "B", 3: "C", 4: "a chiamata"}
 
 for u in cleaners:
     uid = u["id"]
-    role = "Premium" if u.get("user_role_id") == 15 else "Standard"
+    role_id = u.get("user_role_id")
+    if role_id == 15:
+        role = "Premium"
+    elif role_id == 13:
+        role = "Formatore"
+    else:
+        role = "Standard"
     available = 0 if uid in leave_set else 1
 
     cleaner = {
