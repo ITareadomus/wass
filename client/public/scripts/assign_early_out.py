@@ -183,13 +183,43 @@ def main() -> None:
         if str(a.get("logistic_code")) not in assigned_logistic_codes
     ]
     
-    # Aggiungi le nuove assegnazioni early-out
+    # Aggiungi le nuove assegnazioni early-out con orari e posizione
     for task in assigned_sorted:
         if task.get("assignment_status") == "assigned" and task.get("assigned_cleaner"):
+            cleaner = task["assigned_cleaner"]
+            start_time = cleaner.get("start_time", "10:00")
+            end_time = cleaner.get("end_time", "10:00")
+            
+            # Calcola posizione nella timeline (08:00-19:00 = 11 ore = 660 minuti)
+            start_parts = start_time.split(":")
+            start_hour = int(start_parts[0])
+            start_minute = int(start_parts[1]) if len(start_parts) > 1 else 0
+            start_minutes_from_midnight = start_hour * 60 + start_minute
+            
+            end_parts = end_time.split(":")
+            end_hour = int(end_parts[0])
+            end_minute = int(end_parts[1]) if len(end_parts) > 1 else 0
+            end_minutes_from_midnight = end_hour * 60 + end_minute
+            
+            timeline_start_minutes = 8 * 60  # 08:00
+            timeline_total_minutes = 11 * 60  # 11 ore
+            
+            offset_minutes = start_minutes_from_midnight - timeline_start_minutes
+            left_percentage = (offset_minutes / timeline_total_minutes) * 100
+            
+            duration_minutes = end_minutes_from_midnight - start_minutes_from_midnight
+            width_percentage = (duration_minutes / timeline_total_minutes) * 100
+            
             timeline_assignments["assignments"].append({
                 "logistic_code": str(task.get("logistic_code")),
-                "cleanerId": task["assigned_cleaner"]["id"],
-                "assignment_type": "smista_button"
+                "cleanerId": cleaner["id"],
+                "assignment_type": "smista_button",
+                "start_time": start_time,
+                "end_time": end_time,
+                "position": {
+                    "left": round(left_percentage, 2),
+                    "width": round(width_percentage, 2)
+                }
             })
     
     save_json(TIMELINE_ASSIGNMENTS_PATH, timeline_assignments)

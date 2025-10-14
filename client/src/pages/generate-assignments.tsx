@@ -301,12 +301,28 @@ export default function GenerateAssignments() {
     }
   };
 
-  const saveTimelineAssignment = async (taskId: string, cleanerId: number, logisticCode?: string) => {
+  const saveTimelineAssignment = async (
+    taskId: string, 
+    cleanerId: number, 
+    logisticCode?: string,
+    startTime?: string,
+    endTime?: string,
+    leftPercentage?: number,
+    widthPercentage?: number
+  ) => {
     try {
       const response = await fetch('/api/save-timeline-assignment', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ taskId, cleanerId, logisticCode }),
+        body: JSON.stringify({ 
+          taskId, 
+          cleanerId, 
+          logisticCode,
+          startTime,
+          endTime,
+          leftPercentage,
+          widthPercentage
+        }),
       });
       if (!response.ok) {
         console.error('Errore nel salvataggio dell\'assegnazione nella timeline');
@@ -396,8 +412,29 @@ export default function GenerateAssignments() {
       const task = allTasksWithAssignments.find(t => t.id === taskId);
       const logisticCode = task?.name; // name contiene il logistic_code
 
-      // Salva l'assegnazione nella timeline
-      saveTimelineAssignment(taskId, cleanerId, logisticCode);
+      // Calcola start_time e end_time dalla task aggiornata
+      const updatedTask = allTasksWithAssignments.find(t => t.id === taskId);
+      const startTime = (updatedTask as any)?.start_time || "10:00";
+      const endTime = (updatedTask as any)?.end_time || "10:00";
+      
+      // Calcola la posizione nella timeline
+      const durationParts = (updatedTask?.duration || "0.0").split(".");
+      const hours = parseInt(durationParts[0] || "0");
+      const minutes = durationParts[1] ? parseInt(durationParts[1]) : 0;
+      const taskDurationMinutes = hours * 60 + minutes;
+      
+      const [startHour, startMinute] = startTime.split(":").map(Number);
+      const startMinutesFromMidnight = startHour * 60 + startMinute;
+      
+      const timelineStartMinutes = 8 * 60; // 08:00
+      const timelineTotalMinutes = 11 * 60; // 11 ore
+      
+      const offsetMinutes = startMinutesFromMidnight - timelineStartMinutes;
+      const leftPercentage = (offsetMinutes / timelineTotalMinutes) * 100;
+      const widthPercentage = (taskDurationMinutes / timelineTotalMinutes) * 100;
+
+      // Salva l'assegnazione nella timeline con orari e posizione
+      saveTimelineAssignment(taskId, cleanerId, logisticCode, startTime, endTime, leftPercentage, widthPercentage);
 
       // Rimuovi la task dal container originale
       if (source.droppableId === 'early-out') {
