@@ -190,7 +190,7 @@ export default function GenerateAssignments() {
         }
         return !isAssigned;
       });
-      
+
       const filteredHigh = initialHigh.filter(task => {
         const isAssigned = assignedInTimelineCodes.has(String(task.name));
         if (isAssigned) {
@@ -198,7 +198,7 @@ export default function GenerateAssignments() {
         }
         return !isAssigned;
       });
-      
+
       const filteredLow = initialLow.filter(task => {
         const isAssigned = assignedInTimelineCodes.has(String(task.name));
         if (isAssigned) {
@@ -434,7 +434,7 @@ export default function GenerateAssignments() {
 
   return (
     <div className="bg-background text-foreground min-h-screen">
-      <div className="container mx-auto p-4 max-w-screen-2xl">
+      <div className="w-full px-4 py-6">
         <div className="mb-6 flex justify-between items-center flex-wrap gap-4">
           <h1 className="text-3xl font-bold text-foreground flex items-center gap-2">
             GENERA ASSEGNAZIONI
@@ -475,7 +475,7 @@ export default function GenerateAssignments() {
         </div>
 
         <DragDropContext onDragEnd={onDragEnd}>
-          <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6 w-full">
             <PriorityColumn
               title="EARLY OUT"
               priority="early-out"
@@ -499,8 +499,8 @@ export default function GenerateAssignments() {
             />
           </div>
 
-          <div className="mt-6 grid grid-cols-1 xl:grid-cols-3 gap-6">
-            <div className="xl:col-span-2">
+          <div className="mt-6 grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div className="lg:col-span-2 w-full">
               <TimelineView
                 personnel={[]}
                 tasks={allTasksWithAssignments}
