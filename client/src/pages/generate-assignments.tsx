@@ -4,7 +4,13 @@ import PriorityColumn from "@/components/drag-drop/priority-column";
 import TimelineView from "@/components/timeline/timeline-view";
 import { useState, useEffect } from "react";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { MapPin } from "lucide-react";
+import { MapPin, CalendarIcon } from "lucide-react";
+import { format } from "date-fns";
+import { it } from "date-fns/locale";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
 interface RawTask {
   task_id: number;
@@ -33,6 +39,7 @@ interface RawTask {
 }
 
 export default function GenerateAssignments() {
+  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [earlyOutTasks, setEarlyOutTasks] = useState<Task[]>([]);
   const [highPriorityTasks, setHighPriorityTasks] = useState<Task[]>([]);
   const [lowPriorityTasks, setLowPriorityTasks] = useState<Task[]>([]);
@@ -332,12 +339,38 @@ export default function GenerateAssignments() {
   return (
     <div className="bg-background text-foreground min-h-screen">
       <div className="container mx-auto p-4 max-w-screen-2xl">
-        <div className="mb-6 flex justify-between items-center">
-          <h1 className="text-3xl font-bold text-foreground">
-            Genera Assegnazioni
+        <div className="mb-6 flex justify-between items-center flex-wrap gap-4">
+          <h1 className="text-3xl font-bold text-foreground flex items-center gap-2">
+            GENERA ASSEGNAZIONI
+            <span className="text-2xl font-normal text-muted-foreground ml-4">
+              del {format(selectedDate, "dd/MM/yyyy", { locale: it })}
+            </span>
           </h1>
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3">
             <ThemeToggle />
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  className={cn(
+                    "w-[240px] justify-start text-left font-normal",
+                    !selectedDate && "text-muted-foreground"
+                  )}
+                >
+                  <CalendarIcon className="mr-2 h-4 w-4" />
+                  {selectedDate ? format(selectedDate, "PPP", { locale: it }) : <span>Seleziona data</span>}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="end">
+                <Calendar
+                  mode="single"
+                  selected={selectedDate}
+                  onSelect={(date) => date && setSelectedDate(date)}
+                  initialFocus
+                  locale={it}
+                />
+              </PopoverContent>
+            </Popover>
             <div className="bg-card rounded-lg border shadow-sm px-4 py-2 text-center">
               <div className="text-sm text-muted-foreground">Task Totali</div>
               <div className="text-2xl font-bold text-primary">{allTasks.length}</div>
