@@ -1,5 +1,5 @@
 import { Personnel, Task } from "@shared/schema";
-import { Calendar } from "lucide-react";
+import { Calendar, RotateCcw } from "lucide-react";
 import { useState, useEffect } from "react";
 import { Droppable } from "react-beautiful-dnd";
 import TaskCard from "@/components/drag-drop/task-card";
@@ -9,6 +9,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
 
 interface TimelineViewProps {
   personnel: Personnel[];
@@ -87,6 +88,26 @@ export default function TimelineView({
     setIsModalOpen(true);
   };
 
+  const handleResetAssignments = async () => {
+    try {
+      // Rimuovi tutte le assegnazioni salvate
+      const response = await fetch('/api/save-assignments', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify([]),
+      });
+
+      if (response.ok) {
+        // Ricarica la pagina per ripristinare lo stato iniziale
+        window.location.reload();
+      } else {
+        console.error('Errore nel reset delle assegnazioni');
+      }
+    } catch (error) {
+      console.error('Errore nella chiamata API di reset:', error);
+    }
+  };
+
   // Non mostrare nulla se non ci sono cleaners
   if (cleaners.length === 0) {
     return null;
@@ -96,10 +117,21 @@ export default function TimelineView({
     <>
       <div className="bg-card rounded-lg border shadow-sm">
         <div className="p-4 border-b border-border">
-          <h3 className="font-semibold text-foreground flex items-center">
-            <Calendar className="w-5 h-5 mr-2 text-primary" />
-            Timeline Assegnazioni - {cleaners.length} Cleaners
-          </h3>
+          <div className="flex items-center justify-between">
+            <h3 className="font-semibold text-foreground flex items-center">
+              <Calendar className="w-5 h-5 mr-2 text-primary" />
+              Timeline Assegnazioni - {cleaners.length} Cleaners
+            </h3>
+            <Button
+              onClick={handleResetAssignments}
+              variant="outline"
+              size="sm"
+              className="flex items-center gap-2"
+            >
+              <RotateCcw className="w-4 h-4" />
+              Reset Assegnazioni
+            </Button>
+          </div>
         </div>
         <div className="p-4 overflow-x-auto">
           {/* Header con orari */}
