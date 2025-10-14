@@ -198,23 +198,60 @@ export default function TimelineView({
                         ))}
                       </div>
 
-                      {/* Task posizionate in sequenza */}
-                      <div className="relative z-10 flex items-center h-full">
+                      {/* Task posizionate e dimensionate in base a start_time/end_time */}
+                      <div className="relative z-10 h-full">
                         {tasks
                           .filter((task) => (task as any).assignedCleaner === cleaner.id)
                           .filter((task, index, self) => 
                             // Rimuovi duplicati basandoti sul logistic_code (task.name)
                             index === self.findIndex((t) => t.name === task.name)
                           )
-                          .sort((a, b) => ((a as any).assignedSlot || 0) - ((b as any).assignedSlot || 0))
-                          .map((task, index) => (
-                            <TaskCard 
-                              key={`${task.name}-${cleaner.id}`}
-                              task={task} 
-                              index={index}
-                              isInTimeline={true}
-                            />
-                          ))}
+                          .sort((a, b) => {
+                            const aStart = (a as any).start_time || "10:00";
+                            const bStart = (b as any).start_time || "10:00";
+                            return aStart.localeCompare(bStart);
+                          })
+                          .map((task, index) => {
+                            const startTime = (task as any).start_time || "10:00";
+                            const endTime = (task as any).end_time || "10:00";
+                            
+                            const [startHour, startMinute] = startTime.split(":").map(Number);
+                            const [endHour, endMinute] = endTime.split(":").map(Number);
+                            
+                            const startMinutesFromMidnight = startHour * 60 + startMinute;
+                            const endMinutesFromMidnight = endHour * 60 + endMinute;
+                            
+                            // La timeline va dalle 08:00 alle 19:00 = 11 ore = 660 minuti
+                            const timelineStartMinutes = 8 * 60; // 08:00 = 480 min
+                            const timelineTotalMinutes = 11 * 60; // 660 min
+                            
+                            // Calcola posizione (left) in percentuale
+                            const offsetMinutes = startMinutesFromMidnight - timelineStartMinutes;
+                            const leftPercentage = (offsetMinutes / timelineTotalMinutes) * 100;
+                            
+                            // Calcola larghezza in percentuale basata sulla durata effettiva
+                            const durationMinutes = endMinutesFromMidnight - startMinutesFromMidnight;
+                            const widthPercentage = (durationMinutes / timelineTotalMinutes) * 100;
+                            
+                            return (
+                              <div
+                                key={`${task.name}-${cleaner.id}`}
+                                className="absolute"
+                                style={{ 
+                                  left: `${Math.max(0, leftPercentage)}%`,
+                                  width: `${widthPercentage}%`,
+                                  top: '50%',
+                                  transform: 'translateY(-50%)'
+                                }}
+                              >
+                                <TaskCard 
+                                  task={task} 
+                                  index={index}
+                                  isInTimeline={true}
+                                />
+                              </div>
+                            );
+                          })}
                         {provided.placeholder}
                       </div>
                     </div>
