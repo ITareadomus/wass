@@ -76,8 +76,18 @@
       "assignment_type": "smista_button"
     },
     {
-      "logistic_code": "609",
+      "logistic_code": "619",
       "cleanerId": 24,
+      "assignment_type": "manual_drag"
+    },
+    {
+      "logistic_code": "609",
+      "cleanerId": 249,
+      "assignment_type": "manual_drag"
+    },
+    {
+      "logistic_code": "617",
+      "cleanerId": 132,
       "assignment_type": "manual_drag"
     }
   ]
