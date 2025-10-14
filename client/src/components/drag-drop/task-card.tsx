@@ -44,20 +44,41 @@ export default function TaskCard({
     return "task-standard";
   };
 
-  // Calcola la larghezza in base alla durata (sempre in percentuale rispetto a 12 ore)
+  // Calcola la larghezza in base alla durata con breakpoint responsive
   const calculateWidth = (duration: string, forTimeline: boolean) => {
     const parts = duration.split(".");
     const hours = parseInt(parts[0] || "0");
     const minutes = parts[1] ? parseInt(parts[1]) : 0;
     const totalMinutes = hours * 60 + minutes;
 
-    // La timeline copre 12 ore (720 minuti)
-    // Calcola la percentuale della durata rispetto ai 720 minuti
-    const widthPercentage = totalMinutes === 0 
-      ? (30 / 720) * 100  // Se 0 minuti, usa almeno 30 minuti (4.166%)
-      : (totalMinutes / 720) * 100;
-    
-    return `${widthPercentage}%`;
+    // Se 0 minuti, usa almeno 30 minuti
+    if (totalMinutes === 0) {
+      return forTimeline ? "4.166%" : "w-[50px] sm:w-[60px] md:w-[70px]";
+    }
+
+    // Se la task dura meno di 1 ora e non è sulla timeline, mostrala come 1 ora
+    if (totalMinutes < 60 && !forTimeline) {
+      return "w-[80px] sm:w-[90px] md:w-[100px]"; // Responsive per task < 1h
+    }
+
+    if (forTimeline) {
+      // La timeline copre 12 ore (720 minuti)
+      // Calcola la percentuale della durata rispetto ai 720 minuti
+      const widthPercentage = (totalMinutes / 720) * 100;
+      return `${widthPercentage}%`;
+    } else {
+      // Per le colonne di priorità, calcola con breakpoint responsive
+      const halfHours = Math.ceil(totalMinutes / 30);
+      
+      // Mobile: 40px per mezz'ora
+      // Tablet (sm): 45px per mezz'ora
+      // Desktop (md): 50px per mezz'ora
+      const mobileWidth = halfHours * 40;
+      const tabletWidth = halfHours * 45;
+      const desktopWidth = halfHours * 50;
+      
+      return `w-[${mobileWidth}px] sm:w-[${tabletWidth}px] md:w-[${desktopWidth}px]`;
+    }
   };
 
   return (
@@ -77,10 +98,11 @@ export default function TaskCard({
                 ${snapshot.isDragging ? "shadow-lg scale-105" : ""}
                 hover:shadow-md cursor-pointer
                 flex-shrink-0 relative
+                ${!isInTimeline && cardWidth.startsWith('w-') ? cardWidth : ''}
               `}
               style={{
                 ...provided.draggableProps.style,
-                width: cardWidth,
+                width: cardWidth.startsWith('w-') ? undefined : cardWidth,
                 minHeight: "40px",
               }}
               data-testid={`task-card-${task.id}`}
