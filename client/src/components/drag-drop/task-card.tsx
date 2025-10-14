@@ -8,7 +8,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { HelpCircle } from "lucide-react";
 
 interface TaskCardProps {
@@ -45,9 +45,13 @@ export default function TaskCard({
     return "task-standard";
   };
 
-  // Calcola la larghezza in base alla durata
-  const calculateWidth = (duration: string) => {
-    const parts = duration.split(".");
+  // Calcola la larghezza in base alla durata usando useMemo
+  const cardWidth = useMemo(() => {
+    if (isInTimeline) {
+      return "100%";
+    }
+
+    const parts = task.duration.split(".");
     const hours = parseInt(parts[0] || "0");
     const minutes = parts[1] ? parseInt(parts[1]) : 0;
     const totalMinutes = hours * 60 + minutes;
@@ -65,13 +69,12 @@ export default function TaskCard({
     // Per le colonne di priorità, usa i pixel (50px per ogni mezz'ora)
     const width = Math.ceil(totalMinutes / 30) * 50;
     return `${width}px`;
-  };
+  }, [task.duration, isInTimeline]);
 
   return (
     <>
       <Draggable draggableId={task.id} index={index}>
         {(provided, snapshot) => {
-          const cardWidth = isInTimeline ? "100%" : calculateWidth(task.duration);
           
           return (
             <div
