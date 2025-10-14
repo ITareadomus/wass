@@ -337,11 +337,51 @@ export default function GenerateAssignments() {
       const cleanerId = parseInt(destination.droppableId.replace('timeline-', ''));
 
       setAllTasksWithAssignments((prevTasks) => {
+        // 1) Accertati che ci siano elementi già presenti
+        const existingTasksForCleaner = prevTasks.filter(
+          t => (t as any).assignedCleaner === cleanerId
+        );
+
+        // 2) Calcola start_time e end_time basandoti sull'ultima task presente
+        let calculatedStartTime = "10:00"; // Default se non ci sono task
+        let calculatedEndTime = "10:00";
+        
+        const taskToAssign = prevTasks.find(t => t.id === taskId);
+        if (!taskToAssign) return prevTasks;
+
+        // Calcola la durata in minuti della task da assegnare
+        const durationParts = taskToAssign.duration.split(".");
+        const hours = parseInt(durationParts[0] || "0");
+        const minutes = durationParts[1] ? parseInt(durationParts[1]) : 0;
+        const taskDurationMinutes = hours * 60 + minutes;
+
+        if (existingTasksForCleaner.length > 0) {
+          // Trova l'ultima end_time tra le task esistenti
+          const lastTask = existingTasksForCleaner.reduce((latest, current) => {
+            const currentEndTime = (current as any).end_time || "10:00";
+            const latestEndTime = (latest as any).end_time || "10:00";
+            return currentEndTime > latestEndTime ? current : latest;
+          });
+
+          calculatedStartTime = (lastTask as any).end_time || "10:00";
+        }
+
+        // Calcola end_time aggiungendo la durata allo start_time
+        const [startHour, startMinute] = calculatedStartTime.split(":").map(Number);
+        const startMinutes = startHour * 60 + startMinute;
+        const endMinutes = startMinutes + taskDurationMinutes;
+        const endHour = Math.floor(endMinutes / 60);
+        const endMinute = endMinutes % 60;
+        calculatedEndTime = `${endHour.toString().padStart(2, '0')}:${endMinute.toString().padStart(2, '0')}`;
+
+        // 3) Aggiorna la task con cleaner, start_time e end_time
         const updatedTasks = prevTasks.map((task) => {
           if (task.id === taskId) {
             return {
               ...task,
               assignedCleaner: cleanerId,
+              start_time: calculatedStartTime,
+              end_time: calculatedEndTime,
             };
           }
           return task;

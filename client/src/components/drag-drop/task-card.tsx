@@ -77,7 +77,7 @@ export default function TaskCard({
     <>
       <Draggable draggableId={task.id} index={index}>
         {(provided, snapshot) => {
-          const cardWidth = calculateWidth(task.duration, isInTimeline);
+          const cardWidth = isInTimeline ? '100%' : calculateWidth(task.duration, false);
           
           return (
             <div
