@@ -188,8 +188,7 @@ def main() -> None:
         if task.get("assignment_status") == "assigned" and task.get("assigned_cleaner"):
             timeline_assignments["assignments"].append({
                 "taskId": str(tid(task)),
-                "cleanerId": task["assigned_cleaner"]["id"],
-                "slot": 0  # Default slot per early-out
+                "cleanerId": task["assigned_cleaner"]["id"]
             })
     
     save_json(TIMELINE_ASSIGNMENTS_PATH, timeline_assignments)

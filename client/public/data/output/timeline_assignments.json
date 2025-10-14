@@ -2,108 +2,87 @@
   "assignments": [
     {
       "taskId": "217368",
-      "cleanerId": 24,
-      "slot": 0
+      "cleanerId": 24
     },
     {
       "taskId": "217365",
-      "cleanerId": 132,
-      "slot": 0
+      "cleanerId": 132
     },
     {
       "taskId": "217228",
-      "cleanerId": 132,
-      "slot": 0
+      "cleanerId": 132
     },
     {
       "taskId": "217229",
-      "cleanerId": 24,
-      "slot": 0
+      "cleanerId": 24
     },
     {
       "taskId": "217230",
-      "cleanerId": 249,
-      "slot": 0
+      "cleanerId": 249
     },
     {
       "taskId": "217231",
-      "cleanerId": 445,
-      "slot": 0
+      "cleanerId": 445
     },
     {
       "taskId": "217232",
-      "cleanerId": 287,
-      "slot": 0
+      "cleanerId": 287
     },
     {
       "taskId": "217233",
-      "cleanerId": 326,
-      "slot": 0
+      "cleanerId": 326
     },
     {
       "taskId": "217234",
-      "cleanerId": 404,
-      "slot": 0
+      "cleanerId": 404
     },
     {
       "taskId": "217235",
-      "cleanerId": 469,
-      "slot": 0
+      "cleanerId": 469
     },
     {
       "taskId": "217244",
-      "cleanerId": 771,
-      "slot": 0
+      "cleanerId": 771
     },
     {
       "taskId": "217248",
-      "cleanerId": 845,
-      "slot": 0
+      "cleanerId": 845
     },
     {
       "taskId": "217249",
-      "cleanerId": 596,
-      "slot": 0
+      "cleanerId": 596
     },
     {
       "taskId": "217250",
-      "cleanerId": 644,
-      "slot": 0
+      "cleanerId": 644
     },
     {
       "taskId": "217251",
-      "cleanerId": 785,
-      "slot": 0
+      "cleanerId": 785
     },
     {
       "taskId": "217252",
-      "cleanerId": 829,
-      "slot": 0
+      "cleanerId": 829
     },
     {
       "taskId": "217269",
-      "cleanerId": 495,
-      "slot": 0
+      "cleanerId": 495
     },
     {
       "taskId": "217307",
-      "cleanerId": 937,
-      "slot": 0
+      "cleanerId": 937
     },
     {
       "taskId": "217364",
-      "cleanerId": 249,
-      "slot": 1
+      "cleanerId": 249
     },
     {
       "taskId": "217355",
-      "cleanerId": 287,
-      "slot": 1
+      "cleanerId": 287
     },
     {
       "taskId": "217308",
-      "cleanerId": 326,
-      "slot": 1
+      "cleanerId": 326
     }
   ]
 }
