@@ -1,11 +1,6 @@
 {
   "assignments": [
     {
-      "logistic_code": "1633",
-      "cleanerId": 24,
-      "assignment_type": "manual_drag"
-    },
-    {
       "logistic_code": "1642",
       "cleanerId": 132,
       "assignment_type": "smista_button"
@@ -88,6 +83,11 @@
     {
       "logistic_code": "619",
       "cleanerId": 24,
+      "assignment_type": "manual_drag"
+    },
+    {
+      "logistic_code": "617",
+      "cleanerId": 287,
       "assignment_type": "manual_drag"
     }
   ]
