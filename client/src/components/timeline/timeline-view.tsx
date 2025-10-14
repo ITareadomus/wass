@@ -213,41 +213,39 @@ export default function TimelineView({
                             return aStart.localeCompare(bStart);
                           })
                           .map((task, index) => {
-                            // Usa i dati di posizione da timeline_assignments.json se disponibili
                             const taskData = (task as any);
-                            let leftPercentage = 0;
-                            let widthPercentage = 10;
-                            
-                            if (taskData.position) {
-                              // Usa la posizione salvata dallo script Python
-                              // Converti da timeline 12 ore (8:00-20:00) a 11 ore (8:00-19:00)
-                              const originalLeft = taskData.position.left;
-                              const originalWidth = taskData.position.width;
-                              
-                              // Ricalcola per timeline 11 ore
-                              // left: ((start_hour - 8) / 11) * 100
-                              // width: (duration_hours / 11) * 100
-                              leftPercentage = (originalLeft / 12) * 11;
-                              widthPercentage = (originalWidth / 12) * 11;
-                            } else if (taskData.start_time) {
-                              // Fallback: calcola dalla start_time e duration
-                              const startTime = taskData.start_time;
-                              const durationParts = task.duration.split(".");
-                              const hours = parseInt(durationParts[0] || "0");
-                              const minutes = durationParts[1] ? parseInt(durationParts[1]) : 0;
-                              const taskDurationMinutes = hours * 60 + minutes;
-                              
-                              const [startHour, startMinute] = startTime.split(":").map(Number);
-                              const startMinutesFromMidnight = startHour * 60 + startMinute;
-                              
-                              const timelineStartMinutes = 8 * 60;
-                              const timelineTotalMinutes = 11 * 60;
-                              
-                              const offsetMinutes = startMinutesFromMidnight - timelineStartMinutes;
-                              leftPercentage = (offsetMinutes / timelineTotalMinutes) * 100;
-                              widthPercentage = (taskDurationMinutes / timelineTotalMinutes) * 100;
-                            }
-                            
+
+                            // Calcola posizione e larghezza normalizzando i minuti
+                            // Timeline: 11 ore (8:00-19:00)
+                            // Ogni ora = 100 unità (dove ogni minuto = 100/60 ≈ 1.67 unità)
+                            // Timeline totale = 11 * 100 = 1100 unità
+
+                            const timelineStartHour = 8;
+                            const timelineTotalHours = 11;
+                            const unitsPerHour = 100; // Ogni ora = 100 unità
+                            const unitsPerMinute = unitsPerHour / 60; // 1.67 unità per minuto
+                            const totalUnits = timelineTotalHours * unitsPerHour; // 1100 unità totali
+
+                            // Estrai start_time
+                            let startTime = taskData.start_time || "10:00";
+                            const [startHour, startMinute] = startTime.split(":").map(Number);
+                            const startMinutesFromTimelineStart = (startHour * 60 + startMinute) - (timelineStartHour * 60);
+
+                            // Converti minuti in unità normalizzate
+                            const startUnits = startMinutesFromTimelineStart * unitsPerMinute;
+
+                            // Calcola left in percentuale
+                            const leftPercentage = (startUnits / totalUnits) * 100;
+
+                            // Estrai cleaning_time in minuti
+                            const cleaningTimeMinutes = taskData.cleaning_time || 60;
+
+                            // Converti cleaning_time in unità normalizzate
+                            const widthUnits = cleaningTimeMinutes * unitsPerMinute;
+
+                            // Calcola width in percentuale
+                            const widthPercentage = (widthUnits / totalUnits) * 100;
+
                             return (
                               <div
                                 key={`${task.name}-${cleaner.id}`}
