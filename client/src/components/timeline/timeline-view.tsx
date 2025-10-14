@@ -173,9 +173,6 @@ export default function TimelineView({
                     <div className="text-xs font-medium break-words leading-tight">
                       {cleaner.name} {cleaner.lastname}
                     </div>
-                    <div className="text-xs opacity-80 mt-0.5">
-                      {cleaner.role}
-                    </div>
                   </div>
                 </div>
 
