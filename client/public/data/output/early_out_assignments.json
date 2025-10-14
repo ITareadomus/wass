@@ -522,7 +522,7 @@
       "cleaning_time": 60,
       "checkin_date": "2025-10-15",
       "checkout_date": "2025-10-15",
-      "checkin_time": null,
+      "checkin_time": "15:00",
       "checkout_time": "10:00",
       "pax_in": 2,
       "pax_out": 4,
