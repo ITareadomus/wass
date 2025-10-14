@@ -171,7 +171,7 @@ export default function TimelineView({
                 >
                   <div className="w-full">
                     <div className="text-xs font-medium break-words leading-tight">
-                      {cleaner.name} {cleaner.lastname}
+                      {cleaner.name.toUpperCase()} {cleaner.lastname.toUpperCase()}
                     </div>
                   </div>
                 </div>
@@ -243,11 +243,11 @@ export default function TimelineView({
                 </div>
                 <div>
                   <p className="text-sm font-semibold text-muted-foreground">name</p>
-                  <p className="text-sm">{selectedCleaner.name}</p>
+                  <p className="text-sm">{selectedCleaner.name.toUpperCase()}</p>
                 </div>
                 <div>
                   <p className="text-sm font-semibold text-muted-foreground">lastname</p>
-                  <p className="text-sm">{selectedCleaner.lastname}</p>
+                  <p className="text-sm">{selectedCleaner.lastname.toUpperCase()}</p>
                 </div>
                 <div>
                   <p className="text-sm font-semibold text-muted-foreground">role</p>
