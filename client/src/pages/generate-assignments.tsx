@@ -140,11 +140,11 @@ export default function GenerateAssignments() {
       setIsLoadingTasks(true);
       setExtractionStep("Caricamento task nei contenitori...");
 
-      const [earlyOutResponse, highPriorityResponse, lowPriorityResponse, manualAssignmentsResponse] = await Promise.all([
+      const [earlyOutResponse, highPriorityResponse, lowPriorityResponse, timelineAssignmentsResponse] = await Promise.all([
         fetch('/data/output/early_out.json'),
         fetch('/data/output/high_priority.json'),
         fetch('/data/output/low_priority.json'),
-        fetch('/data/output/manual_assignments.json')
+        fetch('/data/output/timeline_assignments.json')
       ]);
 
       if (!earlyOutResponse.ok || !highPriorityResponse.ok || !lowPriorityResponse.ok) {
@@ -154,12 +154,12 @@ export default function GenerateAssignments() {
       const earlyOutData = await earlyOutResponse.json();
       const highPriorityData = await highPriorityResponse.json();
       const lowPriorityData = await lowPriorityResponse.json();
-      const manualAssignmentsData = manualAssignmentsResponse.ok ? await manualAssignmentsResponse.json() : { assignments: [] };
+      const timelineAssignmentsData = timelineAssignmentsResponse.ok ? await timelineAssignmentsResponse.json() : { assignments: [] };
 
       console.log("Early out data:", earlyOutData);
       console.log("High priority data:", highPriorityData);
       console.log("Low priority data:", lowPriorityData);
-      console.log("Manual assignments data:", manualAssignmentsData);
+      console.log("Timeline assignments data:", timelineAssignmentsData);
 
       const initialEarlyOut: Task[] = (earlyOutData.early_out_tasks || []).map((task: RawTask) =>
         convertRawTask(task, "early-out")
@@ -175,29 +175,29 @@ export default function GenerateAssignments() {
 
       console.log("Tasks convertiti - Early:", initialEarlyOut.length, "High:", initialHigh.length, "Low:", initialLow.length);
 
-      // Crea un Set di task IDs assegnate manualmente
-      const manuallyAssignedIds = new Set(
-        manualAssignmentsData.assignments.map((a: any) => a.taskId)
+      // Crea un Set di task IDs assegnate nella timeline
+      const assignedInTimelineIds = new Set(
+        timelineAssignmentsData.assignments.map((a: any) => a.taskId)
       );
 
-      // Filtra le task assegnate manualmente dai container
-      const filteredEarlyOut = initialEarlyOut.filter(task => !manuallyAssignedIds.has(task.id));
-      const filteredHigh = initialHigh.filter(task => !manuallyAssignedIds.has(task.id));
-      const filteredLow = initialLow.filter(task => !manuallyAssignedIds.has(task.id));
+      // Filtra le task già presenti nella timeline dai container
+      const filteredEarlyOut = initialEarlyOut.filter(task => !assignedInTimelineIds.has(task.id));
+      const filteredHigh = initialHigh.filter(task => !assignedInTimelineIds.has(task.id));
+      const filteredLow = initialLow.filter(task => !assignedInTimelineIds.has(task.id));
 
       setEarlyOutTasks(filteredEarlyOut);
       setHighPriorityTasks(filteredHigh);
       setLowPriorityTasks(filteredLow);
 
-      // Crea l'array unificato con le assegnazioni manuali
+      // Crea l'array unificato con le assegnazioni della timeline
       const allTasks = [...initialEarlyOut, ...initialHigh, ...initialLow];
       const tasksWithAssignments = allTasks.map(task => {
-        const manualAssignment = manualAssignmentsData.assignments.find((a: any) => a.taskId === task.id);
-        if (manualAssignment) {
+        const timelineAssignment = timelineAssignmentsData.assignments.find((a: any) => a.taskId === task.id);
+        if (timelineAssignment) {
           return {
             ...task,
-            assignedCleaner: manualAssignment.cleanerId,
-            assignedSlot: manualAssignment.slot,
+            assignedCleaner: timelineAssignment.cleanerId,
+            assignedSlot: timelineAssignment.slot,
           };
         }
         return task;
@@ -276,20 +276,20 @@ export default function GenerateAssignments() {
     }
   };
 
-  const saveManualAssignments = async (taskId: string, cleanerId: number, slot: number) => {
+  const saveTimelineAssignment = async (taskId: string, cleanerId: number, slot: number) => {
     try {
-      const response = await fetch('/api/save-manual-assignment', {
+      const response = await fetch('/api/save-timeline-assignment', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ taskId, cleanerId, slot }),
       });
       if (!response.ok) {
-        console.error('Errore nel salvataggio dell\'assegnazione manuale');
+        console.error('Errore nel salvataggio dell\'assegnazione nella timeline');
       } else {
-        console.log('Assegnazione manuale salvata con successo');
+        console.log('Assegnazione salvata nella timeline con successo');
       }
     } catch (error) {
-      console.error('Errore nella chiamata API di salvataggio manuale:', error);
+      console.error('Errore nella chiamata API di salvataggio timeline:', error);
     }
   };
 
@@ -328,8 +328,8 @@ export default function GenerateAssignments() {
         return updatedTasks;
       });
 
-      // Salva l'assegnazione manuale
-      saveManualAssignments(taskId, cleanerId, destination.index);
+      // Salva l'assegnazione nella timeline
+      saveTimelineAssignment(taskId, cleanerId, destination.index);
 
       // Rimuovi la task dal container originale
       if (source.droppableId === 'early-out') {

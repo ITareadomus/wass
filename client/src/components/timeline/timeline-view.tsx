@@ -72,7 +72,7 @@ export default function TimelineView({
         }
         const selectedData = await response.json();
         console.log("Cleaners caricati da selected_cleaners.json:", selectedData);
-        
+
         // I cleaners sono già nel formato corretto
         const cleanersList = selectedData.cleaners || [];
         setCleaners(cleanersList);
@@ -90,8 +90,8 @@ export default function TimelineView({
 
   const handleResetAssignments = async () => {
     try {
-      // Svuota manual_assignments.json
-      const response = await fetch('/api/reset-manual-assignments', {
+      // Svuota timeline_assignments.json
+      const response = await fetch('/api/reset-timeline-assignments', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
       });
