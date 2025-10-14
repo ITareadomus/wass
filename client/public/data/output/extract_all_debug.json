@@ -365,6 +365,15 @@
       "reasons": [
         "checkout_time<=eo_time"
       ]
+    },
+    {
+      "task_id": 217368,
+      "client_id": 61,
+      "premium": false,
+      "final_class": "EO",
+      "reasons": [
+        "client_forced_eo"
+      ]
     }
   ]
 }

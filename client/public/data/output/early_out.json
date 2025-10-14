@@ -297,7 +297,7 @@
       "cleaning_time": 60,
       "checkin_date": "2025-10-15",
       "checkout_date": "2025-10-15",
-      "checkin_time": null,
+      "checkin_time": "13:00",
       "checkout_time": null,
       "pax_in": 1,
       "pax_out": 1,
@@ -519,7 +519,33 @@
       "reasons": [
         "checkout_time<=eo_time"
       ]
+    },
+    {
+      "task_id": 217368,
+      "logistic_code": 609,
+      "client_id": 61,
+      "premium": false,
+      "address": "VIALE STELVIO 53",
+      "lat": "45.494052",
+      "lng": "9.186503",
+      "cleaning_time": 60,
+      "checkin_date": "2025-10-15",
+      "checkout_date": "2025-10-15",
+      "checkin_time": "15:00",
+      "checkout_time": null,
+      "pax_in": 2,
+      "pax_out": 2,
+      "small_equipment": true,
+      "operation_id": 2,
+      "confirmed_operation": false,
+      "straordinaria": false,
+      "type_apt": "A",
+      "alias": "NTM",
+      "customer_name": "NOTA-MI",
+      "reasons": [
+        "client_forced_eo"
+      ]
     }
   ],
-  "total_apartments": 20
+  "total_apartments": 21
 }
