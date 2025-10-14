@@ -84,6 +84,11 @@
       "logistic_code": "619",
       "cleanerId": 24,
       "assignment_type": "manual_drag"
+    },
+    {
+      "logistic_code": "617",
+      "cleanerId": 24,
+      "assignment_type": "manual_drag"
     }
   ]
 }
