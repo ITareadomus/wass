@@ -101,6 +101,28 @@
     border-color: #22c55e;
   }
   
+  /* Responsive width utilities per task cards */
+  @media (max-width: 639px) {
+    /* Mobile: larghezze ridotte */
+    .task-card-width {
+      min-width: 60px;
+    }
+  }
+  
+  @media (min-width: 640px) and (max-width: 767px) {
+    /* Tablet: larghezze medie */
+    .task-card-width {
+      min-width: 70px;
+    }
+  }
+  
+  @media (min-width: 768px) {
+    /* Desktop: larghezze standard */
+    .task-card-width {
+      min-width: 80px;
+    }
+  }
+  
   .task-early-out {
     background-color: var(--task-early-out-bg);
     color: var(--task-early-out-fg);
