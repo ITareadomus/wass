@@ -1,3 +1,4 @@
+
 import { Draggable } from "react-beautiful-dnd";
 import { Task } from "@shared/schema";
 import {
@@ -45,12 +46,7 @@ export default function TaskCard({
   };
 
   // Calcola la larghezza in base alla durata
-  const calculateWidth = (duration: string, forTimeline: boolean) => {
-    // Se la task è nella timeline, la larghezza è gestita dal parent
-    if (forTimeline) {
-      return "100%";
-    }
-    
+  const calculateWidth = (duration: string) => {
     const parts = duration.split(".");
     const hours = parseInt(parts[0] || "0");
     const minutes = parts[1] ? parseInt(parts[1]) : 0;
@@ -75,7 +71,7 @@ export default function TaskCard({
     <>
       <Draggable draggableId={task.id} index={index}>
         {(provided, snapshot) => {
-          const cardWidth = calculateWidth(task.duration, isInTimeline);
+          const cardWidth = isInTimeline ? "100%" : calculateWidth(task.duration);
           
           return (
             <div
