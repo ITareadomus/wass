@@ -374,6 +374,16 @@
       "reasons": [
         "client_forced_eo"
       ]
+    },
+    {
+      "task_id": 217375,
+      "client_id": 67,
+      "premium": false,
+      "final_class": "LP",
+      "reasons": [
+        "not_eo",
+        "not_hp"
+      ]
     }
   ]
 }
