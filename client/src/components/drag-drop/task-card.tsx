@@ -44,45 +44,43 @@ export default function TaskCard({
     return "task-standard";
   };
 
-  // Calcola la larghezza in pixel fissi (1 minuto = 1.667px, basato su timeline di 1200px per 12 ore)
-  const calculateWidth = (duration: string) => {
+  // Calcola la larghezza in base alla durata (sempre in percentuale rispetto a 12 ore)
+  const calculateWidth = (duration: string, forTimeline: boolean) => {
     const parts = duration.split(".");
     const hours = parseInt(parts[0] || "0");
     const minutes = parts[1] ? parseInt(parts[1]) : 0;
     const totalMinutes = hours * 60 + minutes;
 
-    // 12 ore (720 minuti) = 1200px nella timeline
-    // Quindi 1 minuto = 1.667px
-    const pixelsPerMinute = 1200 / 720;
-    const widthInPixels = totalMinutes === 0
-      ? pixelsPerMinute * 30  // Se 0 minuti, usa almeno 30 minuti (50px)
-      : pixelsPerMinute * totalMinutes;
-
-    return `${Math.round(widthInPixels)}px`;
+    // La timeline copre 12 ore (720 minuti)
+    // Calcola la percentuale della durata rispetto ai 720 minuti
+    const widthPercentage = totalMinutes === 0 
+      ? (30 / 720) * 100  // Se 0 minuti, usa almeno 30 minuti (4.166%)
+      : (totalMinutes / 720) * 100;
+    
+    return `${widthPercentage}%`;
   };
 
   return (
     <>
       <Draggable draggableId={task.id} index={index}>
         {(provided, snapshot) => {
-          const cardWidth = calculateWidth(task.duration);
-
+          const cardWidth = calculateWidth(task.duration, isInTimeline);
+          
           return (
             <div
               ref={provided.innerRef}
               {...provided.draggableProps}
               {...provided.dragHandleProps}
               className={`
-                ${getTaskClassByPriority(task)}
+                ${getTaskClassByPriority(task)} 
                 rounded-sm px-2 py-1 shadow-sm border transition-all duration-200
                 ${snapshot.isDragging ? "shadow-lg scale-105" : ""}
                 hover:shadow-md cursor-pointer
                 flex-shrink-0 relative
-                ${!isInTimeline ? `w-[${cardWidth}]` : ''}
               `}
               style={{
                 ...provided.draggableProps.style,
-                width: isInTimeline ? cardWidth : undefined,
+                width: cardWidth,
                 minHeight: "40px",
               }}
               data-testid={`task-card-${task.id}`}
