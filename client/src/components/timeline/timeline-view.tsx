@@ -215,44 +215,36 @@ export default function TimelineView({
                           .map((task, index) => {
                             const taskData = (task as any);
 
-                            // Calcola posizione e larghezza normalizzando i minuti
                             // Timeline: 11 ore (8:00-19:00)
-                            // Ogni ora = 100 unità (dove ogni minuto = 100/60 ≈ 1.67 unità)
-                            // Timeline totale = 11 * 100 = 1100 unità
+                            // 1 minuto = 1.67 pixel
+                            // Esempio: task alle 10:15 = 135 minuti dall'inizio (8:00) = 135 × 1.67 = 225px
 
-                            const timelineStartHour = 8;
-                            const timelineTotalHours = 11;
-                            const unitsPerHour = 100; // Ogni ora = 100 unità
-                            const unitsPerMinute = unitsPerHour / 60; // 1.67 unità per minuto
-                            const totalUnits = timelineTotalHours * unitsPerHour; // 1100 unità totali
+                            const PIXELS_PER_MINUTE = 1.67;
+                            const timelineStartHour = 8; // La timeline inizia alle 8:00
 
                             // Estrai start_time
                             let startTime = taskData.start_time || "10:00";
                             const [startHour, startMinute] = startTime.split(":").map(Number);
+                            
+                            // Calcola minuti dall'inizio della timeline (8:00)
                             const startMinutesFromTimelineStart = (startHour * 60 + startMinute) - (timelineStartHour * 60);
 
-                            // Converti minuti in unità normalizzate
-                            const startUnits = startMinutesFromTimelineStart * unitsPerMinute;
-
-                            // Calcola left in percentuale
-                            const leftPercentage = (startUnits / totalUnits) * 100;
+                            // Converti minuti in pixel
+                            const leftPixels = startMinutesFromTimelineStart * PIXELS_PER_MINUTE;
 
                             // Estrai cleaning_time in minuti
                             const cleaningTimeMinutes = taskData.cleaning_time || 60;
 
-                            // Converti cleaning_time in unità normalizzate
-                            const widthUnits = cleaningTimeMinutes * unitsPerMinute;
-
-                            // Calcola width in percentuale
-                            const widthPercentage = (widthUnits / totalUnits) * 100;
+                            // Converti cleaning_time in pixel
+                            const widthPixels = cleaningTimeMinutes * PIXELS_PER_MINUTE;
 
                             return (
                               <div
                                 key={`${task.name}-${cleaner.id}`}
                                 className="absolute"
                                 style={{ 
-                                  left: `${Math.max(0, leftPercentage)}%`,
-                                  width: `${widthPercentage}%`,
+                                  left: `${Math.max(0, leftPixels)}px`,
+                                  width: `${widthPixels}px`,
                                   top: '50%',
                                   transform: 'translateY(-50%)'
                                 }}
