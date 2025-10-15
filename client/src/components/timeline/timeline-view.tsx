@@ -45,6 +45,42 @@ export default function TimelineView({
     "13:00", "14:00", "15:00", "16:00", "17:00", "18:00", "19:00"
   ];
 
+  // Funzione per convertire orario HH:MM in minuti dall'inizio del giorno
+  const timeToMinutes = (time: string): number => {
+    if (!time) return 0;
+    const [hours, minutes] = time.split(':').map(Number);
+    return hours * 60 + minutes;
+  };
+
+  // Funzione per calcolare la posizione e larghezza della task nella griglia
+  const getTaskPosition = (task: any) => {
+    const startTime = task.fw_start_time || task.start_time || "10:00";
+    const endTime = task.fw_end_time || task.end_time || "11:00";
+    
+    const startMinutes = timeToMinutes(startTime);
+    const endMinutes = timeToMinutes(endTime);
+    
+    // Orario di inizio della timeline (8:00)
+    const timelineStartMinutes = 8 * 60; // 480 minuti
+    // Durata totale della timeline in minuti (12 ore)
+    const timelineDurationMinutes = 12 * 60; // 720 minuti
+    
+    // Calcola posizione percentuale dall'inizio della timeline
+    const offsetMinutes = startMinutes - timelineStartMinutes;
+    const leftPercentage = (offsetMinutes / timelineDurationMinutes) * 100;
+    
+    // Calcola larghezza percentuale
+    const durationMinutes = endMinutes - startMinutes;
+    const widthPercentage = (durationMinutes / timelineDurationMinutes) * 100;
+    
+    return {
+      left: `${Math.max(0, leftPercentage)}%`,
+      width: `${Math.max(0.5, widthPercentage)}%`,
+      startTime,
+      endTime
+    };
+  };
+
   // Palette di colori azzurri per i cleaners
   const cleanerColors = [
     { bg: '#0EA5E9', text: '#FFFFFF' }, // Azzurro
@@ -198,23 +234,36 @@ export default function TimelineView({
                         ))}
                       </div>
 
-                      {/* Task posizionate in sequenza */}
-                      <div className="relative z-10 flex items-center h-full">
+                      {/* Task posizionate in base agli orari */}
+                      <div className="relative z-10 h-full">
                         {tasks
                           .filter((task) => (task as any).assignedCleaner === cleaner.id)
                           .filter((task, index, self) => 
                             // Rimuovi duplicati basandoti sul logistic_code (task.name)
                             index === self.findIndex((t) => t.name === task.name)
                           )
-                          .sort((a, b) => ((a as any).assignedSlot || 0) - ((b as any).assignedSlot || 0))
-                          .map((task, index) => (
-                            <TaskCard 
-                              key={`${task.name}-${cleaner.id}`}
-                              task={task} 
-                              index={index}
-                              isInTimeline={true}
-                            />
-                          ))}
+                          .map((task, index) => {
+                            const position = getTaskPosition(task);
+                            return (
+                              <div
+                                key={`${task.name}-${cleaner.id}`}
+                                className="absolute"
+                                style={{
+                                  left: position.left,
+                                  width: position.width,
+                                  top: '2px',
+                                  bottom: '2px'
+                                }}
+                                title={`${position.startTime} - ${position.endTime}`}
+                              >
+                                <TaskCard 
+                                  task={task} 
+                                  index={index}
+                                  isInTimeline={true}
+                                />
+                              </div>
+                            );
+                          })}
                         {provided.placeholder}
                       </div>
                     </div>
