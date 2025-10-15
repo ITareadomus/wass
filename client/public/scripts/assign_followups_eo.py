@@ -220,6 +220,10 @@ def assign_greedy_for_date(the_date, tasks, cleaners):
                     best = t
                     best_travel = trav
 
+            # Se non è stata trovata nessuna task, salta questo cleaner
+            if best is None:
+                continue
+
             # calcola orari
             start_min = cstate["available_min"] + (best_travel or 0)
             end_min   = start_min + int(best["cleaning_time"])
