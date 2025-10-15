@@ -39,11 +39,53 @@ export default function TimelineView({
   const [cleaners, setCleaners] = useState<Cleaner[]>([]);
   const [selectedCleaner, setSelectedCleaner] = useState<Cleaner | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [earlyOutAssignments, setEarlyOutAssignments] = useState<any[]>([]);
+  const [followupAssignments, setFollowupAssignments] = useState<any[]>([]);
 
-  const timeSlots = [
-    "08:00", "09:00", "10:00", "11:00", "12:00",
-    "13:00", "14:00", "15:00", "16:00", "17:00", "18:00", "19:00"
-  ];
+  // Calcola il primo start_time dalle assegnazioni
+  const getEarliestStartTime = () => {
+    const allStartTimes: string[] = [];
+
+    // Aggiungi start_time dalle early-out assignments
+    earlyOutAssignments.forEach((task: any) => {
+      if (task.assigned_cleaner?.start_time) {
+        allStartTimes.push(task.assigned_cleaner.start_time);
+      }
+    });
+
+    // Aggiungi start_time dalle followup assignments
+    followupAssignments.forEach((assignment: any) => {
+      assignment.assigned_tasks?.forEach((task: any) => {
+        if (task.start_time) {
+          allStartTimes.push(task.start_time);
+        }
+      });
+    });
+
+    if (allStartTimes.length === 0) return "08:00";
+
+    // Trova il minimo
+    allStartTimes.sort();
+    const earliest = allStartTimes[0];
+    
+    // Arrotonda all'ora precedente (es: 09:30 -> 09:00)
+    const hour = parseInt(earliest.split(':')[0]);
+    return `${hour.toString().padStart(2, '0')}:00`;
+  };
+
+  const generateTimeSlots = () => {
+    const startHour = parseInt(getEarliestStartTime().split(':')[0]);
+    const endHour = 19; // Ora di fine fissa
+    const slots: string[] = [];
+    
+    for (let hour = startHour; hour <= endHour; hour++) {
+      slots.push(`${hour.toString().padStart(2, '0')}:00`);
+    }
+    
+    return slots;
+  };
+
+  const timeSlots = generateTimeSlots();
 
   // Palette di colori azzurri per i cleaners
   const cleanerColors = [
@@ -64,23 +106,44 @@ export default function TimelineView({
   };
 
   useEffect(() => {
-    const loadCleaners = async () => {
+    const loadData = async () => {
       try {
-        const response = await fetch('/data/cleaners/selected_cleaners.json');
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
+        // Carica cleaners
+        const cleanersResponse = await fetch('/data/cleaners/selected_cleaners.json');
+        if (!cleanersResponse.ok) {
+          throw new Error(`HTTP error! status: ${cleanersResponse.status}`);
         }
-        const selectedData = await response.json();
+        const selectedData = await cleanersResponse.json();
         console.log("Cleaners caricati da selected_cleaners.json:", selectedData);
-
-        // I cleaners sono già nel formato corretto
         const cleanersList = selectedData.cleaners || [];
         setCleaners(cleanersList);
+
+        // Carica early-out assignments
+        try {
+          const earlyOutResponse = await fetch('/data/output/early_out_assignments.json');
+          if (earlyOutResponse.ok) {
+            const earlyOutData = await earlyOutResponse.json();
+            setEarlyOutAssignments(earlyOutData.early_out_tasks_assigned || []);
+          }
+        } catch (error) {
+          console.log("Early-out assignments non disponibili");
+        }
+
+        // Carica followup assignments
+        try {
+          const followupResponse = await fetch('/data/output/followup_assignments.json');
+          if (followupResponse.ok) {
+            const followupData = await followupResponse.json();
+            setFollowupAssignments(followupData.assignments || []);
+          }
+        } catch (error) {
+          console.log("Followup assignments non disponibili");
+        }
       } catch (error) {
-        console.error("Errore nel caricamento dei cleaners selezionati:", error);
+        console.error("Errore nel caricamento dei dati:", error);
       }
     };
-    loadCleaners();
+    loadData();
   }, []);
 
   const handleCleanerClick = (cleaner: Cleaner) => {
