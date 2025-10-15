@@ -19,7 +19,7 @@ OUTPUT_FILE       = BASE / "output" / "followup_assignments.json"
 # =============================
 # Parametri
 # =============================
-URBAN_SPEED_KMPH   = 25.0
+FIXED_TRAVEL_MINUTES = 15  # Tempo fisso di spostamento tra task
 DAY_START_DEFAULT  = "08:00"   # se un cleaner non ha EO pregressa
 # nessun DAY_END e nessuna finestra: calcoliamo orari "a seguire" finché ci sono task
 
@@ -50,10 +50,9 @@ def haversine_km(lat1, lon1, lat2, lon2) -> float:
     a = math.sin(dphi/2.0)**2 + math.cos(phi1)*math.cos(phi2)*math.sin(dlambda/2.0)**2
     return 2 * R * math.asin(math.sqrt(a))
 
-def travel_minutes(lat1, lon1, lat2, lon2, speed_kmph=URBAN_SPEED_KMPH) -> int:
-    km = haversine_km(lat1, lon1, lat2, lon2)
-    hours = km / max(1e-6, speed_kmph)
-    return int(round(hours * 60))
+def travel_minutes(lat1, lon1, lat2, lon2) -> int:
+    """Restituisce sempre il tempo fisso di spostamento, indipendentemente dalla distanza."""
+    return FIXED_TRAVEL_MINUTES
 
 # =============================
 # Caricamento dati
@@ -285,7 +284,7 @@ for the_date in sorted(tasks_by_date.keys()):
 OUTPUT_FILE.parent.mkdir(parents=True, exist_ok=True)
 meta = {
     "method": "greedy_round_robin_nearest",
-    "speed_kmph": URBAN_SPEED_KMPH,
+    "fixed_travel_minutes": FIXED_TRAVEL_MINUTES,
     "premium_rule": "premium tasks require premium cleaners; if none exist, allow standard and mark premium_fallback=true",
     "premium_fallback_dates": list(premium_fallback_dates.keys()),
     "premium_fallback_task_ids": dict(premium_fallback_dates)
@@ -294,4 +293,4 @@ with open(OUTPUT_FILE, "w", encoding="utf-8") as f:
     json.dump({"meta": meta, "assignments": all_results}, f, ensure_ascii=False, indent=2)
 
 total_assigned = sum(len(r["assigned_tasks"]) for r in all_results)
-print(f"✅ OK. Scritto {OUTPUT_FILE} con {total_assigned} task assegnate (greedy, senza OR-Tools).")
+print(f"✅ OK. Scritto {OUTPUT_FILE} con {total_assigned} task assegnate (greedy, tempo fisso {FIXED_TRAVEL_MINUTES} min tra task).")
