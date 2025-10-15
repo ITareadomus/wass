@@ -89,13 +89,23 @@ for t in assigned_items:
                 "cleaning_time": int(t["cleaning_time"]),
                 "address": t["address"],
             })
-    if (t.get("assignment_status") or "").startswith("unassigned"):
+    # Aggiungi solo task veramente non assegnate (senza cleaner o con status unassigned)
+    if (t.get("assignment_status") or "").startswith("unassigned") and not t.get("assigned_cleaner"):
+        # Valida che non ci siano conflitti temporali
+        checkin_t = t.get("checkin_time")
+        checkout_t = t.get("checkout_time")
+        
+        # Se ha checkout ma non checkin, salta (potrebbe creare conflitti)
+        if checkout_t and not checkin_t:
+            print(f"WARN: task {t['task_id']} ha checkout_time ma non checkin_time, ignorata per follow-up")
+            continue
+            
         unassigned_pool.append({
             "task_id": t["task_id"],
             "date": d,
             "lat": float(t["lat"]), "lng": float(t["lng"]),
             "cleaning_time": int(t["cleaning_time"]),
-            "checkin_time": t.get("checkin_time"),
+            "checkin_time": checkin_t,
             "address": t["address"],
             "alias": t.get("alias"),
             "premium": bool(t.get("premium", False))
@@ -224,10 +234,15 @@ def build_and_solve_for_date(the_date, tasks: List[Dict[str, Any]], cleaners: Li
     )
     time_dim = routing.GetDimensionOrDie("Time")
 
-    # Finestre temporali
+    # Finestre temporali con validazione
     for node in range(N + V):
         index = manager.NodeToIndex(node)
-        time_dim.CumulVar(index).SetRange(tw_early[node], tw_late[node])
+        # Assicurati che tw_early <= tw_late, altrimenti usa finestra ampia
+        if tw_early[node] > tw_late[node]:
+            print(f"WARN: nodo {node} ha finestra temporale invalida ({tw_early[node]} > {tw_late[node]}), uso finestra ampia")
+            time_dim.CumulVar(index).SetRange(day_start, day_end)
+        else:
+            time_dim.CumulVar(index).SetRange(tw_early[node], tw_late[node])
 
     # ===== VINCOLO PREMIUM =====
     # mappa veicoli Premium
@@ -314,10 +329,16 @@ premium_fallback_dates = defaultdict(list)  # date -> task_ids premium in fallba
 
 for the_date in sorted(tasks_by_date.keys()):
     cleaners_ordered = [c for c in selected_cleaners]
-    day_results, day_fallback = build_and_solve_for_date(the_date, tasks_by_date[the_date], cleaners_ordered)
-    all_results.extend(day_results)
-    if day_fallback:
-        premium_fallback_dates[the_date.isoformat()] = day_fallback
+    try:
+        day_results, day_fallback = build_and_solve_for_date(the_date, tasks_by_date[the_date], cleaners_ordered)
+        all_results.extend(day_results)
+        if day_fallback:
+            premium_fallback_dates[the_date.isoformat()] = day_fallback
+    except Exception as e:
+        print(f"ERRORE nella data {the_date.isoformat()}: {e}")
+        print(f"Task problematiche per questa data: {[t['task_id'] for t in tasks_by_date[the_date]]}")
+        # Continua con le altre date invece di fermarsi
+        continue
 
 # -----------------------------
 # Salva output
