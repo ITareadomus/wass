@@ -87,7 +87,7 @@ export default function PriorityColumn({
         const result2 = await response2.json();
         console.log('Assegnazione follow-up completata:', result2);
 
-        alert('Early-out e follow-up tasks assegnati con successo!');
+        alert('✅ EARLY-OUT assegnati con successo!');
 
         // Ricarica le assegnazioni senza ricaricare la pagina
         if ((window as any).reloadEarlyOutAssignments) {
