@@ -183,12 +183,13 @@ export default function GenerateAssignments() {
         timelineAssignmentsData.assignments.map((a: any) => String(a.logistic_code))
       );
 
-      // Crea un Set di task_id (non logistic_code!) delle task assegnate in early_out_assignments.json
-      const assignedTaskIds = new Set(
-        (earlyOutAssignmentsData.early_out_tasks_assigned || [])
+      // Crea un Set di task_id delle task assegnate in early_out_assignments.json (se esiste)
+      const assignedTaskIds = new Set<string>();
+      if (earlyOutAssignmentsData?.early_out_tasks_assigned) {
+        earlyOutAssignmentsData.early_out_tasks_assigned
           .filter((t: any) => t.assignment_status === "assigned")
-          .map((t: any) => String(t.task_id))
-      );
+          .forEach((t: any) => assignedTaskIds.add(String(t.task_id)));
+      }
 
       console.log("Task assegnate nella timeline (logistic_code):", Array.from(assignedInTimelineCodes));
       console.log("Task assegnate in early_out (task_id):", Array.from(assignedTaskIds));

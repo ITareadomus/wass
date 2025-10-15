@@ -74,10 +74,11 @@ export default function TimelineView({
         console.log("Cleaners caricati da selected_cleaners.json:", selectedData);
 
         // I cleaners sono già nel formato corretto
-        const cleanersList = selectedData.cleaners || [];
+        const cleanersList = selectedData?.cleaners || [];
         setCleaners(cleanersList);
       } catch (error) {
         console.error("Errore nel caricamento dei cleaners selezionati:", error);
+        setCleaners([]);
       }
     };
     loadCleaners();
