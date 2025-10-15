@@ -14,10 +14,10 @@ DAY_START_DEFAULT = "08:00"      # finestra larga quando orari non noti
 DAY_END_DEFAULT = "21:00"
 MAX_ROUTE_MIN = 10 * 60          # limite orario massimo per turno (min) — 10h
 
-INPUT_ASSIGNMENTS = "early_out_assignments.json"
-INPUT_EARLYOUT = "early_out.json"
-INPUT_CLEANERS = "selected_cleaners.json"
-OUTPUT_FILE = "followup_assignments.json"
+INPUT_ASSIGNMENTS = "client/public/data/output/early_out_assignments.json"
+INPUT_EARLYOUT = "client/public/data/output/early_out.json"
+INPUT_CLEANERS = "client/public/data/cleaners/selected_cleaners.json"
+OUTPUT_FILE = "client/public/data/output/followup_assignments.json"
 
 # -----------------------------
 # Utility
