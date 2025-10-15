@@ -105,6 +105,7 @@ for t in assigned_items:
     if (t.get("assignment_status") or "").startswith("unassigned"):
         pool_unassigned.append({
             "task_id": t["task_id"],
+            "logistic_code": t.get("logistic_code", t["task_id"]),
             "date": parse_date(t["checkin_date"]),
             "lat": float(t["lat"]), "lng": float(t["lng"]),
             "cleaning_time": int(t["cleaning_time"]),
@@ -117,6 +118,7 @@ for t in assigned_items:
 for t in earlyout_tasks:
     pool_unassigned.append({
         "task_id": t["task_id"],
+        "logistic_code": t.get("logistic_code", t["task_id"]),
         "date": parse_date(t["checkin_date"]),
         "lat": float(t["lat"]), "lng": float(t["lng"]),
         "cleaning_time": int(t["cleaning_time"]),
@@ -236,6 +238,7 @@ def assign_greedy_for_date(the_date, tasks, cleaners):
             # registra sul cleaner
             cstate["route"].append({
                 "task_id": best["task_id"],
+                "logistic_code": best.get("logistic_code", best["task_id"]),
                 "address": best.get("address",""),
                 "alias": best.get("alias"),
                 "start_time": minutes_to_hhmm(start_min),
