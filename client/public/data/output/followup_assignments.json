@@ -1,0 +1,13 @@
+{
+  "meta": {
+    "speed_kmph": 25.0,
+    "day_start_default": "08:00",
+    "day_end_default": "21:00",
+    "checkin_tolerance_min": 10,
+    "max_route_min": 600,
+    "premium_rule": "premium tasks require premium cleaners; if none exist, allow standard and mark premium_fallback=true",
+    "premium_fallback_dates": [],
+    "premium_fallback_task_ids": {}
+  },
+  "assignments": []
+}
