@@ -15,6 +15,7 @@ INPUT_ASSIGNMENTS = BASE / "output" / "early_out_assignments.json"
 INPUT_EARLYOUT    = BASE / "output" / "early_out.json"
 INPUT_CLEANERS    = BASE / "cleaners" / "selected_cleaners.json"
 OUTPUT_FILE       = BASE / "output" / "followup_assignments.json"
+OUTPUT_EARLY_OUT  = BASE / "output" / "early_out_assignments.json"
 
 # =============================
 # Parametri
@@ -282,6 +283,7 @@ for the_date in sorted(tasks_by_date.keys()):
     if day_fallback:
         premium_fallback_dates[the_date.isoformat()] = day_fallback
 
+# 1. Salva followup_assignments.json (formato originale)
 OUTPUT_FILE.parent.mkdir(parents=True, exist_ok=True)
 meta = {
     "method": "greedy_round_robin_nearest",
@@ -295,3 +297,67 @@ with open(OUTPUT_FILE, "w", encoding="utf-8") as f:
 
 total_assigned = sum(len(r["assigned_tasks"]) for r in all_results)
 print(f"✅ OK. Scritto {OUTPUT_FILE} con {total_assigned} task assegnate (greedy, tempo fisso {FIXED_TRAVEL_MINUTES} min tra task).")
+
+# 2. Aggiungi task followup anche in early_out_assignments.json
+existing_data = {"early_out_tasks_assigned": [], "meta": {}}
+if OUTPUT_EARLY_OUT.exists():
+    with open(OUTPUT_EARLY_OUT, "r", encoding="utf-8") as f:
+        existing_data = json.load(f)
+
+existing_tasks = existing_data.get("early_out_tasks_assigned", [])
+
+# Per ogni assegnazione followup, aggiungi alla lista delle task
+for assignment in all_results:
+    for task in assignment["assigned_tasks"]:
+        # Trova la task originale per recuperare tutti i dettagli
+        original_task = None
+        for t in pool_unassigned:
+            if t["task_id"] == task["task_id"]:
+                original_task = t
+                break
+
+        if original_task:
+            # Aggiungi la task con il flag followup
+            existing_tasks.append({
+                "task_id": task["task_id"],
+                "logistic_code": task["task_id"],
+                "address": task.get("address", ""),
+                "alias": task.get("alias", ""),
+                "lat": str(original_task.get("lat", "")),
+                "lng": str(original_task.get("lng", "")),
+                "cleaning_time": task["service_min"],
+                "checkin_date": assignment["date"],
+                "premium": task.get("premium", False),
+                "assigned_cleaner": {
+                    "id": assignment["cleaner_id"],
+                    "name": assignment["cleaner_name"].split()[0] if assignment["cleaner_name"] else "",
+                    "lastname": " ".join(assignment["cleaner_name"].split()[1:]) if len(assignment["cleaner_name"].split()) > 1 else "",
+                    "role": assignment["cleaner_role"],
+                    "start_time": task["start_time"],
+                    "end_time": task["end_time"]
+                },
+                "assignment_status": "assigned",
+                "followup": True
+            })
+
+# Aggiorna i metadati
+existing_meta = existing_data.get("meta", {})
+existing_meta["followup_added"] = {
+    "method": "greedy_round_robin_nearest",
+    "fixed_travel_minutes": FIXED_TRAVEL_MINUTES,
+    "premium_rule": "premium tasks require premium cleaners; if none exist, allow standard and mark premium_fallback=true",
+    "total_followup_tasks": total_assigned,
+    "premium_fallback_dates": list(premium_fallback_dates.keys()),
+    "premium_fallback_task_ids": dict(premium_fallback_dates)
+}
+
+# Salva il file aggiornato
+output_data = {
+    "early_out_tasks_assigned": existing_tasks,
+    "meta": existing_meta
+}
+
+with open(OUTPUT_EARLY_OUT, "w", encoding="utf-8") as f:
+    json.dump(output_data, f, ensure_ascii=False, indent=2)
+
+print(f"✅ OK. Aggiunte {total_assigned} task followup anche in {OUTPUT_EARLY_OUT}.")
