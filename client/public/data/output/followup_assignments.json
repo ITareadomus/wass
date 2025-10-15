@@ -15,6 +15,7 @@
       "assigned_tasks": [
         {
           "task_id": 217321,
+          "logistic_code": 490,
           "address": "VIA DELLA COMMENDA, 28",
           "alias": "NTM",
           "start_time": "11:15",
@@ -26,6 +27,7 @@
         },
         {
           "task_id": 217306,
+          "logistic_code": 623,
           "address": "RIPA DI PORTA TICINESE 49",
           "alias": "NTM",
           "start_time": "12:30",
@@ -45,6 +47,7 @@
       "assigned_tasks": [
         {
           "task_id": 217416,
+          "logistic_code": 617,
           "address": "VIA VOGHERA, 4",
           "alias": "EXPRDS",
           "start_time": "12:15",
@@ -64,6 +67,7 @@
       "assigned_tasks": [
         {
           "task_id": 217417,
+          "logistic_code": 618,
           "address": "VIA VOGHERA, 4",
           "alias": "EXPRDS",
           "start_time": "12:15",
@@ -83,6 +87,7 @@
       "assigned_tasks": [
         {
           "task_id": 217419,
+          "logistic_code": 618,
           "address": "VIA VOGHERA, 4",
           "alias": "EXPRDS",
           "start_time": "10:00",
@@ -102,6 +107,7 @@
       "assigned_tasks": [
         {
           "task_id": 217275,
+          "logistic_code": 1645,
           "address": "Via Scaldasole, 4",
           "alias": "HACCA",
           "start_time": "10:00",
@@ -121,6 +127,7 @@
       "assigned_tasks": [
         {
           "task_id": 217285,
+          "logistic_code": 624,
           "address": "VIALE MONTENERO 50",
           "alias": "NTM",
           "start_time": "11:15",
@@ -140,6 +147,7 @@
       "assigned_tasks": [
         {
           "task_id": 217286,
+          "logistic_code": 494,
           "address": "P.ZZA S. MARCO, 1",
           "alias": "NTM",
           "start_time": "11:15",
@@ -159,6 +167,7 @@
       "assigned_tasks": [
         {
           "task_id": 217287,
+          "logistic_code": 502,
           "address": "VIA BRUSUGLIO 78",
           "alias": "NTM",
           "start_time": "11:15",
@@ -178,6 +187,7 @@
       "assigned_tasks": [
         {
           "task_id": 217290,
+          "logistic_code": 1153,
           "address": "VIA CELESTINO IV, 9",
           "alias": "NTM",
           "start_time": "10:00",
@@ -197,6 +207,7 @@
       "assigned_tasks": [
         {
           "task_id": 217291,
+          "logistic_code": 1629,
           "address": "via Bianca Ceva, 32 lotto E",
           "alias": "NTM",
           "start_time": "11:15",
@@ -216,6 +227,7 @@
       "assigned_tasks": [
         {
           "task_id": 217283,
+          "logistic_code": 1620,
           "address": "Via Pietro Borsieri, 29,",
           "alias": "NTM",
           "start_time": "10:00",
@@ -235,6 +247,7 @@
       "assigned_tasks": [
         {
           "task_id": 217284,
+          "logistic_code": 1630,
           "address": "Via dei Transiti 21",
           "alias": "NTM",
           "start_time": "10:00",
@@ -254,6 +267,7 @@
       "assigned_tasks": [
         {
           "task_id": 217292,
+          "logistic_code": 1631,
           "address": "VIA FIORDALISI 1",
           "alias": "NTM",
           "start_time": "10:00",
