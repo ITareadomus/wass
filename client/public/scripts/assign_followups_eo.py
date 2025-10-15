@@ -123,8 +123,17 @@ for t in unassigned_pool:
 from ortools.constraint_solver import routing_enums_pb2
 from ortools.constraint_solver import pywrapcp
 
+def is_formatore(cleaner: Dict[str, Any]) -> bool:
+    return str(cleaner.get("role", "")).strip().lower() == "formatore"
+
 def build_and_solve_for_date(the_date, tasks: List[Dict[str, Any]], cleaners: List[Dict[str, Any]]):
     if not tasks:
+        return [], []
+
+    # Filtra i Formatori dal pool di cleaners disponibili
+    cleaners = [c for c in cleaners if not is_formatore(c)]
+    
+    if not cleaners:
         return [], []
 
     # start per cleaner (dopo EO di seed)
