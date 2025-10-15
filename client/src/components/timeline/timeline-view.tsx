@@ -73,9 +73,12 @@ export default function TimelineView({
     const durationMinutes = endMinutes - startMinutes;
     const widthPercentage = (durationMinutes / timelineDurationMinutes) * 100;
     
+    // Larghezza minima: 6% della timeline (circa 40-45 minuti visivamente)
+    const finalWidthPercentage = Math.max(6, widthPercentage);
+    
     return {
       left: `${Math.max(0, leftPercentage)}%`,
-      width: `${Math.max(0.5, widthPercentage)}%`,
+      width: `${finalWidthPercentage}%`,
       startTime,
       endTime
     };
