@@ -118,13 +118,16 @@ for t in unassigned_pool:
     tasks_by_date[t["date"]].append(t)
 
 # -----------------------------
+# Funzione helper per identificare i Formatori
+# -----------------------------
+def is_formatore(cleaner: Dict[str, Any]) -> bool:
+    return str(cleaner.get("role", "")).strip().lower() == "formatore"
+
+# -----------------------------
 # OR-Tools
 # -----------------------------
 from ortools.constraint_solver import routing_enums_pb2
 from ortools.constraint_solver import pywrapcp
-
-def is_formatore(cleaner: Dict[str, Any]) -> bool:
-    return str(cleaner.get("role", "")).strip().lower() == "formatore"
 
 def build_and_solve_for_date(the_date, tasks: List[Dict[str, Any]], cleaners: List[Dict[str, Any]]):
     if not tasks:
