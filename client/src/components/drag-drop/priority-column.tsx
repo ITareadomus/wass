@@ -3,6 +3,7 @@ import { Task } from "@shared/schema";
 import TaskCard from "./task-card";
 import { Clock, AlertCircle, ArrowDown, Calendar } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useToast } from "@/hooks/use-toast";
 
 interface PriorityColumnProps {
   title: string;
@@ -19,6 +20,8 @@ export default function PriorityColumn({
   droppableId,
   icon,
 }: PriorityColumnProps) {
+  const { toast } = useToast();
+  
   const getColumnClass = (priority: string, tasks: Task[]) => {
     switch (priority) {
       case "early-out":
@@ -87,7 +90,10 @@ export default function PriorityColumn({
         const result2 = await response2.json();
         console.log('Assegnazione follow-up completata:', result2);
 
-        alert('✅ EARLY-OUT assegnati con successo!');
+        toast({
+          title: "✅ EARLY-OUT assegnati con successo!",
+          description: "Le task sono state assegnate correttamente",
+        });
 
         // Ricarica le assegnazioni senza ricaricare la pagina
         if ((window as any).reloadEarlyOutAssignments) {
@@ -95,7 +101,11 @@ export default function PriorityColumn({
         }
       } catch (error) {
         console.error('Errore nell\'assegnazione:', error);
-        alert('Errore durante l\'assegnazione dei task');
+        toast({
+          title: "Errore",
+          description: "Si è verificato un errore durante l'assegnazione dei task",
+          variant: "destructive",
+        });
       }
     } else {
       // Logica originale per high e low priority
