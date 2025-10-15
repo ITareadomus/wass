@@ -140,11 +140,12 @@ export default function GenerateAssignments() {
       setIsLoadingTasks(true);
       setExtractionStep("Caricamento task nei contenitori...");
 
-      const [earlyOutResponse, highPriorityResponse, lowPriorityResponse, timelineAssignmentsResponse] = await Promise.all([
+      const [earlyOutResponse, highPriorityResponse, lowPriorityResponse, timelineAssignmentsResponse, earlyOutAssignmentsResponse] = await Promise.all([
         fetch('/data/output/early_out.json'),
         fetch('/data/output/high_priority.json'),
         fetch('/data/output/low_priority.json'),
-        fetch('/data/output/timeline_assignments.json')
+        fetch('/data/output/timeline_assignments.json'),
+        fetch('/data/output/early_out_assignments.json')
       ]);
 
       if (!earlyOutResponse.ok || !highPriorityResponse.ok || !lowPriorityResponse.ok) {
@@ -155,6 +156,7 @@ export default function GenerateAssignments() {
       const highPriorityData = await highPriorityResponse.json();
       const lowPriorityData = await lowPriorityResponse.json();
       const timelineAssignmentsData = timelineAssignmentsResponse.ok ? await timelineAssignmentsResponse.json() : { assignments: [] };
+      const earlyOutAssignmentsData = earlyOutAssignmentsResponse.ok ? await earlyOutAssignmentsResponse.json() : { early_out_tasks_assigned: [] };
 
       console.log("Early out data:", earlyOutData);
       console.log("High priority data:", highPriorityData);
@@ -180,15 +182,27 @@ export default function GenerateAssignments() {
         timelineAssignmentsData.assignments.map((a: any) => String(a.logistic_code))
       );
 
-      console.log("Task assegnate nella timeline (logistic_code):", Array.from(assignedInTimelineCodes));
+      // Aggiungi anche le task followup dalle assegnazioni early-out
+      const followupTaskIds = new Set(
+        (earlyOutAssignmentsData.early_out_tasks_assigned || [])
+          .filter((t: any) => t.followup === true)
+          .map((t: any) => String(t.logistic_code))
+      );
 
-      // Filtra le task già presenti nella timeline dai container
+      console.log("Task assegnate nella timeline (logistic_code):", Array.from(assignedInTimelineCodes));
+      console.log("Task followup (logistic_code):", Array.from(followupTaskIds));
+
+      // Filtra le task già presenti nella timeline o followup dai container
       const filteredEarlyOut = initialEarlyOut.filter(task => {
         const isAssigned = assignedInTimelineCodes.has(String(task.name));
+        const isFollowup = followupTaskIds.has(String(task.name));
         if (isAssigned) {
           console.log(`Task ${task.name} filtrata da Early Out (è nella timeline)`);
         }
-        return !isAssigned;
+        if (isFollowup) {
+          console.log(`Task ${task.name} filtrata da Early Out (è followup)`);
+        }
+        return !isAssigned && !isFollowup;
       });
 
       const filteredHigh = initialHigh.filter(task => {

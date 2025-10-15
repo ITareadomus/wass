@@ -90,20 +90,23 @@ export default function TimelineView({
 
   const handleResetAssignments = async () => {
     try {
-      // Svuota timeline_assignments.json
+      // Reset timeline_assignments.json e followup tasks
       const response = await fetch('/api/reset-timeline-assignments', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
       });
 
-      if (response.ok) {
-        // Ricarica la pagina per ripristinare lo stato iniziale
-        window.location.reload();
-      } else {
+      if (!response.ok) {
         console.error('Errore nel reset delle assegnazioni');
+        return;
       }
+
+      console.log('Assegnazioni resettate con successo');
+
+      // Ricarica la pagina per aggiornare lo stato
+      window.location.reload();
     } catch (error) {
-      console.error('Errore nella chiamata API di reset:', error);
+      console.error('Errore durante il reset:', error);
     }
   };
 
