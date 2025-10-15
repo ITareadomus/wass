@@ -416,3 +416,34 @@ with open(OUTPUT_EARLY_OUT, "w", encoding="utf-8") as f:
     json.dump(output_data, f, ensure_ascii=False, indent=2)
 
 print(f"✅ OK. Aggiunte {total_assigned} task followup anche in {OUTPUT_EARLY_OUT}.")
+
+# 3. Aggiorna timeline_assignments.json con le task followup
+TIMELINE_ASSIGNMENTS = BASE / "output" / "timeline_assignments.json"
+
+# Carica o crea timeline_assignments.json
+timeline_data = {"assignments": []}
+if TIMELINE_ASSIGNMENTS.exists():
+    with open(TIMELINE_ASSIGNMENTS, "r", encoding="utf-8") as f:
+        timeline_data = json.load(f)
+
+# Aggiungi le assegnazioni followup alla timeline
+for assignment in all_results:
+    for task in assignment["assigned_tasks"]:
+        # Rimuovi eventuali assegnazioni precedenti per questo logistic_code
+        timeline_data["assignments"] = [
+            a for a in timeline_data["assignments"] 
+            if a.get("logistic_code") != str(task.get("logistic_code"))
+        ]
+        
+        # Aggiungi la nuova assegnazione followup
+        timeline_data["assignments"].append({
+            "logistic_code": str(task.get("logistic_code")),
+            "cleanerId": assignment["cleaner_id"],
+            "assignment_type": "followup_auto"
+        })
+
+# Salva timeline_assignments.json aggiornato
+with open(TIMELINE_ASSIGNMENTS, "w", encoding="utf-8") as f:
+    json.dump(timeline_data, f, ensure_ascii=False, indent=2)
+
+print(f"✅ OK. Aggiunte {total_assigned} task followup anche in {TIMELINE_ASSIGNMENTS}.")
