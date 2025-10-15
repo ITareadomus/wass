@@ -56,6 +56,13 @@ def travel_minutes(lat1, lon1, lat2, lon2) -> int:
     return FIXED_TRAVEL_MINUTES
 
 # =============================
+# Funzione per verificare se un cleaner è formatore
+# =============================
+def is_formatore(cleaner: Dict[str, Any]) -> bool:
+    """I Formatori non possono ricevere task followup"""
+    return str(cleaner.get("role", "")).strip().lower() == "formatore"
+
+# =============================
 # Caricamento dati
 # =============================
 for p in [INPUT_ASSIGNMENTS, INPUT_EARLYOUT, INPUT_CLEANERS]:
@@ -71,7 +78,8 @@ with open(INPUT_CLEANERS, "r", encoding="utf-8") as f:
 
 assigned_items    = assignments.get("early_out_tasks_assigned", [])
 earlyout_tasks    = earlyout.get("early_out_tasks", [])
-selected_cleaners = cleaners_blob.get("cleaners", [])
+# Filtra i formatori dai cleaners selezionati
+selected_cleaners = [c for c in cleaners_blob.get("cleaners", []) if not is_formatore(c)]
 
 # =============================
 # Prepara seed (ancora per cleaner) e pool task
