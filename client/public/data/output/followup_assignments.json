@@ -3,6 +3,7 @@
     "method": "greedy_round_robin_nearest",
     "fixed_travel_minutes": 15,
     "premium_rule": "premium tasks require premium cleaners; if none exist, allow standard and mark premium_fallback=true",
+    "apartment_type_rule": "cleaners can only be assigned tasks for apartment types they are configured to handle in settings.json",
     "premium_fallback_dates": [],
     "premium_fallback_task_ids": {}
   },
