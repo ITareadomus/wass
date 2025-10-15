@@ -87,12 +87,12 @@ for t in assigned_items:
     # Salta le task followup già presenti (evita duplicati)
     if t.get("followup"):
         continue
-    
+
     d = parse_date(t["checkin_date"])
     if t.get("assigned_cleaner"):
         cid = t["assigned_cleaner"]["id"]
         already_assigned_task_ids.add(t["task_id"])  # Traccia task assegnata
-        
+
         # prendo solo cleaner presenti nel selected_cleaners
         if any(c["id"] == cid for c in selected_cleaners):
             start_hhmm = try_hhmm(t["assigned_cleaner"].get("start_time"), DAY_START_DEFAULT)
@@ -319,7 +319,7 @@ if OUTPUT_EARLY_OUT.exists():
 
 existing_tasks = existing_data.get("early_out_tasks_assigned", [])
 
-# Per ogni assegnazione followup, aggiungi alla lista delle task
+# Per ogni assegnazione followup, aggiorna la task esistente
 for assignment in all_results:
     for task in assignment["assigned_tasks"]:
         # Trova la task originale per recuperare tutti i dettagli
@@ -330,28 +330,48 @@ for assignment in all_results:
                 break
 
         if original_task:
-            # Aggiungi la task con il flag followup
-            existing_tasks.append({
-                "task_id": task["task_id"],
-                "logistic_code": task["task_id"],
-                "address": task.get("address", ""),
-                "alias": task.get("alias", ""),
-                "lat": str(original_task.get("lat", "")),
-                "lng": str(original_task.get("lng", "")),
-                "cleaning_time": task["service_min"],
-                "checkin_date": assignment["date"],
-                "premium": task.get("premium", False),
-                "assigned_cleaner": {
-                    "id": assignment["cleaner_id"],
-                    "name": assignment["cleaner_name"].split()[0] if assignment["cleaner_name"] else "",
-                    "lastname": " ".join(assignment["cleaner_name"].split()[1:]) if len(assignment["cleaner_name"].split()) > 1 else "",
-                    "role": assignment["cleaner_role"],
-                    "start_time": task["start_time"],
-                    "end_time": task["end_time"]
-                },
-                "assignment_status": "assigned",
-                "followup": True
-            })
+            # Cerca la task esistente nell'array
+            task_found = False
+            for i, existing_task in enumerate(existing_tasks):
+                if existing_task["task_id"] == task["task_id"]:
+                    # Aggiorna la task esistente
+                    existing_tasks[i]["assigned_cleaner"] = {
+                        "id": assignment["cleaner_id"],
+                        "name": assignment["cleaner_name"].split()[0] if assignment["cleaner_name"] else "",
+                        "lastname": " ".join(assignment["cleaner_name"].split()[1:]) if len(assignment["cleaner_name"].split()) > 1 else "",
+                        "role": assignment["cleaner_role"],
+                        "start_time": task["start_time"],
+                        "end_time": task["end_time"]
+                    }
+                    existing_tasks[i]["assignment_status"] = "assigned"
+                    existing_tasks[i]["followup"] = True
+                    existing_tasks[i]["logistic_code"] = task["logistic_code"]
+                    task_found = True
+                    break
+
+            # Se la task non esiste, aggiungila (questo non dovrebbe mai accadere)
+            if not task_found:
+                existing_tasks.append({
+                    "task_id": task["task_id"],
+                    "logistic_code": task["logistic_code"],
+                    "address": task.get("address", ""),
+                    "alias": task.get("alias", ""),
+                    "lat": str(original_task.get("lat", "")),
+                    "lng": str(original_task.get("lng", "")),
+                    "cleaning_time": task["service_min"],
+                    "checkin_date": assignment["date"],
+                    "premium": task.get("premium", False),
+                    "assigned_cleaner": {
+                        "id": assignment["cleaner_id"],
+                        "name": assignment["cleaner_name"].split()[0] if assignment["cleaner_name"] else "",
+                        "lastname": " ".join(assignment["cleaner_name"].split()[1:]) if len(assignment["cleaner_name"].split()) > 1 else "",
+                        "role": assignment["cleaner_role"],
+                        "start_time": task["start_time"],
+                        "end_time": task["end_time"]
+                    },
+                    "assignment_status": "assigned",
+                    "followup": True
+                })
 
 # Aggiorna i metadati
 existing_meta = existing_data.get("meta", {})
