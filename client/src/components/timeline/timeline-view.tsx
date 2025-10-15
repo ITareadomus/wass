@@ -75,22 +75,32 @@ export default function TimelineView({
         console.log("Cleaners caricati da selected_cleaners.json:", selectedData);
         setCleaners(selectedData.cleaners || []);
 
-        // Carica le task early-out
-        const earlyOutResponse = await fetch('/data/output/early_out.json');
-        if (!earlyOutResponse.ok) throw new Error(`HTTP error! status: ${earlyOutResponse.status}`);
-        const earlyOutData = await earlyOutResponse.json();
-        console.log("Task early-out caricate:", earlyOutData.assignments);
-        setEarlyOutTasksData(earlyOutData.assignments);
+        // Carica le task early-out assegnate
+        const earlyOutResponse = await fetch('/data/output/early_out_assignments.json');
+        if (earlyOutResponse.ok) {
+          const earlyOutData = await earlyOutResponse.json();
+          console.log("Task early-out caricate:", earlyOutData.early_out_tasks_assigned);
+          setEarlyOutTasksData(earlyOutData.early_out_tasks_assigned || []);
+        } else {
+          console.log("Nessuna assegnazione early-out trovata");
+          setEarlyOutTasksData([]);
+        }
 
         // Carica le assegnazioni follow-up
         const followupResponse = await fetch('/data/output/followup_assignments.json');
-        if (!followupResponse.ok) throw new Error(`HTTP error! status: ${followupResponse.status}`);
-        const followupData = await followupResponse.json();
-        console.log("Assegnazioni follow-up caricate:", followupData.assignments);
-        setFollowupTasksData(followupData.assignments);
+        if (followupResponse.ok) {
+          const followupData = await followupResponse.json();
+          console.log("Assegnazioni follow-up caricate:", followupData.assignments);
+          setFollowupTasksData(followupData.assignments || []);
+        } else {
+          console.log("Nessuna assegnazione follow-up trovata");
+          setFollowupTasksData([]);
+        }
 
       } catch (error) {
         console.error("Errore nel caricamento dei dati:", error);
+        setEarlyOutTasksData([]);
+        setFollowupTasksData([]);
       }
     };
     loadData();
@@ -99,29 +109,33 @@ export default function TimelineView({
   // Combina le task early-out e follow-up
   const allTasks = [
     ...tasks, // Task generiche (se presenti)
-    ...earlyOutTasksData.flatMap((assignment: any) => 
-      assignment.assigned_tasks.map((task: any) => ({
+    ...(earlyOutTasksData || [])
+      .filter((task: any) => task.assigned_cleaner) // Solo task assegnate
+      .map((task: any) => ({
         ...task,
-        id: `early-out-${task.task_id}`, // Prefisso per distinguerle
+        id: String(task.logistic_code || task.task_id),
         name: String(task.logistic_code || task.task_id),
-        priority: "early-out", // Aggiungi priorità
-        assignedCleaner: assignment.cleaner_id,
-        startTime: task.start_time,
-      }))
-    ),
-    ...followupTasksData.flatMap((assignment: any) => 
-      assignment.assigned_tasks.map((task: any) => {
+        priority: "early-out",
+        assignedCleaner: task.assigned_cleaner.id,
+        startTime: task.assigned_cleaner.start_time,
+        premium: task.premium || false,
+        is_straordinaria: task.straordinaria || false,
+      })),
+    ...(followupTasksData || []).flatMap((assignment: any) => 
+      (assignment.assigned_tasks || []).map((task: any) => {
         const originalTask = earlyOutTasksData.find(
-          (eoTask) => eoTask.task_id === task.task_id
+          (eoTask: any) => eoTask.task_id === task.task_id
         );
         const logisticCode = String(originalTask?.logistic_code || task.task_id);
         return {
           ...task,
-          id: logisticCode, // Usa logistic_code come ID
-          name: logisticCode, // Usa logistic_code come nome
-          priority: "early-out", // Mantieni "early-out" per uniformità di visualizzazione
+          id: logisticCode,
+          name: logisticCode,
+          priority: "early-out",
           assignedCleaner: assignment.cleaner_id,
           startTime: task.start_time,
+          premium: task.premium || false,
+          is_straordinaria: originalTask?.straordinaria || false,
         };
       })
     ),
