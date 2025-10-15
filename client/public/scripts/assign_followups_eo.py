@@ -279,27 +279,14 @@ def assign_greedy_for_date(the_date, tasks, cleaners):
                         best_cleaner_id = cid
                         best_task = t
                         best_travel = trav
-        
-        # Filtra task compatibili con il cleaner in base alla tipologia appartamento
-        available_tasks = [
-            t for t in remaining
-            if (
-                (not t.get("premium") or cstate["role"] == "Premium")
-                and can_cleaner_handle_apartment(
-                    cstate["role"], 
-                    t.get("type_apt", "X"), 
-                    settings
-                )
-            )
-        ]
-        
+
         # Se non abbiamo trovato nessuna combinazione valida, esci
         if best_cleaner_id is None or best_task is None:
             break
 
         # Assegna la task al cleaner migliore
         cstate = state[best_cleaner_id]
-
+        
         # calcola orari
         start_min = cstate["available_min"] + (best_travel or 0)
         end_min   = start_min + int(best_task["cleaning_time"])
