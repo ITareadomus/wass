@@ -198,7 +198,7 @@ def assign_greedy_for_date(the_date, tasks, cleaners):
     assigned_any = True
     premium_fallback_today = []
 
-    # assegna sempre al cleaner globalmente più vicino
+    # assegna sempre al cleaner globalmente più vicino, con priorità per task nello stesso indirizzo
     while remaining and assigned_any:
         assigned_any = False
         
@@ -222,18 +222,34 @@ def assign_greedy_for_date(the_date, tasks, cleaners):
             
             candidates = [t for t in remaining if allowed(t)]
             
-            # per ogni task candidata di questo cleaner, calcola la distanza
-            for t in candidates:
-                if cstate["lat"] is None or cstate["lng"] is None:
-                    trav = 0
-                else:
-                    trav = travel_minutes(cstate["lat"], cstate["lng"], t["lat"], t["lng"])
-                
-                # aggiorna il miglior match globale
-                if best_travel is None or trav < best_travel:
+            # PRIORITÀ 1: task nello stesso posto del cleaner (distanza = 0)
+            same_location_tasks = []
+            if cstate["lat"] is not None and cstate["lng"] is not None:
+                same_location_tasks = [
+                    t for t in candidates 
+                    if abs(float(t["lat"]) - cstate["lat"]) < 0.0001 
+                    and abs(float(t["lng"]) - cstate["lng"]) < 0.0001
+                ]
+            
+            # Se ci sono task nello stesso posto, prendiamo la prima
+            if same_location_tasks:
+                if best_travel is None or best_travel > 0:
                     best_cleaner_id = cid
-                    best_task = t
-                    best_travel = trav
+                    best_task = same_location_tasks[0]
+                    best_travel = 0
+            else:
+                # PRIORITÀ 2: task più vicina
+                for t in candidates:
+                    if cstate["lat"] is None or cstate["lng"] is None:
+                        trav = 0
+                    else:
+                        trav = travel_minutes(cstate["lat"], cstate["lng"], t["lat"], t["lng"])
+                    
+                    # aggiorna il miglior match globale
+                    if best_travel is None or trav < best_travel:
+                        best_cleaner_id = cid
+                        best_task = t
+                        best_travel = trav
         
         # Se non abbiamo trovato nessuna combinazione valida, esci
         if best_cleaner_id is None or best_task is None:
