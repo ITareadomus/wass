@@ -32,32 +32,6 @@ interface Cleaner {
   start_time: string | null;
 }
 
-// Define interfaces for the assignment data structures
-interface EarlyOutAssignment {
-  id: number;
-  assigned_cleaner?: {
-    id: number;
-    name: string;
-    lastname: string;
-    start_time: string | null;
-    end_time: string | null;
-    fw_start_time: string | null;
-    fw_end_time: string | null;
-  };
-  task_name: string; // Assuming task name is directly here or needs to be mapped
-  start_time: string | null;
-  end_time: string | null;
-  fw_start_time: string | null;
-  fw_end_time: string | null;
-}
-
-interface FollowupAssignment {
-  id: number;
-  cleaner_id: number;
-  assigned_tasks: Task[]; // Assuming assigned_tasks are of type Task or similar
-}
-
-
 export default function TimelineView({
   personnel,
   tasks,
@@ -65,50 +39,11 @@ export default function TimelineView({
   const [cleaners, setCleaners] = useState<Cleaner[]>([]);
   const [selectedCleaner, setSelectedCleaner] = useState<Cleaner | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [earlyOutAssignments, setEarlyOutAssignments] = useState<EarlyOutAssignment[]>([]);
-  const [followupAssignments, setFollowupAssignments] = useState<FollowupAssignment[]>([]);
-
 
   const timeSlots = [
     "08:00", "09:00", "10:00", "11:00", "12:00",
     "13:00", "14:00", "15:00", "16:00", "17:00", "18:00", "19:00"
   ];
-
-  // Funzione per convertire orario HH:MM in minuti dall'inizio del giorno
-  const timeToMinutes = (time: string): number => {
-    if (!time) return 0;
-    const [hours, minutes] = time.split(':').map(Number);
-    return hours * 60 + minutes;
-  };
-
-  // Funzione per calcolare la posizione e larghezza della task nella griglia
-  const getTaskPosition = (task: any) => {
-    const startTime = task.fw_start_time || task.start_time || "10:00";
-    const endTime = task.fw_end_time || task.end_time || "11:00";
-
-    const startMinutes = timeToMinutes(startTime);
-    const endMinutes = timeToMinutes(endTime);
-
-    // Orario di inizio della timeline (8:00)
-    const timelineStartMinutes = 8 * 60; // 480 minuti
-    // Durata totale della timeline in minuti (12 ore)
-    const timelineDurationMinutes = 12 * 60; // 720 minuti
-
-    // Calcola posizione percentuale dall'inizio della timeline
-    const offsetMinutes = startMinutes - timelineStartMinutes;
-    const leftPercentage = (offsetMinutes / timelineDurationMinutes) * 100;
-
-    // Calcola larghezza percentuale
-    const durationMinutes = endMinutes - startMinutes;
-    const widthPercentage = (durationMinutes / timelineDurationMinutes) * 100;
-
-    return {
-      left: `${Math.max(0, leftPercentage)}%`,
-      width: `${Math.max(0.5, widthPercentage)}%`,
-      startTime,
-      endTime
-    };
-  };
 
   // Palette di colori azzurri per i cleaners
   const cleanerColors = [
@@ -138,43 +73,14 @@ export default function TimelineView({
         const selectedData = await response.json();
         console.log("Cleaners caricati da selected_cleaners.json:", selectedData);
 
+        // I cleaners sono già nel formato corretto
         const cleanersList = selectedData.cleaners || [];
         setCleaners(cleanersList);
       } catch (error) {
         console.error("Errore nel caricamento dei cleaners selezionati:", error);
       }
     };
-
-    const loadAssignments = async () => {
-      try {
-        const earlyOutResponse = await fetch('/data/assignments/early_out_assignments.json');
-        if (!earlyOutResponse.ok) {
-          console.error(`HTTP error for early_out_assignments! status: ${earlyOutResponse.status}`);
-          setEarlyOutAssignments([]);
-        } else {
-          const earlyOutData = await earlyOutResponse.json();
-          setEarlyOutAssignments(earlyOutData.assignments || []);
-          console.log("Early out assignments caricati:", earlyOutData.assignments);
-        }
-
-        const followupResponse = await fetch('/data/assignments/followup_assignments.json');
-        if (!followupResponse.ok) {
-          console.error(`HTTP error for followup_assignments! status: ${followupResponse.status}`);
-          setFollowupAssignments([]);
-        } else {
-          const followupData = await followupResponse.json();
-          setFollowupAssignments(followupData.assignments || []);
-          console.log("Follow-up assignments caricati:", followupData.assignments);
-        }
-      } catch (error) {
-        console.error("Errore nel caricamento delle assegnazioni:", error);
-        setEarlyOutAssignments([]);
-        setFollowupAssignments([]);
-      }
-    };
-
     loadCleaners();
-    loadAssignments();
   }, []);
 
   const handleCleanerClick = (cleaner: Cleaner) => {
@@ -184,12 +90,14 @@ export default function TimelineView({
 
   const handleResetAssignments = async () => {
     try {
+      // Svuota timeline_assignments.json
       const response = await fetch('/api/reset-timeline-assignments', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
       });
 
       if (response.ok) {
+        // Ricarica la pagina per ripristinare lo stato iniziale
         window.location.reload();
       } else {
         console.error('Errore nel reset delle assegnazioni');
@@ -199,8 +107,8 @@ export default function TimelineView({
     }
   };
 
-  // Non mostrare nulla se non ci sono cleaners o assegnazioni caricate
-  if (cleaners.length === 0 && earlyOutAssignments.length === 0 && followupAssignments.length === 0) {
+  // Non mostrare nulla se non ci sono cleaners
+  if (cleaners.length === 0) {
     return null;
   }
 
@@ -245,37 +153,10 @@ export default function TimelineView({
             const color = getCleanerColor(index);
             const droppableId = `cleaner-${cleaner.id}`;
 
-            // Trova le task assegnate a questo cleaner dalle assegnazioni early-out e follow-up
-            const earlyOutTasks = earlyOutAssignments
-              .filter(assignment => assignment.assigned_cleaner?.id === cleaner.id)
-              .map(assignment => ({
-                ...assignment, // Spread the whole assignment to get task details if any
-                // Map specific task properties, assuming task name and times are directly in assignment or needs further mapping
-                // If `assignment` itself represents a task for a cleaner:
-                task_id: assignment.id, // Use assignment id as task id if appropriate
-                name: assignment.task_name || `Task ${assignment.id}`, // Use task_name or a placeholder
-                start_time: assignment.start_time || assignment.assigned_cleaner?.start_time || assignment.assigned_cleaner?.fw_start_time || "10:00",
-                end_time: assignment.end_time || assignment.assigned_cleaner?.end_time || assignment.assigned_cleaner?.fw_end_time || "11:00",
-                fw_start_time: assignment.fw_start_time || assignment.assigned_cleaner?.fw_start_time,
-                fw_end_time: assignment.fw_end_time || assignment.assigned_cleaner?.fw_end_time,
-                assignedCleaner: cleaner.id // Ensure this property exists if TaskCard expects it
-              }));
-
-            const followupTasks = followupAssignments
-              .filter(assignment => assignment.cleaner_id === cleaner.id)
-              .flatMap(assignment => 
-                (assignment.assigned_tasks || []).map((task: any) => ({
-                  ...task, // Spread the task properties
-                  start_time: task.fw_start_time || task.start_time || "10:00",
-                  end_time: task.fw_end_time || task.end_time || "11:00",
-                  assignedCleaner: cleaner.id // Ensure this property exists if TaskCard expects it
-                }))
-              );
-            
-            // Combine tasks, ensuring uniqueness if necessary (e.g., by a task ID or name)
-            // For now, assuming no direct overlap issues in this mapping
-            const cleanerTasks = [...earlyOutTasks, ...followupTasks];
-
+            // Trova tutte le task assegnate a questo cleaner
+            const cleanerTasks = tasks.filter(task => 
+              (task as any).assignedCleaner === cleaner.id
+            );
 
             return (
               <div key={cleaner.id} className="flex mb-0.5">
@@ -317,32 +198,23 @@ export default function TimelineView({
                         ))}
                       </div>
 
-                      {/* Task posizionate in base agli orari */}
-                      <div className="relative z-10 h-full">
-                        {cleanerTasks.map((task, index) => {
-                          // Ensure task has a unique identifier for key prop
-                          const taskId = task.id || task.task_id || task.name || `temp-${index}`; 
-                          const position = getTaskPosition(task);
-                          return (
-                            <div
-                              key={`${taskId}-${cleaner.id}`}
-                              className="absolute"
-                              style={{
-                                left: position.left,
-                                width: position.width,
-                                top: '2px',
-                                bottom: '2px'
-                              }}
-                              title={`${position.startTime} - ${position.endTime}`}
-                            >
-                              <TaskCard 
-                                task={task} 
-                                index={index}
-                                isInTimeline={true}
-                              />
-                            </div>
-                          );
-                        })}
+                      {/* Task posizionate in sequenza */}
+                      <div className="relative z-10 flex items-center h-full">
+                        {tasks
+                          .filter((task) => (task as any).assignedCleaner === cleaner.id)
+                          .filter((task, index, self) => 
+                            // Rimuovi duplicati basandoti sul logistic_code (task.name)
+                            index === self.findIndex((t) => t.name === task.name)
+                          )
+                          .sort((a, b) => ((a as any).assignedSlot || 0) - ((b as any).assignedSlot || 0))
+                          .map((task, index) => (
+                            <TaskCard 
+                              key={`${task.name}-${cleaner.id}`}
+                              task={task} 
+                              index={index}
+                              isInTimeline={true}
+                            />
+                          ))}
                         {provided.placeholder}
                       </div>
                     </div>
