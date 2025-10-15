@@ -616,8 +616,8 @@
         "name": "BAH",
         "lastname": "ISMAILA",
         "role": "Standard",
-        "start_time": "10:00",
-        "end_time": "11:00"
+        "fw_start_time": "10:00",
+        "fw_end_time": "11:00"
       },
       "assignment_status": "assigned",
       "followup": true
@@ -652,8 +652,8 @@
         "name": "FESTUS",
         "lastname": "OSARO AIHIVBERE",
         "role": "Standard",
-        "start_time": "10:00",
-        "end_time": "10:30"
+        "fw_start_time": "10:00",
+        "fw_end_time": "10:30"
       },
       "assignment_status": "assigned",
       "followup": true
@@ -688,8 +688,8 @@
         "name": "FESTUS",
         "lastname": "OSARO AIHIVBERE",
         "role": "Standard",
-        "start_time": "10:30",
-        "end_time": "11:00"
+        "fw_start_time": "10:30",
+        "fw_end_time": "11:00"
       },
       "assignment_status": "assigned",
       "followup": true
