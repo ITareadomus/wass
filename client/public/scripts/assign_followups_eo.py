@@ -91,21 +91,13 @@ for t in assigned_items:
             })
     # Aggiungi solo task veramente non assegnate (senza cleaner o con status unassigned)
     if (t.get("assignment_status") or "").startswith("unassigned") and not t.get("assigned_cleaner"):
-        # Valida che non ci siano conflitti temporali
-        checkin_t = t.get("checkin_time")
-        checkout_t = t.get("checkout_time")
-        
-        # Se ha checkout ma non checkin, salta (potrebbe creare conflitti)
-        if checkout_t and not checkin_t:
-            print(f"WARN: task {t['task_id']} ha checkout_time ma non checkin_time, ignorata per follow-up")
-            continue
-            
+        # Per le follow-up non serve il checkin_time, usiamo l'end_time delle EO come riferimento
         unassigned_pool.append({
             "task_id": t["task_id"],
             "date": d,
             "lat": float(t["lat"]), "lng": float(t["lng"]),
             "cleaning_time": int(t["cleaning_time"]),
-            "checkin_time": checkin_t,
+            "checkin_time": None,  # Non serve per follow-up
             "address": t["address"],
             "alias": t.get("alias"),
             "premium": bool(t.get("premium", False))
@@ -186,14 +178,14 @@ def build_and_solve_for_date(the_date, tasks: List[Dict[str, Any]], cleaners: Li
 
     for i, t in enumerate(tasks):
         service[i] = int(t["cleaning_time"] + SERVICE_BUFFER_MIN)
-        if t.get("checkin_time"):
-            center = hhmm_to_minutes(t["checkin_time"])
-            tw_early[i] = max(day_start, center - CHECKIN_TOLERANCE_MIN)
-            tw_late[i]  = min(day_end,   center + CHECKIN_TOLERANCE_MIN)
+        # Per follow-up: finestra temporale ampia, partono dopo l'end_time delle EO
+        tw_early[i] = day_start
+        tw_late[i] = day_end
 
     for j, s in enumerate(start_info):
         idx = N + j
         service[idx] = 0
+        # Il cleaner parte dall'end_time della sua ultima task EO
         tw_early[idx] = s["origin_time_min"]
         tw_late[idx] = day_end
 
@@ -234,15 +226,10 @@ def build_and_solve_for_date(the_date, tasks: List[Dict[str, Any]], cleaners: Li
     )
     time_dim = routing.GetDimensionOrDie("Time")
 
-    # Finestre temporali con validazione
+    # Finestre temporali
     for node in range(N + V):
         index = manager.NodeToIndex(node)
-        # Assicurati che tw_early <= tw_late, altrimenti usa finestra ampia
-        if tw_early[node] > tw_late[node]:
-            print(f"WARN: nodo {node} ha finestra temporale invalida ({tw_early[node]} > {tw_late[node]}), uso finestra ampia")
-            time_dim.CumulVar(index).SetRange(day_start, day_end)
-        else:
-            time_dim.CumulVar(index).SetRange(tw_early[node], tw_late[node])
+        time_dim.CumulVar(index).SetRange(tw_early[node], tw_late[node])
 
     # ===== VINCOLO PREMIUM =====
     # mappa veicoli Premium
