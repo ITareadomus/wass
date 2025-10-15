@@ -65,11 +65,11 @@ def can_cleaner_handle_apartment(cleaner_role, apt_type, settings):
     apartment_types = settings.get("apartment_types", {})
 
     if cleaner_role == "Premium":
-        allowed_types = apartment_types.get("premium_apt", ["A", "B", "C", "D", "E", "F", "X"])
+        allowed_types = apartment_types.get("premium_apt", [])
     elif cleaner_role == "Formatore":
-        allowed_types = apartment_types.get("formatore_apt", ["B", "C"])
+        allowed_types = apartment_types.get("formatore_apt", [])
     else:  # Standard
-        allowed_types = apartment_types.get("standard_apt", ["A", "B", "C", "D", "E", "F", "X"])
+        allowed_types = apartment_types.get("standard_apt", [])
 
     return apt_type in allowed_types
 
