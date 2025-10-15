@@ -39,6 +39,8 @@ export default function TimelineView({
   const [cleaners, setCleaners] = useState<Cleaner[]>([]);
   const [selectedCleaner, setSelectedCleaner] = useState<Cleaner | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [earlyOutTasksData, setEarlyOutTasksData] = useState<any[]>([]);
+  const [followupTasksData, setFollowupTasksData] = useState<any[]>([]);
 
   const timeSlots = [
     "08:00", "09:00", "10:00", "11:00", "12:00",
@@ -64,36 +66,66 @@ export default function TimelineView({
   };
 
   useEffect(() => {
-    const loadCleaners = async () => {
+    const loadData = async () => {
       try {
-        const response = await fetch('/data/cleaners/selected_cleaners.json');
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        const selectedData = await response.json();
+        // Carica i cleaners selezionati
+        const cleanersResponse = await fetch('/data/cleaners/selected_cleaners.json');
+        if (!cleanersResponse.ok) throw new Error(`HTTP error! status: ${cleanersResponse.status}`);
+        const selectedData = await cleanersResponse.json();
         console.log("Cleaners caricati da selected_cleaners.json:", selectedData);
+        setCleaners(selectedData.cleaners || []);
 
-        // I cleaners sono già nel formato corretto
-        const cleanersList = selectedData.cleaners || [];
-        setCleaners(cleanersList);
+        // Carica le task early-out
+        const earlyOutResponse = await fetch('/data/output/early_out.json');
+        if (!earlyOutResponse.ok) throw new Error(`HTTP error! status: ${earlyOutResponse.status}`);
+        const earlyOutData = await earlyOutResponse.json();
+        console.log("Task early-out caricate:", earlyOutData.assignments);
+        setEarlyOutTasksData(earlyOutData.assignments);
 
-        // Carica anche le assegnazioni follow-up
-        try {
-          const followupResponse = await fetch('/data/output/followup_assignments.json');
-          if (followupResponse.ok) {
-            const followupData = await followupResponse.json();
-            console.log("Assegnazioni follow-up caricate:", followupData.assignments);
-            // Le assegnazioni follow-up verranno visualizzate nella timeline se presenti
-          }
-        } catch (error) {
-          console.error("Errore nel caricamento delle assegnazioni follow-up:", error);
-        }
+        // Carica le assegnazioni follow-up
+        const followupResponse = await fetch('/data/output/followup_assignments.json');
+        if (!followupResponse.ok) throw new Error(`HTTP error! status: ${followupResponse.status}`);
+        const followupData = await followupResponse.json();
+        console.log("Assegnazioni follow-up caricate:", followupData.assignments);
+        setFollowupTasksData(followupData.assignments);
+
       } catch (error) {
-        console.error("Errore nel caricamento dei cleaners selezionati:", error);
+        console.error("Errore nel caricamento dei dati:", error);
       }
     };
-    loadCleaners();
+    loadData();
   }, []);
+
+  // Combina le task early-out e follow-up
+  const allTasks = [
+    ...tasks, // Task generiche (se presenti)
+    ...earlyOutTasksData.flatMap((assignment: any) => 
+      assignment.assigned_tasks.map((task: any) => ({
+        ...task,
+        id: `early-out-${task.task_id}`, // Prefisso per distinguerle
+        name: String(task.logistic_code || task.task_id),
+        priority: "early-out", // Aggiungi priorità
+        assignedCleaner: assignment.cleaner_id,
+        startTime: task.start_time,
+      }))
+    ),
+    ...followupTasksData.flatMap((assignment: any) => 
+      assignment.assigned_tasks.map((task: any) => {
+        const originalTask = earlyOutTasksData.find(
+          (eoTask) => eoTask.task_id === task.task_id
+        );
+        const logisticCode = String(originalTask?.logistic_code || task.task_id);
+        return {
+          ...task,
+          id: logisticCode, // Usa logistic_code come ID
+          name: logisticCode, // Usa logistic_code come nome
+          priority: "early-out", // Mantieni "early-out" per uniformità di visualizzazione
+          assignedCleaner: assignment.cleaner_id,
+          startTime: task.start_time,
+        };
+      })
+    ),
+  ];
 
   const handleCleanerClick = (cleaner: Cleaner) => {
     setSelectedCleaner(cleaner);
@@ -102,14 +134,12 @@ export default function TimelineView({
 
   const handleResetAssignments = async () => {
     try {
-      // Svuota timeline_assignments.json
       const response = await fetch('/api/reset-timeline-assignments', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
       });
 
       if (response.ok) {
-        // Ricarica la pagina per ripristinare lo stato iniziale
         window.location.reload();
       } else {
         console.error('Errore nel reset delle assegnazioni');
@@ -119,7 +149,6 @@ export default function TimelineView({
     }
   };
 
-  // Non mostrare nulla se non ci sono cleaners
   if (cleaners.length === 0) {
     return null;
   }
@@ -145,7 +174,6 @@ export default function TimelineView({
           </div>
         </div>
         <div className="p-4 overflow-x-auto">
-          {/* Header con orari */}
           <div className="flex mb-2">
             <div className="w-24 flex-shrink-0"></div>
             <div className="flex-1 flex">
@@ -160,22 +188,17 @@ export default function TimelineView({
             </div>
           </div>
 
-          {/* Righe dei cleaners */}
           {cleaners.map((cleaner, index) => {
             const color = getCleanerColor(index);
-            const droppableId = `cleaner-${cleaner.id}`;
-
-            // Trova tutte le task assegnate a questo cleaner
-            const cleanerTasks = tasks.filter(task => 
-              (task as any).assignedCleaner === cleaner.id
+            const cleanerTimelineTasks = allTasks.filter(
+              (task) => (task as any).assignedCleaner === cleaner.id
             );
 
             return (
               <div key={cleaner.id} className="flex mb-0.5">
-                {/* Info cleaner */}
                 <div
                   className="w-24 flex-shrink-0 p-1 flex items-center border border-border cursor-pointer hover:opacity-90 transition-opacity"
-                  style={{ 
+                  style={{
                     backgroundColor: color.bg,
                     color: color.text
                   }}
@@ -188,7 +211,6 @@ export default function TimelineView({
                   </div>
                 </div>
 
-                {/* Timeline per questo cleaner - area unica droppable */}
                 <Droppable droppableId={`timeline-${cleaner.id}`} direction="horizontal">
                   {(provided, snapshot) => (
                     <div
@@ -197,32 +219,32 @@ export default function TimelineView({
                       className={`relative border-t border-border transition-colors min-h-[45px] flex-1 ${
                         snapshot.isDraggingOver ? 'bg-primary/20 ring-2 ring-primary' : ''
                       }`}
-                      style={{ 
-                        backgroundColor: snapshot.isDraggingOver 
+                      style={{
+                        backgroundColor: snapshot.isDraggingOver
                           ? `${color.bg}40`
                           : `${color.bg}10`
                       }}
                     >
-                      {/* Griglia oraria di sfondo (solo visiva) */}
                       <div className="absolute inset-0 grid grid-cols-12 pointer-events-none opacity-10">
                         {timeSlots.map((slot, idx) => (
                           <div key={idx} className="border-r border-border"></div>
                         ))}
                       </div>
 
-                      {/* Task posizionate in sequenza */}
-                      <div className="relative z-10 flex items-center h-full">
-                        {tasks
-                          .filter((task) => (task as any).assignedCleaner === cleaner.id)
-                          .filter((task, index, self) => 
-                            // Rimuovi duplicati basandoti sul logistic_code (task.name)
+                      <div className="relative z-10 flex items-center h-full gap-1">
+                        {cleanerTimelineTasks
+                          .filter((task, index, self) =>
                             index === self.findIndex((t) => t.name === task.name)
                           )
-                          .sort((a, b) => ((a as any).assignedSlot || 0) - ((b as any).assignedSlot || 0))
+                          .sort((a, b) => {
+                            const timeA = (a as any).startTime || "00:00";
+                            const timeB = (b as any).startTime || "00:00";
+                            return timeA.localeCompare(timeB);
+                          })
                           .map((task, index) => (
-                            <TaskCard 
-                              key={`${task.name}-${cleaner.id}`}
-                              task={task} 
+                            <TaskCard
+                              key={`${task.id}-${cleaner.id}`}
+                              task={task}
                               index={index}
                               isInTimeline={true}
                             />
@@ -238,7 +260,6 @@ export default function TimelineView({
         </div>
       </div>
 
-      {/* Cleaner Details Dialog */}
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
         <DialogContent className="sm:max-w-2xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
