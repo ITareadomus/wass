@@ -1,36 +1,46 @@
+# -*- coding: utf-8 -*-
 import json
 import math
 from datetime import datetime
 from collections import defaultdict
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Tuple
+from pathlib import Path
 
-# -----------------------------
-# Parametri di modello/config
-# -----------------------------
-URBAN_SPEED_KMPH = 25.0          # velocità media per stimare i tempi di viaggio
-SERVICE_BUFFER_MIN = 0           # buffer aggiuntivo al cleaning_time (min)
-CHECKIN_TOLERANCE_MIN = 10       # tolleranza sulle task con checkin_time noto (± min)
-DAY_START_DEFAULT = "08:00"      # finestra larga quando orari non noti
-DAY_END_DEFAULT = "21:00"
-MAX_ROUTE_MIN = 10 * 60          # limite orario massimo per turno (min) — 10h
+# =============================
+# Percorsi ASSOLUTI (Windows)
+# =============================
+BASE = Path(r"C:\Users\IT\Desktop\TaskFlowMaster\TaskFlowMaster\client\public\data")
 
-INPUT_ASSIGNMENTS = "client/public/data/output/early_out_assignments.json"
-INPUT_EARLYOUT = "client/public/data/output/early_out.json"
-INPUT_CLEANERS = "client/public/data/cleaners/selected_cleaners.json"
-OUTPUT_FILE = "client/public/data/output/followup_assignments.json"
+INPUT_ASSIGNMENTS = BASE / "output" / "early_out_assignments.json"
+INPUT_EARLYOUT    = BASE / "output" / "early_out.json"
+INPUT_CLEANERS    = BASE / "cleaners" / "selected_cleaners.json"
+OUTPUT_FILE       = BASE / "output" / "followup_assignments.json"
 
-# -----------------------------
+# =============================
+# Parametri
+# =============================
+URBAN_SPEED_KMPH   = 25.0
+DAY_START_DEFAULT  = "08:00"   # se un cleaner non ha EO pregressa
+# nessun DAY_END e nessuna finestra: calcoliamo orari "a seguire" finché ci sono task
+
+# =============================
 # Utility
-# -----------------------------
+# =============================
 def hhmm_to_minutes(hhmm: str) -> int:
     h, m = hhmm.split(":")
-    return int(h) * 60 + int(m)
+    return int(h)*60 + int(m)
 
 def minutes_to_hhmm(m: int) -> str:
     m = int(round(m))
     h = m // 60
     mm = m % 60
     return f"{h:02d}:{mm:02d}"
+
+def parse_date(s: str):
+    return datetime.strptime(s, "%Y-%m-%d").date()
+
+def try_hhmm(s: Optional[str], fallback: str) -> str:
+    return s if s and ":" in s else fallback
 
 def haversine_km(lat1, lon1, lat2, lon2) -> float:
     R = 6371.0
@@ -45,15 +55,13 @@ def travel_minutes(lat1, lon1, lat2, lon2, speed_kmph=URBAN_SPEED_KMPH) -> int:
     hours = km / max(1e-6, speed_kmph)
     return int(round(hours * 60))
 
-def parse_date(s: str) -> datetime.date:
-    return datetime.strptime(s, "%Y-%m-%d").date()
+# =============================
+# Caricamento dati
+# =============================
+for p in [INPUT_ASSIGNMENTS, INPUT_EARLYOUT, INPUT_CLEANERS]:
+    if not p.exists():
+        raise FileNotFoundError(f"File non trovato: {p}")
 
-def try_hhmm(s: Optional[str], fallback: str) -> str:
-    return s if s and ":" in s else fallback
-
-# -----------------------------
-# Carica dati
-# -----------------------------
 with open(INPUT_ASSIGNMENTS, "r", encoding="utf-8") as f:
     assignments = json.load(f)
 with open(INPUT_EARLYOUT, "r", encoding="utf-8") as f:
@@ -61,102 +69,81 @@ with open(INPUT_EARLYOUT, "r", encoding="utf-8") as f:
 with open(INPUT_CLEANERS, "r", encoding="utf-8") as f:
     cleaners_blob = json.load(f)
 
-assigned_items = assignments.get("early_out_tasks_assigned", [])
+assigned_items    = assignments.get("early_out_tasks_assigned", [])
+earlyout_tasks    = earlyout.get("early_out_tasks", [])
 selected_cleaners = cleaners_blob.get("cleaners", [])
-earlyout_tasks = earlyout.get("early_out_tasks", [])
 
-# -----------------------------
-# Indici e pool task
-# -----------------------------
-cleaner_by_id = {c["id"]: c for c in selected_cleaners}
+# =============================
+# Prepara seed (ancora per cleaner) e pool task
+# =============================
+seed_by_cleaner_and_date: Dict[Tuple[int, object], List[Dict[str, Any]]] = defaultdict(list)
+pool_unassigned: List[Dict[str, Any]] = []
 
-seed_by_cleaner_and_date = defaultdict(list)  # (cleaner_id, date) -> EO già assegnate
-unassigned_pool = []  # task da assegnare
-
+# seed: EO già assegnate (posizione + end_time)
 for t in assigned_items:
     d = parse_date(t["checkin_date"])
     if t.get("assigned_cleaner"):
         cid = t["assigned_cleaner"]["id"]
-        if cid in cleaner_by_id:
-            # Usa start_time dall'assigned_cleaner, o calcola da checkout_time se manca
-            ac = t["assigned_cleaner"]
-            if ac.get("start_time"):
-                start_hhmm = ac["start_time"]
-            elif t.get("checkout_time"):
-                # Se non c'è start_time ma c'è checkout, usa checkout come riferimento
-                start_hhmm = t["checkout_time"]
-            else:
-                start_hhmm = DAY_START_DEFAULT
-            
-            # Calcola end_time: se presente usa quello, altrimenti start + cleaning_time
-            if ac.get("end_time"):
-                end_hhmm = ac["end_time"]
-            else:
-                end_hhmm = minutes_to_hhmm(hhmm_to_minutes(start_hhmm) + int(t["cleaning_time"]))
-            
+        # prendo solo cleaner presenti nel selected_cleaners
+        if any(c["id"] == cid for c in selected_cleaners):
+            start_hhmm = try_hhmm(t["assigned_cleaner"].get("start_time"), DAY_START_DEFAULT)
+            # se end_time mancante, stimalo come start + cleaning_time
+            end_hhmm = try_hhmm(
+                t["assigned_cleaner"].get("end_time"),
+                minutes_to_hhmm(hhmm_to_minutes(start_hhmm) + int(t["cleaning_time"]))
+            )
             seed_by_cleaner_and_date[(cid, d)].append({
                 "task_id": t["task_id"],
                 "lat": float(t["lat"]),
                 "lng": float(t["lng"]),
-                "start_hhmm": start_hhmm,
                 "end_hhmm": end_hhmm,
+                "address": t.get("address",""),
                 "cleaning_time": int(t["cleaning_time"]),
-                "address": t["address"],
             })
-    # Aggiungi solo task veramente non assegnate (senza cleaner o con status unassigned)
-    if (t.get("assignment_status") or "").startswith("unassigned") and not t.get("assigned_cleaner"):
-        # Per le follow-up non serve il checkin_time, usiamo l'end_time delle EO come riferimento
-        unassigned_pool.append({
+
+    # nel pool vanno solo le unassigned
+    if (t.get("assignment_status") or "").startswith("unassigned"):
+        pool_unassigned.append({
             "task_id": t["task_id"],
-            "date": d,
+            "date": parse_date(t["checkin_date"]),
             "lat": float(t["lat"]), "lng": float(t["lng"]),
             "cleaning_time": int(t["cleaning_time"]),
-            "checkin_time": None,  # Non serve per follow-up
-            "address": t["address"],
+            "address": t.get("address",""),
             "alias": t.get("alias"),
-            "premium": bool(t.get("premium", False))
+            "premium": bool(t.get("premium", False)),
         })
 
+# aggiungi task dal pacchetto early_out.json
 for t in earlyout_tasks:
-    unassigned_pool.append({
+    pool_unassigned.append({
         "task_id": t["task_id"],
         "date": parse_date(t["checkin_date"]),
         "lat": float(t["lat"]), "lng": float(t["lng"]),
         "cleaning_time": int(t["cleaning_time"]),
-        "checkin_time": t.get("checkin_time"),
-        "address": t["address"],
+        "address": t.get("address",""),
         "alias": t.get("alias"),
-        "premium": bool(t.get("premium", False))
+        "premium": bool(t.get("premium", False)),
     })
 
-tasks_by_date = defaultdict(list)
-for t in unassigned_pool:
+# dedup su task_id (caso in cui compaiano in entrambi i file)
+seen = set()
+dedup_pool = []
+for t in pool_unassigned:
+    if t["task_id"] not in seen:
+        seen.add(t["task_id"])
+        dedup_pool.append(t)
+pool_unassigned = dedup_pool
+
+# =============================
+# Greedy per data
+# =============================
+tasks_by_date: Dict[object, List[Dict[str, Any]]] = defaultdict(list)
+for t in pool_unassigned:
     tasks_by_date[t["date"]].append(t)
 
-# -----------------------------
-# Funzione helper per identificare i Formatori
-# -----------------------------
-def is_formatore(cleaner: Dict[str, Any]) -> bool:
-    return str(cleaner.get("role", "")).strip().lower() == "formatore"
-
-# -----------------------------
-# OR-Tools
-# -----------------------------
-from ortools.constraint_solver import routing_enums_pb2
-from ortools.constraint_solver import pywrapcp
-
-def build_and_solve_for_date(the_date, tasks: List[Dict[str, Any]], cleaners: List[Dict[str, Any]]):
-    if not tasks:
-        return [], []
-
-    # Filtra i Formatori dal pool di cleaners disponibili
-    cleaners = [c for c in cleaners if not is_formatore(c)]
-    
-    if not cleaners:
-        return [], []
-
-    # start per cleaner (dopo EO di seed)
-    start_info = []
+def build_initial_state_for_date(the_date, cleaners):
+    """Per ogni cleaner crea stato: available_time e current (lat,lng)."""
+    state = {}
     for c in cleaners:
         cid = c["id"]
         c_start = try_hhmm(c.get("start_time"), DAY_START_DEFAULT)
@@ -164,216 +151,143 @@ def build_and_solve_for_date(the_date, tasks: List[Dict[str, Any]], cleaners: Li
         if seeds:
             seeds_sorted = sorted(seeds, key=lambda s: hhmm_to_minutes(s["end_hhmm"]))
             last = seeds_sorted[-1]
-            origin_lat, origin_lng = last["lat"], last["lng"]
-            origin_time_min = hhmm_to_minutes(last["end_hhmm"])
+            state[cid] = {
+                "available_min": hhmm_to_minutes(last["end_hhmm"]),
+                "lat": float(last["lat"]),
+                "lng": float(last["lng"]),
+                "role": c.get("role"),
+                "name": f"{c.get('name','')} {c.get('lastname','')}".strip(),
+                "route": []
+            }
         else:
-            origin_lat = sum(t["lat"] for t in tasks)/len(tasks)
-            origin_lng = sum(t["lng"] for t in tasks)/len(tasks)
-            origin_time_min = hhmm_to_minutes(c_start)
-        start_info.append({
-            "cleaner_id": cid,
-            "origin_lat": origin_lat,
-            "origin_lng": origin_lng,
-            "origin_time_min": origin_time_min
-        })
+            state[cid] = {
+                "available_min": hhmm_to_minutes(c_start),
+                "lat": None, "lng": None,          # prima task: viaggio=0 da "nulla"
+                "role": c.get("role"),
+                "name": f"{c.get('name','')} {c.get('lastname','')}".strip(),
+                "route": []
+            }
+    return state
 
-    # nodi: task (0..N-1) + start veicoli (N..N+V-1)
-    N = len(tasks)
-    V = len(cleaners)
+def assign_greedy_for_date(the_date, tasks, cleaners):
+    """Assegna greedy in round-robin: per ogni cleaner prende la task più vicina alla sua posizione attuale.
+       Ignora ogni checkin/checkout_time. Calcola start = available + travel, end = start + cleaning_time."""
+    if not tasks:
+        return [], []
 
-    lats = [t["lat"] for t in tasks] + [s["origin_lat"] for s in start_info]
-    lngs = [t["lng"] for t in tasks] + [s["origin_lng"] for s in start_info]
+    # stati cleaner
+    state = build_initial_state_for_date(the_date, cleaners)
+    # premium availability
+    premium_vehicle_ids = {c["id"] for c in cleaners if str(c.get("role","")).lower() == "premium"}
+    has_premium = len(premium_vehicle_ids) > 0
 
-    day_start = hhmm_to_minutes(DAY_START_DEFAULT)
-    day_end = hhmm_to_minutes(DAY_END_DEFAULT)
-    service = [0]*(N+V)
-    tw_early = [day_start]*(N+V)
-    tw_late = [day_end]*(N+V)
+    # lavoriamo su una copia della lista task
+    remaining = tasks[:]
+    assigned_any = True
+    premium_fallback_today = []
 
-    for i, t in enumerate(tasks):
-        service[i] = int(t["cleaning_time"] + SERVICE_BUFFER_MIN)
-        # Per follow-up: finestra temporale ampia, partono dopo l'end_time delle EO
-        tw_early[i] = day_start
-        tw_late[i] = day_end
+    # round-robin finché qualcosa si muove
+    while remaining and assigned_any:
+        assigned_any = False
+        for c in cleaners:
+            if not remaining:
+                break
+            cid = c["id"]
+            cstate = state[cid]
 
-    for j, s in enumerate(start_info):
-        idx = N + j
-        service[idx] = 0
-        # Il cleaner parte dall'end_time della sua ultima task EO
-        tw_early[idx] = s["origin_time_min"]
-        tw_late[idx] = day_end
+            # filtro premium
+            def allowed(task):
+                if task.get("premium", False):
+                    if has_premium:
+                        return cid in premium_vehicle_ids
+                    else:
+                        return True  # fallback permesso
+                return True
 
-    def travel(i, j):
-        if i == j: return 0
-        return travel_minutes(lats[i], lngs[i], lats[j], lngs[j])
+            candidates = [t for t in remaining if allowed(t)]
+            if not candidates:
+                continue
 
-    travel_cache = {}
-    def travel_cached(i, j):
-        key = (i, j)
-        if key not in travel_cache:
-            travel_cache[key] = travel(i, j)
-        return travel_cache[key]
+            # scegli la più vicina (in minuti viaggio); se nessuna posizione, costo viaggio=0
+            best = None
+            best_travel = None
+            for t in candidates:
+                if cstate["lat"] is None or cstate["lng"] is None:
+                    trav = 0
+                else:
+                    trav = travel_minutes(cstate["lat"], cstate["lng"], t["lat"], t["lng"])
+                if best is None or trav < best_travel:
+                    best = t
+                    best_travel = trav
 
-    starts = [N + v for v in range(V)]
-    ends = [N + v for v in range(V)]
-    manager = pywrapcp.RoutingIndexManager(N + V, V, starts, ends)
-    routing = pywrapcp.RoutingModel(manager)
+            # calcola orari
+            start_min = cstate["available_min"] + (best_travel or 0)
+            end_min   = start_min + int(best["cleaning_time"])
 
-    def time_callback(from_index, to_index):
-        i = manager.IndexToNode(from_index)
-        j = manager.IndexToNode(to_index)
-        return travel_cached(i, j)
-    transit_callback_index = routing.RegisterTransitCallback(time_callback)
-    routing.SetArcCostEvaluatorOfAllVehicles(transit_callback_index)
+            premium_fallback = False
+            if best.get("premium", False) and cid not in premium_vehicle_ids and not has_premium:
+                premium_fallback = True
+                premium_fallback_today.append(best["task_id"])
 
-    def time_with_service(from_index, to_index):
-        i = manager.IndexToNode(from_index)
-        j = manager.IndexToNode(to_index)
-        return service[i] + travel_cached(i, j)
-    time_ws_index = routing.RegisterTransitCallback(time_with_service)
-    routing.AddDimension(
-        time_ws_index,
-        60,                  # slack
-        MAX_ROUTE_MIN,       # max durata route
-        False,               # non forzare lo start a 0
-        "Time"
-    )
-    time_dim = routing.GetDimensionOrDie("Time")
+            # registra sul cleaner
+            cstate["route"].append({
+                "task_id": best["task_id"],
+                "address": best.get("address",""),
+                "alias": best.get("alias"),
+                "start_time": minutes_to_hhmm(start_min),
+                "end_time": minutes_to_hhmm(end_min),
+                "service_min": int(best["cleaning_time"]),
+                "premium": bool(best.get("premium", False)),
+                "premium_fallback": premium_fallback
+            })
+            # aggiorna stato cleaner
+            cstate["available_min"] = end_min
+            cstate["lat"], cstate["lng"] = best["lat"], best["lng"]
 
-    # Finestre temporali
-    for node in range(N + V):
-        index = manager.NodeToIndex(node)
-        time_dim.CumulVar(index).SetRange(tw_early[node], tw_late[node])
+            # togli la task dalla lista
+            remaining.remove(best)
+            assigned_any = True
 
-    # ===== VINCOLO PREMIUM =====
-    # mappa veicoli Premium
-    premium_vehicle_ids = {v for v, c in enumerate(cleaners) if str(c.get("role", "")).lower() == "premium"}
-    has_premium_cleaners = len(premium_vehicle_ids) > 0
-    premium_fallback_today = []  # colleziona task_id se saremo costretti a usare Standard (solo quando non ci sono Premium)
-
-    # Se ci sono cleaner Premium: restringi i nodi premium ai soli veicoli premium
-    # Se non ci sono: permetti a tutti, ma segna fallback (visivo in output)
-    for node in range(N):
-        if tasks[node].get("premium", False):
-            if has_premium_cleaners:
-                allowed = sorted(list(premium_vehicle_ids))
-                routing.SetAllowedVehiclesForIndex(allowed, manager.NodeToIndex(node))
-            else:
-                # nessun premium: lascio tutti i veicoli, ma segno che questa data va in fallback
-                premium_fallback_today.append(tasks[node]["task_id"])
-
-    # Disjunction per consentire opzionalità (penalità alta -> solver proverà ad assegnare)
-    penalty = 100000
-    for node in range(N):
-        routing.AddDisjunction([manager.NodeToIndex(node)], penalty)
-
-    # Parametri di ricerca
-    search_params = pywrapcp.DefaultRoutingSearchParameters()
-    search_params.first_solution_strategy = routing_enums_pb2.FirstSolutionStrategy.PATH_CHEAPEST_ARC
-    search_params.local_search_metaheuristic = routing_enums_pb2.LocalSearchMetaheuristic.GUIDED_LOCAL_SEARCH
-    search_params.time_limit.FromSeconds(30)  # Aumentato a 30s per problemi più complessi
-    search_params.log_search = False  # Disabilita log verboso
-
-    solution = routing.SolveWithParameters(search_params)
+    # format results
     results = []
+    for c in cleaners:
+        cid = c["id"]
+        if state[cid]["route"]:
+            results.append({
+                "date": the_date.isoformat(),
+                "cleaner_id": cid,
+                "cleaner_name": state[cid]["name"],
+                "cleaner_role": state[cid]["role"],
+                "assigned_tasks": state[cid]["route"]
+            })
 
-    if solution:
-        for v in range(V):
-            cleaner = cleaners[v]
-            cid = cleaner["id"]
-            idx = routing.Start(v)
-            route = []
-            path_nodes = []
-            while not routing.IsEnd(idx):
-                node = manager.IndexToNode(idx)
-                path_nodes.append(node)
-                if node < N:
-                    t = tasks[node]
-                    start_min = solution.Min(time_dim.CumulVar(idx))
-                    end_min = start_min + service[node]
-                    # flag visivo: premium assegnata a Standard SOLO nel caso fallback (nessun premium disponibile)
-                    premium_fallback = False
-                    if t.get("premium", False) and str(cleaner.get("role","")).lower() != "premium" and not has_premium_cleaners:
-                        premium_fallback = True
-                    route.append({
-                        "task_id": t["task_id"],
-                        "address": t["address"],
-                        "alias": t.get("alias"),
-                        "start_time": minutes_to_hhmm(start_min),
-                        "end_time": minutes_to_hhmm(end_min),
-                        "service_min": service[node],
-                        "premium": bool(t.get("premium", False)),
-                        "premium_fallback": premium_fallback
-                    })
-                idx = solution.Value(routing.NextVar(idx))
+    return results, list(set(premium_fallback_today))
 
-            if route:
-                # km totali stimati sulla path (incluso start virtuale)
-                km_total = 0.0
-                for a, b in zip(path_nodes, path_nodes[1:]):
-                    km_total += haversine_km(lats[a], lngs[a], lats[b], lngs[b])
-                results.append({
-                    "date": the_date.isoformat(),
-                    "cleaner_id": cid,
-                    "cleaner_name": f"{cleaner.get('name','')}".strip(),
-                    "cleaner_role": cleaner.get("role"),
-                    "route_km_est": round(km_total, 2),
-                    "assigned_tasks": route
-                })
-
-    return results, premium_fallback_today
-
-# -----------------------------
-# Risolvi per ogni data
-# -----------------------------
+# =============================
+# Esecuzione per data + salvataggio
+# =============================
 all_results = []
-premium_fallback_dates = defaultdict(list)  # date -> task_ids premium in fallback
+premium_fallback_dates = defaultdict(list)
 
 for the_date in sorted(tasks_by_date.keys()):
-    cleaners_ordered = [c for c in selected_cleaners]
-    tasks_for_date = tasks_by_date[the_date]
-    
-    print(f"\n=== Elaborazione data {the_date.isoformat()} ===")
-    print(f"Task da assegnare: {len(tasks_for_date)}")
-    print(f"Cleaners disponibili: {len([c for c in cleaners_ordered if not is_formatore(c)])}")
-    
-    # Mostra dettagli task problematiche (senza checkin_time)
-    no_checkin = [t for t in tasks_for_date if not t.get("checkin_time")]
-    if no_checkin:
-        print(f"WARN: {len(no_checkin)} task senza checkin_time: {[t['task_id'] for t in no_checkin]}")
-    
-    try:
-        day_results, day_fallback = build_and_solve_for_date(the_date, tasks_for_date, cleaners_ordered)
-        all_results.extend(day_results)
-        if day_fallback:
-            premium_fallback_dates[the_date.isoformat()] = day_fallback
-        print(f"✓ Assegnate {sum(len(r['assigned_tasks']) for r in day_results)} task per {len(day_results)} cleaners")
-    except Exception as e:
-        print(f"✗ ERRORE nella data {the_date.isoformat()}: {e}")
-        import traceback
-        traceback.print_exc()
-        # Continua con le altre date invece di fermarsi
-        continue
+    day_tasks = tasks_by_date[the_date]
+    day_cleaners = selected_cleaners  # usa tutti i cleaner forniti
+    print(f"--- Greedy {the_date} | tasks={len(day_tasks)} | cleaners={len(day_cleaners)} ---")
+    day_results, day_fallback = assign_greedy_for_date(the_date, day_tasks, day_cleaners)
+    all_results.extend(day_results)
+    if day_fallback:
+        premium_fallback_dates[the_date.isoformat()] = day_fallback
 
-# -----------------------------
-# Salva output
-# -----------------------------
+OUTPUT_FILE.parent.mkdir(parents=True, exist_ok=True)
+meta = {
+    "method": "greedy_round_robin_nearest",
+    "speed_kmph": URBAN_SPEED_KMPH,
+    "premium_rule": "premium tasks require premium cleaners; if none exist, allow standard and mark premium_fallback=true",
+    "premium_fallback_dates": list(premium_fallback_dates.keys()),
+    "premium_fallback_task_ids": dict(premium_fallback_dates)
+}
 with open(OUTPUT_FILE, "w", encoding="utf-8") as f:
-    json.dump({
-        "meta": {
-            "speed_kmph": URBAN_SPEED_KMPH,
-            "day_start_default": DAY_START_DEFAULT,
-            "day_end_default": DAY_END_DEFAULT,
-            "checkin_tolerance_min": CHECKIN_TOLERANCE_MIN,
-            "max_route_min": MAX_ROUTE_MIN,
-            "premium_rule": "premium tasks require premium cleaners; if none exist, allow standard and mark premium_fallback=true",
-            "premium_fallback_dates": list(premium_fallback_dates.keys()),
-            "premium_fallback_task_ids": premium_fallback_dates
-        },
-        "assignments": all_results
-    }, f, ensure_ascii=False, indent=2)
+    json.dump({"meta": meta, "assignments": all_results}, f, ensure_ascii=False, indent=2)
 
-total_assigned = sum(len(r['assigned_tasks']) for r in all_results)
-print(f"OK. Scritto {OUTPUT_FILE} con {total_assigned} task assegnate.")
-if premium_fallback_dates:
-    print("ATTENZIONE: fallback premium->standard in queste date:", ", ".join(premium_fallback_dates.keys()))
+total_assigned = sum(len(r["assigned_tasks"]) for r in all_results)
+print(f"✅ OK. Scritto {OUTPUT_FILE} con {total_assigned} task assegnate (greedy, senza OR-Tools).")
