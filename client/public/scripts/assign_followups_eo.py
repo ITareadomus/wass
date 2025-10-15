@@ -7,9 +7,9 @@ from typing import List, Dict, Any, Optional, Tuple
 from pathlib import Path
 
 # =============================
-# Percorsi ASSOLUTI (Windows)
+# Percorsi relativi (compatibili Linux/Replit)
 # =============================
-BASE = Path(r"C:\Users\IT\Desktop\TaskFlowMaster\TaskFlowMaster\client\public\data")
+BASE = Path(__file__).parent.parent / "data"
 
 INPUT_ASSIGNMENTS = BASE / "output" / "early_out_assignments.json"
 INPUT_EARLYOUT    = BASE / "output" / "early_out.json"
