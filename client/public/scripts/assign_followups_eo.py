@@ -79,6 +79,9 @@ selected_cleaners = cleaners_blob.get("cleaners", [])
 seed_by_cleaner_and_date: Dict[Tuple[int, object], List[Dict[str, Any]]] = defaultdict(list)
 pool_unassigned: List[Dict[str, Any]] = []
 
+# Traccia le task già assegnate per evitare duplicati
+already_assigned_task_ids = set()
+
 # seed: EO già assegnate (posizione + end_time)
 for t in assigned_items:
     # Salta le task followup già presenti (evita duplicati)
@@ -88,6 +91,8 @@ for t in assigned_items:
     d = parse_date(t["checkin_date"])
     if t.get("assigned_cleaner"):
         cid = t["assigned_cleaner"]["id"]
+        already_assigned_task_ids.add(t["task_id"])  # Traccia task assegnata
+        
         # prendo solo cleaner presenti nel selected_cleaners
         if any(c["id"] == cid for c in selected_cleaners):
             start_hhmm = try_hhmm(t["assigned_cleaner"].get("start_time"), DAY_START_DEFAULT)
@@ -118,18 +123,19 @@ for t in assigned_items:
             "premium": bool(t.get("premium", False)),
         })
 
-# aggiungi task dal pacchetto early_out.json
+# aggiungi task dal pacchetto early_out.json (solo se non già assegnate)
 for t in earlyout_tasks:
-    pool_unassigned.append({
-        "task_id": t["task_id"],
-        "logistic_code": t.get("logistic_code", t["task_id"]),
-        "date": parse_date(t["checkin_date"]),
-        "lat": float(t["lat"]), "lng": float(t["lng"]),
-        "cleaning_time": int(t["cleaning_time"]),
-        "address": t.get("address",""),
-        "alias": t.get("alias"),
-        "premium": bool(t.get("premium", False)),
-    })
+    if t["task_id"] not in already_assigned_task_ids:
+        pool_unassigned.append({
+            "task_id": t["task_id"],
+            "logistic_code": t.get("logistic_code", t["task_id"]),
+            "date": parse_date(t["checkin_date"]),
+            "lat": float(t["lat"]), "lng": float(t["lng"]),
+            "cleaning_time": int(t["cleaning_time"]),
+            "address": t.get("address",""),
+            "alias": t.get("alias"),
+            "premium": bool(t.get("premium", False)),
+        })
 
 # dedup su task_id (caso in cui compaiano in entrambi i file)
 seen = set()
