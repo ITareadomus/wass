@@ -45,7 +45,7 @@ export default function TaskCard({
   };
 
   // Calcola la larghezza in base alla durata con breakpoint responsive
-  const calculateWidth = (duration: string, forTimeline: boolean) => {
+  const calculateWidth = (duration: string, forTimeline: boolean, timelineHours?: number) => {
     const parts = duration.split(".");
     const hours = parseInt(parts[0] || "0");
     const minutes = parts[1] ? parseInt(parts[1]) : 0;
@@ -62,9 +62,10 @@ export default function TaskCard({
     }
 
     if (forTimeline) {
-      // La timeline copre 12 ore (720 minuti)
-      // Calcola la percentuale della durata rispetto ai 720 minuti
-      const widthPercentage = (totalMinutes / 720) * 100;
+      // Usa il numero di ore dinamico della timeline (default 12)
+      const totalTimelineMinutes = (timelineHours || 12) * 60;
+      // Calcola la percentuale della durata rispetto al totale minuti della timeline
+      const widthPercentage = (totalMinutes / totalTimelineMinutes) * 100;
       return `${widthPercentage}%`;
     } else {
       // Per le colonne di priorità, calcola con breakpoint responsive
@@ -85,7 +86,7 @@ export default function TaskCard({
     <>
       <Draggable draggableId={task.id} index={index}>
         {(provided, snapshot) => {
-          const cardWidth = calculateWidth(task.duration, isInTimeline);
+          const cardWidth = calculateWidth(task.duration, isInTimeline, (task as any).timelineHours);
           
           return (
             <div
