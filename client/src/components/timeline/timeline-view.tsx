@@ -77,23 +77,56 @@ export default function TimelineView({
         const cleanersList = selectedData.cleaners || [];
         setCleaners(cleanersList);
 
-        // Carica anche le assegnazioni follow-up
+        // Carica le task follow-up da early_out_assignments.json
         try {
-          const followupResponse = await fetch('/data/output/followup_assignments.json');
-          if (followupResponse.ok) {
-            const followupData = await followupResponse.json();
-            console.log("Assegnazioni follow-up caricate:", followupData.assignments);
-            // Le assegnazioni follow-up verranno visualizzate nella timeline se presenti
+          const earlyOutResponse = await fetch('/data/output/early_out_assignments.json');
+          if (earlyOutResponse.ok) {
+            const earlyOutData = await earlyOutResponse.json();
+            const followupTasks = earlyOutData.early_out_tasks_assigned.filter(
+              (task: any) => task.followup === true
+            );
+            console.log("Task follow-up caricate da early_out_assignments:", followupTasks);
+
+            // Crea oggetti Task da aggiungere alla timeline
+            const newTasks: Task[] = followupTasks.map((task: any, index: number) => ({
+              id: `followup-${task.task_id}`,
+              name: String(task.task_id),
+              address: task.address || "",
+              alias: task.alias || "",
+              customer_name: task.customer_name || "",
+              duration: task.cleaning_time ? `${Math.floor(task.cleaning_time / 60)}.${task.cleaning_time % 60}` : "1.0",
+              premium: task.premium || false,
+              is_straordinaria: false,
+              confirmed_operation: task.confirmed_operation !== false,
+              assignedCleaner: task.assigned_cleaner?.id,
+              assignedSlot: index,
+            }));
+
+            // Aggiorna le task esistenti con le follow-up
+            tasks.forEach(task => {
+              const followupMatch = followupTasks.find((ft: any) => String(ft.task_id) === task.name);
+              if (followupMatch && followupMatch.assigned_cleaner) {
+                (task as any).assignedCleaner = followupMatch.assigned_cleaner.id;
+              }
+            });
+
+            // Aggiungi le nuove task follow-up che non esistevano già
+            newTasks.forEach(newTask => {
+              const exists = tasks.some(t => t.name === newTask.name);
+              if (!exists) {
+                tasks.push(newTask);
+              }
+            });
           }
         } catch (error) {
-          console.error("Errore nel caricamento delle assegnazioni follow-up:", error);
+          console.error("Errore nel caricamento delle task follow-up:", error);
         }
       } catch (error) {
         console.error("Errore nel caricamento dei cleaners selezionati:", error);
       }
     };
     loadCleaners();
-  }, []);
+  }, [tasks]);
 
   const handleCleanerClick = (cleaner: Cleaner) => {
     setSelectedCleaner(cleaner);
