@@ -81,6 +81,10 @@ pool_unassigned: List[Dict[str, Any]] = []
 
 # seed: EO già assegnate (posizione + end_time)
 for t in assigned_items:
+    # Salta le task followup già presenti (evita duplicati)
+    if t.get("followup"):
+        continue
+    
     d = parse_date(t["checkin_date"])
     if t.get("assigned_cleaner"):
         cid = t["assigned_cleaner"]["id"]
