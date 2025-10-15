@@ -9,6 +9,26 @@
   "assignments": [
     {
       "date": "2025-10-16",
+      "cleaner_id": 24,
+      "cleaner_name": "HUSSAIN SYED SHUJIAHAT",
+      "cleaner_role": "Standard",
+      "assigned_tasks": [
+        {
+          "task_id": 217419,
+          "logistic_code": 618,
+          "address": "VIA VOGHERA, 4",
+          "alias": "EXPRDS",
+          "start_time": "11:15",
+          "end_time": "11:45",
+          "service_min": 30,
+          "premium": false,
+          "premium_fallback": false,
+          "followup": true
+        }
+      ]
+    },
+    {
+      "date": "2025-10-16",
       "cleaner_id": 287,
       "cleaner_name": "BAH ISMAILA",
       "cleaner_role": "Standard",
@@ -44,26 +64,22 @@
           "premium": false,
           "premium_fallback": false,
           "followup": true
-        },
+        }
+      ]
+    },
+    {
+      "date": "2025-10-16",
+      "cleaner_id": 495,
+      "cleaner_name": "EL HADJI BA",
+      "cleaner_role": "Premium",
+      "assigned_tasks": [
         {
           "task_id": 217417,
           "logistic_code": 618,
           "address": "VIA VOGHERA, 4",
           "alias": "EXPRDS",
-          "start_time": "10:30",
-          "end_time": "11:00",
-          "service_min": 30,
-          "premium": false,
-          "premium_fallback": false,
-          "followup": true
-        },
-        {
-          "task_id": 217419,
-          "logistic_code": 618,
-          "address": "VIA VOGHERA, 4",
-          "alias": "EXPRDS",
-          "start_time": "11:00",
-          "end_time": "11:30",
+          "start_time": "10:00",
+          "end_time": "10:30",
           "service_min": 30,
           "premium": false,
           "premium_fallback": false,

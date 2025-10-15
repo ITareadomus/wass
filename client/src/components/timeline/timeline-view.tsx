@@ -74,11 +74,10 @@ export default function TimelineView({
         console.log("Cleaners caricati da selected_cleaners.json:", selectedData);
 
         // I cleaners sono già nel formato corretto
-        const cleanersList = selectedData?.cleaners || [];
+        const cleanersList = selectedData.cleaners || [];
         setCleaners(cleanersList);
       } catch (error) {
         console.error("Errore nel caricamento dei cleaners selezionati:", error);
-        setCleaners([]);
       }
     };
     loadCleaners();
@@ -91,23 +90,20 @@ export default function TimelineView({
 
   const handleResetAssignments = async () => {
     try {
-      // Reset timeline_assignments.json e followup tasks
+      // Svuota timeline_assignments.json
       const response = await fetch('/api/reset-timeline-assignments', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
       });
 
-      if (!response.ok) {
+      if (response.ok) {
+        // Ricarica la pagina per ripristinare lo stato iniziale
+        window.location.reload();
+      } else {
         console.error('Errore nel reset delle assegnazioni');
-        return;
       }
-
-      console.log('Assegnazioni resettate con successo');
-
-      // Ricarica la pagina per aggiornare lo stato
-      window.location.reload();
     } catch (error) {
-      console.error('Errore durante il reset:', error);
+      console.error('Errore nella chiamata API di reset:', error);
     }
   };
 

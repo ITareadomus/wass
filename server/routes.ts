@@ -19,29 +19,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/reset-timeline-assignments", async (req, res) => {
     try {
       const timelineAssignmentsPath = path.join(process.cwd(), 'client/public/data/output/timeline_assignments.json');
-      const earlyOutAssignmentsPath = path.join(process.cwd(), 'client/public/data/output/early_out_assignments.json');
       
-      // Svuota timeline_assignments.json
+      // Svuota il file
       await fs.writeFile(timelineAssignmentsPath, JSON.stringify({ assignments: [] }, null, 2));
-
-      // Rimuovi le task followup da early_out_assignments.json
-      try {
-        const earlyOutData = await fs.readFile(earlyOutAssignmentsPath, 'utf8').then(JSON.parse);
-        
-        // Filtra via le task followup
-        earlyOutData.early_out_tasks_assigned = (earlyOutData.early_out_tasks_assigned || []).filter(
-          (task: any) => !task.followup
-        );
-        
-        // Rimuovi i metadati followup
-        if (earlyOutData.meta && earlyOutData.meta.followup_added) {
-          delete earlyOutData.meta.followup_added;
-        }
-        
-        await fs.writeFile(earlyOutAssignmentsPath, JSON.stringify(earlyOutData, null, 2));
-      } catch (error) {
-        console.error("Errore nel reset delle task followup:", error);
-      }
 
       res.json({ success: true, message: "Assegnazioni della timeline resettate con successo" });
     } catch (error: any) {
