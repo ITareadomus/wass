@@ -113,7 +113,8 @@ def main() -> None:
 
     # Pass 1
     for t in premium_tasks:
-        start = t.get("start_time") or DEFAULT_START_TIME
+        # Usa checkout_time se disponibile, altrimenti start_time, altrimenti default
+        start = t.get("checkout_time") or t.get("start_time") or DEFAULT_START_TIME
         end = end_time_for(start, t.get("cleaning_time"))
         chosen = pick_first_free(premium_cleaners, used_ids)
         enriched = dict(t)
@@ -128,7 +129,8 @@ def main() -> None:
 
     # Pass 2
     for t in nonpremium_tasks:
-        start = t.get("start_time") or DEFAULT_START_TIME
+        # Usa checkout_time se disponibile, altrimenti start_time, altrimenti default
+        start = t.get("checkout_time") or t.get("start_time") or DEFAULT_START_TIME
         end = end_time_for(start, t.get("cleaning_time"))
         chosen = pick_first_free(nonpremium_cleaners, used_ids)
         if not chosen:
