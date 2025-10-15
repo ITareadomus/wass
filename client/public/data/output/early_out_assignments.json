@@ -597,7 +597,7 @@
       "cleaning_time": 60,
       "checkin_date": "2025-10-16",
       "checkout_date": "2025-10-16",
-      "checkin_time": null,
+      "checkin_time": "19:00",
       "checkout_time": "10:00",
       "pax_in": 2,
       "pax_out": 1,
@@ -612,12 +612,12 @@
         "client_forced_eo"
       ],
       "assigned_cleaner": {
-        "id": 24,
-        "name": "HUSSAIN",
-        "lastname": "SYED SHUJIAHAT",
+        "id": 287,
+        "name": "BAH",
+        "lastname": "ISMAILA",
         "role": "Standard",
-        "start_time": "11:15",
-        "end_time": "12:15"
+        "start_time": "10:00",
+        "end_time": "11:00"
       },
       "assignment_status": "assigned",
       "followup": true
@@ -648,12 +648,12 @@
         "checkout_time<=eo_time"
       ],
       "assigned_cleaner": {
-        "id": 132,
-        "name": "JOHOISER",
-        "lastname": "ERNESTO LOPEZ GIRON",
-        "role": "Premium",
-        "start_time": "12:15",
-        "end_time": "12:45"
+        "id": 326,
+        "name": "FESTUS",
+        "lastname": "OSARO AIHIVBERE",
+        "role": "Standard",
+        "start_time": "10:00",
+        "end_time": "10:30"
       },
       "assignment_status": "assigned",
       "followup": true
@@ -684,12 +684,12 @@
         "checkout_time<=eo_time"
       ],
       "assigned_cleaner": {
-        "id": 249,
-        "name": "Ogbodo",
-        "lastname": "Chidi Igwe",
+        "id": 495,
+        "name": "EL",
+        "lastname": "HADJI BA",
         "role": "Premium",
-        "start_time": "12:15",
-        "end_time": "12:45"
+        "start_time": "10:00",
+        "end_time": "10:30"
       },
       "assignment_status": "assigned",
       "followup": true
@@ -720,12 +720,12 @@
         "checkout_time<=eo_time"
       ],
       "assigned_cleaner": {
-        "id": 287,
-        "name": "BAH",
-        "lastname": "ISMAILA",
+        "id": 24,
+        "name": "HUSSAIN",
+        "lastname": "SYED SHUJIAHAT",
         "role": "Standard",
-        "start_time": "10:00",
-        "end_time": "10:30"
+        "start_time": "11:15",
+        "end_time": "11:45"
       },
       "assignment_status": "assigned",
       "followup": true
