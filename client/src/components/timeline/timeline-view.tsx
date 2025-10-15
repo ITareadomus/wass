@@ -40,10 +40,43 @@ export default function TimelineView({
   const [selectedCleaner, setSelectedCleaner] = useState<Cleaner | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  const timeSlots = [
-    "08:00", "09:00", "10:00", "11:00", "12:00",
-    "13:00", "14:00", "15:00", "16:00", "17:00", "18:00", "19:00"
-  ];
+  // Calcola il primo start_time dalle task assegnate
+  const calculateTimeSlots = () => {
+    const startTimes: string[] = [];
+    
+    // Raccogli tutti gli start_time dalle task
+    tasks.forEach((task) => {
+      const taskStartTime = (task as any).startTime || (task as any).fw_start_time;
+      if (taskStartTime) {
+        startTimes.push(taskStartTime);
+      }
+    });
+
+    // Se non ci sono task assegnate, usa 08:00 come default
+    if (startTimes.length === 0) {
+      const slots = [];
+      for (let i = 0; i < 12; i++) {
+        const hour = 8 + i;
+        slots.push(`${hour.toString().padStart(2, '0')}:00`);
+      }
+      return slots;
+    }
+
+    // Trova il primo orario
+    const minTime = startTimes.sort()[0];
+    const [hour] = minTime.split(':').map(Number);
+    
+    // Genera 12 slot orari partendo dall'ora più bassa
+    const slots = [];
+    for (let i = 0; i < 12; i++) {
+      const currentHour = hour + i;
+      slots.push(`${currentHour.toString().padStart(2, '0')}:00`);
+    }
+    
+    return slots;
+  };
+
+  const timeSlots = calculateTimeSlots();
 
   // Palette di colori azzurri per i cleaners
   const cleanerColors = [
