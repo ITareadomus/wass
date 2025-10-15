@@ -162,6 +162,7 @@ export default function GenerateAssignments() {
       console.log("High priority data:", highPriorityData);
       console.log("Low priority data:", lowPriorityData);
       console.log("Timeline assignments data:", timelineAssignmentsData);
+      console.log("Early out assignments data:", earlyOutAssignmentsData);
 
       const initialEarlyOut: Task[] = (earlyOutData.early_out_tasks || []).map((task: RawTask) =>
         convertRawTask(task, "early-out")
@@ -182,27 +183,27 @@ export default function GenerateAssignments() {
         timelineAssignmentsData.assignments.map((a: any) => String(a.logistic_code))
       );
 
-      // Aggiungi anche le task followup dalle assegnazioni early-out
-      const followupTaskIds = new Set(
+      // Crea un Set di task_id (non logistic_code!) delle task assegnate in early_out_assignments.json
+      const assignedTaskIds = new Set(
         (earlyOutAssignmentsData.early_out_tasks_assigned || [])
-          .filter((t: any) => t.followup === true)
-          .map((t: any) => String(t.logistic_code))
+          .filter((t: any) => t.assignment_status === "assigned")
+          .map((t: any) => String(t.task_id))
       );
 
       console.log("Task assegnate nella timeline (logistic_code):", Array.from(assignedInTimelineCodes));
-      console.log("Task followup (logistic_code):", Array.from(followupTaskIds));
+      console.log("Task assegnate in early_out (task_id):", Array.from(assignedTaskIds));
 
-      // Filtra le task già presenti nella timeline o followup dai container
+      // Filtra le task già assegnate dai container
       const filteredEarlyOut = initialEarlyOut.filter(task => {
-        const isAssigned = assignedInTimelineCodes.has(String(task.name));
-        const isFollowup = followupTaskIds.has(String(task.name));
-        if (isAssigned) {
-          console.log(`Task ${task.name} filtrata da Early Out (è nella timeline)`);
+        const isInTimeline = assignedInTimelineCodes.has(String(task.name));
+        const isAssignedEO = assignedTaskIds.has(String(task.id));
+        if (isInTimeline) {
+          console.log(`Task ${task.name} (id: ${task.id}) filtrata da Early Out (è nella timeline)`);
         }
-        if (isFollowup) {
-          console.log(`Task ${task.name} filtrata da Early Out (è followup)`);
+        if (isAssignedEO) {
+          console.log(`Task ${task.name} (id: ${task.id}) filtrata da Early Out (è assegnata in early_out_assignments)`);
         }
-        return !isAssigned && !isFollowup;
+        return !isInTimeline && !isAssignedEO;
       });
 
       const filteredHigh = initialHigh.filter(task => {
