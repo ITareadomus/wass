@@ -224,15 +224,6 @@
       ]
     },
     {
-      "task_id": 217419,
-      "client_id": 67,
-      "premium": false,
-      "final_class": "EO",
-      "reasons": [
-        "checkout_time<=eo_time"
-      ]
-    },
-    {
       "task_id": 217434,
       "client_id": 3,
       "premium": true,
