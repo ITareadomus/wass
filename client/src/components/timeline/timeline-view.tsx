@@ -264,7 +264,7 @@ export default function TimelineView({
             const followupTasks = followupAssignments
               .filter(assignment => assignment.cleaner_id === cleaner.id)
               .flatMap(assignment => 
-                assignment.assigned_tasks.map((task: any) => ({
+                (assignment.assigned_tasks || []).map((task: any) => ({
                   ...task, // Spread the task properties
                   start_time: task.fw_start_time || task.start_time || "10:00",
                   end_time: task.fw_end_time || task.end_time || "11:00",
