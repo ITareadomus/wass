@@ -611,8 +611,16 @@
       "reasons": [
         "client_forced_eo"
       ],
-      "assigned_cleaner": null,
-      "assignment_status": "unassigned_no_cleaners"
+      "assigned_cleaner": {
+        "id": 24,
+        "name": "HUSSAIN",
+        "lastname": "SYED SHUJIAHAT",
+        "role": "Standard",
+        "start_time": "11:15",
+        "end_time": "12:15"
+      },
+      "assignment_status": "assigned",
+      "followup": true
     },
     {
       "task_id": 217416,
@@ -639,96 +647,6 @@
       "reasons": [
         "checkout_time<=eo_time"
       ],
-      "assigned_cleaner": null,
-      "assignment_status": "unassigned_no_cleaners"
-    },
-    {
-      "task_id": 217417,
-      "logistic_code": 618,
-      "client_id": 67,
-      "premium": false,
-      "address": "VIA VOGHERA, 4",
-      "lat": "45.454632",
-      "lng": "9.168536",
-      "cleaning_time": 30,
-      "checkin_date": "2025-10-16",
-      "checkout_date": "2025-10-16",
-      "checkin_time": null,
-      "checkout_time": "09:30",
-      "pax_in": 1,
-      "pax_out": 0,
-      "small_equipment": true,
-      "operation_id": 2,
-      "confirmed_operation": true,
-      "straordinaria": false,
-      "type_apt": "A",
-      "alias": "EXPRDS",
-      "customer_name": "EXPERIENCE DESIGN BED & SHOW",
-      "reasons": [
-        "checkout_time<=eo_time"
-      ],
-      "assigned_cleaner": null,
-      "assignment_status": "unassigned_no_cleaners"
-    },
-    {
-      "task_id": 217419,
-      "logistic_code": 618,
-      "client_id": 67,
-      "premium": false,
-      "address": "VIA VOGHERA, 4",
-      "lat": "45.454632",
-      "lng": "9.168536",
-      "cleaning_time": 30,
-      "checkin_date": "2025-10-16",
-      "checkout_date": "2025-10-16",
-      "checkin_time": null,
-      "checkout_time": "09:30",
-      "pax_in": 1,
-      "pax_out": 0,
-      "small_equipment": true,
-      "operation_id": 2,
-      "confirmed_operation": true,
-      "straordinaria": false,
-      "type_apt": "A",
-      "alias": "EXPRDS",
-      "customer_name": "EXPERIENCE DESIGN BED & SHOW",
-      "reasons": [
-        "checkout_time<=eo_time"
-      ],
-      "assigned_cleaner": null,
-      "assignment_status": "unassigned_no_cleaners"
-    },
-    {
-      "task_id": 217321,
-      "logistic_code": 217321,
-      "address": "VIA DELLA COMMENDA, 28",
-      "alias": "NTM",
-      "lat": "45.4551641",
-      "lng": "9.1994733",
-      "cleaning_time": 60,
-      "checkin_date": "2025-10-16",
-      "premium": false,
-      "assigned_cleaner": {
-        "id": 24,
-        "name": "HUSSAIN",
-        "lastname": "SYED SHUJIAHAT",
-        "role": "Standard",
-        "start_time": "11:15",
-        "end_time": "12:15"
-      },
-      "assignment_status": "assigned",
-      "followup": true
-    },
-    {
-      "task_id": 217416,
-      "logistic_code": 217416,
-      "address": "VIA VOGHERA, 4",
-      "alias": "EXPRDS",
-      "lat": "45.454632",
-      "lng": "9.168536",
-      "cleaning_time": 30,
-      "checkin_date": "2025-10-16",
-      "premium": false,
       "assigned_cleaner": {
         "id": 132,
         "name": "JOHOISER",
@@ -742,14 +660,29 @@
     },
     {
       "task_id": 217417,
-      "logistic_code": 217417,
+      "logistic_code": 618,
+      "client_id": 67,
+      "premium": false,
       "address": "VIA VOGHERA, 4",
-      "alias": "EXPRDS",
       "lat": "45.454632",
       "lng": "9.168536",
       "cleaning_time": 30,
       "checkin_date": "2025-10-16",
-      "premium": false,
+      "checkout_date": "2025-10-16",
+      "checkin_time": null,
+      "checkout_time": "09:30",
+      "pax_in": 1,
+      "pax_out": 0,
+      "small_equipment": true,
+      "operation_id": 2,
+      "confirmed_operation": true,
+      "straordinaria": false,
+      "type_apt": "A",
+      "alias": "EXPRDS",
+      "customer_name": "EXPERIENCE DESIGN BED & SHOW",
+      "reasons": [
+        "checkout_time<=eo_time"
+      ],
       "assigned_cleaner": {
         "id": 249,
         "name": "Ogbodo",
@@ -763,14 +696,29 @@
     },
     {
       "task_id": 217419,
-      "logistic_code": 217419,
+      "logistic_code": 618,
+      "client_id": 67,
+      "premium": false,
       "address": "VIA VOGHERA, 4",
-      "alias": "EXPRDS",
       "lat": "45.454632",
       "lng": "9.168536",
       "cleaning_time": 30,
       "checkin_date": "2025-10-16",
-      "premium": false,
+      "checkout_date": "2025-10-16",
+      "checkin_time": null,
+      "checkout_time": "09:30",
+      "pax_in": 1,
+      "pax_out": 0,
+      "small_equipment": true,
+      "operation_id": 2,
+      "confirmed_operation": true,
+      "straordinaria": false,
+      "type_apt": "A",
+      "alias": "EXPRDS",
+      "customer_name": "EXPERIENCE DESIGN BED & SHOW",
+      "reasons": [
+        "checkout_time<=eo_time"
+      ],
       "assigned_cleaner": {
         "id": 287,
         "name": "BAH",
