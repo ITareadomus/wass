@@ -198,16 +198,20 @@ def assign_greedy_for_date(the_date, tasks, cleaners):
     assigned_any = True
     premium_fallback_today = []
 
-    # round-robin finché qualcosa si muove
+    # assegna sempre al cleaner globalmente più vicino
     while remaining and assigned_any:
         assigned_any = False
+        
+        # Trova la migliore combinazione (cleaner, task) globalmente
+        best_cleaner_id = None
+        best_task = None
+        best_travel = None
+        
         for c in cleaners:
-            if not remaining:
-                break
             cid = c["id"]
             cstate = state[cid]
-
-            # filtro premium
+            
+            # filtro premium per questo cleaner
             def allowed(task):
                 if task.get("premium", False):
                     if has_premium:
@@ -215,56 +219,58 @@ def assign_greedy_for_date(the_date, tasks, cleaners):
                     else:
                         return True  # fallback permesso
                 return True
-
+            
             candidates = [t for t in remaining if allowed(t)]
-            if not candidates:
-                continue
-
-            # scegli la più vicina (in minuti viaggio); se nessuna posizione, costo viaggio=0
-            best = None
-            best_travel = None
+            
+            # per ogni task candidata di questo cleaner, calcola la distanza
             for t in candidates:
                 if cstate["lat"] is None or cstate["lng"] is None:
                     trav = 0
                 else:
                     trav = travel_minutes(cstate["lat"], cstate["lng"], t["lat"], t["lng"])
-                if best is None or trav < best_travel:
-                    best = t
+                
+                # aggiorna il miglior match globale
+                if best_travel is None or trav < best_travel:
+                    best_cleaner_id = cid
+                    best_task = t
                     best_travel = trav
-
-            # Se non è stata trovata nessuna task, salta questo cleaner
-            if best is None:
-                continue
-
-            # calcola orari
-            start_min = cstate["available_min"] + (best_travel or 0)
-            end_min   = start_min + int(best["cleaning_time"])
-
-            premium_fallback = False
-            if best.get("premium", False) and cid not in premium_vehicle_ids and not has_premium:
-                premium_fallback = True
-                premium_fallback_today.append(best["task_id"])
-
-            # registra sul cleaner
-            cstate["route"].append({
-                "task_id": best["task_id"],
-                "logistic_code": best.get("logistic_code", best["task_id"]),
-                "address": best.get("address",""),
-                "alias": best.get("alias"),
-                "start_time": minutes_to_hhmm(start_min),
-                "end_time": minutes_to_hhmm(end_min),
-                "service_min": int(best["cleaning_time"]),
-                "premium": bool(best.get("premium", False)),
-                "premium_fallback": premium_fallback,
-                "followup": True
-            })
-            # aggiorna stato cleaner
-            cstate["available_min"] = end_min
-            cstate["lat"], cstate["lng"] = best["lat"], best["lng"]
-
-            # togli la task dalla lista
-            remaining.remove(best)
-            assigned_any = True
+        
+        # Se non abbiamo trovato nessuna combinazione valida, esci
+        if best_cleaner_id is None or best_task is None:
+            break
+        
+        # Assegna la task al cleaner migliore
+        cstate = state[best_cleaner_id]
+        
+        # calcola orari
+        start_min = cstate["available_min"] + (best_travel or 0)
+        end_min   = start_min + int(best_task["cleaning_time"])
+        
+        premium_fallback = False
+        if best_task.get("premium", False) and best_cleaner_id not in premium_vehicle_ids and not has_premium:
+            premium_fallback = True
+            premium_fallback_today.append(best_task["task_id"])
+        
+        # registra sul cleaner
+        cstate["route"].append({
+            "task_id": best_task["task_id"],
+            "logistic_code": best_task.get("logistic_code", best_task["task_id"]),
+            "address": best_task.get("address",""),
+            "alias": best_task.get("alias"),
+            "start_time": minutes_to_hhmm(start_min),
+            "end_time": minutes_to_hhmm(end_min),
+            "service_min": int(best_task["cleaning_time"]),
+            "premium": bool(best_task.get("premium", False)),
+            "premium_fallback": premium_fallback,
+            "followup": True
+        })
+        # aggiorna stato cleaner
+        cstate["available_min"] = end_min
+        cstate["lat"], cstate["lng"] = best_task["lat"], best_task["lng"]
+        
+        # togli la task dalla lista
+        remaining.remove(best_task)
+        assigned_any = True
 
     # format results
     results = []
