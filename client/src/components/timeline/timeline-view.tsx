@@ -42,18 +42,19 @@ export default function TimelineView({
 
   // Calcola il primo start_time dalle task assegnate
   const calculateTimeSlots = () => {
-    const startTimes: string[] = [];
+    const startTimesInMinutes: number[] = [];
     
-    // Raccogli tutti gli start_time dalle task
+    // Raccogli tutti gli start_time dalle task (sia start_time che fw_start_time)
     tasks.forEach((task) => {
-      const taskStartTime = (task as any).startTime || (task as any).fw_start_time;
-      if (taskStartTime) {
-        startTimes.push(taskStartTime);
+      const taskStartTime = (task as any).start_time || (task as any).fw_start_time || (task as any).startTime;
+      if (taskStartTime && typeof taskStartTime === 'string') {
+        const [h, m] = taskStartTime.split(':').map(Number);
+        startTimesInMinutes.push(h * 60 + m);
       }
     });
 
     // Se non ci sono task assegnate, usa 08:00 come default
-    if (startTimes.length === 0) {
+    if (startTimesInMinutes.length === 0) {
       const slots = [];
       for (let i = 0; i < 12; i++) {
         const hour = 8 + i;
@@ -62,14 +63,14 @@ export default function TimelineView({
       return slots;
     }
 
-    // Trova il primo orario
-    const minTime = startTimes.sort()[0];
-    const [hour] = minTime.split(':').map(Number);
+    // Trova il primo orario in minuti
+    const minTimeInMinutes = Math.min(...startTimesInMinutes);
+    const startHour = Math.floor(minTimeInMinutes / 60);
     
     // Genera 12 slot orari partendo dall'ora più bassa
     const slots = [];
     for (let i = 0; i < 12; i++) {
-      const currentHour = hour + i;
+      const currentHour = startHour + i;
       slots.push(`${currentHour.toString().padStart(2, '0')}:00`);
     }
     
