@@ -1,6 +1,6 @@
 import { Personnel, Task } from "@shared/schema";
 import { Calendar, RotateCcw } from "lucide-react";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Droppable } from "react-beautiful-dnd";
 import TaskCard from "@/components/drag-drop/task-card";
 import {
@@ -40,8 +40,18 @@ export default function TimelineView({
   const [selectedCleaner, setSelectedCleaner] = useState<Cleaner | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  // Calcola il primo start_time dalle task assegnate
-  const calculateTimeSlots = () => {
+  // Calcola il primo start_time dalle task assegnate usando useMemo
+  const timeSlots = useMemo(() => {
+    if (!tasks || tasks.length === 0) {
+      // Default: 08:00-19:00
+      const slots = [];
+      for (let i = 0; i < 12; i++) {
+        const hour = 8 + i;
+        slots.push(`${hour.toString().padStart(2, '0')}:00`);
+      }
+      return slots;
+    }
+
     const startTimesInMinutes: number[] = [];
     
     // Raccogli tutti gli start_time dalle task (sia start_time che fw_start_time)
@@ -53,7 +63,7 @@ export default function TimelineView({
       }
     });
 
-    // Se non ci sono task assegnate, usa 08:00 come default
+    // Se non ci sono start_time validi, usa 08:00 come default
     if (startTimesInMinutes.length === 0) {
       const slots = [];
       for (let i = 0; i < 12; i++) {
@@ -75,9 +85,7 @@ export default function TimelineView({
     }
     
     return slots;
-  };
-
-  const timeSlots = calculateTimeSlots();
+  }, [tasks]);
 
   // Palette di colori azzurri per i cleaners
   const cleanerColors = [
