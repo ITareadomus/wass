@@ -40,7 +40,7 @@ export default function TimelineView({
   const [selectedCleaner, setSelectedCleaner] = useState<Cleaner | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  // Calcola il primo checkout_time dalle task early-out (non followup) usando useMemo
+  // Calcola il primo orario dalla start_time delle task early-out (non followup) usando useMemo
   const timeSlots = useMemo(() => {
     if (!tasks || tasks.length === 0) {
       // Default: 08:00-19:00
@@ -54,15 +54,15 @@ export default function TimelineView({
 
     const startTimesInMinutes: number[] = [];
 
-    // Raccogli checkout_time dalle task NON followup
+    // Raccogli start_time dalle task early-out NON followup
     tasks.forEach((task) => {
-      const isFollowup = (task as any).followup === true;
+      const taskData = task as any;
+      const isFollowup = taskData.followup === true;
 
-      if (!isFollowup) {
-        // Per task early-out usa checkout_time
-        const checkoutTime = (task as any).checkout_time;
-        if (checkoutTime && typeof checkoutTime === 'string' && checkoutTime.includes(':')) {
-          const [h, m] = checkoutTime.split(':').map(Number);
+      if (!isFollowup && taskData.assigned_cleaner?.start_time) {
+        const startTime = taskData.assigned_cleaner.start_time;
+        if (typeof startTime === 'string' && startTime.includes(':')) {
+          const [h, m] = startTime.split(':').map(Number);
           if (!isNaN(h) && !isNaN(m)) {
             startTimesInMinutes.push(h * 60 + m);
           }
@@ -70,7 +70,7 @@ export default function TimelineView({
       }
     });
 
-    // Se non ci sono checkout_time validi, usa 08:00 come default
+    // Se non ci sono start_time validi, usa 08:00 come default
     if (startTimesInMinutes.length === 0) {
       const slots = [];
       for (let i = 0; i < 12; i++) {
