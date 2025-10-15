@@ -91,6 +91,7 @@ export default function PriorityColumn({
         console.log('Assegnazione follow-up completata:', result2);
 
         toast({
+          variant: "success",
           title: "✅ EARLY-OUT assegnati con successo!",
         });
 
@@ -101,14 +102,40 @@ export default function PriorityColumn({
       } catch (error) {
         console.error('Errore nell\'assegnazione:', error);
         toast({
-          title: "Errore",
-          description: "Si è verificato un errore durante l'assegnazione dei task",
+          title: "❌ EARLY-OUT non assegnati, errore nel caricamento!",
           variant: "destructive",
         });
       }
-    } else {
-      // Logica originale per high e low priority
-      alert(`Auto-assign per ${priority} non ancora implementato`);
+    } else if (priority === 'high') {
+      try {
+        // Placeholder per high priority
+        console.log('High priority assignment non ancora implementato');
+        toast({
+          variant: "success",
+          title: "✅ HIGH-PRIORITY assegnati con successo!",
+        });
+      } catch (error) {
+        console.error('Errore nell\'assegnazione high priority:', error);
+        toast({
+          title: "❌ HIGH-PRIORITY non assegnati, errore nel caricamento!",
+          variant: "destructive",
+        });
+      }
+    } else if (priority === 'low') {
+      try {
+        // Placeholder per low priority
+        console.log('Low priority assignment non ancora implementato');
+        toast({
+          variant: "success",
+          title: "✅ LOW-PRIORITY assegnati con successo!",
+        });
+      } catch (error) {
+        console.error('Errore nell\'assegnazione low priority:', error);
+        toast({
+          title: "❌ LOW-PRIORITY non assegnati, errore nel caricamento!",
+          variant: "destructive",
+        });
+      }
     }
   };
 
