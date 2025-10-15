@@ -79,6 +79,9 @@ export default function Convocazioni() {
           cleanersList = cleanersData.cleaners;
         }
         
+        // Ordina per counter_hours (decrescente - più ore prima)
+        cleanersList.sort((a, b) => b.counter_hours - a.counter_hours);
+        
         setCleaners(cleanersList);
         setSelectedCleaners(new Set()); // Reset selezioni quando cambia la data
         setIsLoading(false);
