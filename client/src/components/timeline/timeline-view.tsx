@@ -76,6 +76,18 @@ export default function TimelineView({
         // I cleaners sono già nel formato corretto
         const cleanersList = selectedData.cleaners || [];
         setCleaners(cleanersList);
+
+        // Carica anche le assegnazioni follow-up
+        try {
+          const followupResponse = await fetch('/data/output/followup_assignments.json');
+          if (followupResponse.ok) {
+            const followupData = await followupResponse.json();
+            console.log("Assegnazioni follow-up caricate:", followupData.assignments);
+            // Le assegnazioni follow-up verranno visualizzate nella timeline se presenti
+          }
+        } catch (error) {
+          console.error("Errore nel caricamento delle assegnazioni follow-up:", error);
+        }
       } catch (error) {
         console.error("Errore nel caricamento dei cleaners selezionati:", error);
       }
