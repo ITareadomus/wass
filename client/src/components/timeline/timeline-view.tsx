@@ -1,6 +1,6 @@
 import { Personnel, Task } from "@shared/schema";
 import { Calendar, RotateCcw } from "lucide-react";
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect } from "react";
 import { Droppable } from "react-beautiful-dnd";
 import TaskCard from "@/components/drag-drop/task-card";
 import {
@@ -40,59 +40,10 @@ export default function TimelineView({
   const [selectedCleaner, setSelectedCleaner] = useState<Cleaner | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  // Calcola il primo orario dalla start_time delle task early-out (non followup) usando useMemo
-  const timeSlots = useMemo(() => {
-    if (!tasks || tasks.length === 0) {
-      // Default: 08:00-19:00
-      const slots = [];
-      for (let i = 0; i < 12; i++) {
-        const hour = 8 + i;
-        slots.push(`${hour.toString().padStart(2, '0')}:00`);
-      }
-      return slots;
-    }
-
-    const startTimesInMinutes: number[] = [];
-
-    // Raccogli start_time dalle task early-out NON followup
-    tasks.forEach((task) => {
-      const taskData = task as any;
-      const isFollowup = taskData.followup === true;
-
-      if (!isFollowup && taskData.assigned_cleaner?.start_time) {
-        const startTime = taskData.assigned_cleaner.start_time;
-        if (typeof startTime === 'string' && startTime.includes(':')) {
-          const [h, m] = startTime.split(':').map(Number);
-          if (!isNaN(h) && !isNaN(m)) {
-            startTimesInMinutes.push(h * 60 + m);
-          }
-        }
-      }
-    });
-
-    // Se non ci sono start_time validi, usa 08:00 come default
-    if (startTimesInMinutes.length === 0) {
-      const slots = [];
-      for (let i = 0; i < 12; i++) {
-        const hour = 8 + i;
-        slots.push(`${hour.toString().padStart(2, '0')}:00`);
-      }
-      return slots;
-    }
-
-    // Trova il primo orario in minuti
-    const minTimeInMinutes = Math.min(...startTimesInMinutes);
-    const startHour = Math.floor(minTimeInMinutes / 60);
-
-    // Genera 12 slot orari partendo dall'ora più bassa
-    const slots = [];
-    for (let i = 0; i < 12; i++) {
-      const currentHour = startHour + i;
-      slots.push(`${currentHour.toString().padStart(2, '0')}:00`);
-    }
-
-    return slots;
-  }, [tasks]);
+  const timeSlots = [
+    "08:00", "09:00", "10:00", "11:00", "12:00",
+    "13:00", "14:00", "15:00", "16:00", "17:00", "18:00", "19:00"
+  ];
 
   // Palette di colori azzurri per i cleaners
   const cleanerColors = [
@@ -203,7 +154,7 @@ export default function TimelineView({
             const droppableId = `cleaner-${cleaner.id}`;
 
             // Trova tutte le task assegnate a questo cleaner
-            const cleanerTasks = tasks.filter(task =>
+            const cleanerTasks = tasks.filter(task => 
               (task as any).assignedCleaner === cleaner.id
             );
 
@@ -212,7 +163,7 @@ export default function TimelineView({
                 {/* Info cleaner */}
                 <div
                   className="w-24 flex-shrink-0 p-1 flex items-center border border-border cursor-pointer hover:opacity-90 transition-opacity"
-                  style={{
+                  style={{ 
                     backgroundColor: color.bg,
                     color: color.text
                   }}
@@ -234,8 +185,8 @@ export default function TimelineView({
                       className={`relative border-t border-border transition-colors min-h-[45px] flex-1 ${
                         snapshot.isDraggingOver ? 'bg-primary/20 ring-2 ring-primary' : ''
                       }`}
-                      style={{
-                        backgroundColor: snapshot.isDraggingOver
+                      style={{ 
+                        backgroundColor: snapshot.isDraggingOver 
                           ? `${color.bg}40`
                           : `${color.bg}10`
                       }}
@@ -251,15 +202,15 @@ export default function TimelineView({
                       <div className="relative z-10 flex items-center h-full">
                         {tasks
                           .filter((task) => (task as any).assignedCleaner === cleaner.id)
-                          .filter((task, index, self) =>
+                          .filter((task, index, self) => 
                             // Rimuovi duplicati basandoti sul logistic_code (task.name)
                             index === self.findIndex((t) => t.name === task.name)
                           )
                           .sort((a, b) => ((a as any).assignedSlot || 0) - ((b as any).assignedSlot || 0))
                           .map((task, index) => (
-                            <TaskCard
+                            <TaskCard 
                               key={`${task.name}-${cleaner.id}`}
-                              task={task}
+                              task={task} 
                               index={index}
                               isInTimeline={true}
                             />
