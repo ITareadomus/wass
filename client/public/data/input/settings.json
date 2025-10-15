@@ -3,5 +3,10 @@
   "eo_clients": [61, 87],
   "hp_time": "15:30",
   "hp_clients": [64],
-  "dedupe_strategy": "eo_wins"
+  "dedupe_strategy": "eo_wins",
+  "apartment_types": {
+    "standard_apt": ["A", "B", "C", "D", "E", "F", "X"],
+    "premium_apt": ["A", "B", "C", "D", "E", "F", "X"],
+    "formatore_apt": ["B", "C"]
+  }
 }

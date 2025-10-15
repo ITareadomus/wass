@@ -8,22 +8,24 @@ from __future__ import annotations
 import json
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
+from pathlib import Path
 
 DEFAULT_START_TIME = "10:00"
 DEFAULT_EO_TIME = "10:00"
 
 # Path relativi al progetto
-CLEANERS_PATH = "client/public/data/cleaners/selected_cleaners.json"
-TASKS_PATH    = "client/public/data/output/early_out.json"
-OUTPUT_PATH   = "client/public/data/output/early_out_assignments.json"
-TIMELINE_ASSIGNMENTS_PATH = "client/public/data/output/timeline_assignments.json"
+TASKS_PATH = Path(__file__).parents[1] / "data" / "output" / "early_out.json"
+CLEANERS_PATH = Path(__file__).parents[1] / "data" / "cleaners" / "selected_cleaners.json"
+OUTPUT_PATH = Path(__file__).parents[1] / "data" / "output" / "early_out_assignments.json"
+TIMELINE_ASSIGNMENTS_PATH = Path(__file__).parents[1] / "data" / "output" / "timeline_assignments.json"
+SETTINGS_PATH = Path(__file__).parents[1] / "data" / "input" / "settings.json"
 
-def load_json(path: str) -> Any:
-    with open(path, "r", encoding="utf-8") as f:
+def load_json(path: Path) -> Any:
+    with path.open("r", encoding="utf-8") as f:
         return json.load(f)
 
-def save_json(path: str, data: Any) -> None:
-    with open(path, "w", encoding="utf-8") as f:
+def save_json(path: Path, data: Any) -> None:
+    with path.open("w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
 
 def normalize_checkout_time(val: Optional[str]) -> str:
@@ -91,7 +93,27 @@ def pick_first_free(candidates: List[Dict[str, Any]], used_ids: set) -> Optional
             return c
     return None
 
+def can_cleaner_handle_apartment(cleaner_role: str, apt_type: str, settings: dict) -> bool:
+    """Verifica se un cleaner può gestire un determinato tipo di appartamento."""
+    apartment_types = settings.get("apartment_types", {})
+
+    if cleaner_role == "Premium":
+        allowed_types = apartment_types.get("premium_apt", ["A", "B", "C", "D", "E", "F", "X"])
+    elif cleaner_role == "Formatore":
+        allowed_types = apartment_types.get("formatore_apt", ["B", "C"])
+    else:  # Standard
+        allowed_types = apartment_types.get("standard_apt", ["A", "B", "C", "D", "E", "F", "X"])
+
+    return apt_type in allowed_types
+
+def make_assignment(cleaner: Dict[str, Any], task: Dict[str, Any]) -> Dict[str, Any]:
+    """Crea l'assegnazione del task al cleaner con orari."""
+    start = task.get("checkout_time") or task.get("start_time") or DEFAULT_START_TIME
+    end = end_time_for(start, task.get("cleaning_time"))
+    return reorder_cleaner_with_times(cleaner, start, end)
+
 def main() -> None:
+    settings = load_json(SETTINGS_PATH)
     cleaners_data = load_json(CLEANERS_PATH)
     early_out_data = load_json(TASKS_PATH)
 
@@ -111,35 +133,61 @@ def main() -> None:
     used_ids: set = set()
     assigned: List[Dict[str, Any]] = []
 
-    # Pass 1
+    # Pass 1: Assegna task premium a cleaner premium
     for t in premium_tasks:
-        # Usa checkout_time se disponibile, altrimenti start_time, altrimenti default
-        start = t.get("checkout_time") or t.get("start_time") or DEFAULT_START_TIME
-        end = end_time_for(start, t.get("cleaning_time"))
-        chosen = pick_first_free(premium_cleaners, used_ids)
+        apt_type = t.get("type_apt", "X")
+        chosen = None
+        for c in premium_cleaners:
+            if ident(c) in used_ids:
+                continue
+            # Verifica se il cleaner può gestire questo tipo di appartamento
+            if not can_cleaner_handle_apartment(c.get("role", "Standard"), apt_type, settings):
+                continue
+            chosen = c
+            break
+
         enriched = dict(t)
         enriched.pop("start_time", None); enriched.pop("end_time", None)
         if chosen:
-            enriched["assigned_cleaner"] = reorder_cleaner_with_times(chosen, start, end)
+            enriched["assigned_cleaner"] = make_assignment(chosen, t)
             enriched["assignment_status"] = "assigned"
+            used_ids.add(ident(chosen))
         else:
             enriched["assigned_cleaner"] = None
             enriched["assignment_status"] = "unassigned_premium_rule"
         assigned.append(enriched)
 
-    # Pass 2
+    # Pass 2: Assegna task non-premium a cleaner non-premium (o premium se necessario)
     for t in nonpremium_tasks:
-        # Usa checkout_time se disponibile, altrimenti start_time, altrimenti default
-        start = t.get("checkout_time") or t.get("start_time") or DEFAULT_START_TIME
-        end = end_time_for(start, t.get("cleaning_time"))
-        chosen = pick_first_free(nonpremium_cleaners, used_ids)
+        apt_type = t.get("type_apt", "X")
+        chosen = None
+        # Prima prova con cleaner non-premium
+        for c in nonpremium_cleaners:
+            if ident(c) in used_ids:
+                continue
+            # Verifica se il cleaner può gestire questo tipo di appartamento
+            if not can_cleaner_handle_apartment(c.get("role", "Standard"), apt_type, settings):
+                continue
+            chosen = c
+            break
+
+        # Se non trovato, prova con cleaner premium
         if not chosen:
-            chosen = pick_first_free(premium_cleaners, used_ids)
+            for c in premium_cleaners:
+                if ident(c) in used_ids:
+                    continue
+                # Verifica se il cleaner può gestire questo tipo di appartamento
+                if not can_cleaner_handle_apartment(c.get("role", "Standard"), apt_type, settings):
+                    continue
+                chosen = c
+                break
+
         enriched = dict(t)
         enriched.pop("start_time", None); enriched.pop("end_time", None)
         if chosen:
-            enriched["assigned_cleaner"] = reorder_cleaner_with_times(chosen, start, end)
+            enriched["assigned_cleaner"] = make_assignment(chosen, t)
             enriched["assignment_status"] = "assigned"
+            used_ids.add(ident(chosen))
         else:
             enriched["assigned_cleaner"] = None
             enriched["assignment_status"] = "unassigned_no_cleaners"
