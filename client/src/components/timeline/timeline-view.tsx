@@ -56,23 +56,23 @@ export default function TimelineView({
   const getTaskPosition = (task: any) => {
     const startTime = task.fw_start_time || task.start_time || "10:00";
     const endTime = task.fw_end_time || task.end_time || "11:00";
-    
+
     const startMinutes = timeToMinutes(startTime);
     const endMinutes = timeToMinutes(endTime);
-    
+
     // Orario di inizio della timeline (8:00)
     const timelineStartMinutes = 8 * 60; // 480 minuti
     // Durata totale della timeline in minuti (12 ore)
     const timelineDurationMinutes = 12 * 60; // 720 minuti
-    
+
     // Calcola posizione percentuale dall'inizio della timeline
     const offsetMinutes = startMinutes - timelineStartMinutes;
     const leftPercentage = (offsetMinutes / timelineDurationMinutes) * 100;
-    
+
     // Calcola larghezza percentuale
     const durationMinutes = endMinutes - startMinutes;
     const widthPercentage = (durationMinutes / timelineDurationMinutes) * 100;
-    
+
     return {
       left: `${Math.max(0, leftPercentage)}%`,
       width: `${Math.max(0.5, widthPercentage)}%`,
