@@ -78,8 +78,22 @@ for t in assigned_items:
     if t.get("assigned_cleaner"):
         cid = t["assigned_cleaner"]["id"]
         if cid in cleaner_by_id:
-            start_hhmm = try_hhmm(t["assigned_cleaner"].get("start_time"), DAY_START_DEFAULT)
-            end_hhmm = try_hhmm(t["assigned_cleaner"].get("end_time"), minutes_to_hhmm(hhmm_to_minutes(start_hhmm) + int(t["cleaning_time"])))
+            # Usa start_time dall'assigned_cleaner, o calcola da checkout_time se manca
+            ac = t["assigned_cleaner"]
+            if ac.get("start_time"):
+                start_hhmm = ac["start_time"]
+            elif t.get("checkout_time"):
+                # Se non c'è start_time ma c'è checkout, usa checkout come riferimento
+                start_hhmm = t["checkout_time"]
+            else:
+                start_hhmm = DAY_START_DEFAULT
+            
+            # Calcola end_time: se presente usa quello, altrimenti start + cleaning_time
+            if ac.get("end_time"):
+                end_hhmm = ac["end_time"]
+            else:
+                end_hhmm = minutes_to_hhmm(hhmm_to_minutes(start_hhmm) + int(t["cleaning_time"]))
+            
             seed_by_cleaner_and_date[(cid, d)].append({
                 "task_id": t["task_id"],
                 "lat": float(t["lat"]),
@@ -257,7 +271,8 @@ def build_and_solve_for_date(the_date, tasks: List[Dict[str, Any]], cleaners: Li
     search_params = pywrapcp.DefaultRoutingSearchParameters()
     search_params.first_solution_strategy = routing_enums_pb2.FirstSolutionStrategy.PATH_CHEAPEST_ARC
     search_params.local_search_metaheuristic = routing_enums_pb2.LocalSearchMetaheuristic.GUIDED_LOCAL_SEARCH
-    search_params.time_limit.FromSeconds(10)
+    search_params.time_limit.FromSeconds(30)  # Aumentato a 30s per problemi più complessi
+    search_params.log_search = False  # Disabilita log verboso
 
     solution = routing.SolveWithParameters(search_params)
     results = []
@@ -316,14 +331,27 @@ premium_fallback_dates = defaultdict(list)  # date -> task_ids premium in fallba
 
 for the_date in sorted(tasks_by_date.keys()):
     cleaners_ordered = [c for c in selected_cleaners]
+    tasks_for_date = tasks_by_date[the_date]
+    
+    print(f"\n=== Elaborazione data {the_date.isoformat()} ===")
+    print(f"Task da assegnare: {len(tasks_for_date)}")
+    print(f"Cleaners disponibili: {len([c for c in cleaners_ordered if not is_formatore(c)])}")
+    
+    # Mostra dettagli task problematiche (senza checkin_time)
+    no_checkin = [t for t in tasks_for_date if not t.get("checkin_time")]
+    if no_checkin:
+        print(f"WARN: {len(no_checkin)} task senza checkin_time: {[t['task_id'] for t in no_checkin]}")
+    
     try:
-        day_results, day_fallback = build_and_solve_for_date(the_date, tasks_by_date[the_date], cleaners_ordered)
+        day_results, day_fallback = build_and_solve_for_date(the_date, tasks_for_date, cleaners_ordered)
         all_results.extend(day_results)
         if day_fallback:
             premium_fallback_dates[the_date.isoformat()] = day_fallback
+        print(f"✓ Assegnate {sum(len(r['assigned_tasks']) for r in day_results)} task per {len(day_results)} cleaners")
     except Exception as e:
-        print(f"ERRORE nella data {the_date.isoformat()}: {e}")
-        print(f"Task problematiche per questa data: {[t['task_id'] for t in tasks_by_date[the_date]]}")
+        print(f"✗ ERRORE nella data {the_date.isoformat()}: {e}")
+        import traceback
+        traceback.print_exc()
         # Continua con le altre date invece di fermarsi
         continue
 
