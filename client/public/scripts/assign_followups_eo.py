@@ -267,14 +267,14 @@ def assign_greedy_for_date(the_date, tasks, cleaners):
             premium_fallback = True
             premium_fallback_today.append(best_task["task_id"])
         
-        # registra sul cleaner
+        # registra sul cleaner (usa fw_start_time e fw_end_time per followup)
         cstate["route"].append({
             "task_id": best_task["task_id"],
             "logistic_code": best_task.get("logistic_code", best_task["task_id"]),
             "address": best_task.get("address",""),
             "alias": best_task.get("alias"),
-            "start_time": minutes_to_hhmm(start_min),
-            "end_time": minutes_to_hhmm(end_min),
+            "fw_start_time": minutes_to_hhmm(start_min),
+            "fw_end_time": minutes_to_hhmm(end_min),
             "service_min": int(best_task["cleaning_time"]),
             "premium": bool(best_task.get("premium", False)),
             "premium_fallback": premium_fallback,
@@ -356,14 +356,14 @@ for assignment in all_results:
             task_found = False
             for i, existing_task in enumerate(existing_tasks):
                 if existing_task["task_id"] == task["task_id"]:
-                    # Aggiorna la task esistente
+                    # Aggiorna la task esistente (usa fw_start_time e fw_end_time per followup)
                     existing_tasks[i]["assigned_cleaner"] = {
                         "id": assignment["cleaner_id"],
                         "name": assignment["cleaner_name"].split()[0] if assignment["cleaner_name"] else "",
                         "lastname": " ".join(assignment["cleaner_name"].split()[1:]) if len(assignment["cleaner_name"].split()) > 1 else "",
                         "role": assignment["cleaner_role"],
-                        "start_time": task["start_time"],
-                        "end_time": task["end_time"]
+                        "fw_start_time": task["fw_start_time"],
+                        "fw_end_time": task["fw_end_time"]
                     }
                     existing_tasks[i]["assignment_status"] = "assigned"
                     existing_tasks[i]["followup"] = True
@@ -388,8 +388,8 @@ for assignment in all_results:
                         "name": assignment["cleaner_name"].split()[0] if assignment["cleaner_name"] else "",
                         "lastname": " ".join(assignment["cleaner_name"].split()[1:]) if len(assignment["cleaner_name"].split()) > 1 else "",
                         "role": assignment["cleaner_role"],
-                        "start_time": task["start_time"],
-                        "end_time": task["end_time"]
+                        "fw_start_time": task["fw_start_time"],
+                        "fw_end_time": task["fw_end_time"]
                     },
                     "assignment_status": "assigned",
                     "followup": True
