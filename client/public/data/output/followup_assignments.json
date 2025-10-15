@@ -14,52 +14,12 @@
       "cleaner_role": "Standard",
       "assigned_tasks": [
         {
-          "task_id": 217321,
-          "logistic_code": 490,
-          "address": "VIA DELLA COMMENDA, 28",
-          "alias": "NTM",
-          "start_time": "11:15",
-          "end_time": "12:15",
-          "service_min": 60,
-          "premium": false,
-          "premium_fallback": false,
-          "followup": true
-        }
-      ]
-    },
-    {
-      "date": "2025-10-16",
-      "cleaner_id": 132,
-      "cleaner_name": "JOHOISER ERNESTO LOPEZ GIRON",
-      "cleaner_role": "Premium",
-      "assigned_tasks": [
-        {
-          "task_id": 217416,
-          "logistic_code": 617,
-          "address": "VIA VOGHERA, 4",
-          "alias": "EXPRDS",
-          "start_time": "12:15",
-          "end_time": "12:45",
-          "service_min": 30,
-          "premium": false,
-          "premium_fallback": false,
-          "followup": true
-        }
-      ]
-    },
-    {
-      "date": "2025-10-16",
-      "cleaner_id": 249,
-      "cleaner_name": "Ogbodo Chidi Igwe",
-      "cleaner_role": "Premium",
-      "assigned_tasks": [
-        {
-          "task_id": 217417,
+          "task_id": 217419,
           "logistic_code": 618,
           "address": "VIA VOGHERA, 4",
           "alias": "EXPRDS",
-          "start_time": "12:15",
-          "end_time": "12:45",
+          "start_time": "11:15",
+          "end_time": "11:45",
           "service_min": 30,
           "premium": false,
           "premium_fallback": false,
@@ -74,7 +34,47 @@
       "cleaner_role": "Standard",
       "assigned_tasks": [
         {
-          "task_id": 217419,
+          "task_id": 217321,
+          "logistic_code": 490,
+          "address": "VIA DELLA COMMENDA, 28",
+          "alias": "NTM",
+          "start_time": "10:00",
+          "end_time": "11:00",
+          "service_min": 60,
+          "premium": false,
+          "premium_fallback": false,
+          "followup": true
+        }
+      ]
+    },
+    {
+      "date": "2025-10-16",
+      "cleaner_id": 326,
+      "cleaner_name": "FESTUS OSARO AIHIVBERE",
+      "cleaner_role": "Standard",
+      "assigned_tasks": [
+        {
+          "task_id": 217416,
+          "logistic_code": 617,
+          "address": "VIA VOGHERA, 4",
+          "alias": "EXPRDS",
+          "start_time": "10:00",
+          "end_time": "10:30",
+          "service_min": 30,
+          "premium": false,
+          "premium_fallback": false,
+          "followup": true
+        }
+      ]
+    },
+    {
+      "date": "2025-10-16",
+      "cleaner_id": 495,
+      "cleaner_name": "EL HADJI BA",
+      "cleaner_role": "Premium",
+      "assigned_tasks": [
+        {
+          "task_id": 217417,
           "logistic_code": 618,
           "address": "VIA VOGHERA, 4",
           "alias": "EXPRDS",

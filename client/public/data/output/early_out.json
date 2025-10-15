@@ -271,7 +271,7 @@
       "cleaning_time": 60,
       "checkin_date": "2025-10-16",
       "checkout_date": "2025-10-16",
-      "checkin_time": null,
+      "checkin_time": "19:00",
       "checkout_time": null,
       "pax_in": 2,
       "pax_out": 1,
