@@ -61,27 +61,41 @@ export default function PriorityColumn({
       // Esegui assign_early_out.py per early-out
       try {
         console.log('Esecuzione assign_early_out.py...');
-        const response = await fetch('/api/assign-early-out', {
+        const response1 = await fetch('/api/assign-early-out', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' }
         });
 
-        if (!response.ok) {
+        if (!response1.ok) {
           throw new Error('Errore durante l\'assegnazione early-out');
         }
 
-        const result = await response.json();
-        console.log('Assegnazione early-out completata:', result);
+        const result1 = await response1.json();
+        console.log('Assegnazione early-out completata:', result1);
 
-        alert('Early-out tasks assegnati con successo!');
+        // Esegui assign_followups_eo.py dopo assign_early_out.py
+        console.log('Esecuzione assign_followups_eo.py...');
+        const response2 = await fetch('/api/assign-followups-eo', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' }
+        });
+
+        if (!response2.ok) {
+          throw new Error('Errore durante l\'assegnazione follow-up');
+        }
+
+        const result2 = await response2.json();
+        console.log('Assegnazione follow-up completata:', result2);
+
+        alert('Early-out e follow-up tasks assegnati con successo!');
 
         // Ricarica le assegnazioni senza ricaricare la pagina
         if ((window as any).reloadEarlyOutAssignments) {
           await (window as any).reloadEarlyOutAssignments();
         }
       } catch (error) {
-        console.error('Errore nell\'assegnazione early-out:', error);
-        alert('Errore durante l\'assegnazione dei task early-out');
+        console.error('Errore nell\'assegnazione:', error);
+        alert('Errore durante l\'assegnazione dei task');
       }
     } else {
       // Logica originale per high e low priority
