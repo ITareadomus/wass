@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
@@ -27,6 +26,22 @@ interface Cleaner {
   telegram_id: number | null;
   start_time: string | null;
 }
+
+// Helper function to get unique colors for each cleaner
+const getCleanerColor = (index: number) => {
+  const colors = [
+    { border: '#2563EB', bg: '#2563EB' }, // Blue
+    { border: '#10B981', bg: '#10B981' }, // Green
+    { border: '#8B5CF6', bg: '#8B5CF6' }, // Purple
+    { border: '#F59E0B', bg: '#F59E0B' }, // Amber
+    { border: '#06B6D4', bg: '#06B6D4' }, // Cyan
+    { border: '#6D28D9', bg: '#6D28D9' }, // Violet
+    { border: '#D97706', bg: '#D97706' }, // Orange
+    { border: '#000000', bg: '#000000' }, // Black (fallback)
+  ];
+  return colors[index % colors.length];
+};
+
 
 export default function Convocazioni() {
   const [cleaners, setCleaners] = useState<Cleaner[]>([]);
@@ -69,7 +84,7 @@ export default function Convocazioni() {
         }
         const cleanersData = await response.json();
         console.log("Cleaners caricati da cleaners.json:", cleanersData);
-        
+
         // Estrai i cleaners dalla struttura del file
         let cleanersList: Cleaner[] = [];
         if (cleanersData.dates) {
@@ -78,7 +93,7 @@ export default function Convocazioni() {
         } else if (cleanersData.cleaners) {
           cleanersList = cleanersData.cleaners;
         }
-        
+
         setCleaners(cleanersList);
         setSelectedCleaners(new Set()); // Reset selezioni quando cambia la data
         setIsLoading(false);
@@ -89,7 +104,7 @@ export default function Convocazioni() {
         setIsLoading(false);
       }
     };
-    
+
     loadCleaners();
   }, [selectedDate]);
 
@@ -128,7 +143,7 @@ export default function Convocazioni() {
   const handleConfirm = async () => {
     try {
       const selectedCleanersData = cleaners.filter(c => selectedCleaners.has(c.id));
-      
+
       const dataToSave = {
         cleaners: selectedCleanersData,
         total_selected: selectedCleanersData.length
@@ -182,7 +197,7 @@ export default function Convocazioni() {
                 del {format(selectedDate, "dd/MM/yyyy", { locale: it })}
               </span>
             </h1>
-            
+
             {/* Selettore Data e Dark Mode Toggle */}
             <div className="flex items-center gap-3">
               <ThemeToggle />
@@ -230,30 +245,41 @@ export default function Convocazioni() {
           {/* Lista Cleaners - 2/3 dello spazio */}
           <Card className="p-6 lg:col-span-2 flex flex-col overflow-hidden">
           <div className="space-y-3 flex-1 overflow-y-auto pr-2">
-            {cleaners.map((cleaner) => {
-              const isPremium = cleaner.role === "Premium";
-              const isAvailable = cleaner.available !== false;
-              
-              const isFormatore = cleaner.role === "Formatore";
-              
-              const borderColor = !isAvailable 
-                ? "border-gray-400" 
-                : isFormatore ? "border-orange-500" 
-                : isPremium ? "border-yellow-500" : "border-green-500";
-              const bgColor = !isAvailable 
-                ? "bg-gray-300/30 dark:bg-gray-700/30" 
-                : isFormatore ? "bg-orange-500/10"
-                : isPremium ? "bg-yellow-500/10" : "bg-green-500/10";
-              const badgeColor = !isAvailable
-                ? "bg-gray-400/20 text-gray-700 dark:text-gray-200 border-gray-400 dark:border-gray-500"
-                : isFormatore ? "bg-orange-500/20 text-orange-700 border-orange-500"
-                : isPremium ? "bg-yellow-500/20 text-yellow-700 border-yellow-500" : "bg-green-500/20 text-green-700 border-green-500";
-              
+            {cleaners.map((cleaner, index) => {
+              const isAvailable = cleaner.available;
+              const isSelected = selectedCleaners.has(cleaner.id);
+              const cleanerColor = getCleanerColor(index);
+
+              // Colore del bordo basato su selezione e disponibilità
+              const borderColor = isSelected 
+                ? `border-[${cleanerColor.border}]` 
+                : !isAvailable 
+                  ? 'border-gray-300' 
+                  : 'border-border';
+
+              // Colore dello sfondo con l'indicatore colorato
+              const bgStyle = isSelected 
+                ? { 
+                    backgroundColor: `${cleanerColor.bg}15`,
+                    borderLeft: `6px solid ${cleanerColor.bg}`
+                  } 
+                : !isAvailable 
+                  ? { backgroundColor: 'rgb(243 244 246 / 0.5)' }
+                  : { 
+                      borderLeft: `6px solid ${cleanerColor.bg}40`
+                    };
+
+              // Badge del ruolo
+              const badgeColor = cleaner.role === "Premium" 
+                ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 border-purple-300 dark:border-purple-700' 
+                : 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border-blue-300 dark:border-blue-700';
+
               return (
                 <div
                   key={cleaner.id}
                   onClick={() => toggleCleanerSelection(cleaner.id, isAvailable)}
-                  className={`flex items-center justify-between p-4 border-2 rounded-lg transition-all ${borderColor} ${bgColor} ${
+                  style={bgStyle}
+                  className={`flex items-center justify-between p-4 border-2 rounded-lg transition-all ${borderColor} ${
                     !isAvailable 
                       ? 'opacity-60 cursor-pointer hover:opacity-70' 
                       : 'hover:opacity-80 cursor-pointer'
