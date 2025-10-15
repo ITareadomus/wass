@@ -59,8 +59,10 @@ export default function TaskCard({
       const widthPercentage = (effectiveMinutes / 720) * 100;
       return `${widthPercentage}%`;
     } else {
-      // Per le colonne di priorità: 50px per mezz'ora (base desktop)
-      const halfHours = Math.ceil(effectiveMinutes / 30);
+      // Per le colonne di priorità:
+      // Se la task è < 60 minuti, usa sempre 60 minuti (larghezza di 1 ora)
+      const displayMinutes = effectiveMinutes < 60 ? 60 : effectiveMinutes;
+      const halfHours = Math.ceil(displayMinutes / 30);
       const baseWidth = halfHours * 50;
       return `${baseWidth}px`;
     }
