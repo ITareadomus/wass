@@ -684,12 +684,12 @@
         "checkout_time<=eo_time"
       ],
       "assigned_cleaner": {
-        "id": 495,
-        "name": "EL",
-        "lastname": "HADJI BA",
-        "role": "Premium",
-        "start_time": "10:00",
-        "end_time": "10:30"
+        "id": 326,
+        "name": "FESTUS",
+        "lastname": "OSARO AIHIVBERE",
+        "role": "Standard",
+        "start_time": "10:30",
+        "end_time": "11:00"
       },
       "assignment_status": "assigned",
       "followup": true
@@ -720,12 +720,12 @@
         "checkout_time<=eo_time"
       ],
       "assigned_cleaner": {
-        "id": 24,
-        "name": "HUSSAIN",
-        "lastname": "SYED SHUJIAHAT",
+        "id": 326,
+        "name": "FESTUS",
+        "lastname": "OSARO AIHIVBERE",
         "role": "Standard",
-        "start_time": "11:15",
-        "end_time": "11:45"
+        "start_time": "11:00",
+        "end_time": "11:30"
       },
       "assignment_status": "assigned",
       "followup": true
