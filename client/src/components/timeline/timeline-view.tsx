@@ -45,23 +45,18 @@ export default function TimelineView({
     "13:00", "14:00", "15:00", "16:00", "17:00", "18:00", "19:00"
   ];
 
-  // Palette di colori diversi per i cleaners (per mappa e timeline)
+  // Palette di colori azzurri per i cleaners
   const cleanerColors = [
-    { bg: '#EF4444', text: '#FFFFFF' }, // Rosso
-    { bg: '#F59E0B', text: '#FFFFFF' }, // Arancione
-    { bg: '#10B981', text: '#FFFFFF' }, // Verde
-    { bg: '#3B82F6', text: '#FFFFFF' }, // Blu
-    { bg: '#8B5CF6', text: '#FFFFFF' }, // Viola
-    { bg: '#EC4899', text: '#FFFFFF' }, // Rosa
-    { bg: '#14B8A6', text: '#FFFFFF' }, // Teal
-    { bg: '#F97316', text: '#FFFFFF' }, // Arancione scuro
+    { bg: '#0EA5E9', text: '#FFFFFF' }, // Azzurro
+    { bg: '#38BDF8', text: '#FFFFFF' }, // Azzurro chiaro
+    { bg: '#0284C7', text: '#FFFFFF' }, // Azzurro scuro
+    { bg: '#7DD3FC', text: '#000000' }, // Azzurro molto chiaro
+    { bg: '#075985', text: '#FFFFFF' }, // Azzurro molto scuro
     { bg: '#06B6D4', text: '#FFFFFF' }, // Ciano
-    { bg: '#84CC16', text: '#FFFFFF' }, // Lime
-    { bg: '#A855F7', text: '#FFFFFF' }, // Viola chiaro
-    { bg: '#EAB308', text: '#000000' }, // Giallo
-    { bg: '#6366F1', text: '#FFFFFF' }, // Indaco
-    { bg: '#DB2777', text: '#FFFFFF' }, // Rosa scuro
-    { bg: '#059669', text: '#FFFFFF' }, // Verde smeraldo
+    { bg: '#22D3EE', text: '#000000' }, // Ciano chiaro
+    { bg: '#0891B2', text: '#FFFFFF' }, // Ciano scuro
+    { bg: '#67E8F9', text: '#000000' }, // Ciano molto chiaro
+    { bg: '#164E63', text: '#FFFFFF' }, // Ciano molto scuro
   ];
 
   const getCleanerColor = (index: number) => {
