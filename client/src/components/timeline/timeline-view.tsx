@@ -271,7 +271,10 @@ export default function TimelineView({
                           )
                           .sort((a, b) => ((a as any).assignedSlot || 0) - ((b as any).assignedSlot || 0))
                           .map((task, index) => {
-                            const timelineHours = timeSlots.length - 1;
+                            // Calcola le ore totali della timeline (differenza tra primo e ultimo slot)
+                            const firstHour = parseInt(timeSlots[0].split(':')[0]);
+                            const lastHour = parseInt(timeSlots[timeSlots.length - 1].split(':')[0]);
+                            const timelineHours = lastHour - firstHour;
                             return (
                               <TaskCard 
                                 key={`${task.name}-${cleaner.id}`}
