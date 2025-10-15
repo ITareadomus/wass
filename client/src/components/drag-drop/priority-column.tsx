@@ -92,7 +92,6 @@ export default function PriorityColumn({
 
         toast({
           title: "✅ EARLY-OUT assegnati con successo!",
-          description: "Le task sono state assegnate correttamente",
         });
 
         // Ricarica le assegnazioni senza ricaricare la pagina
