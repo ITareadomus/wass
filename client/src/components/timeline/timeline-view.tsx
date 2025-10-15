@@ -39,6 +39,7 @@ export default function TimelineView({
   const [cleaners, setCleaners] = useState<Cleaner[]>([]);
   const [selectedCleaner, setSelectedCleaner] = useState<Cleaner | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [earlyOutTasksData, setEarlyOutTasksData] = useState<any[]>([]);
 
   const timeSlots = [
     "08:00", "09:00", "10:00", "11:00", "12:00",
@@ -76,6 +77,17 @@ export default function TimelineView({
         // I cleaners sono già nel formato corretto
         const cleanersList = selectedData.cleaners || [];
         setCleaners(cleanersList);
+
+        // Carica early_out.json per ottenere gli attributi premium e straordinaria
+        try {
+          const earlyOutResponse = await fetch('/data/output/early_out.json');
+          if (earlyOutResponse.ok) {
+            const earlyOutData = await earlyOutResponse.json();
+            setEarlyOutTasksData(earlyOutData.early_out_tasks || []);
+          }
+        } catch (error) {
+          console.error("Errore nel caricamento di early_out.json:", error);
+        }
 
         // Carica anche le assegnazioni follow-up
         try {
@@ -219,14 +231,28 @@ export default function TimelineView({
                             index === self.findIndex((t) => t.name === task.name)
                           )
                           .sort((a, b) => ((a as any).assignedSlot || 0) - ((b as any).assignedSlot || 0))
-                          .map((task, index) => (
-                            <TaskCard 
-                              key={`${task.name}-${cleaner.id}`}
-                              task={task} 
-                              index={index}
-                              isInTimeline={true}
-                            />
-                          ))}
+                          .map((task, index) => {
+                            // Trova i dati originali da early_out.json per ottenere premium e straordinaria
+                            const originalTaskData = earlyOutTasksData.find(
+                              (eoTask) => eoTask.logistic_code === parseInt(task.name)
+                            );
+                            
+                            // Crea una copia arricchita della task con gli attributi corretti
+                            const enrichedTask = {
+                              ...task,
+                              premium: originalTaskData?.premium || false,
+                              is_straordinaria: originalTaskData?.straordinaria || false,
+                            };
+
+                            return (
+                              <TaskCard 
+                                key={`${task.name}-${cleaner.id}`}
+                                task={enrichedTask} 
+                                index={index}
+                                isInTimeline={true}
+                              />
+                            );
+                          })}
                         {provided.placeholder}
                       </div>
                     </div>
