@@ -270,14 +270,17 @@ export default function TimelineView({
                             index === self.findIndex((t) => t.name === task.name)
                           )
                           .sort((a, b) => ((a as any).assignedSlot || 0) - ((b as any).assignedSlot || 0))
-                          .map((task, index) => (
-                            <TaskCard 
-                              key={`${task.name}-${cleaner.id}`}
-                              task={task} 
-                              index={index}
-                              isInTimeline={true}
-                            />
-                          ))}
+                          .map((task, index) => {
+                            const timelineHours = timeSlots.length - 1;
+                            return (
+                              <TaskCard 
+                                key={`${task.name}-${cleaner.id}`}
+                                task={{...task, timelineHours}} 
+                                index={index}
+                                isInTimeline={true}
+                              />
+                            );
+                          })}
                         {provided.placeholder}
                       </div>
                     </div>
