@@ -344,19 +344,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Endpoint per eseguire assign_early_out.py
+  // Endpoint per eseguire assign_eo.py
   app.post("/api/assign-early-out", async (req, res) => {
     try {
-      console.log("Eseguendo assign_early_out.py...");
+      console.log("Eseguendo assign_eo.py...");
       const { stdout, stderr } = await execAsync(
-        `python3 client/public/scripts/assign_early_out.py`,
+        `python3 client/public/scripts/assign_eo.py`,
         { maxBuffer: 1024 * 1024 * 10 }
       );
 
       if (stderr && !stderr.includes('Browserslist')) {
-        console.error("Errore assign_early_out:", stderr);
+        console.error("Errore assign_eo:", stderr);
       }
-      console.log("assign_early_out output:", stdout);
+      console.log("assign_eo output:", stdout);
 
       res.json({
         success: true,
