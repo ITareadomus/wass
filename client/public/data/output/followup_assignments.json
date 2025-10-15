@@ -1,7 +1,7 @@
 {
   "meta": {
     "method": "greedy_round_robin_nearest",
-    "fixed_travel_minutes": 15,
+    "speed_kmph": 25.0,
     "premium_rule": "premium tasks require premium cleaners; if none exist, allow standard and mark premium_fallback=true",
     "premium_fallback_dates": [],
     "premium_fallback_task_ids": {}
@@ -14,22 +14,22 @@
       "cleaner_role": "Standard",
       "assigned_tasks": [
         {
-          "task_id": 217321,
-          "address": "VIA DELLA COMMENDA, 28",
-          "alias": "NTM",
-          "start_time": "11:15",
-          "end_time": "12:15",
+          "task_id": 217275,
+          "address": "Via Scaldasole, 4",
+          "alias": "HACCA",
+          "start_time": "11:00",
+          "end_time": "12:00",
           "service_min": 60,
           "premium": false,
           "premium_fallback": false
         },
         {
-          "task_id": 217306,
-          "address": "RIPA DI PORTA TICINESE 49",
-          "alias": "NTM",
-          "start_time": "12:30",
-          "end_time": "13:30",
-          "service_min": 60,
+          "task_id": 217419,
+          "address": "VIA VOGHERA, 4",
+          "alias": "EXPRDS",
+          "start_time": "12:02",
+          "end_time": "12:32",
+          "service_min": 30,
           "premium": false,
           "premium_fallback": false
         }
@@ -42,12 +42,12 @@
       "cleaner_role": "Premium",
       "assigned_tasks": [
         {
-          "task_id": 217416,
-          "address": "VIA VOGHERA, 4",
-          "alias": "EXPRDS",
-          "start_time": "12:15",
-          "end_time": "12:45",
-          "service_min": 30,
+          "task_id": 217287,
+          "address": "VIA BRUSUGLIO 78",
+          "alias": "NTM",
+          "start_time": "12:00",
+          "end_time": "14:00",
+          "service_min": 120,
           "premium": false,
           "premium_fallback": false
         }
@@ -60,12 +60,12 @@
       "cleaner_role": "Premium",
       "assigned_tasks": [
         {
-          "task_id": 217417,
-          "address": "VIA VOGHERA, 4",
-          "alias": "EXPRDS",
-          "start_time": "12:15",
-          "end_time": "12:45",
-          "service_min": 30,
+          "task_id": 217290,
+          "address": "VIA CELESTINO IV, 9",
+          "alias": "NTM",
+          "start_time": "12:00",
+          "end_time": "14:00",
+          "service_min": 120,
           "premium": false,
           "premium_fallback": false
         }
@@ -78,12 +78,12 @@
       "cleaner_role": "Standard",
       "assigned_tasks": [
         {
-          "task_id": 217419,
-          "address": "VIA VOGHERA, 4",
-          "alias": "EXPRDS",
+          "task_id": 217321,
+          "address": "VIA DELLA COMMENDA, 28",
+          "alias": "NTM",
           "start_time": "10:00",
-          "end_time": "10:30",
-          "service_min": 30,
+          "end_time": "11:00",
+          "service_min": 60,
           "premium": false,
           "premium_fallback": false
         }
@@ -96,12 +96,12 @@
       "cleaner_role": "Standard",
       "assigned_tasks": [
         {
-          "task_id": 217275,
-          "address": "Via Scaldasole, 4",
-          "alias": "HACCA",
+          "task_id": 217416,
+          "address": "VIA VOGHERA, 4",
+          "alias": "EXPRDS",
           "start_time": "10:00",
-          "end_time": "11:00",
-          "service_min": 60,
+          "end_time": "10:30",
+          "service_min": 30,
           "premium": false,
           "premium_fallback": false
         }
@@ -117,8 +117,8 @@
           "task_id": 217285,
           "address": "VIALE MONTENERO 50",
           "alias": "NTM",
-          "start_time": "11:15",
-          "end_time": "12:15",
+          "start_time": "11:00",
+          "end_time": "12:00",
           "service_min": 60,
           "premium": false,
           "premium_fallback": false
@@ -132,11 +132,11 @@
       "cleaner_role": "Premium",
       "assigned_tasks": [
         {
-          "task_id": 217286,
-          "address": "P.ZZA S. MARCO, 1",
+          "task_id": 217291,
+          "address": "via Bianca Ceva, 32 lotto E",
           "alias": "NTM",
-          "start_time": "11:15",
-          "end_time": "12:15",
+          "start_time": "11:00",
+          "end_time": "12:00",
           "service_min": 60,
           "premium": false,
           "premium_fallback": false
@@ -150,12 +150,12 @@
       "cleaner_role": "Standard",
       "assigned_tasks": [
         {
-          "task_id": 217287,
-          "address": "VIA BRUSUGLIO 78",
+          "task_id": 217286,
+          "address": "P.ZZA S. MARCO, 1",
           "alias": "NTM",
-          "start_time": "11:15",
-          "end_time": "13:15",
-          "service_min": 120,
+          "start_time": "11:00",
+          "end_time": "12:00",
+          "service_min": 60,
           "premium": false,
           "premium_fallback": false
         }
@@ -168,12 +168,12 @@
       "cleaner_role": "Premium",
       "assigned_tasks": [
         {
-          "task_id": 217290,
-          "address": "VIA CELESTINO IV, 9",
-          "alias": "NTM",
+          "task_id": 217417,
+          "address": "VIA VOGHERA, 4",
+          "alias": "EXPRDS",
           "start_time": "10:00",
-          "end_time": "12:00",
-          "service_min": 120,
+          "end_time": "10:30",
+          "service_min": 30,
           "premium": false,
           "premium_fallback": false
         }
@@ -186,11 +186,11 @@
       "cleaner_role": "Premium",
       "assigned_tasks": [
         {
-          "task_id": 217291,
-          "address": "via Bianca Ceva, 32 lotto E",
+          "task_id": 217306,
+          "address": "RIPA DI PORTA TICINESE 49",
           "alias": "NTM",
-          "start_time": "11:15",
-          "end_time": "12:15",
+          "start_time": "11:00",
+          "end_time": "12:00",
           "service_min": 60,
           "premium": false,
           "premium_fallback": false
