@@ -241,7 +241,8 @@ def assign_greedy_for_date(the_date, tasks, cleaners):
                 "end_time": minutes_to_hhmm(end_min),
                 "service_min": int(best["cleaning_time"]),
                 "premium": bool(best.get("premium", False)),
-                "premium_fallback": premium_fallback
+                "premium_fallback": premium_fallback,
+                "followup": True
             })
             # aggiorna stato cleaner
             cstate["available_min"] = end_min
