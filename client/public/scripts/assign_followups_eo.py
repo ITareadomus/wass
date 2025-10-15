@@ -16,6 +16,7 @@ INPUT_EARLYOUT    = BASE / "output" / "early_out.json"
 INPUT_CLEANERS    = BASE / "cleaners" / "selected_cleaners.json"
 OUTPUT_FILE       = BASE / "output" / "followup_assignments.json"
 OUTPUT_EARLY_OUT  = BASE / "output" / "early_out_assignments.json"
+SETTINGS_FILE = BASE / "input" / "settings.json"
 
 # =============================
 # Parametri
@@ -55,6 +56,23 @@ def travel_minutes(lat1, lon1, lat2, lon2) -> int:
     """Restituisce sempre il tempo fisso di spostamento, indipendentemente dalla distanza."""
     return FIXED_TRAVEL_MINUTES
 
+def load_json(path):
+    with open(path, "r", encoding="utf-8") as f:
+        return json.load(f)
+
+def can_cleaner_handle_apartment(cleaner_role, apt_type, settings):
+    """Verifica se un cleaner può gestire un determinato tipo di appartamento."""
+    apartment_types = settings.get("apartment_types", {})
+
+    if cleaner_role == "Premium":
+        allowed_types = apartment_types.get("premium_apt", ["A", "B", "C", "D", "E", "F", "X"])
+    elif cleaner_role == "Formatore":
+        allowed_types = apartment_types.get("formatore_apt", ["B", "C"])
+    else:  # Standard
+        allowed_types = apartment_types.get("standard_apt", ["A", "B", "C", "D", "E", "F", "X"])
+
+    return apt_type in allowed_types
+
 # =============================
 # Funzione per verificare se un cleaner è formatore
 # =============================
@@ -65,7 +83,7 @@ def is_formatore(cleaner: Dict[str, Any]) -> bool:
 # =============================
 # Caricamento dati
 # =============================
-for p in [INPUT_ASSIGNMENTS, INPUT_EARLYOUT, INPUT_CLEANERS]:
+for p in [INPUT_ASSIGNMENTS, INPUT_EARLYOUT, INPUT_CLEANERS, SETTINGS_FILE]:
     if not p.exists():
         raise FileNotFoundError(f"File non trovato: {p}")
 
@@ -75,6 +93,7 @@ with open(INPUT_EARLYOUT, "r", encoding="utf-8") as f:
     earlyout = json.load(f)
 with open(INPUT_CLEANERS, "r", encoding="utf-8") as f:
     cleaners_blob = json.load(f)
+settings = load_json(SETTINGS_FILE)
 
 assigned_items    = assignments.get("early_out_tasks_assigned", [])
 earlyout_tasks    = earlyout.get("early_out_tasks", [])
@@ -129,6 +148,7 @@ for t in assigned_items:
             "address": t.get("address",""),
             "alias": t.get("alias"),
             "premium": bool(t.get("premium", False)),
+            "type_apt": t.get("type_apt", "X") # Aggiunto per compatibilità appartamento
         })
 
 # aggiungi task dal pacchetto early_out.json (solo se non già assegnate)
@@ -143,6 +163,7 @@ for t in earlyout_tasks:
             "address": t.get("address",""),
             "alias": t.get("alias"),
             "premium": bool(t.get("premium", False)),
+            "type_apt": t.get("type_apt", "X") # Aggiunto per compatibilità appartamento
         })
 
 # dedup su task_id (caso in cui compaiano in entrambi i file)
@@ -209,16 +230,16 @@ def assign_greedy_for_date(the_date, tasks, cleaners):
     # assegna sempre al cleaner globalmente più vicino, con priorità per task nello stesso indirizzo
     while remaining and assigned_any:
         assigned_any = False
-        
+
         # Trova la migliore combinazione (cleaner, task) globalmente
         best_cleaner_id = None
         best_task = None
         best_travel = None
-        
+
         for c in cleaners:
             cid = c["id"]
             cstate = state[cid]
-            
+
             # filtro premium per questo cleaner
             def allowed(task):
                 if task.get("premium", False):
@@ -227,9 +248,9 @@ def assign_greedy_for_date(the_date, tasks, cleaners):
                     else:
                         return True  # fallback permesso
                 return True
-            
+
             candidates = [t for t in remaining if allowed(t)]
-            
+
             # PRIORITÀ 1: task nello stesso posto del cleaner (distanza = 0)
             same_location_tasks = []
             if cstate["lat"] is not None and cstate["lng"] is not None:
@@ -238,7 +259,7 @@ def assign_greedy_for_date(the_date, tasks, cleaners):
                     if abs(float(t["lat"]) - cstate["lat"]) < 0.0001 
                     and abs(float(t["lng"]) - cstate["lng"]) < 0.0001
                 ]
-            
+
             # Se ci sono task nello stesso posto, prendiamo la prima
             if same_location_tasks:
                 if best_travel is None or best_travel > 0:
@@ -252,29 +273,42 @@ def assign_greedy_for_date(the_date, tasks, cleaners):
                         trav = 0
                     else:
                         trav = travel_minutes(cstate["lat"], cstate["lng"], t["lat"], t["lng"])
-                    
+
                     # aggiorna il miglior match globale
                     if best_travel is None or trav < best_travel:
                         best_cleaner_id = cid
                         best_task = t
                         best_travel = trav
         
+        # Filtra task compatibili con il cleaner in base alla tipologia appartamento
+        available_tasks = [
+            t for t in remaining
+            if (
+                (not t.get("premium") or cstate["role"] == "Premium")
+                and can_cleaner_handle_apartment(
+                    cstate["role"], 
+                    t.get("type_apt", "X"), 
+                    settings
+                )
+            )
+        ]
+        
         # Se non abbiamo trovato nessuna combinazione valida, esci
         if best_cleaner_id is None or best_task is None:
             break
-        
+
         # Assegna la task al cleaner migliore
         cstate = state[best_cleaner_id]
-        
+
         # calcola orari
         start_min = cstate["available_min"] + (best_travel or 0)
         end_min   = start_min + int(best_task["cleaning_time"])
-        
+
         premium_fallback = False
         if best_task.get("premium", False) and best_cleaner_id not in premium_vehicle_ids and not has_premium:
             premium_fallback = True
             premium_fallback_today.append(best_task["task_id"])
-        
+
         # registra sul cleaner (usa fw_start_time e fw_end_time per followup)
         cstate["route"].append({
             "task_id": best_task["task_id"],
@@ -291,7 +325,7 @@ def assign_greedy_for_date(the_date, tasks, cleaners):
         # aggiorna stato cleaner
         cstate["available_min"] = end_min
         cstate["lat"], cstate["lng"] = best_task["lat"], best_task["lng"]
-        
+
         # togli la task dalla lista
         remaining.remove(best_task)
         assigned_any = True
@@ -332,6 +366,7 @@ meta = {
     "method": "greedy_round_robin_nearest",
     "fixed_travel_minutes": FIXED_TRAVEL_MINUTES,
     "premium_rule": "premium tasks require premium cleaners; if none exist, allow standard and mark premium_fallback=true",
+    "apartment_type_rule": "cleaners can only be assigned tasks for apartment types they are configured to handle in settings.json",
     "premium_fallback_dates": list(premium_fallback_dates.keys()),
     "premium_fallback_task_ids": dict(premium_fallback_dates)
 }
@@ -391,6 +426,7 @@ for assignment in all_results:
                     "cleaning_time": task["service_min"],
                     "checkin_date": assignment["date"],
                     "premium": task.get("premium", False),
+                    "type_apt": original_task.get("type_apt", "X"), # Aggiunto per compatibilità appartamento
                     "assigned_cleaner": {
                         "id": assignment["cleaner_id"],
                         "name": assignment["cleaner_name"].split()[0] if assignment["cleaner_name"] else "",
@@ -409,6 +445,7 @@ existing_meta["followup_added"] = {
     "method": "greedy_round_robin_nearest",
     "fixed_travel_minutes": FIXED_TRAVEL_MINUTES,
     "premium_rule": "premium tasks require premium cleaners; if none exist, allow standard and mark premium_fallback=true",
+    "apartment_type_rule": "cleaners can only be assigned tasks for apartment types they are configured to handle in settings.json",
     "total_followup_tasks": total_assigned,
     "premium_fallback_dates": list(premium_fallback_dates.keys()),
     "premium_fallback_task_ids": dict(premium_fallback_dates)
@@ -442,7 +479,7 @@ for assignment in all_results:
             a for a in timeline_data["assignments"] 
             if a.get("logistic_code") != str(task.get("logistic_code"))
         ]
-        
+
         # Aggiungi la nuova assegnazione followup
         timeline_data["assignments"].append({
             "logistic_code": str(task.get("logistic_code")),
