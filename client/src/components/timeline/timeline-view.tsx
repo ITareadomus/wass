@@ -39,8 +39,6 @@ export default function TimelineView({
   const [cleaners, setCleaners] = useState<Cleaner[]>([]);
   const [selectedCleaner, setSelectedCleaner] = useState<Cleaner | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [earlyOutTasksData, setEarlyOutTasksData] = useState<any[]>([]);
-  const [followupTasks, setFollowupTasks] = useState<Task[]>([]);
 
   const timeSlots = [
     "08:00", "09:00", "10:00", "11:00", "12:00",
@@ -79,60 +77,13 @@ export default function TimelineView({
         const cleanersList = selectedData.cleaners || [];
         setCleaners(cleanersList);
 
-        // Carica early_out.json per ottenere gli attributi premium e straordinaria
-        try {
-          const earlyOutResponse = await fetch('/data/output/early_out.json');
-          if (earlyOutResponse.ok) {
-            const earlyOutData = await earlyOutResponse.json();
-            setEarlyOutTasksData(earlyOutData.early_out_tasks || []);
-          }
-        } catch (error) {
-          console.error("Errore nel caricamento di early_out.json:", error);
-        }
-
         // Carica anche le assegnazioni follow-up
         try {
           const followupResponse = await fetch('/data/output/followup_assignments.json');
           if (followupResponse.ok) {
             const followupData = await followupResponse.json();
             console.log("Assegnazioni follow-up caricate:", followupData.assignments);
-            
-            // Converti le assegnazioni follow-up in task per la timeline
-            const followupTasksArray: Task[] = [];
-            followupData.assignments.forEach((assignment: any) => {
-              assignment.assigned_tasks.forEach((task: any) => {
-                // Trova i dati originali da early_out.json
-                const originalTask = earlyOutTasksData.find(
-                  (eoTask) => eoTask.task_id === task.task_id
-                );
-                
-                followupTasksArray.push({
-                  id: `followup-${task.task_id}`,
-                  name: String(originalTask?.logistic_code || task.task_id),
-                  duration: `${Math.floor(task.service_min / 60)}.${task.service_min % 60}`,
-                  priority: "early-out",
-                  address: task.address,
-                  alias: task.alias,
-                  customer_name: originalTask?.customer_name || task.alias,
-                  premium: task.premium || false,
-                  is_straordinaria: originalTask?.straordinaria || false,
-                  assignedCleaner: assignment.cleaner_id,
-                  startTime: task.start_time,
-                  type_apt: originalTask?.type_apt,
-                  checkout_date: originalTask?.checkout_date,
-                  checkout_time: originalTask?.checkout_time,
-                  checkin_date: originalTask?.checkin_date,
-                  checkin_time: originalTask?.checkin_time,
-                  pax_in: originalTask?.pax_in,
-                  pax_out: originalTask?.pax_out,
-                  operation_id: originalTask?.operation_id,
-                  confirmed_operation: originalTask?.confirmed_operation,
-                } as Task);
-              });
-            });
-            
-            setFollowupTasks(followupTasksArray);
-            console.log("Task follow-up convertite:", followupTasksArray);
+            // Le assegnazioni follow-up verranno visualizzate nella timeline se presenti
           }
         } catch (error) {
           console.error("Errore nel caricamento delle assegnazioni follow-up:", error);
@@ -214,14 +165,10 @@ export default function TimelineView({
             const color = getCleanerColor(index);
             const droppableId = `cleaner-${cleaner.id}`;
 
-            // Trova tutte le task assegnate a questo cleaner (sia da props che follow-up)
-            const tasksFromProps = tasks.filter(task => 
+            // Trova tutte le task assegnate a questo cleaner
+            const cleanerTasks = tasks.filter(task => 
               (task as any).assignedCleaner === cleaner.id
             );
-            const tasksFromFollowup = followupTasks.filter(task =>
-              (task as any).assignedCleaner === cleaner.id
-            );
-            const cleanerTasks = [...tasksFromProps, ...tasksFromFollowup];
 
             return (
               <div key={cleaner.id} className="flex mb-0.5">
@@ -265,39 +212,21 @@ export default function TimelineView({
 
                       {/* Task posizionate in sequenza */}
                       <div className="relative z-10 flex items-center h-full">
-                        {cleanerTasks
+                        {tasks
+                          .filter((task) => (task as any).assignedCleaner === cleaner.id)
                           .filter((task, index, self) => 
                             // Rimuovi duplicati basandoti sul logistic_code (task.name)
                             index === self.findIndex((t) => t.name === task.name)
                           )
-                          .sort((a, b) => {
-                            // Ordina per orario di inizio se disponibile
-                            const timeA = (a as any).startTime || "00:00";
-                            const timeB = (b as any).startTime || "00:00";
-                            return timeA.localeCompare(timeB);
-                          })
-                          .map((task, index) => {
-                            // Trova i dati originali da early_out.json per ottenere premium e straordinaria
-                            const originalTaskData = earlyOutTasksData.find(
-                              (eoTask) => eoTask.logistic_code === parseInt(task.name)
-                            );
-                            
-                            // Crea una copia arricchita della task con gli attributi corretti
-                            const enrichedTask = {
-                              ...task,
-                              premium: originalTaskData?.premium || false,
-                              is_straordinaria: originalTaskData?.straordinaria || false,
-                            };
-
-                            return (
-                              <TaskCard 
-                                key={`${task.name}-${cleaner.id}`}
-                                task={enrichedTask} 
-                                index={index}
-                                isInTimeline={true}
-                              />
-                            );
-                          })}
+                          .sort((a, b) => ((a as any).assignedSlot || 0) - ((b as any).assignedSlot || 0))
+                          .map((task, index) => (
+                            <TaskCard 
+                              key={`${task.name}-${cleaner.id}`}
+                              task={task} 
+                              index={index}
+                              isInTimeline={true}
+                            />
+                          ))}
                         {provided.placeholder}
                       </div>
                     </div>
