@@ -174,21 +174,21 @@ def main() -> None:
 
     save_json(OUTPUT_PATH, output)
     print(f"✅ File salvato: {OUTPUT_PATH}")
-    
+
     # Aggiorna anche timeline_assignments.json
     timeline_assignments = {"assignments": []}
     try:
         timeline_assignments = load_json(TIMELINE_ASSIGNMENTS_PATH)
     except:
         pass
-    
+
     # Rimuovi vecchie assegnazioni early-out (mantieni solo quelle manuali)
     assigned_logistic_codes = set(str(t.get("logistic_code")) for t in assigned_sorted if t.get("assignment_status") == "assigned")
     timeline_assignments["assignments"] = [
         a for a in timeline_assignments.get("assignments", [])
         if str(a.get("logistic_code")) not in assigned_logistic_codes
     ]
-    
+
     # Aggiungi le nuove assegnazioni early-out
     for task in assigned_sorted:
         if task.get("assignment_status") == "assigned" and task.get("assigned_cleaner"):
@@ -197,10 +197,10 @@ def main() -> None:
                 "cleanerId": task["assigned_cleaner"]["id"],
                 "assignment_type": "smista_button"
             })
-    
+
     save_json(TIMELINE_ASSIGNMENTS_PATH, timeline_assignments)
     print(f"✅ File salvato: {TIMELINE_ASSIGNMENTS_PATH}")
-    
+
     if unused:
         print("ℹ️ Cleaners non usati (numero task inferiore al numero di cleaners):", ", ".join(unused))
 
