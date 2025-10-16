@@ -123,7 +123,7 @@ for t in assigned_items:
             else:
                 start_hhmm = try_hhmm(t["assigned_cleaner"].get("start_time"), DAY_START_DEFAULT)
                 end_hhmm = minutes_to_hhmm(hhmm_to_minutes(start_hhmm) + int(t["cleaning_time"]))
-            
+
             seed_by_cleaner_and_date[(cid, d)].append({
                 "task_id": t["task_id"],
                 "lat": float(t["lat"]),
@@ -172,7 +172,7 @@ def build_initial_state_for_date(the_date, cleaners):
         c_start = c.get("start_time")  # start_time è obbligatorio
         if not c_start:
             raise ValueError(f"Cleaner {cid} non ha start_time definito")
-        
+
         seeds = seed_by_cleaner_and_date.get((cid, the_date), [])
         if seeds:
             seeds_sorted = sorted(seeds, key=lambda s: hhmm_to_minutes(s["end_hhmm"]))
@@ -271,7 +271,7 @@ def assign_greedy_for_date(the_date, tasks, cleaners):
 
         # Assegna la task al cleaner migliore
         cstate = state[best_cleaner_id]
-        
+
         # calcola orari
         start_min = cstate["available_min"] + (best_travel or 0)
         end_min   = start_min + int(best_task["cleaning_time"])

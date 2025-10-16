@@ -36,11 +36,14 @@ with open(SETTINGS_PATH, "r", encoding="utf-8") as f:
     settings = json.load(f)
 
 # ---- Parametri / default ----
-eo_time = parse_time(settings.get("eo_time")) or datetime.strptime("10:00", "%H:%M").time()
-hp_time = parse_time(settings.get("hp_time")) or datetime.strptime("15:30", "%H:%M").time()
+early_out_config = settings.get("early-out", {})
+high_priority_config = settings.get("high-priority", {})
 
-eo_clients = settings.get("eo_clients") or []
-hp_clients = settings.get("hp_clients") or []
+eo_time = parse_time(early_out_config.get("eo_time")) or datetime.strptime("10:00", "%H:%M").time()
+hp_time = parse_time(high_priority_config.get("hp_time")) or datetime.strptime("15:30", "%H:%M").time()
+
+eo_clients = early_out_config.get("eo_clients") or []
+hp_clients = high_priority_config.get("hp_clients") or []
 if not isinstance(eo_clients, list):
     raise ValueError("'eo_clients' deve essere una lista di client_id.")
 if not isinstance(hp_clients, list):
