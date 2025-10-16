@@ -322,13 +322,17 @@ def load_cleaners() -> List[Cleaner]:
     return cleaners
 
 def load_tasks() -> List[Task]:
+    settings = load_settings()
+    eo_start_time = settings.get("eo_start_time", "10:00") if settings else "10:00"
+    eo_start_min = hhmm_to_min(eo_start_time, default="10:00")
+    
     data = json.loads(INPUT_TASKS.read_text(encoding="utf-8"))
     tasks: List[Task] = []
     for t in data.get("early_out_tasks", []):
-        checkout = hhmm_to_min(t.get("checkout_time"), default="10:00")
-        # Se checkout_time < 10:00 (600 minuti), imposta a 10:00
-        if checkout < 600:
-            checkout = 600
+        checkout = hhmm_to_min(t.get("checkout_time"), default=eo_start_time)
+        # Se checkout_time < eo_start_time, imposta a eo_start_time
+        if checkout < eo_start_min:
+            checkout = eo_start_min
         checkin  = hhmm_to_min(t.get("checkin_time"),  default="23:59")
         tasks.append(Task(
             task_id=str(t.get("task_id") or t.get("id")),
