@@ -207,9 +207,11 @@ export default function TimelineView({
                             index === self.findIndex((t) => t.name === task.name)
                           )
                           .sort((a, b) => {
-                            // Ordina per orario di inizio (startTime o fw_start_time)
-                            const timeA = (a as any).startTime || (a as any).fw_start_time || "00:00";
-                            const timeB = (b as any).startTime || (b as any).fw_start_time || "00:00";
+                            // Ordina per orario di inizio (start_time o fw_start_time in snake_case)
+                            const taskA = a as any;
+                            const taskB = b as any;
+                            const timeA = taskA.start_time || taskA.fw_start_time || taskA.startTime || taskA.fw_start_time || "00:00";
+                            const timeB = taskB.start_time || taskB.fw_start_time || taskB.startTime || taskB.fw_start_time || "00:00";
                             return timeA.localeCompare(timeB);
                           })
                           .map((task, index) => (
