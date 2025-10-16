@@ -554,16 +554,8 @@
       "reasons": [
         "checkout_time<=eo_time"
       ],
-      "assigned_cleaner": {
-        "id": 249,
-        "name": "Ogbodo",
-        "lastname": "Chidi Igwe",
-        "role": "Premium",
-        "fw_start_time": "10:00",
-        "fw_end_time": "10:30"
-      },
-      "assignment_status": "assigned",
-      "followup": true
+      "assigned_cleaner": null,
+      "assignment_status": "unassigned_no_cleaners"
     },
     {
       "task_id": 217420,
@@ -590,16 +582,8 @@
       "reasons": [
         "checkout_time<=eo_time"
       ],
-      "assigned_cleaner": {
-        "id": 24,
-        "name": "HUSSAIN",
-        "lastname": "SYED SHUJIAHAT",
-        "role": "Standard",
-        "fw_start_time": "12:15",
-        "fw_end_time": "12:55"
-      },
-      "assignment_status": "assigned",
-      "followup": true
+      "assigned_cleaner": null,
+      "assignment_status": "unassigned_no_cleaners"
     },
     {
       "task_id": 217421,
@@ -626,16 +610,8 @@
       "reasons": [
         "checkout_time<=eo_time"
       ],
-      "assigned_cleaner": {
-        "id": 24,
-        "name": "HUSSAIN",
-        "lastname": "SYED SHUJIAHAT",
-        "role": "Standard",
-        "fw_start_time": "12:55",
-        "fw_end_time": "13:35"
-      },
-      "assignment_status": "assigned",
-      "followup": true
+      "assigned_cleaner": null,
+      "assignment_status": "unassigned_no_cleaners"
     },
     {
       "task_id": 217473,
@@ -709,15 +685,6 @@
       "each cleaner used at most once",
       "start/end only inside assigned_cleaner after telegram_id",
       "checkout_time default 10:00"
-    ],
-    "followup_added": {
-      "method": "greedy_round_robin_nearest",
-      "fixed_travel_minutes": 15,
-      "premium_rule": "premium tasks require premium cleaners; if none exist, allow standard and mark premium_fallback=true",
-      "apartment_type_rule": "cleaners can only be assigned tasks for apartment types they are configured to handle in settings.json",
-      "total_followup_tasks": 3,
-      "premium_fallback_dates": [],
-      "premium_fallback_task_ids": {}
-    }
+    ]
   }
 }
