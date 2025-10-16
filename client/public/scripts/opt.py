@@ -412,10 +412,11 @@ def build_output(cleaners: List[Cleaner], unassigned: List[Task]) -> Dict[str, A
                 out.append({
                     "task_id": int(t.task_id),
                     "logistic_code": int(t.logistic_code) if t.logistic_code else int(t.task_id),
+                    "address": t.address,
+                    "premium": t.is_premium,
                     "assigned_cleaner": {
                         "id": cl.id,
                         "name": cl.name,
-                        "telegram_id": cl.telegram_id,
                         "role": cl.role,
                         "premium": cl.is_premium,
                         "start_time": min_to_hhmm(start),
@@ -428,10 +429,11 @@ def build_output(cleaners: List[Cleaner], unassigned: List[Task]) -> Dict[str, A
                 out.append({
                     "task_id": int(t.task_id),
                     "logistic_code": int(t.logistic_code) if t.logistic_code else int(t.task_id),
+                    "address": t.address,
+                    "premium": t.is_premium,
                     "assigned_cleaner": {
                         "id": cl.id,
                         "name": cl.name,
-                        "telegram_id": cl.telegram_id,
                         "role": cl.role,
                         "premium": cl.is_premium,
                         "fw_start_time": min_to_hhmm(start),
