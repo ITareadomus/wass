@@ -19,7 +19,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/reset-timeline-assignments", async (req, res) => {
     try {
       const timelineAssignmentsPath = path.join(process.cwd(), 'client/public/data/output/timeline_assignments.json');
-      
+
       // Svuota il file
       await fs.writeFile(timelineAssignmentsPath, JSON.stringify({ assignments: [] }, null, 2));
 
@@ -434,45 +434,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Endpoint per eseguire l'estrazione dei dati
   app.post("/api/extract-data", async (req, res) => {
     try {
-      // Step 1: Esegui task_extractor.py
+      // Resetta i file di assegnazione all'inizio dell'estrazione
+      const earlyOutAssignmentsPath = path.join(process.cwd(), 'client/public/data/output/early_out_assignments.json');
+      const timelineAssignmentsPath = path.join(process.cwd(), 'client/public/data/output/timeline_assignments.json');
+
+      await fs.writeFile(earlyOutAssignmentsPath, JSON.stringify({ early_out_tasks_assigned: [], meta: {} }, null, 2));
+      await fs.writeFile(timelineAssignmentsPath, JSON.stringify({ assignments: [] }, null, 2));
+
+      // Usa python3 e chiama task_extractor.py (con data di domani)
       console.log("Eseguendo task_extractor.py...");
-      const { stdout: stdout1, stderr: stderr1 } = await execAsync(
-        `python3 client/public/scripts/task_extractor.py`,
-        { maxBuffer: 1024 * 1024 * 10 }
-      );
+      const taskExtractorResult = await execAsync('python3 client/public/scripts/task_extractor.py', {
+        cwd: process.cwd(),
+        maxBuffer: 10 * 1024 * 1024
+      });
+      console.log("task_extractor output:", taskExtractorResult.stdout);
 
-      if (stderr1 && !stderr1.includes('Browserslist')) {
-        console.error("Errore task_extractor:", stderr1);
-      }
-      console.log("task_extractor output:", stdout1);
-
-      // Step 2: Esegui extract_all.py
       console.log("Eseguendo extract_all.py...");
-      const { stdout: stdout2, stderr: stderr2 } = await execAsync(
-        `python3 client/public/scripts/extract_all.py`,
-        { maxBuffer: 1024 * 1024 * 10 }
-      );
-
-      if (stderr2 && !stderr2.includes('Browserslist')) {
-        console.error("Errore extract_all:", stderr2);
-      }
-      console.log("extract_all output:", stdout2);
+      const extractAllResult = await execAsync('python3 client/public/scripts/extract_all.py', {
+        cwd: process.cwd(),
+        maxBuffer: 10 * 1024 * 1024
+      });
+      console.log("extract_all output:", extractAllResult.stdout);
 
       res.json({
         success: true,
         message: "Dati estratti con successo",
         outputs: {
-          task_extractor: stdout1,
-          extract_all: stdout2
+          task_extractor: taskExtractorResult.stdout,
+          extract_all: extractAllResult.stdout
         }
       });
     } catch (error: any) {
-      console.error("Errore durante l'estrazione:", error);
-      res.status(500).json({
-        success: false,
-        error: error.message,
-        stderr: error.stderr
-      });
+      console.error("Errore nell'estrazione dei dati:", error);
+      res.status(500).json({ success: false, error: error.message });
     }
   });
 

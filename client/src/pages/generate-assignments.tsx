@@ -94,7 +94,7 @@ export default function GenerateAssignments() {
     };
 
     extractData();
-    loadEarlyOutAssignments();
+    // NON caricare le assegnazioni all'avvio - verranno caricate solo dopo aver premuto "Smista"
   }, []);
 
   // Funzione per convertire cleaning_time (minuti) in formato ore.minuti
