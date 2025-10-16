@@ -1,4 +1,3 @@
-
 # -*- coding: utf-8 -*-
 """
 Unified EO day planner (Regret-Insertion + 2-opt) with:
@@ -406,21 +405,41 @@ def build_output(cleaners: List[Cleaner], unassigned: List[Task]) -> Dict[str, A
     out: List[Dict[str, Any]] = []
     for cl in cleaners:
         cost, schedule = evaluate_route_cost(cl.route)
-        for t, (arr, start, fin) in zip(cl.route, schedule):
-            out.append({
-                "task_id": int(t.task_id),
-                "logistic_code": int(t.logistic_code) if t.logistic_code else int(t.task_id),
-                "assigned_cleaner": {
-                    "id": cl.id,
-                    "name": cl.name,
-                    "telegram_id": cl.telegram_id,
-                    "role": cl.role,
-                    "premium": cl.is_premium,
-                    "start_time": min_to_hhmm(start),
-                    "end_time":   min_to_hhmm(fin),
-                },
-                "assignment_status": "assigned",
-            })
+        for idx, (t, (arr, start, fin)) in enumerate(zip(cl.route, schedule)):
+            # Se è la prima task, usa start_time e end_time
+            # Se è una task successiva (in coda), usa fw_start_time, fw_end_time e followup: true
+            if idx == 0:
+                out.append({
+                    "task_id": int(t.task_id),
+                    "logistic_code": int(t.logistic_code) if t.logistic_code else int(t.task_id),
+                    "assigned_cleaner": {
+                        "id": cl.id,
+                        "name": cl.name,
+                        "telegram_id": cl.telegram_id,
+                        "role": cl.role,
+                        "premium": cl.is_premium,
+                        "start_time": min_to_hhmm(start),
+                        "end_time":   min_to_hhmm(fin),
+                    },
+                    "assignment_status": "assigned",
+                })
+            else:
+                # Task in coda: usa fw_start_time, fw_end_time e aggiungi followup: true
+                out.append({
+                    "task_id": int(t.task_id),
+                    "logistic_code": int(t.logistic_code) if t.logistic_code else int(t.task_id),
+                    "assigned_cleaner": {
+                        "id": cl.id,
+                        "name": cl.name,
+                        "telegram_id": cl.telegram_id,
+                        "role": cl.role,
+                        "premium": cl.is_premium,
+                        "fw_start_time": min_to_hhmm(start),
+                        "fw_end_time":   min_to_hhmm(fin),
+                    },
+                    "assignment_status": "assigned",
+                    "followup": True
+                })
     for t in unassigned:
         out.append({
             "task_id": int(t.task_id),
@@ -428,7 +447,7 @@ def build_output(cleaners: List[Cleaner], unassigned: List[Task]) -> Dict[str, A
             "assignment_status": "unassigned",
             "reason": "no feasible cleaner/window (end < checkin required)",
         })
-    
+
     return {
         "early_out_tasks_assigned": out,
         "meta": {
@@ -460,20 +479,20 @@ if __name__ == "__main__":
     tasks = load_tasks()
 
     print(f"Caricati {len(tasks)} task e {len(cleaners)} cleaners")
-    
+
     planners, leftovers = plan_day(tasks, cleaners, settings)
 
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-    
+
     output_data = build_output(planners, leftovers)
-    
+
     with OUTPUT_ASSIGN.open("w", encoding="utf-8") as f:
         json.dump(output_data, f, ensure_ascii=False, indent=2)
 
     print(f"✅ Scritto {OUTPUT_ASSIGN}")
     print(f"   Assegnate: {output_data['meta']['assigned']}")
     print(f"   Non assegnate: {output_data['meta']['unassigned']}")
-    
+
     # Aggiorna anche timeline_assignments.json
     timeline_data = {"assignments": []}
     if TIMELINE_ASSIGNMENTS.exists():
@@ -481,14 +500,14 @@ if __name__ == "__main__":
             timeline_data = json.loads(TIMELINE_ASSIGNMENTS.read_text(encoding="utf-8"))
         except:
             pass
-    
+
     # Rimuovi vecchie assegnazioni early-out
     assigned_codes = set(str(x["logistic_code"]) for x in output_data["early_out_tasks_assigned"] if x.get("assignment_status") == "assigned")
     timeline_data["assignments"] = [
         a for a in timeline_data.get("assignments", [])
         if str(a.get("logistic_code")) not in assigned_codes
     ]
-    
+
     # Aggiungi nuove assegnazioni
     for task in output_data["early_out_tasks_assigned"]:
         if task.get("assignment_status") == "assigned" and task.get("assigned_cleaner"):
@@ -497,8 +516,8 @@ if __name__ == "__main__":
                 "cleanerId": task["assigned_cleaner"]["id"],
                 "assignment_type": "smista_button"
             })
-    
+
     with TIMELINE_ASSIGNMENTS.open("w", encoding="utf-8") as f:
         json.dump(timeline_data, f, ensure_ascii=False, indent=2)
-    
+
     print(f"✅ Aggiornato {TIMELINE_ASSIGNMENTS}")
