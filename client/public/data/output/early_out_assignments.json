@@ -2,7 +2,7 @@
   "early_out_tasks_assigned": [
     {
       "task_id": 217486,
-      "logistic_code": 217486,
+      "logistic_code": 1666,
       "assigned_cleaner": {
         "id": 24,
         "name": "HUSSAIN",
@@ -16,7 +16,7 @@
     },
     {
       "task_id": 217338,
-      "logistic_code": 217338,
+      "logistic_code": 504,
       "assigned_cleaner": {
         "id": 24,
         "name": "HUSSAIN",
@@ -30,7 +30,7 @@
     },
     {
       "task_id": 217317,
-      "logistic_code": 217317,
+      "logistic_code": 1650,
       "assigned_cleaner": {
         "id": 132,
         "name": "JOHOISER ERNESTO",
@@ -44,7 +44,7 @@
     },
     {
       "task_id": 217341,
-      "logistic_code": 217341,
+      "logistic_code": 1213,
       "assigned_cleaner": {
         "id": 132,
         "name": "JOHOISER ERNESTO",
@@ -58,7 +58,7 @@
     },
     {
       "task_id": 217473,
-      "logistic_code": 217473,
+      "logistic_code": 980,
       "assigned_cleaner": {
         "id": 249,
         "name": "Ogbodo Chidi",
@@ -72,7 +72,7 @@
     },
     {
       "task_id": 217342,
-      "logistic_code": 217342,
+      "logistic_code": 1625,
       "assigned_cleaner": {
         "id": 249,
         "name": "Ogbodo Chidi",
@@ -86,7 +86,7 @@
     },
     {
       "task_id": 217418,
-      "logistic_code": 217418,
+      "logistic_code": 617,
       "assigned_cleaner": {
         "id": 287,
         "name": "BAH",
@@ -100,7 +100,7 @@
     },
     {
       "task_id": 217337,
-      "logistic_code": 217337,
+      "logistic_code": 992,
       "assigned_cleaner": {
         "id": 287,
         "name": "BAH",
@@ -114,7 +114,7 @@
     },
     {
       "task_id": 217489,
-      "logistic_code": 217489,
+      "logistic_code": 618,
       "assigned_cleaner": {
         "id": 326,
         "name": "FESTUS OSARO",
@@ -128,7 +128,7 @@
     },
     {
       "task_id": 217339,
-      "logistic_code": 217339,
+      "logistic_code": 1084,
       "assigned_cleaner": {
         "id": 326,
         "name": "FESTUS OSARO",
@@ -142,7 +142,7 @@
     },
     {
       "task_id": 217420,
-      "logistic_code": 217420,
+      "logistic_code": 619,
       "assigned_cleaner": {
         "id": 404,
         "name": "RASEL",
@@ -156,7 +156,7 @@
     },
     {
       "task_id": 217343,
-      "logistic_code": 217343,
+      "logistic_code": 1543,
       "assigned_cleaner": {
         "id": 404,
         "name": "RASEL",
@@ -170,7 +170,7 @@
     },
     {
       "task_id": 217318,
-      "logistic_code": 217318,
+      "logistic_code": 1649,
       "assigned_cleaner": {
         "id": 445,
         "name": "IBRAHIM",
@@ -184,7 +184,7 @@
     },
     {
       "task_id": 217421,
-      "logistic_code": 217421,
+      "logistic_code": 723,
       "assigned_cleaner": {
         "id": 469,
         "name": "LAMIN",
@@ -198,7 +198,7 @@
     },
     {
       "task_id": 217340,
-      "logistic_code": 217340,
+      "logistic_code": 1135,
       "assigned_cleaner": {
         "id": 469,
         "name": "LAMIN",
