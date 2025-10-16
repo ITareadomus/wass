@@ -3,10 +3,11 @@
     {
       "task_id": 217486,
       "logistic_code": 1666,
+      "address": "VIA CESARE CORRENTI 16",
+      "premium": false,
       "assigned_cleaner": {
         "id": 24,
         "name": "HUSSAIN",
-        "telegram_id": null,
         "role": "Standard",
         "premium": false,
         "start_time": "07:00",
@@ -17,24 +18,27 @@
     {
       "task_id": 217338,
       "logistic_code": 504,
+      "address": "VIA TOFANE, 5",
+      "premium": false,
       "assigned_cleaner": {
         "id": 24,
         "name": "HUSSAIN",
-        "telegram_id": null,
         "role": "Standard",
         "premium": false,
-        "start_time": "10:00",
-        "end_time": "11:00"
+        "fw_start_time": "10:00",
+        "fw_end_time": "11:00"
       },
-      "assignment_status": "assigned"
+      "assignment_status": "assigned",
+      "followup": true
     },
     {
       "task_id": 217317,
       "logistic_code": 1650,
+      "address": "VIA VIGNOLA 4",
+      "premium": false,
       "assigned_cleaner": {
         "id": 132,
         "name": "JOHOISER ERNESTO",
-        "telegram_id": 1577716674,
         "role": "Premium",
         "premium": true,
         "start_time": "10:00",
@@ -45,24 +49,27 @@
     {
       "task_id": 217341,
       "logistic_code": 1213,
+      "address": "VIA TORRICELLI 5",
+      "premium": false,
       "assigned_cleaner": {
         "id": 132,
         "name": "JOHOISER ERNESTO",
-        "telegram_id": 1577716674,
         "role": "Premium",
         "premium": true,
-        "start_time": "12:22",
-        "end_time": "13:22"
+        "fw_start_time": "12:22",
+        "fw_end_time": "13:22"
       },
-      "assignment_status": "assigned"
+      "assignment_status": "assigned",
+      "followup": true
     },
     {
       "task_id": 217473,
       "logistic_code": 980,
+      "address": "LARGO CORSIA DEI SERVI 11",
+      "premium": true,
       "assigned_cleaner": {
         "id": 249,
         "name": "Ogbodo Chidi",
-        "telegram_id": 6481457174,
         "role": "Premium",
         "premium": true,
         "start_time": "10:00",
@@ -73,24 +80,27 @@
     {
       "task_id": 217342,
       "logistic_code": 1625,
+      "address": "via Goffredo Mameli 9",
+      "premium": false,
       "assigned_cleaner": {
         "id": 249,
         "name": "Ogbodo Chidi",
-        "telegram_id": 6481457174,
         "role": "Premium",
         "premium": true,
-        "start_time": "12:22",
-        "end_time": "13:22"
+        "fw_start_time": "12:22",
+        "fw_end_time": "13:22"
       },
-      "assignment_status": "assigned"
+      "assignment_status": "assigned",
+      "followup": true
     },
     {
       "task_id": 217418,
       "logistic_code": 617,
+      "address": "VIA VOGHERA, 4",
+      "premium": false,
       "assigned_cleaner": {
         "id": 287,
         "name": "BAH",
-        "telegram_id": 5173164898,
         "role": "Standard",
         "premium": false,
         "start_time": "09:30",
@@ -101,24 +111,27 @@
     {
       "task_id": 217337,
       "logistic_code": 992,
+      "address": "VIA VOGHERA 14",
+      "premium": false,
       "assigned_cleaner": {
         "id": 287,
         "name": "BAH",
-        "telegram_id": 5173164898,
         "role": "Standard",
         "premium": false,
-        "start_time": "10:07",
-        "end_time": "11:07"
+        "fw_start_time": "10:07",
+        "fw_end_time": "11:07"
       },
-      "assignment_status": "assigned"
+      "assignment_status": "assigned",
+      "followup": true
     },
     {
       "task_id": 217489,
       "logistic_code": 618,
+      "address": "VIA VOGHERA, 4",
+      "premium": false,
       "assigned_cleaner": {
         "id": 326,
         "name": "FESTUS OSARO",
-        "telegram_id": 7895288780,
         "role": "Standard",
         "premium": false,
         "start_time": "09:30",
@@ -129,24 +142,27 @@
     {
       "task_id": 217339,
       "logistic_code": 1084,
+      "address": "VIA FORCELLA, 11",
+      "premium": false,
       "assigned_cleaner": {
         "id": 326,
         "name": "FESTUS OSARO",
-        "telegram_id": 7895288780,
         "role": "Standard",
         "premium": false,
-        "start_time": "10:09",
-        "end_time": "11:09"
+        "fw_start_time": "10:09",
+        "fw_end_time": "11:09"
       },
-      "assignment_status": "assigned"
+      "assignment_status": "assigned",
+      "followup": true
     },
     {
       "task_id": 217420,
       "logistic_code": 619,
+      "address": "VIA TORTONA, 10",
+      "premium": false,
       "assigned_cleaner": {
         "id": 404,
         "name": "RASEL",
-        "telegram_id": 7559507853,
         "role": "Standard",
         "premium": false,
         "start_time": "09:30",
@@ -157,24 +173,27 @@
     {
       "task_id": 217343,
       "logistic_code": 1543,
+      "address": "via Forcella 11",
+      "premium": false,
       "assigned_cleaner": {
         "id": 404,
         "name": "RASEL",
-        "telegram_id": 7559507853,
         "role": "Standard",
         "premium": false,
-        "start_time": "10:19",
-        "end_time": "11:19"
+        "fw_start_time": "10:19",
+        "fw_end_time": "11:19"
       },
-      "assignment_status": "assigned"
+      "assignment_status": "assigned",
+      "followup": true
     },
     {
       "task_id": 217318,
       "logistic_code": 1649,
+      "address": "PIAZZA GRAMSCI 10",
+      "premium": true,
       "assigned_cleaner": {
         "id": 445,
         "name": "IBRAHIM",
-        "telegram_id": null,
         "role": "Premium",
         "premium": true,
         "start_time": "10:00",
@@ -185,10 +204,11 @@
     {
       "task_id": 217421,
       "logistic_code": 723,
+      "address": "VIA TORTONA, 10",
+      "premium": false,
       "assigned_cleaner": {
         "id": 469,
         "name": "LAMIN",
-        "telegram_id": null,
         "role": "Standard",
         "premium": false,
         "start_time": "09:30",
@@ -199,16 +219,18 @@
     {
       "task_id": 217340,
       "logistic_code": 1135,
+      "address": "VIA CORSICO,  5",
+      "premium": false,
       "assigned_cleaner": {
         "id": 469,
         "name": "LAMIN",
-        "telegram_id": null,
         "role": "Standard",
         "premium": false,
-        "start_time": "10:22",
-        "end_time": "11:22"
+        "fw_start_time": "10:22",
+        "fw_end_time": "11:22"
       },
-      "assignment_status": "assigned"
+      "assignment_status": "assigned",
+      "followup": true
     }
   ],
   "meta": {
