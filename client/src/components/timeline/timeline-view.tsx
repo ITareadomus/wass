@@ -202,10 +202,6 @@ export default function TimelineView({
                       <div className="relative z-10 flex items-center h-full">
                         {tasks
                           .filter((task) => (task as any).assignedCleaner === cleaner.id)
-                          .filter((task, index, self) => 
-                            // Rimuovi duplicati basandoti sul logistic_code (task.name)
-                            index === self.findIndex((t) => t.name === task.name)
-                          )
                           .sort((a, b) => {
                             // Ordina per orario di inizio (start_time o fw_start_time in snake_case)
                             const taskA = a as any;
@@ -216,7 +212,7 @@ export default function TimelineView({
                           })
                           .map((task, index) => (
                             <TaskCard 
-                              key={`${task.name}-${cleaner.id}`}
+                              key={`${task.id}-${cleaner.id}-${index}`}
                               task={task} 
                               index={index}
                               isInTimeline={true}
