@@ -280,8 +280,9 @@ export default function GenerateAssignments() {
     }
   };
 
-  // Esponi la funzione per poterla chiamare da altri componenti
+  // Esponi le funzioni per poterle chiamare da altri componenti
   (window as any).reloadEarlyOutAssignments = loadEarlyOutAssignments;
+  (window as any).reloadAllTasks = loadTasks;
 
   const saveTaskAssignments = async (tasks: Task[]) => {
     try {

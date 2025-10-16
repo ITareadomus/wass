@@ -81,7 +81,12 @@ export default function PriorityColumn({
           title: "✅ EARLY-OUT assegnati con successo (algoritmo ottimizzato)!",
         });
 
-        // Ricarica le assegnazioni senza ricaricare la pagina
+        // Ricarica tutti i task per aggiornare i filtri e la timeline
+        if ((window as any).reloadAllTasks) {
+          await (window as any).reloadAllTasks();
+        }
+        
+        // Ricarica anche le assegnazioni early-out
         if ((window as any).reloadEarlyOutAssignments) {
           await (window as any).reloadEarlyOutAssignments();
         }
