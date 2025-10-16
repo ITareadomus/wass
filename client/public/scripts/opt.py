@@ -422,7 +422,8 @@ def build_output(cleaners: List[Cleaner], unassigned: List[Task]) -> Dict[str, A
                 "cleaning_time": t.cleaning_time,
                 "start_time": min_to_hhmm(start),
                 "end_time": min_to_hhmm(fin),
-                "followup": idx > 0
+                "followup": idx > 0,
+                "sequence": idx + 1
             }
             tasks_list.append(task_data)
         
@@ -522,7 +523,8 @@ if __name__ == "__main__":
             timeline_data["assignments"].append({
                 "logistic_code": str(task["logistic_code"]),
                 "cleanerId": cleaner_id,
-                "assignment_type": "smista_button"
+                "assignment_type": "smista_button",
+                "sequence": task.get("sequence", 0)
             })
 
     with TIMELINE_ASSIGNMENTS.open("w", encoding="utf-8") as f:

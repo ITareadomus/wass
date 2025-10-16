@@ -203,11 +203,18 @@ export default function TimelineView({
                         {tasks
                           .filter((task) => (task as any).assignedCleaner === cleaner.id)
                           .sort((a, b) => {
-                            // Ordina per orario di inizio (start_time o fw_start_time in snake_case)
+                            // Ordina prima per sequence (se presente), poi per orario
                             const taskA = a as any;
                             const taskB = b as any;
-                            const timeA = taskA.start_time || taskA.fw_start_time || taskA.startTime || taskA.fw_start_time || "00:00";
-                            const timeB = taskB.start_time || taskB.fw_start_time || taskB.startTime || taskB.fw_start_time || "00:00";
+                            
+                            // Se entrambe hanno sequence, usa quello
+                            if (taskA.sequence !== undefined && taskB.sequence !== undefined) {
+                              return taskA.sequence - taskB.sequence;
+                            }
+                            
+                            // Altrimenti ordina per orario di inizio
+                            const timeA = taskA.start_time || taskA.fw_start_time || taskA.startTime || "00:00";
+                            const timeB = taskB.start_time || taskB.fw_start_time || taskB.startTime || "00:00";
                             return timeA.localeCompare(timeB);
                           })
                           .map((task, index) => (

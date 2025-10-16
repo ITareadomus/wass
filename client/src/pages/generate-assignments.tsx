@@ -223,6 +223,7 @@ export default function GenerateAssignments() {
           return {
             ...task,
             assignedCleaner: timelineAssignment.cleanerId,
+            sequence: timelineAssignment.sequence,
           };
         }
         return task;
@@ -260,7 +261,8 @@ export default function GenerateAssignments() {
             return {
               ...task,
               assignedCleaner: assignment.assigned_cleaner.id,
-              startTime: assignment.assigned_cleaner.start_time
+              startTime: assignment.assigned_cleaner.start_time,
+              sequence: assignment.sequence
             };
           }
           return task;
