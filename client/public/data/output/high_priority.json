@@ -79,6 +79,136 @@
       ]
     },
     {
+      "task_id": 217317,
+      "logistic_code": 1650,
+      "client_id": 87,
+      "premium": false,
+      "address": "VIA VIGNOLA 4",
+      "lat": "45.449398",
+      "lng": "9.196514",
+      "cleaning_time": 120,
+      "checkin_date": "2025-10-17",
+      "checkout_date": "2025-10-17",
+      "checkin_time": "15:00",
+      "checkout_time": null,
+      "pax_in": 4,
+      "pax_out": 2,
+      "small_equipment": false,
+      "operation_id": 2,
+      "confirmed_operation": false,
+      "straordinaria": false,
+      "type_apt": "C",
+      "alias": "HACCA",
+      "customer_name": "HACCA SRL",
+      "reasons": [
+        "same_day_checkin_between_eo_hp"
+      ]
+    },
+    {
+      "task_id": 217318,
+      "logistic_code": 1649,
+      "client_id": 87,
+      "premium": true,
+      "address": "PIAZZA GRAMSCI 10",
+      "lat": "45.4822754",
+      "lng": "9.1688625",
+      "cleaning_time": 120,
+      "checkin_date": "2025-10-17",
+      "checkout_date": "2025-10-17",
+      "checkin_time": "19:00",
+      "checkout_time": null,
+      "pax_in": 2,
+      "pax_out": 2,
+      "small_equipment": false,
+      "operation_id": 2,
+      "confirmed_operation": false,
+      "straordinaria": false,
+      "type_apt": "C",
+      "alias": "HACCA",
+      "customer_name": "HACCA SRL",
+      "reasons": [
+        "premium"
+      ]
+    },
+    {
+      "task_id": 217337,
+      "logistic_code": 992,
+      "client_id": 61,
+      "premium": false,
+      "address": "VIA VOGHERA 14",
+      "lat": "45.4543398",
+      "lng": "9.1674386",
+      "cleaning_time": 60,
+      "checkin_date": "2025-10-17",
+      "checkout_date": "2025-10-17",
+      "checkin_time": "15:00",
+      "checkout_time": null,
+      "pax_in": 1,
+      "pax_out": 1,
+      "small_equipment": true,
+      "operation_id": 2,
+      "confirmed_operation": false,
+      "straordinaria": false,
+      "type_apt": "A",
+      "alias": "NTM",
+      "customer_name": "NOTA-MI",
+      "reasons": [
+        "same_day_checkin_between_eo_hp"
+      ]
+    },
+    {
+      "task_id": 217338,
+      "logistic_code": 504,
+      "client_id": 61,
+      "premium": false,
+      "address": "VIA TOFANE, 5",
+      "lat": "45.5034283",
+      "lng": "9.221111",
+      "cleaning_time": 60,
+      "checkin_date": "2025-10-17",
+      "checkout_date": "2025-10-17",
+      "checkin_time": "15:00",
+      "checkout_time": null,
+      "pax_in": 1,
+      "pax_out": 2,
+      "small_equipment": true,
+      "operation_id": 2,
+      "confirmed_operation": false,
+      "straordinaria": false,
+      "type_apt": "A",
+      "alias": "NTM",
+      "customer_name": "NOTA-MI",
+      "reasons": [
+        "same_day_checkin_between_eo_hp"
+      ]
+    },
+    {
+      "task_id": 217339,
+      "logistic_code": 1084,
+      "client_id": 61,
+      "premium": false,
+      "address": "VIA FORCELLA, 11",
+      "lat": "45.4524898",
+      "lng": "9.1673869",
+      "cleaning_time": 60,
+      "checkin_date": "2025-10-17",
+      "checkout_date": "2025-10-17",
+      "checkin_time": "15:00",
+      "checkout_time": null,
+      "pax_in": 2,
+      "pax_out": 1,
+      "small_equipment": true,
+      "operation_id": 2,
+      "confirmed_operation": false,
+      "straordinaria": false,
+      "type_apt": "A",
+      "alias": "NTM",
+      "customer_name": "NOTA-MI",
+      "reasons": [
+        "same_day_checkin_between_eo_hp"
+      ]
+    },
+    {
       "task_id": 217347,
       "logistic_code": 1127,
       "client_id": 64,
@@ -101,8 +231,7 @@
       "alias": "RELSTAY",
       "customer_name": "RELSTAY - FERRARA GIULIA",
       "reasons": [
-        "same_day_checkin_between_eo_hp",
-        "client_forced_hp"
+        "same_day_checkin_between_eo_hp"
       ]
     },
     {
@@ -128,8 +257,7 @@
       "alias": "RELSTAY",
       "customer_name": "RELSTAY - FERRARA GIULIA",
       "reasons": [
-        "same_day_checkin_between_eo_hp",
-        "client_forced_hp"
+        "same_day_checkin_between_eo_hp"
       ]
     },
     {
@@ -181,8 +309,33 @@
       "alias": "RELSTAY",
       "customer_name": "RELSTAY - FERRARA GIULIA",
       "reasons": [
-        "same_day_checkin_between_eo_hp",
-        "client_forced_hp"
+        "same_day_checkin_between_eo_hp"
+      ]
+    },
+    {
+      "task_id": 217473,
+      "logistic_code": 980,
+      "client_id": 87,
+      "premium": true,
+      "address": "LARGO CORSIA DEI SERVI 11",
+      "lat": "45.4650722",
+      "lng": "9.196025",
+      "cleaning_time": 120,
+      "checkin_date": "2025-10-20",
+      "checkout_date": "2025-10-17",
+      "checkin_time": "16:30",
+      "checkout_time": null,
+      "pax_in": 3,
+      "pax_out": 4,
+      "small_equipment": false,
+      "operation_id": 2,
+      "confirmed_operation": false,
+      "straordinaria": false,
+      "type_apt": "C",
+      "alias": "HACCA",
+      "customer_name": "HACCA SRL",
+      "reasons": [
+        "premium"
       ]
     },
     {
@@ -208,8 +361,7 @@
       "alias": "RELSTAY",
       "customer_name": "RELSTAY - FERRARA GIULIA",
       "reasons": [
-        "same_day_checkin_between_eo_hp",
-        "client_forced_hp"
+        "same_day_checkin_between_eo_hp"
       ]
     },
     {
@@ -371,5 +523,5 @@
       ]
     }
   ],
-  "total_apartments": 14
+  "total_apartments": 20
 }
