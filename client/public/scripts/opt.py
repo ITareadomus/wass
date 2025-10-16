@@ -149,9 +149,13 @@ class Cleaner:
 def is_trainer(cleaner: Cleaner) -> bool:
     return (cleaner.role or "").strip().lower() == "formatore"
 
-def premium_soft_penalty(cleaner: Cleaner, task: Task) -> float:
+def can_handle_premium(cleaner: Cleaner, task: Task) -> bool:
+    """Controllo rigido: task premium SOLO per cleaner premium"""
     if task.is_premium and not cleaner.is_premium:
-        return PENALTY_PREMIUM_TO_STANDARD
+        return False
+    return True
+
+def premium_soft_penalty(cleaner: Cleaner, task: Task) -> float:
     if (not task.is_premium) and cleaner.is_premium:
         return PENALTY_STANDARD_TO_PREMIUM
     return 0.0
@@ -255,6 +259,8 @@ def best_k_positions(cleaner: Cleaner, task: Task, settings: Optional[Dict[str, 
     if is_trainer(cleaner):
         return []
     if len(cleaner.route) >= MAX_TASKS_PER_CLEANER:
+        return []
+    if not can_handle_premium(cleaner, task):
         return []
     if not can_handle_apt(cleaner, task, settings):
         return []
