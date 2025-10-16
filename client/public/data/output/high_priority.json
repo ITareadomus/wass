@@ -211,7 +211,113 @@
         "same_day_checkin_between_eo_hp",
         "client_forced_hp"
       ]
+    },
+    {
+      "task_id": 217505,
+      "logistic_code": 298,
+      "client_id": 3,
+      "premium": true,
+      "address": "STRADA DELLA CARITA', 2",
+      "lat": "45.4493742",
+      "lng": "9.2075671",
+      "cleaning_time": 150,
+      "checkin_date": "2025-10-17",
+      "checkout_date": "2025-10-17",
+      "checkin_time": "22:00",
+      "checkout_time": null,
+      "pax_in": 2,
+      "pax_out": 2,
+      "small_equipment": false,
+      "operation_id": 2,
+      "confirmed_operation": false,
+      "straordinaria": false,
+      "type_apt": "C",
+      "alias": "TBR",
+      "customer_name": "THE BEST RENT S.r.l.",
+      "reasons": [
+        "premium"
+      ]
+    },
+    {
+      "task_id": 217510,
+      "logistic_code": 1090,
+      "client_id": 3,
+      "premium": true,
+      "address": "via Caminadella 13",
+      "lat": "45.4597769",
+      "lng": "9.1770378",
+      "cleaning_time": 270,
+      "checkin_date": "2025-10-17",
+      "checkout_date": "2025-10-17",
+      "checkin_time": null,
+      "checkout_time": null,
+      "pax_in": 3,
+      "pax_out": 4,
+      "small_equipment": false,
+      "operation_id": 2,
+      "confirmed_operation": false,
+      "straordinaria": false,
+      "type_apt": "E",
+      "alias": "TBR",
+      "customer_name": "THE BEST RENT S.r.l.",
+      "reasons": [
+        "premium"
+      ]
+    },
+    {
+      "task_id": 217513,
+      "logistic_code": 1393,
+      "client_id": 3,
+      "premium": true,
+      "address": "Via San Carpoforo, 7",
+      "lat": "45.4715316",
+      "lng": "9.184796",
+      "cleaning_time": 120,
+      "checkin_date": "2025-10-17",
+      "checkout_date": "2025-10-17",
+      "checkin_time": "15:00",
+      "checkout_time": null,
+      "pax_in": 2,
+      "pax_out": 2,
+      "small_equipment": false,
+      "operation_id": 2,
+      "confirmed_operation": false,
+      "straordinaria": false,
+      "type_apt": "B",
+      "alias": "TBR",
+      "customer_name": "THE BEST RENT S.r.l.",
+      "reasons": [
+        "same_day_checkin_between_eo_hp",
+        "premium"
+      ]
+    },
+    {
+      "task_id": 217514,
+      "logistic_code": 1483,
+      "client_id": 3,
+      "premium": true,
+      "address": "Via Santa Croce,8",
+      "lat": "45.4560183",
+      "lng": "9.1835278",
+      "cleaning_time": 270,
+      "checkin_date": "2025-10-17",
+      "checkout_date": "2025-10-17",
+      "checkin_time": "15:00",
+      "checkout_time": null,
+      "pax_in": 6,
+      "pax_out": 5,
+      "small_equipment": false,
+      "operation_id": 2,
+      "confirmed_operation": false,
+      "straordinaria": false,
+      "type_apt": "E",
+      "alias": "TBR",
+      "customer_name": "THE BEST RENT S.r.l.",
+      "reasons": [
+        "same_day_checkin_between_eo_hp",
+        "premium"
+      ]
     }
   ],
-  "total_apartments": 8
+  "total_apartments": 12
 }
