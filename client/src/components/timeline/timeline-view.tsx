@@ -41,8 +41,8 @@ export default function TimelineView({
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   const timeSlots = [
-    "08:00", "09:00", "10:00", "11:00", "12:00",
-    "13:00", "14:00", "15:00", "16:00", "17:00", "18:00", "19:00"
+    "10:00", "11:00", "12:00", "13:00", "14:00",
+    "15:00", "16:00", "17:00", "18:00", "19:00"
   ];
 
   // Palette di colori azzurri per i cleaners
@@ -192,7 +192,7 @@ export default function TimelineView({
                       }}
                     >
                       {/* Griglia oraria di sfondo (solo visiva) */}
-                      <div className="absolute inset-0 grid grid-cols-12 pointer-events-none opacity-10">
+                      <div className="absolute inset-0 grid grid-cols-10 pointer-events-none opacity-10">
                         {timeSlots.map((slot, idx) => (
                           <div key={idx} className="border-r border-border"></div>
                         ))}
