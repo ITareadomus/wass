@@ -78,7 +78,7 @@ export default function PriorityColumn({
 
         toast({
           variant: "success",
-          title: "✅ EARLY-OUT assegnati con successo (algoritmo ottimizzato)!",
+          title: "✅ EARLY-OUT assegnati con successo!",
         });
 
         // Ricarica tutti i task per aggiornare i filtri e la timeline
