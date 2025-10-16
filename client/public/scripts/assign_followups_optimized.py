@@ -8,9 +8,9 @@ from pathlib import Path
 import random
 
 # =============================
-# Percorsi ASSOLUTI (Windows)
+# Percorsi relativi (compatibile Linux/Replit)
 # =============================
-BASE = Path(r"C:\Users\IT\Desktop\TaskFlowMaster\TaskFlowMaster\client\public\data")
+BASE = Path(__file__).parents[1] / "data"
 
 INPUT_ASSIGNMENTS = BASE / "output" / "early_out_assignments.json"
 INPUT_EARLYOUT    = BASE / "output" / "early_out.json"
