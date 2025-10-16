@@ -57,13 +57,8 @@ def haversine_km(lat1, lon1, lat2, lon2) -> float:
     return 2 * R * math.asin(math.sqrt(a))
 
 def travel_minutes(lat1, lon1, lat2, lon2, speed_kmph=URBAN_SPEED_KMPH) -> int:
-    # Se è stato impostato un tempo di viaggio fisso, usalo
-    if FIXED_TRAVEL_MINUTES > 0:
-        return int(FIXED_TRAVEL_MINUTES)
-    # Altrimenti, calcola come prima
-    km = haversine_km(lat1, lon1, lat2, lon2)
-    hours = km / max(1e-6, speed_kmph)
-    return int(round(hours * 60))
+    # Usa sempre il tempo di viaggio fisso di 15 minuti
+    return int(FIXED_TRAVEL_MINUTES)
 
 def centroid(points: List[Tuple[float,float]]) -> Tuple[float,float]:
     if not points:
@@ -126,23 +121,10 @@ def route_distance(lat0, lon0, tasks_seq: List[Dict[str,Any]]) -> float:
     return dist
 
 def two_opt(lat0, lon0, tasks_seq: List[Dict[str,Any]]) -> List[Dict[str,Any]]:
-    """Semplice 2-opt sul percorso. Non cambia gli orari: dopo il riordino, verranno ricalcolati."""
-    improved = True
-    seq = tasks_seq[:]
-    while improved:
-        improved = False
-        for i in range(len(seq)-2):
-            for j in range(i+2, len(seq)):
-                # salto se lo swap non ha senso
-                before = route_distance(lat0, lon0, seq)
-                # swap segment i+1..j
-                new_seq = seq[:i+1] + list(reversed(seq[i+1:j+1])) + seq[j+1:]
-                after = route_distance(lat0, lon0, new_seq)
-                if after + 1e-9 < before:
-                    seq = new_seq
-                    improved = True
-        # loop finché non migliora più
-    return seq
+    """Semplice 2-opt sul percorso. Con tempo fisso, disabilitiamo l'ottimizzazione."""
+    # Con tempo di viaggio fisso, l'ordine non influisce sulla distanza totale
+    # quindi ritorniamo la sequenza così com'è
+    return tasks_seq[:]
 
 # =============================
 # Caricamento dati
@@ -467,17 +449,17 @@ for the_date in sorted(tasks_by_date.keys()):
 
 OUTPUT_FILE.parent.mkdir(parents=True, exist_ok=True)
 meta = {
-    "method": "clustering(k-means)+global_regret2+2opt",
+    "method": "regret2_fixed_travel_time",
     "fixed_travel_minutes": FIXED_TRAVEL_MINUTES,
     "use_clustering": USE_CLUSTERING,
     "premium_rule": "premium tasks require premium cleaners; if none exist, allow standard and mark premium_fallback=true",
     "premium_fallback_dates": list(premium_fallback_dates.keys()),
     "premium_fallback_task_ids": dict(premium_fallback_dates),
     "notes": [
-        "Tempo di viaggio fisso: 15 minuti tra ogni task",
-        "Ignoriamo completamente checkin/checkout: gli orari sono calcolati in catena.",
-        "Anchor su end_time dell'ultima EO del cleaner (se manca: start_time).",
-        "Se vuoi disattivare il clustering, metti USE_CLUSTERING=False."
+        "Tempo di viaggio FISSO: 15 minuti tra ogni task (non calcolato da distanza)",
+        "Gli orari sono calcolati in catena con tempo fisso tra task",
+        "Anchor su end_time dell'ultima EO del cleaner",
+        "2-opt disabilitato perché con tempo fisso l'ordine non influisce sulla distanza"
     ]
 }
 with open(OUTPUT_FILE, "w", encoding="utf-8") as f:
@@ -553,7 +535,7 @@ for assignment in all_results:
 # Aggiorna i metadati
 existing_meta = existing_data.get("meta", {})
 existing_meta["followup_added"] = {
-    "method": "clustering(k-means)+global_regret2+2opt",
+    "method": "regret2_fixed_travel_time",
     "fixed_travel_minutes": FIXED_TRAVEL_MINUTES,
     "use_clustering": USE_CLUSTERING,
     "total_followup_tasks": total_assigned
