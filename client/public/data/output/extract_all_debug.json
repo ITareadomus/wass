@@ -262,6 +262,24 @@
         "same_day_checkin_between_eo_hp",
         "client_forced_hp"
       ]
+    },
+    {
+      "task_id": 217486,
+      "client_id": 125,
+      "premium": false,
+      "final_class": "EO",
+      "reasons": [
+        "checkout_time<=eo_time"
+      ]
+    },
+    {
+      "task_id": 217489,
+      "client_id": 67,
+      "premium": false,
+      "final_class": "EO",
+      "reasons": [
+        "checkout_time<=eo_time"
+      ]
     }
   ]
 }
