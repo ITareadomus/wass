@@ -39,7 +39,6 @@ export default function TimelineView({
   const [cleaners, setCleaners] = useState<Cleaner[]>([]);
   const [selectedCleaner, setSelectedCleaner] = useState<Cleaner | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
 
   const timeSlots = [
     "08:00", "09:00", "10:00", "11:00", "12:00",
@@ -66,7 +65,6 @@ export default function TimelineView({
 
   useEffect(() => {
     const loadCleaners = async () => {
-      setIsLoading(true);
       try {
         const response = await fetch('/data/cleaners/selected_cleaners.json');
         if (!response.ok) {
@@ -80,8 +78,6 @@ export default function TimelineView({
         setCleaners(cleanersList);
       } catch (error) {
         console.error("Errore nel caricamento dei cleaners selezionati:", error);
-      } finally {
-        setIsLoading(false);
       }
     };
     loadCleaners();
@@ -111,8 +107,8 @@ export default function TimelineView({
     }
   };
 
-  // Non mostrare nulla se sta caricando o non ci sono cleaners
-  if (isLoading || cleaners.length === 0) {
+  // Non mostrare nulla se non ci sono cleaners
+  if (cleaners.length === 0) {
     return null;
   }
 
