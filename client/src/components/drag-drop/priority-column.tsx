@@ -81,8 +81,10 @@ export default function PriorityColumn({
           title: "✅ EARLY-OUT assegnati con successo (algoritmo ottimizzato)!",
         });
 
-        // Ricarica la pagina per mostrare le assegnazioni nella timeline
-        window.location.reload();
+        // Ricarica le assegnazioni senza ricaricare la pagina
+        if ((window as any).reloadEarlyOutAssignments) {
+          await (window as any).reloadEarlyOutAssignments();
+        }
       } catch (error) {
         console.error('Errore nell\'assegnazione:', error);
         toast({

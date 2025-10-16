@@ -255,12 +255,12 @@ export default function GenerateAssignments() {
       // Aggiorna le task con le assegnazioni
       setAllTasksWithAssignments(prevTasks => {
         const updatedTasks = prevTasks.map(task => {
-          const assignment = assignments.find((a: any) => String(a.task_id) === task.id || String(a.logistic_code) === task.name);
+          const assignment = assignments.find((a: any) => String(a.task_id) === task.id);
           if (assignment && assignment.assigned_cleaner) {
             return {
               ...task,
               assignedCleaner: assignment.assigned_cleaner.id,
-              startTime: assignment.assigned_cleaner.start_time || assignment.assigned_cleaner.fw_start_time
+              startTime: assignment.assigned_cleaner.start_time
             };
           }
           return task;
@@ -268,16 +268,13 @@ export default function GenerateAssignments() {
         return updatedTasks;
       });
 
-      // Rimuovi le task assegnate dai container
-      const assignedTaskIds = new Set(
-        assignments
-          .filter((a: any) => a.assigned_cleaner && a.assignment_status === 'assigned')
-          .map((a: any) => String(a.logistic_code))
-      );
-
-      setEarlyOutTasks(prevTasks => prevTasks.filter(task => !assignedTaskIds.has(task.name)));
-      setHighPriorityTasks(prevTasks => prevTasks.filter(task => !assignedTaskIds.has(task.name)));
-      setLowPriorityTasks(prevTasks => prevTasks.filter(task => !assignedTaskIds.has(task.name)));
+      // Aggiorna anche earlyOutTasks per rimuovere quelle assegnate
+      setEarlyOutTasks(prevTasks => {
+        return prevTasks.filter(task => {
+          const assignment = assignments.find((a: any) => String(a.task_id) === task.id);
+          return !assignment || !assignment.assigned_cleaner;
+        });
+      });
     } catch (error) {
       console.error('Errore nel caricamento delle assegnazioni early-out:', error);
     }
