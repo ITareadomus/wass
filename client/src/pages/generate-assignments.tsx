@@ -95,8 +95,15 @@ export default function GenerateAssignments() {
     };
 
     extractData();
-    // NON caricare le assegnazioni all'avvio - verranno caricate solo dopo aver premuto "Smista"
   }, []);
+
+  // Carica le assegnazioni quando i task sono pronti
+  useEffect(() => {
+    if (!isLoadingTasks && earlyOutTasks.length === 0 && highPriorityTasks.length > 0) {
+      // Se non ci sono early-out tasks ma ci sono high priority, probabilmente sono già state assegnate
+      loadEarlyOutAssignments();
+    }
+  }, [isLoadingTasks, earlyOutTasks.length, highPriorityTasks.length]);
 
   // Funzione per convertire cleaning_time (minuti) in formato ore.minuti
   const formatDuration = (minutes: number): string => {
@@ -250,33 +257,41 @@ export default function GenerateAssignments() {
       }
 
       const assignmentsData = await response.json();
-      const assignments = assignmentsData.early_out_tasks_assigned || [];
+      const cleanersWithTasks = assignmentsData.early_out_tasks_assigned || [];
 
-      console.log('Assegnazioni early-out caricate:', assignments);
+      console.log('Assegnazioni early-out caricate:', cleanersWithTasks);
+
+      // Crea un Set di task_id assegnate
+      const assignedTaskIds = new Set();
+      cleanersWithTasks.forEach((cleanerEntry: any) => {
+        cleanerEntry.tasks?.forEach((task: any) => {
+          assignedTaskIds.add(String(task.task_id));
+        });
+      });
 
       // Aggiorna le task con le assegnazioni
       setAllTasksWithAssignments(prevTasks => {
         const updatedTasks = prevTasks.map(task => {
-          const assignment = assignments.find((a: any) => String(a.task_id) === task.id);
-          if (assignment && assignment.assigned_cleaner) {
-            return {
-              ...task,
-              assignedCleaner: assignment.assigned_cleaner.id,
-              startTime: assignment.assigned_cleaner.start_time,
-              sequence: assignment.sequence
-            };
+          // Trova il cleaner e la task specifica
+          for (const cleanerEntry of cleanersWithTasks) {
+            const assignedTask = cleanerEntry.tasks?.find((t: any) => String(t.task_id) === task.id);
+            if (assignedTask) {
+              return {
+                ...task,
+                assignedCleaner: cleanerEntry.cleaner.id,
+                startTime: assignedTask.start_time,
+                sequence: assignedTask.sequence
+              };
+            }
           }
           return task;
         });
         return updatedTasks;
       });
 
-      // Aggiorna anche earlyOutTasks per rimuovere quelle assegnate
+      // Aggiorna earlyOutTasks per rimuovere quelle assegnate
       setEarlyOutTasks(prevTasks => {
-        return prevTasks.filter(task => {
-          const assignment = assignments.find((a: any) => String(a.task_id) === task.id);
-          return !assignment || !assignment.assigned_cleaner;
-        });
+        return prevTasks.filter(task => !assignedTaskIds.has(task.id));
       });
     } catch (error) {
       console.error('Errore nel caricamento delle assegnazioni early-out:', error);
