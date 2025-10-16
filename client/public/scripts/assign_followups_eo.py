@@ -11,8 +11,8 @@ from pathlib import Path
 # =============================
 BASE = Path(__file__).parent.parent / "data"
 
-INPUT_ASSIGNMENTS = BASE / "output" / "early_out_assignments.json"
-INPUT_EARLYOUT    = BASE / "output" / "early_out.json"
+INPUT_ASSIGNMENTS = BASE / "output" / "early_out_assignments.json"  # Per il seed (task già assegnate)
+INPUT_EARLYOUT    = BASE / "output" / "early_out.json"  # Per task da assegnare come followup
 INPUT_CLEANERS    = BASE / "cleaners" / "selected_cleaners.json"
 OUTPUT_FILE       = BASE / "output" / "followup_assignments.json"
 OUTPUT_EARLY_OUT  = BASE / "output" / "early_out_assignments.json"
@@ -106,28 +106,27 @@ selected_cleaners = [c for c in cleaners_blob.get("cleaners", []) if not is_form
 seed_by_cleaner_and_date: Dict[Tuple[int, object], List[Dict[str, Any]]] = defaultdict(list)
 pool_unassigned: List[Dict[str, Any]] = []
 
-# Traccia le task già assegnate per evitare duplicati
+# Traccia le task già assegnate (solo per il seed)
 already_assigned_task_ids = set()
 
-# seed: EO già assegnate (posizione + end_time)
+# seed: EO già assegnate (posizione + end_time) - INCLUDE anche followup per posizione finale
 for t in assigned_items:
-    # Salta le task followup già presenti (evita duplicati)
-    if t.get("followup"):
-        continue
-
     d = parse_date(t["checkin_date"])
     if t.get("assigned_cleaner"):
         cid = t["assigned_cleaner"]["id"]
-        already_assigned_task_ids.add(t["task_id"])  # Traccia task assegnata
+        already_assigned_task_ids.add(t["task_id"])  # Traccia task già assegnata
 
         # prendo solo cleaner presenti nel selected_cleaners
         if any(c["id"] == cid for c in selected_cleaners):
-            start_hhmm = try_hhmm(t["assigned_cleaner"].get("start_time"), DAY_START_DEFAULT)
-            # se end_time mancante, stimalo come start + cleaning_time
-            end_hhmm = try_hhmm(
-                t["assigned_cleaner"].get("end_time"),
-                minutes_to_hhmm(hhmm_to_minutes(start_hhmm) + int(t["cleaning_time"]))
-            )
+            # Usa fw_end_time se disponibile (per followup), altrimenti end_time
+            if t.get("assigned_cleaner").get("fw_end_time"):
+                end_hhmm = t["assigned_cleaner"]["fw_end_time"]
+            elif t.get("assigned_cleaner").get("end_time"):
+                end_hhmm = t["assigned_cleaner"]["end_time"]
+            else:
+                start_hhmm = try_hhmm(t["assigned_cleaner"].get("start_time"), DAY_START_DEFAULT)
+                end_hhmm = minutes_to_hhmm(hhmm_to_minutes(start_hhmm) + int(t["cleaning_time"]))
+            
             seed_by_cleaner_and_date[(cid, d)].append({
                 "task_id": t["task_id"],
                 "lat": float(t["lat"]),
@@ -137,21 +136,7 @@ for t in assigned_items:
                 "cleaning_time": int(t["cleaning_time"]),
             })
 
-    # nel pool vanno solo le unassigned
-    if (t.get("assignment_status") or "").startswith("unassigned"):
-        pool_unassigned.append({
-            "task_id": t["task_id"],
-            "logistic_code": t.get("logistic_code", t["task_id"]),
-            "date": parse_date(t["checkin_date"]),
-            "lat": float(t["lat"]), "lng": float(t["lng"]),
-            "cleaning_time": int(t["cleaning_time"]),
-            "address": t.get("address",""),
-            "alias": t.get("alias"),
-            "premium": bool(t.get("premium", False)),
-            "type_apt": t.get("type_apt", "X") # Aggiunto per compatibilità appartamento
-        })
-
-# aggiungi task dal pacchetto early_out.json (solo se non già assegnate)
+# Pool task: SOLO da early_out.json (escludi task già nel seed)
 for t in earlyout_tasks:
     if t["task_id"] not in already_assigned_task_ids:
         pool_unassigned.append({
@@ -163,7 +148,7 @@ for t in earlyout_tasks:
             "address": t.get("address",""),
             "alias": t.get("alias"),
             "premium": bool(t.get("premium", False)),
-            "type_apt": t.get("type_apt", "X") # Aggiunto per compatibilità appartamento
+            "type_apt": t.get("type_apt", "X")
         })
 
 # dedup su task_id (caso in cui compaiano in entrambi i file)
