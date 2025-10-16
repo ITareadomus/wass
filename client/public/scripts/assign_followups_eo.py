@@ -22,8 +22,6 @@ SETTINGS_FILE = BASE / "input" / "settings.json"
 # Parametri
 # =============================
 FIXED_TRAVEL_MINUTES = 15  # Tempo fisso di spostamento tra task
-DAY_START_DEFAULT  = "08:00"   # se un cleaner non ha EO pregressa
-# nessun DAY_END e nessuna finestra: calcoliamo orari "a seguire" finché ci sono task
 
 # =============================
 # Utility
@@ -41,8 +39,7 @@ def minutes_to_hhmm(m: int) -> str:
 def parse_date(s: str):
     return datetime.strptime(s, "%Y-%m-%d").date()
 
-def try_hhmm(s: Optional[str], fallback: str) -> str:
-    return s if s and ":" in s else fallback
+
 
 def haversine_km(lat1, lon1, lat2, lon2) -> float:
     R = 6371.0
@@ -172,7 +169,10 @@ def build_initial_state_for_date(the_date, cleaners):
     state = {}
     for c in cleaners:
         cid = c["id"]
-        c_start = try_hhmm(c.get("start_time"), DAY_START_DEFAULT)
+        c_start = c.get("start_time")  # start_time è obbligatorio
+        if not c_start:
+            raise ValueError(f"Cleaner {cid} non ha start_time definito")
+        
         seeds = seed_by_cleaner_and_date.get((cid, the_date), [])
         if seeds:
             seeds_sorted = sorted(seeds, key=lambda s: hhmm_to_minutes(s["end_hhmm"]))
