@@ -1,3 +1,4 @@
+
 # -*- coding: utf-8 -*-
 """
 Unified EO day planner (Regret-Insertion + 2-opt) with:
@@ -16,13 +17,16 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 # =============================
-# WINDOWS PATHS (absolute)
+# PATH RELATIVI (compatibili Windows/Linux)
 # =============================
-INPUT_TASKS    = Path(r"C:\Users\IT\Desktop\TaskFlowMaster\client\public\data\output\early_out.json")
-INPUT_CLEANERS = Path(r"C:\Users\IT\Desktop\TaskFlowMaster\client\public\data\cleaners\selected_cleaners.json")
-INPUT_SETTINGS = Path(r"C:\Users\IT\Desktop\TaskFlowMaster\client\public\data\input\settings.json")
-OUTPUT_DIR     = Path(r"C:\Users\IT\Desktop\TaskFlowMaster\client\public\data\output")
-OUTPUT_ASSIGN  = OUTPUT_DIR / "assignments_regret.json"
+BASE = Path(__file__).parent.parent / "data"
+
+INPUT_TASKS    = BASE / "output" / "early_out.json"
+INPUT_CLEANERS = BASE / "cleaners" / "selected_cleaners.json"
+INPUT_SETTINGS = BASE / "input" / "settings.json"
+OUTPUT_DIR     = BASE / "output"
+OUTPUT_ASSIGN  = OUTPUT_DIR / "early_out_assignments.json"
+TIMELINE_ASSIGNMENTS = OUTPUT_DIR / "timeline_assignments.json"
 
 # =============================
 # CONFIG (same behavior as final version)
@@ -156,9 +160,9 @@ def can_handle_apt(cleaner: Cleaner, task: Task, settings: Optional[Dict[str, An
         return True
     apt_map = (settings or {}).get("apartment_types") or {}
     if cleaner.is_premium:
-        allowed = set(apt_map.get("Premium", []))
+        allowed = set(apt_map.get("premium_apt", []))
     else:
-        allowed = set(apt_map.get("Standard", []))
+        allowed = set(apt_map.get("standard_apt", []))
     return (task.apt_type in allowed) if allowed else True
 
 # =============================
@@ -394,17 +398,18 @@ def plan_day(tasks: List[Task], cleaners: List[Cleaner], settings: Optional[Dict
     return cleaners, unassigned
 
 # =============================
-# Export
+# Export (formato compatibile con early_out_assignments.json)
 # =============================
-def build_output(cleaners: List[Cleaner], unassigned: List[Task]) -> List[Dict[str, Any]]:
+def build_output(cleaners: List[Cleaner], unassigned: List[Task]) -> Dict[str, Any]:
     out: List[Dict[str, Any]] = []
     for cl in cleaners:
         cost, schedule = evaluate_route_cost(cl.route)
         for t, (arr, start, fin) in zip(cl.route, schedule):
             out.append({
-                "task_id": t.task_id,
+                "task_id": int(t.task_id),
+                "logistic_code": int(t.task_id),
                 "assigned_cleaner": {
-                    "cleaner_id": cl.id,
+                    "id": cl.id,
                     "name": cl.name,
                     "telegram_id": cl.telegram_id,
                     "role": cl.role,
@@ -416,11 +421,28 @@ def build_output(cleaners: List[Cleaner], unassigned: List[Task]) -> List[Dict[s
             })
     for t in unassigned:
         out.append({
-            "task_id": t.task_id,
+            "task_id": int(t.task_id),
+            "logistic_code": int(t.task_id),
             "assignment_status": "unassigned",
             "reason": "no feasible cleaner/window (end < checkin required)",
         })
-    return out
+    
+    return {
+        "early_out_tasks_assigned": out,
+        "meta": {
+            "total_tasks": len(cleaners) + len(unassigned),
+            "assigned": len([x for x in out if x.get("assignment_status") == "assigned"]),
+            "unassigned": len(unassigned),
+            "max_tasks_per_cleaner": MAX_TASKS_PER_CLEANER,
+            "algorithm": "regret_insertion_2opt",
+            "notes": [
+                f"Max {MAX_TASKS_PER_CLEANER} tasks per cleaner",
+                "Realistic travel model with equipment awareness",
+                "Check-in time hard constraint (finish < checkin)",
+                "Premium/Standard soft preferences"
+            ]
+        }
+    }
 
 # =============================
 # Main
@@ -431,19 +453,50 @@ if __name__ == "__main__":
     if not INPUT_CLEANERS.exists():
         raise SystemExit(f"Missing {INPUT_CLEANERS}")
 
-    settings = None
-    try:
-        settings = json.loads(INPUT_SETTINGS.read_text(encoding="utf-8"))
-    except Exception:
-        settings = None
-
+    settings = load_settings()
     cleaners = load_cleaners()
     tasks = load_tasks()
 
+    print(f"Caricati {len(tasks)} task e {len(cleaners)} cleaners")
+    
     planners, leftovers = plan_day(tasks, cleaners, settings)
 
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+    
+    output_data = build_output(planners, leftovers)
+    
     with OUTPUT_ASSIGN.open("w", encoding="utf-8") as f:
-        json.dump(build_output(planners, leftovers), f, ensure_ascii=False, indent=2)
+        json.dump(output_data, f, ensure_ascii=False, indent=2)
 
-    print(f"Wrote {OUTPUT_ASSIGN}")
+    print(f"✅ Scritto {OUTPUT_ASSIGN}")
+    print(f"   Assegnate: {output_data['meta']['assigned']}")
+    print(f"   Non assegnate: {output_data['meta']['unassigned']}")
+    
+    # Aggiorna anche timeline_assignments.json
+    timeline_data = {"assignments": []}
+    if TIMELINE_ASSIGNMENTS.exists():
+        try:
+            timeline_data = json.loads(TIMELINE_ASSIGNMENTS.read_text(encoding="utf-8"))
+        except:
+            pass
+    
+    # Rimuovi vecchie assegnazioni early-out
+    assigned_codes = set(str(x["logistic_code"]) for x in output_data["early_out_tasks_assigned"] if x.get("assignment_status") == "assigned")
+    timeline_data["assignments"] = [
+        a for a in timeline_data.get("assignments", [])
+        if str(a.get("logistic_code")) not in assigned_codes
+    ]
+    
+    # Aggiungi nuove assegnazioni
+    for task in output_data["early_out_tasks_assigned"]:
+        if task.get("assignment_status") == "assigned" and task.get("assigned_cleaner"):
+            timeline_data["assignments"].append({
+                "logistic_code": str(task["logistic_code"]),
+                "cleanerId": task["assigned_cleaner"]["id"],
+                "assignment_type": "smista_button"
+            })
+    
+    with TIMELINE_ASSIGNMENTS.open("w", encoding="utf-8") as f:
+        json.dump(timeline_data, f, ensure_ascii=False, indent=2)
+    
+    print(f"✅ Aggiornato {TIMELINE_ASSIGNMENTS}")

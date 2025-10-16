@@ -61,38 +61,24 @@ export default function PriorityColumn({
 
   const handleTimelineAssignment = async () => {
     if (priority === 'early-out') {
-      // Esegui assign_early_out.py per early-out
+      // Esegui il nuovo script ottimizzato opt.py
       try {
-        console.log('Esecuzione assign_early_out.py...');
-        const response1 = await fetch('/api/assign-early-out', {
+        console.log('Esecuzione opt.py (algoritmo ottimizzato)...');
+        const response = await fetch('/api/assign-unified', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' }
         });
 
-        if (!response1.ok) {
-          throw new Error('Errore durante l\'assegnazione early-out');
+        if (!response.ok) {
+          throw new Error('Errore durante l\'assegnazione ottimizzata');
         }
 
-        const result1 = await response1.json();
-        console.log('Assegnazione early-out completata:', result1);
-
-        // Esegui assign_followups_eo.py dopo assign_early_out.py
-        console.log('Esecuzione assign_followups_eo.py...');
-        const response2 = await fetch('/api/assign-followups-eo', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' }
-        });
-
-        if (!response2.ok) {
-          throw new Error('Errore durante l\'assegnazione follow-up');
-        }
-
-        const result2 = await response2.json();
-        console.log('Assegnazione follow-up completata:', result2);
+        const result = await response.json();
+        console.log('Assegnazione ottimizzata completata:', result);
 
         toast({
           variant: "success",
-          title: "✅ EARLY-OUT assegnati con successo!",
+          title: "✅ EARLY-OUT assegnati con successo (algoritmo ottimizzato)!",
         });
 
         // Ricarica le assegnazioni senza ricaricare la pagina
