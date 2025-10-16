@@ -16,6 +16,7 @@ INPUT_ASSIGNMENTS = BASE / "output" / "early_out_assignments.json"
 INPUT_EARLYOUT    = BASE / "output" / "early_out.json"
 INPUT_CLEANERS    = BASE / "cleaners" / "selected_cleaners.json"
 OUTPUT_FILE       = BASE / "output" / "followup_assignments.json"
+OUTPUT_EARLY_OUT  = BASE / "output" / "early_out_assignments.json"
 
 # =============================
 # Parametri
