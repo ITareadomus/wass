@@ -402,6 +402,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Endpoint per il nuovo script di assegnazione ottimizzato (opt.py)
+  app.post("/api/assign-unified", async (req, res) => {
+    try {
+      console.log("Eseguendo opt.py (algoritmo ottimizzato)...");
+      const { stdout, stderr } = await execAsync(
+        `python3 client/public/scripts/opt.py`,
+        { maxBuffer: 1024 * 1024 * 10 }
+      );
+
+      if (stderr && !stderr.includes('Browserslist')) {
+        console.error("Errore opt.py:", stderr);
+      }
+      console.log("opt.py output:", stdout);
+
+      res.json({
+        success: true,
+        message: "Task assegnati con successo (algoritmo ottimizzato)",
+        output: stdout
+      });
+    } catch (error: any) {
+      console.error("Errore durante l'assegnazione ottimizzata:", error);
+      res.status(500).json({
+        success: false,
+        error: error.message,
+        stderr: error.stderr
+      });
+    }
+  });
+
   // Endpoint per eseguire l'estrazione dei dati
   app.post("/api/extract-data", async (req, res) => {
     try {
