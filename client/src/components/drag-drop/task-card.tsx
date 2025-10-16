@@ -24,10 +24,7 @@ export default function TaskCard({
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   const handleCardClick = (e: React.MouseEvent) => {
-    // Previeni apertura modale durante drag
-    if ((e.target as HTMLElement).closest('[data-rbd-draggable-id]')) {
-      return;
-    }
+    e.stopPropagation();
     setIsModalOpen(true);
   };
 
@@ -93,7 +90,6 @@ export default function TaskCard({
                 minHeight: "40px",
               }}
               data-testid={`task-card-${task.id}`}
-              onClick={handleCardClick}
             >
             {task.confirmed_operation === false && (
               <div className="absolute top-0.5 right-0.5 z-50">
@@ -103,7 +99,10 @@ export default function TaskCard({
                 />
               </div>
             )}
-            <div className="flex flex-col items-center justify-center h-full gap-0.5">
+            <div 
+              className="flex flex-col items-center justify-center h-full gap-0.5 cursor-pointer"
+              onClick={handleCardClick}
+            >
               <div className="flex items-center gap-1">
                 <span
                   className="font-medium text-[10px] leading-none"
