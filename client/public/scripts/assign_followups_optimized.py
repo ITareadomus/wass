@@ -478,3 +478,128 @@ with open(OUTPUT_FILE, "w", encoding="utf-8") as f:
 
 total_assigned = sum(len(r["assigned_tasks"]) for r in all_results)
 print(f"✅ OK. Scritto {OUTPUT_FILE} con {total_assigned} task assegnate (regret-2 + 2-opt).")
+
+# =============================
+# Aggiorna early_out_assignments.json con le task followup
+# =============================
+existing_data = {"early_out_tasks_assigned": [], "meta": {}}
+if OUTPUT_EARLY_OUT.exists():
+    with open(OUTPUT_EARLY_OUT, "r", encoding="utf-8") as f:
+        existing_data = json.load(f)
+
+existing_tasks = existing_data.get("early_out_tasks_assigned", [])
+
+# Per ogni assegnazione followup, aggiorna la task esistente
+for assignment in all_results:
+    for task in assignment["assigned_tasks"]:
+        # Trova la task originale per recuperare tutti i dettagli
+        original_task = None
+        for t in pool_unassigned:
+            if t["task_id"] == task["task_id"]:
+                original_task = t
+                break
+
+        if original_task:
+            # Cerca la task esistente nell'array
+            task_found = False
+            for i, existing_task in enumerate(existing_tasks):
+                if existing_task["task_id"] == task["task_id"]:
+                    # Aggiorna la task esistente (usa start_time e end_time per followup)
+                    existing_tasks[i]["assigned_cleaner"] = {
+                        "id": assignment["cleaner_id"],
+                        "name": assignment["cleaner_name"].split()[0] if assignment["cleaner_name"] else "",
+                        "lastname": " ".join(assignment["cleaner_name"].split()[1:]) if len(assignment["cleaner_name"].split()) > 1 else "",
+                        "role": assignment["cleaner_role"],
+                        "start_time": task["start_time"],
+                        "end_time": task["end_time"]
+                    }
+                    existing_tasks[i]["assignment_status"] = "assigned"
+                    existing_tasks[i]["followup"] = True
+                    task_found = True
+                    break
+
+            # Se la task non esiste, aggiungila
+            if not task_found:
+                existing_tasks.append({
+                    "task_id": task["task_id"],
+                    "logistic_code": original_task.get("logistic_code", task["task_id"]),
+                    "address": task.get("address", ""),
+                    "alias": original_task.get("alias", ""),
+                    "lat": str(original_task.get("lat", "")),
+                    "lng": str(original_task.get("lng", "")),
+                    "cleaning_time": task["service_min"],
+                    "checkin_date": assignment["date"],
+                    "premium": task.get("premium", False),
+                    "type_apt": original_task.get("type_apt", "X"),
+                    "assigned_cleaner": {
+                        "id": assignment["cleaner_id"],
+                        "name": assignment["cleaner_name"].split()[0] if assignment["cleaner_name"] else "",
+                        "lastname": " ".join(assignment["cleaner_name"].split()[1:]) if len(assignment["cleaner_name"].split()) > 1 else "",
+                        "role": assignment["cleaner_role"],
+                        "start_time": task["start_time"],
+                        "end_time": task["end_time"]
+                    },
+                    "assignment_status": "assigned",
+                    "followup": True
+                })
+
+# Aggiorna i metadati
+existing_meta = existing_data.get("meta", {})
+existing_meta["followup_added"] = {
+    "method": "clustering(k-means)+global_regret2+2opt",
+    "speed_kmph": URBAN_SPEED_KMPH,
+    "use_clustering": USE_CLUSTERING,
+    "total_followup_tasks": total_assigned
+}
+
+# Salva il file aggiornato
+output_data = {
+    "early_out_tasks_assigned": existing_tasks,
+    "meta": existing_meta
+}
+
+with open(OUTPUT_EARLY_OUT, "w", encoding="utf-8") as f:
+    json.dump(output_data, f, ensure_ascii=False, indent=2)
+
+print(f"✅ OK. Aggiunte {total_assigned} task followup anche in {OUTPUT_EARLY_OUT}.")
+
+# =============================
+# Aggiorna timeline_assignments.json con le task followup
+# =============================
+TIMELINE_ASSIGNMENTS = BASE / "output" / "timeline_assignments.json"
+
+# Carica o crea timeline_assignments.json
+timeline_data = {"assignments": []}
+if TIMELINE_ASSIGNMENTS.exists():
+    with open(TIMELINE_ASSIGNMENTS, "r", encoding="utf-8") as f:
+        timeline_data = json.load(f)
+
+# Aggiungi le assegnazioni followup alla timeline
+for assignment in all_results:
+    for task in assignment["assigned_tasks"]:
+        # Trova task originale per logistic_code
+        logistic_code = None
+        for t in pool_unassigned:
+            if t["task_id"] == task["task_id"]:
+                logistic_code = str(t.get("logistic_code", t["task_id"]))
+                break
+        
+        if logistic_code:
+            # Rimuovi eventuali assegnazioni precedenti per questo logistic_code
+            timeline_data["assignments"] = [
+                a for a in timeline_data["assignments"] 
+                if a.get("logistic_code") != logistic_code
+            ]
+
+            # Aggiungi la nuova assegnazione followup
+            timeline_data["assignments"].append({
+                "logistic_code": logistic_code,
+                "cleanerId": assignment["cleaner_id"],
+                "assignment_type": "followup_auto"
+            })
+
+# Salva timeline_assignments.json aggiornato
+with open(TIMELINE_ASSIGNMENTS, "w", encoding="utf-8") as f:
+    json.dump(timeline_data, f, ensure_ascii=False, indent=2)
+
+print(f"✅ OK. Aggiunte {total_assigned} task followup anche in {TIMELINE_ASSIGNMENTS}.")
