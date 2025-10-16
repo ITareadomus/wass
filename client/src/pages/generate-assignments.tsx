@@ -335,6 +335,20 @@ export default function GenerateAssignments() {
     }
 
     const taskId = draggableId;
+    const task = allTasksWithAssignments.find(t => t.id === taskId);
+    const logisticCode = task?.name;
+
+    // Mappa dei container ID ai nomi dei file JSON
+    const containerToJsonName: { [key: string]: string } = {
+      'early-out': 'early-out',
+      'high': 'high',
+      'low': 'low'
+    };
+
+    const fromContainer = containerToJsonName[source.droppableId] || null;
+    const toContainer = destination.droppableId.startsWith('timeline-') 
+      ? destination.droppableId 
+      : containerToJsonName[destination.droppableId] || null;
 
     // Se sto muovendo verso una timeline di un cleaner
     if (destination.droppableId.startsWith('timeline-')) {
@@ -355,12 +369,13 @@ export default function GenerateAssignments() {
         return updatedTasks;
       });
 
-      // Trova il logistic_code della task
-      const task = allTasksWithAssignments.find(t => t.id === taskId);
-      const logisticCode = task?.name; // name contiene il logistic_code
-
       // Salva l'assegnazione nella timeline
       saveTimelineAssignment(taskId, cleanerId, logisticCode);
+
+      // Aggiorna i JSON: rimuovi dal container di origine
+      if (fromContainer) {
+        updateTaskJson(taskId, logisticCode, fromContainer, toContainer);
+      }
 
       // Rimuovi la task dal container originale
       if (source.droppableId === 'early-out') {
@@ -372,7 +387,7 @@ export default function GenerateAssignments() {
       }
     }
     // Se sto muovendo da una timeline verso una colonna di priorità
-    else {
+    else if (source.droppableId.startsWith('timeline-')) {
       setAllTasksWithAssignments((prevTasks) => {
         const updatedTasks = prevTasks.map((task) => {
           if (task.id === taskId) {
@@ -399,7 +414,57 @@ export default function GenerateAssignments() {
         } else if (destination.droppableId === 'low') {
           setLowPriorityTasks(prev => [...prev, taskToAdd]);
         }
+
+        // Aggiorna i JSON: aggiungi al container di destinazione
+        if (toContainer) {
+          updateTaskJson(taskId, logisticCode, 'timeline', toContainer);
+        }
       }
+    }
+    // Se sto muovendo tra contenitori di priorità
+    else {
+      // Rimuovi dal container di origine
+      if (source.droppableId === 'early-out') {
+        setEarlyOutTasks(prev => prev.filter(t => t.id !== taskId));
+      } else if (source.droppableId === 'high') {
+        setHighPriorityTasks(prev => prev.filter(t => t.id !== taskId));
+      } else if (source.droppableId === 'low') {
+        setLowPriorityTasks(prev => prev.filter(t => t.id !== taskId));
+      }
+
+      // Aggiungi al container di destinazione
+      const taskToAdd = allTasksWithAssignments.find(t => t.id === taskId);
+      if (taskToAdd) {
+        if (destination.droppableId === 'early-out') {
+          setEarlyOutTasks(prev => [...prev, taskToAdd]);
+        } else if (destination.droppableId === 'high') {
+          setHighPriorityTasks(prev => [...prev, taskToAdd]);
+        } else if (destination.droppableId === 'low') {
+          setLowPriorityTasks(prev => [...prev, taskToAdd]);
+        }
+
+        // Aggiorna i JSON
+        if (fromContainer && toContainer) {
+          updateTaskJson(taskId, logisticCode, fromContainer, toContainer);
+        }
+      }
+    }
+  };
+
+  const updateTaskJson = async (taskId: string, logisticCode: string | undefined, fromContainer: string, toContainer: string) => {
+    try {
+      const response = await fetch('/api/update-task-json', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ taskId, logisticCode, fromContainer, toContainer }),
+      });
+      if (!response.ok) {
+        console.error('Errore nell\'aggiornamento dei JSON');
+      } else {
+        console.log('JSON aggiornati con successo');
+      }
+    } catch (error) {
+      console.error('Errore nella chiamata API di aggiornamento JSON:', error);
     }
   };
 

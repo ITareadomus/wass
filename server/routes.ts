@@ -15,6 +15,24 @@ const __dirname = dirname(__filename);
 const execAsync = promisify(exec);
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Endpoint per svuotare early_out.json dopo l'assegnazione
+  app.post("/api/clear-early-out-json", async (req, res) => {
+    try {
+      const earlyOutPath = path.join(process.cwd(), 'client/public/data/output/early_out.json');
+
+      // Svuota il file mantenendo la struttura
+      await fs.writeFile(earlyOutPath, JSON.stringify({ 
+        early_out_tasks: [], 
+        total_apartments: 0 
+      }, null, 2));
+
+      res.json({ success: true, message: "early_out.json svuotato con successo" });
+    } catch (error: any) {
+      console.error("Errore nello svuotamento di early_out.json:", error);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
   // Endpoint per resettare le assegnazioni della timeline
   app.post("/api/reset-timeline-assignments", async (req, res) => {
     try {
@@ -175,10 +193,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Endpoint per aggiornare i file JSON quando un task viene spostato
   app.post("/api/update-task-json", async (req, res) => {
     try {
-      const { taskId, fromContainer, toContainer } = req.body;
-
-      // Leggi i file JSON usando import ESM
-      // const fs = await import('fs/promises');
+      const { taskId, logisticCode, fromContainer, toContainer } = req.body;
 
       const earlyOutPath = path.join(process.cwd(), 'client/public/data/output/early_out.json');
       const highPriorityPath = path.join(process.cwd(), 'client/public/data/output/high_priority.json');
@@ -194,19 +209,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let taskToMove = null;
 
       if (fromContainer === 'early-out') {
-        const index = earlyOutData.early_out_tasks.findIndex((t: any) => t.task_id === taskId);
+        const index = earlyOutData.early_out_tasks.findIndex((t: any) => 
+          t.task_id === parseInt(taskId) || t.logistic_code === parseInt(logisticCode)
+        );
         if (index !== -1) {
           taskToMove = earlyOutData.early_out_tasks.splice(index, 1)[0];
           earlyOutData.total_apartments = earlyOutData.early_out_tasks.length;
         }
       } else if (fromContainer === 'high') {
-        const index = highPriorityData.high_priority_tasks.findIndex((t: any) => t.task_id === taskId);
+        const index = highPriorityData.high_priority_tasks.findIndex((t: any) => 
+          t.task_id === parseInt(taskId) || t.logistic_code === parseInt(logisticCode)
+        );
         if (index !== -1) {
           taskToMove = highPriorityData.high_priority_tasks.splice(index, 1)[0];
           highPriorityData.total_apartments = highPriorityData.high_priority_tasks.length;
         }
       } else if (fromContainer === 'low') {
-        const index = lowPriorityData.low_priority_tasks.findIndex((t: any) => t.task_id === taskId);
+        const index = lowPriorityData.low_priority_tasks.findIndex((t: any) => 
+          t.task_id === parseInt(taskId) || t.logistic_code === parseInt(logisticCode)
+        );
         if (index !== -1) {
           taskToMove = lowPriorityData.low_priority_tasks.splice(index, 1)[0];
           lowPriorityData.total_apartments = lowPriorityData.low_priority_tasks.length;
@@ -215,6 +236,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       if (!taskToMove) {
         res.status(404).json({ success: false, message: "Task non trovato" });
+        return;
+      }
+
+      // Se la destinazione è la timeline, non aggiungere a nessun container
+      if (toContainer && toContainer.startsWith('timeline-')) {
+        // Solo rimuovi dal container di origine
+        await Promise.all([
+          fs.writeFile(earlyOutPath, JSON.stringify(earlyOutData, null, 2)),
+          fs.writeFile(highPriorityPath, JSON.stringify(highPriorityData, null, 2)),
+          fs.writeFile(lowPriorityPath, JSON.stringify(lowPriorityData, null, 2))
+        ]);
+        res.json({ success: true, message: "Task rimosso dal container" });
         return;
       }
 

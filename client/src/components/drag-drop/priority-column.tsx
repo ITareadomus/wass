@@ -76,6 +76,12 @@ export default function PriorityColumn({
         const result = await response.json();
         console.log('Assegnazione ottimizzata completata:', result);
 
+        // Svuota il file early_out.json
+        await fetch('/api/clear-early-out-json', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' }
+        });
+
         toast({
           variant: "success",
           title: "✅ EARLY-OUT assegnati con successo!",
