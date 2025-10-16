@@ -56,6 +56,16 @@
       "assignment_type": "followup_auto"
     },
     {
+      "logistic_code": "217420",
+      "cleanerId": 24,
+      "assignment_type": "followup_auto"
+    },
+    {
+      "logistic_code": "217421",
+      "cleanerId": 24,
+      "assignment_type": "followup_auto"
+    },
+    {
       "logistic_code": "217318",
       "cleanerId": 132,
       "assignment_type": "followup_auto"
@@ -66,12 +76,7 @@
       "assignment_type": "followup_auto"
     },
     {
-      "logistic_code": "217420",
-      "cleanerId": 249,
-      "assignment_type": "followup_auto"
-    },
-    {
-      "logistic_code": "217421",
+      "logistic_code": "217340",
       "cleanerId": 249,
       "assignment_type": "followup_auto"
     },
@@ -98,11 +103,6 @@
     {
       "logistic_code": "217341",
       "cleanerId": 445,
-      "assignment_type": "followup_auto"
-    },
-    {
-      "logistic_code": "217340",
-      "cleanerId": 469,
       "assignment_type": "followup_auto"
     },
     {
