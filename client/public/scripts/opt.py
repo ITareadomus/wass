@@ -119,11 +119,12 @@ def same_street(a: Optional[str], b: Optional[str]) -> bool:
 @dataclass
 class Task:
     task_id: str
-    lat: float
-    lng: float
-    cleaning_time: int
-    checkout_time: int
-    checkin_time: int
+    logistic_code: Optional[str] = None
+    lat: float = 0.0
+    lng: float = 0.0
+    cleaning_time: int = 0
+    checkout_time: int = 0
+    checkin_time: int = 0
     is_premium: bool = False
     apt_type: Optional[str] = None
     address: Optional[str] = None
@@ -326,7 +327,8 @@ def load_tasks() -> List[Task]:
         checkout = hhmm_to_min(t.get("checkout_time"), default="10:00")
         checkin  = hhmm_to_min(t.get("checkin_time"),  default="23:59")
         tasks.append(Task(
-            task_id=str(t.get("task_id") or t.get("logistic_code") or t.get("id")),
+            task_id=str(t.get("task_id") or t.get("id")),
+            logistic_code=str(t.get("logistic_code")) if t.get("logistic_code") else None,
             lat=float(t.get("lat")),
             lng=float(t.get("lng")),
             cleaning_time=int(t.get("cleaning_time") or t.get("duration") or 45),
@@ -407,7 +409,7 @@ def build_output(cleaners: List[Cleaner], unassigned: List[Task]) -> Dict[str, A
         for t, (arr, start, fin) in zip(cl.route, schedule):
             out.append({
                 "task_id": int(t.task_id),
-                "logistic_code": int(t.task_id),
+                "logistic_code": int(t.logistic_code) if t.logistic_code else int(t.task_id),
                 "assigned_cleaner": {
                     "id": cl.id,
                     "name": cl.name,
@@ -422,7 +424,7 @@ def build_output(cleaners: List[Cleaner], unassigned: List[Task]) -> Dict[str, A
     for t in unassigned:
         out.append({
             "task_id": int(t.task_id),
-            "logistic_code": int(t.task_id),
+            "logistic_code": int(t.logistic_code) if t.logistic_code else int(t.task_id),
             "assignment_status": "unassigned",
             "reason": "no feasible cleaner/window (end < checkin required)",
         })
