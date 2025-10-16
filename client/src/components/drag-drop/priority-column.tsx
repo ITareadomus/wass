@@ -76,19 +76,19 @@ export default function PriorityColumn({
         const result1 = await response1.json();
         console.log('Assegnazione early-out completata:', result1);
 
-        // Esegui assign_followups_optimized.py dopo assign_early_out.py
-        console.log('Esecuzione assign_followups_optimized.py...');
-        const response2 = await fetch('/api/assign-followups-optimized', {
+        // Esegui assign_followups_eo.py dopo assign_early_out.py
+        console.log('Esecuzione assign_followups_eo.py...');
+        const response2 = await fetch('/api/assign-followups-eo', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' }
         });
 
         if (!response2.ok) {
-          throw new Error('Errore durante l\'assegnazione follow-up ottimizzata');
+          throw new Error('Errore durante l\'assegnazione follow-up');
         }
 
         const result2 = await response2.json();
-        console.log('Assegnazione follow-up ottimizzata completata:', result2);
+        console.log('Assegnazione follow-up completata:', result2);
 
         toast({
           variant: "success",

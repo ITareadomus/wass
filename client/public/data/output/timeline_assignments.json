@@ -1,118 +1,68 @@
 {
   "assignments": [
     {
-      "logistic_code": "1650",
+      "logistic_code": "1645",
       "cleanerId": 24,
       "assignment_type": "smista_button"
     },
     {
-      "logistic_code": "1649",
-      "cleanerId": 132,
-      "assignment_type": "smista_button"
-    },
-    {
-      "logistic_code": "992",
+      "logistic_code": "1620",
       "cleanerId": 287,
       "assignment_type": "smista_button"
     },
     {
-      "logistic_code": "504",
+      "logistic_code": "1630",
       "cleanerId": 326,
       "assignment_type": "smista_button"
     },
     {
-      "logistic_code": "1084",
+      "logistic_code": "624",
       "cleanerId": 404,
       "assignment_type": "smista_button"
     },
     {
-      "logistic_code": "1135",
+      "logistic_code": "494",
       "cleanerId": 469,
       "assignment_type": "smista_button"
     },
     {
-      "logistic_code": "1213",
+      "logistic_code": "502",
+      "cleanerId": 132,
+      "assignment_type": "smista_button"
+    },
+    {
+      "logistic_code": "1153",
+      "cleanerId": 249,
+      "assignment_type": "smista_button"
+    },
+    {
+      "logistic_code": "1629",
       "cleanerId": 445,
       "assignment_type": "smista_button"
     },
     {
-      "logistic_code": "1625",
+      "logistic_code": "1631",
       "cleanerId": 495,
       "assignment_type": "smista_button"
     },
     {
-      "logistic_code": "1543",
+      "logistic_code": "623",
       "cleanerId": 596,
       "assignment_type": "smista_button"
     },
     {
-      "logistic_code": "980",
-      "cleanerId": 249,
-      "assignment_type": "smista_button"
-    },
-    {
-      "logistic_code": "217317",
-      "cleanerId": 24,
-      "assignment_type": "followup_auto"
-    },
-    {
-      "logistic_code": "217420",
-      "cleanerId": 24,
-      "assignment_type": "followup_auto"
-    },
-    {
-      "logistic_code": "217421",
-      "cleanerId": 24,
-      "assignment_type": "followup_auto"
-    },
-    {
-      "logistic_code": "217318",
-      "cleanerId": 132,
-      "assignment_type": "followup_auto"
-    },
-    {
-      "logistic_code": "217418",
-      "cleanerId": 249,
-      "assignment_type": "followup_auto"
-    },
-    {
-      "logistic_code": "217340",
-      "cleanerId": 249,
-      "assignment_type": "followup_auto"
-    },
-    {
-      "logistic_code": "217337",
+      "logistic_code": "490",
       "cleanerId": 287,
       "assignment_type": "followup_auto"
     },
     {
-      "logistic_code": "217338",
+      "logistic_code": "617",
       "cleanerId": 326,
       "assignment_type": "followup_auto"
     },
     {
-      "logistic_code": "217339",
-      "cleanerId": 404,
-      "assignment_type": "followup_auto"
-    },
-    {
-      "logistic_code": "217343",
-      "cleanerId": 404,
-      "assignment_type": "followup_auto"
-    },
-    {
-      "logistic_code": "217341",
-      "cleanerId": 445,
-      "assignment_type": "followup_auto"
-    },
-    {
-      "logistic_code": "217342",
-      "cleanerId": 495,
-      "assignment_type": "followup_auto"
-    },
-    {
-      "logistic_code": "217473",
-      "cleanerId": 132,
+      "logistic_code": "618",
+      "cleanerId": 326,
       "assignment_type": "followup_auto"
     }
   ]
