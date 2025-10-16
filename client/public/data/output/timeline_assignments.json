@@ -74,6 +74,81 @@
       "logistic_code": "217340",
       "cleanerId": 469,
       "assignment_type": "smista_button"
+    },
+    {
+      "logistic_code": "1666",
+      "cleanerId": 24,
+      "assignment_type": "smista_button"
+    },
+    {
+      "logistic_code": "504",
+      "cleanerId": 24,
+      "assignment_type": "smista_button"
+    },
+    {
+      "logistic_code": "1650",
+      "cleanerId": 132,
+      "assignment_type": "smista_button"
+    },
+    {
+      "logistic_code": "1213",
+      "cleanerId": 132,
+      "assignment_type": "smista_button"
+    },
+    {
+      "logistic_code": "980",
+      "cleanerId": 249,
+      "assignment_type": "smista_button"
+    },
+    {
+      "logistic_code": "1625",
+      "cleanerId": 249,
+      "assignment_type": "smista_button"
+    },
+    {
+      "logistic_code": "617",
+      "cleanerId": 287,
+      "assignment_type": "smista_button"
+    },
+    {
+      "logistic_code": "992",
+      "cleanerId": 287,
+      "assignment_type": "smista_button"
+    },
+    {
+      "logistic_code": "618",
+      "cleanerId": 326,
+      "assignment_type": "smista_button"
+    },
+    {
+      "logistic_code": "1084",
+      "cleanerId": 326,
+      "assignment_type": "smista_button"
+    },
+    {
+      "logistic_code": "619",
+      "cleanerId": 404,
+      "assignment_type": "smista_button"
+    },
+    {
+      "logistic_code": "1543",
+      "cleanerId": 404,
+      "assignment_type": "smista_button"
+    },
+    {
+      "logistic_code": "1649",
+      "cleanerId": 445,
+      "assignment_type": "smista_button"
+    },
+    {
+      "logistic_code": "723",
+      "cleanerId": 469,
+      "assignment_type": "smista_button"
+    },
+    {
+      "logistic_code": "1135",
+      "cleanerId": 469,
+      "assignment_type": "smista_button"
     }
   ]
 }
