@@ -206,7 +206,12 @@ export default function TimelineView({
                             // Rimuovi duplicati basandoti sul logistic_code (task.name)
                             index === self.findIndex((t) => t.name === task.name)
                           )
-                          .sort((a, b) => ((a as any).assignedSlot || 0) - ((b as any).assignedSlot || 0))
+                          .sort((a, b) => {
+                            // Ordina per orario di inizio (startTime o fw_start_time)
+                            const timeA = (a as any).startTime || (a as any).fw_start_time || "00:00";
+                            const timeB = (b as any).startTime || (b as any).fw_start_time || "00:00";
+                            return timeA.localeCompare(timeB);
+                          })
                           .map((task, index) => (
                             <TaskCard 
                               key={`${task.name}-${cleaner.id}`}
