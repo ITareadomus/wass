@@ -60,12 +60,12 @@ export default function TaskCard({
       const widthPercentage = (effectiveMinutes / 600) * 100;
       return `${widthPercentage}%`;
     } else {
-      // Per le colonne di priorità:
-      // Se la task è < 60 minuti, usa sempre 60 minuti (larghezza di 1 ora)
-      const displayMinutes = effectiveMinutes < 60 ? 60 : effectiveMinutes;
-      const halfHours = Math.ceil(displayMinutes / 30);
-      const baseWidth = halfHours * 50;
-      return `${baseWidth}px`;
+      // Per le colonne di priorità: usa larghezza proporzionale alla durata
+      // Base: 60px per ora (60 minuti)
+      const widthPerHour = 60; // px per ora
+      const hours = effectiveMinutes / 60;
+      const width = hours * widthPerHour;
+      return `${width}px`;
     }
   };
 
