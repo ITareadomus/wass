@@ -501,10 +501,11 @@ export default function GenerateAssignments() {
 
           <div className="mt-6 grid grid-cols-1 xl:grid-cols-3 gap-6">
             <div className="xl:col-span-2">
-              <TimelineView
+              {/* Temporaneamente commentato per debugging */}
+              {/* <TimelineView
                 personnel={[]}
                 tasks={allTasksWithAssignments}
-              />
+              /> */}
             </div>
 
             <div className="bg-card rounded-lg border shadow-sm">
