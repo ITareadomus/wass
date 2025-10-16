@@ -22,6 +22,7 @@ OUTPUT_EARLY_OUT  = BASE / "output" / "early_out_assignments.json"
 # Parametri
 # =============================
 URBAN_SPEED_KMPH   = 25.0             # km/h -> viaggi in minuti
+FIXED_TRAVEL_MINUTES = 15.0             # Minuti fissi per ogni viaggio tra task
 DAY_START_DEFAULT  = "08:00"          # anchor quando non esiste EO per il cleaner
 USE_CLUSTERING     = True             # clustering k-means (senza sklearn)
 MAX_KMEANS_ITERS   = 20
@@ -56,6 +57,10 @@ def haversine_km(lat1, lon1, lat2, lon2) -> float:
     return 2 * R * math.asin(math.sqrt(a))
 
 def travel_minutes(lat1, lon1, lat2, lon2, speed_kmph=URBAN_SPEED_KMPH) -> int:
+    # Se è stato impostato un tempo di viaggio fisso, usalo
+    if FIXED_TRAVEL_MINUTES > 0:
+        return int(FIXED_TRAVEL_MINUTES)
+    # Altrimenti, calcola come prima
     km = haversine_km(lat1, lon1, lat2, lon2)
     hours = km / max(1e-6, speed_kmph)
     return int(round(hours * 60))
@@ -463,14 +468,15 @@ for the_date in sorted(tasks_by_date.keys()):
 OUTPUT_FILE.parent.mkdir(parents=True, exist_ok=True)
 meta = {
     "method": "clustering(k-means)+global_regret2+2opt",
-    "speed_kmph": URBAN_SPEED_KMPH,
+    "fixed_travel_minutes": FIXED_TRAVEL_MINUTES,
     "use_clustering": USE_CLUSTERING,
     "premium_rule": "premium tasks require premium cleaners; if none exist, allow standard and mark premium_fallback=true",
     "premium_fallback_dates": list(premium_fallback_dates.keys()),
     "premium_fallback_task_ids": dict(premium_fallback_dates),
     "notes": [
+        "Tempo di viaggio fisso: 15 minuti tra ogni task",
         "Ignoriamo completamente checkin/checkout: gli orari sono calcolati in catena.",
-        "Anchor su end_time dell’ultima EO del cleaner (se manca: start_time).",
+        "Anchor su end_time dell'ultima EO del cleaner (se manca: start_time).",
         "Se vuoi disattivare il clustering, metti USE_CLUSTERING=False."
     ]
 }
@@ -548,7 +554,7 @@ for assignment in all_results:
 existing_meta = existing_data.get("meta", {})
 existing_meta["followup_added"] = {
     "method": "clustering(k-means)+global_regret2+2opt",
-    "speed_kmph": URBAN_SPEED_KMPH,
+    "fixed_travel_minutes": FIXED_TRAVEL_MINUTES,
     "use_clustering": USE_CLUSTERING,
     "total_followup_tasks": total_assigned
 }
@@ -584,11 +590,11 @@ for assignment in all_results:
             if t["task_id"] == task["task_id"]:
                 logistic_code = str(t.get("logistic_code", t["task_id"]))
                 break
-        
+
         if logistic_code:
             # Rimuovi eventuali assegnazioni precedenti per questo logistic_code
             timeline_data["assignments"] = [
-                a for a in timeline_data["assignments"] 
+                a for a in timeline_data["assignments"]
                 if a.get("logistic_code") != logistic_code
             ]
 
