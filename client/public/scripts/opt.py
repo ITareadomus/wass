@@ -134,6 +134,7 @@ class Task:
 class Cleaner:
     id: Any
     name: str
+    lastname: str
     telegram_id: Optional[Any]
     role: str
     is_premium: bool
@@ -311,6 +312,7 @@ def load_cleaners() -> List[Cleaner]:
         cleaners.append(Cleaner(
             id=c.get("id"),
             name=c.get("name") or str(c.get("id")),
+            lastname=c.get("lastname", ""),
             telegram_id=c.get("telegram_id"),
             role=role or ("Premium" if is_premium else "Standard"),
             is_premium=is_premium,
@@ -428,6 +430,7 @@ def build_output(cleaners: List[Cleaner], unassigned: List[Task]) -> Dict[str, A
             "cleaner": {
                 "id": cl.id,
                 "name": cl.name,
+                "lastname": getattr(cl, 'lastname', ''),
                 "role": cl.role,
                 "premium": cl.is_premium
             },
