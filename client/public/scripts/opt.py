@@ -326,6 +326,9 @@ def load_tasks() -> List[Task]:
     tasks: List[Task] = []
     for t in data.get("early_out_tasks", []):
         checkout = hhmm_to_min(t.get("checkout_time"), default="10:00")
+        # Se checkout_time < 10:00 (600 minuti), imposta a 10:00
+        if checkout < 600:
+            checkout = 600
         checkin  = hhmm_to_min(t.get("checkin_time"),  default="23:59")
         tasks.append(Task(
             task_id=str(t.get("task_id") or t.get("id")),
