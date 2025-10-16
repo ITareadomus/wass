@@ -1,11 +1,11 @@
 {
     "metadata": {
-        "last_updated": "2025-10-16T13:26:17.421354",
+        "last_updated": "2025-10-16T13:31:17.353138",
         "schema_version": "1.0"
     },
     "dates": {
         "2025-10-17": {
-            "timestamp": "2025-10-16T13:26:17.421363",
+            "timestamp": "2025-10-16T13:31:17.353148",
             "apt": [
                 {
                     "task_id": 206222,
@@ -409,7 +409,7 @@
                     "cleaning_time": 60,
                     "checkin_date": "2025-10-17",
                     "checkout_date": "2025-10-17",
-                    "checkin_time": null,
+                    "checkin_time": "17:30",
                     "checkout_time": null,
                     "pax_in": 1,
                     "pax_out": 1,
@@ -846,7 +846,7 @@
                     "cleaning_time": 120,
                     "checkin_date": "2025-10-17",
                     "checkout_date": "2025-10-17",
-                    "checkin_time": null,
+                    "checkin_time": "15:00",
                     "checkout_time": null,
                     "pax_in": 1,
                     "pax_out": 1,
@@ -880,9 +880,32 @@
                     "type_apt": "C",
                     "alias": "ITW",
                     "customer_name": "ITALIANWAY SRL"
+                },
+                {
+                    "task_id": 217527,
+                    "logistic_code": 1551,
+                    "client_id": 94,
+                    "premium": false,
+                    "address": "VIA ADAMELLO, 8",
+                    "lat": "45.4428459",
+                    "lng": "9.2030197",
+                    "cleaning_time": 90,
+                    "checkin_date": "2025-10-17",
+                    "checkout_date": "2025-10-17",
+                    "checkin_time": "17:00",
+                    "checkout_time": null,
+                    "pax_in": 4,
+                    "pax_out": 1,
+                    "small_equipment": false,
+                    "operation_id": 2,
+                    "confirmed_operation": false,
+                    "straordinaria": false,
+                    "type_apt": "B",
+                    "alias": "IHST",
+                    "customer_name": "IHOST"
                 }
             ],
-            "total_apartments": 38,
+            "total_apartments": 39,
             "date": "2025-10-17"
         }
     }

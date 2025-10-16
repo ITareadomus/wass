@@ -317,7 +317,33 @@
         "same_day_checkin_between_eo_hp",
         "premium"
       ]
+    },
+    {
+      "task_id": 217515,
+      "logistic_code": 1611,
+      "client_id": 3,
+      "premium": false,
+      "address": "VIA BURLAMACCHI, 11",
+      "lat": "45.4516629",
+      "lng": "9.2061433",
+      "cleaning_time": 120,
+      "checkin_date": "2025-10-17",
+      "checkout_date": "2025-10-17",
+      "checkin_time": "15:00",
+      "checkout_time": null,
+      "pax_in": 1,
+      "pax_out": 1,
+      "small_equipment": false,
+      "operation_id": 2,
+      "confirmed_operation": false,
+      "straordinaria": false,
+      "type_apt": "B",
+      "alias": "TBR",
+      "customer_name": "THE BEST RENT S.r.l.",
+      "reasons": [
+        "same_day_checkin_between_eo_hp"
+      ]
     }
   ],
-  "total_apartments": 12
+  "total_apartments": 13
 }
