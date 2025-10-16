@@ -49,21 +49,6 @@
       "logistic_code": "980",
       "cleanerId": 249,
       "assignment_type": "smista_button"
-    },
-    {
-      "logistic_code": "619",
-      "cleanerId": 24,
-      "assignment_type": "followup_auto"
-    },
-    {
-      "logistic_code": "723",
-      "cleanerId": 24,
-      "assignment_type": "followup_auto"
-    },
-    {
-      "logistic_code": "617",
-      "cleanerId": 249,
-      "assignment_type": "followup_auto"
     }
   ]
 }
