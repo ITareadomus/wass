@@ -373,27 +373,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Endpoint per eseguire assign_followups_optimized.py
-  app.post("/api/assign-followups-optimized", async (req, res) => {
+  // Endpoint per eseguire assign_followups_eo.py
+  app.post("/api/assign-followups-eo", async (req, res) => {
     try {
-      console.log("Eseguendo assign_followups_optimized.py...");
+      console.log("Eseguendo assign_followups_eo.py...");
       const { stdout, stderr } = await execAsync(
-        `python3 client/public/scripts/assign_followups_optimized.py`,
+        `python3 client/public/scripts/assign_followups_eo.py`,
         { maxBuffer: 1024 * 1024 * 10 }
       );
 
       if (stderr && !stderr.includes('Browserslist')) {
-        console.error("Errore assign_followups_optimized:", stderr);
+        console.error("Errore assign_followups_eo:", stderr);
       }
-      console.log("assign_followups_optimized output:", stdout);
+      console.log("assign_followups_eo output:", stdout);
 
       res.json({
         success: true,
-        message: "Follow-up tasks assegnati con successo (ottimizzato)",
+        message: "Follow-up tasks assegnati con successo",
         output: stdout
       });
     } catch (error: any) {
-      console.error("Errore durante l'assegnazione follow-up (ottimizzato):", error);
+      console.error("Errore durante l'assegnazione follow-up:", error);
       res.status(500).json({
         success: false,
         error: error.message,

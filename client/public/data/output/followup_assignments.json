@@ -1,218 +1,62 @@
 {
   "meta": {
-    "method": "clustering(k-means)+global_regret2+2opt",
-    "fixed_travel_minutes": 15.0,
-    "use_clustering": true,
+    "method": "greedy_round_robin_nearest",
+    "fixed_travel_minutes": 15,
     "premium_rule": "premium tasks require premium cleaners; if none exist, allow standard and mark premium_fallback=true",
+    "apartment_type_rule": "cleaners can only be assigned tasks for apartment types they are configured to handle in settings.json",
     "premium_fallback_dates": [],
-    "premium_fallback_task_ids": {},
-    "notes": [
-      "Tempo di viaggio fisso: 15 minuti tra ogni task",
-      "Ignoriamo completamente checkin/checkout: gli orari sono calcolati in catena.",
-      "Anchor su end_time dell'ultima EO del cleaner (se manca: start_time).",
-      "Se vuoi disattivare il clustering, metti USE_CLUSTERING=False."
-    ]
+    "premium_fallback_task_ids": {}
   },
   "assignments": [
     {
-      "date": "2025-10-17",
-      "cleaner_id": 24,
-      "cleaner_name": "HUSSAIN SYED SHUJIAHAT",
-      "cleaner_role": "Standard",
-      "assigned_tasks": [
-        {
-          "task_id": 217317,
-          "address": "VIA VIGNOLA 4",
-          "alias": "HACCA",
-          "start_time": "12:15",
-          "end_time": "14:15",
-          "service_min": 120,
-          "premium": false,
-          "premium_fallback": false
-        },
-        {
-          "task_id": 217420,
-          "address": "VIA TORTONA, 10",
-          "alias": "EXPRDS",
-          "start_time": "14:30",
-          "end_time": "15:10",
-          "service_min": 40,
-          "premium": false,
-          "premium_fallback": false
-        },
-        {
-          "task_id": 217421,
-          "address": "VIA TORTONA, 10",
-          "alias": "EXPRDS",
-          "start_time": "15:25",
-          "end_time": "16:05",
-          "service_min": 40,
-          "premium": false,
-          "premium_fallback": false
-        }
-      ]
-    },
-    {
-      "date": "2025-10-17",
-      "cleaner_id": 132,
-      "cleaner_name": "JOHOISER ERNESTO LOPEZ GIRON",
-      "cleaner_role": "Premium",
-      "assigned_tasks": [
-        {
-          "task_id": 217318,
-          "address": "PIAZZA GRAMSCI 10",
-          "alias": "HACCA",
-          "start_time": "12:15",
-          "end_time": "14:15",
-          "service_min": 120,
-          "premium": true,
-          "premium_fallback": false
-        }
-      ]
-    },
-    {
-      "date": "2025-10-17",
-      "cleaner_id": 249,
-      "cleaner_name": "Ogbodo Chidi Igwe",
-      "cleaner_role": "Premium",
-      "assigned_tasks": [
-        {
-          "task_id": 217418,
-          "address": "VIA VOGHERA, 4",
-          "alias": "EXPRDS",
-          "start_time": "10:30",
-          "end_time": "11:00",
-          "service_min": 30,
-          "premium": false,
-          "premium_fallback": false
-        },
-        {
-          "task_id": 217340,
-          "address": "VIA CORSICO,  5",
-          "alias": "NTM",
-          "start_time": "11:15",
-          "end_time": "12:15",
-          "service_min": 60,
-          "premium": false,
-          "premium_fallback": false
-        }
-      ]
-    },
-    {
-      "date": "2025-10-17",
+      "date": "2025-10-16",
       "cleaner_id": 287,
       "cleaner_name": "BAH ISMAILA",
       "cleaner_role": "Standard",
       "assigned_tasks": [
         {
-          "task_id": 217337,
-          "address": "VIA VOGHERA 14",
+          "task_id": 217321,
+          "logistic_code": 490,
+          "address": "VIA DELLA COMMENDA, 28",
           "alias": "NTM",
-          "start_time": "11:15",
-          "end_time": "12:15",
+          "fw_start_time": "10:00",
+          "fw_end_time": "11:00",
           "service_min": 60,
           "premium": false,
-          "premium_fallback": false
+          "premium_fallback": false,
+          "followup": true
         }
       ]
     },
     {
-      "date": "2025-10-17",
+      "date": "2025-10-16",
       "cleaner_id": 326,
       "cleaner_name": "FESTUS OSARO AIHIVBERE",
       "cleaner_role": "Standard",
       "assigned_tasks": [
         {
-          "task_id": 217338,
-          "address": "VIA TOFANE, 5",
-          "alias": "NTM",
-          "start_time": "11:15",
-          "end_time": "12:15",
-          "service_min": 60,
+          "task_id": 217416,
+          "logistic_code": 617,
+          "address": "VIA VOGHERA, 4",
+          "alias": "EXPRDS",
+          "fw_start_time": "10:00",
+          "fw_end_time": "10:30",
+          "service_min": 30,
           "premium": false,
-          "premium_fallback": false
-        }
-      ]
-    },
-    {
-      "date": "2025-10-17",
-      "cleaner_id": 404,
-      "cleaner_name": "RASEL MOLLA",
-      "cleaner_role": "Standard",
-      "assigned_tasks": [
-        {
-          "task_id": 217339,
-          "address": "VIA FORCELLA, 11",
-          "alias": "NTM",
-          "start_time": "11:15",
-          "end_time": "12:15",
-          "service_min": 60,
-          "premium": false,
-          "premium_fallback": false
+          "premium_fallback": false,
+          "followup": true
         },
         {
-          "task_id": 217343,
-          "address": "via Forcella 11",
-          "alias": "NTM",
-          "start_time": "12:30",
-          "end_time": "13:30",
-          "service_min": 60,
+          "task_id": 217417,
+          "logistic_code": 618,
+          "address": "VIA VOGHERA, 4",
+          "alias": "EXPRDS",
+          "fw_start_time": "10:30",
+          "fw_end_time": "11:00",
+          "service_min": 30,
           "premium": false,
-          "premium_fallback": false
-        }
-      ]
-    },
-    {
-      "date": "2025-10-17",
-      "cleaner_id": 445,
-      "cleaner_name": "IBRAHIM SANYANG",
-      "cleaner_role": "Premium",
-      "assigned_tasks": [
-        {
-          "task_id": 217341,
-          "address": "VIA TORRICELLI 5",
-          "alias": "NTM",
-          "start_time": "11:15",
-          "end_time": "12:15",
-          "service_min": 60,
-          "premium": false,
-          "premium_fallback": false
-        }
-      ]
-    },
-    {
-      "date": "2025-10-17",
-      "cleaner_id": 495,
-      "cleaner_name": "EL HADJI BA",
-      "cleaner_role": "Premium",
-      "assigned_tasks": [
-        {
-          "task_id": 217342,
-          "address": "via Goffredo Mameli 9",
-          "alias": "NTM",
-          "start_time": "11:15",
-          "end_time": "12:15",
-          "service_min": 60,
-          "premium": false,
-          "premium_fallback": false
-        }
-      ]
-    },
-    {
-      "date": "2025-10-20",
-      "cleaner_id": 132,
-      "cleaner_name": "JOHOISER ERNESTO LOPEZ GIRON",
-      "cleaner_role": "Premium",
-      "assigned_tasks": [
-        {
-          "task_id": 217473,
-          "address": "LARGO CORSIA DEI SERVI 11",
-          "alias": "HACCA",
-          "start_time": "10:15",
-          "end_time": "12:15",
-          "service_min": 120,
-          "premium": true,
-          "premium_fallback": false
+          "premium_fallback": false,
+          "followup": true
         }
       ]
     }
