@@ -37,6 +37,18 @@
           "premium": false,
           "premium_fallback": false,
           "followup": true
+        },
+        {
+          "task_id": 217486,
+          "logistic_code": 1666,
+          "address": "VIA CESARE CORRENTI 16",
+          "alias": "REST",
+          "fw_start_time": "13:50",
+          "fw_end_time": "15:50",
+          "service_min": 120,
+          "premium": false,
+          "premium_fallback": false,
+          "followup": true
         }
       ]
     },
@@ -53,6 +65,18 @@
           "alias": "EXPRDS",
           "fw_start_time": "10:00",
           "fw_end_time": "10:30",
+          "service_min": 30,
+          "premium": false,
+          "premium_fallback": false,
+          "followup": true
+        },
+        {
+          "task_id": 217489,
+          "logistic_code": 618,
+          "address": "VIA VOGHERA, 4",
+          "alias": "EXPRDS",
+          "fw_start_time": "10:30",
+          "fw_end_time": "11:00",
           "service_min": 30,
           "premium": false,
           "premium_fallback": false,
