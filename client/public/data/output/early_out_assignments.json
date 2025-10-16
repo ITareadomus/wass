@@ -1,242 +1,248 @@
 {
-  "early_out_tasks_assigned": [
+  "assignments": [
     {
-      "task_id": 217486,
-      "logistic_code": 1666,
-      "address": "VIA CESARE CORRENTI 16",
-      "premium": false,
-      "assigned_cleaner": {
-        "id": 24,
-        "name": "HUSSAIN",
-        "role": "Standard",
-        "premium": false,
-        "start_time": "07:00",
-        "end_time": "09:00"
-      },
-      "assignment_status": "assigned"
+      "cleaner_id": 24,
+      "cleaner_name": "HUSSAIN",
+      "cleaner_role": "Standard",
+      "cleaner_premium": false,
+      "total_tasks": 2,
+      "assigned_tasks": [
+        {
+          "task_id": 217486,
+          "logistic_code": 1666,
+          "address": "VIA CESARE CORRENTI 16",
+          "alias": "REST",
+          "cleaning_time": 120,
+          "premium": false,
+          "followup": false,
+          "start_time": "07:00",
+          "end_time": "09:00"
+        },
+        {
+          "task_id": 217338,
+          "logistic_code": 504,
+          "address": "VIA TOFANE, 5",
+          "alias": "NTM",
+          "cleaning_time": 60,
+          "premium": false,
+          "followup": true,
+          "fw_start_time": "10:00",
+          "fw_end_time": "11:00"
+        }
+      ]
     },
     {
-      "task_id": 217338,
-      "logistic_code": 504,
-      "address": "VIA TOFANE, 5",
-      "premium": false,
-      "assigned_cleaner": {
-        "id": 24,
-        "name": "HUSSAIN",
-        "role": "Standard",
-        "premium": false,
-        "fw_start_time": "10:00",
-        "fw_end_time": "11:00"
-      },
-      "assignment_status": "assigned",
-      "followup": true
+      "cleaner_id": 132,
+      "cleaner_name": "JOHOISER ERNESTO",
+      "cleaner_role": "Premium",
+      "cleaner_premium": true,
+      "total_tasks": 2,
+      "assigned_tasks": [
+        {
+          "task_id": 217317,
+          "logistic_code": 1650,
+          "address": "VIA VIGNOLA 4",
+          "alias": "HACCA",
+          "cleaning_time": 120,
+          "premium": false,
+          "followup": false,
+          "start_time": "10:00",
+          "end_time": "12:00"
+        },
+        {
+          "task_id": 217341,
+          "logistic_code": 1213,
+          "address": "VIA TORRICELLI 5",
+          "alias": "NTM",
+          "cleaning_time": 60,
+          "premium": false,
+          "followup": true,
+          "fw_start_time": "12:22",
+          "fw_end_time": "13:22"
+        }
+      ]
     },
     {
-      "task_id": 217317,
-      "logistic_code": 1650,
-      "address": "VIA VIGNOLA 4",
-      "premium": false,
-      "assigned_cleaner": {
-        "id": 132,
-        "name": "JOHOISER ERNESTO",
-        "role": "Premium",
-        "premium": true,
-        "start_time": "10:00",
-        "end_time": "12:00"
-      },
-      "assignment_status": "assigned"
+      "cleaner_id": 249,
+      "cleaner_name": "Ogbodo Chidi",
+      "cleaner_role": "Premium",
+      "cleaner_premium": true,
+      "total_tasks": 2,
+      "assigned_tasks": [
+        {
+          "task_id": 217473,
+          "logistic_code": 980,
+          "address": "LARGO CORSIA DEI SERVI 11",
+          "alias": "HACCA",
+          "cleaning_time": 120,
+          "premium": true,
+          "followup": false,
+          "start_time": "10:00",
+          "end_time": "12:00"
+        },
+        {
+          "task_id": 217342,
+          "logistic_code": 1625,
+          "address": "via Goffredo Mameli 9",
+          "alias": "NTM",
+          "cleaning_time": 60,
+          "premium": false,
+          "followup": true,
+          "fw_start_time": "12:22",
+          "fw_end_time": "13:22"
+        }
+      ]
     },
     {
-      "task_id": 217341,
-      "logistic_code": 1213,
-      "address": "VIA TORRICELLI 5",
-      "premium": false,
-      "assigned_cleaner": {
-        "id": 132,
-        "name": "JOHOISER ERNESTO",
-        "role": "Premium",
-        "premium": true,
-        "fw_start_time": "12:22",
-        "fw_end_time": "13:22"
-      },
-      "assignment_status": "assigned",
-      "followup": true
+      "cleaner_id": 287,
+      "cleaner_name": "BAH",
+      "cleaner_role": "Standard",
+      "cleaner_premium": false,
+      "total_tasks": 2,
+      "assigned_tasks": [
+        {
+          "task_id": 217418,
+          "logistic_code": 617,
+          "address": "VIA VOGHERA, 4",
+          "alias": "EXPRDS",
+          "cleaning_time": 30,
+          "premium": false,
+          "followup": false,
+          "start_time": "09:30",
+          "end_time": "10:00"
+        },
+        {
+          "task_id": 217337,
+          "logistic_code": 992,
+          "address": "VIA VOGHERA 14",
+          "alias": "NTM",
+          "cleaning_time": 60,
+          "premium": false,
+          "followup": true,
+          "fw_start_time": "10:07",
+          "fw_end_time": "11:07"
+        }
+      ]
     },
     {
-      "task_id": 217473,
-      "logistic_code": 980,
-      "address": "LARGO CORSIA DEI SERVI 11",
-      "premium": true,
-      "assigned_cleaner": {
-        "id": 249,
-        "name": "Ogbodo Chidi",
-        "role": "Premium",
-        "premium": true,
-        "start_time": "10:00",
-        "end_time": "12:00"
-      },
-      "assignment_status": "assigned"
+      "cleaner_id": 326,
+      "cleaner_name": "FESTUS OSARO",
+      "cleaner_role": "Standard",
+      "cleaner_premium": false,
+      "total_tasks": 2,
+      "assigned_tasks": [
+        {
+          "task_id": 217489,
+          "logistic_code": 618,
+          "address": "VIA VOGHERA, 4",
+          "alias": "EXPRDS",
+          "cleaning_time": 30,
+          "premium": false,
+          "followup": false,
+          "start_time": "09:30",
+          "end_time": "10:00"
+        },
+        {
+          "task_id": 217339,
+          "logistic_code": 1084,
+          "address": "VIA FORCELLA, 11",
+          "alias": "NTM",
+          "cleaning_time": 60,
+          "premium": false,
+          "followup": true,
+          "fw_start_time": "10:09",
+          "fw_end_time": "11:09"
+        }
+      ]
     },
     {
-      "task_id": 217342,
-      "logistic_code": 1625,
-      "address": "via Goffredo Mameli 9",
-      "premium": false,
-      "assigned_cleaner": {
-        "id": 249,
-        "name": "Ogbodo Chidi",
-        "role": "Premium",
-        "premium": true,
-        "fw_start_time": "12:22",
-        "fw_end_time": "13:22"
-      },
-      "assignment_status": "assigned",
-      "followup": true
+      "cleaner_id": 404,
+      "cleaner_name": "RASEL",
+      "cleaner_role": "Standard",
+      "cleaner_premium": false,
+      "total_tasks": 2,
+      "assigned_tasks": [
+        {
+          "task_id": 217420,
+          "logistic_code": 619,
+          "address": "VIA TORTONA, 10",
+          "alias": "EXPRDS",
+          "cleaning_time": 40,
+          "premium": false,
+          "followup": false,
+          "start_time": "09:30",
+          "end_time": "10:10"
+        },
+        {
+          "task_id": 217343,
+          "logistic_code": 1543,
+          "address": "via Forcella 11",
+          "alias": "NTM",
+          "cleaning_time": 60,
+          "premium": false,
+          "followup": true,
+          "fw_start_time": "10:19",
+          "fw_end_time": "11:19"
+        }
+      ]
     },
     {
-      "task_id": 217418,
-      "logistic_code": 617,
-      "address": "VIA VOGHERA, 4",
-      "premium": false,
-      "assigned_cleaner": {
-        "id": 287,
-        "name": "BAH",
-        "role": "Standard",
-        "premium": false,
-        "start_time": "09:30",
-        "end_time": "10:00"
-      },
-      "assignment_status": "assigned"
+      "cleaner_id": 445,
+      "cleaner_name": "IBRAHIM",
+      "cleaner_role": "Premium",
+      "cleaner_premium": true,
+      "total_tasks": 1,
+      "assigned_tasks": [
+        {
+          "task_id": 217318,
+          "logistic_code": 1649,
+          "address": "PIAZZA GRAMSCI 10",
+          "alias": "HACCA",
+          "cleaning_time": 120,
+          "premium": true,
+          "followup": false,
+          "start_time": "10:00",
+          "end_time": "12:00"
+        }
+      ]
     },
     {
-      "task_id": 217337,
-      "logistic_code": 992,
-      "address": "VIA VOGHERA 14",
-      "premium": false,
-      "assigned_cleaner": {
-        "id": 287,
-        "name": "BAH",
-        "role": "Standard",
-        "premium": false,
-        "fw_start_time": "10:07",
-        "fw_end_time": "11:07"
-      },
-      "assignment_status": "assigned",
-      "followup": true
-    },
-    {
-      "task_id": 217489,
-      "logistic_code": 618,
-      "address": "VIA VOGHERA, 4",
-      "premium": false,
-      "assigned_cleaner": {
-        "id": 326,
-        "name": "FESTUS OSARO",
-        "role": "Standard",
-        "premium": false,
-        "start_time": "09:30",
-        "end_time": "10:00"
-      },
-      "assignment_status": "assigned"
-    },
-    {
-      "task_id": 217339,
-      "logistic_code": 1084,
-      "address": "VIA FORCELLA, 11",
-      "premium": false,
-      "assigned_cleaner": {
-        "id": 326,
-        "name": "FESTUS OSARO",
-        "role": "Standard",
-        "premium": false,
-        "fw_start_time": "10:09",
-        "fw_end_time": "11:09"
-      },
-      "assignment_status": "assigned",
-      "followup": true
-    },
-    {
-      "task_id": 217420,
-      "logistic_code": 619,
-      "address": "VIA TORTONA, 10",
-      "premium": false,
-      "assigned_cleaner": {
-        "id": 404,
-        "name": "RASEL",
-        "role": "Standard",
-        "premium": false,
-        "start_time": "09:30",
-        "end_time": "10:10"
-      },
-      "assignment_status": "assigned"
-    },
-    {
-      "task_id": 217343,
-      "logistic_code": 1543,
-      "address": "via Forcella 11",
-      "premium": false,
-      "assigned_cleaner": {
-        "id": 404,
-        "name": "RASEL",
-        "role": "Standard",
-        "premium": false,
-        "fw_start_time": "10:19",
-        "fw_end_time": "11:19"
-      },
-      "assignment_status": "assigned",
-      "followup": true
-    },
-    {
-      "task_id": 217318,
-      "logistic_code": 1649,
-      "address": "PIAZZA GRAMSCI 10",
-      "premium": true,
-      "assigned_cleaner": {
-        "id": 445,
-        "name": "IBRAHIM",
-        "role": "Premium",
-        "premium": true,
-        "start_time": "10:00",
-        "end_time": "12:00"
-      },
-      "assignment_status": "assigned"
-    },
-    {
-      "task_id": 217421,
-      "logistic_code": 723,
-      "address": "VIA TORTONA, 10",
-      "premium": false,
-      "assigned_cleaner": {
-        "id": 469,
-        "name": "LAMIN",
-        "role": "Standard",
-        "premium": false,
-        "start_time": "09:30",
-        "end_time": "10:10"
-      },
-      "assignment_status": "assigned"
-    },
-    {
-      "task_id": 217340,
-      "logistic_code": 1135,
-      "address": "VIA CORSICO,  5",
-      "premium": false,
-      "assigned_cleaner": {
-        "id": 469,
-        "name": "LAMIN",
-        "role": "Standard",
-        "premium": false,
-        "fw_start_time": "10:22",
-        "fw_end_time": "11:22"
-      },
-      "assignment_status": "assigned",
-      "followup": true
+      "cleaner_id": 469,
+      "cleaner_name": "LAMIN",
+      "cleaner_role": "Standard",
+      "cleaner_premium": false,
+      "total_tasks": 2,
+      "assigned_tasks": [
+        {
+          "task_id": 217421,
+          "logistic_code": 723,
+          "address": "VIA TORTONA, 10",
+          "alias": "EXPRDS",
+          "cleaning_time": 40,
+          "premium": false,
+          "followup": false,
+          "start_time": "09:30",
+          "end_time": "10:10"
+        },
+        {
+          "task_id": 217340,
+          "logistic_code": 1135,
+          "address": "VIA CORSICO,  5",
+          "alias": "NTM",
+          "cleaning_time": 60,
+          "premium": false,
+          "followup": true,
+          "fw_start_time": "10:22",
+          "fw_end_time": "11:22"
+        }
+      ]
     }
   ],
+  "unassigned_tasks": [],
   "meta": {
-    "total_tasks": 10,
-    "assigned": 15,
-    "unassigned": 0,
+    "total_cleaners_used": 8,
+    "total_tasks_assigned": 15,
+    "total_tasks_unassigned": 0,
     "max_tasks_per_cleaner": 2,
     "algorithm": "regret_insertion_2opt",
     "notes": [
