@@ -7,19 +7,27 @@ from typing import Any, Dict, List, Optional, Tuple
 from pathlib import Path
 
 # =============================
-# I/O paths
+# I/O paths (use uploaded files)
 # =============================
-BASE = Path(__file__).parent.parent / "data"
-INPUT_TASKS    = BASE / "output" / "early_out.json"
-INPUT_CLEANERS = BASE / "cleaners" / "selected_cleaners.json"
-OUTPUT_ASSIGN  = BASE / "output" / "early_out_assignments.json"
-TIMELINE_ASSIGNMENTS = BASE / "output" / "timeline_assignments.json"
+INPUT_TASKS    = Path("/mnt/data/early_out.json")
+INPUT_CLEANERS = Path("/mnt/data/selected_cleaners.json")
+OUTPUT_ASSIGN  = Path("/mnt/data/early_out_assignments.json")
 
 # =============================
 # CONFIG
 # =============================
-MAX_TASKS_PER_CLEANER          = 2
+MAX_TASKS_PER_CLEANER          = 3        # <-- 3, but see the 3rd-task rule below
 REGRET_K                       = 2
+
+# Caps (hard)
+HARD_MAX_TRAVEL = 22.0  # minutes of travel between consecutive tasks: beyond => infeasible
+HARD_MAX_GAP    = 22.0  # door-to-door gap (start_B - end_A): beyond => infeasible
+
+# 3rd task exception thresholds
+THIRD_TASK_MAX_TRAVEL = 10.0  # default travel cap for 3rd task (2->3 hop)
+THIRD_TASK_MAX_GAP    = 10.0  # default door-to-door cap for 3rd task
+THIRD_TASK_SAME_STREET_TRAVEL = 12.0  # relaxed if same street/building
+THIRD_TASK_SAME_STREET_GAP    = 12.0
 
 # Travel model parameters (time in minutes)
 SHORT_RANGE_KM       = 0.30
@@ -41,20 +49,6 @@ MAX_TRAVEL           = 45.0
 # Penalties
 ACTIVATION_COST                = 0.0
 PENALTY_STANDARD_TO_PREMIUM    = 0.0   # premium can do standard without malus
-PENALTY_PREMIUM_TO_STANDARD    = 8.0   # standard cannot do premium anyway, so unused
-SOFT_PENALTY_BASE_KM           = 1.5
-ALPHA_SOFT_GEO                 = 45.0 / ((3.0 - SOFT_PENALTY_BASE_KM)**2)  # ~45' a 3 km oltre 1.5km
-
-# Long-hop control (time-based)
-LONG_HOP_TIME_MIN = 18.0  # inizia super-penalità
-HARD_MAX_GAP = 22.0  # hard cap (minutes) on door-to-door gap between consecutive tasks
-
-HARD_MAX_TRAVEL = 22.0  # hard cap (minutes): hops above this are infeasible
-
-HOP_SURCHARGE     = 120.0
-HOP_EXTRA_SLOPE   = 6.0
-SOFT_HARD_CAP_MIN = 24.0  # oltre: mega-malus ma non infeasible
-HUGE_MALUS        = 20000.0
 
 @dataclass
 class Task:
@@ -81,7 +75,6 @@ class Cleaner:
     home_lat: Optional[float] = None
     home_lng: Optional[float] = None
     route: List[Task] = field(default_factory=list)
-    insertions_since_opt: int = 0
 
 # Utils
 def hhmm_to_min(hhmm: Optional[str], default: str = "10:00") -> int:
@@ -165,19 +158,6 @@ def travel_minutes(a: Optional[Task], b: Optional[Task]) -> float:
 
     return max(MIN_TRAVEL, min(MAX_TRAVEL, t))
 
-def soft_geo_penalty(route: List[Task]) -> float:
-    if len(route) <= 1:
-        return 0.0
-    extra = 0.0
-    prev = None
-    for t in route:
-        if prev is not None:
-            km = haversine_km(prev.lat, prev.lng, t.lat, t.lng)
-            if km > SOFT_PENALTY_BASE_KM:
-                extra += ALPHA_SOFT_GEO * (km - SOFT_PENALTY_BASE_KM) ** 2
-        prev = t
-    return extra
-
 # Eligibility & soft penalties
 def can_handle_premium(cleaner: Cleaner, task: Task) -> bool:
     return False if (task.is_premium and not cleaner.is_premium) else True
@@ -192,10 +172,14 @@ def evaluate_route_cost(route: List[Task]) -> Tuple[float, List[Tuple[int, int, 
     total = ACTIVATION_COST
     schedule: List[Tuple[int, int, int]] = []
     prev: Optional[Task] = None
+    prev_finish: Optional[float] = None
     cur = 0.0
-    for t in route:
+    for i, t in enumerate(route):
         tt = travel_minutes(prev, t)
         total += tt
+        # Hard cap on travel (always)
+        if tt > HARD_MAX_TRAVEL:
+            return float("inf"), []
         cur += tt
         arrival = cur
         wait = max(0.0, t.checkout_time - arrival)
@@ -203,13 +187,29 @@ def evaluate_route_cost(route: List[Task]) -> Tuple[float, List[Tuple[int, int, 
         cur += wait
         start = cur
         finish = start + t.cleaning_time
+
+        # Hard cap on door-to-door gap (always)
+        if prev_finish is not None and (start - prev_finish) > HARD_MAX_GAP:
+            return float("inf"), []
+
+        # 3rd task rule (i == 2)
+        if i == 2 and prev is not None:
+            # thresholds: relaxed if same street/building from prev->t
+            relax = same_building(prev.address, t.address) or same_street(prev.address, t.address)
+            t_travel_cap = THIRD_TASK_SAME_STREET_TRAVEL if relax else THIRD_TASK_MAX_TRAVEL
+            t_gap_cap    = THIRD_TASK_SAME_STREET_GAP    if relax else THIRD_TASK_MAX_GAP
+            door2door = start - prev_finish if prev_finish is not None else 0.0
+            if tt > t_travel_cap or door2door > t_gap_cap:
+                return float("inf"), []
+
         if finish >= t.checkin_time:
             return float("inf"), []
+
         total += t.cleaning_time
         cur = finish
         schedule.append((int(arrival), int(start), int(finish)))
         prev = t
-    total += soft_geo_penalty(route)
+        prev_finish = finish
     return total, schedule
 
 def delta_insert_cost(route: List[Task], task: Task, pos: int) -> Tuple[float, List[Task]]:
@@ -219,6 +219,7 @@ def delta_insert_cost(route: List[Task], task: Task, pos: int) -> Tuple[float, L
     return new - base, new_route
 
 def best_k_positions(cleaner: Cleaner, task: Task) -> List[float]:
+    # capacity quick check: allow up to 3, but only if 3rd satisfies local rule (enforced via evaluate_route_cost anyway)
     if len(cleaner.route) >= MAX_TASKS_PER_CLEANER:
         return []
     if not can_handle_premium(cleaner, task):
@@ -229,18 +230,11 @@ def best_k_positions(cleaner: Cleaner, task: Task) -> List[float]:
         if math.isinf(d):
             continue
         d += premium_soft_penalty(cleaner, task)
-        # time-based local hop penalty
-        if len(cleaner.route) > 0 and pos > 0:
-            prev_task = cleaner.route[pos - 1]
-            tt = travel_minutes(prev_task, task)
-            if tt > SOFT_HARD_CAP_MIN:
-                d += HUGE_MALUS
-            elif tt > LONG_HOP_TIME_MIN:
-                d += HOP_SURCHARGE + HOP_EXTRA_SLOPE * (tt - LONG_HOP_TIME_MIN)
         best.append(d)
     best.sort()
     return best[:REGRET_K]
 
+# Simple 2-opt that respects hard caps via evaluate_route_cost
 def two_opt_inplace(cleaner: Cleaner) -> None:
     r = cleaner.route
     if len(r) < 4:
@@ -285,7 +279,6 @@ def load_cleaners() -> List[Cleaner]:
 
 def load_tasks() -> List[Task]:
     data = json.loads(INPUT_TASKS.read_text(encoding="utf-8"))
-    # EO start: 10:00 di default
     eo_start_min = hhmm_to_min("10:00")
     tasks: List[Task] = []
     for t in data.get("early_out_tasks", []):
@@ -307,83 +300,55 @@ def load_tasks() -> List[Task]:
             alias=t.get("alias"),
             small_equipment=bool(t.get("small_equipment", False)),
         ))
+    # Premium-first, then by checkout
+    tasks.sort(key=lambda x: (not x.is_premium, x.checkout_time))
     return tasks
 
-# Planner (premium-first, poi standard)
+# Planner (premium-first, regret insertion)
 def plan_day(tasks: List[Task], cleaners: List[Cleaner]) -> Tuple[List[Cleaner], List[Task]]:
-    prem = [t for t in tasks if t.is_premium]
-    std  = [t for t in tasks if not t.is_premium]
-    unassigned = prem + std
-
+    unassigned = tasks[:]
     while unassigned:
-        chosen = None  # (best_regret, best_delta, task, cleaner, pos, new_route)
-
+        chosen = None  # (regret, delta, task, cleaner, pos, new_route)
         for task in list(unassigned):
-            # Build all candidate insertions across ALL cleaners (pos included)
-            candidates: List[Tuple[float, Cleaner, int, List[Task]]] = []
+            per_cleaner_best: List[Tuple[Cleaner, float, float, int, List[Task]]] = []
             for cl in cleaners:
                 if len(cl.route) >= MAX_TASKS_PER_CLEANER:
                     continue
                 if not can_handle_premium(cl, task):
                     continue
-                best_local: Tuple[float, int, List[Task]] = (float("inf"), -1, [])
+                # evaluate every position
+                best_local = (float("inf"), -1, [])  # (delta, pos, new_route)
                 second_local = float("inf")
-
-                for pos in range(len(cl.route) + 1):
+                for pos in range(len(cl.route)+1):
                     d, new_r = delta_insert_cost(cl.route, task, pos)
                     if math.isinf(d):
                         continue
-                    d += premium_soft_penalty(cl, task)
-                    # time-based local hop penalty
-                    if len(cl.route) > 0 and pos > 0:
-                        prev_task = cl.route[pos - 1]
-                        tt = travel_minutes(prev_task, task)
-                        if tt > SOFT_HARD_CAP_MIN:
-                            d += HUGE_MALUS
-                        elif tt > LONG_HOP_TIME_MIN:
-                            d += HOP_SURCHARGE + HOP_EXTRA_SLOPE * (tt - LONG_HOP_TIME_MIN)
                     if d < best_local[0]:
                         second_local = best_local[0]
                         best_local = (d, pos, new_r)
                     elif d < second_local:
                         second_local = d
-
                 if best_local[1] != -1:
-                    candidates.append((best_local[0], cl, best_local[1], best_local[2]))
-                    # Also track second best per-cleaner as a potential global 2nd-best
-                    if second_local < float("inf"):
-                        candidates.append((second_local, cl, -2, []))  # marker for 2nd best
-
-            if not candidates:
+                    per_cleaner_best.append((cl, best_local[0], second_local, best_local[1], best_local[2]))
+            if not per_cleaner_best:
                 continue
-
-            # Sort all candidates by delta
-            candidates.sort(key=lambda x: x[0])
-            best_delta, best_cl, best_pos, best_route = candidates[0]
-            # Find the second-best REAL candidate (skip markers with pos==-2 if needed)
+            per_cleaner_best.sort(key=lambda x: x[1])
+            d1_cl, d1, d2, pos1, route1 = per_cleaner_best[0][0], per_cleaner_best[0][1], per_cleaner_best[0][2], per_cleaner_best[0][3], per_cleaner_best[0][4]
+            # get a true global second-best
             second_delta = None
-            for d2, cl2, pos2, _ in candidates[1:]:
-                if pos2 != -2:
-                    second_delta = d2
-                    break
+            for c, dd1, dd2, ppos, rroute in per_cleaner_best[1:]:
+                second_delta = dd1
+                break
             if second_delta is None:
-                # fallback: take next available even if marker
-                second_delta = candidates[1][0] if len(candidates) > 1 else (best_delta + 60.0)
-
-            regret = second_delta - best_delta
-
-            # Keep the globally best task-choice by regret, then tie-break on delta
-            if chosen is None or (regret > chosen[0]) or (abs(regret - chosen[0]) < 1e-6 and best_delta < chosen[1]):
-                chosen = (regret, best_delta, task, best_cl, best_pos, best_route)
-
+                second_delta = d1 + 60.0
+            regret = second_delta - d1
+            if (chosen is None) or (regret > chosen[0]) or (abs(regret - chosen[0]) < 1e-6 and d1 < chosen[1]):
+                chosen = (regret, d1, task, d1_cl, pos1, route1)
         if chosen is None:
             break
-
-        _, _, task, chosen_cleaner, pos, new_route = chosen
-        # Apply the chosen insertion
-        chosen_cleaner.route = new_route  # type: ignore
+        _, _, task, cl, pos, new_r = chosen
+        cl.route = new_r  # commit
         unassigned.remove(task)
-
     return cleaners, unassigned
 
 def build_output(cleaners: List[Cleaner], unassigned: List[Task]) -> Dict[str, Any]:
@@ -393,6 +358,8 @@ def build_output(cleaners: List[Cleaner], unassigned: List[Task]) -> Dict[str, A
             continue
         # derive schedule to export times
         total, schedule = evaluate_route_cost(cl.route)
+        if math.isinf(total) or not schedule:
+            continue
         tasks_list: List[Dict[str, Any]] = []
         for idx, (t, (arr, start, fin)) in enumerate(zip(cl.route, schedule)):
             tasks_list.append({
@@ -420,7 +387,7 @@ def build_output(cleaners: List[Cleaner], unassigned: List[Task]) -> Dict[str, A
         "task_id": int(t.task_id),
         "logistic_code": int(t.logistic_code),
         "address": t.address,
-        "reason": "no feasible cleaner/window"
+        "reason": "no feasible cleaner/window (caps or 3rd-task rule)"
     } for t in unassigned]
 
     total_assigned = sum(len(c["tasks"]) for c in cleaners_with_tasks)
@@ -433,139 +400,15 @@ def build_output(cleaners: List[Cleaner], unassigned: List[Task]) -> Dict[str, A
             "unassigned": len(unassigned_list),
             "cleaners_used": len(cleaners_with_tasks),
             "max_tasks_per_cleaner": MAX_TASKS_PER_CLEANER,
-            "algorithm": "regret_insertion",
+            "algorithm": "regret_insertion (3rd-task rule)",
             "notes": [
                 "Premium-first assignment",
-                "Time-based long-hop penalties (18–24 soft, 24+ huge malus)",
-                "No activation cost for new route",
-                "Premium can do standard"
+                "Hard cap: travel > 22' or gap > 22' infeasible",
+                "3rd task allowed only if travel<=10' and gap<=10' (12'/12' if same street/building)",
+                "No activation cost; premium can do standard"
             ]
         }
     }
-
-
-def enforce_gap_cap(cleaners: List[Cleaner], gap_cap: float = 22.0) -> Tuple[List[Cleaner], List[Task]]:
-    """Scan each route; if a door-to-door gap exceeds gap_cap, cut the route at that point
-    and try to move the tail task to an unused cleaner; if none is available, leave it unassigned."""
-    # Build a pool of free cleaners (those with empty route)
-    free_cleaners = [cl for cl in cleaners if not cl.route]
-    leftovers: List[Task] = []
-    for cl in cleaners:
-        if len(cl.route) < 2:
-            continue
-        new_route: List[Task] = [cl.route[0]]
-        prev_end = None
-        # compute end time from schedule
-        _, schedule = evaluate_route_cost([cl.route[0]])
-        prev_end = schedule[-1][2] if schedule else None  # finish minutes
-        for t in cl.route[1:]:
-            # evaluate one-step schedule to get start time
-            cost, sch = evaluate_route_cost(new_route + [t])
-            if math.isinf(cost) or not sch:
-                # infeasible already; try to move t to a free cleaner
-                if free_cleaners:
-                    tgt = free_cleaners.pop(0)
-                    tgt.route = [t]
-                else:
-                    leftovers.append(t)
-                continue
-            start = sch[-1][1]
-            if prev_end is not None and (start - prev_end) > gap_cap:
-                # move t to a free cleaner, or mark leftover
-                if free_cleaners:
-                    tgt = free_cleaners.pop(0)
-                    tgt.route = [t]
-                else:
-                    leftovers.append(t)
-            else:
-                new_route.append(t)
-                prev_end = sch[-1][2]
-        cl.route = new_route
-    return cleaners, leftovers
-
-
-
-def try_move_task_to_others(task: Task, src: Cleaner, cleaners: List[Cleaner]) -> bool:
-    """Try to move 'task' from src to any other cleaner/position that keeps caps respected and cost minimal."""
-    best = (float("inf"), None, None, None)  # delta, cleaner, pos, new_route
-    # Temporarily remove task from src
-    saved_route = [t for t in src.route if t is not task]
-    # For each other cleaner with capacity
-    for cl in cleaners:
-        if cl is src:
-            continue
-        if len(cl.route) >= MAX_TASKS_PER_CLEANER:
-            continue
-        if not can_handle_premium(cl, task):
-            continue
-        for pos in range(len(cl.route)+1):
-            d, new_r = delta_insert_cost(cl.route, task, pos)
-            if math.isinf(d):
-                continue
-            # check caps implicitly via evaluate_route_cost (already inside delta)
-            if d < best[0]:
-                best = (d, cl, pos, new_r)
-    if best[1] is None:
-        return False
-    # Commit: remove from src, set new route on target
-    src.route = saved_route
-    best[1].route = best[3]  # type: ignore
-    return True
-
-
-def _spawn_cleaner_like(task: Task, cleaners: List[Cleaner]) -> Cleaner:
-    """Create a new virtual cleaner with the right premium flag to host a task."""
-    next_id = 9000 + sum(1 for c in cleaners if isinstance(c.id, int) and c.id >= 9000)
-    newc = Cleaner(
-        id=next_id,
-        name="NUOVO",
-        lastname=f"CLEANER {next_id}",
-        role="Premium" if task.is_premium else "Standard",
-        is_premium=bool(task.is_premium),
-        home_lat=None, home_lng=None
-    )
-    cleaners.append(newc)
-    return newc
-
-def try_move_task_to_others_or_spawn(task: Task, src: Cleaner, cleaners: List[Cleaner]) -> bool:
-    """As before, but if no feasible slot on existing cleaners, spawn a virtual cleaner."""
-    if try_move_task_to_others(task, src, cleaners):
-        return True
-    # Spawn a virtual cleaner and assign
-    newc = _spawn_cleaner_like(task, cleaners)
-    newc.route = [task]
-    # remove from src
-    src.route = [t for t in src.route if t is not task]
-    return True
-
-
-def rebalance_long_gaps(cleaners: List[Cleaner], gap_cap: float = 22.0) -> List[Task]:
-    """For any gap > gap_cap, try to move the later task to another cleaner.
-       Returns tasks that could not be moved (leftovers)."""
-    leftovers: List[Task] = []
-    for cl in cleaners:
-        changed = True
-        while changed:
-            changed = False
-            # recompute schedule
-            cost, sch = evaluate_route_cost(cl.route)
-            if math.isinf(cost) or len(cl.route) < 2:
-                break
-            for i in range(len(cl.route)-1):
-                a, b = cl.route[i], cl.route[i+1]
-                end_a = sch[i][2]
-                start_b = sch[i+1][1]
-                if (start_b - end_a) > gap_cap:
-                    # try move b away
-                    ok = try_move_task_to_others_or_spawn(b, cl, cleaners)
-                    if not ok:
-                        leftovers.append(b)
-                        # remove b from current route
-                        cl.route.pop(i+1)
-                    changed = True
-                    break
-    return leftovers
-
 
 def main():
     if not INPUT_TASKS.exists() or not INPUT_CLEANERS.exists():
@@ -573,48 +416,9 @@ def main():
     cleaners = load_cleaners()
     tasks = load_tasks()
     planners, leftovers = plan_day(tasks, cleaners)
-    # rebalance long gaps by moving tasks across cleaners
-    leftover2 = rebalance_long_gaps(planners, gap_cap=22.0)
-    leftovers = (leftovers or []) + (leftover2 or [])
-    planners, leftover2 = enforce_gap_cap(planners, gap_cap=22.0)
-    leftovers = (leftovers or []) + (leftover2 or [])
     output = build_output(planners, leftovers)
-    
-    # Save early_out_assignments.json
     OUTPUT_ASSIGN.write_text(json.dumps(output, ensure_ascii=False, indent=2), encoding="utf-8")
-    print(f"✅ Scritto {OUTPUT_ASSIGN}")
-    print(f"   Assegnate: {output['meta']['assigned']}")
-    print(f"   Non assegnate: {output['meta']['unassigned']}")
-    
-    # Update timeline_assignments.json
-    timeline_data = {"assignments": []}
-    if TIMELINE_ASSIGNMENTS.exists():
-        try:
-            timeline_data = json.loads(TIMELINE_ASSIGNMENTS.read_text(encoding="utf-8"))
-        except:
-            pass
-    
-    # Remove old early-out assignments (those from smista_button)
-    timeline_data["assignments"] = [
-        a for a in timeline_data.get("assignments", [])
-        if a.get("assignment_type") != "smista_button"
-    ]
-    
-    # Add new assignments
-    for cleaner_entry in output["early_out_tasks_assigned"]:
-        cleaner_id = cleaner_entry["cleaner"]["id"]
-        for task in cleaner_entry.get("tasks", []):
-            timeline_data["assignments"].append({
-                "logistic_code": str(task["logistic_code"]),
-                "cleanerId": cleaner_id,
-                "assignment_type": "smista_button",
-                "sequence": task.get("sequence", 0),
-                "start_time": task.get("start_time"),
-                "end_time": task.get("end_time")
-            })
-    
-    TIMELINE_ASSIGNMENTS.write_text(json.dumps(timeline_data, ensure_ascii=False, indent=2), encoding="utf-8")
-    print(f"✅ Aggiornato {TIMELINE_ASSIGNMENTS}")
+    print(f"✅ Wrote {OUTPUT_ASSIGN}")
 
 if __name__ == "__main__":
     main()
