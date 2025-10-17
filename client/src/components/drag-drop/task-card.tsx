@@ -156,13 +156,13 @@ export default function TaskCard({
                 <p className="text-sm font-semibold text-muted-foreground">
                   Cliente
                 </p>
-                <p className="text-sm">{task.customer_name || "N/A"}</p>
+                <p className="text-sm">{task.customer_name || "non migrato"}</p>
               </div>
               <div>
                 <p className="text-sm font-semibold text-muted-foreground">
                   Tipologia
                 </p>
-                <p className="text-sm">{(task as any).type_apt ?? "N/A"}</p>
+                <p className="text-sm">{(task as any).type_apt ?? "non migrato"}</p>
               </div>
               <div>
                 <p className="text-sm font-semibold text-muted-foreground">
@@ -177,7 +177,7 @@ export default function TaskCard({
               <p className="text-sm font-semibold text-muted-foreground">
                 Indirizzo
               </p>
-              <p className="text-sm">{task.address || "N/A"}</p>
+              <p className="text-sm">{task.address || "non migrato"}</p>
             </div>
 
             {/* Date e orari */}
@@ -192,7 +192,7 @@ export default function TaskCard({
                         "it-IT",
                         { day: "2-digit", month: "2-digit", year: "numeric" },
                       )
-                    : "N/A"}
+                    : "non migrato"}
                   {(task as any).checkout_time
                     ? ` - ${(task as any).checkout_time}`
                     : ""}
@@ -208,7 +208,7 @@ export default function TaskCard({
                         "it-IT",
                         { day: "2-digit", month: "2-digit", year: "numeric" },
                       )
-                    : "N/A"}
+                    : "non migrato"}
                   {(task as any).checkin_time
                     ? ` - ${(task as any).checkin_time}`
                     : ""}
@@ -222,13 +222,13 @@ export default function TaskCard({
                 <p className="text-sm font-semibold text-muted-foreground">
                   Pax-In
                 </p>
-                <p className="text-sm">{(task as any).pax_in ?? "N/A"}</p>
+                <p className="text-sm">{(task as any).pax_in ?? "non migrato"}</p>
               </div>
               <div>
                 <p className="text-sm font-semibold text-muted-foreground">
                   Pax-Out
                 </p>
-                <p className="text-sm">{(task as any).pax_out ?? "N/A"}</p>
+                <p className="text-sm">{(task as any).pax_out ?? "non migrato"}</p>
               </div>
             </div>
 
@@ -240,7 +240,7 @@ export default function TaskCard({
               <p className="text-sm">
                 {(task as any).operation_id === 2 && !(task as any).confirmed_operation
                   ? "non migrato"
-                  : (task as any).operation_id ?? "N/A"}
+                  : (task as any).operation_id ?? "non migrato"}
               </p>
             </div>
           </div>
