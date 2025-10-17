@@ -1,4 +1,195 @@
 {
-  "early_out_tasks_assigned": [],
-  "meta": {}
+  "early_out_tasks_assigned": [
+    {
+      "cleaner": {
+        "id": 24,
+        "name": "HUSSAIN",
+        "lastname": "SYED SHUJIAHAT",
+        "role": "Standard",
+        "premium": false
+      },
+      "tasks": [
+        {
+          "task_id": 217543,
+          "logistic_code": 619,
+          "address": "VIA TORTONA, 10",
+          "premium": false,
+          "cleaning_time": 40,
+          "start_time": "10:00",
+          "end_time": "10:40",
+          "followup": false,
+          "sequence": 1
+        },
+        {
+          "task_id": 217542,
+          "logistic_code": 723,
+          "address": "VIA TORTONA, 10",
+          "premium": false,
+          "cleaning_time": 40,
+          "start_time": "10:43",
+          "end_time": "11:23",
+          "followup": true,
+          "sequence": 2
+        },
+        {
+          "task_id": 217541,
+          "logistic_code": 617,
+          "address": "VIA VOGHERA, 4",
+          "premium": false,
+          "cleaning_time": 30,
+          "start_time": "11:29",
+          "end_time": "11:59",
+          "followup": true,
+          "sequence": 3
+        }
+      ]
+    },
+    {
+      "cleaner": {
+        "id": 132,
+        "name": "JOHOISER ERNESTO",
+        "lastname": "LOPEZ GIRON",
+        "role": "Premium",
+        "premium": true
+      },
+      "tasks": [
+        {
+          "task_id": 217379,
+          "logistic_code": 1639,
+          "address": "CORSO MAGENTA 27",
+          "premium": true,
+          "cleaning_time": 120,
+          "start_time": "10:00",
+          "end_time": "12:00",
+          "followup": false,
+          "sequence": 1
+        },
+        {
+          "task_id": 217380,
+          "logistic_code": 1646,
+          "address": "Via Matteo Bandello 4/1",
+          "premium": false,
+          "cleaning_time": 60,
+          "start_time": "12:16",
+          "end_time": "13:16",
+          "followup": true,
+          "sequence": 2
+        }
+      ]
+    },
+    {
+      "cleaner": {
+        "id": 249,
+        "name": "Ogbodo Chidi",
+        "lastname": "Igwe",
+        "role": "Premium",
+        "premium": true
+      },
+      "tasks": [
+        {
+          "task_id": 217474,
+          "logistic_code": 980,
+          "address": "LARGO CORSIA DEI SERVI 11",
+          "premium": true,
+          "cleaning_time": 120,
+          "start_time": "10:00",
+          "end_time": "12:00",
+          "followup": false,
+          "sequence": 1
+        },
+        {
+          "task_id": 217394,
+          "logistic_code": 1283,
+          "address": "via della Commenda 28",
+          "premium": false,
+          "cleaning_time": 60,
+          "start_time": "12:20",
+          "end_time": "13:20",
+          "followup": true,
+          "sequence": 2
+        }
+      ]
+    },
+    {
+      "cleaner": {
+        "id": 287,
+        "name": "BAH",
+        "lastname": "ISMAILA",
+        "role": "Standard",
+        "premium": false
+      },
+      "tasks": [
+        {
+          "task_id": 217396,
+          "logistic_code": 1063,
+          "address": "VIA ORESTE SALOMONE, 51",
+          "premium": false,
+          "cleaning_time": 60,
+          "start_time": "10:00",
+          "end_time": "11:00",
+          "followup": false,
+          "sequence": 1
+        }
+      ]
+    },
+    {
+      "cleaner": {
+        "id": 326,
+        "name": "FESTUS OSARO",
+        "lastname": "AIHIVBERE",
+        "role": "Standard",
+        "premium": false
+      },
+      "tasks": [
+        {
+          "task_id": 217397,
+          "logistic_code": 1623,
+          "address": "via Principe Eugenio 15",
+          "premium": false,
+          "cleaning_time": 60,
+          "start_time": "10:00",
+          "end_time": "11:00",
+          "followup": false,
+          "sequence": 1
+        }
+      ]
+    },
+    {
+      "cleaner": {
+        "id": 404,
+        "name": "RASEL",
+        "lastname": "MOLLA",
+        "role": "Standard",
+        "premium": false
+      },
+      "tasks": [
+        {
+          "task_id": 217395,
+          "logistic_code": 1626,
+          "address": "Via Giancarlo Sismondi, 74",
+          "premium": false,
+          "cleaning_time": 120,
+          "start_time": "10:00",
+          "end_time": "12:00",
+          "followup": false,
+          "sequence": 1
+        }
+      ]
+    }
+  ],
+  "unassigned_tasks": [],
+  "meta": {
+    "total_tasks": 10,
+    "assigned": 10,
+    "unassigned": 0,
+    "cleaners_used": 6,
+    "max_tasks_per_cleaner": 3,
+    "algorithm": "regret_insertion (3rd-task rule)",
+    "notes": [
+      "Premium-first assignment",
+      "Hard cap: travel > 22' or gap > 22' infeasible",
+      "3rd task allowed only if travel<=10' and gap<=10' (12'/12' if same street/building)",
+      "No activation cost; premium can do standard"
+    ]
+  }
 }
