@@ -263,23 +263,23 @@ export default function TimelineView({
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <p className="text-sm font-semibold text-muted-foreground">name</p>
+                  <p className="text-sm font-semibold text-muted-foreground">Nome</p>
                   <p className="text-sm">{selectedCleaner.name.toUpperCase()}</p>
                 </div>
                 <div>
-                  <p className="text-sm font-semibold text-muted-foreground">lastname</p>
+                  <p className="text-sm font-semibold text-muted-foreground">Cognome</p>
                   <p className="text-sm">{selectedCleaner.lastname.toUpperCase()}</p>
                 </div>
                 <div>
-                  <p className="text-sm font-semibold text-muted-foreground">counter_days</p>
+                  <p className="text-sm font-semibold text-muted-foreground">Giorni lavorati</p>
                   <p className="text-sm">{selectedCleaner.counter_days}</p>
                 </div>
                 <div>
-                  <p className="text-sm font-semibold text-muted-foreground">counter_hours</p>
+                  <p className="text-sm font-semibold text-muted-foreground">Ore lavorate</p>
                   <p className="text-sm">{selectedCleaner.counter_hours}</p>
                 </div>
                 <div>
-                  <p className="text-sm font-semibold text-muted-foreground">contract_type</p>
+                  <p className="text-sm font-semibold text-muted-foreground">Tipo contratto</p>
                   <p className="text-sm">{selectedCleaner.contract_type}</p>
                 </div>
               </div>
