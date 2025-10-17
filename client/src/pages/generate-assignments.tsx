@@ -50,6 +50,11 @@ export default function GenerateAssignments() {
     tomorrow.setDate(tomorrow.getDate() + 1);
     return tomorrow;
   });
+
+  // Salva la data in localStorage ogni volta che cambia
+  useEffect(() => {
+    localStorage.setItem('selected_work_date', selectedDate.toISOString());
+  }, [selectedDate]);
   const [earlyOutTasks, setEarlyOutTasks] = useState<Task[]>([]);
   const [highPriorityTasks, setHighPriorityTasks] = useState<Task[]>([]);
   const [lowPriorityTasks, setLowPriorityTasks] = useState<Task[]>([]);
