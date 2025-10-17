@@ -55,10 +55,19 @@
       "sequence": 1
     },
     {
+      "logistic_code": "1028",
+      "cleanerId": 249,
+      "assignment_type": "manual_drag"
+    },
+    {
+      "logistic_code": "1496",
+      "cleanerId": 469,
+      "assignment_type": "manual_drag"
+    },
+    {
       "logistic_code": "980",
       "cleanerId": 495,
-      "assignment_type": "optimizer",
-      "sequence": 1
+      "assignment_type": "manual_drag"
     }
   ]
 }
