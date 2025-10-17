@@ -91,6 +91,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { taskId, logisticCode } = req.body;
       const timelineAssignmentsPath = path.join(process.cwd(), 'client/public/data/output/timeline_assignments.json');
 
+      console.log(`Rimozione assegnazione timeline - taskId: ${taskId}, logisticCode: ${logisticCode}`);
+
       // Carica timeline_assignments.json
       let assignmentsData: any = { assignments: [] };
       try {
@@ -100,10 +102,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // File non esiste, usa struttura vuota
       }
 
-      // Rimuovi l'assegnazione per questo task
+      console.log(`Assegnazioni prima della rimozione:`, assignmentsData.assignments);
+
+      // Rimuovi l'assegnazione per questo task (usa OR per match su logistic_code o taskId)
+      const initialLength = assignmentsData.assignments.length;
       assignmentsData.assignments = assignmentsData.assignments.filter(
-        (a: any) => a.logistic_code !== logisticCode && a.taskId !== taskId
+        (a: any) => {
+          const matchCode = String(a.logistic_code) === String(logisticCode);
+          const matchId = String(a.taskId) === String(taskId);
+          return !matchCode && !matchId;
+        }
       );
+
+      console.log(`Assegnazioni dopo la rimozione:`, assignmentsData.assignments);
+      console.log(`Rimosse ${initialLength - assignmentsData.assignments.length} assegnazioni`);
 
       // Salva il file
       await fs.writeFile(timelineAssignmentsPath, JSON.stringify(assignmentsData, null, 2));

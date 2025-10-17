@@ -430,6 +430,9 @@ export default function GenerateAssignments() {
     }
     // Se sto muovendo da una timeline verso una colonna di priorità
     else if (source.droppableId.startsWith('timeline-')) {
+      // Prima rimuovi l'assegnazione dalla timeline
+      removeTimelineAssignment(taskId, logisticCode);
+
       setAllTasksWithAssignments((prevTasks) => {
         const updatedTasks = prevTasks.map((task) => {
           if (task.id === taskId) {
@@ -437,6 +440,7 @@ export default function GenerateAssignments() {
               ...task,
               assignedCleaner: undefined,
               startTime: undefined,
+              sequence: undefined,
             };
           }
           return task;
@@ -446,18 +450,23 @@ export default function GenerateAssignments() {
         return updatedTasks;
       });
 
-      // Rimuovi l'assegnazione dalla timeline
-      removeTimelineAssignment(taskId, logisticCode);
-
       // Ri-aggiungi la task al container di destinazione
       const taskToAdd = allTasksWithAssignments.find(t => t.id === taskId);
       if (taskToAdd) {
+        // Rimuovi i dati di assegnazione dalla task
+        const cleanTask = {
+          ...taskToAdd,
+          assignedCleaner: undefined,
+          startTime: undefined,
+          sequence: undefined,
+        };
+
         if (destination.droppableId === 'early-out') {
-          setEarlyOutTasks(prev => [...prev, taskToAdd]);
+          setEarlyOutTasks(prev => [...prev, cleanTask]);
         } else if (destination.droppableId === 'high') {
-          setHighPriorityTasks(prev => [...prev, taskToAdd]);
+          setHighPriorityTasks(prev => [...prev, cleanTask]);
         } else if (destination.droppableId === 'low') {
-          setLowPriorityTasks(prev => [...prev, taskToAdd]);
+          setLowPriorityTasks(prev => [...prev, cleanTask]);
         }
 
         // Aggiorna i JSON: aggiungi al container di destinazione
