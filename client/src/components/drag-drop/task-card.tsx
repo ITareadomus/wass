@@ -129,7 +129,7 @@ export default function TaskCard({
         <DialogContent className="sm:max-w-2xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              Dettagli Task #{task.name}
+              Dettagli Task #{(task as any).task_id ?? task.id}
               {task.is_straordinaria ? (
                 <Badge className="bg-red-500 text-white border-2 border-black">
                   Straordinaria
