@@ -69,6 +69,7 @@ class Task:
     address: Optional[str] = None
     alias: Optional[str] = None
     small_equipment: bool = False
+    straordinaria: bool = False
 
 
 @dataclass
@@ -175,7 +176,13 @@ def travel_minutes(a: Optional[Task], b: Optional[Task]) -> float:
 
 
 def can_handle_premium(cleaner: Cleaner, task: Task) -> bool:
-    return False if (task.is_premium and not cleaner.is_premium) else True
+    # Premium task requires premium cleaner
+    if task.is_premium and not cleaner.is_premium:
+        return False
+    # Straordinaria requires premium cleaner
+    if task.straordinaria and not cleaner.is_premium:
+        return False
+    return True
 
 
 def premium_soft_penalty(cleaner: Cleaner, task: Task) -> float:
@@ -307,9 +314,10 @@ def load_tasks() -> List[Task]:
                 address=t.get("address"),
                 alias=t.get("alias"),
                 small_equipment=bool(t.get("small_equipment", False)),
+                straordinaria=bool(t.get("straordinaria", False)),
             ))
-    # Premium-first, poi per checkout
-    tasks.sort(key=lambda x: (not x.is_premium, x.checkout_time))
+    # Straordinarie first, poi premium-first, poi per checkout
+    tasks.sort(key=lambda x: (not x.straordinaria, not x.is_premium, x.checkout_time))
     return tasks
 
 
@@ -335,6 +343,13 @@ def plan_day(tasks: List[Task],
                 second_local = float("inf")
 
                 for pos in range(len(cl.route) + 1):
+                    # Straordinaria MUST be first (pos=0, sequence=1)
+                    if task.straordinaria and pos != 0:
+                        continue
+                    # If route already has straordinaria at pos=0, can't add another straordinaria
+                    if task.straordinaria and len(cl.route) > 0 and cl.route[0].straordinaria:
+                        continue
+                    
                     # redirect: se l'inserimento crea hop > 15' e c'è un libero idoneo, salta
                     prev_t = cl.route[pos -
                                       1] if (pos - 1) >= 0 and (pos - 1) < len(
@@ -476,6 +491,7 @@ def build_output(cleaners: List[Cleaner],
             "algorithm":
             "regret_insertion + redirect + best-of-infeasible",
             "notes": [
+                "Straordinarie-first (only premium, must be sequence=1)",
                 "Premium-first",
                 "Hard cap: travel/gap > 22' infeasible (tranne fallback quando TUTTE le mosse superano 22')",
                 "3rd task only if travel<=10' and gap<=10' (12'/12' if same street/building)",
