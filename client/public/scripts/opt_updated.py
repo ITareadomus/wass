@@ -5,18 +5,18 @@ from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Tuple
 from pathlib import Path
 
-    # =============================
-    # I/O paths
-    # =============================
-    INPUT_TASKS    = Path("early_out.json")
-    INPUT_CLEANERS = Path("selected_cleaners.json")
-    OUTPUT_ASSIGN  = Path("early_out_assignments.json")
+# =============================
+# I/O paths
+# =============================
+INPUT_TASKS    = Path("early_out.json")
+INPUT_CLEANERS = Path("selected_cleaners.json")
+OUTPUT_ASSIGN  = Path("early_out_assignments.json")
 
-    # =============================
-    # CONFIG
-    # =============================
-    MAX_TASKS_PER_CLEANER          = 3        # 3, ma la 3ª segue la regola "vicina"
-    REGRET_K                       = 2
+# =============================
+# CONFIG
+# =============================
+MAX_TASKS_PER_CLEANER          = 3        # 3, ma la 3ª segue la regola "vicina"
+REGRET_K                       = 2
 
     # Hard caps (sempre attivi)
     HARD_MAX_TRAVEL = 22.0  # travel > 22' => infeasible
