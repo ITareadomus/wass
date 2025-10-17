@@ -7,11 +7,13 @@ from typing import Any, Dict, List, Optional, Tuple
 from pathlib import Path
 
 # =============================
-# I/O paths (use uploaded files)
+# I/O paths
 # =============================
-INPUT_TASKS    = Path("/mnt/data/early_out.json")
-INPUT_CLEANERS = Path("/mnt/data/selected_cleaners.json")
-OUTPUT_ASSIGN  = Path("/mnt/data/early_out_assignments.json")
+BASE = Path(__file__).parent.parent / "data"
+INPUT_TASKS    = BASE / "output" / "early_out.json"
+INPUT_CLEANERS = BASE / "cleaners" / "selected_cleaners.json"
+OUTPUT_ASSIGN  = BASE / "output" / "early_out_assignments.json"
+TIMELINE_ASSIGNMENTS = BASE / "output" / "timeline_assignments.json"
 
 # =============================
 # CONFIG
@@ -448,8 +450,45 @@ def main():
     tasks = load_tasks()
     planners, leftovers = plan_day(tasks, cleaners)
     output = build_output(planners, leftovers)
+    
+    # Save early_out_assignments.json
     OUTPUT_ASSIGN.write_text(json.dumps(output, ensure_ascii=False, indent=2), encoding="utf-8")
-    print(f"✅ Wrote {OUTPUT_ASSIGN}")
+    print(f"✅ Scritto {OUTPUT_ASSIGN}")
+    print(f"   Assegnate: {output['meta']['assigned']}")
+    print(f"   Non assegnate: {output['meta']['unassigned']}")
+    
+    # Update timeline_assignments.json
+    timeline_data = {"assignments": []}
+    if TIMELINE_ASSIGNMENTS.exists():
+        try:
+            timeline_data = json.loads(TIMELINE_ASSIGNMENTS.read_text(encoding="utf-8"))
+        except:
+            pass
+    
+    # Remove old early-out assignments
+    assigned_codes = set()
+    for cleaner_entry in output["early_out_tasks_assigned"]:
+        for task in cleaner_entry.get("tasks", []):
+            assigned_codes.add(str(task["logistic_code"]))
+    
+    timeline_data["assignments"] = [
+        a for a in timeline_data.get("assignments", [])
+        if str(a.get("logistic_code")) not in assigned_codes
+    ]
+    
+    # Add new assignments
+    for cleaner_entry in output["early_out_tasks_assigned"]:
+        cleaner_id = cleaner_entry["cleaner"]["id"]
+        for task in cleaner_entry.get("tasks", []):
+            timeline_data["assignments"].append({
+                "logistic_code": str(task["logistic_code"]),
+                "cleanerId": cleaner_id,
+                "assignment_type": "smista_button",
+                "sequence": task.get("sequence", 0)
+            })
+    
+    TIMELINE_ASSIGNMENTS.write_text(json.dumps(timeline_data, ensure_ascii=False, indent=2), encoding="utf-8")
+    print(f"✅ Aggiornato {TIMELINE_ASSIGNMENTS}")
 
 if __name__ == "__main__":
     main()
