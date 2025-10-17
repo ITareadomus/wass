@@ -68,9 +68,14 @@ export default function GenerateAssignments() {
         setIsExtracting(true);
         setExtractionStep("Estrazione dati dal database...");
 
+        // Leggi la data selezionata da localStorage
+        const selectedDate = localStorage.getItem('selected_work_date');
+        console.log("Data selezionata da localStorage:", selectedDate);
+
         const response = await fetch('/api/extract-data', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' }
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ date: selectedDate || undefined })
         });
 
         if (!response.ok) {
