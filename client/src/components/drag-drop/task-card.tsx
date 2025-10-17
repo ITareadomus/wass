@@ -258,17 +258,29 @@ export default function TaskCard({
               </div>
             </div>
 
-            {/* Nuova riga: Travel Time - Start Time/End Time */}
+            {/* Nuova riga: Travel Time/Small Equipment - Start Time/End Time */}
             <div className="grid grid-cols-2 gap-4">
-              <div>
-                <p className="text-sm font-semibold text-muted-foreground">
-                  Travel Time
-                </p>
-                <p className="text-sm">
-                  {assignmentTimes.travel_time !== undefined 
-                    ? `${assignmentTimes.travel_time} minuti` 
-                    : "non assegnato"}
-                </p>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <p className="text-sm font-semibold text-muted-foreground">
+                    Travel Time
+                  </p>
+                  <p className="text-sm">
+                    {assignmentTimes.travel_time !== undefined 
+                      ? `${assignmentTimes.travel_time} min` 
+                      : "n/a"}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-muted-foreground">
+                    Small Equip.
+                  </p>
+                  <p className="text-sm">
+                    {(task as any).small_equipment !== undefined 
+                      ? ((task as any).small_equipment ? "Sì" : "No")
+                      : "n/a"}
+                  </p>
+                </div>
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <div>
