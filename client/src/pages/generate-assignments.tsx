@@ -198,16 +198,16 @@ export default function GenerateAssignments() {
 
       console.log("Tasks convertiti - Early:", initialEarlyOut.length, "High:", initialHigh.length, "Low:", initialLow.length);
 
-      // Crea un Set di logistic_code assegnati nella timeline
-      const assignedInTimelineCodes = new Set(
-        timelineAssignmentsData.assignments.map((a: any) => String(a.logistic_code))
+      // Crea una mappa di logistic_code -> assegnazione timeline
+      const timelineAssignmentsMap = new Map(
+        timelineAssignmentsData.assignments.map((a: any) => [String(a.logistic_code), a])
       );
 
-      console.log("Task assegnate nella timeline (logistic_code):", Array.from(assignedInTimelineCodes));
+      console.log("Task assegnate nella timeline (logistic_code):", Array.from(timelineAssignmentsMap.keys()));
 
       // Filtra le task già presenti nella timeline dai container
       const filteredEarlyOut = initialEarlyOut.filter(task => {
-        const isAssigned = assignedInTimelineCodes.has(String(task.name));
+        const isAssigned = timelineAssignmentsMap.has(String(task.name));
         if (isAssigned) {
           console.log(`Task ${task.name} filtrata da Early Out (è nella timeline)`);
         }
@@ -215,7 +215,7 @@ export default function GenerateAssignments() {
       });
 
       const filteredHigh = initialHigh.filter(task => {
-        const isAssigned = assignedInTimelineCodes.has(String(task.name));
+        const isAssigned = timelineAssignmentsMap.has(String(task.name));
         if (isAssigned) {
           console.log(`Task ${task.name} filtrata da High Priority (è nella timeline)`);
         }
@@ -223,7 +223,7 @@ export default function GenerateAssignments() {
       });
 
       const filteredLow = initialLow.filter(task => {
-        const isAssigned = assignedInTimelineCodes.has(String(task.name));
+        const isAssigned = timelineAssignmapsMap.has(String(task.name));
         if (isAssigned) {
           console.log(`Task ${task.name} filtrata da Low Priority (è nella timeline)`);
         }
@@ -236,12 +236,10 @@ export default function GenerateAssignments() {
       setHighPriorityTasks(filteredHigh);
       setLowPriorityTasks(filteredLow);
 
-      // Crea l'array unificato con le assegnazioni della timeline
+      // Crea l'array unificato con TUTTE le task e le loro assegnazioni
       const allTasks = [...initialEarlyOut, ...initialHigh, ...initialLow];
       const tasksWithAssignments = allTasks.map(task => {
-        const timelineAssignment = timelineAssignmentsData.assignments.find(
-          (a: any) => a.logistic_code === task.name || a.taskId === task.id
-        );
+        const timelineAssignment = timelineAssignmentsMap.get(String(task.name));
         if (timelineAssignment) {
           return {
             ...task,
