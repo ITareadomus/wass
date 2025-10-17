@@ -240,6 +240,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const earlyOutPath = path.join(process.cwd(), 'client/public/data/output/early_out.json');
       const highPriorityPath = path.join(process.cwd(), 'client/public/data/output/high_priority.json');
       const lowPriorityPath = path.join(process.cwd(), 'client/public/data/output/low_priority.json');
+      const earlyOutAssignmentsPath = path.join(process.cwd(), 'client/public/data/output/early_out_assignments.json');
 
       const [earlyOutData, highPriorityData, lowPriorityData] = await Promise.all([
         fs.readFile(earlyOutPath, 'utf8').then(JSON.parse),
@@ -314,6 +315,58 @@ export async function registerRoutes(app: Express): Promise<Server> {
         fs.writeFile(highPriorityPath, JSON.stringify(highPriorityData, null, 2)),
         fs.writeFile(lowPriorityPath, JSON.stringify(lowPriorityData, null, 2))
       ]);
+      
+      // Aggiungi il task a early_out_assignments.json se è stato spostato nell'early-out
+      if (toContainer === 'early-out') {
+        let earlyOutAssignmentsData: any = { early_out_tasks_assigned: [], meta: {} };
+        try {
+          const existingData = await fs.readFile(earlyOutAssignmentsPath, 'utf8');
+          earlyOutAssignmentsData = JSON.parse(existingData);
+        } catch (error) {
+          // File non esiste, usa struttura vuota
+        }
+        
+        // Assicurati che taskToMove abbia le proprietà necessarie per essere aggiunto
+        const taskToAdd = {
+          task_id: parseInt(taskId),
+          logistic_code: parseInt(logisticCode),
+          // Aggiungi altre proprietà rilevanti se necessario dal taskToMove
+          // Ad esempio: address, cleaning_time, etc.
+          // Se queste proprietà non sono presenti in taskToMove, dovrai caricarle
+          // dal storage o assicurarti che siano incluse quando taskToMove viene creato.
+          // Per ora, assumiamo che le proprietà essenziali siano presenti o possano essere dedotte.
+          // Se 'taskToMove' proviene da earlyOutData, dovrebbe già contenere queste info.
+          // Se proviene da highPriorityData o lowPriorityData, potrebbe mancare 'logistic_code' se non era presente lì.
+          // Dobbiamo gestire questo caso.
+        };
+
+        // Aggiungi taskToAdd se non esiste già (basato su task_id o logistic_code)
+        const alreadyExists = earlyOutAssignmentsData.early_out_tasks_assigned.some(
+          (t: any) => (taskToAdd.task_id && t.task_id === taskToAdd.task_id) || (taskToAdd.logistic_code && t.logistic_code === taskToAdd.logistic_code)
+        );
+
+        if (!alreadyExists) {
+          // Se taskToMove è stato appena spostato da 'timeline' a 'early-out' (implicito nel toContainer === 'early-out'),
+          // e se taskToMove non ha `logistic_code` ma solo `taskId` (o viceversa), dobbiamo assicurarci di avere entrambi
+          // o almeno uno dei due per identificare univocamente il task.
+          // Il `taskToMove` ottenuto dallo splice dovrebbe contenere i dati originali del task.
+          // Se `logisticCode` è fornito nel body, usiamolo. Altrimenti, cerchiamo di recuperarlo da `taskToMove`.
+          const finalTaskId = taskToAdd.task_id;
+          const finalLogisticCode = taskToAdd.logistic_code || (taskToMove.logistic_code ? parseInt(taskToMove.logistic_code) : undefined);
+
+          if (finalTaskId !== undefined && finalLogisticCode !== undefined) {
+              earlyOutAssignmentsData.early_out_tasks_assigned.push({
+                task_id: finalTaskId,
+                logistic_code: finalLogisticCode,
+                // Aggiungi altre proprietà se necessario
+              });
+              await fs.writeFile(earlyOutAssignmentsPath, JSON.stringify(earlyOutAssignmentsData, null, 2));
+          } else {
+              console.warn("Impossibile aggiungere task a early_out_assignments.json: manca task_id o logistic_code.");
+          }
+        }
+      }
+
 
       res.json({ success: true, message: "Task aggiornato con successo" });
     } catch (error: any) {
@@ -892,6 +945,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     }
   });
+
+  // Endpoint per rimuovere un task da early_out_assignments.json
+  app.post("/api/remove-from-early-out-assignments", async (req, res) => {
+    try {
+      const { taskId, logisticCode } = req.body;
+      const earlyOutAssignmentsPath = path.join(process.cwd(), 'client/public/data/output/early_out_assignments.json');
+
+      console.log(`Rimozione da early_out_assignments.json - taskId: ${taskId}, logisticCode: ${logisticCode}`);
+
+      let assignmentsData: any = { early_out_tasks_assigned: [], meta: {} };
+      try {
+        const existingData = await fs.readFile(earlyOutAssignmentsPath, 'utf8');
+        assignmentsData = JSON.parse(existingData);
+      } catch (error) {
+        // File non esiste, usa struttura vuota
+      }
+
+      const initialLength = assignmentsData.early_out_tasks_assigned.length;
+      assignmentsData.early_out_tasks_assigned = assignmentsData.early_out_tasks_assigned.filter(
+        (t: any) => {
+          const matchId = String(t.task_id) === String(taskId);
+          const matchCode = String(t.logistic_code) === String(logisticCode);
+          return !matchId && !matchCode;
+        }
+      );
+
+      console.log(`Early out assignments prima: ${initialLength}, dopo: ${assignmentsData.early_out_tasks_assigned.length}`);
+
+      await fs.writeFile(earlyOutAssignmentsPath, JSON.stringify(assignmentsData, null, 2));
+
+      res.json({ success: true, message: "Task rimosso da early_out_assignments.json con successo" });
+    } catch (error: any) {
+      console.error("Errore nella rimozione da early_out_assignments.json:", error);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
 
   const httpServer = createServer(app);
   return httpServer;
