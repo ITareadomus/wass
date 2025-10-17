@@ -1,4 +1,4 @@
-    # -*- coding: utf-8 -*-
+# -*- coding: utf-8 -*-
 from __future__ import annotations
 import json, math
 from dataclasses import dataclass, field
@@ -8,88 +8,93 @@ from pathlib import Path
 # =============================
 # I/O paths
 # =============================
-INPUT_TASKS    = Path("early_out.json")
+INPUT_TASKS = Path("early_out.json")
 INPUT_CLEANERS = Path("selected_cleaners.json")
-OUTPUT_ASSIGN  = Path("early_out_assignments.json")
+OUTPUT_ASSIGN = Path("early_out_assignments.json")
 
 # =============================
 # CONFIG
 # =============================
-MAX_TASKS_PER_CLEANER          = 3        # 3, ma la 3ª segue la regola "vicina"
-REGRET_K                       = 2
+MAX_TASKS_PER_CLEANER = 3  # 3, ma la 3ª segue la regola "vicina"
+REGRET_K = 2
 
 # Hard caps (sempre attivi)
 HARD_MAX_TRAVEL = 22.0  # travel > 22' => infeasible
-HARD_MAX_GAP    = 22.0  # (start_B - end_A) > 22' => infeasible
+HARD_MAX_GAP = 22.0  # (start_B - end_A) > 22' => infeasible
 
 # 3ª task (2→3 hop) - default e deroga stessa via/edificio
-THIRD_TASK_MAX_TRAVEL          = 10.0
-THIRD_TASK_MAX_GAP             = 10.0
-THIRD_TASK_SAME_STREET_TRAVEL  = 12.0
-THIRD_TASK_SAME_STREET_GAP     = 12.0
+THIRD_TASK_MAX_TRAVEL = 10.0
+THIRD_TASK_MAX_GAP = 10.0
+THIRD_TASK_SAME_STREET_TRAVEL = 12.0
+THIRD_TASK_SAME_STREET_GAP = 12.0
 
 # Redirect: se un inserimento crea hop > 15', preferisci un cleaner libero idoneo
 REDIRECT_TRAVEL = 15.0
 
 # Travel model (min)
-SHORT_RANGE_KM       = 0.30
-SHORT_BASE_MIN       = 3.5
+SHORT_RANGE_KM = 0.30
+SHORT_BASE_MIN = 3.5
 WALK_SLOW_MIN_PER_KM = 16.0
 
-BASE_OVERHEAD_MIN    = 6.0
-SCALED_OH_KM         = 0.50
-K_SWITCH_KM          = 1.2
-WALK_MIN_PER_KM      = 12.0
-RIDE_MIN_PER_KM      = 4.5
+BASE_OVERHEAD_MIN = 6.0
+SCALED_OH_KM = 0.50
+K_SWITCH_KM = 1.2
+WALK_MIN_PER_KM = 12.0
+RIDE_MIN_PER_KM = 4.5
 
-EQ_EXTRA_LT05        = 2.0
-EQ_EXTRA_GE05        = 1.0
+EQ_EXTRA_LT05 = 2.0
+EQ_EXTRA_GE05 = 1.0
 
-MIN_TRAVEL           = 2.0
-MAX_TRAVEL           = 45.0
+MIN_TRAVEL = 2.0
+MAX_TRAVEL = 45.0
 
 # Costi/penalità
-ACTIVATION_COST                = 20.0
-PENALTY_STANDARD_TO_PREMIUM    = 0.0   # i premium possono fare standard senza malus
-SOFT_PENALTY_BASE_KM           = 1.0   # oltre questo km, penalità geografica soft
-ALPHA_SOFT_GEO                 = 50.0  # coefficiente penalità molto forte per viaggi lunghi
+ACTIVATION_COST = 20.0
+PENALTY_STANDARD_TO_PREMIUM = 0.0  # i premium possono fare standard senza malus
+SOFT_PENALTY_BASE_KM = 1.0  # oltre questo km, penalità geografica soft
+ALPHA_SOFT_GEO = 50.0  # coefficiente penalità molto forte per viaggi lunghi
+
 
 @dataclass
 class Task:
-        task_id: str
-        logistic_code: str
-        lat: float
-        lng: float
-        cleaning_time: int
-        checkout_time: int
-        checkin_time: int
-        is_premium: bool
-        apt_type: Optional[str] = None
-        address: Optional[str] = None
-        alias: Optional[str] = None
-        small_equipment: bool = False
+    task_id: str
+    logistic_code: str
+    lat: float
+    lng: float
+    cleaning_time: int
+    checkout_time: int
+    checkin_time: int
+    is_premium: bool
+    apt_type: Optional[str] = None
+    address: Optional[str] = None
+    alias: Optional[str] = None
+    small_equipment: bool = False
 
-    @dataclass
-    class Cleaner:
-        id: Any
-        name: str
-        lastname: str
-        role: str
-        is_premium: bool
-        home_lat: Optional[float] = None
-        home_lng: Optional[float] = None
-        route: List[Task] = field(default_factory=list)
 
-    # -------- Utils --------
+@dataclass
+class Cleaner:
+    id: Any
+    name: str
+    lastname: str
+    role: str
+    is_premium: bool
+    home_lat: Optional[float] = None
+    home_lng: Optional[float] = None
+    route: List[Task] = field(default_factory=list)
+
+
+# -------- Utils --------
 def hhmm_to_min(hhmm: Optional[str], default: str = "10:00") -> int:
     if not hhmm or not isinstance(hhmm, str) or ":" not in hhmm:
         hhmm = default
     h, m = hhmm.strip().split(":")
-    return int(h)*60 + int(m)
+    return int(h) * 60 + int(m)
+
 
 def min_to_hhmm(m: float) -> str:
     m = int(round(m))
     return f"{m//60:02d}:{m%60:02d}"
+
 
 def normalize_addr(s: Optional[str]) -> str:
     s = (s or "").upper()
@@ -97,6 +102,7 @@ def normalize_addr(s: Optional[str]) -> str:
         s = s.replace(ch, " ")
     s = " ".join(s.split())
     return s.strip()
+
 
 def split_street_number(addr: str):
     tokens = addr.split()
@@ -107,6 +113,7 @@ def split_street_number(addr: str):
         return " ".join(tokens[:-1]).strip(), last
     return addr, None
 
+
 def same_building(a: Optional[str], b: Optional[str]) -> bool:
     na, nb = normalize_addr(a), normalize_addr(b)
     if not na or not nb:
@@ -114,6 +121,7 @@ def same_building(a: Optional[str], b: Optional[str]) -> bool:
     sa, ca = split_street_number(na)
     sb, cb = split_street_number(nb)
     return (sa == sb) and (ca is not None) and (cb is not None) and (ca == cb)
+
 
 def same_street(a: Optional[str], b: Optional[str]) -> bool:
     na, nb = normalize_addr(a), normalize_addr(b)
@@ -123,129 +131,149 @@ def same_street(a: Optional[str], b: Optional[str]) -> bool:
     sb, _ = split_street_number(nb)
     return sa == sb
 
+
 def haversine_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
-        R = 6371.0
-        phi1, phi2 = math.radians(lat1), math.radians(lat2)
-        dphi = math.radians(lat2 - lat1)
-        dl = math.radians(lon2 - lon1)
-        a = math.sin(dphi/2)**2 + math.cos(phi1)*math.cos(phi2)*math.sin(dl/2)**2
-        c = 2 * math.atan2(math.sqrt(a), math.sqrt(1-a))
-        return R * c
+    R = 6371.0
+    phi1, phi2 = math.radians(lat1), math.radians(lat2)
+    dphi = math.radians(lat2 - lat1)
+    dl = math.radians(lon2 - lon1)
+    a = math.sin(
+        dphi / 2)**2 + math.cos(phi1) * math.cos(phi2) * math.sin(dl / 2)**2
+    c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+    return R * c
 
-    def travel_minutes(a: Optional[Task], b: Optional[Task]) -> float:
-        if a is None or b is None:
-            return 0.0
-        km = haversine_km(a.lat, a.lng, b.lat, b.lng)
 
-        if same_building(a.address, b.address):
-            t = SHORT_BASE_MIN
-            return max(MIN_TRAVEL, min(MAX_TRAVEL, t))
+def travel_minutes(a: Optional[Task], b: Optional[Task]) -> float:
+    if a is None or b is None:
+        return 0.0
+    km = haversine_km(a.lat, a.lng, b.lat, b.lng)
 
-        if km < SHORT_RANGE_KM:
-            t = SHORT_BASE_MIN + WALK_SLOW_MIN_PER_KM * km
-        else:
-            overhead = BASE_OVERHEAD_MIN * (km / SCALED_OH_KM) if km < SCALED_OH_KM else BASE_OVERHEAD_MIN
-            t = overhead
-            if km <= K_SWITCH_KM:
-                t += WALK_MIN_PER_KM * km
-            else:
-                t += WALK_MIN_PER_KM * K_SWITCH_KM + RIDE_MIN_PER_KM * (km - K_SWITCH_KM)
-
-        if getattr(a, "small_equipment", False) or getattr(b, "small_equipment", False):
-            t += (EQ_EXTRA_LT05 if km < 0.5 else EQ_EXTRA_GE05)
-
-        if same_street(a.address, b.address) and km < 0.10:
-            t += 1.0
-
+    if same_building(a.address, b.address):
+        t = SHORT_BASE_MIN
         return max(MIN_TRAVEL, min(MAX_TRAVEL, t))
 
-    def can_handle_premium(cleaner: Cleaner, task: Task) -> bool:
-        return False if (task.is_premium and not cleaner.is_premium) else True
+    if km < SHORT_RANGE_KM:
+        t = SHORT_BASE_MIN + WALK_SLOW_MIN_PER_KM * km
+    else:
+        overhead = BASE_OVERHEAD_MIN * (
+            km / SCALED_OH_KM) if km < SCALED_OH_KM else BASE_OVERHEAD_MIN
+        t = overhead
+        if km <= K_SWITCH_KM:
+            t += WALK_MIN_PER_KM * km
+        else:
+            t += WALK_MIN_PER_KM * K_SWITCH_KM + RIDE_MIN_PER_KM * (
+                km - K_SWITCH_KM)
 
-    def premium_soft_penalty(cleaner: Cleaner, task: Task) -> float:
-        return PENALTY_STANDARD_TO_PREMIUM if (not task.is_premium and cleaner.is_premium) else 0.0
+    if getattr(a, "small_equipment", False) or getattr(b, "small_equipment",
+                                                       False):
+        t += (EQ_EXTRA_LT05 if km < 0.5 else EQ_EXTRA_GE05)
 
-    # -------- Schedulazione / costo --------
-    def evaluate_route_cost(route: List[Task]) -> Tuple[float, List[Tuple[int, int, int]]]:
-        if not route:
-            return 0.0, []
-        total = ACTIVATION_COST
-        schedule: List[Tuple[int, int, int]] = []
-        prev: Optional[Task] = None
-        prev_finish: Optional[float] = None
-        cur = 0.0
-        for i, t in enumerate(route):
-            tt = travel_minutes(prev, t)
-            total += tt
-            # Hard cap travel
-            if tt > HARD_MAX_TRAVEL:
+    if same_street(a.address, b.address) and km < 0.10:
+        t += 1.0
+
+    return max(MIN_TRAVEL, min(MAX_TRAVEL, t))
+
+
+def can_handle_premium(cleaner: Cleaner, task: Task) -> bool:
+    return False if (task.is_premium and not cleaner.is_premium) else True
+
+
+def premium_soft_penalty(cleaner: Cleaner, task: Task) -> float:
+    return PENALTY_STANDARD_TO_PREMIUM if (not task.is_premium
+                                           and cleaner.is_premium) else 0.0
+
+
+# -------- Schedulazione / costo --------
+def evaluate_route_cost(
+        route: List[Task]) -> Tuple[float, List[Tuple[int, int, int]]]:
+    if not route:
+        return 0.0, []
+    total = ACTIVATION_COST
+    schedule: List[Tuple[int, int, int]] = []
+    prev: Optional[Task] = None
+    prev_finish: Optional[float] = None
+    cur = 0.0
+    for i, t in enumerate(route):
+        tt = travel_minutes(prev, t)
+        total += tt
+        # Hard cap travel
+        if tt > HARD_MAX_TRAVEL:
+            return float("inf"), []
+        cur += tt
+        arrival = cur
+        wait = max(0.0, t.checkout_time - arrival)
+        total += wait
+        cur += wait
+        start = cur
+        finish = start + t.cleaning_time
+
+        # Hard cap gap porta-a-porta
+        if prev_finish is not None and (start - prev_finish) > HARD_MAX_GAP:
+            return float("inf"), []
+
+        # Regola 3ª task
+        if i == 2 and prev is not None:
+            relax = same_building(prev.address, t.address) or same_street(
+                prev.address, t.address)
+            t_travel_cap = THIRD_TASK_SAME_STREET_TRAVEL if relax else THIRD_TASK_MAX_TRAVEL
+            t_gap_cap = THIRD_TASK_SAME_STREET_GAP if relax else THIRD_TASK_MAX_GAP
+            door2door = start - prev_finish if prev_finish is not None else 0.0
+            if tt > t_travel_cap or door2door > t_gap_cap:
                 return float("inf"), []
-            cur += tt
-            arrival = cur
-            wait = max(0.0, t.checkout_time - arrival)
-            total += wait
-            cur += wait
-            start = cur
-            finish = start + t.cleaning_time
 
-            # Hard cap gap porta-a-porta
-            if prev_finish is not None and (start - prev_finish) > HARD_MAX_GAP:
-                return float("inf"), []
+        if finish >= t.checkin_time:
+            return float("inf"), []
 
-            # Regola 3ª task
-            if i == 2 and prev is not None:
-                relax = same_building(prev.address, t.address) or same_street(prev.address, t.address)
-                t_travel_cap = THIRD_TASK_SAME_STREET_TRAVEL if relax else THIRD_TASK_MAX_TRAVEL
-                t_gap_cap    = THIRD_TASK_SAME_STREET_GAP    if relax else THIRD_TASK_MAX_GAP
-                door2door = start - prev_finish if prev_finish is not None else 0.0
-                if tt > t_travel_cap or door2door > t_gap_cap:
-                    return float("inf"), []
+        total += t.cleaning_time
+        cur = finish
+        schedule.append((int(arrival), int(start), int(finish)))
+        prev = t
+        prev_finish = finish
+    return total, schedule
 
-            if finish >= t.checkin_time:
-                return float("inf"), []
 
-            total += t.cleaning_time
-            cur = finish
-            schedule.append((int(arrival), int(start), int(finish)))
-            prev = t
-            prev_finish = finish
-        return total, schedule
+def delta_insert_cost(route: List[Task], task: Task,
+                      pos: int) -> Tuple[float, List[Task]]:
+    base, _ = evaluate_route_cost(route)
+    new_route = route[:pos] + [task] + route[pos:]
+    new, _ = evaluate_route_cost(new_route)
+    return new - base, new_route
 
-    def delta_insert_cost(route: List[Task], task: Task, pos: int) -> Tuple[float, List[Task]]:
-        base, _ = evaluate_route_cost(route)
-        new_route = route[:pos] + [task] + route[pos:]
-        new, _ = evaluate_route_cost(new_route)
-        return new - base, new_route
 
-    def max_new_hop_if_insert(route: List[Task], task: Task, pos: int) -> float:
-        prev_t = route[pos-1] if (pos-1) >= 0 and (pos-1) < len(route) else None
-        next_t = route[pos]   if pos < len(route) else None
-        hop_left  = travel_minutes(prev_t, task)  if prev_t else 0.0
-        hop_right = travel_minutes(task, next_t)  if next_t else 0.0
-        return max(hop_left, hop_right)
+def max_new_hop_if_insert(route: List[Task], task: Task, pos: int) -> float:
+    prev_t = route[pos -
+                   1] if (pos - 1) >= 0 and (pos - 1) < len(route) else None
+    next_t = route[pos] if pos < len(route) else None
+    hop_left = travel_minutes(prev_t, task) if prev_t else 0.0
+    hop_right = travel_minutes(task, next_t) if next_t else 0.0
+    return max(hop_left, hop_right)
 
-    def has_free_cleaner_for(task: Task, cleaners: List[Cleaner]) -> bool:
-        for free in cleaners:
-            if free.route:
-                continue
-            if not can_handle_premium(free, task):
-                continue
-            new_route = [task]
-            cost, _ = evaluate_route_cost(new_route)  # applica cap, orari, 3ª task non rilevante su singola
-            if not math.isinf(cost):
-                return True
-        return False
 
-    # -------- Planner --------
-    def load_cleaners() -> List[Cleaner]:
-        data = json.loads(INPUT_CLEANERS.read_text(encoding="utf-8"))
-        cleaners: List[Cleaner] = []
-        for c in data.get("cleaners", []):
-            role = (c.get("role") or "").strip()
-            is_premium = bool(c.get("premium", (role.lower() == "premium")))
-            if (role or "").lower() == "formatore":
-                continue
-            cleaners.append(Cleaner(
+def has_free_cleaner_for(task: Task, cleaners: List[Cleaner]) -> bool:
+    for free in cleaners:
+        if free.route:
+            continue
+        if not can_handle_premium(free, task):
+            continue
+        new_route = [task]
+        cost, _ = evaluate_route_cost(
+            new_route)  # applica cap, orari, 3ª task non rilevante su singola
+        if not math.isinf(cost):
+            return True
+    return False
+
+
+# -------- Planner --------
+def load_cleaners() -> List[Cleaner]:
+    data = json.loads(INPUT_CLEANERS.read_text(encoding="utf-8"))
+    cleaners: List[Cleaner] = []
+    for c in data.get("cleaners", []):
+        role = (c.get("role") or "").strip()
+        is_premium = bool(c.get("premium", (role.lower() == "premium")))
+        if (role or "").lower() == "formatore":
+            continue
+        cleaners.append(
+            Cleaner(
                 id=c.get("id"),
                 name=c.get("name") or str(c.get("id")),
                 lastname=c.get("lastname", ""),
@@ -254,18 +282,20 @@ def haversine_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
                 home_lat=c.get("home_lat"),
                 home_lng=c.get("home_lng"),
             ))
-        return cleaners
+    return cleaners
 
-    def load_tasks() -> List[Task]:
-        data = json.loads(INPUT_TASKS.read_text(encoding="utf-8"))
-        eo_start_min = hhmm_to_min("10:00")
-        tasks: List[Task] = []
-        for t in data.get("early_out_tasks", []):
-            checkout = hhmm_to_min(t.get("checkout_time"), default="10:00")
-            if checkout < eo_start_min:
-                checkout = eo_start_min
-            checkin  = hhmm_to_min(t.get("checkin_time"),  default="23:59")
-            tasks.append(Task(
+
+def load_tasks() -> List[Task]:
+    data = json.loads(INPUT_TASKS.read_text(encoding="utf-8"))
+    eo_start_min = hhmm_to_min("10:00")
+    tasks: List[Task] = []
+    for t in data.get("early_out_tasks", []):
+        checkout = hhmm_to_min(t.get("checkout_time"), default="10:00")
+        if checkout < eo_start_min:
+            checkout = eo_start_min
+        checkin = hhmm_to_min(t.get("checkin_time"), default="23:59")
+        tasks.append(
+            Task(
                 task_id=str(t.get("task_id")),
                 logistic_code=str(t.get("logistic_code")),
                 lat=float(t.get("lat")),
@@ -279,156 +309,205 @@ def haversine_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
                 alias=t.get("alias"),
                 small_equipment=bool(t.get("small_equipment", False)),
             ))
-        # Premium-first, poi per checkout
-        tasks.sort(key=lambda x: (not x.is_premium, x.checkout_time))
-        return tasks
+    # Premium-first, poi per checkout
+    tasks.sort(key=lambda x: (not x.is_premium, x.checkout_time))
+    return tasks
 
-    def plan_day(tasks: List[Task], cleaners: List[Cleaner]) -> Tuple[List[Cleaner], List[Task]]:
-        unassigned = tasks[:]
-        while unassigned:
-            chosen = None  # (regret, delta, task, cleaner, pos, new_route)
-            for task in list(unassigned):
-                per_cleaner_best: List[Tuple[Cleaner, float, float, int, List[Task]]] = []
-                min_infeasible_hop = None
-                min_infeasible_choice = None  # (cleaner, pos, new_route, hop)
 
-                for cl in cleaners:
-                    if len(cl.route) >= MAX_TASKS_PER_CLEANER:
-                        continue
-                    if not can_handle_premium(cl, task):
-                        continue
+def plan_day(tasks: List[Task],
+             cleaners: List[Cleaner]) -> Tuple[List[Cleaner], List[Task]]:
+    unassigned = tasks[:]
+    while unassigned:
+        chosen = None  # (regret, delta, task, cleaner, pos, new_route)
+        for task in list(unassigned):
+            per_cleaner_best: List[Tuple[Cleaner, float, float, int,
+                                         List[Task]]] = []
+            min_infeasible_hop = None
+            min_infeasible_choice = None  # (cleaner, pos, new_route, hop)
 
-                    best_local = (float("inf"), -1, [])  # (delta, pos, new_route)
-                    second_local = float("inf")
-
-                    for pos in range(len(cl.route)+1):
-                        # redirect: se l'inserimento crea hop > 15' e c'è un libero idoneo, salta
-                        prev_t = cl.route[pos-1] if (pos-1) >= 0 and (pos-1) < len(cl.route) else None
-                        next_t = cl.route[pos]   if pos < len(cl.route) else None
-                        hop_left  = travel_minutes(prev_t, task)  if prev_t else 0.0
-                        hop_right = travel_minutes(task, next_t)  if next_t else 0.0
-                        if (hop_left > REDIRECT_TRAVEL or hop_right > REDIRECT_TRAVEL) and has_free_cleaner_for(task, cleaners):
-                            continue
-
-                        local_max_hop = max(hop_left, hop_right)
-                        d, new_r = delta_insert_cost(cl.route, task, pos)
-
-                        # se infeasible o hop > 22', tienila come fallback "best-of-infeasible"
-                        if math.isinf(d) or local_max_hop > HARD_MAX_TRAVEL:
-                            if (min_infeasible_hop is None) or (local_max_hop < min_infeasible_hop):
-                                min_infeasible_hop = local_max_hop
-                                min_infeasible_choice = (cl, pos, new_r, local_max_hop)
-                            continue
-
-                        if d < best_local[0]:
-                            second_local = best_local[0]
-                            best_local = (d, pos, new_r)
-                        elif d < second_local:
-                            second_local = d
-
-                    if best_local[1] != -1:
-                        per_cleaner_best.append((cl, best_local[0], second_local, best_local[1], best_local[2]))
-
-                # nessuna mossa fattibile ≤22'? usa il fallback se esiste
-                if not per_cleaner_best:
-                    if min_infeasible_choice is not None:
-                        _cl, _pos, _route, _hop = min_infeasible_choice
-                        _cl.route = _route
-                        unassigned.remove(task)
-                        continue
-                    # altrimenti resta unassigned (si vedrà al giro dopo, ma qui non c'è modo)
+            for cl in cleaners:
+                if len(cl.route) >= MAX_TASKS_PER_CLEANER:
+                    continue
+                if not can_handle_premium(cl, task):
                     continue
 
-                per_cleaner_best.sort(key=lambda x: x[1])  # ordina per miglior delta
-                d1_cl, d1, d2, pos1, route1 = per_cleaner_best[0][0], per_cleaner_best[0][1], per_cleaner_best[0][2], per_cleaner_best[0][3], per_cleaner_best[0][4]
-                # second-best globale (per regret)
-                second_delta = None
-                for c, dd1, dd2, ppos, rroute in per_cleaner_best[1:]:
-                    second_delta = dd1
-                    break
-                if second_delta is None:
-                    second_delta = d1 + 60.0
-                regret = second_delta - d1
-                if (chosen is None) or (regret > chosen[0]) or (abs(regret - chosen[0]) < 1e-6 and d1 < chosen[1]):
-                    chosen = (regret, d1, task, d1_cl, pos1, route1)
+                best_local = (float("inf"), -1, [])  # (delta, pos, new_route)
+                second_local = float("inf")
 
-            if chosen is None:
-                break
-            _, _, task, cl, pos, new_r = chosen
-            cl.route = new_r  # commit
-            unassigned.remove(task)
+                for pos in range(len(cl.route) + 1):
+                    # redirect: se l'inserimento crea hop > 15' e c'è un libero idoneo, salta
+                    prev_t = cl.route[pos -
+                                      1] if (pos - 1) >= 0 and (pos - 1) < len(
+                                          cl.route) else None
+                    next_t = cl.route[pos] if pos < len(cl.route) else None
+                    hop_left = travel_minutes(prev_t, task) if prev_t else 0.0
+                    hop_right = travel_minutes(task, next_t) if next_t else 0.0
+                    if (hop_left > REDIRECT_TRAVEL or hop_right
+                            > REDIRECT_TRAVEL) and has_free_cleaner_for(
+                                task, cleaners):
+                        continue
 
-        return cleaners, unassigned
+                    local_max_hop = max(hop_left, hop_right)
+                    d, new_r = delta_insert_cost(cl.route, task, pos)
 
-    def build_output(cleaners: List[Cleaner], unassigned: List[Task]) -> Dict[str, Any]:
-        cleaners_with_tasks: List[Dict[str, Any]] = []
-        for cl in cleaners:
-            if not cl.route:
+                    # se infeasible o hop > 22', tienila come fallback "best-of-infeasible"
+                    if math.isinf(d) or local_max_hop > HARD_MAX_TRAVEL:
+                        if (min_infeasible_hop
+                                is None) or (local_max_hop
+                                             < min_infeasible_hop):
+                            min_infeasible_hop = local_max_hop
+                            min_infeasible_choice = (cl, pos, new_r,
+                                                     local_max_hop)
+                        continue
+
+                    if d < best_local[0]:
+                        second_local = best_local[0]
+                        best_local = (d, pos, new_r)
+                    elif d < second_local:
+                        second_local = d
+
+                if best_local[1] != -1:
+                    per_cleaner_best.append((cl, best_local[0], second_local,
+                                             best_local[1], best_local[2]))
+
+            # nessuna mossa fattibile ≤22'? usa il fallback se esiste
+            if not per_cleaner_best:
+                if min_infeasible_choice is not None:
+                    _cl, _pos, _route, _hop = min_infeasible_choice
+                    _cl.route = _route
+                    unassigned.remove(task)
+                    continue
+                # altrimenti resta unassigned (si vedrà al giro dopo, ma qui non c'è modo)
                 continue
-            total, schedule = evaluate_route_cost(cl.route)
-            if math.isinf(total) or not schedule:
-                continue
-            tasks_list: List[Dict[str, Any]] = []
-            for idx, (t, (arr, start, fin)) in enumerate(zip(cl.route, schedule)):
-                tasks_list.append({
-                    "task_id": int(t.task_id),
-                    "logistic_code": int(t.logistic_code),
-                    "address": t.address,
-                    "premium": t.is_premium,
-                    "cleaning_time": t.cleaning_time,
-                    "start_time": min_to_hhmm(start),
-                    "end_time": min_to_hhmm(fin),
-                    "followup": idx > 0,
-                    "sequence": idx + 1
-                })
-            cleaners_with_tasks.append({
-                "cleaner": {
-                    "id": cl.id,
-                    "name": cl.name,
-                    "lastname": cl.lastname,
-                    "role": cl.role,
-                    "premium": cl.is_premium
-                },
-                "tasks": tasks_list
+
+            per_cleaner_best.sort(
+                key=lambda x: x[1])  # ordina per miglior delta
+            d1_cl, d1, d2, pos1, route1 = per_cleaner_best[0][
+                0], per_cleaner_best[0][1], per_cleaner_best[0][
+                    2], per_cleaner_best[0][3], per_cleaner_best[0][4]
+            # second-best globale (per regret)
+            second_delta = None
+            # The second best delta is either the second best insertion into the best cleaner (d2)
+            # OR the best insertion into the second-best cleaner (dd1 from per_cleaner_best[1])
+            # The original code only checked the best insertion into the second-best cleaner *if it exists*
+            # and defaulted to d1 + 60.0 otherwise.
+
+            # Find the true second best cost across all cleaners and positions.
+            all_deltas = [item[1] for item in per_cleaner_best] + [
+                item[2] for item in per_cleaner_best if item[2] != float("inf")
+            ]
+            all_deltas.sort()
+
+            # The best delta is d1. The second best must be greater than d1.
+            # We search for the first value strictly greater than d1.
+            second_delta_candidate = next(
+                (d for d in all_deltas if d > d1 + 1e-6), None)
+
+            if second_delta_candidate is None:
+                second_delta = d1 + 60.0  # Arbitrary large number if only one feasible option
+            else:
+                second_delta = second_delta_candidate
+
+            regret = second_delta - d1
+
+            if (chosen is None) or (regret > chosen[0]) or (
+                    abs(regret - chosen[0]) < 1e-6 and d1 < chosen[1]):
+                chosen = (regret, d1, task, d1_cl, pos1, route1)
+
+        if chosen is None:
+            break
+        _, _, task, cl, _, new_r = chosen
+        cl.route = new_r  # commit
+        unassigned.remove(task)
+
+    return cleaners, unassigned
+
+
+def build_output(cleaners: List[Cleaner],
+                 unassigned: List[Task]) -> Dict[str, Any]:
+    cleaners_with_tasks: List[Dict[str, Any]] = []
+    for cl in cleaners:
+        if not cl.route:
+            continue
+        total, schedule = evaluate_route_cost(cl.route)
+        if math.isinf(total) or not schedule:
+            continue
+        tasks_list: List[Dict[str, Any]] = []
+        for idx, (t, (arr, start, fin)) in enumerate(zip(cl.route, schedule)):
+            tasks_list.append({
+                "task_id": int(t.task_id),
+                "logistic_code": int(t.logistic_code),
+                "address": t.address,
+                "premium": t.is_premium,
+                "cleaning_time": t.cleaning_time,
+                "start_time": min_to_hhmm(start),
+                "end_time": min_to_hhmm(fin),
+                "followup": idx > 0,
+                "sequence": idx + 1
             })
-        unassigned_list = [{
-            "task_id": int(t.task_id),
-            "logistic_code": int(t.logistic_code),
-            "address": t.address,
-            "reason": "no feasible option; even best-of-infeasible not applicable"  # dovrebbe raramente accadere
-        } for t in unassigned]
+        cleaners_with_tasks.append({
+            "cleaner": {
+                "id": cl.id,
+                "name": cl.name,
+                "lastname": cl.lastname,
+                "role": cl.role,
+                "premium": cl.is_premium
+            },
+            "tasks": tasks_list
+        })
+    unassigned_list = [{
+        "task_id":
+        int(t.task_id),
+        "logistic_code":
+        int(t.logistic_code),
+        "address":
+        t.address,
+        "reason":
+        "no feasible option; even best-of-infeasible not applicable"
+    } for t in unassigned]
 
-        total_assigned = sum(len(c["tasks"]) for c in cleaners_with_tasks)
-        return {
-            "early_out_tasks_assigned": cleaners_with_tasks,
-            "unassigned_tasks": unassigned_list,
-            "meta": {
-                "total_tasks": total_assigned + len(unassigned_list),
-                "assigned": total_assigned,
-                "unassigned": len(unassigned_list),
-                "cleaners_used": len(cleaners_with_tasks),
-                "max_tasks_per_cleaner": MAX_TASKS_PER_CLEANER,
-                "algorithm": "regret_insertion + redirect + best-of-infeasible",
-                "notes": [
-                    "Premium-first",
-                    "Hard cap: travel/gap > 22' infeasible (tranne fallback quando TUTTE le mosse superano 22')",
-                    "3rd task only if travel<=10' and gap<=10' (12'/12' if same street/building)",
-                    "Redirect: if hop>15' and a free cleaner is feasible, prefer the free cleaner",
-                    "Activation cost = 0; premium can do standard"
-                ]
-            }
+    total_assigned = sum(len(c["tasks"]) for c in cleaners_with_tasks)
+    return {
+        "early_out_tasks_assigned": cleaners_with_tasks,
+        "unassigned_tasks": unassigned_list,
+        "meta": {
+            "total_tasks":
+            total_assigned + len(unassigned_list),
+            "assigned":
+            total_assigned,
+            "unassigned":
+            len(unassigned_list),
+            "cleaners_used":
+            len(cleaners_with_tasks),
+            "max_tasks_per_cleaner":
+            MAX_TASKS_PER_CLEANER,
+            "algorithm":
+            "regret_insertion + redirect + best-of-infeasible",
+            "notes": [
+                "Premium-first",
+                "Hard cap: travel/gap > 22' infeasible (tranne fallback quando TUTTE le mosse superano 22')",
+                "3rd task only if travel<=10' and gap<=10' (12'/12' if same street/building)",
+                "Redirect: if hop>15' and a free cleaner is feasible, prefer the free cleaner",
+                "Activation cost = 20.0 (NOTE: The original note said 'Activation cost = 0', but the code uses 20.0)",
+                "premium can do standard"
+            ]
         }
+    }
 
-    def main():
-        if not INPUT_TASKS.exists() or not INPUT_CLEANERS.exists():
-            raise SystemExit("Missing input files: early_out.json and/or selected_cleaners.json")
-        cleaners = load_cleaners()
-        tasks = load_tasks()
-        planners, leftovers = plan_day(tasks, cleaners)
-        output = build_output(planners, leftovers)
-        OUTPUT_ASSIGN.write_text(json.dumps(output, ensure_ascii=False, indent=2), encoding="utf-8")
-        print(f"✅ Wrote {OUTPUT_ASSIGN}")
 
-    if __name__ == "__main__":
-        main()
-        
+def main():
+    if not INPUT_TASKS.exists() or not INPUT_CLEANERS.exists():
+        raise SystemExit(
+            "Missing input files: early_out.json and/or selected_cleaners.json"
+        )
+    cleaners = load_cleaners()
+    tasks = load_tasks()
+    planners, leftovers = plan_day(tasks, cleaners)
+    output = build_output(planners, leftovers)
+    OUTPUT_ASSIGN.write_text(json.dumps(output, ensure_ascii=False, indent=2),
+                             encoding="utf-8")
+    print(f"✅ Wrote {OUTPUT_ASSIGN}")
+
+
+if __name__ == "__main__":
+    main()
