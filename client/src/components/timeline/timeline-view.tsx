@@ -32,6 +32,14 @@ interface Cleaner {
   start_time: string | null;
 }
 
+interface AssignmentData {
+  task_id: number;
+  logistic_code: number;
+  start_time: string;
+  end_time: string;
+  sequence: number;
+}
+
 export default function TimelineView({
   personnel,
   tasks,
@@ -39,11 +47,16 @@ export default function TimelineView({
   const [cleaners, setCleaners] = useState<Cleaner[]>([]);
   const [selectedCleaner, setSelectedCleaner] = useState<Cleaner | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [assignmentsMap, setAssignmentsMap] = useState<Map<string, AssignmentData>>(new Map());
 
   const timeSlots = [
     "10:00", "11:00", "12:00", "13:00", "14:00",
     "15:00", "16:00", "17:00", "18:00", "19:00"
   ];
+
+  const TIMELINE_START = 10 * 60; // 10:00 in minuti
+  const TIMELINE_END = 19 * 60; // 19:00 in minuti
+  const TIMELINE_DURATION = TIMELINE_END - TIMELINE_START; // 540 minuti (9 ore)
 
   // Palette di colori azzurri per i cleaners
   const cleanerColors = [
@@ -83,9 +96,59 @@ export default function TimelineView({
     loadCleaners();
   }, []);
 
+  useEffect(() => {
+    const loadAssignments = async () => {
+      try {
+        const response = await fetch('/data/output/early_out_assignments.json');
+        if (!response.ok) {
+          console.log('Nessuna assegnazione trovata');
+          return;
+        }
+
+        const data = await response.json();
+        const map = new Map<string, AssignmentData>();
+
+        for (const cleanerEntry of data.early_out_tasks_assigned || []) {
+          for (const task of cleanerEntry.tasks || []) {
+            const key = `${task.task_id}-${task.logistic_code}`;
+            map.set(key, task);
+          }
+        }
+
+        setAssignmentsMap(map);
+        console.log('Assignment times caricati:', map.size, 'tasks');
+      } catch (error) {
+        console.error('Errore nel caricamento assignment times:', error);
+      }
+    };
+
+    loadAssignments();
+  }, []);
+
   const handleCleanerClick = (cleaner: Cleaner) => {
     setSelectedCleaner(cleaner);
     setIsModalOpen(true);
+  };
+
+  // Converte una stringa time (HH:MM) in minuti dal midnight
+  const timeToMinutes = (time: string): number => {
+    const [hours, minutes] = time.split(':').map(Number);
+    return hours * 60 + minutes;
+  };
+
+  // Calcola la posizione left in percentuale rispetto alla timeline
+  const calculateLeftPosition = (startTime: string): number => {
+    const startMinutes = timeToMinutes(startTime);
+    const offset = startMinutes - TIMELINE_START;
+    return (offset / TIMELINE_DURATION) * 100;
+  };
+
+  // Calcola la larghezza in percentuale
+  const calculateTaskWidth = (startTime: string, endTime: string): number => {
+    const startMinutes = timeToMinutes(startTime);
+    const endMinutes = timeToMinutes(endTime);
+    const duration = endMinutes - startMinutes;
+    return (duration / TIMELINE_DURATION) * 100;
   };
 
   const handleResetAssignments = async () => {
@@ -198,48 +261,31 @@ export default function TimelineView({
                         ))}
                       </div>
 
-                      {/* Task posizionate in base allo start_time */}
+                      {/* Task posizionate in base a start_time */}
                       <div className="relative z-10 h-full">
                         {tasks
                           .filter((task) => (task as any).assignedCleaner === cleaner.id)
-                          .sort((a, b) => {
-                            // Ordina prima per sequence (se presente), poi per orario
-                            const taskA = a as any;
-                            const taskB = b as any;
-                            
-                            // Se entrambe hanno sequence, usa quello
-                            if (taskA.sequence !== undefined && taskB.sequence !== undefined) {
-                              return taskA.sequence - taskB.sequence;
-                            }
-                            
-                            // Altrimenti ordina per orario di inizio
-                            const timeA = taskA.start_time || taskA.fw_start_time || taskA.startTime || "00:00";
-                            const timeB = taskB.start_time || taskB.fw_start_time || taskB.startTime || "00:00";
-                            return timeA.localeCompare(timeB);
-                          })
                           .map((task, index) => {
-                            // Calcola la posizione in base allo start_time
-                            const taskData = task as any;
-                            const startTime = taskData.start_time || taskData.fw_start_time || taskData.startTime || "10:00";
-                            
-                            // Converti l'orario in minuti dalla 10:00 (inizio timeline)
-                            const [hours, minutes] = startTime.split(':').map(Number);
-                            const minutesFromStart = (hours - 10) * 60 + minutes;
-                            
-                            // La timeline va dalle 10:00 alle 19:00 (540 minuti totali)
-                            const leftPosition = (minutesFromStart / 540) * 100;
-                            
-                            // Calcola la larghezza in base al cleaning_time
-                            const cleaningTime = taskData.cleaning_time || 60; // default 60 minuti
-                            const widthPercentage = (cleaningTime / 540) * 100;
-                            
+                            const taskId = (task as any).task_id ?? task.id;
+                            const logisticCode = task.name;
+                            const assignmentKey = `${taskId}-${logisticCode}`;
+                            const assignmentData = assignmentsMap.get(assignmentKey);
+
+                            if (!assignmentData?.start_time || !assignmentData?.end_time) {
+                              return null; // Non mostrare task senza tempi
+                            }
+
+                            const leftPosition = calculateLeftPosition(assignmentData.start_time);
+                            const width = calculateTaskWidth(assignmentData.start_time, assignmentData.end_time);
+
                             return (
-                              <div 
+                              <div
                                 key={`${task.id}-${cleaner.id}-${index}`}
                                 className="absolute top-0 bottom-0 flex items-center"
-                                style={{ 
-                                  left: `${Math.max(0, leftPosition)}%`,
-                                  width: `${widthPercentage}%`
+                                style={{
+                                  left: `${leftPosition}%`,
+                                  width: `${width}%`,
+                                  zIndex: 20
                                 }}
                               >
                                 <TaskCard 
