@@ -61,10 +61,10 @@ export default function PriorityColumn({
 
   const handleTimelineAssignment = async () => {
     if (priority === 'early-out') {
-      // Esegui il nuovo script ottimizzato opt.py
+      // Esegui il nuovo script ottimizzato opt_updated.py
       try {
-        console.log('Esecuzione opt.py (algoritmo ottimizzato)...');
-        const response = await fetch('/api/assign-unified', {
+        console.log('Esecuzione opt_updated.py (algoritmo ottimizzato)...');
+        const response = await fetch('/api/run-optimizer', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' }
         });
