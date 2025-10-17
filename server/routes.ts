@@ -469,12 +469,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { date } = req.body;
 
-      // Resetta i file di assegnazione all'inizio dell'estrazione
+      // Resetta solo early_out_assignments, NON timeline_assignments (che persiste tra refresh)
       const earlyOutAssignmentsPath = path.join(process.cwd(), 'client/public/data/output/early_out_assignments.json');
-      const timelineAssignmentsPath = path.join(process.cwd(), 'client/public/data/output/timeline_assignments.json');
 
       await fs.writeFile(earlyOutAssignmentsPath, JSON.stringify({ early_out_tasks_assigned: [], meta: {} }, null, 2));
-      await fs.writeFile(timelineAssignmentsPath, JSON.stringify({ assignments: [] }, null, 2));
 
       // Usa python3 e chiama task_extractor.py con la data specificata
       const command = date 
