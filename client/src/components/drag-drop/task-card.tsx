@@ -212,11 +212,11 @@ export default function TaskCard({
               </div>
             </div>
 
-            {/* Quarta riga: Tipologia - Tipologia intervento */}
+            {/* Quarta riga: Tipologia appartamento - Tipologia intervento */}
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <p className="text-sm font-semibold text-muted-foreground">
-                  Tipologia
+                  Tipologia appartamento
                 </p>
                 <p className="text-sm">{(task as any).type_apt ?? "non migrato"}</p>
               </div>
