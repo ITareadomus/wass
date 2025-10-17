@@ -144,7 +144,7 @@ export default function TaskCard({
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
-            {/* Informazioni Base */}
+            {/* Prima riga: Codice ADAM - Cliente */}
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <p className="text-sm font-semibold text-muted-foreground">
@@ -158,11 +158,15 @@ export default function TaskCard({
                 </p>
                 <p className="text-sm">{task.customer_name || "non migrato"}</p>
               </div>
+            </div>
+
+            {/* Seconda riga: Indirizzo - Durata pulizie */}
+            <div className="grid grid-cols-2 gap-4">
               <div>
                 <p className="text-sm font-semibold text-muted-foreground">
-                  Tipologia
+                  Indirizzo
                 </p>
-                <p className="text-sm">{(task as any).type_apt ?? "non migrato"}</p>
+                <p className="text-sm">{task.address || "non migrato"}</p>
               </div>
               <div>
                 <p className="text-sm font-semibold text-muted-foreground">
@@ -172,15 +176,7 @@ export default function TaskCard({
               </div>
             </div>
 
-            {/* Indirizzo */}
-            <div>
-              <p className="text-sm font-semibold text-muted-foreground">
-                Indirizzo
-              </p>
-              <p className="text-sm">{task.address || "non migrato"}</p>
-            </div>
-
-            {/* Date e orari */}
+            {/* Terza riga: Checkout - Checkin */}
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <p className="text-sm font-semibold text-muted-foreground">
@@ -216,7 +212,27 @@ export default function TaskCard({
               </div>
             </div>
 
-            {/* Pax */}
+            {/* Quarta riga: Tipologia - Tipologia intervento */}
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <p className="text-sm font-semibold text-muted-foreground">
+                  Tipologia
+                </p>
+                <p className="text-sm">{(task as any).type_apt ?? "non migrato"}</p>
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-muted-foreground">
+                  Tipologia intervento
+                </p>
+                <p className="text-sm">
+                  {(task as any).operation_id === 2 && !(task as any).confirmed_operation
+                    ? "non migrato"
+                    : (task as any).operation_id ?? "non migrato"}
+                </p>
+              </div>
+            </div>
+
+            {/* Quinta riga: Pax-In - Pax-Out */}
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <p className="text-sm font-semibold text-muted-foreground">
@@ -230,18 +246,6 @@ export default function TaskCard({
                 </p>
                 <p className="text-sm">{(task as any).pax_out ?? "non migrato"}</p>
               </div>
-            </div>
-
-            {/* Tipologia intervento */}
-            <div>
-              <p className="text-sm font-semibold text-muted-foreground">
-                Tipologia intervento
-              </p>
-              <p className="text-sm">
-                {(task as any).operation_id === 2 && !(task as any).confirmed_operation
-                  ? "non migrato"
-                  : (task as any).operation_id ?? "non migrato"}
-              </p>
             </div>
           </div>
         </DialogContent>
