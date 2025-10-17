@@ -407,6 +407,14 @@ def plan_day(tasks: List[Task], cleaners: List[Cleaner], settings: Optional[Dict
                     if math.isinf(d):
                         continue
                     d += premium_soft_penalty(c1, task)
+                    
+                    # Applica penalità distanza anche qui (non solo in best_k_positions)
+                    if len(c1.route) > 0 and pos > 0:
+                        prev_task = c1.route[pos - 1]
+                        km = haversine_km(prev_task.lat, prev_task.lng, task.lat, task.lng)
+                        if km > 1.0:
+                            d += 20.0 * (km - 1.0)
+                    
                     if d < candidate[0]:
                         candidate = (d, pos, new_r)
 
