@@ -18,42 +18,44 @@ OUTPUT_ASSIGN  = Path("early_out_assignments.json")
 MAX_TASKS_PER_CLEANER          = 3        # 3, ma la 3ª segue la regola "vicina"
 REGRET_K                       = 2
 
-    # Hard caps (sempre attivi)
-    HARD_MAX_TRAVEL = 22.0  # travel > 22' => infeasible
-    HARD_MAX_GAP    = 22.0  # (start_B - end_A) > 22' => infeasible
+# Hard caps (sempre attivi)
+HARD_MAX_TRAVEL = 22.0  # travel > 22' => infeasible
+HARD_MAX_GAP    = 22.0  # (start_B - end_A) > 22' => infeasible
 
-    # 3ª task (2→3 hop) - default e deroga stessa via/edificio
-    THIRD_TASK_MAX_TRAVEL          = 10.0
-    THIRD_TASK_MAX_GAP             = 10.0
-    THIRD_TASK_SAME_STREET_TRAVEL  = 12.0
-    THIRD_TASK_SAME_STREET_GAP     = 12.0
+# 3ª task (2→3 hop) - default e deroga stessa via/edificio
+THIRD_TASK_MAX_TRAVEL          = 10.0
+THIRD_TASK_MAX_GAP             = 10.0
+THIRD_TASK_SAME_STREET_TRAVEL  = 12.0
+THIRD_TASK_SAME_STREET_GAP     = 12.0
 
-    # Redirect: se un inserimento crea hop > 15', preferisci un cleaner libero idoneo
-    REDIRECT_TRAVEL = 15.0
+# Redirect: se un inserimento crea hop > 15', preferisci un cleaner libero idoneo
+REDIRECT_TRAVEL = 15.0
 
-    # Travel model (min)
-    SHORT_RANGE_KM       = 0.30
-    SHORT_BASE_MIN       = 3.5
-    WALK_SLOW_MIN_PER_KM = 16.0
+# Travel model (min)
+SHORT_RANGE_KM       = 0.30
+SHORT_BASE_MIN       = 3.5
+WALK_SLOW_MIN_PER_KM = 16.0
 
-    BASE_OVERHEAD_MIN    = 6.0
-    SCALED_OH_KM         = 0.50
-    K_SWITCH_KM          = 1.2
-    WALK_MIN_PER_KM      = 12.0
-    RIDE_MIN_PER_KM      = 4.5
+BASE_OVERHEAD_MIN    = 6.0
+SCALED_OH_KM         = 0.50
+K_SWITCH_KM          = 1.2
+WALK_MIN_PER_KM      = 12.0
+RIDE_MIN_PER_KM      = 4.5
 
-    EQ_EXTRA_LT05        = 2.0
-    EQ_EXTRA_GE05        = 1.0
+EQ_EXTRA_LT05        = 2.0
+EQ_EXTRA_GE05        = 1.0
 
-    MIN_TRAVEL           = 2.0
-    MAX_TRAVEL           = 45.0
+MIN_TRAVEL           = 2.0
+MAX_TRAVEL           = 45.0
 
-    # Costi/penalità
-    ACTIVATION_COST                = 0.0
-    PENALTY_STANDARD_TO_PREMIUM    = 0.0   # i premium possono fare standard senza malus
+# Costi/penalità
+ACTIVATION_COST                = 20.0
+PENALTY_STANDARD_TO_PREMIUM    = 0.0   # i premium possono fare standard senza malus
+SOFT_PENALTY_BASE_KM           = 1.0   # oltre questo km, penalità geografica soft
+ALPHA_SOFT_GEO                 = 50.0  # coefficiente penalità molto forte per viaggi lunghi
 
-    @dataclass
-    class Task:
+@dataclass
+class Task:
         task_id: str
         logistic_code: str
         lat: float
@@ -79,49 +81,49 @@ REGRET_K                       = 2
         route: List[Task] = field(default_factory=list)
 
     # -------- Utils --------
-    def hhmm_to_min(hhmm: Optional[str], default: str = "10:00") -> int:
-        if not hhmm or not isinstance(hhmm, str) or ":" not in hhmm:
-            hhmm = default
-        h, m = hhmm.strip().split(":")
-        return int(h)*60 + int(m)
+def hhmm_to_min(hhmm: Optional[str], default: str = "10:00") -> int:
+    if not hhmm or not isinstance(hhmm, str) or ":" not in hhmm:
+        hhmm = default
+    h, m = hhmm.strip().split(":")
+    return int(h)*60 + int(m)
 
-    def min_to_hhmm(m: float) -> str:
-        m = int(round(m))
-        return f"{m//60:02d}:{m%60:02d}"
+def min_to_hhmm(m: float) -> str:
+    m = int(round(m))
+    return f"{m//60:02d}:{m%60:02d}"
 
-    def normalize_addr(s: Optional[str]) -> str:
-        s = (s or "").upper()
-        for ch in [".", ","]:
-            s = s.replace(ch, " ")
-        s = " ".join(s.split())
-        return s.strip()
+def normalize_addr(s: Optional[str]) -> str:
+    s = (s or "").upper()
+    for ch in [".", ","]:
+        s = s.replace(ch, " ")
+    s = " ".join(s.split())
+    return s.strip()
 
-    def split_street_number(addr: str):
-        tokens = addr.split()
-        if not tokens:
-            return "", None
-        last = tokens[-1]
-        if any(ch.isdigit() for ch in last):
-            return " ".join(tokens[:-1]).strip(), last
-        return addr, None
+def split_street_number(addr: str):
+    tokens = addr.split()
+    if not tokens:
+        return "", None
+    last = tokens[-1]
+    if any(ch.isdigit() for ch in last):
+        return " ".join(tokens[:-1]).strip(), last
+    return addr, None
 
-    def same_building(a: Optional[str], b: Optional[str]) -> bool:
-        na, nb = normalize_addr(a), normalize_addr(b)
-        if not na or not nb:
-            return False
-        sa, ca = split_street_number(na)
-        sb, cb = split_street_number(nb)
-        return (sa == sb) and (ca is not None) and (cb is not None) and (ca == cb)
+def same_building(a: Optional[str], b: Optional[str]) -> bool:
+    na, nb = normalize_addr(a), normalize_addr(b)
+    if not na or not nb:
+        return False
+    sa, ca = split_street_number(na)
+    sb, cb = split_street_number(nb)
+    return (sa == sb) and (ca is not None) and (cb is not None) and (ca == cb)
 
-    def same_street(a: Optional[str], b: Optional[str]) -> bool:
-        na, nb = normalize_addr(a), normalize_addr(b)
-        if not na or not nb:
-            return False
-        sa, _ = split_street_number(na)
-        sb, _ = split_street_number(nb)
-        return sa == sb
+def same_street(a: Optional[str], b: Optional[str]) -> bool:
+    na, nb = normalize_addr(a), normalize_addr(b)
+    if not na or not nb:
+        return False
+    sa, _ = split_street_number(na)
+    sb, _ = split_street_number(nb)
+    return sa == sb
 
-    def haversine_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
+def haversine_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
         R = 6371.0
         phi1, phi2 = math.radians(lat1), math.radians(lat2)
         dphi = math.radians(lat2 - lat1)
