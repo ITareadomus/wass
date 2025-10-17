@@ -424,17 +424,14 @@ def plan_day(tasks: List[Task],
 
         if chosen is None:
             # Se nessuna task può essere assegnata in questa iterazione,
-            # rimuovi le task senza opzioni dalla lista unassigned
-            if tasks_with_no_options:
-                for t in tasks_with_no_options:
-                    if t in unassigned:
-                        # Queste task rimarranno in unassigned alla fine
-                        pass
+            # interrompi il ciclo - le task rimanenti in unassigned
+            # saranno ritornate come non assegnate
             break
         _, _, task, cl, pos, new_r = chosen
         cl.route = new_r  # commit
         unassigned.remove(task)
 
+    # Ritorna i cleaner con le route assegnate e le task rimaste non assegnate
     return cleaners, unassigned
 
 
