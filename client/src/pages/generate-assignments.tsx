@@ -236,11 +236,12 @@ export default function GenerateAssignments() {
       setHighPriorityTasks(filteredHigh);
       setLowPriorityTasks(filteredLow);
 
-      // Crea l'array unificato con TUTTE le task e le loro assegnazioni
+      // Crea l'array unificato con TUTTE le task (incluse quelle filtrate) e le loro assegnazioni
       const allTasks = [...initialEarlyOut, ...initialHigh, ...initialLow];
       const tasksWithAssignments = allTasks.map(task => {
         const timelineAssignment = timelineAssignmentsMap.get(String(task.name));
         if (timelineAssignment) {
+          console.log(`Assegnando task ${task.name} a cleaner ${timelineAssignment.cleanerId} con sequence ${timelineAssignment.sequence}`);
           return {
             ...task,
             assignedCleaner: timelineAssignment.cleanerId,
@@ -250,6 +251,7 @@ export default function GenerateAssignments() {
         return task;
       });
 
+      console.log(`Task con assegnazioni (${tasksWithAssignments.length} totali):`, tasksWithAssignments.filter(t => (t as any).assignedCleaner).length, "assegnate");
       setAllTasksWithAssignments(tasksWithAssignments);
 
       setIsLoadingTasks(false);
