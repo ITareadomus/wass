@@ -248,7 +248,7 @@ export default function TimelineView({
               Dettagli Cleaner #{selectedCleaner?.id}
               {selectedCleaner && (
                 selectedCleaner.role === "Formatore" ? (
-                  <span className="px-3 py-1 rounded-md bg-orange-500 text-white border-2 border-black font-semibold text-sm">
+                  <span className="px-3 py-1 rounded-md bg-orange-500 text-black border-2 border-black font-semibold text-sm">
                     Formatore
                   </span>
                 ) : selectedCleaner.role === "Premium" ? (
