@@ -23,6 +23,8 @@ from typing import Any, Dict, List, Optional, Tuple
 LONG_HOP_TIME_MIN = 18.0   # minutes; beyond this, hops are heavily penalized
 HOP_SURCHARGE     = 80.0   # fixed penalty if above threshold
 HOP_EXTRA_SLOPE   = 3.0    # extra penalty per minute beyond threshold
+SOFT_HARD_CAP_MIN = 35.0   # Hard cap for travel time (minutes)
+HUGE_MALUS        = 500.0  # Penalty for exceeding hard cap
 
 BASE = Path(__file__).parent.parent / "data"
 
