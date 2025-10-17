@@ -174,7 +174,10 @@ def can_handle_apt(cleaner: Cleaner, task: Task, settings: Optional[Dict[str, An
 # Travel model
 # =============================
 def travel_minutes(a: Optional[Task], b: Optional[Task]) -> float:
-    if a is None or b is None:
+    # Se a è None (primo task di un cleaner), non c'è costo di viaggio geografico
+    if a is None:
+        return 0.0
+    if b is None:
         return 0.0
     km = haversine_km(a.lat, a.lng, b.lat, b.lng)
 
@@ -210,6 +213,9 @@ def travel_minutes(a: Optional[Task], b: Optional[Task]) -> float:
     return max(MIN_TRAVEL, min(MAX_TRAVEL, t))
 
 def soft_geo_penalty(route: List[Task]) -> float:
+    # Non applicare penalità geografica se c'è solo 1 task (nessun viaggio reale)
+    if len(route) <= 1:
+        return 0.0
     prev = None
     extra = 0.0
     for t in route:
