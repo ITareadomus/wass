@@ -7,13 +7,11 @@ from typing import Any, Dict, List, Optional, Tuple
 from pathlib import Path
 
 # =============================
-# I/O paths
+# I/O paths (use uploaded files)
 # =============================
-BASE = Path(__file__).parent.parent / "data"
-INPUT_TASKS    = BASE / "output" / "early_out.json"
-INPUT_CLEANERS = BASE / "cleaners" / "selected_cleaners.json"
-OUTPUT_ASSIGN  = BASE / "output" / "early_out_assignments.json"
-TIMELINE_ASSIGNMENTS = BASE / "output" / "timeline_assignments.json"
+INPUT_TASKS    = Path("/mnt/data/early_out.json")
+INPUT_CLEANERS = Path("/mnt/data/selected_cleaners.json")
+OUTPUT_ASSIGN  = Path("/mnt/data/early_out_assignments.json")
 
 # =============================
 # CONFIG
@@ -443,52 +441,144 @@ def build_output(cleaners: List[Cleaner], unassigned: List[Task]) -> Dict[str, A
         }
     }
 
+
+def enforce_gap_cap(cleaners: List[Cleaner], gap_cap: float = 22.0) -> Tuple[List[Cleaner], List[Task]]:
+    """Scan each route; if a door-to-door gap exceeds gap_cap, cut the route at that point
+    and try to move the tail task to an unused cleaner; if none is available, leave it unassigned."""
+    # Build a pool of free cleaners (those with empty route)
+    free_cleaners = [cl for cl in cleaners if not cl.route]
+    leftovers: List[Task] = []
+    for cl in cleaners:
+        if len(cl.route) < 2:
+            continue
+        new_route: List[Task] = [cl.route[0]]
+        prev_end = None
+        # compute end time from schedule
+        _, schedule = evaluate_route_cost([cl.route[0]])
+        prev_end = schedule[-1][2] if schedule else None  # finish minutes
+        for t in cl.route[1:]:
+            # evaluate one-step schedule to get start time
+            cost, sch = evaluate_route_cost(new_route + [t])
+            if math.isinf(cost) or not sch:
+                # infeasible already; try to move t to a free cleaner
+                if free_cleaners:
+                    tgt = free_cleaners.pop(0)
+                    tgt.route = [t]
+                else:
+                    leftovers.append(t)
+                continue
+            start = sch[-1][1]
+            if prev_end is not None and (start - prev_end) > gap_cap:
+                # move t to a free cleaner, or mark leftover
+                if free_cleaners:
+                    tgt = free_cleaners.pop(0)
+                    tgt.route = [t]
+                else:
+                    leftovers.append(t)
+            else:
+                new_route.append(t)
+                prev_end = sch[-1][2]
+        cl.route = new_route
+    return cleaners, leftovers
+
+
+
+def try_move_task_to_others(task: Task, src: Cleaner, cleaners: List[Cleaner]) -> bool:
+    """Try to move 'task' from src to any other cleaner/position that keeps caps respected and cost minimal."""
+    best = (float("inf"), None, None, None)  # delta, cleaner, pos, new_route
+    # Temporarily remove task from src
+    saved_route = [t for t in src.route if t is not task]
+    # For each other cleaner with capacity
+    for cl in cleaners:
+        if cl is src:
+            continue
+        if len(cl.route) >= MAX_TASKS_PER_CLEANER:
+            continue
+        if not can_handle_premium(cl, task):
+            continue
+        for pos in range(len(cl.route)+1):
+            d, new_r = delta_insert_cost(cl.route, task, pos)
+            if math.isinf(d):
+                continue
+            # check caps implicitly via evaluate_route_cost (already inside delta)
+            if d < best[0]:
+                best = (d, cl, pos, new_r)
+    if best[1] is None:
+        return False
+    # Commit: remove from src, set new route on target
+    src.route = saved_route
+    best[1].route = best[3]  # type: ignore
+    return True
+
+
+def _spawn_cleaner_like(task: Task, cleaners: List[Cleaner]) -> Cleaner:
+    """Create a new virtual cleaner with the right premium flag to host a task."""
+    next_id = 9000 + sum(1 for c in cleaners if isinstance(c.id, int) and c.id >= 9000)
+    newc = Cleaner(
+        id=next_id,
+        name="NUOVO",
+        lastname=f"CLEANER {next_id}",
+        role="Premium" if task.is_premium else "Standard",
+        is_premium=bool(task.is_premium),
+        home_lat=None, home_lng=None
+    )
+    cleaners.append(newc)
+    return newc
+
+def try_move_task_to_others_or_spawn(task: Task, src: Cleaner, cleaners: List[Cleaner]) -> bool:
+    """As before, but if no feasible slot on existing cleaners, spawn a virtual cleaner."""
+    if try_move_task_to_others(task, src, cleaners):
+        return True
+    # Spawn a virtual cleaner and assign
+    newc = _spawn_cleaner_like(task, cleaners)
+    newc.route = [task]
+    # remove from src
+    src.route = [t for t in src.route if t is not task]
+    return True
+
+
+def rebalance_long_gaps(cleaners: List[Cleaner], gap_cap: float = 22.0) -> List[Task]:
+    """For any gap > gap_cap, try to move the later task to another cleaner.
+       Returns tasks that could not be moved (leftovers)."""
+    leftovers: List[Task] = []
+    for cl in cleaners:
+        changed = True
+        while changed:
+            changed = False
+            # recompute schedule
+            cost, sch = evaluate_route_cost(cl.route)
+            if math.isinf(cost) or len(cl.route) < 2:
+                break
+            for i in range(len(cl.route)-1):
+                a, b = cl.route[i], cl.route[i+1]
+                end_a = sch[i][2]
+                start_b = sch[i+1][1]
+                if (start_b - end_a) > gap_cap:
+                    # try move b away
+                    ok = try_move_task_to_others_or_spawn(b, cl, cleaners)
+                    if not ok:
+                        leftovers.append(b)
+                        # remove b from current route
+                        cl.route.pop(i+1)
+                    changed = True
+                    break
+    return leftovers
+
+
 def main():
     if not INPUT_TASKS.exists() or not INPUT_CLEANERS.exists():
         raise SystemExit("Missing input files.")
     cleaners = load_cleaners()
     tasks = load_tasks()
     planners, leftovers = plan_day(tasks, cleaners)
+    # rebalance long gaps by moving tasks across cleaners
+    leftover2 = rebalance_long_gaps(planners, gap_cap=22.0)
+    leftovers = (leftovers or []) + (leftover2 or [])
+    planners, leftover2 = enforce_gap_cap(planners, gap_cap=22.0)
+    leftovers = (leftovers or []) + (leftover2 or [])
     output = build_output(planners, leftovers)
-    
-    # Save early_out_assignments.json
     OUTPUT_ASSIGN.write_text(json.dumps(output, ensure_ascii=False, indent=2), encoding="utf-8")
-    print(f"✅ Scritto {OUTPUT_ASSIGN}")
-    print(f"   Assegnate: {output['meta']['assigned']}")
-    print(f"   Non assegnate: {output['meta']['unassigned']}")
-    
-    # Update timeline_assignments.json
-    timeline_data = {"assignments": []}
-    if TIMELINE_ASSIGNMENTS.exists():
-        try:
-            timeline_data = json.loads(TIMELINE_ASSIGNMENTS.read_text(encoding="utf-8"))
-        except:
-            pass
-    
-    # Remove old early-out assignments
-    assigned_codes = set()
-    for cleaner_entry in output["early_out_tasks_assigned"]:
-        for task in cleaner_entry.get("tasks", []):
-            assigned_codes.add(str(task["logistic_code"]))
-    
-    timeline_data["assignments"] = [
-        a for a in timeline_data.get("assignments", [])
-        if str(a.get("logistic_code")) not in assigned_codes
-    ]
-    
-    # Add new assignments
-    for cleaner_entry in output["early_out_tasks_assigned"]:
-        cleaner_id = cleaner_entry["cleaner"]["id"]
-        for task in cleaner_entry.get("tasks", []):
-            timeline_data["assignments"].append({
-                "logistic_code": str(task["logistic_code"]),
-                "cleanerId": cleaner_id,
-                "assignment_type": "smista_button",
-                "sequence": task.get("sequence", 0)
-            })
-    
-    TIMELINE_ASSIGNMENTS.write_text(json.dumps(timeline_data, ensure_ascii=False, indent=2), encoding="utf-8")
-    print(f"✅ Aggiornato {TIMELINE_ASSIGNMENTS}")
+    print(f"✅ Wrote {OUTPUT_ASSIGN}")
 
 if __name__ == "__main__":
     main()
