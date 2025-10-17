@@ -494,6 +494,43 @@ def main():
     OUTPUT_ASSIGN.write_text(json.dumps(output, ensure_ascii=False, indent=2),
                              encoding="utf-8")
     print(f"✅ Wrote {OUTPUT_ASSIGN}")
+    
+    # Update timeline_assignments.json
+    timeline_assignments_path = OUTPUT_ASSIGN.parent / "timeline_assignments.json"
+    timeline_data = {"assignments": []}
+    
+    # Load existing timeline assignments if they exist
+    if timeline_assignments_path.exists():
+        try:
+            timeline_data = json.loads(timeline_assignments_path.read_text(encoding="utf-8"))
+        except:
+            timeline_data = {"assignments": []}
+    
+    # Remove old early-out assignments
+    assigned_codes = set()
+    for cleaner_entry in output["early_out_tasks_assigned"]:
+        for task in cleaner_entry.get("tasks", []):
+            assigned_codes.add(str(task["logistic_code"]))
+    
+    timeline_data["assignments"] = [
+        a for a in timeline_data.get("assignments", [])
+        if str(a.get("logistic_code")) not in assigned_codes
+    ]
+    
+    # Add new assignments
+    for cleaner_entry in output["early_out_tasks_assigned"]:
+        cleaner_id = cleaner_entry["cleaner"]["id"]
+        for task in cleaner_entry.get("tasks", []):
+            timeline_data["assignments"].append({
+                "logistic_code": str(task["logistic_code"]),
+                "cleanerId": cleaner_id,
+                "assignment_type": "optimizer",
+                "sequence": task.get("sequence", 0)
+            })
+    
+    timeline_assignments_path.write_text(json.dumps(timeline_data, ensure_ascii=False, indent=2),
+                                         encoding="utf-8")
+    print(f"✅ Aggiornato {timeline_assignments_path}")
 
 
 if __name__ == "__main__":
