@@ -276,9 +276,11 @@ export default function TaskCard({
                     Small Equip.
                   </p>
                   <p className="text-sm">
-                    {(task as any).small_equipment !== undefined 
-                      ? ((task as any).small_equipment ? "Sì" : "No")
-                      : "n/a"}
+                    {(task as any).small_equipment === true 
+                      ? "Sì" 
+                      : (task as any).small_equipment === false 
+                        ? "No" 
+                        : "n/a"}
                   </p>
                 </div>
               </div>
