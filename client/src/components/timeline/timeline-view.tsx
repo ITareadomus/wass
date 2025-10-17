@@ -198,8 +198,8 @@ export default function TimelineView({
                         ))}
                       </div>
 
-                      {/* Task posizionate in base allo start_time */}
-                      <div className="relative z-10 h-full">
+                      {/* Task posizionate in sequenza */}
+                      <div className="relative z-10 flex items-center h-full">
                         {tasks
                           .filter((task) => (task as any).assignedCleaner === cleaner.id)
                           .sort((a, b) => {
@@ -217,32 +217,14 @@ export default function TimelineView({
                             const timeB = taskB.start_time || taskB.fw_start_time || taskB.startTime || "00:00";
                             return timeA.localeCompare(timeB);
                           })
-                          .map((task, index) => {
-                            // Calcola la posizione in base allo start_time
-                            const taskData = task as any;
-                            const startTime = taskData.start_time || taskData.fw_start_time || taskData.startTime || "10:00";
-                            
-                            // Converti l'orario in minuti dalla 10:00 (inizio timeline)
-                            const [hours, minutes] = startTime.split(':').map(Number);
-                            const minutesFromStart = (hours - 10) * 60 + minutes;
-                            
-                            // La timeline va dalle 10:00 alle 19:00 (540 minuti totali)
-                            const leftPosition = (minutesFromStart / 540) * 100;
-                            
-                            return (
-                              <div 
-                                key={`${task.id}-${cleaner.id}-${index}`}
-                                className="absolute top-0 bottom-0 flex items-center"
-                                style={{ left: `${Math.max(0, leftPosition)}%` }}
-                              >
-                                <TaskCard 
-                                  task={task} 
-                                  index={index}
-                                  isInTimeline={true}
-                                />
-                              </div>
-                            );
-                          })}
+                          .map((task, index) => (
+                            <TaskCard 
+                              key={`${task.id}-${cleaner.id}-${index}`}
+                              task={task} 
+                              index={index}
+                              isInTimeline={true}
+                            />
+                          ))}
                         {provided.placeholder}
                       </div>
                     </div>
