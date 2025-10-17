@@ -240,11 +240,11 @@ export default function TimelineView({
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
         <DialogContent className={`sm:max-w-2xl max-h-[80vh] overflow-y-auto ${
           selectedCleaner?.role === "Formatore" 
-            ? "border-4 border-black bg-orange-500/10" 
+            ? "border-4 border-black bg-orange-500/30" 
             : selectedCleaner?.role === "Premium"
-            ? "border-4 border-yellow-500 bg-yellow-500/10"
+            ? "border-4 border-yellow-500 bg-yellow-500/30"
             : selectedCleaner?.role === "Standard"
-            ? "border-4 border-green-500 bg-green-500/10"
+            ? "border-4 border-green-500 bg-green-500/30"
             : ""
         }`}>
           <DialogHeader>
