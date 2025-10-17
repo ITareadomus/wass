@@ -416,12 +416,13 @@ def build_output(cleaners: List[Cleaner],
         if math.isinf(total) or not schedule:
             continue
         tasks_list: List[Dict[str, Any]] = []
+        prev_finish_time = None
         for idx, (t, (arr, start, fin)) in enumerate(zip(cl.route, schedule)):
-            # Calcola il tempo di viaggio dal task precedente
+            # Calcola il tempo di viaggio effettivo dalla schedulazione
             travel_time = 0
-            if idx > 0:
-                prev_task = cl.route[idx - 1]
-                travel_time = int(round(travel_minutes(prev_task, t)))
+            if idx > 0 and prev_finish_time is not None:
+                # Il travel time è la differenza tra arrivo e fine del task precedente
+                travel_time = arr - prev_finish_time
             
             tasks_list.append({
                 "task_id": int(t.task_id),
@@ -435,6 +436,7 @@ def build_output(cleaners: List[Cleaner],
                 "sequence": idx + 1,
                 "travel_time": travel_time
             })
+            prev_finish_time = fin
         cleaners_with_tasks.append({
             "cleaner": {
                 "id": cl.id,
