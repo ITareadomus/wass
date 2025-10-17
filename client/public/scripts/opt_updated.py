@@ -7,11 +7,13 @@ from typing import Any, Dict, List, Optional, Tuple
 from pathlib import Path
 
 # =============================
-# I/O paths (use uploaded files)
+# I/O paths
 # =============================
-INPUT_TASKS    = Path("/mnt/data/early_out.json")
-INPUT_CLEANERS = Path("/mnt/data/selected_cleaners.json")
-OUTPUT_ASSIGN  = Path("/mnt/data/early_out_assignments.json")
+BASE = Path(__file__).parent.parent / "data"
+INPUT_TASKS    = BASE / "output" / "early_out.json"
+INPUT_CLEANERS = BASE / "cleaners" / "selected_cleaners.json"
+OUTPUT_ASSIGN  = BASE / "output" / "early_out_assignments.json"
+TIMELINE_ASSIGNMENTS = BASE / "output" / "timeline_assignments.json"
 
 # =============================
 # CONFIG
