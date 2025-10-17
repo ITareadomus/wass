@@ -50,8 +50,6 @@ MAX_TRAVEL           = 45.0
 # Penalties
 ACTIVATION_COST                = 0.0
 PENALTY_STANDARD_TO_PREMIUM    = 0.0   # premium can do standard without malus
-SOFT_PENALTY_BASE_KM           = 1.0   # oltre questo km, penalità geografica soft
-ALPHA_SOFT_GEO                 = 10.0  # coefficiente penalità (~30' a 3 km)
 
 @dataclass
 class Task:
@@ -131,20 +129,6 @@ def haversine_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
     a = math.sin(dphi/2)**2 + math.cos(phi1)*math.cos(phi2)*math.sin(dl/2)**2
     c = 2 * math.atan2(math.sqrt(a), math.sqrt(1-a))
     return R * c
-
-# Soft geographic penalty
-def soft_geo_penalty(route: List[Task]) -> float:
-    if len(route) <= 1:
-        return 0.0
-    prev = None
-    extra = 0.0
-    for t in route:
-        if prev is not None:
-            km = haversine_km(prev.lat, prev.lng, t.lat, t.lng)
-            if km > SOFT_PENALTY_BASE_KM:
-                extra += ALPHA_SOFT_GEO * (km - SOFT_PENALTY_BASE_KM) ** 2
-        prev = t
-    return extra
 
 # Travel model: minutes between tasks
 def travel_minutes(a: Optional[Task], b: Optional[Task]) -> float:
@@ -227,30 +211,13 @@ def evaluate_route_cost(route: List[Task]) -> Tuple[float, List[Tuple[int, int, 
         schedule.append((int(arrival), int(start), int(finish)))
         prev = t
         prev_finish = finish
-    total += soft_geo_penalty(route)
     return total, schedule
 
 def delta_insert_cost(route: List[Task], task: Task, pos: int) -> Tuple[float, List[Task]]:
-    # Calcola il costo base includendo la penalità geografica
     base, _ = evaluate_route_cost(route)
-    
-    # Calcola il nuovo percorso
     new_route = route[:pos] + [task] + route[pos:]
-    
-    # Calcola il nuovo costo includendo la penalità geografica
     new, _ = evaluate_route_cost(new_route)
-    
-    # Il delta ora include correttamente la differenza di penalità geografica
-    delta = new - base
-    
-    # Aggiungi penalità extra per viaggi lunghi (oltre la penalità quadratica già in evaluate_route_cost)
-    if pos > 0:
-        prev_task = route[pos - 1]
-        km = haversine_km(prev_task.lat, prev_task.lng, task.lat, task.lng)
-        if km > 2.0:  # Penalità extra per distanze > 2km
-            delta += 50.0 * (km - 2.0)  # Penalità lineare molto forte
-    
-    return delta, new_route
+    return new - base, new_route
 
 def best_k_positions(cleaner: Cleaner, task: Task) -> List[float]:
     # capacity quick check: allow up to 3, but only if 3rd satisfies local rule (enforced via evaluate_route_cost anyway)
