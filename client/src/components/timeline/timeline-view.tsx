@@ -242,6 +242,21 @@ export default function TimelineView({
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               Dettagli Cleaner #{selectedCleaner?.id}
+              {selectedCleaner && (
+                selectedCleaner.role === "Formatore" ? (
+                  <span className="px-3 py-1 rounded-md bg-orange-500 text-white border-2 border-black font-semibold text-sm">
+                    Formatore
+                  </span>
+                ) : selectedCleaner.role === "Premium" ? (
+                  <span className="px-3 py-1 rounded-md bg-yellow-400 text-black border-2 border-black font-semibold text-sm">
+                    Premium
+                  </span>
+                ) : (
+                  <span className="px-3 py-1 rounded-md bg-green-500 text-white border-2 border-black font-semibold text-sm">
+                    Standard
+                  </span>
+                )
+              )}
             </DialogTitle>
           </DialogHeader>
           {selectedCleaner && (
