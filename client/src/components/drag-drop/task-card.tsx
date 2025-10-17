@@ -21,6 +21,7 @@ interface AssignedTask {
   logistic_code: number;
   start_time: string;
   end_time: string;
+  travel_time?: number;
 }
 
 export default function TaskCard({
@@ -29,7 +30,7 @@ export default function TaskCard({
   isInTimeline = false,
 }: TaskCardProps) {
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [assignmentTimes, setAssignmentTimes] = useState<{ start_time?: string; end_time?: string }>({});
+  const [assignmentTimes, setAssignmentTimes] = useState<{ start_time?: string; end_time?: string; travel_time?: number }>({});
 
   useEffect(() => {
     const loadAssignmentTimes = async () => {
@@ -47,7 +48,8 @@ export default function TaskCard({
             if (assignedTask) {
               setAssignmentTimes({
                 start_time: assignedTask.start_time,
-                end_time: assignedTask.end_time
+                end_time: assignedTask.end_time,
+                travel_time: assignedTask.travel_time
               });
               break;
             }
@@ -256,6 +258,34 @@ export default function TaskCard({
               </div>
             </div>
 
+            {/* Nuova riga: Travel Time - Start Time/End Time */}
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <p className="text-sm font-semibold text-muted-foreground">
+                  Travel Time
+                </p>
+                <p className="text-sm">
+                  {assignmentTimes.travel_time !== undefined 
+                    ? `${assignmentTimes.travel_time} minuti` 
+                    : "non assegnato"}
+                </p>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <p className="text-sm font-semibold text-muted-foreground">
+                    Start Time
+                  </p>
+                  <p className="text-sm">{assignmentTimes.start_time ?? "non assegnato"}</p>
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-muted-foreground">
+                    End Time
+                  </p>
+                  <p className="text-sm">{assignmentTimes.end_time ?? "non assegnato"}</p>
+                </div>
+              </div>
+            </div>
+
             {/* Quarta riga: Tipologia appartamento - Tipologia intervento */}
             <div className="grid grid-cols-2 gap-4">
               <div>
@@ -292,21 +322,7 @@ export default function TaskCard({
               </div>
             </div>
 
-            {/* Sesta riga: Start Time - End Time */}
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <p className="text-sm font-semibold text-muted-foreground">
-                  Start Time
-                </p>
-                <p className="text-sm">{assignmentTimes.start_time ?? "non assegnato"}</p>
-              </div>
-              <div>
-                <p className="text-sm font-semibold text-muted-foreground">
-                  End Time
-                </p>
-                <p className="text-sm">{assignmentTimes.end_time ?? "non assegnato"}</p>
-              </div>
-            </div>
+            
           </div>
         </DialogContent>
       </Dialog>
