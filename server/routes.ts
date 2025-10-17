@@ -468,7 +468,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/extract-data", async (req, res) => {
     try {
       const { date } = req.body;
-      
+
       // Resetta i file di assegnazione all'inizio dell'estrazione
       const earlyOutAssignmentsPath = path.join(process.cwd(), 'client/public/data/output/early_out_assignments.json');
       const timelineAssignmentsPath = path.join(process.cwd(), 'client/public/data/output/timeline_assignments.json');
@@ -480,7 +480,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const command = date 
         ? `python3 client/public/scripts/task_extractor.py ${date}`
         : 'python3 client/public/scripts/task_extractor.py';
-      
+
       console.log(`Eseguendo task_extractor.py con data ${date || 'default'}...`);
       const taskExtractorResult = await execAsync(command, {
         cwd: process.cwd(),
@@ -813,6 +813,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(task);
     } catch (error) {
       res.status(500).json({ message: "Failed to schedule task" });
+    }
+  });
+
+  // Endpoint for running the optimizer script
+  app.post("/api/run-optimizer", async (req, res) => {
+    try {
+      console.log("Eseguendo opt_updated.py...");
+      const result = await new Promise<{ stdout: string; stderr: string }>((resolve, reject) => {
+        exec(
+          "python3 /home/runner/workspace/client/public/scripts/opt_updated.py",
+          (error, stdout, stderr) => {
+            if (error) {
+              reject(error);
+              return;
+            }
+            resolve({ stdout, stderr });
+          }
+        );
+      });
+
+      console.log("opt_updated.py output:", result.stdout);
+      if (result.stderr) {
+        console.error("opt_updated.py stderr:", result.stderr);
+      }
+
+      res.json({
+        success: true,
+        message: "Optimizer eseguito con successo",
+        output: result.stdout,
+      });
+    } catch (error: any) {
+      console.error("Errore nell'esecuzione di opt_updated.py:", error);
+      res.status(500).json({
+        success: false,
+        message: "Errore nell'esecuzione dell'optimizer",
+        error: error.message,
+      });
     }
   });
 
