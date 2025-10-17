@@ -297,9 +297,14 @@ def load_tasks() -> List[Task]:
     tasks: List[Task] = []
     for t in data.get("early_out_tasks", []):
         checkout = hhmm_to_min(t.get("checkout_time"), default="10:00")
-        if checkout < eo_start_min:
-            checkout = eo_start_min
         checkin = hhmm_to_min(t.get("checkin_time"), default="23:59")
+        
+        # Handle overnight tasks (checkout before start time)
+        # These should still be processable if they have reasonable checkin times
+        if checkout < eo_start_min:
+            # For overnight tasks, we can start at eo_start_min
+            checkout = eo_start_min
+        
         tasks.append(
             Task(
                 task_id=str(t.get("task_id")),
@@ -463,14 +468,17 @@ def build_output(cleaners: List[Cleaner],
             "tasks": tasks_list
         })
     unassigned_list = [{
-        "task_id":
-        int(t.task_id),
-        "logistic_code":
-        int(t.logistic_code),
-        "address":
-        t.address,
-        "reason":
-        "no feasible option; even best-of-infeasible not applicable"
+        "task_id": int(t.task_id),
+        "logistic_code": int(t.logistic_code),
+        "address": t.address,
+        "premium": t.is_premium,
+        "straordinaria": t.straordinaria,
+        "cleaning_time": t.cleaning_time,
+        "checkout_time": min_to_hhmm(t.checkout_time),
+        "checkin_time": min_to_hhmm(t.checkin_time),
+        "alias": t.alias,
+        "apt_type": t.apt_type,
+        "reason": "no feasible option; even best-of-infeasible not applicable"
     } for t in unassigned]
 
     total_assigned = sum(len(c["tasks"]) for c in cleaners_with_tasks)
