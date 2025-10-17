@@ -467,8 +467,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Endpoint per eseguire l'estrazione dei dati
   app.post("/api/extract-data", async (req, res) => {
     try {
-      const { date } = req.body;
-      
       // Resetta i file di assegnazione all'inizio dell'estrazione
       const earlyOutAssignmentsPath = path.join(process.cwd(), 'client/public/data/output/early_out_assignments.json');
       const timelineAssignmentsPath = path.join(process.cwd(), 'client/public/data/output/timeline_assignments.json');
@@ -476,13 +474,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       await fs.writeFile(earlyOutAssignmentsPath, JSON.stringify({ early_out_tasks_assigned: [], meta: {} }, null, 2));
       await fs.writeFile(timelineAssignmentsPath, JSON.stringify({ assignments: [] }, null, 2));
 
-      // Costruisci il comando con la data se fornita
-      const taskExtractorCommand = date 
-        ? `python3 client/public/scripts/task_extractor.py ${date}`
-        : 'python3 client/public/scripts/task_extractor.py';
-      
-      console.log(`Eseguendo task_extractor.py${date ? ` con data ${date}` : ''}...`);
-      const taskExtractorResult = await execAsync(taskExtractorCommand, {
+      // Usa python3 e chiama task_extractor.py (con data di domani)
+      console.log("Eseguendo task_extractor.py...");
+      const taskExtractorResult = await execAsync('python3 client/public/scripts/task_extractor.py', {
         cwd: process.cwd(),
         maxBuffer: 10 * 1024 * 1024
       });
@@ -498,7 +492,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({
         success: true,
         message: "Dati estratti con successo",
-        date: date || "default (domani)",
         outputs: {
           task_extractor: taskExtractorResult.stdout,
           extract_all: extractAllResult.stdout

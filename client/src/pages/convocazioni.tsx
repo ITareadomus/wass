@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
@@ -38,118 +39,37 @@ export default function Convocazioni() {
     return tomorrow;
   });
   const [confirmDialog, setConfirmDialog] = useState<{ open: boolean; cleanerId: number | null }>({ open: false, cleanerId: null });
-  const [isExtractingData, setIsExtractingData] = useState(false);
-
-  const handleDateSelect = async (date: Date | undefined) => {
-    if (!date) return;
-
-    setSelectedDate(date);
-    const dateString = format(date, 'yyyy-MM-dd');
-
-    setIsExtractingData(true);
-    setLoadingMessage("Estrazione dati per la data selezionata...");
-
-    try {
-      // Estrai i task per la data selezionata
-      const extractDataResponse = await fetch('/api/extract-data', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ date: dateString })
-      });
-
-      if (!extractDataResponse.ok) {
-        throw new Error('Errore durante l\'estrazione dei dati');
-      }
-
-      setLoadingMessage("Dati estratti con successo!");
-
-      // Poi carica i cleaner
-      await loadCleaners(date);
-    } catch (error) {
-      console.error('Errore nell\'estrazione dei dati:', error);
-      setLoadingMessage("Errore nell'estrazione dei dati");
-    } finally {
-      setIsExtractingData(false);
-    }
-  };
-
-  const loadCleaners = async (forceDate?: Date) => {
-    const dateToUse = forceDate || selectedDate;
-    const dateString = format(dateToUse, 'yyyy-MM-dd');
-
-    setIsLoading(true); // Usiamo setIsLoading per il caricamento generale
-    setLoadingMessage("Caricamento cleaner in corso...");
-
-    try {
-      // Prima estrai i cleaner per la data selezionata
-      setLoadingMessage("Estrazione cleaner dal database...");
-      const extractResponse = await fetch('/api/extract-cleaners-optimized', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ date: dateString })
-      });
-
-      if (!extractResponse.ok) {
-        throw new Error('Errore durante l\'estrazione dei cleaner');
-      }
-
-      // Poi carica i cleaner estratti
-      setLoadingMessage("Caricamento lista cleaner...");
-      const response = await fetch('/data/cleaners/cleaners.json');
-      if (!response.ok) {
-        throw new Error('Errore nel caricamento dei cleaner');
-      }
-
-      const data = await response.json();
-      setCleaners(data.cleaners || []);
-      setLoadingMessage("Cleaner caricati con successo!");
-    } catch (error) {
-      console.error('Errore nel caricamento dei cleaner:', error);
-      setLoadingMessage("Errore nel caricamento dei cleaner");
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
 
   useEffect(() => {
-    const initializePage = async () => {
+    const loadCleaners = async () => {
       try {
         setIsLoading(true);
-        setLoadingMessage("Estrazione dati iniziali...");
-
-        // Esegui extract_data.py per la data odierna (o quella di default)
-        const dateStr = format(selectedDate, "yyyy-MM-dd");
-        const extractDataResponse = await fetch('/api/extract-data', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ date: dateStr })
-        });
-
-        if (!extractDataResponse.ok) {
-          throw new Error('Errore durante l\'estrazione dei dati');
-        }
-
         setLoadingMessage("Estrazione cleaners dal database...");
+
         // Esegui extract_cleaners_optimized.py
-        const extractCleanersResponse = await fetch('/api/extract-cleaners-optimized', {
+        const dateStr = format(selectedDate, "yyyy-MM-dd");
+        const extractResponse = await fetch('/api/extract-cleaners-optimized', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ date: dateStr })
         });
 
-        if (!extractCleanersResponse.ok) {
+        if (!extractResponse.ok) {
           throw new Error('Errore durante l\'estrazione dei cleaners');
         }
 
+        const extractResult = await extractResponse.json();
+        console.log("Estrazione cleaners completata:", extractResult);
+
         setLoadingMessage("Caricamento cleaners...");
+
         const response = await fetch('/data/cleaners/cleaners.json');
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
         }
         const cleanersData = await response.json();
         console.log("Cleaners caricati da cleaners.json:", cleanersData);
-
+        
         // Estrai i cleaners dalla struttura del file
         let cleanersList: Cleaner[] = [];
         if (cleanersData.dates) {
@@ -158,24 +78,23 @@ export default function Convocazioni() {
         } else if (cleanersData.cleaners) {
           cleanersList = cleanersData.cleaners;
         }
-
+        
         // Ordina per counter_hours (decrescente - più ore prima)
         cleanersList.sort((a, b) => b.counter_hours - a.counter_hours);
-
+        
         setCleaners(cleanersList);
         setSelectedCleaners(new Set()); // Reset selezioni quando cambia la data
         setIsLoading(false);
-        setLoadingMessage("Convocazioni caricate con successo!");
+        setLoadingMessage("Cleaners caricati con successo!");
       } catch (error) {
-        console.error("Errore nell'inizializzazione della pagina:", error);
-        setLoadingMessage("Errore nell'inizializzazione");
+        console.error("Errore nel caricamento dei cleaners:", error);
+        setLoadingMessage("Errore nel caricamento dei cleaners");
         setIsLoading(false);
       }
     };
-
-    initializePage();
-  }, []); // useEffect viene eseguito solo al mount del componente
-
+    
+    loadCleaners();
+  }, [selectedDate]);
 
   const toggleCleanerSelection = (cleanerId: number, isAvailable: boolean) => {
     if (!isAvailable) {
@@ -212,7 +131,7 @@ export default function Convocazioni() {
   const handleConfirm = async () => {
     try {
       const selectedCleanersData = cleaners.filter(c => selectedCleaners.has(c.id));
-
+      
       const dataToSave = {
         cleaners: selectedCleanersData,
         total_selected: selectedCleanersData.length
@@ -266,7 +185,7 @@ export default function Convocazioni() {
                 del {format(selectedDate, "dd/MM/yyyy", { locale: it })}
               </span>
             </h1>
-
+            
             {/* Selettore Data e Dark Mode Toggle */}
             <div className="flex items-center gap-3">
               <ThemeToggle />
@@ -287,10 +206,9 @@ export default function Convocazioni() {
                 <Calendar
                   mode="single"
                   selected={selectedDate}
-                  onSelect={handleDateSelect}
+                  onSelect={(date) => date && setSelectedDate(date)}
                   initialFocus
                   locale={it}
-                  disabled={isExtractingData || isLoading}
                 />
               </PopoverContent>
             </Popover>
@@ -318,29 +236,29 @@ export default function Convocazioni() {
             {cleaners.map((cleaner) => {
               const isPremium = cleaner.role === "Premium";
               const isAvailable = cleaner.available !== false;
-
+              
               const isFormatore = cleaner.role === "Formatore";
-
-              const borderColor = !isAvailable
-                ? "border-gray-400"
-                : isFormatore ? "border-orange-500"
+              
+              const borderColor = !isAvailable 
+                ? "border-gray-400" 
+                : isFormatore ? "border-orange-500" 
                 : isPremium ? "border-yellow-500" : "border-green-500";
-              const bgColor = !isAvailable
-                ? "bg-gray-300/30 dark:bg-gray-700/30"
+              const bgColor = !isAvailable 
+                ? "bg-gray-300/30 dark:bg-gray-700/30" 
                 : isFormatore ? "bg-orange-500/10"
                 : isPremium ? "bg-yellow-500/10" : "bg-green-500/10";
               const badgeColor = !isAvailable
                 ? "bg-gray-400/20 text-gray-700 dark:text-gray-200 border-gray-400 dark:border-gray-500"
                 : isFormatore ? "bg-orange-500/20 text-orange-700 border-orange-500"
                 : isPremium ? "bg-yellow-500/20 text-yellow-700 border-yellow-500" : "bg-green-500/20 text-green-700 border-green-500";
-
+              
               return (
                 <div
                   key={cleaner.id}
                   onClick={() => toggleCleanerSelection(cleaner.id, isAvailable)}
                   className={`flex items-center justify-between p-4 border-2 rounded-lg transition-all ${borderColor} ${bgColor} ${
-                    !isAvailable
-                      ? 'opacity-60 cursor-pointer hover:opacity-70'
+                    !isAvailable 
+                      ? 'opacity-60 cursor-pointer hover:opacity-70' 
                       : 'hover:opacity-80 cursor-pointer'
                   }`}
                 >
@@ -355,7 +273,7 @@ export default function Convocazioni() {
                         </span>
                       </div>
                       <div className="text-xs text-foreground/80">
-                        <span className="font-semibold">Ore questa settimana:</span> {cleaner.counter_hours}h
+                        <span className="font-semibold">Ore questa settimana:</span> {cleaner.counter_hours}h 
                         <span className="mx-2">|</span>
                         <span className="font-semibold">Giorni consecutivi:</span> {cleaner.counter_days}
                         <span className="mx-2">|</span>
@@ -473,17 +391,6 @@ export default function Convocazioni() {
           </div>
         </Card>
       </div>
-
-      {(isLoading || isExtractingData) && (
-        <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center">
-          <div className="text-center space-y-4">
-            <div className="flex justify-center">
-              <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-primary"></div>
-            </div>
-            <p className="text-lg font-semibold">{loadingMessage}</p>
-          </div>
-        </div>
-      )}
       </div>
     </div>
   );
