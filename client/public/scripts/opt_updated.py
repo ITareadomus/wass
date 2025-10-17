@@ -418,8 +418,40 @@ def main():
     tasks = load_tasks()
     planners, leftovers = plan_day(tasks, cleaners)
     output = build_output(planners, leftovers)
+    
+    # Save early_out_assignments.json
     OUTPUT_ASSIGN.write_text(json.dumps(output, ensure_ascii=False, indent=2), encoding="utf-8")
     print(f"✅ Wrote {OUTPUT_ASSIGN}")
+    
+    # Update timeline_assignments.json
+    timeline_data = {"assignments": []}
+    if TIMELINE_ASSIGNMENTS.exists():
+        try:
+            timeline_data = json.loads(TIMELINE_ASSIGNMENTS.read_text(encoding="utf-8"))
+        except:
+            pass
+    
+    # Remove old early-out assignments (from smista_button)
+    timeline_data["assignments"] = [
+        a for a in timeline_data.get("assignments", [])
+        if a.get("assignment_type") != "smista_button"
+    ]
+    
+    # Add new assignments
+    for cleaner_entry in output["early_out_tasks_assigned"]:
+        cleaner_id = cleaner_entry["cleaner"]["id"]
+        for task in cleaner_entry.get("tasks", []):
+            timeline_data["assignments"].append({
+                "logistic_code": str(task["logistic_code"]),
+                "cleanerId": cleaner_id,
+                "assignment_type": "smista_button",
+                "sequence": task.get("sequence", 0),
+                "start_time": task.get("start_time"),
+                "end_time": task.get("end_time")
+            })
+    
+    TIMELINE_ASSIGNMENTS.write_text(json.dumps(timeline_data, ensure_ascii=False, indent=2), encoding="utf-8")
+    print(f"✅ Updated {TIMELINE_ASSIGNMENTS}")
 
 if __name__ == "__main__":
     main()
