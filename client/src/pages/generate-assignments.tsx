@@ -68,7 +68,7 @@ export default function GenerateAssignments() {
   const [isLoadingTasks, setIsLoadingTasks] = useState(false);
 
   useEffect(() => {
-    // Esegui l'estrazione dei dati all'avvio
+    // Esegui l'estrazione dei dati all'avvio e quando cambia la data
     const extractData = async () => {
       try {
         setIsExtracting(true);
@@ -105,7 +105,7 @@ export default function GenerateAssignments() {
     };
 
     extractData();
-  }, []);
+  }, [selectedDate]); // Aggiungi selectedDate come dipendenza
 
   // Carica le assegnazioni quando i task sono pronti
   useEffect(() => {
