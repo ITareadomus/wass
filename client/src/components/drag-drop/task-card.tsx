@@ -189,8 +189,10 @@ export default function TaskCard({
                         { day: "2-digit", month: "2-digit", year: "numeric" },
                       )
                     : "non migrato"}
-                  {(task as any).checkout_time
-                    ? ` - ${(task as any).checkout_time}`
+                  {(task as any).checkout_date
+                    ? ((task as any).checkout_time
+                        ? ` - ${(task as any).checkout_time}`
+                        : " - orario non migrato")
                     : ""}
                 </p>
               </div>
@@ -205,8 +207,10 @@ export default function TaskCard({
                         { day: "2-digit", month: "2-digit", year: "numeric" },
                       )
                     : "non migrato"}
-                  {(task as any).checkin_time
-                    ? ` - ${(task as any).checkin_time}`
+                  {(task as any).checkin_date
+                    ? ((task as any).checkin_time
+                        ? ` - ${(task as any).checkin_time}`
+                        : " - orario non migrato")
                     : ""}
                 </p>
               </div>
