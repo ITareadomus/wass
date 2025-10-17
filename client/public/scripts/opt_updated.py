@@ -417,6 +417,12 @@ def build_output(cleaners: List[Cleaner],
             continue
         tasks_list: List[Dict[str, Any]] = []
         for idx, (t, (arr, start, fin)) in enumerate(zip(cl.route, schedule)):
+            # Calcola il tempo di viaggio dal task precedente
+            travel_time = 0
+            if idx > 0:
+                prev_task = cl.route[idx - 1]
+                travel_time = int(round(travel_minutes(prev_task, t)))
+            
             tasks_list.append({
                 "task_id": int(t.task_id),
                 "logistic_code": int(t.logistic_code),
@@ -426,7 +432,8 @@ def build_output(cleaners: List[Cleaner],
                 "start_time": min_to_hhmm(start),
                 "end_time": min_to_hhmm(fin),
                 "followup": idx > 0,
-                "sequence": idx + 1
+                "sequence": idx + 1,
+                "travel_time": travel_time
             })
         cleaners_with_tasks.append({
             "cleaner": {
