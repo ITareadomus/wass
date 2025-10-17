@@ -55,14 +55,14 @@
       "sequence": 1
     },
     {
-      "logistic_code": "980",
-      "cleanerId": 644,
+      "logistic_code": "1382",
+      "cleanerId": 249,
       "assignment_type": "optimizer",
       "sequence": 1
     },
     {
       "logistic_code": "1153",
-      "cleanerId": 249,
+      "cleanerId": 469,
       "assignment_type": "optimizer",
       "sequence": 1
     }
