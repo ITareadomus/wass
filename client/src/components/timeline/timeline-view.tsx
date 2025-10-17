@@ -229,11 +229,18 @@ export default function TimelineView({
                             // La timeline va dalle 10:00 alle 19:00 (540 minuti totali)
                             const leftPosition = (minutesFromStart / 540) * 100;
                             
+                            // Calcola la larghezza in base al cleaning_time
+                            const cleaningTime = taskData.cleaning_time || 60; // default 60 minuti
+                            const widthPercentage = (cleaningTime / 540) * 100;
+                            
                             return (
                               <div 
                                 key={`${task.id}-${cleaner.id}-${index}`}
                                 className="absolute top-0 bottom-0 flex items-center"
-                                style={{ left: `${Math.max(0, leftPosition)}%` }}
+                                style={{ 
+                                  left: `${Math.max(0, leftPosition)}%`,
+                                  width: `${widthPercentage}%`
+                                }}
                               >
                                 <TaskCard 
                                   task={task} 
