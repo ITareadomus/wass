@@ -8,9 +8,11 @@ from pathlib import Path
 # =============================
 # I/O paths
 # =============================
-INPUT_TASKS = Path("early_out.json")
-INPUT_CLEANERS = Path("selected_cleaners.json")
-OUTPUT_ASSIGN = Path("early_out_assignments.json")
+BASE = Path(__file__).parent.parent / "data"
+
+INPUT_TASKS = BASE / "output" / "early_out.json"
+INPUT_CLEANERS = BASE / "cleaners" / "selected_cleaners.json"
+OUTPUT_ASSIGN = BASE / "output" / "early_out_assignments.json"
 
 # =============================
 # CONFIG
@@ -476,14 +478,19 @@ def build_output(cleaners: List[Cleaner],
 
 
 def main():
-    if not INPUT_TASKS.exists() or not INPUT_CLEANERS.exists():
-        raise SystemExit(
-            "Missing input files: early_out.json and/or selected_cleaners.json"
-        )
+    if not INPUT_TASKS.exists():
+        raise SystemExit(f"Missing input file: {INPUT_TASKS}")
+    if not INPUT_CLEANERS.exists():
+        raise SystemExit(f"Missing input file: {INPUT_CLEANERS}")
+    
     cleaners = load_cleaners()
     tasks = load_tasks()
     planners, leftovers = plan_day(tasks, cleaners)
     output = build_output(planners, leftovers)
+    
+    # Ensure output directory exists
+    OUTPUT_ASSIGN.parent.mkdir(parents=True, exist_ok=True)
+    
     OUTPUT_ASSIGN.write_text(json.dumps(output, ensure_ascii=False, indent=2),
                              encoding="utf-8")
     print(f"✅ Wrote {OUTPUT_ASSIGN}")
