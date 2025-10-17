@@ -231,10 +231,26 @@ def evaluate_route_cost(route: List[Task]) -> Tuple[float, List[Tuple[int, int, 
     return total, schedule
 
 def delta_insert_cost(route: List[Task], task: Task, pos: int) -> Tuple[float, List[Task]]:
+    # Calcola il costo base includendo la penalità geografica
     base, _ = evaluate_route_cost(route)
+    
+    # Calcola il nuovo percorso
     new_route = route[:pos] + [task] + route[pos:]
+    
+    # Calcola il nuovo costo includendo la penalità geografica
     new, _ = evaluate_route_cost(new_route)
-    return new - base, new_route
+    
+    # Il delta ora include correttamente la differenza di penalità geografica
+    delta = new - base
+    
+    # Aggiungi penalità extra per viaggi lunghi (oltre la penalità quadratica già in evaluate_route_cost)
+    if pos > 0:
+        prev_task = route[pos - 1]
+        km = haversine_km(prev_task.lat, prev_task.lng, task.lat, task.lng)
+        if km > 2.0:  # Penalità extra per distanze > 2km
+            delta += 50.0 * (km - 2.0)  # Penalità lineare molto forte
+    
+    return delta, new_route
 
 def best_k_positions(cleaner: Cleaner, task: Task) -> List[float]:
     # capacity quick check: allow up to 3, but only if 3rd satisfies local rule (enforced via evaluate_route_cost anyway)
