@@ -46,8 +46,11 @@ export default function Convocazioni() {
         setIsLoading(true);
         setLoadingMessage("Estrazione cleaners dal database...");
 
-        // Esegui extract_cleaners_optimized.py
+        // Salva la data selezionata in localStorage
         const dateStr = format(selectedDate, "yyyy-MM-dd");
+        localStorage.setItem('selected_work_date', dateStr);
+
+        // Esegui extract_cleaners_optimized.py
         const extractResponse = await fetch('/api/extract-cleaners-optimized', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },

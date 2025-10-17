@@ -40,10 +40,16 @@ interface RawTask {
 }
 
 export default function GenerateAssignments() {
-  // Inizializza con domani (come task_extractor.py)
-  const tomorrow = new Date();
-  tomorrow.setDate(tomorrow.getDate() + 1);
-  const [selectedDate, setSelectedDate] = useState<Date>(tomorrow);
+  // Leggi la data da localStorage se disponibile, altrimenti usa domani
+  const [selectedDate, setSelectedDate] = useState<Date>(() => {
+    const savedDate = localStorage.getItem('selected_work_date');
+    if (savedDate) {
+      return new Date(savedDate);
+    }
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    return tomorrow;
+  });
   const [earlyOutTasks, setEarlyOutTasks] = useState<Task[]>([]);
   const [highPriorityTasks, setHighPriorityTasks] = useState<Task[]>([]);
   const [lowPriorityTasks, setLowPriorityTasks] = useState<Task[]>([]);
@@ -68,9 +74,13 @@ export default function GenerateAssignments() {
         setIsExtracting(true);
         setExtractionStep("Estrazione dati dal database...");
 
+        const dateStr = format(selectedDate, "yyyy-MM-dd");
+        console.log("Estraendo task per la data:", dateStr);
+
         const response = await fetch('/api/extract-data', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' }
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ date: dateStr })
         });
 
         if (!response.ok) {
