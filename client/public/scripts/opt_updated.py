@@ -49,10 +49,8 @@ MIN_TRAVEL = 2.0
 MAX_TRAVEL = 45.0
 
 # Costi/penalità
-ACTIVATION_COST = 20.0
+ACTIVATION_COST = 0.0
 PENALTY_STANDARD_TO_PREMIUM = 0.0  # i premium possono fare standard senza malus
-SOFT_PENALTY_BASE_KM = 1.0  # oltre questo km, penalità geografica soft
-ALPHA_SOFT_GEO = 50.0  # coefficiente penalità molto forte per viaggi lunghi
 
 
 @dataclass
@@ -137,7 +135,8 @@ def haversine_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
     phi1, phi2 = math.radians(lat1), math.radians(lat2)
     dphi = math.radians(lat2 - lat1)
     dl = math.radians(lon2 - lon1)
-    a = math.sin(dphi / 2)**2 + math.cos(phi1) * math.cos(phi2) * math.sin(dl / 2)**2
+    a = math.sin(
+        dphi / 2)**2 + math.cos(phi1) * math.cos(phi2) * math.sin(dl / 2)**2
     c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
     return R * c
 
@@ -255,14 +254,13 @@ def has_free_cleaner_for(task: Task, cleaners: List[Cleaner]) -> bool:
         if not can_handle_premium(free, task):
             continue
         new_route = [task]
-        cost, _ = evaluate_route_cost(
-            new_route)  # applica cap, orari, 3ª task non rilevante su singola
+        cost, _ = evaluate_route_cost(new_route)  # applica cap, orari
         if not math.isinf(cost):
             return True
     return False
 
 
-# -------- Planner --------
+# -------- Loader --------
 def load_cleaners() -> List[Cleaner]:
     data = json.loads(INPUT_CLEANERS.read_text(encoding="utf-8"))
     cleaners: List[Cleaner] = []
@@ -313,6 +311,7 @@ def load_tasks() -> List[Task]:
     return tasks
 
 
+# -------- Planner --------
 def plan_day(tasks: List[Task],
              cleaners: List[Cleaner]) -> Tuple[List[Cleaner], List[Task]]:
     unassigned = tasks[:]
@@ -376,7 +375,7 @@ def plan_day(tasks: List[Task],
                     _cl.route = _route
                     unassigned.remove(task)
                     continue
-                # altrimenti resta unassigned (si vedrà al giro dopo, ma qui non c'è modo)
+                # altrimenti resta unassigned
                 continue
 
             per_cleaner_best.sort(
@@ -386,36 +385,19 @@ def plan_day(tasks: List[Task],
                     2], per_cleaner_best[0][3], per_cleaner_best[0][4]
             # second-best globale (per regret)
             second_delta = None
-            # The second best delta is either the second best insertion into the best cleaner (d2)
-            # OR the best insertion into the second-best cleaner (dd1 from per_cleaner_best[1])
-            # The original code only checked the best insertion into the second-best cleaner *if it exists*
-            # and defaulted to d1 + 60.0 otherwise.
-
-            # Find the true second best cost across all cleaners and positions.
-            all_deltas = [item[1] for item in per_cleaner_best] + [
-                item[2] for item in per_cleaner_best if item[2] != float("inf")
-            ]
-            all_deltas.sort()
-
-            # The best delta is d1. The second best must be greater than d1.
-            # We search for the first value strictly greater than d1.
-            second_delta_candidate = next(
-                (d for d in all_deltas if d > d1 + 1e-6), None)
-
-            if second_delta_candidate is None:
-                second_delta = d1 + 60.0  # Arbitrary large number if only one feasible option
-            else:
-                second_delta = second_delta_candidate
-
+            for c, dd1, dd2, ppos, rroute in per_cleaner_best[1:]:
+                second_delta = dd1
+                break
+            if second_delta is None:
+                second_delta = d1 + 60.0
             regret = second_delta - d1
-
             if (chosen is None) or (regret > chosen[0]) or (
                     abs(regret - chosen[0]) < 1e-6 and d1 < chosen[1]):
                 chosen = (regret, d1, task, d1_cl, pos1, route1)
 
         if chosen is None:
             break
-        _, _, task, cl, _, new_r = chosen
+        _, _, task, cl, pos, new_r = chosen
         cl.route = new_r  # commit
         unassigned.remove(task)
 
@@ -487,8 +469,7 @@ def build_output(cleaners: List[Cleaner],
                 "Hard cap: travel/gap > 22' infeasible (tranne fallback quando TUTTE le mosse superano 22')",
                 "3rd task only if travel<=10' and gap<=10' (12'/12' if same street/building)",
                 "Redirect: if hop>15' and a free cleaner is feasible, prefer the free cleaner",
-                "Activation cost = 20.0 (NOTE: The original note said 'Activation cost = 0', but the code uses 20.0)",
-                "premium can do standard"
+                "Activation cost = 0; premium can do standard"
             ]
         }
     }
