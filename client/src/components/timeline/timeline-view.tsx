@@ -238,7 +238,11 @@ export default function TimelineView({
 
       {/* Cleaner Details Dialog */}
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-        <DialogContent className="sm:max-w-2xl max-h-[80vh] overflow-y-auto">
+        <DialogContent className={`sm:max-w-2xl max-h-[80vh] overflow-y-auto ${
+          selectedCleaner?.role === "Formatore" 
+            ? "border-4 border-black bg-orange-500/10" 
+            : ""
+        }`}>
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               Dettagli Cleaner #{selectedCleaner?.id}
