@@ -68,11 +68,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         (a: any) => a.logistic_code !== logisticCode && a.taskId !== taskId
       );
 
-      // Aggiungi la nuova assegnazione
+      // Calcola la sequence: trova il massimo sequence per questo cleaner e aggiungi 1
+      const cleanerAssignments = assignmentsData.assignments.filter((a: any) => a.cleanerId === cleanerId);
+      const maxSequence = cleanerAssignments.length > 0 
+        ? Math.max(...cleanerAssignments.map((a: any) => a.sequence || 0))
+        : -1;
+      const newSequence = maxSequence + 1;
+
+      // Aggiungi la nuova assegnazione con sequence
       assignmentsData.assignments.push({
         logistic_code: logisticCode,
         cleanerId,
-        assignment_type: "manual_drag"
+        assignment_type: "manual_drag",
+        sequence: newSequence
       });
 
       // Salva il file
