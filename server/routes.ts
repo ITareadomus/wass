@@ -85,6 +85,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Endpoint per rimuovere un'assegnazione dalla timeline
+  app.post("/api/remove-timeline-assignment", async (req, res) => {
+    try {
+      const { taskId, logisticCode } = req.body;
+      const timelineAssignmentsPath = path.join(process.cwd(), 'client/public/data/output/timeline_assignments.json');
+
+      // Carica timeline_assignments.json
+      let assignmentsData: any = { assignments: [] };
+      try {
+        const existingData = await fs.readFile(timelineAssignmentsPath, 'utf8');
+        assignmentsData = JSON.parse(existingData);
+      } catch (error) {
+        // File non esiste, usa struttura vuota
+      }
+
+      // Rimuovi l'assegnazione per questo task
+      assignmentsData.assignments = assignmentsData.assignments.filter(
+        (a: any) => a.logistic_code !== logisticCode && a.taskId !== taskId
+      );
+
+      // Salva il file
+      await fs.writeFile(timelineAssignmentsPath, JSON.stringify(assignmentsData, null, 2));
+
+      res.json({ success: true, message: "Assegnazione rimossa dalla timeline con successo" });
+    } catch (error: any) {
+      console.error("Errore nella rimozione dell'assegnazione dalla timeline:", error);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
   // Endpoint per aggiornare assignments.json quando un task viene assegnato a un cleaner
   app.post("/api/update-assignments", async (req, res) => {
     try {

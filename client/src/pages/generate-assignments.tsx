@@ -346,6 +346,23 @@ export default function GenerateAssignments() {
     }
   };
 
+  const removeTimelineAssignment = async (taskId: string, logisticCode?: string) => {
+    try {
+      const response = await fetch('/api/remove-timeline-assignment', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ taskId, logisticCode }),
+      });
+      if (!response.ok) {
+        console.error('Errore nella rimozione dell\'assegnazione dalla timeline');
+      } else {
+        console.log('Assegnazione rimossa dalla timeline con successo');
+      }
+    } catch (error) {
+      console.error('Errore nella chiamata API di rimozione timeline:', error);
+    }
+  };
+
   const onDragEnd = (result: DropResult) => {
     const { source, destination, draggableId } = result;
 
@@ -428,6 +445,9 @@ export default function GenerateAssignments() {
         saveTaskAssignments(updatedTasks);
         return updatedTasks;
       });
+
+      // Rimuovi l'assegnazione dalla timeline
+      removeTimelineAssignment(taskId, logisticCode);
 
       // Ri-aggiungi la task al container di destinazione
       const taskToAdd = allTasksWithAssignments.find(t => t.id === taskId);
