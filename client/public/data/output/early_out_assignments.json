@@ -187,21 +187,21 @@
     },
     {
       "cleaner": {
-        "id": 644,
-        "name": "HENRY",
-        "lastname": "CHIDUBEM",
+        "id": 249,
+        "name": "Ogbodo Chidi",
+        "lastname": "Igwe",
         "role": "Premium",
         "premium": true
       },
       "tasks": [
         {
-          "task_id": 217274,
-          "logistic_code": 980,
-          "address": "LARGO CORSIA DEI SERVI 11",
-          "premium": true,
-          "cleaning_time": 120,
+          "task_id": 217195,
+          "logistic_code": 1382,
+          "address": "VIA PONTE SEVESO 40",
+          "premium": false,
+          "cleaning_time": 240,
           "start_time": "10:00",
-          "end_time": "12:00",
+          "end_time": "14:00",
           "followup": false,
           "sequence": 1,
           "travel_time": 0
@@ -210,11 +210,11 @@
     },
     {
       "cleaner": {
-        "id": 249,
-        "name": "Ogbodo Chidi",
-        "lastname": "Igwe",
-        "role": "Premium",
-        "premium": true
+        "id": 469,
+        "name": "LAMIN",
+        "lastname": "SOLY",
+        "role": "Standard",
+        "premium": false
       },
       "tasks": [
         {
@@ -241,6 +241,7 @@
     "max_tasks_per_cleaner": 3,
     "algorithm": "regret_insertion + redirect + best-of-infeasible",
     "notes": [
+      "Straordinarie-first (only premium, must be sequence=1)",
       "Premium-first",
       "Hard cap: travel/gap > 22' infeasible (tranne fallback quando TUTTE le mosse superano 22')",
       "3rd task only if travel<=10' and gap<=10' (12'/12' if same street/building)",
