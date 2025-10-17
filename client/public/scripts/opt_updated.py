@@ -296,14 +296,11 @@ def load_tasks() -> List[Task]:
     eo_start_min = hhmm_to_min("10:00")
     tasks: List[Task] = []
     for t in data.get("early_out_tasks", []):
-        checkout = hhmm_to_min(t.get("checkout_time"), default="10:00")
+        # Per gli early-out, checkout_time NON è rilevante come vincolo di inizio
+        # Tutte le task possono iniziare dalle 10:00 in poi
+        # L'unico vincolo è finire prima del checkin_time
+        checkout = eo_start_min  # Tutte le early-out possono iniziare dalle 10:00
         checkin = hhmm_to_min(t.get("checkin_time"), default="23:59")
-        
-        # Handle overnight tasks (checkout before start time)
-        # These should still be processable if they have reasonable checkin times
-        if checkout < eo_start_min:
-            # For overnight tasks, we can start at eo_start_min
-            checkout = eo_start_min
         
         tasks.append(
             Task(
