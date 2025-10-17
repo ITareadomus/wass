@@ -316,7 +316,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         fs.writeFile(lowPriorityPath, JSON.stringify(lowPriorityData, null, 2))
       ]);
       
-      // Aggiungi il task a early_out_assignments.json se è stato spostato nell'early-out
+      // Se la task viene spostata nell'early-out, rimuovila da early_out_assignments
+      // in modo che non sia più considerata "già assegnata" al prossimo run dell'optimizer
       if (toContainer === 'early-out') {
         let earlyOutAssignmentsData: any = { early_out_tasks_assigned: [], meta: {} };
         try {
@@ -326,44 +327,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
           // File non esiste, usa struttura vuota
         }
         
-        // Assicurati che taskToMove abbia le proprietà necessarie per essere aggiunto
-        const taskToAdd = {
-          task_id: parseInt(taskId),
-          logistic_code: parseInt(logisticCode),
-          // Aggiungi altre proprietà rilevanti se necessario dal taskToMove
-          // Ad esempio: address, cleaning_time, etc.
-          // Se queste proprietà non sono presenti in taskToMove, dovrai caricarle
-          // dal storage o assicurarti che siano incluse quando taskToMove viene creato.
-          // Per ora, assumiamo che le proprietà essenziali siano presenti o possano essere dedotte.
-          // Se 'taskToMove' proviene da earlyOutData, dovrebbe già contenere queste info.
-          // Se proviene da highPriorityData o lowPriorityData, potrebbe mancare 'logistic_code' se non era presente lì.
-          // Dobbiamo gestire questo caso.
-        };
-
-        // Aggiungi taskToAdd se non esiste già (basato su task_id o logistic_code)
-        const alreadyExists = earlyOutAssignmentsData.early_out_tasks_assigned.some(
-          (t: any) => (taskToAdd.task_id && t.task_id === taskToAdd.task_id) || (taskToAdd.logistic_code && t.logistic_code === taskToAdd.logistic_code)
-        );
-
-        if (!alreadyExists) {
-          // Se taskToMove è stato appena spostato da 'timeline' a 'early-out' (implicito nel toContainer === 'early-out'),
-          // e se taskToMove non ha `logistic_code` ma solo `taskId` (o viceversa), dobbiamo assicurarci di avere entrambi
-          // o almeno uno dei due per identificare univocamente il task.
-          // Il `taskToMove` ottenuto dallo splice dovrebbe contenere i dati originali del task.
-          // Se `logisticCode` è fornito nel body, usiamolo. Altrimenti, cerchiamo di recuperarlo da `taskToMove`.
-          const finalTaskId = taskToAdd.task_id;
-          const finalLogisticCode = taskToAdd.logistic_code || (taskToMove.logistic_code ? parseInt(taskToMove.logistic_code) : undefined);
-
-          if (finalTaskId !== undefined && finalLogisticCode !== undefined) {
-              earlyOutAssignmentsData.early_out_tasks_assigned.push({
-                task_id: finalTaskId,
-                logistic_code: finalLogisticCode,
-                // Aggiungi altre proprietà se necessario
-              });
-              await fs.writeFile(earlyOutAssignmentsPath, JSON.stringify(earlyOutAssignmentsData, null, 2));
-          } else {
-              console.warn("Impossibile aggiungere task a early_out_assignments.json: manca task_id o logistic_code.");
-          }
+        // Rimuovi la task da tutti i cleaner in early_out_tasks_assigned
+        let wasRemoved = false;
+        earlyOutAssignmentsData.early_out_tasks_assigned = earlyOutAssignmentsData.early_out_tasks_assigned.map((cleanerEntry: any) => {
+          const filteredTasks = cleanerEntry.tasks.filter((t: any) => {
+            const matchId = String(t.task_id) === String(taskId);
+            const matchCode = String(t.logistic_code) === String(logisticCode);
+            if (matchId || matchCode) {
+              wasRemoved = true;
+              console.log(`Rimossa task ${taskId}/${logisticCode} da early_out_assignments (cleaner ${cleanerEntry.cleaner.id})`);
+              return false;
+            }
+            return true;
+          });
+          return { ...cleanerEntry, tasks: filteredTasks };
+        }).filter((cleanerEntry: any) => cleanerEntry.tasks.length > 0); // Rimuovi cleaner senza task
+        
+        if (wasRemoved) {
+          await fs.writeFile(earlyOutAssignmentsPath, JSON.stringify(earlyOutAssignmentsData, null, 2));
+          console.log(`✅ Task ${taskId}/${logisticCode} rimossa da early_out_assignments.json`);
         }
       }
 
