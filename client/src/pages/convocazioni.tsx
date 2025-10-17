@@ -232,6 +232,10 @@ export default function Convocazioni() {
 
       const result = await response.json();
       console.log("Cleaners salvati con successo:", result);
+      
+      // Salva la data selezionata in localStorage
+      localStorage.setItem('selected_work_date', format(selectedDate, 'yyyy-MM-dd'));
+      
       alert(`${selectedCleanersData.length} cleaners salvati con successo in selected_cleaners.json`);
     } catch (error) {
       console.error("Errore nel salvataggio:", error);
