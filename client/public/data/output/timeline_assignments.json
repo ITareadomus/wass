@@ -1,7 +1,7 @@
 {
   "assignments": [
     {
-      "logistic_code": "618",
+      "logistic_code": "1625",
       "cleanerId": 24,
       "assignment_type": "smista_button",
       "sequence": 1
@@ -13,7 +13,7 @@
       "sequence": 2
     },
     {
-      "logistic_code": "619",
+      "logistic_code": "1650",
       "cleanerId": 132,
       "assignment_type": "smista_button",
       "sequence": 1
@@ -25,19 +25,19 @@
       "sequence": 2
     },
     {
-      "logistic_code": "1666",
+      "logistic_code": "1213",
       "cleanerId": 249,
       "assignment_type": "smista_button",
       "sequence": 1
     },
     {
-      "logistic_code": "1650",
+      "logistic_code": "1135",
       "cleanerId": 249,
       "assignment_type": "smista_button",
       "sequence": 2
     },
     {
-      "logistic_code": "1625",
+      "logistic_code": "1666",
       "cleanerId": 287,
       "assignment_type": "smista_button",
       "sequence": 1
@@ -49,37 +49,37 @@
       "sequence": 2
     },
     {
-      "logistic_code": "992",
+      "logistic_code": "619",
       "cleanerId": 326,
+      "assignment_type": "smista_button",
+      "sequence": 1
+    },
+    {
+      "logistic_code": "618",
+      "cleanerId": 326,
+      "assignment_type": "smista_button",
+      "sequence": 2
+    },
+    {
+      "logistic_code": "992",
+      "cleanerId": 404,
       "assignment_type": "smista_button",
       "sequence": 1
     },
     {
       "logistic_code": "723",
-      "cleanerId": 326,
+      "cleanerId": 404,
       "assignment_type": "smista_button",
       "sequence": 2
     },
     {
       "logistic_code": "1543",
-      "cleanerId": 404,
-      "assignment_type": "smista_button",
-      "sequence": 1
-    },
-    {
-      "logistic_code": "1084",
-      "cleanerId": 404,
-      "assignment_type": "smista_button",
-      "sequence": 2
-    },
-    {
-      "logistic_code": "1213",
       "cleanerId": 469,
       "assignment_type": "smista_button",
       "sequence": 1
     },
     {
-      "logistic_code": "1135",
+      "logistic_code": "1084",
       "cleanerId": 469,
       "assignment_type": "smista_button",
       "sequence": 2
