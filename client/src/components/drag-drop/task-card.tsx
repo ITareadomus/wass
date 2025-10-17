@@ -251,6 +251,22 @@ export default function TaskCard({
                 <p className="text-sm">{(task as any).pax_out ?? "non migrato"}</p>
               </div>
             </div>
+
+            {/* Sesta riga: Start Time - End Time */}
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <p className="text-sm font-semibold text-muted-foreground">
+                  Start Time
+                </p>
+                <p className="text-sm">{(task as any).start_time ?? "non assegnato"}</p>
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-muted-foreground">
+                  End Time
+                </p>
+                <p className="text-sm">{(task as any).end_time ?? "non assegnato"}</p>
+              </div>
+            </div>
           </div>
         </DialogContent>
       </Dialog>
