@@ -271,45 +271,17 @@ export default function TimelineView({
                   <p className="text-sm">{selectedCleaner.lastname.toUpperCase()}</p>
                 </div>
                 <div>
-                  <p className="text-sm font-semibold text-muted-foreground">role</p>
-                  <p className="text-sm">{selectedCleaner.role}</p>
-                </div>
-                <div>
-                  <p className="text-sm font-semibold text-muted-foreground">active</p>
-                  <p className="text-sm">{selectedCleaner.active ? 'true' : 'false'}</p>
-                </div>
-                <div>
-                  <p className="text-sm font-semibold text-muted-foreground">ranking</p>
-                  <p className="text-sm">{selectedCleaner.ranking}</p>
+                  <p className="text-sm font-semibold text-muted-foreground">counter_days</p>
+                  <p className="text-sm">{selectedCleaner.counter_days}</p>
                 </div>
                 <div>
                   <p className="text-sm font-semibold text-muted-foreground">counter_hours</p>
                   <p className="text-sm">{selectedCleaner.counter_hours}</p>
                 </div>
                 <div>
-                  <p className="text-sm font-semibold text-muted-foreground">counter_days</p>
-                  <p className="text-sm">{selectedCleaner.counter_days}</p>
-                </div>
-                <div>
-                  <p className="text-sm font-semibold text-muted-foreground">available</p>
-                  <p className="text-sm">{selectedCleaner.available ? 'true' : 'false'}</p>
-                </div>
-                <div>
                   <p className="text-sm font-semibold text-muted-foreground">contract_type</p>
                   <p className="text-sm">{selectedCleaner.contract_type}</p>
                 </div>
-                <div>
-                  <p className="text-sm font-semibold text-muted-foreground">telegram_id</p>
-                  <p className="text-sm">{selectedCleaner.telegram_id ?? 'null'}</p>
-                </div>
-                <div>
-                  <p className="text-sm font-semibold text-muted-foreground">start_time</p>
-                  <p className="text-sm">{selectedCleaner.start_time ?? 'null'}</p>
-                </div>
-              </div>
-              <div>
-                <p className="text-sm font-semibold text-muted-foreground">preferred_customers</p>
-                <p className="text-sm">[{selectedCleaner.preferred_customers.join(', ')}]</p>
               </div>
             </div>
           )}
