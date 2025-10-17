@@ -210,7 +210,33 @@
         "same_day_checkin_between_eo_hp",
         "premium"
       ]
+    },
+    {
+      "task_id": 217574,
+      "logistic_code": 1496,
+      "client_id": 113,
+      "premium": false,
+      "address": "VIA TORINO 44",
+      "lat": "45.4613523",
+      "lng": "9.1849551",
+      "cleaning_time": 60,
+      "checkin_date": "2025-10-18",
+      "checkout_date": "2025-10-18",
+      "checkin_time": "12:00",
+      "checkout_time": "10:30",
+      "pax_in": 2,
+      "pax_out": 2,
+      "small_equipment": true,
+      "operation_id": 2,
+      "confirmed_operation": false,
+      "straordinaria": false,
+      "type_apt": "A",
+      "alias": "ELITE",
+      "customer_name": "ELITE APARTMENTS",
+      "reasons": [
+        "same_day_checkin_between_eo_hp"
+      ]
     }
   ],
-  "total_apartments": 8
+  "total_apartments": 9
 }

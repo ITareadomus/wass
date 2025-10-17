@@ -1,11 +1,11 @@
 {
     "metadata": {
-        "last_updated": "2025-10-17T11:31:45.486784",
+        "last_updated": "2025-10-17T11:54:10.804208",
         "schema_version": "1.0"
     },
     "dates": {
         "2025-10-18": {
-            "timestamp": "2025-10-17T11:31:45.486793",
+            "timestamp": "2025-10-17T11:54:10.804218",
             "apt": [
                 {
                     "task_id": 215344,
@@ -535,9 +535,32 @@
                     "type_apt": "C",
                     "alias": "TBR",
                     "customer_name": "THE BEST RENT S.r.l."
+                },
+                {
+                    "task_id": 217574,
+                    "logistic_code": 1496,
+                    "client_id": 113,
+                    "premium": false,
+                    "address": "VIA TORINO 44",
+                    "lat": "45.4613523",
+                    "lng": "9.1849551",
+                    "cleaning_time": 60,
+                    "checkin_date": "2025-10-18",
+                    "checkout_date": "2025-10-18",
+                    "checkin_time": "12:00",
+                    "checkout_time": "10:30",
+                    "pax_in": 2,
+                    "pax_out": 2,
+                    "small_equipment": true,
+                    "operation_id": 2,
+                    "confirmed_operation": false,
+                    "straordinaria": false,
+                    "type_apt": "A",
+                    "alias": "ELITE",
+                    "customer_name": "ELITE APARTMENTS"
                 }
             ],
-            "total_apartments": 23,
+            "total_apartments": 24,
             "date": "2025-10-18"
         }
     }
