@@ -277,13 +277,14 @@ def best_k_positions(cleaner: Cleaner, task: Task, settings: Optional[Dict[str, 
             continue
         d += premium_soft_penalty(cleaner, task)
         
-        # Penalità per usare cleaner già attivi quando la distanza è > 1.5 km
+        # Penalità per usare cleaner già attivi quando la distanza è > 1.0 km
         if len(cleaner.route) > 0 and pos > 0:
             prev_task = cleaner.route[pos - 1]
             km = haversine_km(prev_task.lat, prev_task.lng, task.lat, task.lng)
-            if km > 1.5:
-                # Penalità proporzionale alla distanza: ~15 minuti a 2 km
-                d += 10.0 * (km - 1.5)
+            if km > 1.0:
+                # Penalità forte: ~20 minuti per km oltre 1.0 km
+                # A 2.2 km → penalità di ~24 minuti (supera il costo di attivazione)
+                d += 20.0 * (km - 1.0)
         
         best.append(d)
     best.sort()
