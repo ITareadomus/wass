@@ -10,7 +10,7 @@
       },
       "tasks": [
         {
-          "task_id": 217543,
+          "task_id": 217420,
           "logistic_code": 619,
           "address": "VIA TORTONA, 10",
           "premium": false,
@@ -21,24 +21,24 @@
           "sequence": 1
         },
         {
-          "task_id": 217542,
-          "logistic_code": 723,
-          "address": "VIA TORTONA, 10",
+          "task_id": 217489,
+          "logistic_code": 618,
+          "address": "VIA VOGHERA, 4",
           "premium": false,
-          "cleaning_time": 40,
-          "start_time": "10:43",
-          "end_time": "11:23",
+          "cleaning_time": 30,
+          "start_time": "10:46",
+          "end_time": "11:16",
           "followup": true,
           "sequence": 2
         },
         {
-          "task_id": 217541,
+          "task_id": 217418,
           "logistic_code": 617,
           "address": "VIA VOGHERA, 4",
           "premium": false,
           "cleaning_time": 30,
-          "start_time": "11:29",
-          "end_time": "11:59",
+          "start_time": "11:19",
+          "end_time": "11:49",
           "followup": true,
           "sequence": 3
         }
@@ -54,15 +54,37 @@
       },
       "tasks": [
         {
-          "task_id": 217380,
-          "logistic_code": 1646,
-          "address": "Via Matteo Bandello 4/1",
+          "task_id": 217339,
+          "logistic_code": 1084,
+          "address": "VIA FORCELLA, 11",
           "premium": false,
           "cleaning_time": 60,
           "start_time": "10:00",
           "end_time": "11:00",
           "followup": false,
           "sequence": 1
+        },
+        {
+          "task_id": 217337,
+          "logistic_code": 992,
+          "address": "VIA VOGHERA 14",
+          "premium": false,
+          "cleaning_time": 60,
+          "start_time": "11:08",
+          "end_time": "12:08",
+          "followup": true,
+          "sequence": 2
+        },
+        {
+          "task_id": 217421,
+          "logistic_code": 723,
+          "address": "VIA TORTONA, 10",
+          "premium": false,
+          "cleaning_time": 40,
+          "start_time": "12:15",
+          "end_time": "12:55",
+          "followup": true,
+          "sequence": 3
         }
       ]
     },
@@ -76,9 +98,9 @@
       },
       "tasks": [
         {
-          "task_id": 217394,
-          "logistic_code": 1283,
-          "address": "via della Commenda 28",
+          "task_id": 217338,
+          "logistic_code": 504,
+          "address": "VIA TOFANE, 5",
           "premium": false,
           "cleaning_time": 60,
           "start_time": "10:00",
@@ -98,15 +120,26 @@
       },
       "tasks": [
         {
-          "task_id": 217396,
-          "logistic_code": 1063,
-          "address": "VIA ORESTE SALOMONE, 51",
+          "task_id": 217343,
+          "logistic_code": 1543,
+          "address": "via Forcella 11",
           "premium": false,
           "cleaning_time": 60,
           "start_time": "10:00",
           "end_time": "11:00",
           "followup": false,
           "sequence": 1
+        },
+        {
+          "task_id": 217340,
+          "logistic_code": 1135,
+          "address": "VIA CORSICO,  5",
+          "premium": false,
+          "cleaning_time": 60,
+          "start_time": "11:12",
+          "end_time": "12:12",
+          "followup": true,
+          "sequence": 2
         }
       ]
     },
@@ -120,9 +153,9 @@
       },
       "tasks": [
         {
-          "task_id": 217397,
-          "logistic_code": 1623,
-          "address": "via Principe Eugenio 15",
+          "task_id": 217341,
+          "logistic_code": 1213,
+          "address": "VIA TORRICELLI 5",
           "premium": false,
           "cleaning_time": 60,
           "start_time": "10:00",
@@ -142,13 +175,13 @@
       },
       "tasks": [
         {
-          "task_id": 217395,
-          "logistic_code": 1626,
-          "address": "Via Giancarlo Sismondi, 74",
+          "task_id": 217342,
+          "logistic_code": 1625,
+          "address": "via Goffredo Mameli 9",
           "premium": false,
-          "cleaning_time": 120,
+          "cleaning_time": 60,
           "start_time": "10:00",
-          "end_time": "12:00",
+          "end_time": "11:00",
           "followup": false,
           "sequence": 1
         }
@@ -164,10 +197,32 @@
       },
       "tasks": [
         {
-          "task_id": 217379,
-          "logistic_code": 1639,
-          "address": "CORSO MAGENTA 27",
+          "task_id": 217318,
+          "logistic_code": 1649,
+          "address": "PIAZZA GRAMSCI 10",
           "premium": true,
+          "cleaning_time": 120,
+          "start_time": "10:00",
+          "end_time": "12:00",
+          "followup": false,
+          "sequence": 1
+        }
+      ]
+    },
+    {
+      "cleaner": {
+        "id": 469,
+        "name": "LAMIN",
+        "lastname": "SOLY",
+        "role": "Standard",
+        "premium": false
+      },
+      "tasks": [
+        {
+          "task_id": 217317,
+          "logistic_code": 1650,
+          "address": "VIA VIGNOLA 4",
+          "premium": false,
           "cleaning_time": 120,
           "start_time": "10:00",
           "end_time": "12:00",
@@ -186,10 +241,10 @@
       },
       "tasks": [
         {
-          "task_id": 217474,
-          "logistic_code": 980,
-          "address": "LARGO CORSIA DEI SERVI 11",
-          "premium": true,
+          "task_id": 217486,
+          "logistic_code": 1666,
+          "address": "VIA CESARE CORRENTI 16",
+          "premium": false,
           "cleaning_time": 120,
           "start_time": "10:00",
           "end_time": "12:00",
@@ -201,10 +256,10 @@
   ],
   "unassigned_tasks": [],
   "meta": {
-    "total_tasks": 10,
-    "assigned": 10,
+    "total_tasks": 14,
+    "assigned": 14,
     "unassigned": 0,
-    "cleaners_used": 8,
+    "cleaners_used": 9,
     "max_tasks_per_cleaner": 3,
     "algorithm": "regret_insertion + redirect + best-of-infeasible",
     "notes": [
