@@ -396,6 +396,16 @@ export default function GenerateAssignments() {
     if (destination.droppableId.startsWith('timeline-')) {
       const cleanerId = parseInt(destination.droppableId.replace('timeline-', ''));
 
+      // PRIMA rimuovi la task dal container di origine
+      if (source.droppableId === 'early-out') {
+        setEarlyOutTasks(prev => prev.filter(t => t.id !== taskId));
+      } else if (source.droppableId === 'high') {
+        setHighPriorityTasks(prev => prev.filter(t => t.id !== taskId));
+      } else if (source.droppableId === 'low') {
+        setLowPriorityTasks(prev => prev.filter(t => t.id !== taskId));
+      }
+
+      // POI aggiorna lo stato con l'assegnazione
       setAllTasksWithAssignments((prevTasks) => {
         const updatedTasks = prevTasks.map((task) => {
           if (task.id === taskId) {
@@ -417,15 +427,6 @@ export default function GenerateAssignments() {
       // Aggiorna i JSON: rimuovi dal container di origine
       if (fromContainer) {
         updateTaskJson(taskId, logisticCode, fromContainer, toContainer);
-      }
-
-      // Rimuovi la task dal container originale
-      if (source.droppableId === 'early-out') {
-        setEarlyOutTasks(prev => prev.filter(t => t.id !== taskId));
-      } else if (source.droppableId === 'high') {
-        setHighPriorityTasks(prev => prev.filter(t => t.id !== taskId));
-      } else if (source.droppableId === 'low') {
-        setLowPriorityTasks(prev => prev.filter(t => t.id !== taskId));
       }
     }
     // Se sto muovendo da una timeline verso una colonna di priorità
