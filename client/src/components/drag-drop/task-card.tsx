@@ -237,7 +237,11 @@ export default function TaskCard({
               <p className="text-sm font-semibold text-muted-foreground">
                 Tipologia intervento
               </p>
-              <p className="text-sm">{(task as any).operation_id ?? "N/A"}</p>
+              <p className="text-sm">
+                {(task as any).operation_id === 2 && !(task as any).confirmed_operation
+                  ? "non migrato"
+                  : (task as any).operation_id ?? "N/A"}
+              </p>
             </div>
           </div>
         </DialogContent>
