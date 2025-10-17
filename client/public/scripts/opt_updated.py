@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+
 """
 Unified EO day planner (Regret-Insertion + 2-opt) with:
 - Max 2 EO per cleaner
@@ -18,6 +19,11 @@ from typing import Any, Dict, List, Optional, Tuple
 # =============================
 # PATH RELATIVI (compatibili Windows/Linux)
 # =============================
+# --- Long-hop time penalty (new) ---
+LONG_HOP_TIME_MIN = 18.0   # minutes; beyond this, hops are heavily penalized
+HOP_SURCHARGE     = 80.0   # fixed penalty if above threshold
+HOP_EXTRA_SLOPE   = 3.0    # extra penalty per minute beyond threshold
+
 BASE = Path(__file__).parent.parent / "data"
 
 INPUT_TASKS    = BASE / "output" / "early_out.json"
@@ -42,11 +48,6 @@ K_SWITCH_KM          = 1.2
 WALK_MIN_PER_KM      = 12.0
 RIDE_MIN_PER_KM      = 4.5
 
-LONG_HOP_KM          = 1.5   # soglia forte per hop consecutivi
-PEN_OVER_MIN_PER_KM  = 35.0  # min extra per km oltre soglia
-HOP_SURCHARGE        = 50.0  # mazzata fissa quando superi la soglia
-
-
 EQ_EXTRA_LT05        = 2.0
 EQ_EXTRA_GE05        = 1.0
 
@@ -54,11 +55,11 @@ MIN_TRAVEL           = 2.0
 MAX_TRAVEL           = 45.0
 
 SOFT_PENALTY_BASE_KM = 1.5
-ALPHA_SOFT_GEO       = 45.0 / ((3.0 - SOFT_PENALTY_BASE_KM)**2)  # ~45' at 3 km
+ALPHA_SOFT_GEO       = 30.0 / ((3.0 - SOFT_PENALTY_BASE_KM)**2)  # 30' at 3 km
 
-ACTIVATION_COST = 0.0
+ACTIVATION_COST                = 0.0
 PENALTY_PREMIUM_TO_STANDARD    = 8.0
-PENALTY_STANDARD_TO_PREMIUM = 0.0
+PENALTY_STANDARD_TO_PREMIUM    = 0.0
 REGRET_K                       = 2
 MAX_LOCAL_2OPT_EVERY           = 8
 MAX_TASKS_PER_CLEANER          = 2
@@ -283,16 +284,14 @@ def best_k_positions(cleaner: Cleaner, task: Task, settings: Optional[Dict[str, 
         
         # Applica PRIMA la penalità premium
         d += premium_soft_penalty(cleaner, task)
-        
-        # POI applica la penalità per distanza (PRIMA di aggiungere a best!)
+        # Penalità sul TEMPO del salto (non più sui km):
         if len(cleaner.route) > 0 and pos > 0:
             prev_task = cleaner.route[pos - 1]
-            km = haversine_km(prev_task.lat, prev_task.lng, task.lat, task.lng)
-            if km > LONG_HOP_KM:
-                d += HOP_SURCHARGE + PEN_OVER_MIN_PER_KM * (km - LONG_HOP_KM)
-            elif km > 1.0:
-                d += 20.0 * (km - 1.0)
-        
+            tt = travel_minutes(prev_task, task)
+            if tt > SOFT_HARD_CAP_MIN:
+                d += HUGE_MALUS
+            elif tt > LONG_HOP_TIME_MIN:
+                d += HOP_SURCHARGE + HOP_EXTRA_SLOPE * (tt - LONG_HOP_TIME_MIN)
         # SOLO ORA aggiungi a best (con tutte le penalità incluse)
         best.append(d)
     
@@ -385,81 +384,70 @@ def load_tasks() -> List[Task]:
 # Planner
 # =============================
 def plan_day(tasks: List[Task], cleaners: List[Cleaner], settings: Optional[Dict[str, Any]]) -> Tuple[List[Cleaner], List[Task]]:
-    """Two-phase assignment:
-    - Phase 1: assign premium tasks first (premium -> premium only, enforced by can_handle_premium)
-    - Phase 2: assign standard tasks (can also go to premium)
-    Keeps the existing regret-insertion logic and distance penalties.
-    """
-    def assign_batch(unassigned: List[Task]) -> List[Task]:
-        unassigned = unassigned[:]
-        while unassigned:
-            best_choice: Optional[Tuple[Task, Cleaner]] = None
-            best_new_route: Optional[List[Task]] = None
-            best_delta = float("inf")
-            best_regret = -1.0
+    prem = [t for t in tasks if getattr(t, "is_premium", False)]
+    std  = [t for t in tasks if not getattr(t, "is_premium", False)]
+    unassigned = prem + std
+    while unassigned:
+        best_choice: Optional[Tuple[Task, Cleaner]] = None
+        best_new_route: Optional[List[Task]] = None
+        best_delta = float("inf")
+        best_regret = -1.0
 
-            for task in list(unassigned):
-                per_cleaner_best: List[Tuple[Cleaner, float, float]] = []
-                for cl in cleaners:
-                    ds = best_k_positions(cl, task, settings)
-                    if ds:
-                        first = ds[0]
-                        second = ds[1] if len(ds) > 1 else (first + 60.0)
-                        per_cleaner_best.append((cl, first, second))
-                if not per_cleaner_best:
-                    continue
-                per_cleaner_best.sort(key=lambda x: x[1])
-                c1, d1, d2 = per_cleaner_best[0]
-                regret = d2 - d1
+        for task in list(unassigned):
+            per_cleaner_best: List[Tuple[Cleaner, float, float]] = []
+            for cl in cleaners:
+                ds = best_k_positions(cl, task, settings)
+                if ds:
+                    first = ds[0]
+                    second = ds[1] if len(ds) > 1 else (first + 60.0)
+                    per_cleaner_best.append((cl, first, second))
+            if not per_cleaner_best:
+                continue
+            per_cleaner_best.sort(key=lambda x: x[1])
+            c1, d1, d2 = per_cleaner_best[0]
+            regret = d2 - d1
 
-                candidate: Tuple[float, Optional[int], Optional[List[Task]]] = (float("inf"), None, None)
-                if len(c1.route) < MAX_TASKS_PER_CLEANER:
-                    for pos in range(len(c1.route) + 1):
-                        d, new_r = delta_insert_cost(c1.route, task, pos)
-                        if math.isinf(d):
-                            continue
-                        # apply premium soft penalty
-                        d += premium_soft_penalty(c1, task)
-                        # apply distance surcharge here too
-                        if len(c1.route) > 0 and pos > 0:
-                            prev_task = c1.route[pos - 1]
-                            km = haversine_km(prev_task.lat, prev_task.lng, task.lat, task.lng)
-                            if km > LONG_HOP_KM:
-                                d += HOP_SURCHARGE + PEN_OVER_MIN_PER_KM * (km - LONG_HOP_KM)
-                            elif km > 1.0:
-                                d += 20.0 * (km - 1.0)
-                        if d < candidate[0]:
-                            candidate = (d, pos, new_r)
+            candidate = (float("inf"), None, None)
+            if len(c1.route) < MAX_TASKS_PER_CLEANER:
+                for pos in range(len(c1.route) + 1):
+                    d, new_r = delta_insert_cost(c1.route, task, pos)
+                    if math.isinf(d):
+                        continue
+                    d += premium_soft_penalty(c1, task)
+                    # Applica penalità distanza anche qui (non solo in best_k_positions)
+                    if len(c1.route) > 0 and pos > 0:
+                        prev_task = c1.route[pos - 1]
+                        tt = travel_minutes(prev_task, task)
+                        if tt > LONG_HOP_TIME_MIN:
+                            d += HOP_SURCHARGE + HOP_EXTRA_SLOPE * (tt - LONG_HOP_TIME_MIN)
+                    if d < candidate[0]:
+                        candidate = (d, pos, new_r)
 
-                if candidate[1] is None:
-                    continue
+            if candidate[1] is None:
+                continue
 
-                if (regret > best_regret) or (abs(regret - best_regret) < 1e-6 and candidate[0] < best_delta):
-                    best_choice = (task, c1)
-                    best_delta = candidate[0]
-                    best_new_route = candidate[2]  # type: ignore
-                    best_regret = regret
+            if (regret > best_regret) or (abs(regret - best_regret) < 1e-6 and candidate[0] < best_delta):
+                best_choice = (task, c1)
+                best_delta = candidate[0]
+                best_new_route = candidate[2]  # type: ignore
+                best_regret = regret
 
-            if best_choice is None:
-                break
+        if best_choice is None:
+            break
 
-            task, chosen_cleaner = best_choice
-            chosen_cleaner.route = best_new_route  # type: ignore
-            chosen_cleaner.insertions_since_opt += 1
-            if chosen_cleaner.insertions_since_opt >= MAX_LOCAL_2OPT_EVERY:
-                two_opt_inplace(chosen_cleaner)
-                chosen_cleaner.insertions_since_opt = 0
-            unassigned.remove(task)
+        task, chosen_cleaner = best_choice
+        chosen_cleaner.route = best_new_route  # type: ignore
+        chosen_cleaner.insertions_since_opt += 1
+        if chosen_cleaner.insertions_since_opt >= MAX_LOCAL_2OPT_EVERY:
+            two_opt_inplace(chosen_cleaner)
+            chosen_cleaner.insertions_since_opt = 0
+        unassigned.remove(task)
 
-        return unassigned
+    return cleaners, unassigned
 
-    prem_tasks = [t for t in tasks if t.is_premium]
-    std_tasks  = [t for t in tasks if not t.is_premium]
-
-    leftovers_prem = assign_batch(prem_tasks)
-    leftovers_std  = assign_batch(std_tasks)
-
-    return cleaners, leftovers_prem + leftovers_std
+# =============================
+# Export (formato con cleaners e task nidificate)
+# =============================
 def build_output(cleaners: List[Cleaner], unassigned: List[Task]) -> Dict[str, Any]:
     cleaners_with_tasks: List[Dict[str, Any]] = []
     
