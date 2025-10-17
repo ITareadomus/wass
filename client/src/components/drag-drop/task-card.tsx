@@ -7,7 +7,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { HelpCircle } from "lucide-react";
 
 interface TaskCardProps {
@@ -16,12 +16,52 @@ interface TaskCardProps {
   isInTimeline?: boolean;
 }
 
+interface AssignedTask {
+  task_id: number;
+  logistic_code: number;
+  start_time: string;
+  end_time: string;
+}
+
 export default function TaskCard({
   task,
   index,
   isInTimeline = false,
 }: TaskCardProps) {
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [assignmentTimes, setAssignmentTimes] = useState<{ start_time?: string; end_time?: string }>({});
+
+  useEffect(() => {
+    const loadAssignmentTimes = async () => {
+      try {
+        const response = await fetch('/data/output/early_out_assignments.json');
+        if (response.ok) {
+          const data = await response.json();
+          const taskId = (task as any).task_id ?? task.id;
+          
+          // Cerca la task nelle assegnazioni
+          for (const cleanerEntry of data.early_out_tasks_assigned || []) {
+            const assignedTask = cleanerEntry.tasks?.find((t: AssignedTask) => 
+              String(t.task_id) === String(taskId) || String(t.logistic_code) === String(task.name)
+            );
+            if (assignedTask) {
+              setAssignmentTimes({
+                start_time: assignedTask.start_time,
+                end_time: assignedTask.end_time
+              });
+              break;
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Errore nel caricamento dei tempi di assegnazione:', error);
+      }
+    };
+
+    if (isModalOpen) {
+      loadAssignmentTimes();
+    }
+  }, [isModalOpen, task]);
 
   const handleCardClick = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -258,13 +298,13 @@ export default function TaskCard({
                 <p className="text-sm font-semibold text-muted-foreground">
                   Start Time
                 </p>
-                <p className="text-sm">{(task as any).start_time ?? "non assegnato"}</p>
+                <p className="text-sm">{assignmentTimes.start_time ?? "non assegnato"}</p>
               </div>
               <div>
                 <p className="text-sm font-semibold text-muted-foreground">
                   End Time
                 </p>
-                <p className="text-sm">{(task as any).end_time ?? "non assegnato"}</p>
+                <p className="text-sm">{assignmentTimes.end_time ?? "non assegnato"}</p>
               </div>
             </div>
           </div>
