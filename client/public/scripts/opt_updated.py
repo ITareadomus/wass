@@ -330,8 +330,12 @@ def load_tasks() -> List[Task]:
 def plan_day(tasks: List[Task],
              cleaners: List[Cleaner]) -> Tuple[List[Cleaner], List[Task]]:
     unassigned = tasks[:]
+    iteration = 0
     while unassigned:
+        iteration += 1
         chosen = None  # (regret, delta, task, cleaner, pos, new_route)
+        tasks_with_no_options = []
+        
         for task in list(unassigned):
             per_cleaner_best: List[Tuple[Cleaner, float, float, int,
                                          List[Task]]] = []
@@ -397,7 +401,8 @@ def plan_day(tasks: List[Task],
                     _cl.route = _route
                     unassigned.remove(task)
                     continue
-                # altrimenti resta unassigned
+                # altrimenti resta unassigned - tracciala
+                tasks_with_no_options.append(task)
                 continue
 
             per_cleaner_best.sort(
@@ -418,6 +423,13 @@ def plan_day(tasks: List[Task],
                 chosen = (regret, d1, task, d1_cl, pos1, route1)
 
         if chosen is None:
+            # Se nessuna task può essere assegnata in questa iterazione,
+            # rimuovi le task senza opzioni dalla lista unassigned
+            if tasks_with_no_options:
+                for t in tasks_with_no_options:
+                    if t in unassigned:
+                        # Queste task rimarranno in unassigned alla fine
+                        pass
             break
         _, _, task, cl, pos, new_r = chosen
         cl.route = new_r  # commit
