@@ -223,7 +223,7 @@ export default function GenerateAssignments() {
       });
 
       const filteredLow = initialLow.filter(task => {
-        const isAssigned = timelineAssignmapsMap.has(String(task.name));
+        const isAssigned = timelineAssignmentsMap.has(String(task.name));
         if (isAssigned) {
           console.log(`Task ${task.name} filtrata da Low Priority (è nella timeline)`);
         }
