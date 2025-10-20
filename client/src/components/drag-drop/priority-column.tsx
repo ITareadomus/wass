@@ -99,12 +99,33 @@ export default function PriorityColumn({
       }
     } else if (priority === 'high') {
       try {
-        // Placeholder per high priority
-        console.log('High priority assignment non ancora implementato');
+        console.log('Esecuzione assign_hp.py...');
+        const response = await fetch('/api/assign-hp', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' }
+        });
+
+        if (!response.ok) {
+          throw new Error('Errore durante l\'assegnazione HP');
+        }
+
+        const result = await response.json();
+        console.log('Assegnazione HP completata:', result);
+
         toast({
           variant: "success",
           title: "✅ HIGH-PRIORITY assegnati con successo!",
         });
+
+        // Ricarica le assegnazioni HP prima di ricaricare i task
+        if ((window as any).reloadEarlyOutAssignments) {
+          await (window as any).reloadEarlyOutAssignments();
+        }
+        
+        // Poi ricarica tutti i task per aggiornare i filtri e la timeline
+        if ((window as any).reloadAllTasks) {
+          await (window as any).reloadAllTasks();
+        }
       } catch (error) {
         console.error('Errore nell\'assegnazione high priority:', error);
         toast({

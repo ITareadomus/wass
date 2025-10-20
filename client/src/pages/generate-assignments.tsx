@@ -265,20 +265,33 @@ export default function GenerateAssignments() {
 
   const loadEarlyOutAssignments = async () => {
     try {
-      const response = await fetch('/data/output/early_out_assignments.json');
-      if (!response.ok) {
-        console.log('Nessuna assegnazione early-out trovata');
-        return;
+      const [eoResponse, hpResponse] = await Promise.all([
+        fetch('/data/output/early_out_assignments.json'),
+        fetch('/data/output/high_priority_assignments.json')
+      ]);
+
+      // Carica Early Out assignments
+      let eoCleanersWithTasks: any[] = [];
+      if (eoResponse.ok) {
+        const eoAssignmentsData = await eoResponse.json();
+        eoCleanersWithTasks = eoAssignmentsData.early_out_tasks_assigned || [];
+        console.log('Assegnazioni early-out caricate:', eoCleanersWithTasks);
       }
 
-      const assignmentsData = await response.json();
-      const cleanersWithTasks = assignmentsData.early_out_tasks_assigned || [];
+      // Carica High Priority assignments
+      let hpCleanersWithTasks: any[] = [];
+      if (hpResponse.ok) {
+        const hpAssignmentsData = await hpResponse.json();
+        hpCleanersWithTasks = hpAssignmentsData.high_priority_tasks_assigned || [];
+        console.log('Assegnazioni high-priority caricate:', hpCleanersWithTasks);
+      }
 
-      console.log('Assegnazioni early-out caricate:', cleanersWithTasks);
+      // Combina le assegnazioni
+      const allCleanersWithTasks = [...eoCleanersWithTasks, ...hpCleanersWithTasks];
 
       // Crea un Set di task_id assegnate
       const assignedTaskIds = new Set();
-      cleanersWithTasks.forEach((cleanerEntry: any) => {
+      allCleanersWithTasks.forEach((cleanerEntry: any) => {
         cleanerEntry.tasks?.forEach((task: any) => {
           assignedTaskIds.add(String(task.task_id));
         });
@@ -288,7 +301,7 @@ export default function GenerateAssignments() {
       setAllTasksWithAssignments(prevTasks => {
         const updatedTasks = prevTasks.map(task => {
           // Trova il cleaner e la task specifica
-          for (const cleanerEntry of cleanersWithTasks) {
+          for (const cleanerEntry of allCleanersWithTasks) {
             const assignedTask = cleanerEntry.tasks?.find((t: any) => String(t.task_id) === task.id);
             if (assignedTask) {
               return {
@@ -304,12 +317,11 @@ export default function GenerateAssignments() {
         return updatedTasks;
       });
 
-      // Aggiorna earlyOutTasks per rimuovere quelle assegnate
-      setEarlyOutTasks(prevTasks => {
-        return prevTasks.filter(task => !assignedTaskIds.has(task.id));
-      });
+      // Aggiorna i contenitori per rimuovere le task assegnate
+      setEarlyOutTasks(prevTasks => prevTasks.filter(task => !assignedTaskIds.has(task.id)));
+      setHighPriorityTasks(prevTasks => prevTasks.filter(task => !assignedTaskIds.has(task.id)));
     } catch (error) {
-      console.error('Errore nel caricamento delle assegnazioni early-out:', error);
+      console.error('Errore nel caricamento delle assegnazioni:', error);
     }
   };
 
