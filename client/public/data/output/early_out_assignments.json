@@ -55,9 +55,9 @@
     },
     {
       "cleaner": {
-        "id": 596,
-        "name": "TRACY",
-        "lastname": "OKE",
+        "id": 495,
+        "name": "EL HADJI",
+        "lastname": "BA",
         "role": "Premium",
         "premium": true
       },
@@ -161,19 +161,19 @@
     },
     {
       "cleaner": {
-        "id": 404,
-        "name": "RASEL",
-        "lastname": "MOLLA",
+        "id": 24,
+        "name": "HUSSAIN",
+        "lastname": "SYED SHUJIAHAT",
         "role": "Standard",
         "premium": false
       },
       "tasks": [
         {
-          "task_id": 217667,
-          "logistic_code": 1627,
-          "address": "via Nino Oxilia 24",
-          "lat": 45.491965,
-          "lng": 9.2137771,
+          "task_id": 217561,
+          "logistic_code": 624,
+          "address": "VIALE MONTENERO 50",
+          "lat": 45.4583211,
+          "lng": 9.206311,
           "premium": false,
           "cleaning_time": 60,
           "start_time": "10:00",
@@ -183,18 +183,18 @@
           "travel_time": 0
         },
         {
-          "task_id": 217556,
-          "logistic_code": 1630,
-          "address": "Via dei Transiti 21",
-          "lat": 45.490856,
-          "lng": 9.2194138,
+          "task_id": 217559,
+          "logistic_code": 490,
+          "address": "VIA DELLA COMMENDA, 28",
+          "lat": 45.4551641,
+          "lng": 9.1994733,
           "premium": false,
           "cleaning_time": 60,
-          "start_time": "11:12",
-          "end_time": "12:12",
+          "start_time": "11:14",
+          "end_time": "12:14",
           "followup": true,
           "sequence": 2,
-          "travel_time": 12
+          "travel_time": 14
         }
       ]
     },
@@ -239,9 +239,9 @@
     },
     {
       "cleaner": {
-        "id": 24,
-        "name": "HUSSAIN",
-        "lastname": "SYED SHUJIAHAT",
+        "id": 404,
+        "name": "RASEL",
+        "lastname": "MOLLA",
         "role": "Standard",
         "premium": false
       },
@@ -264,11 +264,11 @@
     },
     {
       "cleaner": {
-        "id": 1031,
-        "name": "YAH PRISCA LEA",
-        "lastname": "ADOU",
-        "role": "Standard",
-        "premium": false
+        "id": 445,
+        "name": "IBRAHIM",
+        "lastname": "SANYANG",
+        "role": "Premium",
+        "premium": true
       },
       "tasks": [
         {
@@ -303,9 +303,9 @@
     },
     {
       "cleaner": {
-        "id": 1045,
-        "name": "ARACELY ROCIO",
-        "lastname": "MORLA ZAMBRANO",
+        "id": 771,
+        "name": "PRECIOUS",
+        "lastname": "GYABAAH",
         "role": "Standard",
         "premium": false
       },
@@ -328,9 +328,9 @@
     },
     {
       "cleaner": {
-        "id": 1055,
-        "name": "BEAUTY",
-        "lastname": "OMOREGIE",
+        "id": 1031,
+        "name": "YAH PRISCA LEA",
+        "lastname": "ADOU",
         "role": "Standard",
         "premium": false
       },
@@ -353,9 +353,9 @@
     },
     {
       "cleaner": {
-        "id": 771,
-        "name": "PRECIOUS",
-        "lastname": "GYABAAH",
+        "id": 1045,
+        "name": "ARACELY ROCIO",
+        "lastname": "MORLA ZAMBRANO",
         "role": "Standard",
         "premium": false
       },
@@ -378,11 +378,11 @@
     },
     {
       "cleaner": {
-        "id": 445,
-        "name": "IBRAHIM",
-        "lastname": "SANYANG",
-        "role": "Premium",
-        "premium": true
+        "id": 1054,
+        "name": "TOUDO",
+        "lastname": "BARADJI",
+        "role": "Standard",
+        "premium": false
       },
       "tasks": [
         {
@@ -403,9 +403,9 @@
     },
     {
       "cleaner": {
-        "id": 1054,
-        "name": "TOUDO",
-        "lastname": "BARADJI",
+        "id": 1055,
+        "name": "BEAUTY",
+        "lastname": "OMOREGIE",
         "role": "Standard",
         "premium": false
       },
@@ -416,31 +416,6 @@
           "address": "VIA BRUSUGLIO 78",
           "lat": 45.5159478,
           "lng": 9.1728622,
-          "premium": false,
-          "cleaning_time": 120,
-          "start_time": "10:00",
-          "end_time": "12:00",
-          "followup": false,
-          "sequence": 1,
-          "travel_time": 0
-        }
-      ]
-    },
-    {
-      "cleaner": {
-        "id": 1034,
-        "name": "PRINCE",
-        "lastname": "OPOKU",
-        "role": "Standard",
-        "premium": false
-      },
-      "tasks": [
-        {
-          "task_id": 217569,
-          "logistic_code": 1153,
-          "address": "VIA CELESTINO IV, 9",
-          "lat": 45.4596054,
-          "lng": 9.1821442,
           "premium": false,
           "cleaning_time": 120,
           "start_time": "10:00",
@@ -475,65 +450,48 @@
           "travel_time": 0
         }
       ]
-    }
-  ],
-  "unassigned_tasks": [
-    {
-      "task_id": 217549,
-      "logistic_code": 1647,
-      "address": "Viale Piave 35",
-      "premium": true,
-      "straordinaria": false,
-      "cleaning_time": 180,
-      "checkout_time": "10:00",
-      "checkin_time": "23:59",
-      "alias": "HACCA",
-      "apt_type": "E",
-      "reason": "no feasible option under constraints (travel/gap caps, 3rd-task rule, redirect)"
     },
     {
-      "task_id": 217559,
-      "logistic_code": 490,
-      "address": "VIA DELLA COMMENDA, 28",
-      "premium": false,
-      "straordinaria": false,
-      "cleaning_time": 60,
-      "checkout_time": "10:00",
-      "checkin_time": "20:00",
-      "alias": "NTM",
-      "apt_type": "A",
-      "reason": "no feasible option under constraints (travel/gap caps, 3rd-task rule, redirect)"
-    },
-    {
-      "task_id": 217561,
-      "logistic_code": 624,
-      "address": "VIALE MONTENERO 50",
-      "premium": false,
-      "straordinaria": false,
-      "cleaning_time": 60,
-      "checkout_time": "10:00",
-      "checkin_time": "16:00",
-      "alias": "NTM",
-      "apt_type": "A",
-      "reason": "no feasible option under constraints (travel/gap caps, 3rd-task rule, redirect)"
+      "cleaner": {
+        "id": 287,
+        "name": "BAH",
+        "lastname": "ISMAILA",
+        "role": "Standard",
+        "premium": false
+      },
+      "tasks": [
+        {
+          "task_id": 217569,
+          "logistic_code": 1153,
+          "address": "VIA CELESTINO IV, 9",
+          "lat": 45.4596054,
+          "lng": 9.1821442,
+          "premium": false,
+          "cleaning_time": 120,
+          "start_time": "10:00",
+          "end_time": "12:00",
+          "followup": false,
+          "sequence": 1,
+          "travel_time": 0
+        }
+      ]
     }
   ],
+  "unassigned_tasks": [],
   "meta": {
-    "total_tasks": 26,
+    "total_tasks": 23,
     "assigned": 23,
-    "unassigned": 3,
+    "unassigned": 0,
     "cleaners_used": 14,
     "max_tasks_per_cleaner": 3,
-    "algorithm": "regret_insertion + redirect + best-of-infeasible + relaxed_final_assign",
+    "algorithm": "regret_insertion + redirect + best-of-infeasible",
     "notes": [
       "Straordinarie-first (only premium, must be sequence=1)",
       "Premium-first",
       "Hard cap: travel/gap > 22' infeasible (tranne fallback quando TUTTE le mosse superano 22')",
       "3rd task only if travel<=10' and gap<=10' (12'/12' if same street/building)",
       "Redirect: if hop>15' and a free cleaner is feasible, prefer the free cleaner",
-      "Activation cost = 0; premium can do standard",
-      "Final assignment: prefer free cleaners, then relaxed constraints (travel/gap)",
-      "Consider checkout_time != checkin_time for more available time"
+      "Activation cost = 0; premium can do standard"
     ]
   }
 }
