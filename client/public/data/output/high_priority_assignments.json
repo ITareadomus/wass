@@ -2,34 +2,34 @@
   "high_priority_tasks_assigned": [
     {
       "cleaner": {
-        "id": 596,
-        "name": "TRACY",
-        "lastname": "OKE",
-        "role": "Premium",
-        "premium": true
+        "id": 24,
+        "name": "HUSSAIN",
+        "lastname": "SYED SHUJIAHAT",
+        "role": "Standard",
+        "premium": false
       },
       "tasks": [
         {
-          "task_id": 217659,
-          "logistic_code": 1276,
-          "address": "Via GAUDENZIO Ferrari,3 20123 (MI)",
-          "lat": 45.4558873,
-          "lng": 9.1754552,
-          "premium": true,
-          "cleaning_time": 150,
-          "start_time": "12:45",
-          "end_time": "15:15",
+          "task_id": 217532,
+          "logistic_code": 986,
+          "address": "VIA WASHINGTON, 54",
+          "lat": 45.4623642,
+          "lng": 9.1543891,
+          "premium": false,
+          "cleaning_time": 60,
+          "start_time": "12:56",
+          "end_time": "13:56",
           "followup": true,
           "sequence": 4,
-          "travel_time": 13
+          "travel_time": 24
         }
       ]
     },
     {
       "cleaner": {
-        "id": 937,
-        "name": "LOVETH",
-        "lastname": "IGUDIA",
+        "id": 132,
+        "name": "JOHOISER ERNESTO",
+        "lastname": "LOPEZ GIRON",
         "role": "Premium",
         "premium": true
       },
@@ -66,50 +66,50 @@
     },
     {
       "cleaner": {
-        "id": 1045,
-        "name": "ARACELY ROCIO",
-        "lastname": "MORLA ZAMBRANO",
-        "role": "Standard",
-        "premium": false
+        "id": 249,
+        "name": "Ogbodo Chidi",
+        "lastname": "Igwe",
+        "role": "Premium",
+        "premium": true
       },
       "tasks": [
         {
-          "task_id": 217532,
-          "logistic_code": 986,
-          "address": "VIA WASHINGTON, 54",
-          "lat": 45.4623642,
-          "lng": 9.1543891,
-          "premium": false,
-          "cleaning_time": 60,
-          "start_time": "11:19",
-          "end_time": "12:19",
+          "task_id": 217661,
+          "logistic_code": 1393,
+          "address": "Via San Carpoforo, 7",
+          "lat": 45.4715316,
+          "lng": 9.184796,
+          "premium": true,
+          "cleaning_time": 120,
+          "start_time": "11:25",
+          "end_time": "13:25",
           "followup": true,
           "sequence": 2,
-          "travel_time": 19
+          "travel_time": 25
         },
         {
-          "task_id": 217534,
-          "logistic_code": 751,
-          "address": "Via L. Cagnola, 12",
-          "lat": 45.4776,
-          "lng": 9.17287,
+          "task_id": 216062,
+          "logistic_code": 1392,
+          "address": "VIA SANTA MARTA 11",
+          "lat": 45.4654219,
+          "lng": 9.1859243,
           "premium": false,
           "cleaning_time": 60,
-          "start_time": "12:52",
-          "end_time": "13:52",
+          "start_time": "13:39",
+          "end_time": "14:39",
           "followup": true,
           "sequence": 3,
-          "travel_time": 34
+          "travel_time": 15
         }
       ]
     },
     {
       "cleaner": {
-        "id": 495,
-        "name": "EL HADJI",
-        "lastname": "BA",
-        "role": "Premium",
-        "premium": true
+        "id": 287,
+        "name": "BAH",
+        "lastname": "ISMAILA",
+        "role": "Standard",
+        "premium": false
       },
       "tasks": [
         {
@@ -130,48 +130,59 @@
     },
     {
       "cleaner": {
-        "id": 24,
-        "name": "HUSSAIN",
-        "lastname": "SYED SHUJIAHAT",
+        "id": 326,
+        "name": "FESTUS OSARO",
+        "lastname": "AIHIVBERE",
         "role": "Standard",
         "premium": false
       },
       "tasks": [
         {
-          "task_id": 217698,
-          "logistic_code": 1062,
-          "address": "VIA OLMETTO, 10",
-          "lat": 45.4593924,
-          "lng": 9.1850088,
-          "premium": false,
-          "cleaning_time": 120,
-          "start_time": "11:00",
-          "end_time": "13:00",
-          "followup": false,
-          "sequence": 1,
-          "travel_time": 0
-        },
-        {
-          "task_id": 216062,
-          "logistic_code": 1392,
-          "address": "VIA SANTA MARTA 11",
-          "lat": 45.4654219,
-          "lng": 9.1859243,
+          "task_id": 217579,
+          "logistic_code": 1540,
+          "address": "VIA GONIN, 58",
+          "lat": 45.4423379,
+          "lng": 9.1195717,
           "premium": false,
           "cleaning_time": 60,
-          "start_time": "13:14",
-          "end_time": "14:14",
+          "start_time": "13:06",
+          "end_time": "14:06",
           "followup": true,
           "sequence": 2,
-          "travel_time": 14
+          "travel_time": 127
         }
       ]
     },
     {
       "cleaner": {
-        "id": 132,
-        "name": "JOHOISER ERNESTO",
-        "lastname": "LOPEZ GIRON",
+        "id": 404,
+        "name": "RASEL",
+        "lastname": "MOLLA",
+        "role": "Standard",
+        "premium": false
+      },
+      "tasks": [
+        {
+          "task_id": 217426,
+          "logistic_code": 1654,
+          "address": "CORSO SAN GOTTARDO 5",
+          "lat": 45.4512977,
+          "lng": 9.1801824,
+          "premium": false,
+          "cleaning_time": 90,
+          "start_time": "11:45",
+          "end_time": "13:15",
+          "followup": true,
+          "sequence": 2,
+          "travel_time": 45
+        }
+      ]
+    },
+    {
+      "cleaner": {
+        "id": 445,
+        "name": "IBRAHIM",
+        "lastname": "SANYANG",
         "role": "Premium",
         "premium": true
       },
@@ -184,19 +195,19 @@
           "lng": 9.2067142,
           "premium": true,
           "cleaning_time": 150,
-          "start_time": "12:12",
-          "end_time": "14:42",
+          "start_time": "11:17",
+          "end_time": "13:47",
           "followup": true,
           "sequence": 2,
-          "travel_time": 73
+          "travel_time": 18
         }
       ]
     },
     {
       "cleaner": {
-        "id": 287,
-        "name": "BAH",
-        "lastname": "ISMAILA",
+        "id": 469,
+        "name": "LAMIN",
+        "lastname": "SOLY",
         "role": "Standard",
         "premium": false
       },
@@ -219,36 +230,36 @@
     },
     {
       "cleaner": {
-        "id": 326,
-        "name": "FESTUS OSARO",
-        "lastname": "AIHIVBERE",
-        "role": "Standard",
-        "premium": false
+        "id": 495,
+        "name": "EL HADJI",
+        "lastname": "BA",
+        "role": "Premium",
+        "premium": true
       },
       "tasks": [
         {
-          "task_id": 217426,
-          "logistic_code": 1654,
-          "address": "CORSO SAN GOTTARDO 5",
-          "lat": 45.4512977,
-          "lng": 9.1801824,
-          "premium": false,
-          "cleaning_time": 90,
-          "start_time": "11:25",
-          "end_time": "12:55",
+          "task_id": 217659,
+          "logistic_code": 1276,
+          "address": "Via GAUDENZIO Ferrari,3 20123 (MI)",
+          "lat": 45.4558873,
+          "lng": 9.1754552,
+          "premium": true,
+          "cleaning_time": 150,
+          "start_time": "11:21",
+          "end_time": "13:51",
           "followup": true,
           "sequence": 2,
-          "travel_time": 25
+          "travel_time": 21
         }
       ]
     },
     {
       "cleaner": {
-        "id": 404,
-        "name": "RASEL",
-        "lastname": "MOLLA",
-        "role": "Standard",
-        "premium": false
+        "id": 596,
+        "name": "TRACY",
+        "lastname": "OKE",
+        "role": "Premium",
+        "premium": true
       },
       "tasks": [
         {
@@ -264,28 +275,14 @@
           "followup": true,
           "sequence": 2,
           "travel_time": 20
-        },
-        {
-          "task_id": 217506,
-          "logistic_code": 1652,
-          "address": "VIA NINO BIXIO 33",
-          "lat": 45.4725999,
-          "lng": 9.2118362,
-          "premium": false,
-          "cleaning_time": 90,
-          "start_time": "13:10",
-          "end_time": "14:40",
-          "followup": true,
-          "sequence": 3,
-          "travel_time": 21
         }
       ]
     },
     {
       "cleaner": {
-        "id": 445,
-        "name": "IBRAHIM",
-        "lastname": "SANYANG",
+        "id": 644,
+        "name": "HENRY",
+        "lastname": "CHIDUBEM",
         "role": "Premium",
         "premium": true
       },
@@ -308,9 +305,34 @@
     },
     {
       "cleaner": {
-        "id": 469,
-        "name": "LAMIN",
-        "lastname": "SOLY",
+        "id": 722,
+        "name": "KONE LASSINE",
+        "lastname": "KONE",
+        "role": "Premium",
+        "premium": true
+      },
+      "tasks": [
+        {
+          "task_id": 217534,
+          "logistic_code": 751,
+          "address": "Via L. Cagnola, 12",
+          "lat": 45.4776,
+          "lng": 9.17287,
+          "premium": false,
+          "cleaning_time": 60,
+          "start_time": "12:51",
+          "end_time": "13:51",
+          "followup": true,
+          "sequence": 2,
+          "travel_time": 51
+        }
+      ]
+    },
+    {
+      "cleaner": {
+        "id": 771,
+        "name": "PRECIOUS",
+        "lastname": "GYABAAH",
         "role": "Standard",
         "premium": false
       },
@@ -323,32 +345,52 @@
           "lng": 9.1833014,
           "premium": false,
           "cleaning_time": 60,
-          "start_time": "12:43",
-          "end_time": "13:43",
+          "start_time": "12:57",
+          "end_time": "13:57",
           "followup": true,
           "sequence": 2,
-          "travel_time": 43
+          "travel_time": 58
+        }
+      ]
+    },
+    {
+      "cleaner": {
+        "id": 785,
+        "name": "RACHEL",
+        "lastname": "OTSHINGA",
+        "role": "Premium",
+        "premium": true
+      },
+      "tasks": [
+        {
+          "task_id": 217506,
+          "logistic_code": 1652,
+          "address": "VIA NINO BIXIO 33",
+          "lat": 45.4725999,
+          "lng": 9.2118362,
+          "premium": false,
+          "cleaning_time": 90,
+          "start_time": "13:13",
+          "end_time": "14:43",
+          "followup": true,
+          "sequence": 2,
+          "travel_time": 13
         }
       ]
     }
   ],
   "unassigned_tasks": [
     {
-      "task_id": 217661,
-      "logistic_code": 1393,
-      "reason": "no_eligible_cleaner_or_time_window"
-    },
-    {
-      "task_id": 217579,
-      "logistic_code": 1540,
+      "task_id": 217698,
+      "logistic_code": 1062,
       "reason": "no_eligible_cleaner_or_time_window"
     }
   ],
   "meta": {
     "total_tasks": 17,
-    "assigned": 15,
-    "unassigned": 2,
-    "cleaners_used": 11,
+    "assigned": 16,
+    "unassigned": 1,
+    "cleaners_used": 14,
     "max_tasks_per_cleaner": 2,
     "algorithm": "regret_insertion + redirect + best-of-infeasible",
     "notes": [
