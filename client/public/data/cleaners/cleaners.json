@@ -1,6 +1,6 @@
 {
     "metadata": {
-        "last_updated": "2025-10-20T08:05:50.778925",
+        "last_updated": "2025-10-20T10:33:49.264616",
         "db_config": {
             "host": "139.59.132.41",
             "user": "admin",
@@ -11,7 +11,7 @@
     },
     "dates": {
         "2025-10-21": {
-            "timestamp": "2025-10-20T08:05:50.778938",
+            "timestamp": "2025-10-20T10:33:49.264626",
             "cleaners": [
                 {
                     "id": 24,
@@ -20,7 +20,7 @@
                     "role": "Standard",
                     "active": true,
                     "ranking": 0,
-                    "counter_hours": 0.0,
+                    "counter_hours": 1.0,
                     "counter_days": 2,
                     "available": true,
                     "contract_type": "B",
@@ -43,7 +43,7 @@
                     "role": "Premium",
                     "active": true,
                     "ranking": 0,
-                    "counter_hours": 0.0,
+                    "counter_hours": 1.5,
                     "counter_days": 5,
                     "available": true,
                     "contract_type": "C",
@@ -157,7 +157,7 @@
                     "role": "Standard",
                     "active": true,
                     "ranking": 0,
-                    "counter_hours": 0.0,
+                    "counter_hours": 1.0,
                     "counter_days": 1,
                     "available": true,
                     "contract_type": "B",
@@ -254,7 +254,7 @@
                     "role": "Premium",
                     "active": true,
                     "ranking": 0,
-                    "counter_hours": 0.0,
+                    "counter_hours": 3.5,
                     "counter_days": 2,
                     "available": true,
                     "contract_type": "B",
@@ -288,7 +288,7 @@
                     "role": "Premium",
                     "active": true,
                     "ranking": 0,
-                    "counter_hours": 0.0,
+                    "counter_hours": 1.5,
                     "counter_days": 0,
                     "available": true,
                     "contract_type": "B",
@@ -326,7 +326,7 @@
                     "role": "Formatore",
                     "active": true,
                     "ranking": 0,
-                    "counter_hours": 0.0,
+                    "counter_hours": 6.0,
                     "counter_days": 0,
                     "available": true,
                     "contract_type": "B",
@@ -403,7 +403,7 @@
                     "role": "Standard",
                     "active": true,
                     "ranking": 0,
-                    "counter_hours": 0.0,
+                    "counter_hours": 2.0,
                     "counter_days": 1,
                     "available": true,
                     "contract_type": "a chiamata",
@@ -520,7 +520,7 @@
                     "role": "Premium",
                     "active": true,
                     "ranking": 0,
-                    "counter_hours": 0.0,
+                    "counter_hours": 1.0,
                     "counter_days": 1,
                     "available": true,
                     "contract_type": "a chiamata",
@@ -538,6 +538,34 @@
                         121
                     ],
                     "telegram_id": 7573041558,
+                    "start_time": "10:00"
+                },
+                {
+                    "id": 987,
+                    "name": "MARIE LAURE",
+                    "lastname": "PENKA",
+                    "role": "Standard",
+                    "active": true,
+                    "ranking": 0,
+                    "counter_hours": 0.0,
+                    "counter_days": 0,
+                    "available": true,
+                    "contract_type": "a chiamata",
+                    "preferred_customers": [
+                        2,
+                        3,
+                        61,
+                        72,
+                        75,
+                        80,
+                        84,
+                        91,
+                        94,
+                        113,
+                        115,
+                        118
+                    ],
+                    "telegram_id": null,
                     "start_time": "10:00"
                 },
                 {
@@ -579,7 +607,7 @@
                     "role": "Standard",
                     "active": true,
                     "ranking": 0,
-                    "counter_hours": 0.0,
+                    "counter_hours": 1.0,
                     "counter_days": 0,
                     "available": true,
                     "contract_type": "a chiamata",
@@ -708,7 +736,7 @@
                     "start_time": null
                 }
             ],
-            "total_cleaners": 29,
+            "total_cleaners": 30,
             "date": "2025-10-21",
             "data_source": "database_query"
         }
