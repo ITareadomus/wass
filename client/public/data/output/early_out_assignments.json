@@ -477,11 +477,51 @@
       ]
     }
   ],
-  "unassigned_tasks": [],
+  "unassigned_tasks": [
+    {
+      "task_id": 217549,
+      "logistic_code": 1647,
+      "address": "Viale Piave 35",
+      "premium": true,
+      "straordinaria": false,
+      "cleaning_time": 180,
+      "checkout_time": "10:00",
+      "checkin_time": "23:59",
+      "alias": "HACCA",
+      "apt_type": "E",
+      "reason": "no feasible option under constraints (travel/gap caps, 3rd-task rule, redirect)"
+    },
+    {
+      "task_id": 217556,
+      "logistic_code": 1630,
+      "address": "Via dei Transiti 21",
+      "premium": false,
+      "straordinaria": false,
+      "cleaning_time": 60,
+      "checkout_time": "10:00",
+      "checkin_time": "20:00",
+      "alias": "NTM",
+      "apt_type": "A",
+      "reason": "no feasible option under constraints (travel/gap caps, 3rd-task rule, redirect)"
+    },
+    {
+      "task_id": 217667,
+      "logistic_code": 1627,
+      "address": "via Nino Oxilia 24",
+      "premium": false,
+      "straordinaria": false,
+      "cleaning_time": 60,
+      "checkout_time": "10:00",
+      "checkin_time": "19:00",
+      "alias": "NTM",
+      "apt_type": "A",
+      "reason": "no feasible option under constraints (travel/gap caps, 3rd-task rule, redirect)"
+    }
+  ],
   "meta": {
-    "total_tasks": 23,
+    "total_tasks": 26,
     "assigned": 23,
-    "unassigned": 0,
+    "unassigned": 3,
     "cleaners_used": 14,
     "max_tasks_per_cleaner": 3,
     "algorithm": "regret_insertion + redirect + best-of-infeasible",
