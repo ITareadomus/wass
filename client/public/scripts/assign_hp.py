@@ -19,8 +19,8 @@ OUTPUT_ASSIGN = BASE / "output" / "high_priority_assignments.json"
 # =============================
 # Travel / gap policy
 # =============================
-HARD_TRAVEL_CAP = 22.0
-REDIRECT_TRAVEL = 15.0
+HARD_TRAVEL_CAP = 35.0  # rilassato da 22' per permettere più assegnazioni
+REDIRECT_TRAVEL = 25.0  # rilassato da 15' per permettere più assegnazioni
 
 # Travel model (walking-centric)
 SHORT_RANGE_KM = 0.30
@@ -420,8 +420,9 @@ def build_output(cleaners: List[Cleaner], unassigned: List[Dict[str, Any]],
                 "HP senza orari: start >= 11:00 (hard), nessun obbligo di iniziare alle 11",
                 "Se check-in/out presenti: regole EO (start >= checkout; finire prima del check-in)",
                 "Premium/straordinarie solo a Premium; no formatori",
-                "Hard cap viaggi: 22' (fallback best-of-infeasible se tutte le mosse > 22')",
-                "Redirect: se hop > 15' preferisci altro cleaner idoneo"
+                "Hard cap viaggi: 35' (rilassato per più assegnazioni)",
+                "Redirect: se hop > 25' preferisci altro cleaner idoneo (rilassato)",
+                "Vincoli rilassati per ridurre task HP non assegnate"
             ]
         }
     }
