@@ -140,15 +140,6 @@ export default function TimelineView({
             </h3>
             <div className="flex gap-2">
               <Button
-                onClick={handleGoToConvocazioni}
-                variant="outline"
-                size="sm"
-                className="flex items-center gap-2"
-              >
-                <Users className="w-4 h-4" />
-                Convocazioni
-              </Button>
-              <Button
                 onClick={handleResetAssignments}
                 variant="outline"
                 size="sm"
