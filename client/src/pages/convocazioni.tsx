@@ -171,7 +171,7 @@ export default function Convocazioni() {
         title: `${selectedCleanersData.length} cleaner selezionati correttamente!`,
         description: ""
       });
-      setLocation('/');
+      // Rimani sulla pagina convocazioni dopo il salvataggio
     } catch (error) {
       console.error("Errore nel salvataggio:", error);
       toast({
