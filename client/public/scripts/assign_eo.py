@@ -513,6 +513,60 @@ def final_relaxed_assign(planners: List[Cleaner],
             cl.route = new_r
             remaining.remove(task)
             assigned_in_pass.add(task.logistic_code) # Segna come assegnata in questa fase
+    
+    # SUPER-RILASSATO: prova ad assegnare le task rimanenti a qualsiasi cleaner disponibile
+    # ignorando quasi tutti i vincoli eccetto premium/straordinaria
+    for task in list(remaining):
+        if task.logistic_code in assigned_in_pass:
+            continue
+            
+        best_desperate = None # (finish_time, cleaner, new_route)
+        for cl in planners:
+            if len(cl.route) >= MAX_TASKS_PER_CLEANER:
+                continue
+            if not can_handle_premium(cl, task):
+                continue
+            if task.straordinaria and len(cl.route) > 0:
+                continue
+                
+            # Prova solo come prima task (per cleaner liberi) o ultima (per cleaner occupati)
+            positions = [0] if not cl.route else [len(cl.route)]
+            
+            for pos in positions:
+                if task.straordinaria and pos != 0:
+                    continue
+                    
+                new_route = cl.route[:pos] + [task] + cl.route[pos:]
+                
+                # Calcola manualmente se la task finisce prima del checkin
+                cur_time = hhmm_to_min("10:00")
+                finish_time = None
+                valid = True
+                
+                for t in new_route:
+                    if finish_time is not None:
+                        tt = travel_minutes(new_route[new_route.index(t)-1] if new_route.index(t) > 0 else None, t)
+                        cur_time = finish_time + tt
+                    
+                    arrival = cur_time
+                    wait = max(0.0, t.checkout_time - arrival)
+                    start = arrival + wait
+                    finish_time = start + t.cleaning_time
+                    
+                    if finish_time > t.checkin_time:
+                        valid = False
+                        break
+                
+                if valid and finish_time is not None:
+                    if best_desperate is None or finish_time < best_desperate[0]:
+                        best_desperate = (finish_time, cl, new_route)
+        
+        if best_desperate is not None:
+            _, cl, new_r = best_desperate
+            cl.route = new_r
+            remaining.remove(task)
+            assigned_in_pass.add(task.logistic_code)
+            print(f"⚡ Assegnata task #{task.logistic_code} con modalità super-rilassata")
 
     return planners, remaining
 
