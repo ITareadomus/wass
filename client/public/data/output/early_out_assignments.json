@@ -55,9 +55,9 @@
     },
     {
       "cleaner": {
-        "id": 132,
-        "name": "JOHOISER ERNESTO",
-        "lastname": "LOPEZ GIRON",
+        "id": 785,
+        "name": "RACHEL",
+        "lastname": "OTSHINGA",
         "role": "Premium",
         "premium": true
       },
@@ -108,9 +108,9 @@
     },
     {
       "cleaner": {
-        "id": 937,
-        "name": "LOVETH",
-        "lastname": "IGUDIA",
+        "id": 132,
+        "name": "JOHOISER ERNESTO",
+        "lastname": "LOPEZ GIRON",
         "role": "Premium",
         "premium": true
       },
@@ -161,11 +161,11 @@
     },
     {
       "cleaner": {
-        "id": 404,
-        "name": "RASEL",
-        "lastname": "MOLLA",
-        "role": "Standard",
-        "premium": false
+        "id": 937,
+        "name": "LOVETH",
+        "lastname": "IGUDIA",
+        "role": "Premium",
+        "premium": true
       },
       "tasks": [
         {
@@ -200,11 +200,11 @@
     },
     {
       "cleaner": {
-        "id": 495,
-        "name": "EL HADJI",
-        "lastname": "BA",
-        "role": "Premium",
-        "premium": true
+        "id": 404,
+        "name": "RASEL",
+        "lastname": "MOLLA",
+        "role": "Standard",
+        "premium": false
       },
       "tasks": [
         {
@@ -239,9 +239,9 @@
     },
     {
       "cleaner": {
-        "id": 785,
-        "name": "RACHEL",
-        "lastname": "OTSHINGA",
+        "id": 495,
+        "name": "EL HADJI",
+        "lastname": "BA",
         "role": "Premium",
         "premium": true
       },
@@ -286,6 +286,20 @@
       },
       "tasks": [
         {
+          "task_id": 217564,
+          "logistic_code": 1381,
+          "address": "VIA PONTE SEVESO 40",
+          "lat": 45.4901211,
+          "lng": 9.2057682,
+          "premium": false,
+          "cleaning_time": 90,
+          "start_time": "10:00",
+          "end_time": "11:30",
+          "followup": false,
+          "sequence": 1,
+          "travel_time": 0
+        },
+        {
           "task_id": 217567,
           "logistic_code": 504,
           "address": "VIA TOFANE, 5",
@@ -293,11 +307,11 @@
           "lng": 9.221111,
           "premium": false,
           "cleaning_time": 60,
-          "start_time": "10:00",
-          "end_time": "11:00",
-          "followup": false,
-          "sequence": 1,
-          "travel_time": 0
+          "start_time": "11:54",
+          "end_time": "12:54",
+          "followup": true,
+          "sequence": 2,
+          "travel_time": 24
         }
       ]
     },
@@ -350,6 +364,20 @@
       },
       "tasks": [
         {
+          "task_id": 217569,
+          "logistic_code": 1153,
+          "address": "VIA CELESTINO IV, 9",
+          "lat": 45.4596054,
+          "lng": 9.1821442,
+          "premium": false,
+          "cleaning_time": 120,
+          "start_time": "10:00",
+          "end_time": "12:00",
+          "followup": false,
+          "sequence": 1,
+          "travel_time": 0
+        },
+        {
           "task_id": 217635,
           "logistic_code": 273,
           "address": "V.LE BLIGNY 19 A C",
@@ -357,71 +385,21 @@
           "lng": 9.1910662,
           "premium": false,
           "cleaning_time": 60,
-          "start_time": "10:00",
-          "end_time": "11:00",
-          "followup": false,
-          "sequence": 1,
-          "travel_time": 0
+          "start_time": "12:21",
+          "end_time": "13:21",
+          "followup": true,
+          "sequence": 2,
+          "travel_time": 21
         }
       ]
     },
     {
       "cleaner": {
-        "id": 1045,
-        "name": "ARACELY ROCIO",
-        "lastname": "MORLA ZAMBRANO",
+        "id": 1055,
+        "name": "BEAUTY",
+        "lastname": "OMOREGIE",
         "role": "Standard",
         "premium": false
-      },
-      "tasks": [
-        {
-          "task_id": 217692,
-          "logistic_code": 1240,
-          "address": "VIALE CONI ZUGNA 52",
-          "lat": 45.4566617,
-          "lng": 9.1699158,
-          "premium": false,
-          "cleaning_time": 60,
-          "start_time": "10:00",
-          "end_time": "11:00",
-          "followup": false,
-          "sequence": 1,
-          "travel_time": 0
-        }
-      ]
-    },
-    {
-      "cleaner": {
-        "id": 1054,
-        "name": "TOUDO",
-        "lastname": "BARADJI",
-        "role": "Standard",
-        "premium": false
-      },
-      "tasks": [
-        {
-          "task_id": 217564,
-          "logistic_code": 1381,
-          "address": "VIA PONTE SEVESO 40",
-          "lat": 45.4901211,
-          "lng": 9.2057682,
-          "premium": false,
-          "cleaning_time": 90,
-          "start_time": "10:00",
-          "end_time": "11:30",
-          "followup": false,
-          "sequence": 1,
-          "travel_time": 0
-        }
-      ]
-    },
-    {
-      "cleaner": {
-        "id": 249,
-        "name": "Ogbodo Chidi",
-        "lastname": "Igwe",
-        "role": "Premium",
-        "premium": true
       },
       "tasks": [
         {
@@ -437,14 +415,28 @@
           "followup": false,
           "sequence": 1,
           "travel_time": 0
+        },
+        {
+          "task_id": 217692,
+          "logistic_code": 1240,
+          "address": "VIALE CONI ZUGNA 52",
+          "lat": 45.4566617,
+          "lng": 9.1699158,
+          "premium": false,
+          "cleaning_time": 60,
+          "start_time": "11:53",
+          "end_time": "12:53",
+          "followup": true,
+          "sequence": 2,
+          "travel_time": 23
         }
       ]
     },
     {
       "cleaner": {
-        "id": 287,
-        "name": "BAH",
-        "lastname": "ISMAILA",
+        "id": 771,
+        "name": "PRECIOUS",
+        "lastname": "GYABAAH",
         "role": "Standard",
         "premium": false
       },
@@ -467,59 +459,9 @@
     },
     {
       "cleaner": {
-        "id": 326,
-        "name": "FESTUS OSARO",
-        "lastname": "AIHIVBERE",
-        "role": "Standard",
-        "premium": false
-      },
-      "tasks": [
-        {
-          "task_id": 217569,
-          "logistic_code": 1153,
-          "address": "VIA CELESTINO IV, 9",
-          "lat": 45.4596054,
-          "lng": 9.1821442,
-          "premium": false,
-          "cleaning_time": 120,
-          "start_time": "10:00",
-          "end_time": "12:00",
-          "followup": false,
-          "sequence": 1,
-          "travel_time": 0
-        }
-      ]
-    },
-    {
-      "cleaner": {
-        "id": 644,
-        "name": "HENRY",
-        "lastname": "CHIDUBEM",
-        "role": "Premium",
-        "premium": true
-      },
-      "tasks": [
-        {
-          "task_id": 217550,
-          "logistic_code": 1649,
-          "address": "PIAZZA GRAMSCI 10",
-          "lat": 45.4822754,
-          "lng": 9.1688625,
-          "premium": true,
-          "cleaning_time": 120,
-          "start_time": "10:00",
-          "end_time": "12:00",
-          "followup": false,
-          "sequence": 1,
-          "travel_time": 0
-        }
-      ]
-    },
-    {
-      "cleaner": {
-        "id": 722,
-        "name": "KONE LASSINE",
-        "lastname": "KONE",
+        "id": 249,
+        "name": "Ogbodo Chidi",
+        "lastname": "Igwe",
         "role": "Premium",
         "premium": true
       },
@@ -537,6 +479,20 @@
           "followup": false,
           "sequence": 1,
           "travel_time": 0
+        },
+        {
+          "task_id": 217550,
+          "logistic_code": 1649,
+          "address": "PIAZZA GRAMSCI 10",
+          "lat": 45.4822754,
+          "lng": 9.1688625,
+          "premium": true,
+          "cleaning_time": 120,
+          "start_time": "13:28",
+          "end_time": "15:28",
+          "followup": true,
+          "sequence": 2,
+          "travel_time": 28
         }
       ]
     }
@@ -546,16 +502,17 @@
     "total_tasks": 26,
     "assigned": 26,
     "unassigned": 0,
-    "cleaners_used": 16,
+    "cleaners_used": 12,
     "max_tasks_per_cleaner": 3,
     "algorithm": "regret_insertion + redirect + best-of-infeasible",
     "notes": [
       "Straordinarie-first (only premium, must be sequence=1)",
       "Premium-first",
-      "Hard cap: travel/gap > 22' infeasible (tranne fallback quando TUTTE le mosse superano 22')",
-      "3rd task only if travel<=10' and gap<=10' (12'/12' if same street/building)",
-      "Redirect: if hop>15' and a free cleaner is feasible, prefer the free cleaner",
-      "Activation cost = 0; premium can do standard"
+      "Hard cap: travel/gap > 35' infeasible (vincoli rilassati per più assegnazioni)",
+      "3rd task only if travel<=10' and gap<=10' (12'/12' if same street/building) - INVARIATO",
+      "Redirect: if hop>25' and a free cleaner is feasible, prefer the free cleaner",
+      "Activation cost = 0; premium can do standard",
+      "Vincoli rilassati (eccetto 3ª task) per ridurre task non assegnate"
     ]
   }
 }
