@@ -326,13 +326,31 @@ export default function GenerateAssignments() {
         console.log('Assegnazioni high-priority caricate:', hpCleanersWithTasks);
       }
 
-      // Crea un Set di task_id assegnate
+      // Crea un Set di task_id assegnate e aggiorna timeline_assignments.json
       const assignedTaskIds = new Set();
+      const timelineAssignments: any[] = [];
+      
       hpCleanersWithTasks.forEach((cleanerEntry: any) => {
         cleanerEntry.tasks?.forEach((task: any) => {
           assignedTaskIds.add(String(task.task_id));
+          // Aggiungi alla timeline
+          timelineAssignments.push({
+            logistic_code: String(task.logistic_code),
+            cleanerId: cleanerEntry.cleaner.id,
+            assignment_type: "high_priority",
+            sequence: task.sequence || 0
+          });
         });
       });
+
+      // Salva le assegnazioni HP in timeline_assignments.json
+      if (timelineAssignments.length > 0) {
+        await fetch('/api/save-hp-timeline-assignments', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ assignments: timelineAssignments })
+        });
+      }
 
       // Aggiorna le task con le assegnazioni HP
       setAllTasksWithAssignments(prevTasks => {
