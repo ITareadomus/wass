@@ -689,8 +689,21 @@ def main():
     
     cleaners = load_cleaners()
     tasks = load_tasks()
+    
+    print(f"📊 Caricate {len(tasks)} task early-out da processare")
+    print(f"👥 Disponibili {len(cleaners)} cleaners")
+    
     planners, leftovers = plan_day(tasks, cleaners)
+    print(f"✅ Dopo plan_day: {len(tasks) - len(leftovers)} assegnate, {len(leftovers)} non assegnate")
+    
     planners, leftovers = final_fallback_assign(planners, leftovers)
+    print(f"✅ Dopo fallback: {len(tasks) - len(leftovers)} assegnate, {len(leftovers)} non assegnate")
+    
+    if leftovers:
+        print(f"⚠️  Task NON assegnate ({len(leftovers)}):")
+        for t in leftovers:
+            print(f"  - #{t.logistic_code} ({t.address})")
+    
     output = build_output(planners, leftovers, tasks)
     
     # Ensure output directory exists
