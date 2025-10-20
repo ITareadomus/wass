@@ -1,6 +1,6 @@
 {
     "metadata": {
-        "last_updated": "2025-10-20T10:03:42.944336",
+        "last_updated": "2025-10-20T08:05:50.778925",
         "db_config": {
             "host": "139.59.132.41",
             "user": "admin",
@@ -11,7 +11,7 @@
     },
     "dates": {
         "2025-10-21": {
-            "timestamp": "2025-10-20T10:03:42.944349",
+            "timestamp": "2025-10-20T08:05:50.778938",
             "cleaners": [
                 {
                     "id": 24,
@@ -254,7 +254,7 @@
                     "role": "Premium",
                     "active": true,
                     "ranking": 0,
-                    "counter_hours": 0.5,
+                    "counter_hours": 0.0,
                     "counter_days": 2,
                     "available": true,
                     "contract_type": "B",
@@ -288,7 +288,7 @@
                     "role": "Premium",
                     "active": true,
                     "ranking": 0,
-                    "counter_hours": 1.5,
+                    "counter_hours": 0.0,
                     "counter_days": 0,
                     "available": true,
                     "contract_type": "B",
@@ -326,7 +326,7 @@
                     "role": "Formatore",
                     "active": true,
                     "ranking": 0,
-                    "counter_hours": 6.0,
+                    "counter_hours": 0.0,
                     "counter_days": 0,
                     "available": true,
                     "contract_type": "B",
@@ -520,7 +520,7 @@
                     "role": "Premium",
                     "active": true,
                     "ranking": 0,
-                    "counter_hours": 1.0,
+                    "counter_hours": 0.0,
                     "counter_days": 1,
                     "available": true,
                     "contract_type": "a chiamata",
@@ -579,7 +579,7 @@
                     "role": "Standard",
                     "active": true,
                     "ranking": 0,
-                    "counter_hours": 1.0,
+                    "counter_hours": 0.0,
                     "counter_days": 0,
                     "available": true,
                     "contract_type": "a chiamata",
