@@ -1,5 +1,5 @@
 import { Draggable } from "react-beautiful-dnd";
-import { Task } from "@shared/schema";
+import { TaskType as Task } from "@shared/schema";
 import {
   Dialog,
   DialogContent,

@@ -1,4 +1,4 @@
-import { Personnel, Task } from "@shared/schema";
+import { Personnel, TaskType as Task } from "@shared/schema";
 import { Calendar, RotateCcw, Users } from "lucide-react";
 import { useState, useEffect } from "react";
 import { Droppable } from "react-beautiful-dnd";

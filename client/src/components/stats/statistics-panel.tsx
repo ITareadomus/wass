@@ -1,4 +1,4 @@
-import { Task } from "@shared/schema";
+import { TaskType as Task } from "@shared/schema";
 import { BarChart3 } from "lucide-react";
 
 interface StatisticsPanelProps {
