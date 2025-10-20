@@ -1,3 +1,124 @@
 {
-  "assignments": []
+  "assignments": [
+    {
+      "logistic_code": "619",
+      "cleanerId": 132,
+      "assignment_type": "optimizer",
+      "sequence": 1
+    },
+    {
+      "logistic_code": "618",
+      "cleanerId": 132,
+      "assignment_type": "optimizer",
+      "sequence": 2
+    },
+    {
+      "logistic_code": "617",
+      "cleanerId": 132,
+      "assignment_type": "optimizer",
+      "sequence": 3
+    },
+    {
+      "logistic_code": "1084",
+      "cleanerId": 596,
+      "assignment_type": "optimizer",
+      "sequence": 1
+    },
+    {
+      "logistic_code": "1472",
+      "cleanerId": 596,
+      "assignment_type": "optimizer",
+      "sequence": 2
+    },
+    {
+      "logistic_code": "723",
+      "cleanerId": 596,
+      "assignment_type": "optimizer",
+      "sequence": 3
+    },
+    {
+      "logistic_code": "623",
+      "cleanerId": 937,
+      "assignment_type": "optimizer",
+      "sequence": 1
+    },
+    {
+      "logistic_code": "1644",
+      "cleanerId": 937,
+      "assignment_type": "optimizer",
+      "sequence": 2
+    },
+    {
+      "logistic_code": "1645",
+      "cleanerId": 937,
+      "assignment_type": "optimizer",
+      "sequence": 3
+    },
+    {
+      "logistic_code": "1627",
+      "cleanerId": 404,
+      "assignment_type": "optimizer",
+      "sequence": 1
+    },
+    {
+      "logistic_code": "1630",
+      "cleanerId": 404,
+      "assignment_type": "optimizer",
+      "sequence": 2
+    },
+    {
+      "logistic_code": "1631",
+      "cleanerId": 785,
+      "assignment_type": "optimizer",
+      "sequence": 1
+    },
+    {
+      "logistic_code": "839",
+      "cleanerId": 785,
+      "assignment_type": "optimizer",
+      "sequence": 2
+    },
+    {
+      "logistic_code": "504",
+      "cleanerId": 24,
+      "assignment_type": "optimizer",
+      "sequence": 1
+    },
+    {
+      "logistic_code": "1649",
+      "cleanerId": 445,
+      "assignment_type": "optimizer",
+      "sequence": 1
+    },
+    {
+      "logistic_code": "273",
+      "cleanerId": 1045,
+      "assignment_type": "optimizer",
+      "sequence": 1
+    },
+    {
+      "logistic_code": "1153",
+      "cleanerId": 1054,
+      "assignment_type": "optimizer",
+      "sequence": 1
+    },
+    {
+      "logistic_code": "1240",
+      "cleanerId": 1054,
+      "assignment_type": "optimizer",
+      "sequence": 2
+    },
+    {
+      "logistic_code": "1381",
+      "cleanerId": 1055,
+      "assignment_type": "optimizer",
+      "sequence": 1
+    },
+    {
+      "logistic_code": "809",
+      "cleanerId": 771,
+      "assignment_type": "optimizer",
+      "sequence": 1
+    }
+  ]
 }
