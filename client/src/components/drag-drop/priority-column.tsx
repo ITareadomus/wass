@@ -21,7 +21,7 @@ export default function PriorityColumn({
   icon,
 }: PriorityColumnProps) {
   const { toast } = useToast();
-  
+
   const getColumnClass = (priority: string, tasks: Task[]) => {
     switch (priority) {
       case "early-out":
@@ -85,7 +85,7 @@ export default function PriorityColumn({
         if ((window as any).reloadEarlyOutAssignments) {
           await (window as any).reloadEarlyOutAssignments();
         }
-        
+
         // Poi ricarica tutti i task per aggiornare i filtri e la timeline
         if ((window as any).reloadAllTasks) {
           await (window as any).reloadAllTasks();
@@ -121,15 +121,15 @@ export default function PriorityColumn({
         if ((window as any).reloadHighPriorityAssignments) {
           await (window as any).reloadHighPriorityAssignments();
         }
-        
-        // Poi ricarica tutti i task per aggiornare i filtri e la timeline
+
+        // IMPORTANTE: ricarica tutti i task per aggiornare la timeline
         if ((window as any).reloadAllTasks) {
           await (window as any).reloadAllTasks();
         }
       } catch (error) {
-        console.error('Errore nell\'assegnazione high priority:', error);
+        console.error('Errore nell\'assegnazione HP:', error);
         toast({
-          title: "❌ HIGH-PRIORITY non assegnati, errore nel caricamento!",
+          title: "❌ HIGH-PRIORITY non assegnati, errore!",
           variant: "destructive",
         });
       }
