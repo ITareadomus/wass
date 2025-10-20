@@ -345,11 +345,21 @@ export default function GenerateAssignments() {
 
       // Salva le assegnazioni HP in timeline_assignments.json
       if (timelineAssignments.length > 0) {
-        await fetch('/api/save-hp-timeline-assignments', {
+        console.log(`Salvando ${timelineAssignments.length} assegnazioni HP in timeline_assignments.json:`, timelineAssignments);
+        const saveResponse = await fetch('/api/save-hp-timeline-assignments', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ assignments: timelineAssignments })
         });
+        
+        if (!saveResponse.ok) {
+          console.error('Errore nel salvataggio delle assegnazioni HP in timeline_assignments.json');
+        } else {
+          const saveResult = await saveResponse.json();
+          console.log('Assegnazioni HP salvate con successo:', saveResult);
+        }
+      } else {
+        console.warn('Nessuna assegnazione HP da salvare in timeline_assignments.json');
       }
 
       // Aggiorna le task con le assegnazioni HP
