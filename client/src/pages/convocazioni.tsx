@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
@@ -6,11 +5,13 @@ import { Card } from "@/components/ui/card";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Users, CalendarIcon } from "lucide-react";
+import { Users, CalendarIcon, ArrowLeft, Save, UserPlus } from "lucide-react";
 import { format } from "date-fns";
 import { it } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { useToast } from "@/components/ui/use-toast";
+import { useNavigate } from 'react-router-dom';
 
 interface Cleaner {
   id: number;
@@ -39,6 +40,8 @@ export default function Convocazioni() {
     return tomorrow;
   });
   const [confirmDialog, setConfirmDialog] = useState<{ open: boolean; cleanerId: number | null }>({ open: false, cleanerId: null });
+  const { toast } = useToast();
+  const navigate = useNavigate();
 
   useEffect(() => {
     const loadCleaners = async () => {
@@ -72,7 +75,7 @@ export default function Convocazioni() {
         }
         const cleanersData = await response.json();
         console.log("Cleaners caricati da cleaners.json:", cleanersData);
-        
+
         // Estrai i cleaners dalla struttura del file
         let cleanersList: Cleaner[] = [];
         if (cleanersData.dates) {
@@ -81,10 +84,10 @@ export default function Convocazioni() {
         } else if (cleanersData.cleaners) {
           cleanersList = cleanersData.cleaners;
         }
-        
+
         // Ordina per counter_hours (decrescente - più ore prima)
         cleanersList.sort((a, b) => b.counter_hours - a.counter_hours);
-        
+
         setCleaners(cleanersList);
         setSelectedCleaners(new Set()); // Reset selezioni quando cambia la data
         setIsLoading(false);
@@ -95,7 +98,7 @@ export default function Convocazioni() {
         setIsLoading(false);
       }
     };
-    
+
     loadCleaners();
   }, [selectedDate]);
 
@@ -131,10 +134,19 @@ export default function Convocazioni() {
     setConfirmDialog({ open: false, cleanerId: null });
   };
 
-  const handleConfirm = async () => {
+  const handleSaveSelection = async () => {
+    if (selectedCleaners.size === 0) {
+      toast({
+        variant: "destructive",
+        title: "⚠️ Nessun cleaner selezionato",
+        description: "Seleziona almeno un cleaner prima di salvare"
+      });
+      return;
+    }
+
     try {
       const selectedCleanersData = cleaners.filter(c => selectedCleaners.has(c.id));
-      
+
       const dataToSave = {
         cleaners: selectedCleanersData,
         total_selected: selectedCleanersData.length
@@ -154,10 +166,74 @@ export default function Convocazioni() {
 
       const result = await response.json();
       console.log("Cleaners salvati con successo:", result);
-      alert(`${selectedCleanersData.length} cleaners salvati con successo in selected_cleaners.json`);
+      toast({
+        variant: "success",
+        title: "✅ Selezione salvata!",
+        description: `${selectedCleanersData.length} cleaners salvati con successo in selected_cleaners.json`
+      });
+      navigate('/');
     } catch (error) {
       console.error("Errore nel salvataggio:", error);
-      alert("Errore nel salvataggio dei cleaners selezionati");
+      toast({
+        variant: "destructive",
+        title: "❌ Errore nel salvataggio",
+        description: "Si è verificato un errore nel salvataggio dei cleaners selezionati"
+      });
+    }
+  };
+
+  const handleAddCleaners = async () => {
+    if (selectedCleaners.size === 0) {
+      toast({
+        variant: "destructive",
+        title: "⚠️ Nessun cleaner selezionato",
+        description: "Seleziona almeno un cleaner prima di aggiungere"
+      });
+      return;
+    }
+
+    try {
+      // Carica la selezione attuale
+      const currentResponse = await fetch('/data/cleaners/selected_cleaners.json');
+      const currentData = await currentResponse.json();
+      const currentCleaners = currentData.cleaners || [];
+
+      // Unisci i cleaners esistenti con i nuovi selezionati (evita duplicati)
+      const existingIds = new Set(currentCleaners.map((c: any) => c.id));
+      const newCleanersToFilter = cleaners.filter(c => selectedCleaners.has(c.id));
+      const newCleaners = newCleanersToFilter.filter(c => !existingIds.has(c.id));
+      const mergedCleaners = [...currentCleaners, ...newCleaners];
+
+      const dataToSave = {
+        cleaners: mergedCleaners,
+        total_selected: mergedCleaners.length
+      };
+
+      const response = await fetch('/api/save-selected-cleaners', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(dataToSave)
+      });
+
+      if (!response.ok) {
+        throw new Error('Errore nel salvataggio');
+      }
+
+      toast({
+        variant: "success",
+        title: "✅ Cleaners aggiunti!",
+        description: `${newCleaners.length} nuovi cleaners aggiunti (totale: ${mergedCleaners.length})`
+      });
+
+      // Torna alla pagina principale SENZA resettare la timeline
+      navigate('/', { state: { preserveAssignments: true } });
+    } catch (error) {
+      console.error('Errore nell\'aggiunta cleaners:', error);
+      toast({
+        variant: "destructive",
+        title: "❌ Errore nell'aggiunta",
+        description: "Si è verificato un errore durante l\'aggiunta dei cleaners"
+      });
     }
   };
 
@@ -188,7 +264,7 @@ export default function Convocazioni() {
                 del {format(selectedDate, "dd/MM/yyyy", { locale: it })}
               </span>
             </h1>
-            
+
             {/* Selettore Data e Dark Mode Toggle */}
             <div className="flex items-center gap-3">
               <ThemeToggle />
@@ -239,29 +315,28 @@ export default function Convocazioni() {
             {cleaners.map((cleaner) => {
               const isPremium = cleaner.role === "Premium";
               const isAvailable = cleaner.available !== false;
-              
               const isFormatore = cleaner.role === "Formatore";
-              
-              const borderColor = !isAvailable 
-                ? "border-gray-400" 
-                : isFormatore ? "border-orange-500" 
+
+              const borderColor = !isAvailable
+                ? "border-gray-400"
+                : isFormatore ? "border-orange-500"
                 : isPremium ? "border-yellow-500" : "border-green-500";
-              const bgColor = !isAvailable 
-                ? "bg-gray-300/30 dark:bg-gray-700/30" 
+              const bgColor = !isAvailable
+                ? "bg-gray-300/30 dark:bg-gray-700/30"
                 : isFormatore ? "bg-orange-500/10"
                 : isPremium ? "bg-yellow-500/10" : "bg-green-500/10";
               const badgeColor = !isAvailable
                 ? "bg-gray-400/20 text-gray-700 dark:text-gray-200 border-gray-400 dark:border-gray-500"
                 : isFormatore ? "bg-orange-500/20 text-orange-700 border-orange-500"
                 : isPremium ? "bg-yellow-500/20 text-yellow-700 border-yellow-500" : "bg-green-500/20 text-green-700 border-green-500";
-              
+
               return (
                 <div
                   key={cleaner.id}
                   onClick={() => toggleCleanerSelection(cleaner.id, isAvailable)}
                   className={`flex items-center justify-between p-4 border-2 rounded-lg transition-all ${borderColor} ${bgColor} ${
-                    !isAvailable 
-                      ? 'opacity-60 cursor-pointer hover:opacity-70' 
+                    !isAvailable
+                      ? 'opacity-60 cursor-pointer hover:opacity-70'
                       : 'hover:opacity-80 cursor-pointer'
                   }`}
                 >
@@ -276,7 +351,7 @@ export default function Convocazioni() {
                         </span>
                       </div>
                       <div className="text-xs text-foreground/80">
-                        <span className="font-semibold">Ore questa settimana:</span> {cleaner.counter_hours}h 
+                        <span className="font-semibold">Ore questa settimana:</span> {cleaner.counter_hours}h
                         <span className="mx-2">|</span>
                         <span className="font-semibold">Giorni consecutivi:</span> {cleaner.counter_days}
                         <span className="mx-2">|</span>
@@ -316,7 +391,7 @@ export default function Convocazioni() {
           </Dialog>
           <div className="flex justify-start mt-4 pt-4 border-t">
             <Button
-              onClick={handleConfirm}
+              onClick={handleSaveSelection}
               size="lg"
               disabled={selectedCleaners.size === 0}
             >
@@ -394,6 +469,37 @@ export default function Convocazioni() {
           </div>
         </Card>
       </div>
+
+      {/* Pulsanti Annulla, Aggiungi, Sostituisci */}
+      <div className="p-4 border-t flex justify-between items-center">
+            <Button
+              variant="outline"
+              onClick={() => navigate('/')}
+              className="flex items-center gap-2"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              Annulla
+            </Button>
+            <div className="flex gap-2">
+              <Button
+                onClick={handleAddCleaners}
+                disabled={selectedCleaners.size === 0}
+                variant="secondary"
+                className="flex items-center gap-2"
+              >
+                <UserPlus className="w-4 h-4" />
+                Aggiungi ({selectedCleaners.size})
+              </Button>
+              <Button
+                onClick={handleSaveSelection}
+                disabled={selectedCleaners.size === 0}
+                className="flex items-center gap-2"
+              >
+                <Save className="w-4 h-4" />
+                Sostituisci ({selectedCleaners.size})
+              </Button>
+            </div>
+          </div>
       </div>
     </div>
   );
