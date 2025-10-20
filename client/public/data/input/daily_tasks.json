@@ -1,11 +1,11 @@
 {
     "metadata": {
-        "last_updated": "2025-10-20T12:35:47.957381",
+        "last_updated": "2025-10-20T12:47:12.114807",
         "schema_version": "1.0"
     },
     "dates": {
         "2025-10-21": {
-            "timestamp": "2025-10-20T12:35:47.957390",
+            "timestamp": "2025-10-20T12:47:12.114817",
             "apt": [
                 {
                     "task_id": 217226,
@@ -170,13 +170,13 @@
                 },
                 {
                     "task_id": 217551,
-                    "logistic_code": null,
+                    "logistic_code": 1675,
                     "client_id": 123,
                     "premium": false,
                     "address": "Via Lambro, 12",
                     "lat": "45.474136",
                     "lng": "9.2097826",
-                    "cleaning_time": null,
+                    "cleaning_time": 90,
                     "checkin_date": "2025-10-22",
                     "checkout_date": "2025-10-21",
                     "checkin_time": null,
@@ -187,7 +187,7 @@
                     "operation_id": 2,
                     "confirmed_operation": false,
                     "straordinaria": false,
-                    "type_apt": "X",
+                    "type_apt": "B",
                     "alias": "YOUHO",
                     "customer_name": "YOUHOSTY"
                 },
