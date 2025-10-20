@@ -35,13 +35,14 @@ export default function TaskCard({
   useEffect(() => {
     const loadAssignmentTimes = async () => {
       try {
-        const response = await fetch('/data/output/early_out_assignments.json');
-        if (response.ok) {
-          const data = await response.json();
+        // Prova prima con early_out_assignments.json
+        const eoResponse = await fetch('/data/output/early_out_assignments.json');
+        if (eoResponse.ok) {
+          const eoData = await eoResponse.json();
           const taskId = (task as any).task_id ?? task.id;
           
-          // Cerca la task nelle assegnazioni
-          for (const cleanerEntry of data.early_out_tasks_assigned || []) {
+          // Cerca la task nelle assegnazioni Early Out
+          for (const cleanerEntry of eoData.early_out_tasks_assigned || []) {
             const assignedTask = cleanerEntry.tasks?.find((t: AssignedTask) => 
               String(t.task_id) === String(taskId) || String(t.logistic_code) === String(task.name)
             );
@@ -51,7 +52,29 @@ export default function TaskCard({
                 end_time: assignedTask.end_time,
                 travel_time: assignedTask.travel_time
               });
-              break;
+              return; // Trovata, esci
+            }
+          }
+        }
+
+        // Se non trovata in EO, prova con high_priority_assignments.json
+        const hpResponse = await fetch('/data/output/high_priority_assignments.json');
+        if (hpResponse.ok) {
+          const hpData = await hpResponse.json();
+          const taskId = (task as any).task_id ?? task.id;
+          
+          // Cerca la task nelle assegnazioni High Priority
+          for (const cleanerEntry of hpData.high_priority_tasks_assigned || []) {
+            const assignedTask = cleanerEntry.tasks?.find((t: AssignedTask) => 
+              String(t.task_id) === String(taskId) || String(t.logistic_code) === String(task.name)
+            );
+            if (assignedTask) {
+              setAssignmentTimes({
+                start_time: assignedTask.start_time,
+                end_time: assignedTask.end_time,
+                travel_time: assignedTask.travel_time
+              });
+              return; // Trovata, esci
             }
           }
         }
