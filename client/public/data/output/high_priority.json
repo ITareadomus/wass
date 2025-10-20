@@ -278,7 +278,7 @@
       "cleaning_time": 270,
       "checkin_date": "2025-10-21",
       "checkout_date": "2025-10-21",
-      "checkin_time": null,
+      "checkin_time": "17:00",
       "checkout_time": null,
       "pax_in": 4,
       "pax_out": 5,
@@ -320,6 +320,32 @@
       ]
     },
     {
+      "task_id": 217721,
+      "logistic_code": 1556,
+      "client_id": 3,
+      "premium": false,
+      "address": "Via Torino, 68 20123 (MI)",
+      "lat": "45.46069",
+      "lng": "9.1820749",
+      "cleaning_time": 120,
+      "checkin_date": "2025-10-21",
+      "checkout_date": "2025-10-21",
+      "checkin_time": "15:00",
+      "checkout_time": null,
+      "pax_in": 2,
+      "pax_out": 2,
+      "small_equipment": false,
+      "operation_id": 2,
+      "confirmed_operation": false,
+      "straordinaria": false,
+      "type_apt": "B",
+      "alias": "TBR",
+      "customer_name": "THE BEST RENT S.r.l.",
+      "reasons": [
+        "same_day_checkin_between_eo_hp"
+      ]
+    },
+    {
       "task_id": 217722,
       "logistic_code": 1537,
       "client_id": 3,
@@ -346,5 +372,5 @@
       ]
     }
   ],
-  "total_apartments": 13
+  "total_apartments": 14
 }
