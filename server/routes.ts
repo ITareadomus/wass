@@ -971,10 +971,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Endpoint for running the optimizer script
   app.post("/api/run-optimizer", async (req, res) => {
     try {
-      console.log("Eseguendo opt_updated.py...");
+      console.log("Eseguendo assign_eo.py...");
       const result = await new Promise<{ stdout: string; stderr: string }>((resolve, reject) => {
         exec(
-          "python3 /home/runner/workspace/client/public/scripts/opt_updated.py",
+          "python3 /home/runner/workspace/client/public/scripts/assign_eo.py",
           (error, stdout, stderr) => {
             if (error) {
               reject(error);
@@ -985,9 +985,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         );
       });
 
-      console.log("opt_updated.py output:", result.stdout);
+      console.log("assign_eo.py output:", result.stdout);
       if (result.stderr) {
-        console.error("opt_updated.py stderr:", result.stderr);
+        console.error("assign_eo.py stderr:", result.stderr);
       }
 
       res.json({
@@ -996,7 +996,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         output: result.stdout,
       });
     } catch (error: any) {
-      console.error("Errore nell'esecuzione di opt_updated.py:", error);
+      console.error("Errore nell'esecuzione di assign_eo.py:", error);
       res.status(500).json({
         success: false,
         message: "Errore nell'esecuzione dell'optimizer",
