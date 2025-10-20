@@ -168,8 +168,8 @@ export default function Convocazioni() {
       console.log("Cleaners salvati con successo:", result);
       toast({
         variant: "success",
-        title: "✅ Selezione salvata!",
-        description: `${selectedCleanersData.length} cleaners salvati con successo in selected_cleaners.json`
+        title: `${selectedCleanersData.length} cleaner selezionati correttamente!`,
+        description: ""
       });
       setLocation('/');
     } catch (error) {
@@ -221,8 +221,8 @@ export default function Convocazioni() {
 
       toast({
         variant: "success",
-        title: "✅ Cleaners aggiunti!",
-        description: `${newCleaners.length} nuovi cleaners aggiunti (totale: ${mergedCleaners.length})`
+        title: `${newCleaners.length} cleaner selezionati correttamente!`,
+        description: `Totale cleaners: ${mergedCleaners.length}`
       });
 
       // Torna alla pagina principale SENZA resettare la timeline
