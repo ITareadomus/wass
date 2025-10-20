@@ -67,10 +67,20 @@ export default function TimelineView({
   useEffect(() => {
     const loadCleaners = async () => {
       try {
-        const response = await fetch('/data/cleaners/selected_cleaners.json');
+        // Aggiungi timestamp per evitare caching
+        const response = await fetch(`/data/cleaners/selected_cleaners.json?t=${Date.now()}`);
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
         }
+        
+        // Verifica che la risposta sia JSON
+        const contentType = response.headers.get('content-type');
+        if (!contentType || !contentType.includes('application/json')) {
+          console.error('Risposta non JSON:', contentType);
+          setCleaners([]);
+          return;
+        }
+        
         const selectedData = await response.json();
         console.log("Cleaners caricati da selected_cleaners.json:", selectedData);
 
@@ -79,6 +89,7 @@ export default function TimelineView({
         setCleaners(cleanersList);
       } catch (error) {
         console.error("Errore nel caricamento dei cleaners selezionati:", error);
+        setCleaners([]); // Imposta array vuoto invece di lasciare undefined
       }
     };
     loadCleaners();
