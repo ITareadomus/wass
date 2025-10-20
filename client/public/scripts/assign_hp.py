@@ -9,12 +9,12 @@ from datetime import datetime, timedelta
 # =============================
 # I/O paths
 # =============================
-BASE = Path("/mnt/data")
+BASE = Path(__file__).parent.parent / "data"
 
-INPUT_TASKS = BASE / "high_priority.json"
-INPUT_CLEANERS = BASE / "selected_cleaners.json"
-INPUT_EO_ASSIGN = BASE / "early_out_assignments.json"
-OUTPUT_ASSIGN = BASE / "high_priority_assignments.json"
+INPUT_TASKS = BASE / "output" / "high_priority.json"
+INPUT_CLEANERS = BASE / "cleaners" / "selected_cleaners.json"
+INPUT_EO_ASSIGN = BASE / "output" / "early_out_assignments.json"
+OUTPUT_ASSIGN = BASE / "output" / "high_priority_assignments.json"
 
 # =============================
 # Travel / gap policy

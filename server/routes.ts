@@ -520,6 +520,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Endpoint per eseguire assign_hp.py
+  app.post("/api/assign-hp", async (req, res) => {
+    try {
+      console.log("Eseguendo assign_hp.py...");
+      const { stdout, stderr } = await execAsync(
+        `python3 client/public/scripts/assign_hp.py`,
+        { maxBuffer: 1024 * 1024 * 10 }
+      );
+
+      if (stderr && !stderr.includes('Browserslist')) {
+        console.error("Errore assign_hp:", stderr);
+      }
+      console.log("assign_hp output:", stdout);
+
+      res.json({
+        success: true,
+        message: "High Priority tasks assegnati con successo",
+        output: stdout
+      });
+    } catch (error: any) {
+      console.error("Errore durante l'assegnazione HP:", error);
+      res.status(500).json({
+        success: false,
+        error: error.message,
+        stderr: error.stderr
+      });
+    }
+  });
+
   // Endpoint per il nuovo script di assegnazione ottimizzato (opt.py)
   app.post("/api/assign-unified", async (req, res) => {
     try {
