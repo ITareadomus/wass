@@ -109,8 +109,8 @@ export default function TimelineView({
   };
 
   const handleGoToConvocazioni = () => {
-    // Naviga alla pagina delle convocazioni
-    window.location.href = '/convocazioni';
+    // Apri la pagina delle convocazioni in una nuova finestra
+    window.open('/convocazioni', '_blank');
   };
 
   // Non mostrare nulla se non ci sono cleaners
