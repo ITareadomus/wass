@@ -972,28 +972,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/run-optimizer", async (req, res) => {
     try {
       console.log("Eseguendo assign_eo_updated.py...");
-      const result = await new Promise<{ stdout: string; stderr: string }>((resolve, reject) => {
-        exec(
-          "python3 /home/runner/workspace/client/public/scripts/assign_eo_updated.py",
-          (error, stdout, stderr) => {
-            if (error) {
-              reject(error);
-              return;
-            }
-            resolve({ stdout, stderr });
-          }
-        );
-      });
+      const { stdout, stderr } = await execAsync(
+        `python3 client/public/scripts/assign_eo_updated.py`,
+        { maxBuffer: 1024 * 1024 * 10 }
+      );
 
-      console.log("assign_eo_updated.py output:", result.stdout);
-      if (result.stderr) {
-        console.error("assign_eo_updated.py stderr:", result.stderr);
+      if (stderr && !stderr.includes('Browserslist')) {
+        console.error("Errore assign_eo_updated:", stderr);
       }
+      console.log("assign_eo_updated output:", stdout);
 
       res.json({
         success: true,
         message: "Optimizer eseguito con successo",
-        output: result.stdout,
+        output: stdout,
       });
     } catch (error: any) {
       console.error("Errore nell'esecuzione di assign_eo_updated.py:", error);
@@ -1001,6 +993,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         success: false,
         message: "Errore nell'esecuzione dell'optimizer",
         error: error.message,
+        stderr: error.stderr
       });
     }
   });
