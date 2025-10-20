@@ -323,7 +323,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         fs.writeFile(highPriorityPath, JSON.stringify(highPriorityData, null, 2)),
         fs.writeFile(lowPriorityPath, JSON.stringify(lowPriorityData, null, 2))
       ]);
-      
+
       // Se la task viene spostata nell'early-out, rimuovila da early_out_assignments
       // in modo che non sia più considerata "già assegnata" al prossimo run dell'optimizer
       if (toContainer === 'early-out') {
@@ -334,7 +334,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         } catch (error) {
           // File non esiste, usa struttura vuota
         }
-        
+
         // Rimuovi la task da tutti i cleaner in early_out_tasks_assigned
         let wasRemoved = false;
         earlyOutAssignmentsData.early_out_tasks_assigned = earlyOutAssignmentsData.early_out_tasks_assigned.map((cleanerEntry: any) => {
@@ -350,7 +350,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           });
           return { ...cleanerEntry, tasks: filteredTasks };
         }).filter((cleanerEntry: any) => cleanerEntry.tasks.length > 0); // Rimuovi cleaner senza task
-        
+
         if (wasRemoved) {
           await fs.writeFile(earlyOutAssignmentsPath, JSON.stringify(earlyOutAssignmentsData, null, 2));
           console.log(`✅ Task ${taskId}/${logisticCode} rimossa da early_out_assignments.json`);
@@ -973,6 +973,50 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       console.error("Errore nella rimozione da early_out_assignments.json:", error);
       res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  // Endpoint per scaricare early_out_assignments.json
+  app.get("/api/download-early-out-assignments", async (req, res) => {
+    try {
+      const filePath = path.join(process.cwd(), 'client/public/data/output/early_out_assignments.json');
+      const data = await fs.readFile(filePath, 'utf8');
+
+      res.setHeader('Content-Type', 'application/json');
+      res.setHeader('Content-Disposition', 'attachment; filename=early_out_assignments.json');
+      res.send(data);
+    } catch (error: any) {
+      console.error("Errore nel download di early_out_assignments.json:", error);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  // Endpoint per eseguire opt_updated.py
+  app.post("/api/run-optimizer", async (req, res) => {
+    try {
+      console.log("Eseguendo opt_updated.py...");
+      const { stdout, stderr } = await execAsync(
+        `python3 client/public/scripts/opt_updated.py`,
+        { maxBuffer: 1024 * 1024 * 10 }
+      );
+
+      if (stderr && !stderr.includes('Browserslist')) {
+        console.error("Errore opt_updated:", stderr);
+      }
+      console.log("opt_updated.py output:", stdout);
+
+      res.json({
+        success: true,
+        message: "Optimizer eseguito con successo",
+        output: stdout
+      });
+    } catch (error: any) {
+      console.error("Errore durante l'esecuzione dell'optimizer:", error);
+      res.status(500).json({
+        success: false,
+        error: error.message,
+        stderr: error.stderr
+      });
     }
   });
 
