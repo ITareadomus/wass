@@ -154,7 +154,7 @@ export default function Convocazioni() {
 
       const result = await response.json();
       console.log("Cleaners salvati con successo:", result);
-      alert(`${selectedCleanersData.length} cleaners salvati con successo in selected_cleaners.json`);
+      alert(`${selectedCleanersData.length} cleaners salvati con successo!\n\nPuoi tornare alla pagina Generate Assignments per vedere le modifiche.`);
     } catch (error) {
       console.error("Errore nel salvataggio:", error);
       alert("Errore nel salvataggio dei cleaners selezionati");
