@@ -1,5 +1,5 @@
 import { Personnel, Task } from "@shared/schema";
-import { Calendar, RotateCcw } from "lucide-react";
+import { Calendar, RotateCcw, Users } from "lucide-react";
 import { useState, useEffect } from "react";
 import { Droppable } from "react-beautiful-dnd";
 import TaskCard from "@/components/drag-drop/task-card";
@@ -8,6 +8,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 
@@ -107,6 +108,11 @@ export default function TimelineView({
     }
   };
 
+  const handleGoToConvocazioni = () => {
+    // Naviga alla pagina delle convocazioni
+    window.location.href = '/convocazioni';
+  };
+
   // Non mostrare nulla se non ci sono cleaners
   if (cleaners.length === 0) {
     return null;
@@ -121,15 +127,26 @@ export default function TimelineView({
               <Calendar className="w-5 h-5 mr-2 text-primary" />
               Timeline Assegnazioni - {cleaners.length} Cleaners
             </h3>
-            <Button
-              onClick={handleResetAssignments}
-              variant="outline"
-              size="sm"
-              className="flex items-center gap-2"
-            >
-              <RotateCcw className="w-4 h-4" />
-              Reset Assegnazioni
-            </Button>
+            <div className="flex gap-2">
+              <Button
+                onClick={handleGoToConvocazioni}
+                variant="outline"
+                size="sm"
+                className="flex items-center gap-2"
+              >
+                <Users className="w-4 h-4" />
+                Convocazioni
+              </Button>
+              <Button
+                onClick={handleResetAssignments}
+                variant="outline"
+                size="sm"
+                className="flex items-center gap-2"
+              >
+                <RotateCcw className="w-4 h-4" />
+                Reset Assegnazioni
+              </Button>
+            </div>
           </div>
         </div>
         <div className="p-4 overflow-x-auto">
@@ -206,12 +223,12 @@ export default function TimelineView({
                             // Ordina prima per sequence (se presente), poi per orario
                             const taskA = a as any;
                             const taskB = b as any;
-                            
+
                             // Se entrambe hanno sequence, usa quello
                             if (taskA.sequence !== undefined && taskB.sequence !== undefined) {
                               return taskA.sequence - taskB.sequence;
                             }
-                            
+
                             // Altrimenti ordina per orario di inizio
                             const timeA = taskA.start_time || taskA.fw_start_time || taskA.startTime || "00:00";
                             const timeB = taskB.start_time || taskB.fw_start_time || taskB.startTime || "00:00";
