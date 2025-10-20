@@ -524,14 +524,16 @@
     "unassigned": 3,
     "cleaners_used": 14,
     "max_tasks_per_cleaner": 3,
-    "algorithm": "regret_insertion + redirect + best-of-infeasible",
+    "algorithm": "regret_insertion + redirect + best-of-infeasible + relaxed_final_assign",
     "notes": [
       "Straordinarie-first (only premium, must be sequence=1)",
       "Premium-first",
       "Hard cap: travel/gap > 22' infeasible (tranne fallback quando TUTTE le mosse superano 22')",
       "3rd task only if travel<=10' and gap<=10' (12'/12' if same street/building)",
       "Redirect: if hop>15' and a free cleaner is feasible, prefer the free cleaner",
-      "Activation cost = 0; premium can do standard"
+      "Activation cost = 0; premium can do standard",
+      "Final assignment: prefer free cleaners, then relaxed constraints (travel/gap)",
+      "Consider checkout_time != checkin_time for more available time"
     ]
   }
 }
