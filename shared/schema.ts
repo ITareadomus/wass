@@ -77,6 +77,9 @@ export const taskSchema = z.object({
   pax_out: z.number().optional(),
   operation_id: z.number().optional(),
   customer_name: z.string().optional(),
+  type_apt: z.string().optional(),
   createdAt: z.string(),
   updatedAt: z.string(),
 });
+
+export type TaskType = z.infer<typeof taskSchema>;

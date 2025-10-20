@@ -1,5 +1,5 @@
 import { Droppable } from "react-beautiful-dnd";
-import { Task } from "@shared/schema";
+import { TaskType as Task } from "@shared/schema";
 import TaskCard from "./task-card";
 import { Clock, AlertCircle, ArrowDown, Calendar } from "lucide-react";
 import { Button } from "@/components/ui/button";

@@ -1,5 +1,5 @@
 import { Droppable } from "react-beautiful-dnd";
-import { Task } from "@shared/schema";
+import { TaskType as Task } from "@shared/schema";
 import TaskCard from "./task-card";
 import { Inbox } from "lucide-react";
 

@@ -1,5 +1,5 @@
 import { DragDropContext, DropResult } from "react-beautiful-dnd";
-import { Task } from "@shared/schema";
+import { TaskType as Task } from "@shared/schema";
 import PriorityColumn from "@/components/drag-drop/priority-column";
 import TimelineView from "@/components/timeline/timeline-view";
 import { useState, useEffect } from "react";
@@ -11,7 +11,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { toast } from "@/components/ui/toast";
+import { useToast } from "@/hooks/use-toast";
 
 interface RawTask {
   task_id: number;
@@ -31,11 +31,10 @@ interface RawTask {
   pax_out: number;
   small_equipment: boolean;
   operation_id: number;
-  is_straordinaria: boolean;
+  is_straordinaria?: boolean;
   zone: number;
   reasons?: string[];
   alias?: string;
-  is_straordinaria?: boolean;
   confirmed_operation?: boolean;
 }
 
@@ -77,9 +76,10 @@ export default function GenerateAssignments() {
     const extractData = async () => {
       try {
         // Controlla se stiamo tornando dalla pagina convocazioni con preserveAssignments
-        const state = (window.history.state as any)?.usr;
-        if (state?.preserveAssignments) {
+        const preserveAssignments = sessionStorage.getItem('preserveAssignments');
+        if (preserveAssignments === 'true') {
           console.log("Preservo le assegnazioni esistenti, salto l'estrazione");
+          sessionStorage.removeItem('preserveAssignments');
           setIsExtracting(false);
           loadTasks();
           return;
@@ -208,8 +208,8 @@ export default function GenerateAssignments() {
       console.log("Tasks convertiti - Early:", initialEarlyOut.length, "High:", initialHigh.length, "Low:", initialLow.length);
 
       // Crea una mappa di logistic_code -> assegnazione timeline
-      const timelineAssignmentsMap = new Map(
-        timelineAssignmentsData.assignments.map((a: any) => [String(a.logistic_code), a])
+      const timelineAssignmentsMap = new Map<string, { cleanerId: number; sequence: number; logistic_code: string }>(
+        timelineAssignmentsData.assignments.map((a: any) => [String(a.logistic_code), { cleanerId: a.cleanerId, sequence: a.sequence, logistic_code: a.logistic_code }])
       );
 
       console.log("Task assegnate nella timeline (logistic_code):", Array.from(timelineAssignmentsMap.keys()));
@@ -249,7 +249,7 @@ export default function GenerateAssignments() {
       const allTasks = [...initialEarlyOut, ...initialHigh, ...initialLow];
       const tasksWithAssignments = allTasks.map(task => {
         const timelineAssignment = timelineAssignmentsMap.get(String(task.name));
-        if (timelineAssignment) {
+        if (timelineAssignment && timelineAssignment.cleanerId) {
           console.log(`Assegnando task ${task.name} a cleaner ${timelineAssignment.cleanerId} con sequence ${timelineAssignment.sequence}`);
           return {
             ...task,
@@ -597,7 +597,11 @@ export default function GenerateAssignments() {
     }
   };
 
-  const updateTaskJson = async (taskId: string, logisticCode: string | undefined, fromContainer: string, toContainer: string) => {
+  const updateTaskJson = async (taskId: string, logisticCode: string | undefined, fromContainer: string | null, toContainer: string | null) => {
+    if (!logisticCode || !fromContainer || !toContainer) {
+      console.warn('Missing required parameters for updateTaskJson');
+      return;
+    }
     try {
       const response = await fetch('/api/update-task-json', {
         method: 'POST',

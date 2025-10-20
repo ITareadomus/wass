@@ -10,8 +10,8 @@ import { format } from "date-fns";
 import { it } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { useToast } from "@/components/ui/use-toast";
-import { useNavigate } from 'react-router-dom';
+import { useToast } from "@/hooks/use-toast";
+import { useLocation } from 'wouter';
 
 interface Cleaner {
   id: number;
@@ -41,7 +41,7 @@ export default function Convocazioni() {
   });
   const [confirmDialog, setConfirmDialog] = useState<{ open: boolean; cleanerId: number | null }>({ open: false, cleanerId: null });
   const { toast } = useToast();
-  const navigate = useNavigate();
+  const [, setLocation] = useLocation();
 
   useEffect(() => {
     const loadCleaners = async () => {
@@ -171,7 +171,7 @@ export default function Convocazioni() {
         title: "✅ Selezione salvata!",
         description: `${selectedCleanersData.length} cleaners salvati con successo in selected_cleaners.json`
       });
-      navigate('/');
+      setLocation('/');
     } catch (error) {
       console.error("Errore nel salvataggio:", error);
       toast({
@@ -226,7 +226,8 @@ export default function Convocazioni() {
       });
 
       // Torna alla pagina principale SENZA resettare la timeline
-      navigate('/', { state: { preserveAssignments: true } });
+      sessionStorage.setItem('preserveAssignments', 'true');
+      setLocation('/');
     } catch (error) {
       console.error('Errore nell\'aggiunta cleaners:', error);
       toast({
@@ -474,7 +475,7 @@ export default function Convocazioni() {
       <div className="p-4 border-t flex justify-between items-center">
             <Button
               variant="outline"
-              onClick={() => navigate('/')}
+              onClick={() => setLocation('/')}
               className="flex items-center gap-2"
             >
               <ArrowLeft className="w-4 h-4" />
