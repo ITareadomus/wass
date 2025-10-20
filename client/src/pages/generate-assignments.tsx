@@ -329,7 +329,7 @@ export default function GenerateAssignments() {
       // Crea un Set di task_id assegnate e aggiorna timeline_assignments.json
       const assignedTaskIds = new Set();
       const timelineAssignments: any[] = [];
-      
+
       hpCleanersWithTasks.forEach((cleanerEntry: any) => {
         cleanerEntry.tasks?.forEach((task: any) => {
           assignedTaskIds.add(String(task.task_id));
@@ -351,7 +351,7 @@ export default function GenerateAssignments() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ assignments: timelineAssignments })
         });
-        
+
         if (!saveResponse.ok) {
           console.error('Errore nel salvataggio delle assegnazioni HP in timeline_assignments.json');
         } else {
@@ -470,8 +470,8 @@ export default function GenerateAssignments() {
     };
 
     const fromContainer = containerToJsonName[source.droppableId] || null;
-    const toContainer = destination.droppableId.startsWith('timeline-') 
-      ? destination.droppableId 
+    const toContainer = destination.droppableId.startsWith('timeline-')
+      ? destination.droppableId
       : containerToJsonName[destination.droppableId] || null;
 
     // Se sto muovendo verso una timeline di un cleaner
@@ -638,6 +638,38 @@ export default function GenerateAssignments() {
     );
   }
 
+  const handleGoToConvocazioni = () => {
+    // Apri la pagina delle convocazioni in una nuova finestra
+    window.open('/convocazioni', '_blank');
+  };
+
+  const handleManageCleaners = () => {
+    // Apri Convocazioni in una nuova finestra/tab
+    const convocazioniWindow = window.open('/convocazioni', 'convocazioni', 'width=1200,height=800');
+
+    // Listener per ricaricare i cleaners quando la finestra viene chiusa
+    const checkWindowClosed = setInterval(() => {
+      if (convocazioniWindow && convocazioniWindow.closed) {
+        clearInterval(checkWindowClosed);
+        // Ricarica solo i cleaners senza resettare le assegnazioni
+        loadCleanersOnly();
+      }
+    }, 500);
+  };
+
+  const loadCleanersOnly = async () => {
+    try {
+      // Ricarica solo i cleaners da selected_cleaners.json
+      // senza toccare le task o le assegnazioni della timeline
+      console.log("Ricaricamento cleaners...");
+      // Non fare nulla qui, la timeline si aggiorna automaticamente
+      // leggendo da selected_cleaners.json
+      window.location.reload();
+    } catch (error) {
+      console.error("Errore nel ricaricamento dei cleaners:", error);
+    }
+  };
+
   return (
     <div className="bg-background text-foreground min-h-screen">
       <div className="w-full px-4 py-6">
@@ -649,6 +681,9 @@ export default function GenerateAssignments() {
             </span>
           </h1>
           <div className="flex items-center gap-3">
+            <Button onClick={handleManageCleaners} className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
+              Gestisci Cleaners
+            </Button>
             <ThemeToggle />
             <Popover>
               <PopoverTrigger asChild>
