@@ -20,18 +20,18 @@ OUTPUT_ASSIGN = BASE / "output" / "early_out_assignments.json"
 MAX_TASKS_PER_CLEANER = 3  # 3, ma la 3ª segue la regola "vicina"
 REGRET_K = 2
 
-# Hard caps (sempre attivi)
-HARD_MAX_TRAVEL = 22.0  # travel > 22' => infeasible
-HARD_MAX_GAP = 22.0  # (start_B - end_A) > 22' => infeasible
+# Hard caps (rilassati per permettere più assegnazioni)
+HARD_MAX_TRAVEL = 35.0  # travel > 35' => infeasible (era 22')
+HARD_MAX_GAP = 35.0  # (start_B - end_A) > 35' => infeasible (era 22')
 
-# 3ª task (2→3 hop) - default e deroga stessa via/edificio
+# 3ª task (2→3 hop) - MANTENUTI INVARIATI
 THIRD_TASK_MAX_TRAVEL = 10.0
 THIRD_TASK_MAX_GAP = 10.0
 THIRD_TASK_SAME_STREET_TRAVEL = 12.0
 THIRD_TASK_SAME_STREET_GAP = 12.0
 
-# Redirect: se un inserimento crea hop > 15', preferisci un cleaner libero idoneo
-REDIRECT_TRAVEL = 15.0
+# Redirect: rilassato per permettere più assegnazioni
+REDIRECT_TRAVEL = 25.0  # era 15' - ora preferisce assegnare anche con hop più lunghi
 
 # Travel model (min)
 SHORT_RANGE_KM = 0.30
@@ -518,10 +518,11 @@ def build_output(cleaners: List[Cleaner],
             "notes": [
                 "Straordinarie-first (only premium, must be sequence=1)",
                 "Premium-first",
-                "Hard cap: travel/gap > 22' infeasible (tranne fallback quando TUTTE le mosse superano 22')",
-                "3rd task only if travel<=10' and gap<=10' (12'/12' if same street/building)",
-                "Redirect: if hop>15' and a free cleaner is feasible, prefer the free cleaner",
-                "Activation cost = 0; premium can do standard"
+                "Hard cap: travel/gap > 35' infeasible (vincoli rilassati per più assegnazioni)",
+                "3rd task only if travel<=10' and gap<=10' (12'/12' if same street/building) - INVARIATO",
+                "Redirect: if hop>25' and a free cleaner is feasible, prefer the free cleaner",
+                "Activation cost = 0; premium can do standard",
+                "Vincoli rilassati (eccetto 3ª task) per ridurre task non assegnate"
             ]
         }
     }
