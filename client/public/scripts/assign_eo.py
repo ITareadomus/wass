@@ -496,6 +496,7 @@ def plan_day(tasks: List[Task],
                 continue
             break
         _, _, task, cl, pos, new_r = chosen
+        _add_reason(task, "assegnata via regret insertion")
         cl.route = new_r  # commit
         unassigned.remove(task)
 
