@@ -20,81 +20,87 @@
     },
     {
       "logistic_code": "1084",
-      "cleanerId": 132,
+      "cleanerId": 785,
       "assignment_type": "optimizer",
       "sequence": 1
     },
     {
       "logistic_code": "1472",
-      "cleanerId": 132,
+      "cleanerId": 785,
       "assignment_type": "optimizer",
       "sequence": 2
     },
     {
       "logistic_code": "723",
-      "cleanerId": 132,
+      "cleanerId": 785,
       "assignment_type": "optimizer",
       "sequence": 3
     },
     {
       "logistic_code": "623",
-      "cleanerId": 937,
+      "cleanerId": 132,
       "assignment_type": "optimizer",
       "sequence": 1
     },
     {
       "logistic_code": "1644",
-      "cleanerId": 937,
+      "cleanerId": 132,
       "assignment_type": "optimizer",
       "sequence": 2
     },
     {
       "logistic_code": "1645",
-      "cleanerId": 937,
+      "cleanerId": 132,
       "assignment_type": "optimizer",
       "sequence": 3
     },
     {
       "logistic_code": "1627",
-      "cleanerId": 404,
+      "cleanerId": 937,
       "assignment_type": "optimizer",
       "sequence": 1
     },
     {
       "logistic_code": "1630",
-      "cleanerId": 404,
+      "cleanerId": 937,
       "assignment_type": "optimizer",
       "sequence": 2
     },
     {
       "logistic_code": "624",
-      "cleanerId": 495,
+      "cleanerId": 404,
       "assignment_type": "optimizer",
       "sequence": 1
     },
     {
       "logistic_code": "490",
-      "cleanerId": 495,
+      "cleanerId": 404,
       "assignment_type": "optimizer",
       "sequence": 2
     },
     {
       "logistic_code": "1631",
-      "cleanerId": 785,
+      "cleanerId": 495,
       "assignment_type": "optimizer",
       "sequence": 1
     },
     {
       "logistic_code": "839",
-      "cleanerId": 785,
+      "cleanerId": 495,
       "assignment_type": "optimizer",
       "sequence": 2
+    },
+    {
+      "logistic_code": "1381",
+      "cleanerId": 24,
+      "assignment_type": "optimizer",
+      "sequence": 1
     },
     {
       "logistic_code": "504",
       "cleanerId": 24,
       "assignment_type": "optimizer",
-      "sequence": 1
+      "sequence": 2
     },
     {
       "logistic_code": "1624",
@@ -109,136 +115,100 @@
       "sequence": 2
     },
     {
-      "logistic_code": "273",
+      "logistic_code": "1153",
       "cleanerId": 1031,
       "assignment_type": "optimizer",
       "sequence": 1
     },
     {
-      "logistic_code": "1240",
-      "cleanerId": 1045,
+      "logistic_code": "273",
+      "cleanerId": 1031,
       "assignment_type": "optimizer",
-      "sequence": 1
-    },
-    {
-      "logistic_code": "1381",
-      "cleanerId": 1054,
-      "assignment_type": "optimizer",
-      "sequence": 1
+      "sequence": 2
     },
     {
       "logistic_code": "809",
-      "cleanerId": 249,
+      "cleanerId": 1055,
       "assignment_type": "optimizer",
       "sequence": 1
+    },
+    {
+      "logistic_code": "1240",
+      "cleanerId": 1055,
+      "assignment_type": "optimizer",
+      "sequence": 2
     },
     {
       "logistic_code": "502",
-      "cleanerId": 287,
-      "assignment_type": "optimizer",
-      "sequence": 1
-    },
-    {
-      "logistic_code": "1153",
-      "cleanerId": 326,
-      "assignment_type": "optimizer",
-      "sequence": 1
-    },
-    {
-      "logistic_code": "1649",
-      "cleanerId": 644,
+      "cleanerId": 771,
       "assignment_type": "optimizer",
       "sequence": 1
     },
     {
       "logistic_code": "1647",
-      "cleanerId": 722,
+      "cleanerId": 249,
       "assignment_type": "optimizer",
       "sequence": 1
     },
     {
-      "logistic_code": "1530",
+      "logistic_code": "1649",
+      "cleanerId": 249,
+      "assignment_type": "optimizer",
+      "sequence": 2
+    },
+    {
+      "logistic_code": "1090",
       "cleanerId": 596,
       "assignment_type": "high_priority",
       "sequence": 4
     },
     {
       "logistic_code": "1537",
-      "cleanerId": 937,
+      "cleanerId": 132,
       "assignment_type": "high_priority",
       "sequence": 4
     },
     {
+      "logistic_code": "144",
+      "cleanerId": 132,
+      "assignment_type": "high_priority",
+      "sequence": 5
+    },
+    {
       "logistic_code": "1545",
+      "cleanerId": 937,
+      "assignment_type": "high_priority",
+      "sequence": 3
+    },
+    {
+      "logistic_code": "1032",
       "cleanerId": 404,
       "assignment_type": "high_priority",
       "sequence": 3
     },
     {
-      "logistic_code": "144",
+      "logistic_code": "512",
       "cleanerId": 495,
       "assignment_type": "high_priority",
       "sequence": 3
     },
     {
-      "logistic_code": "512",
-      "cleanerId": 785,
+      "logistic_code": "1494",
+      "cleanerId": 1055,
       "assignment_type": "high_priority",
       "sequence": 3
     },
     {
-      "logistic_code": "1494",
-      "cleanerId": 1031,
-      "assignment_type": "high_priority",
-      "sequence": 2
-    },
-    {
-      "logistic_code": "937",
-      "cleanerId": 1045,
-      "assignment_type": "high_priority",
-      "sequence": 2
-    },
-    {
-      "logistic_code": "1556",
-      "cleanerId": 1054,
-      "assignment_type": "high_priority",
-      "sequence": 2
-    },
-    {
-      "logistic_code": "1541",
-      "cleanerId": 249,
-      "assignment_type": "high_priority",
-      "sequence": 2
-    },
-    {
-      "logistic_code": "1032",
-      "cleanerId": 326,
-      "assignment_type": "high_priority",
-      "sequence": 2
-    },
-    {
       "logistic_code": "1127",
-      "cleanerId": 469,
+      "cleanerId": 1034,
       "assignment_type": "high_priority",
       "sequence": 1
     },
     {
       "logistic_code": "751",
-      "cleanerId": 469,
+      "cleanerId": 1034,
       "assignment_type": "high_priority",
       "sequence": 2
-    },
-    {
-      "logistic_code": "1101",
-      "cleanerId": 644,
-      "assignment_type": "high_priority",
-      "sequence": 2
-    },
-    {
-      "logistic_code": "1090",
-      "cleanerId": 829,
-      "assignment_type": "high_priority",
-      "sequence": 1
     }
   ]
 }
