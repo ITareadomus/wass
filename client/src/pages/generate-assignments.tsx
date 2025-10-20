@@ -265,12 +265,9 @@ export default function GenerateAssignments() {
 
   const loadEarlyOutAssignments = async () => {
     try {
-      const [eoResponse, hpResponse] = await Promise.all([
-        fetch('/data/output/early_out_assignments.json'),
-        fetch('/data/output/high_priority_assignments.json')
-      ]);
+      const eoResponse = await fetch('/data/output/early_out_assignments.json');
 
-      // Carica Early Out assignments
+      // Carica solo Early Out assignments
       let eoCleanersWithTasks: any[] = [];
       if (eoResponse.ok) {
         const eoAssignmentsData = await eoResponse.json();
@@ -278,16 +275,8 @@ export default function GenerateAssignments() {
         console.log('Assegnazioni early-out caricate:', eoCleanersWithTasks);
       }
 
-      // Carica High Priority assignments
-      let hpCleanersWithTasks: any[] = [];
-      if (hpResponse.ok) {
-        const hpAssignmentsData = await hpResponse.json();
-        hpCleanersWithTasks = hpAssignmentsData.high_priority_tasks_assigned || [];
-        console.log('Assegnazioni high-priority caricate:', hpCleanersWithTasks);
-      }
-
-      // Combina le assegnazioni
-      const allCleanersWithTasks = [...eoCleanersWithTasks, ...hpCleanersWithTasks];
+      // Solo Early Out
+      const allCleanersWithTasks = eoCleanersWithTasks;
 
       // Crea un Set di task_id assegnate
       const assignedTaskIds = new Set();
@@ -325,8 +314,56 @@ export default function GenerateAssignments() {
     }
   };
 
+  const loadHighPriorityAssignments = async () => {
+    try {
+      const hpResponse = await fetch('/data/output/high_priority_assignments.json');
+
+      // Carica solo High Priority assignments
+      let hpCleanersWithTasks: any[] = [];
+      if (hpResponse.ok) {
+        const hpAssignmentsData = await hpResponse.json();
+        hpCleanersWithTasks = hpAssignmentsData.high_priority_tasks_assigned || [];
+        console.log('Assegnazioni high-priority caricate:', hpCleanersWithTasks);
+      }
+
+      // Crea un Set di task_id assegnate
+      const assignedTaskIds = new Set();
+      hpCleanersWithTasks.forEach((cleanerEntry: any) => {
+        cleanerEntry.tasks?.forEach((task: any) => {
+          assignedTaskIds.add(String(task.task_id));
+        });
+      });
+
+      // Aggiorna le task con le assegnazioni HP
+      setAllTasksWithAssignments(prevTasks => {
+        const updatedTasks = prevTasks.map(task => {
+          // Trova il cleaner e la task specifica
+          for (const cleanerEntry of hpCleanersWithTasks) {
+            const assignedTask = cleanerEntry.tasks?.find((t: any) => String(t.task_id) === task.id);
+            if (assignedTask) {
+              return {
+                ...task,
+                assignedCleaner: cleanerEntry.cleaner.id,
+                startTime: assignedTask.start_time,
+                sequence: assignedTask.sequence
+              };
+            }
+          }
+          return task;
+        });
+        return updatedTasks;
+      });
+
+      // Aggiorna i contenitori per rimuovere le task HP assegnate
+      setHighPriorityTasks(prevTasks => prevTasks.filter(task => !assignedTaskIds.has(task.id)));
+    } catch (error) {
+      console.error('Errore nel caricamento delle assegnazioni HP:', error);
+    }
+  };
+
   // Esponi le funzioni per poterle chiamare da altri componenti
   (window as any).reloadEarlyOutAssignments = loadEarlyOutAssignments;
+  (window as any).reloadHighPriorityAssignments = loadHighPriorityAssignments;
   (window as any).reloadAllTasks = loadTasks;
 
   const saveTaskAssignments = async (tasks: Task[]) => {

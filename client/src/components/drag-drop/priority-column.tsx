@@ -118,8 +118,8 @@ export default function PriorityColumn({
         });
 
         // Ricarica le assegnazioni HP prima di ricaricare i task
-        if ((window as any).reloadEarlyOutAssignments) {
-          await (window as any).reloadEarlyOutAssignments();
+        if ((window as any).reloadHighPriorityAssignments) {
+          await (window as any).reloadHighPriorityAssignments();
         }
         
         // Poi ricarica tutti i task per aggiornare i filtri e la timeline
