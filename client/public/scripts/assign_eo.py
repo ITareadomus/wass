@@ -514,72 +514,70 @@ def final_relaxed_assign(planners: List[Cleaner],
             remaining.remove(task)
             assigned_in_pass.add(task.logistic_code) # Segna come assegnata in questa fase
     
-    # SUPER-RILASSATO: prova ad assegnare le task rimanenti a qualsiasi cleaner disponibile
-    # ignorando tutti i vincoli di travel/gap MA rispettando premium/straordinaria e checkin_time
+    # SUPER-RILASSATO: assegna task a cleaner liberi compatibili (ignora tutti i vincoli di travel/gap)
+    # Rispetta solo: premium/straordinaria, checkin_time, MAX_TASKS_PER_CLEANER
     for task in list(remaining):
         if task.logistic_code in assigned_in_pass:
             continue
+        
+        # Priorità: cleaner liberi first, poi occupati
+        free_cleaners = [cl for cl in planners if not cl.route and len(cl.route) < MAX_TASKS_PER_CLEANER and can_handle_premium(cl, task)]
+        busy_cleaners = [cl for cl in planners if cl.route and len(cl.route) < MAX_TASKS_PER_CLEANER and can_handle_premium(cl, task)]
+        
+        assigned = False
+        
+        # 1. Prova con cleaner liberi (assegnazione diretta)
+        for cl in free_cleaners:
+            # Calcola start/finish per task singola
+            start_time = max(hhmm_to_min("10:00"), task.checkout_time)
+            finish_time = start_time + task.cleaning_time
             
-        best_desperate = None # (finish_time, cleaner, new_route, pos)
+            # Verifica solo checkin_time
+            if finish_time <= task.checkin_time:
+                cl.route = [task]
+                remaining.remove(task)
+                assigned_in_pass.add(task.logistic_code)
+                print(f"⚡ SUPER-RILASSATO: Assegnata task #{task.logistic_code} ({task.address}) a cleaner libero {cl.name} {cl.lastname} (Premium: {cl.is_premium})")
+                assigned = True
+                break
         
-        # Priorità ai cleaner liberi
-        cleaners_sorted = sorted(planners, key=lambda c: (len(c.route), c.id))
+        if assigned:
+            continue
         
-        for cl in cleaners_sorted:
-            if len(cl.route) >= MAX_TASKS_PER_CLEANER:
-                continue
-            if not can_handle_premium(cl, task):
-                continue
-            if task.straordinaria and len(cl.route) > 0:
-                continue
-                
-            # Per cleaner liberi prova pos=0, per occupati prova append
-            positions = [0] if not cl.route else [len(cl.route)]
+        # 2. Prova con cleaner occupati (append alla fine)
+        for cl in busy_cleaners:
+            if task.straordinaria:
+                continue  # Straordinaria deve essere prima
             
-            for pos in positions:
-                if task.straordinaria and pos != 0:
-                    continue
-                    
-                new_route = cl.route[:pos] + [task] + cl.route[pos:]
+            # Simula append alla fine della route
+            new_route = cl.route + [task]
+            
+            # Simula l'intera route
+            cur_time = hhmm_to_min("10:00")
+            prev_t = None
+            valid = True
+            
+            for t in new_route:
+                tt = travel_minutes(prev_t, t)
+                cur_time += tt
+                arrival = cur_time
+                wait = max(0.0, t.checkout_time - arrival)
+                start = arrival + wait
+                finish = start + t.cleaning_time
                 
-                # Simula l'intera route con vincoli temporali
-                cur_time = hhmm_to_min("10:00")
-                prev_t = None
-                valid = True
-                final_finish = None
+                if finish > t.checkin_time:
+                    valid = False
+                    break
                 
-                for idx, t in enumerate(new_route):
-                    # Travel time
-                    tt = travel_minutes(prev_t, t)
-                    cur_time += tt
-                    
-                    # Arrival e wait per checkout
-                    arrival = cur_time
-                    wait = max(0.0, t.checkout_time - arrival)
-                    start = arrival + wait
-                    finish = start + t.cleaning_time
-                    
-                    # Verifica se finisce prima del checkin
-                    if finish > t.checkin_time:
-                        valid = False
-                        break
-                    
-                    cur_time = finish
-                    prev_t = t
-                    if idx == len(new_route) - 1:
-                        final_finish = finish
-                
-                # Accetta solo route valide
-                if valid and final_finish is not None:
-                    if best_desperate is None or final_finish < best_desperate[0]:
-                        best_desperate = (final_finish, cl, new_route, pos)
-        
-        if best_desperate is not None:
-            _, cl, new_r, pos = best_desperate
-            cl.route = new_r
-            remaining.remove(task)
-            assigned_in_pass.add(task.logistic_code)
-            print(f"⚡ Assegnata task #{task.logistic_code} a {cl.name} {cl.lastname} (pos={pos}, cleaner {'libero' if pos == 0 and len(cl.route) == 1 else 'occupato'})")
+                cur_time = finish
+                prev_t = t
+            
+            if valid:
+                cl.route = new_route
+                remaining.remove(task)
+                assigned_in_pass.add(task.logistic_code)
+                print(f"⚡ SUPER-RILASSATO: Assegnata task #{task.logistic_code} ({task.address}) a cleaner occupato {cl.name} {cl.lastname} (route: {len(cl.route)} task)")
+                break
 
     return planners, remaining
 
