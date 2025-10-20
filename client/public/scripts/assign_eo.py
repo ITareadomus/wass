@@ -301,7 +301,7 @@ def load_tasks() -> List[Task]:
         # L'unico vincolo è finire prima del checkin_time
         checkout = eo_start_min  # Tutte le early-out possono iniziare dalle 10:00
         checkin = hhmm_to_min(t.get("checkin_time"), default="23:59")
-        
+
         tasks.append(
             Task(
                 task_id=str(t.get("task_id")),
@@ -332,7 +332,7 @@ def plan_day(tasks: List[Task],
         iteration += 1
         chosen = None  # (regret, delta, task, cleaner, pos, new_route)
         tasks_with_no_options = []
-        
+
         for task in list(unassigned):
             per_cleaner_best: List[Tuple[Cleaner, float, float, int,
                                          List[Task]]] = []
@@ -355,7 +355,7 @@ def plan_day(tasks: List[Task],
                     # If route already has straordinaria at pos=0, can't add another straordinaria
                     if task.straordinaria and len(cl.route) > 0 and cl.route[0].straordinaria:
                         continue
-                    
+
                     # redirect: se l'inserimento crea hop > 15' e c'è un libero idoneo, salta
                     prev_t = cl.route[pos -
                                       1] if (pos - 1) >= 0 and (pos - 1) < len(
@@ -432,22 +432,108 @@ def plan_day(tasks: List[Task],
     return cleaners, unassigned
 
 
+# -------- Fase Finale --------
+def final_relaxed_assign(planners: List[Cleaner],
+                         leftovers: List[Task]) -> Tuple[List[Cleaner], List[Task]]:
+    # Fase finale: assegna i leftovers con cap rilassati, preferendo cleaner liberi
+    remaining = list(leftovers)
+    # Ordina per dare priorità a straordinarie e premium, e poi per checkout_time
+    remaining.sort(key=lambda x: (not x.straordinaria, not x.is_premium, x.checkout_time))
+
+    # Tenta prima con i cleaner liberi, cercando di minimizzare il costo totale
+    free_cleaners = [cl for cl in planners if not cl.route]
+    assigned_in_pass = set()
+    for task in list(remaining):
+        best_free = None # (cost, cleaner, new_route)
+        for cl in free_cleaners:
+            if len(cl.route) >= MAX_TASKS_PER_CLEANER:
+                continue
+            if not can_handle_premium(cl, task):
+                continue
+            # Straordinaria MUST be first
+            if task.straordinaria and len(cl.route) > 0:
+                continue
+
+            new_route = [task] # Assegna solo questa task a un cleaner libero
+            cost, _ = evaluate_route_cost(new_route)
+
+            # Considera solo task fattibili (cost < inf)
+            if not math.isinf(cost):
+                if best_free is None or cost < best_free[0]:
+                    best_free = (cost, cl, new_route)
+
+        if best_free is not None:
+            _, cl, new_r = best_free
+            cl.route = new_r
+            remaining.remove(task)
+            assigned_in_pass.add(task.logistic_code)
+            # Se il cleaner non è più libero (pieno), rimuovilo dalla lista dei liberi
+            if len(cl.route) >= MAX_TASKS_PER_CLEANER:
+                free_cleaners = [c for c in free_cleaners if c.id != cl.id]
+
+    # Poi tenta con i cleaner già occupati o con i pochi liberi rimasti,
+    # rilassando i vincoli di travel/gap MA mantenendo i vincoli hard e la regola della 3ª task.
+    # Si cerca sempre di minimizzare il costo aggiuntivo.
+    # L'obiettivo è assegnare quante più task possibili.
+    for task in list(remaining):
+        if task.logistic_code in assigned_in_pass: # Già assegnata in questa fase
+            continue
+
+        best = None # (cost, cleaner, new_route)
+        for cl in planners: # Itera su tutti i cleaner, liberi e non
+            if len(cl.route) >= MAX_TASKS_PER_CLEANER:
+                continue
+            if not can_handle_premium(cl, task):
+                continue
+            # Straordinaria MUST be first
+            if task.straordinaria and len(cl.route) > 0:
+                continue
+
+            # Prova tutte le posizioni per inserire la task
+            for pos in range(len(cl.route) + 1):
+                if task.straordinaria and pos != 0: # Straordinaria must be first
+                    continue
+
+                # Calcola il delta di costo e la nuova route
+                d, new_r = delta_insert_cost(cl.route, task, pos)
+
+                # Valuta la nuova route con i vincoli standard (evaluate_route_cost)
+                # Questo ci dice se la nuova route è fattibile OMENO, considerando tutti i cap.
+                current_cost, _ = evaluate_route_cost(new_r)
+
+                # Considera la mossa solo se la task è inseribile nel percorso (non supera i cap hard/3rd-task)
+                # e se il costo totale è inferiore al migliore trovato finora
+                if not math.isinf(current_cost):
+                    if best is None or current_cost < best[0]:
+                        best = (current_cost, cl, new_r)
+
+        # Se è stata trovata una mossa migliore, aggiorna la route del cleaner
+        if best is not None:
+            cost, cl, new_r = best
+            cl.route = new_r
+            remaining.remove(task)
+            assigned_in_pass.add(task.logistic_code) # Segna come assegnata in questa fase
+
+    return planners, remaining
+
 
 def build_output(cleaners: List[Cleaner],
                  unassigned: List[Task],
                  original_tasks: List[Task]) -> Dict[str, Any]:
-    # Build per-cleaner assignment view (unchanged)
+    # Build per-cleaner assignment view
     cleaners_with_tasks: List[Dict[str, Any]] = []
     for cl in cleaners:
         if not cl.route:
             continue
         total, schedule = evaluate_route_cost(cl.route)
+        # Se la route completa è infattibile, salta questo cleaner
         if math.isinf(total) or not schedule:
             continue
         tasks_list: List[Dict[str, Any]] = []
         prev_finish_time = None
         for idx, (t, (arr, start, fin)) in enumerate(zip(cl.route, schedule)):
             travel_time = 0
+            # Calcola il tempo di viaggio effettivo tra task consecutive
             if idx > 0 and prev_finish_time is not None:
                 travel_time = arr - prev_finish_time
             tasks_list.append({
@@ -460,8 +546,8 @@ def build_output(cleaners: List[Cleaner],
                 "cleaning_time": t.cleaning_time,
                 "start_time": min_to_hhmm(start),
                 "end_time": min_to_hhmm(fin),
-                "followup": idx > 0,
-                "sequence": idx + 1,
+                "followup": idx > 0, # Indica se questa task segue un'altra
+                "sequence": idx + 1, # Sequenza della task nella route del cleaner
                 "travel_time": travel_time
             })
             prev_finish_time = fin
@@ -476,19 +562,20 @@ def build_output(cleaners: List[Cleaner],
             "tasks": tasks_list
         })
 
-    # Lookup assigned logistic_codes
+    # Lookup assigned logistic_codes per identificare rapidamente le task assegnate
     assigned_codes = set()
     for entry in cleaners_with_tasks:
         for t in entry.get("tasks", []):
             assigned_codes.add(int(t["logistic_code"]))
 
-    # Base reasons from optimizer leftovers
+    # Motivi per cui le task non sono state assegnate (se presenti nei leftovers)
     leftover_reasons = {int(t.logistic_code): "no feasible option; even best-of-infeasible not applicable" for t in unassigned}
 
-    # Unassigned list = all original tasks NOT assigned
+    # Crea la lista delle task non assegnate
     unassigned_list: List[Dict[str, Any]] = []
     for ot in original_tasks:
         lc = int(ot.logistic_code)
+        # Se il codice logistico della task originale non è tra quelli assegnati, aggiungila alla lista non assegnate
         if lc not in assigned_codes:
             unassigned_list.append({
                 "task_id": int(ot.task_id),
@@ -514,14 +601,16 @@ def build_output(cleaners: List[Cleaner],
             "unassigned": len(original_tasks) - total_assigned,
             "cleaners_used": len(cleaners_with_tasks),
             "max_tasks_per_cleaner": MAX_TASKS_PER_CLEANER,
-            "algorithm": "regret_insertion + redirect + best-of-infeasible",
+            "algorithm": "regret_insertion + redirect + best-of-infeasible + relaxed_final_assign",
             "notes": [
                 "Straordinarie-first (only premium, must be sequence=1)",
                 "Premium-first",
                 "Hard cap: travel/gap > 22' infeasible (tranne fallback quando TUTTE le mosse superano 22')",
                 "3rd task only if travel<=10' and gap<=10' (12'/12' if same street/building)",
                 "Redirect: if hop>15' and a free cleaner is feasible, prefer the free cleaner",
-                "Activation cost = 0; premium can do standard"
+                "Activation cost = 0; premium can do standard",
+                "Final assignment: prefer free cleaners, then relaxed constraints (travel/gap)",
+                "Consider checkout_time != checkin_time for more available time"
             ]
         }
     }
@@ -531,41 +620,55 @@ def main():
         raise SystemExit(f"Missing input file: {INPUT_TASKS}")
     if not INPUT_CLEANERS.exists():
         raise SystemExit(f"Missing input file: {INPUT_CLEANERS}")
-    
+
     cleaners = load_cleaners()
     tasks = load_tasks()
+
+    print(f"📊 Caricate {len(tasks)} task early-out da processare")
+    print(f"👥 Disponibili {len(cleaners)} cleaners")
+
     planners, leftovers = plan_day(tasks, cleaners)
+    print(f"✅ Dopo plan_day: {len(tasks) - len(leftovers)} assegnate, {len(leftovers)} non assegnate")
+
+    # Fase finale con vincoli rilassati e preferenza per cleaner liberi
+    planners, leftovers = final_relaxed_assign(planners, leftovers)
+
+    if leftovers:
+        print(f"⚠️  Task NON assegnate ({len(leftovers)}):")
+        for t in leftovers:
+            print(f"  - #{t.logistic_code} ({t.address})")
+
     output = build_output(planners, leftovers, tasks)
-    
+
     # Ensure output directory exists
     OUTPUT_ASSIGN.parent.mkdir(parents=True, exist_ok=True)
-    
+
     OUTPUT_ASSIGN.write_text(json.dumps(output, ensure_ascii=False, indent=2),
                              encoding="utf-8")
     print(f"✅ Wrote {OUTPUT_ASSIGN}")
-    
+
     # Update timeline_assignments.json
     timeline_assignments_path = OUTPUT_ASSIGN.parent / "timeline_assignments.json"
     timeline_data = {"assignments": []}
-    
+
     # Load existing timeline assignments if they exist
     if timeline_assignments_path.exists():
         try:
             timeline_data = json.loads(timeline_assignments_path.read_text(encoding="utf-8"))
         except:
             timeline_data = {"assignments": []}
-    
+
     # Remove old early-out assignments
     assigned_codes = set()
     for cleaner_entry in output["early_out_tasks_assigned"]:
         for task in cleaner_entry.get("tasks", []):
             assigned_codes.add(str(task["logistic_code"]))
-    
+
     timeline_data["assignments"] = [
         a for a in timeline_data.get("assignments", [])
         if str(a.get("logistic_code")) not in assigned_codes
     ]
-    
+
     # Add new assignments
     for cleaner_entry in output["early_out_tasks_assigned"]:
         cleaner_id = cleaner_entry["cleaner"]["id"]
@@ -576,7 +679,7 @@ def main():
                 "assignment_type": "optimizer",
                 "sequence": task.get("sequence", 0)
             })
-    
+
     timeline_assignments_path.write_text(json.dumps(timeline_data, ensure_ascii=False, indent=2),
                                          encoding="utf-8")
     print(f"✅ Aggiornato {timeline_assignments_path}")
