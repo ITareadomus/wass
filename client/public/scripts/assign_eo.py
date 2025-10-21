@@ -99,8 +99,10 @@ def travel_minutes(a: Optional[Tuple[float, float]], b: Optional[Tuple[float, fl
 # =============================
 def load_cleaners() -> List[Cleaner]:
     raw = json.loads(INPUT_CLEANERS.read_text(encoding="utf-8"))
+    # Il file selected_cleaners.json ha la struttura: {"cleaners": [...], "total_selected": N}
+    cleaners_list = raw.get("cleaners", raw) if isinstance(raw, dict) else raw
     cleaners: List[Cleaner] = []
-    for c in raw:
+    for c in cleaners_list:
         cleaners.append(Cleaner(
             id=c.get("id"),
             name=c.get("name", ""),
