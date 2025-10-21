@@ -61,9 +61,9 @@ export default function PriorityColumn({
 
   const handleTimelineAssignment = async () => {
     if (priority === 'early-out') {
-      // Esegui il nuovo script ottimizzato assign_eo.py
+      // Esegui il nuovo script ottimizzato assign_eo_updated.py
       try {
-        console.log('Esecuzione assign_eo.py (algoritmo ottimizzato)...');
+        console.log('Esecuzione assign_eo_updated.py (algoritmo ottimizzato)...');
         const response = await fetch('/api/run-optimizer', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' }
@@ -99,7 +99,7 @@ export default function PriorityColumn({
       }
     } else if (priority === 'high') {
       try {
-        console.log('Esecuzione assign_hp.py...');
+        console.log('Esecuzione assign_hp_updated.py...');
         const response = await fetch('/api/assign-hp', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' }
