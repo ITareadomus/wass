@@ -116,8 +116,10 @@ def load_cleaners() -> List[Cleaner]:
 
 def load_tasks() -> List[Task]:
     raw = json.loads(INPUT_TASKS.read_text(encoding="utf-8"))
+    # Il file early_out.json ha la struttura: {"early_out_tasks": [...], "total_apartments": N}
+    tasks_list = raw.get("early_out_tasks", raw) if isinstance(raw, dict) else raw
     tasks: List[Task] = []
-    for t in raw:
+    for t in tasks_list:
         tasks.append(Task(
             task_id=str(t.get("task_id") or t.get("id") or t.get("logistic_code")),
             logistic_code=str(t.get("logistic_code") or t.get("task_id") or t.get("id")),

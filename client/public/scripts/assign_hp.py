@@ -92,8 +92,10 @@ def travel_minutes(a: Optional[Tuple[float, float]], b: Optional[Tuple[float, fl
 # =============================
 def load_cleaners() -> List[Cleaner]:
     raw = json.loads(INPUT_CLEANERS.read_text(encoding="utf-8"))
+    # Il file selected_cleaners.json ha la struttura: {"cleaners": [...], "total_selected": N}
+    cleaners_list = raw.get("cleaners", raw) if isinstance(raw, dict) else raw
     cleaners: List[Cleaner] = []
-    for c in raw:
+    for c in cleaners_list:
         cleaners.append(Cleaner(
             id=c.get("id"),
             name=c.get("name", ""),
@@ -124,8 +126,10 @@ def load_cleaners() -> List[Cleaner]:
 
 def load_tasks() -> List[Task]:
     raw = json.loads(INPUT_TASKS.read_text(encoding="utf-8"))
+    # Il file high_priority.json ha la struttura: {"high_priority_tasks": [...], "total_apartments": N}
+    tasks_list = raw.get("high_priority_tasks", raw) if isinstance(raw, dict) else raw
     tasks: List[Task] = []
-    for t in raw:
+    for t in tasks_list:
         tasks.append(Task(
             task_id=str(t.get("task_id") or t.get("id") or t.get("logistic_code")),
             logistic_code=str(t.get("logistic_code") or t.get("task_id") or t.get("id")),
