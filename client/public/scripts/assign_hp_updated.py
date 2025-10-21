@@ -19,8 +19,17 @@ OUTPUT_ASSIGN = BASE / "output" / "high_priority_assignments.json"
 # =============================
 # Travel / gap policy
 # =============================
-HARD_TRAVEL_CAP = 35.0  # rilassato da 22' per permettere più assegnazioni
-REDIRECT_TRAVEL = 25.0  # rilassato da 15' per permettere più assegnazioni
+HARD_TRAVEL_CAP = 45.0  # rilassato da 22' per permettere più assegnazioni
+REDIRECT_TRAVEL = 15.0  # rilassato da 15' per permettere più assegnazioni
+
+# Soft thresholds
+IDEAL_TRAVEL = 15.0
+TARGET_TRAVEL = 30.0
+
+# 3rd-task exceptions
+HP_THIRD_TASK_MAX_TRAVEL = 12.0
+HP_THIRD_TASK_MAX_GAP = 12.0
+MAX_TASKS_PER_CLEANER_HP = 3
 
 # Travel model (walking-centric)
 SHORT_RANGE_KM = 0.30
@@ -171,7 +180,7 @@ def insert_cost(
         hop_min = travel_minutes(last.task.lat, last.task.lng, t.lat, t.lng)
         start_base = last.finish + timedelta(minutes=hop_min)
         infeasible_hop = hop_min > HARD_TRAVEL_CAP
-        travel_penalty = hop_min if hop_min > REDIRECT_TRAVEL else 0.25 * hop_min
+        travel_penalty = (0.20 * hop_min) if hop_min <= IDEAL_TRAVEL else ((1.00 * hop_min) if hop_min <= TARGET_TRAVEL else (3.00 * hop_min))
     else:
         # First HP for this cleaner: seed from EO
         base = cleaner.start_time
@@ -187,7 +196,7 @@ def insert_cost(
                                          t.address) else 12.0
         start_base = base + timedelta(minutes=hop_min)
         infeasible_hop = hop_min > HARD_TRAVEL_CAP
-        travel_penalty = hop_min if hop_min > REDIRECT_TRAVEL else 0.25 * hop_min
+        travel_penalty = (0.20 * hop_min) if hop_min <= IDEAL_TRAVEL else ((1.00 * hop_min) if hop_min <= TARGET_TRAVEL else (3.00 * hop_min))
 
     start, finish = place_after(start_base, t)
     feas, penalty = feasible_time_window(t, start, finish)
@@ -222,6 +231,18 @@ def assign(tasks: List[Task], cleaners: List[Cleaner]):
             if cl.role == "Formatore":
                 continue
             if (t.premium or t.straordinaria) and cl.role != "Premium":
+                continue
+        # Enforce 2-task max, allow 3rd only if very close (12'/12')
+        if len(cl.route) >= MAX_TASKS_PER_CLEANER_HP:
+            continue
+        if len(cl.route) >= 2:
+            last = cl.route[-1]
+            hop_to_new = travel_minutes(last.task.lat, last.task.lng, t.lat, t.lng)
+            # estimate start after last + travel
+            start_base = last.finish + timedelta(minutes=hop_to_new)
+            start_tmp, finish_tmp = place_after(start_base, t)
+            door2door = minutes(start_tmp - last.finish)
+            if not (hop_to_new <= HP_THIRD_TASK_MAX_TRAVEL and door2door <= HP_THIRD_TASK_MAX_GAP):
                 continue
             cost, pos, placed, hop_min, infeasible_hop = insert_cost(cl, t)
             if pos is None:

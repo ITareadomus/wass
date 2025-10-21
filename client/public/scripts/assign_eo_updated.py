@@ -21,8 +21,8 @@ MAX_TASKS_PER_CLEANER = 3  # 3, ma la 3ª segue la regola "vicina"
 REGRET_K = 2
 
 # Hard caps (rilassati per permettere più assegnazioni)
-HARD_MAX_TRAVEL = 35.0  # travel > 35' => infeasible (era 22')
-HARD_MAX_GAP = 35.0  # (start_B - end_A) > 35' => infeasible (era 22')
+HARD_MAX_TRAVEL = 45.0  # travel > 35' => infeasible (era 22')
+HARD_MAX_GAP = 45.0  # (start_B - end_A) > 35' => infeasible (era 22')
 
 # 3ª task (2→3 hop) - MANTENUTI INVARIATI
 THIRD_TASK_MAX_TRAVEL = 10.0
@@ -31,7 +31,7 @@ THIRD_TASK_SAME_STREET_TRAVEL = 12.0
 THIRD_TASK_SAME_STREET_GAP = 12.0
 
 # Redirect: rilassato per permettere più assegnazioni
-REDIRECT_TRAVEL = 25.0  # era 15' - ora preferisce assegnare anche con hop più lunghi
+REDIRECT_TRAVEL = 15.0  # era 15' - ora preferisce assegnare anche con hop più lunghi
 
 # Travel model (min)
 SHORT_RANGE_KM = 0.30

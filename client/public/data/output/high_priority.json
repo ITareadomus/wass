@@ -28,32 +28,6 @@
       ]
     },
     {
-      "task_id": 217305,
-      "logistic_code": 579,
-      "client_id": 2,
-      "premium": false,
-      "address": "VIA ATTO VANNUCCI 15",
-      "lat": "45.4495699",
-      "lng": "9.199613",
-      "cleaning_time": 60,
-      "checkin_date": "2025-10-21",
-      "checkout_date": "2025-10-21",
-      "checkin_time": "15:00",
-      "checkout_time": "11:00",
-      "pax_in": 1,
-      "pax_out": 2,
-      "small_equipment": true,
-      "operation_id": 2,
-      "confirmed_operation": true,
-      "straordinaria": false,
-      "type_apt": "A",
-      "alias": "ITW",
-      "customer_name": "ITALIANWAY SRL",
-      "reasons": [
-        "same_day_checkin_between_eo_hp"
-      ]
-    },
-    {
       "task_id": 217560,
       "logistic_code": 1494,
       "client_id": 94,
@@ -70,7 +44,7 @@
       "pax_out": 2,
       "small_equipment": false,
       "operation_id": 2,
-      "confirmed_operation": true,
+      "confirmed_operation": false,
       "straordinaria": false,
       "type_apt": "B",
       "alias": "IHST",
@@ -284,7 +258,7 @@
       "pax_out": 4,
       "small_equipment": false,
       "operation_id": 2,
-      "confirmed_operation": true,
+      "confirmed_operation": false,
       "straordinaria": false,
       "type_apt": "B",
       "alias": "TBR",
@@ -310,7 +284,7 @@
       "pax_out": 6,
       "small_equipment": false,
       "operation_id": 2,
-      "confirmed_operation": true,
+      "confirmed_operation": false,
       "straordinaria": false,
       "type_apt": "E",
       "alias": "TBR",
@@ -336,7 +310,7 @@
       "pax_out": 6,
       "small_equipment": false,
       "operation_id": 2,
-      "confirmed_operation": true,
+      "confirmed_operation": false,
       "straordinaria": false,
       "type_apt": "E",
       "alias": "TBR",
@@ -362,7 +336,7 @@
       "pax_out": 2,
       "small_equipment": false,
       "operation_id": 2,
-      "confirmed_operation": true,
+      "confirmed_operation": false,
       "straordinaria": false,
       "type_apt": "B",
       "alias": "TBR",
@@ -388,7 +362,7 @@
       "pax_out": 2,
       "small_equipment": false,
       "operation_id": 2,
-      "confirmed_operation": true,
+      "confirmed_operation": false,
       "straordinaria": false,
       "type_apt": "C",
       "alias": "TBR",
@@ -396,33 +370,7 @@
       "reasons": [
         "premium"
       ]
-    },
-    {
-      "task_id": 217746,
-      "logistic_code": 1496,
-      "client_id": 113,
-      "premium": false,
-      "address": "VIA TORINO 44",
-      "lat": "45.4613523",
-      "lng": "9.1849551",
-      "cleaning_time": 60,
-      "checkin_date": "2025-10-21",
-      "checkout_date": "2025-10-21",
-      "checkin_time": "15:00",
-      "checkout_time": "14:00",
-      "pax_in": 2,
-      "pax_out": 2,
-      "small_equipment": true,
-      "operation_id": 2,
-      "confirmed_operation": true,
-      "straordinaria": false,
-      "type_apt": "A",
-      "alias": "ELITE",
-      "customer_name": "ELITE APARTMENTS",
-      "reasons": [
-        "same_day_checkin_between_eo_hp"
-      ]
     }
   ],
-  "total_apartments": 16
+  "total_apartments": 14
 }
