@@ -1,24 +1,12 @@
 {
   "date": "2025-10-24",
-  "confirmed_at": "2025-10-23T14:07:33.751Z",
+  "confirmed_at": "2025-10-23T14:21:26.280Z",
   "assignments": [
     {
-      "logistic_code": "1617",
-      "cleanerId": 24,
+      "logistic_code": "1644",
+      "cleanerId": 1045,
       "assignment_type": "manual_drag",
       "sequence": 0
-    },
-    {
-      "logistic_code": "1643",
-      "cleanerId": 404,
-      "assignment_type": "manual_drag",
-      "sequence": 0
-    },
-    {
-      "logistic_code": "617",
-      "cleanerId": 404,
-      "assignment_type": "manual_drag",
-      "sequence": 1
     }
   ]
 }
