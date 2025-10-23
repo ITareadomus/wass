@@ -52,7 +52,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Endpoint per salvare un'assegnazione nella timeline
   app.post("/api/save-timeline-assignment", async (req, res) => {
     try {
-      const { taskId, cleanerId, logisticCode, date } = req.body;
+      const { taskId, cleanerId, logisticCode, date, assignments } = req.body;
       const workDate = date || format(new Date(), 'yyyy-MM-dd');
       const timelineAssignmentsBasePath = path.join(process.cwd(), 'client/public/data/output/timeline_assignments');
       const timelineAssignmentsPath = path.join(timelineAssignmentsBasePath, `${workDate}.json`);
@@ -69,25 +69,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // File non esiste, usa struttura vuota
       }
 
-      // Rimuovi eventuali assegnazioni precedenti per questo task (usa logistic_code se disponibile)
-      assignmentsData.assignments = assignmentsData.assignments.filter(
-        (a: any) => a.logistic_code !== logisticCode && a.taskId !== taskId
-      );
+      // Se sono fornite assegnazioni multiple (bulk save)
+      if (assignments && Array.isArray(assignments)) {
+        assignmentsData.assignments = assignments;
+        assignmentsData.current_date = workDate;
+      } else {
+        // Singola assegnazione
+        // Rimuovi eventuali assegnazioni precedenti per questo task (usa logistic_code se disponibile)
+        assignmentsData.assignments = assignmentsData.assignments.filter(
+          (a: any) => a.logistic_code !== logisticCode && a.taskId !== taskId
+        );
 
-      // Calcola la sequence: trova il massimo sequence per questo cleaner e aggiungi 1
-      const cleanerAssignments = assignmentsData.assignments.filter((a: any) => a.cleanerId === cleanerId);
-      const maxSequence = cleanerAssignments.length > 0 
-        ? Math.max(...cleanerAssignments.map((a: any) => a.sequence || 0))
-        : -1;
-      const newSequence = maxSequence + 1;
+        // Calcola la sequence: trova il massimo sequence per questo cleaner e aggiungi 1
+        const cleanerAssignments = assignmentsData.assignments.filter((a: any) => a.cleanerId === cleanerId);
+        const maxSequence = cleanerAssignments.length > 0 
+          ? Math.max(...cleanerAssignments.map((a: any) => a.sequence || 0))
+          : -1;
+        const newSequence = maxSequence + 1;
 
-      // Aggiungi la nuova assegnazione con sequence
-      assignmentsData.assignments.push({
-        logistic_code: logisticCode,
-        cleanerId,
-        assignment_type: "manual_drag",
-        sequence: newSequence
-      });
+        // Aggiungi la nuova assegnazione con sequence
+        assignmentsData.assignments.push({
+          logistic_code: logisticCode,
+          cleanerId,
+          assignment_type: "manual_drag",
+          sequence: newSequence
+        });
+      }
 
       // Salva il file
       await fs.writeFile(timelineAssignmentsPath, JSON.stringify(assignmentsData, null, 2));
@@ -1072,6 +1079,97 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.send(data);
     } catch (error: any) {
       console.error("Errore nel download di early_out_assignments.json:", error);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  // Endpoint per salvare le assegnazioni confermate
+  app.post("/api/confirm-assignments", async (req, res) => {
+    try {
+      const { date } = req.body;
+      const assignedDir = path.join(process.cwd(), 'client/public/data/assigned');
+      
+      // Crea la directory se non esiste
+      await fs.mkdir(assignedDir, { recursive: true });
+
+      // Formato data: ddmmyy
+      const dateObj = new Date(date);
+      const day = String(dateObj.getDate()).padStart(2, '0');
+      const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+      const year = String(dateObj.getFullYear()).slice(-2);
+      const filename = `assignments_${day}${month}${year}.json`;
+      
+      const assignedFilePath = path.join(assignedDir, filename);
+      const timelineAssignmentsPath = path.join(
+        process.cwd(), 
+        'client/public/data/output/timeline_assignments',
+        `${date}.json`
+      );
+
+      // Carica le assegnazioni della timeline
+      let timelineData: any = { assignments: [], current_date: date };
+      try {
+        const existingData = await fs.readFile(timelineAssignmentsPath, 'utf8');
+        timelineData = JSON.parse(existingData);
+      } catch (error) {
+        console.log('Nessuna assegnazione trovata per questa data');
+      }
+
+      // Salva le assegnazioni confermate
+      const confirmedData = {
+        date: date,
+        confirmed_at: new Date().toISOString(),
+        assignments: timelineData.assignments
+      };
+
+      await fs.writeFile(assignedFilePath, JSON.stringify(confirmedData, null, 2));
+
+      res.json({ 
+        success: true, 
+        message: `Assegnazioni confermate salvate in ${filename}`,
+        filename: filename,
+        total_assignments: timelineData.assignments.length
+      });
+    } catch (error: any) {
+      console.error("Errore nel salvataggio delle assegnazioni confermate:", error);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  // Endpoint per caricare assegnazioni confermate
+  app.get("/api/load-confirmed-assignments/:date", async (req, res) => {
+    try {
+      const { date } = req.params;
+      const assignedDir = path.join(process.cwd(), 'client/public/data/assigned');
+      
+      // Formato data: ddmmyy
+      const dateObj = new Date(date);
+      const day = String(dateObj.getDate()).padStart(2, '0');
+      const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+      const year = String(dateObj.getFullYear()).slice(-2);
+      const filename = `assignments_${day}${month}${year}.json`;
+      
+      const assignedFilePath = path.join(assignedDir, filename);
+
+      try {
+        const data = await fs.readFile(assignedFilePath, 'utf8');
+        const confirmedData = JSON.parse(data);
+        
+        res.json({ 
+          success: true, 
+          data: confirmedData,
+          message: `Assegnazioni caricate da ${filename}`
+        });
+      } catch (error) {
+        // File non esiste
+        res.json({ 
+          success: true, 
+          data: null,
+          message: 'Nessuna assegnazione confermata trovata per questa data'
+        });
+      }
+    } catch (error: any) {
+      console.error("Errore nel caricamento delle assegnazioni confermate:", error);
       res.status(500).json({ success: false, error: error.message });
     }
   });

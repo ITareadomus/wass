@@ -70,6 +70,8 @@ export default function GenerateAssignments() {
   const [isExtracting, setIsExtracting] = useState(true);
   const [extractionStep, setExtractionStep] = useState<string>("Inizializzazione...");
   const [isLoadingTasks, setIsLoadingTasks] = useState(false);
+  const [isConfirming, setIsConfirming] = useState(false);
+  const { toast } = useToast();
 
   useEffect(() => {
     // Esegui l'estrazione dei dati all'avvio e quando cambia la data
@@ -80,6 +82,9 @@ export default function GenerateAssignments() {
 
         const dateStr = format(selectedDate, "yyyy-MM-dd");
         console.log("Estraendo task per la data:", dateStr);
+
+        // Prima controlla se esistono assegnazioni confermate
+        await loadConfirmedAssignments(selectedDate);
 
         const response = await fetch('/api/extract-data', {
           method: 'POST',
@@ -389,6 +394,79 @@ export default function GenerateAssignments() {
     }
   };
 
+  // Funzione per confermare le assegnazioni
+  const confirmAssignments = async () => {
+    try {
+      setIsConfirming(true);
+      const dateStr = format(selectedDate, "yyyy-MM-dd");
+      
+      const response = await fetch('/api/confirm-assignments', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ date: dateStr })
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        toast({
+          title: "Assegnazioni Confermate!",
+          description: `${result.total_assignments} assegnazioni salvate in ${result.filename}`,
+          duration: 5000,
+        });
+      } else {
+        throw new Error(result.error || 'Errore sconosciuto');
+      }
+    } catch (error: any) {
+      console.error("Errore nella conferma delle assegnazioni:", error);
+      toast({
+        title: "Errore",
+        description: error.message || "Errore durante il salvataggio delle assegnazioni",
+        variant: "destructive",
+        duration: 5000,
+      });
+    } finally {
+      setIsConfirming(false);
+    }
+  };
+
+  // Carica assegnazioni confermate se esistono
+  const loadConfirmedAssignments = async (date: Date) => {
+    try {
+      const dateStr = format(date, "yyyy-MM-dd");
+      const response = await fetch(`/api/load-confirmed-assignments/${dateStr}`);
+      const result = await response.json();
+
+      if (result.success && result.data && result.data.assignments) {
+        console.log(`Caricando ${result.data.assignments.length} assegnazioni confermate per ${dateStr}`);
+        
+        // Scrivi le assegnazioni nel file timeline_assignments per questa data
+        const timelineAssignmentsBasePath = 'client/public/data/output/timeline_assignments';
+        const timelineAssignmentsPath = `${timelineAssignmentsBasePath}/${dateStr}.json`;
+        
+        const saveResponse = await fetch('/api/save-timeline-assignment', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+            date: dateStr,
+            assignments: result.data.assignments 
+          })
+        });
+
+        if (saveResponse.ok) {
+          console.log('Assegnazioni confermate caricate sulla timeline');
+          toast({
+            title: "Assegnazioni Caricate",
+            description: `${result.data.assignments.length} assegnazioni ripristinate`,
+            duration: 3000,
+          });
+        }
+      }
+    } catch (error) {
+      console.error("Errore nel caricamento delle assegnazioni confermate:", error);
+    }
+  };
+
   // Esponi le funzioni per poterle chiamare da altri componenti
   (window as any).reloadEarlyOutAssignments = loadEarlyOutAssignments;
   (window as any).reloadHighPriorityAssignments = loadHighPriorityAssignments;
@@ -679,6 +757,20 @@ export default function GenerateAssignments() {
                 />
               </PopoverContent>
             </Popover>
+            <Button
+              onClick={confirmAssignments}
+              disabled={isConfirming || allTasksWithAssignments.filter(t => (t as any).assignedCleaner).length === 0}
+              className="bg-green-600 hover:bg-green-700 text-white"
+            >
+              {isConfirming ? (
+                <>
+                  <span className="animate-spin mr-2">⏳</span>
+                  Salvando...
+                </>
+              ) : (
+                '✓ Conferma Assegnazioni'
+              )}
+            </Button>
             <div className="bg-card rounded-lg border shadow-sm px-4 py-2 text-center">
               <div className="text-sm text-muted-foreground">Task Totali</div>
               <div className="text-2xl font-bold text-primary">{allTasks.length}</div>
