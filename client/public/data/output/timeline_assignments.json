@@ -1,3 +1,10 @@
 {
-  "assignments": []
+  "assignments": [
+    {
+      "logistic_code": "1643",
+      "cleanerId": 132,
+      "assignment_type": "manual_drag",
+      "sequence": 0
+    }
+  ]
 }
