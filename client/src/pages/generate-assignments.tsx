@@ -162,11 +162,12 @@ export default function GenerateAssignments() {
       setIsLoadingTasks(true);
       setExtractionStep("Caricamento task nei contenitori...");
 
+      const dateStr = format(selectedDate, "yyyy-MM-dd");
       const [earlyOutResponse, highPriorityResponse, lowPriorityResponse, timelineAssignmentsResponse] = await Promise.all([
         fetch('/data/output/early_out.json'),
         fetch('/data/output/high_priority.json'),
         fetch('/data/output/low_priority.json'),
-        fetch('/data/output/timeline_assignments.json')
+        fetch(`/data/output/timeline_assignments/${dateStr}.json`)
       ]);
 
       if (!earlyOutResponse.ok || !highPriorityResponse.ok || !lowPriorityResponse.ok) {
@@ -176,7 +177,7 @@ export default function GenerateAssignments() {
       const earlyOutData = await earlyOutResponse.json();
       const highPriorityData = await highPriorityResponse.json();
       const lowPriorityData = await lowPriorityResponse.json();
-      const timelineAssignmentsData = timelineAssignmentsResponse.ok ? await timelineAssignmentsResponse.json() : { assignments: [] };
+      const timelineAssignmentsData = timelineAssignmentsResponse.ok ? await timelineAssignmentsResponse.json() : { assignments: [], current_date: dateStr };
 
       console.log("Early out data:", earlyOutData);
       console.log("High priority data:", highPriorityData);
@@ -412,10 +413,11 @@ export default function GenerateAssignments() {
 
   const saveTimelineAssignment = async (taskId: string, cleanerId: number, logisticCode?: string) => {
     try {
+      const dateStr = format(selectedDate, "yyyy-MM-dd");
       const response = await fetch('/api/save-timeline-assignment', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ taskId, cleanerId, logisticCode }),
+        body: JSON.stringify({ taskId, cleanerId, logisticCode, date: dateStr }),
       });
       if (!response.ok) {
         console.error('Errore nel salvataggio dell\'assegnazione nella timeline');
@@ -429,10 +431,11 @@ export default function GenerateAssignments() {
 
   const removeTimelineAssignment = async (taskId: string, logisticCode?: string) => {
     try {
+      const dateStr = format(selectedDate, "yyyy-MM-dd");
       const response = await fetch('/api/remove-timeline-assignment', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ taskId, logisticCode }),
+        body: JSON.stringify({ taskId, logisticCode, date: dateStr }),
       });
       if (!response.ok) {
         console.error('Errore nella rimozione dell\'assegnazione dalla timeline');
