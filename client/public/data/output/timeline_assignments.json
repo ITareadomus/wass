@@ -1,10 +1,4 @@
 {
-  "assignments": [
-    {
-      "logistic_code": "1643",
-      "cleanerId": 132,
-      "assignment_type": "manual_drag",
-      "sequence": 0
-    }
-  ]
+  "assignments": [],
+  "current_date": "2025-10-24"
 }

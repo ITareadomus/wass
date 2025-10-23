@@ -1,6 +1,32 @@
 {
   "early_out_tasks": [
     {
+      "task_id": 217714,
+      "logistic_code": 1643,
+      "client_id": 87,
+      "premium": true,
+      "address": "Viale Majno 23",
+      "lat": "45.47048",
+      "lng": "9.2052883",
+      "cleaning_time": 180,
+      "checkin_date": "2025-10-25",
+      "checkout_date": "2025-10-24",
+      "checkin_time": "21:30",
+      "checkout_time": null,
+      "pax_in": 5,
+      "pax_out": 4,
+      "small_equipment": false,
+      "operation_id": 2,
+      "confirmed_operation": false,
+      "straordinaria": false,
+      "type_apt": "E",
+      "alias": "HACCA",
+      "customer_name": "HACCA SRL",
+      "reasons": [
+        "client_forced_eo"
+      ]
+    },
+    {
       "task_id": 217715,
       "logistic_code": 1644,
       "client_id": 87,
@@ -287,5 +313,5 @@
       ]
     }
   ],
-  "total_apartments": 11
+  "total_apartments": 12
 }
