@@ -75,16 +75,6 @@ export default function GenerateAssignments() {
     // Esegui l'estrazione dei dati all'avvio e quando cambia la data
     const extractData = async () => {
       try {
-        // Controlla se stiamo tornando dalla pagina convocazioni con preserveAssignments
-        const preserveAssignments = sessionStorage.getItem('preserveAssignments');
-        if (preserveAssignments === 'true') {
-          console.log("Preservo le assegnazioni esistenti, salto l'estrazione");
-          sessionStorage.removeItem('preserveAssignments');
-          setIsExtracting(false);
-          loadTasks();
-          return;
-        }
-
         setIsExtracting(true);
         setExtractionStep("Estrazione dati dal database...");
 

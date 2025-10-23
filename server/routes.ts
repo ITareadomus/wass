@@ -55,7 +55,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const timelineAssignmentsPath = path.join(process.cwd(), 'client/public/data/output/timeline_assignments.json');
 
       // Carica o crea timeline_assignments.json
-      let assignmentsData: any = { assignments: [] };
+      let assignmentsData: any = { assignments: [], current_date: null };
       try {
         const existingData = await fs.readFile(timelineAssignmentsPath, 'utf8');
         assignmentsData = JSON.parse(existingData);
@@ -83,7 +83,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         sequence: newSequence
       });
 
-      // Salva il file
+      // Salva il file (preserva current_date se esiste)
       await fs.writeFile(timelineAssignmentsPath, JSON.stringify(assignmentsData, null, 2));
 
       res.json({ success: true, message: "Assegnazione salvata nella timeline con successo" });
@@ -102,7 +102,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log(`Salvando ${assignments.length} assegnazioni HP nella timeline`);
 
       // Carica timeline_assignments.json
-      let assignmentsData: any = { assignments: [] };
+      let assignmentsData: any = { assignments: [], current_date: null };
       try {
         const existingData = await fs.readFile(timelineAssignmentsPath, 'utf8');
         assignmentsData = JSON.parse(existingData);
@@ -119,7 +119,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Aggiungi le nuove assegnazioni HP
       assignmentsData.assignments.push(...assignments);
 
-      // Salva il file
+      // Salva il file (preserva current_date)
       await fs.writeFile(timelineAssignmentsPath, JSON.stringify(assignmentsData, null, 2));
 
       res.json({ success: true, message: `${assignments.length} assegnazioni HP salvate nella timeline` });
@@ -138,7 +138,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log(`Rimozione assegnazione timeline - taskId: ${taskId}, logisticCode: ${logisticCode}`);
 
       // Carica timeline_assignments.json
-      let assignmentsData: any = { assignments: [] };
+      let assignmentsData: any = { assignments: [], current_date: null };
       try {
         const existingData = await fs.readFile(timelineAssignmentsPath, 'utf8');
         assignmentsData = JSON.parse(existingData);
@@ -161,7 +161,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log(`Assegnazioni dopo la rimozione:`, assignmentsData.assignments);
       console.log(`Rimosse ${initialLength - assignmentsData.assignments.length} assegnazioni`);
 
-      // Salva il file
+      // Salva il file (preserva current_date)
       await fs.writeFile(timelineAssignmentsPath, JSON.stringify(assignmentsData, null, 2));
 
       res.json({ success: true, message: "Assegnazione rimossa dalla timeline con successo" });
@@ -619,14 +619,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { date } = req.body;
 
-      // Resetta sia early_out_assignments che timeline_assignments quando cambi data
       const earlyOutAssignmentsPath = path.join(process.cwd(), 'client/public/data/output/early_out_assignments.json');
       const timelineAssignmentsPath = path.join(process.cwd(), 'client/public/data/output/timeline_assignments.json');
 
-      await Promise.all([
-        fs.writeFile(earlyOutAssignmentsPath, JSON.stringify({ early_out_tasks_assigned: [], meta: {} }, null, 2)),
-        fs.writeFile(timelineAssignmentsPath, JSON.stringify({ assignments: [] }, null, 2))
-      ]);
+      // Carica timeline_assignments.json esistente per verificare la data
+      let timelineData: any = { assignments: [], current_date: null };
+      try {
+        const existingData = await fs.readFile(timelineAssignmentsPath, 'utf8');
+        timelineData = JSON.parse(existingData);
+      } catch (error) {
+        // File non esiste o è vuoto
+      }
+
+      // Resetta solo se la data è diversa da quella salvata
+      const shouldReset = timelineData.current_date !== date;
+
+      if (shouldReset) {
+        console.log(`Data cambiata da ${timelineData.current_date} a ${date}, resetto le assegnazioni`);
+        await Promise.all([
+          fs.writeFile(earlyOutAssignmentsPath, JSON.stringify({ early_out_tasks_assigned: [], meta: {} }, null, 2)),
+          fs.writeFile(timelineAssignmentsPath, JSON.stringify({ assignments: [], current_date: date }, null, 2))
+        ]);
+      } else {
+        console.log(`Data invariata (${date}), preservo le assegnazioni esistenti`);
+        // Aggiorna solo la data corrente se non presente
+        if (!timelineData.current_date) {
+          timelineData.current_date = date;
+          await fs.writeFile(timelineAssignmentsPath, JSON.stringify(timelineData, null, 2));
+        }
+      }
 
       // Usa python3 e chiama task_extractor.py con la data specificata
       const command = date 
