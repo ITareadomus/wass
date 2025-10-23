@@ -794,7 +794,7 @@ export default function GenerateAssignments() {
                 </h3>
               </div>
               <div className="p-4 relative">
-                <div className="absolute top-[16px] left-[16px] w-[140px] h-[48px] bg-background z-10 pointer-events-none"></div>
+                <div className="absolute top-4 left-4 w-32 h-12 bg-card z-10 pointer-events-none"></div>
                 <iframe
                   id="map-iframe"
                   width="100%"
