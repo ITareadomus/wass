@@ -629,7 +629,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Endpoint per eseguire l'estrazione dei dati
+  // Endpoint per estrarre i dati
   app.post("/api/extract-data", async (req, res) => {
     try {
       const { date } = req.body;
@@ -637,26 +637,65 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const earlyOutAssignmentsPath = path.join(process.cwd(), 'client/public/data/output/early_out_assignments.json');
       const timelineAssignmentsBasePath = path.join(process.cwd(), 'client/public/data/output/timeline_assignments');
       const timelineAssignmentsPath = path.join(timelineAssignmentsBasePath, `${date}.json`);
+      const assignedDir = path.join(process.cwd(), 'client/public/data/assigned');
 
       // Crea la directory per le assegnazioni se non esiste
       await fs.mkdir(timelineAssignmentsBasePath, { recursive: true });
 
       // Carica timeline_assignments per questa data specifica
       let timelineData: any = { assignments: [], current_date: date };
+      let loadedFrom = 'new';
+
       try {
+        // Primo tentativo: carica da timeline_assignments/{date}.json
         const existingData = await fs.readFile(timelineAssignmentsPath, 'utf8');
         timelineData = JSON.parse(existingData);
-        console.log(`Caricato timeline_assignments per ${date} con ${timelineData.assignments?.length || 0} assegnazioni`);
+        if (timelineData.assignments && timelineData.assignments.length > 0) {
+          console.log(`Caricato timeline_assignments per ${date} con ${timelineData.assignments.length} assegnazioni`);
+          loadedFrom = 'timeline';
+        } else {
+          // Se il file esiste ma è vuoto, consideralo come "non trovato" per procedere al fallback
+          throw new Error('No assignments in timeline file');
+        }
       } catch (error) {
-        // File non esiste per questa data, crea nuovo
-        console.log(`Creando nuovo timeline_assignments per ${date}`);
-        await fs.writeFile(timelineAssignmentsPath, JSON.stringify(timelineData, null, 2));
+        // Secondo tentativo: carica da assigned/assignments_{ddmmyy}.json
+        try {
+          const dateObj = new Date(date);
+          const day = String(dateObj.getDate()).padStart(2, '0');
+          const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+          const year = String(dateObj.getFullYear()).slice(-2);
+          const filename = `assignments_${day}${month}${year}.json`;
+          const assignedFilePath = path.join(assignedDir, filename);
+
+          const confirmedData = await fs.readFile(assignedFilePath, 'utf8');
+          const confirmedJson = JSON.parse(confirmedData);
+
+          if (confirmedJson.assignments && confirmedJson.assignments.length > 0) {
+            timelineData = {
+              assignments: confirmedJson.assignments,
+              current_date: date
+            };
+            console.log(`Caricato da assigned/${filename} con ${timelineData.assignments.length} assegnazioni`);
+            loadedFrom = 'assigned';
+
+            // Salva in timeline_assignments per questa data per caching/convenience
+            await fs.writeFile(timelineAssignmentsPath, JSON.stringify(timelineData, null, 2));
+          } else {
+            // Se il file assigned esiste ma è vuoto, considera come "non trovato"
+            throw new Error('No assignments in assigned file');
+          }
+        } catch (assignedError) {
+          // Nessun file trovato in nessuna delle due posizioni, crea nuovo file vuoto
+          console.log(`Nessuna assegnazione trovata per ${date} in timeline o assigned, creando timeline vuota`);
+          loadedFrom = 'new';
+          await fs.writeFile(timelineAssignmentsPath, JSON.stringify(timelineData, null, 2));
+        }
       }
 
       // Non resettiamo mai - ogni data ha il suo file
-      console.log(`Data selezionata: ${date}, preservo le assegnazioni esistenti`);
-      
-      // Assicurati che current_date sia sempre aggiornato
+      console.log(`Data selezionata: ${date}, preservo le assegnazioni esistenti (fonte: ${loadedFrom})`);
+
+      // Assicurati che current_date sia sempre aggiornato, specialmente se è stato appena creato
       if (!timelineData.current_date) {
         timelineData.current_date = date;
         await fs.writeFile(timelineAssignmentsPath, JSON.stringify(timelineData, null, 2));
@@ -1002,7 +1041,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Endpoint for running the optimizer script
+  // Endpoint per running the optimizer script
   app.post("/api/run-optimizer", async (req, res) => {
     try {
       console.log("Eseguendo assign_eo_updated.py...");
@@ -1088,7 +1127,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { date } = req.body;
       const assignedDir = path.join(process.cwd(), 'client/public/data/assigned');
-      
+
       // Crea la directory se non esiste
       await fs.mkdir(assignedDir, { recursive: true });
 
@@ -1098,7 +1137,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const month = String(dateObj.getMonth() + 1).padStart(2, '0');
       const year = String(dateObj.getFullYear()).slice(-2);
       const filename = `assignments_${day}${month}${year}.json`;
-      
+
       const assignedFilePath = path.join(assignedDir, filename);
       const timelineAssignmentsPath = path.join(
         process.cwd(), 
@@ -1141,20 +1180,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { date } = req.params;
       const assignedDir = path.join(process.cwd(), 'client/public/data/assigned');
-      
+
       // Formato data: ddmmyy
       const dateObj = new Date(date);
       const day = String(dateObj.getDate()).padStart(2, '0');
       const month = String(dateObj.getMonth() + 1).padStart(2, '0');
       const year = String(dateObj.getFullYear()).slice(-2);
       const filename = `assignments_${day}${month}${year}.json`;
-      
+
       const assignedFilePath = path.join(assignedDir, filename);
 
       try {
         const data = await fs.readFile(assignedFilePath, 'utf8');
         const confirmedData = JSON.parse(data);
-        
+
         res.json({ 
           success: true, 
           data: confirmedData,
@@ -1174,7 +1213,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  
+
 
 
   const httpServer = createServer(app);

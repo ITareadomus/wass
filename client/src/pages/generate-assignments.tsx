@@ -83,9 +83,6 @@ export default function GenerateAssignments() {
         const dateStr = format(selectedDate, "yyyy-MM-dd");
         console.log("Estraendo task per la data:", dateStr);
 
-        // Prima controlla se esistono assegnazioni confermate
-        await loadConfirmedAssignments(selectedDate);
-
         const response = await fetch('/api/extract-data', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -430,42 +427,7 @@ export default function GenerateAssignments() {
     }
   };
 
-  // Carica assegnazioni confermate se esistono
-  const loadConfirmedAssignments = async (date: Date) => {
-    try {
-      const dateStr = format(date, "yyyy-MM-dd");
-      const response = await fetch(`/api/load-confirmed-assignments/${dateStr}`);
-      const result = await response.json();
-
-      if (result.success && result.data && result.data.assignments) {
-        console.log(`Caricando ${result.data.assignments.length} assegnazioni confermate per ${dateStr}`);
-        
-        // Scrivi le assegnazioni nel file timeline_assignments per questa data
-        const timelineAssignmentsBasePath = 'client/public/data/output/timeline_assignments';
-        const timelineAssignmentsPath = `${timelineAssignmentsBasePath}/${dateStr}.json`;
-        
-        const saveResponse = await fetch('/api/save-timeline-assignment', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ 
-            date: dateStr,
-            assignments: result.data.assignments 
-          })
-        });
-
-        if (saveResponse.ok) {
-          console.log('Assegnazioni confermate caricate sulla timeline');
-          toast({
-            title: "Assegnazioni Caricate",
-            description: `${result.data.assignments.length} assegnazioni ripristinate`,
-            duration: 3000,
-          });
-        }
-      }
-    } catch (error) {
-      console.error("Errore nel caricamento delle assegnazioni confermate:", error);
-    }
-  };
+  
 
   // Esponi le funzioni per poterle chiamare da altri componenti
   (window as any).reloadEarlyOutAssignments = loadEarlyOutAssignments;
