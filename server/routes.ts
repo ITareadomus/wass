@@ -513,19 +513,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Endpoint per eseguire assign_eo_updated.py
+  // Endpoint per eseguire assign_eo.py
   app.post("/api/assign-early-out", async (req, res) => {
     try {
-      console.log("Eseguendo assign_eo_updated.py...");
+      console.log("Eseguendo assign_eo.py...");
       const { stdout, stderr } = await execAsync(
-        `python3 client/public/scripts/assign_eo_updated.py`,
+        `python3 client/public/scripts/assign_eo.py`,
         { maxBuffer: 1024 * 1024 * 10 }
       );
 
       if (stderr && !stderr.includes('Browserslist')) {
-        console.error("Errore assign_eo_updated:", stderr);
+        console.error("Errore assign_eo:", stderr);
       }
-      console.log("assign_eo_updated output:", stdout);
+      console.log("assign_eo output:", stdout);
 
       res.json({
         success: true,
@@ -571,19 +571,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Endpoint per eseguire assign_hp_updated.py
+  // Endpoint per eseguire assign_hp.py
   app.post("/api/assign-hp", async (req, res) => {
     try {
-      console.log("Eseguendo assign_hp_updated.py...");
+      console.log("Eseguendo assign_hp.py...");
       const { stdout, stderr } = await execAsync(
-        `python3 client/public/scripts/assign_hp_updated.py`,
+        `python3 client/public/scripts/assign_hp.py`,
         { maxBuffer: 1024 * 1024 * 10 }
       );
 
       if (stderr && !stderr.includes('Browserslist')) {
-        console.error("Errore assign_hp_updated:", stderr);
+        console.error("Errore assign_hp:", stderr);
       }
-      console.log("assign_hp_updated output:", stdout);
+      console.log("assign_hp output:", stdout);
 
       res.json({
         success: true,
@@ -1047,16 +1047,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Endpoint per running the optimizer script
   app.post("/api/run-optimizer", async (req, res) => {
     try {
-      console.log("Eseguendo assign_eo_updated.py...");
+      console.log("Eseguendo assign_eo.py...");
       const { stdout, stderr } = await execAsync(
-        `python3 client/public/scripts/assign_eo_updated.py`,
+        `python3 client/public/scripts/assign_eo.py`,
         { maxBuffer: 1024 * 1024 * 10 }
       );
 
       if (stderr && !stderr.includes('Browserslist')) {
-        console.error("Errore assign_eo_updated:", stderr);
+        console.error("Errore assign_eo:", stderr);
       }
-      console.log("assign_eo_updated output:", stdout);
+      console.log("assign_eo output:", stdout);
 
       res.json({
         success: true,
@@ -1064,7 +1064,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         output: stdout,
       });
     } catch (error: any) {
-      console.error("Errore nell'esecuzione di assign_eo_updated.py:", error);
+      console.error("Errore nell'esecuzione di assign_eo.py:", error);
       res.status(500).json({
         success: false,
         message: "Errore nell'esecuzione dell'optimizer",
