@@ -650,13 +650,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Primo tentativo: carica da timeline_assignments/{date}.json
         const existingData = await fs.readFile(timelineAssignmentsPath, 'utf8');
         timelineData = JSON.parse(existingData);
-        if (timelineData.assignments && timelineData.assignments.length > 0) {
-          console.log(`Caricato timeline_assignments per ${date} con ${timelineData.assignments.length} assegnazioni`);
-          loadedFrom = 'timeline';
-        } else {
-          // Se il file esiste ma è vuoto, consideralo come "non trovato" per procedere al fallback
+        
+        // Se il file esiste ma è vuoto, prova a caricare da assigned
+        if (!timelineData.assignments || timelineData.assignments.length === 0) {
+          console.log(`Timeline per ${date} è vuota, cercando in assigned...`);
           throw new Error('No assignments in timeline file');
         }
+        
+        console.log(`Caricato timeline_assignments per ${date} con ${timelineData.assignments.length} assegnazioni`);
+        loadedFrom = 'timeline';
       } catch (error) {
         // Secondo tentativo: carica da assigned/assignments_{ddmmyy}.json
         try {
@@ -667,6 +669,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const filename = `assignments_${day}${month}${year}.json`;
           const assignedFilePath = path.join(assignedDir, filename);
 
+          console.log(`Cercando file confermato: ${filename}`);
           const confirmedData = await fs.readFile(assignedFilePath, 'utf8');
           const confirmedJson = JSON.parse(confirmedData);
 
@@ -675,19 +678,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
               assignments: confirmedJson.assignments,
               current_date: date
             };
-            console.log(`Caricato da assigned/${filename} con ${timelineData.assignments.length} assegnazioni`);
+            console.log(`✅ Caricato da assigned/${filename} con ${timelineData.assignments.length} assegnazioni`);
             loadedFrom = 'assigned';
 
-            // Salva in timeline_assignments per questa data per caching/convenience
+            // Salva in timeline_assignments per questa data
             await fs.writeFile(timelineAssignmentsPath, JSON.stringify(timelineData, null, 2));
           } else {
-            // Se il file assigned esiste ma è vuoto, considera come "non trovato"
             throw new Error('No assignments in assigned file');
           }
         } catch (assignedError) {
           // Nessun file trovato in nessuna delle due posizioni, crea nuovo file vuoto
           console.log(`Nessuna assegnazione trovata per ${date} in timeline o assigned, creando timeline vuota`);
           loadedFrom = 'new';
+          timelineData = { assignments: [], current_date: date };
           await fs.writeFile(timelineAssignmentsPath, JSON.stringify(timelineData, null, 2));
         }
       }
