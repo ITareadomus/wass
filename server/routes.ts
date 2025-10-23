@@ -636,13 +636,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       if (shouldReset) {
         console.log(`Data cambiata da ${timelineData.current_date} a ${date}, resetto le assegnazioni`);
-        await Promise.all([
-          fs.writeFile(earlyOutAssignmentsPath, JSON.stringify({ early_out_tasks_assigned: [], meta: {} }, null, 2)),
-          fs.writeFile(timelineAssignmentsPath, JSON.stringify({ assignments: [], current_date: date }, null, 2))
-        ]);
+        await fs.writeFile(earlyOutAssignmentsPath, JSON.stringify({ early_out_tasks_assigned: [], meta: {} }, null, 2));
+        await fs.writeFile(timelineAssignmentsPath, JSON.stringify({ assignments: [], current_date: date }, null, 2));
       } else {
         console.log(`Data invariata (${date}), preservo le assegnazioni esistenti`);
-        // Aggiorna solo la data corrente se non presente
+        // Assicurati che current_date sia sempre aggiornato
         if (!timelineData.current_date) {
           timelineData.current_date = date;
           await fs.writeFile(timelineAssignmentsPath, JSON.stringify(timelineData, null, 2));

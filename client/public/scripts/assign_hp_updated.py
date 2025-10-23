@@ -473,9 +473,58 @@ def main():
     seed_cleaners_from_eo(cleaners, INPUT_EO_ASSIGN, ref_date)
     assignment, unassigned = assign(tasks, cleaners)
 
-    out = build_output(cleaners, unassigned, total_tasks=len(tasks))
-    write_output(OUTPUT_ASSIGN, out)
+    output = build_output(cleaners, unassigned, total_tasks=len(tasks))
+    write_output(OUTPUT_ASSIGN, output)
     print(f"✅ Wrote {OUTPUT_ASSIGN}")
+
+    # Update timeline_assignments.json
+    timeline_assignments_path = OUTPUT_ASSIGN.parent / "timeline_assignments.json"
+    timeline_data = {"assignments": [], "current_date": None}
+
+    # Load existing timeline assignments if they exist
+    if timeline_assignments_path.exists():
+        try:
+            timeline_data = json.loads(timeline_assignments_path.read_text(encoding="utf-8"))
+            # Assicurati che current_date esista
+            if "current_date" not in timeline_data:
+                timeline_data["current_date"] = None
+        except:
+            timeline_data = {"assignments": [], "current_date": None}
+
+    # Remove old high-priority assignments
+    assigned_codes = set()
+    for cleaner_entry in output["high_priority_tasks_assigned"]:
+        for task in cleaner_entry.get("tasks", []):
+            assigned_codes.add(str(task["logistic_code"]))
+
+    timeline_data["assignments"] = [
+        a for a in timeline_data.get("assignments", [])
+        if str(a.get("logistic_code")) not in assigned_codes
+    ]
+
+    # Add new high-priority assignments
+    for cleaner_entry in output["high_priority_tasks_assigned"]:
+        cleaner_info = cleaner_entry["cleaner"]
+        for task in cleaner_entry.get("tasks", []):
+            timeline_data["assignments"].append({
+                "cleaner_id": cleaner_info["id"],
+                "task_id": task["task_id"],
+                "logistic_code": task["logistic_code"],
+                "start_time": task["start_time"],
+                "end_time": task["end_time"],
+                "address": task["address"],
+                "sequence": task["sequence"],
+                "travel_time": task["travel_time"],
+            })
+    
+    # Preserve current_date if it exists, otherwise set it to today's date
+    if timeline_data.get("current_date") is None:
+        timeline_data["current_date"] = ref_date
+
+    # Write the updated timeline assignments
+    with open(timeline_assignments_path, "w", encoding="utf-8") as f:
+        json.dump(timeline_data, f, ensure_ascii=False, indent=2)
+    print(f"✅ Wrote {timeline_assignments_path}")
 
 
 if __name__ == "__main__":

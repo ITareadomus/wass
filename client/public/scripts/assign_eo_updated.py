@@ -547,14 +547,17 @@ def main():
     
     # Update timeline_assignments.json
     timeline_assignments_path = OUTPUT_ASSIGN.parent / "timeline_assignments.json"
-    timeline_data = {"assignments": []}
+    timeline_data = {"assignments": [], "current_date": None}
     
     # Load existing timeline assignments if they exist
     if timeline_assignments_path.exists():
         try:
             timeline_data = json.loads(timeline_assignments_path.read_text(encoding="utf-8"))
+            # Assicurati che current_date esista
+            if "current_date" not in timeline_data:
+                timeline_data["current_date"] = None
         except:
-            timeline_data = {"assignments": []}
+            timeline_data = {"assignments": [], "current_date": None}
     
     # Remove old early-out assignments
     assigned_codes = set()
