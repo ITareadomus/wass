@@ -735,7 +735,7 @@ export default function GenerateAssignments() {
                   id="map-iframe"
                   width="100%"
                   height="400"
-                  style={{ border: 0 }}
+                  style={{ border: 0, pointerEvents: 'auto' }}
                   loading="lazy"
                   allowFullScreen
                   referrerPolicy="no-referrer-when-downgrade"
