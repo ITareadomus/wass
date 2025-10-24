@@ -87,12 +87,51 @@ export async function registerRoutes(app: Express): Promise<Server> {
           : -1;
         const newSequence = maxSequence + 1;
 
-        // Aggiungi la nuova assegnazione con sequence
+        // Carica i dati completi del task dai file JSON per includerli nella timeline
+        const tasksFilePaths = [
+          path.join(process.cwd(), 'client/public/data/output/early_out.json'),
+          path.join(process.cwd(), 'client/public/data/output/high_priority.json'),
+          path.join(process.cwd(), 'client/public/data/output/low_priority.json')
+        ];
+
+        let taskData: any = null;
+        for (const filePath of tasksFilePaths) {
+          try {
+            const fileData = await fs.readFile(filePath, 'utf8');
+            const jsonData = JSON.parse(fileData);
+            const tasksList = jsonData.early_out_tasks || jsonData.high_priority_tasks || jsonData.low_priority_tasks || [];
+            taskData = tasksList.find((t: any) => String(t.logistic_code) === String(logisticCode));
+            if (taskData) break;
+          } catch (e) {
+            // Continua con il prossimo file
+          }
+        }
+
+        // Aggiungi la nuova assegnazione con sequence e tutti i dati del task
         assignmentsData.assignments.push({
+          task_id: taskData?.task_id || taskId,
           logistic_code: logisticCode,
           cleanerId,
           assignment_type: "manual_drag",
-          sequence: newSequence
+          sequence: newSequence,
+          address: taskData?.address,
+          lat: taskData?.lat,
+          lng: taskData?.lng,
+          premium: taskData?.premium,
+          cleaning_time: taskData?.cleaning_time,
+          checkin_date: taskData?.checkin_date,
+          checkout_date: taskData?.checkout_date,
+          checkin_time: taskData?.checkin_time,
+          checkout_time: taskData?.checkout_time,
+          pax_in: taskData?.pax_in,
+          pax_out: taskData?.pax_out,
+          operation_id: taskData?.operation_id,
+          confirmed_operation: taskData?.confirmed_operation,
+          straordinaria: taskData?.straordinaria,
+          type_apt: taskData?.type_apt,
+          alias: taskData?.alias,
+          customer_name: taskData?.customer_name,
+          small_equipment: taskData?.small_equipment
         });
       }
 
