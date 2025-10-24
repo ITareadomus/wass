@@ -105,12 +105,6 @@ export default function MapSection({ tasks }: MapSectionProps) {
         position,
         map: googleMapRef.current,
         title: `${task.name} - ${task.type}`,
-        label: {
-          text: String(index + 1),
-          color: 'white',
-          fontSize: '12px',
-          fontWeight: 'bold'
-        },
         icon: {
           path: window.google.maps.SymbolPath.CIRCLE,
           fillColor: markerColor,
