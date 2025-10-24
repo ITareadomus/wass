@@ -22,22 +22,7 @@ export default function MapSection() {
           
           {/* Location markers overlay */}
           <div className="absolute inset-0" data-testid="map-markers">
-            {/* Sample location markers */}
-            <div className="absolute top-16 left-20 w-6 h-6 bg-red-500 rounded-full border-2 border-white shadow-lg flex items-center justify-center">
-              <div className="w-2 h-2 bg-white rounded-full"></div>
-            </div>
-            <div className="absolute top-24 left-32 w-6 h-6 bg-blue-500 rounded-full border-2 border-white shadow-lg flex items-center justify-center">
-              <div className="w-2 h-2 bg-white rounded-full"></div>
-            </div>
-            <div className="absolute top-32 left-28 w-6 h-6 bg-green-500 rounded-full border-2 border-white shadow-lg flex items-center justify-center">
-              <div className="w-2 h-2 bg-white rounded-full"></div>
-            </div>
-            <div className="absolute top-20 left-40 w-6 h-6 bg-orange-500 rounded-full border-2 border-white shadow-lg flex items-center justify-center">
-              <div className="w-2 h-2 bg-white rounded-full"></div>
-            </div>
-            <div className="absolute top-40 left-24 w-6 h-6 bg-purple-500 rounded-full border-2 border-white shadow-lg flex items-center justify-center">
-              <div className="w-2 h-2 bg-white rounded-full"></div>
-            </div>
+            {/* I marker verranno aggiunti dinamicamente in base alle assegnazioni */}
           </div>
         </div>
       </div>
