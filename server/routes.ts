@@ -37,12 +37,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Endpoint per resettare le assegnazioni della timeline
   app.post("/api/reset-timeline-assignments", async (req, res) => {
     try {
-      const timelineAssignmentsPath = path.join(process.cwd(), 'client/public/data/output/timeline_assignments.json');
+      const { date } = req.body;
+      const workDate = date || format(new Date(), 'yyyy-MM-dd');
+      const timelineAssignmentsBasePath = path.join(process.cwd(), 'client/public/data/output/timeline_assignments');
+      const timelineAssignmentsPath = path.join(timelineAssignmentsBasePath, `${workDate}.json`);
 
-      // Svuota il file
-      await fs.writeFile(timelineAssignmentsPath, JSON.stringify({ assignments: [] }, null, 2));
+      // Crea la directory se non esiste
+      await fs.mkdir(timelineAssignmentsBasePath, { recursive: true });
 
-      res.json({ success: true, message: "Assegnazioni della timeline resettate con successo" });
+      // Svuota il file per questa data specifica
+      await fs.writeFile(timelineAssignmentsPath, JSON.stringify({ assignments: [], current_date: workDate }, null, 2));
+
+      console.log(`Timeline resettata per la data ${workDate}`);
+
+      res.json({ success: true, message: `Assegnazioni della timeline resettate per ${workDate}` });
     } catch (error: any) {
       console.error("Errore nel reset delle assegnazioni della timeline:", error);
       res.status(500).json({ success: false, error: error.message });
