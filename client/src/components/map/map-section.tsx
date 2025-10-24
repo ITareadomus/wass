@@ -72,9 +72,18 @@ export default function MapSection({ tasks }: MapSectionProps) {
 
     // Filtra task con coordinate valide
     const tasksWithCoordinates = tasks.filter(task => {
-      const hasCoordinates = task.address && (task as any).lat && (task as any).lng;
+      const hasCoordinates = task.address && task.lat && task.lng;
       return hasCoordinates;
     });
+
+    console.log('Task totali:', tasks.length);
+    console.log('Task con coordinate:', tasksWithCoordinates.length);
+    console.log('Prime 3 task con coordinate:', tasksWithCoordinates.slice(0, 3).map(t => ({
+      name: t.name,
+      address: t.address,
+      lat: t.lat,
+      lng: t.lng
+    })));
 
     if (tasksWithCoordinates.length === 0) return;
 
@@ -82,10 +91,10 @@ export default function MapSection({ tasks }: MapSectionProps) {
 
     // Crea marker per ogni task
     tasksWithCoordinates.forEach((task, index) => {
-      const lat = parseFloat((task as any).lat);
-      const lng = parseFloat((task as any).lng);
+      const lat = parseFloat(task.lat || '0');
+      const lng = parseFloat(task.lng || '0');
 
-      if (isNaN(lat) || isNaN(lng)) return;
+      if (isNaN(lat) || isNaN(lng) || lat === 0 || lng === 0) return;
 
       const position = { lat, lng };
       

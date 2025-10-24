@@ -142,6 +142,8 @@ export default function GenerateAssignments() {
       status: "pending",
       scheduledTime: null,
       address: rawTask.address,
+      lat: rawTask.lat,
+      lng: rawTask.lng,
       premium: rawTask.premium,
       is_straordinaria: (rawTask as any).straordinaria || rawTask.is_straordinaria,
       confirmed_operation: rawTask.confirmed_operation,
