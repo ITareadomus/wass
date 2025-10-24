@@ -265,6 +265,11 @@ export default function GenerateAssignments() {
     }
   };
 
+  // Funzione esposta per ricaricare i task e le assegnazioni
+  const reloadAllTasks = async () => {
+    await loadTasks();
+  };
+
   const loadEarlyOutAssignments = async () => {
     try {
       const eoResponse = await fetch('/data/output/early_out_assignments.json');
@@ -357,8 +362,7 @@ export default function GenerateAssignments() {
   
 
   // Esponi le funzioni per poterle chiamare da altri componenti
-  (window as any).reloadEarlyOutAssignments = loadEarlyOutAssignments;
-  (window as any).reloadAllTasks = loadTasks;
+  (window as any).reloadAllTasks = reloadAllTasks;
 
   const saveTaskAssignments = async (tasks: Task[]) => {
     try {

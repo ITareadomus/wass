@@ -81,19 +81,14 @@ export default function PriorityColumn({
           title: "✅ EARLY-OUT assegnati con successo!",
         });
 
-        // Ricarica le assegnazioni early-out prima di ricaricare i task
-        if ((window as any).reloadEarlyOutAssignments) {
-          await (window as any).reloadEarlyOutAssignments();
-        }
-
-        // Poi ricarica tutti i task per aggiornare i filtri e la timeline
+        // IMPORTANTE: ricarica tutti i task per aggiornare la timeline con le nuove assegnazioni
         if ((window as any).reloadAllTasks) {
           await (window as any).reloadAllTasks();
         }
       } catch (error) {
-        console.error('Errore nell\'assegnazione:', error);
+        console.error('Errore nell\'assegnazione EO:', error);
         toast({
-          title: "❌ EARLY-OUT non assegnati, errore nel caricamento!",
+          title: "❌ EARLY-OUT non assegnati, errore!",
           variant: "destructive",
         });
       }
