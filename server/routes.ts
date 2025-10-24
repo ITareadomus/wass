@@ -22,9 +22,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const earlyOutPath = path.join(process.cwd(), 'client/public/data/output/early_out.json');
 
       // Svuota il file mantenendo la struttura
-      await fs.writeFile(earlyOutPath, JSON.stringify({ 
-        early_out_tasks: [], 
-        total_apartments: 0 
+      await fs.writeFile(earlyOutPath, JSON.stringify({
+        early_out_tasks: [],
+        total_apartments: 0
       }, null, 2));
 
       res.json({ success: true, message: "early_out.json svuotato con successo" });
@@ -82,7 +82,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         // Calcola la sequence: trova il massimo sequence per questo cleaner e aggiungi 1
         const cleanerAssignments = assignmentsData.assignments.filter((a: any) => a.cleanerId === cleanerId);
-        const maxSequence = cleanerAssignments.length > 0 
+        const maxSequence = cleanerAssignments.length > 0
           ? Math.max(...cleanerAssignments.map((a: any) => a.sequence || 0))
           : -1;
         const newSequence = maxSequence + 1;
@@ -106,7 +106,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  
+
 
   // Endpoint per rimuovere un'assegnazione dalla timeline
   app.post("/api/remove-timeline-assignment", async (req, res) => {
@@ -277,7 +277,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let taskToMove = null;
 
       if (fromContainer === 'early-out') {
-        const index = earlyOutData.early_out_tasks.findIndex((t: any) => 
+        const index = earlyOutData.early_out_tasks.findIndex((t: any) =>
           t.task_id === parseInt(taskId) || t.logistic_code === parseInt(logisticCode)
         );
         if (index !== -1) {
@@ -285,7 +285,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           earlyOutData.total_apartments = earlyOutData.early_out_tasks.length;
         }
       } else if (fromContainer === 'high') {
-        const index = highPriorityData.high_priority_tasks.findIndex((t: any) => 
+        const index = highPriorityData.high_priority_tasks.findIndex((t: any) =>
           t.task_id === parseInt(taskId) || t.logistic_code === parseInt(logisticCode)
         );
         if (index !== -1) {
@@ -293,7 +293,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           highPriorityData.total_apartments = highPriorityData.high_priority_tasks.length;
         }
       } else if (fromContainer === 'low') {
-        const index = lowPriorityData.low_priority_tasks.findIndex((t: any) => 
+        const index = lowPriorityData.low_priority_tasks.findIndex((t: any) =>
           t.task_id === parseInt(taskId) || t.logistic_code === parseInt(logisticCode)
         );
         if (index !== -1) {
@@ -540,28 +540,54 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Endpoint per eseguire assign_hp.py
   app.post("/api/assign-hp", async (req, res) => {
     try {
-      console.log("Eseguendo assign_hp.py...");
-      const { stdout, stderr } = await execAsync(
-        `python3 client/public/scripts/assign_hp.py`,
-        { maxBuffer: 1024 * 1024 * 10 }
-      );
+      const { date } = req.body;
+      const workDate = date || format(new Date(), 'yyyy-MM-dd');
 
-      if (stderr && !stderr.includes('Browserslist')) {
-        console.error("Errore assign_hp:", stderr);
-      }
-      console.log("assign_hp output:", stdout);
+      console.log(`Eseguendo assign_hp.py per data ${workDate}...`);
 
-      res.json({
-        success: true,
-        message: "High Priority tasks assegnati con successo",
-        output: stdout
+      const { spawn } = await import('child_process');
+      const scriptPath = path.join(process.cwd(), 'client/public/scripts/assign_hp.py');
+
+      const pythonProcess = spawn('python3', [scriptPath, workDate]);
+
+      let stdoutData = '';
+      pythonProcess.stdout.on('data', (data) => {
+        stdoutData += data.toString();
       });
+
+      let stderrData = '';
+      pythonProcess.stderr.on('data', (data) => {
+        stderrData += data.toString();
+        console.error(`assign_hp.py stderr: ${data}`);
+      });
+
+      pythonProcess.on('close', (code) => {
+        if (code !== 0) {
+          console.error(`assign_hp.py exited with code ${code}`);
+          res.status(500).json({
+            success: false,
+            message: "High Priority tasks assegnazione fallita",
+            stderr: stderrData,
+            stdout: stdoutData
+          });
+          return;
+        }
+
+        console.log("assign_hp output:", stdoutData);
+        res.json({
+          success: true,
+          message: "High Priority tasks assegnati con successo",
+          output: stdoutData
+        });
+      });
+
     } catch (error: any) {
       console.error("Errore durante l'assegnazione HP:", error);
       res.status(500).json({
         success: false,
         error: error.message,
-        stderr: error.stderr
+        stderr: error.stderr || "N/A",
+        stdout: error.stdout || "N/A"
       });
     }
   });
@@ -616,13 +642,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Primo tentativo: carica da timeline_assignments/{date}.json
         const existingData = await fs.readFile(timelineAssignmentsPath, 'utf8');
         timelineData = JSON.parse(existingData);
-        
+
         // Se il file esiste ma è vuoto, prova a caricare da assigned
         if (!timelineData.assignments || timelineData.assignments.length === 0) {
           console.log(`Timeline per ${date} è vuota, cercando in assigned...`);
           throw new Error('No assignments in timeline file');
         }
-        
+
         console.log(`Caricato timeline_assignments per ${date} con ${timelineData.assignments.length} assegnazioni`);
         loadedFrom = 'timeline';
       } catch (error) {
@@ -671,7 +697,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Usa python3 e chiama task_extractor.py con la data specificata
-      const command = date 
+      const command = date
         ? `python3 client/public/scripts/task_extractor.py ${date}`
         : 'python3 client/public/scripts/task_extractor.py';
 
@@ -1010,32 +1036,58 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Endpoint per running the optimizer script
+  // Endpoint for running the optimizer script
   app.post("/api/run-optimizer", async (req, res) => {
     try {
-      console.log("Eseguendo assign_eo.py...");
-      const { stdout, stderr } = await execAsync(
-        `python3 client/public/scripts/assign_eo.py`,
-        { maxBuffer: 1024 * 1024 * 10 }
-      );
+      const { date } = req.body;
+      const workDate = date || format(new Date(), 'yyyy-MM-dd');
 
-      if (stderr && !stderr.includes('Browserslist')) {
-        console.error("Errore assign_eo:", stderr);
-      }
-      console.log("assign_eo output:", stdout);
+      console.log(`Eseguendo assign_eo.py per data ${workDate}...`);
 
-      res.json({
-        success: true,
-        message: "Optimizer eseguito con successo",
-        output: stdout,
+      const { spawn } = await import('child_process');
+      const scriptPath = path.join(process.cwd(), 'client/public/scripts/assign_eo.py');
+
+      const pythonProcess = spawn('python3', [scriptPath, workDate]);
+
+      let stdoutData = '';
+      pythonProcess.stdout.on('data', (data) => {
+        stdoutData += data.toString();
       });
+
+      let stderrData = '';
+      pythonProcess.stderr.on('data', (data) => {
+        stderrData += data.toString();
+        console.error(`assign_eo.py stderr: ${data}`);
+      });
+
+      pythonProcess.on('close', (code) => {
+        if (code !== 0) {
+          console.error(`assign_eo.py exited with code ${code}`);
+          res.status(500).json({
+            success: false,
+            message: "Optimizer execution failed",
+            stderr: stderrData,
+            stdout: stdoutData
+          });
+          return;
+        }
+
+        console.log("assign_eo output:", stdoutData);
+        res.json({
+          success: true,
+          message: "Optimizer executed successfully",
+          output: stdoutData,
+        });
+      });
+
     } catch (error: any) {
       console.error("Errore nell'esecuzione di assign_eo.py:", error);
       res.status(500).json({
         success: false,
-        message: "Errore nell'esecuzione dell'optimizer",
+        message: "Optimizer execution failed",
         error: error.message,
-        stderr: error.stderr
+        stderr: error.stderr || "N/A",
+        stdout: error.stdout || "N/A"
       });
     }
   });
@@ -1109,7 +1161,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const assignedFilePath = path.join(assignedDir, filename);
       const timelineAssignmentsPath = path.join(
-        process.cwd(), 
+        process.cwd(),
         'client/public/data/output/timeline_assignments',
         `${date}.json`
       );
@@ -1132,8 +1184,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       await fs.writeFile(assignedFilePath, JSON.stringify(confirmedData, null, 2));
 
-      res.json({ 
-        success: true, 
+      res.json({
+        success: true,
         message: `Assegnazioni confermate salvate in ${filename}`,
         filename: filename,
         total_assignments: timelineData.assignments.length
@@ -1163,15 +1215,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const data = await fs.readFile(assignedFilePath, 'utf8');
         const confirmedData = JSON.parse(data);
 
-        res.json({ 
-          success: true, 
+        res.json({
+          success: true,
           data: confirmedData,
           message: `Assegnazioni caricate da ${filename}`
         });
       } catch (error) {
         // File non esiste
-        res.json({ 
-          success: true, 
+        res.json({
+          success: true,
           data: null,
           message: 'Nessuna assegnazione confermata trovata per questa data'
         });

@@ -616,7 +616,17 @@ def main():
     if not INPUT_CLEANERS.exists():
         raise SystemExit(f"Missing input file: {INPUT_CLEANERS}")
     
-    tasks, ref_date = load_tasks()
+    # Usa la data passata come argomento da riga di comando
+    import sys
+    if len(sys.argv) > 1:
+        ref_date = sys.argv[1]
+        print(f"📅 Usando data da argomento: {ref_date}")
+    else:
+        # Fallback: carica la data dai task
+        tasks_temp, ref_date = load_tasks()
+        print(f"📅 Data estratta dai task: {ref_date}")
+    
+    tasks, _ = load_tasks()
     cleaners = load_cleaners(ref_date)
     seed_cleaners_from_eo(cleaners, ref_date)
     
