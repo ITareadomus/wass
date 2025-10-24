@@ -38,11 +38,6 @@ export default function MapSection() {
             <div className="absolute top-40 left-24 w-6 h-6 bg-purple-500 rounded-full border-2 border-white shadow-lg flex items-center justify-center">
               <div className="w-2 h-2 bg-white rounded-full"></div>
             </div>
-            
-            {/* Central Milan marker */}
-            <div className="absolute top-28 left-36 w-8 h-8 bg-yellow-500 rounded-full border-2 border-white shadow-lg flex items-center justify-center">
-              <MapPin className="w-4 h-4 text-white" />
-            </div>
           </div>
         </div>
       </div>
