@@ -275,7 +275,30 @@
       "type_apt": "B",
       "alias": "TBR",
       "customer_name": "THE BEST RENT S.r.l."
+    },
+    {
+      "task_id": 217946,
+      "logistic_code": 1252,
+      "client_id": 84,
+      "premium": false,
+      "address": "VIALE MONZA 43/C",
+      "lat": "45.490857",
+      "lng": "9.21773",
+      "cleaning_time": 30,
+      "checkin_date": "2025-10-25",
+      "checkout_date": "2025-10-25",
+      "checkin_time": null,
+      "checkout_time": null,
+      "pax_in": 0,
+      "pax_out": 0,
+      "small_equipment": false,
+      "operation_id": 4,
+      "confirmed_operation": true,
+      "straordinaria": false,
+      "type_apt": "B",
+      "alias": "GTK",
+      "customer_name": "GET THE KEY"
     }
   ],
-  "total_apartments": 12
+  "total_apartments": 13
 }

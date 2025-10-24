@@ -442,6 +442,16 @@
       "reasons": [
         "premium"
       ]
+    },
+    {
+      "task_id": 217946,
+      "client_id": 84,
+      "premium": false,
+      "final_class": "LP",
+      "reasons": [
+        "not_eo",
+        "not_hp"
+      ]
     }
   ]
 }
