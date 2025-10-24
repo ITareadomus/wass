@@ -287,20 +287,6 @@
       "end_time": "11:43",
       "travel_time": 13,
       "followup": true
-    },
-    {
-      "task_id": "217923",
-      "logistic_code": "1393",
-      "cleanerId": 1045,
-      "assignment_type": "manual_drag",
-      "sequence": 2
-    },
-    {
-      "task_id": "217922",
-      "logistic_code": "109",
-      "cleanerId": 495,
-      "assignment_type": "manual_drag",
-      "sequence": 2
     }
   ],
   "current_date": "2025-10-25"

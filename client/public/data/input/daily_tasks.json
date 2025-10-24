@@ -1,11 +1,11 @@
 {
     "metadata": {
-        "last_updated": "2025-10-24T14:30:54.533027",
+        "last_updated": "2025-10-24T14:29:14.195013",
         "schema_version": "1.0"
     },
     "dates": {
         "2025-10-25": {
-            "timestamp": "2025-10-24T14:30:54.533036",
+            "timestamp": "2025-10-24T14:29:14.195022",
             "apt": [
                 {
                     "task_id": 202566,
@@ -223,11 +223,11 @@
                     "lat": "45.4510412",
                     "lng": "9.1910662",
                     "cleaning_time": 60,
-                    "checkin_date": "2025-10-25",
+                    "checkin_date": "2025-11-03",
                     "checkout_date": "2025-10-25",
                     "checkin_time": null,
-                    "checkout_time": "11:00",
-                    "pax_in": 3,
+                    "checkout_time": null,
+                    "pax_in": 2,
                     "pax_out": 1,
                     "small_equipment": true,
                     "operation_id": 2,

@@ -93,9 +93,9 @@ export default function MapSection({ tasks }: MapSectionProps) {
     googleMapRef.current = map;
   }, [isMapLoaded]);
 
-  // Aggiorna i marker quando cambiano le task o i cleaners
+  // Aggiorna i marker quando cambiano le task
   useEffect(() => {
-    if (!googleMapRef.current || !isMapLoaded || cleaners.length === 0) return;
+    if (!googleMapRef.current || !isMapLoaded) return;
 
     // Rimuovi marker esistenti
     markersRef.current.forEach(marker => marker.setMap(null));
@@ -206,7 +206,7 @@ export default function MapSection({ tasks }: MapSectionProps) {
     if (tasksWithCoordinates.length > 0) {
       googleMapRef.current.fitBounds(bounds);
     }
-  }, [tasks, isMapLoaded, cleaners]);
+  }, [tasks, isMapLoaded]);
 
   const toggleFullscreen = () => {
     if (!mapRef.current) return;
