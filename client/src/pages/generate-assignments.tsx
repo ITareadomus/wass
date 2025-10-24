@@ -4,7 +4,7 @@ import PriorityColumn from "@/components/drag-drop/priority-column";
 import TimelineView from "@/components/timeline/timeline-view";
 import { useState, useEffect } from "react";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { MapPin, CalendarIcon } from "lucide-react";
+import { CalendarIcon } from "lucide-react";
 import { format } from "date-fns";
 import { it } from "date-fns/locale";
 import { Calendar } from "@/components/ui/calendar";
@@ -702,47 +702,11 @@ export default function GenerateAssignments() {
             />
           </div>
 
-          <div className="mt-6 grid grid-cols-1 xl:grid-cols-3 gap-6">
-            <div className="xl:col-span-2">
-              <TimelineView
-                personnel={[]}
-                tasks={allTasksWithAssignments}
-              />
-            </div>
-
-            <div className="bg-card rounded-lg border shadow-sm">
-              <div className="p-4 border-b border-border">
-                <h3 className="font-semibold text-foreground flex items-center justify-between">
-                  <span className="flex items-center">
-                    <MapPin className="w-5 h-5 mr-2 text-primary" />
-                    Mappa Assegnazioni
-                  </span>
-                  <button
-                    onClick={() => {
-                      const iframe = document.getElementById('map-iframe') as HTMLIFrameElement;
-                      if (iframe.requestFullscreen) {
-                        iframe.requestFullscreen();
-                      }
-                    }}
-                    className="px-3 py-1 text-sm bg-primary text-primary-foreground rounded hover:bg-primary/90"
-                  >
-                    Schermo intero
-                  </button>
-                </h3>
-              </div>
-              <div className="p-4">
-                <iframe
-                  id="map-iframe"
-                  width="100%"
-                  height="400"
-                  style={{ border: 0, pointerEvents: 'auto' }}
-                  loading="lazy"
-                  allowFullScreen
-                  referrerPolicy="no-referrer-when-downgrade"
-                  src="https://www.google.com/maps/embed?pb=!1m14!1m12!1m3!1d89506.83160109393!2d9.19!3d45.464!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!5e0!3m2!1sit!2sit!4v1234567890&gestureHandling=greedy&disableDefaultUI=true&zoomControl=true"
-                ></iframe>
-              </div>
-            </div>
+          <div className="mt-6">
+            <TimelineView
+              personnel={[]}
+              tasks={allTasksWithAssignments}
+            />
           </div>
         </DragDropContext>
       </div>
