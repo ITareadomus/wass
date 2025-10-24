@@ -1,6 +1,6 @@
 import { Personnel, TaskType as Task } from "@shared/schema";
 import { Calendar, RotateCcw, Users } from "lucide-react";
-import { useState, useEffect, useRef } from "react"; // Aggiunto useRef
+import { useState, useEffect } from "react";
 import { Droppable } from "react-beautiful-dnd";
 import TaskCard from "@/components/drag-drop/task-card";
 import {
@@ -72,7 +72,7 @@ export default function TimelineView({
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
         }
-
+        
         // Verifica che la risposta sia JSON
         const contentType = response.headers.get('content-type');
         if (!contentType || !contentType.includes('application/json')) {
@@ -80,7 +80,7 @@ export default function TimelineView({
           setCleaners([]);
           return;
         }
-
+        
         const selectedData = await response.json();
         console.log("Cleaners caricati da selected_cleaners.json:", selectedData);
 
@@ -149,18 +149,6 @@ export default function TimelineView({
     return null;
   }
 
-  // Ref per il container dello scroll orizzontale
-  const scrollContainerRef = useRef<HTMLDivElement>(null);
-
-  const handleWheel = (e: React.WheelEvent) => {
-    // Scroll orizzontale con la rotella del mouse
-    if (scrollContainerRef.current) {
-      e.preventDefault();
-      scrollContainerRef.current.scrollLeft += e.deltaY;
-    }
-  };
-
-
   return (
     <>
       <div className="bg-card rounded-lg border shadow-sm">
@@ -183,7 +171,7 @@ export default function TimelineView({
             </div>
           </div>
         </div>
-        <div className="p-4 overflow-x-auto" ref={scrollContainerRef} onWheel={handleWheel}>
+        <div className="p-4 overflow-x-auto">
           {/* Header con orari */}
           <div className="flex mb-2">
             <div className="w-24 flex-shrink-0"></div>
