@@ -1,32 +1,6 @@
 {
   "early_out_tasks": [
     {
-      "task_id": 217728,
-      "logistic_code": 1622,
-      "client_id": 61,
-      "premium": false,
-      "address": "Viale Certosa 61",
-      "lat": "45.491214",
-      "lng": "9.1485422",
-      "cleaning_time": 90,
-      "checkin_date": "2025-10-27",
-      "checkout_date": "2025-10-25",
-      "checkin_time": "17:00",
-      "checkout_time": null,
-      "pax_in": 1,
-      "pax_out": 1,
-      "small_equipment": false,
-      "operation_id": 2,
-      "confirmed_operation": false,
-      "straordinaria": false,
-      "type_apt": "B",
-      "alias": "NTM",
-      "customer_name": "NOTA-MI",
-      "reasons": [
-        "client_forced_eo"
-      ]
-    },
-    {
       "task_id": 217762,
       "logistic_code": 1643,
       "client_id": 87,
@@ -495,5 +469,5 @@
       ]
     }
   ],
-  "total_apartments": 19
+  "total_apartments": 18
 }
