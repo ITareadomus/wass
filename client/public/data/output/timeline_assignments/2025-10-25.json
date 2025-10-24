@@ -1,20 +1,6 @@
 {
   "assignments": [
     {
-      "task_id": "217786",
-      "logistic_code": "1051",
-      "cleanerId": 404,
-      "assignment_type": "manual_drag",
-      "sequence": 0
-    },
-    {
-      "task_id": "217926",
-      "logistic_code": "1600",
-      "cleanerId": 937,
-      "assignment_type": "manual_drag",
-      "sequence": 0
-    },
-    {
       "task_id": 217762,
       "logistic_code": "1643",
       "cleanerId": 132,

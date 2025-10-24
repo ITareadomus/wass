@@ -365,6 +365,32 @@
       ]
     },
     {
+      "task_id": 217786,
+      "logistic_code": 1051,
+      "client_id": 61,
+      "premium": false,
+      "address": "VIA FEZZAN 3/3",
+      "lat": "45.4581403",
+      "lng": "9.1462786",
+      "cleaning_time": 90,
+      "checkin_date": "2025-10-25",
+      "checkout_date": "2025-10-25",
+      "checkin_time": "11:00",
+      "checkout_time": null,
+      "pax_in": 2,
+      "pax_out": 1,
+      "small_equipment": false,
+      "operation_id": 2,
+      "confirmed_operation": false,
+      "straordinaria": false,
+      "type_apt": "B",
+      "alias": "NTM",
+      "customer_name": "NOTA-MI",
+      "reasons": [
+        "client_forced_eo"
+      ]
+    },
+    {
       "task_id": 217787,
       "logistic_code": 1135,
       "client_id": 61,
@@ -469,5 +495,5 @@
       ]
     }
   ],
-  "total_apartments": 18
+  "total_apartments": 19
 }

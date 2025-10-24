@@ -418,11 +418,25 @@
       ]
     }
   ],
-  "unassigned_tasks": [],
+  "unassigned_tasks": [
+    {
+      "task_id": 217786,
+      "logistic_code": 1051,
+      "address": "VIA FEZZAN 3/3",
+      "premium": false,
+      "straordinaria": false,
+      "cleaning_time": 90,
+      "checkout_time": "10:00",
+      "checkin_time": "11:00",
+      "alias": "NTM",
+      "apt_type": "B",
+      "reason": "no feasible assignment under simplified rules"
+    }
+  ],
   "meta": {
-    "total_tasks": 18,
+    "total_tasks": 19,
     "assigned": 18,
-    "unassigned": 0,
+    "unassigned": 1,
     "cleaners_used": 15,
     "max_tasks_per_cleaner": 3,
     "algorithm": "simplified_greedy",
