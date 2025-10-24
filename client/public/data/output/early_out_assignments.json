@@ -35,7 +35,7 @@
       },
       "tasks": [
         {
-          "task_id": 217728,
+          "task_id": 217903,
           "logistic_code": 1622,
           "address": "Viale Certosa 61",
           "lat": 45.491214,
@@ -47,6 +47,20 @@
           "followup": false,
           "sequence": 1,
           "travel_time": 0
+        },
+        {
+          "task_id": 217728,
+          "logistic_code": 1622,
+          "address": "Viale Certosa 61",
+          "lat": 45.491214,
+          "lng": 9.1485422,
+          "premium": false,
+          "cleaning_time": 90,
+          "start_time": "11:33",
+          "end_time": "13:03",
+          "followup": true,
+          "sequence": 2,
+          "travel_time": 3
         }
       ]
     },
@@ -135,20 +149,6 @@
       },
       "tasks": [
         {
-          "task_id": 217785,
-          "logistic_code": 839,
-          "address": "Via dei Biancospini 13",
-          "lat": 45.4494831,
-          "lng": 9.1400384,
-          "premium": false,
-          "cleaning_time": 60,
-          "start_time": "10:00",
-          "end_time": "11:00",
-          "followup": false,
-          "sequence": 1,
-          "travel_time": 0
-        },
-        {
           "task_id": 217767,
           "logistic_code": 1648,
           "address": "via Isabella d'Aragona 2",
@@ -156,11 +156,11 @@
           "lng": 9.1901083,
           "premium": false,
           "cleaning_time": 60,
-          "start_time": "11:33",
-          "end_time": "12:33",
-          "followup": true,
-          "sequence": 2,
-          "travel_time": 33
+          "start_time": "10:00",
+          "end_time": "11:00",
+          "followup": false,
+          "sequence": 1,
+          "travel_time": 0
         }
       ]
     },
@@ -249,6 +249,45 @@
       },
       "tasks": [
         {
+          "task_id": 217788,
+          "logistic_code": 1627,
+          "address": "via Nino Oxilia 24",
+          "lat": 45.491965,
+          "lng": 9.2137771,
+          "premium": false,
+          "cleaning_time": 60,
+          "start_time": "10:00",
+          "end_time": "11:00",
+          "followup": false,
+          "sequence": 1,
+          "travel_time": 0
+        },
+        {
+          "task_id": 217776,
+          "logistic_code": 1382,
+          "address": "VIA PONTE SEVESO 40",
+          "lat": 45.4901211,
+          "lng": 9.2057682,
+          "premium": false,
+          "cleaning_time": 90,
+          "start_time": "11:14",
+          "end_time": "12:44",
+          "followup": true,
+          "sequence": 2,
+          "travel_time": 14
+        }
+      ]
+    },
+    {
+      "cleaner": {
+        "id": 249,
+        "name": "Ogbodo Chidi",
+        "lastname": "Igwe",
+        "role": "Premium",
+        "premium": true
+      },
+      "tasks": [
+        {
           "task_id": 217778,
           "logistic_code": 1401,
           "address": "VIALE ZARA, 118",
@@ -266,9 +305,9 @@
     },
     {
       "cleaner": {
-        "id": 249,
-        "name": "Ogbodo Chidi",
-        "lastname": "Igwe",
+        "id": 785,
+        "name": "RACHEL",
+        "lastname": "OTSHINGA",
         "role": "Premium",
         "premium": true
       },
@@ -291,45 +330,6 @@
     },
     {
       "cleaner": {
-        "id": 785,
-        "name": "RACHEL",
-        "lastname": "OTSHINGA",
-        "role": "Premium",
-        "premium": true
-      },
-      "tasks": [
-        {
-          "task_id": 217776,
-          "logistic_code": 1382,
-          "address": "VIA PONTE SEVESO 40",
-          "lat": 45.4901211,
-          "lng": 9.2057682,
-          "premium": false,
-          "cleaning_time": 90,
-          "start_time": "10:00",
-          "end_time": "11:30",
-          "followup": false,
-          "sequence": 1,
-          "travel_time": 0
-        },
-        {
-          "task_id": 217783,
-          "logistic_code": 1381,
-          "address": "VIA PONTE SEVESO 40",
-          "lat": 45.4901211,
-          "lng": 9.2057682,
-          "premium": false,
-          "cleaning_time": 90,
-          "start_time": "11:33",
-          "end_time": "13:03",
-          "followup": true,
-          "sequence": 2,
-          "travel_time": 3
-        }
-      ]
-    },
-    {
-      "cleaner": {
         "id": 1031,
         "name": "YAH PRISCA LEA",
         "lastname": "ADOU",
@@ -338,15 +338,15 @@
       },
       "tasks": [
         {
-          "task_id": 217788,
-          "logistic_code": 1627,
-          "address": "via Nino Oxilia 24",
-          "lat": 45.491965,
-          "lng": 9.2137771,
+          "task_id": 217783,
+          "logistic_code": 1381,
+          "address": "VIA PONTE SEVESO 40",
+          "lat": 45.4901211,
+          "lng": 9.2057682,
           "premium": false,
-          "cleaning_time": 60,
+          "cleaning_time": 90,
           "start_time": "10:00",
-          "end_time": "11:00",
+          "end_time": "11:30",
           "followup": false,
           "sequence": 1,
           "travel_time": 0
@@ -363,15 +363,15 @@
       },
       "tasks": [
         {
-          "task_id": 217903,
-          "logistic_code": 1622,
-          "address": "Viale Certosa 61",
-          "lat": 45.491214,
-          "lng": 9.1485422,
+          "task_id": 217785,
+          "logistic_code": 839,
+          "address": "Via dei Biancospini 13",
+          "lat": 45.4494831,
+          "lng": 9.1400384,
           "premium": false,
-          "cleaning_time": 90,
+          "cleaning_time": 60,
           "start_time": "10:00",
-          "end_time": "11:30",
+          "end_time": "11:00",
           "followup": false,
           "sequence": 1,
           "travel_time": 0
@@ -388,20 +388,6 @@
       },
       "tasks": [
         {
-          "task_id": 217787,
-          "logistic_code": 1135,
-          "address": "VIA CORSICO,  5",
-          "lat": 45.4517049,
-          "lng": 9.1727477,
-          "premium": false,
-          "cleaning_time": 60,
-          "start_time": "10:00",
-          "end_time": "11:00",
-          "followup": false,
-          "sequence": 1,
-          "travel_time": 0
-        },
-        {
           "task_id": 217904,
           "logistic_code": 618,
           "address": "VIA VOGHERA, 4",
@@ -409,7 +395,21 @@
           "lng": 9.168536,
           "premium": false,
           "cleaning_time": 30,
-          "start_time": "11:13",
+          "start_time": "10:00",
+          "end_time": "10:30",
+          "followup": false,
+          "sequence": 1,
+          "travel_time": 0
+        },
+        {
+          "task_id": 217787,
+          "logistic_code": 1135,
+          "address": "VIA CORSICO,  5",
+          "lat": 45.4517049,
+          "lng": 9.1727477,
+          "premium": false,
+          "cleaning_time": 60,
+          "start_time": "10:43",
           "end_time": "11:43",
           "followup": true,
           "sequence": 2,
@@ -418,11 +418,25 @@
       ]
     }
   ],
-  "unassigned_tasks": [],
+  "unassigned_tasks": [
+    {
+      "task_id": 217786,
+      "logistic_code": 1051,
+      "address": "VIA FEZZAN 3/3",
+      "premium": false,
+      "straordinaria": false,
+      "cleaning_time": 90,
+      "checkout_time": "10:00",
+      "checkin_time": "11:00",
+      "alias": "NTM",
+      "apt_type": "B",
+      "reason": "no feasible assignment under simplified rules"
+    }
+  ],
   "meta": {
-    "total_tasks": 18,
+    "total_tasks": 19,
     "assigned": 18,
-    "unassigned": 0,
+    "unassigned": 1,
     "cleaners_used": 15,
     "max_tasks_per_cleaner": 3,
     "algorithm": "simplified_greedy",
