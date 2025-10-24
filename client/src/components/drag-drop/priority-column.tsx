@@ -20,6 +20,7 @@ export default function PriorityColumn({
   droppableId,
   icon,
 }: PriorityColumnProps) {
+  const [isAssigning, setIsAssigning] = useState(false);
   const { toast } = useToast();
 
   const getColumnClass = (priority: string, tasks: Task[]) => {
@@ -60,9 +61,12 @@ export default function PriorityColumn({
   };
 
   const handleTimelineAssignment = async () => {
-    if (priority === 'early-out') {
-      // Esegui lo script di assegnazione assign_eo.py
-      try {
+    if (isAssigning) return;
+    
+    setIsAssigning(true);
+    
+    try {
+      if (priority === 'early-out') {
         // Ottieni la data selezionata dal localStorage
         const savedDate = localStorage.getItem('selected_work_date');
         const selectedDate = savedDate ? new Date(savedDate) : new Date();
@@ -76,14 +80,14 @@ export default function PriorityColumn({
         });
 
         if (!response.ok) {
-          throw new Error('Errore durante l\'assegnazione ottimizzata');
+          const errorData = await response.json().catch(() => ({}));
+          throw new Error(errorData.error || 'Errore durante l\'assegnazione ottimizzata');
         }
 
         const result = await response.json();
         console.log('Assegnazione ottimizzata completata:', result);
 
         toast({
-          variant: "success",
           title: "✅ EARLY-OUT assegnati con successo!",
         });
 
@@ -93,17 +97,8 @@ export default function PriorityColumn({
         }
 
         // Ricarica la pagina per aggiornare i marker sulla mappa
-        window.location.reload();
-      } catch (error: any) {
-        console.error('Errore durante l\'assegnazione:', error);
-        toast({
-          variant: "destructive",
-          title: "Errore durante l'assegnazione",
-          description: error.message,
-        });
-      }
-    } else if (priority === 'high') {
-      try {
+        setTimeout(() => window.location.reload(), 500);
+      } else if (priority === 'high') {
         // Ottieni la data selezionata dal localStorage
         const savedDate = localStorage.getItem('selected_work_date');
         const selectedDate = savedDate ? new Date(savedDate) : new Date();
@@ -117,14 +112,14 @@ export default function PriorityColumn({
         });
 
         if (!response.ok) {
-          throw new Error('Errore durante l\'assegnazione HP');
+          const errorData = await response.json().catch(() => ({}));
+          throw new Error(errorData.error || 'Errore durante l\'assegnazione HP');
         }
 
         const result = await response.json();
         console.log('Assegnazione HP completata:', result);
 
         toast({
-          variant: "success",
           title: "✅ HIGH PRIORITY assegnati con successo!",
         });
 
@@ -134,29 +129,23 @@ export default function PriorityColumn({
         }
 
         // Ricarica la pagina per aggiornare i marker sulla mappa
-        window.location.reload();
-      } catch (error: any) {
-        console.error('Errore nell\'assegnazione HP:', error);
-        toast({
-          title: "❌ HIGH-PRIORITY non assegnati, errore!",
-          variant: "destructive",
-        });
-      }
-    } else if (priority === 'low') {
-      try {
+        setTimeout(() => window.location.reload(), 500);
+      } else if (priority === 'low') {
         // Placeholder per low priority
         console.log('Low priority assignment non ancora implementato');
         toast({
-          variant: "success",
           title: "✅ LOW-PRIORITY assegnati con successo!",
         });
-      } catch (error) {
-        console.error('Errore nell\'assegnazione low priority:', error);
-        toast({
-          title: "❌ LOW-PRIORITY non assegnati, errore nel caricamento!",
-          variant: "destructive",
-        });
       }
+    } catch (error: any) {
+      console.error('Errore durante l\'assegnazione:', error);
+      toast({
+        title: `❌ Errore nell'assegnazione ${priority.toUpperCase()}`,
+        description: error.message || 'Errore sconosciuto',
+        variant: "destructive",
+      });
+    } finally {
+      setIsAssigning(false);
     }
   };
 
@@ -177,10 +166,19 @@ export default function PriorityColumn({
           size="sm"
           onClick={handleTimelineAssignment}
           className="text-xs px-2 py-1 h-7"
-          disabled={tasks.length === 0}
+          disabled={tasks.length === 0 || isAssigning}
         >
-          <Calendar className="w-3 h-3 mr-1" />
-          Assegna
+          {isAssigning ? (
+            <>
+              <span className="animate-spin mr-1">⏳</span>
+              Assegnando...
+            </>
+          ) : (
+            <>
+              <Calendar className="w-3 h-3 mr-1" />
+              Assegna
+            </>
+          )}
         </Button>
       </div>
 
