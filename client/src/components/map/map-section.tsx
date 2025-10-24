@@ -1,6 +1,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { TaskType as Task } from "@shared/schema";
+import TaskCard from "@/components/drag-drop/task-card";
 
 interface MapSectionProps {
   tasks: Task[];
@@ -19,6 +20,7 @@ export default function MapSection({ tasks }: MapSectionProps) {
   const markersRef = useRef<any[]>([]);
   const [isMapLoaded, setIsMapLoaded] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
 
   // Carica Google Maps API
   useEffect(() => {
@@ -68,19 +70,18 @@ export default function MapSection({ tasks }: MapSectionProps) {
     markersRef.current.forEach(marker => marker.setMap(null));
     markersRef.current = [];
 
-    // Filtra task assegnate con coordinate valide
-    const assignedTasks = tasks.filter(task => {
-      const hasAssignment = (task as any).assignedCleaner;
+    // Filtra task con coordinate valide
+    const tasksWithCoordinates = tasks.filter(task => {
       const hasCoordinates = task.address && (task as any).lat && (task as any).lng;
-      return hasAssignment && hasCoordinates;
+      return hasCoordinates;
     });
 
-    if (assignedTasks.length === 0) return;
+    if (tasksWithCoordinates.length === 0) return;
 
     const bounds = new window.google.maps.LatLngBounds();
 
-    // Crea marker per ogni task assegnata
-    assignedTasks.forEach((task, index) => {
+    // Crea marker per ogni task
+    tasksWithCoordinates.forEach((task, index) => {
       const lat = parseFloat((task as any).lat);
       const lng = parseFloat((task as any).lng);
 
@@ -88,11 +89,8 @@ export default function MapSection({ tasks }: MapSectionProps) {
 
       const position = { lat, lng };
       
-      // Colore marker in base alla priorità
-      let markerColor = '#3B82F6'; // blue di default
-      if (task.priority === 'early-out') markerColor = '#EF4444'; // red
-      else if (task.priority === 'high') markerColor = '#F59E0B'; // amber
-      else if (task.priority === 'low') markerColor = '#10B981'; // green
+      // Tutti i marker sono grigi
+      const markerColor = '#6B7280'; // gray-500
 
       const marker = new window.google.maps.Marker({
         position,
@@ -114,37 +112,9 @@ export default function MapSection({ tasks }: MapSectionProps) {
         }
       });
 
-      // Info window per il marker
-      const infoWindow = new window.google.maps.InfoWindow({
-        content: `
-          <div style="padding: 8px; min-width: 200px;">
-            <h3 style="font-weight: bold; margin: 0 0 8px 0; color: #1f2937;">
-              ${task.name} ${task.alias ? `(${task.alias})` : ''}
-            </h3>
-            <p style="margin: 4px 0; color: #4b5563;">
-              <strong>Cliente:</strong> ${task.type || 'N/A'}
-            </p>
-            <p style="margin: 4px 0; color: #4b5563;">
-              <strong>Indirizzo:</strong> ${task.address}
-            </p>
-            <p style="margin: 4px 0; color: #4b5563;">
-              <strong>Durata:</strong> ${task.duration}h
-            </p>
-            <p style="margin: 4px 0; color: #4b5563;">
-              <strong>Orario:</strong> ${(task as any).startTime || 'Da programmare'}
-            </p>
-            <p style="margin: 4px 0;">
-              <span style="background-color: ${markerColor}; color: white; padding: 2px 8px; border-radius: 4px; font-size: 12px;">
-                ${task.priority?.toUpperCase()}
-              </span>
-              ${task.premium ? '<span style="background-color: #9333ea; color: white; padding: 2px 8px; border-radius: 4px; font-size: 12px; margin-left: 4px;">PREMIUM</span>' : ''}
-            </p>
-          </div>
-        `
-      });
-
+      // Click sul marker per mostrare la TaskCard
       marker.addListener('click', () => {
-        infoWindow.open(googleMapRef.current, marker);
+        setSelectedTask(task);
       });
 
       markersRef.current.push(marker);
@@ -152,7 +122,7 @@ export default function MapSection({ tasks }: MapSectionProps) {
     });
 
     // Adatta la vista per mostrare tutti i marker
-    if (assignedTasks.length > 0) {
+    if (tasksWithCoordinates.length > 0) {
       googleMapRef.current.fitBounds(bounds);
     }
   }, [tasks, isMapLoaded]);
@@ -202,9 +172,9 @@ export default function MapSection({ tasks }: MapSectionProps) {
                 d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" 
               />
             </svg>
-            Mappa Assegnazioni
+            Mappa Appartamenti
             <span className="ml-2 text-sm font-normal text-muted-foreground">
-              ({tasks.filter(t => (t as any).assignedCleaner).length} assegnate)
+              ({tasks.filter(t => (t as any).lat && (t as any).lng).length} appartamenti)
             </span>
           </span>
           <button
@@ -215,7 +185,7 @@ export default function MapSection({ tasks }: MapSectionProps) {
           </button>
         </h3>
       </div>
-      <div className="p-4">
+      <div className="p-4 relative">
         <div 
           ref={mapRef} 
           className="w-full h-[400px] rounded-lg bg-muted"
@@ -230,6 +200,69 @@ export default function MapSection({ tasks }: MapSectionProps) {
             </div>
           )}
         </div>
+
+        {/* TaskCard overlay quando un marker è selezionato */}
+        {selectedTask && (
+          <div className="absolute top-4 right-4 z-10 max-w-sm">
+            <div className="bg-background rounded-lg shadow-2xl border-2 border-primary p-4">
+              <div className="flex justify-between items-start mb-2">
+                <h4 className="font-bold text-lg">Dettagli Appartamento</h4>
+                <button
+                  onClick={() => setSelectedTask(null)}
+                  className="text-muted-foreground hover:text-foreground"
+                >
+                  ✕
+                </button>
+              </div>
+              <div className="space-y-2 text-sm">
+                <div>
+                  <span className="font-semibold">Codice ADAM:</span> {selectedTask.name}
+                </div>
+                {selectedTask.alias && (
+                  <div>
+                    <span className="font-semibold">Alias:</span> {selectedTask.alias}
+                  </div>
+                )}
+                <div>
+                  <span className="font-semibold">Cliente:</span> {selectedTask.customer_name || selectedTask.type}
+                </div>
+                <div>
+                  <span className="font-semibold">Indirizzo:</span> {selectedTask.address}
+                </div>
+                <div>
+                  <span className="font-semibold">Durata pulizie:</span> {selectedTask.duration.replace(".", ":")} ore
+                </div>
+                {(selectedTask as any).checkout_time && (
+                  <div>
+                    <span className="font-semibold">Checkout:</span> {(selectedTask as any).checkout_time}
+                  </div>
+                )}
+                {(selectedTask as any).checkin_time && (
+                  <div>
+                    <span className="font-semibold">Checkin:</span> {(selectedTask as any).checkin_time}
+                  </div>
+                )}
+                <div className="pt-2 flex gap-2">
+                  {selectedTask.is_straordinaria && (
+                    <span className="bg-red-500 text-white px-2 py-1 rounded text-xs">
+                      Straordinaria
+                    </span>
+                  )}
+                  {selectedTask.premium && (
+                    <span className="bg-yellow-400 text-black px-2 py-1 rounded text-xs">
+                      Premium
+                    </span>
+                  )}
+                  {!selectedTask.premium && !selectedTask.is_straordinaria && (
+                    <span className="bg-green-500 text-white px-2 py-1 rounded text-xs">
+                      Standard
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
