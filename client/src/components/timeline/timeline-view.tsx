@@ -61,7 +61,29 @@ export default function TimelineView({
   ];
 
   const getCleanerColor = (index: number) => {
-    return cleanerColors[index % cleanerColors.length];
+    const colors = [
+      { bg: "#DBEAFE", text: "#1E40AF" }, // blue
+      { bg: "#FEE2E2", text: "#991B1B" }, // red
+      { bg: "#FEF3C7", text: "#92400E" }, // amber
+      { bg: "#D1FAE5", text: "#065F46" }, // emerald
+      { bg: "#E0E7FF", text: "#4338CA" }, // indigo
+      { bg: "#FCE7F3", text: "#9F1239" }, // pink
+      { bg: "#CCFBF1", text: "#115E59" }, // teal
+      { bg: "#FED7AA", text: "#9A3412" }, // orange
+      { bg: "#E9D5FF", text: "#6B21A8" }, // purple
+      { bg: "#FEF9C3", text: "#854D0E" }, // yellow
+      { bg: "#BFDBFE", text: "#1E3A8A" }, // light blue
+      { bg: "#FBCFE8", text: "#831843" }, // light pink
+      { bg: "#D9F99D", text: "#3F6212" }, // lime
+      { bg: "#BAE6FD", text: "#075985" }, // sky
+      { bg: "#DDD6FE", text: "#5B21B6" }, // violet
+      { bg: "#FED7D7", text: "#7F1D1D" }, // rose
+      { bg: "#A7F3D0", text: "#064E3B" }, // light emerald
+      { bg: "#FDE68A", text: "#78350F" }, // light amber
+      { bg: "#C7D2FE", text: "#3730A3" }, // light indigo
+      { bg: "#99F6E4", text: "#134E4A" }, // light teal
+    ];
+    return colors[index % colors.length];
   };
 
   useEffect(() => {
@@ -72,7 +94,7 @@ export default function TimelineView({
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
         }
-        
+
         // Verifica che la risposta sia JSON
         const contentType = response.headers.get('content-type');
         if (!contentType || !contentType.includes('application/json')) {
@@ -80,7 +102,7 @@ export default function TimelineView({
           setCleaners([]);
           return;
         }
-        
+
         const selectedData = await response.json();
         console.log("Cleaners caricati da selected_cleaners.json:", selectedData);
 
