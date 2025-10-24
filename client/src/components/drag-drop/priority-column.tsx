@@ -67,7 +67,7 @@ export default function PriorityColumn({
         const savedDate = localStorage.getItem('selected_work_date');
         const selectedDate = savedDate ? new Date(savedDate) : new Date();
         const dateStr = selectedDate.toISOString().split('T')[0];
-        
+
         console.log('Esecuzione assign_eo.py per data:', dateStr);
         const response = await fetch('/api/run-optimizer', {
           method: 'POST',
@@ -87,15 +87,19 @@ export default function PriorityColumn({
           title: "✅ EARLY-OUT assegnati con successo!",
         });
 
-        // IMPORTANTE: ricarica tutti i task per aggiornare la timeline con le nuove assegnazioni
+        // Ricarica i task per riflettere le nuove assegnazioni
         if ((window as any).reloadAllTasks) {
           await (window as any).reloadAllTasks();
         }
-      } catch (error) {
-        console.error('Errore nell\'assegnazione EO:', error);
+
+        // Ricarica la pagina per aggiornare i marker sulla mappa
+        window.location.reload();
+      } catch (error: any) {
+        console.error('Errore durante l\'assegnazione:', error);
         toast({
-          title: "❌ EARLY-OUT non assegnati, errore!",
           variant: "destructive",
+          title: "Errore durante l'assegnazione",
+          description: error.message,
         });
       }
     } else if (priority === 'high') {
@@ -104,7 +108,7 @@ export default function PriorityColumn({
         const savedDate = localStorage.getItem('selected_work_date');
         const selectedDate = savedDate ? new Date(savedDate) : new Date();
         const dateStr = selectedDate.toISOString().split('T')[0];
-        
+
         console.log('Esecuzione assign_hp.py per data:', dateStr);
         const response = await fetch('/api/assign-hp', {
           method: 'POST',
@@ -121,19 +125,17 @@ export default function PriorityColumn({
 
         toast({
           variant: "success",
-          title: "✅ HIGH-PRIORITY assegnati con successo!",
+          title: "✅ HIGH PRIORITY assegnati con successo!",
         });
 
-        // Ricarica le assegnazioni HP prima di ricaricare i task
-        if ((window as any).reloadHighPriorityAssignments) {
-          await (window as any).reloadHighPriorityAssignments();
-        }
-
-        // IMPORTANTE: ricarica tutti i task per aggiornare la timeline
+        // Ricarica i task
         if ((window as any).reloadAllTasks) {
           await (window as any).reloadAllTasks();
         }
-      } catch (error) {
+
+        // Ricarica la pagina per aggiornare i marker sulla mappa
+        window.location.reload();
+      } catch (error: any) {
         console.error('Errore nell\'assegnazione HP:', error);
         toast({
           title: "❌ HIGH-PRIORITY non assegnati, errore!",
