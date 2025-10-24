@@ -65,6 +65,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const timelineAssignmentsBasePath = path.join(process.cwd(), 'client/public/data/output/timeline_assignments');
       const timelineAssignmentsPath = path.join(timelineAssignmentsBasePath, `${workDate}.json`);
 
+      console.log(`[save-timeline-assignment] Saving to: ${timelineAssignmentsPath}`);
+      console.log(`[save-timeline-assignment] Data: taskId=${taskId}, cleanerId=${cleanerId}, logisticCode=${logisticCode}, date=${workDate}`);
+
       // Crea la directory se non esiste
       await fs.mkdir(timelineAssignmentsBasePath, { recursive: true });
 
@@ -73,8 +76,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       try {
         const existingData = await fs.readFile(timelineAssignmentsPath, 'utf8');
         assignmentsData = JSON.parse(existingData);
+        console.log(`[save-timeline-assignment] Loaded existing data with ${assignmentsData.assignments.length} assignments`);
       } catch (error) {
-        // File non esiste, usa struttura vuota
+        console.log(`[save-timeline-assignment] No existing file, creating new`);
       }
 
       // Se sono fornite assegnazioni multiple (bulk save)
@@ -94,6 +98,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           ? Math.max(...cleanerAssignments.map((a: any) => a.sequence || 0))
           : -1;
         const newSequence = maxSequence + 1;
+
+        console.log(`[save-timeline-assignment] New sequence: ${newSequence} for cleaner ${cleanerId}`);
 
         // Carica i dati completi del task dai file JSON per includerli nella timeline
         const tasksFilePaths = [
@@ -116,7 +122,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
 
         // Aggiungi la nuova assegnazione con sequence e tutti i dati del task
-        assignmentsData.assignments.push({
+        const newAssignment = {
           task_id: taskData?.task_id || taskId,
           logistic_code: logisticCode,
           cleanerId,
@@ -140,11 +146,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
           alias: taskData?.alias,
           customer_name: taskData?.customer_name,
           small_equipment: taskData?.small_equipment
-        });
+        };
+        
+        assignmentsData.assignments.push(newAssignment);
+        console.log(`[save-timeline-assignment] Added assignment:`, newAssignment);
       }
 
-      // Salva il file
-      await fs.writeFile(timelineAssignmentsPath, JSON.stringify(assignmentsData, null, 2));
+      // Salva il file con flag per forzare il flush
+      await fs.writeFile(timelineAssignmentsPath, JSON.stringify(assignmentsData, null, 2), { encoding: 'utf8', flag: 'w' });
+      console.log(`[save-timeline-assignment] File saved successfully with ${assignmentsData.assignments.length} total assignments`);
 
       res.json({ success: true, message: "Assegnazione salvata nella timeline con successo" });
     } catch (error: any) {
@@ -189,8 +199,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log(`Assegnazioni dopo la rimozione:`, assignmentsData.assignments);
       console.log(`Rimosse ${initialLength - assignmentsData.assignments.length} assegnazioni`);
 
-      // Salva il file
-      await fs.writeFile(timelineAssignmentsPath, JSON.stringify(assignmentsData, null, 2));
+      // Salva il file con flag per forzare il flush
+      await fs.writeFile(timelineAssignmentsPath, JSON.stringify(assignmentsData, null, 2), { encoding: 'utf8', flag: 'w' });
+      console.log(`[remove-timeline-assignment] File saved successfully with ${assignmentsData.assignments.length} remaining assignments`);
 
       res.json({ success: true, message: "Assegnazione rimossa dalla timeline con successo" });
     } catch (error: any) {
