@@ -63,10 +63,16 @@ export default function PriorityColumn({
     if (priority === 'early-out') {
       // Esegui lo script di assegnazione assign_eo.py
       try {
-        console.log('Esecuzione assign_eo.py...');
+        // Ottieni la data selezionata dal localStorage
+        const savedDate = localStorage.getItem('selected_work_date');
+        const selectedDate = savedDate ? new Date(savedDate) : new Date();
+        const dateStr = selectedDate.toISOString().split('T')[0];
+        
+        console.log('Esecuzione assign_eo.py per data:', dateStr);
         const response = await fetch('/api/run-optimizer', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' }
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ date: dateStr })
         });
 
         if (!response.ok) {
@@ -94,10 +100,16 @@ export default function PriorityColumn({
       }
     } else if (priority === 'high') {
       try {
-        console.log('Esecuzione assign_hp.py...');
+        // Ottieni la data selezionata dal localStorage
+        const savedDate = localStorage.getItem('selected_work_date');
+        const selectedDate = savedDate ? new Date(savedDate) : new Date();
+        const dateStr = selectedDate.toISOString().split('T')[0];
+        
+        console.log('Esecuzione assign_hp.py per data:', dateStr);
         const response = await fetch('/api/assign-hp', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' }
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ date: dateStr })
         });
 
         if (!response.ok) {

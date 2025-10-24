@@ -504,21 +504,16 @@ def main():
     print()
     print(f"💾 Risultati salvati in: {OUTPUT_ASSIGN}")
     
-    # Determina la data di riferimento dal primo task
-    ref_date = None
-    for task in tasks:
-        if hasattr(task, 'checkin_time') and task.checkin_time:
-            from datetime import datetime
-            try:
-                # Estrai la data dal timestamp (assumendo formato ISO)
-                ref_date = datetime.now().strftime("%Y-%m-%d")
-                break
-            except:
-                pass
-    
-    if not ref_date:
+    # Usa la data passata come argomento da riga di comando
+    import sys
+    if len(sys.argv) > 1:
+        ref_date = sys.argv[1]
+        print(f"📅 Usando data da argomento: {ref_date}")
+    else:
+        # Fallback: usa la data corrente
         from datetime import datetime
         ref_date = datetime.now().strftime("%Y-%m-%d")
+        print(f"📅 Nessuna data specificata, usando: {ref_date}")
     
     # Update timeline_assignments/{date}.json
     timeline_dir = OUTPUT_ASSIGN.parent / "timeline_assignments"
