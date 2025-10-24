@@ -397,33 +397,7 @@
         "same_day_checkin_between_eo_hp",
         "premium"
       ]
-    },
-    {
-      "task_id": 217926,
-      "logistic_code": 1600,
-      "client_id": 3,
-      "premium": true,
-      "address": "VIA VIVAIO, 15",
-      "lat": "45.46967",
-      "lng": "9.2034764",
-      "cleaning_time": 120,
-      "checkin_date": "2025-10-25",
-      "checkout_date": "2025-10-25",
-      "checkin_time": "19:30",
-      "checkout_time": null,
-      "pax_in": 3,
-      "pax_out": 2,
-      "small_equipment": false,
-      "operation_id": 2,
-      "confirmed_operation": false,
-      "straordinaria": false,
-      "type_apt": "B",
-      "alias": "TBR",
-      "customer_name": "THE BEST RENT S.r.l.",
-      "reasons": [
-        "premium"
-      ]
     }
   ],
-  "total_apartments": 16
+  "total_apartments": 15
 }
