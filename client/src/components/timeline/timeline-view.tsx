@@ -11,6 +11,8 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { useToast } from "@/components/ui/use-toast";
+import { format } from "date-fns";
 
 interface TimelineViewProps {
   personnel: Personnel[];
@@ -40,6 +42,7 @@ export default function TimelineView({
   const [cleaners, setCleaners] = useState<Cleaner[]>([]);
   const [selectedCleaner, setSelectedCleaner] = useState<Cleaner | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const { toast } = useToast();
 
   const timeSlots = [
     "10:00", "11:00", "12:00", "13:00", "14:00",
@@ -72,7 +75,7 @@ export default function TimelineView({
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
         }
-        
+
         // Verifica che la risposta sia JSON
         const contentType = response.headers.get('content-type');
         if (!contentType || !contentType.includes('application/json')) {
@@ -80,7 +83,7 @@ export default function TimelineView({
           setCleaners([]);
           return;
         }
-        
+
         const selectedData = await response.json();
         console.log("Cleaners caricati da selected_cleaners.json:", selectedData);
 
@@ -102,20 +105,48 @@ export default function TimelineView({
 
   const handleResetAssignments = async () => {
     try {
-      // Svuota timeline_assignments.json
-      const response = await fetch('/api/reset-timeline-assignments', {
+      const savedDate = localStorage.getItem('selected_work_date');
+      const selectedDate = savedDate ? new Date(savedDate) : new Date();
+      const dateStr = format(selectedDate, "yyyy-MM-dd");
+
+      // 1. Reset timeline assignments
+      const resetResponse = await fetch('/api/reset-timeline-assignments', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ date: dateStr })
       });
 
-      if (response.ok) {
-        // Ricarica la pagina per ripristinare lo stato iniziale
-        window.location.reload();
-      } else {
-        console.error('Errore nel reset delle assegnazioni');
+      if (!resetResponse.ok) {
+        throw new Error('Errore nel reset della timeline');
+      }
+
+      // 2. Riesegui extract-data per ripopolare i contenitori
+      const extractResponse = await fetch('/api/extract-data', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ date: dateStr })
+      });
+
+      if (!extractResponse.ok) {
+        throw new Error('Errore nella riestrazione dei dati');
+      }
+
+      toast({
+        title: "Reset completato",
+        description: "Le assegnazioni sono state resettate e i contenitori ripopolati",
+      });
+
+      // 3. Ricarica i task
+      if ((window as any).reloadAllTasks) {
+        await (window as any).reloadAllTasks();
       }
     } catch (error) {
-      console.error('Errore nella chiamata API di reset:', error);
+      console.error('Errore nel reset:', error);
+      toast({
+        title: "Errore",
+        description: "Impossibile resettare le assegnazioni",
+        variant: "destructive",
+      });
     }
   };
 
