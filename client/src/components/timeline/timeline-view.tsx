@@ -61,42 +61,43 @@ export default function TimelineView({
   ];
 
   const getCleanerColor = (index: number) => {
+    // Colori distribuiti per massimo contrasto visivo tra consecutivi
     const colors = [
-      { bg: "#EF4444", text: "#FFFFFF" }, // red-500
-      { bg: "#F97316", text: "#FFFFFF" }, // orange-500
-      { bg: "#F59E0B", text: "#000000" }, // amber-500
-      { bg: "#EAB308", text: "#000000" }, // yellow-500
-      { bg: "#84CC16", text: "#000000" }, // lime-500
-      { bg: "#22C55E", text: "#000000" }, // green-500
-      { bg: "#10B981", text: "#000000" }, // emerald-500
-      { bg: "#14B8A6", text: "#000000" }, // teal-500
-      { bg: "#06B6D4", text: "#000000" }, // cyan-500
-      { bg: "#0EA5E9", text: "#FFFFFF" }, // sky-500
-      { bg: "#3B82F6", text: "#FFFFFF" }, // blue-500
-      { bg: "#6366F1", text: "#FFFFFF" }, // indigo-500
-      { bg: "#8B5CF6", text: "#FFFFFF" }, // violet-500
-      { bg: "#A855F7", text: "#FFFFFF" }, // purple-500
-      { bg: "#D946EF", text: "#FFFFFF" }, // fuchsia-500
-      { bg: "#EC4899", text: "#FFFFFF" }, // pink-500
-      { bg: "#F43F5E", text: "#FFFFFF" }, // rose-500
-      { bg: "#DC2626", text: "#FFFFFF" }, // red-600
-      { bg: "#EA580C", text: "#FFFFFF" }, // orange-600
-      { bg: "#D97706", text: "#FFFFFF" }, // amber-600
-      { bg: "#CA8A04", text: "#000000" }, // yellow-600
-      { bg: "#65A30D", text: "#FFFFFF" }, // lime-600
-      { bg: "#16A34A", text: "#FFFFFF" }, // green-600
-      { bg: "#059669", text: "#FFFFFF" }, // emerald-600
-      { bg: "#0D9488", text: "#FFFFFF" }, // teal-600
-      { bg: "#0891B2", text: "#FFFFFF" }, // cyan-600
-      { bg: "#0284C7", text: "#FFFFFF" }, // sky-600
-      { bg: "#2563EB", text: "#FFFFFF" }, // blue-600
-      { bg: "#4F46E5", text: "#FFFFFF" }, // indigo-600
-      { bg: "#7C3AED", text: "#FFFFFF" }, // violet-600
-      { bg: "#9333EA", text: "#FFFFFF" }, // purple-600
-      { bg: "#C026D3", text: "#FFFFFF" }, // fuchsia-600
-      { bg: "#DB2777", text: "#FFFFFF" }, // pink-600
-      { bg: "#E11D48", text: "#FFFFFF" }, // rose-600
-      { bg: "#15803D", text: "#FFFFFF" }, // green-700
+      { bg: "#EF4444", text: "#FFFFFF" }, // rosso
+      { bg: "#3B82F6", text: "#FFFFFF" }, // blu
+      { bg: "#22C55E", text: "#000000" }, // verde
+      { bg: "#D946EF", text: "#FFFFFF" }, // fucsia
+      { bg: "#F59E0B", text: "#000000" }, // ambra
+      { bg: "#8B5CF6", text: "#FFFFFF" }, // viola
+      { bg: "#14B8A6", text: "#000000" }, // teal
+      { bg: "#F97316", text: "#FFFFFF" }, // arancione
+      { bg: "#6366F1", text: "#FFFFFF" }, // indaco
+      { bg: "#84CC16", text: "#000000" }, // lime
+      { bg: "#EC4899", text: "#FFFFFF" }, // rosa
+      { bg: "#0EA5E9", text: "#FFFFFF" }, // sky
+      { bg: "#DC2626", text: "#FFFFFF" }, // rosso scuro
+      { bg: "#10B981", text: "#000000" }, // smeraldo
+      { bg: "#A855F7", text: "#FFFFFF" }, // viola chiaro
+      { bg: "#EAB308", text: "#000000" }, // giallo
+      { bg: "#06B6D4", text: "#000000" }, // ciano
+      { bg: "#F43F5E", text: "#FFFFFF" }, // rose
+      { bg: "#2563EB", text: "#FFFFFF" }, // blu scuro
+      { bg: "#16A34A", text: "#FFFFFF" }, // verde scuro
+      { bg: "#C026D3", text: "#FFFFFF" }, // fucsia scuro
+      { bg: "#EA580C", text: "#FFFFFF" }, // arancione scuro
+      { bg: "#7C3AED", text: "#FFFFFF" }, // viola medio
+      { bg: "#0891B2", text: "#FFFFFF" }, // ciano scuro
+      { bg: "#CA8A04", text: "#000000" }, // giallo scuro
+      { bg: "#DB2777", text: "#FFFFFF" }, // rosa scuro
+      { bg: "#4F46E5", text: "#FFFFFF" }, // indaco scuro
+      { bg: "#65A30D", text: "#FFFFFF" }, // lime scuro
+      { bg: "#059669", text: "#FFFFFF" }, // smeraldo scuro
+      { bg: "#9333EA", text: "#FFFFFF" }, // viola profondo
+      { bg: "#D97706", text: "#FFFFFF" }, // ambra scuro
+      { bg: "#E11D48", text: "#FFFFFF" }, // rose scuro
+      { bg: "#0284C7", text: "#FFFFFF" }, // sky scuro
+      { bg: "#15803D", text: "#FFFFFF" }, // verde molto scuro
+      { bg: "#0D9488", text: "#FFFFFF" }, // teal scuro
     ];
     return colors[index % colors.length];
   };
