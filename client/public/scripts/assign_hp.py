@@ -639,6 +639,46 @@ def main():
     print(f"   - Task non assegnati: {output['meta']['unassigned']}")
     print()
     print(f"💾 Risultati salvati in: {OUTPUT_ASSIGN}")
+    
+    # Update timeline_assignments/{date}.json
+    timeline_dir = OUTPUT_ASSIGN.parent / "timeline_assignments"
+    timeline_dir.mkdir(parents=True, exist_ok=True)
+    timeline_assignments_path = timeline_dir / f"{ref_date}.json"
+    
+    timeline_data = {"assignments": [], "current_date": ref_date}
+    
+    if timeline_assignments_path.exists():
+        try:
+            timeline_data = json.loads(timeline_assignments_path.read_text(encoding="utf-8"))
+            if "current_date" not in timeline_data:
+                timeline_data["current_date"] = ref_date
+        except:
+            timeline_data = {"assignments": [], "current_date": ref_date}
+    
+    # Rimuovi vecchie assegnazioni HP
+    assigned_codes = set()
+    for cleaner_entry in output["high_priority_tasks_assigned"]:
+        for task in cleaner_entry.get("tasks", []):
+            assigned_codes.add(str(task["logistic_code"]))
+    
+    timeline_data["assignments"] = [
+        a for a in timeline_data.get("assignments", [])
+        if str(a.get("logistic_code")) not in assigned_codes
+    ]
+    
+    # Aggiungi nuove assegnazioni HP
+    for cleaner_entry in output["high_priority_tasks_assigned"]:
+        cleaner_id = cleaner_entry["cleaner"]["id"]
+        for task in cleaner_entry.get("tasks", []):
+            timeline_data["assignments"].append({
+                "logistic_code": str(task["logistic_code"]),
+                "cleanerId": cleaner_id,
+                "assignment_type": "high_priority",
+                "sequence": task.get("sequence", 0)
+            })
+    
+    timeline_assignments_path.write_text(json.dumps(timeline_data, ensure_ascii=False, indent=2), encoding="utf-8")
+    print(f"✅ Aggiornato {timeline_assignments_path}")
 
 
 if __name__ == "__main__":

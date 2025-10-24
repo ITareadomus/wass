@@ -316,80 +316,7 @@ export default function GenerateAssignments() {
     }
   };
 
-  const loadHighPriorityAssignments = async () => {
-    try {
-      const hpResponse = await fetch('/data/output/high_priority_assignments.json');
-
-      // Carica solo High Priority assignments
-      let hpCleanersWithTasks: any[] = [];
-      if (hpResponse.ok) {
-        const hpAssignmentsData = await hpResponse.json();
-        hpCleanersWithTasks = hpAssignmentsData.high_priority_tasks_assigned || [];
-        console.log('Assegnazioni high-priority caricate:', hpCleanersWithTasks);
-      }
-
-      // Crea un Set di task_id assegnate e aggiorna timeline_assignments.json
-      const assignedTaskIds = new Set();
-      const timelineAssignments: any[] = [];
-      
-      hpCleanersWithTasks.forEach((cleanerEntry: any) => {
-        cleanerEntry.tasks?.forEach((task: any) => {
-          assignedTaskIds.add(String(task.task_id));
-          // Aggiungi alla timeline
-          timelineAssignments.push({
-            logistic_code: String(task.logistic_code),
-            cleanerId: cleanerEntry.cleaner.id,
-            assignment_type: "high_priority",
-            sequence: task.sequence || 0
-          });
-        });
-      });
-
-      // Salva le assegnazioni HP in timeline_assignments.json
-      if (timelineAssignments.length > 0) {
-        console.log(`Salvando ${timelineAssignments.length} assegnazioni HP in timeline_assignments.json:`, timelineAssignments);
-        const saveResponse = await fetch('/api/save-hp-timeline-assignments', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ assignments: timelineAssignments })
-        });
-        
-        if (!saveResponse.ok) {
-          console.error('Errore nel salvataggio delle assegnazioni HP in timeline_assignments.json');
-        } else {
-          const saveResult = await saveResponse.json();
-          console.log('Assegnazioni HP salvate con successo:', saveResult);
-        }
-      } else {
-        console.warn('Nessuna assegnazione HP da salvare in timeline_assignments.json');
-      }
-
-      // Aggiorna le task con le assegnazioni HP
-      setAllTasksWithAssignments(prevTasks => {
-        const updatedTasks = prevTasks.map(task => {
-          // Trova il cleaner e la task specifica
-          for (const cleanerEntry of hpCleanersWithTasks) {
-            const assignedTask = cleanerEntry.tasks?.find((t: any) => String(t.task_id) === task.id);
-            if (assignedTask) {
-              return {
-                ...task,
-                assignedCleaner: cleanerEntry.cleaner.id,
-                startTime: assignedTask.start_time,
-                sequence: assignedTask.sequence
-              };
-            }
-          }
-          return task;
-        });
-        return updatedTasks;
-      });
-
-      // Aggiorna i contenitori per rimuovere le task HP assegnate
-      setHighPriorityTasks(prevTasks => prevTasks.filter(task => !assignedTaskIds.has(task.id)));
-    } catch (error) {
-      console.error('Errore nel caricamento delle assegnazioni HP:', error);
-    }
-  };
+  
 
   // Funzione per confermare le assegnazioni
   const confirmAssignments = async () => {
@@ -431,7 +358,6 @@ export default function GenerateAssignments() {
 
   // Esponi le funzioni per poterle chiamare da altri componenti
   (window as any).reloadEarlyOutAssignments = loadEarlyOutAssignments;
-  (window as any).reloadHighPriorityAssignments = loadHighPriorityAssignments;
   (window as any).reloadAllTasks = loadTasks;
 
   const saveTaskAssignments = async (tasks: Task[]) => {
