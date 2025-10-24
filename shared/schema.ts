@@ -66,6 +66,8 @@ export const taskSchema = z.object({
   status: z.enum(["pending", "assigned", "in-progress", "completed"]).default("pending"),
   scheduledTime: z.string().nullable(),
   address: z.string().optional(),
+  lat: z.string().optional(),
+  lng: z.string().optional(),
   premium: z.boolean().optional(),
   is_straordinaria: z.boolean().optional(),
   confirmed_operation: z.boolean().optional(),
