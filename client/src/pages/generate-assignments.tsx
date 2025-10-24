@@ -168,10 +168,11 @@ export default function GenerateAssignments() {
       setExtractionStep("Caricamento task nei contenitori...");
 
       const dateStr = format(selectedDate, "yyyy-MM-dd");
-      const [earlyOutResponse, highPriorityResponse, lowPriorityResponse, timelineAssignmentsResponse] = await Promise.all([
+      const [earlyOutResponse, highPriorityResponse, lowPriorityResponse, generalTimelineResponse, dateTimelineResponse] = await Promise.all([
         fetch('/data/output/early_out.json'),
         fetch('/data/output/high_priority.json'),
         fetch('/data/output/low_priority.json'),
+        fetch('/data/output/timeline_assignments.json'),
         fetch(`/data/output/timeline_assignments/${dateStr}.json`)
       ]);
 
@@ -182,7 +183,16 @@ export default function GenerateAssignments() {
       const earlyOutData = await earlyOutResponse.json();
       const highPriorityData = await highPriorityResponse.json();
       const lowPriorityData = await lowPriorityResponse.json();
-      const timelineAssignmentsData = timelineAssignmentsResponse.ok ? await timelineAssignmentsResponse.json() : { assignments: [], current_date: dateStr };
+      
+      // Prima prova a caricare da timeline_assignments.json, poi da timeline_assignments/{date}.json
+      let timelineAssignmentsData = { assignments: [], current_date: dateStr };
+      if (generalTimelineResponse.ok) {
+        timelineAssignmentsData = await generalTimelineResponse.json();
+        console.log("Caricato da timeline_assignments.json (principale)");
+      } else if (dateTimelineResponse.ok) {
+        timelineAssignmentsData = await dateTimelineResponse.json();
+        console.log(`Caricato da timeline_assignments/${dateStr}.json (fallback)`);
+      }
 
       console.log("Early out data:", earlyOutData);
       console.log("High priority data:", highPriorityData);
