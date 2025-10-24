@@ -89,12 +89,27 @@ export default function MapSection({ tasks }: MapSectionProps) {
 
     const bounds = new window.google.maps.LatLngBounds();
 
+    // Traccia le coordinate già usate per aggiungere offset
+    const coordinateCount = new Map<string, number>();
+
     // Crea marker per ogni task
     tasksWithCoordinates.forEach((task, index) => {
-      const lat = parseFloat(task.lat || '0');
-      const lng = parseFloat(task.lng || '0');
+      const baseLat = parseFloat(task.lat || '0');
+      const baseLng = parseFloat(task.lng || '0');
 
-      if (isNaN(lat) || isNaN(lng) || lat === 0 || lng === 0) return;
+      if (isNaN(baseLat) || isNaN(baseLng) || baseLat === 0 || baseLng === 0) return;
+
+      // Chiave per identificare coordinate duplicate
+      const coordKey = `${baseLat.toFixed(6)},${baseLng.toFixed(6)}`;
+      const count = coordinateCount.get(coordKey) || 0;
+      coordinateCount.set(coordKey, count + 1);
+
+      // Aggiungi un piccolo offset se ci sono marker duplicati
+      // Offset di circa 5-10 metri (0.00005 gradi ≈ 5.5 metri)
+      const offset = count * 0.00005;
+      const angle = count * (Math.PI / 3); // 60 gradi tra ogni marker
+      const lat = baseLat + (offset * Math.cos(angle));
+      const lng = baseLng + (offset * Math.sin(angle));
 
       const position = { lat, lng };
       
