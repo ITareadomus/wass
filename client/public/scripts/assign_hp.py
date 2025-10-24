@@ -697,8 +697,14 @@ def main():
                 "followup": task.get("followup", False)
             })
     
+    # Scrivi il file specifico per la data
     timeline_assignments_path.write_text(json.dumps(timeline_data, ensure_ascii=False, indent=2), encoding="utf-8")
     print(f"✅ Aggiornato {timeline_assignments_path}")
+    
+    # Aggiorna anche il file generale timeline_assignments.json
+    general_timeline_path = OUTPUT_ASSIGN.parent / "timeline_assignments.json"
+    general_timeline_path.write_text(json.dumps(timeline_data, ensure_ascii=False, indent=2), encoding="utf-8")
+    print(f"✅ Aggiornato anche: {general_timeline_path}")
 
 
 if __name__ == "__main__":
