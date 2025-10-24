@@ -102,20 +102,40 @@ export default function TimelineView({
 
   const handleResetAssignments = async () => {
     try {
-      // Svuota timeline_assignments.json
-      const response = await fetch('/api/reset-timeline-assignments', {
+      const savedDate = localStorage.getItem('selected_work_date');
+      const selectedDate = savedDate ? new Date(savedDate) : new Date();
+      const year = selectedDate.getFullYear();
+      const month = String(selectedDate.getMonth() + 1).padStart(2, '0');
+      const day = String(selectedDate.getDate()).padStart(2, '0');
+      const dateStr = `${year}-${month}-${day}`;
+
+      // 1. Reset timeline assignments
+      const resetResponse = await fetch('/api/reset-timeline-assignments', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ date: dateStr })
       });
 
-      if (response.ok) {
-        // Ricarica la pagina per ripristinare lo stato iniziale
-        window.location.reload();
-      } else {
-        console.error('Errore nel reset delle assegnazioni');
+      if (!resetResponse.ok) {
+        throw new Error('Errore nel reset della timeline');
       }
+
+      // 2. Riesegui extract-data per ripopolare i contenitori
+      const extractResponse = await fetch('/api/extract-data', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ date: dateStr })
+      });
+
+      if (!extractResponse.ok) {
+        throw new Error('Errore nella riestrazione dei dati');
+      }
+
+      // 3. Ricarica la pagina
+      window.location.reload();
     } catch (error) {
-      console.error('Errore nella chiamata API di reset:', error);
+      console.error('Errore nel reset:', error);
+      alert('Errore durante il reset delle assegnazioni');
     }
   };
 
