@@ -2,6 +2,7 @@ import { DragDropContext, DropResult } from "react-beautiful-dnd";
 import { TaskType as Task } from "@shared/schema";
 import PriorityColumn from "@/components/drag-drop/priority-column";
 import TimelineView from "@/components/timeline/timeline-view";
+import MapSection from "@/components/map/map-section";
 import { useState, useEffect } from "react";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { CalendarIcon } from "lucide-react";
@@ -710,57 +711,7 @@ export default function GenerateAssignments() {
               />
             </div>
 
-            <div className="bg-card rounded-lg border shadow-sm">
-              <div className="p-4 border-b border-border">
-                <h3 className="font-semibold text-foreground flex items-center justify-between">
-                  <span className="flex items-center">
-                    <svg 
-                      className="w-5 h-5 mr-2 text-primary" 
-                      fill="none" 
-                      stroke="currentColor" 
-                      viewBox="0 0 24 24"
-                    >
-                      <path 
-                        strokeLinecap="round" 
-                        strokeLinejoin="round" 
-                        strokeWidth={2} 
-                        d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" 
-                      />
-                      <path 
-                        strokeLinecap="round" 
-                        strokeLinejoin="round" 
-                        strokeWidth={2} 
-                        d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" 
-                      />
-                    </svg>
-                    Mappa Assegnazioni
-                  </span>
-                  <button
-                    onClick={() => {
-                      const iframe = document.getElementById('map-iframe') as HTMLIFrameElement;
-                      if (iframe.requestFullscreen) {
-                        iframe.requestFullscreen();
-                      }
-                    }}
-                    className="px-3 py-1 text-sm bg-primary text-primary-foreground rounded hover:bg-primary/90"
-                  >
-                    Schermo intero
-                  </button>
-                </h3>
-              </div>
-              <div className="p-4">
-                <iframe
-                  id="map-iframe"
-                  width="100%"
-                  height="400"
-                  style={{ border: 0 }}
-                  loading="lazy"
-                  allowFullScreen
-                  referrerPolicy="no-referrer-when-downgrade"
-                  src="https://www.google.com/maps/embed/v1/view?key=AIzaSyBRKGlNnryWd0psedJholmVPlaxQUmSlY0&center=45.464,9.19&zoom=13&maptype=roadmap&style=feature:poi|visibility:off"
-                ></iframe>
-              </div>
-            </div>
+            <MapSection tasks={allTasksWithAssignments} />
           </div>
         </DragDropContext>
       </div>
