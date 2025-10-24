@@ -41,13 +41,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const workDate = date || format(new Date(), 'yyyy-MM-dd');
       const timelineAssignmentsBasePath = path.join(process.cwd(), 'client/public/data/output/timeline_assignments');
       const timelineAssignmentsPath = path.join(timelineAssignmentsBasePath, `${workDate}.json`);
+      const generalTimelinePath = path.join(process.cwd(), 'client/public/data/output/timeline_assignments.json');
 
       // Crea la directory se non esiste
       await fs.mkdir(timelineAssignmentsBasePath, { recursive: true });
 
-      // Svuota il file per questa data specifica
-      await fs.writeFile(timelineAssignmentsPath, JSON.stringify({ assignments: [], current_date: workDate }, null, 2));
+      // Svuota il file principale timeline_assignments.json
+      await fs.writeFile(generalTimelinePath, JSON.stringify({ assignments: [], current_date: workDate }, null, 2));
+      console.log(`Timeline principale resettata: timeline_assignments.json`);
 
+      // Svuota anche il file per questa data specifica
+      await fs.writeFile(timelineAssignmentsPath, JSON.stringify({ assignments: [], current_date: workDate }, null, 2));
       console.log(`Timeline resettata per la data ${workDate}`);
 
       res.json({ success: true, message: `Assegnazioni della timeline resettate per ${workDate}` });

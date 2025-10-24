@@ -147,7 +147,7 @@ export default function TimelineView({
       const day = String(selectedDate.getDate()).padStart(2, '0');
       const dateStr = `${year}-${month}-${day}`;
 
-      // 1. Reset timeline assignments
+      // 1. Reset timeline_assignments.json (file principale)
       const resetResponse = await fetch('/api/reset-timeline-assignments', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -158,18 +158,7 @@ export default function TimelineView({
         throw new Error('Errore nel reset della timeline');
       }
 
-      // 2. Riesegui extract-data per ripopolare i contenitori
-      const extractResponse = await fetch('/api/extract-data', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ date: dateStr })
-      });
-
-      if (!extractResponse.ok) {
-        throw new Error('Errore nella riestrazione dei dati');
-      }
-
-      // 3. Ricarica la pagina
+      // 2. Ricarica la pagina per rieseguire extract_all
       window.location.reload();
     } catch (error) {
       console.error('Errore nel reset:', error);
