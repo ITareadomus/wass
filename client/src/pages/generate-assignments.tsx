@@ -394,20 +394,15 @@ export default function GenerateAssignments() {
   const saveTimelineAssignment = async (taskId: string, cleanerId: number, logisticCode?: string) => {
     try {
       const dateStr = format(selectedDate, "yyyy-MM-dd");
-      console.log(`[saveTimelineAssignment] Saving taskId=${taskId}, cleanerId=${cleanerId}, logisticCode=${logisticCode}, date=${dateStr}`);
-      
       const response = await fetch('/api/save-timeline-assignment', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ taskId, cleanerId, logisticCode, date: dateStr }),
       });
-      
-      const result = await response.json();
-      
       if (!response.ok) {
-        console.error('Errore nel salvataggio dell\'assegnazione nella timeline:', result);
+        console.error('Errore nel salvataggio dell\'assegnazione nella timeline');
       } else {
-        console.log('Assegnazione salvata nella timeline con successo:', result);
+        console.log('Assegnazione salvata nella timeline con successo');
       }
     } catch (error) {
       console.error('Errore nella chiamata API di salvataggio timeline:', error);
@@ -417,20 +412,15 @@ export default function GenerateAssignments() {
   const removeTimelineAssignment = async (taskId: string, logisticCode?: string) => {
     try {
       const dateStr = format(selectedDate, "yyyy-MM-dd");
-      console.log(`[removeTimelineAssignment] Removing taskId=${taskId}, logisticCode=${logisticCode}, date=${dateStr}`);
-      
       const response = await fetch('/api/remove-timeline-assignment', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ taskId, logisticCode, date: dateStr }),
       });
-      
-      const result = await response.json();
-      
       if (!response.ok) {
-        console.error('Errore nella rimozione dell\'assegnazione dalla timeline:', result);
+        console.error('Errore nella rimozione dell\'assegnazione dalla timeline');
       } else {
-        console.log('Assegnazione rimossa dalla timeline con successo:', result);
+        console.log('Assegnazione rimossa dalla timeline con successo');
       }
     } catch (error) {
       console.error('Errore nella chiamata API di rimozione timeline:', error);
