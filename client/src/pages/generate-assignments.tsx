@@ -757,7 +757,7 @@ export default function GenerateAssignments() {
                   loading="lazy"
                   allowFullScreen
                   referrerPolicy="no-referrer-when-downgrade"
-                  src="https://www.google.com/maps/embed/v1/view?key=YOUR_API_KEY&center=45.464,9.19&zoom=13&maptype=roadmap"
+                  src="https://www.google.com/maps/embed/v1/view?key=AIzaSyBRKGlNnryWd0psedJholmVPlaxQUmSlY0&center=45.464,9.19&zoom=13&maptype=roadmap&style=feature:poi|visibility:off"
                 ></iframe>
               </div>
             </div>
