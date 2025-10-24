@@ -62,26 +62,41 @@ export default function TimelineView({
 
   const getCleanerColor = (index: number) => {
     const colors = [
-      { bg: "#DBEAFE", text: "#1E40AF" }, // blue
-      { bg: "#FEE2E2", text: "#991B1B" }, // red
-      { bg: "#FEF3C7", text: "#92400E" }, // amber
-      { bg: "#D1FAE5", text: "#065F46" }, // emerald
-      { bg: "#E0E7FF", text: "#4338CA" }, // indigo
-      { bg: "#FCE7F3", text: "#9F1239" }, // pink
-      { bg: "#CCFBF1", text: "#115E59" }, // teal
-      { bg: "#FED7AA", text: "#9A3412" }, // orange
-      { bg: "#E9D5FF", text: "#6B21A8" }, // purple
-      { bg: "#FEF9C3", text: "#854D0E" }, // yellow
-      { bg: "#BFDBFE", text: "#1E3A8A" }, // light blue
-      { bg: "#FBCFE8", text: "#831843" }, // light pink
-      { bg: "#D9F99D", text: "#3F6212" }, // lime
-      { bg: "#BAE6FD", text: "#075985" }, // sky
-      { bg: "#DDD6FE", text: "#5B21B6" }, // violet
-      { bg: "#FED7D7", text: "#7F1D1D" }, // rose
-      { bg: "#A7F3D0", text: "#064E3B" }, // light emerald
-      { bg: "#FDE68A", text: "#78350F" }, // light amber
-      { bg: "#C7D2FE", text: "#3730A3" }, // light indigo
-      { bg: "#99F6E4", text: "#134E4A" }, // light teal
+      { bg: "#EF4444", text: "#FFFFFF" }, // red-500
+      { bg: "#F97316", text: "#FFFFFF" }, // orange-500
+      { bg: "#F59E0B", text: "#000000" }, // amber-500
+      { bg: "#EAB308", text: "#000000" }, // yellow-500
+      { bg: "#84CC16", text: "#000000" }, // lime-500
+      { bg: "#22C55E", text: "#000000" }, // green-500
+      { bg: "#10B981", text: "#000000" }, // emerald-500
+      { bg: "#14B8A6", text: "#000000" }, // teal-500
+      { bg: "#06B6D4", text: "#000000" }, // cyan-500
+      { bg: "#0EA5E9", text: "#FFFFFF" }, // sky-500
+      { bg: "#3B82F6", text: "#FFFFFF" }, // blue-500
+      { bg: "#6366F1", text: "#FFFFFF" }, // indigo-500
+      { bg: "#8B5CF6", text: "#FFFFFF" }, // violet-500
+      { bg: "#A855F7", text: "#FFFFFF" }, // purple-500
+      { bg: "#D946EF", text: "#FFFFFF" }, // fuchsia-500
+      { bg: "#EC4899", text: "#FFFFFF" }, // pink-500
+      { bg: "#F43F5E", text: "#FFFFFF" }, // rose-500
+      { bg: "#DC2626", text: "#FFFFFF" }, // red-600
+      { bg: "#EA580C", text: "#FFFFFF" }, // orange-600
+      { bg: "#D97706", text: "#FFFFFF" }, // amber-600
+      { bg: "#CA8A04", text: "#000000" }, // yellow-600
+      { bg: "#65A30D", text: "#FFFFFF" }, // lime-600
+      { bg: "#16A34A", text: "#FFFFFF" }, // green-600
+      { bg: "#059669", text: "#FFFFFF" }, // emerald-600
+      { bg: "#0D9488", text: "#FFFFFF" }, // teal-600
+      { bg: "#0891B2", text: "#FFFFFF" }, // cyan-600
+      { bg: "#0284C7", text: "#FFFFFF" }, // sky-600
+      { bg: "#2563EB", text: "#FFFFFF" }, // blue-600
+      { bg: "#4F46E5", text: "#FFFFFF" }, // indigo-600
+      { bg: "#7C3AED", text: "#FFFFFF" }, // violet-600
+      { bg: "#9333EA", text: "#FFFFFF" }, // purple-600
+      { bg: "#C026D3", text: "#FFFFFF" }, // fuchsia-600
+      { bg: "#DB2777", text: "#FFFFFF" }, // pink-600
+      { bg: "#E11D48", text: "#FFFFFF" }, // rose-600
+      { bg: "#15803D", text: "#FFFFFF" }, // green-700
     ];
     return colors[index % colors.length];
   };
