@@ -676,15 +676,25 @@ def main():
         if str(a.get("logistic_code")) not in assigned_codes
     ]
     
-    # Aggiungi nuove assegnazioni HP
+    # Aggiungi nuove assegnazioni HP con tutti i dati del task
     for cleaner_entry in output["high_priority_tasks_assigned"]:
         cleaner_id = cleaner_entry["cleaner"]["id"]
         for task in cleaner_entry.get("tasks", []):
             timeline_data["assignments"].append({
+                "task_id": task["task_id"],
                 "logistic_code": str(task["logistic_code"]),
                 "cleanerId": cleaner_id,
                 "assignment_type": "high_priority",
-                "sequence": task.get("sequence", 0)
+                "sequence": task.get("sequence", 0),
+                "address": task.get("address"),
+                "lat": task.get("lat"),
+                "lng": task.get("lng"),
+                "premium": task.get("premium"),
+                "cleaning_time": task.get("cleaning_time"),
+                "start_time": task.get("start_time"),
+                "end_time": task.get("end_time"),
+                "travel_time": task.get("travel_time", 0),
+                "followup": task.get("followup", False)
             })
     
     timeline_assignments_path.write_text(json.dumps(timeline_data, ensure_ascii=False, indent=2), encoding="utf-8")

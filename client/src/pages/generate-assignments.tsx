@@ -200,9 +200,9 @@ export default function GenerateAssignments() {
 
       console.log("Tasks convertiti - Early:", initialEarlyOut.length, "High:", initialHigh.length, "Low:", initialLow.length);
 
-      // Crea una mappa di logistic_code -> assegnazione timeline
-      const timelineAssignmentsMap = new Map<string, { cleanerId: number; sequence: number; logistic_code: string }>(
-        timelineAssignmentsData.assignments.map((a: any) => [String(a.logistic_code), { cleanerId: a.cleanerId, sequence: a.sequence, logistic_code: a.logistic_code }])
+      // Crea una mappa di logistic_code -> assegnazione timeline completa
+      const timelineAssignmentsMap = new Map<string, any>(
+        timelineAssignmentsData.assignments.map((a: any) => [String(a.logistic_code), a])
       );
 
       console.log("Task assegnate nella timeline (logistic_code):", Array.from(timelineAssignmentsMap.keys()));
@@ -244,10 +244,17 @@ export default function GenerateAssignments() {
         const timelineAssignment = timelineAssignmentsMap.get(String(task.name));
         if (timelineAssignment && timelineAssignment.cleanerId) {
           console.log(`Assegnando task ${task.name} a cleaner ${timelineAssignment.cleanerId} con sequence ${timelineAssignment.sequence}`);
+          // Usa i dati dalla timeline se disponibili, altrimenti usa i dati del task originale
           return {
             ...task,
             assignedCleaner: timelineAssignment.cleanerId,
             sequence: timelineAssignment.sequence,
+            startTime: timelineAssignment.start_time || task.startTime,
+            endTime: timelineAssignment.end_time || task.endTime,
+            travelTime: timelineAssignment.travel_time || 0,
+            address: timelineAssignment.address || task.address,
+            lat: timelineAssignment.lat || task.lat,
+            lng: timelineAssignment.lng || task.lng,
           };
         }
         return task;
