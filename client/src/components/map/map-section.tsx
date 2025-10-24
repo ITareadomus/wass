@@ -21,6 +21,37 @@ export default function MapSection({ tasks }: MapSectionProps) {
   const [isMapLoaded, setIsMapLoaded] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+  const [cleaners, setCleaners] = useState<any[]>([]);
+
+  // Carica i cleaners
+  useEffect(() => {
+    const loadCleaners = async () => {
+      try {
+        const response = await fetch(`/data/cleaners/selected_cleaners.json?t=${Date.now()}`);
+        if (!response.ok) return;
+        const data = await response.json();
+        setCleaners(data.cleaners || []);
+      } catch (error) {
+        console.error('Errore caricamento cleaners:', error);
+      }
+    };
+    loadCleaners();
+  }, []);
+
+  // Funzione per ottenere il colore del cleaner
+  const getCleanerColor = (cleanerId: number) => {
+    const colors = [
+      "#EF4444", "#3B82F6", "#22C55E", "#D946EF", "#F59E0B",
+      "#8B5CF6", "#14B8A6", "#F97316", "#6366F1", "#84CC16",
+      "#EC4899", "#0EA5E9", "#DC2626", "#10B981", "#A855F7",
+      "#EAB308", "#06B6D4", "#F43F5E", "#2563EB", "#16A34A",
+      "#C026D3", "#EA580C", "#7C3AED", "#0891B2", "#CA8A04",
+      "#DB2777", "#4F46E5", "#65A30D", "#059669", "#9333EA",
+      "#D97706", "#E11D48", "#0284C7", "#15803D", "#0D9488"
+    ];
+    const cleanerIndex = cleaners.findIndex(c => c.id === cleanerId);
+    return cleanerIndex >= 0 ? colors[cleanerIndex % colors.length] : '#6B7280';
+  };
 
   // Carica Google Maps API
   useEffect(() => {
@@ -113,29 +144,61 @@ export default function MapSection({ tasks }: MapSectionProps) {
 
       const position = { lat, lng };
       
-      // Tutti i marker sono grigi
-      const markerColor = '#6B7280'; // gray-500
+      // Ottieni il colore in base al cleaner assegnato
+      const assignedCleaner = (task as any).assignedCleaner;
+      const markerColor = assignedCleaner ? getCleanerColor(assignedCleaner) : '#6B7280';
+      const sequence = (task as any).sequence;
 
-      const marker = new window.google.maps.Marker({
-        position,
-        map: googleMapRef.current,
-        title: `${task.name} - ${task.type}`,
-        icon: {
-          path: window.google.maps.SymbolPath.CIRCLE,
-          fillColor: markerColor,
-          fillOpacity: 1,
-          strokeColor: '#ffffff',
-          strokeWeight: 2,
-          scale: 10
-        }
-      });
+      // Se c'è una sequenza, usa un marker con testo
+      if (sequence !== undefined && sequence !== null) {
+        const marker = new window.google.maps.Marker({
+          position,
+          map: googleMapRef.current,
+          title: `${task.name} - ${task.type} (Seq: ${sequence})`,
+          label: {
+            text: String(sequence),
+            color: '#ffffff',
+            fontSize: '12px',
+            fontWeight: 'bold'
+          },
+          icon: {
+            path: window.google.maps.SymbolPath.CIRCLE,
+            fillColor: markerColor,
+            fillOpacity: 1,
+            strokeColor: '#ffffff',
+            strokeWeight: 2,
+            scale: 12
+          }
+        });
 
-      // Click sul marker per mostrare la TaskCard
-      marker.addListener('click', () => {
-        setSelectedTask(task);
-      });
+        marker.addListener('click', () => {
+          setSelectedTask(task);
+        });
 
-      markersRef.current.push(marker);
+        markersRef.current.push(marker);
+      } else {
+        // Marker senza sequenza (non assegnato)
+        const marker = new window.google.maps.Marker({
+          position,
+          map: googleMapRef.current,
+          title: `${task.name} - ${task.type}`,
+          icon: {
+            path: window.google.maps.SymbolPath.CIRCLE,
+            fillColor: markerColor,
+            fillOpacity: 1,
+            strokeColor: '#ffffff',
+            strokeWeight: 2,
+            scale: 12
+          }
+        });
+
+        marker.addListener('click', () => {
+          setSelectedTask(task);
+        });
+
+        markersRef.current.push(marker);
+      }
+
       bounds.extend(position);
     });
 
