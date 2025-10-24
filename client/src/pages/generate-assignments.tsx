@@ -258,7 +258,7 @@ export default function GenerateAssignments() {
             address: timelineAssignment.address || task.address,
             lat: timelineAssignment.lat || task.lat,
             lng: timelineAssignment.lng || task.lng,
-          };
+          } as any;
         }
         return task;
       });
@@ -315,7 +315,7 @@ export default function GenerateAssignments() {
                 assignedCleaner: cleanerEntry.cleaner.id,
                 startTime: assignedTask.start_time,
                 sequence: assignedTask.sequence
-              };
+              } as any;
             }
           }
           return task;
