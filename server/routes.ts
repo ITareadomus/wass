@@ -106,41 +106,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Endpoint per salvare le assegnazioni HP in timeline_assignments.json
-  app.post("/api/save-hp-timeline-assignments", async (req, res) => {
-    try {
-      const { assignments } = req.body;
-      const timelineAssignmentsPath = path.join(process.cwd(), 'client/public/data/output/timeline_assignments.json');
-
-      console.log(`Salvando ${assignments.length} assegnazioni HP nella timeline`);
-
-      // Carica timeline_assignments.json
-      let assignmentsData: any = { assignments: [], current_date: null };
-      try {
-        const existingData = await fs.readFile(timelineAssignmentsPath, 'utf8');
-        assignmentsData = JSON.parse(existingData);
-      } catch (error) {
-        // File non esiste, usa struttura vuota
-      }
-
-      // Rimuovi vecchie assegnazioni HP (per evitare duplicati)
-      const hpLogisticCodes = new Set(assignments.map((a: any) => a.logistic_code));
-      assignmentsData.assignments = assignmentsData.assignments.filter(
-        (a: any) => !hpLogisticCodes.has(a.logistic_code) || a.assignment_type !== 'high_priority'
-      );
-
-      // Aggiungi le nuove assegnazioni HP
-      assignmentsData.assignments.push(...assignments);
-
-      // Salva il file (preserva current_date)
-      await fs.writeFile(timelineAssignmentsPath, JSON.stringify(assignmentsData, null, 2));
-
-      res.json({ success: true, message: `${assignments.length} assegnazioni HP salvate nella timeline` });
-    } catch (error: any) {
-      console.error("Errore nel salvataggio delle assegnazioni HP:", error);
-      res.status(500).json({ success: false, error: error.message });
-    }
-  });
+  
 
   // Endpoint per rimuovere un'assegnazione dalla timeline
   app.post("/api/remove-timeline-assignment", async (req, res) => {

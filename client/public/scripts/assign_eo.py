@@ -504,16 +504,38 @@ def main():
     print()
     print(f"💾 Risultati salvati in: {OUTPUT_ASSIGN}")
     
-    # Update timeline_assignments.json
-    timeline_assignments_path = OUTPUT_ASSIGN.parent / "timeline_assignments.json"
-    timeline_data = {"assignments": []}
+    # Determina la data di riferimento dal primo task
+    ref_date = None
+    for task in tasks:
+        if hasattr(task, 'checkin_time') and task.checkin_time:
+            from datetime import datetime
+            try:
+                # Estrai la data dal timestamp (assumendo formato ISO)
+                ref_date = datetime.now().strftime("%Y-%m-%d")
+                break
+            except:
+                pass
+    
+    if not ref_date:
+        from datetime import datetime
+        ref_date = datetime.now().strftime("%Y-%m-%d")
+    
+    # Update timeline_assignments/{date}.json
+    timeline_dir = OUTPUT_ASSIGN.parent / "timeline_assignments"
+    timeline_dir.mkdir(parents=True, exist_ok=True)
+    timeline_assignments_path = timeline_dir / f"{ref_date}.json"
+    
+    timeline_data = {"assignments": [], "current_date": ref_date}
     
     if timeline_assignments_path.exists():
         try:
             timeline_data = json.loads(timeline_assignments_path.read_text(encoding="utf-8"))
+            if "current_date" not in timeline_data:
+                timeline_data["current_date"] = ref_date
         except:
-            timeline_data = {"assignments": []}
+            timeline_data = {"assignments": [], "current_date": ref_date}
     
+    # Rimuovi vecchie assegnazioni EO
     assigned_codes = set()
     for cleaner_entry in output["early_out_tasks_assigned"]:
         for task in cleaner_entry.get("tasks", []):
@@ -524,13 +546,14 @@ def main():
         if str(a.get("logistic_code")) not in assigned_codes
     ]
     
+    # Aggiungi nuove assegnazioni EO
     for cleaner_entry in output["early_out_tasks_assigned"]:
         cleaner_id = cleaner_entry["cleaner"]["id"]
         for task in cleaner_entry.get("tasks", []):
             timeline_data["assignments"].append({
                 "logistic_code": str(task["logistic_code"]),
                 "cleanerId": cleaner_id,
-                "assignment_type": "optimizer",
+                "assignment_type": "early_out",
                 "sequence": task.get("sequence", 0)
             })
     
