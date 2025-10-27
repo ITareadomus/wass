@@ -2,6 +2,9 @@
 import json
 import mysql.connector
 import sys
+import os
+import psycopg2
+from psycopg2.extras import execute_values
 from datetime import datetime, date, timedelta
 
 # ---------- Utilità di standardizzazione richieste ----------
@@ -20,7 +23,7 @@ def normalize_coord(coord):
         return None
     return str(coord).replace(',', '.').strip()
 
-# ---------- Config DB condivisa ----------
+# ---------- Config DB MySQL (source) ----------
 DB_CONFIG = {
     "host": "139.59.132.41",
     "user": "admin",
@@ -28,11 +31,16 @@ DB_CONFIG = {
     "database": "adamdb",
 }
 
-# ---------- Funzioni per lista operazioni attive (integrazione richiesta) ----------
+# ---------- Config DB PostgreSQL (destination) ----------
+def get_pg_connection():
+    database_url = os.environ.get('DATABASE_URL')
+    if not database_url:
+        raise Exception("DATABASE_URL environment variable not set")
+    return psycopg2.connect(database_url)
+
+# ---------- Funzioni per lista operazioni attive ----------
 def get_active_operations():
-    """
-    Carica le operazioni attive dal database (active=1 e enable_wass=1)
-    """
+    """Carica le operazioni attive dal database MySQL e le salva in PostgreSQL"""
     connection = mysql.connector.connect(**DB_CONFIG)
     cursor = connection.cursor(dictionary=True)
     cursor.execute("""
@@ -44,50 +52,47 @@ def get_active_operations():
     cursor.close()
     connection.close()
     operation_ids = [row['id'] for row in results]
+    
+    # Salva anche in PostgreSQL
+    pg_conn = get_pg_connection()
+    pg_cur = pg_conn.cursor()
+    
+    # Pulisci vecchie operazioni
+    pg_cur.execute("DELETE FROM operations")
+    
+    # Inserisci nuove operazioni
+    for op_id in operation_ids:
+        pg_cur.execute("""
+            INSERT INTO operations (id, active, enable_wass)
+            VALUES (%s, true, true)
+            ON CONFLICT (id) DO UPDATE SET active = true, enable_wass = true
+        """, (op_id,))
+    
+    pg_conn.commit()
+    pg_cur.close()
+    pg_conn.close()
+    
     return operation_ids
 
-def save_operations_to_file(operation_ids, output_file="client/public/data/input/operations.json"):
-    """
-    Salva gli operation_id validi in un file JSON
-    """
-    operations_data = {
-        "timestamp": datetime.now().isoformat(),
-        "active_operation_ids": operation_ids,
-        "total_operations": len(operation_ids)
-    }
-    with open(output_file, "w", encoding="utf-8") as f:
-        json.dump(operations_data, f, indent=4, ensure_ascii=False)
-    print(f"Salvati {len(operation_ids)} operation_id validi in {output_file}")
-    return operations_data
-
-def refresh_operations_list():
-    """
-    Aggiorna data/operations.json interrogando direttamente il DB.
-    """
-    print("Aggiorno la lista delle operazioni attive dal DB...")
-    ops = get_active_operations()
-    save_operations_to_file(ops)
-    print("Lista operazioni aggiornata con successo.")
-
 def load_valid_operation_ids():
-    """
-    Carica gli operation_id validi dal file client/public/data/input/operations.json.
-    Se il file manca/non è valido, lo rigenera interrogando il DB.
-    """
+    """Carica gli operation_id validi dal database PostgreSQL"""
     try:
-        with open("client/public/data/input/operations.json", "r", encoding="utf-8") as f:
-            operations_data = json.load(f)
-        return operations_data.get("active_operation_ids", [])
-    except (FileNotFoundError, json.JSONDecodeError):
-        print("operations.json assente/non valido. Lo rigenero dal DB...")
-        refresh_operations_list()
-        try:
-            with open("client/public/data/input/operations.json", "r", encoding="utf-8") as f:
-                operations_data = json.load(f)
-            return operations_data.get("active_operation_ids", [])
-        except Exception as e2:
-            print(f"Errore nel caricamento delle operazioni dopo il refresh: {e2}")
-            return []
+        pg_conn = get_pg_connection()
+        pg_cur = pg_conn.cursor()
+        pg_cur.execute("SELECT id FROM operations WHERE active = true AND enable_wass = true")
+        operation_ids = [row[0] for row in pg_cur.fetchall()]
+        pg_cur.close()
+        pg_conn.close()
+        
+        if not operation_ids:
+            print("Nessuna operazione trovata in PostgreSQL, aggiorno dal DB MySQL...")
+            operation_ids = get_active_operations()
+        
+        return operation_ids
+    except Exception as e:
+        print(f"Errore nel caricamento delle operazioni da PostgreSQL: {e}")
+        print("Fallback: caricamento da MySQL...")
+        return get_active_operations()
 
 # ---------- Mapping structure_type_id -> type (A..F/X) ----------
 def map_structure_type_to_letter(structure_type_id):
@@ -96,21 +101,15 @@ def map_structure_type_to_letter(structure_type_id):
 
 # ---------- Core ----------
 def get_apartments_for_date(selected_date):
-    """
-    Estrae gli appartamenti per la data indicata,
-    restituendo SOLO i campi richiesti con le trasformazioni specificate.
-    """
-    # filtri operation_id come nel tuo flusso attuale
+    """Estrae gli appartamenti per la data indicata dal DB MySQL"""
     valid_operation_ids = load_valid_operation_ids()
-    valid_operation_ids.extend([0, None])  # includi anche 0 e NULL
+    valid_operation_ids.extend([0, None])
     non_null_operation_ids = [op for op in valid_operation_ids if op is not None]
     operation_placeholders = ','.join(['%s'] * len(non_null_operation_ids)) if non_null_operation_ids else 'NULL'
 
     connection = mysql.connector.connect(**DB_CONFIG)
     cursor = connection.cursor(dictionary=True)
 
-    # JOIN con app_customers per prendere alias
-    # Subquery per cleaning_time mantenuta
     base_query = f"""
         SELECT 
             h.id AS task_id,
@@ -120,19 +119,19 @@ def get_apartments_for_date(selected_date):
             s.address1 AS address,
             s.lat,
             s.lng,
-                        (
-                                SELECT duration_minutes 
-                                FROM app_structure_timings ast
-                                WHERE ast.structure_type_id = s.structure_type_id
-                                    AND ast.customer_id = s.customer_id
-                                    AND ast.structure_operation_id = (
-                                            CASE WHEN h.operation_id = 0 THEN 2 ELSE h.operation_id END
-                                    )
-                                    AND ast.data_contratto <= CURDATE()
-                                    AND ast.deleted_at IS NULL
-                                ORDER BY ABS(DATEDIFF(ast.data_contratto, CURDATE()))
-                                LIMIT 1
-                        ) AS cleaning_time,
+            (
+                SELECT duration_minutes 
+                FROM app_structure_timings ast
+                WHERE ast.structure_type_id = s.structure_type_id
+                    AND ast.customer_id = s.customer_id
+                    AND ast.structure_operation_id = (
+                        CASE WHEN h.operation_id = 0 THEN 2 ELSE h.operation_id END
+                    )
+                    AND ast.data_contratto <= CURDATE()
+                    AND ast.deleted_at IS NULL
+                ORDER BY ABS(DATEDIFF(ast.data_contratto, CURDATE()))
+                LIMIT 1
+            ) AS cleaning_time,
             h.checkin,
             h.checkout,
             h.checkin_time,
@@ -164,14 +163,11 @@ def get_apartments_for_date(selected_date):
     cursor.close()
     connection.close()
 
-    # Prepara output con i soli campi richiesti + trasformazioni
     results = []
     for r in rows:
         structure_type_id = r.get("structure_type_id")
         op_id = r.get("operation_id")
 
-        # Se operation_id originale è 0, confirmed_operation = False 
-        # e operation_id = 2 (di default è una partenza) (graficamente sarà segnalato con un punto di domanda)
         if op_id == 0:
             confirmed_operation = False
             output_operation_id = 2
@@ -210,8 +206,63 @@ def get_apartments_for_date(selected_date):
 
     return results
 
+def save_tasks_to_db(tasks, work_date):
+    """Salva i task nel database PostgreSQL"""
+    pg_conn = get_pg_connection()
+    pg_cur = pg_conn.cursor()
+    
+    # Elimina i task esistenti per questa data
+    pg_cur.execute("DELETE FROM tasks WHERE work_date = %s", (work_date,))
+    
+    # Prepara i dati per l'inserimento batch
+    task_values = []
+    for t in tasks:
+        task_values.append((
+            t["task_id"],
+            str(t["logistic_code"]),
+            t.get("client_id"),
+            t["premium"],
+            t.get("address"),
+            t.get("lat"),
+            t.get("lng"),
+            t.get("cleaning_time"),
+            t.get("checkin_date"),
+            t.get("checkout_date"),
+            t.get("checkin_time"),
+            t.get("checkout_time"),
+            t.get("pax_in"),
+            t.get("pax_out"),
+            t["small_equipment"],
+            t["operation_id"],
+            t["confirmed_operation"],
+            t["straordinaria"],
+            t.get("type_apt"),
+            t.get("alias"),
+            t.get("customer_name"),
+            None,  # priority (sarà assegnata dopo)
+            "pending",  # status
+            work_date,
+            []  # reasons
+        ))
+    
+    # Inserimento batch
+    execute_values(pg_cur, """
+        INSERT INTO tasks (
+            task_id, logistic_code, client_id, premium, address, lat, lng,
+            cleaning_time, checkin_date, checkout_date, checkin_time, checkout_time,
+            pax_in, pax_out, small_equipment, operation_id, confirmed_operation,
+            straordinaria, type_apt, alias, customer_name, priority, status,
+            work_date, reasons
+        ) VALUES %s
+    """, task_values)
+    
+    pg_conn.commit()
+    pg_cur.close()
+    pg_conn.close()
+    
+    print(f"✅ Salvati {len(tasks)} task nel database PostgreSQL per la data {work_date}")
+
 def main():
-    # Data da CLI o default domani
     if len(sys.argv) > 1:
         selected_date = sys.argv[1]
         print(f"Usando data specifica: {selected_date}")
@@ -219,11 +270,16 @@ def main():
         selected_date = (datetime.now() + timedelta(days=1)).strftime("%Y-%m-%d")
         print(f"Usando data di default (domani): {selected_date}")
 
-    # Assicurati che operations.json sia aggiornato prima di estrarre i task
-    refresh_operations_list()
+    # Aggiorna le operazioni attive
+    get_active_operations()
 
+    # Estrai i task
     apt_data = get_apartments_for_date(selected_date)
 
+    # Salva nel database PostgreSQL
+    save_tasks_to_db(apt_data, selected_date)
+
+    # Mantieni anche il salvataggio JSON per retrocompatibilità temporanea
     output = {
         "metadata": {
             "last_updated": datetime.now().isoformat(),
@@ -239,10 +295,12 @@ def main():
         }
     }
 
+    import os
+    os.makedirs("client/public/data/input", exist_ok=True)
     with open("client/public/data/input/daily_tasks.json", "w", encoding="utf-8") as f:
         json.dump(output, f, indent=4, ensure_ascii=False)
 
-    print(f"Aggiornato daily_tasks.json con {len(apt_data)} appartamenti per la data {selected_date}.")
+    print(f"Aggiornato database e daily_tasks.json con {len(apt_data)} appartamenti per la data {selected_date}.")
 
 if __name__ == "__main__":
     main()
