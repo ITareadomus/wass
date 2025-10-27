@@ -185,6 +185,29 @@
       "customer_name": "THE BEST RENT S.r.l."
     },
     {
+      "task_id": 218044,
+      "logistic_code": null,
+      "client_id": 1,
+      "premium": false,
+      "address": "VIA IMPERIA 3/B",
+      "lat": "45.4416781",
+      "lng": "9.1752361",
+      "cleaning_time": null,
+      "checkin_date": "2025-10-27",
+      "checkout_date": "2025-10-27",
+      "checkin_time": null,
+      "checkout_time": null,
+      "pax_in": 0,
+      "pax_out": 0,
+      "small_equipment": true,
+      "operation_id": 2,
+      "confirmed_operation": false,
+      "straordinaria": false,
+      "type_apt": "A",
+      "alias": "AD",
+      "customer_name": "AREA DOMUS SRL"
+    },
+    {
       "task_id": 218049,
       "logistic_code": 229,
       "client_id": 2,
@@ -208,5 +231,5 @@
       "customer_name": "ITALIANWAY SRL"
     }
   ],
-  "total_apartments": 9
+  "total_apartments": 10
 }
