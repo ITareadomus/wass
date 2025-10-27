@@ -4,6 +4,7 @@ import TaskCard from "./task-card";
 import { Clock, AlertCircle, ArrowDown, Calendar } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
+import { format } from "date-fns";
 
 interface PriorityColumnProps {
   title: string;
@@ -21,6 +22,8 @@ export default function PriorityColumn({
   icon,
 }: PriorityColumnProps) {
   const { toast } = useToast();
+  // State to track if assignments are in progress
+  const [isAssigning, setIsAssigning] = React.useState(false);
 
   const getColumnClass = (priority: string, tasks: Task[]) => {
     switch (priority) {
@@ -103,45 +106,7 @@ export default function PriorityColumn({
         });
       }
     } else if (priority === 'high') {
-      try {
-        // Ottieni la data selezionata dal localStorage
-        const savedDate = localStorage.getItem('selected_work_date');
-        const selectedDate = savedDate ? new Date(savedDate) : new Date();
-        const dateStr = selectedDate.toISOString().split('T')[0];
-
-        console.log('Esecuzione assign_hp.py per data:', dateStr);
-        const response = await fetch('/api/assign-hp', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ date: dateStr })
-        });
-
-        if (!response.ok) {
-          throw new Error('Errore durante l\'assegnazione HP');
-        }
-
-        const result = await response.json();
-        console.log('Assegnazione HP completata:', result);
-
-        toast({
-          variant: "success",
-          title: "✅ HIGH PRIORITY assegnati con successo!",
-        });
-
-        // Ricarica i task
-        if ((window as any).reloadAllTasks) {
-          await (window as any).reloadAllTasks();
-        }
-
-        // Ricarica la pagina per aggiornare i marker sulla mappa
-        window.location.reload();
-      } catch (error: any) {
-        console.error('Errore nell\'assegnazione HP:', error);
-        toast({
-          title: "❌ HIGH-PRIORITY non assegnati, errore!",
-          variant: "destructive",
-        });
-      }
+      // This part is handled by handleAssignHighPriority now
     } else if (priority === 'low') {
       try {
         // Ottieni la data selezionata dal localStorage
@@ -185,6 +150,76 @@ export default function PriorityColumn({
     }
   };
 
+  const handleAssignHighPriority = async () => {
+    try {
+      setIsAssigning(true);
+      const dateStr = format(new Date(localStorage.getItem('selected_work_date') || new Date()), "yyyy-MM-dd");
+
+      const response = await fetch('/api/assign-hp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ date: dateStr })
+      });
+
+      if (!response.ok) {
+        throw new Error('Errore durante l\'assegnazione high priority');
+      }
+
+      const result = await response.json();
+      console.log('Assegnazione HP completata:', result);
+
+      toast({
+        variant: "success",
+        title: "✅ HIGH PRIORITY assegnati con successo!",
+      });
+
+      // Ricarica i task
+      if (typeof (window as any).reloadAllTasks === 'function') {
+        await (window as any).reloadAllTasks();
+      }
+
+      // Ricarica la pagina per aggiornare i marker sulla mappa
+      window.location.reload();
+    } catch (error: any) {
+      console.error('Errore nell\'assegnazione HP:', error);
+      toast({
+        title: "❌ HIGH-PRIORITY non assegnati, errore!",
+        variant: "destructive",
+      });
+    } finally {
+      setIsAssigning(false);
+    }
+  };
+
+  const handleAssignLowPriority = async () => {
+    try {
+      setIsAssigning(true);
+      const dateStr = format(new Date(localStorage.getItem('selected_work_date') || new Date()), "yyyy-MM-dd");
+
+      const response = await fetch('/api/assign-lp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ date: dateStr })
+      });
+
+      if (!response.ok) {
+        throw new Error('Errore durante l\'assegnazione low priority');
+      }
+
+      const result = await response.json();
+      console.log('Assegnazione LP completata:', result);
+
+      // Ricarica i task
+      if (typeof (window as any).reloadAllTasks === 'function') {
+        await (window as any).reloadAllTasks();
+      }
+    } catch (error) {
+      console.error('Errore nell\'assegnazione LP:', error);
+    } finally {
+      setIsAssigning(false);
+    }
+  };
+
   return (
     <div className={`${getColumnClass(priority, tasks)} rounded-lg p-4 border-2`}>
       <div className="flex items-center justify-between mb-4">
@@ -197,16 +232,36 @@ export default function PriorityColumn({
             {tasks.length} task
           </div>
         </div>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={handleTimelineAssignment}
-          className="text-xs px-2 py-1 h-7"
-          disabled={tasks.length === 0}
-        >
-          <Calendar className="w-3 h-3 mr-1" />
-          Assegna
-        </Button>
+        {priority === "high" ? (
+          <Button
+            onClick={handleAssignHighPriority}
+            disabled={isAssigning || tasks.length === 0}
+            className="text-xs px-2 py-1 h-7"
+          >
+            {isAssigning ? (
+              <>
+                <span className="animate-spin mr-2">⏳</span>
+                Assegnando...
+              </>
+            ) : (
+              <>
+                <Calendar className="w-3 h-3 mr-1" />
+                Assegna
+              </>
+            )}
+          </Button>
+        ) : (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleTimelineAssignment}
+            className="text-xs px-2 py-1 h-7"
+            disabled={tasks.length === 0}
+          >
+            <Calendar className="w-3 h-3 mr-1" />
+            Assegna
+          </Button>
+        )}
       </div>
 
       <Droppable droppableId={droppableId}>
