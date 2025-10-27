@@ -537,15 +537,10 @@ def main():
         except:
             timeline_data = {"assignments": [], "current_date": ref_date}
 
-    # Rimuovi vecchie assegnazioni EO
-    assigned_codes = set()
-    for cleaner_entry in output["early_out_tasks_assigned"]:
-        for task in cleaner_entry.get("tasks", []):
-            assigned_codes.add(str(task["logistic_code"]))
-
+    # Rimuovi SOLO le vecchie assegnazioni EO (mantieni HP e altre)
     timeline_data["assignments"] = [
         a for a in timeline_data.get("assignments", [])
-        if str(a.get("logistic_code")) not in assigned_codes
+        if a.get("assignment_type") != "early_out"
     ]
 
     # Aggiungi nuove assegnazioni EO con tutti i dati del task
