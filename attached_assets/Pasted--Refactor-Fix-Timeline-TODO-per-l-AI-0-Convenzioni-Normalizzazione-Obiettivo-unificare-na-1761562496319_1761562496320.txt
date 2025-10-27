@@ -1,0 +1,291 @@
+🔧 Refactor & Fix Timeline – TODO per l’AI
+0) Convenzioni & Normalizzazione
+
+Obiettivo: unificare naming e tipi per evitare mismatch.
+
+Modifiche:
+
+Usa camelCase ovunque negli assignment di timeline:
+
+taskId: string
+
+logisticCode: string (sempre string)
+
+cleanerId: number
+
+sequence: number
+
+startTime?: "HH:mm"
+
+endTime?: "HH:mm"
+
+In ogni parsing di input (early/high/low): logisticCode = String(item.logistic_code).
+
+Ovunque compaiano varianti (task_id, cleaner_id, logistic_code), normalizza ai campi sopra prima di salvare/ritornare.
+
+Criteri OK
+
+Nessun campo snake_case negli assignment salvati.
+
+logisticCode sempre string, anche se numerico in origine.
+
+1) Salvataggio posizionale con dropIndex
+
+File/Endpoint: /api/save-timeline-assignment
+
+Cosa fare:
+
+Accetta dropIndex dal client.
+
+Per il cleanerId di destinazione: inserisci il nuovo item in posizione dropIndex (clamp agli estremi), poi ricalcola sequence = 1..N.
+
+Rimuovi eventuali assegnazioni precedenti dello stesso task (match su taskId o logisticCode, confrontando come stringhe).
+
+Client: nel DnD, passa destination.index come dropIndex.
+
+Criteri OK
+
+Un drop in mezzo alla timeline salva esattamente quella posizione.
+
+Nessuna duplicazione dello stesso task in timeline.
+
+2) Reorder intra-timeline
+
+Endpoint nuovo: /api/reorder-timeline
+
+Cosa fare (server):
+
+Input: date, cleanerId, taskId, logisticCode, fromIndex, toIndex.
+
+Muovi l’item da fromIndex a toIndex dentro la timeline di cleanerId.
+
+Ricalcola sequence 1..N.
+
+Client: intercetta il caso source.droppableId === destination.droppableId e chiama questo endpoint.
+
+Criteri OK
+
+Il semplice riordino (drag nella stessa colonna) persiste l’ordine senza side-effect.
+
+3) Rimozione robusta
+
+Endpoint: /api/remove-timeline-assignment
+
+Cosa fare:
+
+Match per rimozione con:
+
+const matchCode = String(a.logisticCode ?? a.logistic_code) === String(logisticCode);
+const matchId   = String(a.taskId ?? a.task_id) === String(taskId);
+// rimuovi se matchCode || matchId
+
+
+Non re-inserire la task nei JSON sorgente (evita duplicazioni). I container restano fonti di verità; la timeline è un overlay filtrato.
+
+Criteri OK
+
+Rimozione funziona sia con taskId sia con logisticCode, indipendentemente dai tipi.
+
+4) Calcolo orari centralizzato (no default finti)
+
+Modulo nuovo (server): schedule/recompute.ts
+
+Funzioni:
+
+recomputeSchedule(assignmentsForCleaner, cleanerStartHHmm, date):
+
+Ordina per sequence.
+
+Calcola startTime/endTime in HH:mm partendo da cleanerStartHHmm, sommando travelMinutes(prev, curr) e cleaning_time (o duration).
+
+Timezone: Europe/Rome. Usa date-fns + date-fns-tz.
+
+travelMinutes(prev, curr): placeholder deterministico (0 per ora, o semplice euristica).
+
+Chiamare il ricalcolo dopo ogni save/reorder solo per il cleaner toccato, prima di salvare il file.
+
+Criteri OK
+
+Nessun “10:00–12:00” generato di default.
+
+Ogni modifica alla sequenza genera orari coerenti.
+
+5) Migrazione una-tantum degli orari legacy
+
+Scopo: recuperare orari da campi vecchi o ricalcolarli.
+
+Aggiungi scheduleVersion nel JSON del giorno (default legacy 0).
+
+Script server: scripts/migrate-schedule.ts
+
+Per ogni giorno:
+
+Se scheduleVersion < 1: per ogni assignment
+
+Se startTime/endTime non validi HH:mm, prova fallback: start_time/end_time, slotStart/slotEnd, timestamp, ecc.
+
+Se ancora mancanti ⇒ usa recomputeSchedule.
+
+Imposta scheduleVersion = 1.
+
+Scrittura atomica file.tmp + rename.
+
+Criteri OK
+
+I file legacy sono normalizzati e privi di orari placeholder.
+
+Campo scheduleVersion presente e = 1.
+
+6) Validazioni dure (Zod)
+
+File: @shared/schema.ts
+
+Aggiungi:
+
+export const timelineAssignmentSchema = z.object({
+  taskId: z.string(),
+  logisticCode: z.string(),
+  cleanerId: z.number().int().nonnegative(),
+  sequence: z.number().int().positive(),
+  startTime: z.string().regex(/^\d{2}:\d{2}$/).optional(),
+  endTime: z.string().regex(/^\d{2}:\d{2}$/).optional(),
+});
+
+export const timelineFileSchema = z.object({
+  current_date: z.string(), // yyyy-MM-dd
+  scheduleVersion: z.number().int().nonnegative().default(1),
+  assignments: z.array(timelineAssignmentSchema)
+});
+
+
+Usa queste validazioni prima del salvataggio in tutti gli endpoint timeline.
+
+Criteri OK
+
+Salvataggi rifiutati se i campi non rispettano lo schema.
+
+7) Scritture atomiche + coda per data
+
+Implementa scritture atomiche (write tmp + rename) per timeline_assignments/{yyyy-MM-dd}.json.
+
+(Opzionale) coda per data (mutex soft) per serializzare operazioni concorrenti entro pochi ms.
+
+Criteri OK
+
+Nessuna corruzione con drag multipli veloci.
+
+8) Niente full reload
+
+Client: rimuovi ogni window.location.reload().
+
+Esporre reloadAllTasks() che rilegge i JSON e aggiorna lo stato in memoria.
+
+Criteri OK
+
+Dopo le operazioni, la UI si aggiorna senza ricaricare la pagina.
+
+9) UI: stato “TBD” invece di orari fake
+
+Componente timeline: se !startTime || !endTime, mostra badge “TBD” + bottone “Ricalcola”.
+
+Disabilita il rendering della barra oraria sulla griglia per item “TBD”.
+
+Criteri OK
+
+In UI non compaiono più orari inventati; gli elementi incompleti sono chiaramente marcati.
+
+10) File “generale” timeline
+
+Se esiste timeline_assignments.json “generale”, rimuoverlo o mantenerlo sempre mirror del file della data attiva.
+
+Preferito: eliminarlo per ridurre le fonti di verità.
+
+Criteri OK
+
+Una sola fonte di verità: file per-data.
+
+11) Timezone & DST
+
+Tutti i calcoli orari usano Europe/Rome con date-fns-tz (zonedTimeToUtc / utcToZonedTime).
+
+Testa una giornata con cambio ora legale: nessun salto/sovrapposizione.
+
+Criteri OK
+
+Orari coerenti anche nei giorni di cambio DST.
+
+12) Telemetria minima
+
+Log per ogni write:
+
+numero assignment ricalcolati,
+
+presenza di fallback/migrazioni,
+
+durata totale per cleaner.
+
+Se ricalcoli > 0 ⇒ log livello warn.
+
+Criteri OK
+
+Log utili per individuare anomalie future.
+
+Snippet chiave da applicare
+Client – passare dropIndex
+await fetch('/api/save-timeline-assignment', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ taskId, cleanerId, logisticCode, date: format(selectedDate, 'yyyy-MM-dd'), dropIndex: destination.index }),
+});
+
+Server – inserimento posizionale + resequencing (estratto)
+const { taskId, cleanerId, logisticCode, date, dropIndex } = req.body;
+const data = await loadTimeline(date);
+
+data.assignments = data.assignments.filter(a =>
+  String(a.logisticCode ?? a.logistic_code) !== String(logisticCode) &&
+  String(a.taskId ?? a.task_id) !== String(taskId)
+);
+
+const same = data.assignments.filter(a => a.cleanerId === Number(cleanerId));
+const others = data.assignments.filter(a => a.cleanerId !== Number(cleanerId));
+
+const newItem = { taskId: String(taskId), logisticCode: String(logisticCode), cleanerId: Number(cleanerId), sequence: 0 };
+
+const pos = Math.max(0, Math.min(dropIndex ?? same.length, same.length));
+same.splice(pos, 0, newItem);
+
+same.forEach((a, i) => a.sequence = i + 1);
+
+await recomputeScheduleForCleaner(same, cleanerId, date); // usa modulo schedule
+
+data.assignments = [...others, ...same];
+await saveTimelineAtomic(date, data);
+
+Server – reorder intra-timeline (estratto)
+const { date, cleanerId, fromIndex, toIndex } = req.body;
+const data = await loadTimeline(date);
+const same = data.assignments.filter(a => a.cleanerId === Number(cleanerId)).sort((x,y)=>x.sequence-y.sequence);
+const others = data.assignments.filter(a => a.cleanerId !== Number(cleanerId));
+
+const [moved] = same.splice(fromIndex, 1);
+same.splice(Math.max(0, Math.min(toIndex, same.length)), 0, moved);
+same.forEach((a, i) => a.sequence = i + 1);
+
+await recomputeScheduleForCleaner(same, cleanerId, date);
+data.assignments = [...others, ...same];
+await saveTimelineAtomic(date, data);
+
+Test di accettazione (rapidi)
+
+Drop in mezzo: trascino una task al centro della timeline ⇒ dopo refresh logico (senza ricaricare pagina) l’item resta a quell’indice; sequence coerente; orari ricalcolati.
+
+Reorder intra: sposto su/giù un item ⇒ ordine persistito, orari aggiornati, nessun default.
+
+Rimozione: tolgo una task ⇒ sparisce dalla timeline, niente duplicazioni nei container, riaggiungibile da origine.
+
+Migrazione: su un file legacy con start_time/end_time misti ⇒ i campi diventano startTime/endTime validi, scheduleVersion = 1.
+
+DST: giorno di cambio ora ⇒ nessun orario “saltato” o invertito.
+
+No reload: nessun window.location.reload() nel codice; stato aggiornato via funzioni.
