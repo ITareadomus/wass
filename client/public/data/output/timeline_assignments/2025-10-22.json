@@ -1,0 +1,30 @@
+{
+  "assignments": [
+    {
+      "task_id": 217775,
+      "logistic_code": "1363",
+      "cleanerId": 785,
+      "assignment_type": "manual_drag",
+      "sequence": 0,
+      "address": "VIA AMEDEI, 2",
+      "lat": "45.4597298",
+      "lng": "9.186577",
+      "premium": true,
+      "cleaning_time": 270,
+      "checkin_date": "2025-10-22",
+      "checkout_date": "2025-10-22",
+      "checkin_time": null,
+      "checkout_time": null,
+      "pax_in": 2,
+      "pax_out": 2,
+      "operation_id": 2,
+      "confirmed_operation": true,
+      "straordinaria": false,
+      "type_apt": "E",
+      "alias": "TBR",
+      "customer_name": "THE BEST RENT S.r.l.",
+      "small_equipment": false
+    }
+  ],
+  "current_date": "2025-10-22"
+}
