@@ -596,9 +596,17 @@ def build_output(cleaners: List[Cleaner], unassigned: List[Task], original_tasks
     
     total_assigned = sum(len(c["tasks"]) for c in cleaners_with_tasks)
     
+    # Usa la data passata come argomento da riga di comando
+    import sys
+    if len(sys.argv) > 1:
+        current_ref_date = sys.argv[1]
+    else:
+        current_ref_date = ref_date
+
     return {
         "high_priority_tasks_assigned": cleaners_with_tasks,
         "unassigned_tasks": unassigned_list,
+        "current_date": current_ref_date,
         "meta": {
             "total_tasks": len(original_tasks),
             "assigned": total_assigned,
