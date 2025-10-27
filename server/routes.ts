@@ -1296,15 +1296,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
       try {
         const eoData = await fs.readFile(eoAssignmentsPath, 'utf8');
         const eoJson = JSON.parse(eoData);
+        console.log(`EO file current_date: ${eoJson.current_date}, searching for: ${date}`);
+        console.log(`EO tasks found: ${eoJson.early_out_tasks_assigned?.length || 0} cleaners`);
+        
         if (eoJson.current_date === date) {
           for (const cleanerEntry of eoJson.early_out_tasks_assigned || []) {
             const cleanerId = cleanerEntry.cleaner.id;
+            console.log(`Processing cleaner ${cleanerId} with ${cleanerEntry.tasks?.length || 0} EO tasks`);
             for (const task of cleanerEntry.tasks || []) {
               // Verifica se questa task non è già nelle assegnazioni manuali
               const alreadyExists = allAssignments.some(a => 
-                String(a.logistic_code) === String(task.logistic_code)
+                String(a.logistic_code) === String(task.logistic_code) ||
+                String(a.task_id) === String(task.task_id)
               );
               if (!alreadyExists) {
+                console.log(`Adding EO task ${task.task_id} (${task.logistic_code}) to cleaner ${cleanerId}`);
                 allAssignments.push({
                   task_id: task.task_id,
                   logistic_code: String(task.logistic_code),
@@ -1321,26 +1327,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   travel_time: task.travel_time,
                   followup: task.followup
                 });
+              } else {
+                console.log(`Skipping duplicate EO task ${task.task_id} (${task.logistic_code})`);
               }
             }
           }
+        } else {
+          console.log(`EO file date mismatch: ${eoJson.current_date} !== ${date}`);
         }
       } catch (error) {
-        console.log('Nessuna assegnazione Early Out trovata');
+        console.log('Nessuna assegnazione Early Out trovata:', error);
       }
 
       // Aggiungi assegnazioni HP
       try {
         const hpData = await fs.readFile(hpAssignmentsPath, 'utf8');
         const hpJson = JSON.parse(hpData);
-        if (hpJson.current_date === date) {
+        console.log(`HP file current_date: ${hpJson.current_date}, searching for: ${date}`);
+        console.log(`HP tasks found: ${hpJson.high_priority_tasks_assigned?.length || 0} cleaners`);
+        
+        // Confronta solo la data senza l'ora
+        const hpDate = hpJson.current_date?.split('T')[0] || hpJson.current_date;
+        const searchDate = date.split('T')[0];
+        
+        if (hpDate === searchDate) {
           for (const cleanerEntry of hpJson.high_priority_tasks_assigned || []) {
             const cleanerId = cleanerEntry.cleaner.id;
+            console.log(`Processing cleaner ${cleanerId} with ${cleanerEntry.tasks?.length || 0} HP tasks`);
             for (const task of cleanerEntry.tasks || []) {
               const alreadyExists = allAssignments.some(a => 
-                String(a.logistic_code) === String(task.logistic_code)
+                String(a.logistic_code) === String(task.logistic_code) ||
+                String(a.task_id) === String(task.task_id)
               );
               if (!alreadyExists) {
+                console.log(`Adding HP task ${task.task_id} (${task.logistic_code}) to cleaner ${cleanerId}`);
                 allAssignments.push({
                   task_id: task.task_id,
                   logistic_code: String(task.logistic_code),
@@ -1357,26 +1377,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   travel_time: task.travel_time,
                   followup: task.followup
                 });
+              } else {
+                console.log(`Skipping duplicate HP task ${task.task_id} (${task.logistic_code})`);
               }
             }
           }
+        } else {
+          console.log(`HP file date mismatch: ${hpDate} !== ${searchDate}`);
         }
       } catch (error) {
-        console.log('Nessuna assegnazione High Priority trovata');
+        console.log('Nessuna assegnazione High Priority trovata:', error);
       }
 
       // Aggiungi assegnazioni LP
       try {
         const lpData = await fs.readFile(lpAssignmentsPath, 'utf8');
         const lpJson = JSON.parse(lpData);
-        if (lpJson.current_date === date) {
+        console.log(`LP file current_date: ${lpJson.current_date}, searching for: ${date}`);
+        console.log(`LP tasks found: ${lpJson.low_priority_tasks_assigned?.length || 0} cleaners`);
+        
+        // Confronta solo la data senza l'ora
+        const lpDate = lpJson.current_date?.split('T')[0] || lpJson.current_date;
+        const searchDate = date.split('T')[0];
+        
+        if (lpDate === searchDate) {
           for (const cleanerEntry of lpJson.low_priority_tasks_assigned || []) {
             const cleanerId = cleanerEntry.cleaner.id;
+            console.log(`Processing cleaner ${cleanerId} with ${cleanerEntry.tasks?.length || 0} LP tasks`);
             for (const task of cleanerEntry.tasks || []) {
               const alreadyExists = allAssignments.some(a => 
-                String(a.logistic_code) === String(task.logistic_code)
+                String(a.logistic_code) === String(task.logistic_code) ||
+                String(a.task_id) === String(task.task_id)
               );
               if (!alreadyExists) {
+                console.log(`Adding LP task ${task.task_id} (${task.logistic_code}) to cleaner ${cleanerId}`);
                 allAssignments.push({
                   task_id: task.task_id,
                   logistic_code: String(task.logistic_code),
@@ -1393,12 +1427,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   travel_time: task.travel_time,
                   followup: task.followup
                 });
+              } else {
+                console.log(`Skipping duplicate LP task ${task.task_id} (${task.logistic_code})`);
               }
             }
           }
+        } else {
+          console.log(`LP file date mismatch: ${lpDate} !== ${searchDate}`);
         }
       } catch (error) {
-        console.log('Nessuna assegnazione Low Priority trovata');
+        console.log('Nessuna assegnazione Low Priority trovata:', error);
       }
 
       // Salva tutte le assegnazioni confermate
@@ -1407,6 +1445,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         confirmed_at: new Date().toISOString(),
         assignments: allAssignments
       };
+
+      console.log(`Salvando ${allAssignments.length} assegnazioni totali in ${filename}`);
+      console.log(`Breakdown: ${timelineData.assignments.length} manuali + ${allAssignments.length - timelineData.assignments.length} da script`);
 
       await fs.writeFile(assignedFilePath, JSON.stringify(confirmedData, null, 2));
 
