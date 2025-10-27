@@ -1,4 +1,6 @@
 {
+  "date": "2025-10-27",
+  "confirmed_at": "2025-10-27T10:13:47.185Z",
   "assignments": [
     {
       "task_id": "218044",
@@ -7,6 +9,5 @@
       "assignment_type": "manual_drag",
       "sequence": 0
     }
-  ],
-  "current_date": "2025-10-27"
+  ]
 }
