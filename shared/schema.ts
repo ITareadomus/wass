@@ -80,6 +80,8 @@ export const taskSchema = z.object({
   operation_id: z.number().optional(),
   customer_name: z.string().optional(),
   type_apt: z.string().optional(),
+  startTime: z.string().optional(),
+  endTime: z.string().optional(),
   createdAt: z.string(),
   updatedAt: z.string(),
 });
