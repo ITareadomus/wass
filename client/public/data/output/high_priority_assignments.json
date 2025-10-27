@@ -1,160 +1,29 @@
 {
-  "high_priority_tasks_assigned": [
-    {
-      "cleaner": {
-        "id": 829,
-        "name": "MUSTAPHA",
-        "lastname": "BAH",
-        "role": "Premium",
-        "premium": true
-      },
-      "tasks": [
-        {
-          "task_id": 217722,
-          "logistic_code": 1537,
-          "address": "Via dei Piatti, 4 20123 (MI)",
-          "lat": 45.460795,
-          "lng": 9.1850985,
-          "premium": true,
-          "cleaning_time": 150,
-          "start_time": "13:24",
-          "end_time": "15:54",
-          "followup": true,
-          "sequence": 2,
-          "travel_time": 25
-        }
-      ]
-    },
-    {
-      "cleaner": {
-        "id": 596,
-        "name": "TRACY",
-        "lastname": "OKE",
-        "role": "Premium",
-        "premium": true
-      },
-      "tasks": [
-        {
-          "task_id": 217718,
-          "logistic_code": 1101,
-          "address": "Via Paolo Sarpi, 26, 20154 (MI)",
-          "lat": 45.481556,
-          "lng": 9.1767745,
-          "premium": true,
-          "cleaning_time": 270,
-          "start_time": "12:13",
-          "end_time": "16:43",
-          "followup": true,
-          "sequence": 2,
-          "travel_time": 13
-        }
-      ]
-    },
-    {
-      "cleaner": {
-        "id": 1046,
-        "name": "JOY",
-        "lastname": "EDIAGBANYA",
-        "role": "Standard",
-        "premium": false
-      },
-      "tasks": [
-        {
-          "task_id": 217560,
-          "logistic_code": 1494,
-          "address": "VIA ORTI 16D",
-          "lat": 45.454729,
-          "lng": 9.2015875,
-          "premium": false,
-          "cleaning_time": 90,
-          "start_time": "11:06",
-          "end_time": "12:36",
-          "followup": true,
-          "sequence": 2,
-          "travel_time": 6
-        }
-      ]
-    },
-    {
-      "cleaner": {
-        "id": 132,
-        "name": "JOHOISER ERNESTO",
-        "lastname": "LOPEZ GIRON",
-        "role": "Premium",
-        "premium": true
-      },
-      "tasks": [
-        {
-          "task_id": 217717,
-          "logistic_code": 144,
-          "address": "CORSO DI PORTA ROMANA 107",
-          "lat": 45.4541963,
-          "lng": 9.199497,
-          "premium": true,
-          "cleaning_time": 120,
-          "start_time": "11:14",
-          "end_time": "13:14",
-          "followup": true,
-          "sequence": 2,
-          "travel_time": 14
-        }
-      ]
-    },
-    {
-      "cleaner": {
-        "id": 1055,
-        "name": "BEAUTY",
-        "lastname": "OMOREGIE",
-        "role": "Standard",
-        "premium": false
-      },
-      "tasks": [
-        {
-          "task_id": 217721,
-          "logistic_code": 1556,
-          "address": "Via Torino, 68 20123 (MI)",
-          "lat": 45.46069,
-          "lng": 9.1820749,
-          "premium": false,
-          "cleaning_time": 120,
-          "start_time": "13:04",
-          "end_time": "15:04",
-          "followup": true,
-          "sequence": 3,
-          "travel_time": 5
-        }
-      ]
-    },
-    {
-      "cleaner": {
-        "id": 495,
-        "name": "EL HADJI",
-        "lastname": "BA",
-        "role": "Premium",
-        "premium": true
-      },
-      "tasks": [
-        {
-          "task_id": 217719,
-          "logistic_code": 1090,
-          "address": "via Caminadella 13",
-          "lat": 45.4597769,
-          "lng": 9.1770378,
-          "premium": true,
-          "cleaning_time": 270,
-          "start_time": "14:11",
-          "end_time": "18:41",
-          "followup": true,
-          "sequence": 4,
-          "travel_time": 17
-        }
-      ]
-    }
-  ],
+  "high_priority_tasks_assigned": [],
   "unassigned_tasks": [
     {
       "task_id": 217258,
       "logistic_code": 1530,
+      "reason": "no_eligible_cleaner_or_time_window"
+    },
+    {
+      "task_id": 217718,
+      "logistic_code": 1101,
+      "reason": "no_eligible_cleaner_or_time_window"
+    },
+    {
+      "task_id": 217717,
+      "logistic_code": 144,
+      "reason": "no_eligible_cleaner_or_time_window"
+    },
+    {
+      "task_id": 217719,
+      "logistic_code": 1090,
+      "reason": "no_eligible_cleaner_or_time_window"
+    },
+    {
+      "task_id": 217722,
+      "logistic_code": 1537,
       "reason": "no_eligible_cleaner_or_time_window"
     },
     {
@@ -193,8 +62,18 @@
       "reason": "no_eligible_cleaner_or_time_window"
     },
     {
+      "task_id": 217560,
+      "logistic_code": 1494,
+      "reason": "no_eligible_cleaner_or_time_window"
+    },
+    {
       "task_id": 217695,
       "logistic_code": 1541,
+      "reason": "no_eligible_cleaner_or_time_window"
+    },
+    {
+      "task_id": 217721,
+      "logistic_code": 1556,
       "reason": "no_eligible_cleaner_or_time_window"
     },
     {
@@ -203,25 +82,22 @@
       "reason": "no_eligible_cleaner_or_time_window"
     }
   ],
-  "current_date": "2025-10-20",
   "meta": {
     "total_tasks": 16,
-    "assigned": 6,
-    "unassigned": 10,
-    "cleaners_used": 6,
-    "max_tasks_per_cleaner": 3,
-    "algorithm": "simplified_greedy",
+    "assigned": 0,
+    "unassigned": 16,
+    "cleaners_used": 0,
+    "max_tasks_per_cleaner": 0,
+    "algorithm": "regret_insertion + redirect + best-of-infeasible",
     "notes": [
-      "REGOLE SEMPLIFICATE:",
-      "1. Max 2 task per cleaner (3ª solo se entro 10' dalla 2ª)",
-      "2. Favorisce percorsi < 15'",
-      "3. Se non ci sono percorsi < 15', sceglie il minore dei > 15'",
-      "4. Straordinarie solo a premium cleaner, devono essere la prima task",
-      "5. Premium task solo a premium cleaner",
-      "6. Check-in strict: deve finire prima del check-in time",
-      "7. HP hard earliest: 11:00",
-      "8. Seed da EO: disponibilità e posizione dall'ultima EO",
-      "9. Vincolo orario: nessuna task deve finire dopo le 19:00"
+      "Seed disponibilità e posizione dall'ultima EO (end_time, lat/lng)",
+      "Primo hop EO→HP calcolato con haversine sui km reali",
+      "HP senza orari: start >= 11:00 (hard), nessun obbligo di iniziare alle 11",
+      "Se check-in/out presenti: regole EO (start >= checkout; finire prima del check-in)",
+      "Premium/straordinarie solo a Premium; no formatori",
+      "Hard cap viaggi: 35' (rilassato per più assegnazioni)",
+      "Redirect: se hop > 25' preferisci altro cleaner idoneo (rilassato)",
+      "Vincoli rilassati per ridurre task HP non assegnate"
     ]
   }
 }
