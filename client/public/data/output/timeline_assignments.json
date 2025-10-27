@@ -1,116 +1,166 @@
 {
   "assignments": [
     {
-      "task_id": 217558,
-      "logistic_code": "1632",
-      "cleanerId": 24,
-      "assignment_type": "low_priority",
-      "sequence": 1,
-      "address": "VIA LUPETTA 12",
-      "lat": 45.4612993,
-      "lng": 9.1864016,
-      "premium": false,
-      "cleaning_time": 150,
-      "start_time": "10:12",
-      "end_time": "12:42",
-      "travel_time": 0,
-      "followup": false
+      "logistic_code": "619",
+      "cleanerId": 829,
+      "assignment_type": "optimizer",
+      "sequence": 1
     },
     {
-      "task_id": 217720,
-      "logistic_code": "1446",
+      "logistic_code": "618",
+      "cleanerId": 829,
+      "assignment_type": "optimizer",
+      "sequence": 2
+    },
+    {
+      "logistic_code": "617",
+      "cleanerId": 829,
+      "assignment_type": "optimizer",
+      "sequence": 3
+    },
+    {
+      "logistic_code": "1677",
+      "cleanerId": 404,
+      "assignment_type": "optimizer",
+      "sequence": 1
+    },
+    {
+      "logistic_code": "723",
+      "cleanerId": 404,
+      "assignment_type": "optimizer",
+      "sequence": 2
+    },
+    {
+      "logistic_code": "1472",
+      "cleanerId": 404,
+      "assignment_type": "optimizer",
+      "sequence": 3
+    },
+    {
+      "logistic_code": "623",
+      "cleanerId": 596,
+      "assignment_type": "optimizer",
+      "sequence": 1
+    },
+    {
+      "logistic_code": "1644",
+      "cleanerId": 596,
+      "assignment_type": "optimizer",
+      "sequence": 2
+    },
+    {
+      "logistic_code": "1645",
+      "cleanerId": 596,
+      "assignment_type": "optimizer",
+      "sequence": 3
+    },
+    {
+      "logistic_code": "1627",
+      "cleanerId": 1045,
+      "assignment_type": "optimizer",
+      "sequence": 1
+    },
+    {
+      "logistic_code": "1630",
+      "cleanerId": 1045,
+      "assignment_type": "optimizer",
+      "sequence": 2
+    },
+    {
+      "logistic_code": "624",
       "cleanerId": 1046,
-      "assignment_type": "low_priority",
-      "sequence": 3,
-      "address": "Corso di Porta Romana, 94",
-      "lat": 45.45562,
-      "lng": 9.1963418,
-      "premium": false,
-      "cleaning_time": 120,
-      "start_time": "12:21",
-      "end_time": "14:21",
-      "travel_time": 7,
-      "followup": true
+      "assignment_type": "optimizer",
+      "sequence": 1
     },
     {
-      "task_id": 217758,
-      "logistic_code": "84",
+      "logistic_code": "490",
+      "cleanerId": 1046,
+      "assignment_type": "optimizer",
+      "sequence": 2
+    },
+    {
+      "logistic_code": "839",
+      "cleanerId": 132,
+      "assignment_type": "optimizer",
+      "sequence": 1
+    },
+    {
+      "logistic_code": "504",
+      "cleanerId": 722,
+      "assignment_type": "optimizer",
+      "sequence": 1
+    },
+    {
+      "logistic_code": "1240",
       "cleanerId": 937,
-      "assignment_type": "low_priority",
-      "sequence": 3,
-      "address": "RIPA DI PORTA TICINESE 55",
-      "lat": 45.4510064,
-      "lng": 9.1722021,
-      "premium": false,
-      "cleaning_time": 60,
-      "start_time": "12:22",
-      "end_time": "13:22",
-      "travel_time": 10,
-      "followup": true
+      "assignment_type": "optimizer",
+      "sequence": 1
     },
     {
-      "task_id": 217226,
-      "logistic_code": "229",
+      "logistic_code": "1084",
+      "cleanerId": 937,
+      "assignment_type": "optimizer",
+      "sequence": 2
+    },
+    {
+      "logistic_code": "1624",
+      "cleanerId": 1060,
+      "assignment_type": "optimizer",
+      "sequence": 1
+    },
+    {
+      "logistic_code": "1623",
+      "cleanerId": 1060,
+      "assignment_type": "optimizer",
+      "sequence": 2
+    },
+    {
+      "logistic_code": "273",
       "cleanerId": 785,
-      "assignment_type": "low_priority",
-      "sequence": 2,
-      "address": "Viale Bligny 19",
-      "lat": 45.4510472,
-      "lng": 9.1910628,
-      "premium": false,
-      "cleaning_time": 60,
-      "start_time": "11:03",
-      "end_time": "12:03",
-      "travel_time": 4,
-      "followup": true
+      "assignment_type": "optimizer",
+      "sequence": 1
     },
     {
-      "task_id": 217551,
-      "logistic_code": "1675",
+      "logistic_code": "782",
+      "cleanerId": 1031,
+      "assignment_type": "optimizer",
+      "sequence": 1
+    },
+    {
+      "logistic_code": "1381",
+      "cleanerId": 1054,
+      "assignment_type": "optimizer",
+      "sequence": 1
+    },
+    {
+      "logistic_code": "809",
+      "cleanerId": 1055,
+      "assignment_type": "optimizer",
+      "sequence": 1
+    },
+    {
+      "logistic_code": "1649",
+      "cleanerId": 495,
+      "assignment_type": "optimizer",
+      "sequence": 1
+    },
+    {
+      "logistic_code": "1647",
       "cleanerId": 249,
-      "assignment_type": "low_priority",
-      "sequence": 2,
-      "address": "Via Lambro, 12",
-      "lat": 45.474136,
-      "lng": 9.2097826,
-      "premium": false,
-      "cleaning_time": 90,
-      "start_time": "13:07",
-      "end_time": "14:37",
-      "travel_time": 7,
-      "followup": true
+      "assignment_type": "optimizer",
+      "sequence": 1
     },
     {
-      "task_id": 217562,
-      "logistic_code": "1655",
-      "cleanerId": 249,
-      "assignment_type": "low_priority",
-      "sequence": 3,
-      "address": "VIA NINO BIXIO 33",
-      "lat": 45.4725999,
-      "lng": 9.2118362,
-      "premium": false,
-      "cleaning_time": 90,
-      "start_time": "14:44",
-      "end_time": "16:14",
-      "travel_time": 7,
-      "followup": true
+      "logistic_code": "502",
+      "cleanerId": 287,
+      "assignment_type": "optimizer",
+      "sequence": 1
     },
     {
-      "task_id": 217487,
-      "logistic_code": "1666",
+      "logistic_code": "1153",
       "cleanerId": 326,
-      "assignment_type": "low_priority",
-      "sequence": 2,
-      "address": "VIA CESARE CORRENTI 16",
-      "lat": 45.4596414,
-      "lng": 9.1796493,
-      "premium": false,
-      "cleaning_time": 120,
-      "start_time": "12:06",
-      "end_time": "14:06",
-      "travel_time": 7,
-      "followup": true
+      "assignment_type": "optimizer",
+      "sequence": 1
     }
   ],
   "current_date": "2025-10-21"
