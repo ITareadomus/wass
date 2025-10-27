@@ -495,9 +495,17 @@ def build_output(cleaners: List[Cleaner], unassigned: List[Task], original_tasks
                 hop = travel_minutes(prev.lat, prev.lng, t.lat, t.lng, prev.address, t.address)
                 travel_time = int(round(hop))
 
+            # Gestisci logistic_code che può essere None, 'None' stringa, o un numero
+            logistic_code_val = 0
+            if t.logistic_code and str(t.logistic_code).lower() != 'none':
+                try:
+                    logistic_code_val = int(t.logistic_code)
+                except (ValueError, TypeError):
+                    logistic_code_val = 0
+
             tasks_list.append({
                 "task_id": int(t.task_id) if t.task_id else 0,
-                "logistic_code": int(t.logistic_code) if t.logistic_code else 0,
+                "logistic_code": logistic_code_val,
                 "address": t.address,
                 "lat": t.lat,
                 "lng": t.lng,
@@ -530,7 +538,12 @@ def build_output(cleaners: List[Cleaner], unassigned: List[Task], original_tasks
     # Unassigned list
     unassigned_list: List[Dict[str, Any]] = []
     for ot in original_tasks:
-        lc = int(ot.logistic_code) if ot.logistic_code else 0
+        lc = 0
+        if ot.logistic_code and str(ot.logistic_code).lower() != 'none':
+            try:
+                lc = int(ot.logistic_code)
+            except (ValueError, TypeError):
+                lc = 0
         if lc not in assigned_codes:
             unassigned_list.append({
                 "task_id": int(ot.task_id) if ot.task_id else 0,
