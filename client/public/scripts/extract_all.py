@@ -167,13 +167,25 @@ for entry in audit_log:
 
 # ---- Export ----
 with open(EO_JSON, "w", encoding="utf-8") as f:
-    json.dump({"early_out_tasks": early_out_selected, "total_apartments": len(early_out_selected)}, f, ensure_ascii=False, indent=2)
+    json.dump({
+        "early_out_tasks": early_out_selected, 
+        "total_apartments": len(early_out_selected),
+        "current_date": date_key
+    }, f, ensure_ascii=False, indent=2)
 
 with open(HP_JSON, "w", encoding="utf-8") as f:
-    json.dump({"high_priority_tasks": high_priority_selected, "total_apartments": len(high_priority_selected)}, f, ensure_ascii=False, indent=2)
+    json.dump({
+        "high_priority_tasks": high_priority_selected, 
+        "total_apartments": len(high_priority_selected),
+        "current_date": date_key
+    }, f, ensure_ascii=False, indent=2)
 
 with open(LP_JSON, "w", encoding="utf-8") as f:
-    json.dump({"low_priority_tasks": low_priority_selected, "total_apartments": len(low_priority_selected)}, f, ensure_ascii=False, indent=2)
+    json.dump({
+        "low_priority_tasks": low_priority_selected, 
+        "total_apartments": len(low_priority_selected),
+        "current_date": date_key
+    }, f, ensure_ascii=False, indent=2)
 
 with open(DEBUG_JSON, "w", encoding="utf-8") as f:
     json.dump({"audit": audit_log}, f, ensure_ascii=False, indent=2)
