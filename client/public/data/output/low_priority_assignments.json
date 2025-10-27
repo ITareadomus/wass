@@ -10,18 +10,18 @@
       },
       "tasks": [
         {
-          "task_id": 218044,
-          "logistic_code": 0,
-          "address": "VIA IMPERIA 3/B",
-          "lat": 45.4416781,
-          "lng": 9.1752361,
+          "task_id": 218049,
+          "logistic_code": 229,
+          "address": "Viale Bligny 19",
+          "lat": 45.4510472,
+          "lng": 9.1910628,
           "premium": false,
-          "cleaning_time": 60,
-          "start_time": "12:27",
-          "end_time": "13:27",
+          "cleaning_time": 150,
+          "start_time": "12:23",
+          "end_time": "14:53",
           "followup": true,
           "sequence": 2,
-          "travel_time": 27
+          "travel_time": 24
         }
       ]
     },
@@ -180,6 +180,31 @@
     },
     {
       "cleaner": {
+        "id": 1055,
+        "name": "BEAUTY",
+        "lastname": "OMOREGIE",
+        "role": "Standard",
+        "premium": false
+      },
+      "tasks": [
+        {
+          "task_id": 218044,
+          "logistic_code": 0,
+          "address": "VIA IMPERIA 3/B",
+          "lat": 45.4416781,
+          "lng": 9.1752361,
+          "premium": false,
+          "cleaning_time": 60,
+          "start_time": "12:27",
+          "end_time": "13:27",
+          "followup": true,
+          "sequence": 3,
+          "travel_time": 27
+        }
+      ]
+    },
+    {
+      "cleaner": {
         "id": 722,
         "name": "KONE LASSINE",
         "lastname": "KONE",
@@ -206,10 +231,10 @@
   ],
   "unassigned_tasks": [],
   "meta": {
-    "total_tasks": 9,
-    "assigned": 9,
+    "total_tasks": 10,
+    "assigned": 10,
     "unassigned": 0,
-    "cleaners_used": 7,
+    "cleaners_used": 8,
     "max_tasks_per_cleaner": 3,
     "algorithm": "simplified_greedy",
     "notes": [
