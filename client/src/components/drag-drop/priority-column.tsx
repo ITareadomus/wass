@@ -181,9 +181,6 @@ export default function PriorityColumn({
       if (typeof (window as any).reloadAllTasks === 'function') {
         await (window as any).reloadAllTasks();
       }
-
-      // Ricarica la pagina per aggiornare i marker sulla mappa
-      window.location.reload();
     } catch (error: any) {
       console.error('Errore nell\'assegnazione HP:', error);
       toast({
@@ -216,12 +213,21 @@ export default function PriorityColumn({
       const result = await response.json();
       console.log('Assegnazione LP completata:', result);
 
+      toast({
+        variant: "success",
+        title: "✅ LOW PRIORITY assegnati con successo!",
+      });
+
       // Ricarica i task
       if (typeof (window as any).reloadAllTasks === 'function') {
         await (window as any).reloadAllTasks();
       }
     } catch (error) {
       console.error('Errore nell\'assegnazione LP:', error);
+      toast({
+        title: "❌ LOW PRIORITY non assegnati, errore!",
+        variant: "destructive",
+      });
     } finally {
       setIsAssigning(false);
     }

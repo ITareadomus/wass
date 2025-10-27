@@ -171,19 +171,22 @@ export default function GenerateAssignments() {
     };
   };
 
-  // Carica i task dai file JSON
-  const loadTasks = async () => {
+  // Carica i task dai file JSON (SENZA rieseguire extract-data)
+  const loadTasks = async (skipExtraction: boolean = false) => {
     try {
       setIsLoadingTasks(true);
       setExtractionStep("Caricamento task nei contenitori...");
 
       const dateStr = format(selectedDate, "yyyy-MM-dd");
+      
+      // Aggiungi timestamp per evitare cache
+      const timestamp = Date.now();
       const [earlyOutResponse, highPriorityResponse, lowPriorityResponse, generalTimelineResponse, dateTimelineResponse] = await Promise.all([
-        fetch('/data/output/early_out.json'),
-        fetch('/data/output/high_priority.json'),
-        fetch('/data/output/low_priority.json'),
-        fetch('/data/output/timeline_assignments.json'),
-        fetch(`/data/output/timeline_assignments/${dateStr}.json`)
+        fetch(`/data/output/early_out.json?t=${timestamp}`),
+        fetch(`/data/output/high_priority.json?t=${timestamp}`),
+        fetch(`/data/output/low_priority.json?t=${timestamp}`),
+        fetch(`/data/output/timeline_assignments.json?t=${timestamp}`),
+        fetch(`/data/output/timeline_assignments/${dateStr}.json?t=${timestamp}`)
       ]);
 
       if (!earlyOutResponse.ok || !highPriorityResponse.ok || !lowPriorityResponse.ok) {
@@ -297,7 +300,7 @@ export default function GenerateAssignments() {
 
   // Funzione esposta per ricaricare i task e le assegnazioni
   const reloadAllTasks = async () => {
-    await loadTasks();
+    await loadTasks(true); // Skip extraction, just reload from files
   };
 
   const loadEarlyOutAssignments = async () => {
