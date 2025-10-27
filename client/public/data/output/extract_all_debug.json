@@ -1,7 +1,7 @@
 {
   "audit": [
     {
-      "task_id": 213580,
+      "task_id": 217226,
       "client_id": 2,
       "premium": false,
       "final_class": "LP",
@@ -11,16 +11,7 @@
       ]
     },
     {
-      "task_id": 216064,
-      "client_id": 75,
-      "premium": false,
-      "final_class": "HP",
-      "reasons": [
-        "same_day_checkin_between_eo_hp"
-      ]
-    },
-    {
-      "task_id": 217260,
+      "task_id": 217258,
       "client_id": 101,
       "premium": true,
       "final_class": "HP",
@@ -30,7 +21,16 @@
       ]
     },
     {
-      "task_id": 217488,
+      "task_id": 217305,
+      "client_id": 2,
+      "premium": false,
+      "final_class": "HP",
+      "reasons": [
+        "same_day_checkin_between_eo_hp"
+      ]
+    },
+    {
+      "task_id": 217487,
       "client_id": 125,
       "premium": false,
       "final_class": "LP",
@@ -40,7 +40,44 @@
       ]
     },
     {
-      "task_id": 217884,
+      "task_id": 217548,
+      "client_id": 87,
+      "premium": false,
+      "final_class": "EO",
+      "reasons": [
+        "client_forced_eo"
+      ]
+    },
+    {
+      "task_id": 217549,
+      "client_id": 87,
+      "premium": true,
+      "final_class": "EO",
+      "reasons": [
+        "client_forced_eo"
+      ]
+    },
+    {
+      "task_id": 217550,
+      "client_id": 87,
+      "premium": true,
+      "final_class": "EO",
+      "reasons": [
+        "client_forced_eo"
+      ]
+    },
+    {
+      "task_id": 217551,
+      "client_id": 123,
+      "premium": false,
+      "final_class": "LP",
+      "reasons": [
+        "not_eo",
+        "not_hp"
+      ]
+    },
+    {
+      "task_id": 217556,
       "client_id": 61,
       "premium": false,
       "final_class": "EO",
@@ -49,8 +86,36 @@
       ]
     },
     {
-      "task_id": 217906,
-      "client_id": 118,
+      "task_id": 217557,
+      "client_id": 61,
+      "premium": false,
+      "final_class": "EO",
+      "reasons": [
+        "client_forced_eo"
+      ]
+    },
+    {
+      "task_id": 217558,
+      "client_id": 123,
+      "premium": false,
+      "final_class": "LP",
+      "reasons": [
+        "not_eo",
+        "not_hp"
+      ]
+    },
+    {
+      "task_id": 217559,
+      "client_id": 61,
+      "premium": false,
+      "final_class": "EO",
+      "reasons": [
+        "client_forced_eo"
+      ]
+    },
+    {
+      "task_id": 217560,
+      "client_id": 94,
       "premium": false,
       "final_class": "HP",
       "reasons": [
@@ -58,8 +123,8 @@
       ]
     },
     {
-      "task_id": 217907,
-      "client_id": 87,
+      "task_id": 217561,
+      "client_id": 61,
       "premium": false,
       "final_class": "EO",
       "reasons": [
@@ -67,34 +132,7 @@
       ]
     },
     {
-      "task_id": 217908,
-      "client_id": 87,
-      "premium": true,
-      "final_class": "EO",
-      "reasons": [
-        "client_forced_eo"
-      ]
-    },
-    {
-      "task_id": 217909,
-      "client_id": 87,
-      "premium": false,
-      "final_class": "EO",
-      "reasons": [
-        "client_forced_eo"
-      ]
-    },
-    {
-      "task_id": 217910,
-      "client_id": 87,
-      "premium": false,
-      "final_class": "EO",
-      "reasons": [
-        "client_forced_eo"
-      ]
-    },
-    {
-      "task_id": 217911,
+      "task_id": 217562,
       "client_id": 123,
       "premium": false,
       "final_class": "LP",
@@ -104,56 +142,7 @@
       ]
     },
     {
-      "task_id": 217912,
-      "client_id": 94,
-      "premium": false,
-      "final_class": "LP",
-      "reasons": [
-        "not_eo",
-        "not_hp"
-      ]
-    },
-    {
-      "task_id": 217913,
-      "client_id": 94,
-      "premium": false,
-      "final_class": "LP",
-      "reasons": [
-        "not_eo",
-        "not_hp"
-      ]
-    },
-    {
-      "task_id": 217914,
-      "client_id": 123,
-      "premium": false,
-      "final_class": "LP",
-      "reasons": [
-        "not_eo",
-        "not_hp"
-      ]
-    },
-    {
-      "task_id": 217920,
-      "client_id": 123,
-      "premium": true,
-      "final_class": "HP",
-      "reasons": [
-        "premium"
-      ]
-    },
-    {
-      "task_id": 217925,
-      "client_id": 94,
-      "premium": false,
-      "final_class": "LP",
-      "reasons": [
-        "not_eo",
-        "not_hp"
-      ]
-    },
-    {
-      "task_id": 217927,
+      "task_id": 217563,
       "client_id": 61,
       "premium": false,
       "final_class": "EO",
@@ -162,27 +151,7 @@
       ]
     },
     {
-      "task_id": 217928,
-      "client_id": 94,
-      "premium": false,
-      "final_class": "LP",
-      "reasons": [
-        "not_eo",
-        "not_hp"
-      ]
-    },
-    {
-      "task_id": 217929,
-      "client_id": 123,
-      "premium": false,
-      "final_class": "LP",
-      "reasons": [
-        "not_eo",
-        "not_hp"
-      ]
-    },
-    {
-      "task_id": 217930,
+      "task_id": 217564,
       "client_id": 61,
       "premium": false,
       "final_class": "EO",
@@ -191,7 +160,7 @@
       ]
     },
     {
-      "task_id": 217931,
+      "task_id": 217565,
       "client_id": 61,
       "premium": false,
       "final_class": "EO",
@@ -200,7 +169,7 @@
       ]
     },
     {
-      "task_id": 217932,
+      "task_id": 217566,
       "client_id": 61,
       "premium": false,
       "final_class": "EO",
@@ -209,7 +178,7 @@
       ]
     },
     {
-      "task_id": 217933,
+      "task_id": 217567,
       "client_id": 61,
       "premium": false,
       "final_class": "EO",
@@ -218,7 +187,7 @@
       ]
     },
     {
-      "task_id": 217934,
+      "task_id": 217568,
       "client_id": 61,
       "premium": false,
       "final_class": "EO",
@@ -227,7 +196,7 @@
       ]
     },
     {
-      "task_id": 217935,
+      "task_id": 217569,
       "client_id": 61,
       "premium": false,
       "final_class": "EO",
@@ -236,17 +205,43 @@
       ]
     },
     {
-      "task_id": 217949,
-      "client_id": 120,
+      "task_id": 217570,
+      "client_id": 61,
       "premium": false,
-      "final_class": "LP",
+      "final_class": "EO",
       "reasons": [
-        "not_eo",
-        "not_hp"
+        "client_forced_eo"
       ]
     },
     {
-      "task_id": 217994,
+      "task_id": 217571,
+      "client_id": 61,
+      "premium": false,
+      "final_class": "EO",
+      "reasons": [
+        "client_forced_eo"
+      ]
+    },
+    {
+      "task_id": 217572,
+      "client_id": 61,
+      "premium": false,
+      "final_class": "EO",
+      "reasons": [
+        "client_forced_eo"
+      ]
+    },
+    {
+      "task_id": 217573,
+      "client_id": 61,
+      "premium": false,
+      "final_class": "EO",
+      "reasons": [
+        "client_forced_eo"
+      ]
+    },
+    {
+      "task_id": 217587,
       "client_id": 64,
       "premium": false,
       "final_class": "HP",
@@ -256,8 +251,85 @@
       ]
     },
     {
-      "task_id": 217996,
-      "client_id": 94,
+      "task_id": 217588,
+      "client_id": 64,
+      "premium": false,
+      "final_class": "HP",
+      "reasons": [
+        "same_day_checkin_between_eo_hp",
+        "client_forced_hp"
+      ]
+    },
+    {
+      "task_id": 217589,
+      "client_id": 64,
+      "premium": false,
+      "final_class": "HP",
+      "reasons": [
+        "same_day_checkin_between_eo_hp",
+        "client_forced_hp"
+      ]
+    },
+    {
+      "task_id": 217590,
+      "client_id": 64,
+      "premium": false,
+      "final_class": "HP",
+      "reasons": [
+        "same_day_checkin_between_eo_hp",
+        "client_forced_hp"
+      ]
+    },
+    {
+      "task_id": 217591,
+      "client_id": 64,
+      "premium": false,
+      "final_class": "HP",
+      "reasons": [
+        "same_day_checkin_between_eo_hp",
+        "client_forced_hp"
+      ]
+    },
+    {
+      "task_id": 217608,
+      "client_id": 64,
+      "premium": false,
+      "final_class": "HP",
+      "reasons": [
+        "same_day_checkin_between_eo_hp",
+        "client_forced_hp"
+      ]
+    },
+    {
+      "task_id": 217635,
+      "client_id": 2,
+      "premium": false,
+      "final_class": "EO",
+      "reasons": [
+        "checkout_time<=eo_time"
+      ]
+    },
+    {
+      "task_id": 217667,
+      "client_id": 61,
+      "premium": false,
+      "final_class": "EO",
+      "reasons": [
+        "client_forced_eo"
+      ]
+    },
+    {
+      "task_id": 217692,
+      "client_id": 61,
+      "premium": false,
+      "final_class": "EO",
+      "reasons": [
+        "client_forced_eo"
+      ]
+    },
+    {
+      "task_id": 217695,
+      "client_id": 118,
       "premium": false,
       "final_class": "HP",
       "reasons": [
@@ -265,17 +337,80 @@
       ]
     },
     {
-      "task_id": 218000,
-      "client_id": 121,
+      "task_id": 217701,
+      "client_id": 87,
       "premium": false,
-      "final_class": "HP",
+      "final_class": "EO",
       "reasons": [
-        "same_day_checkin_between_eo_hp"
+        "client_forced_eo"
       ]
     },
     {
-      "task_id": 218046,
-      "client_id": 123,
+      "task_id": 217710,
+      "client_id": 67,
+      "premium": false,
+      "final_class": "EO",
+      "reasons": [
+        "checkout_time<=eo_time"
+      ]
+    },
+    {
+      "task_id": 217711,
+      "client_id": 67,
+      "premium": false,
+      "final_class": "EO",
+      "reasons": [
+        "checkout_time<=eo_time"
+      ]
+    },
+    {
+      "task_id": 217712,
+      "client_id": 67,
+      "premium": false,
+      "final_class": "EO",
+      "reasons": [
+        "checkout_time<=eo_time"
+      ]
+    },
+    {
+      "task_id": 217713,
+      "client_id": 67,
+      "premium": false,
+      "final_class": "EO",
+      "reasons": [
+        "checkout_time<=eo_time"
+      ]
+    },
+    {
+      "task_id": 217717,
+      "client_id": 3,
+      "premium": true,
+      "final_class": "HP",
+      "reasons": [
+        "premium"
+      ]
+    },
+    {
+      "task_id": 217718,
+      "client_id": 3,
+      "premium": true,
+      "final_class": "HP",
+      "reasons": [
+        "premium"
+      ]
+    },
+    {
+      "task_id": 217719,
+      "client_id": 3,
+      "premium": true,
+      "final_class": "HP",
+      "reasons": [
+        "premium"
+      ]
+    },
+    {
+      "task_id": 217720,
+      "client_id": 3,
       "premium": false,
       "final_class": "LP",
       "reasons": [
@@ -284,35 +419,16 @@
       ]
     },
     {
-      "task_id": 218059,
-      "client_id": 3,
-      "premium": true,
-      "final_class": "HP",
-      "reasons": [
-        "premium"
-      ]
-    },
-    {
-      "task_id": 218060,
-      "client_id": 3,
-      "premium": true,
-      "final_class": "HP",
-      "reasons": [
-        "premium"
-      ]
-    },
-    {
-      "task_id": 218061,
+      "task_id": 217721,
       "client_id": 3,
       "premium": false,
-      "final_class": "LP",
+      "final_class": "HP",
       "reasons": [
-        "not_eo",
-        "not_hp"
+        "same_day_checkin_between_eo_hp"
       ]
     },
     {
-      "task_id": 218062,
+      "task_id": 217722,
       "client_id": 3,
       "premium": true,
       "final_class": "HP",
@@ -321,8 +437,35 @@
       ]
     },
     {
-      "task_id": 218073,
-      "client_id": 3,
+      "task_id": 217745,
+      "client_id": 67,
+      "premium": false,
+      "final_class": "EO",
+      "reasons": [
+        "checkout_time<=eo_time"
+      ]
+    },
+    {
+      "task_id": 217746,
+      "client_id": 113,
+      "premium": false,
+      "final_class": "HP",
+      "reasons": [
+        "same_day_checkin_between_eo_hp"
+      ]
+    },
+    {
+      "task_id": 217753,
+      "client_id": 64,
+      "premium": false,
+      "final_class": "EO",
+      "reasons": [
+        "checkout_time<=eo_time"
+      ]
+    },
+    {
+      "task_id": 217758,
+      "client_id": 2,
       "premium": false,
       "final_class": "LP",
       "reasons": [
