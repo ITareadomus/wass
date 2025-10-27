@@ -1,16 +1,26 @@
 import json
 import mysql.connector
+import psycopg2
+from psycopg2.extras import execute_values
 import sys
+import os
 from datetime import datetime, timedelta
 from pathlib import Path
 
-# Configurazione del database (lasciata invariata rispetto allo script originale)
+# Configurazione del database MySQL (source)
 db_config = {
     "host": "139.59.132.41",
     "user": "admin",
     "password": "ed329a875c6c4ebdf4e87e2bbe53a15771b5844ef6606dde",
     "database": "adamdb"
 }
+
+# Configurazione PostgreSQL (destination)
+def get_pg_connection():
+    database_url = os.environ.get('DATABASE_URL')
+    if not database_url:
+        raise Exception("DATABASE_URL environment variable not set")
+    return psycopg2.connect(database_url)
 
 # --- UTIL ---------------------------------------------------------------
 
@@ -178,6 +188,52 @@ fresh_data = {
         }
     }
 }
+
+# Salva i cleaners nel database PostgreSQL
+def save_cleaners_to_db(cleaners_data):
+    pg_conn = get_pg_connection()
+    pg_cur = pg_conn.cursor()
+    
+    # Elimina cleaners esistenti
+    pg_cur.execute("DELETE FROM cleaners")
+    
+    # Prepara i dati per l'inserimento batch
+    cleaner_values = []
+    for c in cleaners_data:
+        cleaner_values.append((
+            c["id"],
+            c["name"],
+            c["lastname"],
+            c["role"],
+            c["active"],
+            c["ranking"],
+            c["counter_hours"],
+            c["counter_days"],
+            c["available"],
+            c.get("contract_type"),
+            json.dumps(c.get("preferred_customers", [])),
+            c.get("telegram_id"),
+            c.get("start_time"),
+            c.get("premium", c["role"].lower() == "premium"),
+            None,  # home_lat
+            None   # home_lng
+        ))
+    
+    # Inserimento batch
+    execute_values(pg_cur, """
+        INSERT INTO cleaners (
+            id, name, lastname, role, active, ranking, counter_hours,
+            counter_days, available, contract_type, preferred_customers,
+            telegram_id, start_time, premium, home_lat, home_lng
+        ) VALUES %s
+    """, cleaner_values)
+    
+    pg_conn.commit()
+    pg_cur.close()
+    pg_conn.close()
+    print(f"✅ Salvati {len(cleaners_data)} cleaners nel database PostgreSQL")
+
+save_cleaners_to_db(cleaners_data)
 
 # Scrittura su data/cleaners/cleaners.json (stesso percorso dell'originale)
 output_path = Path(__file__).resolve().parents[1] / "data" / "cleaners" / "cleaners.json"
