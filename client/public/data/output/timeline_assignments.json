@@ -497,19 +497,19 @@
       "followup": false
     },
     {
-      "task_id": 218044,
-      "logistic_code": "0",
+      "task_id": 218049,
+      "logistic_code": "229",
       "cleanerId": 132,
       "assignment_type": "low_priority",
       "sequence": 2,
-      "address": "VIA IMPERIA 3/B",
-      "lat": 45.4416781,
-      "lng": 9.1752361,
+      "address": "Viale Bligny 19",
+      "lat": 45.4510472,
+      "lng": 9.1910628,
       "premium": false,
-      "cleaning_time": 60,
-      "start_time": "12:27",
-      "end_time": "13:27",
-      "travel_time": 27,
+      "cleaning_time": 150,
+      "start_time": "12:23",
+      "end_time": "14:53",
+      "travel_time": 24,
       "followup": true
     },
     {
@@ -622,6 +622,22 @@
       "start_time": "15:23",
       "end_time": "17:23",
       "travel_time": 6,
+      "followup": true
+    },
+    {
+      "task_id": 218044,
+      "logistic_code": "0",
+      "cleanerId": 1055,
+      "assignment_type": "low_priority",
+      "sequence": 3,
+      "address": "VIA IMPERIA 3/B",
+      "lat": 45.4416781,
+      "lng": 9.1752361,
+      "premium": false,
+      "cleaning_time": 60,
+      "start_time": "12:27",
+      "end_time": "13:27",
+      "travel_time": 27,
       "followup": true
     },
     {

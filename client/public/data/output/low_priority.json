@@ -206,7 +206,30 @@
       "type_apt": "A",
       "alias": "AD",
       "customer_name": "AREA DOMUS SRL"
+    },
+    {
+      "task_id": 218049,
+      "logistic_code": 229,
+      "client_id": 2,
+      "premium": false,
+      "address": "Viale Bligny 19",
+      "lat": "45.4510472",
+      "lng": "9.1910628",
+      "cleaning_time": 150,
+      "checkin_date": "2026-02-06",
+      "checkout_date": "2025-10-27",
+      "checkin_time": null,
+      "checkout_time": null,
+      "pax_in": 4,
+      "pax_out": 0,
+      "small_equipment": true,
+      "operation_id": 3,
+      "confirmed_operation": true,
+      "straordinaria": true,
+      "type_apt": "A",
+      "alias": "ITW",
+      "customer_name": "ITALIANWAY SRL"
     }
   ],
-  "total_apartments": 9
+  "total_apartments": 10
 }

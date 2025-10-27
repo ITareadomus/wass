@@ -375,6 +375,16 @@
         "not_eo",
         "not_hp"
       ]
+    },
+    {
+      "task_id": 218049,
+      "client_id": 2,
+      "premium": false,
+      "final_class": "LP",
+      "reasons": [
+        "not_eo",
+        "not_hp"
+      ]
     }
   ]
 }
