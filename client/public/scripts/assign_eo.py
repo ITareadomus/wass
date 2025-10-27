@@ -175,6 +175,9 @@ def evaluate_route(route: List[Task]) -> Tuple[bool, List[Tuple[int, int, int]]]
     if not route:
         return True, []
 
+    # Orario massimo di fine task: 19:00 (1140 minuti da mezzanotte)
+    MAX_END_TIME = 19 * 60  # 19:00 in minuti
+
     schedule: List[Tuple[int, int, int]] = []
     prev: Optional[Task] = None
     cur = 0.0
@@ -190,6 +193,10 @@ def evaluate_route(route: List[Task]) -> Tuple[bool, List[Tuple[int, int, int]]]
 
         # Check-in strict: deve finire prima del check-in
         if finish >= t.checkin_time:
+            return False, []
+
+        # Vincolo orario: nessuna task deve finire dopo le 19:00
+        if finish > MAX_END_TIME:
             return False, []
 
         schedule.append((int(arrival), int(start), int(finish)))
@@ -468,7 +475,8 @@ def build_output(cleaners: List[Cleaner], unassigned: List[Task], original_tasks
                 "3. Se non ci sono percorsi < 15', sceglie il minore dei > 15'",
                 "4. Straordinarie solo a premium cleaner, devono essere la prima task",
                 "5. Premium task solo a premium cleaner",
-                "6. Check-in strict: deve finire prima del check-in time"
+                "6. Check-in strict: deve finire prima del check-in time",
+                "7. Vincolo orario: nessuna task deve finire dopo le 19:00"
             ]
         }
     }

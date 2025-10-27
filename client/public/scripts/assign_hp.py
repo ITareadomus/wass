@@ -210,6 +210,9 @@ def evaluate_route(cleaner: Cleaner, route: List[Task]) -> Tuple[bool, List[Tupl
     hp_earliest = datetime(arrival.year, arrival.month, arrival.day, HP_HARD_EARLIEST_H, HP_HARD_EARLIEST_M)
     arrival = max(arrival, hp_earliest)
     
+    # Orario massimo di fine task: 19:00
+    max_end_time = datetime(arrival.year, arrival.month, arrival.day, 19, 0)
+    
     # Considera checkout se presente
     if first.checkout_dt:
         arrival = max(arrival, first.checkout_dt)
@@ -219,6 +222,10 @@ def evaluate_route(cleaner: Cleaner, route: List[Task]) -> Tuple[bool, List[Tupl
     
     # Check-in strict
     if first.checkin_dt and finish > first.checkin_dt:
+        return False, []
+    
+    # Vincolo orario: nessuna task deve finire dopo le 19:00
+    if finish > max_end_time:
         return False, []
     
     schedule.append((arrival, start, finish))
@@ -243,6 +250,10 @@ def evaluate_route(cleaner: Cleaner, route: List[Task]) -> Tuple[bool, List[Tupl
         
         # Check-in strict
         if t.checkin_dt and finish > t.checkin_dt:
+            return False, []
+        
+        # Vincolo orario: nessuna task deve finire dopo le 19:00
+        if finish > max_end_time:
             return False, []
         
         schedule.append((arrival, start, finish))
@@ -604,7 +615,8 @@ def build_output(cleaners: List[Cleaner], unassigned: List[Task], original_tasks
                 "5. Premium task solo a premium cleaner",
                 "6. Check-in strict: deve finire prima del check-in time",
                 "7. HP hard earliest: 11:00",
-                "8. Seed da EO: disponibilità e posizione dall'ultima EO"
+                "8. Seed da EO: disponibilità e posizione dall'ultima EO",
+                "9. Vincolo orario: nessuna task deve finire dopo le 19:00"
             ]
         }
     }
