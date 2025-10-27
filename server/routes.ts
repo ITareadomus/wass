@@ -584,7 +584,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log(`Eseguendo assign_hp.py per data ${workDate}...`);
 
       const { spawn } = await import('child_process');
-      const scriptPath = path.join(process.cwd(), 'client/public/scripts/assign_hp_updated.py');
+      const scriptPath = path.join(process.cwd(), 'client/public/scripts/assign_hp.py');
 
       const pythonProcess = spawn('python3', [scriptPath, workDate]);
 
@@ -841,7 +841,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const workDate = date;
 
       const { spawn } = await import('child_process');
-      const scriptPath = path.join(process.cwd(), 'client/public/scripts/assign_eo_updated.py');
+      const scriptPath = path.join(process.cwd(), 'client/public/scripts/assign_eo.py');
 
       console.log(`Eseguendo assign_eo.py per data ${workDate}...`);
 
