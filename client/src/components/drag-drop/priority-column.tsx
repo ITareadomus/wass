@@ -77,8 +77,8 @@ export default function PriorityColumn({
           });
           return;
         }
-        const selectedDate = new Date(savedDate);
-        const dateStr = format(selectedDate, 'yyyy-MM-dd');
+        // Usa direttamente la stringa salvata (è già in formato yyyy-MM-dd)
+        const dateStr = savedDate;
 
         console.log('Esecuzione assign_eo.py per data:', dateStr);
         const response = await fetch('/api/run-optimizer', {
@@ -128,8 +128,8 @@ export default function PriorityColumn({
           });
           return;
         }
-        const selectedDate = new Date(savedDate);
-        const dateStr = format(selectedDate, 'yyyy-MM-dd');
+        // Usa direttamente la stringa salvata (è già in formato yyyy-MM-dd)
+        const dateStr = savedDate;
 
         console.log('Esecuzione assign_lp.py per data:', dateStr);
         const response = await fetch('/api/assign-lp', {
@@ -180,8 +180,8 @@ export default function PriorityColumn({
         setIsAssigning(false);
         return;
       }
-      const selectedDate = new Date(savedDate);
-      const dateStr = format(selectedDate, 'yyyy-MM-dd');
+      // Usa direttamente la stringa salvata (è già in formato yyyy-MM-dd)
+      const dateStr = savedDate;
 
       console.log('Esecuzione assign_hp.py per data:', dateStr);
       const response = await fetch('/api/assign-hp', {
@@ -230,8 +230,8 @@ export default function PriorityColumn({
         setIsAssigning(false);
         return;
       }
-      const selectedDate = new Date(savedDate);
-      const dateStr = format(selectedDate, 'yyyy-MM-dd');
+      // Usa direttamente la stringa salvata (è già in formato yyyy-MM-dd)
+      const dateStr = savedDate;
 
       const response = await fetch('/api/assign-lp', {
         method: 'POST',
