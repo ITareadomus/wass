@@ -77,8 +77,8 @@ export default function PriorityColumn({
           });
           return;
         }
-        // Usa direttamente la stringa salvata (è già in formato yyyy-MM-dd)
-        const dateStr = savedDate;
+        // Converti in formato yyyy-MM-dd (rimuovi eventuali timestamp)
+        const dateStr = savedDate.split('T')[0];
 
         console.log('📅 Data dal localStorage:', dateStr);
         console.log('🔄 Esecuzione assign_eo.py per data:', dateStr);
@@ -129,8 +129,8 @@ export default function PriorityColumn({
           });
           return;
         }
-        // Usa direttamente la stringa salvata (è già in formato yyyy-MM-dd)
-        const dateStr = savedDate;
+        // Converti in formato yyyy-MM-dd (rimuovi eventuali timestamp)
+        const dateStr = savedDate.split('T')[0];
 
         console.log('📅 Data dal localStorage:', dateStr);
         console.log('🔄 Esecuzione assign_lp.py per data:', dateStr);
@@ -182,8 +182,8 @@ export default function PriorityColumn({
         setIsAssigning(false);
         return;
       }
-      // Usa direttamente la stringa salvata (è già in formato yyyy-MM-dd)
-      const dateStr = savedDate;
+      // Converti in formato yyyy-MM-dd (rimuovi eventuali timestamp)
+      const dateStr = savedDate.split('T')[0];
 
       console.log('📅 Data dal localStorage:', dateStr);
       console.log('🔄 Esecuzione assign_hp.py per data:', dateStr);
