@@ -44,7 +44,17 @@ export default function GenerateAssignments() {
   const [selectedDate, setSelectedDate] = useState<Date>(() => {
     const savedDate = localStorage.getItem('selected_work_date');
     if (savedDate) {
-      return new Date(savedDate);
+      const saved = new Date(savedDate);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      
+      // Se la data salvata è nel passato, usa domani
+      if (saved < today) {
+        const tomorrow = new Date();
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        return tomorrow;
+      }
+      return saved;
     }
     const tomorrow = new Date();
     tomorrow.setDate(tomorrow.getDate() + 1);
