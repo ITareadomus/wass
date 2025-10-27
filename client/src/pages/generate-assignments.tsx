@@ -47,7 +47,7 @@ export default function GenerateAssignments() {
       const saved = new Date(savedDate);
       const today = new Date();
       today.setHours(0, 0, 0, 0);
-      
+
       // Se la data salvata è nel passato, usa domani
       if (saved < today) {
         const tomorrow = new Date();
@@ -178,7 +178,7 @@ export default function GenerateAssignments() {
       setExtractionStep("Caricamento task nei contenitori...");
 
       const dateStr = format(selectedDate, "yyyy-MM-dd");
-      
+
       // Aggiungi timestamp per evitare cache
       const timestamp = Date.now();
       const [earlyOutResponse, highPriorityResponse, lowPriorityResponse, generalTimelineResponse, dateTimelineResponse] = await Promise.all([
@@ -196,7 +196,7 @@ export default function GenerateAssignments() {
       const earlyOutData = await earlyOutResponse.json();
       const highPriorityData = await highPriorityResponse.json();
       const lowPriorityData = await lowPriorityResponse.json();
-      
+
       // Prima prova a caricare da timeline_assignments.json, poi da timeline_assignments/{date}.json
       let timelineAssignmentsData = { assignments: [], current_date: dateStr };
       if (generalTimelineResponse.ok) {
@@ -354,14 +354,14 @@ export default function GenerateAssignments() {
     }
   };
 
-  
+
 
   // Funzione per confermare le assegnazioni
   const confirmAssignments = async () => {
     try {
       setIsConfirming(true);
       const dateStr = format(selectedDate, "yyyy-MM-dd");
-      
+
       const response = await fetch('/api/confirm-assignments', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -392,7 +392,7 @@ export default function GenerateAssignments() {
     }
   };
 
-  
+
 
   // Esponi le funzioni per poterle chiamare da altri componenti
   (window as any).reloadAllTasks = reloadAllTasks;
@@ -493,8 +493,8 @@ export default function GenerateAssignments() {
     };
 
     const fromContainer = containerToJsonName[source.droppableId] || null;
-    const toContainer = destination.droppableId.startsWith('timeline-') 
-      ? destination.droppableId 
+    const toContainer = destination.droppableId.startsWith('timeline-')
+      ? destination.droppableId
       : containerToJsonName[destination.droppableId] || null;
 
     // Caso 1: Reorder intra-timeline (stessa colonna cleaner)
@@ -505,7 +505,7 @@ export default function GenerateAssignments() {
       if (sourceCleanerId === destCleanerId) {
         // Reorder nella stessa timeline
         reorderTimelineAssignment(taskId, sourceCleanerId, logisticCode || '', source.index, destination.index);
-        
+
         // Aggiorna lo stato locale
         setAllTasksWithAssignments((prevTasks) => {
           const updatedTasks = [...prevTasks];
