@@ -2,90 +2,60 @@
   "high_priority_tasks_assigned": [],
   "unassigned_tasks": [
     {
-      "task_id": 217258,
-      "logistic_code": 1530,
+      "task_id": 217920,
+      "logistic_code": 1602,
       "reason": "no_eligible_cleaner_or_time_window"
     },
     {
-      "task_id": 217718,
+      "task_id": 218059,
       "logistic_code": 1101,
       "reason": "no_eligible_cleaner_or_time_window"
     },
     {
-      "task_id": 217717,
-      "logistic_code": 144,
-      "reason": "no_eligible_cleaner_or_time_window"
-    },
-    {
-      "task_id": 217719,
+      "task_id": 218060,
       "logistic_code": 1090,
       "reason": "no_eligible_cleaner_or_time_window"
     },
     {
-      "task_id": 217722,
+      "task_id": 218062,
       "logistic_code": 1537,
       "reason": "no_eligible_cleaner_or_time_window"
     },
     {
-      "task_id": 217587,
-      "logistic_code": 1545,
+      "task_id": 217260,
+      "logistic_code": 1530,
       "reason": "no_eligible_cleaner_or_time_window"
     },
     {
-      "task_id": 217588,
+      "task_id": 217994,
       "logistic_code": 1127,
       "reason": "no_eligible_cleaner_or_time_window"
     },
     {
-      "task_id": 217589,
-      "logistic_code": 1032,
+      "task_id": 216064,
+      "logistic_code": 1392,
       "reason": "no_eligible_cleaner_or_time_window"
     },
     {
-      "task_id": 217590,
-      "logistic_code": 937,
+      "task_id": 217906,
+      "logistic_code": 1539,
       "reason": "no_eligible_cleaner_or_time_window"
     },
     {
-      "task_id": 217591,
-      "logistic_code": 512,
+      "task_id": 217996,
+      "logistic_code": 1129,
       "reason": "no_eligible_cleaner_or_time_window"
     },
     {
-      "task_id": 217608,
-      "logistic_code": 751,
-      "reason": "no_eligible_cleaner_or_time_window"
-    },
-    {
-      "task_id": 217305,
-      "logistic_code": 579,
-      "reason": "no_eligible_cleaner_or_time_window"
-    },
-    {
-      "task_id": 217560,
-      "logistic_code": 1494,
-      "reason": "no_eligible_cleaner_or_time_window"
-    },
-    {
-      "task_id": 217695,
-      "logistic_code": 1541,
-      "reason": "no_eligible_cleaner_or_time_window"
-    },
-    {
-      "task_id": 217721,
-      "logistic_code": 1556,
-      "reason": "no_eligible_cleaner_or_time_window"
-    },
-    {
-      "task_id": 217746,
-      "logistic_code": 1496,
+      "task_id": 218000,
+      "logistic_code": 1578,
       "reason": "no_eligible_cleaner_or_time_window"
     }
   ],
   "meta": {
-    "total_tasks": 16,
+    "total_tasks": 10,
     "assigned": 0,
-    "unassigned": 16,
+    "unassigned": 10,
     "cleaners_used": 0,
     "max_tasks_per_cleaner": 0,
     "algorithm": "regret_insertion + redirect + best-of-infeasible",
