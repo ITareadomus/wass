@@ -64,7 +64,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Endpoint per salvare un'assegnazione nella timeline
   app.post("/api/save-timeline-assignment", async (req, res) => {
     try {
-      const { taskId, cleanerId, logisticCode, date, assignments } = req.body;
+      const { taskId, cleanerId, logisticCode, date, assignments, dropIndex } = req.body;
       const workDate = date || format(new Date(), 'yyyy-MM-dd');
       const timelineAssignmentsBasePath = path.join(process.cwd(), 'client/public/data/output/timeline_assignments');
       const timelineAssignmentsPath = path.join(timelineAssignmentsBasePath, `${workDate}.json`);
@@ -72,85 +72,75 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Crea la directory se non esiste
       await fs.mkdir(timelineAssignmentsBasePath, { recursive: true });
 
-      // Carica o crea timeline_assignments per questa data
-      let assignmentsData: any = { assignments: [], current_date: workDate };
+      // Carica o crea il file delle assegnazioni timeline
+      let timelineData: any = { 
+        assignments: [], 
+        current_date: workDate,
+        scheduleVersion: 1
+      };
+
       try {
         const existingData = await fs.readFile(timelineAssignmentsPath, 'utf8');
-        assignmentsData = JSON.parse(existingData);
-      } catch (error) {
-        // File non esiste, usa struttura vuota
-      }
-
-      // Se sono fornite assegnazioni multiple (bulk save)
-      if (assignments && Array.isArray(assignments)) {
-        assignmentsData.assignments = assignments;
-        assignmentsData.current_date = workDate;
-      } else {
-        // Singola assegnazione
-        // Rimuovi eventuali assegnazioni precedenti per questo task (usa logistic_code se disponibile)
-        assignmentsData.assignments = assignmentsData.assignments.filter(
-          (a: any) => a.logistic_code !== logisticCode && a.taskId !== taskId
-        );
-
-        // Calcola la sequence: trova il massimo sequence per questo cleaner e aggiungi 1
-        const cleanerAssignments = assignmentsData.assignments.filter((a: any) => a.cleanerId === cleanerId);
-        const maxSequence = cleanerAssignments.length > 0
-          ? Math.max(...cleanerAssignments.map((a: any) => a.sequence || 0))
-          : -1;
-        const newSequence = maxSequence + 1;
-
-        // Carica i dati completi del task dai file JSON per includerli nella timeline
-        const tasksFilePaths = [
-          path.join(process.cwd(), 'client/public/data/output/early_out.json'),
-          path.join(process.cwd(), 'client/public/data/output/high_priority.json'),
-          path.join(process.cwd(), 'client/public/data/output/low_priority.json')
-        ];
-
-        let taskData: any = null;
-        for (const filePath of tasksFilePaths) {
-          try {
-            const fileData = await fs.readFile(filePath, 'utf8');
-            const jsonData = JSON.parse(fileData);
-            const tasksList = jsonData.early_out_tasks || jsonData.high_priority_tasks || jsonData.low_priority_tasks || [];
-            taskData = tasksList.find((t: any) => String(t.logistic_code) === String(logisticCode));
-            if (taskData) break;
-          } catch (e) {
-            // Continua con il prossimo file
-          }
+        timelineData = JSON.parse(existingData);
+        if (!timelineData.scheduleVersion) {
+          timelineData.scheduleVersion = 1;
         }
-
-        // Aggiungi la nuova assegnazione con sequence e tutti i dati del task
-        assignmentsData.assignments.push({
-          task_id: taskData?.task_id || taskId,
-          logistic_code: logisticCode,
-          cleanerId,
-          assignment_type: "manual_drag",
-          sequence: newSequence,
-          address: taskData?.address,
-          lat: taskData?.lat,
-          lng: taskData?.lng,
-          premium: taskData?.premium,
-          cleaning_time: taskData?.cleaning_time,
-          checkin_date: taskData?.checkin_date,
-          checkout_date: taskData?.checkout_date,
-          checkin_time: taskData?.checkin_time,
-          checkout_time: taskData?.checkout_time,
-          pax_in: taskData?.pax_in,
-          pax_out: taskData?.pax_out,
-          operation_id: taskData?.operation_id,
-          confirmed_operation: taskData?.confirmed_operation,
-          straordinaria: taskData?.straordinaria,
-          type_apt: taskData?.type_apt,
-          alias: taskData?.alias,
-          customer_name: taskData?.customer_name,
-          small_equipment: taskData?.small_equipment
-        });
+      } catch (error) {
+        console.log(`Creazione nuovo file timeline per ${workDate}`);
       }
 
-      // Salva il file
-      await fs.writeFile(timelineAssignmentsPath, JSON.stringify(assignmentsData, null, 2));
+      // Normalizza logisticCode e taskId come stringhe
+      const normalizedLogisticCode = String(logisticCode);
+      const normalizedTaskId = String(taskId);
+      const normalizedCleanerId = Number(cleanerId);
 
-      res.json({ success: true, message: "Assegnazione salvata nella timeline con successo" });
+      // Rimuovi assegnazioni precedenti dello stesso task (evita duplicazioni)
+      timelineData.assignments = timelineData.assignments.filter((a: any) => {
+        const aLogisticCode = String(a.logisticCode ?? a.logistic_code);
+        const aTaskId = String(a.taskId ?? a.task_id);
+        return aLogisticCode !== normalizedLogisticCode && aTaskId !== normalizedTaskId;
+      });
+
+      // Separa assegnazioni dello stesso cleaner e degli altri
+      const sameCleanerAssignments = timelineData.assignments
+        .filter((a: any) => Number(a.cleanerId) === normalizedCleanerId)
+        .sort((a: any, b: any) => (a.sequence || 0) - (b.sequence || 0));
+
+      const otherAssignments = timelineData.assignments
+        .filter((a: any) => Number(a.cleanerId) !== normalizedCleanerId);
+
+      // Crea nuovo assignment normalizzato
+      const newAssignment = {
+        taskId: normalizedTaskId,
+        logisticCode: normalizedLogisticCode,
+        cleanerId: normalizedCleanerId,
+        assignmentType: 'manual_drag',
+        sequence: 0
+      };
+
+      // Inserisci in posizione dropIndex
+      const targetIndex = dropIndex !== undefined 
+        ? Math.max(0, Math.min(dropIndex, sameCleanerAssignments.length))
+        : sameCleanerAssignments.length;
+
+      sameCleanerAssignments.splice(targetIndex, 0, newAssignment);
+
+      // Ricalcola sequence
+      sameCleanerAssignments.forEach((a: any, i: number) => {
+        a.sequence = i + 1;
+      });
+
+      // Ricombina tutte le assegnazioni
+      timelineData.assignments = [...otherAssignments, ...sameCleanerAssignments];
+      timelineData.current_date = workDate;
+
+      // Scrittura atomica
+      const tmpPath = `${timelineAssignmentsPath}.tmp`;
+      await fs.writeFile(tmpPath, JSON.stringify(timelineData, null, 2));
+      await fs.rename(tmpPath, timelineAssignmentsPath);
+
+      console.log(`✅ Salvato assignment per cleaner ${normalizedCleanerId} in posizione ${targetIndex}`);
+      res.json({ success: true });
     } catch (error: any) {
       console.error("Errore nel salvataggio dell'assegnazione nella timeline:", error);
       res.status(500).json({ success: false, error: error.message });
@@ -1298,7 +1288,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const eoJson = JSON.parse(eoData);
         console.log(`EO file current_date: ${eoJson.current_date}, searching for: ${date}`);
         console.log(`EO tasks found: ${eoJson.early_out_tasks_assigned?.length || 0} cleaners`);
-        
+
         if (eoJson.current_date === date) {
           for (const cleanerEntry of eoJson.early_out_tasks_assigned || []) {
             const cleanerId = cleanerEntry.cleaner.id;
@@ -1345,11 +1335,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const hpJson = JSON.parse(hpData);
         console.log(`HP file current_date: ${hpJson.current_date}, searching for: ${date}`);
         console.log(`HP tasks found: ${hpJson.high_priority_tasks_assigned?.length || 0} cleaners`);
-        
+
         // Confronta solo la data senza l'ora
         const hpDate = hpJson.current_date?.split('T')[0] || hpJson.current_date;
         const searchDate = date.split('T')[0];
-        
+
         if (hpDate === searchDate) {
           for (const cleanerEntry of hpJson.high_priority_tasks_assigned || []) {
             const cleanerId = cleanerEntry.cleaner.id;
@@ -1395,11 +1385,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const lpJson = JSON.parse(lpData);
         console.log(`LP file current_date: ${lpJson.current_date}, searching for: ${date}`);
         console.log(`LP tasks found: ${lpJson.low_priority_tasks_assigned?.length || 0} cleaners`);
-        
+
         // Confronta solo la data senza l'ora
         const lpDate = lpJson.current_date?.split('T')[0] || lpJson.current_date;
         const searchDate = date.split('T')[0];
-        
+
         if (lpDate === searchDate) {
           for (const cleanerEntry of lpJson.low_priority_tasks_assigned || []) {
             const cleanerId = cleanerEntry.cleaner.id;
