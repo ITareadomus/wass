@@ -643,6 +643,62 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Endpoint per assegnare Low Priority tasks
+  app.post("/api/assign-lp", async (req, res) => {
+    try {
+      const { date } = req.body;
+      const dateStr = date || new Date().toISOString().split('T')[0];
+      
+      console.log(`Eseguendo assign_lp.py per data ${dateStr}...`);
+      
+      const pythonProcess = spawn('python3', [
+        'client/public/scripts/assign_lp.py',
+        dateStr
+      ]);
+
+      let stdoutData = '';
+      pythonProcess.stdout.on('data', (data) => {
+        stdoutData += data.toString();
+        console.log(`assign_lp.py: ${data}`);
+      });
+
+      let stderrData = '';
+      pythonProcess.stderr.on('data', (data) => {
+        stderrData += data.toString();
+        console.error(`assign_lp.py stderr: ${data}`);
+      });
+
+      pythonProcess.on('close', (code) => {
+        if (code !== 0) {
+          console.error(`assign_lp.py exited with code ${code}`);
+          res.status(500).json({
+            success: false,
+            message: "Low Priority tasks assegnazione fallita",
+            stderr: stderrData,
+            stdout: stdoutData
+          });
+          return;
+        }
+
+        console.log("assign_lp output:", stdoutData);
+        res.json({
+          success: true,
+          message: "Low Priority tasks assegnati con successo",
+          output: stdoutData
+        });
+      });
+
+    } catch (error: any) {
+      console.error("Errore durante l'assegnazione LP:", error);
+      res.status(500).json({
+        success: false,
+        error: error.message,
+        stderr: error.stderr || "N/A",
+        stdout: error.stdout || "N/A"
+      });
+    }
+  });
+
   // Endpoint per il nuovo script di assegnazione ottimizzato (opt.py)
   app.post("/api/assign-unified", async (req, res) => {
     try {
