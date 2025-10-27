@@ -235,6 +235,8 @@ export default function PriorityColumn({
         </div>
         {priority === "high" ? (
           <Button
+            variant="outline"
+            size="sm"
             onClick={handleAssignHighPriority}
             disabled={isAssigning || tasks.length === 0}
             className="text-xs px-2 py-1 h-7"
