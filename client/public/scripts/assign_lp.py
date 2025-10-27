@@ -496,8 +496,8 @@ def build_output(cleaners: List[Cleaner], unassigned: List[Task], original_tasks
                 travel_time = int(round(hop))
 
             tasks_list.append({
-                "task_id": int(t.task_id),
-                "logistic_code": int(t.logistic_code),
+                "task_id": int(t.task_id) if t.task_id else 0,
+                "logistic_code": int(t.logistic_code) if t.logistic_code else 0,
                 "address": t.address,
                 "lat": t.lat,
                 "lng": t.lng,
@@ -530,10 +530,10 @@ def build_output(cleaners: List[Cleaner], unassigned: List[Task], original_tasks
     # Unassigned list
     unassigned_list: List[Dict[str, Any]] = []
     for ot in original_tasks:
-        lc = int(ot.logistic_code)
+        lc = int(ot.logistic_code) if ot.logistic_code else 0
         if lc not in assigned_codes:
             unassigned_list.append({
-                "task_id": int(ot.task_id),
+                "task_id": int(ot.task_id) if ot.task_id else 0,
                 "logistic_code": lc,
                 "reason": "no_eligible_cleaner_or_time_window"
             })
