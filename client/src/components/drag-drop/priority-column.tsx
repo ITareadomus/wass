@@ -80,7 +80,8 @@ export default function PriorityColumn({
         // Usa direttamente la stringa salvata (è già in formato yyyy-MM-dd)
         const dateStr = savedDate;
 
-        console.log('Esecuzione assign_eo.py per data:', dateStr);
+        console.log('📅 Data dal localStorage:', dateStr);
+        console.log('🔄 Esecuzione assign_eo.py per data:', dateStr);
         const response = await fetch('/api/run-optimizer', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -131,7 +132,8 @@ export default function PriorityColumn({
         // Usa direttamente la stringa salvata (è già in formato yyyy-MM-dd)
         const dateStr = savedDate;
 
-        console.log('Esecuzione assign_lp.py per data:', dateStr);
+        console.log('📅 Data dal localStorage:', dateStr);
+        console.log('🔄 Esecuzione assign_lp.py per data:', dateStr);
         const response = await fetch('/api/assign-lp', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -183,7 +185,8 @@ export default function PriorityColumn({
       // Usa direttamente la stringa salvata (è già in formato yyyy-MM-dd)
       const dateStr = savedDate;
 
-      console.log('Esecuzione assign_hp.py per data:', dateStr);
+      console.log('📅 Data dal localStorage:', dateStr);
+      console.log('🔄 Esecuzione assign_hp.py per data:', dateStr);
       const response = await fetch('/api/assign-hp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
