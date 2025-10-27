@@ -6,7 +6,15 @@
       "cleanerId": 24,
       "assignment_type": "manual_drag",
       "sequence": 0
+    },
+    {
+      "taskId": "218025",
+      "logisticCode": "716",
+      "cleanerId": 937,
+      "assignmentType": "manual_drag",
+      "sequence": 1
     }
   ],
-  "current_date": "2025-10-27"
+  "current_date": "2025-10-27",
+  "scheduleVersion": 1
 }
