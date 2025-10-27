@@ -832,7 +832,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/run-optimizer", async (req, res) => {
     try {
       const { date } = req.body;
-      const workDate = date || format(new Date(), 'yyyy-MM-dd');
+      if (!date) {
+        return res.status(400).json({
+          success: false,
+          message: "Data mancante nella richiesta"
+        });
+      }
+      const workDate = date;
 
       const { spawn } = await import('child_process');
       const scriptPath = path.join(process.cwd(), 'client/public/scripts/assign_eo.py');
