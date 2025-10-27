@@ -85,3 +85,36 @@ export const taskSchema = z.object({
 });
 
 export type TaskType = z.infer<typeof taskSchema>;
+
+export const InsertTaskSchema = taskSchema.omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+// Timeline Assignment Schema
+export const timelineAssignmentSchema = z.object({
+  taskId: z.string(),
+  logisticCode: z.string(),
+  cleanerId: z.number().int().nonnegative(),
+  sequence: z.number().int().positive(),
+  assignmentType: z.string().optional(),
+  address: z.string().optional(),
+  lat: z.union([z.string(), z.number()]).optional(),
+  lng: z.union([z.string(), z.number()]).optional(),
+  premium: z.boolean().optional(),
+  cleaningTime: z.number().optional(),
+  startTime: z.string().regex(/^\d{2}:\d{2}$/).optional(),
+  endTime: z.string().regex(/^\d{2}:\d{2}$/).optional(),
+  travelTime: z.number().optional(),
+  followup: z.boolean().optional(),
+});
+
+export const timelineFileSchema = z.object({
+  current_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  scheduleVersion: z.number().int().nonnegative().default(1),
+  assignments: z.array(timelineAssignmentSchema)
+});
+
+export type TimelineAssignment = z.infer<typeof timelineAssignmentSchema>;
+export type TimelineFile = z.infer<typeof timelineFileSchema>;

@@ -411,13 +411,13 @@ export default function GenerateAssignments() {
     }
   };
 
-  const saveTimelineAssignment = async (taskId: string, cleanerId: number, logisticCode?: string) => {
+  const saveTimelineAssignment = async (taskId: string, cleanerId: number, logisticCode?: string, dropIndex?: number) => {
     try {
       const dateStr = format(selectedDate, "yyyy-MM-dd");
       const response = await fetch('/api/save-timeline-assignment', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ taskId, cleanerId, logisticCode, date: dateStr }),
+        body: JSON.stringify({ taskId, cleanerId, logisticCode, date: dateStr, dropIndex }),
       });
       if (!response.ok) {
         console.error('Errore nel salvataggio dell\'assegnazione nella timeline');
@@ -426,6 +426,24 @@ export default function GenerateAssignments() {
       }
     } catch (error) {
       console.error('Errore nella chiamata API di salvataggio timeline:', error);
+    }
+  };
+
+  const reorderTimelineAssignment = async (taskId: string, cleanerId: number, logisticCode: string, fromIndex: number, toIndex: number) => {
+    try {
+      const dateStr = format(selectedDate, "yyyy-MM-dd");
+      const response = await fetch('/api/reorder-timeline', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ date: dateStr, cleanerId, taskId, logisticCode, fromIndex, toIndex }),
+      });
+      if (!response.ok) {
+        console.error('Errore nel reorder della timeline');
+      } else {
+        console.log('Timeline riordinata con successo');
+      }
+    } catch (error) {
+      console.error('Errore nella chiamata API di reorder timeline:', error);
     }
   };
 
@@ -476,7 +494,29 @@ export default function GenerateAssignments() {
       ? destination.droppableId 
       : containerToJsonName[destination.droppableId] || null;
 
-    // Se sto muovendo verso una timeline di un cleaner
+    // Caso 1: Reorder intra-timeline (stessa colonna cleaner)
+    if (source.droppableId.startsWith('timeline-') && destination.droppableId.startsWith('timeline-')) {
+      const sourceCleanerId = parseInt(source.droppableId.replace('timeline-', ''));
+      const destCleanerId = parseInt(destination.droppableId.replace('timeline-', ''));
+
+      if (sourceCleanerId === destCleanerId) {
+        // Reorder nella stessa timeline
+        reorderTimelineAssignment(taskId, sourceCleanerId, logisticCode || '', source.index, destination.index);
+        
+        // Aggiorna lo stato locale
+        setAllTasksWithAssignments((prevTasks) => {
+          const updatedTasks = [...prevTasks];
+          const taskToMove = updatedTasks.find(t => t.id === taskId);
+          if (taskToMove) {
+            (taskToMove as any).sequence = destination.index + 1;
+          }
+          return updatedTasks;
+        });
+        return;
+      }
+    }
+
+    // Caso 2: Spostamento verso una timeline di un cleaner
     if (destination.droppableId.startsWith('timeline-')) {
       const cleanerId = parseInt(destination.droppableId.replace('timeline-', ''));
 
@@ -505,8 +545,8 @@ export default function GenerateAssignments() {
         return updatedTasks;
       });
 
-      // Salva l'assegnazione nella timeline
-      saveTimelineAssignment(taskId, cleanerId, logisticCode);
+      // Salva l'assegnazione nella timeline con dropIndex
+      saveTimelineAssignment(taskId, cleanerId, logisticCode, destination.index);
 
       // Aggiorna i JSON: rimuovi dal container di origine
       if (fromContainer) {
