@@ -5,6 +5,7 @@ import { Clock, AlertCircle, ArrowDown, Calendar } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
+import { useState } from "react";
 
 interface PriorityColumnProps {
   title: string;
@@ -23,7 +24,7 @@ export default function PriorityColumn({
 }: PriorityColumnProps) {
   const { toast } = useToast();
   // State to track if assignments are in progress
-  const [isAssigning, setIsAssigning] = React.useState(false);
+  const [isAssigning, setIsAssigning] = useState(false);
 
   const getColumnClass = (priority: string, tasks: Task[]) => {
     switch (priority) {
