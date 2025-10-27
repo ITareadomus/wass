@@ -231,5 +231,6 @@
       "customer_name": "ITALIANWAY SRL"
     }
   ],
-  "total_apartments": 10
+  "total_apartments": 10,
+  "current_date": "2025-10-27"
 }
