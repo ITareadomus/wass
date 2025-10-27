@@ -1276,20 +1276,136 @@ export async function registerRoutes(app: Express): Promise<Server> {
         `${date}.json`
       );
 
-      // Carica le assegnazioni della timeline
+      // Carica le assegnazioni della timeline (manuali)
       let timelineData: any = { assignments: [], current_date: date };
       try {
         const existingData = await fs.readFile(timelineAssignmentsPath, 'utf8');
         timelineData = JSON.parse(existingData);
       } catch (error) {
-        console.log('Nessuna assegnazione trovata per questa data');
+        console.log('Nessuna assegnazione manuale trovata per questa data');
       }
 
-      // Salva le assegnazioni confermate
+      // Carica le assegnazioni dagli script
+      const eoAssignmentsPath = path.join(process.cwd(), 'client/public/data/output/early_out_assignments.json');
+      const hpAssignmentsPath = path.join(process.cwd(), 'client/public/data/output/high_priority_assignments.json');
+      const lpAssignmentsPath = path.join(process.cwd(), 'client/public/data/output/low_priority_assignments.json');
+
+      let allAssignments = [...timelineData.assignments];
+
+      // Aggiungi assegnazioni EO
+      try {
+        const eoData = await fs.readFile(eoAssignmentsPath, 'utf8');
+        const eoJson = JSON.parse(eoData);
+        if (eoJson.current_date === date) {
+          for (const cleanerEntry of eoJson.early_out_tasks_assigned || []) {
+            const cleanerId = cleanerEntry.cleaner.id;
+            for (const task of cleanerEntry.tasks || []) {
+              // Verifica se questa task non è già nelle assegnazioni manuali
+              const alreadyExists = allAssignments.some(a => 
+                String(a.logistic_code) === String(task.logistic_code)
+              );
+              if (!alreadyExists) {
+                allAssignments.push({
+                  task_id: task.task_id,
+                  logistic_code: String(task.logistic_code),
+                  cleanerId: cleanerId,
+                  assignment_type: "early_out",
+                  sequence: task.sequence,
+                  address: task.address,
+                  lat: task.lat,
+                  lng: task.lng,
+                  premium: task.premium,
+                  cleaning_time: task.cleaning_time,
+                  start_time: task.start_time,
+                  end_time: task.end_time,
+                  travel_time: task.travel_time,
+                  followup: task.followup
+                });
+              }
+            }
+          }
+        }
+      } catch (error) {
+        console.log('Nessuna assegnazione Early Out trovata');
+      }
+
+      // Aggiungi assegnazioni HP
+      try {
+        const hpData = await fs.readFile(hpAssignmentsPath, 'utf8');
+        const hpJson = JSON.parse(hpData);
+        if (hpJson.current_date === date) {
+          for (const cleanerEntry of hpJson.high_priority_tasks_assigned || []) {
+            const cleanerId = cleanerEntry.cleaner.id;
+            for (const task of cleanerEntry.tasks || []) {
+              const alreadyExists = allAssignments.some(a => 
+                String(a.logistic_code) === String(task.logistic_code)
+              );
+              if (!alreadyExists) {
+                allAssignments.push({
+                  task_id: task.task_id,
+                  logistic_code: String(task.logistic_code),
+                  cleanerId: cleanerId,
+                  assignment_type: "high_priority",
+                  sequence: task.sequence,
+                  address: task.address,
+                  lat: task.lat,
+                  lng: task.lng,
+                  premium: task.premium,
+                  cleaning_time: task.cleaning_time,
+                  start_time: task.start_time,
+                  end_time: task.end_time,
+                  travel_time: task.travel_time,
+                  followup: task.followup
+                });
+              }
+            }
+          }
+        }
+      } catch (error) {
+        console.log('Nessuna assegnazione High Priority trovata');
+      }
+
+      // Aggiungi assegnazioni LP
+      try {
+        const lpData = await fs.readFile(lpAssignmentsPath, 'utf8');
+        const lpJson = JSON.parse(lpData);
+        if (lpJson.current_date === date) {
+          for (const cleanerEntry of lpJson.low_priority_tasks_assigned || []) {
+            const cleanerId = cleanerEntry.cleaner.id;
+            for (const task of cleanerEntry.tasks || []) {
+              const alreadyExists = allAssignments.some(a => 
+                String(a.logistic_code) === String(task.logistic_code)
+              );
+              if (!alreadyExists) {
+                allAssignments.push({
+                  task_id: task.task_id,
+                  logistic_code: String(task.logistic_code),
+                  cleanerId: cleanerId,
+                  assignment_type: "low_priority",
+                  sequence: task.sequence,
+                  address: task.address,
+                  lat: task.lat,
+                  lng: task.lng,
+                  premium: task.premium,
+                  cleaning_time: task.cleaning_time,
+                  start_time: task.start_time,
+                  end_time: task.end_time,
+                  travel_time: task.travel_time,
+                  followup: task.followup
+                });
+              }
+            }
+          }
+        }
+      } catch (error) {
+        console.log('Nessuna assegnazione Low Priority trovata');
+      }
+
+      // Salva tutte le assegnazioni confermate
       const confirmedData = {
         date: date,
         confirmed_at: new Date().toISOString(),
-        assignments: timelineData.assignments
+        assignments: allAssignments
       };
 
       await fs.writeFile(assignedFilePath, JSON.stringify(confirmedData, null, 2));
@@ -1298,7 +1414,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         success: true,
         message: `Assegnazioni confermate salvate in ${filename}`,
         filename: filename,
-        total_assignments: timelineData.assignments.length
+        total_assignments: allAssignments.length
       });
     } catch (error: any) {
       console.error("Errore nel salvataggio delle assegnazioni confermate:", error);
