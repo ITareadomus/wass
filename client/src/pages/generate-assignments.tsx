@@ -84,44 +84,44 @@ export default function GenerateAssignments() {
   const [isConfirming, setIsConfirming] = useState(false);
   const { toast } = useToast();
 
-  useEffect(() => {
-    // Esegui l'estrazione dei dati all'avvio e quando cambia la data
-    const extractData = async () => {
-      try {
-        setIsExtracting(true);
-        setExtractionStep("Estrazione dati dal database...");
+  // Funzione per estrarre i dati dal backend
+  const extractData = async (dateStr: string) => {
+    try {
+      setIsExtracting(true);
+      setExtractionStep("Estrazione dati dal database...");
 
-        const dateStr = format(selectedDate, "yyyy-MM-dd");
-        console.log("Estraendo task per la data:", dateStr);
+      console.log("Estraendo task per la data:", dateStr);
 
-        const response = await fetch('/api/extract-data', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ date: dateStr })
-        });
+      const response = await fetch('/api/extract-data', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ date: dateStr })
+      });
 
-        if (!response.ok) {
-          throw new Error('Errore durante l\'estrazione dei dati');
-        }
-
-        const result = await response.json();
-        console.log("Estrazione completata:", result);
-
-        setExtractionStep("Elaborazione task completata!");
-        setIsExtracting(false);
-
-        // Carica i task dopo l'estrazione
-        loadTasks();
-      } catch (error) {
-        console.error("Errore nell'estrazione:", error);
-        setExtractionStep("Errore durante l'estrazione. Caricamento task esistenti...");
-        setIsExtracting(false);
-        // Prova comunque a caricare i task esistenti
-        loadTasks();
+      if (!response.ok) {
+        throw new Error('Errore durante l\'estrazione dei dati');
       }
-    };
 
-    extractData();
+      const result = await response.json();
+      console.log("Estrazione completata:", result);
+
+      setExtractionStep("Elaborazione task completata!");
+      setIsExtracting(false);
+
+      // Carica i task dopo l'estrazione
+      loadTasks();
+    } catch (error) {
+      console.error("Errore nell'estrazione:", error);
+      setExtractionStep("Errore durante l'estrazione. Caricamento task esistenti...");
+      setIsExtracting(false);
+      // Prova comunque a caricare i task esistenti
+      loadTasks();
+    }
+  };
+
+  useEffect(() => {
+    const dateStr = format(selectedDate, "yyyy-MM-dd");
+    extractData(dateStr);
   }, [selectedDate]); // Aggiungi selectedDate come dipendenza
 
   // Carica le assegnazioni quando i task sono pronti
