@@ -1,11 +1,13 @@
 
 # -*- coding: utf-8 -*-
 from __future__ import annotations
-import json, math
+import json, math, os
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Tuple
 from pathlib import Path
 from datetime import datetime, timedelta
+import psycopg2
+from psycopg2.extras import execute_values
 
 # =============================
 # I/O paths
@@ -622,6 +624,66 @@ def build_output(cleaners: List[Cleaner], unassigned: List[Task], original_tasks
     }
 
 
+def save_to_database(output: Dict[str, Any], ref_date: str):
+    """Salva le assegnazioni nel database PostgreSQL"""
+    database_url = os.environ.get('DATABASE_URL')
+    if not database_url:
+        print("⚠️  DATABASE_URL non trovato, salvataggio DB saltato")
+        return
+    
+    try:
+        conn = psycopg2.connect(database_url)
+        cur = conn.cursor()
+        
+        # Rimuovi le vecchie assegnazioni HP per questa data
+        cur.execute("""
+            DELETE FROM timeline_assignments 
+            WHERE work_date = %s AND assignment_type = 'high_priority'
+        """, (ref_date,))
+        
+        # Prepara i dati da inserire
+        assignment_values = []
+        for cleaner_entry in output["high_priority_tasks_assigned"]:
+            cleaner_id = cleaner_entry["cleaner"]["id"]
+            for task in cleaner_entry.get("tasks", []):
+                assignment_values.append((
+                    task["task_id"],
+                    str(task["logistic_code"]),
+                    cleaner_id,
+                    "high_priority",
+                    task.get("sequence", 0),
+                    task.get("address"),
+                    str(task.get("lat")) if task.get("lat") else None,
+                    str(task.get("lng")) if task.get("lng") else None,
+                    task.get("premium", False),
+                    task.get("cleaning_time"),
+                    task.get("start_time"),
+                    task.get("end_time"),
+                    task.get("travel_time", 0),
+                    task.get("followup", False),
+                    ref_date
+                ))
+        
+        # Inserisci le nuove assegnazioni
+        if assignment_values:
+            execute_values(cur, """
+                INSERT INTO timeline_assignments (
+                    task_id, logistic_code, cleaner_id, assignment_type, sequence,
+                    address, lat, lng, premium, cleaning_time, start_time, end_time,
+                    travel_time, followup, work_date
+                ) VALUES %s
+            """, assignment_values)
+        
+        conn.commit()
+        cur.close()
+        conn.close()
+        
+        print(f"✅ Salvate {len(assignment_values)} assegnazioni HP nel database per {ref_date}")
+        
+    except Exception as e:
+        print(f"⚠️  Errore nel salvataggio DB: {e}")
+
+
 def main():
     if not INPUT_TASKS.exists():
         raise SystemExit(f"Missing input file: {INPUT_TASKS}")
@@ -661,6 +723,9 @@ def main():
     print(f"   - Task non assegnati: {output['meta']['unassigned']}")
     print()
     print(f"💾 Risultati salvati in: {OUTPUT_ASSIGN}")
+    
+    # Salva nel database
+    save_to_database(output, ref_date)
     
     # Update timeline_assignments/{date}.json
     timeline_dir = OUTPUT_ASSIGN.parent / "timeline_assignments"
