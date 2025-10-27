@@ -651,8 +651,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       console.log(`Eseguendo assign_lp.py per data ${dateStr}...`);
       
+      const { spawn } = await import('child_process');
+      const scriptPath = path.join(process.cwd(), 'client/public/scripts/assign_lp.py');
+      
       const pythonProcess = spawn('python3', [
-        'client/public/scripts/assign_lp.py',
+        scriptPath,
         dateStr
       ]);
 
