@@ -647,16 +647,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/assign-lp", async (req, res) => {
     try {
       const { date } = req.body;
-      const dateStr = date || new Date().toISOString().split('T')[0];
+      const workDate = date || format(new Date(), 'yyyy-MM-dd');
       
-      console.log(`Eseguendo assign_lp.py per data ${dateStr}...`);
+      console.log(`Eseguendo assign_lp.py per data ${workDate}...`);
       
       const { spawn } = await import('child_process');
       const scriptPath = path.join(process.cwd(), 'client/public/scripts/assign_lp.py');
       
       const pythonProcess = spawn('python3', [
         scriptPath,
-        dateStr
+        workDate
       ]);
 
       let stdoutData = '';

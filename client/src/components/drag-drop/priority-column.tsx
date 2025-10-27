@@ -154,8 +154,11 @@ export default function PriorityColumn({
   const handleAssignHighPriority = async () => {
     try {
       setIsAssigning(true);
-      const dateStr = format(new Date(localStorage.getItem('selected_work_date') || new Date()), "yyyy-MM-dd");
+      const savedDate = localStorage.getItem('selected_work_date');
+      const selectedDate = savedDate ? new Date(savedDate) : new Date();
+      const dateStr = selectedDate.toISOString().split('T')[0];
 
+      console.log('Esecuzione assign_hp.py per data:', dateStr);
       const response = await fetch('/api/assign-hp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -195,7 +198,10 @@ export default function PriorityColumn({
   const handleAssignLowPriority = async () => {
     try {
       setIsAssigning(true);
-      const dateStr = format(new Date(localStorage.getItem('selected_work_date') || new Date()), "yyyy-MM-dd");
+      const savedDate = localStorage.getItem('selected_work_date');
+      const selectedDate = savedDate ? new Date(savedDate) : new Date();
+      const dateStr = selectedDate.toISOString().split('T')[0];
+
 
       const response = await fetch('/api/assign-lp', {
         method: 'POST',
