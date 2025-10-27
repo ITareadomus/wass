@@ -1,11 +1,9 @@
 # -*- coding: utf-8 -*-
 from __future__ import annotations
-import json, math, os
+import json, math
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Tuple
 from pathlib import Path
-import psycopg2
-from psycopg2.extras import execute_values
 
 # =============================
 # I/O paths
@@ -484,82 +482,11 @@ def build_output(cleaners: List[Cleaner], unassigned: List[Task], original_tasks
     }
 
 
-def save_to_database(output: Dict[str, Any], ref_date: str):
-    """Salva le assegnazioni nel database PostgreSQL"""
-    database_url = os.environ.get('DATABASE_URL')
-    if not database_url:
-        print("⚠️  DATABASE_URL non trovato, salvataggio DB saltato")
-        return
-    
-    try:
-        conn = psycopg2.connect(database_url)
-        cur = conn.cursor()
-        
-        # Rimuovi le vecchie assegnazioni EO per questa data
-        cur.execute("""
-            DELETE FROM timeline_assignments 
-            WHERE work_date = %s AND assignment_type = 'early_out'
-        """, (ref_date,))
-        
-        # Prepara i dati da inserire
-        assignment_values = []
-        for cleaner_entry in output["early_out_tasks_assigned"]:
-            cleaner_id = cleaner_entry["cleaner"]["id"]
-            for task in cleaner_entry.get("tasks", []):
-                assignment_values.append((
-                    task["task_id"],
-                    str(task["logistic_code"]),
-                    cleaner_id,
-                    "early_out",
-                    task.get("sequence", 0),
-                    task.get("address"),
-                    str(task.get("lat")) if task.get("lat") else None,
-                    str(task.get("lng")) if task.get("lng") else None,
-                    task.get("premium", False),
-                    task.get("cleaning_time"),
-                    task.get("start_time"),
-                    task.get("end_time"),
-                    task.get("travel_time", 0),
-                    task.get("followup", False),
-                    ref_date
-                ))
-        
-        # Inserisci le nuove assegnazioni
-        if assignment_values:
-            execute_values(cur, """
-                INSERT INTO timeline_assignments (
-                    task_id, logistic_code, cleaner_id, assignment_type, sequence,
-                    address, lat, lng, premium, cleaning_time, start_time, end_time,
-                    travel_time, followup, work_date
-                ) VALUES %s
-            """, assignment_values)
-        
-        conn.commit()
-        cur.close()
-        conn.close()
-        
-        print(f"✅ Salvate {len(assignment_values)} assegnazioni EO nel database per {ref_date}")
-        
-    except Exception as e:
-        print(f"⚠️  Errore nel salvataggio DB: {e}")
-
-
 def main():
     if not INPUT_TASKS.exists():
         raise SystemExit(f"Missing input file: {INPUT_TASKS}")
     if not INPUT_CLEANERS.exists():
         raise SystemExit(f"Missing input file: {INPUT_CLEANERS}")
-
-    # Usa la data passata come argomento da riga di comando
-    import sys
-    if len(sys.argv) > 1:
-        ref_date = sys.argv[1]
-        print(f"📅 Usando data da argomento: {ref_date}")
-    else:
-        # Fallback: usa la data corrente
-        from datetime import datetime
-        ref_date = datetime.now().strftime("%Y-%m-%d")
-        print(f"📅 Nessuna data specificata, usando: {ref_date}")
 
     cleaners = load_cleaners()
     tasks = load_tasks()
@@ -583,9 +510,17 @@ def main():
     print(f"   - Task non assegnati: {output['meta']['unassigned']}")
     print()
     print(f"💾 Risultati salvati in: {OUTPUT_ASSIGN}")
-    
-    # Salva nel database
-    save_to_database(output, ref_date)
+
+    # Usa la data passata come argomento da riga di comando
+    import sys
+    if len(sys.argv) > 1:
+        ref_date = sys.argv[1]
+        print(f"📅 Usando data da argomento: {ref_date}")
+    else:
+        # Fallback: usa la data corrente
+        from datetime import datetime
+        ref_date = datetime.now().strftime("%Y-%m-%d")
+        print(f"📅 Nessuna data specificata, usando: {ref_date}")
 
     # Update timeline_assignments/{date}.json
     timeline_dir = OUTPUT_ASSIGN.parent / "timeline_assignments"
@@ -602,10 +537,15 @@ def main():
         except:
             timeline_data = {"assignments": [], "current_date": ref_date}
 
-    # Rimuovi SOLO le vecchie assegnazioni EO (mantieni HP e altre)
+    # Rimuovi vecchie assegnazioni EO
+    assigned_codes = set()
+    for cleaner_entry in output["early_out_tasks_assigned"]:
+        for task in cleaner_entry.get("tasks", []):
+            assigned_codes.add(str(task["logistic_code"]))
+
     timeline_data["assignments"] = [
         a for a in timeline_data.get("assignments", [])
-        if a.get("assignment_type") != "early_out"
+        if str(a.get("logistic_code")) not in assigned_codes
     ]
 
     # Aggiungi nuove assegnazioni EO con tutti i dati del task
