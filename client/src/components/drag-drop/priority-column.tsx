@@ -144,16 +144,41 @@ export default function PriorityColumn({
       }
     } else if (priority === 'low') {
       try {
-        // Placeholder per low priority
-        console.log('Low priority assignment non ancora implementato');
+        // Ottieni la data selezionata dal localStorage
+        const savedDate = localStorage.getItem('selected_work_date');
+        const selectedDate = savedDate ? new Date(savedDate) : new Date();
+        const dateStr = selectedDate.toISOString().split('T')[0];
+
+        console.log('Esecuzione assign_lp.py per data:', dateStr);
+        const response = await fetch('/api/assign-lp', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ date: dateStr })
+        });
+
+        if (!response.ok) {
+          throw new Error('Errore durante l\'assegnazione LP');
+        }
+
+        const result = await response.json();
+        console.log('Assegnazione LP completata:', result);
+
         toast({
           variant: "success",
-          title: "✅ LOW-PRIORITY assegnati con successo!",
+          title: "✅ LOW PRIORITY assegnati con successo!",
         });
-      } catch (error) {
-        console.error('Errore nell\'assegnazione low priority:', error);
+
+        // Ricarica i task
+        if ((window as any).reloadAllTasks) {
+          await (window as any).reloadAllTasks();
+        }
+
+        // Ricarica la pagina per aggiornare i marker sulla mappa
+        window.location.reload();
+      } catch (error: any) {
+        console.error('Errore nell\'assegnazione LP:', error);
         toast({
-          title: "❌ LOW-PRIORITY non assegnati, errore nel caricamento!",
+          title: "❌ LOW PRIORITY non assegnati, errore!",
           variant: "destructive",
         });
       }
