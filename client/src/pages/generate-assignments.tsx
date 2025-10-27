@@ -224,7 +224,7 @@ export default function GenerateAssignments() {
         convertRawTask(task, "low")
       );
 
-      console.log("Tasks convertiti - Early:", initialEarlyOut.length, "High:", initialHigh.length, "Low:", initialLow.length);
+      console.log("Task convertiti - Early:", initialEarlyOut.length, "High:", initialHigh.length, "Low:", initialLow.length);
 
       // Crea una mappa di logistic_code -> assegnazione timeline completa
       const timelineAssignmentsMap = new Map<string, any>(
@@ -519,89 +519,56 @@ export default function GenerateAssignments() {
       }
     }
 
-    // Caso 2: Spostamento verso una timeline di un cleaner
-    if (destination.droppableId.startsWith('timeline-')) {
-      const cleanerId = parseInt(destination.droppableId.replace('timeline-', ''));
+    // Se droppo dalla timeline a un container
+    if (source.droppableId.startsWith('timeline-') && 
+        (destination.droppableId === 'early-out' || 
+         destination.droppableId === 'high' || 
+         destination.droppableId === 'low')) {
 
-      // PRIMA rimuovi la task dal container di origine
-      if (source.droppableId === 'early-out') {
-        setEarlyOutTasks(prev => prev.filter(t => t.id !== taskId));
-      } else if (source.droppableId === 'high') {
-        setHighPriorityTasks(prev => prev.filter(t => t.id !== taskId));
-      } else if (source.droppableId === 'low') {
-        setLowPriorityTasks(prev => prev.filter(t => t.id !== taskId));
-      }
+      console.log(`Spostamento da timeline a container: ${source.droppableId} -> ${destination.droppableId}`);
 
-      // POI aggiorna lo stato con l'assegnazione
-      setAllTasksWithAssignments((prevTasks) => {
-        const updatedTasks = prevTasks.map((task) => {
-          if (task.id === taskId) {
-            return {
-              ...task,
-              assignedCleaner: cleanerId,
-            };
-          }
-          return task;
-        });
-
-        saveTaskAssignments(updatedTasks);
-        return updatedTasks;
+      // Rimuovi dalla timeline
+      const updatedTasks = allTasksWithAssignments.map(t => {
+        if (t.id === taskId) {
+          const updated = { ...t };
+          delete (updated as any).assignedCleaner;
+          return updated;
+        }
+        return t;
       });
+      setAllTasksWithAssignments(updatedTasks);
 
-      // Salva l'assegnazione nella timeline con dropIndex
-      saveTimelineAssignment(taskId, cleanerId, logisticCode, destination.index);
+      // Rimuovi da timeline_assignments.json
+      await removeTimelineAssignment(taskId, logisticCode);
 
-      // Aggiorna i JSON: rimuovi dal container di origine
-      if (fromContainer) {
-        updateTaskJson(taskId, logisticCode, fromContainer, toContainer);
-      }
+      // Aggiorna il file JSON del container di destinazione
+      await updateTaskJson(taskId, logisticCode, 'timeline', destination.droppableId);
+
+      return;
     }
-    // Se sto muovendo da una timeline verso una colonna di priorità
-    else if (source.droppableId.startsWith('timeline-')) {
-      // Prima rimuovi l'assegnazione dalla timeline
-      removeTimelineAssignment(taskId, logisticCode);
+    // Se droppo da un container a una timeline
+    if ((source.droppableId === 'early-out' || source.droppableId === 'high' || source.droppableId === 'low') &&
+        destination.droppableId.startsWith('timeline-')) {
 
-      setAllTasksWithAssignments((prevTasks) => {
-        const updatedTasks = prevTasks.map((task) => {
-          if (task.id === taskId) {
-            return {
-              ...task,
-              assignedCleaner: undefined,
-              startTime: undefined,
-              sequence: undefined,
-            };
-          }
-          return task;
-        });
+      const cleanerId = parseInt(destination.droppableId.split('-')[1]);
+      console.log(`Spostamento da container a timeline: ${source.droppableId} -> cleaner ${cleanerId}`);
 
-        saveTaskAssignments(updatedTasks);
-        return updatedTasks;
+      // Aggiorna lo stato locale
+      const updatedTasks = allTasksWithAssignments.map(t => {
+        if (t.id === taskId) {
+          return { ...t, assignedCleaner: cleanerId } as any;
+        }
+        return t;
       });
+      setAllTasksWithAssignments(updatedTasks);
 
-      // Ri-aggiungi la task al container di destinazione
-      const taskToAdd = allTasksWithAssignments.find(t => t.id === taskId);
-      if (taskToAdd) {
-        // Rimuovi i dati di assegnazione dalla task
-        const cleanTask = {
-          ...taskToAdd,
-          assignedCleaner: undefined,
-          startTime: undefined,
-          sequence: undefined,
-        };
+      // Salva in timeline_assignments.json
+      await saveTimelineAssignment(taskId, cleanerId, logisticCode, destination.index);
 
-        if (destination.droppableId === 'early-out') {
-          setEarlyOutTasks(prev => [...prev, cleanTask]);
-        } else if (destination.droppableId === 'high') {
-          setHighPriorityTasks(prev => [...prev, cleanTask]);
-        } else if (destination.droppableId === 'low') {
-          setLowPriorityTasks(prev => [...prev, cleanTask]);
-        }
+      // Aggiorna i file JSON dei container
+      await updateTaskJson(taskId, logisticCode, source.droppableId, destination.droppableId);
 
-        // Aggiorna i JSON: aggiungi al container di destinazione
-        if (toContainer) {
-          updateTaskJson(taskId, logisticCode, 'timeline', toContainer);
-        }
-      }
+      return;
     }
     // Se sto muovendo tra contenitori di priorità
     else {
