@@ -648,12 +648,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { date } = req.body;
       const workDate = date || format(new Date(), 'yyyy-MM-dd');
-      
+
       console.log(`Eseguendo assign_lp.py per data ${workDate}...`);
-      
+
       const { spawn } = await import('child_process');
       const scriptPath = path.join(process.cwd(), 'client/public/scripts/assign_lp.py');
-      
+
       const pythonProcess = spawn('python3', [
         scriptPath,
         workDate
@@ -1152,10 +1152,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { date } = req.body;
       const workDate = date || format(new Date(), 'yyyy-MM-dd');
 
-      console.log(`Eseguendo assign_eo.py per data ${workDate}...`);
-
       const { spawn } = await import('child_process');
       const scriptPath = path.join(process.cwd(), 'client/public/scripts/assign_eo.py');
+
+      console.log(`Eseguendo assign_eo.py per data ${workDate}...`);
 
       const pythonProcess = spawn('python3', [scriptPath, workDate]);
 
