@@ -69,8 +69,16 @@ export default function PriorityColumn({
       try {
         // Ottieni la data selezionata dal localStorage
         const savedDate = localStorage.getItem('selected_work_date');
-        const selectedDate = savedDate ? new Date(savedDate) : new Date();
-        const dateStr = selectedDate.toISOString().split('T')[0];
+        if (!savedDate) {
+          toast({
+            variant: "destructive",
+            title: "Errore",
+            description: "Nessuna data selezionata",
+          });
+          return;
+        }
+        const selectedDate = new Date(savedDate);
+        const dateStr = format(selectedDate, 'yyyy-MM-dd');
 
         console.log('Esecuzione assign_eo.py per data:', dateStr);
         const response = await fetch('/api/run-optimizer', {
@@ -112,8 +120,16 @@ export default function PriorityColumn({
       try {
         // Ottieni la data selezionata dal localStorage
         const savedDate = localStorage.getItem('selected_work_date');
-        const selectedDate = savedDate ? new Date(savedDate) : new Date();
-        const dateStr = selectedDate.toISOString().split('T')[0];
+        if (!savedDate) {
+          toast({
+            variant: "destructive",
+            title: "Errore",
+            description: "Nessuna data selezionata",
+          });
+          return;
+        }
+        const selectedDate = new Date(savedDate);
+        const dateStr = format(selectedDate, 'yyyy-MM-dd');
 
         console.log('Esecuzione assign_lp.py per data:', dateStr);
         const response = await fetch('/api/assign-lp', {
@@ -155,8 +171,17 @@ export default function PriorityColumn({
     try {
       setIsAssigning(true);
       const savedDate = localStorage.getItem('selected_work_date');
-      const selectedDate = savedDate ? new Date(savedDate) : new Date();
-      const dateStr = selectedDate.toISOString().split('T')[0];
+      if (!savedDate) {
+        toast({
+          variant: "destructive",
+          title: "Errore",
+          description: "Nessuna data selezionata",
+        });
+        setIsAssigning(false);
+        return;
+      }
+      const selectedDate = new Date(savedDate);
+      const dateStr = format(selectedDate, 'yyyy-MM-dd');
 
       console.log('Esecuzione assign_hp.py per data:', dateStr);
       const response = await fetch('/api/assign-hp', {
@@ -196,9 +221,17 @@ export default function PriorityColumn({
     try {
       setIsAssigning(true);
       const savedDate = localStorage.getItem('selected_work_date');
-      const selectedDate = savedDate ? new Date(savedDate) : new Date();
-      const dateStr = selectedDate.toISOString().split('T')[0];
-
+      if (!savedDate) {
+        toast({
+          variant: "destructive",
+          title: "Errore",
+          description: "Nessuna data selezionata",
+        });
+        setIsAssigning(false);
+        return;
+      }
+      const selectedDate = new Date(savedDate);
+      const dateStr = format(selectedDate, 'yyyy-MM-dd');
 
       const response = await fetch('/api/assign-lp', {
         method: 'POST',
