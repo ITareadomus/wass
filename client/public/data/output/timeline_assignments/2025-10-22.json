@@ -1,22 +1,6 @@
 {
   "assignments": [
     {
-      "task_id": 217668,
-      "logistic_code": "1642",
-      "cleanerId": 132,
-      "assignment_type": "early_out",
-      "sequence": 1,
-      "address": "Via Bainsizza 2",
-      "lat": 45.451767,
-      "lng": 9.1855212,
-      "premium": true,
-      "cleaning_time": 180,
-      "start_time": "10:00",
-      "end_time": "13:00",
-      "travel_time": 0,
-      "followup": false
-    },
-    {
       "task_id": 217669,
       "logistic_code": "1646",
       "cleanerId": 24,
@@ -33,9 +17,25 @@
       "followup": false
     },
     {
+      "task_id": 217668,
+      "logistic_code": "1642",
+      "cleanerId": 829,
+      "assignment_type": "early_out",
+      "sequence": 1,
+      "address": "Via Bainsizza 2",
+      "lat": 45.451767,
+      "lng": 9.1855212,
+      "premium": true,
+      "cleaning_time": 180,
+      "start_time": "10:00",
+      "end_time": "13:00",
+      "travel_time": 0,
+      "followup": false
+    },
+    {
       "task_id": 217670,
       "logistic_code": "609",
-      "cleanerId": 596,
+      "cleanerId": 404,
       "assignment_type": "early_out",
       "sequence": 1,
       "address": "VIALE STELVIO 53",
@@ -51,7 +51,7 @@
     {
       "task_id": 217671,
       "logistic_code": "1620",
-      "cleanerId": 404,
+      "cleanerId": 596,
       "assignment_type": "early_out",
       "sequence": 1,
       "address": "Via Pietro Borsieri, 29,",
@@ -67,7 +67,7 @@
     {
       "task_id": 217675,
       "logistic_code": "624",
-      "cleanerId": 445,
+      "cleanerId": 1045,
       "assignment_type": "early_out",
       "sequence": 1,
       "address": "VIALE MONTENERO 50",
@@ -83,7 +83,7 @@
     {
       "task_id": 217680,
       "logistic_code": "1626",
-      "cleanerId": 937,
+      "cleanerId": 1046,
       "assignment_type": "early_out",
       "sequence": 1,
       "address": "Via Giancarlo Sismondi, 74",
@@ -99,7 +99,7 @@
     {
       "task_id": 217681,
       "logistic_code": "514",
-      "cleanerId": 1045,
+      "cleanerId": 132,
       "assignment_type": "early_out",
       "sequence": 1,
       "address": "PIAZZA TIRANA 17",
@@ -115,7 +115,7 @@
     {
       "task_id": 217683,
       "logistic_code": "843",
-      "cleanerId": 495,
+      "cleanerId": 722,
       "assignment_type": "early_out",
       "sequence": 1,
       "address": "VIA CATERINA DA FORLI, 42",
@@ -131,7 +131,7 @@
     {
       "task_id": 217684,
       "logistic_code": "992",
-      "cleanerId": 771,
+      "cleanerId": 937,
       "assignment_type": "early_out",
       "sequence": 1,
       "address": "VIA VOGHERA 14",
@@ -147,7 +147,7 @@
     {
       "task_id": 217685,
       "logistic_code": "1487",
-      "cleanerId": 1054,
+      "cleanerId": 1060,
       "assignment_type": "early_out",
       "sequence": 1,
       "address": "viale monteceneri 58",
@@ -163,7 +163,7 @@
     {
       "task_id": 217686,
       "logistic_code": "1625",
-      "cleanerId": 249,
+      "cleanerId": 785,
       "assignment_type": "early_out",
       "sequence": 1,
       "address": "via Goffredo Mameli 9",
@@ -179,7 +179,7 @@
     {
       "task_id": 217804,
       "logistic_code": "1571",
-      "cleanerId": 785,
+      "cleanerId": 1031,
       "assignment_type": "early_out",
       "sequence": 1,
       "address": "VIALE MONTENERO, 23",
@@ -195,7 +195,7 @@
     {
       "task_id": 217848,
       "logistic_code": "617",
-      "cleanerId": 1031,
+      "cleanerId": 1054,
       "assignment_type": "early_out",
       "sequence": 1,
       "address": "VIA VOGHERA, 4",
@@ -227,7 +227,7 @@
     {
       "task_id": 217850,
       "logistic_code": "619",
-      "cleanerId": 722,
+      "cleanerId": 495,
       "assignment_type": "early_out",
       "sequence": 1,
       "address": "VIA TORTONA, 10",
