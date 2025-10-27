@@ -321,6 +321,22 @@
       "followup": true
     },
     {
+      "task_id": 217884,
+      "logistic_code": "1153",
+      "cleanerId": 1054,
+      "assignment_type": "early_out",
+      "sequence": 1,
+      "address": "VIA CELESTINO IV, 9",
+      "lat": 45.4596054,
+      "lng": 9.1821442,
+      "premium": false,
+      "cleaning_time": 120,
+      "start_time": "10:00",
+      "end_time": "12:00",
+      "travel_time": 0,
+      "followup": false
+    },
+    {
       "task_id": 217865,
       "logistic_code": "1639",
       "cleanerId": 132,
@@ -465,25 +481,9 @@
       "followup": false
     },
     {
-      "task_id": 217884,
-      "logistic_code": "1153",
-      "cleanerId": 1054,
-      "assignment_type": "early_out",
-      "sequence": 1,
-      "address": "VIA CELESTINO IV, 9",
-      "lat": 45.4596054,
-      "lng": 9.1821442,
-      "premium": false,
-      "cleaning_time": 120,
-      "start_time": "10:00",
-      "end_time": "12:00",
-      "travel_time": 0,
-      "followup": false
-    },
-    {
       "task_id": 217885,
       "logistic_code": "1240",
-      "cleanerId": 249,
+      "cleanerId": 1054,
       "assignment_type": "early_out",
       "sequence": 1,
       "address": "VIALE CONI ZUGNA 52",
@@ -499,7 +499,7 @@
     {
       "task_id": 217997,
       "logistic_code": "617",
-      "cleanerId": 785,
+      "cleanerId": 249,
       "assignment_type": "early_out",
       "sequence": 1,
       "address": "VIA VOGHERA, 4",
@@ -515,7 +515,7 @@
     {
       "task_id": 217998,
       "logistic_code": "618",
-      "cleanerId": 1031,
+      "cleanerId": 785,
       "assignment_type": "early_out",
       "sequence": 1,
       "address": "VIA VOGHERA, 4",
@@ -531,7 +531,7 @@
     {
       "task_id": 217999,
       "logistic_code": "619",
-      "cleanerId": 1055,
+      "cleanerId": 1031,
       "assignment_type": "early_out",
       "sequence": 1,
       "address": "VIA TORTONA, 10",
