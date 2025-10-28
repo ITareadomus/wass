@@ -1,11 +1,11 @@
 {
     "metadata": {
-        "last_updated": "2025-10-28T09:33:07.868095",
+        "last_updated": "2025-10-28T09:37:58.319235",
         "schema_version": "1.0"
     },
     "dates": {
         "2025-10-29": {
-            "timestamp": "2025-10-28T09:33:07.868107",
+            "timestamp": "2025-10-28T09:37:58.319244",
             "apt": [
                 {
                     "task_id": 210458,
@@ -75,6 +75,29 @@
                     "type_apt": "B",
                     "alias": "SFRSRT",
                     "customer_name": "SEFORA SARTORE"
+                },
+                {
+                    "task_id": 217914,
+                    "logistic_code": 1652,
+                    "client_id": 123,
+                    "premium": false,
+                    "address": "VIA NINO BIXIO 33",
+                    "lat": "45.4725999",
+                    "lng": "9.2118362",
+                    "cleaning_time": 90,
+                    "checkin_date": "2025-11-01",
+                    "checkout_date": "2025-10-29",
+                    "checkin_time": null,
+                    "checkout_time": null,
+                    "pax_in": 4,
+                    "pax_out": 3,
+                    "small_equipment": false,
+                    "operation_id": 2,
+                    "confirmed_operation": true,
+                    "straordinaria": false,
+                    "type_apt": "B",
+                    "alias": "YOUHO",
+                    "customer_name": "YOUHOSTY"
                 },
                 {
                     "task_id": 217948,
@@ -606,7 +629,7 @@
                     "customer_name": "EXPERIENCE DESIGN BED & SHOW"
                 }
             ],
-            "total_apartments": 26,
+            "total_apartments": 27,
             "date": "2025-10-29"
         }
     }
