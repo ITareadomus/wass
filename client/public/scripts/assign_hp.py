@@ -855,11 +855,15 @@ const client = new Client();
         with open(upload_script_path, 'w') as f:
             f.write(node_script)
 
+        # Ottieni il percorso della directory workspace
+        workspace_dir = Path(__file__).resolve().parents[3]
+        
         result = subprocess.run(
             ['node', upload_script_path],
-            cwd='/home/runner/workspace',
+            cwd=str(workspace_dir),
             capture_output=True,
-            text=True
+            text=True,
+            env={**os.environ}
         )
 
         if result.returncode == 0:
