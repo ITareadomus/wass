@@ -93,7 +93,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Raggruppa assignments per cleaner
       const assignmentsByCleanerId = new Map<number, any[]>();
-      
+
       for (const assignment of timelineData.assignments || []) {
         const cleanerId = assignment.cleanerId;
         if (!assignmentsByCleanerId.has(cleanerId)) {
@@ -167,9 +167,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (!timelineData.scheduleVersion) {
           timelineData.scheduleVersion = 1;
         }
-        // Se esiste già la struttura per cleaner, estrai gli assignments
+        // Supporta sia struttura per cleaner che flat
         if (timelineData.cleaners) {
-          timelineData.assignments = timelineData.cleaners.flatMap((c: any) => c.tasks || []);
+          // Estrai assignments dalla struttura per cleaner
+          timelineData.assignments = [];
+          for (const cleaner_entry of timelineData.cleaners) {
+            for (const task of cleaner_entry.tasks || []) {
+              timelineData.assignments.push(task);
+            }
+          }
+        } else if (timelineData.assignments && timelineData.assignments.length > 0) {
+          // Se abbiamo solo assignments flat, NON facciamo nulla qui
+          // La riorganizzazione avverrà dopo l'inserimento
         }
       } catch (error) {
         console.log(`Creazione nuovo file timeline per ${workDate}`);
@@ -226,10 +235,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       await fs.rename(tmpPath, timelineAssignmentsPath);
 
       console.log(`✅ Salvato assignment per cleaner ${normalizedCleanerId} in posizione ${targetIndex}`);
-      
+
       // Riorganizza il file per cleaner
       await reorganizeTimelineByCleaners(timelineAssignmentsPath, timelineData);
-      
+
       res.json({ success: true });
     } catch (error: any) {
       console.error("Errore nel salvataggio dell'assegnazione nella timeline:", error);
@@ -254,9 +263,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       try {
         const existingData = await fs.readFile(timelineAssignmentsPath, 'utf8');
         timelineData = JSON.parse(existingData);
-        // Se esiste già la struttura per cleaner, estrai gli assignments
+        // Supporta sia struttura per cleaner che flat
         if (timelineData.cleaners) {
-          timelineData.assignments = timelineData.cleaners.flatMap((c: any) => c.tasks || []);
+          // Estrai assignments dalla struttura per cleaner
+          timelineData.assignments = [];
+          for (const cleaner_entry of timelineData.cleaners) {
+            for (const task of cleaner_entry.tasks || []) {
+              timelineData.assignments.push(task);
+            }
+          }
+        } else if (timelineData.assignments && timelineData.assignments.length > 0) {
+          // Se abbiamo solo assignments flat, NON facciamo nulla qui
+          // La riorganizzazione avverrà dopo l'inserimento
         }
       } catch (error) {
         console.log(`File timeline non trovato per ${workDate}, creazione nuovo file`);
@@ -265,13 +283,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Rimuovi l'assegnazione
       const normalizedLogisticCode = String(logisticCode);
       const normalizedTaskId = String(taskId);
-      
+
       const initialLength = timelineData.assignments.length;
       timelineData.assignments = timelineData.assignments.filter((a: any) => 
         String(a.logistic_code || a.logisticCode) !== normalizedLogisticCode &&
         String(a.task_id || a.taskId) !== normalizedTaskId
       );
-      
+
       const removed = initialLength - timelineData.assignments.length;
       console.log(`Rimossi ${removed} assignment per task ${taskId} / logistic ${logisticCode}`);
 
@@ -297,7 +315,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       timelineData.assignments = Array.from(assignmentsByCleanerId.values()).flat();
 
       await fs.writeFile(timelineAssignmentsPath, JSON.stringify(timelineData, null, 2));
-      
+
       // Riorganizza il file per cleaner
       await reorganizeTimelineByCleaners(timelineAssignmentsPath, timelineData);
 
@@ -321,6 +339,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       try {
         const existingData = await fs.readFile(timelineAssignmentsPath, 'utf8');
         assignmentsData = JSON.parse(existingData);
+        // Supporta sia struttura per cleaner che flat
+        if (assignmentsData.cleaners) {
+          // Estrai assignments dalla struttura per cleaner
+          assignmentsData.assignments = [];
+          for (const cleaner_entry of assignmentsData.cleaners) {
+            for (const task of cleaner_entry.tasks || []) {
+              assignmentsData.assignments.push(task);
+            }
+          }
+        } else if (assignmentsData.assignments && assignmentsData.assignments.length > 0) {
+          // Se abbiamo solo assignments flat, NON facciamo nulla qui
+          // La riorganizzazione avverrà dopo l'inserimento
+        }
       } catch (error) {
         // File non esiste, usa struttura vuota
       }
@@ -1158,9 +1189,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const month = String(dateObj.getMonth() + 1).padStart(2, '0');
         const year = dateObj.getFullYear();
         const dateFolder = `${day}-${month}-${year}`;
-        
+
         let eoJson = await loadAssignmentFromStorage(`${dateFolder}/early_out_assignments.json`);
-        
+
         // Fallback: leggi dal file locale se non trovato su Object Storage
         if (!eoJson) {
           const eoData = await fs.readFile(eoAssignmentsPath, 'utf8');
@@ -1217,9 +1248,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const month = String(dateObj.getMonth() + 1).padStart(2, '0');
         const year = dateObj.getFullYear();
         const dateFolder = `${day}-${month}-${year}`;
-        
+
         let hpJson = await loadAssignmentFromStorage(`${dateFolder}/high_priority_assignments.json`);
-        
+
         if (!hpJson) {
           const hpData = await fs.readFile(hpAssignmentsPath, 'utf8');
           hpJson = JSON.parse(hpData);
@@ -1278,9 +1309,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const month = String(dateObj.getMonth() + 1).padStart(2, '0');
         const year = dateObj.getFullYear();
         const dateFolder = `${day}-${month}-${year}`;
-        
+
         let lpJson = await loadAssignmentFromStorage(`${dateFolder}/low_priority_assignments.json`);
-        
+
         if (!lpJson) {
           const lpData = await fs.readFile(lpAssignmentsPath, 'utf8');
           lpJson = JSON.parse(lpData);
@@ -1411,7 +1442,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/load-confirmed-assignments/:date", async (req, res) => {
     try {
       const { date } = req.params;
-      
+
       // Prima prova a caricare dal database MySQL
       let dbAssignments: any[] = [];
       try {
@@ -1427,13 +1458,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
           `SELECT * FROM app_wass_assignments WHERE DATE(date) = ? ORDER BY cleaner_id, sequence`,
           [date]
         );
-        
+
         dbAssignments = rows as any[];
         await connection.end();
 
         if (dbAssignments.length > 0) {
           console.log(`✅ Caricate ${dbAssignments.length} assegnazioni dal database MySQL per ${date}`);
-          
+
           // Converti dal formato DB al formato frontend
           const assignments = dbAssignments.map((row: any) => ({
             task_id: row.task_id,
