@@ -778,6 +778,10 @@ def main():
         with open(temp_file, 'w', encoding='utf-8') as f:
             json.dump(output, f, ensure_ascii=False, indent=2)
 
+        # Ottieni il percorso della directory workspace
+        workspace_dir = Path(__file__).resolve().parents[3]
+        upload_script_path = workspace_dir / 'upload_storage_lp.js'
+        
         node_script = f"""
 const {{ Client }} = require('@replit/object-storage');
 const fs = require('fs');
@@ -793,15 +797,11 @@ const client = new Client();
   }}
 }})();
 """
-        upload_script_path = '/tmp/upload_storage_lp.js'
         with open(upload_script_path, 'w') as f:
             f.write(node_script)
-
-        # Ottieni il percorso della directory workspace
-        workspace_dir = Path(__file__).resolve().parents[3]
         
         result = subprocess.run(
-            ['node', upload_script_path],
+            ['node', str(upload_script_path)],
             cwd=str(workspace_dir),
             capture_output=True,
             text=True,
