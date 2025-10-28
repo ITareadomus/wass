@@ -810,7 +810,8 @@ def main():
         for task in cleaner_entry.get("tasks", []):
             assigned_codes.add(str(task["logistic_code"]))
 
-    for assignment in existing_assignments:
+    existing_assignments = [
+        assignment for assignment in existing_assignments
         if str(assignment.get("logistic_code")) not in assigned_codes
     ]
 
