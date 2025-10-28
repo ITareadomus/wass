@@ -4,18 +4,37 @@
   "cleaners_assignments": [
     {
       "cleaner": {
-        "id": 24,
-        "name": "HUSSAIN",
-        "lastname": "SYED SHUJIAHAT",
-        "role": "Standard",
+        "id": 829,
+        "name": "MUSTAPHA",
+        "lastname": "BAH",
+        "role": "Premium",
         "premium": false
       },
       "assignment_type": "manual_drag",
       "tasks": [
         {
-          "task_id": 217967,
-          "logistic_code": 1649,
-          "sequence": 1
+          "premium": true,
+          "address": "Viale Majno 23",
+          "lat": "45.47048",
+          "lng": "9.2052883",
+          "checkin_date": "2025-10-29",
+          "checkout_date": "2025-10-29",
+          "checkin_time": "15:00",
+          "checkout_time": null,
+          "pax_in": 4,
+          "pax_out": 5,
+          "operation_id": 2,
+          "confirmed_operation": false,
+          "type_apt": "E",
+          "alias": "HACCA",
+          "customer_name": "HACCA SRL",
+          "reasons": [
+            "manually_moved_to_timeline"
+          ],
+          "sequence": 1,
+          "start_time": null,
+          "end_time": null,
+          "travel_time": 0
         }
       ]
     }
@@ -23,6 +42,6 @@
   "meta": {
     "total_cleaners": 1,
     "total_tasks": 1,
-    "last_updated": "2025-10-28T14:45:40.562Z"
+    "last_updated": "2025-10-28T14:48:33.492Z"
   }
 }
