@@ -1,8 +1,7 @@
-
 import json
 from datetime import datetime
 from pathlib import Path
-import mysql.connector
+import mysql.connector # Importa il connettore MySQL
 
 # --- CONFIGURAZIONE DATABASE ---
 DB_CONFIG = {
@@ -11,13 +10,20 @@ DB_CONFIG = {
     "password": "ed329a875c6c4ebdf4e87e2bbe53a15771b5844ef6606dde",
     "database": "adamdb"
 }
+# --- FINE CONFIGURAZIONE DATABASE ---
+
 
 # --- PATH ---
+# Use a project-relative data folder so the script works on Windows and UNIX
+# BASE_DIR points to client/public/data (from workspace root)
 BASE_DIR = Path("client/public/data")
 INPUT_DIR = BASE_DIR / "input"
 OUTPUT_DIR = BASE_DIR / "output"
 INPUT_PATH = INPUT_DIR / "daily_tasks.json"
 SETTINGS_PATH = INPUT_DIR / "settings.json"
+EO_JSON = OUTPUT_DIR / "early_out.json"
+HP_JSON = OUTPUT_DIR / "high_priority.json"
+LP_JSON = OUTPUT_DIR / "low_priority.json"
 DEBUG_JSON = OUTPUT_DIR / "extract_all_debug.json"
 
 # Crea le directory se non esistono
@@ -25,55 +31,34 @@ INPUT_DIR.mkdir(parents=True, exist_ok=True)
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
 # --- DATABASE FUNCTIONS ---
-def save_container_to_db(tasks, priority, work_date):
-    """Salva i task di un container nel database"""
+def update_task_priority_in_db(tasks, priority, work_date):
+    """Aggiorna la priority e i reasons dei task già presenti in task_containers"""
     try:
         conn = mysql.connector.connect(**DB_CONFIG)
         cur = conn.cursor()
 
-        # Elimina i vecchi task per questa data e priorità
-        cur.execute("""
-            DELETE FROM task_containers 
-            WHERE date = %s AND priority = %s
-        """, (work_date, priority))
-
-        # Inserisci i nuovi task
-        if tasks:
-            insert_query = """
-                INSERT INTO task_containers (
-                    task_id, logistic_code, date, priority, client_id,
-                    address, lat, lng, cleaning_time, checkin_date, checkout_date,
-                    checkin_time, checkout_time, premium, straordinaria, reasons
-                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-            """
-
-            for task in tasks:
-                cur.execute(insert_query, (
-                    task.get("task_id"),
-                    task.get("logistic_code"),
-                    work_date,
-                    priority,
-                    task.get("client_id"),
-                    task.get("address"),
-                    task.get("lat"),
-                    task.get("lng"),
-                    task.get("cleaning_time"),
-                    task.get("checkin_date"),
-                    task.get("checkout_date"),
-                    task.get("checkin_time"),
-                    task.get("checkout_time"),
-                    1 if task.get("premium") else 0,
-                    1 if task.get("straordinaria") else 0,
-                    json.dumps(task.get("reasons", []))
-                ))
+        updated_count = 0
+        for task in tasks:
+            # UPDATE della priority e reasons per task_id
+            cur.execute("""
+                UPDATE task_containers 
+                SET priority = %s, reasons = %s
+                WHERE date = %s AND task_id = %s
+            """, (
+                priority,
+                json.dumps(task.get("reasons", [])),
+                work_date,
+                task.get("task_id")
+            ))
+            updated_count += cur.rowcount
 
         conn.commit()
         cur.close()
         conn.close()
-        print(f"✅ Salvati {len(tasks)} task in task_containers (priority={priority})")
+        print(f"✅ Aggiornati {updated_count} task a priority={priority}")
         return True
     except Exception as e:
-        print(f"❌ Errore salvando container {priority} nel DB: {e}")
+        print(f"❌ Errore aggiornando priority {priority} nel DB: {e}")
         return False
 
 
@@ -184,7 +169,7 @@ for task in tasks_list:
         "task_id": task_id,
         "client_id": client_id,
         "premium": is_premium,
-        "final_class": final_class,
+        "final_class": final_class,  # verrà aggiornato dopo deduplica
         "reasons": eo_reasons if eo_reasons else (hp_reasons if hp_reasons else ["not_eo", "not_hp"])
     })
 
@@ -223,18 +208,33 @@ for entry in audit_log:
     else:
         entry["final_class"] = "LP"
 
-# --- Salva i container nel database ---
-save_container_to_db(early_out_selected, "early_out", date_key)
-save_container_to_db(high_priority_selected, "high_priority", date_key)
-save_container_to_db(low_priority_selected, "low_priority", date_key)
+# --- 5) Salva i container nel database ---
+# Prepara i dati per la funzione save_container_to_db
+eo_output = {
+    "early_out_tasks": early_out_selected,
+    "total_apartments": len(early_out_selected),
+    "current_date": date_key
+}
+hp_output = {
+    "high_priority_tasks": high_priority_selected,
+    "total_apartments": len(high_priority_selected),
+    "current_date": date_key
+}
+lp_output = {
+    "low_priority_tasks": low_priority_selected,
+    "total_apartments": len(low_priority_selected),
+    "current_date": date_key
+}
+
+# Aggiorna le priority nel database (i task sono già stati inseriti da task_extractor)
+update_task_priority_in_db(eo_output["early_out_tasks"], "early_out", date_key)
+update_task_priority_in_db(hp_output["high_priority_tasks"], "high_priority", date_key)
+update_task_priority_in_db(lp_output["low_priority_tasks"], "low_priority", date_key)
 
 # Scrivi solo il debug in JSON
 with open(DEBUG_JSON, "w", encoding="utf-8") as f:
     json.dump({"audit": audit_log}, f, indent=2, ensure_ascii=False)
 
 print(f"✅ Container salvati nel database per la data {date_key}")
-print(f"   - Early Out: {len(early_out_selected)} task")
-print(f"   - High Priority: {len(high_priority_selected)} task")
-print(f"   - Low Priority: {len(low_priority_selected)} task")
-print(f"Generato debug: {DEBUG_JSON}")
+print(f"Generato:\n- {DEBUG_JSON}")
 print(f"Strategia deduplica EO/HP: {dedupe_strategy}")
