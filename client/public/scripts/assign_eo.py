@@ -614,90 +614,75 @@ def main():
     timeline_dir.mkdir(parents=True, exist_ok=True)
     timeline_assignments_path = timeline_dir / f"{ref_date}.json"
 
-    # Estrai i logistic codes delle task assegnate per poterle filtrare dal file generale
-    assigned_codes_for_timeline_output = set()
+    timeline_data = {"assignments": [], "current_date": ref_date}
+
+    if timeline_assignments_path.exists():
+        try:
+            timeline_data = json.loads(timeline_assignments_path.read_text(encoding="utf-8"))
+            if "current_date" not in timeline_data:
+                timeline_data["current_date"] = ref_date
+        except json.JSONDecodeError:
+            print(f"Attenzione: il file {timeline_assignments_path} è corrotto o vuoto. Verrà sovrascritto.")
+            timeline_data = {"assignments": [], "current_date": ref_date}
+        except Exception as e:
+            print(f"Errore durante la lettura di {timeline_assignments_path}: {e}. Verrà sovrascritto.")
+            timeline_data = {"assignments": [], "current_date": ref_date}
+
+    # Rimuovi vecchie assegnazioni EO dal file timeline_assignments/{date}.json
+    assigned_logistic_codes_from_output = set()
     for cleaner_entry in output.get("early_out_tasks_assigned", []):
         for task in cleaner_entry.get("tasks", []):
-            assigned_codes_for_timeline_output.add(str(task["logistic_code"]))
+            assigned_logistic_codes_from_output.add(str(task["logistic_code"]))
 
-    # Salva nel file generale timeline_assignments.json (SOLO struttura cleaners)
-    general_timeline_path = OUTPUT_ASSIGN.parent / "timeline_assignments.json"
+    # Filtra le assegnazioni esistenti nel file timeline per rimuovere quelle EO che ora sono nel DB
+    timeline_data["assignments"] = [
+        a for a in timeline_data.get("assignments", [])
+        if a.get("assignment_type") != "early_out" or str(a.get("logistic_code")) not in assigned_logistic_codes_from_output
+    ]
 
-    # Riorganizza per cleaner
-    from collections import defaultdict
-    cleaners_map = defaultdict(list)
-
-    # Carica i dati dei cleaner
-    selected_cleaners_path = Path(__file__).parent.parent / "data" / "cleaners" / "selected_cleaners.json"
-    cleaners_info = {}
-    if selected_cleaners_path.exists():
-        cleaners_data = json.loads(selected_cleaners_path.read_text(encoding="utf-8"))
-        for cleaner in cleaners_data.get("cleaners", []):
-            cleaners_info[cleaner["id"]] = cleaner
-
-    # Carica il file generale esistente per preservare altre assegnazioni
-    general_timeline_data = {"cleaners": [], "current_date": ref_date, "scheduleVersion": 1}
-    if general_timeline_path.exists():
-        try:
-            existing_data = json.loads(general_timeline_path.read_text(encoding="utf-8"))
-            general_timeline_data["scheduleVersion"] = existing_data.get("scheduleVersion", 1)
-
-            # Estrai assignments da struttura cleaners o flat
-            existing_assignments = []
-            if "cleaners" in existing_data:
-                for cleaner_entry in existing_data.get("cleaners", []):
-                    for task in cleaner_entry.get("tasks", []):
-                        existing_assignments.append(task)
-            elif "assignments" in existing_data:
-                existing_assignments = existing_data.get("assignments", [])
-
-            # Filtra via le vecchie EO
-            for assignment in existing_assignments:
-                if assignment.get("assignment_type") != "early_out" or str(assignment.get("logistic_code")) not in assigned_codes_for_timeline_output:
-                    cleaner_id = assignment.get("cleanerId")
-                    if cleaner_id:
-                        cleaners_map[cleaner_id].append(assignment)
-        except:
-            pass
-
-    # Aggiungi le nuove assegnazioni EO
-    for cleaner_entry in output["early_out_tasks_assigned"]:
+    # Aggiungi nuove assegnazioni EO (che ora sono nel DB) al file timeline_assignments/{date}.json
+    # Nota: questo file conterrà solo le assegnazioni EO generate *oggi*.
+    # Se vuoi un file che aggreghi tutto, dovrai leggere il DB o un file generale.
+    for cleaner_entry in output.get("early_out_tasks_assigned", []):
         cleaner_id = cleaner_entry["cleaner"]["id"]
         for task in cleaner_entry.get("tasks", []):
-            cleaners_map[cleaner_id].append({
+            timeline_data["assignments"].append({
                 "task_id": task["task_id"],
                 "logistic_code": str(task["logistic_code"]),
                 "cleanerId": cleaner_id,
                 "assignment_type": "early_out",
-                "sequence": task["sequence"],
-                "address": task["address"],
-                "lat": task["lat"],
-                "lng": task["lng"],
-                "premium": task["premium"],
-                "cleaning_time": task["cleaning_time"],
-                "start_time": task["start_time"],
-                "end_time": task["end_time"],
-                "travel_time": task["travel_time"],
-                "followup": task["followup"]
+                "sequence": task.get("sequence", 0),
+                "address": task.get("address"),
+                "lat": task.get("lat"),
+                "lng": task.get("lng"),
+                "premium": task.get("premium"),
+                "cleaning_time": task.get("cleaning_time"),
+                "start_time": task.get("start_time"),
+                "end_time": task.get("end_time"),
+                "travel_time": task.get("travel_time", 0),
+                "followup": task.get("followup", False)
             })
 
-    # Costruisci struttura cleaners
-    cleaners_list = []
-    for cleaner_id, tasks in sorted(cleaners_map.items()):
-        tasks.sort(key=lambda t: t.get("sequence", 0))
-        cleaner_info = cleaners_info.get(cleaner_id, {})
-        cleaners_list.append({
-            "cleaner": {
-                "id": cleaner_id,
-                "name": cleaner_info.get("name", ""),
-                "lastname": cleaner_info.get("lastname", ""),
-                "role": cleaner_info.get("role", "Standard")
-            },
-            "tasks": tasks
-        })
+    # Scrivi immediatamente il file aggiornato per la data specifica
+    try:
+        timeline_assignments_path.write_text(json.dumps(timeline_data, ensure_ascii=False, indent=2), encoding="utf-8")
+        print(f"✅ Timeline per {ref_date} aggiornata: {timeline_assignments_path}")
+        print(f"   - Assegnazioni EO nel file: {len([a for a in timeline_data['assignments'] if a.get('assignment_type') == 'early_out'])}")
+        # Se ci fossero altre tipologie di assignment nel file, potresti contare anche quelle
+        # print(f"   - Assegnazioni HP nel file: {len([a for a in timeline_data['assignments'] if a.get('assignment_type') == 'high_priority'])}")
+        print(f"   - Totale assegnazioni nel file: {len(timeline_data['assignments'])}")
+    except Exception as e:
+        print(f"Errore durante la scrittura del file {timeline_assignments_path}: {e}")
 
-    general_timeline_data["cleaners"] = cleaners_list
-    general_timeline_path.write_text(json.dumps(general_timeline_data, ensure_ascii=False, indent=2), encoding="utf-8")
+    # Aggiorna anche il file generale timeline_assignments.json
+    # Questo file conterrà le assegnazioni più recenti per ogni data gestita, o un aggregato se la logica cambia.
+    # Attualmente, sovrascrive con il contenuto del file della data specifica.
+    general_timeline_path = OUTPUT_ASSIGN.parent / "timeline_assignments.json"
+    try:
+        general_timeline_path.write_text(json.dumps(timeline_data, ensure_ascii=False, indent=2), encoding="utf-8")
+        print(f"✅ Aggiornato anche il file generale: {general_timeline_path}")
+    except Exception as e:
+        print(f"Errore durante la scrittura del file {general_timeline_path}: {e}")
 
 
 if __name__ == "__main__":
