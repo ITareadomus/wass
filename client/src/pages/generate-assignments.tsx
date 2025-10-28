@@ -433,10 +433,21 @@ export default function GenerateAssignments() {
   const saveTimelineAssignment = async (taskId: string, cleanerId: number, logisticCode?: string, dropIndex?: number) => {
     try {
       const dateStr = format(selectedDate, "yyyy-MM-dd");
+      
+      // Trova il task completo dai containers
+      const task = allTasksWithAssignments.find(t => t.id === taskId);
+      
       const response = await fetch('/api/save-timeline-assignment', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ taskId, cleanerId, logisticCode, date: dateStr, dropIndex }),
+        body: JSON.stringify({ 
+          taskId, 
+          cleanerId, 
+          logisticCode, 
+          date: dateStr, 
+          dropIndex,
+          taskData: task // Passa tutti i dati del task
+        }),
       });
       if (!response.ok) {
         console.error('Errore nel salvataggio dell\'assegnazione nella timeline');
