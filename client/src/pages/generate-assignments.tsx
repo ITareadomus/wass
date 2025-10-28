@@ -727,6 +727,22 @@ export default function GenerateAssignments() {
     }
   };
 
+  // Funzione per caricare i container dal database
+  const loadContainerFromDB = async (priority: string, date: string) => {
+    try {
+      const response = await fetch(`/api/container/${priority}/${date}`);
+      if (!response.ok) {
+        console.error(`Errore nel caricamento container ${priority}`);
+        return [];
+      }
+      const data = await response.json();
+      return data[`${priority}_tasks`] || [];
+    } catch (error) {
+      console.error(`Errore nel caricamento container ${priority}:`, error);
+      return [];
+    }
+  };
+
   const updateTaskJson = async (taskId: string, logisticCode: string | undefined, fromContainer: string | null, toContainer: string | null) => {
     if (!logisticCode || !fromContainer || !toContainer) {
       console.warn('Missing required parameters for updateTaskJson');

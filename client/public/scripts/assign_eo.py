@@ -22,7 +22,7 @@ DB_CONFIG = {
 # =============================
 BASE = Path(__file__).parent.parent / "data"
 
-INPUT_TASKS = BASE / "output" / "early_out.json"
+# INPUT_TASKS rimosso - ora leggiamo dal database
 INPUT_CLEANERS = BASE / "cleaners" / "selected_cleaners.json"
 OUTPUT_ASSIGN = BASE / "output" / "early_out_assignments.json" # Questo file potrebbe non essere più necessario se salviamo tutto nel DB e timeline_assignments.json
 
@@ -323,8 +323,51 @@ def load_cleaners() -> List[Cleaner]:
     return cleaners
 
 
+def load_tasks_from_db(work_date: str) -> List[Task]:
+    """Carica i task early-out dal database"""
+    try:
+        conn = mysql.connector.connect(**DB_CONFIG)
+        cur = conn.cursor(dictionary=True)
+        
+        cur.execute("""
+            SELECT * FROM task_containers 
+            WHERE priority = 'early_out' AND date = %s
+        """, (work_date,))
+        
+        rows = cur.fetchall()
+        cur.close()
+        conn.close()
+        
+        tasks: List[Task] = []
+        for row in rows:
+            tasks.append(Task(
+                task_id=str(row["task_id"]),
+                logistic_code=str(row["logistic_code"]),
+                lat=float(row["lat"]),
+                lng=float(row["lng"]),
+                cleaning_time=int(row["cleaning_time"]) if row["cleaning_time"] else 60,
+                checkout_time=hhmm_to_min("10:00"),
+                checkin_time=hhmm_to_min(row["checkin_time"]) if row["checkin_time"] else hhmm_to_min("23:59"),
+                is_premium=bool(row["premium"]),
+                address=row["address"],
+                small_equipment=False,
+                straordinaria=bool(row["straordinaria"])
+            ))
+        
+        return tasks
+    except Exception as e:
+        print(f"Errore caricamento task dal DB: {e}")
+        return []
+
 def load_tasks() -> List[Task]:
-    data = json.loads(INPUT_TASKS.read_text(encoding="utf-8"))
+    # Funzione deprecata - manteniamo per compatibilità
+    import sys
+    if len(sys.argv) > 1:
+        work_date = sys.argv[1]
+    else:
+        from datetime import datetime
+        work_date = datetime.now().strftime("%Y-%m-%d")
+    return load_tasks_from_db(work_date)
     eo_start_min = hhmm_to_min("10:00")
     tasks: List[Task] = []
     for t in data.get("early_out_tasks", []):
@@ -567,13 +610,19 @@ def save_to_database(output: Dict[str, Any], ref_date: str):
 
 # -------- Main Execution --------
 def main():
-    if not INPUT_TASKS.exists():
-        raise SystemExit(f"Missing input file: {INPUT_TASKS}")
     if not INPUT_CLEANERS.exists():
         raise SystemExit(f"Missing input file: {INPUT_CLEANERS}")
 
+    # Usa la data passata come argomento da riga di comando
+    import sys
+    if len(sys.argv) > 1:
+        ref_date = sys.argv[1]
+    else:
+        from datetime import datetime
+        ref_date = datetime.now().strftime("%Y-%m-%d")
+
     cleaners = load_cleaners()
-    tasks = load_tasks()
+    tasks = load_tasks_from_db(ref_date)
 
     print(f"📋 Caricamento dati...")
     print(f"   - Cleaner disponibili: {len(cleaners)}")
