@@ -8,22 +8,6 @@
       "sequence": 0
     },
     {
-      "task_id": 217908,
-      "logistic_code": "980",
-      "cleanerId": 132,
-      "assignment_type": "early_out",
-      "sequence": 1,
-      "address": "LARGO CORSIA DEI SERVI 11",
-      "lat": 45.4650722,
-      "lng": 9.196025,
-      "premium": true,
-      "cleaning_time": 120,
-      "start_time": "10:00",
-      "end_time": "12:00",
-      "travel_time": 0,
-      "followup": false
-    },
-    {
       "task_id": 217884,
       "logistic_code": "1153",
       "cleanerId": 24,
@@ -40,9 +24,25 @@
       "followup": false
     },
     {
+      "task_id": 217908,
+      "logistic_code": "980",
+      "cleanerId": 829,
+      "assignment_type": "early_out",
+      "sequence": 1,
+      "address": "LARGO CORSIA DEI SERVI 11",
+      "lat": 45.4650722,
+      "lng": 9.196025,
+      "premium": true,
+      "cleaning_time": 120,
+      "start_time": "10:00",
+      "end_time": "12:00",
+      "travel_time": 0,
+      "followup": false
+    },
+    {
       "task_id": 217907,
       "logistic_code": "1640",
-      "cleanerId": 596,
+      "cleanerId": 404,
       "assignment_type": "early_out",
       "sequence": 1,
       "address": "VIA EUGENIO MONTALE 12",
@@ -58,7 +58,7 @@
     {
       "task_id": 217909,
       "logistic_code": "1646",
-      "cleanerId": 404,
+      "cleanerId": 596,
       "assignment_type": "early_out",
       "sequence": 1,
       "address": "Via Matteo Bandello 4/1",
@@ -74,7 +74,7 @@
     {
       "task_id": 217910,
       "logistic_code": "1648",
-      "cleanerId": 445,
+      "cleanerId": 1045,
       "assignment_type": "early_out",
       "sequence": 1,
       "address": "via Isabella d'Aragona 2",
@@ -90,7 +90,7 @@
     {
       "task_id": 217927,
       "logistic_code": "1009",
-      "cleanerId": 937,
+      "cleanerId": 1046,
       "assignment_type": "early_out",
       "sequence": 1,
       "address": "Via Fabio Filzi, 45",
@@ -106,7 +106,7 @@
     {
       "task_id": 217930,
       "logistic_code": "1063",
-      "cleanerId": 1045,
+      "cleanerId": 132,
       "assignment_type": "early_out",
       "sequence": 1,
       "address": "VIA ORESTE SALOMONE, 51",
@@ -122,7 +122,7 @@
     {
       "task_id": 217931,
       "logistic_code": "1472",
-      "cleanerId": 495,
+      "cleanerId": 722,
       "assignment_type": "early_out",
       "sequence": 1,
       "address": "via Voghera 9/A",
@@ -138,7 +138,7 @@
     {
       "task_id": 217932,
       "logistic_code": "1623",
-      "cleanerId": 771,
+      "cleanerId": 937,
       "assignment_type": "early_out",
       "sequence": 1,
       "address": "via Principe Eugenio 15",
@@ -154,7 +154,7 @@
     {
       "task_id": 217933,
       "logistic_code": "1629",
-      "cleanerId": 1054,
+      "cleanerId": 1060,
       "assignment_type": "early_out",
       "sequence": 1,
       "address": "via Bianca Ceva, 32 lotto E",
@@ -170,7 +170,7 @@
     {
       "task_id": 217934,
       "logistic_code": "1543",
-      "cleanerId": 249,
+      "cleanerId": 785,
       "assignment_type": "early_out",
       "sequence": 1,
       "address": "via Forcella 11",
@@ -186,7 +186,7 @@
     {
       "task_id": 217935,
       "logistic_code": "1571",
-      "cleanerId": 785,
+      "cleanerId": 1031,
       "assignment_type": "early_out",
       "sequence": 1,
       "address": "VIALE MONTENERO, 23",
@@ -200,41 +200,9 @@
       "followup": false
     },
     {
-      "task_id": 218062,
-      "logistic_code": "1537",
-      "cleanerId": 132,
-      "assignment_type": "high_priority",
-      "sequence": 2,
-      "address": "Via dei Piatti, 4 20123 (MI)",
-      "lat": 45.460795,
-      "lng": 9.1850985,
-      "premium": true,
-      "cleaning_time": 150,
-      "start_time": "12:17",
-      "end_time": "14:47",
-      "travel_time": 18,
-      "followup": true
-    },
-    {
-      "task_id": 218059,
-      "logistic_code": "1101",
-      "cleanerId": 937,
-      "assignment_type": "high_priority",
-      "sequence": 2,
-      "address": "Via Paolo Sarpi, 26, 20154 (MI)",
-      "lat": 45.481556,
-      "lng": 9.1767745,
-      "premium": true,
-      "cleaning_time": 270,
-      "start_time": "11:24",
-      "end_time": "15:54",
-      "travel_time": 25,
-      "followup": true
-    },
-    {
       "task_id": 218060,
       "logistic_code": "1090",
-      "cleanerId": 495,
+      "cleanerId": 722,
       "assignment_type": "high_priority",
       "sequence": 2,
       "address": "via Caminadella 13",
@@ -250,7 +218,7 @@
     {
       "task_id": 217996,
       "logistic_code": "1129",
-      "cleanerId": 1031,
+      "cleanerId": 1054,
       "assignment_type": "high_priority",
       "sequence": 1,
       "address": "VIA SAVONA, 112",
@@ -266,7 +234,7 @@
     {
       "task_id": 217920,
       "logistic_code": "1602",
-      "cleanerId": 722,
+      "cleanerId": 495,
       "assignment_type": "high_priority",
       "sequence": 1,
       "address": "VIA BRERA 17",
@@ -276,6 +244,22 @@
       "cleaning_time": 180,
       "start_time": "11:00",
       "end_time": "14:00",
+      "travel_time": 0,
+      "followup": false
+    },
+    {
+      "task_id": 218059,
+      "logistic_code": "1101",
+      "cleanerId": 249,
+      "assignment_type": "high_priority",
+      "sequence": 1,
+      "address": "Via Paolo Sarpi, 26, 20154 (MI)",
+      "lat": 45.481556,
+      "lng": 9.1767745,
+      "premium": true,
+      "cleaning_time": 270,
+      "start_time": "11:00",
+      "end_time": "15:30",
       "travel_time": 0,
       "followup": false
     }
