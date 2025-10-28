@@ -4,42 +4,6 @@
   "cleaners_assignments": [
     {
       "cleaner": {
-        "id": 829,
-        "name": "MUSTAPHA",
-        "lastname": "BAH",
-        "role": "Premium",
-        "premium": false
-      },
-      "assignment_type": "manual_drag",
-      "tasks": [
-        {
-          "premium": true,
-          "address": "Viale Majno 23",
-          "lat": "45.47048",
-          "lng": "9.2052883",
-          "checkin_date": "2025-10-29",
-          "checkout_date": "2025-10-29",
-          "checkin_time": "15:00",
-          "checkout_time": null,
-          "pax_in": 4,
-          "pax_out": 5,
-          "operation_id": 2,
-          "confirmed_operation": false,
-          "type_apt": "E",
-          "alias": "HACCA",
-          "customer_name": "HACCA SRL",
-          "reasons": [
-            "manually_moved_to_timeline"
-          ],
-          "sequence": 1,
-          "start_time": null,
-          "end_time": null,
-          "travel_time": 0
-        }
-      ]
-    },
-    {
-      "cleaner": {
         "id": 24,
         "name": "HUSSAIN",
         "lastname": "SYED SHUJIAHAT",
@@ -49,57 +13,21 @@
       "assignment_type": "manual_drag",
       "tasks": [
         {
-          "premium": true,
-          "address": "VIA DELL'ANNUNCIATA 10",
-          "lat": "45.4725608",
-          "lng": "9.1933648",
-          "checkin_date": "2025-10-29",
-          "checkout_date": "2025-10-29",
-          "checkin_time": "15:00",
-          "checkout_time": null,
-          "pax_in": 4,
-          "pax_out": 3,
-          "operation_id": 2,
-          "confirmed_operation": false,
-          "type_apt": "C",
-          "alias": "HACCA",
-          "customer_name": "HACCA SRL",
-          "reasons": [
-            "manually_moved_to_timeline"
-          ],
-          "sequence": 1,
-          "start_time": null,
-          "end_time": null,
-          "travel_time": 0
-        }
-      ]
-    },
-    {
-      "cleaner": {
-        "id": 596,
-        "name": "TRACY",
-        "lastname": "OKE",
-        "role": "Premium",
-        "premium": false
-      },
-      "assignment_type": "manual_drag",
-      "tasks": [
-        {
-          "premium": true,
-          "address": "Via Santa Croce,8",
-          "lat": "45.4560183",
-          "lng": "9.1835278",
+          "premium": false,
+          "address": "VIA VOGHERA, 4",
+          "lat": "45.454632",
+          "lng": "9.168536",
           "checkin_date": "2025-10-29",
           "checkout_date": "2025-10-29",
           "checkin_time": null,
-          "checkout_time": null,
-          "pax_in": 6,
-          "pax_out": 4,
+          "checkout_time": "09:30",
+          "pax_in": 1,
+          "pax_out": 0,
           "operation_id": 2,
-          "confirmed_operation": false,
-          "type_apt": "E",
-          "alias": "TBR",
-          "customer_name": "THE BEST RENT S.r.l.",
+          "confirmed_operation": true,
+          "type_apt": "A",
+          "alias": "EXPRDS",
+          "customer_name": "EXPERIENCE DESIGN BED & SHOW",
           "reasons": [
             "manually_moved_to_timeline"
           ],
@@ -112,8 +40,8 @@
     }
   ],
   "meta": {
-    "total_cleaners": 3,
-    "total_tasks": 3,
-    "last_updated": "2025-10-28T14:54:44.088Z"
+    "total_cleaners": 1,
+    "total_tasks": 1,
+    "last_updated": "2025-10-28T14:58:48.973Z"
   }
 }
