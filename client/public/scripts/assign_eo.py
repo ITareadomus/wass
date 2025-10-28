@@ -587,6 +587,38 @@ def main():
     print(f"   - Cleaner con assegnazioni LP: {lp_count}")
     print(f"   - Totale task: {timeline_data['meta']['total_tasks']}")
 
+    # SPOSTAMENTO: Rimuovi le task assegnate da containers.json
+    containers_path = INPUT_CONTAINERS
+    if containers_path.exists():
+        containers_data = json.loads(containers_path.read_text(encoding="utf-8"))
+        
+        # Trova tutti i logistic_code assegnati
+        assigned_codes = set()
+        for cleaner_entry in output["early_out_tasks_assigned"]:
+            for task in cleaner_entry.get("tasks", []):
+                assigned_codes.add(int(task["logistic_code"]))
+        
+        # Rimuovi le task assegnate dal container early_out
+        if "containers" in containers_data and "early_out" in containers_data["containers"]:
+            original_count = len(containers_data["containers"]["early_out"]["tasks"])
+            containers_data["containers"]["early_out"]["tasks"] = [
+                t for t in containers_data["containers"]["early_out"]["tasks"]
+                if int(t.get("logistic_code", 0)) not in assigned_codes
+            ]
+            new_count = len(containers_data["containers"]["early_out"]["tasks"])
+            containers_data["containers"]["early_out"]["count"] = new_count
+            
+            # Aggiorna summary
+            containers_data["summary"]["early_out"] = new_count
+            containers_data["summary"]["total_tasks"] = (
+                containers_data["summary"].get("total_tasks", 0) - (original_count - new_count)
+            )
+            
+            # Scrivi containers.json aggiornato
+            containers_path.write_text(json.dumps(containers_data, ensure_ascii=False, indent=2), encoding="utf-8")
+            print(f"✅ Rimosse {original_count - new_count} task da containers.json (early_out)")
+            print(f"   - Task rimaste in early_out: {new_count}")
+
 
 if __name__ == "__main__":
     main()

@@ -314,9 +314,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { taskId, logisticCode, fromContainer: sourceContainer, toContainer: destContainer } = req.body;
 
       const containersPath = path.join(process.cwd(), 'client/public/data/output/containers.json');
-      const earlyOutAssignmentsPath = path.join(process.cwd(), 'client/public/data/output/early_out_assignments.json');
+      const timelinePath = path.join(process.cwd(), 'client/public/data/output/timeline.json');
 
-      // Carica il file containers.json
+      // Carica containers.json
       let containersData: any = {
         containers: {
           early_out: { tasks: [], count: 0 },
@@ -328,100 +328,126 @@ export async function registerRoutes(app: Express): Promise<Server> {
       try {
         const existingData = await fs.readFile(containersPath, 'utf8');
         containersData = JSON.parse(existingData);
-        // Assicurati che la struttura sia completa anche se il file è parziale o corrotto
-        containersData.containers = containersData.containers || {
-          early_out: { tasks: [], count: 0 },
-          high_priority: { tasks: [], count: 0 },
-          low_priority: { tasks: [], count: 0 }
-        };
-        containersData.summary = containersData.summary || { total_tasks: 0, early_out: 0, high_priority: 0, low_priority: 0 };
       } catch (error) {
-        console.log('File containers.json non trovato o corrotto, creazione di una nuova struttura.');
+        console.log('File containers.json non trovato, creazione di una nuova struttura.');
       }
 
+      // Carica timeline.json
+      let timelineData: any = {
+        cleaners_assignments: [],
+        current_date: format(new Date(), 'yyyy-MM-dd'),
+        meta: { total_cleaners: 0, total_tasks: 0, last_updated: new Date().toISOString() }
+      };
+      try {
+        const existingData = await fs.readFile(timelinePath, 'utf8');
+        timelineData = JSON.parse(existingData);
+      } catch (error) {
+        console.log('File timeline.json non trovato, creazione di una nuova struttura.');
+      }
 
-      // Trova e rimuovi il task dal container di origine
       let taskToMove = null;
 
-      if (sourceContainer && containersData.containers?.[sourceContainer]) {
-        taskToMove = containersData.containers[sourceContainer].tasks.find((t: any) => String(t.task_id) === taskId || String(t.logistic_code) === logisticCode);
-        containersData.containers[sourceContainer].tasks = containersData.containers[sourceContainer].tasks.filter((t: any) => String(t.task_id) !== taskId && String(t.logistic_code) !== logisticCode);
-        containersData.containers[sourceContainer].count = containersData.containers[sourceContainer].tasks.length;
-      }
-
-      if (!taskToMove) {
-        return res.status(404).json({ success: false, error: 'Task non trovato nel container di origine' });
-      }
-
-      // Se la destinazione è la timeline, solo rimuovi dal container di origine
-      if (destContainer && destContainer.startsWith('timeline-')) {
-        await fs.writeFile(containersPath, JSON.stringify(containersData, null, 2));
-        res.json({ success: true, message: "Task rimosso dal container" });
+      // CASO 1: Spostamento DA timeline A containers
+      if (sourceContainer && sourceContainer.startsWith('timeline-')) {
+        // Trova la task in timeline e rimuovila
+        for (const cleanerEntry of timelineData.cleaners_assignments) {
+          const taskIndex = cleanerEntry.tasks.findIndex((t: any) => 
+            String(t.task_id) === String(taskId) || String(t.logistic_code) === String(logisticCode)
+          );
+          if (taskIndex !== -1) {
+            taskToMove = cleanerEntry.tasks[taskIndex];
+            cleanerEntry.tasks.splice(taskIndex, 1);
+            
+            // Rimuovi campi specifici della timeline
+            delete taskToMove.sequence;
+            delete taskToMove.start_time;
+            delete taskToMove.end_time;
+            delete taskToMove.travel_time;
+            delete taskToMove.followup;
+            
+            // Aggiorna la reason
+            taskToMove.reasons = taskToMove.reasons || [];
+            if (!taskToMove.reasons.includes('manually_moved_to_container')) {
+              taskToMove.reasons.push('manually_moved_to_container');
+            }
+            
+            break;
+          }
+        }
+        
+        // Rimuovi cleaner entries vuote
+        timelineData.cleaners_assignments = timelineData.cleaners_assignments.filter(
+          (c: any) => c.tasks && c.tasks.length > 0
+        );
+        
+        // Aggiorna meta timeline
+        timelineData.meta.total_cleaners = timelineData.cleaners_assignments.length;
+        timelineData.meta.total_tasks = timelineData.cleaners_assignments.reduce(
+          (sum: number, c: any) => sum + c.tasks.length, 0
+        );
+        timelineData.meta.last_updated = new Date().toISOString();
+        
+        // Scrivi timeline aggiornata
+        await fs.writeFile(timelinePath, JSON.stringify(timelineData, null, 2));
+        
+        // Aggiungi la task al container di destinazione
+        if (destContainer && containersData.containers[destContainer]) {
+          taskToMove.priority = destContainer;
+          containersData.containers[destContainer].tasks.push(taskToMove);
+          containersData.containers[destContainer].count = containersData.containers[destContainer].tasks.length;
+          
+          // Aggiorna summary
+          containersData.summary[destContainer] = containersData.containers[destContainer].count;
+          containersData.summary.total_tasks = 
+            containersData.containers.early_out.count + 
+            containersData.containers.high_priority.count + 
+            containersData.containers.low_priority.count;
+          
+          await fs.writeFile(containersPath, JSON.stringify(containersData, null, 2));
+          console.log(`✅ Task ${logisticCode} spostata da timeline a ${destContainer}`);
+        }
+        
+        res.json({ success: true, message: "Task spostata da timeline a container" });
         return;
       }
 
-      // Aggiorna la priorità del task, se specificato
-      if (destContainer) {
-        taskToMove.priority = destContainer; // Aggiunge o aggiorna il campo priority
-      } else {
-        // Se non c'è destContainer, significa che il task è stato rimosso
-        // (es. trascinato fuori da tutti i container). Non aggiungerlo da nessuna parte.
-        console.log(`Task ${taskId}/${logisticCode} rimosso senza destinazione specificata.`);
-      }
-
-      // Aggiungi il task al container di destinazione, se specificato
-      if (destContainer && containersData.containers?.[destContainer]) {
-        containersData.containers[destContainer].tasks.push(taskToMove);
-        containersData.containers[destContainer].count = containersData.containers[destContainer].tasks.length;
-      }
-
-      // Aggiorna il summary
-      containersData.summary = {
-        total_tasks: containersData.summary.total_tasks, // Manteniamo il totale generale se presente
-        early_out: containersData.containers.early_out?.count || 0,
-        high_priority: containersData.containers.high_priority?.count || 0,
-        low_priority: containersData.containers.low_priority?.count || 0
-      };
-
-      // Scrivi il file aggiornato
-      await fs.writeFile(containersPath, JSON.stringify(containersData, null, 2));
-
-      // Se la task viene spostata nell'early-out, rimuovila da early_out_assignments
-      // in modo che non sia più considerata "già assegnata" al prossimo run dell'optimizer
-      if (destContainer === 'early-out') {
-        let earlyOutAssignmentsData: any = { early_out_tasks_assigned: [], meta: {} };
-        try {
-          const existingData = await fs.readFile(earlyOutAssignmentsPath, 'utf8');
-          earlyOutAssignmentsData = JSON.parse(existingData);
-        } catch (error) {
-          // File non esiste, usa struttura vuota
-        }
-
-        // Rimuovi la task da tutti i cleaner in early_out_tasks_assigned
-        let wasRemoved = false;
-        earlyOutAssignmentsData.early_out_tasks_assigned = earlyOutAssignmentsData.early_out_tasks_assigned.map((cleanerEntry: any) => {
-          const filteredTasks = cleanerEntry.tasks.filter((t: any) => {
-            const matchId = String(t.task_id) === String(taskId);
-            const matchCode = String(t.logistic_code) === String(logisticCode);
-            if (matchId || matchCode) {
-              wasRemoved = true;
-              console.log(`Rimossa task ${taskId}/${logisticCode} da early_out_assignments (cleaner ${cleanerEntry.cleaner.id})`);
-              return false;
-            }
-            return true;
-          });
-          return { ...cleanerEntry, tasks: filteredTasks };
-        }).filter((cleanerEntry: any) => cleanerEntry.tasks.length > 0); // Rimuovi cleaner senza task
-
-        if (wasRemoved) {
-          await fs.writeFile(earlyOutAssignmentsPath, JSON.stringify(earlyOutAssignmentsData, null, 2));
-          console.log(`✅ Task ${taskId}/${logisticCode} rimossa da early_out_assignments.json`);
+      // CASO 2: Spostamento DA containers A timeline (già gestito da save-timeline-assignment)
+      // CASO 3: Spostamento TRA containers
+      if (sourceContainer && containersData.containers[sourceContainer]) {
+        const taskIndex = containersData.containers[sourceContainer].tasks.findIndex(
+          (t: any) => String(t.task_id) === String(taskId) || String(t.logistic_code) === String(logisticCode)
+        );
+        
+        if (taskIndex !== -1) {
+          taskToMove = containersData.containers[sourceContainer].tasks[taskIndex];
+          containersData.containers[sourceContainer].tasks.splice(taskIndex, 1);
+          containersData.containers[sourceContainer].count = containersData.containers[sourceContainer].tasks.length;
+          
+          // Aggiorna la priorità e aggiungi al container di destinazione
+          if (destContainer && containersData.containers[destContainer]) {
+            taskToMove.priority = destContainer;
+            containersData.containers[destContainer].tasks.push(taskToMove);
+            containersData.containers[destContainer].count = containersData.containers[destContainer].tasks.length;
+          }
+          
+          // Aggiorna summary
+          containersData.summary = {
+            total_tasks: containersData.containers.early_out.count + 
+                        containersData.containers.high_priority.count + 
+                        containersData.containers.low_priority.count,
+            early_out: containersData.containers.early_out.count,
+            high_priority: containersData.containers.high_priority.count,
+            low_priority: containersData.containers.low_priority.count
+          };
+          
+          await fs.writeFile(containersPath, JSON.stringify(containersData, null, 2));
+          console.log(`✅ Task ${logisticCode} spostata da ${sourceContainer} a ${destContainer}`);
         }
       }
 
-      res.json({ success: true, message: "Task aggiornato con successo" });
+      res.json({ success: true, message: "Task spostata con successo" });
     } catch (error: any) {
-      console.error("Errore nell'aggiornamento del task:", error);
+      console.error("Errore nello spostamento del task:", error);
       res.status(500).json({ success: false, error: error.message });
     }
   });
