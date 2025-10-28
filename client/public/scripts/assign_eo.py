@@ -4,6 +4,17 @@ import json, math
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Tuple
 from pathlib import Path
+import mysql.connector
+
+# =============================
+# Database Configuration
+# =============================
+DB_CONFIG = {
+    "host": "localhost",
+    "user": "root",
+    "password": "",
+    "database": "wass_db" # Assicurati che questo database esista
+}
 
 # =============================
 # I/O paths
@@ -12,7 +23,7 @@ BASE = Path(__file__).parent.parent / "data"
 
 INPUT_TASKS = BASE / "output" / "early_out.json"
 INPUT_CLEANERS = BASE / "cleaners" / "selected_cleaners.json"
-OUTPUT_ASSIGN = BASE / "output" / "early_out_assignments.json"
+OUTPUT_ASSIGN = BASE / "output" / "early_out_assignments.json" # Questo file potrebbe non essere più necessario se salviamo tutto nel DB e timeline_assignments.json
 
 # =============================
 # CONFIG - REGOLE SEMPLIFICATE
@@ -458,18 +469,9 @@ def build_output(cleaners: List[Cleaner], unassigned: List[Task], original_tasks
 
     total_assigned = sum(len(c["tasks"]) for c in cleaners_with_tasks)
 
-    # Usa la data passata come argomento da riga di comando
-    import sys
-    if len(sys.argv) > 1:
-        ref_date = sys.argv[1]
-    else:
-        from datetime import datetime
-        ref_date = datetime.now().strftime("%Y-%m-%d")
-
     return {
         "early_out_tasks_assigned": cleaners_with_tasks,
         "unassigned_tasks": unassigned_list,
-        "current_date": ref_date,
         "meta": {
             "total_tasks": len(original_tasks),
             "assigned": total_assigned,
@@ -491,6 +493,80 @@ def build_output(cleaners: List[Cleaner], unassigned: List[Task], original_tasks
     }
 
 
+# -------- Database Operations --------
+def save_to_database(output: Dict[str, Any], ref_date: str):
+    try:
+        conn = mysql.connector.connect(**DB_CONFIG)
+        cursor = conn.cursor()
+
+        # Elimina eventuali assegnazioni esistenti per la data corrente per evitare duplicati
+        delete_query = "DELETE FROM app_wass_assignments WHERE DATE(assignment_datetime) = %s"
+        cursor.execute(delete_query, (ref_date,))
+        conn.commit()
+
+        assignments_to_insert = []
+        assigned_logistic_codes = set()
+
+        # Processa le assegnazioni Early-Out
+        for cleaner_entry in output.get("early_out_tasks_assigned", []):
+            cleaner_id = cleaner_entry["cleaner"]["id"]
+            for task in cleaner_entry.get("tasks", []):
+                logistic_code_str = str(task["logistic_code"])
+                assigned_logistic_codes.add(logistic_code_str)
+
+                assignments_to_insert.append((
+                    task["task_id"],
+                    logistic_code_str,
+                    cleaner_id,
+                    "early_out",
+                    task.get("sequence", 0),
+                    task.get("address"),
+                    task.get("lat"),
+                    task.get("lng"),
+                    task.get("premium"),
+                    task.get("cleaning_time"),
+                    task.get("start_time"),
+                    task.get("end_time"),
+                    task.get("travel_time", 0),
+                    task.get("followup", False),
+                    ref_date # Usa ref_date come base per assignment_datetime
+                ))
+
+        # Inserisci le nuove assegnazioni
+        if assignments_to_insert:
+            insert_query = """
+            INSERT INTO app_wass_assignments (task_id, logistic_code, cleanerId, assignment_type, sequence, address, lat, lng, premium, cleaning_time, start_time, end_time, travel_time, followup, assignment_datetime)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            """
+            cursor.executemany(insert_query, assignments_to_insert)
+            conn.commit()
+            print(f"✅ {len(assignments_to_insert)} assegnazioni salvate nel database per la data {ref_date}.")
+        else:
+            print(f"ℹ️ Nessuna nuova assegnazione Early-Out da salvare nel database per la data {ref_date}.")
+
+        # Gestisci le task non assegnate (opzionale: potresti volerle loggare o inserire con un flag specifico)
+        for task in output.get("unassigned_tasks", []):
+            logistic_code_str = str(task["logistic_code"])
+            if logistic_code_str not in assigned_logistic_codes:
+                 # Esempio: inserire come 'unassigned' nel DB, o semplicemente loggare
+                 print(f"WARNING: Task non assegnata nel DB: LogisticCode={logistic_code_str}, Reason={task.get('reason')}")
+                 # Potresti voler inserire queste nel DB con un `assignment_type` specifico tipo 'unassigned'
+                 # Esempio:
+                 # cursor.execute("""
+                 #    INSERT INTO app_wass_assignments (logistic_code, assignment_type, assignment_datetime, reason)
+                 #    VALUES (%s, %s, %s, %s)
+                 # """, (logistic_code_str, 'unassigned', ref_date, task.get('reason')))
+                 # conn.commit()
+
+    except mysql.connector.Error as err:
+        print(f"Errore database: {err}")
+    finally:
+        if conn and conn.is_connected():
+            cursor.close()
+            conn.close()
+            print("Connessione al database chiusa.")
+
+# -------- Main Execution --------
 def main():
     if not INPUT_TASKS.exists():
         raise SystemExit(f"Missing input file: {INPUT_TASKS}")
@@ -501,35 +577,36 @@ def main():
     tasks = load_tasks()
 
     print(f"📋 Caricamento dati...")
-    print(f"👥 Cleaner disponibili: {len(cleaners)}")
-    print(f"📦 Task Early-Out da assegnare: {len(tasks)}")
+    print(f"   - Cleaner disponibili: {len(cleaners)}")
+    print(f"   - Task Early-Out da assegnare: {len(tasks)}")
     print()
     print(f"🔄 Assegnazione in corso...")
 
     planners, leftovers = plan_day(tasks, cleaners)
     output = build_output(planners, leftovers, tasks)
 
+    # salva il file di output intermedio che contiene le assegnazioni, anche se la destinazione finale è il DB
     OUTPUT_ASSIGN.parent.mkdir(parents=True, exist_ok=True)
     OUTPUT_ASSIGN.write_text(json.dumps(output, ensure_ascii=False, indent=2), encoding="utf-8")
 
     print()
     print(f"✅ Assegnazione completata!")
-    print(f"   - Task assegnati: {output['meta']['assigned']}/{output['meta']['total_tasks']}")
+    print(f"   - Task assegnati (Early-Out): {output['meta']['assigned']}/{output['meta']['total_tasks']}")
     print(f"   - Cleaner utilizzati: {output['meta']['cleaners_used']}")
     print(f"   - Task non assegnati: {output['meta']['unassigned']}")
     print()
-    print(f"💾 Risultati salvati in: {OUTPUT_ASSIGN}")
+    print(f"💾 Risultati intermedi salvati in: {OUTPUT_ASSIGN}")
 
     # Usa la data passata come argomento da riga di comando
     import sys
     if len(sys.argv) > 1:
         ref_date = sys.argv[1]
-        print(f"📅 Usando data da argomento: {ref_date}")
     else:
-        # Fallback: usa la data corrente
         from datetime import datetime
         ref_date = datetime.now().strftime("%Y-%m-%d")
-        print(f"📅 Nessuna data specificata, usando: {ref_date}")
+
+    # Salva nel database MySQL
+    save_to_database(output, ref_date)
 
     # Update timeline_assignments/{date}.json
     timeline_dir = OUTPUT_ASSIGN.parent / "timeline_assignments"
@@ -543,22 +620,29 @@ def main():
             timeline_data = json.loads(timeline_assignments_path.read_text(encoding="utf-8"))
             if "current_date" not in timeline_data:
                 timeline_data["current_date"] = ref_date
-        except:
+        except json.JSONDecodeError:
+            print(f"Attenzione: il file {timeline_assignments_path} è corrotto o vuoto. Verrà sovrascritto.")
+            timeline_data = {"assignments": [], "current_date": ref_date}
+        except Exception as e:
+            print(f"Errore durante la lettura di {timeline_assignments_path}: {e}. Verrà sovrascritto.")
             timeline_data = {"assignments": [], "current_date": ref_date}
 
-    # Rimuovi vecchie assegnazioni EO
-    assigned_codes = set()
-    for cleaner_entry in output["early_out_tasks_assigned"]:
+    # Rimuovi vecchie assegnazioni EO dal file timeline_assignments/{date}.json
+    assigned_logistic_codes_from_output = set()
+    for cleaner_entry in output.get("early_out_tasks_assigned", []):
         for task in cleaner_entry.get("tasks", []):
-            assigned_codes.add(str(task["logistic_code"]))
+            assigned_logistic_codes_from_output.add(str(task["logistic_code"]))
 
+    # Filtra le assegnazioni esistenti nel file timeline per rimuovere quelle EO che ora sono nel DB
     timeline_data["assignments"] = [
         a for a in timeline_data.get("assignments", [])
-        if str(a.get("logistic_code")) not in assigned_codes
+        if a.get("assignment_type") != "early_out" or str(a.get("logistic_code")) not in assigned_logistic_codes_from_output
     ]
 
-    # Aggiungi nuove assegnazioni EO con tutti i dati del task
-    for cleaner_entry in output["early_out_tasks_assigned"]:
+    # Aggiungi nuove assegnazioni EO (che ora sono nel DB) al file timeline_assignments/{date}.json
+    # Nota: questo file conterrà solo le assegnazioni EO generate *oggi*.
+    # Se vuoi un file che aggreghi tutto, dovrai leggere il DB o un file generale.
+    for cleaner_entry in output.get("early_out_tasks_assigned", []):
         cleaner_id = cleaner_entry["cleaner"]["id"]
         for task in cleaner_entry.get("tasks", []):
             timeline_data["assignments"].append({
@@ -579,16 +663,25 @@ def main():
             })
 
     # Scrivi immediatamente il file aggiornato per la data specifica
-    timeline_assignments_path.write_text(json.dumps(timeline_data, ensure_ascii=False, indent=2), encoding="utf-8")
-    print(f"✅ Timeline aggiornata simultaneamente: {timeline_assignments_path}")
-    print(f"   - Assegnazioni EO: {len([a for a in timeline_data['assignments'] if a.get('assignment_type') == 'early_out'])}")
-    print(f"   - Assegnazioni HP: {len([a for a in timeline_data['assignments'] if a.get('assignment_type') == 'high_priority'])}")
-    print(f"   - Totale assegnazioni: {len(timeline_data['assignments'])}")
+    try:
+        timeline_assignments_path.write_text(json.dumps(timeline_data, ensure_ascii=False, indent=2), encoding="utf-8")
+        print(f"✅ Timeline per {ref_date} aggiornata: {timeline_assignments_path}")
+        print(f"   - Assegnazioni EO nel file: {len([a for a in timeline_data['assignments'] if a.get('assignment_type') == 'early_out'])}")
+        # Se ci fossero altre tipologie di assignment nel file, potresti contare anche quelle
+        # print(f"   - Assegnazioni HP nel file: {len([a for a in timeline_data['assignments'] if a.get('assignment_type') == 'high_priority'])}")
+        print(f"   - Totale assegnazioni nel file: {len(timeline_data['assignments'])}")
+    except Exception as e:
+        print(f"Errore durante la scrittura del file {timeline_assignments_path}: {e}")
 
     # Aggiorna anche il file generale timeline_assignments.json
+    # Questo file conterrà le assegnazioni più recenti per ogni data gestita, o un aggregato se la logica cambia.
+    # Attualmente, sovrascrive con il contenuto del file della data specifica.
     general_timeline_path = OUTPUT_ASSIGN.parent / "timeline_assignments.json"
-    general_timeline_path.write_text(json.dumps(timeline_data, ensure_ascii=False, indent=2), encoding="utf-8")
-    print(f"✅ Aggiornato anche: {general_timeline_path}")
+    try:
+        general_timeline_path.write_text(json.dumps(timeline_data, ensure_ascii=False, indent=2), encoding="utf-8")
+        print(f"✅ Aggiornato anche il file generale: {general_timeline_path}")
+    except Exception as e:
+        print(f"Errore durante la scrittura del file {general_timeline_path}: {e}")
 
 
 if __name__ == "__main__":
