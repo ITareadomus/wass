@@ -841,29 +841,42 @@ const {{ Client }} = require('@replit/object-storage');
 const fs = require('fs');
 const client = new Client();
 (async () => {{
-  const data = fs.readFileSync('{temp_file}', 'utf-8');
-  await client.uploadFromText('{storage_filename}', data);
-  console.log('✅ Caricato su Object Storage: {storage_filename}');
-}})().catch(console.error);
+  try {{
+    const data = fs.readFileSync('{temp_file}', 'utf-8');
+    await client.uploadFromText('{storage_filename}', data);
+    console.log('✅ Caricato su Object Storage: {storage_filename}');
+  }} catch (error) {{
+    console.error('❌ Errore upload Object Storage:', error.message);
+    process.exit(1);
+  }}
+}})();
 """
-        upload_script_path = '/home/runner/workspace/upload_storage_hp.js'
+        upload_script_path = '/tmp/upload_storage_hp.js'
         with open(upload_script_path, 'w') as f:
             f.write(node_script)
 
         result = subprocess.run(
             ['node', upload_script_path],
-            check=True,
             cwd='/home/runner/workspace',
             capture_output=True,
             text=True
         )
-        print(result.stdout)
+
+        if result.returncode == 0:
+            print(result.stdout)
+            print(f"📦 Salvato anche su Object Storage: {storage_filename}")
+        else:
+            print(f"⚠️  Errore upload Object Storage:")
+            print(result.stderr)
 
         # Rimuovi lo script temporaneo
-        os.remove(upload_script_path)
-        print(f"📦 Salvato anche su Object Storage: {storage_filename}")
+        if os.path.exists(upload_script_path):
+            os.remove(upload_script_path)
+
     except Exception as e:
         print(f"⚠️  Errore salvando su Object Storage (continuo comunque): {e}")
+        import traceback
+        traceback.print_exc()
 
 
 if __name__ == "__main__":

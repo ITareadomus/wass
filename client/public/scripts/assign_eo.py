@@ -602,6 +602,7 @@ def main():
     # Salva anche su Object Storage con struttura data/filename.json
     try:
         from datetime import datetime
+        import os
 
         # Formatta la data come dd-mm-yyyy
         date_obj = datetime.strptime(ref_date, "%Y-%m-%d")
@@ -618,26 +619,43 @@ const {{ Client }} = require('@replit/object-storage');
 const fs = require('fs');
 const client = new Client();
 (async () => {{
-  const data = fs.readFileSync('{temp_file}', 'utf-8');
-  await client.uploadFromText('{storage_filename}', data);
-  console.log('✅ Caricato su Object Storage: {storage_filename}');
-}})().catch(console.error);
+  try {{
+    const data = fs.readFileSync('{temp_file}', 'utf-8');
+    await client.uploadFromText('{storage_filename}', data);
+    console.log('✅ Caricato su Object Storage: {storage_filename}');
+  }} catch (error) {{
+    console.error('❌ Errore upload Object Storage:', error.message);
+    process.exit(1);
+  }}
+}})();
 """
-        with open('/tmp/upload_storage.js', 'w') as f:
+        upload_script_path = '/tmp/upload_storage_eo.js'
+        with open(upload_script_path, 'w') as f:
             f.write(node_script)
 
         # Esegui lo script Node.js per caricare su Object Storage dalla directory workspace
         result = subprocess.run(
-            ['node', '/tmp/upload_storage.js'],
-            check=True,
+            ['node', upload_script_path],
             cwd='/home/runner/workspace',
             capture_output=True,
             text=True
         )
-        print(result.stdout)
-        print(f"📦 Salvato anche su Object Storage: {storage_filename}")
+        
+        if result.returncode == 0:
+            print(result.stdout)
+            print(f"📦 Salvato anche su Object Storage: {storage_filename}")
+        else:
+            print(f"⚠️  Errore upload Object Storage:")
+            print(result.stderr)
+        
+        # Rimuovi lo script temporaneo
+        if os.path.exists(upload_script_path):
+            os.remove(upload_script_path)
+            
     except Exception as e:
         print(f"⚠️  Errore salvando su Object Storage (continuo comunque): {e}")
+        import traceback
+        traceback.print_exc()
 
 
     print()
