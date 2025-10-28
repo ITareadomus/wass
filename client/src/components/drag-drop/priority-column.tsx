@@ -23,7 +23,6 @@ export default function PriorityColumn({
   icon,
 }: PriorityColumnProps) {
   const { toast } = useToast();
-  // State to track if assignments are in progress
   const [isAssigning, setIsAssigning] = useState(false);
 
   const getColumnClass = (priority: string, tasks: Task[]) => {
@@ -63,113 +62,7 @@ export default function PriorityColumn({
     }
   };
 
-  const handleTimelineAssignment = async () => {
-    if (priority === 'early-out') {
-      // Esegui lo script di assegnazione assign_eo.py
-      try {
-        // Ottieni la data selezionata dal localStorage
-        const savedDate = localStorage.getItem('selected_work_date');
-        if (!savedDate) {
-          toast({
-            variant: "destructive",
-            title: "Errore",
-            description: "Nessuna data selezionata",
-          });
-          return;
-        }
-        // Converti in formato yyyy-MM-dd (rimuovi eventuali timestamp)
-        const dateStr = savedDate.split('T')[0];
-
-        console.log('📅 Data dal localStorage:', dateStr);
-        console.log('🔄 Esecuzione assign_eo.py per data:', dateStr);
-        const response = await fetch('/api/run-optimizer', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ date: dateStr })
-        });
-
-        if (!response.ok) {
-          throw new Error('Errore durante l\'assegnazione ottimizzata');
-        }
-
-        const result = await response.json();
-        console.log('Assegnazione ottimizzata completata:', result);
-
-        toast({
-          variant: "success",
-          title: "✅ EARLY-OUT assegnati con successo!",
-        });
-
-        // Ricarica i task per riflettere le nuove assegnazioni
-        if ((window as any).reloadAllTasks) {
-          await (window as any).reloadAllTasks();
-        }
-
-        // Ricarica la pagina per aggiornare i marker sulla mappa
-        window.location.reload();
-      } catch (error: any) {
-        console.error('Errore durante l\'assegnazione:', error);
-        toast({
-          variant: "destructive",
-          title: "Errore durante l'assegnazione",
-          description: error.message,
-        });
-      }
-    } else if (priority === 'high') {
-      // This part is handled by handleAssignHighPriority now
-    } else if (priority === 'low') {
-      try {
-        // Ottieni la data selezionata dal localStorage
-        const savedDate = localStorage.getItem('selected_work_date');
-        if (!savedDate) {
-          toast({
-            variant: "destructive",
-            title: "Errore",
-            description: "Nessuna data selezionata",
-          });
-          return;
-        }
-        // Converti in formato yyyy-MM-dd (rimuovi eventuali timestamp)
-        const dateStr = savedDate.split('T')[0];
-
-        console.log('📅 Data dal localStorage:', dateStr);
-        console.log('🔄 Esecuzione assign_lp.py per data:', dateStr);
-        const response = await fetch('/api/assign-lp', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ date: dateStr })
-        });
-
-        if (!response.ok) {
-          throw new Error('Errore durante l\'assegnazione LP');
-        }
-
-        const result = await response.json();
-        console.log('Assegnazione LP completata:', result);
-
-        toast({
-          variant: "success",
-          title: "✅ LOW PRIORITY assegnati con successo!",
-        });
-
-        // Ricarica i task
-        if ((window as any).reloadAllTasks) {
-          await (window as any).reloadAllTasks();
-        }
-
-        // Ricarica la pagina per aggiornare i marker sulla mappa
-        window.location.reload();
-      } catch (error: any) {
-        console.error('Errore nell\'assegnazione LP:', error);
-        toast({
-          title: "❌ LOW PRIORITY non assegnati, errore!",
-          variant: "destructive",
-        });
-      }
-    }
-  };
-
-  const handleAssignHighPriority = async () => {
+  const handleAssignContainer = async () => {
     try {
       setIsAssigning(true);
       const savedDate = localStorage.getItem('selected_work_date');
@@ -182,86 +75,58 @@ export default function PriorityColumn({
         setIsAssigning(false);
         return;
       }
-      // Converti in formato yyyy-MM-dd (rimuovi eventuali timestamp)
       const dateStr = savedDate.split('T')[0];
 
-      console.log('📅 Data dal localStorage:', dateStr);
-      console.log('🔄 Esecuzione assign_hp.py per data:', dateStr);
-      const response = await fetch('/api/assign-hp', {
+      let endpoint = '';
+      let successMessage = '';
+
+      switch (priority) {
+        case 'early-out':
+          endpoint = '/api/assign-early-out-to-timeline';
+          successMessage = '✅ EARLY-OUT assegnati con successo!';
+          break;
+        case 'high':
+          endpoint = '/api/assign-high-priority-to-timeline';
+          successMessage = '✅ HIGH PRIORITY assegnati con successo!';
+          break;
+        case 'low':
+          endpoint = '/api/assign-low-priority-to-timeline';
+          successMessage = '✅ LOW PRIORITY assegnati con successo!';
+          break;
+        default:
+          throw new Error('Tipo di container non supportato');
+      }
+
+      console.log(`🔄 Esecuzione assegnazione ${priority} per data: ${dateStr}`);
+      const response = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ date: dateStr })
       });
 
       if (!response.ok) {
-        throw new Error('Errore durante l\'assegnazione high priority');
+        throw new Error(`Errore durante l'assegnazione ${priority}`);
       }
 
       const result = await response.json();
-      console.log('Assegnazione HP completata:', result);
+      console.log(`Assegnazione ${priority} completata:`, result);
 
       toast({
         variant: "success",
-        title: "✅ HIGH PRIORITY assegnati con successo!",
+        title: successMessage,
       });
 
-      // Ricarica i task
-      if (typeof (window as any).reloadAllTasks === 'function') {
+      // Ricarica i task per riflettere le nuove assegnazioni
+      if ((window as any).reloadAllTasks) {
         await (window as any).reloadAllTasks();
       }
+
+      // Ricarica la pagina per aggiornare la timeline e i marker sulla mappa
+      window.location.reload();
     } catch (error: any) {
-      console.error('Errore nell\'assegnazione HP:', error);
+      console.error(`Errore nell'assegnazione ${priority}:`, error);
       toast({
-        title: "❌ HIGH-PRIORITY non assegnati, errore!",
-        variant: "destructive",
-      });
-    } finally {
-      setIsAssigning(false);
-    }
-  };
-
-  const handleAssignLowPriority = async () => {
-    try {
-      setIsAssigning(true);
-      const savedDate = localStorage.getItem('selected_work_date');
-      if (!savedDate) {
-        toast({
-          variant: "destructive",
-          title: "Errore",
-          description: "Nessuna data selezionata",
-        });
-        setIsAssigning(false);
-        return;
-      }
-      // Usa direttamente la stringa salvata (è già in formato yyyy-MM-dd)
-      const dateStr = savedDate;
-
-      const response = await fetch('/api/assign-lp', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ date: dateStr })
-      });
-
-      if (!response.ok) {
-        throw new Error('Errore durante l\'assegnazione low priority');
-      }
-
-      const result = await response.json();
-      console.log('Assegnazione LP completata:', result);
-
-      toast({
-        variant: "success",
-        title: "✅ LOW PRIORITY assegnati con successo!",
-      });
-
-      // Ricarica i task
-      if (typeof (window as any).reloadAllTasks === 'function') {
-        await (window as any).reloadAllTasks();
-      }
-    } catch (error) {
-      console.error('Errore nell\'assegnazione LP:', error);
-      toast({
-        title: "❌ LOW PRIORITY non assegnati, errore!",
+        title: `❌ ${title} non assegnati, errore!`,
         variant: "destructive",
       });
     } finally {
@@ -281,38 +146,25 @@ export default function PriorityColumn({
             {tasks.length} task
           </div>
         </div>
-        {priority === "high" ? (
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleAssignHighPriority}
-            disabled={isAssigning || tasks.length === 0}
-            className="text-xs px-2 py-1 h-7"
-          >
-            {isAssigning ? (
-              <>
-                <span className="animate-spin mr-2">⏳</span>
-                Assegnando...
-              </>
-            ) : (
-              <>
-                <Calendar className="w-3 h-3 mr-1" />
-                Assegna
-              </>
-            )}
-          </Button>
-        ) : (
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleTimelineAssignment}
-            className="text-xs px-2 py-1 h-7"
-            disabled={tasks.length === 0}
-          >
-            <Calendar className="w-3 h-3 mr-1" />
-            Assegna
-          </Button>
-        )}
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handleAssignContainer}
+          disabled={isAssigning || tasks.length === 0}
+          className="text-xs px-2 py-1 h-7"
+        >
+          {isAssigning ? (
+            <>
+              <span className="animate-spin mr-2">⏳</span>
+              Assegnando...
+            </>
+          ) : (
+            <>
+              <Calendar className="w-3 h-3 mr-1" />
+              Assegna
+            </>
+          )}
+        </Button>
       </div>
 
       <Droppable droppableId={droppableId}>

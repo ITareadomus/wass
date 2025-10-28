@@ -682,6 +682,166 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Nuovi endpoint per assegnazione diretta a timeline.json
+  app.post("/api/assign-early-out-to-timeline", async (req, res) => {
+    try {
+      const { date } = req.body;
+      const workDate = date || format(new Date(), 'yyyy-MM-dd');
+
+      console.log(`Eseguendo assign_eo.py per timeline.json - data: ${workDate}`);
+
+      const { spawn } = await import('child_process');
+      const scriptPath = path.join(process.cwd(), 'client/public/scripts/assign_eo.py');
+
+      const pythonProcess = spawn('python3', [scriptPath, workDate]);
+
+      let stdoutData = '';
+      pythonProcess.stdout.on('data', (data) => {
+        stdoutData += data.toString();
+      });
+
+      let stderrData = '';
+      pythonProcess.stderr.on('data', (data) => {
+        stderrData += data.toString();
+        console.error(`assign_eo.py stderr: ${data}`);
+      });
+
+      pythonProcess.on('close', async (code) => {
+        if (code !== 0) {
+          console.error(`assign_eo.py exited with code ${code}`);
+          res.status(500).json({
+            success: false,
+            message: "Early Out assegnazione fallita",
+            stderr: stderrData,
+            stdout: stdoutData
+          });
+          return;
+        }
+
+        console.log("assign_eo output:", stdoutData);
+        res.json({
+          success: true,
+          message: "Early Out tasks assegnati con successo in timeline.json",
+          output: stdoutData
+        });
+      });
+
+    } catch (error: any) {
+      console.error("Errore durante l'assegnazione EO a timeline:", error);
+      res.status(500).json({
+        success: false,
+        error: error.message,
+        stderr: error.stderr || "N/A"
+      });
+    }
+  });
+
+  app.post("/api/assign-high-priority-to-timeline", async (req, res) => {
+    try {
+      const { date } = req.body;
+      const workDate = date || format(new Date(), 'yyyy-MM-dd');
+
+      console.log(`Eseguendo assign_hp.py per timeline.json - data: ${workDate}`);
+
+      const { spawn } = await import('child_process');
+      const scriptPath = path.join(process.cwd(), 'client/public/scripts/assign_hp.py');
+
+      const pythonProcess = spawn('python3', [scriptPath, workDate]);
+
+      let stdoutData = '';
+      pythonProcess.stdout.on('data', (data) => {
+        stdoutData += data.toString();
+      });
+
+      let stderrData = '';
+      pythonProcess.stderr.on('data', (data) => {
+        stderrData += data.toString();
+        console.error(`assign_hp.py stderr: ${data}`);
+      });
+
+      pythonProcess.on('close', async (code) => {
+        if (code !== 0) {
+          console.error(`assign_hp.py exited with code ${code}`);
+          res.status(500).json({
+            success: false,
+            message: "High Priority assegnazione fallita",
+            stderr: stderrData,
+            stdout: stdoutData
+          });
+          return;
+        }
+
+        console.log("assign_hp output:", stdoutData);
+        res.json({
+          success: true,
+          message: "High Priority tasks assegnati con successo in timeline.json",
+          output: stdoutData
+        });
+      });
+
+    } catch (error: any) {
+      console.error("Errore durante l'assegnazione HP a timeline:", error);
+      res.status(500).json({
+        success: false,
+        error: error.message,
+        stderr: error.stderr || "N/A"
+      });
+    }
+  });
+
+  app.post("/api/assign-low-priority-to-timeline", async (req, res) => {
+    try {
+      const { date } = req.body;
+      const workDate = date || format(new Date(), 'yyyy-MM-dd');
+
+      console.log(`Eseguendo assign_lp.py per timeline.json - data: ${workDate}`);
+
+      const { spawn } = await import('child_process');
+      const scriptPath = path.join(process.cwd(), 'client/public/scripts/assign_lp.py');
+
+      const pythonProcess = spawn('python3', [scriptPath, workDate]);
+
+      let stdoutData = '';
+      pythonProcess.stdout.on('data', (data) => {
+        stdoutData += data.toString();
+      });
+
+      let stderrData = '';
+      pythonProcess.stderr.on('data', (data) => {
+        stderrData += data.toString();
+        console.error(`assign_lp.py stderr: ${data}`);
+      });
+
+      pythonProcess.on('close', async (code) => {
+        if (code !== 0) {
+          console.error(`assign_lp.py exited with code ${code}`);
+          res.status(500).json({
+            success: false,
+            message: "Low Priority assegnazione fallita",
+            stderr: stderrData,
+            stdout: stdoutData
+          });
+          return;
+        }
+
+        console.log("assign_lp output:", stdoutData);
+        res.json({
+          success: true,
+          message: "Low Priority tasks assegnati con successo in timeline.json",
+          output: stdoutData
+        });
+      });
+
+    } catch (error: any) {
+      console.error("Errore durante l'assegnazione LP a timeline:", error);
+      res.status(500).json({
+        success: false,
+        error: error.message,
+        stderr: error.stderr || "N/A"
+      });
+    }
+  });
+
   // Endpoint per il nuovo script di assegnazione ottimizzato (opt.py)
   app.post("/api/assign-unified", async (req, res) => {
     try {
