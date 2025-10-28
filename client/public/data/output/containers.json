@@ -1,6 +1,6 @@
 {
   "metadata": {
-    "last_updated": "2025-10-28T14:28:33.124966",
+    "last_updated": "2025-10-28T14:32:39.690217",
     "schema_version": "1.0",
     "date": "2025-10-29"
   },
@@ -259,11 +259,11 @@
           "lat": "45.4517049",
           "lng": "9.1727477",
           "cleaning_time": 60,
-          "checkin_date": "2025-11-01",
+          "checkin_date": "2025-10-30",
           "checkout_date": "2025-10-29",
-          "checkin_time": "15:00",
+          "checkin_time": null,
           "checkout_time": null,
-          "pax_in": 2,
+          "pax_in": 1,
           "pax_out": 2,
           "small_equipment": true,
           "operation_id": 2,
@@ -872,7 +872,7 @@
           "cleaning_time": 120,
           "checkin_date": "2025-11-01",
           "checkout_date": "2025-10-29",
-          "checkin_time": "15:00",
+          "checkin_time": "21:00",
           "checkout_time": null,
           "pax_in": 4,
           "pax_out": 3,
