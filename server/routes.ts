@@ -980,6 +980,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       let allAssignments = [...timelineData.assignments];
 
+      // Connessione MySQL per salvare nel database
+      const mysql = await import('mysql2/promise');
+      const connection = await mysql.createConnection({
+        host: '139.59.132.41',
+        user: 'admin',
+        password: 'ed329a875c6c4ebdf4e87e2bbe53a15771b5844ef6606dde',
+        database: 'adamdb'
+      });
+
       // Aggiungi assegnazioni EO
       try {
         const eoData = await fs.readFile(eoAssignmentsPath, 'utf8');
@@ -1137,13 +1146,65 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log(`Salvando ${allAssignments.length} assegnazioni totali in ${filename}`);
       console.log(`Breakdown: ${timelineData.assignments.length} manuali + ${allAssignments.length - timelineData.assignments.length} da script`);
 
+      // Salva nel database MySQL
+      let dbSavedCount = 0;
+      try {
+        // Prima elimina le assegnazioni esistenti per questa data
+        await connection.execute(
+          'DELETE FROM app_wass_assignments WHERE DATE(date) = ?',
+          [date]
+        );
+        console.log(`🗑️  Eliminate assegnazioni esistenti per ${date}`);
+
+        // Inserisci le nuove assegnazioni
+        for (const assignment of allAssignments) {
+          try {
+            await connection.execute(
+              `INSERT INTO app_wass_assignments (
+                task_id, cleaner_id, date, logistic_code, assignment_type, sequence,
+                start_time, end_time, cleaning_time, travel_time, address, lat, lng,
+                premium, followup
+              ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+              [
+                assignment.task_id || null,
+                assignment.cleanerId,
+                date,
+                assignment.logistic_code,
+                assignment.assignment_type || 'manual_drag',
+                assignment.sequence || 1,
+                assignment.start_time || null,
+                assignment.end_time || null,
+                assignment.cleaning_time || null,
+                assignment.travel_time || 0,
+                assignment.address || null,
+                assignment.lat || null,
+                assignment.lng || null,
+                assignment.premium ? 1 : 0,
+                assignment.followup ? 1 : 0
+              ]
+            );
+            dbSavedCount++;
+          } catch (dbError: any) {
+            console.error(`Errore inserimento assignment ${assignment.logistic_code}:`, dbError.message);
+          }
+        }
+        console.log(`✅ Salvate ${dbSavedCount} assegnazioni nel database MySQL`);
+      } catch (dbError: any) {
+        console.error('⚠️  Errore MySQL (continuo con salvataggio JSON):', dbError.message);
+      } finally {
+        await connection.end();
+      }
+
+      // Salva anche nel file JSON (fallback)
       await fs.writeFile(assignedFilePath, JSON.stringify(confirmedData, null, 2));
+      console.log(`✅ Salvate ${allAssignments.length} assegnazioni in ${filename}`);
 
       res.json({
         success: true,
-        message: `Assegnazioni confermate salvate in ${filename}`,
+        message: `Assegnazioni confermate salvate in database (${dbSavedCount}) e in ${filename}`,
         filename: filename,
-        total_assignments: allAssignments.length
+        total_assignments: allAssignments.length,
+        db_saved: dbSavedCount
       });
     } catch (error: any) {
       console.error("Errore nel salvataggio delle assegnazioni confermate:", error);
@@ -1155,15 +1216,69 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/load-confirmed-assignments/:date", async (req, res) => {
     try {
       const { date } = req.params;
-      const assignedDir = path.join(process.cwd(), 'client/public/data/assigned');
+      
+      // Prima prova a caricare dal database MySQL
+      let dbAssignments: any[] = [];
+      try {
+        const mysql = await import('mysql2/promise');
+        const connection = await mysql.createConnection({
+          host: '139.59.132.41',
+          user: 'admin',
+          password: 'ed329a875c6c4ebdf4e87e2bbe53a15771b5844ef6606dde',
+          database: 'adamdb'
+        });
 
-      // Formato data: ddmmyy
+        const [rows] = await connection.execute(
+          `SELECT * FROM app_wass_assignments WHERE DATE(date) = ? ORDER BY cleaner_id, sequence`,
+          [date]
+        );
+        
+        dbAssignments = rows as any[];
+        await connection.end();
+
+        if (dbAssignments.length > 0) {
+          console.log(`✅ Caricate ${dbAssignments.length} assegnazioni dal database MySQL per ${date}`);
+          
+          // Converti dal formato DB al formato frontend
+          const assignments = dbAssignments.map((row: any) => ({
+            task_id: row.task_id,
+            logistic_code: String(row.logistic_code),
+            cleanerId: row.cleaner_id,
+            assignment_type: row.assignment_type,
+            sequence: row.sequence,
+            address: row.address,
+            lat: row.lat,
+            lng: row.lng,
+            premium: row.premium === 1,
+            cleaning_time: row.cleaning_time,
+            start_time: row.start_time,
+            end_time: row.end_time,
+            travel_time: row.travel_time,
+            followup: row.followup === 1
+          }));
+
+          return res.json({
+            success: true,
+            data: {
+              date: date,
+              confirmed_at: new Date().toISOString(),
+              assignments: assignments,
+              source: 'database'
+            },
+            message: `Assegnazioni caricate dal database (${assignments.length})`
+          });
+        }
+      } catch (dbError: any) {
+        console.warn('⚠️  Errore caricamento da MySQL (provo con JSON):', dbError.message);
+      }
+
+      // Fallback: carica dal file JSON
+      const assignedDir = path.join(process.cwd(), 'client/public/data/assigned');
       const dateObj = new Date(date);
       const day = String(dateObj.getDate()).padStart(2, '0');
       const month = String(dateObj.getMonth() + 1).padStart(2, '0');
       const year = String(dateObj.getFullYear()).slice(-2);
       const filename = `assignments_${day}${month}${year}.json`;
-
       const assignedFilePath = path.join(assignedDir, filename);
 
       try {
@@ -1172,11 +1287,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         res.json({
           success: true,
-          data: confirmedData,
-          message: `Assegnazioni caricate da ${filename}`
+          data: { ...confirmedData, source: 'json' },
+          message: `Assegnazioni caricate da ${filename} (fallback)`
         });
       } catch (error) {
-        // File non esiste
+        // Nessun dato trovato
         res.json({
           success: true,
           data: null,
