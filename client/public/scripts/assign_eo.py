@@ -4,27 +4,15 @@ import json, math
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Tuple
 from pathlib import Path
-import mysql.connector
-import subprocess
-
-# =============================
-# Database configuration
-# =============================
-DB_CONFIG = {
-    "host": "139.59.132.41",
-    "user": "admin",
-    "password": "ed329a875c6c4ebdf4e87e2bbe53a15771b5844ef6606dde",
-    "database": "adamdb"
-}
 
 # =============================
 # I/O paths
 # =============================
 BASE = Path(__file__).parent.parent / "data"
 
-# INPUT_TASKS rimosso - ora leggiamo dal database
+INPUT_TASKS = BASE / "output" / "early_out.json"
 INPUT_CLEANERS = BASE / "cleaners" / "selected_cleaners.json"
-OUTPUT_ASSIGN = BASE / "output" / "early_out_assignments.json" # Questo file potrebbe non essere più necessario se salviamo tutto nel DB e timeline_assignments.json
+OUTPUT_ASSIGN = BASE / "output" / "early_out_assignments.json"
 
 # =============================
 # CONFIG - REGOLE SEMPLIFICATE
@@ -198,8 +186,6 @@ def evaluate_route(route: List[Task]) -> Tuple[bool, List[Tuple[int, int, int]]]
         tt = travel_minutes(prev, t)
         cur += tt
         arrival = cur
-
-        # Aspetta fino al checkout_time se necessario
         wait = max(0.0, t.checkout_time - arrival)
         cur += wait
         start = cur
@@ -325,61 +311,34 @@ def load_cleaners() -> List[Cleaner]:
     return cleaners
 
 
-def load_tasks_from_db(work_date: str) -> List[Task]:
-    """Carica i task early-out dal database"""
-    try:
-        conn = mysql.connector.connect(
-            host="139.59.132.41",
-            user="admin",
-            password="ed329a875c6c4ebdf4e87e2bbe53a15771b5844ef6606dde",
-            database="adamdb"
-        )
-        cur = conn.cursor(dictionary=True)
+def load_tasks() -> List[Task]:
+    data = json.loads(INPUT_TASKS.read_text(encoding="utf-8"))
+    eo_start_min = hhmm_to_min("10:00")
+    tasks: List[Task] = []
+    for t in data.get("early_out_tasks", []):
+        checkout = eo_start_min
+        checkin = hhmm_to_min(t.get("checkin_time"), default="23:59")
 
-        cur.execute("""
-            SELECT * FROM wass_task_containers
-            WHERE priority = 'early_out' AND date = %s
-        """, (work_date,))
-
-        rows = cur.fetchall()
-        cur.close()
-        conn.close()
-
-        tasks: List[Task] = []
-        eo_start_min = hhmm_to_min("10:00")  # Minimo assoluto per Early Out
-
-        for row in rows:
-            # Se checkout_time è null, usa 10:00 come minimo ma permetti flessibilità
-            # Se checkout_time ha un valore, usalo come vincolo fisso
-            if row["checkout_time"]:
-                checkout_min = hhmm_to_min(row["checkout_time"])
-            else:
-                # null = può iniziare da 10:00 in poi, usa 10:00 come valore di riferimento
-                checkout_min = eo_start_min
-
-            tasks.append(Task(
-                task_id=str(row["task_id"]),
-                logistic_code=str(row["logistic_code"]),
-                lat=float(row["lat"]),
-                lng=float(row["lng"]),
-                cleaning_time=int(row["cleaning_time"]) if row["cleaning_time"] else 60,
-                checkout_time=checkout_min,
-                checkin_time=hhmm_to_min(row["checkin_time"]) if row["checkin_time"] else hhmm_to_min("23:59"),
-                is_premium=bool(row["premium"]),
-                address=row["address"],
-                small_equipment=False,
-                straordinaria=bool(row["straordinaria"]),
-                apt_type=None,
-                alias=None,
+        tasks.append(
+            Task(
+                task_id=str(t.get("task_id")),
+                logistic_code=str(t.get("logistic_code")),
+                lat=float(t.get("lat")),
+                lng=float(t.get("lng")),
+                cleaning_time=int(t.get("cleaning_time") or 45),
+                checkout_time=checkout,
+                checkin_time=checkin,
+                is_premium=bool(t.get("premium", False)),
+                apt_type=t.get("type_apt"),
+                address=t.get("address"),
+                alias=t.get("alias"),
+                small_equipment=bool(t.get("small_equipment", False)),
+                straordinaria=bool(t.get("straordinaria", False)),
             ))
 
-        # Ordina: straordinarie first, poi premium, poi per checkout
-        tasks.sort(key=lambda x: (not x.straordinaria, not x.is_premium, x.checkout_time))
-
-        return tasks
-    except Exception as e:
-        print(f"❌ Errore caricamento task early-out dal DB: {e}")
-        return []
+    # Ordina: straordinarie first, poi premium, poi per checkout
+    tasks.sort(key=lambda x: (not x.straordinaria, not x.is_premium, x.checkout_time))
+    return tasks
 
 
 # -------- Planner --------
@@ -499,9 +458,18 @@ def build_output(cleaners: List[Cleaner], unassigned: List[Task], original_tasks
 
     total_assigned = sum(len(c["tasks"]) for c in cleaners_with_tasks)
 
+    # Usa la data passata come argomento da riga di comando
+    import sys
+    if len(sys.argv) > 1:
+        ref_date = sys.argv[1]
+    else:
+        from datetime import datetime
+        ref_date = datetime.now().strftime("%Y-%m-%d")
+
     return {
         "early_out_tasks_assigned": cleaners_with_tasks,
         "unassigned_tasks": unassigned_list,
+        "current_date": ref_date,
         "meta": {
             "total_tasks": len(original_tasks),
             "assigned": total_assigned,
@@ -523,126 +491,104 @@ def build_output(cleaners: List[Cleaner], unassigned: List[Task], original_tasks
     }
 
 
-# -------- Database Operations --------
-def save_to_database(output: Dict[str, Any], ref_date: str):
-    conn = None
-    cursor = None
-    try:
-        conn = mysql.connector.connect(**DB_CONFIG)
-        cursor = conn.cursor()
-
-        # Elimina eventuali assegnazioni esistenti per la data corrente per evitare duplicati
-        delete_query = "DELETE FROM wass_assignments WHERE DATE(date) = %s AND assignment_type = 'early_out'"
-        cursor.execute(delete_query, (ref_date,))
-        conn.commit()
-
-        assignments_to_insert = []
-        assigned_logistic_codes = set()
-
-        # Processa le assegnazioni Early-Out
-        for cleaner_entry in output.get("early_out_tasks_assigned", []):
-            cleaner_id = cleaner_entry["cleaner"]["id"]
-            for task in cleaner_entry.get("tasks", []):
-                logistic_code_str = str(task["logistic_code"])
-                assigned_logistic_codes.add(logistic_code_str)
-
-                assignments_to_insert.append((
-                    task["task_id"],
-                    cleaner_id,
-                    ref_date,
-                    logistic_code_str,
-                    "early_out",
-                    task.get("sequence", 0),
-                    task.get("start_time"),
-                    task.get("end_time"),
-                    task.get("cleaning_time"),
-                    task.get("travel_time", 0),
-                    task.get("address"),
-                    task.get("lat"),
-                    task.get("lng"),
-                    1 if task.get("premium") else 0,
-                    1 if task.get("followup", False) else 0
-                ))
-
-        # Inserisci le nuove assegnazioni
-        if assignments_to_insert:
-            insert_query = """
-            INSERT INTO wass_assignments (
-                task_id, cleaner_id, date, logistic_code, assignment_type, sequence,
-                start_time, end_time, cleaning_time, travel_time, address, lat, lng,
-                premium, followup
-            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-            """
-            cursor.executemany(insert_query, assignments_to_insert)
-            conn.commit()
-            print(f"✅ {len(assignments_to_insert)} assegnazioni salvate nel database per la data {ref_date}.")
-        else:
-            print(f"ℹ️ Nessuna nuova assegnazione Early-Out da salvare nel database per la data {ref_date}.")
-
-        # Gestisci le task non assegnate
-        for task in output.get("unassigned_tasks", []):
-            logistic_code_str = str(task["logistic_code"])
-            if logistic_code_str not in assigned_logistic_codes:
-                print(f"WARNING: Task non assegnata nel DB: LogisticCode={logistic_code_str}, Reason={task.get('reason')}")
-
-    except mysql.connector.Error as err:
-        print(f"❌ Errore database: {err}")
-    finally:
-        if conn and conn.is_connected():
-            if cursor:
-                cursor.close()
-            conn.close()
-            print("Connessione al database chiusa.")
-
-# -------- Main Execution --------
 def main():
-    # Non controlliamo più INPUT_TASKS perché leggiamo dal database
+    if not INPUT_TASKS.exists():
+        raise SystemExit(f"Missing input file: {INPUT_TASKS}")
     if not INPUT_CLEANERS.exists():
         raise SystemExit(f"Missing input file: {INPUT_CLEANERS}")
 
-    # Usa la data passata come argomento da riga di comando
-    import sys
-    if len(sys.argv) > 1:
-        ref_date = sys.argv[1]
-    else:
-        from datetime import datetime
-        ref_date = datetime.now().strftime("%Y-%m-%d")
-
     cleaners = load_cleaners()
-    tasks = load_tasks_from_db(ref_date)
+    tasks = load_tasks()
 
     print(f"📋 Caricamento dati...")
-    print(f"   - Cleaner disponibili: {len(cleaners)}")
-    print(f"   - Task Early-Out da assegnare: {len(tasks)}")
+    print(f"👥 Cleaner disponibili: {len(cleaners)}")
+    print(f"📦 Task Early-Out da assegnare: {len(tasks)}")
     print()
     print(f"🔄 Assegnazione in corso...")
 
     planners, leftovers = plan_day(tasks, cleaners)
     output = build_output(planners, leftovers, tasks)
 
-    # Salva output JSON localmente (fallback)
+    OUTPUT_ASSIGN.parent.mkdir(parents=True, exist_ok=True)
     OUTPUT_ASSIGN.write_text(json.dumps(output, ensure_ascii=False, indent=2), encoding="utf-8")
-    print(f"✅ Salvato {OUTPUT_ASSIGN}")
+
+    print()
+    print(f"✅ Assegnazione completata!")
+    print(f"   - Task assegnati: {output['meta']['assigned']}/{output['meta']['total_tasks']}")
+    print(f"   - Cleaner utilizzati: {output['meta']['cleaners_used']}")
+    print(f"   - Task non assegnati: {output['meta']['unassigned']}")
+    print()
+    print(f"💾 Risultati salvati in: {OUTPUT_ASSIGN}")
 
     # Usa la data passata come argomento da riga di comando
     import sys
     if len(sys.argv) > 1:
         ref_date = sys.argv[1]
+        print(f"📅 Usando data da argomento: {ref_date}")
     else:
+        # Fallback: usa la data corrente
         from datetime import datetime
         ref_date = datetime.now().strftime("%Y-%m-%d")
+        print(f"📅 Nessuna data specificata, usando: {ref_date}")
 
-    # Salva nel database MySQL
-    save_to_database(output, ref_date)
+    # Update timeline_assignments/{date}.json
+    timeline_dir = OUTPUT_ASSIGN.parent / "timeline_assignments"
+    timeline_dir.mkdir(parents=True, exist_ok=True)
+    timeline_assignments_path = timeline_dir / f"{ref_date}.json"
 
+    timeline_data = {"assignments": [], "current_date": ref_date}
 
-    print()
-    print(f"✅ Assegnazione completata!")
-    print(f"   - Task assegnati (Early-Out): {output['meta']['assigned']}/{output['meta']['total_tasks']}")
-    print(f"   - Cleaner utilizzati: {output['meta']['cleaners_used']}")
-    print(f"   - Task non assegnati: {output['meta']['unassigned']}")
-    print()
-    print(f"💾 Risultati salvati nel database MySQL e nel file JSON")
+    if timeline_assignments_path.exists():
+        try:
+            timeline_data = json.loads(timeline_assignments_path.read_text(encoding="utf-8"))
+            if "current_date" not in timeline_data:
+                timeline_data["current_date"] = ref_date
+        except:
+            timeline_data = {"assignments": [], "current_date": ref_date}
+
+    # Rimuovi vecchie assegnazioni EO
+    assigned_codes = set()
+    for cleaner_entry in output["early_out_tasks_assigned"]:
+        for task in cleaner_entry.get("tasks", []):
+            assigned_codes.add(str(task["logistic_code"]))
+
+    timeline_data["assignments"] = [
+        a for a in timeline_data.get("assignments", [])
+        if str(a.get("logistic_code")) not in assigned_codes
+    ]
+
+    # Aggiungi nuove assegnazioni EO con tutti i dati del task
+    for cleaner_entry in output["early_out_tasks_assigned"]:
+        cleaner_id = cleaner_entry["cleaner"]["id"]
+        for task in cleaner_entry.get("tasks", []):
+            timeline_data["assignments"].append({
+                "task_id": task["task_id"],
+                "logistic_code": str(task["logistic_code"]),
+                "cleanerId": cleaner_id,
+                "assignment_type": "early_out",
+                "sequence": task.get("sequence", 0),
+                "address": task.get("address"),
+                "lat": task.get("lat"),
+                "lng": task.get("lng"),
+                "premium": task.get("premium"),
+                "cleaning_time": task.get("cleaning_time"),
+                "start_time": task.get("start_time"),
+                "end_time": task.get("end_time"),
+                "travel_time": task.get("travel_time", 0),
+                "followup": task.get("followup", False)
+            })
+
+    # Scrivi immediatamente il file aggiornato per la data specifica
+    timeline_assignments_path.write_text(json.dumps(timeline_data, ensure_ascii=False, indent=2), encoding="utf-8")
+    print(f"✅ Timeline aggiornata simultaneamente: {timeline_assignments_path}")
+    print(f"   - Assegnazioni EO: {len([a for a in timeline_data['assignments'] if a.get('assignment_type') == 'early_out'])}")
+    print(f"   - Assegnazioni HP: {len([a for a in timeline_data['assignments'] if a.get('assignment_type') == 'high_priority'])}")
+    print(f"   - Totale assegnazioni: {len(timeline_data['assignments'])}")
+
+    # Aggiorna anche il file generale timeline_assignments.json
+    general_timeline_path = OUTPUT_ASSIGN.parent / "timeline_assignments.json"
+    general_timeline_path.write_text(json.dumps(timeline_data, ensure_ascii=False, indent=2), encoding="utf-8")
+    print(f"✅ Aggiornato anche: {general_timeline_path}")
 
 
 if __name__ == "__main__":

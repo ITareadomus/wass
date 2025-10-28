@@ -1,11 +1,10 @@
+
 # -*- coding: utf-8 -*-
 from __future__ import annotations
 import json, math
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Tuple
 from pathlib import Path
-import os
-import mysql.connector
 
 # =============================
 # I/O paths
@@ -233,7 +232,7 @@ def can_add_task(cleaner: Cleaner, task: Task) -> bool:
     if not can_handle_premium(cleaner, task):
         return False
 
-    # Straordinaria deve andare per forza in pos 0
+    # Straordinaria deve essere la prima
     if task.straordinaria:
         if len(cleaner.route) > 0:
             return False
@@ -346,114 +345,77 @@ def load_cleaners() -> List[Cleaner]:
 
 def seed_cleaners_from_assignments(cleaners: List[Cleaner]):
     """
-    Seed cleaners con informazioni da database (EO e HP assignments)
+    Seed cleaners con informazioni da EO e HP assignments
     """
-    import mysql.connector
-    import sys
+    # Carica EO assignments
+    if INPUT_EO_ASSIGN.exists():
+        data = json.loads(INPUT_EO_ASSIGN.read_text(encoding="utf-8"))
+        for block in data.get("early_out_tasks_assigned", []):
+            cid = int(block["cleaner"]["id"])
+            tasks = block.get("tasks", [])
+            if not tasks:
+                continue
+            last = tasks[-1]
+            end_time = hhmm_to_min(last.get("end_time"))
+            last_addr = last.get("address")
+            last_lat = last.get("lat")
+            last_lng = last.get("lng")
+            last_seq = last.get("sequence") or len(tasks)
+            for cl in cleaners:
+                if cl.id == cid:
+                    cl.available_from = end_time
+                    cl.last_address = last_addr
+                    cl.last_lat = float(last_lat) if last_lat is not None else None
+                    cl.last_lng = float(last_lng) if last_lng is not None else None
+                    cl.last_sequence = int(last_seq)
+                    break
 
-    # Ottieni la data di riferimento
-    if len(sys.argv) > 1:
-        ref_date = sys.argv[1]
-    else:
-        from datetime import datetime
-        ref_date = datetime.now().strftime("%Y-%m-%d")
-
-    try:
-        conn = mysql.connector.connect(
-            host="139.59.132.41",
-            user="admin",
-            password="ed329a875c6c4ebdf4e87e2bbe53a15771b5844ef6606dde",
-            database="adamdb"
-        )
-        cur = conn.cursor(dictionary=True)
-
-        # Query per ottenere l'ultima task di ogni cleaner (EO o HP)
-        cur.execute("""
-            SELECT
-                cleaner_id,
-                end_time,
-                address,
-                lat,
-                lng,
-                sequence,
-                assignment_type
-            FROM wass_assignments
-            WHERE DATE(date) = %s
-              AND assignment_type IN ('early_out', 'high_priority')
-            ORDER BY cleaner_id, sequence DESC
-        """, (ref_date,))
-
-        assignments = cur.fetchall()
-
-        # Raggruppa per cleaner_id e prendi l'ultima task
-        cleaner_last_task = {}
-        for row in assignments:
-            cid = row['cleaner_id']
-            if cid not in cleaner_last_task:
-                cleaner_last_task[cid] = row
-
-        # Aggiorna i cleaner
-        for cl in cleaners:
-            if cl.id in cleaner_last_task:
-                last = cleaner_last_task[cl.id]
-                cl.available_from = hhmm_to_min(last['end_time'])
-                cl.last_address = last['address']
-                cl.last_lat = float(last['lat']) if last['lat'] is not None else None
-                cl.last_lng = float(last['lng']) if last['lng'] is not None else None
-                cl.last_sequence = int(last['sequence'])
-
-        cur.close()
-        conn.close()
-
-    except Exception as e:
-        print(f"⚠️  Errore nel seed da database: {e}")
-        print("Continuo senza seed...")
+    # Carica HP assignments (sovrascrive EO se presenti)
+    if INPUT_HP_ASSIGN.exists():
+        data = json.loads(INPUT_HP_ASSIGN.read_text(encoding="utf-8"))
+        for block in data.get("high_priority_tasks_assigned", []):
+            cid = int(block["cleaner"]["id"])
+            tasks = block.get("tasks", [])
+            if not tasks:
+                continue
+            last = tasks[-1]
+            end_time = hhmm_to_min(last.get("end_time"))
+            last_addr = last.get("address")
+            last_lat = last.get("lat")
+            last_lng = last.get("lng")
+            last_seq = last.get("sequence") or len(tasks)
+            for cl in cleaners:
+                if cl.id == cid:
+                    cl.available_from = end_time
+                    cl.last_address = last_addr
+                    cl.last_lat = float(last_lat) if last_lat is not None else None
+                    cl.last_lng = float(last_lng) if last_lng is not None else None
+                    cl.last_sequence = int(last_seq)
+                    break
 
 
-def load_tasks_from_db(work_date: str) -> List[Task]:
-    """Carica i task low-priority dal database"""
-    try:
-        conn = mysql.connector.connect(
-            host="139.59.132.41",
-            user="admin",
-            password="ed329a875c6c4ebdf4e87e2bbe53a15771b5844ef6606dde",
-            database="adamdb"
-        )
-        cur = conn.cursor(dictionary=True)
-        
-        cur.execute("""
-            SELECT * FROM wass_task_containers 
-            WHERE priority = 'low_priority' AND date = %s
-        """, (work_date,))
-        
-        rows = cur.fetchall()
-        cur.close()
-        conn.close()
-        
-        tasks: List[Task] = []
-        
-        for row in rows:
-            tasks.append(Task(
-                task_id=str(row["task_id"]),
-                logistic_code=str(row["logistic_code"]),
-                lat=float(row["lat"]),
-                lng=float(row["lng"]),
-                cleaning_time=int(row["cleaning_time"]) if row["cleaning_time"] else 60,
-                is_premium=bool(row["premium"]),
-                address=row["address"],
-                small_equipment=False,
-                straordinaria=bool(row["straordinaria"]),
-                apt_type=None,
-                alias=None
+def load_tasks() -> List[Task]:
+    data = json.loads(INPUT_TASKS.read_text(encoding="utf-8"))
+    tasks: List[Task] = []
+    for t in data.get("low_priority_tasks", []):
+        tasks.append(
+            Task(
+                task_id=str(t.get("task_id")),
+                logistic_code=str(t.get("logistic_code")),
+                lat=float(t.get("lat")),
+                lng=float(t.get("lng")),
+                cleaning_time=int(t.get("cleaning_time") or 60),
+                is_premium=bool(t.get("premium", False)),
+                apt_type=t.get("type_apt"),
+                address=t.get("address"),
+                alias=t.get("alias"),
+                small_equipment=bool(t.get("small_equipment", False)),
+                straordinaria=bool(t.get("straordinaria", False)),
             ))
-        
-        # Ordina: straordinarie first, poi premium
-        tasks.sort(key=lambda x: (not x.straordinaria, not x.is_premium))
-        
-        return tasks
-    except Exception as e:
-        print(f"❌ Errore caricamento task low-priority dal DB: {e}")
-        return []
+
+    # Ordina: straordinarie first, poi premium
+    tasks.sort(key=lambda x: (not x.straordinaria, not x.is_premium))
+    return tasks
 
 
 # -------- Planner --------
@@ -625,67 +587,9 @@ def build_output(cleaners: List[Cleaner], unassigned: List[Task], original_tasks
     }
 
 
-def save_to_database(output: Dict[str, Any], ref_date: str):
-    """Salva le assegnazioni nel database MySQL"""
-    import mysql.connector
-
-    try:
-        conn = mysql.connector.connect(
-            host="139.59.132.41",
-            user="admin",
-            password="ed329a875c6c4ebdf4e87e2bbe53a15771b5844ef6606dde",
-            database="adamdb"
-        )
-        cur = conn.cursor()
-
-        # Elimina le assegnazioni LP esistenti per questa data
-        cur.execute(
-            "DELETE FROM wass_assignments WHERE assignment_type = 'low_priority' AND DATE(date) = %s",
-            (ref_date,)
-        )
-
-        # Inserisci le nuove assegnazioni
-        insert_count = 0
-        for cleaner_entry in output.get("low_priority_tasks_assigned", []):
-            cleaner_id = cleaner_entry["cleaner"]["id"]
-            for task in cleaner_entry.get("tasks", []):
-                cur.execute("""
-                    INSERT INTO wass_assignments (
-                        task_id, cleaner_id, date, logistic_code, assignment_type, sequence,
-                        start_time, end_time, cleaning_time, travel_time, address, lat, lng,
-                        premium, followup
-                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                """, (
-                    task.get("task_id"),
-                    cleaner_id,
-                    ref_date,
-                    task.get("logistic_code"),
-                    'low_priority',
-                    task.get("sequence", 0),
-                    task.get("start_time"),
-                    task.get("end_time"),
-                    task.get("cleaning_time"),
-                    task.get("travel_time", 0),
-                    task.get("address"),
-                    task.get("lat"),
-                    task.get("lng"),
-                    1 if task.get("premium") else 0,
-                    1 if task.get("followup") else 0
-                ))
-                insert_count += 1
-
-        conn.commit()
-        cur.close()
-        conn.close()
-
-        print(f"✅ Salvate {insert_count} assegnazioni nel database MySQL")
-        return True
-    except Exception as e:
-        print(f"❌ Errore nel salvataggio database: {e}")
-        return False
-
-
 def main():
+    if not INPUT_TASKS.exists():
+        raise SystemExit(f"Missing input file: {INPUT_TASKS}")
     if not INPUT_CLEANERS.exists():
         raise SystemExit(f"Missing input file: {INPUT_CLEANERS}")
 
@@ -702,7 +606,7 @@ def main():
 
     cleaners = load_cleaners()
     seed_cleaners_from_assignments(cleaners)
-    tasks = load_tasks_from_db(ref_date)
+    tasks = load_tasks()
 
     print(f"📋 Caricamento dati...")
     print(f"👥 Cleaner disponibili: {len(cleaners)}")
@@ -713,20 +617,72 @@ def main():
     planners, leftovers = plan_day(tasks, cleaners)
     output = build_output(planners, leftovers, tasks)
 
+    OUTPUT_ASSIGN.parent.mkdir(parents=True, exist_ok=True)
+    OUTPUT_ASSIGN.write_text(json.dumps(output, ensure_ascii=False, indent=2), encoding="utf-8")
+
     print()
     print(f"✅ Assegnazione completata!")
     print(f"   - Task assegnati: {output['meta']['assigned']}/{output['meta']['total_tasks']}")
     print(f"   - Cleaner utilizzati: {output['meta']['cleaners_used']}")
     print(f"   - Task non assegnati: {output['meta']['unassigned']}")
     print()
+    print(f"💾 Risultati salvati in: {OUTPUT_ASSIGN}")
 
-    # Salva nel database MySQL
-    save_to_database(output, ref_date)
-    
-    # Salva anche nel file JSON (per compatibilità)
-    OUTPUT_ASSIGN.write_text(json.dumps(output, ensure_ascii=False, indent=2), encoding="utf-8")
-    print(f"✅ Salvato {OUTPUT_ASSIGN}")
-    print(f"✅ Assegnazioni LP salvate nel database e nel file JSON per {ref_date}")
+    # Update timeline_assignments/{date}.json
+    timeline_dir = OUTPUT_ASSIGN.parent / "timeline_assignments"
+    timeline_dir.mkdir(parents=True, exist_ok=True)
+    timeline_assignments_path = timeline_dir / f"{ref_date}.json"
+
+    timeline_data = {"assignments": [], "current_date": ref_date}
+
+    if timeline_assignments_path.exists():
+        try:
+            timeline_data = json.loads(timeline_assignments_path.read_text(encoding="utf-8"))
+            if "current_date" not in timeline_data:
+                timeline_data["current_date"] = ref_date
+        except:
+            timeline_data = {"assignments": [], "current_date": ref_date}
+
+    # Rimuovi vecchie assegnazioni LP
+    assigned_codes = set()
+    for cleaner_entry in output["low_priority_tasks_assigned"]:
+        for task in cleaner_entry.get("tasks", []):
+            assigned_codes.add(str(task["logistic_code"]))
+
+    timeline_data["assignments"] = [
+        a for a in timeline_data.get("assignments", [])
+        if str(a.get("logistic_code")) not in assigned_codes
+    ]
+
+    # Aggiungi nuove assegnazioni LP con tutti i dati del task
+    for cleaner_entry in output["low_priority_tasks_assigned"]:
+        cleaner_id = cleaner_entry["cleaner"]["id"]
+        for task in cleaner_entry.get("tasks", []):
+            timeline_data["assignments"].append({
+                "task_id": task["task_id"],
+                "logistic_code": str(task["logistic_code"]),
+                "cleanerId": cleaner_id,
+                "assignment_type": "low_priority",
+                "sequence": task.get("sequence", 0),
+                "address": task.get("address"),
+                "lat": task.get("lat"),
+                "lng": task.get("lng"),
+                "premium": task.get("premium"),
+                "cleaning_time": task.get("cleaning_time"),
+                "start_time": task.get("start_time"),
+                "end_time": task.get("end_time"),
+                "travel_time": task.get("travel_time", 0),
+                "followup": task.get("followup", False)
+            })
+
+    # Scrivi il file specifico per la data
+    timeline_assignments_path.write_text(json.dumps(timeline_data, ensure_ascii=False, indent=2), encoding="utf-8")
+    print(f"✅ Aggiornato {timeline_assignments_path}")
+
+    # Aggiorna anche il file generale timeline_assignments.json
+    general_timeline_path = OUTPUT_ASSIGN.parent / "timeline_assignments.json"
+    general_timeline_path.write_text(json.dumps(timeline_data, ensure_ascii=False, indent=2), encoding="utf-8")
+    print(f"✅ Aggiornato anche: {general_timeline_path}")
 
 
 if __name__ == "__main__":

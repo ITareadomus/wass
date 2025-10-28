@@ -1,17 +1,6 @@
 import json
 from datetime import datetime
 from pathlib import Path
-import mysql.connector # Importa il connettore MySQL
-
-# --- CONFIGURAZIONE DATABASE ---
-DB_CONFIG = {
-    "host": "139.59.132.41",
-    "user": "admin",
-    "password": "ed329a875c6c4ebdf4e87e2bbe53a15771b5844ef6606dde",
-    "database": "adamdb"
-}
-# --- FINE CONFIGURAZIONE DATABASE ---
-
 
 # --- PATH ---
 # Use a project-relative data folder so the script works on Windows and UNIX
@@ -29,38 +18,6 @@ DEBUG_JSON = OUTPUT_DIR / "extract_all_debug.json"
 # Crea le directory se non esistono
 INPUT_DIR.mkdir(parents=True, exist_ok=True)
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-
-# --- DATABASE FUNCTIONS ---
-def update_task_priority_in_db(tasks, priority, work_date):
-    """Aggiorna la priority e i reasons dei task già presenti in wass_task_containers"""
-    try:
-        conn = mysql.connector.connect(**DB_CONFIG)
-        cur = conn.cursor()
-
-        updated_count = 0
-        for task in tasks:
-            # UPDATE della priority e reasons per task_id
-            cur.execute("""
-                UPDATE wass_task_containers 
-                SET priority = %s, reasons = %s
-                WHERE date = %s AND task_id = %s
-            """, (
-                priority,
-                json.dumps(task.get("reasons", [])),
-                work_date,
-                task.get("task_id")
-            ))
-            updated_count += cur.rowcount
-
-        conn.commit()
-        cur.close()
-        conn.close()
-        print(f"✅ Aggiornati {updated_count} task a priority={priority}")
-        return True
-    except Exception as e:
-        print(f"❌ Errore aggiornando priority {priority} nel DB: {e}")
-        return False
-
 
 def parse_time(t):
     if not t:
@@ -208,33 +165,32 @@ for entry in audit_log:
     else:
         entry["final_class"] = "LP"
 
-# --- 5) Salva i container nel database ---
-# Prepara i dati per la funzione save_container_to_db
-eo_output = {
-    "early_out_tasks": early_out_selected,
-    "total_apartments": len(early_out_selected),
-    "current_date": date_key
-}
-hp_output = {
-    "high_priority_tasks": high_priority_selected,
-    "total_apartments": len(high_priority_selected),
-    "current_date": date_key
-}
-lp_output = {
-    "low_priority_tasks": low_priority_selected,
-    "total_apartments": len(low_priority_selected),
-    "current_date": date_key
-}
+# ---- Export ----
+with open(EO_JSON, "w", encoding="utf-8") as f:
+    json.dump({
+        "early_out_tasks": early_out_selected, 
+        "total_apartments": len(early_out_selected),
+        "current_date": date_key
+    }, f, ensure_ascii=False, indent=2)
 
-# Aggiorna le priority nel database (i task sono già stati inseriti da task_extractor)
-update_task_priority_in_db(eo_output["early_out_tasks"], "early_out", date_key)
-update_task_priority_in_db(hp_output["high_priority_tasks"], "high_priority", date_key)
-update_task_priority_in_db(lp_output["low_priority_tasks"], "low_priority", date_key)
+with open(HP_JSON, "w", encoding="utf-8") as f:
+    json.dump({
+        "high_priority_tasks": high_priority_selected, 
+        "total_apartments": len(high_priority_selected),
+        "current_date": date_key
+    }, f, ensure_ascii=False, indent=2)
 
-# Scrivi solo il debug in JSON
+with open(LP_JSON, "w", encoding="utf-8") as f:
+    json.dump({
+        "low_priority_tasks": low_priority_selected, 
+        "total_apartments": len(low_priority_selected),
+        "current_date": date_key
+    }, f, ensure_ascii=False, indent=2)
+
 with open(DEBUG_JSON, "w", encoding="utf-8") as f:
-    json.dump({"audit": audit_log}, f, indent=2, ensure_ascii=False)
+    json.dump({"audit": audit_log}, f, ensure_ascii=False, indent=2)
 
-print(f"✅ Container salvati nel database per la data {date_key}")
-print(f"Generato:\n- {DEBUG_JSON}")
-print(f"Strategia deduplica EO/HP: {dedupe_strategy}")
+print(
+    f"Generati:\n- {EO_JSON}\n- {HP_JSON}\n- {LP_JSON}\n- {DEBUG_JSON}\n"
+    f"Strategia deduplica EO/HP: {dedupe_strategy}"
+)
