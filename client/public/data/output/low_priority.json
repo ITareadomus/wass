@@ -1,29 +1,6 @@
 {
   "low_priority_tasks": [
     {
-      "task_id": 210458,
-      "logistic_code": 777,
-      "client_id": 2,
-      "premium": false,
-      "address": "Via Imperia 43",
-      "lat": "45.4418695",
-      "lng": "9.1687704",
-      "cleaning_time": 330,
-      "checkin_date": "2025-10-31",
-      "checkout_date": "2025-10-29",
-      "checkin_time": null,
-      "checkout_time": null,
-      "pax_in": 3,
-      "pax_out": 4,
-      "small_equipment": false,
-      "operation_id": 3,
-      "confirmed_operation": true,
-      "straordinaria": true,
-      "type_apt": "D",
-      "alias": "ITW",
-      "customer_name": "ITALIANWAY SRL"
-    },
-    {
       "task_id": 217914,
       "logistic_code": 1652,
       "client_id": 123,
@@ -139,6 +116,6 @@
       "customer_name": "ITALIANWAY SRL"
     }
   ],
-  "total_apartments": 6,
+  "total_apartments": 5,
   "current_date": "2025-10-29"
 }
