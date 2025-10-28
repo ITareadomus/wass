@@ -83,6 +83,66 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Funzione helper per riorganizzare timeline_assignments.json per cleaner
+  const reorganizeTimelineByCleaners = async (timelineAssignmentsPath: string, timelineData: any) => {
+    try {
+      // Carica i dati dei cleaner
+      const cleanersPath = path.join(process.cwd(), 'client/public/data/cleaners/selected_cleaners.json');
+      const cleanersData = JSON.parse(await fs.readFile(cleanersPath, 'utf8'));
+      const cleanersMap = new Map(cleanersData.cleaners.map((c: any) => [c.id, c]));
+
+      // Raggruppa assignments per cleaner
+      const assignmentsByCleanerId = new Map<number, any[]>();
+      
+      for (const assignment of timelineData.assignments || []) {
+        const cleanerId = assignment.cleanerId;
+        if (!assignmentsByCleanerId.has(cleanerId)) {
+          assignmentsByCleanerId.set(cleanerId, []);
+        }
+        assignmentsByCleanerId.get(cleanerId)!.push(assignment);
+      }
+
+      // Ordina le task per sequence all'interno di ogni cleaner
+      for (const [cleanerId, tasks] of assignmentsByCleanerId) {
+        tasks.sort((a, b) => (a.sequence || 0) - (b.sequence || 0));
+      }
+
+      // Costruisci la struttura organizzata per cleaner
+      const cleanersWithTasks = [];
+      for (const [cleanerId, tasks] of assignmentsByCleanerId) {
+        const cleanerInfo = cleanersMap.get(cleanerId);
+        if (cleanerInfo) {
+          cleanersWithTasks.push({
+            cleaner: {
+              id: cleanerId,
+              name: cleanerInfo.name,
+              lastname: cleanerInfo.lastname,
+              role: cleanerInfo.role || 'Standard'
+            },
+            tasks: tasks
+          });
+        }
+      }
+
+      // Ordina i cleaner per ID
+      cleanersWithTasks.sort((a, b) => a.cleaner.id - b.cleaner.id);
+
+      // Struttura finale del file
+      const organizedData = {
+        current_date: timelineData.current_date,
+        scheduleVersion: timelineData.scheduleVersion || 1,
+        cleaners: cleanersWithTasks,
+        // Mantieni anche l'array flat per retrocompatibilità
+        assignments: timelineData.assignments || []
+      };
+
+      await fs.writeFile(timelineAssignmentsPath, JSON.stringify(organizedData, null, 2));
+      console.log(`✅ Timeline riorganizzata per cleaner in ${timelineAssignmentsPath}`);
+    } catch (error) {
+      console.error('Errore nella riorganizzazione timeline:', error);
+    }
+  };
+
   // Endpoint per salvare un'assegnazione nella timeline
   app.post("/api/save-timeline-assignment", async (req, res) => {
     try {
@@ -106,6 +166,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         timelineData = JSON.parse(existingData);
         if (!timelineData.scheduleVersion) {
           timelineData.scheduleVersion = 1;
+        }
+        // Se esiste già la struttura per cleaner, estrai gli assignments
+        if (timelineData.cleaners) {
+          timelineData.assignments = timelineData.cleaners.flatMap((c: any) => c.tasks || []);
         }
       } catch (error) {
         console.log(`Creazione nuovo file timeline per ${workDate}`);
@@ -162,6 +226,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       await fs.rename(tmpPath, timelineAssignmentsPath);
 
       console.log(`✅ Salvato assignment per cleaner ${normalizedCleanerId} in posizione ${targetIndex}`);
+      
+      // Riorganizza il file per cleaner
+      await reorganizeTimelineByCleaners(timelineAssignmentsPath, timelineData);
+      
       res.json({ success: true });
     } catch (error: any) {
       console.error("Errore nel salvataggio dell'assegnazione nella timeline:", error);
@@ -180,6 +248,73 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const timelineAssignmentsPath = path.join(timelineAssignmentsBasePath, `${workDate}.json`);
 
       console.log(`Rimozione assegnazione timeline - taskId: ${taskId}, logisticCode: ${logisticCode}, date: ${workDate}`);
+
+      let timelineData: any = { assignments: [], current_date: workDate };
+
+      try {
+        const existingData = await fs.readFile(timelineAssignmentsPath, 'utf8');
+        timelineData = JSON.parse(existingData);
+        // Se esiste già la struttura per cleaner, estrai gli assignments
+        if (timelineData.cleaners) {
+          timelineData.assignments = timelineData.cleaners.flatMap((c: any) => c.tasks || []);
+        }
+      } catch (error) {
+        console.log(`File timeline non trovato per ${workDate}, creazione nuovo file`);
+      }
+
+      // Rimuovi l'assegnazione
+      const normalizedLogisticCode = String(logisticCode);
+      const normalizedTaskId = String(taskId);
+      
+      const initialLength = timelineData.assignments.length;
+      timelineData.assignments = timelineData.assignments.filter((a: any) => 
+        String(a.logistic_code || a.logisticCode) !== normalizedLogisticCode &&
+        String(a.task_id || a.taskId) !== normalizedTaskId
+      );
+      
+      const removed = initialLength - timelineData.assignments.length;
+      console.log(`Rimossi ${removed} assignment per task ${taskId} / logistic ${logisticCode}`);
+
+      // Ricalcola le sequence per ogni cleaner
+      const assignmentsByCleanerId = new Map<number, any[]>();
+      for (const assignment of timelineData.assignments) {
+        const cleanerId = assignment.cleanerId;
+        if (!assignmentsByCleanerId.has(cleanerId)) {
+          assignmentsByCleanerId.set(cleanerId, []);
+        }
+        assignmentsByCleanerId.get(cleanerId)!.push(assignment);
+      }
+
+      // Riordina e ricalcola sequence
+      for (const [cleanerId, tasks] of assignmentsByCleanerId) {
+        tasks.sort((a, b) => (a.sequence || 0) - (b.sequence || 0));
+        tasks.forEach((task, index) => {
+          task.sequence = index + 1;
+        });
+      }
+
+      // Ricombina tutti gli assignments
+      timelineData.assignments = Array.from(assignmentsByCleanerId.values()).flat();
+
+      await fs.writeFile(timelineAssignmentsPath, JSON.stringify(timelineData, null, 2));
+      
+      // Riorganizza il file per cleaner
+      await reorganizeTimelineByCleaners(timelineAssignmentsPath, timelineData);
+
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("Errore nella rimozione dell'assegnazione dalla timeline:", error);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  // Endpoint per riordinare le task nella timeline
+  app.post("/api/reorder-timeline", async (req, res) => {
+    try {
+      const { date, cleanerId, taskId, logisticCode, fromIndex, toIndex } = req.body;
+      const workDate = date || format(new Date(), 'yyyy-MM-dd');
+      const timelineAssignmentsBasePath = path.join(process.cwd(), 'client/public/data/output/timeline_assignments');
+      const timelineAssignmentsPath = path.join(timelineAssignmentsBasePath, `${workDate}`);
 
       // Carica timeline_assignments per questa data
       let assignmentsData: any = { assignments: [], current_date: workDate };
