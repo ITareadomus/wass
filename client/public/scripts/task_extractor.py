@@ -1,4 +1,3 @@
-
 import json
 import mysql.connector
 import sys
@@ -241,6 +240,68 @@ def save_tasks_to_db(tasks, work_date):
         print(f"❌ Errore salvando task nel DB: {e}")
         return False
 
+def save_to_task_containers(tasks, work_date):
+    """Salva i task estratti in task_containers con priority='unassigned'"""
+    try:
+        connection = mysql.connector.connect(**DB_CONFIG)
+        cursor = connection.cursor()
+
+        # Elimina i task 'unassigned' esistenti per questa data
+        cursor.execute("""
+            DELETE FROM task_containers 
+            WHERE date = %s AND priority = 'unassigned'
+        """, (work_date,))
+
+        # Inserisci i nuovi task come 'unassigned'
+        if tasks:
+            insert_query = """
+                INSERT INTO task_containers (
+                    task_id, logistic_code, date, priority, client_id,
+                    address, lat, lng, cleaning_time, checkin_date, checkout_date,
+                    checkin_time, checkout_time, premium, straordinaria, reasons,
+                    pax_in, pax_out, small_equipment, operation_id, confirmed_operation,
+                    type_apt, alias, customer_name
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            """
+
+            for task in tasks:
+                cursor.execute(insert_query, (
+                    task.get("task_id"),
+                    task.get("logistic_code"),
+                    work_date,
+                    'unassigned',  # Tutti i task partono come unassigned
+                    task.get("client_id"),
+                    task.get("address"),
+                    task.get("lat"),
+                    task.get("lng"),
+                    task.get("cleaning_time"),
+                    task.get("checkin_date"),
+                    task.get("checkout_date"),
+                    task.get("checkin_time"),
+                    task.get("checkout_time"),
+                    1 if task.get("premium") else 0,
+                    1 if task.get("straordinaria") else 0,
+                    json.dumps([]),  # Reasons vuoti, verranno popolati da extract_all
+                    task.get("pax_in"),
+                    task.get("pax_out"),
+                    1 if task.get("small_equipment") else 0,
+                    task.get("operation_id"),
+                    1 if task.get("confirmed_operation") else 0,
+                    task.get("type_apt"),
+                    task.get("alias"),
+                    task.get("customer_name")
+                ))
+
+        connection.commit()
+        cursor.close()
+        connection.close()
+        print(f"✅ Salvati {len(tasks)} task in task_containers (priority=unassigned)")
+        return True
+    except Exception as e:
+        print(f"❌ Errore salvando task in task_containers: {e}")
+        return False
+
+
 def main():
     # Data da CLI o default domani
     if len(sys.argv) > 1:
@@ -250,15 +311,15 @@ def main():
         selected_date = (datetime.now() + timedelta(days=1)).strftime("%Y-%m-%d")
         print(f"Usando data di default (domani): {selected_date}")
 
-    # Assicurati che operations.json sia aggiornato
+    # Assicurati che operations.json sia aggiornato prima di estrarre i task
     refresh_operations_list()
 
     apt_data = get_apartments_for_date(selected_date)
 
-    # Salva nel database
-    save_tasks_to_db(apt_data, selected_date)
+    # Salva nel database task_containers con priority='unassigned'
+    save_to_task_containers(apt_data, selected_date)
 
-    # Salva anche in daily_tasks.json (per compatibilità con extract_all.py)
+    # Mantieni anche il JSON per retrocompatibilità (opzionale)
     output = {
         "metadata": {
             "last_updated": datetime.now().isoformat(),
@@ -277,9 +338,7 @@ def main():
     with open("client/public/data/input/daily_tasks.json", "w", encoding="utf-8") as f:
         json.dump(output, f, indent=4, ensure_ascii=False)
 
-    print(f"✅ Salvati {len(apt_data)} appartamenti per la data {selected_date}")
-    print(f"   - Nel database: task_containers (priority=unassigned)")
-    print(f"   - Nel file: daily_tasks.json (per compatibilità)")
+    print(f"Estratti {len(apt_data)} appartamenti per la data {selected_date}.")
 
 if __name__ == "__main__":
     main()
