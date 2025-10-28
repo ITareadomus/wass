@@ -51,7 +51,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
       await fs.writeFile(timelineAssignmentsPath, JSON.stringify({ assignments: [], current_date: workDate }, null, 2));
       console.log(`Timeline resettata per la data ${workDate}`);
 
-      res.json({ success: true, message: `Assegnazioni della timeline resettate per ${workDate}` });
+      // Svuota anche il database MySQL per questa data
+      let dbDeleted = 0;
+      try {
+        const mysql = await import('mysql2/promise');
+        const connection = await mysql.createConnection({
+          host: '139.59.132.41',
+          user: 'admin',
+          password: 'REMOVED_MYSQL_PASSWORD',
+          database: 'adamdb'
+        });
+
+        const [result]: any = await connection.execute(
+          'DELETE FROM app_wass_assignments WHERE DATE(date) = ?',
+          [workDate]
+        );
+        dbDeleted = result.affectedRows || 0;
+        await connection.end();
+        console.log(`🗑️  Eliminate ${dbDeleted} assegnazioni dal database per ${workDate}`);
+      } catch (dbError: any) {
+        console.warn('⚠️  Errore durante la cancellazione dal DB (continuo comunque):', dbError.message);
+      }
+
+      res.json({ 
+        success: true, 
+        message: `Timeline resettata per ${workDate} (${dbDeleted} record eliminati dal DB)` 
+      });
     } catch (error: any) {
       console.error("Errore nel reset delle assegnazioni della timeline:", error);
       res.status(500).json({ success: false, error: error.message });
