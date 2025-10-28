@@ -664,6 +664,7 @@ def main():
     print(f"💾 Risultati salvati in: {OUTPUT_ASSIGN}")
 
     # Update timeline.json con struttura organizzata per cleaner
+    from datetime import datetime as dt
     timeline_path = OUTPUT_ASSIGN.parent / "timeline.json"
 
     # Carica timeline esistente o crea nuova struttura
@@ -673,7 +674,7 @@ def main():
         "meta": {
             "total_cleaners": 0,
             "total_tasks": 0,
-            "last_updated": datetime.now().isoformat()
+            "last_updated": dt.now().isoformat()
         }
     }
 
@@ -714,7 +715,7 @@ def main():
     timeline_data["meta"]["total_tasks"] = sum(
         len(c.get("tasks", [])) for c in timeline_data["cleaners_assignments"]
     )
-    timeline_data["meta"]["last_updated"] = datetime.now().isoformat()
+    timeline_data["meta"]["last_updated"] = dt.now().isoformat()
     timeline_data["current_date"] = ref_date
 
     # Scrivi il file timeline.json
