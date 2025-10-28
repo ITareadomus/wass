@@ -626,7 +626,15 @@ const client = new Client();
         with open('/tmp/upload_storage.js', 'w') as f:
             f.write(node_script)
 
-        subprocess.run(['node', '/tmp/upload_storage.js'], check=True, cwd='/home/runner/workspace')
+        # Esegui lo script Node.js per caricare su Object Storage dalla directory workspace
+        result = subprocess.run(
+            ['node', '/tmp/upload_storage.js'],
+            check=True,
+            cwd='/home/runner/workspace',
+            capture_output=True,
+            text=True
+        )
+        print(result.stdout)
         print(f"📦 Salvato anche su Object Storage: {storage_filename}")
     except Exception as e:
         print(f"⚠️  Errore salvando su Object Storage (continuo comunque): {e}")
