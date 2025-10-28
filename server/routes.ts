@@ -78,6 +78,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       );
 
       await connection.end();
+      console.log(`✅ Container ${priority} svuotato per ${date}`);
       res.json({ success: true, message: `Container ${priority} svuotato con successo` });
     } catch (error: any) {
       console.error("Errore nello svuotamento del container:", error);
