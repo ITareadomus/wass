@@ -186,12 +186,10 @@ export default function GenerateAssignments() {
 
       // Aggiungi timestamp per evitare cache
       const timestamp = Date.now();
-      const [earlyOutResponse, highPriorityResponse, lowPriorityResponse, generalTimelineResponse, dateTimelineResponse] = await Promise.all([
+      const [earlyOutResponse, highPriorityResponse, lowPriorityResponse] = await Promise.all([
         fetch(`/data/output/early_out.json?t=${timestamp}`),
         fetch(`/data/output/high_priority.json?t=${timestamp}`),
-        fetch(`/data/output/low_priority.json?t=${timestamp}`),
-        fetch(`/data/output/timeline_assignments.json?t=${timestamp}`),
-        fetch(`/data/output/timeline_assignments/${dateStr}.json?t=${timestamp}`)
+        fetch(`/data/output/low_priority.json?t=${timestamp}`)
       ]);
 
       if (!earlyOutResponse.ok || !highPriorityResponse.ok || !lowPriorityResponse.ok) {
@@ -202,14 +200,14 @@ export default function GenerateAssignments() {
       const highPriorityData = await highPriorityResponse.json();
       const lowPriorityData = await lowPriorityResponse.json();
 
-      // Prima prova a caricare da timeline_assignments.json, poi da timeline_assignments/{date}.json
+      // Carica le assegnazioni dal database invece che dai file JSON
+      const timelineResponse = await fetch(`/api/timeline-assignments/${dateStr}?t=${timestamp}`);
       let timelineAssignmentsData = { assignments: [], current_date: dateStr };
-      if (generalTimelineResponse.ok) {
-        timelineAssignmentsData = await generalTimelineResponse.json();
-        console.log("Caricato da timeline_assignments.json (principale)");
-      } else if (dateTimelineResponse.ok) {
-        timelineAssignmentsData = await dateTimelineResponse.json();
-        console.log(`Caricato da timeline_assignments/${dateStr}.json (fallback)`);
+      if (timelineResponse.ok) {
+        timelineAssignmentsData = await timelineResponse.json();
+        console.log(`Caricato ${timelineAssignmentsData.assignments.length} assegnazioni dal database per ${dateStr}`);
+      } else {
+        console.log("Nessuna assegnazione trovata nel database");
       }
 
       console.log("Early out data:", earlyOutData);
@@ -379,8 +377,8 @@ export default function GenerateAssignments() {
       const result = await response.json();
       console.log('Early Out assegnati:', result);
 
-      // Ricarica i task
-      await reloadAllTasks();
+      // Ricarica i task E le assegnazioni dalla timeline
+      await loadTasks(true);
 
       toast({
         title: "Early Out Assegnati!",
@@ -420,8 +418,8 @@ export default function GenerateAssignments() {
       const result = await response.json();
       console.log('High Priority assegnati:', result);
 
-      // Ricarica i task
-      await reloadAllTasks();
+      // Ricarica i task E le assegnazioni dalla timeline
+      await loadTasks(true);
 
       toast({
         title: "High Priority Assegnati!",
@@ -461,8 +459,8 @@ export default function GenerateAssignments() {
       const result = await response.json();
       console.log('Low Priority assegnati:', result);
 
-      // Ricarica i task
-      await reloadAllTasks();
+      // Ricarica i task E le assegnazioni dalla timeline
+      await loadTasks(true);
 
       toast({
         title: "Low Priority Assegnati!",
