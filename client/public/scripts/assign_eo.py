@@ -588,10 +588,27 @@ def main():
     OUTPUT_ASSIGN.write_text(json.dumps(output, ensure_ascii=False, indent=2), encoding="utf-8")
     print(f"✅ Salvato {OUTPUT_ASSIGN}")
 
-    # Salva anche su Object Storage (esterno al progetto)
+    # Usa la data passata come argomento da riga di comando
+    import sys
+    if len(sys.argv) > 1:
+        ref_date = sys.argv[1]
+    else:
+        from datetime import datetime
+        ref_date = datetime.now().strftime("%Y-%m-%d")
+
+    # Salva nel database MySQL
+    save_to_database(output, ref_date)
+
+    # Salva anche su Object Storage con struttura data/filename.json
     try:
-        storage_filename = "assignments/early_out_assignments.json"
+        from datetime import datetime
+
+        # Formatta la data come dd-mm-yyyy
+        date_obj = datetime.strptime(ref_date, "%Y-%m-%d")
+        date_folder = date_obj.strftime("%d-%m-%Y")
+        storage_filename = f"{date_folder}/early_out_assignments.json"
         temp_file = "/tmp/early_out_assignments.json"
+
         with open(temp_file, 'w', encoding='utf-8') as f:
             json.dump(output, f, ensure_ascii=False, indent=2)
 
@@ -623,16 +640,6 @@ const client = new Client();
     print()
     print(f"💾 Risultati intermedi salvati in: {OUTPUT_ASSIGN}")
 
-    # Usa la data passata come argomento da riga di comando
-    import sys
-    if len(sys.argv) > 1:
-        ref_date = sys.argv[1]
-    else:
-        from datetime import datetime
-        ref_date = datetime.now().strftime("%Y-%m-%d")
-
-    # Salva nel database MySQL
-    save_to_database(output, ref_date)
 
     # Update timeline_assignments/{date}.json
     timeline_dir = OUTPUT_ASSIGN.parent / "timeline_assignments"
