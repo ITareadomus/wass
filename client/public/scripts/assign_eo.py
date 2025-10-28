@@ -10,7 +10,7 @@ from pathlib import Path
 # =============================
 BASE = Path(__file__).parent.parent / "data"
 
-INPUT_TASKS = BASE / "output" / "early_out.json"
+INPUT_CONTAINERS = BASE / "output" / "containers.json"
 INPUT_CLEANERS = BASE / "cleaners" / "selected_cleaners.json"
 OUTPUT_ASSIGN = BASE / "output" / "early_out_assignments.json"
 
@@ -312,10 +312,10 @@ def load_cleaners() -> List[Cleaner]:
 
 
 def load_tasks() -> List[Task]:
-    data = json.loads(INPUT_TASKS.read_text(encoding="utf-8"))
+    data = json.loads(INPUT_CONTAINERS.read_text(encoding="utf-8"))
     eo_start_min = hhmm_to_min("10:00")
     tasks: List[Task] = []
-    for t in data.get("early_out_tasks", []):
+    for t in data.get("containers", {}).get("early_out", {}).get("tasks", []):
         checkout = eo_start_min
         checkin = hhmm_to_min(t.get("checkin_time"), default="23:59")
 

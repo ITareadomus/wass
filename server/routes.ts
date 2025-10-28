@@ -793,31 +793,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
         await fs.writeFile(timelineAssignmentsPath, JSON.stringify(timelineData, null, 2));
       }
 
-      // Usa python3 e chiama task_extractor.py con la data specificata
-      const command = date
-        ? `python3 client/public/scripts/task_extractor.py ${date}`
-        : 'python3 client/public/scripts/task_extractor.py';
-
-      console.log(`Eseguendo task_extractor.py con data ${date || 'default'}...`);
-      const taskExtractorResult = await execAsync(command, {
-        cwd: process.cwd(),
-        maxBuffer: 10 * 1024 * 1024
+      // Esegui create_containers (unifica task_extractor + extract_all)
+      console.log(`Eseguendo create_containers.py per data ${date}...`);
+      const containersResult = await new Promise<string>((resolve, reject) => {
+        exec(
+          `python3 client/public/scripts/create_containers.py ${date}`,
+          (error, stdout, stderr) => {
+            if (error) {
+              console.error("Errore create_containers:", stderr);
+              reject(new Error(stderr || error.message));
+            } else {
+              resolve(stdout);
+            }
+          }
+        );
       });
-      console.log("task_extractor output:", taskExtractorResult.stdout);
-
-      console.log("Eseguendo extract_all.py...");
-      const extractAllResult = await execAsync('python3 client/public/scripts/extract_all.py', {
-        cwd: process.cwd(),
-        maxBuffer: 10 * 1024 * 1024
-      });
-      console.log("extract_all output:", extractAllResult.stdout);
+      console.log("create_containers output:", containersResult);
 
       res.json({
         success: true,
         message: "Dati estratti con successo",
         outputs: {
-          task_extractor: taskExtractorResult.stdout,
-          extract_all: extractAllResult.stdout
+          create_containers: containersResult
         }
       });
     } catch (error: any) {
