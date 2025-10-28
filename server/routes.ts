@@ -1441,9 +1441,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const normalizedDate = dateObj.toISOString().split('T')[0];
       console.log(`Data normalizzata: ${normalizedDate}`);
 
-      // Import mysql2
-      const mysql = await import('mysql2/promise');
-
       // Query al database per ottenere tutte le assegnazioni per questa data
       const connection = await mysql.createConnection(DB_CONFIG);
 
