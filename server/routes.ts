@@ -201,6 +201,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
       await fs.rename(tmpPath, timelinePath);
 
       console.log(`✅ Salvato assignment per cleaner ${normalizedCleanerId} in posizione ${targetIndex}`);
+
+      // RIMUOVI la task da containers.json se esiste
+      try {
+        const containersPath = path.join(process.cwd(), 'client/public/data/output/containers.json');
+        const containersData = JSON.parse(await fs.readFile(containersPath, 'utf8'));
+
+        let taskRemoved = false;
+        for (const containerKey of ['early_out', 'high_priority', 'low_priority']) {
+          const container = containersData.containers?.[containerKey];
+          if (container?.tasks) {
+            const originalCount = container.tasks.length;
+            container.tasks = container.tasks.filter((t: any) => 
+              String(t.task_id) !== normalizedTaskId && 
+              String(t.logistic_code) !== normalizedLogisticCode
+            );
+            const newCount = container.tasks.length;
+            
+            if (originalCount > newCount) {
+              container.count = newCount;
+              containersData.summary[containerKey] = newCount;
+              containersData.summary.total_tasks = (containersData.summary.total_tasks || 0) - (originalCount - newCount);
+              taskRemoved = true;
+              console.log(`✅ Rimossa task ${normalizedLogisticCode} da containers.json (${containerKey})`);
+              break;
+            }
+          }
+        }
+
+        if (taskRemoved) {
+          await fs.writeFile(containersPath, JSON.stringify(containersData, null, 2));
+        }
+      } catch (containerError) {
+        console.warn('Errore nella rimozione da containers.json:', containerError);
+        // Non bloccare la risposta, l'assegnazione timeline è già salvata
+      }
+
       res.json({ success: true });
     } catch (error: any) {
       console.error("Errore nel salvataggio dell'assegnazione nella timeline:", error);
