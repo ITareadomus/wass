@@ -13,20 +13,74 @@ const __dirname = dirname(__filename);
 const execAsync = promisify(exec);
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  // Endpoint per svuotare early_out.json dopo l'assegnazione
-  app.post("/api/clear-early-out-json", async (req, res) => {
+  // Endpoint per ottenere i task di un container dal database
+  app.get("/api/container/:priority/:date", async (req, res) => {
     try {
-      const earlyOutPath = path.join(process.cwd(), 'client/public/data/output/early_out.json');
+      const { priority, date } = req.params;
+      const mysql = await import('mysql2/promise');
+      const connection = await mysql.createConnection({
+        host: '139.59.132.41',
+        user: 'admin',
+        password: 'ed329a875c6c4ebdf4e87e2bbe53a15771b5844ef6606dde',
+        database: 'adamdb'
+      });
 
-      // Svuota il file mantenendo la struttura
-      await fs.writeFile(earlyOutPath, JSON.stringify({
-        early_out_tasks: [],
-        total_apartments: 0
-      }, null, 2));
+      const [rows]: any = await connection.execute(
+        'SELECT * FROM task_containers WHERE priority = ? AND date = ?',
+        [priority, date]
+      );
 
-      res.json({ success: true, message: "early_out.json svuotato con successo" });
+      await connection.end();
+
+      const tasks = rows.map((row: any) => ({
+        task_id: row.task_id,
+        logistic_code: row.logistic_code,
+        client_id: row.client_id,
+        premium: Boolean(row.premium),
+        address: row.address,
+        lat: row.lat,
+        lng: row.lng,
+        cleaning_time: row.cleaning_time,
+        checkin_date: row.checkin_date,
+        checkout_date: row.checkout_date,
+        checkin_time: row.checkin_time,
+        checkout_time: row.checkout_time,
+        straordinaria: Boolean(row.straordinaria),
+        reasons: row.reasons ? JSON.parse(row.reasons) : []
+      }));
+
+      res.json({
+        [`${priority}_tasks`]: tasks,
+        total_apartments: tasks.length,
+        current_date: date
+      });
     } catch (error: any) {
-      console.error("Errore nello svuotamento di early_out.json:", error);
+      console.error(`Errore nel caricamento container ${req.params.priority}:`, error);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  // Endpoint per svuotare un container dal database
+  app.post("/api/clear-container", async (req, res) => {
+    try {
+      const { priority, date } = req.body;
+      const mysql = await import('mysql2/promise');
+      const connection = await mysql.createConnection({
+        host: '139.59.132.41',
+        user: 'admin',
+        password: 'ed329a875c6c4ebdf4e87e2bbe53a15771b5844ef6606dde',
+        database: 'adamdb'
+      });
+
+      await connection.execute(
+        'DELETE FROM task_containers WHERE priority = ? AND date = ?',
+        [priority, date]
+      );
+
+      await connection.end();
+      res.json({ success: true, message: `Container ${priority} svuotato con successo` });
+    } catch (error: any) {
+      console.error("Errore nello svuotamento del container:", error);
       res.status(500).json({ success: false, error: error.message });
     }
   });
