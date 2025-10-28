@@ -821,67 +821,6 @@ def main():
     OUTPUT_ASSIGN.write_text(json.dumps(output, ensure_ascii=False, indent=2), encoding="utf-8")
     print(f"✅ Wrote {OUTPUT_ASSIGN}")
 
-    # Salva anche su Object Storage con struttura data/filename.json
-    try:
-        import subprocess
-        from datetime import datetime
-        import os
-
-        # Formatta la data come dd-mm-yyyy
-        date_obj = datetime.strptime(ref_date, "%Y-%m-%d")
-        date_folder = date_obj.strftime("%d-%m-%Y")
-        storage_filename = f"{date_folder}/high_priority_assignments.json"
-        temp_file = "/tmp/high_priority_assignments.json"
-
-        with open(temp_file, 'w', encoding='utf-8') as f:
-            json.dump(output, f, ensure_ascii=False, indent=2)
-
-        # Ottieni il percorso della directory workspace
-        workspace_dir = Path(__file__).resolve().parents[3]
-        upload_script_path = workspace_dir / 'upload_storage_hp.cjs'
-        
-        node_script = f"""
-const {{ Client }} = require('@replit/object-storage');
-const fs = require('fs');
-const client = new Client();
-(async () => {{
-  try {{
-    const data = fs.readFileSync('{temp_file}', 'utf-8');
-    await client.uploadFromText('{storage_filename}', data);
-    console.log('✅ Caricato su Object Storage: {storage_filename}');
-  }} catch (error) {{
-    console.error('❌ Errore upload Object Storage:', error.message);
-    process.exit(1);
-  }}
-}})();
-"""
-        with open(upload_script_path, 'w') as f:
-            f.write(node_script)
-        
-        result = subprocess.run(
-            ['node', str(upload_script_path)],
-            cwd=str(workspace_dir),
-            capture_output=True,
-            text=True,
-            env={**os.environ}
-        )
-
-        if result.returncode == 0:
-            print(result.stdout)
-            print(f"📦 Salvato anche su Object Storage: {storage_filename}")
-        else:
-            print(f"⚠️  Errore upload Object Storage:")
-            print(result.stderr)
-
-        # Rimuovi lo script temporaneo
-        if os.path.exists(upload_script_path):
-            os.remove(upload_script_path)
-
-    except Exception as e:
-        print(f"⚠️  Errore salvando su Object Storage (continuo comunque): {e}")
-        import traceback
-        traceback.print_exc()
-
 
 if __name__ == "__main__":
     main()
