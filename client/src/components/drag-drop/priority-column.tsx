@@ -63,109 +63,53 @@ export default function PriorityColumn({
     }
   };
 
-  const handleTimelineAssignment = async () => {
-    if (priority === 'early-out') {
-      // Esegui lo script di assegnazione assign_eo.py
-      try {
-        // Ottieni la data selezionata dal localStorage
-        const savedDate = localStorage.getItem('selected_work_date');
-        if (!savedDate) {
-          toast({
-            variant: "destructive",
-            title: "Errore",
-            description: "Nessuna data selezionata",
-          });
-          return;
-        }
-        // Converti in formato yyyy-MM-dd (rimuovi eventuali timestamp)
-        const dateStr = savedDate.split('T')[0];
-
-        console.log('📅 Data dal localStorage:', dateStr);
-        console.log('🔄 Esecuzione assign_eo.py per data:', dateStr);
-        const response = await fetch('/api/run-optimizer', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ date: dateStr })
-        });
-
-        if (!response.ok) {
-          throw new Error('Errore durante l\'assegnazione ottimizzata');
-        }
-
-        const result = await response.json();
-        console.log('Assegnazione ottimizzata completata:', result);
-
-        toast({
-          variant: "success",
-          title: "✅ EARLY-OUT assegnati con successo!",
-        });
-
-        // Ricarica i task per riflettere le nuove assegnazioni
-        if ((window as any).reloadAllTasks) {
-          await (window as any).reloadAllTasks();
-        }
-
-        // Ricarica la pagina per aggiornare i marker sulla mappa
-        window.location.reload();
-      } catch (error: any) {
-        console.error('Errore durante l\'assegnazione:', error);
+  const handleAssignEarlyOut = async () => {
+    try {
+      setIsAssigning(true);
+      const savedDate = localStorage.getItem('selected_work_date');
+      if (!savedDate) {
         toast({
           variant: "destructive",
-          title: "Errore durante l'assegnazione",
-          description: error.message,
+          title: "Errore",
+          description: "Nessuna data selezionata",
         });
+        setIsAssigning(false);
+        return;
       }
-    } else if (priority === 'high') {
-      // This part is handled by handleAssignHighPriority now
-    } else if (priority === 'low') {
-      try {
-        // Ottieni la data selezionata dal localStorage
-        const savedDate = localStorage.getItem('selected_work_date');
-        if (!savedDate) {
-          toast({
-            variant: "destructive",
-            title: "Errore",
-            description: "Nessuna data selezionata",
-          });
-          return;
-        }
-        // Converti in formato yyyy-MM-dd (rimuovi eventuali timestamp)
-        const dateStr = savedDate.split('T')[0];
+      const dateStr = savedDate.split('T')[0];
 
-        console.log('📅 Data dal localStorage:', dateStr);
-        console.log('🔄 Esecuzione assign_lp.py per data:', dateStr);
-        const response = await fetch('/api/assign-lp', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ date: dateStr })
-        });
+      console.log('📅 Data dal localStorage:', dateStr);
+      console.log('🔄 Esecuzione assign_eo.py per data:', dateStr);
+      const response = await fetch('/api/run-optimizer', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ date: dateStr })
+      });
 
-        if (!response.ok) {
-          throw new Error('Errore durante l\'assegnazione LP');
-        }
-
-        const result = await response.json();
-        console.log('Assegnazione LP completata:', result);
-
-        toast({
-          variant: "success",
-          title: "✅ LOW PRIORITY assegnati con successo!",
-        });
-
-        // Ricarica i task
-        if ((window as any).reloadAllTasks) {
-          await (window as any).reloadAllTasks();
-        }
-
-        // Ricarica la pagina per aggiornare i marker sulla mappa
-        window.location.reload();
-      } catch (error: any) {
-        console.error('Errore nell\'assegnazione LP:', error);
-        toast({
-          title: "❌ LOW PRIORITY non assegnati, errore!",
-          variant: "destructive",
-        });
+      if (!response.ok) {
+        throw new Error('Errore durante l\'assegnazione Early Out');
       }
+
+      const result = await response.json();
+      console.log('Assegnazione Early Out completata:', result);
+
+      toast({
+        variant: "success",
+        title: "✅ EARLY-OUT assegnati con successo!",
+      });
+
+      // Ricarica i task
+      if (typeof (window as any).reloadAllTasks === 'function') {
+        await (window as any).reloadAllTasks();
+      }
+    } catch (error: any) {
+      console.error('Errore nell\'assegnazione EO:', error);
+      toast({
+        title: "❌ EARLY-OUT non assegnati, errore!",
+        variant: "destructive",
+      });
+    } finally {
+      setIsAssigning(false);
     }
   };
 
@@ -281,38 +225,31 @@ export default function PriorityColumn({
             {tasks.length} task
           </div>
         </div>
-        {priority === "high" ? (
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleAssignHighPriority}
-            disabled={isAssigning || tasks.length === 0}
-            className="text-xs px-2 py-1 h-7"
-          >
-            {isAssigning ? (
-              <>
-                <span className="animate-spin mr-2">⏳</span>
-                Assegnando...
-              </>
-            ) : (
-              <>
-                <Calendar className="w-3 h-3 mr-1" />
-                Assegna
-              </>
-            )}
-          </Button>
-        ) : (
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleTimelineAssignment}
-            className="text-xs px-2 py-1 h-7"
-            disabled={tasks.length === 0}
-          >
-            <Calendar className="w-3 h-3 mr-1" />
-            Assegna
-          </Button>
-        )}
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={
+            priority === "early-out"
+              ? handleAssignEarlyOut
+              : priority === "high"
+              ? handleAssignHighPriority
+              : handleAssignLowPriority
+          }
+          disabled={isAssigning || tasks.length === 0}
+          className="text-xs px-2 py-1 h-7"
+        >
+          {isAssigning ? (
+            <>
+              <span className="animate-spin mr-2">⏳</span>
+              Assegnando...
+            </>
+          ) : (
+            <>
+              <Calendar className="w-3 h-3 mr-1" />
+              Assegna
+            </>
+          )}
+        </Button>
       </div>
 
       <Droppable droppableId={droppableId}>
