@@ -783,15 +783,35 @@ def main():
             for task in cleaner_entry.get("tasks", []):
                 timeline_data["assignments"].append(task)
     
+    # Riorganizza per cleaner invece di usare assignments flat
+    from collections import defaultdict
+    cleaners_map = defaultdict(list)
+    
+    # Carica i dati dei cleaner
+    selected_cleaners_path = Path(__file__).parent.parent / "data" / "cleaners" / "selected_cleaners.json"
+    cleaners_info = {}
+    if selected_cleaners_path.exists():
+        cleaners_data = json.loads(selected_cleaners_path.read_text(encoding="utf-8"))
+        for cleaner in cleaners_data.get("cleaners", []):
+            cleaners_info[cleaner["id"]] = cleaner
+    
+    # Estrai assignments esistenti
+    existing_assignments = []
+    if "cleaners" in timeline_data:
+        for cleaner_entry in timeline_data.get("cleaners", []):
+            for task in cleaner_entry.get("tasks", []):
+                existing_assignments.append(task)
+    elif "assignments" in timeline_data:
+        existing_assignments = timeline_data.get("assignments", [])
+    
     # Rimuovi vecchie assegnazioni HP
     assigned_codes = set()
     for cleaner_entry in output["high_priority_tasks_assigned"]:
         for task in cleaner_entry.get("tasks", []):
             assigned_codes.add(str(task["logistic_code"]))
 
-    timeline_data["assignments"] = [
-        a for a in timeline_data.get("assignments", [])
-        if str(a.get("logistic_code")) not in assigned_codes
+    for assignment in existing_assignments:
+        if str(assignment.get("logistic_code")) not in assigned_codes
     ]
 
     # Aggiungi nuove assegnazioni HP

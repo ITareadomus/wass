@@ -165,18 +165,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (!timelineData.scheduleVersion) {
           timelineData.scheduleVersion = 1;
         }
-        // Supporta sia struttura per cleaner che flat
+        // Supporta sia struttura per cleaner che flat - CONVERTI SEMPRE A FLAT
+        timelineData.assignments = [];
         if (timelineData.cleaners) {
           // Estrai assignments dalla struttura per cleaner
-          timelineData.assignments = [];
           for (const cleaner_entry of timelineData.cleaners) {
             for (const task of cleaner_entry.tasks || []) {
               timelineData.assignments.push(task);
             }
           }
         } else if (timelineData.assignments && timelineData.assignments.length > 0) {
-          // Se abbiamo solo assignments flat, NON facciamo nulla qui
-          // La riorganizzazione avverrà dopo l'inserimento
+          // Assignments già in formato flat
         }
       } catch (error) {
         console.log(`Creazione nuovo file timeline per ${workDate}`);
