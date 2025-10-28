@@ -634,15 +634,21 @@ def main():
         for task in cleaner_entry.get("tasks", []):
             assigned_logistic_codes_from_output.add(str(task["logistic_code"]))
 
+    # Supporta sia struttura per cleaner che flat
+    if "cleaners" in timeline_data:
+        # Estrai assignments dalla struttura per cleaner
+        timeline_data["assignments"] = []
+        for cleaner_entry in timeline_data.get("cleaners", []):
+            for task in cleaner_entry.get("tasks", []):
+                timeline_data["assignments"].append(task)
+    
     # Filtra le assegnazioni esistenti nel file timeline per rimuovere quelle EO che ora sono nel DB
     timeline_data["assignments"] = [
         a for a in timeline_data.get("assignments", [])
         if a.get("assignment_type") != "early_out" or str(a.get("logistic_code")) not in assigned_logistic_codes_from_output
     ]
 
-    # Aggiungi nuove assegnazioni EO (che ora sono nel DB) al file timeline_assignments/{date}.json
-    # Nota: questo file conterrà solo le assegnazioni EO generate *oggi*.
-    # Se vuoi un file che aggreghi tutto, dovrai leggere il DB o un file generale.
+    # Aggiungi nuove assegnazioni EO
     for cleaner_entry in output.get("early_out_tasks_assigned", []):
         cleaner_id = cleaner_entry["cleaner"]["id"]
         for task in cleaner_entry.get("tasks", []):
@@ -662,6 +668,45 @@ def main():
                 "travel_time": task.get("travel_time", 0),
                 "followup": task.get("followup", False)
             })
+    
+    # Riorganizza per cleaner
+    from collections import defaultdict
+    assignments_by_cleaner = defaultdict(list)
+    for assignment in timeline_data["assignments"]:
+        cleaner_id = assignment.get("cleanerId")
+        if cleaner_id:
+            assignments_by_cleaner[cleaner_id].append(assignment)
+    
+    # Ordina le task di ogni cleaner per sequence
+    for cleaner_id in assignments_by_cleaner:
+        assignments_by_cleaner[cleaner_id].sort(key=lambda x: x.get("sequence", 0))
+    
+    # Carica i dati dei cleaner per avere nome/cognome
+    cleaners_path = BASE / "cleaners" / "selected_cleaners.json"
+    cleaners_map = {}
+    try:
+        cleaners_data = json.loads(cleaners_path.read_text(encoding="utf-8"))
+        for c in cleaners_data.get("cleaners", []):
+            cleaners_map[c["id"]] = c
+    except:
+        pass
+    
+    # Crea struttura organizzata per cleaner
+    cleaners_with_tasks = []
+    for cleaner_id in sorted(assignments_by_cleaner.keys()):
+        cleaner_info = cleaners_map.get(cleaner_id, {})
+        cleaners_with_tasks.append({
+            "cleaner": {
+                "id": cleaner_id,
+                "name": cleaner_info.get("name", f"Cleaner {cleaner_id}"),
+                "lastname": cleaner_info.get("lastname", ""),
+                "role": cleaner_info.get("role", "Standard")
+            },
+            "tasks": assignments_by_cleaner[cleaner_id]
+        })
+    
+    # Salva con entrambe le strutture per retrocompatibilità
+    timeline_data["cleaners"] = cleaners_with_tasks
 
     # Scrivi immediatamente il file aggiornato per la data specifica
     try:

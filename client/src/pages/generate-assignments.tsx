@@ -226,9 +226,21 @@ export default function GenerateAssignments() {
 
       console.log("Task convertiti - Early:", initialEarlyOut.length, "High:", initialHigh.length, "Low:", initialLow.length);
 
+      // Supporta sia la nuova struttura per cleaner che quella vecchia flat
+      let assignments: any[] = [];
+      if (timelineAssignmentsData.cleaners) {
+        // Nuova struttura: estrai tutte le task da tutti i cleaner
+        assignments = timelineAssignmentsData.cleaners.flatMap((c: any) => c.tasks || []);
+        console.log(`Struttura per cleaner rilevata: ${timelineAssignmentsData.cleaners.length} cleaner con ${assignments.length} task totali`);
+      } else if (timelineAssignmentsData.assignments) {
+        // Vecchia struttura flat
+        assignments = timelineAssignmentsData.assignments;
+        console.log(`Struttura flat rilevata: ${assignments.length} assegnazioni`);
+      }
+
       // Crea una mappa di logistic_code -> assegnazione timeline completa
       const timelineAssignmentsMap = new Map<string, any>(
-        timelineAssignmentsData.assignments.map((a: any) => [String(a.logistic_code), a])
+        assignments.map((a: any) => [String(a.logistic_code || a.logisticCode), a])
       );
 
       console.log("Task assegnate nella timeline (logistic_code):", Array.from(timelineAssignmentsMap.keys()));
