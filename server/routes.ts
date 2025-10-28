@@ -160,21 +160,56 @@ export async function registerRoutes(app: Express): Promise<Server> {
         String(t.logistic_code) !== normalizedLogisticCode && String(t.task_id) !== normalizedTaskId
       );
 
-      // Crea il nuovo task con TUTTI i dati richiesti
+      // Crea il nuovo task con TUTTI i dati da containers.json + campi timeline
       const newTask = {
+        // Campi base identificativi
         task_id: fullTaskData.task_id,
         logistic_code: fullTaskData.logistic_code,
+        client_id: fullTaskData.client_id,
+        
+        // Campi di posizione
         address: fullTaskData.address,
         lat: String(fullTaskData.lat),
         lng: String(fullTaskData.lng),
+        
+        // Campi di classificazione
         premium: fullTaskData.premium,
+        priority: fullTaskData.priority,
+        
+        // Campi di durata e tempi
         cleaning_time: fullTaskData.cleaning_time,
+        checkin_date: fullTaskData.checkin_date,
+        checkout_date: fullTaskData.checkout_date,
+        checkin_time: fullTaskData.checkin_time,
+        checkout_time: fullTaskData.checkout_time,
+        
+        // Campi di occupancy e attrezzatura
+        pax_in: fullTaskData.pax_in,
+        pax_out: fullTaskData.pax_out,
+        small_equipment: fullTaskData.small_equipment,
+        
+        // Campi di operazione
+        operation_id: fullTaskData.operation_id,
+        confirmed_operation: fullTaskData.confirmed_operation,
+        straordinaria: fullTaskData.straordinaria,
+        
+        // Campi cliente e appartamento
+        type_apt: fullTaskData.type_apt,
+        alias: fullTaskData.alias,
+        customer_name: fullTaskData.customer_name,
+        
+        // Campi specifici della timeline
         start_time: null,
         end_time: null,
         followup: false,
         sequence: 0,
         travel_time: 0,
-        reasons: ['manually_moved_to_timeline']
+        
+        // Reasons (combina quelle da containers con quella timeline)
+        reasons: [
+          ...(fullTaskData.reasons || []),
+          'manually_moved_to_timeline'
+        ]
       };
 
       console.log(`📝 Task salvato in timeline:`, {
