@@ -400,28 +400,58 @@ def load_cleaners(ref_date: str) -> List[Cleaner]:
 
 
 def seed_cleaners_from_eo(cleaners: List[Cleaner], ref_date: str):
-    if not INPUT_EO_ASSIGN.exists():
-        return
-    data = json.loads(INPUT_EO_ASSIGN.read_text(encoding="utf-8"))
-    for block in data.get("early_out_tasks_assigned", []):
-        cid = int(block["cleaner"]["id"])
-        tasks = block.get("tasks", [])
-        if not tasks:
-            continue
-        last = tasks[-1]
-        end_time = last.get("end_time")  # "HH:MM"
-        last_addr = last.get("address")
-        last_lat = last.get("lat")
-        last_lng = last.get("lng")
-        last_seq = last.get("sequence") or len(tasks)
+    """Seed cleaners da database (Early-Out assignments)"""
+    import mysql.connector
+    
+    try:
+        conn = mysql.connector.connect(
+            host="139.59.132.41",
+            user="admin",
+            password="ed329a875c6c4ebdf4e87e2bbe53a15771b5844ef6606dde",
+            database="adamdb"
+        )
+        cur = conn.cursor(dictionary=True)
+        
+        # Query per ottenere l'ultima task EO di ogni cleaner
+        cur.execute("""
+            SELECT 
+                cleaner_id,
+                end_time,
+                address,
+                lat,
+                lng,
+                sequence
+            FROM app_wass_assignments
+            WHERE DATE(date) = %s 
+              AND assignment_type = 'early_out'
+            ORDER BY cleaner_id, sequence DESC
+        """, (ref_date,))
+        
+        assignments = cur.fetchall()
+        
+        # Raggruppa per cleaner_id e prendi l'ultima task
+        cleaner_last_task = {}
+        for row in assignments:
+            cid = row['cleaner_id']
+            if cid not in cleaner_last_task:
+                cleaner_last_task[cid] = row
+        
+        # Aggiorna i cleaner
         for cl in cleaners:
-            if cl.id == cid:
-                cl.available_from = hhmm_to_dt(ref_date, end_time)
-                cl.last_eo_address = last_addr
-                cl.last_eo_lat = float(last_lat) if last_lat is not None else None
-                cl.last_eo_lng = float(last_lng) if last_lng is not None else None
-                cl.eo_last_sequence = int(last_seq)
-                break
+            if cl.id in cleaner_last_task:
+                last = cleaner_last_task[cl.id]
+                cl.available_from = hhmm_to_dt(ref_date, last['end_time'])
+                cl.last_eo_address = last['address']
+                cl.last_eo_lat = float(last['lat']) if last['lat'] is not None else None
+                cl.last_eo_lng = float(last['lng']) if last['lng'] is not None else None
+                cl.eo_last_sequence = int(last['sequence'])
+        
+        cur.close()
+        conn.close()
+        
+    except Exception as e:
+        print(f"⚠️  Errore nel seed da database: {e}")
+        print("Continuo senza seed...")
 
 
 def load_tasks() -> Tuple[List[Task], str]:
@@ -630,6 +660,66 @@ def build_output(cleaners: List[Cleaner], unassigned: List[Task], original_tasks
     }
 
 
+def save_to_database(output: Dict[str, Any], ref_date: str):
+    """Salva le assegnazioni nel database MySQL"""
+    import mysql.connector
+    
+    try:
+        conn = mysql.connector.connect(
+            host="139.59.132.41",
+            user="admin",
+            password="ed329a875c6c4ebdf4e87e2bbe53a15771b5844ef6606dde",
+            database="adamdb"
+        )
+        cur = conn.cursor()
+        
+        # Elimina le assegnazioni HP esistenti per questa data
+        cur.execute(
+            "DELETE FROM app_wass_assignments WHERE assignment_type = 'high_priority' AND DATE(date) = %s",
+            (ref_date,)
+        )
+        
+        # Inserisci le nuove assegnazioni
+        insert_count = 0
+        for cleaner_entry in output.get("high_priority_tasks_assigned", []):
+            cleaner_id = cleaner_entry["cleaner"]["id"]
+            for task in cleaner_entry.get("tasks", []):
+                cur.execute("""
+                    INSERT INTO app_wass_assignments (
+                        task_id, cleaner_id, date, logistic_code, assignment_type, sequence,
+                        start_time, end_time, cleaning_time, travel_time, address, lat, lng,
+                        premium, followup
+                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                """, (
+                    task.get("task_id"),
+                    cleaner_id,
+                    ref_date,
+                    task.get("logistic_code"),
+                    'high_priority',
+                    task.get("sequence", 0),
+                    task.get("start_time"),
+                    task.get("end_time"),
+                    task.get("cleaning_time"),
+                    task.get("travel_time", 0),
+                    task.get("address"),
+                    task.get("lat"),
+                    task.get("lng"),
+                    1 if task.get("premium") else 0,
+                    1 if task.get("followup") else 0
+                ))
+                insert_count += 1
+        
+        conn.commit()
+        cur.close()
+        conn.close()
+        
+        print(f"✅ Salvate {insert_count} assegnazioni nel database MySQL")
+        return True
+    except Exception as e:
+        print(f"❌ Errore nel salvataggio database: {e}")
+        return False
+
+
 def main():
     if not INPUT_TASKS.exists():
         raise SystemExit(f"Missing input file: {INPUT_TASKS}")
@@ -659,16 +749,15 @@ def main():
     planners, leftovers = plan_day(tasks, cleaners)
     output = build_output(planners, leftovers, tasks)
     
-    OUTPUT_ASSIGN.parent.mkdir(parents=True, exist_ok=True)
-    OUTPUT_ASSIGN.write_text(json.dumps(output, ensure_ascii=False, indent=2), encoding="utf-8")
-    
     print()
     print(f"✅ Assegnazione completata!")
     print(f"   - Task assegnati: {output['meta']['assigned']}/{output['meta']['total_tasks']}")
     print(f"   - Cleaner utilizzati: {output['meta']['cleaners_used']}")
     print(f"   - Task non assegnati: {output['meta']['unassigned']}")
     print()
-    print(f"💾 Risultati salvati in: {OUTPUT_ASSIGN}")
+    
+    # Salva nel database MySQL
+    save_to_database(output, ref_date)
     
     # Update timeline_assignments/{date}.json
     timeline_dir = OUTPUT_ASSIGN.parent / "timeline_assignments"
