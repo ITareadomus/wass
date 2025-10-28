@@ -1,11 +1,11 @@
 {
     "metadata": {
-        "last_updated": "2025-10-28T11:29:12.897743",
+        "last_updated": "2025-10-28T12:06:30.351755",
         "schema_version": "1.0"
     },
     "dates": {
         "2025-10-29": {
-            "timestamp": "2025-10-28T11:29:12.897758",
+            "timestamp": "2025-10-28T12:06:30.351765",
             "apt": [
                 {
                     "task_id": 216826,
@@ -87,8 +87,8 @@
                     "cleaning_time": 120,
                     "checkin_date": "2025-10-29",
                     "checkout_date": "2025-10-29",
-                    "checkin_time": null,
-                    "checkout_time": null,
+                    "checkin_time": "15:00",
+                    "checkout_time": "11:00",
                     "pax_in": 3,
                     "pax_out": 3,
                     "small_equipment": false,
@@ -386,7 +386,7 @@
                     "cleaning_time": 120,
                     "checkin_date": "2025-10-29",
                     "checkout_date": "2025-10-29",
-                    "checkin_time": null,
+                    "checkin_time": "15:00",
                     "checkout_time": "11:00",
                     "pax_in": 3,
                     "pax_out": 1,
