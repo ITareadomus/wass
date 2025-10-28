@@ -177,8 +177,8 @@ export default function PriorityColumn({
         setIsAssigning(false);
         return;
       }
-      // Usa direttamente la stringa salvata (è già in formato yyyy-MM-dd)
-      const dateStr = savedDate;
+      // Converte la data ISO in formato yyyy-MM-dd
+      const dateStr = savedDate.split('T')[0];
 
       const response = await fetch('/api/assign-lp', {
         method: 'POST',
