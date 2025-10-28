@@ -821,11 +821,17 @@ def main():
     OUTPUT_ASSIGN.write_text(json.dumps(output, ensure_ascii=False, indent=2), encoding="utf-8")
     print(f"✅ Wrote {OUTPUT_ASSIGN}")
 
-    # Salva anche su Object Storage
+    # Salva anche su Object Storage con struttura data/filename.json
     try:
         import subprocess
-        storage_filename = "assignments/high_priority_assignments.json"
+        from datetime import datetime
+        
+        # Formatta la data come dd-mm-yyyy
+        date_obj = datetime.strptime(ref_date, "%Y-%m-%d")
+        date_folder = date_obj.strftime("%d-%m-%Y")
+        storage_filename = f"{date_folder}/high_priority_assignments.json"
         temp_file = "/tmp/high_priority_assignments.json"
+        
         with open(temp_file, 'w', encoding='utf-8') as f:
             json.dump(output, f, ensure_ascii=False, indent=2)
 

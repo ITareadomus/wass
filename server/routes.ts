@@ -1017,7 +1017,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Aggiungi assegnazioni EO (prova prima da Object Storage)
       try {
         const { loadAssignmentFromStorage } = await import('./object-storage.js');
-        let eoJson = await loadAssignmentFromStorage('assignments/early_out_assignments.json');
+        // Formatta data come dd-mm-yyyy per Object Storage
+        const dateObj = new Date(date);
+        const day = String(dateObj.getDate()).padStart(2, '0');
+        const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+        const year = dateObj.getFullYear();
+        const dateFolder = `${day}-${month}-${year}`;
+        
+        let eoJson = await loadAssignmentFromStorage(`${dateFolder}/early_out_assignments.json`);
         
         // Fallback: leggi dal file locale se non trovato su Object Storage
         if (!eoJson) {
@@ -1070,7 +1077,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Aggiungi assegnazioni HP (prova prima da Object Storage)
       try {
         const { loadAssignmentFromStorage } = await import('./object-storage.js');
-        let hpJson = await loadAssignmentFromStorage('assignments/high_priority_assignments.json');
+        const dateObj = new Date(date);
+        const day = String(dateObj.getDate()).padStart(2, '0');
+        const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+        const year = dateObj.getFullYear();
+        const dateFolder = `${day}-${month}-${year}`;
+        
+        let hpJson = await loadAssignmentFromStorage(`${dateFolder}/high_priority_assignments.json`);
         
         if (!hpJson) {
           const hpData = await fs.readFile(hpAssignmentsPath, 'utf8');
@@ -1125,7 +1138,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Aggiungi assegnazioni LP (prova prima da Object Storage)
       try {
         const { loadAssignmentFromStorage } = await import('./object-storage.js');
-        let lpJson = await loadAssignmentFromStorage('assignments/low_priority_assignments.json');
+        const dateObj = new Date(date);
+        const day = String(dateObj.getDate()).padStart(2, '0');
+        const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+        const year = dateObj.getFullYear();
+        const dateFolder = `${day}-${month}-${year}`;
+        
+        let lpJson = await loadAssignmentFromStorage(`${dateFolder}/low_priority_assignments.json`);
         
         if (!lpJson) {
           const lpData = await fs.readFile(lpAssignmentsPath, 'utf8');
