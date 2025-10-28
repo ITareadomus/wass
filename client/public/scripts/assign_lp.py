@@ -11,7 +11,7 @@ from pathlib import Path
 # =============================
 BASE = Path(__file__).parent.parent / "data"
 
-INPUT_TASKS = BASE / "output" / "low_priority.json"
+INPUT_CONTAINERS = BASE / "output" / "containers.json"
 INPUT_CLEANERS = BASE / "cleaners" / "selected_cleaners.json"
 INPUT_EO_ASSIGN = BASE / "output" / "early_out_assignments.json"
 INPUT_HP_ASSIGN = BASE / "output" / "high_priority_assignments.json"
@@ -395,9 +395,9 @@ def seed_cleaners_from_assignments(cleaners: List[Cleaner]):
 
 
 def load_tasks() -> List[Task]:
-    data = json.loads(INPUT_TASKS.read_text(encoding="utf-8"))
+    data = json.loads(INPUT_CONTAINERS.read_text(encoding="utf-8"))
     tasks: List[Task] = []
-    for t in data.get("low_priority_tasks", []):
+    for t in data.get("containers", {}).get("low_priority", {}).get("tasks", []):
         tasks.append(
             Task(
                 task_id=str(t.get("task_id")),
