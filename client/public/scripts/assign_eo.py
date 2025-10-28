@@ -10,10 +10,10 @@ import mysql.connector
 # Database Configuration
 # =============================
 DB_CONFIG = {
-    "host": "localhost",
-    "user": "root",
-    "password": "",
-    "database": "wass_db" # Assicurati che questo database esista
+    "host": "139.59.132.41",
+    "user": "admin",
+    "password": "REMOVED_MYSQL_PASSWORD",
+    "database": "adamdb"
 }
 
 # =============================
