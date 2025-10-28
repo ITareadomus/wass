@@ -632,16 +632,7 @@ def main():
     print(f"   - Cleaner utilizzati: {output['meta']['cleaners_used']}")
     print(f"   - Task non assegnati: {output['meta']['unassigned']}")
     print()
-    print(f"💾 Risultati salvati nel database MySQL")
-
-
-    # I file JSON non vengono più utilizzati - tutto è nel database
-    # Update timeline_assignments/{date}.json - RIMOSSO (ora usiamo solo il DB)
-    # timeline_dir = OUTPUT_ASSIGN.parent / "timeline_assignments"
-    # timeline_dir.mkdir(parents=True, exist_ok=True)
-    # timeline_assignments_path = timeline_dir / f"{ref_date}.json"
-
-    # File JSON non più utilizzati - tutte le assegnazioni sono nel database MySQL
+    print(f"💾 Risultati salvati nel database MySQL e nel file JSON")
 
 
 if __name__ == "__main__":

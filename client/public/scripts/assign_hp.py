@@ -768,8 +768,10 @@ def main():
     # Salva nel database MySQL
     save_to_database(output, ref_date)
     
-    # File JSON non più utilizzati - tutte le assegnazioni sono nel database MySQL
-    print(f"✅ Assegnazioni HP salvate nel database per {ref_date}")
+    # Salva anche nel file JSON (per compatibilità)
+    OUTPUT_ASSIGN.write_text(json.dumps(output, ensure_ascii=False, indent=2), encoding="utf-8")
+    print(f"✅ Salvato {OUTPUT_ASSIGN}")
+    print(f"✅ Assegnazioni HP salvate nel database e nel file JSON per {ref_date}")
 
 
 if __name__ == "__main__":
