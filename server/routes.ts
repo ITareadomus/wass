@@ -127,13 +127,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Ordina i cleaner per ID
       cleanersWithTasks.sort((a, b) => a.cleaner.id - b.cleaner.id);
 
-      // Struttura finale del file
+      // Struttura finale del file - SOLO cleaners, senza assignments flat
       const organizedData = {
         current_date: timelineData.current_date,
         scheduleVersion: timelineData.scheduleVersion || 1,
-        cleaners: cleanersWithTasks,
-        // Mantieni anche l'array flat per retrocompatibilità
-        assignments: timelineData.assignments || []
+        cleaners: cleanersWithTasks
       };
 
       await fs.writeFile(timelineAssignmentsPath, JSON.stringify(organizedData, null, 2));
@@ -229,14 +227,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       timelineData.assignments = [...otherAssignments, ...sameCleanerAssignments];
       timelineData.current_date = workDate;
 
-      // Scrittura atomica
-      const tmpPath = `${timelineAssignmentsPath}.tmp`;
-      await fs.writeFile(tmpPath, JSON.stringify(timelineData, null, 2));
-      await fs.rename(tmpPath, timelineAssignmentsPath);
-
       console.log(`✅ Salvato assignment per cleaner ${normalizedCleanerId} in posizione ${targetIndex}`);
 
-      // Riorganizza il file per cleaner
+      // Riorganizza il file per cleaner (questo ora scriverà direttamente il formato corretto)
       await reorganizeTimelineByCleaners(timelineAssignmentsPath, timelineData);
 
       res.json({ success: true });
@@ -314,9 +307,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Ricombina tutti gli assignments
       timelineData.assignments = Array.from(assignmentsByCleanerId.values()).flat();
 
-      await fs.writeFile(timelineAssignmentsPath, JSON.stringify(timelineData, null, 2));
-
-      // Riorganizza il file per cleaner
+      // Riorganizza il file per cleaner (questo scriverà direttamente il formato corretto)
       await reorganizeTimelineByCleaners(timelineAssignmentsPath, timelineData);
 
       res.json({ success: true });
