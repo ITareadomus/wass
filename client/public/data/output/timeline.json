@@ -1,4 +1,28 @@
 {
   "assignments": [],
-  "current_date": "2025-10-29"
+  "current_date": "2025-10-29",
+  "cleaners_assignments": [
+    {
+      "cleaner": {
+        "id": 24,
+        "name": "HUSSAIN",
+        "lastname": "SYED SHUJIAHAT",
+        "role": "Standard",
+        "premium": false
+      },
+      "assignment_type": "manual_drag",
+      "tasks": [
+        {
+          "task_id": 217967,
+          "logistic_code": 1649,
+          "sequence": 1
+        }
+      ]
+    }
+  ],
+  "meta": {
+    "total_cleaners": 1,
+    "total_tasks": 1,
+    "last_updated": "2025-10-28T14:45:40.562Z"
+  }
 }
