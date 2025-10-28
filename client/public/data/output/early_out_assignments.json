@@ -10,11 +10,11 @@
       },
       "tasks": [
         {
-          "task_id": 217964,
-          "logistic_code": 1644,
-          "address": "Via Scaldasole, 6",
-          "lat": 45.454344,
-          "lng": 9.1798238,
+          "task_id": 217909,
+          "logistic_code": 1646,
+          "address": "Via Matteo Bandello 4/1",
+          "lat": 45.465877,
+          "lng": 9.1667974,
           "premium": false,
           "cleaning_time": 60,
           "start_time": "10:00",
@@ -35,15 +35,15 @@
       },
       "tasks": [
         {
-          "task_id": 217967,
-          "logistic_code": 1649,
-          "address": "PIAZZA GRAMSCI 10",
-          "lat": 45.4822754,
-          "lng": 9.1688625,
-          "premium": true,
-          "cleaning_time": 120,
+          "task_id": 217910,
+          "logistic_code": 1648,
+          "address": "via Isabella d'Aragona 2",
+          "lat": 45.451552,
+          "lng": 9.1901083,
+          "premium": false,
+          "cleaning_time": 60,
           "start_time": "10:00",
-          "end_time": "12:00",
+          "end_time": "11:00",
           "followup": false,
           "sequence": 1,
           "travel_time": 0
@@ -60,11 +60,11 @@
       },
       "tasks": [
         {
-          "task_id": 217969,
-          "logistic_code": 609,
-          "address": "VIALE STELVIO 53",
-          "lat": 45.494052,
-          "lng": 9.186503,
+          "task_id": 217927,
+          "logistic_code": 1009,
+          "address": "Via Fabio Filzi, 45",
+          "lat": 45.48811,
+          "lng": 9.20332,
           "premium": false,
           "cleaning_time": 60,
           "start_time": "10:00",
@@ -85,15 +85,15 @@
       },
       "tasks": [
         {
-          "task_id": 217973,
-          "logistic_code": 1620,
-          "address": "Via Pietro Borsieri, 29,",
-          "lat": 45.488597,
-          "lng": 9.1889226,
+          "task_id": 217930,
+          "logistic_code": 1063,
+          "address": "VIA ORESTE SALOMONE, 51",
+          "lat": 45.45289,
+          "lng": 9.24228,
           "premium": false,
-          "cleaning_time": 90,
+          "cleaning_time": 60,
           "start_time": "10:00",
-          "end_time": "11:30",
+          "end_time": "11:00",
           "followup": false,
           "sequence": 1,
           "travel_time": 0
@@ -110,11 +110,11 @@
       },
       "tasks": [
         {
-          "task_id": 217980,
-          "logistic_code": 624,
-          "address": "VIALE MONTENERO 50",
-          "lat": 45.4583211,
-          "lng": 9.206311,
+          "task_id": 217932,
+          "logistic_code": 1623,
+          "address": "via Principe Eugenio 15",
+          "lat": 45.48931,
+          "lng": 9.1635183,
           "premium": false,
           "cleaning_time": 60,
           "start_time": "10:00",
@@ -135,11 +135,11 @@
       },
       "tasks": [
         {
-          "task_id": 217982,
-          "logistic_code": 1487,
-          "address": "viale monteceneri 58",
-          "lat": 45.4920654,
-          "lng": 9.1541396,
+          "task_id": 217933,
+          "logistic_code": 1629,
+          "address": "via Bianca Ceva, 32 lotto E",
+          "lat": 45.453646,
+          "lng": 9.1151558,
           "premium": false,
           "cleaning_time": 60,
           "start_time": "10:00",
@@ -160,18 +160,32 @@
       },
       "tasks": [
         {
-          "task_id": 217983,
-          "logistic_code": 1631,
-          "address": "VIA FIORDALISI 1",
-          "lat": 45.4503469,
-          "lng": 9.136612,
+          "task_id": 217931,
+          "logistic_code": 1472,
+          "address": "via Voghera 9/A",
+          "lat": 45.4540455,
+          "lng": 9.1676391,
           "premium": false,
-          "cleaning_time": 60,
+          "cleaning_time": 120,
           "start_time": "10:00",
-          "end_time": "11:00",
+          "end_time": "12:00",
           "followup": false,
           "sequence": 1,
           "travel_time": 0
+        },
+        {
+          "task_id": 217934,
+          "logistic_code": 1543,
+          "address": "via Forcella 11",
+          "lat": 45.4524898,
+          "lng": 9.1673869,
+          "premium": false,
+          "cleaning_time": 60,
+          "start_time": "12:08",
+          "end_time": "13:08",
+          "followup": true,
+          "sequence": 2,
+          "travel_time": 8
         }
       ]
     },
@@ -185,15 +199,15 @@
       },
       "tasks": [
         {
-          "task_id": 218087,
-          "logistic_code": 619,
-          "address": "VIA TORTONA, 10",
-          "lat": 45.4542397,
-          "lng": 9.1686792,
+          "task_id": 217935,
+          "logistic_code": 1571,
+          "address": "VIALE MONTENERO, 23",
+          "lat": 45.4557027,
+          "lng": 9.2042573,
           "premium": false,
-          "cleaning_time": 40,
+          "cleaning_time": 90,
           "start_time": "10:00",
-          "end_time": "10:40",
+          "end_time": "11:30",
           "followup": false,
           "sequence": 1,
           "travel_time": 0
@@ -210,15 +224,15 @@
       },
       "tasks": [
         {
-          "task_id": 218088,
-          "logistic_code": 723,
-          "address": "VIA TORTONA, 10",
-          "lat": 45.4542397,
-          "lng": 9.1686792,
-          "premium": false,
-          "cleaning_time": 40,
+          "task_id": 217908,
+          "logistic_code": 980,
+          "address": "LARGO CORSIA DEI SERVI 11",
+          "lat": 45.4650722,
+          "lng": 9.196025,
+          "premium": true,
+          "cleaning_time": 120,
           "start_time": "10:00",
-          "end_time": "10:40",
+          "end_time": "12:00",
           "followup": false,
           "sequence": 1,
           "travel_time": 0
@@ -235,15 +249,40 @@
       },
       "tasks": [
         {
-          "task_id": 218089,
-          "logistic_code": 618,
-          "address": "VIA VOGHERA, 4",
-          "lat": 45.454632,
-          "lng": 9.168536,
+          "task_id": 217884,
+          "logistic_code": 1153,
+          "address": "VIA CELESTINO IV, 9",
+          "lat": 45.4596054,
+          "lng": 9.1821442,
           "premium": false,
-          "cleaning_time": 30,
+          "cleaning_time": 120,
           "start_time": "10:00",
-          "end_time": "10:30",
+          "end_time": "12:00",
+          "followup": false,
+          "sequence": 1,
+          "travel_time": 0
+        }
+      ]
+    },
+    {
+      "cleaner": {
+        "id": 785,
+        "name": "RACHEL",
+        "lastname": "OTSHINGA",
+        "role": "Premium",
+        "premium": true
+      },
+      "tasks": [
+        {
+          "task_id": 217907,
+          "logistic_code": 1640,
+          "address": "VIA EUGENIO MONTALE 12",
+          "lat": 45.488914,
+          "lng": 9.1167004,
+          "premium": false,
+          "cleaning_time": 150,
+          "start_time": "10:00",
+          "end_time": "12:30",
           "followup": false,
           "sequence": 1,
           "travel_time": 0
@@ -251,89 +290,22 @@
       ]
     }
   ],
-  "unassigned_tasks": [
-    {
-      "task_id": 217962,
-      "logistic_code": 1643,
-      "address": "Viale Majno 23",
-      "premium": true,
-      "straordinaria": false,
-      "cleaning_time": 180,
-      "checkout_time": "10:00",
-      "checkin_time": "10:00",
-      "alias": null,
-      "apt_type": null,
-      "reason": "no feasible assignment under simplified rules"
-    },
-    {
-      "task_id": 217963,
-      "logistic_code": 1641,
-      "address": "VIA DELL'ANNUNCIATA 10",
-      "premium": true,
-      "straordinaria": false,
-      "cleaning_time": 120,
-      "checkout_time": "10:00",
-      "checkin_time": "10:00",
-      "alias": null,
-      "apt_type": null,
-      "reason": "no feasible assignment under simplified rules"
-    },
-    {
-      "task_id": 217966,
-      "logistic_code": 1647,
-      "address": "Viale Piave 35",
-      "premium": true,
-      "straordinaria": false,
-      "cleaning_time": 180,
-      "checkout_time": "10:00",
-      "checkin_time": "10:00",
-      "alias": null,
-      "apt_type": null,
-      "reason": "no feasible assignment under simplified rules"
-    },
-    {
-      "task_id": 217965,
-      "logistic_code": 1650,
-      "address": "VIA VIGNOLA 4",
-      "premium": false,
-      "straordinaria": false,
-      "cleaning_time": 120,
-      "checkout_time": "10:00",
-      "checkin_time": "10:00",
-      "alias": null,
-      "apt_type": null,
-      "reason": "no feasible assignment under simplified rules"
-    },
-    {
-      "task_id": 217981,
-      "logistic_code": 1135,
-      "address": "VIA CORSICO,  5",
-      "premium": false,
-      "straordinaria": false,
-      "cleaning_time": 60,
-      "checkout_time": "10:00",
-      "checkin_time": "10:00",
-      "alias": null,
-      "apt_type": null,
-      "reason": "no feasible assignment under simplified rules"
-    }
-  ],
+  "unassigned_tasks": [],
   "meta": {
-    "total_tasks": 15,
-    "assigned": 10,
-    "unassigned": 5,
-    "cleaners_used": 10,
+    "total_tasks": 12,
+    "assigned": 12,
+    "unassigned": 0,
+    "cleaners_used": 11,
     "max_tasks_per_cleaner": 3,
-    "algorithm": "simplified_greedy",
+    "algorithm": "regret_insertion + redirect + best-of-infeasible",
     "notes": [
-      "REGOLE SEMPLIFICATE:",
-      "1. Max 2 task per cleaner (3ª solo se entro 10' dalla 2ª)",
-      "2. Favorisce percorsi < 15'",
-      "3. Se non ci sono percorsi < 15', sceglie il minore dei > 15'",
-      "4. Straordinarie solo a premium cleaner, devono essere la prima task",
-      "5. Premium task solo a premium cleaner",
-      "6. Check-in strict: deve finire prima del check-in time",
-      "7. Vincolo orario: nessuna task deve finire dopo le 19:00"
+      "Straordinarie-first (only premium, must be sequence=1)",
+      "Premium-first",
+      "Hard cap: travel/gap > 35' infeasible (vincoli rilassati per più assegnazioni)",
+      "3rd task only if travel<=10' and gap<=10' (12'/12' if same street/building) - INVARIATO",
+      "Redirect: if hop>25' and a free cleaner is feasible, prefer the free cleaner",
+      "Activation cost = 0; premium can do standard",
+      "Vincoli rilassati (eccetto 3ª task) per ridurre task non assegnate"
     ]
   }
 }
