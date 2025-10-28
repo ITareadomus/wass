@@ -492,8 +492,8 @@ def build_output(cleaners: List[Cleaner], unassigned: List[Task], original_tasks
 
 
 def main():
-    if not INPUT_TASKS.exists():
-        raise SystemExit(f"Missing input file: {INPUT_TASKS}")
+    if not INPUT_CONTAINERS.exists():
+        raise SystemExit(f"Missing input file: {INPUT_CONTAINERS}")
     if not INPUT_CLEANERS.exists():
         raise SystemExit(f"Missing input file: {INPUT_CLEANERS}")
 
@@ -532,6 +532,7 @@ def main():
         print(f"📅 Nessuna data specificata, usando: {ref_date}")
 
     # Update timeline.json con struttura organizzata per cleaner
+    from datetime import datetime as dt
     timeline_path = OUTPUT_ASSIGN.parent / "timeline.json"
 
     # Carica timeline esistente o crea nuova struttura
@@ -541,7 +542,7 @@ def main():
         "meta": {
             "total_cleaners": 0,
             "total_tasks": 0,
-            "last_updated": datetime.now().isoformat()
+            "last_updated": dt.now().isoformat()
         }
     }
 
@@ -570,7 +571,7 @@ def main():
     timeline_data["meta"]["total_tasks"] = sum(
         len(c.get("tasks", [])) for c in timeline_data["cleaners_assignments"]
     )
-    timeline_data["meta"]["last_updated"] = datetime.now().isoformat()
+    timeline_data["meta"]["last_updated"] = dt.now().isoformat()
     timeline_data["current_date"] = ref_date
 
     # Scrivi il file aggiornato
