@@ -838,7 +838,7 @@ def main():
 
         # Ottieni il percorso della directory workspace
         workspace_dir = Path(__file__).resolve().parents[3]
-        upload_script_path = workspace_dir / 'upload_storage_hp.js'
+        upload_script_path = workspace_dir / 'upload_storage_hp.cjs'
         
         node_script = f"""
 const {{ Client }} = require('@replit/object-storage');
