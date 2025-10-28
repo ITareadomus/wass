@@ -149,8 +149,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         task_id: fullTaskData.task_id,
         logistic_code: fullTaskData.logistic_code,
         address: fullTaskData.address,
-        lat: fullTaskData.lat,
-        lng: fullTaskData.lng,
+        lat: String(fullTaskData.lat),
+        lng: String(fullTaskData.lng),
         premium: fullTaskData.premium,
         cleaning_time: fullTaskData.cleaning_time,
         start_time: null,
@@ -160,6 +160,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         travel_time: 0,
         reasons: ['manually_moved_to_timeline']
       };
+
+      console.log(`📝 Task salvato in timeline:`, {
+        task_id: newTask.task_id,
+        logistic_code: newTask.logistic_code,
+        cleaning_time: newTask.cleaning_time
+      });
 
       // Inserisci in posizione dropIndex
       const targetIndex = dropIndex !== undefined 
