@@ -616,7 +616,7 @@ def main():
         # Usa Node.js per caricare su Object Storage
         # Ottieni il percorso della directory workspace
         workspace_dir = Path(__file__).resolve().parents[3]
-        upload_script_path = workspace_dir / 'upload_storage_eo.js'
+        upload_script_path = workspace_dir / 'upload_storage_eo.cjs'
         
         node_script = f"""
 const {{ Client }} = require('@replit/object-storage');

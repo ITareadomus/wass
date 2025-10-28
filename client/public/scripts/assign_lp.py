@@ -780,7 +780,7 @@ def main():
 
         # Ottieni il percorso della directory workspace
         workspace_dir = Path(__file__).resolve().parents[3]
-        upload_script_path = workspace_dir / 'upload_storage_lp.js'
+        upload_script_path = workspace_dir / 'upload_storage_lp.cjs'
         
         node_script = f"""
 const {{ Client }} = require('@replit/object-storage');
