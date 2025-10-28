@@ -63,7 +63,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
 
         const [result]: any = await connection.execute(
-          'DELETE FROM app_wass_assignments WHERE DATE(date) = ?',
+          'DELETE FROM wass_assignments WHERE DATE(date) = ?',
           [workDate]
         );
         dbDeleted = result.affectedRows || 0;
@@ -1211,7 +1211,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       try {
         // Prima elimina le assegnazioni esistenti per questa data
         await connection.execute(
-          'DELETE FROM app_wass_assignments WHERE DATE(date) = ?',
+          'DELETE FROM wass_assignments WHERE DATE(date) = ?',
           [date]
         );
         console.log(`🗑️  Eliminate assegnazioni esistenti per ${date}`);
@@ -1220,7 +1220,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         for (const assignment of allAssignments) {
           try {
             await connection.execute(
-              `INSERT INTO app_wass_assignments (
+              `INSERT INTO wass_assignments (
                 task_id, cleaner_id, date, logistic_code, assignment_type, sequence,
                 start_time, end_time, cleaning_time, travel_time, address, lat, lng,
                 premium, followup
@@ -1289,7 +1289,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
 
         const [rows] = await connection.execute(
-          `SELECT * FROM app_wass_assignments WHERE DATE(date) = ? ORDER BY cleaner_id, sequence`,
+          `SELECT * FROM wass_assignments WHERE DATE(date) = ? ORDER BY cleaner_id, sequence`,
           [date]
         );
         

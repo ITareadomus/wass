@@ -376,7 +376,7 @@ def seed_cleaners_from_assignments(cleaners: List[Cleaner]):
                 lng,
                 sequence,
                 assignment_type
-            FROM app_wass_assignments
+            FROM wass_assignments
             WHERE DATE(date) = %s
               AND assignment_type IN ('early_out', 'high_priority')
             ORDER BY cleaner_id, sequence DESC
@@ -617,7 +617,7 @@ def save_to_database(output: Dict[str, Any], ref_date: str):
 
         # Elimina le assegnazioni LP esistenti per questa data
         cur.execute(
-            "DELETE FROM app_wass_assignments WHERE assignment_type = 'low_priority' AND DATE(date) = %s",
+            "DELETE FROM wass_assignments WHERE assignment_type = 'low_priority' AND DATE(date) = %s",
             (ref_date,)
         )
 
@@ -627,7 +627,7 @@ def save_to_database(output: Dict[str, Any], ref_date: str):
             cleaner_id = cleaner_entry["cleaner"]["id"]
             for task in cleaner_entry.get("tasks", []):
                 cur.execute("""
-                    INSERT INTO app_wass_assignments (
+                    INSERT INTO wass_assignments (
                         task_id, cleaner_id, date, logistic_code, assignment_type, sequence,
                         start_time, end_time, cleaning_time, travel_time, address, lat, lng,
                         premium, followup

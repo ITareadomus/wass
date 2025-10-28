@@ -503,7 +503,7 @@ def save_to_database(output: Dict[str, Any], ref_date: str):
         cursor = conn.cursor()
 
         # Elimina eventuali assegnazioni esistenti per la data corrente per evitare duplicati
-        delete_query = "DELETE FROM app_wass_assignments WHERE DATE(date) = %s AND assignment_type = 'early_out'"
+        delete_query = "DELETE FROM wass_assignments WHERE DATE(date) = %s AND assignment_type = 'early_out'"
         cursor.execute(delete_query, (ref_date,))
         conn.commit()
 
@@ -538,7 +538,7 @@ def save_to_database(output: Dict[str, Any], ref_date: str):
         # Inserisci le nuove assegnazioni
         if assignments_to_insert:
             insert_query = """
-            INSERT INTO app_wass_assignments (
+            INSERT INTO wass_assignments (
                 task_id, cleaner_id, date, logistic_code, assignment_type, sequence,
                 start_time, end_time, cleaning_time, travel_time, address, lat, lng,
                 premium, followup
