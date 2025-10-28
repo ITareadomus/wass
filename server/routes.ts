@@ -1014,10 +1014,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         database: 'adamdb'
       });
 
-      // Aggiungi assegnazioni EO
+      // Aggiungi assegnazioni EO (prova prima da Object Storage)
       try {
-        const eoData = await fs.readFile(eoAssignmentsPath, 'utf8');
-        const eoJson = JSON.parse(eoData);
+        const { loadAssignmentFromStorage } = await import('./object-storage.js');
+        let eoJson = await loadAssignmentFromStorage('assignments/early_out_assignments.json');
+        
+        // Fallback: leggi dal file locale se non trovato su Object Storage
+        if (!eoJson) {
+          const eoData = await fs.readFile(eoAssignmentsPath, 'utf8');
+          eoJson = JSON.parse(eoData);
+        }
         console.log(`EO file current_date: ${eoJson.current_date}, searching for: ${date}`);
         console.log(`EO tasks found: ${eoJson.early_out_tasks_assigned?.length || 0} cleaners`);
 
@@ -1061,10 +1067,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.log('Nessuna assegnazione Early Out trovata:', error);
       }
 
-      // Aggiungi assegnazioni HP
+      // Aggiungi assegnazioni HP (prova prima da Object Storage)
       try {
-        const hpData = await fs.readFile(hpAssignmentsPath, 'utf8');
-        const hpJson = JSON.parse(hpData);
+        const { loadAssignmentFromStorage } = await import('./object-storage.js');
+        let hpJson = await loadAssignmentFromStorage('assignments/high_priority_assignments.json');
+        
+        if (!hpJson) {
+          const hpData = await fs.readFile(hpAssignmentsPath, 'utf8');
+          hpJson = JSON.parse(hpData);
+        }
         console.log(`HP file current_date: ${hpJson.current_date}, searching for: ${date}`);
         console.log(`HP tasks found: ${hpJson.high_priority_tasks_assigned?.length || 0} cleaners`);
 
@@ -1111,10 +1122,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.log('Nessuna assegnazione High Priority trovata:', error);
       }
 
-      // Aggiungi assegnazioni LP
+      // Aggiungi assegnazioni LP (prova prima da Object Storage)
       try {
-        const lpData = await fs.readFile(lpAssignmentsPath, 'utf8');
-        const lpJson = JSON.parse(lpData);
+        const { loadAssignmentFromStorage } = await import('./object-storage.js');
+        let lpJson = await loadAssignmentFromStorage('assignments/low_priority_assignments.json');
+        
+        if (!lpJson) {
+          const lpData = await fs.readFile(lpAssignmentsPath, 'utf8');
+          lpJson = JSON.parse(lpData);
+        }
         console.log(`LP file current_date: ${lpJson.current_date}, searching for: ${date}`);
         console.log(`LP tasks found: ${lpJson.low_priority_tasks_assigned?.length || 0} cleaners`);
 
