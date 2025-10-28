@@ -181,21 +181,17 @@ export default function GenerateAssignments() {
 
       // Aggiungi timestamp per evitare cache
       const timestamp = Date.now();
-      const [earlyOutResponse, highPriorityResponse, lowPriorityResponse, generalTimelineResponse, dateTimelineResponse] = await Promise.all([
-        fetch(`/data/output/early_out.json?t=${timestamp}`),
-        fetch(`/data/output/high_priority.json?t=${timestamp}`),
-        fetch(`/data/output/low_priority.json?t=${timestamp}`),
+      const [containersResponse, generalTimelineResponse, dateTimelineResponse] = await Promise.all([
+        fetch(`/data/output/containers.json?t=${timestamp}`),
         fetch(`/data/output/timeline_assignments.json?t=${timestamp}`),
         fetch(`/data/output/timeline_assignments/${dateStr}.json?t=${timestamp}`)
       ]);
 
-      if (!earlyOutResponse.ok || !highPriorityResponse.ok || !lowPriorityResponse.ok) {
-        throw new Error('Errore nel caricamento dei file JSON');
+      if (!containersResponse.ok) {
+        throw new Error('Errore nel caricamento del file containers.json');
       }
 
-      const earlyOutData = await earlyOutResponse.json();
-      const highPriorityData = await highPriorityResponse.json();
-      const lowPriorityData = await lowPriorityResponse.json();
+      const containersData = await containersResponse.json();
 
       // Prima prova a caricare da timeline_assignments.json, poi da timeline_assignments/{date}.json
       let timelineAssignmentsData = { assignments: [], current_date: dateStr };
@@ -207,20 +203,19 @@ export default function GenerateAssignments() {
         console.log(`Caricato da timeline_assignments/${dateStr}.json (fallback)`);
       }
 
-      console.log("Early out data:", earlyOutData);
-      console.log("High priority data:", highPriorityData);
-      console.log("Low priority data:", lowPriorityData);
+      console.log("Containers data:", containersData);
       console.log("Timeline assignments data:", timelineAssignmentsData);
 
-      const initialEarlyOut: Task[] = (earlyOutData.early_out_tasks || []).map((task: RawTask) =>
+      // Estrai task dai container
+      const initialEarlyOut: Task[] = (containersData.containers?.early_out?.tasks || []).map((task: RawTask) =>
         convertRawTask(task, "early-out")
       );
 
-      const initialHigh: Task[] = (highPriorityData.high_priority_tasks || []).map((task: RawTask) =>
+      const initialHigh: Task[] = (containersData.containers?.high_priority?.tasks || []).map((task: RawTask) =>
         convertRawTask(task, "high")
       );
 
-      const initialLow: Task[] = (lowPriorityData.low_priority_tasks || []).map((task: RawTask) =>
+      const initialLow: Task[] = (containersData.containers?.low_priority?.tasks || []).map((task: RawTask) =>
         convertRawTask(task, "low")
       );
 
