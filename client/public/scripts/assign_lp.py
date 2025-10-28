@@ -722,67 +722,9 @@ def main():
 
     # Salva nel database MySQL
     save_to_database(output, ref_date)
-
-    # Update timeline_assignments/{date}.json
-    timeline_dir = OUTPUT_ASSIGN.parent / "timeline_assignments"
-    timeline_dir.mkdir(parents=True, exist_ok=True)
-    timeline_assignments_path = timeline_dir / f"{ref_date}.json"
-
-    timeline_data = {"assignments": [], "current_date": ref_date}
-
-    if timeline_assignments_path.exists():
-        try:
-            timeline_data = json.loads(timeline_assignments_path.read_text(encoding="utf-8"))
-            if "current_date" not in timeline_data:
-                timeline_data["current_date"] = ref_date
-        except:
-            timeline_data = {"assignments": [], "current_date": ref_date}
-
-    # Rimuovi vecchie assegnazioni LP
-    assigned_codes = set()
-    for cleaner_entry in output["low_priority_tasks_assigned"]:
-        for task in cleaner_entry.get("tasks", []):
-            assigned_codes.add(str(task["logistic_code"]))
-
-    timeline_data["assignments"] = [
-        a for a in timeline_data.get("assignments", [])
-        if str(a.get("logistic_code")) not in assigned_codes
-    ]
-
-    # Aggiungi nuove assegnazioni LP con tutti i dati del task
-    for cleaner_entry in output["low_priority_tasks_assigned"]:
-        cleaner_id = cleaner_entry["cleaner"]["id"]
-        for task in cleaner_entry.get("tasks", []):
-            timeline_data["assignments"].append({
-                "task_id": task["task_id"],
-                "logistic_code": str(task["logistic_code"]),
-                "cleanerId": cleaner_id,
-                "assignment_type": "low_priority",
-                "sequence": task.get("sequence", 0),
-                "address": task.get("address"),
-                "lat": task.get("lat"),
-                "lng": task.get("lng"),
-                "premium": task.get("premium"),
-                "cleaning_time": task.get("cleaning_time"),
-                "start_time": task.get("start_time"),
-                "end_time": task.get("end_time"),
-                "travel_time": task.get("travel_time", 0),
-                "followup": task.get("followup", False)
-            })
-
-    # Scrivi il file specifico per la data
-    timeline_assignments_path.write_text(json.dumps(timeline_data, ensure_ascii=False, indent=2), encoding="utf-8")
-    print(f"✅ Aggiornato {timeline_assignments_path}")
-
-    # Aggiorna anche il file generale timeline_assignments.json
-    general_timeline_path = OUTPUT_ASSIGN.parent / "timeline_assignments.json"
-    general_timeline_path.write_text(json.dumps(timeline_data, ensure_ascii=False, indent=2), encoding="utf-8")
-    print(f"✅ Aggiornato anche: {general_timeline_path}")
-
-
-    # Salva il risultato in low_priority_assignments.json (locale - fallback)
-    OUTPUT_ASSIGN.write_text(json.dumps(output, ensure_ascii=False, indent=2), encoding="utf-8")
-    print(f"✅ Wrote {OUTPUT_ASSIGN}")
+    
+    # File JSON non più utilizzati - tutte le assegnazioni sono nel database MySQL
+    print(f"✅ Assegnazioni LP salvate nel database per {ref_date}")
 
 
 if __name__ == "__main__":

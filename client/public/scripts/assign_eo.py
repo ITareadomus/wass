@@ -624,83 +624,16 @@ def main():
     print(f"   - Cleaner utilizzati: {output['meta']['cleaners_used']}")
     print(f"   - Task non assegnati: {output['meta']['unassigned']}")
     print()
-    print(f"💾 Risultati intermedi salvati in: {OUTPUT_ASSIGN}")
+    print(f"💾 Risultati salvati nel database MySQL")
 
 
-    # Update timeline_assignments/{date}.json
-    timeline_dir = OUTPUT_ASSIGN.parent / "timeline_assignments"
-    timeline_dir.mkdir(parents=True, exist_ok=True)
-    timeline_assignments_path = timeline_dir / f"{ref_date}.json"
+    # I file JSON non vengono più utilizzati - tutto è nel database
+    # Update timeline_assignments/{date}.json - RIMOSSO (ora usiamo solo il DB)
+    # timeline_dir = OUTPUT_ASSIGN.parent / "timeline_assignments"
+    # timeline_dir.mkdir(parents=True, exist_ok=True)
+    # timeline_assignments_path = timeline_dir / f"{ref_date}.json"
 
-    timeline_data = {"assignments": [], "current_date": ref_date}
-
-    if timeline_assignments_path.exists():
-        try:
-            timeline_data = json.loads(timeline_assignments_path.read_text(encoding="utf-8"))
-            if "current_date" not in timeline_data:
-                timeline_data["current_date"] = ref_date
-        except json.JSONDecodeError:
-            print(f"Attenzione: il file {timeline_assignments_path} è corrotto o vuoto. Verrà sovrascritto.")
-            timeline_data = {"assignments": [], "current_date": ref_date}
-        except Exception as e:
-            print(f"Errore durante la lettura di {timeline_assignments_path}: {e}. Verrà sovrascritto.")
-            timeline_data = {"assignments": [], "current_date": ref_date}
-
-    # Rimuovi vecchie assegnazioni EO dal file timeline_assignments/{date}.json
-    assigned_logistic_codes_from_output = set()
-    for cleaner_entry in output.get("early_out_tasks_assigned", []):
-        for task in cleaner_entry.get("tasks", []):
-            assigned_logistic_codes_from_output.add(str(task["logistic_code"]))
-
-    # Filtra le assegnazioni esistenti nel file timeline per rimuovere quelle EO che ora sono nel DB
-    timeline_data["assignments"] = [
-        a for a in timeline_data.get("assignments", [])
-        if a.get("assignment_type") != "early_out" or str(a.get("logistic_code")) not in assigned_logistic_codes_from_output
-    ]
-
-    # Aggiungi nuove assegnazioni EO (che ora sono nel DB) al file timeline_assignments/{date}.json
-    # Nota: questo file conterrà solo le assegnazioni EO generate *oggi*.
-    # Se vuoi un file che aggreghi tutto, dovrai leggere il DB o un file generale.
-    for cleaner_entry in output.get("early_out_tasks_assigned", []):
-        cleaner_id = cleaner_entry["cleaner"]["id"]
-        for task in cleaner_entry.get("tasks", []):
-            timeline_data["assignments"].append({
-                "task_id": task["task_id"],
-                "logistic_code": str(task["logistic_code"]),
-                "cleanerId": cleaner_id,
-                "assignment_type": "early_out",
-                "sequence": task.get("sequence", 0),
-                "address": task.get("address"),
-                "lat": task.get("lat"),
-                "lng": task.get("lng"),
-                "premium": task.get("premium"),
-                "cleaning_time": task.get("cleaning_time"),
-                "start_time": task.get("start_time"),
-                "end_time": task.get("end_time"),
-                "travel_time": task.get("travel_time", 0),
-                "followup": task.get("followup", False)
-            })
-
-    # Scrivi immediatamente il file aggiornato per la data specifica
-    try:
-        timeline_assignments_path.write_text(json.dumps(timeline_data, ensure_ascii=False, indent=2), encoding="utf-8")
-        print(f"✅ Timeline per {ref_date} aggiornata: {timeline_assignments_path}")
-        print(f"   - Assegnazioni EO nel file: {len([a for a in timeline_data['assignments'] if a.get('assignment_type') == 'early_out'])}")
-        # Se ci fossero altre tipologie di assignment nel file, potresti contare anche quelle
-        # print(f"   - Assegnazioni HP nel file: {len([a for a in timeline_data['assignments'] if a.get('assignment_type') == 'high_priority'])}")
-        print(f"   - Totale assegnazioni nel file: {len(timeline_data['assignments'])}")
-    except Exception as e:
-        print(f"Errore durante la scrittura del file {timeline_assignments_path}: {e}")
-
-    # Aggiorna anche il file generale timeline_assignments.json
-    # Questo file conterrà le assegnazioni più recenti per ogni data gestita, o un aggregato se la logica cambia.
-    # Attualmente, sovrascrive con il contenuto del file della data specifica.
-    general_timeline_path = OUTPUT_ASSIGN.parent / "timeline_assignments.json"
-    try:
-        general_timeline_path.write_text(json.dumps(timeline_data, ensure_ascii=False, indent=2), encoding="utf-8")
-        print(f"✅ Aggiornato anche il file generale: {general_timeline_path}")
-    except Exception as e:
-        print(f"Errore durante la scrittura del file {general_timeline_path}: {e}")
+    # File JSON non più utilizzati - tutte le assegnazioni sono nel database MySQL
 
 
 if __name__ == "__main__":

@@ -12,6 +12,19 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const execAsync = promisify(exec);
 
+// Database configuration
+const DB_CONFIG = {
+  host: '139.59.132.41',
+  user: 'admin',
+  password: 'ed329a875c6c4ebdf4e87e2bbe53a15771b5844ef6606dde',
+  database: 'adamdb'
+};
+
+// Type for rows returned from the database
+interface RowDataPacket {
+  [key: string]: any;
+}
+
 export async function registerRoutes(app: Express): Promise<Server> {
   // Endpoint per ottenere i task di un container dal database
   app.get("/api/container/:priority/:date", async (req, res) => {
@@ -223,8 +236,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ success: false, error: error.message });
     }
   });
-
-
 
   // Endpoint per rimuovere un'assegnazione dalla timeline
   app.post("/api/remove-timeline-assignment", async (req, res) => {
@@ -1078,9 +1089,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const month = String(dateObj.getMonth() + 1).padStart(2, '0');
         const year = dateObj.getFullYear();
         const dateFolder = `${day}-${month}-${year}`;
-        
+
         let eoJson = await loadAssignmentFromStorage(`${dateFolder}/early_out_assignments.json`);
-        
+
         // Fallback: leggi dal file locale se non trovato su Object Storage
         if (!eoJson) {
           const eoData = await fs.readFile(eoAssignmentsPath, 'utf8');
@@ -1137,9 +1148,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const month = String(dateObj.getMonth() + 1).padStart(2, '0');
         const year = dateObj.getFullYear();
         const dateFolder = `${day}-${month}-${year}`;
-        
+
         let hpJson = await loadAssignmentFromStorage(`${dateFolder}/high_priority_assignments.json`);
-        
+
         if (!hpJson) {
           const hpData = await fs.readFile(hpAssignmentsPath, 'utf8');
           hpJson = JSON.parse(hpData);
@@ -1198,9 +1209,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const month = String(dateObj.getMonth() + 1).padStart(2, '0');
         const year = dateObj.getFullYear();
         const dateFolder = `${day}-${month}-${year}`;
-        
+
         let lpJson = await loadAssignmentFromStorage(`${dateFolder}/low_priority_assignments.json`);
-        
+
         if (!lpJson) {
           const lpData = await fs.readFile(lpAssignmentsPath, 'utf8');
           lpJson = JSON.parse(lpData);
@@ -1331,7 +1342,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/load-confirmed-assignments/:date", async (req, res) => {
     try {
       const { date } = req.params;
-      
+
       // Prima prova a caricare dal database MySQL
       let dbAssignments: any[] = [];
       try {
@@ -1347,13 +1358,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
           `SELECT * FROM wass_assignments WHERE DATE(date) = ? ORDER BY cleaner_id, sequence`,
           [date]
         );
-        
+
         dbAssignments = rows as any[];
         await connection.end();
 
         if (dbAssignments.length > 0) {
           console.log(`✅ Caricate ${dbAssignments.length} assegnazioni dal database MySQL per ${date}`);
-          
+
           // Converti dal formato DB al formato frontend
           const assignments = dbAssignments.map((row: any) => ({
             task_id: row.task_id,
@@ -1419,8 +1430,71 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Endpoint per caricare le task dalla timeline (per la data selezionata) - ORA DAL DATABASE
+  app.get("/api/timeline-assignments/:date", async (req, res) => {
+    try {
+      const { date } = req.params;
+      console.log(`Richiesta timeline per data: ${date}`);
 
+      // Normalizza la data al formato YYYY-MM-DD
+      const dateObj = new Date(date);
+      const normalizedDate = dateObj.toISOString().split('T')[0];
+      console.log(`Data normalizzata: ${normalizedDate}`);
 
+      // Query al database per ottenere tutte le assegnazioni per questa data
+      const connection = await mysql.createConnection(DB_CONFIG);
+
+      const [rows] = await connection.execute<RowDataPacket[]>(
+        `SELECT 
+          task_id,
+          logistic_code,
+          cleaner_id as cleanerId,
+          assignment_type,
+          sequence,
+          address,
+          lat,
+          lng,
+          premium,
+          cleaning_time,
+          start_time,
+          end_time,
+          travel_time,
+          followup
+        FROM wass_assignments
+        WHERE DATE(date) = ?
+        ORDER BY cleaner_id, sequence`,
+        [normalizedDate]
+      );
+
+      await connection.end();
+
+      console.log(`Assegnazioni caricate dal DB per ${normalizedDate}:`, rows.length, "task");
+
+      return res.json({
+        assignments: rows.map(row => ({
+          task_id: row.task_id,
+          logistic_code: String(row.logistic_code),
+          cleanerId: row.cleanerId,
+          assignment_type: row.assignment_type,
+          sequence: row.sequence,
+          address: row.address,
+          lat: row.lat,
+          lng: row.lng,
+          premium: Boolean(row.premium),
+          cleaning_time: row.cleaning_time,
+          start_time: row.start_time,
+          end_time: row.end_time,
+          travel_time: row.travel_time || 0,
+          followup: Boolean(row.followup)
+        })),
+        current_date: normalizedDate
+      });
+
+    } catch (error) {
+      console.error("Errore nel caricamento della timeline dal DB:", error);
+      res.status(500).json({ error: "Errore nel caricamento della timeline" });
+    }
+  });
 
   const httpServer = createServer(app);
   return httpServer;
