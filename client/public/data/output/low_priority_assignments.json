@@ -77,7 +77,7 @@
     }
   ],
   "unassigned_tasks": [],
-  "current_date": "2025-10-29",
+  "current_date": "2025-10-29T00:00:00.000Z",
   "meta": {
     "total_tasks": 3,
     "assigned": 3,
