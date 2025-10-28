@@ -52,9 +52,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Endpoint per salvare un'assegnazione nella timeline
   app.post("/api/save-timeline-assignment", async (req, res) => {
     try {
-      const { taskId, cleanerId, logisticCode, date, dropIndex } = req.body;
+      const { taskId, cleanerId, logisticCode, date, dropIndex, taskData } = req.body;
       const workDate = date || format(new Date(), 'yyyy-MM-dd');
       const timelinePath = path.join(process.cwd(), 'client/public/data/output/timeline.json');
+      const containersPath = path.join(process.cwd(), 'client/public/data/output/containers.json');
+
+      // Carica containers per ottenere i dati completi del task
+      let fullTaskData: any = null;
+      if (taskData) {
+        fullTaskData = taskData;
+      } else {
+        const containersData = JSON.parse(await fs.readFile(containersPath, 'utf8'));
+        // Cerca il task nei containers
+        for (const containerKey of ['early_out', 'high_priority', 'low_priority']) {
+          const container = containersData.containers?.[containerKey];
+          if (container?.tasks) {
+            const task = container.tasks.find((t: any) => 
+              String(t.task_id) === String(taskId) || String(t.logistic_code) === String(logisticCode)
+            );
+            if (task) {
+              fullTaskData = task;
+              break;
+            }
+          }
+        }
+      }
+
+      if (!fullTaskData) {
+        throw new Error(`Task ${logisticCode} non trovato nei containers`);
+      }
 
       // Carica o crea il file timeline con nuova struttura
       let timelineData: any = { 
@@ -118,11 +144,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
         String(t.logistic_code) !== normalizedLogisticCode && String(t.task_id) !== normalizedTaskId
       );
 
-      // Crea il nuovo task
+      // Crea il nuovo task con TUTTI i dati
       const newTask = {
-        task_id: Number(normalizedTaskId),
-        logistic_code: Number(normalizedLogisticCode),
-        sequence: 0
+        task_id: fullTaskData.task_id,
+        logistic_code: fullTaskData.logistic_code,
+        client_id: fullTaskData.client_id,
+        premium: fullTaskData.premium,
+        address: fullTaskData.address,
+        lat: fullTaskData.lat,
+        lng: fullTaskData.lng,
+        cleaning_time: fullTaskData.cleaning_time,
+        checkin_date: fullTaskData.checkin_date,
+        checkout_date: fullTaskData.checkout_date,
+        checkin_time: fullTaskData.checkin_time,
+        checkout_time: fullTaskData.checkout_time,
+        pax_in: fullTaskData.pax_in,
+        pax_out: fullTaskData.pax_out,
+        small_equipment: fullTaskData.small_equipment,
+        operation_id: fullTaskData.operation_id,
+        confirmed_operation: fullTaskData.confirmed_operation,
+        straordinaria: fullTaskData.straordinaria,
+        type_apt: fullTaskData.type_apt,
+        alias: fullTaskData.alias,
+        customer_name: fullTaskData.customer_name,
+        reasons: [...(fullTaskData.reasons || []), 'manually_moved_to_timeline'],
+        sequence: 0,
+        // Campi che verranno calcolati dagli script di assegnazione
+        start_time: null,
+        end_time: null,
+        travel_time: 0
       };
 
       // Inserisci in posizione dropIndex
