@@ -495,12 +495,14 @@ def build_output(cleaners: List[Cleaner], unassigned: List[Task], original_tasks
 
 # -------- Database Operations --------
 def save_to_database(output: Dict[str, Any], ref_date: str):
+    conn = None
+    cursor = None
     try:
         conn = mysql.connector.connect(**DB_CONFIG)
         cursor = conn.cursor()
 
         # Elimina eventuali assegnazioni esistenti per la data corrente per evitare duplicati
-        delete_query = "DELETE FROM app_wass_assignments WHERE DATE(assignment_datetime) = %s"
+        delete_query = "DELETE FROM app_wass_assignments WHERE DATE(date) = %s AND assignment_type = 'early_out'"
         cursor.execute(delete_query, (ref_date,))
         conn.commit()
 
@@ -516,27 +518,30 @@ def save_to_database(output: Dict[str, Any], ref_date: str):
 
                 assignments_to_insert.append((
                     task["task_id"],
-                    logistic_code_str,
                     cleaner_id,
+                    ref_date,
+                    logistic_code_str,
                     "early_out",
                     task.get("sequence", 0),
+                    task.get("start_time"),
+                    task.get("end_time"),
+                    task.get("cleaning_time"),
+                    task.get("travel_time", 0),
                     task.get("address"),
                     task.get("lat"),
                     task.get("lng"),
-                    task.get("premium"),
-                    task.get("cleaning_time"),
-                    task.get("start_time"),
-                    task.get("end_time"),
-                    task.get("travel_time", 0),
-                    task.get("followup", False),
-                    ref_date # Usa ref_date come base per assignment_datetime
+                    1 if task.get("premium") else 0,
+                    1 if task.get("followup", False) else 0
                 ))
 
         # Inserisci le nuove assegnazioni
         if assignments_to_insert:
             insert_query = """
-            INSERT INTO app_wass_assignments (task_id, logistic_code, cleanerId, assignment_type, sequence, address, lat, lng, premium, cleaning_time, start_time, end_time, travel_time, followup, assignment_datetime)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            INSERT INTO app_wass_assignments (
+                task_id, cleaner_id, date, logistic_code, assignment_type, sequence,
+                start_time, end_time, cleaning_time, travel_time, address, lat, lng,
+                premium, followup
+            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             """
             cursor.executemany(insert_query, assignments_to_insert)
             conn.commit()
@@ -544,25 +549,18 @@ def save_to_database(output: Dict[str, Any], ref_date: str):
         else:
             print(f"ℹ️ Nessuna nuova assegnazione Early-Out da salvare nel database per la data {ref_date}.")
 
-        # Gestisci le task non assegnate (opzionale: potresti volerle loggare o inserire con un flag specifico)
+        # Gestisci le task non assegnate
         for task in output.get("unassigned_tasks", []):
             logistic_code_str = str(task["logistic_code"])
             if logistic_code_str not in assigned_logistic_codes:
-                 # Esempio: inserire come 'unassigned' nel DB, o semplicemente loggare
-                 print(f"WARNING: Task non assegnata nel DB: LogisticCode={logistic_code_str}, Reason={task.get('reason')}")
-                 # Potresti voler inserire queste nel DB con un `assignment_type` specifico tipo 'unassigned'
-                 # Esempio:
-                 # cursor.execute("""
-                 #    INSERT INTO app_wass_assignments (logistic_code, assignment_type, assignment_datetime, reason)
-                 #    VALUES (%s, %s, %s, %s)
-                 # """, (logistic_code_str, 'unassigned', ref_date, task.get('reason')))
-                 # conn.commit()
+                print(f"WARNING: Task non assegnata nel DB: LogisticCode={logistic_code_str}, Reason={task.get('reason')}")
 
     except mysql.connector.Error as err:
-        print(f"Errore database: {err}")
+        print(f"❌ Errore database: {err}")
     finally:
         if conn and conn.is_connected():
-            cursor.close()
+            if cursor:
+                cursor.close()
             conn.close()
             print("Connessione al database chiusa.")
 
