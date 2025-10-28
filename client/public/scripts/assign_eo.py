@@ -5,6 +5,7 @@ from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Tuple
 from pathlib import Path
 import mysql.connector
+import subprocess
 
 # =============================
 # Database Configuration
@@ -583,9 +584,36 @@ def main():
     planners, leftovers = plan_day(tasks, cleaners)
     output = build_output(planners, leftovers, tasks)
 
-    # salva il file di output intermedio che contiene le assegnazioni, anche se la destinazione finale è il DB
-    OUTPUT_ASSIGN.parent.mkdir(parents=True, exist_ok=True)
+    # Salva output JSON localmente (fallback)
     OUTPUT_ASSIGN.write_text(json.dumps(output, ensure_ascii=False, indent=2), encoding="utf-8")
+    print(f"✅ Salvato {OUTPUT_ASSIGN}")
+
+    # Salva anche su Object Storage (esterno al progetto)
+    try:
+        storage_filename = "assignments/early_out_assignments.json"
+        temp_file = "/tmp/early_out_assignments.json"
+        with open(temp_file, 'w', encoding='utf-8') as f:
+            json.dump(output, f, ensure_ascii=False, indent=2)
+
+        # Usa Node.js per caricare su Object Storage
+        node_script = f"""
+const {{ Client }} = require('@replit/object-storage');
+const fs = require('fs');
+const client = new Client();
+(async () => {{
+  const data = fs.readFileSync('{temp_file}', 'utf-8');
+  await client.uploadFromText('{storage_filename}', data);
+  console.log('✅ Caricato su Object Storage: {storage_filename}');
+}})().catch(console.error);
+"""
+        with open('/tmp/upload_storage.js', 'w') as f:
+            f.write(node_script)
+
+        subprocess.run(['node', '/tmp/upload_storage.js'], check=True, cwd='/home/runner/workspace')
+        print(f"📦 Salvato anche su Object Storage: {storage_filename}")
+    except Exception as e:
+        print(f"⚠️  Errore salvando su Object Storage (continuo comunque): {e}")
+
 
     print()
     print(f"✅ Assegnazione completata!")

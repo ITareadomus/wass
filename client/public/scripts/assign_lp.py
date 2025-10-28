@@ -1,4 +1,3 @@
-
 # -*- coding: utf-8 -*-
 from __future__ import annotations
 import json, math
@@ -232,7 +231,7 @@ def can_add_task(cleaner: Cleaner, task: Task) -> bool:
     if not can_handle_premium(cleaner, task):
         return False
 
-    # Straordinaria deve essere la prima
+    # Straordinaria deve andare per forza in pos 0
     if task.straordinaria:
         if len(cleaner.route) > 0:
             return False
@@ -349,14 +348,14 @@ def seed_cleaners_from_assignments(cleaners: List[Cleaner]):
     """
     import mysql.connector
     import sys
-    
+
     # Ottieni la data di riferimento
     if len(sys.argv) > 1:
         ref_date = sys.argv[1]
     else:
         from datetime import datetime
         ref_date = datetime.now().strftime("%Y-%m-%d")
-    
+
     try:
         conn = mysql.connector.connect(
             host="139.59.132.41",
@@ -365,7 +364,7 @@ def seed_cleaners_from_assignments(cleaners: List[Cleaner]):
             database="adamdb"
         )
         cur = conn.cursor(dictionary=True)
-        
+
         # Query per ottenere l'ultima task di ogni cleaner (EO o HP)
         cur.execute("""
             SELECT 
@@ -381,16 +380,16 @@ def seed_cleaners_from_assignments(cleaners: List[Cleaner]):
               AND assignment_type IN ('early_out', 'high_priority')
             ORDER BY cleaner_id, sequence DESC
         """, (ref_date,))
-        
+
         assignments = cur.fetchall()
-        
+
         # Raggruppa per cleaner_id e prendi l'ultima task
         cleaner_last_task = {}
         for row in assignments:
             cid = row['cleaner_id']
             if cid not in cleaner_last_task:
                 cleaner_last_task[cid] = row
-        
+
         # Aggiorna i cleaner
         for cl in cleaners:
             if cl.id in cleaner_last_task:
@@ -400,10 +399,10 @@ def seed_cleaners_from_assignments(cleaners: List[Cleaner]):
                 cl.last_lat = float(last['lat']) if last['lat'] is not None else None
                 cl.last_lng = float(last['lng']) if last['lng'] is not None else None
                 cl.last_sequence = int(last['sequence'])
-        
+
         cur.close()
         conn.close()
-        
+
     except Exception as e:
         print(f"⚠️  Errore nel seed da database: {e}")
         print("Continuo senza seed...")
@@ -605,7 +604,7 @@ def build_output(cleaners: List[Cleaner], unassigned: List[Task], original_tasks
 def save_to_database(output: Dict[str, Any], ref_date: str):
     """Salva le assegnazioni nel database MySQL"""
     import mysql.connector
-    
+
     try:
         conn = mysql.connector.connect(
             host="139.59.132.41",
@@ -614,13 +613,13 @@ def save_to_database(output: Dict[str, Any], ref_date: str):
             database="adamdb"
         )
         cur = conn.cursor()
-        
+
         # Elimina le assegnazioni LP esistenti per questa data
         cur.execute(
             "DELETE FROM app_wass_assignments WHERE assignment_type = 'low_priority' AND DATE(date) = %s",
             (ref_date,)
         )
-        
+
         # Inserisci le nuove assegnazioni
         insert_count = 0
         for cleaner_entry in output.get("low_priority_tasks_assigned", []):
@@ -650,11 +649,11 @@ def save_to_database(output: Dict[str, Any], ref_date: str):
                     1 if task.get("followup") else 0
                 ))
                 insert_count += 1
-        
+
         conn.commit()
         cur.close()
         conn.close()
-        
+
         print(f"✅ Salvate {insert_count} assegnazioni nel database MySQL")
         return True
     except Exception as e:
@@ -698,7 +697,7 @@ def main():
     print(f"   - Cleaner utilizzati: {output['meta']['cleaners_used']}")
     print(f"   - Task non assegnati: {output['meta']['unassigned']}")
     print()
-    
+
     # Salva nel database MySQL
     save_to_database(output, ref_date)
 
@@ -757,6 +756,37 @@ def main():
     general_timeline_path = OUTPUT_ASSIGN.parent / "timeline_assignments.json"
     general_timeline_path.write_text(json.dumps(timeline_data, ensure_ascii=False, indent=2), encoding="utf-8")
     print(f"✅ Aggiornato anche: {general_timeline_path}")
+
+
+    # Salva il risultato in low_priority_assignments.json (locale - fallback)
+    OUTPUT_ASSIGN.write_text(json.dumps(output, ensure_ascii=False, indent=2), encoding="utf-8")
+    print(f"✅ Wrote {OUTPUT_ASSIGN}")
+
+    # Salva anche su Object Storage
+    try:
+        import subprocess
+        storage_filename = "assignments/low_priority_assignments.json"
+        temp_file = "/tmp/low_priority_assignments.json"
+        with open(temp_file, 'w', encoding='utf-8') as f:
+            json.dump(output, f, ensure_ascii=False, indent=2)
+
+        node_script = f"""
+const {{ Client }} = require('@replit/object-storage');
+const fs = require('fs');
+const client = new Client();
+(async () => {{
+  const data = fs.readFileSync('{temp_file}', 'utf-8');
+  await client.uploadFromText('{storage_filename}', data);
+  console.log('✅ Caricato su Object Storage: {storage_filename}');
+}})().catch(console.error);
+"""
+        with open('/tmp/upload_storage_lp.js', 'w') as f:
+            f.write(node_script)
+
+        subprocess.run(['node', '/tmp/upload_storage_lp.js'], check=True, cwd='/home/runner/workspace')
+        print(f"📦 Salvato anche su Object Storage: {storage_filename}")
+    except Exception as e:
+        print(f"⚠️  Errore salvando su Object Storage (continuo comunque): {e}")
 
 
 if __name__ == "__main__":

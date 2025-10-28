@@ -1,4 +1,3 @@
-
 # -*- coding: utf-8 -*-
 from __future__ import annotations
 import json, math
@@ -144,7 +143,7 @@ def haversine_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
     return R * c
 
 
-def travel_minutes(a_lat: float, a_lng: float, b_lat: float, b_lng: float, 
+def travel_minutes(a_lat: float, a_lng: float, b_lat: float, b_lng: float,
                    a_addr: Optional[str] = None, b_addr: Optional[str] = None) -> float:
     km = haversine_km(a_lat, a_lng, b_lat, b_lng)
 
@@ -185,81 +184,81 @@ def evaluate_route(cleaner: Cleaner, route: List[Task]) -> Tuple[bool, List[Tupl
     """
     if not route:
         return True, []
-    
+
     schedule: List[Tuple[datetime, datetime, datetime]] = []
-    
+
     # Primo task HP
     first = route[0]
-    
+
     # Calcola l'arrivo al primo task
     base = cleaner.start_time
     if cleaner.available_from:
         base = max(base, cleaner.available_from)
-    
+
     # Viaggio da EO a HP
     if cleaner.last_eo_lat is not None and cleaner.last_eo_lng is not None:
-        tt = travel_minutes(cleaner.last_eo_lat, cleaner.last_eo_lng, 
+        tt = travel_minutes(cleaner.last_eo_lat, cleaner.last_eo_lng,
                           first.lat, first.lng,
                           cleaner.last_eo_address, first.address)
     else:
         tt = 3.0 if same_street(cleaner.last_eo_address, first.address) else 12.0
-    
+
     arrival = base + timedelta(minutes=tt)
-    
+
     # HP hard earliest: 11:00
     hp_earliest = datetime(arrival.year, arrival.month, arrival.day, HP_HARD_EARLIEST_H, HP_HARD_EARLIEST_M)
     arrival = max(arrival, hp_earliest)
-    
+
     # Orario massimo di fine task: 19:00
     max_end_time = datetime(arrival.year, arrival.month, arrival.day, 19, 0)
-    
+
     # Considera checkout se presente
     if first.checkout_dt:
         arrival = max(arrival, first.checkout_dt)
-    
+
     start = arrival
     finish = start + timedelta(minutes=first.cleaning_time)
-    
+
     # Check-in strict
     if first.checkin_dt and finish > first.checkin_dt:
         return False, []
-    
+
     # Vincolo orario: nessuna task deve finire dopo le 19:00
     if finish > max_end_time:
         return False, []
-    
+
     schedule.append((arrival, start, finish))
     prev = first
     cur = finish
-    
+
     # Task successive
     for i in range(1, len(route)):
         t = route[i]
         tt = travel_minutes(prev.lat, prev.lng, t.lat, t.lng, prev.address, t.address)
         cur += timedelta(minutes=tt)
         arrival = cur
-        
+
         # Considera checkout se presente
         wait = timedelta(0)
         if t.checkout_dt and arrival < t.checkout_dt:
             wait = t.checkout_dt - arrival
             cur += wait
-        
+
         start = cur
         finish = start + timedelta(minutes=t.cleaning_time)
-        
+
         # Check-in strict
         if t.checkin_dt and finish > t.checkin_dt:
             return False, []
-        
+
         # Vincolo orario: nessuna task deve finire dopo le 19:00
         if finish > max_end_time:
             return False, []
-        
+
         schedule.append((arrival, start, finish))
         prev = t
         cur = finish
-    
+
     return True, schedule
 
 
@@ -268,32 +267,32 @@ def can_add_task(cleaner: Cleaner, task: Task) -> bool:
     Verifica se è possibile aggiungere una task al cleaner secondo le regole:
     1. Premium task -> premium cleaner
     2. Straordinaria -> premium cleaner, deve essere la prima (pos=0)
-    3. Max 2 task per cleaner (3ª solo se entro 10' dalla 2ª)
+    3. Max 2 task per cleaner (3ª solo se entro 10')
     """
     if not can_handle_premium(cleaner, task):
         return False
-    
+
     # Straordinaria deve essere la prima
     if task.straordinaria:
         if len(cleaner.route) > 0:
             return False
-    
+
     # Se il cleaner ha già una straordinaria, non può aggiungerne altre
     if len(cleaner.route) > 0 and cleaner.route[0].straordinaria:
         if task.straordinaria:
             return False
-    
+
     # Max 2 task (3ª solo se entro 10')
     if len(cleaner.route) >= MAX_TASKS_PER_CLEANER:
         # Può aggiungere una 3ª task solo se il viaggio è ≤ 10'
         if len(cleaner.route) == 2:
             last_task = cleaner.route[-1]
-            tt = travel_minutes(last_task.lat, last_task.lng, task.lat, task.lng, 
+            tt = travel_minutes(last_task.lat, last_task.lng, task.lat, task.lng,
                               last_task.address, task.address)
             if tt <= THIRD_TASK_MAX_TRAVEL:
                 return True
         return False
-    
+
     return True
 
 
@@ -301,15 +300,15 @@ def find_best_position(cleaner: Cleaner, task: Task) -> Optional[Tuple[int, floa
     """
     Trova la migliore posizione per inserire la task.
     Ritorna: (position, travel_time) oppure None se non fattibile
-    
+
     Regola: favorisce percorsi < 15', altrimenti sceglie il minore dei > 15'
     """
     if not can_add_task(cleaner, task):
         return None
-    
+
     best_pos = None
     best_travel = float('inf')
-    
+
     # Straordinaria deve andare per forza in pos 0
     if task.straordinaria:
         test_route = [task] + cleaner.route
@@ -318,55 +317,55 @@ def find_best_position(cleaner: Cleaner, task: Task) -> Optional[Tuple[int, floa
             return (0, 0.0)
         else:
             return None
-    
+
     # Prova tutte le posizioni possibili
     for pos in range(len(cleaner.route) + 1):
         test_route = cleaner.route[:pos] + [task] + cleaner.route[pos:]
         feasible, _ = evaluate_route(cleaner, test_route)
-        
+
         if not feasible:
             continue
-        
+
         # Calcola il tempo di viaggio max generato da questo inserimento
         if pos == 0:
             # Prima task HP: calcola viaggio da EO a HP
             if cleaner.last_eo_lat is not None and cleaner.last_eo_lng is not None:
-                travel_to = travel_minutes(cleaner.last_eo_lat, cleaner.last_eo_lng, 
+                travel_to = travel_minutes(cleaner.last_eo_lat, cleaner.last_eo_lng,
                                          task.lat, task.lng,
                                          cleaner.last_eo_address, task.address)
             else:
                 travel_to = 3.0 if same_street(cleaner.last_eo_address, task.address) else 12.0
-            
+
             if len(cleaner.route) > 0:
                 next_task = cleaner.route[0]
                 travel_from = travel_minutes(task.lat, task.lng, next_task.lat, next_task.lng,
                                             task.address, next_task.address)
             else:
                 travel_from = 0.0
-            
+
             max_travel = max(travel_to, travel_from)
         else:
             prev_task = cleaner.route[pos - 1]
             travel_to = travel_minutes(prev_task.lat, prev_task.lng, task.lat, task.lng,
                                       prev_task.address, task.address)
-            
+
             if pos < len(cleaner.route):
                 next_task = cleaner.route[pos]
                 travel_from = travel_minutes(task.lat, task.lng, next_task.lat, next_task.lng,
                                             task.address, next_task.address)
             else:
                 travel_from = 0.0
-            
+
             max_travel = max(travel_to, travel_from)
-        
+
         # Scegli la posizione con minor viaggio
         if max_travel < best_travel:
             best_travel = max_travel
             best_pos = pos
-    
+
     if best_pos is not None:
         return (best_pos, best_travel)
-    
+
     return None
 
 
@@ -379,14 +378,14 @@ def load_cleaners(ref_date: str) -> List[Cleaner]:
         is_premium = bool(c.get("premium", (role.lower() == "premium")))
         if (role or "").lower() == "formatore":
             continue
-        
+
         st = (c.get("start_time") or "10:00")
         try:
             h, m = [int(x) for x in st.split(":")]
         except Exception:
             h, m = 10, 0
         start_dt = datetime.strptime(f"{ref_date} {h:02d}:{m:02d}", "%Y-%m-%d %H:%M")
-        
+
         cleaners.append(
             Cleaner(
                 id=c.get("id"),
@@ -402,7 +401,7 @@ def load_cleaners(ref_date: str) -> List[Cleaner]:
 def seed_cleaners_from_eo(cleaners: List[Cleaner], ref_date: str):
     """Seed cleaners da database (Early-Out assignments)"""
     import mysql.connector
-    
+
     try:
         conn = mysql.connector.connect(
             host="139.59.132.41",
@@ -411,10 +410,10 @@ def seed_cleaners_from_eo(cleaners: List[Cleaner], ref_date: str):
             database="adamdb"
         )
         cur = conn.cursor(dictionary=True)
-        
+
         # Query per ottenere l'ultima task EO di ogni cleaner
         cur.execute("""
-            SELECT 
+            SELECT
                 cleaner_id,
                 end_time,
                 address,
@@ -422,20 +421,20 @@ def seed_cleaners_from_eo(cleaners: List[Cleaner], ref_date: str):
                 lng,
                 sequence
             FROM app_wass_assignments
-            WHERE DATE(date) = %s 
+            WHERE DATE(date) = %s
               AND assignment_type = 'early_out'
             ORDER BY cleaner_id, sequence DESC
         """, (ref_date,))
-        
+
         assignments = cur.fetchall()
-        
+
         # Raggruppa per cleaner_id e prendi l'ultima task
         cleaner_last_task = {}
         for row in assignments:
             cid = row['cleaner_id']
             if cid not in cleaner_last_task:
                 cleaner_last_task[cid] = row
-        
+
         # Aggiorna i cleaner
         for cl in cleaners:
             if cl.id in cleaner_last_task:
@@ -445,10 +444,10 @@ def seed_cleaners_from_eo(cleaners: List[Cleaner], ref_date: str):
                 cl.last_eo_lat = float(last['lat']) if last['lat'] is not None else None
                 cl.last_eo_lng = float(last['lng']) if last['lng'] is not None else None
                 cl.eo_last_sequence = int(last['sequence'])
-        
+
         cur.close()
         conn.close()
-        
+
     except Exception as e:
         print(f"⚠️  Errore nel seed da database: {e}")
         print("Continuo senza seed...")
@@ -457,7 +456,7 @@ def seed_cleaners_from_eo(cleaners: List[Cleaner], ref_date: str):
 def load_tasks() -> Tuple[List[Task], str]:
     data = json.loads(INPUT_TASKS.read_text(encoding="utf-8"))
     tasks: List[Task] = []
-    
+
     # Determina ref_date dal primo task
     ref_date = None
     for t in data.get("high_priority_tasks", []):
@@ -467,15 +466,15 @@ def load_tasks() -> Tuple[List[Task], str]:
         if ref:
             ref_date = ref.strftime("%Y-%m-%d")
             break
-    
+
     if ref_date is None:
         ref_date = datetime.now().strftime("%Y-%m-%d")
-    
+
     for t in data.get("high_priority_tasks", []):
         checkout_dt = parse_dt(t.get("checkout_date"), t.get("checkout_time"))
         checkin_dt = parse_dt(t.get("checkin_date"), t.get("checkin_time"))
         is_hp_soft = (checkin_dt is None and checkout_dt is None)
-        
+
         tasks.append(
             Task(
                 task_id=str(t.get("task_id")),
@@ -493,13 +492,13 @@ def load_tasks() -> Tuple[List[Task], str]:
                 straordinaria=bool(t.get("straordinaria", False)),
                 is_hp_soft=is_hp_soft,
             ))
-    
+
     # Ordina: straordinarie first, poi premium, poi per checkin/checkout
     def task_key(task: Task):
         base_dt = task.checkin_dt or task.checkout_dt or datetime.now().replace(
             hour=HP_HARD_EARLIEST_H, minute=HP_HARD_EARLIEST_M, second=0, microsecond=0)
         return (not task.straordinaria, not task.is_premium, base_dt)
-    
+
     tasks.sort(key=task_key)
     return tasks, ref_date
 
@@ -513,25 +512,25 @@ def plan_day(tasks: List[Task], cleaners: List[Cleaner]) -> Tuple[List[Cleaner],
     - Max 2 task per cleaner (3ª solo se entro 10')
     """
     unassigned = []
-    
+
     for task in tasks:
         # Trova tutti i cleaner che possono prendere questa task
         candidates = []
-        
+
         for cleaner in cleaners:
             result = find_best_position(cleaner, task)
             if result is not None:
                 pos, travel = result
                 candidates.append((cleaner, pos, travel))
-        
+
         if not candidates:
             unassigned.append(task)
             continue
-        
+
         # Dividi i candidati in due gruppi: < 15' e >= 15'
         preferred = [(c, p, t) for c, p, t in candidates if t < PREFERRED_TRAVEL]
         others = [(c, p, t) for c, p, t in candidates if t >= PREFERRED_TRAVEL]
-        
+
         # Scegli dal gruppo preferito se esiste, altrimenti dal gruppo altri
         if preferred:
             # Scegli quello con minor viaggio tra i preferiti
@@ -541,29 +540,29 @@ def plan_day(tasks: List[Task], cleaners: List[Cleaner]) -> Tuple[List[Cleaner],
             # Scegli quello con minor viaggio tra gli altri
             others.sort(key=lambda x: (len(x[0].route), x[2]))
             chosen = others[0]
-        
+
         cleaner, pos, travel = chosen
         cleaner.route.insert(pos, task)
-    
+
     return cleaners, unassigned
 
 
 def build_output(cleaners: List[Cleaner], unassigned: List[Task], original_tasks: List[Task]) -> Dict[str, Any]:
     cleaners_with_tasks: List[Dict[str, Any]] = []
-    
+
     for cl in cleaners:
         if not cl.route:
             continue
-        
+
         feasible, schedule = evaluate_route(cl, cl.route)
         if not feasible or not schedule:
             continue
-        
+
         tasks_list: List[Dict[str, Any]] = []
-        
+
         for idx, (t, (arr, start, fin)) in enumerate(zip(cl.route, schedule)):
             overall_seq = cl.eo_last_sequence + idx + 1
-            
+
             # Calcola travel_time
             if overall_seq == 1:
                 travel_time = 0
@@ -580,7 +579,7 @@ def build_output(cleaners: List[Cleaner], unassigned: List[Task], original_tasks
                 prev = cl.route[idx - 1]
                 hop = travel_minutes(prev.lat, prev.lng, t.lat, t.lng, prev.address, t.address)
                 travel_time = int(round(hop))
-            
+
             tasks_list.append({
                 "task_id": int(t.task_id),
                 "logistic_code": int(t.logistic_code),
@@ -595,7 +594,7 @@ def build_output(cleaners: List[Cleaner], unassigned: List[Task], original_tasks
                 "sequence": overall_seq,
                 "travel_time": travel_time
             })
-        
+
         cleaners_with_tasks.append({
             "cleaner": {
                 "id": cl.id,
@@ -606,13 +605,13 @@ def build_output(cleaners: List[Cleaner], unassigned: List[Task], original_tasks
             },
             "tasks": tasks_list
         })
-    
+
     # Trova le task assegnate
     assigned_codes = set()
     for entry in cleaners_with_tasks:
         for t in entry.get("tasks", []):
             assigned_codes.add(int(t["logistic_code"]))
-    
+
     # Unassigned list
     unassigned_list: List[Dict[str, Any]] = []
     for ot in original_tasks:
@@ -623,15 +622,18 @@ def build_output(cleaners: List[Cleaner], unassigned: List[Task], original_tasks
                 "logistic_code": lc,
                 "reason": "no_eligible_cleaner_or_time_window"
             })
-    
+
     total_assigned = sum(len(c["tasks"]) for c in cleaners_with_tasks)
-    
+
     # Usa la data passata come argomento da riga di comando
     import sys
     if len(sys.argv) > 1:
         current_ref_date = sys.argv[1]
     else:
-        current_ref_date = ref_date
+        # Fallback: carica la data dal primo task se non specificata
+        tasks_temp, ref_date_from_tasks = load_tasks()
+        current_ref_date = ref_date_from_tasks
+
 
     return {
         "high_priority_tasks_assigned": cleaners_with_tasks,
@@ -663,7 +665,7 @@ def build_output(cleaners: List[Cleaner], unassigned: List[Task], original_tasks
 def save_to_database(output: Dict[str, Any], ref_date: str):
     """Salva le assegnazioni nel database MySQL"""
     import mysql.connector
-    
+
     try:
         conn = mysql.connector.connect(
             host="139.59.132.41",
@@ -672,13 +674,13 @@ def save_to_database(output: Dict[str, Any], ref_date: str):
             database="adamdb"
         )
         cur = conn.cursor()
-        
+
         # Elimina le assegnazioni HP esistenti per questa data
         cur.execute(
             "DELETE FROM app_wass_assignments WHERE assignment_type = 'high_priority' AND DATE(date) = %s",
             (ref_date,)
         )
-        
+
         # Inserisci le nuove assegnazioni
         insert_count = 0
         for cleaner_entry in output.get("high_priority_tasks_assigned", []):
@@ -708,11 +710,11 @@ def save_to_database(output: Dict[str, Any], ref_date: str):
                     1 if task.get("followup") else 0
                 ))
                 insert_count += 1
-        
+
         conn.commit()
         cur.close()
         conn.close()
-        
+
         print(f"✅ Salvate {insert_count} assegnazioni nel database MySQL")
         return True
     except Exception as e:
@@ -725,7 +727,7 @@ def main():
         raise SystemExit(f"Missing input file: {INPUT_TASKS}")
     if not INPUT_CLEANERS.exists():
         raise SystemExit(f"Missing input file: {INPUT_CLEANERS}")
-    
+
     # Usa la data passata come argomento da riga di comando
     import sys
     if len(sys.argv) > 1:
@@ -735,37 +737,37 @@ def main():
         # Fallback: carica la data dai task
         tasks_temp, ref_date = load_tasks()
         print(f"📅 Data estratta dai task: {ref_date}")
-    
+
     tasks, _ = load_tasks()
     cleaners = load_cleaners(ref_date)
     seed_cleaners_from_eo(cleaners, ref_date)
-    
+
     print(f"📋 Caricamento dati...")
     print(f"👥 Cleaner disponibili: {len(cleaners)}")
     print(f"📦 Task High-Priority da assegnare: {len(tasks)}")
     print()
     print(f"🔄 Assegnazione in corso...")
-    
+
     planners, leftovers = plan_day(tasks, cleaners)
     output = build_output(planners, leftovers, tasks)
-    
+
     print()
     print(f"✅ Assegnazione completata!")
     print(f"   - Task assegnati: {output['meta']['assigned']}/{output['meta']['total_tasks']}")
     print(f"   - Cleaner utilizzati: {output['meta']['cleaners_used']}")
     print(f"   - Task non assegnati: {output['meta']['unassigned']}")
     print()
-    
+
     # Salva nel database MySQL
     save_to_database(output, ref_date)
-    
+
     # Update timeline_assignments/{date}.json
     timeline_dir = OUTPUT_ASSIGN.parent / "timeline_assignments"
     timeline_dir.mkdir(parents=True, exist_ok=True)
     timeline_assignments_path = timeline_dir / f"{ref_date}.json"
-    
+
     timeline_data = {"assignments": [], "current_date": ref_date}
-    
+
     if timeline_assignments_path.exists():
         try:
             timeline_data = json.loads(timeline_assignments_path.read_text(encoding="utf-8"))
@@ -773,18 +775,18 @@ def main():
                 timeline_data["current_date"] = ref_date
         except:
             timeline_data = {"assignments": [], "current_date": ref_date}
-    
+
     # Rimuovi vecchie assegnazioni HP
     assigned_codes = set()
     for cleaner_entry in output["high_priority_tasks_assigned"]:
         for task in cleaner_entry.get("tasks", []):
             assigned_codes.add(str(task["logistic_code"]))
-    
+
     timeline_data["assignments"] = [
         a for a in timeline_data.get("assignments", [])
         if str(a.get("logistic_code")) not in assigned_codes
     ]
-    
+
     # Aggiungi nuove assegnazioni HP con tutti i dati del task
     for cleaner_entry in output["high_priority_tasks_assigned"]:
         cleaner_id = cleaner_entry["cleaner"]["id"]
@@ -805,15 +807,47 @@ def main():
                 "travel_time": task.get("travel_time", 0),
                 "followup": task.get("followup", False)
             })
-    
+
     # Scrivi il file specifico per la data
     timeline_assignments_path.write_text(json.dumps(timeline_data, ensure_ascii=False, indent=2), encoding="utf-8")
     print(f"✅ Aggiornato {timeline_assignments_path}")
-    
+
     # Aggiorna anche il file generale timeline_assignments.json
     general_timeline_path = OUTPUT_ASSIGN.parent / "timeline_assignments.json"
     general_timeline_path.write_text(json.dumps(timeline_data, ensure_ascii=False, indent=2), encoding="utf-8")
     print(f"✅ Aggiornato anche: {general_timeline_path}")
+
+    # Salva il risultato in high_priority_assignments.json (locale - fallback)
+    OUTPUT_ASSIGN.write_text(json.dumps(output, ensure_ascii=False, indent=2), encoding="utf-8")
+    print(f"✅ Wrote {OUTPUT_ASSIGN}")
+
+    # Salva anche su Object Storage
+    try:
+        import subprocess
+        storage_filename = "assignments/high_priority_assignments.json"
+        temp_file = "/tmp/high_priority_assignments.json"
+        with open(temp_file, 'w', encoding='utf-8') as f:
+            json.dump(output, f, ensure_ascii=False, indent=2)
+
+        node_script = f"""
+const {{ Client }} = require('@replit/object-storage');
+const fs = require('fs');
+const client = new Client();
+(async () => {{
+  const data = fs.readFileSync('{temp_file}', 'utf-8');
+  await client.uploadFromText('{storage_filename}', data);
+  console.log('✅ Caricato su Object Storage: {storage_filename}');
+}})().catch(console.error);
+"""
+        with open('/tmp/upload_storage_hp.js', 'w') as f:
+            f.write(node_script)
+
+        # Esegui lo script Node.js per caricare su Object Storage
+        # Assicurati che la directory di lavoro sia quella corretta per l'ambiente Replit
+        subprocess.run(['node', '/tmp/upload_storage_hp.js'], check=True, cwd='/home/runner/workspace')
+        print(f"📦 Salvato anche su Object Storage: {storage_filename}")
+    except Exception as e:
+        print(f"⚠️  Errore salvando su Object Storage (continuo comunque): {e}")
 
 
 if __name__ == "__main__":
