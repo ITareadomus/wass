@@ -571,6 +571,9 @@ export default function GenerateAssignments() {
       // Aggiorna il file JSON del container di destinazione
       await updateTaskJson(taskId, logisticCode, 'timeline', destination.droppableId);
 
+      // RICARICA i task da containers.json e timeline.json per sincronizzare
+      await loadTasks(true);
+      
       return;
     }
     // Se droppo da un container a una timeline
@@ -595,6 +598,9 @@ export default function GenerateAssignments() {
       // Aggiorna i file JSON dei container
       await updateTaskJson(taskId, logisticCode, source.droppableId, destination.droppableId);
 
+      // RICARICA i task da containers.json e timeline.json per sincronizzare
+      await loadTasks(true);
+      
       return;
     }
     // Se sto muovendo tra contenitori di priorità
@@ -621,8 +627,11 @@ export default function GenerateAssignments() {
 
         // Aggiorna i JSON
         if (fromContainer && toContainer) {
-          updateTaskJson(taskId, logisticCode, fromContainer, toContainer);
+          await updateTaskJson(taskId, logisticCode, fromContainer, toContainer);
         }
+        
+        // RICARICA i task da containers.json per sincronizzare
+        await loadTasks(true);
       }
     }
   };
