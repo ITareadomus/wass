@@ -1,0 +1,13 @@
+{
+  "assignments": [
+    {
+      "taskId": "218087",
+      "logisticCode": "619",
+      "cleanerId": 596,
+      "assignmentType": "manual_drag",
+      "sequence": 1
+    }
+  ],
+  "current_date": "2025-10-29",
+  "scheduleVersion": 1
+}
