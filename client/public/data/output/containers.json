@@ -1,6 +1,6 @@
 {
   "metadata": {
-    "last_updated": "2025-10-28T15:09:27.523108",
+    "last_updated": "2025-10-28T15:10:49.023540",
     "schema_version": "1.0",
     "date": "2025-10-29"
   },
@@ -357,9 +357,37 @@
             "checkout_time<=eo_time"
           ],
           "priority": "early_out"
+        },
+        {
+          "task_id": 218128,
+          "logistic_code": 1646,
+          "client_id": 87,
+          "premium": false,
+          "address": "Via Matteo Bandello 4/1",
+          "lat": "45.465877",
+          "lng": "9.1667974",
+          "cleaning_time": 60,
+          "checkin_date": "2025-10-29",
+          "checkout_date": "2025-10-29",
+          "checkin_time": "15:00",
+          "checkout_time": "08:00",
+          "pax_in": 2,
+          "pax_out": 0,
+          "small_equipment": true,
+          "operation_id": 2,
+          "confirmed_operation": true,
+          "straordinaria": false,
+          "type_apt": "A",
+          "alias": "HACCA",
+          "customer_name": "HACCA SRL",
+          "reasons": [
+            "checkout_time<=eo_time",
+            "client_forced_eo"
+          ],
+          "priority": "early_out"
         }
       ],
-      "count": 13
+      "count": 14
     },
     "high_priority": {
       "tasks": [
@@ -923,8 +951,8 @@
     }
   },
   "summary": {
-    "total_tasks": 33,
-    "early_out": 13,
+    "total_tasks": 34,
+    "early_out": 14,
     "high_priority": 14,
     "low_priority": 6
   }

@@ -13,10 +13,13 @@
       "assignment_type": "manual_drag",
       "tasks": [
         {
+          "task_id": "218089",
+          "logistic_code": "618",
           "address": "VIA VOGHERA, 4",
           "lat": "45.454632",
           "lng": "9.168536",
           "premium": false,
+          "cleaning_time": 30,
           "start_time": null,
           "end_time": null,
           "followup": false,
@@ -32,6 +35,6 @@
   "meta": {
     "total_cleaners": 1,
     "total_tasks": 1,
-    "last_updated": "2025-10-28T15:09:33.965Z"
+    "last_updated": "2025-10-28T15:10:54.130Z"
   }
 }
