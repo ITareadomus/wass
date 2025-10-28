@@ -7,7 +7,15 @@ from pathlib import Path
 import mysql.connector
 import subprocess
 
-# Database configuration ora inline nelle funzioni
+# =============================
+# Database configuration
+# =============================
+DB_CONFIG = {
+    "host": "139.59.132.41",
+    "user": "admin",
+    "password": "ed329a875c6c4ebdf4e87e2bbe53a15771b5844ef6606dde",
+    "database": "adamdb"
+}
 
 # =============================
 # I/O paths
