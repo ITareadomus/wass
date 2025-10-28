@@ -5,6 +5,7 @@ from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Tuple
 from pathlib import Path
 import os
+import mysql.connector
 
 # =============================
 # I/O paths
@@ -409,28 +410,50 @@ def seed_cleaners_from_assignments(cleaners: List[Cleaner]):
         print("Continuo senza seed...")
 
 
-def load_tasks() -> List[Task]:
-    data = json.loads(INPUT_TASKS.read_text(encoding="utf-8"))
-    tasks: List[Task] = []
-    for t in data.get("low_priority_tasks", []):
-        tasks.append(
-            Task(
-                task_id=str(t.get("task_id")),
-                logistic_code=str(t.get("logistic_code")),
-                lat=float(t.get("lat")),
-                lng=float(t.get("lng")),
-                cleaning_time=int(t.get("cleaning_time") or 60),
-                is_premium=bool(t.get("premium", False)),
-                apt_type=t.get("type_apt"),
-                address=t.get("address"),
-                alias=t.get("alias"),
-                small_equipment=bool(t.get("small_equipment", False)),
-                straordinaria=bool(t.get("straordinaria", False)),
+def load_tasks_from_db(work_date: str) -> List[Task]:
+    """Carica i task low-priority dal database"""
+    try:
+        conn = mysql.connector.connect(
+            host="139.59.132.41",
+            user="admin",
+            password="ed329a875c6c4ebdf4e87e2bbe53a15771b5844ef6606dde",
+            database="adamdb"
+        )
+        cur = conn.cursor(dictionary=True)
+        
+        cur.execute("""
+            SELECT * FROM task_containers 
+            WHERE priority = 'low_priority' AND date = %s
+        """, (work_date,))
+        
+        rows = cur.fetchall()
+        cur.close()
+        conn.close()
+        
+        tasks: List[Task] = []
+        
+        for row in rows:
+            tasks.append(Task(
+                task_id=str(row["task_id"]),
+                logistic_code=str(row["logistic_code"]),
+                lat=float(row["lat"]),
+                lng=float(row["lng"]),
+                cleaning_time=int(row["cleaning_time"]) if row["cleaning_time"] else 60,
+                is_premium=bool(row["premium"]),
+                address=row["address"],
+                small_equipment=False,
+                straordinaria=bool(row["straordinaria"]),
+                apt_type=None,
+                alias=None
             ))
-
-    # Ordina: straordinarie first, poi premium
-    tasks.sort(key=lambda x: (not x.straordinaria, not x.is_premium))
-    return tasks
+        
+        # Ordina: straordinarie first, poi premium
+        tasks.sort(key=lambda x: (not x.straordinaria, not x.is_premium))
+        
+        return tasks
+    except Exception as e:
+        print(f"❌ Errore caricamento task low-priority dal DB: {e}")
+        return []
 
 
 # -------- Planner --------
@@ -663,8 +686,6 @@ def save_to_database(output: Dict[str, Any], ref_date: str):
 
 
 def main():
-    if not INPUT_TASKS.exists():
-        raise SystemExit(f"Missing input file: {INPUT_TASKS}")
     if not INPUT_CLEANERS.exists():
         raise SystemExit(f"Missing input file: {INPUT_CLEANERS}")
 
@@ -681,7 +702,7 @@ def main():
 
     cleaners = load_cleaners()
     seed_cleaners_from_assignments(cleaners)
-    tasks = load_tasks()
+    tasks = load_tasks_from_db(ref_date)
 
     print(f"📋 Caricamento dati...")
     print(f"👥 Cleaner disponibili: {len(cleaners)}")

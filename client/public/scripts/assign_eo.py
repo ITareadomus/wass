@@ -7,15 +7,7 @@ from pathlib import Path
 import mysql.connector
 import subprocess
 
-# =============================
-# Database Configuration
-# =============================
-DB_CONFIG = {
-    "host": "139.59.132.41",
-    "user": "admin",
-    "password": "ed329a875c6c4ebdf4e87e2bbe53a15771b5844ef6606dde",
-    "database": "adamdb"
-}
+# Database configuration ora inline nelle funzioni
 
 # =============================
 # I/O paths
@@ -326,7 +318,12 @@ def load_cleaners() -> List[Cleaner]:
 def load_tasks_from_db(work_date: str) -> List[Task]:
     """Carica i task early-out dal database"""
     try:
-        conn = mysql.connector.connect(**DB_CONFIG)
+        conn = mysql.connector.connect(
+            host="139.59.132.41",
+            user="admin",
+            password="ed329a875c6c4ebdf4e87e2bbe53a15771b5844ef6606dde",
+            database="adamdb"
+        )
         cur = conn.cursor(dictionary=True)
         
         cur.execute("""
@@ -339,6 +336,8 @@ def load_tasks_from_db(work_date: str) -> List[Task]:
         conn.close()
         
         tasks: List[Task] = []
+        eo_start_min = hhmm_to_min("10:00")
+        
         for row in rows:
             tasks.append(Task(
                 task_id=str(row["task_id"]),
@@ -346,54 +345,23 @@ def load_tasks_from_db(work_date: str) -> List[Task]:
                 lat=float(row["lat"]),
                 lng=float(row["lng"]),
                 cleaning_time=int(row["cleaning_time"]) if row["cleaning_time"] else 60,
-                checkout_time=hhmm_to_min("10:00"),
+                checkout_time=eo_start_min,
                 checkin_time=hhmm_to_min(row["checkin_time"]) if row["checkin_time"] else hhmm_to_min("23:59"),
                 is_premium=bool(row["premium"]),
                 address=row["address"],
                 small_equipment=False,
-                straordinaria=bool(row["straordinaria"])
+                straordinaria=bool(row["straordinaria"]),
+                apt_type=None,
+                alias=None
             ))
+        
+        # Ordina: straordinarie first, poi premium, poi per checkout
+        tasks.sort(key=lambda x: (not x.straordinaria, not x.is_premium, x.checkout_time))
         
         return tasks
     except Exception as e:
-        print(f"Errore caricamento task dal DB: {e}")
+        print(f"❌ Errore caricamento task early-out dal DB: {e}")
         return []
-
-def load_tasks() -> List[Task]:
-    # Funzione deprecata - manteniamo per compatibilità
-    import sys
-    if len(sys.argv) > 1:
-        work_date = sys.argv[1]
-    else:
-        from datetime import datetime
-        work_date = datetime.now().strftime("%Y-%m-%d")
-    return load_tasks_from_db(work_date)
-    eo_start_min = hhmm_to_min("10:00")
-    tasks: List[Task] = []
-    for t in data.get("early_out_tasks", []):
-        checkout = eo_start_min
-        checkin = hhmm_to_min(t.get("checkin_time"), default="23:59")
-
-        tasks.append(
-            Task(
-                task_id=str(t.get("task_id")),
-                logistic_code=str(t.get("logistic_code")),
-                lat=float(t.get("lat")),
-                lng=float(t.get("lng")),
-                cleaning_time=int(t.get("cleaning_time") or 45),
-                checkout_time=checkout,
-                checkin_time=checkin,
-                is_premium=bool(t.get("premium", False)),
-                apt_type=t.get("type_apt"),
-                address=t.get("address"),
-                alias=t.get("alias"),
-                small_equipment=bool(t.get("small_equipment", False)),
-                straordinaria=bool(t.get("straordinaria", False)),
-            ))
-
-    # Ordina: straordinarie first, poi premium, poi per checkout
-    tasks.sort(key=lambda x: (not x.straordinaria, not x.is_premium, x.checkout_time))
-    return tasks
 
 
 # -------- Planner --------
@@ -610,6 +578,7 @@ def save_to_database(output: Dict[str, Any], ref_date: str):
 
 # -------- Main Execution --------
 def main():
+    # Non controlliamo più INPUT_TASKS perché leggiamo dal database
     if not INPUT_CLEANERS.exists():
         raise SystemExit(f"Missing input file: {INPUT_CLEANERS}")
 
