@@ -179,11 +179,20 @@ export default function GenerateAssignments() {
 
       const dateStr = format(selectedDate, "yyyy-MM-dd");
 
-      // Aggiungi timestamp per evitare cache
-      const timestamp = Date.now();
+      // Aggiungi timestamp UNIVOCO per evitare QUALSIASI cache
+      const timestamp = Date.now() + Math.random();
+      
+      console.log(`🔄 Caricamento task dai file JSON (timestamp: ${timestamp})...`);
+      
       const [containersResponse, timelineResponse] = await Promise.all([
-        fetch(`/data/output/containers.json?t=${timestamp}`),
-        fetch(`/data/output/timeline.json?t=${timestamp}`)
+        fetch(`/data/output/containers.json?t=${timestamp}`, {
+          cache: 'no-store',
+          headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' }
+        }),
+        fetch(`/data/output/timeline.json?t=${timestamp}`, {
+          cache: 'no-store',
+          headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' }
+        })
       ]);
 
       if (!containersResponse.ok) {
@@ -268,9 +277,15 @@ export default function GenerateAssignments() {
 
       console.log("Task dopo filtro - Early:", filteredEarlyOut.length, "High:", filteredHigh.length, "Low:", filteredLow.length);
 
+      // AGGIORNA GLI STATI IN MODO SINCRONIZZATO
       setEarlyOutTasks(filteredEarlyOut);
       setHighPriorityTasks(filteredHigh);
       setLowPriorityTasks(filteredLow);
+      
+      console.log(`📊 SINCRONIZZAZIONE CONTAINERS:`);
+      console.log(`   - Early Out: ${filteredEarlyOut.length} task`);
+      console.log(`   - High Priority: ${filteredHigh.length} task`);
+      console.log(`   - Low Priority: ${filteredLow.length} task`);
 
       // Crea l'array unificato SOLO con task dai containers (non assegnate)
       // Le task assegnate vengono aggiunte SOLO se sono effettivamente in timeline.json
@@ -302,11 +317,17 @@ export default function GenerateAssignments() {
         }
       }
 
-      console.log(`Task totali: ${tasksWithAssignments.length} (${tasksWithAssignments.filter(t => (t as any).assignedCleaner).length} assegnate, ${tasksWithAssignments.filter(t => !(t as any).assignedCleaner).length} nei containers)`);
+      console.log(`📊 SINCRONIZZAZIONE TIMELINE:`);
+      console.log(`   - Task totali: ${tasksWithAssignments.length}`);
+      console.log(`   - Task assegnate: ${tasksWithAssignments.filter(t => (t as any).assignedCleaner).length}`);
+      console.log(`   - Task nei containers: ${tasksWithAssignments.filter(t => !(t as any).assignedCleaner).length}`);
+      
       setAllTasksWithAssignments(tasksWithAssignments);
 
       setIsLoadingTasks(false);
       setExtractionStep("Task caricati con successo!");
+      
+      console.log(`✅ SINCRONIZZAZIONE COMPLETATA - Containers e Timeline allineati con i file JSON`);
     } catch (error) {
       console.error("Errore nel caricamento dei task:", error);
       setIsLoadingTasks(false);
@@ -524,115 +545,75 @@ export default function GenerateAssignments() {
       ? destination.droppableId
       : containerToJsonName[destination.droppableId] || null;
 
-    // Caso 1: Reorder intra-timeline (stessa colonna cleaner)
-    if (source.droppableId.startsWith('timeline-') && destination.droppableId.startsWith('timeline-')) {
-      const sourceCleanerId = parseInt(source.droppableId.replace('timeline-', ''));
-      const destCleanerId = parseInt(destination.droppableId.replace('timeline-', ''));
+    try {
+      // Caso 1: Reorder intra-timeline (stessa colonna cleaner)
+      if (source.droppableId.startsWith('timeline-') && destination.droppableId.startsWith('timeline-')) {
+        const sourceCleanerId = parseInt(source.droppableId.replace('timeline-', ''));
+        const destCleanerId = parseInt(destination.droppableId.replace('timeline-', ''));
 
-      if (sourceCleanerId === destCleanerId) {
-        // Reorder nella stessa timeline
-        reorderTimelineAssignment(taskId, sourceCleanerId, logisticCode || '', source.index, destination.index);
+        if (sourceCleanerId === destCleanerId) {
+          // Reorder nella stessa timeline
+          await reorderTimelineAssignment(taskId, sourceCleanerId, logisticCode || '', source.index, destination.index);
+          // FORZA ricaricamento completo
+          await loadTasks(true);
+          return;
+        }
+      }
 
-        // Aggiorna lo stato locale
-        setAllTasksWithAssignments((prevTasks) => {
-          const updatedTasks = [...prevTasks];
-          const taskToMove = updatedTasks.find(t => t.id === taskId);
-          if (taskToMove) {
-            (taskToMove as any).sequence = destination.index + 1;
-          }
-          return updatedTasks;
-        });
+      // Caso 2: Da timeline a container
+      if (source.droppableId.startsWith('timeline-') && 
+          (destination.droppableId === 'early-out' || 
+           destination.droppableId === 'high' || 
+           destination.droppableId === 'low')) {
+
+        console.log(`🔄 Spostamento da timeline a container: ${source.droppableId} -> ${destination.droppableId}`);
+
+        // 1. Rimuovi da timeline.json
+        await removeTimelineAssignment(taskId, logisticCode);
+
+        // 2. Aggiorna containers.json
+        await updateTaskJson(taskId, logisticCode, 'timeline', destination.droppableId);
+
+        // 3. FORZA ricaricamento completo e sincronizzato
+        await loadTasks(true);
+        
+        console.log(`✅ Sincronizzazione completata`);
         return;
       }
-    }
 
-    // Se droppo dalla timeline a un container
-    if (source.droppableId.startsWith('timeline-') && 
-        (destination.droppableId === 'early-out' || 
-         destination.droppableId === 'high' || 
-         destination.droppableId === 'low')) {
+      // Caso 3: Da container a timeline
+      if ((source.droppableId === 'early-out' || source.droppableId === 'high' || source.droppableId === 'low') &&
+          destination.droppableId.startsWith('timeline-')) {
 
-      console.log(`Spostamento da timeline a container: ${source.droppableId} -> ${destination.droppableId}`);
+        const cleanerId = parseInt(destination.droppableId.split('-')[1]);
+        console.log(`🔄 Spostamento da container a timeline: ${source.droppableId} -> cleaner ${cleanerId}`);
 
-      // Rimuovi dalla timeline
-      const updatedTasks = allTasksWithAssignments.map(t => {
-        if (t.id === taskId) {
-          const updated = { ...t };
-          delete (updated as any).assignedCleaner;
-          return updated;
-        }
-        return t;
-      });
-      setAllTasksWithAssignments(updatedTasks);
+        // 1. Salva in timeline.json (questo rimuove automaticamente da containers.json)
+        await saveTimelineAssignment(taskId, cleanerId, logisticCode, destination.index);
 
-      // Rimuovi da timeline_assignments.json
-      await removeTimelineAssignment(taskId, logisticCode);
-
-      // Aggiorna il file JSON del container di destinazione
-      await updateTaskJson(taskId, logisticCode, 'timeline', destination.droppableId);
-
-      // RICARICA i task da containers.json e timeline.json per sincronizzare
-      await loadTasks(true);
-      
-      return;
-    }
-    // Se droppo da un container a una timeline
-    if ((source.droppableId === 'early-out' || source.droppableId === 'high' || source.droppableId === 'low') &&
-        destination.droppableId.startsWith('timeline-')) {
-
-      const cleanerId = parseInt(destination.droppableId.split('-')[1]);
-      console.log(`Spostamento da container a timeline: ${source.droppableId} -> cleaner ${cleanerId}`);
-
-      // Aggiorna lo stato locale
-      const updatedTasks = allTasksWithAssignments.map(t => {
-        if (t.id === taskId) {
-          return { ...t, assignedCleaner: cleanerId } as any;
-        }
-        return t;
-      });
-      setAllTasksWithAssignments(updatedTasks);
-
-      // Salva in timeline_assignments.json
-      await saveTimelineAssignment(taskId, cleanerId, logisticCode, destination.index);
-
-      // Aggiorna i file JSON dei container
-      await updateTaskJson(taskId, logisticCode, source.droppableId, destination.droppableId);
-
-      // RICARICA i task da containers.json e timeline.json per sincronizzare
-      await loadTasks(true);
-      
-      return;
-    }
-    // Se sto muovendo tra contenitori di priorità
-    else {
-      // Rimuovi dal container di origine
-      if (source.droppableId === 'early-out') {
-        setEarlyOutTasks(prev => prev.filter(t => t.id !== taskId));
-      } else if (source.droppableId === 'high') {
-        setHighPriorityTasks(prev => prev.filter(t => t.id !== taskId));
-      } else if (source.droppableId === 'low') {
-        setLowPriorityTasks(prev => prev.filter(t => t.id !== taskId));
-      }
-
-      // Aggiungi al container di destinazione
-      const taskToAdd = allTasksWithAssignments.find(t => t.id === taskId);
-      if (taskToAdd) {
-        if (destination.droppableId === 'early-out') {
-          setEarlyOutTasks(prev => [...prev, taskToAdd]);
-        } else if (destination.droppableId === 'high') {
-          setHighPriorityTasks(prev => [...prev, taskToAdd]);
-        } else if (destination.droppableId === 'low') {
-          setLowPriorityTasks(prev => [...prev, taskToAdd]);
-        }
-
-        // Aggiorna i JSON
-        if (fromContainer && toContainer) {
-          await updateTaskJson(taskId, logisticCode, fromContainer, toContainer);
-        }
-        
-        // RICARICA i task da containers.json per sincronizzare
+        // 2. FORZA ricaricamento completo e sincronizzato
         await loadTasks(true);
+        
+        console.log(`✅ Sincronizzazione completata`);
+        return;
       }
+
+      // Caso 4: Tra containers
+      if (fromContainer && toContainer && !destination.droppableId.startsWith('timeline-')) {
+        console.log(`🔄 Spostamento tra containers: ${fromContainer} -> ${toContainer}`);
+
+        // 1. Aggiorna containers.json
+        await updateTaskJson(taskId, logisticCode, fromContainer, toContainer);
+        
+        // 2. FORZA ricaricamento completo e sincronizzato
+        await loadTasks(true);
+        
+        console.log(`✅ Sincronizzazione completata`);
+      }
+    } catch (error) {
+      console.error('❌ Errore durante lo spostamento:', error);
+      // In caso di errore, ricarica comunque per ripristinare lo stato corretto
+      await loadTasks(true);
     }
   };
 
