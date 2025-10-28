@@ -4,6 +4,7 @@ import json, math
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Tuple
 from pathlib import Path
+import os
 
 # =============================
 # I/O paths
@@ -367,7 +368,7 @@ def seed_cleaners_from_assignments(cleaners: List[Cleaner]):
 
         # Query per ottenere l'ultima task di ogni cleaner (EO o HP)
         cur.execute("""
-            SELECT 
+            SELECT
                 cleaner_id,
                 end_time,
                 address,
@@ -376,7 +377,7 @@ def seed_cleaners_from_assignments(cleaners: List[Cleaner]):
                 sequence,
                 assignment_type
             FROM app_wass_assignments
-            WHERE DATE(date) = %s 
+            WHERE DATE(date) = %s
               AND assignment_type IN ('early_out', 'high_priority')
             ORDER BY cleaner_id, sequence DESC
         """, (ref_date,))
@@ -766,13 +767,13 @@ def main():
     try:
         import subprocess
         from datetime import datetime
-        
+
         # Formatta la data come dd-mm-yyyy
         date_obj = datetime.strptime(ref_date, "%Y-%m-%d")
         date_folder = date_obj.strftime("%d-%m-%Y")
         storage_filename = f"{date_folder}/low_priority_assignments.json"
         temp_file = "/tmp/low_priority_assignments.json"
-        
+
         with open(temp_file, 'w', encoding='utf-8') as f:
             json.dump(output, f, ensure_ascii=False, indent=2)
 
@@ -786,10 +787,22 @@ const client = new Client();
   console.log('✅ Caricato su Object Storage: {storage_filename}');
 }})().catch(console.error);
 """
-        with open('/tmp/upload_storage_lp.js', 'w') as f:
+        upload_script_path = '/home/runner/workspace/upload_storage_lp.js'
+        with open(upload_script_path, 'w') as f:
             f.write(node_script)
 
-        subprocess.run(['node', '/tmp/upload_storage_lp.js'], check=True, cwd='/home/runner/workspace')
+        result = subprocess.run(
+            ['node', upload_script_path],
+            check=True,
+            cwd='/home/runner/workspace',
+            capture_output=True,
+            text=True
+        )
+        print(result.stdout)
+
+        # Rimuovi lo script temporaneo
+        os.remove(upload_script_path)
+
         print(f"📦 Salvato anche su Object Storage: {storage_filename}")
     except Exception as e:
         print(f"⚠️  Errore salvando su Object Storage (continuo comunque): {e}")
