@@ -82,6 +82,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
         throw new Error(`Task ${logisticCode} non trovato nei containers`);
       }
 
+      // Mappa i campi dal formato frontend (se necessario)
+      // Il frontend usa: id, name, duration
+      // Il backend richiede: task_id, logistic_code, cleaning_time
+      if (!fullTaskData.task_id && fullTaskData.id) {
+        fullTaskData.task_id = fullTaskData.id;
+      }
+      if (!fullTaskData.logistic_code && fullTaskData.name) {
+        fullTaskData.logistic_code = fullTaskData.name;
+      }
+      if (!fullTaskData.cleaning_time && fullTaskData.duration) {
+        // Converti duration da formato "1.5" (ore.minuti) a minuti
+        const duration = String(fullTaskData.duration);
+        const [hours, mins] = duration.split('.').map(Number);
+        fullTaskData.cleaning_time = (hours || 0) * 60 + (mins || 0);
+      }
+
       // Carica o crea il file timeline con nuova struttura
       let timelineData: any = { 
         cleaners_assignments: [], 
