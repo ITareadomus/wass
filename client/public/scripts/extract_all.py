@@ -32,7 +32,7 @@ OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
 # --- DATABASE FUNCTIONS ---
 def update_task_priority_in_db(tasks, priority, work_date):
-    """Aggiorna la priority e i reasons dei task già presenti in task_containers"""
+    """Aggiorna la priority e i reasons dei task già presenti in wass_task_containers"""
     try:
         conn = mysql.connector.connect(**DB_CONFIG)
         cur = conn.cursor()
@@ -41,7 +41,7 @@ def update_task_priority_in_db(tasks, priority, work_date):
         for task in tasks:
             # UPDATE della priority e reasons per task_id
             cur.execute("""
-                UPDATE task_containers 
+                UPDATE wass_task_containers 
                 SET priority = %s, reasons = %s
                 WHERE date = %s AND task_id = %s
             """, (

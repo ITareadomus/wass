@@ -241,21 +241,21 @@ def save_tasks_to_db(tasks, work_date):
         return False
 
 def save_to_task_containers(tasks, work_date):
-    """Salva i task estratti in task_containers con priority='unassigned'"""
+    """Salva i task estratti in wass_task_containers con priority='unassigned'"""
     try:
         connection = mysql.connector.connect(**DB_CONFIG)
         cursor = connection.cursor()
 
         # Elimina i task 'unassigned' esistenti per questa data
         cursor.execute("""
-            DELETE FROM task_containers 
+            DELETE FROM wass_task_containers 
             WHERE date = %s AND priority = 'unassigned'
         """, (work_date,))
 
         # Inserisci i nuovi task come 'unassigned'
         if tasks:
             insert_query = """
-                INSERT INTO task_containers (
+                INSERT INTO wass_task_containers (
                     task_id, logistic_code, date, priority, client_id,
                     address, lat, lng, cleaning_time, checkin_date, checkout_date,
                     checkin_time, checkout_time, premium, straordinaria, reasons,
@@ -295,10 +295,10 @@ def save_to_task_containers(tasks, work_date):
         connection.commit()
         cursor.close()
         connection.close()
-        print(f"✅ Salvati {len(tasks)} task in task_containers (priority=unassigned)")
+        print(f"✅ Salvati {len(tasks)} task in wass_task_containers (priority=unassigned)")
         return True
     except Exception as e:
-        print(f"❌ Errore salvando task in task_containers: {e}")
+        print(f"❌ Errore salvando task in wass_task_containers: {e}")
         return False
 
 
@@ -338,7 +338,9 @@ def main():
     with open("client/public/data/input/daily_tasks.json", "w", encoding="utf-8") as f:
         json.dump(output, f, indent=4, ensure_ascii=False)
 
-    print(f"Estratti {len(apt_data)} appartamenti per la data {selected_date}.")
+    print(f"✅ Salvati {len(apt_data)} appartamenti per la data {selected_date}")
+    print(f"   - Nel database: wass_task_containers (priority=unassigned)")
+    print(f"   - Nel file: daily_tasks.json (per compatibilità)")
 
 if __name__ == "__main__":
     main()

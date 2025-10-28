@@ -26,7 +26,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       const [rows]: any = await connection.execute(
-        'SELECT * FROM task_containers WHERE priority = ? AND date = ?',
+        'SELECT * FROM wass_task_containers WHERE priority = ? AND date = ?',
         [priority, date]
       );
 
@@ -73,7 +73,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       await connection.execute(
-        'DELETE FROM task_containers WHERE priority = ? AND date = ?',
+        'DELETE FROM wass_task_containers WHERE priority = ? AND date = ?',
         [priority, date]
       );
 
