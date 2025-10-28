@@ -10,81 +10,6 @@
       },
       "tasks": [
         {
-          "task_id": 216826,
-          "logistic_code": 1654,
-          "address": "CORSO SAN GOTTARDO 5",
-          "lat": 45.4512977,
-          "lng": 9.1801824,
-          "premium": false,
-          "cleaning_time": 90,
-          "start_time": "11:08",
-          "end_time": "12:38",
-          "followup": true,
-          "sequence": 2,
-          "travel_time": 8
-        }
-      ]
-    },
-    {
-      "cleaner": {
-        "id": 1046,
-        "name": "JOY",
-        "lastname": "EDIAGBANYA",
-        "role": "Standard",
-        "premium": false
-      },
-      "tasks": [
-        {
-          "task_id": 217741,
-          "logistic_code": 1210,
-          "address": "VIA TONALE 16",
-          "lat": 45.4890205,
-          "lng": 9.2028612,
-          "premium": false,
-          "cleaning_time": 90,
-          "start_time": "11:49",
-          "end_time": "13:19",
-          "followup": true,
-          "sequence": 2,
-          "travel_time": 19
-        }
-      ]
-    },
-    {
-      "cleaner": {
-        "id": 1060,
-        "name": "NELLY GABRIELLE",
-        "lastname": "TENKAM",
-        "role": "Standard",
-        "premium": false
-      },
-      "tasks": [
-        {
-          "task_id": 217988,
-          "logistic_code": 1050,
-          "address": "VIA ASCANIO SFORZA, 9",
-          "lat": 45.4506703,
-          "lng": 9.1779826,
-          "premium": false,
-          "cleaning_time": 60,
-          "start_time": "11:10",
-          "end_time": "12:10",
-          "followup": true,
-          "sequence": 2,
-          "travel_time": 10
-        }
-      ]
-    },
-    {
-      "cleaner": {
-        "id": 249,
-        "name": "Ogbodo Chidi",
-        "lastname": "Igwe",
-        "role": "Premium",
-        "premium": true
-      },
-      "tasks": [
-        {
           "task_id": 217985,
           "logistic_code": 1372,
           "address": "CORSO GARIBALDI, 55",
@@ -102,11 +27,11 @@
     },
     {
       "cleaner": {
-        "id": 287,
-        "name": "BAH",
-        "lastname": "ISMAILA",
-        "role": "Standard",
-        "premium": false
+        "id": 829,
+        "name": "MUSTAPHA",
+        "lastname": "BAH",
+        "role": "Premium",
+        "premium": true
       },
       "tasks": [
         {
@@ -127,11 +52,36 @@
     },
     {
       "cleaner": {
-        "id": 326,
-        "name": "FESTUS OSARO",
-        "lastname": "AIHIVBERE",
+        "id": 404,
+        "name": "RASEL",
+        "lastname": "MOLLA",
         "role": "Standard",
         "premium": false
+      },
+      "tasks": [
+        {
+          "task_id": 217988,
+          "logistic_code": 1050,
+          "address": "VIA ASCANIO SFORZA, 9",
+          "lat": 45.4506703,
+          "lng": 9.1779826,
+          "premium": false,
+          "cleaning_time": 60,
+          "start_time": "11:00",
+          "end_time": "12:00",
+          "followup": false,
+          "sequence": 1,
+          "travel_time": 0
+        }
+      ]
+    },
+    {
+      "cleaner": {
+        "id": 596,
+        "name": "TRACY",
+        "lastname": "OKE",
+        "role": "Premium",
+        "premium": true
       },
       "tasks": [
         {
@@ -144,6 +94,56 @@
           "cleaning_time": 60,
           "start_time": "11:00",
           "end_time": "12:00",
+          "followup": false,
+          "sequence": 1,
+          "travel_time": 0
+        }
+      ]
+    },
+    {
+      "cleaner": {
+        "id": 1045,
+        "name": "ARACELY ROCIO",
+        "lastname": "MORLA ZAMBRANO",
+        "role": "Standard",
+        "premium": false
+      },
+      "tasks": [
+        {
+          "task_id": 216826,
+          "logistic_code": 1654,
+          "address": "CORSO SAN GOTTARDO 5",
+          "lat": 45.4512977,
+          "lng": 9.1801824,
+          "premium": false,
+          "cleaning_time": 90,
+          "start_time": "11:00",
+          "end_time": "12:30",
+          "followup": false,
+          "sequence": 1,
+          "travel_time": 0
+        }
+      ]
+    },
+    {
+      "cleaner": {
+        "id": 1046,
+        "name": "JOY",
+        "lastname": "EDIAGBANYA",
+        "role": "Standard",
+        "premium": false
+      },
+      "tasks": [
+        {
+          "task_id": 217741,
+          "logistic_code": 1210,
+          "address": "VIA TONALE 16",
+          "lat": 45.4890205,
+          "lng": 9.2028612,
+          "premium": false,
+          "cleaning_time": 90,
+          "start_time": "11:00",
+          "end_time": "12:30",
           "followup": false,
           "sequence": 1,
           "travel_time": 0

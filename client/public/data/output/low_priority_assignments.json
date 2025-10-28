@@ -17,11 +17,36 @@
           "lng": 9.1825685,
           "premium": false,
           "cleaning_time": 120,
-          "start_time": "12:44",
-          "end_time": "14:44",
+          "start_time": "10:07",
+          "end_time": "12:07",
           "followup": true,
-          "sequence": 3,
-          "travel_time": 7
+          "sequence": 2,
+          "travel_time": 8
+        }
+      ]
+    },
+    {
+      "cleaner": {
+        "id": 829,
+        "name": "MUSTAPHA",
+        "lastname": "BAH",
+        "role": "Premium",
+        "premium": true
+      },
+      "tasks": [
+        {
+          "task_id": 210458,
+          "logistic_code": 777,
+          "address": "Via Imperia 43",
+          "lat": 45.4418695,
+          "lng": 9.1687704,
+          "premium": false,
+          "cleaning_time": 330,
+          "start_time": "10:34",
+          "end_time": "16:04",
+          "followup": true,
+          "sequence": 2,
+          "travel_time": 34
         }
       ]
     },
@@ -42,8 +67,8 @@
           "lng": 9.1910662,
           "premium": false,
           "cleaning_time": 60,
-          "start_time": "12:11",
-          "end_time": "13:11",
+          "start_time": "10:11",
+          "end_time": "11:11",
           "followup": true,
           "sequence": 2,
           "travel_time": 11
@@ -52,51 +77,26 @@
     },
     {
       "cleaner": {
-        "id": 596,
-        "name": "TRACY",
-        "lastname": "OKE",
+        "id": 132,
+        "name": "JOHOISER ERNESTO",
+        "lastname": "LOPEZ GIRON",
         "role": "Premium",
         "premium": true
       },
       "tasks": [
         {
-          "task_id": 210458,
-          "logistic_code": 777,
-          "address": "Via Imperia 43",
-          "lat": 45.4418695,
-          "lng": 9.1687704,
+          "task_id": 217914,
+          "logistic_code": 1652,
+          "address": "VIA NINO BIXIO 33",
+          "lat": 45.4725999,
+          "lng": 9.2118362,
           "premium": false,
-          "cleaning_time": 330,
-          "start_time": "12:32",
-          "end_time": "18:02",
+          "cleaning_time": 90,
+          "start_time": "10:10",
+          "end_time": "11:40",
           "followup": true,
           "sequence": 2,
-          "travel_time": 33
-        }
-      ]
-    },
-    {
-      "cleaner": {
-        "id": 937,
-        "name": "LOVETH",
-        "lastname": "IGUDIA",
-        "role": "Premium",
-        "premium": true
-      },
-      "tasks": [
-        {
-          "task_id": 217984,
-          "logistic_code": 1565,
-          "address": "Via Lazzaro Papi 14",
-          "lat": 45.4508634,
-          "lng": 9.2079179,
-          "premium": false,
-          "cleaning_time": 120,
-          "start_time": "11:16",
-          "end_time": "13:16",
-          "followup": true,
-          "sequence": 2,
-          "travel_time": 16
+          "travel_time": 10
         }
       ]
     },
@@ -117,11 +117,36 @@
           "lng": 9.1668683,
           "premium": false,
           "cleaning_time": 90,
-          "start_time": "10:47",
-          "end_time": "12:17",
+          "start_time": "10:07",
+          "end_time": "11:37",
           "followup": true,
           "sequence": 2,
           "travel_time": 8
+        }
+      ]
+    },
+    {
+      "cleaner": {
+        "id": 249,
+        "name": "Ogbodo Chidi",
+        "lastname": "Igwe",
+        "role": "Premium",
+        "premium": true
+      },
+      "tasks": [
+        {
+          "task_id": 217984,
+          "logistic_code": 1565,
+          "address": "Via Lazzaro Papi 14",
+          "lat": 45.4508634,
+          "lng": 9.2079179,
+          "premium": false,
+          "cleaning_time": 120,
+          "start_time": "10:12",
+          "end_time": "12:12",
+          "followup": false,
+          "sequence": 1,
+          "travel_time": 0
         }
       ]
     }
@@ -129,10 +154,10 @@
   "unassigned_tasks": [],
   "current_date": "2025-10-29",
   "meta": {
-    "total_tasks": 5,
-    "assigned": 5,
+    "total_tasks": 6,
+    "assigned": 6,
     "unassigned": 0,
-    "cleaners_used": 5,
+    "cleaners_used": 6,
     "max_tasks_per_cleaner": 3,
     "algorithm": "simplified_greedy",
     "notes": [
