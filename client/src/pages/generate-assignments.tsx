@@ -181,10 +181,9 @@ export default function GenerateAssignments() {
 
       // Aggiungi timestamp per evitare cache
       const timestamp = Date.now();
-      const [containersResponse, generalTimelineResponse, dateTimelineResponse] = await Promise.all([
+      const [containersResponse, timelineResponse] = await Promise.all([
         fetch(`/data/output/containers.json?t=${timestamp}`),
-        fetch(`/data/output/timeline_assignments.json?t=${timestamp}`),
-        fetch(`/data/output/timeline_assignments/${dateStr}.json?t=${timestamp}`)
+        fetch(`/data/output/timeline.json?t=${timestamp}`)
       ]);
 
       if (!containersResponse.ok) {
@@ -193,14 +192,12 @@ export default function GenerateAssignments() {
 
       const containersData = await containersResponse.json();
 
-      // Prima prova a caricare da timeline_assignments.json, poi da timeline_assignments/{date}.json
+      // Carica da timeline.json
       let timelineAssignmentsData = { assignments: [], current_date: dateStr };
-      if (generalTimelineResponse.ok) {
-        timelineAssignmentsData = await generalTimelineResponse.json();
-        console.log("Caricato da timeline_assignments.json (principale)");
-      } else if (dateTimelineResponse.ok) {
-        timelineAssignmentsData = await dateTimelineResponse.json();
-        console.log(`Caricato da timeline_assignments/${dateStr}.json (fallback)`);
+
+      if (timelineResponse.ok) {
+        timelineAssignmentsData = await timelineResponse.json();
+        console.log("Caricato da timeline.json");
       }
 
       console.log("Containers data:", containersData);

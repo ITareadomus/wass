@@ -628,16 +628,14 @@ def main():
     print()
     print(f"💾 Risultati salvati in: {OUTPUT_ASSIGN}")
 
-    # Update timeline_assignments/{date}.json
-    timeline_dir = OUTPUT_ASSIGN.parent / "timeline_assignments"
-    timeline_dir.mkdir(parents=True, exist_ok=True)
-    timeline_assignments_path = timeline_dir / f"{ref_date}.json"
+    # Update timeline.json
+    timeline_path = OUTPUT_ASSIGN.parent / "timeline.json"
 
     timeline_data = {"assignments": [], "current_date": ref_date}
 
-    if timeline_assignments_path.exists():
+    if timeline_path.exists():
         try:
-            timeline_data = json.loads(timeline_assignments_path.read_text(encoding="utf-8"))
+            timeline_data = json.loads(timeline_path.read_text(encoding="utf-8"))
             if "current_date" not in timeline_data:
                 timeline_data["current_date"] = ref_date
         except:
@@ -675,14 +673,9 @@ def main():
                 "followup": task.get("followup", False)
             })
 
-    # Scrivi il file specifico per la data
-    timeline_assignments_path.write_text(json.dumps(timeline_data, ensure_ascii=False, indent=2), encoding="utf-8")
-    print(f"✅ Aggiornato {timeline_assignments_path}")
-
-    # Aggiorna anche il file generale timeline_assignments.json
-    general_timeline_path = OUTPUT_ASSIGN.parent / "timeline_assignments.json"
-    general_timeline_path.write_text(json.dumps(timeline_data, ensure_ascii=False, indent=2), encoding="utf-8")
-    print(f"✅ Aggiornato anche: {general_timeline_path}")
+    # Scrivi il file timeline.json
+    timeline_path.write_text(json.dumps(timeline_data, ensure_ascii=False, indent=2), encoding="utf-8")
+    print(f"✅ Aggiornato {timeline_path}")
 
 
 if __name__ == "__main__":
