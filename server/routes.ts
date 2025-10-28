@@ -52,75 +52,102 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Endpoint per salvare un'assegnazione nella timeline
   app.post("/api/save-timeline-assignment", async (req, res) => {
     try {
-      const { taskId, cleanerId, logisticCode, date, assignments, dropIndex } = req.body;
+      const { taskId, cleanerId, logisticCode, date, dropIndex } = req.body;
       const workDate = date || format(new Date(), 'yyyy-MM-dd');
       const timelinePath = path.join(process.cwd(), 'client/public/data/output/timeline.json');
 
-      // Carica o crea il file timeline
+      // Carica o crea il file timeline con nuova struttura
       let timelineData: any = { 
-        assignments: [], 
+        cleaners_assignments: [], 
         current_date: workDate,
-        scheduleVersion: 1
+        meta: {
+          total_cleaners: 0,
+          total_tasks: 0,
+          last_updated: new Date().toISOString()
+        }
       };
 
       try {
         const existingData = await fs.readFile(timelinePath, 'utf8');
         timelineData = JSON.parse(existingData);
-        if (!timelineData.scheduleVersion) {
-          timelineData.scheduleVersion = 1;
+        
+        // Migrazione da vecchia struttura a nuova se necessario
+        if (timelineData.assignments && !timelineData.cleaners_assignments) {
+          timelineData.cleaners_assignments = [];
+          timelineData.meta = {
+            total_cleaners: 0,
+            total_tasks: 0,
+            last_updated: new Date().toISOString()
+          };
         }
       } catch (error) {
         console.log(`Creazione nuovo file timeline per ${workDate}`);
       }
 
-      // Normalizza logisticCode e taskId come stringhe
       const normalizedLogisticCode = String(logisticCode);
       const normalizedTaskId = String(taskId);
       const normalizedCleanerId = Number(cleanerId);
 
-      // Rimuovi assegnazioni precedenti dello stesso task (evita duplicazioni)
-      timelineData.assignments = timelineData.assignments.filter((a: any) => {
-        const aLogisticCode = String(a.logisticCode ?? a.logistic_code);
-        const aTaskId = String(a.taskId ?? a.task_id);
-        return aLogisticCode !== normalizedLogisticCode && aTaskId !== normalizedTaskId;
-      });
+      // Trova o crea l'entry per questo cleaner
+      let cleanerEntry = timelineData.cleaners_assignments.find(
+        (c: any) => c.cleaner.id === normalizedCleanerId
+      );
 
-      // Separa assegnazioni dello stesso cleaner e degli altri
-      const sameCleanerAssignments = timelineData.assignments
-        .filter((a: any) => Number(a.cleanerId) === normalizedCleanerId)
-        .sort((a: any, b: any) => (a.sequence || 0) - (b.sequence || 0));
+      if (!cleanerEntry) {
+        // Carica dati del cleaner da selected_cleaners.json
+        const cleanersPath = path.join(process.cwd(), 'client/public/data/cleaners/selected_cleaners.json');
+        const cleanersData = JSON.parse(await fs.readFile(cleanersPath, 'utf8'));
+        const cleanerInfo = cleanersData.cleaners.find((c: any) => c.id === normalizedCleanerId);
 
-      const otherAssignments = timelineData.assignments
-        .filter((a: any) => Number(a.cleanerId) !== normalizedCleanerId);
+        cleanerEntry = {
+          cleaner: {
+            id: normalizedCleanerId,
+            name: cleanerInfo?.name || 'Unknown',
+            lastname: cleanerInfo?.lastname || '',
+            role: cleanerInfo?.role || 'Standard',
+            premium: cleanerInfo?.premium || false
+          },
+          assignment_type: 'manual_drag',
+          tasks: []
+        };
+        timelineData.cleaners_assignments.push(cleanerEntry);
+      }
 
-      // Crea nuovo assignment normalizzato
-      const newAssignment = {
-        taskId: normalizedTaskId,
-        logisticCode: normalizedLogisticCode,
-        cleanerId: normalizedCleanerId,
-        assignmentType: 'manual_drag',
+      // Rimuovi il task se già presente (evita duplicazioni)
+      cleanerEntry.tasks = cleanerEntry.tasks.filter((t: any) => 
+        String(t.logistic_code) !== normalizedLogisticCode && String(t.task_id) !== normalizedTaskId
+      );
+
+      // Crea il nuovo task
+      const newTask = {
+        task_id: Number(normalizedTaskId),
+        logistic_code: Number(normalizedLogisticCode),
         sequence: 0
       };
 
       // Inserisci in posizione dropIndex
       const targetIndex = dropIndex !== undefined 
-        ? Math.max(0, Math.min(dropIndex, sameCleanerAssignments.length))
-        : sameCleanerAssignments.length;
+        ? Math.max(0, Math.min(dropIndex, cleanerEntry.tasks.length))
+        : cleanerEntry.tasks.length;
 
-      sameCleanerAssignments.splice(targetIndex, 0, newAssignment);
+      cleanerEntry.tasks.splice(targetIndex, 0, newTask);
 
       // Ricalcola sequence
-      sameCleanerAssignments.forEach((a: any, i: number) => {
-        a.sequence = i + 1;
+      cleanerEntry.tasks.forEach((t: any, i: number) => {
+        t.sequence = i + 1;
       });
 
-      // Ricombina tutte le assegnazioni
-      timelineData.assignments = [...otherAssignments, ...sameCleanerAssignments];
+      // Aggiorna meta
       timelineData.current_date = workDate;
+      timelineData.meta.total_cleaners = timelineData.cleaners_assignments.length;
+      timelineData.meta.total_tasks = timelineData.cleaners_assignments.reduce(
+        (sum: number, c: any) => sum + c.tasks.length, 0
+      );
+      timelineData.meta.last_updated = new Date().toISOString();
 
       // Scrittura atomica
       const tmpPath = `${timelinePath}.tmp`;
-      await fs.writeFile(tmpPath, JSON.stringify(timelineData, null, 2));
+      await fs.writeFile(tmpPath, JSON.dumps(timelineData, null, 2));
       await fs.rename(tmpPath, timelinePath);
 
       console.log(`✅ Salvato assignment per cleaner ${normalizedCleanerId} in posizione ${targetIndex}`);

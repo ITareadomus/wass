@@ -663,54 +663,67 @@ def main():
     print()
     print(f"💾 Risultati salvati in: {OUTPUT_ASSIGN}")
 
-    # Update timeline.json
+    # Update timeline.json con struttura organizzata per cleaner
     timeline_path = OUTPUT_ASSIGN.parent / "timeline.json"
 
-    timeline_data = {"assignments": [], "current_date": ref_date}
+    # Carica timeline esistente o crea nuova struttura
+    timeline_data = {
+        "cleaners_assignments": [],
+        "current_date": ref_date,
+        "meta": {
+            "total_cleaners": 0,
+            "total_tasks": 0,
+            "last_updated": datetime.now().isoformat()
+        }
+    }
 
     if timeline_path.exists():
         try:
-            timeline_data = json.loads(timeline_path.read_text(encoding="utf-8"))
-            if "current_date" not in timeline_data:
-                timeline_data["current_date"] = ref_date
+            existing = json.loads(timeline_path.read_text(encoding="utf-8"))
+            # Mantieni le assegnazioni esistenti non-HP
+            if "cleaners_assignments" in existing:
+                timeline_data["cleaners_assignments"] = [
+                    c for c in existing.get("cleaners_assignments", [])
+                    if c.get("assignment_type") != "high_priority"
+                ]
         except:
-            timeline_data = {"assignments": [], "current_date": ref_date}
+            pass
 
-    # Rimuovi vecchie assegnazioni HP
-    assigned_codes = set()
+    # Aggiungi le nuove assegnazioni HP organizzate per cleaner
     for cleaner_entry in output["high_priority_tasks_assigned"]:
-        for task in cleaner_entry.get("tasks", []):
-            assigned_codes.add(str(task["logistic_code"]))
-
-    timeline_data["assignments"] = [
-        a for a in timeline_data.get("assignments", [])
-        if str(a.get("logistic_code")) not in assigned_codes
-    ]
-
-    # Aggiungi nuove assegnazioni HP con tutti i dati del task
-    for cleaner_entry in output["high_priority_tasks_assigned"]:
-        cleaner_id = cleaner_entry["cleaner"]["id"]
-        for task in cleaner_entry.get("tasks", []):
-            timeline_data["assignments"].append({
-                "task_id": task["task_id"],
-                "logistic_code": str(task["logistic_code"]),
-                "cleanerId": cleaner_id,
+        # Cerca se esiste già un'entry per questo cleaner
+        existing_entry = None
+        for entry in timeline_data["cleaners_assignments"]:
+            if entry["cleaner"]["id"] == cleaner_entry["cleaner"]["id"]:
+                existing_entry = entry
+                break
+        
+        if existing_entry:
+            # Aggiungi le task HP alle task esistenti
+            existing_entry["tasks"].extend(cleaner_entry["tasks"])
+        else:
+            # Crea nuova entry
+            timeline_data["cleaners_assignments"].append({
+                "cleaner": cleaner_entry["cleaner"],
                 "assignment_type": "high_priority",
-                "sequence": task.get("sequence", 0),
-                "address": task.get("address"),
-                "lat": task.get("lat"),
-                "lng": task.get("lng"),
-                "premium": task.get("premium"),
-                "cleaning_time": task.get("cleaning_time"),
-                "start_time": task.get("start_time"),
-                "end_time": task.get("end_time"),
-                "travel_time": task.get("travel_time", 0),
-                "followup": task.get("followup", False)
+                "tasks": cleaner_entry["tasks"]
             })
+
+    # Aggiorna meta
+    timeline_data["meta"]["total_cleaners"] = len(timeline_data["cleaners_assignments"])
+    timeline_data["meta"]["total_tasks"] = sum(
+        len(c.get("tasks", [])) for c in timeline_data["cleaners_assignments"]
+    )
+    timeline_data["meta"]["last_updated"] = datetime.now().isoformat()
+    timeline_data["current_date"] = ref_date
 
     # Scrivi il file timeline.json
     timeline_path.write_text(json.dumps(timeline_data, ensure_ascii=False, indent=2), encoding="utf-8")
+    
+    hp_count = len([c for c in timeline_data["cleaners_assignments"] if c.get("assignment_type") == "high_priority"])
     print(f"✅ Aggiornato {timeline_path}")
+    print(f"   - Cleaner con assegnazioni HP: {hp_count}")
+    print(f"   - Totale task: {timeline_data['meta']['total_tasks']}")
 
 
 if __name__ == "__main__":

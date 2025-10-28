@@ -219,9 +219,25 @@ export default function GenerateAssignments() {
       console.log("Task convertiti - Early:", initialEarlyOut.length, "High:", initialHigh.length, "Low:", initialLow.length);
 
       // Crea una mappa di logistic_code -> assegnazione timeline completa
-      const timelineAssignmentsMap = new Map<string, any>(
-        timelineAssignmentsData.assignments.map((a: any) => [String(a.logistic_code), a])
-      );
+      // Nuova struttura: cleaners_assignments è un array di {cleaner, tasks}
+      const timelineAssignmentsMap = new Map<string, any>();
+      
+      if (timelineAssignmentsData.cleaners_assignments) {
+        // Nuova struttura organizzata per cleaner
+        for (const cleanerEntry of timelineAssignmentsData.cleaners_assignments) {
+          for (const task of cleanerEntry.tasks || []) {
+            timelineAssignmentsMap.set(String(task.logistic_code), {
+              ...task,
+              cleanerId: cleanerEntry.cleaner.id
+            });
+          }
+        }
+      } else if (timelineAssignmentsData.assignments) {
+        // Vecchia struttura piatta (fallback)
+        for (const a of timelineAssignmentsData.assignments) {
+          timelineAssignmentsMap.set(String(a.logistic_code), a);
+        }
+      }
 
       console.log("Task assegnate nella timeline (logistic_code):", Array.from(timelineAssignmentsMap.keys()));
 
