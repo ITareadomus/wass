@@ -84,6 +84,11 @@ export default function GenerateAssignments() {
   const [isConfirming, setIsConfirming] = useState(false);
   const { toast } = useToast();
 
+  // Stati per i pulsanti di assegnazione
+  const [isAssigningEO, setIsAssigningEO] = useState(false);
+  const [isAssigningHP, setIsAssigningHP] = useState(false);
+  const [isAssigningLP, setIsAssigningLP] = useState(false);
+
   // Funzione per estrarre i dati dal backend
   const extractData = async (dateStr: string) => {
     try {
@@ -354,6 +359,128 @@ export default function GenerateAssignments() {
     }
   };
 
+  // Funzione per assegnare Early Out tasks
+  const assignEarlyOut = async () => {
+    try {
+      setIsAssigningEO(true);
+      const dateStr = format(selectedDate, "yyyy-MM-dd");
+
+      // Esegui l'assegnazione
+      const response = await fetch('/api/run-optimizer', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ date: dateStr })
+      });
+
+      if (!response.ok) {
+        throw new Error('Errore durante l\'assegnazione Early Out');
+      }
+
+      const result = await response.json();
+      console.log('Early Out assegnati:', result);
+
+      // Ricarica i task
+      await reloadAllTasks();
+
+      toast({
+        title: "Early Out Assegnati!",
+        description: "Le task Early Out sono state assegnate con successo.",
+        duration: 3000,
+      });
+    } catch (error: any) {
+      console.error("Errore nell'assegnazione Early Out:", error);
+      toast({
+        title: "Errore",
+        description: error.message || "Errore durante l'assegnazione Early Out",
+        variant: "destructive",
+        duration: 5000,
+      });
+    } finally {
+      setIsAssigningEO(false);
+    }
+  };
+
+  // Funzione per assegnare High Priority tasks
+  const assignHighPriority = async () => {
+    try {
+      setIsAssigningHP(true);
+      const dateStr = format(selectedDate, "yyyy-MM-dd");
+
+      // Esegui l'assegnazione
+      const response = await fetch('/api/assign-hp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ date: dateStr })
+      });
+
+      if (!response.ok) {
+        throw new Error('Errore durante l\'assegnazione High Priority');
+      }
+
+      const result = await response.json();
+      console.log('High Priority assegnati:', result);
+
+      // Ricarica i task
+      await reloadAllTasks();
+
+      toast({
+        title: "High Priority Assegnati!",
+        description: "Le task High Priority sono state assegnate con successo.",
+        duration: 3000,
+      });
+    } catch (error: any) {
+      console.error("Errore nell'assegnazione High Priority:", error);
+      toast({
+        title: "Errore",
+        description: error.message || "Errore durante l'assegnazione High Priority",
+        variant: "destructive",
+        duration: 5000,
+      });
+    } finally {
+      setIsAssigningHP(false);
+    }
+  };
+
+  // Funzione per assegnare Low Priority tasks
+  const assignLowPriority = async () => {
+    try {
+      setIsAssigningLP(true);
+      const dateStr = format(selectedDate, "yyyy-MM-dd");
+
+      // Esegui l'assegnazione
+      const response = await fetch('/api/assign-lp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ date: dateStr })
+      });
+
+      if (!response.ok) {
+        throw new Error('Errore durante l\'assegnazione Low Priority');
+      }
+
+      const result = await response.json();
+      console.log('Low Priority assegnati:', result);
+
+      // Ricarica i task
+      await reloadAllTasks();
+
+      toast({
+        title: "Low Priority Assegnati!",
+        description: "Le task Low Priority sono state assegnate con successo.",
+        duration: 3000,
+      });
+    } catch (error: any) {
+      console.error("Errore nell'assegnazione Low Priority:", error);
+      toast({
+        title: "Errore",
+        description: error.message || "Errore durante l'assegnazione Low Priority",
+        variant: "destructive",
+        duration: 5000,
+      });
+    } finally {
+      setIsAssigningLP(false);
+    }
+  };
 
 
   // Funzione per confermare le assegnazioni
@@ -520,9 +647,9 @@ export default function GenerateAssignments() {
     }
 
     // Se droppo dalla timeline a un container
-    if (source.droppableId.startsWith('timeline-') && 
-        (destination.droppableId === 'early-out' || 
-         destination.droppableId === 'high' || 
+    if (source.droppableId.startsWith('timeline-') &&
+        (destination.droppableId === 'early-out' ||
+         destination.droppableId === 'high' ||
          destination.droppableId === 'low')) {
 
       console.log(`Spostamento da timeline a container: ${source.droppableId} -> ${destination.droppableId}`);
@@ -718,6 +845,8 @@ export default function GenerateAssignments() {
               tasks={earlyOutTasks}
               droppableId="early-out"
               icon="clock"
+              assignAction={assignEarlyOut}
+              isAssigning={isAssigningEO}
             />
             <PriorityColumn
               title="HIGH PRIORITY"
@@ -725,6 +854,8 @@ export default function GenerateAssignments() {
               tasks={highPriorityTasks}
               droppableId="high"
               icon="alert-circle"
+              assignAction={assignHighPriority}
+              isAssigning={isAssigningHP}
             />
             <PriorityColumn
               title="LOW PRIORITY"
@@ -732,6 +863,8 @@ export default function GenerateAssignments() {
               tasks={lowPriorityTasks}
               droppableId="low"
               icon="arrow-down"
+              assignAction={assignLowPriority}
+              isAssigning={isAssigningLP}
             />
           </div>
 
