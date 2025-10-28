@@ -226,38 +226,9 @@ export default function GenerateAssignments() {
 
       console.log("Task convertiti - Early:", initialEarlyOut.length, "High:", initialHigh.length, "Low:", initialLow.length);
 
-      // Supporta sia la nuova struttura per cleaner che quella vecchia flat
-      let assignments: any[] = [];
-      if (timelineAssignmentsData.cleaners && timelineAssignmentsData.cleaners.length > 0) {
-        // Nuova struttura: estrai tutte le task da tutti i cleaner
-        assignments = timelineAssignmentsData.cleaners.flatMap((c: any) => c.tasks || []);
-        console.log(`Struttura per cleaner rilevata: ${timelineAssignmentsData.cleaners.length} cleaner con ${assignments.length} task totali`);
-      } else if (timelineAssignmentsData.assignments && timelineAssignmentsData.assignments.length > 0) {
-        // Vecchia struttura flat: riorganizza per cleaner
-        assignments = timelineAssignmentsData.assignments;
-        console.log(`Struttura flat rilevata: ${assignments.length} assegnazioni - riorganizzando per cleaner...`);
-        
-        // Raggruppa per cleanerId
-        const assignmentsByCleanerId = new Map<number, any[]>();
-        for (const assignment of assignments) {
-          const cleanerId = assignment.cleanerId;
-          if (!assignmentsByCleanerId.has(cleanerId)) {
-            assignmentsByCleanerId.set(cleanerId, []);
-          }
-          assignmentsByCleanerId.get(cleanerId)!.push(assignment);
-        }
-        
-        // Ordina le task per sequence
-        for (const [cleanerId, tasks] of assignmentsByCleanerId) {
-          tasks.sort((a, b) => (a.sequence || 0) - (b.sequence || 0));
-        }
-        
-        console.log(`Riorganizzato in ${assignmentsByCleanerId.size} cleaner`);
-      }
-
       // Crea una mappa di logistic_code -> assegnazione timeline completa
       const timelineAssignmentsMap = new Map<string, any>(
-        assignments.map((a: any) => [String(a.logistic_code || a.logisticCode), a])
+        timelineAssignmentsData.assignments.map((a: any) => [String(a.logistic_code), a])
       );
 
       console.log("Task assegnate nella timeline (logistic_code):", Array.from(timelineAssignmentsMap.keys()));
