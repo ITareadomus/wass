@@ -126,7 +126,7 @@ export default function PriorityColumn({
         setIsAssigning(false);
         return;
       }
-      // Converti in formato yyyy-MM-dd (rimuovi eventuali timestamp)
+      // Converte la data ISO in formato yyy-MM-dd
       const dateStr = savedDate.split('T')[0];
 
       console.log('📅 Data dal localStorage:', dateStr);
