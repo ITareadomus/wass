@@ -2,111 +2,11 @@
   "low_priority_tasks_assigned": [
     {
       "cleaner": {
-        "id": 24,
-        "name": "HUSSAIN",
-        "lastname": "SYED SHUJIAHAT",
-        "role": "Standard",
-        "premium": false
-      },
-      "tasks": [
-        {
-          "task_id": 217948,
-          "logistic_code": 270,
-          "address": "VIA COL DI LANA 3",
-          "lat": 45.4522431,
-          "lng": 9.1825685,
-          "premium": false,
-          "cleaning_time": 120,
-          "start_time": "10:07",
-          "end_time": "12:07",
-          "followup": true,
-          "sequence": 2,
-          "travel_time": 8
-        }
-      ]
-    },
-    {
-      "cleaner": {
-        "id": 829,
-        "name": "MUSTAPHA",
-        "lastname": "BAH",
+        "id": 937,
+        "name": "LOVETH",
+        "lastname": "IGUDIA",
         "role": "Premium",
         "premium": true
-      },
-      "tasks": [
-        {
-          "task_id": 210458,
-          "logistic_code": 777,
-          "address": "Via Imperia 43",
-          "lat": 45.4418695,
-          "lng": 9.1687704,
-          "premium": false,
-          "cleaning_time": 330,
-          "start_time": "10:34",
-          "end_time": "16:04",
-          "followup": true,
-          "sequence": 2,
-          "travel_time": 34
-        }
-      ]
-    },
-    {
-      "cleaner": {
-        "id": 404,
-        "name": "RASEL",
-        "lastname": "MOLLA",
-        "role": "Standard",
-        "premium": false
-      },
-      "tasks": [
-        {
-          "task_id": 218034,
-          "logistic_code": 273,
-          "address": "V.LE BLIGNY 19 A C",
-          "lat": 45.4510412,
-          "lng": 9.1910662,
-          "premium": false,
-          "cleaning_time": 60,
-          "start_time": "10:11",
-          "end_time": "11:11",
-          "followup": true,
-          "sequence": 2,
-          "travel_time": 11
-        }
-      ]
-    },
-    {
-      "cleaner": {
-        "id": 132,
-        "name": "JOHOISER ERNESTO",
-        "lastname": "LOPEZ GIRON",
-        "role": "Premium",
-        "premium": true
-      },
-      "tasks": [
-        {
-          "task_id": 217914,
-          "logistic_code": 1652,
-          "address": "VIA NINO BIXIO 33",
-          "lat": 45.4725999,
-          "lng": 9.2118362,
-          "premium": false,
-          "cleaning_time": 90,
-          "start_time": "10:10",
-          "end_time": "11:40",
-          "followup": true,
-          "sequence": 2,
-          "travel_time": 10
-        }
-      ]
-    },
-    {
-      "cleaner": {
-        "id": 1054,
-        "name": "TOUDO",
-        "lastname": "BARADJI",
-        "role": "Standard",
-        "premium": false
       },
       "tasks": [
         {
@@ -127,23 +27,48 @@
     },
     {
       "cleaner": {
-        "id": 249,
-        "name": "Ogbodo Chidi",
-        "lastname": "Igwe",
+        "id": 785,
+        "name": "RACHEL",
+        "lastname": "OTSHINGA",
         "role": "Premium",
         "premium": true
       },
       "tasks": [
         {
-          "task_id": 217984,
-          "logistic_code": 1565,
-          "address": "Via Lazzaro Papi 14",
-          "lat": 45.4508634,
-          "lng": 9.2079179,
+          "task_id": 217914,
+          "logistic_code": 1652,
+          "address": "VIA NINO BIXIO 33",
+          "lat": 45.4725999,
+          "lng": 9.2118362,
           "premium": false,
-          "cleaning_time": 120,
+          "cleaning_time": 90,
           "start_time": "10:12",
-          "end_time": "12:12",
+          "end_time": "11:42",
+          "followup": false,
+          "sequence": 1,
+          "travel_time": 0
+        }
+      ]
+    },
+    {
+      "cleaner": {
+        "id": 1031,
+        "name": "YAH PRISCA LEA",
+        "lastname": "ADOU",
+        "role": "Standard",
+        "premium": false
+      },
+      "tasks": [
+        {
+          "task_id": 218034,
+          "logistic_code": 273,
+          "address": "V.LE BLIGNY 19 A C",
+          "lat": 45.4510412,
+          "lng": 9.1910662,
+          "premium": false,
+          "cleaning_time": 60,
+          "start_time": "10:12",
+          "end_time": "11:12",
           "followup": false,
           "sequence": 1,
           "travel_time": 0
@@ -152,12 +77,12 @@
     }
   ],
   "unassigned_tasks": [],
-  "current_date": "2025-10-29T00:00:00.000Z",
+  "current_date": "2025-10-29",
   "meta": {
-    "total_tasks": 6,
-    "assigned": 6,
+    "total_tasks": 3,
+    "assigned": 3,
     "unassigned": 0,
-    "cleaners_used": 6,
+    "cleaners_used": 3,
     "max_tasks_per_cleaner": 3,
     "algorithm": "simplified_greedy",
     "notes": [
