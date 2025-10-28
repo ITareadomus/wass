@@ -233,22 +233,28 @@ export default function GenerateAssignments() {
 
       if (timelineAssignmentsData.cleaners_assignments) {
         // Nuova struttura organizzata per cleaner
+        console.log('📋 Caricamento da cleaners_assignments:', timelineAssignmentsData.cleaners_assignments.length, 'cleaners');
         for (const cleanerEntry of timelineAssignmentsData.cleaners_assignments) {
+          console.log(`   Cleaner ${cleanerEntry.cleaner.id} (${cleanerEntry.cleaner.name}) ha ${cleanerEntry.tasks?.length || 0} task`);
           for (const task of cleanerEntry.tasks || []) {
-            timelineAssignmentsMap.set(String(task.logistic_code), {
+            const logisticCode = String(task.logistic_code);
+            console.log(`      → Task ${logisticCode} assegnata a cleaner ${cleanerEntry.cleaner.id}`);
+            timelineAssignmentsMap.set(logisticCode, {
               ...task,
-              cleanerId: cleanerEntry.cleaner.id
+              cleanerId: cleanerEntry.cleaner.id,
+              sequence: task.sequence
             });
           }
         }
       } else if (timelineAssignmentsData.assignments) {
         // Vecchia struttura piatta (fallback)
+        console.log('📋 Caricamento da assignments (vecchia struttura):', timelineAssignmentsData.assignments.length);
         for (const a of timelineAssignmentsData.assignments) {
           timelineAssignmentsMap.set(String(a.logistic_code), a);
         }
       }
 
-      console.log("Task assegnate nella timeline (logistic_code):", Array.from(timelineAssignmentsMap.keys()));
+      console.log("✅ Task assegnate nella timeline (logistic_code):", Array.from(timelineAssignmentsMap.keys()));
 
       // Filtra le task già presenti nella timeline dai container
       const filteredEarlyOut = initialEarlyOut.filter(task => {
@@ -301,18 +307,47 @@ export default function GenerateAssignments() {
           t => String(t.name) === logisticCode
         );
 
-        if (originalTask && timelineAssignment.cleanerId) {
-          console.log(`Aggiungendo task ${logisticCode} dalla timeline a cleaner ${timelineAssignment.cleanerId} con sequence ${timelineAssignment.sequence}`);
+        if (timelineAssignment.cleanerId) {
+          // Se la task esiste nei containers, usa quei dati come base
+          // Altrimenti usa i dati dalla timeline (task già assegnata in sessioni precedenti)
+          const baseTask = originalTask || {
+            id: String(timelineAssignment.task_id),
+            name: String(timelineAssignment.logistic_code),
+            type: timelineAssignment.customer_name || 'Unknown',
+            duration: formatDuration(timelineAssignment.cleaning_time || 0),
+            priority: 'unknown' as any,
+            assignedTo: null,
+            status: "pending" as const,
+            scheduledTime: null,
+            address: timelineAssignment.address,
+            lat: timelineAssignment.lat,
+            lng: timelineAssignment.lng,
+            premium: timelineAssignment.premium,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+          };
+
+          console.log(`➕ Aggiungendo task ${logisticCode} dalla timeline a cleaner ${timelineAssignment.cleanerId} con sequence ${timelineAssignment.sequence}`);
           tasksWithAssignments.push({
-            ...originalTask,
+            ...baseTask,
             assignedCleaner: timelineAssignment.cleanerId,
             sequence: timelineAssignment.sequence,
-            startTime: timelineAssignment.start_time || originalTask.startTime,
-            endTime: timelineAssignment.end_time || originalTask.endTime,
+            startTime: timelineAssignment.start_time || (baseTask as any).startTime,
+            endTime: timelineAssignment.end_time || (baseTask as any).endTime,
             travelTime: timelineAssignment.travel_time || 0,
-            address: timelineAssignment.address || originalTask.address,
-            lat: timelineAssignment.lat || originalTask.lat,
-            lng: timelineAssignment.lng || originalTask.lng,
+            address: timelineAssignment.address || baseTask.address,
+            lat: timelineAssignment.lat || baseTask.lat,
+            lng: timelineAssignment.lng || baseTask.lng,
+            customer_name: timelineAssignment.customer_name,
+            type_apt: timelineAssignment.type_apt,
+            checkin_date: timelineAssignment.checkin_date,
+            checkout_date: timelineAssignment.checkout_date,
+            checkin_time: timelineAssignment.checkin_time,
+            checkout_time: timelineAssignment.checkout_time,
+            pax_in: timelineAssignment.pax_in,
+            pax_out: timelineAssignment.pax_out,
+            operation_id: timelineAssignment.operation_id,
+            alias: timelineAssignment.alias,
           } as any);
         }
       }
