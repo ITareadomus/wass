@@ -189,27 +189,18 @@ def evaluate_route(route: List[Task]) -> Tuple[bool, List[Tuple[int, int, int]]]
 
     # Orario massimo di fine task: 19:00 (1140 minuti da mezzanotte)
     MAX_END_TIME = 19 * 60  # 19:00 in minuti
-    MIN_START_TIME = 10 * 60  # 10:00 minimo per Early Out
 
     schedule: List[Tuple[int, int, int]] = []
     prev: Optional[Task] = None
-    cur = MIN_START_TIME  # Inizia alle 10:00
+    cur = 0.0
 
     for i, t in enumerate(route):
         tt = travel_minutes(prev, t)
         cur += tt
         arrival = cur
         
-        # Se la task ha un checkout_time specifico (non era null), rispettalo
-        # Altrimenti può iniziare quando arriviamo
-        if hasattr(t, 'original_checkout_time') and t.original_checkout_time:
-            # Checkout_time fisso: aspetta se necessario
-            wait = max(0.0, t.checkout_time - arrival)
-        else:
-            # Checkout_time flessibile (era null): può iniziare appena arriviamo
-            # ma non prima delle 10:00
-            wait = max(0.0, MIN_START_TIME - arrival) if arrival < MIN_START_TIME else 0.0
-        
+        # Aspetta fino al checkout_time se necessario
+        wait = max(0.0, t.checkout_time - arrival)
         cur += wait
         start = cur
         finish = start + t.cleaning_time
