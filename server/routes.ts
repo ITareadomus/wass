@@ -144,35 +144,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
         String(t.logistic_code) !== normalizedLogisticCode && String(t.task_id) !== normalizedTaskId
       );
 
-      // Crea il nuovo task con TUTTI i dati
+      // Crea il nuovo task con TUTTI i dati richiesti
       const newTask = {
         task_id: fullTaskData.task_id,
         logistic_code: fullTaskData.logistic_code,
-        client_id: fullTaskData.client_id,
-        premium: fullTaskData.premium,
         address: fullTaskData.address,
         lat: fullTaskData.lat,
         lng: fullTaskData.lng,
+        premium: fullTaskData.premium,
         cleaning_time: fullTaskData.cleaning_time,
-        checkin_date: fullTaskData.checkin_date,
-        checkout_date: fullTaskData.checkout_date,
-        checkin_time: fullTaskData.checkin_time,
-        checkout_time: fullTaskData.checkout_time,
-        pax_in: fullTaskData.pax_in,
-        pax_out: fullTaskData.pax_out,
-        small_equipment: fullTaskData.small_equipment,
-        operation_id: fullTaskData.operation_id,
-        confirmed_operation: fullTaskData.confirmed_operation,
-        straordinaria: fullTaskData.straordinaria,
-        type_apt: fullTaskData.type_apt,
-        alias: fullTaskData.alias,
-        customer_name: fullTaskData.customer_name,
-        reasons: [...(fullTaskData.reasons || []), 'manually_moved_to_timeline'],
-        sequence: 0,
-        // Campi che verranno calcolati dagli script di assegnazione
         start_time: null,
         end_time: null,
-        travel_time: 0
+        followup: false,
+        sequence: 0,
+        travel_time: 0,
+        reasons: ['manually_moved_to_timeline']
       };
 
       // Inserisci in posizione dropIndex
