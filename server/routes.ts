@@ -298,90 +298,84 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Endpoint per aggiornare i file JSON quando un task viene spostato
   app.post("/api/update-task-json", async (req, res) => {
     try {
-      const { taskId, logisticCode, fromContainer, toContainer } = req.body;
+      const { taskId, logisticCode, fromContainer: sourceContainer, toContainer: destContainer } = req.body;
 
-      const earlyOutPath = path.join(process.cwd(), 'client/public/data/output/early_out.json');
-      const highPriorityPath = path.join(process.cwd(), 'client/public/data/output/high_priority.json');
-      const lowPriorityPath = path.join(process.cwd(), 'client/public/data/output/low_priority.json');
+      const containersPath = path.join(process.cwd(), 'client/public/data/output/containers.json');
       const earlyOutAssignmentsPath = path.join(process.cwd(), 'client/public/data/output/early_out_assignments.json');
 
-      const [earlyOutData, highPriorityData, lowPriorityData] = await Promise.all([
-        fs.readFile(earlyOutPath, 'utf8').then(JSON.parse),
-        fs.readFile(highPriorityPath, 'utf8').then(JSON.parse),
-        fs.readFile(lowPriorityPath, 'utf8').then(JSON.parse)
-      ]);
+      // Carica il file containers.json
+      let containersData: any = {
+        containers: {
+          early_out: { tasks: [], count: 0 },
+          high_priority: { tasks: [], count: 0 },
+          low_priority: { tasks: [], count: 0 }
+        },
+        summary: { total_tasks: 0, early_out: 0, high_priority: 0, low_priority: 0 }
+      };
+      try {
+        const existingData = await fs.readFile(containersPath, 'utf8');
+        containersData = JSON.parse(existingData);
+        // Assicurati che la struttura sia completa anche se il file è parziale o corrotto
+        containersData.containers = containersData.containers || {
+          early_out: { tasks: [], count: 0 },
+          high_priority: { tasks: [], count: 0 },
+          low_priority: { tasks: [], count: 0 }
+        };
+        containersData.summary = containersData.summary || { total_tasks: 0, early_out: 0, high_priority: 0, low_priority: 0 };
+      } catch (error) {
+        console.log('File containers.json non trovato o corrotto, creazione di una nuova struttura.');
+      }
+
 
       // Trova e rimuovi il task dal container di origine
       let taskToMove = null;
 
-      if (fromContainer === 'early-out') {
-        const index = earlyOutData.early_out_tasks.findIndex((t: any) =>
-          t.task_id === parseInt(taskId) || t.logistic_code === parseInt(logisticCode)
-        );
-        if (index !== -1) {
-          taskToMove = earlyOutData.early_out_tasks.splice(index, 1)[0];
-          earlyOutData.total_apartments = earlyOutData.early_out_tasks.length;
-        }
-      } else if (fromContainer === 'high') {
-        const index = highPriorityData.high_priority_tasks.findIndex((t: any) =>
-          t.task_id === parseInt(taskId) || t.logistic_code === parseInt(logisticCode)
-        );
-        if (index !== -1) {
-          taskToMove = highPriorityData.high_priority_tasks.splice(index, 1)[0];
-          highPriorityData.total_apartments = highPriorityData.high_priority_tasks.length;
-        }
-      } else if (fromContainer === 'low') {
-        const index = lowPriorityData.low_priority_tasks.findIndex((t: any) =>
-          t.task_id === parseInt(taskId) || t.logistic_code === parseInt(logisticCode)
-        );
-        if (index !== -1) {
-          taskToMove = lowPriorityData.low_priority_tasks.splice(index, 1)[0];
-          lowPriorityData.total_apartments = lowPriorityData.low_priority_tasks.length;
-        }
+      if (sourceContainer && containersData.containers?.[sourceContainer]) {
+        taskToMove = containersData.containers[sourceContainer].tasks.find((t: any) => String(t.task_id) === taskId || String(t.logistic_code) === logisticCode);
+        containersData.containers[sourceContainer].tasks = containersData.containers[sourceContainer].tasks.filter((t: any) => String(t.task_id) !== taskId && String(t.logistic_code) !== logisticCode);
+        containersData.containers[sourceContainer].count = containersData.containers[sourceContainer].tasks.length;
       }
 
       if (!taskToMove) {
-        res.status(404).json({ success: false, message: "Task non trovato" });
-        return;
+        return res.status(404).json({ success: false, error: 'Task non trovato nel container di origine' });
       }
 
-      // Se la destinazione è la timeline, non aggiungere a nessun container
-      if (toContainer && toContainer.startsWith('timeline-')) {
-        // Solo rimuovi dal container di origine
-        await Promise.all([
-          fs.writeFile(earlyOutPath, JSON.stringify(earlyOutData, null, 2)),
-          fs.writeFile(highPriorityPath, JSON.stringify(highPriorityData, null, 2)),
-          fs.writeFile(lowPriorityPath, JSON.stringify(lowPriorityData, null, 2))
-        ]);
+      // Se la destinazione è la timeline, solo rimuovi dal container di origine
+      if (destContainer && destContainer.startsWith('timeline-')) {
+        await fs.writeFile(containersPath, JSON.stringify(containersData, null, 2));
         res.json({ success: true, message: "Task rimosso dal container" });
         return;
       }
 
-      // Aggiorna il reason a "manually_forced"
-      taskToMove.reasons = ["manually_forced"];
-
-      // Aggiungi il task al container di destinazione
-      if (toContainer === 'early-out') {
-        earlyOutData.early_out_tasks.push(taskToMove);
-        earlyOutData.total_apartments = earlyOutData.early_out_tasks.length;
-      } else if (toContainer === 'high') {
-        highPriorityData.high_priority_tasks.push(taskToMove);
-        highPriorityData.total_apartments = highPriorityData.high_priority_tasks.length;
-      } else if (toContainer === 'low') {
-        lowPriorityData.low_priority_tasks.push(taskToMove);
-        lowPriorityData.total_apartments = lowPriorityData.low_priority_tasks.length;
+      // Aggiorna la priorità del task, se specificato
+      if (destContainer) {
+        taskToMove.priority = destContainer; // Aggiunge o aggiorna il campo priority
+      } else {
+        // Se non c'è destContainer, significa che il task è stato rimosso
+        // (es. trascinato fuori da tutti i container). Non aggiungerlo da nessuna parte.
+        console.log(`Task ${taskId}/${logisticCode} rimosso senza destinazione specificata.`);
       }
 
-      // Scrivi i file aggiornati
-      await Promise.all([
-        fs.writeFile(earlyOutPath, JSON.stringify(earlyOutData, null, 2)),
-        fs.writeFile(highPriorityPath, JSON.stringify(highPriorityData, null, 2)),
-        fs.writeFile(lowPriorityPath, JSON.stringify(lowPriorityData, null, 2))
-      ]);
+      // Aggiungi il task al container di destinazione, se specificato
+      if (destContainer && containersData.containers?.[destContainer]) {
+        containersData.containers[destContainer].tasks.push(taskToMove);
+        containersData.containers[destContainer].count = containersData.containers[destContainer].tasks.length;
+      }
+
+      // Aggiorna il summary
+      containersData.summary = {
+        total_tasks: containersData.summary.total_tasks, // Manteniamo il totale generale se presente
+        early_out: containersData.containers.early_out?.count || 0,
+        high_priority: containersData.containers.high_priority?.count || 0,
+        low_priority: containersData.containers.low_priority?.count || 0
+      };
+
+      // Scrivi il file aggiornato
+      await fs.writeFile(containersPath, JSON.stringify(containersData, null, 2));
 
       // Se la task viene spostata nell'early-out, rimuovila da early_out_assignments
       // in modo che non sia più considerata "già assegnata" al prossimo run dell'optimizer
-      if (toContainer === 'early-out') {
+      if (destContainer === 'early-out') {
         let earlyOutAssignmentsData: any = { early_out_tasks_assigned: [], meta: {} };
         try {
           const existingData = await fs.readFile(earlyOutAssignmentsPath, 'utf8');
@@ -411,7 +405,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
           console.log(`✅ Task ${taskId}/${logisticCode} rimossa da early_out_assignments.json`);
         }
       }
-
 
       res.json({ success: true, message: "Task aggiornato con successo" });
     } catch (error: any) {
