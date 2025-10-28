@@ -198,7 +198,7 @@ def evaluate_route(route: List[Task]) -> Tuple[bool, List[Tuple[int, int, int]]]
         tt = travel_minutes(prev, t)
         cur += tt
         arrival = cur
-        
+
         # Aspetta fino al checkout_time se necessario
         wait = max(0.0, t.checkout_time - arrival)
         cur += wait
@@ -335,19 +335,19 @@ def load_tasks_from_db(work_date: str) -> List[Task]:
             database="adamdb"
         )
         cur = conn.cursor(dictionary=True)
-        
+
         cur.execute("""
-            SELECT * FROM wass_task_containers 
+            SELECT * FROM wass_task_containers
             WHERE priority = 'early_out' AND date = %s
         """, (work_date,))
-        
+
         rows = cur.fetchall()
         cur.close()
         conn.close()
-        
+
         tasks: List[Task] = []
         eo_start_min = hhmm_to_min("10:00")  # Minimo assoluto per Early Out
-        
+
         for row in rows:
             # Se checkout_time è null, usa 10:00 come minimo ma permetti flessibilità
             # Se checkout_time ha un valore, usalo come vincolo fisso
@@ -356,7 +356,7 @@ def load_tasks_from_db(work_date: str) -> List[Task]:
             else:
                 # null = può iniziare da 10:00 in poi, usa 10:00 come valore di riferimento
                 checkout_min = eo_start_min
-            
+
             tasks.append(Task(
                 task_id=str(row["task_id"]),
                 logistic_code=str(row["logistic_code"]),
@@ -371,13 +371,11 @@ def load_tasks_from_db(work_date: str) -> List[Task]:
                 straordinaria=bool(row["straordinaria"]),
                 apt_type=None,
                 alias=None,
-                original_checkout_time=row["checkout_time"],  # Preserva valore originale
-                original_checkin_time=row["checkin_time"]     # Preserva valore originale
             ))
-        
+
         # Ordina: straordinarie first, poi premium, poi per checkout
         tasks.sort(key=lambda x: (not x.straordinaria, not x.is_premium, x.checkout_time))
-        
+
         return tasks
     except Exception as e:
         print(f"❌ Errore caricamento task early-out dal DB: {e}")
