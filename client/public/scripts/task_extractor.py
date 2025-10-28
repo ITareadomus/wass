@@ -28,11 +28,9 @@ DB_CONFIG = {
     "database": "adamdb",
 }
 
-# ---------- Funzioni per lista operazioni attive (integrazione richiesta) ----------
+# ---------- Funzioni per lista operazioni attive ----------
 def get_active_operations():
-    """
-    Carica le operazioni attive dal database (active=1 e enable_wass=1)
-    """
+    """Carica le operazioni attive dal database (active=1 e enable_wass=1)"""
     connection = mysql.connector.connect(**DB_CONFIG)
     cursor = connection.cursor(dictionary=True)
     cursor.execute("""
@@ -47,9 +45,7 @@ def get_active_operations():
     return operation_ids
 
 def save_operations_to_file(operation_ids, output_file="client/public/data/input/operations.json"):
-    """
-    Salva gli operation_id validi in un file JSON
-    """
+    """Salva gli operation_id validi in un file JSON"""
     operations_data = {
         "timestamp": datetime.now().isoformat(),
         "active_operation_ids": operation_ids,
@@ -61,19 +57,14 @@ def save_operations_to_file(operation_ids, output_file="client/public/data/input
     return operations_data
 
 def refresh_operations_list():
-    """
-    Aggiorna data/operations.json interrogando direttamente il DB.
-    """
+    """Aggiorna data/operations.json interrogando direttamente il DB."""
     print("Aggiorno la lista delle operazioni attive dal DB...")
     ops = get_active_operations()
     save_operations_to_file(ops)
     print("Lista operazioni aggiornata con successo.")
 
 def load_valid_operation_ids():
-    """
-    Carica gli operation_id validi dal file client/public/data/input/operations.json.
-    Se il file manca/non è valido, lo rigenera interrogando il DB.
-    """
+    """Carica gli operation_id validi dal file operations.json."""
     try:
         with open("client/public/data/input/operations.json", "r", encoding="utf-8") as f:
             operations_data = json.load(f)
@@ -96,21 +87,15 @@ def map_structure_type_to_letter(structure_type_id):
 
 # ---------- Core ----------
 def get_apartments_for_date(selected_date):
-    """
-    Estrae gli appartamenti per la data indicata,
-    restituendo SOLO i campi richiesti con le trasformazioni specificate.
-    """
-    # filtri operation_id come nel tuo flusso attuale
+    """Estrae gli appartamenti per la data indicata"""
     valid_operation_ids = load_valid_operation_ids()
-    valid_operation_ids.extend([0, None])  # includi anche 0 e NULL
+    valid_operation_ids.extend([0, None])
     non_null_operation_ids = [op for op in valid_operation_ids if op is not None]
     operation_placeholders = ','.join(['%s'] * len(non_null_operation_ids)) if non_null_operation_ids else 'NULL'
 
     connection = mysql.connector.connect(**DB_CONFIG)
     cursor = connection.cursor(dictionary=True)
 
-    # JOIN con app_customers per prendere alias
-    # Subquery per cleaning_time mantenuta
     base_query = f"""
         SELECT 
             h.id AS task_id,
@@ -120,19 +105,19 @@ def get_apartments_for_date(selected_date):
             s.address1 AS address,
             s.lat,
             s.lng,
-                        (
-                                SELECT duration_minutes 
-                                FROM app_structure_timings ast
-                                WHERE ast.structure_type_id = s.structure_type_id
-                                    AND ast.customer_id = s.customer_id
-                                    AND ast.structure_operation_id = (
-                                            CASE WHEN h.operation_id = 0 THEN 2 ELSE h.operation_id END
-                                    )
-                                    AND ast.data_contratto <= CURDATE()
-                                    AND ast.deleted_at IS NULL
-                                ORDER BY ABS(DATEDIFF(ast.data_contratto, CURDATE()))
-                                LIMIT 1
-                        ) AS cleaning_time,
+            (
+                SELECT duration_minutes 
+                FROM app_structure_timings ast
+                WHERE ast.structure_type_id = s.structure_type_id
+                    AND ast.customer_id = s.customer_id
+                    AND ast.structure_operation_id = (
+                        CASE WHEN h.operation_id = 0 THEN 2 ELSE h.operation_id END
+                    )
+                    AND ast.data_contratto <= CURDATE()
+                    AND ast.deleted_at IS NULL
+                ORDER BY ABS(DATEDIFF(ast.data_contratto, CURDATE()))
+                LIMIT 1
+            ) AS cleaning_time,
             h.checkin,
             h.checkout,
             h.checkin_time,
@@ -164,14 +149,11 @@ def get_apartments_for_date(selected_date):
     cursor.close()
     connection.close()
 
-    # Prepara output con i soli campi richiesti + trasformazioni
     results = []
     for r in rows:
         structure_type_id = r.get("structure_type_id")
         op_id = r.get("operation_id")
 
-        # Se operation_id originale è 0, confirmed_operation = False 
-        # e operation_id = 2 (di default è una partenza) (graficamente sarà segnalato con un punto di domanda)
         if op_id == 0:
             confirmed_operation = False
             output_operation_id = 2
@@ -210,6 +192,55 @@ def get_apartments_for_date(selected_date):
 
     return results
 
+def save_tasks_to_db(tasks, work_date):
+    """Salva i task in task_containers con priority='unassigned'"""
+    try:
+        conn = mysql.connector.connect(**DB_CONFIG)
+        cur = conn.cursor()
+
+        # Elimina i vecchi task non assegnati per questa data
+        cur.execute("""
+            DELETE FROM task_containers 
+            WHERE date = %s AND priority = 'unassigned'
+        """, (work_date,))
+
+        # Inserisci i nuovi task
+        if tasks:
+            insert_query = """
+                INSERT INTO task_containers (
+                    task_id, logistic_code, date, priority, client_id,
+                    address, lat, lng, cleaning_time, checkin_date, checkout_date,
+                    checkin_time, checkout_time, premium, straordinaria
+                ) VALUES (%s, %s, %s, 'unassigned', %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            """
+
+            for task in tasks:
+                cur.execute(insert_query, (
+                    task.get("task_id"),
+                    task.get("logistic_code"),
+                    work_date,
+                    task.get("client_id"),
+                    task.get("address"),
+                    task.get("lat"),
+                    task.get("lng"),
+                    task.get("cleaning_time"),
+                    task.get("checkin_date"),
+                    task.get("checkout_date"),
+                    task.get("checkin_time"),
+                    task.get("checkout_time"),
+                    1 if task.get("premium") else 0,
+                    1 if task.get("straordinaria") else 0
+                ))
+
+        conn.commit()
+        cur.close()
+        conn.close()
+        print(f"✅ Salvati {len(tasks)} task in task_containers (priority=unassigned)")
+        return True
+    except Exception as e:
+        print(f"❌ Errore salvando task nel DB: {e}")
+        return False
+
 def main():
     # Data da CLI o default domani
     if len(sys.argv) > 1:
@@ -219,11 +250,15 @@ def main():
         selected_date = (datetime.now() + timedelta(days=1)).strftime("%Y-%m-%d")
         print(f"Usando data di default (domani): {selected_date}")
 
-    # Assicurati che operations.json sia aggiornato prima di estrarre i task
+    # Assicurati che operations.json sia aggiornato
     refresh_operations_list()
 
     apt_data = get_apartments_for_date(selected_date)
 
+    # Salva nel database
+    save_tasks_to_db(apt_data, selected_date)
+
+    # Salva anche in daily_tasks.json (per compatibilità con extract_all.py)
     output = {
         "metadata": {
             "last_updated": datetime.now().isoformat(),
@@ -242,7 +277,9 @@ def main():
     with open("client/public/data/input/daily_tasks.json", "w", encoding="utf-8") as f:
         json.dump(output, f, indent=4, ensure_ascii=False)
 
-    print(f"Aggiornato daily_tasks.json con {len(apt_data)} appartamenti per la data {selected_date}.")
+    print(f"✅ Salvati {len(apt_data)} appartamenti per la data {selected_date}")
+    print(f"   - Nel database: task_containers (priority=unassigned)")
+    print(f"   - Nel file: daily_tasks.json (per compatibilità)")
 
 if __name__ == "__main__":
     main()
