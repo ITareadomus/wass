@@ -189,16 +189,27 @@ def evaluate_route(route: List[Task]) -> Tuple[bool, List[Tuple[int, int, int]]]
 
     # Orario massimo di fine task: 19:00 (1140 minuti da mezzanotte)
     MAX_END_TIME = 19 * 60  # 19:00 in minuti
+    MIN_START_TIME = 10 * 60  # 10:00 minimo per Early Out
 
     schedule: List[Tuple[int, int, int]] = []
     prev: Optional[Task] = None
-    cur = 0.0
+    cur = MIN_START_TIME  # Inizia alle 10:00
 
     for i, t in enumerate(route):
         tt = travel_minutes(prev, t)
         cur += tt
         arrival = cur
-        wait = max(0.0, t.checkout_time - arrival)
+        
+        # Se la task ha un checkout_time specifico (non era null), rispettalo
+        # Altrimenti può iniziare quando arriviamo
+        if hasattr(t, 'original_checkout_time') and t.original_checkout_time:
+            # Checkout_time fisso: aspetta se necessario
+            wait = max(0.0, t.checkout_time - arrival)
+        else:
+            # Checkout_time flessibile (era null): può iniziare appena arriviamo
+            # ma non prima delle 10:00
+            wait = max(0.0, MIN_START_TIME - arrival) if arrival < MIN_START_TIME else 0.0
+        
         cur += wait
         start = cur
         finish = start + t.cleaning_time
@@ -344,23 +355,33 @@ def load_tasks_from_db(work_date: str) -> List[Task]:
         conn.close()
         
         tasks: List[Task] = []
-        eo_start_min = hhmm_to_min("10:00")
+        eo_start_min = hhmm_to_min("10:00")  # Minimo assoluto per Early Out
         
         for row in rows:
+            # Se checkout_time è null, usa 10:00 come minimo ma permetti flessibilità
+            # Se checkout_time ha un valore, usalo come vincolo fisso
+            if row["checkout_time"]:
+                checkout_min = hhmm_to_min(row["checkout_time"])
+            else:
+                # null = può iniziare da 10:00 in poi, usa 10:00 come valore di riferimento
+                checkout_min = eo_start_min
+            
             tasks.append(Task(
                 task_id=str(row["task_id"]),
                 logistic_code=str(row["logistic_code"]),
                 lat=float(row["lat"]),
                 lng=float(row["lng"]),
                 cleaning_time=int(row["cleaning_time"]) if row["cleaning_time"] else 60,
-                checkout_time=eo_start_min,
+                checkout_time=checkout_min,
                 checkin_time=hhmm_to_min(row["checkin_time"]) if row["checkin_time"] else hhmm_to_min("23:59"),
                 is_premium=bool(row["premium"]),
                 address=row["address"],
                 small_equipment=False,
                 straordinaria=bool(row["straordinaria"]),
                 apt_type=None,
-                alias=None
+                alias=None,
+                original_checkout_time=row["checkout_time"],  # Preserva valore originale
+                original_checkin_time=row["checkin_time"]     # Preserva valore originale
             ))
         
         # Ordina: straordinarie first, poi premium, poi per checkout
