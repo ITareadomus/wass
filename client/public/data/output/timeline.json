@@ -4,37 +4,27 @@
   "cleaners_assignments": [
     {
       "cleaner": {
-        "id": 24,
-        "name": "HUSSAIN",
-        "lastname": "SYED SHUJIAHAT",
-        "role": "Standard",
+        "id": 937,
+        "name": "LOVETH",
+        "lastname": "IGUDIA",
+        "role": "Premium",
         "premium": false
       },
       "assignment_type": "manual_drag",
       "tasks": [
         {
+          "address": "VIA TORTONA, 10",
+          "lat": "45.4542397",
+          "lng": "9.1686792",
           "premium": false,
-          "address": "VIA VOGHERA, 4",
-          "lat": "45.454632",
-          "lng": "9.168536",
-          "checkin_date": "2025-10-29",
-          "checkout_date": "2025-10-29",
-          "checkin_time": null,
-          "checkout_time": "09:30",
-          "pax_in": 1,
-          "pax_out": 0,
-          "operation_id": 2,
-          "confirmed_operation": true,
-          "type_apt": "A",
-          "alias": "EXPRDS",
-          "customer_name": "EXPERIENCE DESIGN BED & SHOW",
-          "reasons": [
-            "manually_moved_to_timeline"
-          ],
-          "sequence": 1,
           "start_time": null,
           "end_time": null,
-          "travel_time": 0
+          "followup": false,
+          "sequence": 1,
+          "travel_time": 0,
+          "reasons": [
+            "manually_moved_to_timeline"
+          ]
         }
       ]
     }
@@ -42,6 +32,6 @@
   "meta": {
     "total_cleaners": 1,
     "total_tasks": 1,
-    "last_updated": "2025-10-28T15:01:28.353Z"
+    "last_updated": "2025-10-28T15:06:20.845Z"
   }
 }

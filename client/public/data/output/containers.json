@@ -1,6 +1,6 @@
 {
   "metadata": {
-    "last_updated": "2025-10-28T15:01:24.012056",
+    "last_updated": "2025-10-28T15:06:15.725874",
     "schema_version": "1.0",
     "date": "2025-10-29"
   },
@@ -332,25 +332,25 @@
           "priority": "early_out"
         },
         {
-          "task_id": 218087,
-          "logistic_code": 619,
+          "task_id": 218089,
+          "logistic_code": 618,
           "client_id": 67,
           "premium": false,
-          "address": "VIA TORTONA, 10",
-          "lat": "45.4542397",
-          "lng": "9.1686792",
-          "cleaning_time": 40,
+          "address": "VIA VOGHERA, 4",
+          "lat": "45.454632",
+          "lng": "9.168536",
+          "cleaning_time": 30,
           "checkin_date": "2025-10-29",
           "checkout_date": "2025-10-29",
           "checkin_time": null,
           "checkout_time": "09:30",
           "pax_in": 1,
           "pax_out": 0,
-          "small_equipment": false,
+          "small_equipment": true,
           "operation_id": 2,
           "confirmed_operation": true,
           "straordinaria": false,
-          "type_apt": "B",
+          "type_apt": "A",
           "alias": "EXPRDS",
           "customer_name": "EXPERIENCE DESIGN BED & SHOW",
           "reasons": [
