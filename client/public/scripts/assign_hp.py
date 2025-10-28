@@ -465,7 +465,7 @@ def load_tasks_from_db(work_date: str) -> List[Task]:
         cur = conn.cursor(dictionary=True)
         
         cur.execute("""
-            SELECT * FROM task_containers 
+            SELECT * FROM wass_task_containers 
             WHERE priority = 'high_priority' AND date = %s
         """, (work_date,))
         
