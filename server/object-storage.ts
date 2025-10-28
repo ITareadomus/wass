@@ -1,6 +1,7 @@
 
 import { Client } from '@replit/object-storage';
 
+// Usa il bucket wass_assignments
 const client = new Client();
 
 export async function saveAssignmentToStorage(filename: string, data: any): Promise<void> {
