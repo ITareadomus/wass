@@ -147,7 +147,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Scrittura atomica
       const tmpPath = `${timelinePath}.tmp`;
-      await fs.writeFile(tmpPath, JSON.dumps(timelineData, null, 2));
+      await fs.writeFile(tmpPath, JSON.stringify(timelineData, null, 2));
       await fs.rename(tmpPath, timelinePath);
 
       console.log(`✅ Salvato assignment per cleaner ${normalizedCleanerId} in posizione ${targetIndex}`);

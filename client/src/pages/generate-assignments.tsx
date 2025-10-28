@@ -221,7 +221,7 @@ export default function GenerateAssignments() {
       // Crea una mappa di logistic_code -> assegnazione timeline completa
       // Nuova struttura: cleaners_assignments è un array di {cleaner, tasks}
       const timelineAssignmentsMap = new Map<string, any>();
-      
+
       if (timelineAssignmentsData.cleaners_assignments) {
         // Nuova struttura organizzata per cleaner
         for (const cleanerEntry of timelineAssignmentsData.cleaners_assignments) {
@@ -272,29 +272,37 @@ export default function GenerateAssignments() {
       setHighPriorityTasks(filteredHigh);
       setLowPriorityTasks(filteredLow);
 
-      // Crea l'array unificato con TUTTE le task (incluse quelle filtrate) e le loro assegnazioni
-      const allTasks = [...initialEarlyOut, ...initialHigh, ...initialLow];
-      const tasksWithAssignments = allTasks.map(task => {
-        const timelineAssignment = timelineAssignmentsMap.get(String(task.name));
-        if (timelineAssignment && timelineAssignment.cleanerId) {
-          console.log(`Assegnando task ${task.name} a cleaner ${timelineAssignment.cleanerId} con sequence ${timelineAssignment.sequence}`);
-          // Usa i dati dalla timeline se disponibili, altrimenti usa i dati del task originale
-          return {
-            ...task,
+      // Crea l'array unificato SOLO con task dai containers (non assegnate)
+      // Le task assegnate vengono aggiunte SOLO se sono effettivamente in timeline.json
+      const tasksWithAssignments: Task[] = [];
+
+      // Aggiungi task NON assegnate dai containers
+      tasksWithAssignments.push(...filteredEarlyOut, ...filteredHigh, ...filteredLow);
+
+      // Aggiungi SOLO task che sono effettivamente in timeline.json con i loro dati completi
+      for (const [logisticCode, timelineAssignment] of timelineAssignmentsMap.entries()) {
+        // Trova la task originale dai containers per prendere i dati base
+        const originalTask = [...initialEarlyOut, ...initialHigh, ...initialLow].find(
+          t => String(t.name) === logisticCode
+        );
+
+        if (originalTask && timelineAssignment.cleanerId) {
+          console.log(`Aggiungendo task ${logisticCode} dalla timeline a cleaner ${timelineAssignment.cleanerId} con sequence ${timelineAssignment.sequence}`);
+          tasksWithAssignments.push({
+            ...originalTask,
             assignedCleaner: timelineAssignment.cleanerId,
             sequence: timelineAssignment.sequence,
-            startTime: timelineAssignment.start_time || task.startTime,
-            endTime: timelineAssignment.end_time || task.endTime,
+            startTime: timelineAssignment.start_time || originalTask.startTime,
+            endTime: timelineAssignment.end_time || originalTask.endTime,
             travelTime: timelineAssignment.travel_time || 0,
-            address: timelineAssignment.address || task.address,
-            lat: timelineAssignment.lat || task.lat,
-            lng: timelineAssignment.lng || task.lng,
-          } as any;
+            address: timelineAssignment.address || originalTask.address,
+            lat: timelineAssignment.lat || originalTask.lat,
+            lng: timelineAssignment.lng || originalTask.lng,
+          } as any);
         }
-        return task;
-      });
+      }
 
-      console.log(`Task con assegnazioni (${tasksWithAssignments.length} totali):`, tasksWithAssignments.filter(t => (t as any).assignedCleaner).length, "assegnate");
+      console.log(`Task totali: ${tasksWithAssignments.length} (${tasksWithAssignments.filter(t => (t as any).assignedCleaner).length} assegnate, ${tasksWithAssignments.filter(t => !(t as any).assignedCleaner).length} nei containers)`);
       setAllTasksWithAssignments(tasksWithAssignments);
 
       setIsLoadingTasks(false);
