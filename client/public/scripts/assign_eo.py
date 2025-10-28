@@ -198,6 +198,8 @@ def evaluate_route(route: List[Task]) -> Tuple[bool, List[Tuple[int, int, int]]]
         tt = travel_minutes(prev, t)
         cur += tt
         arrival = cur
+        
+        # Aspetta fino al checkout_time se necessario
         wait = max(0.0, t.checkout_time - arrival)
         cur += wait
         start = cur
@@ -344,23 +346,33 @@ def load_tasks_from_db(work_date: str) -> List[Task]:
         conn.close()
         
         tasks: List[Task] = []
-        eo_start_min = hhmm_to_min("10:00")
+        eo_start_min = hhmm_to_min("10:00")  # Minimo assoluto per Early Out
         
         for row in rows:
+            # Se checkout_time è null, usa 10:00 come minimo ma permetti flessibilità
+            # Se checkout_time ha un valore, usalo come vincolo fisso
+            if row["checkout_time"]:
+                checkout_min = hhmm_to_min(row["checkout_time"])
+            else:
+                # null = può iniziare da 10:00 in poi, usa 10:00 come valore di riferimento
+                checkout_min = eo_start_min
+            
             tasks.append(Task(
                 task_id=str(row["task_id"]),
                 logistic_code=str(row["logistic_code"]),
                 lat=float(row["lat"]),
                 lng=float(row["lng"]),
                 cleaning_time=int(row["cleaning_time"]) if row["cleaning_time"] else 60,
-                checkout_time=eo_start_min,
+                checkout_time=checkout_min,
                 checkin_time=hhmm_to_min(row["checkin_time"]) if row["checkin_time"] else hhmm_to_min("23:59"),
                 is_premium=bool(row["premium"]),
                 address=row["address"],
                 small_equipment=False,
                 straordinaria=bool(row["straordinaria"]),
                 apt_type=None,
-                alias=None
+                alias=None,
+                original_checkout_time=row["checkout_time"],  # Preserva valore originale
+                original_checkin_time=row["checkin_time"]     # Preserva valore originale
             ))
         
         # Ordina: straordinarie first, poi premium, poi per checkout
@@ -632,16 +644,7 @@ def main():
     print(f"   - Cleaner utilizzati: {output['meta']['cleaners_used']}")
     print(f"   - Task non assegnati: {output['meta']['unassigned']}")
     print()
-    print(f"💾 Risultati salvati nel database MySQL")
-
-
-    # I file JSON non vengono più utilizzati - tutto è nel database
-    # Update timeline_assignments/{date}.json - RIMOSSO (ora usiamo solo il DB)
-    # timeline_dir = OUTPUT_ASSIGN.parent / "timeline_assignments"
-    # timeline_dir.mkdir(parents=True, exist_ok=True)
-    # timeline_assignments_path = timeline_dir / f"{ref_date}.json"
-
-    # File JSON non più utilizzati - tutte le assegnazioni sono nel database MySQL
+    print(f"💾 Risultati salvati nel database MySQL e nel file JSON")
 
 
 if __name__ == "__main__":
