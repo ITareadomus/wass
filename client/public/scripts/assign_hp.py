@@ -1,18 +1,3 @@
-[
-  {
-    "file": "assign_hp.py",
-    "modifications": [
-      {
-        "change_type": "replace",
-        "original_string": "task_for_timeline = {\n            \"task_id\": task[\"task_id\"],\n            \"logistic_code\": task[\"logistic_code\"],\n            \"address\": task[\"address\"],\n            \"lat\": float(task[\"lat\"]) if task[\"lat\"] else None,\n            \"lng\": float(task[\"lng\"]) if task[\"lng\"] else None,\n            \"premium\": task.get(\"premium\", False),\n            \"cleaning_time\": task.get(\"cleaning_time\", 60),\n            \"start_time\": start_time_str,\n            \"end_time\": end_time_str,\n            \"followup\": False,\n            \"sequence\": current_seq,\n            \"travel_time\": 0\n        }",
-        "new_string": "# Mantieni TUTTI gli attributi originali del task\n        task_for_timeline = {\n            **task,  # Copia tutti i campi da containers.json\n            # Aggiungi/sovrascrivi campi specifici della timeline\n            \"start_time\": start_time_str,\n            \"end_time\": end_time_str,\n            \"followup\": False,\n            \"sequence\": current_seq,\n            \"travel_time\": 0,\n            \"reasons\": [\n                *(task.get(\"reasons\", [])),  # Mantieni reasons originali\n                \"automatic_assignment_hp\"  # Aggiungi reason timeline\n            ]\n        }"
-      }
-    ]
-  }
-]
-```
-
-```replit_final_file
 # -*- coding: utf-8 -*-
 from __future__ import annotations
 import json, math
@@ -559,7 +544,7 @@ def build_output(cleaners: List[Cleaner], unassigned: List[Task], original_tasks
             # Carica i dati originali completi della task da containers.json
             containers_data = json.loads(INPUT_CONTAINERS.read_text(encoding="utf-8"))
             original_task_data = None
-            
+
             # Cerca la task nei containers
             for container_type in ['early_out', 'high_priority', 'low_priority']:
                 container = containers_data.get('containers', {}).get(container_type, {})
@@ -569,7 +554,7 @@ def build_output(cleaners: List[Cleaner], unassigned: List[Task], original_tasks
                         break
                 if original_task_data:
                     break
-            
+
             # Se non trovato, crea struttura base
             if not original_task_data:
                 original_task_data = {
@@ -596,7 +581,7 @@ def build_output(cleaners: List[Cleaner], unassigned: List[Task], original_tasks
                     "automatic_assignment_hp"  # Aggiungi reason timeline
                 ]
             }
-            
+
             tasks_list.append(task_for_timeline)
 
         cleaners_with_tasks.append({
@@ -807,4 +792,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-</replit_final_file>

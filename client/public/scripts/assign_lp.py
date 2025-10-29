@@ -4,6 +4,8 @@ import json, math
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Tuple
 from pathlib import Path
+import sys
+from datetime import datetime
 
 # =============================
 # I/O paths
@@ -231,7 +233,7 @@ def can_add_task(cleaner: Cleaner, task: Task) -> bool:
     if not can_handle_premium(cleaner, task):
         return False
 
-    # Straordinaria deve essere la prima
+    # Straordinaria deve andare per forza in pos 0
     if task.straordinaria:
         if len(cleaner.route) > 0:
             return False
@@ -510,7 +512,7 @@ def build_output(cleaners: List[Cleaner], unassigned: List[Task], original_tasks
             # Carica i dati originali completi della task da containers.json
             containers_data = json.loads(INPUT_CONTAINERS.read_text(encoding="utf-8"))
             original_task_data = None
-            
+
             # Cerca la task nei containers
             for container_type in ['early_out', 'high_priority', 'low_priority']:
                 container = containers_data.get('containers', {}).get(container_type, {})
@@ -520,7 +522,7 @@ def build_output(cleaners: List[Cleaner], unassigned: List[Task], original_tasks
                         break
                 if original_task_data:
                     break
-            
+
             # Se non trovato, usa i dati del dataclass
             if not original_task_data:
                 original_task_data = {
@@ -586,7 +588,6 @@ def build_output(cleaners: List[Cleaner], unassigned: List[Task], original_tasks
     total_assigned = sum(len(c["tasks"]) for c in cleaners_with_tasks)
 
     # Usa la data passata come argomento da riga di comando
-    import sys
     if len(sys.argv) > 1:
         current_ref_date = sys.argv[1]
     else:
@@ -626,7 +627,6 @@ def main():
         raise SystemExit(f"Missing input file: {INPUT_CLEANERS}")
 
     # Usa la data passata come argomento da riga di comando
-    import sys
     if len(sys.argv) > 1:
         ref_date = sys.argv[1]
         print(f"📅 Usando data da argomento: {ref_date}")
