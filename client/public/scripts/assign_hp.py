@@ -540,20 +540,39 @@ def plan_day(tasks: List[Task], cleaners: List[Cleaner]) -> Tuple[List[Cleaner],
             same_address_candidates.sort(key=lambda x: (len(x[0].route), x[2]))
             chosen = same_address_candidates[0]
         else:
-            # Nessun cleaner ha lo stesso indirizzo, usa logica normale
-            # Dividi i candidati in due gruppi: < 15' e >= 15'
-            preferred = [(c, p, t) for c, p, t in candidates if t < PREFERRED_TRAVEL]
-            others = [(c, p, t) for c, p, t in candidates if t >= PREFERRED_TRAVEL]
-
-            # Scegli dal gruppo preferito se esiste, altrimenti dal gruppo altri
-            if preferred:
-                # Scegli quello con minor viaggio tra i preferiti
-                preferred.sort(key=lambda x: (len(x[0].route), x[2]))
-                chosen = preferred[0]
+            # Priorità 2: Cleaner con task entro 10 minuti (cluster)
+            cluster_candidates = []
+            for c, p, t in candidates:
+                # Controlla se il cleaner ha task entro 10 minuti
+                has_cluster = any(
+                    travel_minutes(existing_task.lat, existing_task.lng, task.lat, task.lng,
+                                 existing_task.address, task.address) <= CLUSTER_MAX_TRAVEL or
+                    travel_minutes(task.lat, task.lng, existing_task.lat, existing_task.lng,
+                                 task.address, existing_task.address) <= CLUSTER_MAX_TRAVEL
+                    for existing_task in c.route
+                )
+                if has_cluster:
+                    cluster_candidates.append((c, p, t))
+            
+            if cluster_candidates:
+                # Priorità alta a cleaner in cluster (minor numero di task, poi minor viaggio)
+                cluster_candidates.sort(key=lambda x: (len(x[0].route), x[2]))
+                chosen = cluster_candidates[0]
             else:
-                # Scegli quello con minor viaggio tra gli altri
-                others.sort(key=lambda x: (len(x[0].route), x[2]))
-                chosen = others[0]
+                # Nessun cluster, usa logica normale
+                # Dividi i candidati in due gruppi: < 15' e >= 15'
+                preferred = [(c, p, t) for c, p, t in candidates if t < PREFERRED_TRAVEL]
+                others = [(c, p, t) for c, p, t in candidates if t >= PREFERRED_TRAVEL]
+
+                # Scegli dal gruppo preferito se esiste, altrimenti dal gruppo altri
+                if preferred:
+                    # Scegli quello con minor viaggio tra i preferiti
+                    preferred.sort(key=lambda x: (len(x[0].route), x[2]))
+                    chosen = preferred[0]
+                else:
+                    # Scegli quello con minor viaggio tra gli altri
+                    others.sort(key=lambda x: (len(x[0].route), x[2]))
+                    chosen = others[0]
 
         cleaner, pos, travel = chosen
         cleaner.route.insert(pos, task)
