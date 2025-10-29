@@ -302,7 +302,6 @@ def main():
     output = {
         "metadata": {
             "last_updated": datetime.now().isoformat(),
-            "schema_version": "1.0",
             "date": selected_date
         },
         "containers": {
