@@ -1,4 +1,3 @@
-
 # -*- coding: utf-8 -*-
 from __future__ import annotations
 import json, math
@@ -663,7 +662,7 @@ def main():
             if entry["cleaner"]["id"] == cleaner_entry["cleaner"]["id"]:
                 existing_entry = entry
                 break
-        
+
         if existing_entry:
             # Aggiungi le task LP alle task esistenti
             existing_entry["tasks"].extend(cleaner_entry["tasks"])
@@ -685,7 +684,7 @@ def main():
 
     # Scrivi il file timeline.json
     timeline_path.write_text(json.dumps(timeline_data, ensure_ascii=False, indent=2), encoding="utf-8")
-    
+
     lp_count = len([c for c in timeline_data["cleaners_assignments"] if c.get("assignment_type") == "low_priority"])
     print(f"✅ Aggiornato {timeline_path}")
     print(f"   - Cleaner con assegnazioni LP: {lp_count}")
@@ -695,13 +694,13 @@ def main():
     containers_path = INPUT_CONTAINERS
     if containers_path.exists():
         containers_data = json.loads(containers_path.read_text(encoding="utf-8"))
-        
+
         # Trova tutti i logistic_code assegnati
         assigned_codes = set()
         for cleaner_entry in output["low_priority_tasks_assigned"]:
             for task in cleaner_entry.get("tasks", []):
                 assigned_codes.add(int(task["logistic_code"]))
-        
+
         # Rimuovi le task assegnate dal container low_priority
         if "containers" in containers_data and "low_priority" in containers_data["containers"]:
             original_count = len(containers_data["containers"]["low_priority"]["tasks"])
@@ -711,13 +710,13 @@ def main():
             ]
             new_count = len(containers_data["containers"]["low_priority"]["tasks"])
             containers_data["containers"]["low_priority"]["count"] = new_count
-            
+
             # Aggiorna summary
             containers_data["summary"]["low_priority"] = new_count
             containers_data["summary"]["total_tasks"] = (
                 containers_data["summary"].get("total_tasks", 0) - (original_count - new_count)
             )
-            
+
             # Scrivi containers.json aggiornato
             containers_path.write_text(json.dumps(containers_data, ensure_ascii=False, indent=2), encoding="utf-8")
             print(f"✅ Rimosse {original_count - new_count} task da containers.json (low_priority)")
