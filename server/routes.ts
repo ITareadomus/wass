@@ -39,10 +39,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const timelinePath = path.join(process.cwd(), 'client/public/data/output/timeline.json');
 
       // Svuota il file timeline.json
-      await fs.writeFile(timelinePath, JSON.stringify({ assignments: [], current_date: workDate }, null, 2));
+      await fs.writeFile(timelinePath, JSON.stringify({ 
+        cleaners_assignments: [], 
+        current_date: workDate,
+        meta: {
+          total_cleaners: 0,
+          total_tasks: 0,
+          last_updated: new Date().toISOString()
+        }
+      }, null, 2));
       console.log(`Timeline resettata: timeline.json`);
 
-      res.json({ success: true, message: `Assegnazioni della timeline resettate per ${workDate}` });
+      // FORZA la ricreazione di containers.json rieseguendo create_containers.py
+      console.log(`Rieseguendo create_containers.py per ripristinare i containers...`);
+      const containersResult = await new Promise<string>((resolve, reject) => {
+        exec(
+          `python3 client/public/scripts/create_containers.py ${workDate}`,
+          (error, stdout, stderr) => {
+            if (error) {
+              console.error("Errore create_containers:", stderr);
+              reject(new Error(stderr || error.message));
+            } else {
+              resolve(stdout);
+            }
+          }
+        );
+      });
+      console.log("create_containers output:", containersResult);
+
+      res.json({ 
+        success: true, 
+        message: `Assegnazioni resettate e containers ripristinati per ${workDate}` 
+      });
     } catch (error: any) {
       console.error("Errore nel reset delle assegnazioni della timeline:", error);
       res.status(500).json({ success: false, error: error.message });
