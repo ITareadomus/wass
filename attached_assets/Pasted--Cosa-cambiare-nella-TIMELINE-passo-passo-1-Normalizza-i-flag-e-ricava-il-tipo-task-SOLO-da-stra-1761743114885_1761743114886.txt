@@ -1,0 +1,109 @@
+✅ Cosa cambiare nella TIMELINE (passo-passo)
+1) Normalizza i flag e ricava il tipo task SOLO da straordinaria/premium
+
+Nel componente della timeline (es. client/src/components/timeline/task-row.tsx oppure il file che renderizza le card in timeline), in alto nel componente inserisci:
+
+// --- NORMALIZZAZIONI TIMELINE ---
+
+// 1) tipo task = dai flag (priorità: straordinaria > premium > standard)
+const isPremium = Boolean((task as any).premium);
+const isStraordinaria = Boolean((task as any).straordinaria);
+
+let taskType: "standard" | "premium" | "straordinaria" = "standard";
+if (isStraordinaria) taskType = "straordinaria";
+else if (isPremium) taskType = "premium";
+
+// 2) confirmed_operation normalizzato (per il punto di domanda)
+const rawConfirmed = (task as any).confirmed_operation;
+const isConfirmedOperation =
+  typeof rawConfirmed === "boolean"
+    ? rawConfirmed
+    : typeof rawConfirmed === "number"
+      ? rawConfirmed !== 0
+      : typeof rawConfirmed === "string"
+        ? ["true", "1", "yes"].includes(rawConfirmed.toLowerCase().trim())
+        : false;
+
+// 3) stile badge in base al tipo (come nei container)
+const getTaskTypeStyle = (type: string) => {
+  switch (type) {
+    case "standard":
+      return { label: "standard", className: "bg-emerald-100 text-emerald-800 border border-emerald-200" }; // verde
+    case "premium":
+      return { label: "premium", className: "bg-amber-100 text-amber-800 border border-amber-200" }; // oro
+    case "straordinaria":
+      return { label: "straordinaria", className: "bg-rose-100 text-rose-800 border border-rose-200" }; // rosso
+    default:
+      return { label: "-", className: "bg-gray-100 text-gray-700 border border-gray-200" };
+  }
+};
+const { label: typeLabel, className: typeClass } = getTaskTypeStyle(taskType);
+
+// 4) testo chip tipologia intervento (solo ID)
+const operationText = `${(task as any).operation_id ?? "-"}`.trim() || "-";
+
+
+Nota: non leggere task.type qui; ignoralo. Usa solo i flag come sopra (come nei container).
+
+2) Render: usa typeClass/typeLabel e il ? legato a isConfirmedOperation
+
+Sostituisci la parte di JSX che disegna badge/icone con:
+
+{/* Badge principale = tipo task (verde/oro/rosso) */}
+<span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${typeClass}`}>
+  {typeLabel}
+</span>
+
+{/* Chip tipologia intervento = SOLO ID, neutra */}
+<span className="inline-flex items-center rounded-md border px-2 py-0.5 text-xs text-muted-foreground">
+  {operationText}
+</span>
+
+{/* Punto di domanda SOLO se NON confermata */}
+{!isConfirmedOperation && (
+  <div className="absolute top-0.5 right-0.5 z-50">
+    <HelpCircle className="w-3 h-3 text-gray-900" strokeWidth={2.5} />
+  </div>
+)}
+
+
+Importantissimo (bug del verde): se stai usando <Badge> di shadcn, non usare variant="default" o lasciare il variant vuoto (mappano bg-primary = verde).
+Se proprio vuoi <Badge>, usa:
+
+<Badge variant="secondary" className={`px-2 py-0.5 text-xs font-medium ${typeClass}`}>
+  {typeLabel}
+</Badge>
+
+3) Rimuovi in TIMELINE questi anti-pattern (causa “tutto verde” e “?” errati)
+
+Qualsiasi fallback che forza lo standard:
+
+// DA RIMUOVERE
+task.type = task.type || "standard";
+
+
+Qualsiasi deduzione del tipo dalla tipologia:
+
+// DA RIMUOVERE
+if (!task.type && task.operation_id) task.type = "standard";
+
+
+Confronti rigidi su confirmed_operation:
+
+// DA RIMUOVERE
+if ((task as any).confirmed_operation === false) { /* mostra ? */ }
+// → sostituisci con: if (!isConfirmedOperation) { ... }
+
+🎯 Risultato atteso sulla 777 (e su tutte le altre)
+
+Timeline: 777 resta rossa con badge “straordinaria” (come nei container).
+
+Timeline: niente ? perché confirmed_operation: true → isConfirmedOperation === true.
+
+Chip tipologia intervento: mostra solo l’ID (com’era già).
+
+Se dopo queste modifiche la timeline è ancora verde, c’è quasi sicuramente:
+
+un variant che sovrascrive i colori (usa variant="secondary" + className), oppure
+
+un pezzo di codice in timeline che non hai sostituito e continua a leggere task.type o confrontare confirmed_operation in modo rigido.
