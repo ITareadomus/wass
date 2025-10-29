@@ -1,3 +1,18 @@
+[
+  {
+    "file": "assign_hp.py",
+    "modifications": [
+      {
+        "change_type": "replace",
+        "original_string": "task_for_timeline = {\n            \"task_id\": task[\"task_id\"],\n            \"logistic_code\": task[\"logistic_code\"],\n            \"address\": task[\"address\"],\n            \"lat\": float(task[\"lat\"]) if task[\"lat\"] else None,\n            \"lng\": float(task[\"lng\"]) if task[\"lng\"] else None,\n            \"premium\": task.get(\"premium\", False),\n            \"cleaning_time\": task.get(\"cleaning_time\", 60),\n            \"start_time\": start_time_str,\n            \"end_time\": end_time_str,\n            \"followup\": False,\n            \"sequence\": current_seq,\n            \"travel_time\": 0\n        }",
+        "new_string": "# Mantieni TUTTI gli attributi originali del task\n        task_for_timeline = {\n            **task,  # Copia tutti i campi da containers.json\n            # Aggiungi/sovrascrivi campi specifici della timeline\n            \"start_time\": start_time_str,\n            \"end_time\": end_time_str,\n            \"followup\": False,\n            \"sequence\": current_seq,\n            \"travel_time\": 0,\n            \"reasons\": [\n                *(task.get(\"reasons\", [])),  # Mantieni reasons originali\n                \"automatic_assignment_hp\"  # Aggiungi reason timeline\n            ]\n        }"
+      }
+    ]
+  }
+]
+```
+
+```replit_final_file
 # -*- coding: utf-8 -*-
 from __future__ import annotations
 import json, math
@@ -698,7 +713,7 @@ def main():
             if entry["cleaner"]["id"] == cleaner_entry["cleaner"]["id"]:
                 existing_entry = entry
                 break
-        
+
         if existing_entry:
             # Aggiungi le task HP alle task esistenti
             existing_entry["tasks"].extend(cleaner_entry["tasks"])
@@ -720,7 +735,7 @@ def main():
 
     # Scrivi il file timeline.json
     timeline_path.write_text(json.dumps(timeline_data, ensure_ascii=False, indent=2), encoding="utf-8")
-    
+
     hp_count = len([c for c in timeline_data["cleaners_assignments"] if c.get("assignment_type") == "high_priority"])
     print(f"✅ Aggiornato {timeline_path}")
     print(f"   - Cleaner con assegnazioni HP: {hp_count}")
@@ -730,13 +745,13 @@ def main():
     containers_path = INPUT_CONTAINERS
     if containers_path.exists():
         containers_data = json.loads(containers_path.read_text(encoding="utf-8"))
-        
+
         # Trova tutti i logistic_code assegnati
         assigned_codes = set()
         for cleaner_entry in output["high_priority_tasks_assigned"]:
             for task in cleaner_entry.get("tasks", []):
                 assigned_codes.add(int(task["logistic_code"]))
-        
+
         # Rimuovi le task assegnate dal container high_priority
         if "containers" in containers_data and "high_priority" in containers_data["containers"]:
             original_count = len(containers_data["containers"]["high_priority"]["tasks"])
@@ -746,13 +761,13 @@ def main():
             ]
             new_count = len(containers_data["containers"]["high_priority"]["tasks"])
             containers_data["containers"]["high_priority"]["count"] = new_count
-            
+
             # Aggiorna summary
             containers_data["summary"]["high_priority"] = new_count
             containers_data["summary"]["total_tasks"] = (
                 containers_data["summary"].get("total_tasks", 0) - (original_count - new_count)
             )
-            
+
             # Scrivi containers.json aggiornato
             containers_path.write_text(json.dumps(containers_data, ensure_ascii=False, indent=2), encoding="utf-8")
             print(f"✅ Rimosse {original_count - new_count} task da containers.json (high_priority)")
@@ -761,3 +776,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+</replit_final_file>

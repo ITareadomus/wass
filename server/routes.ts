@@ -140,7 +140,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       try {
         const existingData = await fs.readFile(timelinePath, 'utf8');
         timelineData = JSON.parse(existingData);
-        
+
         // Migrazione da vecchia struttura a nuova se necessario
         if (timelineData.assignments && !timelineData.cleaners_assignments) {
           timelineData.cleaners_assignments = [];
@@ -188,62 +188,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
         String(t.logistic_code) !== normalizedLogisticCode && String(t.task_id) !== normalizedTaskId
       );
 
-      // Crea il nuovo task con TUTTI i dati da containers.json + campi timeline
-      const newTask = {
-        // Campi base identificativi
-        task_id: fullTaskData.task_id,
-        logistic_code: fullTaskData.logistic_code,
-        client_id: fullTaskData.client_id,
-        
-        // Campi di posizione
-        address: fullTaskData.address,
-        lat: String(fullTaskData.lat),
-        lng: String(fullTaskData.lng),
-        
-        // Campi di classificazione
-        premium: fullTaskData.premium,
-        priority: fullTaskData.priority,
-        
-        // Campi di durata e tempi
-        cleaning_time: fullTaskData.cleaning_time,
-        checkin_date: fullTaskData.checkin_date,
-        checkout_date: fullTaskData.checkout_date,
-        checkin_time: fullTaskData.checkin_time,
-        checkout_time: fullTaskData.checkout_time,
-        
-        // Campi di occupancy e attrezzatura
-        pax_in: fullTaskData.pax_in,
-        pax_out: fullTaskData.pax_out,
-        small_equipment: fullTaskData.small_equipment,
-        
-        // Campi di operazione
-        operation_id: fullTaskData.operation_id,
-        confirmed_operation: fullTaskData.confirmed_operation,
-        straordinaria: fullTaskData.straordinaria,
-        
-        // Campi cliente e appartamento
-        type_apt: fullTaskData.type_apt,
-        alias: fullTaskData.alias,
-        customer_name: fullTaskData.customer_name,
-        
-        // Campi specifici della timeline
+      // Crea il task completo per la timeline con TUTTI i dati da containers
+      const taskForTimeline = {
+        ...fullTaskData,  // Copia TUTTI i campi da containers.json
+
+        // Aggiungi/sovrascrivi campi specifici timeline
         start_time: null,
         end_time: null,
         followup: false,
         sequence: 0,
         travel_time: 0,
-        
+
         // Reasons (combina quelle da containers con quella timeline)
         reasons: [
           ...(fullTaskData.reasons || []),
           'manually_moved_to_timeline'
         ]
-      };
+      }
 
       console.log(`📝 Task salvato in timeline:`, {
-        task_id: newTask.task_id,
-        logistic_code: newTask.logistic_code,
-        cleaning_time: newTask.cleaning_time
+        task_id: taskForTimeline.task_id,
+        logistic_code: taskForTimeline.logistic_code,
+        cleaning_time: taskForTimeline.cleaning_time
       });
 
       // Inserisci in posizione dropIndex
@@ -251,7 +217,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ? Math.max(0, Math.min(dropIndex, cleanerEntry.tasks.length))
         : cleanerEntry.tasks.length;
 
-      cleanerEntry.tasks.splice(targetIndex, 0, newTask);
+      cleanerEntry.tasks.splice(targetIndex, 0, taskForTimeline);
 
       // Ricalcola sequence
       cleanerEntry.tasks.forEach((t: any, i: number) => {
@@ -288,7 +254,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               String(t.logistic_code) !== normalizedLogisticCode
             );
             const newCount = container.tasks.length;
-            
+
             if (originalCount > newCount) {
               container.count = newCount;
               containersData.summary[containerKey] = newCount;
@@ -514,56 +480,56 @@ export async function registerRoutes(app: Express): Promise<Server> {
           if (taskIndex !== -1) {
             taskToMove = cleanerEntry.tasks[taskIndex];
             cleanerEntry.tasks.splice(taskIndex, 1);
-            
+
             // Rimuovi campi specifici della timeline
             delete taskToMove.sequence;
             delete taskToMove.start_time;
             delete taskToMove.end_time;
             delete taskToMove.travel_time;
             delete taskToMove.followup;
-            
+
             // Aggiorna la reason
             taskToMove.reasons = taskToMove.reasons || [];
             if (!taskToMove.reasons.includes('manually_moved_to_container')) {
               taskToMove.reasons.push('manually_moved_to_container');
             }
-            
+
             break;
           }
         }
-        
+
         // Rimuovi cleaner entries vuote
         timelineData.cleaners_assignments = timelineData.cleaners_assignments.filter(
           (c: any) => c.tasks && c.tasks.length > 0
         );
-        
+
         // Aggiorna meta timeline
         timelineData.meta.total_cleaners = timelineData.cleaners_assignments.length;
         timelineData.meta.total_tasks = timelineData.cleaners_assignments.reduce(
           (sum: number, c: any) => sum + c.tasks.length, 0
         );
         timelineData.meta.last_updated = new Date().toISOString();
-        
+
         // Scrivi timeline aggiornata
         await fs.writeFile(timelinePath, JSON.stringify(timelineData, null, 2));
-        
+
         // Aggiungi la task al container di destinazione
         if (destContainer && containersData.containers[destContainer]) {
           taskToMove.priority = destContainer;
           containersData.containers[destContainer].tasks.push(taskToMove);
           containersData.containers[destContainer].count = containersData.containers[destContainer].tasks.length;
-          
+
           // Aggiorna summary
           containersData.summary[destContainer] = containersData.containers[destContainer].count;
           containersData.summary.total_tasks = 
             containersData.containers.early_out.count + 
             containersData.containers.high_priority.count + 
             containersData.containers.low_priority.count;
-          
+
           await fs.writeFile(containersPath, JSON.stringify(containersData, null, 2));
           console.log(`✅ Task ${logisticCode} spostata da timeline a ${destContainer}`);
         }
-        
+
         res.json({ success: true, message: "Task spostata da timeline a container" });
         return;
       }
@@ -574,19 +540,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const taskIndex = containersData.containers[sourceContainer].tasks.findIndex(
           (t: any) => String(t.task_id) === String(taskId) || String(t.logistic_code) === String(logisticCode)
         );
-        
+
         if (taskIndex !== -1) {
           taskToMove = containersData.containers[sourceContainer].tasks[taskIndex];
           containersData.containers[sourceContainer].tasks.splice(taskIndex, 1);
           containersData.containers[sourceContainer].count = containersData.containers[sourceContainer].tasks.length;
-          
+
           // Aggiorna la priorità e aggiungi al container di destinazione
           if (destContainer && containersData.containers[destContainer]) {
             taskToMove.priority = destContainer;
             containersData.containers[destContainer].tasks.push(taskToMove);
             containersData.containers[destContainer].count = containersData.containers[destContainer].tasks.length;
           }
-          
+
           // Aggiorna summary
           containersData.summary = {
             total_tasks: containersData.containers.early_out.count + 
@@ -596,7 +562,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             high_priority: containersData.containers.high_priority.count,
             low_priority: containersData.containers.low_priority.count
           };
-          
+
           await fs.writeFile(containersPath, JSON.stringify(containersData, null, 2));
           console.log(`✅ Task ${logisticCode} spostata da ${sourceContainer} a ${destContainer}`);
         }
@@ -1518,7 +1484,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         try {
           const timelineData = await fs.readFile(timelinePath, 'utf8');
           const timeline = JSON.parse(timelineData);
-          
+
           if (timeline.current_date === date && timeline.assignments && timeline.assignments.length > 0) {
             res.json({
               success: true,

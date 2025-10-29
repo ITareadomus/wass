@@ -404,20 +404,32 @@ def build_output(cleaners: List[Cleaner], unassigned: List[Task], original_tasks
             if idx > 0 and prev_finish_time is not None:
                 travel_time = arr - prev_finish_time
 
-            tasks_list.append({
-                "task_id": int(t.task_id),
-                "logistic_code": int(t.logistic_code),
-                "address": t.address,
-                "lat": t.lat,
-                "lng": t.lng,
-                "premium": t.is_premium,
-                "cleaning_time": t.cleaning_time,
-                "start_time": min_to_hhmm(start),
-                "end_time": min_to_hhmm(fin),
+            # Converti la task in un dizionario, mantenendo tutti gli attributi originali
+            # e aggiungendo quelli specifici della timeline
+            task_data = {field.name: getattr(t, field.name) for field in Task.__dataclass_fields__.values()}
+            start_time_str = min_to_hhmm(start)
+            end_time_str = min_to_hhmm(fin)
+
+            # Mantieni TUTTI gli attributi originali del task + aggiungi campi timeline
+            task_for_timeline = {
+                **task_data,  # Copia tutti i campi da containers.json (es. lat, lng, cleaning_time, ecc.)
+                # Aggiungi/sovrascrivi campi specifici della timeline
+                "start_time": start_time_str,
+                "end_time": end_time_str,
                 "followup": idx > 0,
                 "sequence": idx + 1,
-                "travel_time": travel_time
-            })
+                "travel_time": travel_time,
+                "reasons": [
+                    *(task_data.get("reasons", [])),  # Mantieni reasons originali se esistono
+                    "automatic_assignment_eo"  # Aggiungi reason timeline per questo tipo di assegnazione
+                ]
+            }
+            # Rimuovi gli attributi che sono stati gestiti diversamente o che non servono più nel formato timeline
+            # ad esempio, checkout_time e checkin_time sono usati per la logica, ma non servono nell'output finale
+            task_for_timeline.pop("checkout_time", None)
+            task_for_timeline.pop("checkin_time", None)
+
+            tasks_list.append(task_for_timeline)
             prev_finish_time = fin
 
         cleaners_with_tasks.append({
@@ -576,11 +588,11 @@ def main():
 
     # Scrivi il file aggiornato
     timeline_path.write_text(json.dumps(timeline_data, ensure_ascii=False, indent=2), encoding="utf-8")
-    
+
     eo_count = len([c for c in timeline_data["cleaners_assignments"] if c.get("assignment_type") == "early_out"])
     hp_count = len([c for c in timeline_data["cleaners_assignments"] if c.get("assignment_type") == "high_priority"])
     lp_count = len([c for c in timeline_data["cleaners_assignments"] if c.get("assignment_type") == "low_priority"])
-    
+
     print(f"✅ Timeline aggiornata: {timeline_path}")
     print(f"   - Cleaner con assegnazioni EO: {eo_count}")
     print(f"   - Cleaner con assegnazioni HP: {hp_count}")
@@ -591,13 +603,13 @@ def main():
     containers_path = INPUT_CONTAINERS
     if containers_path.exists():
         containers_data = json.loads(containers_path.read_text(encoding="utf-8"))
-        
+
         # Trova tutti i logistic_code assegnati
         assigned_codes = set()
         for cleaner_entry in output["early_out_tasks_assigned"]:
             for task in cleaner_entry.get("tasks", []):
                 assigned_codes.add(int(task["logistic_code"]))
-        
+
         # Rimuovi le task assegnate dal container early_out
         if "containers" in containers_data and "early_out" in containers_data["containers"]:
             original_count = len(containers_data["containers"]["early_out"]["tasks"])
@@ -607,13 +619,13 @@ def main():
             ]
             new_count = len(containers_data["containers"]["early_out"]["tasks"])
             containers_data["containers"]["early_out"]["count"] = new_count
-            
+
             # Aggiorna summary
             containers_data["summary"]["early_out"] = new_count
             containers_data["summary"]["total_tasks"] = (
                 containers_data["summary"].get("total_tasks", 0) - (original_count - new_count)
             )
-            
+
             # Scrivi containers.json aggiornato
             containers_path.write_text(json.dumps(containers_data, ensure_ascii=False, indent=2), encoding="utf-8")
             print(f"✅ Rimosse {original_count - new_count} task da containers.json (early_out)")
