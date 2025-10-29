@@ -85,10 +85,16 @@ export default function GenerateAssignments() {
   const { toast } = useToast();
 
   // Funzione per estrarre i dati dal backend
-  const extractData = async (dateStr: string) => {
+  const extractData = async (date: Date) => {
     try {
       setIsExtracting(true);
       setExtractionStep("Estrazione dati dal database...");
+
+      // Format date in local timezone to avoid UTC shift
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      const dateStr = `${year}-${month}-${day}`;
 
       console.log("Estraendo task per la data:", dateStr);
 
@@ -120,8 +126,7 @@ export default function GenerateAssignments() {
   };
 
   useEffect(() => {
-    const dateStr = format(selectedDate, "yyyy-MM-dd");
-    extractData(dateStr);
+    extractData(selectedDate);
   }, [selectedDate]); // Aggiungi selectedDate come dipendenza
 
   // Carica le assegnazioni quando i task sono pronti
@@ -465,7 +470,14 @@ export default function GenerateAssignments() {
   // Funzione per assegnare le task Early Out alla timeline
   const assignEarlyOutToTimeline = async () => {
     try {
-      const dateStr = format(selectedDate, "yyyy-MM-dd");
+      // Format date in local timezone to avoid UTC shift
+      const year = selectedDate.getFullYear();
+      const month = String(selectedDate.getMonth() + 1).padStart(2, '0');
+      const day = String(selectedDate.getDate()).padStart(2, '0');
+      const dateStr = `${year}-${month}-${day}`;
+      
+      console.log(`📅 Assegnazione EO per data: ${dateStr}`);
+      
       const response = await fetch('/api/assign-early-out-to-timeline', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -500,7 +512,14 @@ export default function GenerateAssignments() {
   // Funzione per assegnare le task High Priority alla timeline
   const assignHighPriorityToTimeline = async () => {
     try {
-      const dateStr = format(selectedDate, "yyyy-MM-dd");
+      // Format date in local timezone to avoid UTC shift
+      const year = selectedDate.getFullYear();
+      const month = String(selectedDate.getMonth() + 1).padStart(2, '0');
+      const day = String(selectedDate.getDate()).padStart(2, '0');
+      const dateStr = `${year}-${month}-${day}`;
+      
+      console.log(`📅 Assegnazione HP per data: ${dateStr}`);
+      
       const response = await fetch('/api/assign-high-priority-to-timeline', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -539,7 +558,14 @@ export default function GenerateAssignments() {
   // Funzione per assegnare le task Low Priority alla timeline
   const assignLowPriorityToTimeline = async () => {
     try {
-      const dateStr = format(selectedDate, "yyyy-MM-dd");
+      // Format date in local timezone to avoid UTC shift
+      const year = selectedDate.getFullYear();
+      const month = String(selectedDate.getMonth() + 1).padStart(2, '0');
+      const day = String(selectedDate.getDate()).padStart(2, '0');
+      const dateStr = `${year}-${month}-${day}`;
+      
+      console.log(`📅 Assegnazione LP per data: ${dateStr}`);
+      
       const response = await fetch('/api/assign-low-priority-to-timeline', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
