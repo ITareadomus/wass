@@ -678,11 +678,14 @@ def main():
     if timeline_path.exists():
         try:
             existing = json.loads(timeline_path.read_text(encoding="utf-8"))
-            # Mantieni le assegnazioni esistenti non-LP
+            # Mantieni le assegnazioni esistenti non-LP (rimuovi quelle con task LP)
             if "cleaners_assignments" in existing:
+                # Crea un set di cleaner_id che avranno nuove assegnazioni LP
+                new_lp_cleaner_ids = set(c["cleaner"]["id"] for c in output["low_priority_tasks_assigned"])
                 timeline_data["cleaners_assignments"] = [
                     c for c in existing.get("cleaners_assignments", [])
-                    if c.get("assignment_type") != "low_priority"
+                    if c["cleaner"]["id"] not in new_lp_cleaner_ids or 
+                       not any(t.get("reasons") and "automatic_assignment_lp" in t.get("reasons", []) for t in c.get("tasks", []))
                 ]
         except:
             pass
@@ -703,7 +706,6 @@ def main():
             # Crea nuova entry
             timeline_data["cleaners_assignments"].append({
                 "cleaner": cleaner_entry["cleaner"],
-                "assignment_type": "low_priority",
                 "tasks": cleaner_entry["tasks"]
             })
 
@@ -718,7 +720,8 @@ def main():
     # Scrivi il file timeline.json
     timeline_path.write_text(json.dumps(timeline_data, ensure_ascii=False, indent=2), encoding="utf-8")
 
-    lp_count = len([c for c in timeline_data["cleaners_assignments"] if c.get("assignment_type") == "low_priority"])
+    lp_count = len([c for c in timeline_data["cleaners_assignments"] 
+                   if any(t.get("reasons") and "automatic_assignment_lp" in t.get("reasons", []) for t in c.get("tasks", []))])
     print(f"✅ Aggiornato {timeline_path}")
     print(f"   - Cleaner con assegnazioni LP: {lp_count}")
     print(f"   - Totale task: {timeline_data['meta']['total_tasks']}")

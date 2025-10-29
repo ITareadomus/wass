@@ -724,11 +724,14 @@ def main():
     if timeline_path.exists():
         try:
             existing = json.loads(timeline_path.read_text(encoding="utf-8"))
-            # Mantieni le assegnazioni esistenti non-HP
+            # Mantieni le assegnazioni esistenti non-HP (rimuovi quelle con task HP)
             if "cleaners_assignments" in existing:
+                # Crea un set di cleaner_id che avranno nuove assegnazioni HP
+                new_hp_cleaner_ids = set(c["cleaner"]["id"] for c in output["high_priority_tasks_assigned"])
                 timeline_data["cleaners_assignments"] = [
                     c for c in existing.get("cleaners_assignments", [])
-                    if c.get("assignment_type") != "high_priority"
+                    if c["cleaner"]["id"] not in new_hp_cleaner_ids or 
+                       not any(t.get("reasons") and "automatic_assignment_hp" in t.get("reasons", []) for t in c.get("tasks", []))
                 ]
         except:
             pass
@@ -749,7 +752,6 @@ def main():
             # Crea nuova entry
             timeline_data["cleaners_assignments"].append({
                 "cleaner": cleaner_entry["cleaner"],
-                "assignment_type": "high_priority",
                 "tasks": cleaner_entry["tasks"]
             })
 
@@ -764,7 +766,8 @@ def main():
     # Scrivi il file timeline.json
     timeline_path.write_text(json.dumps(timeline_data, ensure_ascii=False, indent=2), encoding="utf-8")
 
-    hp_count = len([c for c in timeline_data["cleaners_assignments"] if c.get("assignment_type") == "high_priority"])
+    hp_count = len([c for c in timeline_data["cleaners_assignments"] 
+                   if any(t.get("reasons") and "automatic_assignment_hp" in t.get("reasons", []) for t in c.get("tasks", []))])
     print(f"✅ Aggiornato {timeline_path}")
     print(f"   - Cleaner con assegnazioni HP: {hp_count}")
     print(f"   - Totale task: {timeline_data['meta']['total_tasks']}")
