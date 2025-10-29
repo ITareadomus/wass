@@ -498,8 +498,8 @@ def build_output(cleaners: List[Cleaner], unassigned: List[Task], original_tasks
         "unassigned_tasks": unassigned_list,
         "current_date": ref_date,
         "meta": {
-            "all_tasks": len(original_tasks),
-            "assigned_tasks": total_assigned,
+            "total_tasks": len(original_tasks),
+            "assigned": total_assigned,
             "unassigned": len(original_tasks) - total_assigned,
             "cleaners_used": len(cleaners_with_tasks),
             "max_tasks_per_cleaner": 3,
@@ -541,7 +541,7 @@ def main():
 
     print()
     print(f"✅ Assegnazione completata!")
-    print(f"   - Task assegnati: {output['meta']['assigned_tasks']}/{output['meta']['all_tasks']}")
+    print(f"   - Task assegnati: {output['meta']['assigned']}/{output['meta']['total_tasks']}")
     print(f"   - Cleaner utilizzati: {output['meta']['cleaners_used']}")
     print(f"   - Task non assegnati: {output['meta']['unassigned']}")
     print()
