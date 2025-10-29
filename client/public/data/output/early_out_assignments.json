@@ -626,7 +626,7 @@
       },
       "tasks": [
         {
-          "task_id": 218128,
+          "task_id": 218135,
           "logistic_code": 1646,
           "client_id": 87,
           "premium": false,
@@ -636,10 +636,10 @@
           "cleaning_time": 60,
           "checkin_date": "2025-10-29",
           "checkout_date": "2025-10-29",
-          "checkin_time": "15:00",
-          "checkout_time": "08:00",
+          "checkin_time": "15:30",
+          "checkout_time": null,
           "pax_in": 2,
-          "pax_out": 0,
+          "pax_out": 1,
           "small_equipment": true,
           "operation_id": 2,
           "confirmed_operation": true,
@@ -648,52 +648,6 @@
           "alias": "HACCA",
           "customer_name": "HACCA SRL",
           "reasons": [
-            "checkout_time<=eo_time",
-            "client_forced_eo",
-            "automatic_assignment_eo"
-          ],
-          "priority": "early_out",
-          "start_time": "10:00",
-          "end_time": "11:00",
-          "followup": false,
-          "sequence": 1,
-          "travel_time": 0
-        }
-      ]
-    },
-    {
-      "cleaner": {
-        "id": 249,
-        "name": "Ogbodo Chidi",
-        "lastname": "Igwe",
-        "role": "Premium",
-        "premium": true
-      },
-      "tasks": [
-        {
-          "task_id": 218128,
-          "logistic_code": 1646,
-          "client_id": 87,
-          "premium": false,
-          "address": "Via Matteo Bandello 4/1",
-          "lat": "45.465877",
-          "lng": "9.1667974",
-          "cleaning_time": 60,
-          "checkin_date": "2025-10-29",
-          "checkout_date": "2025-10-29",
-          "checkin_time": "15:00",
-          "checkout_time": "08:00",
-          "pax_in": 2,
-          "pax_out": 0,
-          "small_equipment": true,
-          "operation_id": 2,
-          "confirmed_operation": true,
-          "straordinaria": false,
-          "type_apt": "A",
-          "alias": "HACCA",
-          "customer_name": "HACCA SRL",
-          "reasons": [
-            "checkout_time<=eo_time",
             "client_forced_eo",
             "automatic_assignment_eo"
           ],
@@ -708,12 +662,12 @@
     }
   ],
   "unassigned_tasks": [],
-  "current_date": "2025-10-29",
+  "current_date": "--tasks",
   "meta": {
-    "total_tasks": 16,
-    "assigned": 16,
+    "total_tasks": 15,
+    "assigned": 15,
     "unassigned": 0,
-    "cleaners_used": 16,
+    "cleaners_used": 15,
     "max_tasks_per_cleaner": 3,
     "algorithm": "simplified_greedy",
     "notes": [
