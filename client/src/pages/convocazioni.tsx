@@ -35,9 +35,8 @@ export default function Convocazioni() {
   const [isLoading, setIsLoading] = useState(true);
   const [loadingMessage, setLoadingMessage] = useState("Inizializzazione...");
   const [selectedDate, setSelectedDate] = useState<Date>(() => {
-    const tomorrow = new Date();
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    return tomorrow;
+    const today = new Date();
+    return today;
   });
   const [confirmDialog, setConfirmDialog] = useState<{ open: boolean; cleanerId: number | null }>({ open: false, cleanerId: null });
   const { toast } = useToast();

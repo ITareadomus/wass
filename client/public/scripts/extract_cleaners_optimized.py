@@ -28,7 +28,7 @@ def _daterange(start, end_excl):
 
 # --- CALCOLO DATE -------------------------------------------------------
 # Manteniamo la stessa semantica dello script originale:
-# - target_date = domani se non specificato da argv
+# - target_date = oggi se non specificato da argv
 # - counter_days si basa su "ieri" rispetto ad OGGI reale
 if len(sys.argv) > 1:
     try:
@@ -37,12 +37,12 @@ if len(sys.argv) > 1:
         print(f"📅 DATA SPECIFICATA DALL'INTERFACCIA: {selected_date_str}")
         print(f"✅ Generando dati cleaner per la data: {target_date}")
     except ValueError:
-        print(f"❌ Formato data non valido: {sys.argv[1]}. Usando domani come default.")
-        target_date = (_today() + timedelta(days=1))
-        print(f"📅 Fallback - usando domani: {target_date}")
+        print(f"❌ Formato data non valido: {sys.argv[1]}. Usando oggi come default.")
+        target_date = _today()
+        print(f"📅 Fallback - usando oggi: {target_date}")
 else:
-    target_date = (_today() + timedelta(days=1))
-    print(f"📅 NESSUNA DATA SPECIFICATA - usando domani come default: {target_date}")
+    target_date = _today()
+    print(f"📅 NESSUNA DATA SPECIFICATA - usando oggi come default: {target_date}")
     print("⚠️ Per usare una data specifica, passa il parametro YYYY-MM-DD")
 
 today = _today()
