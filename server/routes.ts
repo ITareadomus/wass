@@ -854,8 +854,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const { spawn } = await import('child_process');
       const scriptPath = path.join(process.cwd(), 'client/public/scripts/assign_eo.py');
+      
+      // Percorsi dei file necessari
+      const containersPath = path.join(process.cwd(), 'client/public/data/output/containers.json');
+      const cleanersPath = path.join(process.cwd(), 'client/public/data/cleaners/selected_cleaners.json');
+      const timelinePath = path.join(process.cwd(), 'client/public/data/output/timeline.json');
+      
+      // Carica containers.json per estrarre le task early_out
+      const containersData = JSON.parse(await fs.readFile(containersPath, 'utf8'));
+      const earlyOutTasks = containersData.containers?.early_out?.tasks || [];
+      
+      // Salva temporaneamente le task EO in un file
+      const tempTasksPath = path.join(process.cwd(), 'client/public/data/output/temp_eo_tasks.json');
+      await fs.writeFile(tempTasksPath, JSON.stringify(earlyOutTasks, null, 2));
+      
+      // Carica selected_cleaners per estrarre solo l'array cleaners
+      const cleanersData = JSON.parse(await fs.readFile(cleanersPath, 'utf8'));
+      const cleanersArray = cleanersData.cleaners || [];
+      
+      // Salva temporaneamente l'array cleaners
+      const tempCleanersPath = path.join(process.cwd(), 'client/public/data/output/temp_cleaners.json');
+      await fs.writeFile(tempCleanersPath, JSON.stringify(cleanersArray, null, 2));
 
-      const pythonProcess = spawn('python3', [scriptPath, workDate]);
+      const pythonProcess = spawn('python3', [
+        scriptPath,
+        '--tasks', tempTasksPath,
+        '--cleaners', tempCleanersPath,
+        '--timeline', timelinePath,
+        '--out', timelinePath
+      ]);
 
       let stdoutData = '';
       pythonProcess.stdout.on('data', (data) => {
@@ -869,6 +896,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       pythonProcess.on('close', async (code) => {
+        // Pulisci file temporanei
+        try {
+          await fs.unlink(tempTasksPath);
+          await fs.unlink(tempCleanersPath);
+        } catch (e) {
+          console.warn('Errore pulizia file temporanei:', e);
+        }
+        
         if (code !== 0) {
           console.error(`assign_eo.py exited with code ${code}`);
           res.status(500).json({
