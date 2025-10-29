@@ -687,12 +687,16 @@ def main():
     planners, leftovers = plan_day(tasks, cleaners)
     output = build_output(planners, leftovers, tasks)
 
+    OUTPUT_ASSIGN.parent.mkdir(parents=True, exist_ok=True)
+    OUTPUT_ASSIGN.write_text(json.dumps(output, ensure_ascii=False, indent=2), encoding="utf-8")
+
     print()
     print(f"✅ Assegnazione completata!")
     print(f"   - Task assegnati: {output['meta']['assigned']}/{output['meta']['total_tasks']}")
     print(f"   - Cleaner utilizzati: {output['meta']['cleaners_used']}")
     print(f"   - Task non assegnati: {output['meta']['unassigned']}")
     print()
+    print(f"💾 Risultati salvati in: {OUTPUT_ASSIGN}")
 
     # Update timeline.json con struttura organizzata per cleaner
     from datetime import datetime as dt
@@ -753,7 +757,7 @@ def main():
     timeline_data["metadata"]["date"] = ref_date
     timeline_data["meta"]["total_cleaners"] = len(cleaners)  # Tutti i cleaners disponibili
     timeline_data["meta"]["used_cleaners"] = used_cleaners  # Cleaners effettivamente usati
-    timeline_data["meta"]["total_tasks"] = sum(
+    timeline_data["meta"]["assigned_tasks"] = sum(
         len(c.get("tasks", [])) for c in timeline_data["cleaners_assignments"]
     )
 
@@ -764,7 +768,7 @@ def main():
                    if any(t.get("reasons") and "automatic_assignment_hp" in t.get("reasons", []) for t in c.get("tasks", []))])
     print(f"✅ Aggiornato {timeline_path}")
     print(f"   - Cleaner con assegnazioni HP: {hp_count}")
-    print(f"   - Totale task: {timeline_data['meta']['total_tasks']}")
+    print(f"   - Totale task: {timeline_data['meta']['assigned_tasks']}")
 
     # SPOSTAMENTO: Rimuovi le task assegnate da containers.json
     containers_path = INPUT_CONTAINERS
