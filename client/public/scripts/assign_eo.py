@@ -386,7 +386,8 @@ def plan_day(tasks: List[Task], cleaners: List[Cleaner]) -> Tuple[List[Cleaner],
 
 
 def build_output(cleaners: List[Cleaner], unassigned: List[Task], original_tasks: List[Task]) -> Dict[str, Any]:
-    cleaners_with_tasks: List[Dict[str, Any]] = []
+    cleaners_with_tasks = []
+    already_assigned_task_ids = set()  # Traccia le task già assegnate
 
     for cl in cleaners:
         if not cl.route:
@@ -400,6 +401,14 @@ def build_output(cleaners: List[Cleaner], unassigned: List[Task], original_tasks
         prev_finish_time = None
 
         for idx, (t, (arr, start, fin)) in enumerate(zip(cl.route, schedule)):
+            # Controlla se questa task è già stata assegnata
+            if t.task_id in already_assigned_task_ids:
+                print(f"⚠️  SKIP: task_id {t.task_id} già assegnata, salto l'assegnazione al cleaner {cl.id}")
+                continue
+
+            # Segna la task come assegnata
+            already_assigned_task_ids.add(t.task_id)
+
             travel_time = 0
             if idx > 0 and prev_finish_time is not None:
                 travel_time = arr - prev_finish_time
@@ -407,7 +416,7 @@ def build_output(cleaners: List[Cleaner], unassigned: List[Task], original_tasks
             # Carica i dati originali completi della task da containers.json
             containers_data = json.loads(INPUT_CONTAINERS.read_text(encoding="utf-8"))
             original_task_data = None
-            
+
             # Cerca la task nei containers
             for container_type in ['early_out', 'high_priority', 'low_priority']:
                 container = containers_data.get('containers', {}).get(container_type, {})
@@ -417,11 +426,11 @@ def build_output(cleaners: List[Cleaner], unassigned: List[Task], original_tasks
                         break
                 if original_task_data:
                     break
-            
+
             # Se non trovato nei containers, usa i dati del dataclass
             if not original_task_data:
                 original_task_data = {field.name: getattr(t, field.name) for field in Task.__dataclass_fields__.values()}
-            
+
             start_time_str = min_to_hhmm(start)
             end_time_str = min_to_hhmm(fin)
 
@@ -578,7 +587,7 @@ def main():
                 new_eo_cleaner_ids = set(c["cleaner"]["id"] for c in output["early_out_tasks_assigned"])
                 timeline_data["cleaners_assignments"] = [
                     c for c in existing.get("cleaners_assignments", [])
-                    if c["cleaner"]["id"] not in new_eo_cleaner_ids or 
+                    if c["cleaner"]["id"] not in new_eo_cleaner_ids or
                        not any(t.get("reasons") and "automatic_assignment_eo" in t.get("reasons", []) for t in c.get("tasks", []))
                 ]
         except:
@@ -603,11 +612,11 @@ def main():
     timeline_path.write_text(json.dumps(timeline_data, ensure_ascii=False, indent=2), encoding="utf-8")
 
     # Conta i cleaner con task di ogni tipo basandosi sui reasons
-    eo_count = len([c for c in timeline_data["cleaners_assignments"] 
+    eo_count = len([c for c in timeline_data["cleaners_assignments"]
                    if any(t.get("reasons") and "automatic_assignment_eo" in t.get("reasons", []) for t in c.get("tasks", []))])
-    hp_count = len([c for c in timeline_data["cleaners_assignments"] 
+    hp_count = len([c for c in timeline_data["cleaners_assignments"]
                    if any(t.get("reasons") and "automatic_assignment_hp" in t.get("reasons", []) for t in c.get("tasks", []))])
-    lp_count = len([c for c in timeline_data["cleaners_assignments"] 
+    lp_count = len([c for c in timeline_data["cleaners_assignments"]
                    if any(t.get("reasons") and "automatic_assignment_lp" in t.get("reasons", []) for t in c.get("tasks", []))])
 
     print(f"✅ Timeline aggiornata: {timeline_path}")
