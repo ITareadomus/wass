@@ -1,6 +1,6 @@
 {
   "metadata": {
-    "last_updated": "2025-10-29T14:55:32.309828",
+    "last_updated": "2025-10-29T15:04:44.492921",
     "date": "2025-10-30"
   },
   "containers": {
@@ -699,34 +699,6 @@
     "low_priority": {
       "tasks": [
         {
-          "task_id": 210458,
-          "logistic_code": 777,
-          "client_id": 2,
-          "premium": false,
-          "address": "Via Imperia 43",
-          "lat": "45.4418695",
-          "lng": "9.1687704",
-          "cleaning_time": 330,
-          "checkin_date": "2025-10-31",
-          "checkout_date": "2025-10-30",
-          "checkin_time": null,
-          "checkout_time": null,
-          "pax_in": 3,
-          "pax_out": 4,
-          "small_equipment": false,
-          "operation_id": 3,
-          "confirmed_operation": true,
-          "straordinaria": true,
-          "type_apt": "D",
-          "alias": "ITW",
-          "customer_name": "ITALIANWAY SRL",
-          "priority": "low_priority",
-          "reasons": [
-            "not_eo",
-            "not_hp"
-          ]
-        },
-        {
           "task_id": 217863,
           "logistic_code": 464,
           "client_id": 2,
@@ -1007,13 +979,13 @@
           ]
         }
       ],
-      "count": 11
+      "count": 10
     }
   },
   "summary": {
-    "total_tasks": 36,
+    "total_tasks": 35,
     "early_out": 14,
     "high_priority": 11,
-    "low_priority": 11
+    "low_priority": 10
   }
 }
