@@ -605,8 +605,18 @@ def main():
             "tasks": cleaner_entry["tasks"]
         })
 
+    # Carica il numero totale di cleaners disponibili da selected_cleaners.json
+    selected_cleaners_path = INPUT_CLEANERS
+    total_available_cleaners = 0
+    if selected_cleaners_path.exists():
+        try:
+            selected_data = json.loads(selected_cleaners_path.read_text(encoding="utf-8"))
+            total_available_cleaners = len(selected_data.get("cleaners", []))
+        except:
+            total_available_cleaners = len(timeline_data["cleaners_assignments"])
+
     # Aggiorna meta
-    timeline_data["meta"]["total_cleaners"] = len(timeline_data["cleaners_assignments"])
+    timeline_data["meta"]["total_cleaners"] = total_available_cleaners
     timeline_data["meta"]["total_tasks"] = sum(
         len(c.get("tasks", [])) for c in timeline_data["cleaners_assignments"]
     )
