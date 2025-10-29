@@ -177,6 +177,11 @@ export default function TaskCard({
                 minHeight: "40px",
               }}
               data-testid={`task-card-${task.id}`}
+              onClick={(e) => {
+                if (!snapshot.isDragging) {
+                  handleCardClick(e);
+                }
+              }}
             >
             {task.confirmed_operation === false && (
               <div className="absolute top-0.5 right-0.5 z-50">
@@ -187,8 +192,7 @@ export default function TaskCard({
               </div>
             )}
             <div 
-              className="flex flex-col items-center justify-center h-full gap-0.5 cursor-pointer"
-              onClick={handleCardClick}
+              className="flex flex-col items-center justify-center h-full gap-0.5"
             >
               <div className="flex items-center gap-1">
                 <span
