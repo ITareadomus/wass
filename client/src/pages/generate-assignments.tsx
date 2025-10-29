@@ -40,7 +40,7 @@ interface RawTask {
 }
 
 export default function GenerateAssignments() {
-  // Leggi la data da localStorage se disponibile, altrimenti usa domani
+  // Leggi la data da localStorage se disponibile, altrimenti usa oggi
   const [selectedDate, setSelectedDate] = useState<Date>(() => {
     const savedDate = localStorage.getItem('selected_work_date');
     if (savedDate) {
@@ -48,17 +48,13 @@ export default function GenerateAssignments() {
       const today = new Date();
       today.setHours(0, 0, 0, 0);
 
-      // Se la data salvata è nel passato, usa domani
+      // Se la data salvata è nel passato, usa oggi
       if (saved < today) {
-        const tomorrow = new Date();
-        tomorrow.setDate(tomorrow.getDate() + 1);
-        return tomorrow;
+        return new Date();
       }
       return saved;
     }
-    const tomorrow = new Date();
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    return tomorrow;
+    return new Date();
   });
 
   // Salva la data in localStorage ogni volta che cambia (formato locale senza timezone)
