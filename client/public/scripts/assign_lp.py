@@ -22,7 +22,7 @@ OUTPUT_ASSIGN = BASE / "output" / "low_priority_assignments.json"
 # CONFIG - REGOLE SEMPLIFICATE
 # =============================
 MAX_TASKS_PER_CLEANER = 3  # Massimo 3 task per LP
-CLUSTER_MAX_TRAVEL = 5.0  # Se task <= 5' da qualsiasi altra, ignora limite di task
+CLUSTER_MAX_TRAVEL = 10.0  # Se task <= 10' da qualsiasi altra, ignora limite di task
 PREFERRED_TRAVEL = 15.0  # Preferenza per percorsi < 15'
 
 # Travel model (min)
