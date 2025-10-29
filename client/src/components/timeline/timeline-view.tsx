@@ -283,14 +283,52 @@ export default function TimelineView({
                             const timeB = taskB.start_time || taskB.fw_start_time || taskB.startTime || "00:00";
                             return timeA.localeCompare(timeB);
                           })
-                          .map((task, index) => (
-                            <TaskCard 
-                              key={`${task.id}-${cleaner.id}-${index}`}
-                              task={task} 
-                              index={index}
-                              isInTimeline={true}
-                            />
-                          ))}
+                          .map((task, index) => {
+                            // Determina il tipo di task SOLO dai flag premium/straordinaria
+                            const isPremium = Boolean((task as any).premium);
+                            const isStraordinaria = Boolean((task as any).straordinaria);
+
+                            // Priorità: straordinaria → premium → standard
+                            let taskType: "standard" | "premium" | "straordinaria" = "standard";
+                            if (isStraordinaria) taskType = "straordinaria";
+                            else if (isPremium) taskType = "premium";
+
+                            // Debug temporaneo per verificare
+                            console.debug("TYPE FLAGS", { 
+                              id: (task as any).task_id, 
+                              premium: (task as any).premium, 
+                              straordinaria: (task as any).straordinaria, 
+                              taskType 
+                            });
+
+                            // Funzione per assegnare colore e label SOLO in base al tipo
+                            const getTaskTypeStyle = (type: string) => {
+                              switch (type) {
+                                case "standard":
+                                  return { label: "standard", className: "bg-emerald-100 text-emerald-800 border border-emerald-200" };
+                                case "premium":
+                                  return { label: "premium", className: "bg-amber-100 text-amber-800 border border-amber-200" };
+                                case "straordinaria":
+                                  return { label: "straordinaria", className: "bg-rose-100 text-rose-800 border border-rose-200" };
+                                default:
+                                  return { label: "-", className: "bg-gray-100 text-gray-700 border border-gray-200" };
+                              }
+                            };
+
+                            const { label: typeLabel, className: typeClass } = getTaskTypeStyle(taskType);
+                            return (
+                              <TaskCard 
+                                key={`${task.id}-${cleaner.id}-${index}`}
+                                task={task} 
+                                index={index}
+                                isInTimeline={true}
+                              >
+                                <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${typeClass}`}>
+                                  {typeLabel}
+                                </span>
+                              </TaskCard>
+                            );
+                          })}
                         {provided.placeholder}
                       </div>
                     </div>
