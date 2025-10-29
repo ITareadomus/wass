@@ -1,12 +1,244 @@
 {
   "metadata": {
-    "last_updated": "2025-10-29T15:14:21.342Z",
-    "date": "2025-10-29"
+    "last_updated": "2025-10-29T15:17:10.613370",
+    "date": "2025-10-31"
   },
-  "cleaners_assignments": [],
+  "cleaners_assignments": [
+    {
+      "cleaner": {
+        "id": 24,
+        "name": "HUSSAIN",
+        "lastname": "SYED SHUJIAHAT",
+        "role": "Standard",
+        "premium": false
+      },
+      "tasks": [
+        {
+          "task_id": 217320,
+          "logistic_code": 1395,
+          "client_id": 2,
+          "premium": false,
+          "address": "Via Vigevano 7",
+          "lat": "45.4527004",
+          "lng": "9.1751151",
+          "cleaning_time": 120,
+          "checkin_date": "2025-11-11",
+          "checkout_date": "2025-10-31",
+          "checkin_time": null,
+          "checkout_time": null,
+          "pax_in": 1,
+          "pax_out": 3,
+          "small_equipment": false,
+          "operation_id": 2,
+          "confirmed_operation": true,
+          "straordinaria": false,
+          "type_apt": "C",
+          "alias": "ITW",
+          "customer_name": "ITALIANWAY SRL",
+          "priority": "low_priority",
+          "reasons": [
+            "not_eo",
+            "not_hp",
+            "automatic_assignment_lp"
+          ],
+          "start_time": "10:12",
+          "end_time": "12:12",
+          "followup": false,
+          "sequence": 1,
+          "travel_time": 0,
+          "is_straordinaria": false
+        }
+      ]
+    },
+    {
+      "cleaner": {
+        "id": 829,
+        "name": "MUSTAPHA",
+        "lastname": "BAH",
+        "role": "Premium",
+        "premium": true
+      },
+      "tasks": [
+        {
+          "task_id": 218190,
+          "logistic_code": 1535,
+          "client_id": 2,
+          "premium": false,
+          "address": "Via Gallura 9",
+          "lat": "45.4373695",
+          "lng": "9.1993307",
+          "cleaning_time": 270,
+          "checkin_date": "2025-11-01",
+          "checkout_date": "2025-10-31",
+          "checkin_time": null,
+          "checkout_time": null,
+          "pax_in": 2,
+          "pax_out": 2,
+          "small_equipment": false,
+          "operation_id": 3,
+          "confirmed_operation": true,
+          "straordinaria": true,
+          "type_apt": "C",
+          "alias": "ITW",
+          "customer_name": "ITALIANWAY SRL",
+          "priority": "low_priority",
+          "reasons": [
+            "not_eo",
+            "not_hp",
+            "automatic_assignment_lp"
+          ],
+          "start_time": "10:12",
+          "end_time": "14:42",
+          "followup": false,
+          "sequence": 1,
+          "travel_time": 0,
+          "is_straordinaria": true
+        }
+      ]
+    },
+    {
+      "cleaner": {
+        "id": 404,
+        "name": "RASEL",
+        "lastname": "MOLLA",
+        "role": "Standard",
+        "premium": false
+      },
+      "tasks": [
+        {
+          "task_id": 218058,
+          "logistic_code": 1494,
+          "client_id": 94,
+          "premium": false,
+          "address": "VIA ORTI 16D",
+          "lat": "45.454729",
+          "lng": "9.2015875",
+          "cleaning_time": 90,
+          "checkin_date": "2025-11-01",
+          "checkout_date": "2025-10-31",
+          "checkin_time": null,
+          "checkout_time": null,
+          "pax_in": 4,
+          "pax_out": 5,
+          "small_equipment": false,
+          "operation_id": 2,
+          "confirmed_operation": false,
+          "straordinaria": false,
+          "type_apt": "B",
+          "alias": "IHST",
+          "customer_name": "IHOST",
+          "priority": "low_priority",
+          "reasons": [
+            "not_eo",
+            "not_hp",
+            "automatic_assignment_lp"
+          ],
+          "start_time": "10:12",
+          "end_time": "11:42",
+          "followup": false,
+          "sequence": 1,
+          "travel_time": 0,
+          "is_straordinaria": false
+        }
+      ]
+    },
+    {
+      "cleaner": {
+        "id": 596,
+        "name": "TRACY",
+        "lastname": "OKE",
+        "role": "Premium",
+        "premium": true
+      },
+      "tasks": [
+        {
+          "task_id": 218063,
+          "logistic_code": 1632,
+          "client_id": 123,
+          "premium": false,
+          "address": "VIA LUPETTA 12",
+          "lat": "45.4612993",
+          "lng": "9.1864016",
+          "cleaning_time": 150,
+          "checkin_date": "2025-10-31",
+          "checkout_date": "2025-10-31",
+          "checkin_time": null,
+          "checkout_time": null,
+          "pax_in": 2,
+          "pax_out": 3,
+          "small_equipment": false,
+          "operation_id": 2,
+          "confirmed_operation": false,
+          "straordinaria": false,
+          "type_apt": "D",
+          "alias": "YOUHO",
+          "customer_name": "YOUHOSTY",
+          "priority": "low_priority",
+          "reasons": [
+            "not_eo",
+            "not_hp",
+            "automatic_assignment_lp"
+          ],
+          "start_time": "10:12",
+          "end_time": "12:42",
+          "followup": false,
+          "sequence": 1,
+          "travel_time": 0,
+          "is_straordinaria": false
+        }
+      ]
+    },
+    {
+      "cleaner": {
+        "id": 1045,
+        "name": "ARACELY ROCIO",
+        "lastname": "MORLA ZAMBRANO",
+        "role": "Standard",
+        "premium": false
+      },
+      "tasks": [
+        {
+          "task_id": 218079,
+          "logistic_code": 289,
+          "client_id": 2,
+          "premium": false,
+          "address": "VIA VIGEVANO 13",
+          "lat": "45.4528415",
+          "lng": "9.1742551",
+          "cleaning_time": 90,
+          "checkin_date": "2025-11-02",
+          "checkout_date": "2025-10-31",
+          "checkin_time": null,
+          "checkout_time": null,
+          "pax_in": 2,
+          "pax_out": 2,
+          "small_equipment": false,
+          "operation_id": 2,
+          "confirmed_operation": true,
+          "straordinaria": false,
+          "type_apt": "B",
+          "alias": "ITW",
+          "customer_name": "ITALIANWAY SRL",
+          "priority": "low_priority",
+          "reasons": [
+            "not_eo",
+            "not_hp",
+            "automatic_assignment_lp"
+          ],
+          "start_time": "10:12",
+          "end_time": "11:42",
+          "followup": false,
+          "sequence": 1,
+          "travel_time": 0,
+          "is_straordinaria": false
+        }
+      ]
+    }
+  ],
   "meta": {
-    "total_cleaners": 0,
-    "used_cleaners": 0,
-    "assigned_tasks": 0
+    "total_cleaners": 18,
+    "total_tasks": 0,
+    "used_cleaners": 5,
+    "assigned_tasks": 5
   }
 }
