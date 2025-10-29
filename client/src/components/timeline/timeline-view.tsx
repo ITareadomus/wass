@@ -176,6 +176,34 @@ export default function TimelineView({
     return null;
   }
 
+  // --- NORMALIZZAZIONI TIMELINE ---
+  // NON normalizzare task.type - lo determiniamo dai flag
+  const normalizeTask = (task: any) => {
+    // Normalizza SOLO i flag straordinaria/premium, NON il type
+    const isPremium = Boolean(task.premium);
+    const isStraordinaria = Boolean(task.straordinaria || task.is_straordinaria);
+
+    // Normalizza confirmed_operation
+    const rawConfirmed = task.confirmed_operation;
+    const isConfirmedOperation =
+      typeof rawConfirmed === "boolean"
+        ? rawConfirmed
+        : typeof rawConfirmed === "number"
+          ? rawConfirmed !== 0
+          : typeof rawConfirmed === "string"
+            ? ["true", "1", "yes"].includes(rawConfirmed.toLowerCase().trim())
+            : false;
+
+    return {
+      ...task,
+      // NON sovrascrivere task.type - lascialo undefined se non esiste
+      premium: isPremium,
+      straordinaria: isStraordinaria,
+      is_straordinaria: isStraordinaria,
+      confirmed_operation: isConfirmedOperation,
+    };
+  };
+
   return (
     <>
       <div className="bg-card rounded-lg border shadow-sm">
@@ -222,7 +250,7 @@ export default function TimelineView({
             // Trova tutte le task assegnate a questo cleaner
             const cleanerTasks = tasks.filter(task => 
               (task as any).assignedCleaner === cleaner.id
-            );
+            ).map(normalizeTask); // Applica la normalizzazione qui
 
             return (
               <div key={cleaner.id} className="flex mb-0.5">
@@ -268,6 +296,7 @@ export default function TimelineView({
                       <div className="relative z-10 flex items-center h-full">
                         {tasks
                           .filter((task) => (task as any).assignedCleaner === cleaner.id)
+                          .map(normalizeTask) // Applica la normalizzazione prima di ordinare e mappare
                           .sort((a, b) => {
                             // Ordina prima per sequence (se presente), poi per orario
                             const taskA = a as any;
