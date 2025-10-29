@@ -1137,47 +1137,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
         await fs.writeFile(timelinePath, JSON.stringify(timelineData, null, 2));
       }
 
-      // Controlla se containers.json esiste già per questa data
-      const containersPath = path.join(process.cwd(), 'client/public/data/output/containers.json');
-      let shouldRunExtraction = true;
-      
-      try {
-        const existingContainers = await fs.readFile(containersPath, 'utf8');
-        const containersJson = JSON.parse(existingContainers);
-        
-        // Se containers.json esiste ed è della data corretta, NON rieseguire l'estrazione
-        if (containersJson.metadata?.date === date) {
-          console.log(`✅ containers.json già esistente per ${date}, skip estrazione`);
-          shouldRunExtraction = false;
-        }
-      } catch (error) {
-        console.log(`containers.json non trovato o invalido, eseguo estrazione`);
-      }
-
-      let containersResult = 'Containers già esistenti, skip estrazione';
-      
-      if (shouldRunExtraction) {
-        // Esegui create_containers (unifica task_extractor + extract_all)
-        console.log(`Eseguendo create_containers.py per data ${date}...`);
-        containersResult = await new Promise<string>((resolve, reject) => {
-          exec(
-            `python3 client/public/scripts/create_containers.py ${date}`,
-            (error, stdout, stderr) => {
-              if (error) {
-                console.error("Errore create_containers:", stderr);
-                reject(new Error(stderr || error.message));
-              } else {
-                resolve(stdout);
-              }
+      // Esegui SEMPRE create_containers.py per avere dati freschi dal database
+      console.log(`Eseguendo create_containers.py per data ${date}...`);
+      const containersResult = await new Promise<string>((resolve, reject) => {
+        exec(
+          `python3 client/public/scripts/create_containers.py ${date}`,
+          (error, stdout, stderr) => {
+            if (error) {
+              console.error("Errore create_containers:", stderr);
+              reject(new Error(stderr || error.message));
+            } else {
+              resolve(stdout);
             }
-          );
-        });
-        console.log("create_containers output:", containersResult);
-      }
+          }
+        );
+      });
+      console.log("create_containers output:", containersResult);
 
       res.json({
         success: true,
-        message: shouldRunExtraction ? "Dati estratti con successo" : "Dati già esistenti",
+        message: "Dati estratti con successo dal database",
         outputs: {
           create_containers: containersResult
         }
