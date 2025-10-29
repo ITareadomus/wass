@@ -233,7 +233,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         String(t.logistic_code) !== normalizedLogisticCode && String(t.task_id) !== normalizedTaskId
       );
 
-      // Crea il task completo per la timeline con TUTTI i dati da containers
+      // Costruisci la task completo per la timeline con TUTTI i dati da containers
       const taskForTimeline = {
         ...fullTaskData,  // Copia TUTTI i campi da containers.json
 
@@ -243,6 +243,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         followup: false,
         sequence: 0,
         travel_time: 0,
+
+        // Preserva esplicitamente i campi critici
+        confirmed_operation: fullTaskData.confirmed_operation,
+        operation_id: fullTaskData.operation_id,
 
         // Reasons (combina quelle da containers con quella timeline)
         reasons: [
