@@ -348,7 +348,7 @@ export default function TaskCard({
                   Tipologia intervento
                 </p>
                 <p className="text-sm">
-                  {(task as any).operation_id === 2 && (task as any).confirmed_operation === false
+                  {(task as any).confirmed_operation === false
                     ? "non migrato"
                     : (task as any).operation_id ?? "non migrato"}
                 </p>
