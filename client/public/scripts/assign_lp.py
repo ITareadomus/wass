@@ -507,9 +507,34 @@ def build_output(cleaners: List[Cleaner], unassigned: List[Task], original_tasks
             current_seq = overall_seq
 
 
-            # Mantieni TUTTI gli attributi originali del task + aggiungi campi timeline
+            # Carica i dati originali completi della task da containers.json
+            containers_data = json.loads(INPUT_CONTAINERS.read_text(encoding="utf-8"))
+            original_task_data = None
+            
+            # Cerca la task nei containers
+            for container_type in ['early_out', 'high_priority', 'low_priority']:
+                container = containers_data.get('containers', {}).get(container_type, {})
+                for task in container.get('tasks', []):
+                    if str(task.get('task_id')) == str(t.task_id) or str(task.get('logistic_code')) == str(t.logistic_code):
+                        original_task_data = task
+                        break
+                if original_task_data:
+                    break
+            
+            # Se non trovato, usa i dati del dataclass
+            if not original_task_data:
+                original_task_data = {
+                    "task_id": str(t.task_id) if t.task_id else "0",
+                    "logistic_code": logistic_code_val,
+                    "address": t.address,
+                    "lat": t.lat,
+                    "lng": t.lng,
+                    "cleaning_time": t.cleaning_time,
+                }
+
+            # Mantieni TUTTI gli attributi originali + aggiungi campi timeline
             task_for_timeline = {
-                **t.__dict__,  # Copia tutti i campi da Task dataclass
+                **original_task_data,  # Copia TUTTI i campi da containers.json
                 # Aggiungi/sovrascrivi campi specifici della timeline
                 "start_time": start_time_str,
                 "end_time": end_time_str,
@@ -517,29 +542,10 @@ def build_output(cleaners: List[Cleaner], unassigned: List[Task], original_tasks
                 "sequence": current_seq,
                 "travel_time": travel_time,
                 "reasons": [
-                    *(t.reasons if hasattr(t, 'reasons') else []),  # Mantieni reasons originali se esistono
+                    *(original_task_data.get("reasons", [])),  # Mantieni reasons originali
                     "automatic_assignment_lp"  # Aggiungi reason timeline
                 ]
             }
-
-            # Assicurati che i campi obbligatori siano presenti anche se non in Task dataclass
-            if "task_id" not in task_for_timeline or not task_for_timeline["task_id"]:
-                task_for_timeline["task_id"] = str(t.task_id) if t.task_id else "0" # Ensure task_id is string
-
-            if "logistic_code" not in task_for_timeline or not task_for_timeline["logistic_code"]:
-                task_for_timeline["logistic_code"] = logistic_code_val # Use calculated logistic_code_val
-
-            if "address" not in task_for_timeline:
-                 task_for_timeline["address"] = t.address
-
-            if "lat" not in task_for_timeline:
-                 task_for_timeline["lat"] = t.lat
-
-            if "lng" not in task_for_timeline:
-                 task_for_timeline["lng"] = t.lng
-
-            if "cleaning_time" not in task_for_timeline:
-                 task_for_timeline["cleaning_time"] = t.cleaning_time
 
             tasks_list.append(task_for_timeline)
 

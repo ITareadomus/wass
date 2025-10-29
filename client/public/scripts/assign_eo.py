@@ -404,15 +404,30 @@ def build_output(cleaners: List[Cleaner], unassigned: List[Task], original_tasks
             if idx > 0 and prev_finish_time is not None:
                 travel_time = arr - prev_finish_time
 
-            # Converti la task in un dizionario, mantenendo tutti gli attributi originali
-            # e aggiungendo quelli specifici della timeline
-            task_data = {field.name: getattr(t, field.name) for field in Task.__dataclass_fields__.values()}
+            # Carica i dati originali completi della task da containers.json
+            containers_data = json.loads(INPUT_CONTAINERS.read_text(encoding="utf-8"))
+            original_task_data = None
+            
+            # Cerca la task nei containers
+            for container_type in ['early_out', 'high_priority', 'low_priority']:
+                container = containers_data.get('containers', {}).get(container_type, {})
+                for task in container.get('tasks', []):
+                    if str(task.get('task_id')) == str(t.task_id) or str(task.get('logistic_code')) == str(t.logistic_code):
+                        original_task_data = task
+                        break
+                if original_task_data:
+                    break
+            
+            # Se non trovato nei containers, usa i dati del dataclass
+            if not original_task_data:
+                original_task_data = {field.name: getattr(t, field.name) for field in Task.__dataclass_fields__.values()}
+            
             start_time_str = min_to_hhmm(start)
             end_time_str = min_to_hhmm(fin)
 
-            # Mantieni TUTTI gli attributi originali del task + aggiungi campi timeline
+            # Mantieni TUTTI gli attributi originali + aggiungi campi timeline
             task_for_timeline = {
-                **task_data,  # Copia tutti i campi da containers.json (es. lat, lng, cleaning_time, ecc.)
+                **original_task_data,  # Copia TUTTI i campi da containers.json
                 # Aggiungi/sovrascrivi campi specifici della timeline
                 "start_time": start_time_str,
                 "end_time": end_time_str,
@@ -420,14 +435,10 @@ def build_output(cleaners: List[Cleaner], unassigned: List[Task], original_tasks
                 "sequence": idx + 1,
                 "travel_time": travel_time,
                 "reasons": [
-                    *(task_data.get("reasons", [])),  # Mantieni reasons originali se esistono
-                    "automatic_assignment_eo"  # Aggiungi reason timeline per questo tipo di assegnazione
+                    *(original_task_data.get("reasons", [])),  # Mantieni reasons originali
+                    "automatic_assignment_eo"  # Aggiungi reason timeline
                 ]
             }
-            # Rimuovi gli attributi che sono stati gestiti diversamente o che non servono più nel formato timeline
-            # ad esempio, checkout_time e checkin_time sono usati per la logica, ma non servono nell'output finale
-            task_for_timeline.pop("checkout_time", None)
-            task_for_timeline.pop("checkin_time", None)
 
             tasks_list.append(task_for_timeline)
             prev_finish_time = fin

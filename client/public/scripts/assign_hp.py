@@ -556,20 +556,48 @@ def build_output(cleaners: List[Cleaner], unassigned: List[Task], original_tasks
                 hop = travel_minutes(prev.lat, prev.lng, t.lat, t.lng, prev.address, t.address)
                 travel_time = int(round(hop))
 
-            tasks_list.append({
-                "task_id": int(t.task_id),
-                "logistic_code": int(t.logistic_code),
-                "address": t.address,
-                "lat": t.lat,
-                "lng": t.lng,
-                "premium": t.is_premium,
-                "cleaning_time": t.cleaning_time,
+            # Carica i dati originali completi della task da containers.json
+            containers_data = json.loads(INPUT_CONTAINERS.read_text(encoding="utf-8"))
+            original_task_data = None
+            
+            # Cerca la task nei containers
+            for container_type in ['early_out', 'high_priority', 'low_priority']:
+                container = containers_data.get('containers', {}).get(container_type, {})
+                for task in container.get('tasks', []):
+                    if str(task.get('task_id')) == str(t.task_id) or str(task.get('logistic_code')) == str(t.logistic_code):
+                        original_task_data = task
+                        break
+                if original_task_data:
+                    break
+            
+            # Se non trovato, crea struttura base
+            if not original_task_data:
+                original_task_data = {
+                    "task_id": int(t.task_id),
+                    "logistic_code": int(t.logistic_code),
+                    "address": t.address,
+                    "lat": t.lat,
+                    "lng": t.lng,
+                    "premium": t.is_premium,
+                    "cleaning_time": t.cleaning_time,
+                }
+
+            # Mantieni TUTTI gli attributi originali + aggiungi campi timeline
+            task_for_timeline = {
+                **original_task_data,  # Copia TUTTI i campi da containers.json
+                # Aggiungi/sovrascrivi campi specifici della timeline
                 "start_time": fmt_hhmm(start),
                 "end_time": fmt_hhmm(fin),
                 "followup": (overall_seq > 1),
                 "sequence": overall_seq,
-                "travel_time": travel_time
-            })
+                "travel_time": travel_time,
+                "reasons": [
+                    *(original_task_data.get("reasons", [])),  # Mantieni reasons originali
+                    "automatic_assignment_hp"  # Aggiungi reason timeline
+                ]
+            }
+            
+            tasks_list.append(task_for_timeline)
 
         cleaners_with_tasks.append({
             "cleaner": {
