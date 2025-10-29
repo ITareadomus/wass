@@ -978,7 +978,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/assign-early-out-to-timeline", async (req, res) => {
     try {
       const { date } = req.body;
-      const workDate = date || format(new Date(), 'yyyy-MM-dd');
+      if (!date) {
+        return res.status(400).json({
+          success: false,
+          message: "Data mancante nella richiesta"
+        });
+      }
+      const workDate = date;
 
       console.log(`Eseguendo assign_eo.py per timeline.json - data: ${workDate}`);
 
@@ -1031,7 +1037,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/assign-high-priority-to-timeline", async (req, res) => {
     try {
       const { date } = req.body;
-      const workDate = date || format(new Date(), 'yyyy-MM-dd');
+      if (!date) {
+        return res.status(400).json({
+          success: false,
+          message: "Data mancante nella richiesta"
+        });
+      }
+      const workDate = date;
 
       console.log(`Eseguendo assign_hp.py per timeline.json - data: ${workDate}`);
 
@@ -1084,7 +1096,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/assign-low-priority-to-timeline", async (req, res) => {
     try {
       const { date } = req.body;
-      const workDate = date || format(new Date(), 'yyyy-MM-dd');
+      if (!date) {
+        return res.status(400).json({
+          success: false,
+          message: "Data mancante nella richiesta"
+        });
+      }
+      const workDate = date;
 
       console.log(`Eseguendo assign_lp.py per timeline.json - data: ${workDate}`);
 
