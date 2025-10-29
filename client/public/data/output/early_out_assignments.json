@@ -40,7 +40,8 @@
           "end_time": "11:00",
           "followup": false,
           "sequence": 1,
-          "travel_time": 0
+          "travel_time": 0,
+          "is_straordinaria": false
         }
       ]
     },
@@ -84,7 +85,8 @@
           "end_time": "12:00",
           "followup": false,
           "sequence": 1,
-          "travel_time": 0
+          "travel_time": 0,
+          "is_straordinaria": false
         }
       ]
     },
@@ -128,7 +130,8 @@
           "end_time": "11:00",
           "followup": false,
           "sequence": 1,
-          "travel_time": 0
+          "travel_time": 0,
+          "is_straordinaria": false
         }
       ]
     },
@@ -172,7 +175,8 @@
           "end_time": "12:00",
           "followup": false,
           "sequence": 1,
-          "travel_time": 0
+          "travel_time": 0,
+          "is_straordinaria": false
         }
       ]
     },
@@ -216,7 +220,8 @@
           "end_time": "11:30",
           "followup": false,
           "sequence": 1,
-          "travel_time": 0
+          "travel_time": 0,
+          "is_straordinaria": false
         }
       ]
     },
@@ -260,7 +265,8 @@
           "end_time": "12:00",
           "followup": false,
           "sequence": 1,
-          "travel_time": 0
+          "travel_time": 0,
+          "is_straordinaria": false
         }
       ]
     },
@@ -304,7 +310,8 @@
           "end_time": "11:00",
           "followup": false,
           "sequence": 1,
-          "travel_time": 0
+          "travel_time": 0,
+          "is_straordinaria": false
         }
       ]
     },
@@ -348,7 +355,8 @@
           "end_time": "12:00",
           "followup": false,
           "sequence": 1,
-          "travel_time": 0
+          "travel_time": 0,
+          "is_straordinaria": false
         }
       ]
     },
@@ -392,7 +400,8 @@
           "end_time": "10:30",
           "followup": false,
           "sequence": 1,
-          "travel_time": 0
+          "travel_time": 0,
+          "is_straordinaria": false
         }
       ]
     },
@@ -436,7 +445,8 @@
           "end_time": "10:30",
           "followup": false,
           "sequence": 1,
-          "travel_time": 0
+          "travel_time": 0,
+          "is_straordinaria": false
         }
       ]
     },
@@ -480,7 +490,8 @@
           "end_time": "10:40",
           "followup": false,
           "sequence": 1,
-          "travel_time": 0
+          "travel_time": 0,
+          "is_straordinaria": false
         }
       ]
     },
@@ -524,7 +535,8 @@
           "end_time": "10:40",
           "followup": false,
           "sequence": 1,
-          "travel_time": 0
+          "travel_time": 0,
+          "is_straordinaria": false
         }
       ]
     },
@@ -568,7 +580,8 @@
           "end_time": "10:40",
           "followup": false,
           "sequence": 1,
-          "travel_time": 0
+          "travel_time": 0,
+          "is_straordinaria": false
         }
       ]
     },
@@ -612,7 +625,8 @@
           "end_time": "12:30",
           "followup": false,
           "sequence": 1,
-          "travel_time": 0
+          "travel_time": 0,
+          "is_straordinaria": false
         }
       ]
     }
