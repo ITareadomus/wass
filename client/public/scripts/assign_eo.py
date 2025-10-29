@@ -603,7 +603,7 @@ def main():
 
     # Conta i cleaners totali disponibili
     total_available_cleaners = len(cleaners)
-
+    
     # Conta i cleaners effettivamente usati (con almeno una task)
     used_cleaners = len([c for c in combined if len(c.get("tasks", [])) > 0])
 
@@ -617,7 +617,7 @@ def main():
         "meta": {
             "total_cleaners": total_available_cleaners,
             "used_cleaners": used_cleaners,
-            "assigned_tasks": sum(len(c["tasks"]) for c in combined)
+            "total_tasks": sum(len(c["tasks"]) for c in combined)
         }
     }
     timeline_path.write_text(json.dumps(timeline_data, ensure_ascii=False, indent=2), encoding="utf-8")
@@ -634,7 +634,7 @@ def main():
     print(f"   - Cleaner con assegnazioni EO: {eo_count}")
     print(f"   - Cleaner con assegnazioni HP: {hp_count}")
     print(f"   - Cleaner con assegnazioni LP: {lp_count}")
-    print(f"   - Totale task: {timeline_data['meta']['assigned_tasks']}")
+    print(f"   - Totale task: {timeline_data['meta']['total_tasks']}")
 
     # SPOSTAMENTO: Rimuovi le task assegnate da containers.json
     containers_path = INPUT_CONTAINERS
