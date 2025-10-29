@@ -64,6 +64,18 @@ export default function TaskCard({
   useEffect(() => {
     const loadAssignmentTimes = async () => {
       try {
+        // Prima controlla se i dati sono già presenti nell'oggetto task (dalla timeline)
+        const taskObj = task as any;
+        if (taskObj.startTime || taskObj.start_time) {
+          setAssignmentTimes({
+            start_time: taskObj.start_time || taskObj.startTime,
+            end_time: taskObj.end_time || taskObj.endTime,
+            travel_time: taskObj.travel_time || taskObj.travelTime
+          });
+          return;
+        }
+
+        // Se non ci sono, cerca nei file JSON
         // Prova prima con early_out_assignments.json
         const eoResponse = await fetch('/data/output/early_out_assignments.json');
         if (eoResponse.ok) {
