@@ -41,8 +41,7 @@
           "end_time": "13:38",
           "followup": false,
           "sequence": 1,
-          "travel_time": 9,
-          "is_straordinaria": false
+          "travel_time": 9
         }
       ]
     },
@@ -87,8 +86,7 @@
           "end_time": "16:34",
           "followup": false,
           "sequence": 1,
-          "travel_time": 23,
-          "is_straordinaria": false
+          "travel_time": 23
         }
       ]
     },
@@ -133,8 +131,7 @@
           "end_time": "18:00",
           "followup": false,
           "sequence": 1,
-          "travel_time": 30,
-          "is_straordinaria": true
+          "travel_time": 30
         }
       ]
     },
@@ -179,8 +176,7 @@
           "end_time": "12:46",
           "followup": false,
           "sequence": 1,
-          "travel_time": 17,
-          "is_straordinaria": false
+          "travel_time": 17
         }
       ]
     },
@@ -225,8 +221,7 @@
           "end_time": "14:24",
           "followup": false,
           "sequence": 1,
-          "travel_time": 25,
-          "is_straordinaria": false
+          "travel_time": 25
         }
       ]
     },
@@ -271,8 +266,7 @@
           "end_time": "17:15",
           "followup": false,
           "sequence": 1,
-          "travel_time": 5,
-          "is_straordinaria": false
+          "travel_time": 5
         }
       ]
     },
@@ -317,8 +311,7 @@
           "end_time": "15:08",
           "followup": false,
           "sequence": 1,
-          "travel_time": 8,
-          "is_straordinaria": false
+          "travel_time": 8
         },
         {
           "task_id": 218026,
@@ -352,8 +345,7 @@
           "end_time": "16:43",
           "followup": true,
           "sequence": 2,
-          "travel_time": 6,
-          "is_straordinaria": false
+          "travel_time": 6
         }
       ]
     },
@@ -398,8 +390,7 @@
           "end_time": "12:12",
           "followup": false,
           "sequence": 1,
-          "travel_time": 0,
-          "is_straordinaria": false
+          "travel_time": 0
         },
         {
           "task_id": 218018,
@@ -433,8 +424,7 @@
           "end_time": "13:54",
           "followup": true,
           "sequence": 2,
-          "travel_time": 13,
-          "is_straordinaria": false
+          "travel_time": 13
         }
       ]
     },
@@ -479,8 +469,7 @@
           "end_time": "11:42",
           "followup": false,
           "sequence": 1,
-          "travel_time": 0,
-          "is_straordinaria": false
+          "travel_time": 0
         }
       ]
     }
