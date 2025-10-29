@@ -502,20 +502,47 @@ def build_output(cleaners: List[Cleaner], unassigned: List[Task], original_tasks
                 except (ValueError, TypeError):
                     logistic_code_val = 0
 
-            tasks_list.append({
-                "task_id": int(t.task_id) if t.task_id else 0,
-                "logistic_code": logistic_code_val,
-                "address": t.address,
-                "lat": t.lat,
-                "lng": t.lng,
-                "premium": t.is_premium,
-                "cleaning_time": t.cleaning_time,
-                "start_time": min_to_hhmm(start),
-                "end_time": min_to_hhmm(fin),
+            start_time_str = min_to_hhmm(start)
+            end_time_str = min_to_hhmm(fin)
+            current_seq = overall_seq
+
+
+            # Mantieni TUTTI gli attributi originali del task + aggiungi campi timeline
+            task_for_timeline = {
+                **t.__dict__,  # Copia tutti i campi da Task dataclass
+                # Aggiungi/sovrascrivi campi specifici della timeline
+                "start_time": start_time_str,
+                "end_time": end_time_str,
                 "followup": (overall_seq > 1),
-                "sequence": overall_seq,
-                "travel_time": travel_time
-            })
+                "sequence": current_seq,
+                "travel_time": travel_time,
+                "reasons": [
+                    *(t.reasons if hasattr(t, 'reasons') else []),  # Mantieni reasons originali se esistono
+                    "automatic_assignment_lp"  # Aggiungi reason timeline
+                ]
+            }
+
+            # Assicurati che i campi obbligatori siano presenti anche se non in Task dataclass
+            if "task_id" not in task_for_timeline or not task_for_timeline["task_id"]:
+                task_for_timeline["task_id"] = str(t.task_id) if t.task_id else "0" # Ensure task_id is string
+
+            if "logistic_code" not in task_for_timeline or not task_for_timeline["logistic_code"]:
+                task_for_timeline["logistic_code"] = logistic_code_val # Use calculated logistic_code_val
+
+            if "address" not in task_for_timeline:
+                 task_for_timeline["address"] = t.address
+
+            if "lat" not in task_for_timeline:
+                 task_for_timeline["lat"] = t.lat
+
+            if "lng" not in task_for_timeline:
+                 task_for_timeline["lng"] = t.lng
+
+            if "cleaning_time" not in task_for_timeline:
+                 task_for_timeline["cleaning_time"] = t.cleaning_time
+
+            tasks_list.append(task_for_timeline)
+
 
         cleaners_with_tasks.append({
             "cleaner": {
