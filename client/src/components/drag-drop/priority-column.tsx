@@ -75,7 +75,8 @@ export default function PriorityColumn({
         setIsAssigning(false);
         return;
       }
-      const dateStr = savedDate.split('T')[0];
+      // La data è già nel formato corretto yyyy-MM-dd, non serve più lo split
+      const dateStr = savedDate;
 
       let endpoint = '';
       let successMessage = '';

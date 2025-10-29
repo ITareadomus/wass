@@ -140,12 +140,14 @@ export default function TimelineView({
 
   const handleResetAssignments = async () => {
     try {
-      const savedDate = localStorage.getItem('selected_work_date');
-      const selectedDate = savedDate ? new Date(savedDate) : new Date();
-      const year = selectedDate.getFullYear();
-      const month = String(selectedDate.getMonth() + 1).padStart(2, '0');
-      const day = String(selectedDate.getDate()).padStart(2, '0');
-      const dateStr = `${year}-${month}-${day}`;
+      // La data è già nel formato corretto yyyy-MM-dd nel localStorage
+      const dateStr = localStorage.getItem('selected_work_date') || (() => {
+        const today = new Date();
+        const year = today.getFullYear();
+        const month = String(today.getMonth() + 1).padStart(2, '0');
+        const day = String(today.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+      })();
 
       // 1. Reset timeline_assignments.json (file principale)
       const resetResponse = await fetch('/api/reset-timeline-assignments', {
