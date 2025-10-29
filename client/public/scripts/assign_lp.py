@@ -346,53 +346,56 @@ def load_cleaners() -> List[Cleaner]:
 
 def seed_cleaners_from_assignments(cleaners: List[Cleaner]):
     """
-    Seed cleaners con informazioni da EO e HP assignments
+    Seed cleaners con informazioni da timeline.json (EO e HP assignments)
     """
-    # Carica EO assignments
-    if INPUT_EO_ASSIGN.exists():
-        data = json.loads(INPUT_EO_ASSIGN.read_text(encoding="utf-8"))
-        for block in data.get("early_out_tasks_assigned", []):
-            cid = int(block["cleaner"]["id"])
-            tasks = block.get("tasks", [])
-            if not tasks:
-                continue
-            last = tasks[-1]
-            end_time = hhmm_to_min(last.get("end_time"))
-            last_addr = last.get("address")
-            last_lat = last.get("lat")
-            last_lng = last.get("lng")
-            last_seq = last.get("sequence") or len(tasks)
-            for cl in cleaners:
-                if cl.id == cid:
-                    cl.available_from = end_time
-                    cl.last_address = last_addr
-                    cl.last_lat = float(last_lat) if last_lat is not None else None
-                    cl.last_lng = float(last_lng) if last_lng is not None else None
-                    cl.last_sequence = int(last_seq)
-                    break
-
-    # Carica HP assignments (sovrascrive EO se presenti)
-    if INPUT_HP_ASSIGN.exists():
-        data = json.loads(INPUT_HP_ASSIGN.read_text(encoding="utf-8"))
-        for block in data.get("high_priority_tasks_assigned", []):
-            cid = int(block["cleaner"]["id"])
-            tasks = block.get("tasks", [])
-            if not tasks:
-                continue
-            last = tasks[-1]
-            end_time = hhmm_to_min(last.get("end_time"))
-            last_addr = last.get("address")
-            last_lat = last.get("lat")
-            last_lng = last.get("lng")
-            last_seq = last.get("sequence") or len(tasks)
-            for cl in cleaners:
-                if cl.id == cid:
-                    cl.available_from = end_time
-                    cl.last_address = last_addr
-                    cl.last_lat = float(last_lat) if last_lat is not None else None
-                    cl.last_lng = float(last_lng) if last_lng is not None else None
-                    cl.last_sequence = int(last_seq)
-                    break
+    # Leggi dalla timeline.json invece che dai file individuali
+    timeline_path = OUTPUT_ASSIGN.parent / "timeline.json"
+    if not timeline_path.exists():
+        # Fallback: prova con i file individuali
+        if INPUT_EO_ASSIGN.exists():
+            data = json.loads(INPUT_EO_ASSIGN.read_text(encoding="utf-8"))
+            blocks = data.get("early_out_tasks_assigned", [])
+        elif INPUT_HP_ASSIGN.exists():
+            data = json.loads(INPUT_HP_ASSIGN.read_text(encoding="utf-8"))
+            blocks = data.get("high_priority_tasks_assigned", [])
+        else:
+            return
+    else:
+        # Leggi dalla timeline.json
+        timeline_data = json.loads(timeline_path.read_text(encoding="utf-8"))
+        blocks = timeline_data.get("cleaners_assignments", [])
+    
+    for block in blocks:
+        cid = int(block["cleaner"]["id"])
+        tasks = block.get("tasks", [])
+        if not tasks:
+            continue
+        
+        # Filtra solo task NON-LP (EO e HP)
+        non_lp_tasks = [t for t in tasks if 
+                        t.get("priority") in ["early_out", "high_priority"] or 
+                        ("automatic_assignment_lp" not in t.get("reasons", []))]
+        
+        if not non_lp_tasks:
+            continue
+        
+        # Ordina per end_time per trovare l'ultima
+        non_lp_tasks.sort(key=lambda t: t.get("end_time", "00:00"))
+        last = non_lp_tasks[-1]
+        
+        end_time = hhmm_to_min(last.get("end_time"))
+        last_addr = last.get("address")
+        last_lat = last.get("lat")
+        last_lng = last.get("lng")
+        last_seq = last.get("sequence") or len(non_lp_tasks)
+        for cl in cleaners:
+            if cl.id == cid:
+                cl.available_from = end_time
+                cl.last_address = last_addr
+                cl.last_lat = float(last_lat) if last_lat is not None else None
+                cl.last_lng = float(last_lng) if last_lng is not None else None
+                cl.last_sequence = int(last_seq)
+                break
 
 
 def load_tasks() -> List[Task]:
@@ -707,6 +710,8 @@ def main():
         if existing_entry:
             # Aggiungi le task LP alle task esistenti
             existing_entry["tasks"].extend(cleaner_entry["tasks"])
+            # Ordina le task per orario di inizio (start_time)
+            existing_entry["tasks"].sort(key=lambda t: t.get("start_time", "00:00"))
         else:
             # Crea nuova entry
             timeline_data["cleaners_assignments"].append({
