@@ -233,6 +233,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         String(t.logistic_code) !== normalizedLogisticCode && String(t.task_id) !== normalizedTaskId
       );
 
+      // Normalizza i campi straordinaria (potrebbero essere straordinaria o is_straordinaria)
+      const isStraordinaria = fullTaskData.straordinaria === true || fullTaskData.is_straordinaria === true;
+      const isPremium = fullTaskData.premium === true;
+
       // Costruisci la task completo per la timeline con TUTTI i dati da containers
       const taskForTimeline = {
         ...fullTaskData,  // Copia TUTTI i campi da containers.json
@@ -247,6 +251,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Preserva esplicitamente i campi critici (non sovrascrivere se già presenti)
         confirmed_operation: fullTaskData.confirmed_operation !== undefined ? fullTaskData.confirmed_operation : true,
         operation_id: fullTaskData.operation_id !== undefined ? fullTaskData.operation_id : 2,
+
+        // Normalizza esplicitamente straordinaria e premium per garantire coerenza
+        straordinaria: isStraordinaria,
+        is_straordinaria: isStraordinaria,
+        premium: isPremium,
 
         // Reasons (combina quelle da containers con quella timeline)
         reasons: [
