@@ -22,7 +22,7 @@ OUTPUT_ASSIGN = BASE / "output" / "high_priority_assignments.json"
 # =============================
 MAX_TASKS_PER_CLEANER = 2  # Massimo 2 task
 THIRD_TASK_MAX_TRAVEL = 10.0  # 3ª task solo se entro 10' dalla 2ª
-CLUSTER_MAX_TRAVEL = 5.0  # Se task <= 5' da qualsiasi altra, ignora limite di task
+CLUSTER_MAX_TRAVEL = 10.0  # Se task <= 10' da qualsiasi altra, ignora limite di task
 
 PREFERRED_TRAVEL = 15.0  # Preferenza per percorsi < 15'
 
