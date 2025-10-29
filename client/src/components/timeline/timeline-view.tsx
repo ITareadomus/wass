@@ -180,11 +180,9 @@ export default function TimelineView({
   const normalizeTask = (task: any) => {
     // Normalizza i flag booleani in modo esplicito
     const premium = task.premium === true || task.premium === 1 || task.premium === "true";
+
+    // Il campo principale è "straordinaria" (usato da tutti i JSON)
     const straordinaria = task.straordinaria === true || task.straordinaria === 1 || task.straordinaria === "true";
-    const is_straordinaria = task.is_straordinaria === true || task.is_straordinaria === 1 || task.is_straordinaria === "true";
-    
-    // Se uno dei due flag straordinaria è true, entrambi devono essere true
-    const finalStraordinaria = straordinaria || is_straordinaria;
 
     // Normalizza confirmed_operation
     const rawConfirmed = task.confirmed_operation;
@@ -200,8 +198,7 @@ export default function TimelineView({
     return {
       ...task,
       premium,
-      straordinaria: finalStraordinaria,
-      is_straordinaria: finalStraordinaria,
+      straordinaria,
       confirmed_operation,
     };
   };
