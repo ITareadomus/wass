@@ -42,7 +42,28 @@ export default function TaskCard({
         ? rawConfirmed !== 0
         : typeof rawConfirmed === "string"
           ? ["true", "1", "yes"].includes(rawConfirmed.toLowerCase().trim())
-          : Boolean(rawConfirmed);
+          : false;
+
+  // Normalizza il tipo della task
+  const taskType = String((task as any).type ?? (task as any).task_type ?? "")
+    .toLowerCase()
+    .trim();
+
+  // Funzione per assegnare colore e label in base al tipo
+  const getTaskTypeStyle = (type: string) => {
+    switch (type) {
+      case "standard":
+        return { label: "STANDARD", colorClass: "task-standard" };
+      case "premium":
+        return { label: "PREMIUM", colorClass: "task-premium" };
+      case "straordinaria":
+      case "extra":
+        return { label: "STRAORD", colorClass: "task-straordinaria" };
+      default:
+        return { label: "-", colorClass: "task-standard" };
+    }
+  };
+  const { label: typeLabel, colorClass } = getTaskTypeStyle(taskType);
 
   useEffect(() => {
     const loadAssignmentTimes = async () => {
@@ -127,19 +148,6 @@ export default function TaskCard({
     setIsModalOpen(true);
   };
 
-  const getTaskClassByPriority = (task: Task) => {
-    // Se is_straordinaria è true, sempre rosso
-    if (task.is_straordinaria) {
-      return "task-straordinaria";
-    }
-    // Se premium è true, dorato
-    if (task.premium) {
-      return "task-premium";
-    }
-    // Altrimenti verde
-    return "task-standard";
-  };
-
   // Calcola la larghezza in base alla durata
   const calculateWidth = (duration: string, forTimeline: boolean) => {
     const parts = duration.split(".");
@@ -177,7 +185,7 @@ export default function TaskCard({
               {...provided.draggableProps}
               {...provided.dragHandleProps}
               className={`
-                ${getTaskClassByPriority(task)} 
+                ${colorClass} 
                 rounded-sm px-2 py-1 shadow-sm border transition-all duration-200
                 ${snapshot.isDragging ? "shadow-lg scale-105" : ""}
                 hover:shadow-md cursor-pointer
@@ -237,14 +245,14 @@ export default function TaskCard({
                 variant="outline"
                 className={cn(
                   "text-xs shrink-0",
-                  ((task as any).straordinaria || task.is_straordinaria)
+                  taskType === "straordinaria" || taskType === "extra"
                     ? "bg-red-500 text-white border-red-700"
-                    : task.premium
+                    : taskType === "premium"
                       ? "bg-yellow-400 text-black border-yellow-600"
                       : "bg-green-500 text-white border-green-700"
                 )}
               >
-                {((task as any).straordinaria || task.is_straordinaria) ? "STRAORD" : task.premium ? "PREMIUM" : "STANDARD"}
+                {typeLabel}
               </Badge>
             </DialogTitle>
           </DialogHeader>
