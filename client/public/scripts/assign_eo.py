@@ -536,12 +536,16 @@ def main():
     planners, leftovers = plan_day(tasks, cleaners)
     output = build_output(planners, leftovers, tasks)
 
+    OUTPUT_ASSIGN.parent.mkdir(parents=True, exist_ok=True)
+    OUTPUT_ASSIGN.write_text(json.dumps(output, ensure_ascii=False, indent=2), encoding="utf-8")
+
     print()
     print(f"✅ Assegnazione completata!")
     print(f"   - Task assegnati: {output['meta']['assigned']}/{output['meta']['total_tasks']}")
     print(f"   - Cleaner utilizzati: {output['meta']['cleaners_used']}")
     print(f"   - Task non assegnati: {output['meta']['unassigned']}")
     print()
+    print(f"💾 Risultati salvati in: {OUTPUT_ASSIGN}")
 
     # Usa la data passata come argomento da riga di comando
     import sys
@@ -599,7 +603,7 @@ def main():
 
     # Conta i cleaners totali disponibili
     total_available_cleaners = len(cleaners)
-    
+
     # Conta i cleaners effettivamente usati (con almeno una task)
     used_cleaners = len([c for c in combined if len(c.get("tasks", [])) > 0])
 
@@ -613,7 +617,7 @@ def main():
         "meta": {
             "total_cleaners": total_available_cleaners,
             "used_cleaners": used_cleaners,
-            "total_tasks": sum(len(c["tasks"]) for c in combined)
+            "assigned_tasks": sum(len(c["tasks"]) for c in combined)
         }
     }
     timeline_path.write_text(json.dumps(timeline_data, ensure_ascii=False, indent=2), encoding="utf-8")
@@ -630,7 +634,7 @@ def main():
     print(f"   - Cleaner con assegnazioni EO: {eo_count}")
     print(f"   - Cleaner con assegnazioni HP: {hp_count}")
     print(f"   - Cleaner con assegnazioni LP: {lp_count}")
-    print(f"   - Totale task: {timeline_data['meta']['total_tasks']}")
+    print(f"   - Totale task: {timeline_data['meta']['assigned_tasks']}")
 
     # SPOSTAMENTO: Rimuovi le task assegnate da containers.json
     containers_path = INPUT_CONTAINERS
