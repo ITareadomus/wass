@@ -8,7 +8,6 @@
         "role": "Standard",
         "premium": false
       },
-      "assignment_type": "early_out",
       "tasks": [
         {
           "task_id": 217964,
@@ -53,7 +52,6 @@
         "role": "Premium",
         "premium": true
       },
-      "assignment_type": "early_out",
       "tasks": [
         {
           "task_id": 217962,
@@ -98,7 +96,6 @@
         "role": "Standard",
         "premium": false
       },
-      "assignment_type": "early_out",
       "tasks": [
         {
           "task_id": 217965,
@@ -143,7 +140,6 @@
         "role": "Premium",
         "premium": true
       },
-      "assignment_type": "early_out",
       "tasks": [
         {
           "task_id": 217963,
@@ -188,7 +184,6 @@
         "role": "Standard",
         "premium": false
       },
-      "assignment_type": "early_out",
       "tasks": [
         {
           "task_id": 217969,
@@ -233,7 +228,6 @@
         "role": "Standard",
         "premium": false
       },
-      "assignment_type": "early_out",
       "tasks": [
         {
           "task_id": 217973,
@@ -278,7 +272,6 @@
         "role": "Premium",
         "premium": true
       },
-      "assignment_type": "early_out",
       "tasks": [
         {
           "task_id": 217966,
@@ -323,7 +316,6 @@
         "role": "Premium",
         "premium": true
       },
-      "assignment_type": "early_out",
       "tasks": [
         {
           "task_id": 217967,
@@ -368,7 +360,6 @@
         "role": "Premium",
         "premium": true
       },
-      "assignment_type": "early_out",
       "tasks": [
         {
           "task_id": 217980,
@@ -413,7 +404,6 @@
         "role": "Standard",
         "premium": false
       },
-      "assignment_type": "early_out",
       "tasks": [
         {
           "task_id": 217981,
@@ -458,7 +448,6 @@
         "role": "Premium",
         "premium": true
       },
-      "assignment_type": "early_out",
       "tasks": [
         {
           "task_id": 217982,
@@ -503,7 +492,6 @@
         "role": "Standard",
         "premium": false
       },
-      "assignment_type": "early_out",
       "tasks": [
         {
           "task_id": 217983,
@@ -548,7 +536,6 @@
         "role": "Standard",
         "premium": false
       },
-      "assignment_type": "early_out",
       "tasks": [
         {
           "task_id": 218087,
@@ -593,7 +580,6 @@
         "role": "Standard",
         "premium": false
       },
-      "assignment_type": "early_out",
       "tasks": [
         {
           "task_id": 218089,
@@ -638,7 +624,6 @@
         "role": "Premium",
         "premium": true
       },
-      "assignment_type": "early_out",
       "tasks": [
         {
           "task_id": 218128,
@@ -684,7 +669,6 @@
         "role": "Premium",
         "premium": true
       },
-      "assignment_type": "early_out",
       "tasks": [
         {
           "task_id": 218128,
@@ -727,6 +711,6 @@
   "meta": {
     "total_cleaners": 16,
     "total_tasks": 16,
-    "last_updated": "2025-10-29T09:37:42.749287"
+    "last_updated": "2025-10-29T09:41:27.243204"
   }
 }
