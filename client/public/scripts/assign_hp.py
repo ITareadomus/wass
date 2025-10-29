@@ -579,6 +579,10 @@ def build_output(cleaners: List[Cleaner], unassigned: List[Task], original_tasks
                 "followup": idx > 0,
                 "sequence": idx + 1,
                 "travel_time": travel_time,
+                # Normalizza ESPLICITAMENTE i campi straordinaria e premium
+                "straordinaria": bool(original_task_data.get("straordinaria", False) or original_task_data.get("is_straordinaria", False)),
+                "premium": bool(original_task_data.get("premium", False)),
+                "is_straordinaria": bool(original_task_data.get("straordinaria", False) or original_task_data.get("is_straordinaria", False)),
                 "reasons": [
                     *(original_task_data.get("reasons", [])),  # Mantieni reasons originali
                     "automatic_assignment_hp"  # Aggiungi reason timeline
