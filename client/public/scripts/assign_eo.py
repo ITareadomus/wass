@@ -536,16 +536,12 @@ def main():
     planners, leftovers = plan_day(tasks, cleaners)
     output = build_output(planners, leftovers, tasks)
 
-    OUTPUT_ASSIGN.parent.mkdir(parents=True, exist_ok=True)
-    OUTPUT_ASSIGN.write_text(json.dumps(output, ensure_ascii=False, indent=2), encoding="utf-8")
-
     print()
     print(f"✅ Assegnazione completata!")
     print(f"   - Task assegnati: {output['meta']['assigned']}/{output['meta']['total_tasks']}")
     print(f"   - Cleaner utilizzati: {output['meta']['cleaners_used']}")
     print(f"   - Task non assegnati: {output['meta']['unassigned']}")
     print()
-    print(f"💾 Risultati salvati in: {OUTPUT_ASSIGN}")
 
     # Usa la data passata come argomento da riga di comando
     import sys
