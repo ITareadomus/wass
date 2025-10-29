@@ -619,8 +619,9 @@
   ],
   "current_date": "2025-10-29",
   "meta": {
-    "total_cleaners": 14,
+    "total_cleaners": 18,
+    "used_cleaners": 14,
     "total_tasks": 14,
-    "last_updated": "2025-10-29T11:06:03.147578"
+    "last_updated": "2025-10-29T11:10:06.787628"
   }
 }
