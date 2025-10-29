@@ -49,6 +49,18 @@ export default function TaskCard({
   const isPremium = Boolean((task as any).premium);
   const isStraordinaria = Boolean((task as any).straordinaria || (task as any).is_straordinaria);
   
+  // Debug temporaneo per la task 777
+  if (task.name === "777" || (task as any).task_id === 777) {
+    console.debug("TASK 777 FLAGS:", {
+      premium: (task as any).premium,
+      straordinaria: (task as any).straordinaria,
+      is_straordinaria: (task as any).is_straordinaria,
+      isPremium,
+      isStraordinaria,
+      isInTimeline
+    });
+  }
+  
   // Funzione per assegnare colore e label SOLO in base al tipo
   const getTaskTypeStyle = () => {
     if (isStraordinaria) {
