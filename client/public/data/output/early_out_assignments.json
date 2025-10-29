@@ -349,15 +349,65 @@
           "travel_time": 0
         }
       ]
+    },
+    {
+      "cleaner": {
+        "id": 495,
+        "name": "EL HADJI",
+        "lastname": "BA",
+        "role": "Premium",
+        "premium": true
+      },
+      "tasks": [
+        {
+          "task_id": 218128,
+          "logistic_code": 1646,
+          "address": "Via Matteo Bandello 4/1",
+          "lat": 45.465877,
+          "lng": 9.1667974,
+          "premium": false,
+          "cleaning_time": 60,
+          "start_time": "10:00",
+          "end_time": "11:00",
+          "followup": false,
+          "sequence": 1,
+          "travel_time": 0
+        }
+      ]
+    },
+    {
+      "cleaner": {
+        "id": 249,
+        "name": "Ogbodo Chidi",
+        "lastname": "Igwe",
+        "role": "Premium",
+        "premium": true
+      },
+      "tasks": [
+        {
+          "task_id": 218135,
+          "logistic_code": 1646,
+          "address": "Via Matteo Bandello 4/1",
+          "lat": 45.465877,
+          "lng": 9.1667974,
+          "premium": false,
+          "cleaning_time": 60,
+          "start_time": "10:00",
+          "end_time": "11:00",
+          "followup": false,
+          "sequence": 1,
+          "travel_time": 0
+        }
+      ]
     }
   ],
   "unassigned_tasks": [],
   "current_date": "2025-10-29",
   "meta": {
-    "total_tasks": 14,
-    "assigned": 14,
+    "total_tasks": 16,
+    "assigned": 16,
     "unassigned": 0,
-    "cleaners_used": 14,
+    "cleaners_used": 16,
     "max_tasks_per_cleaner": 3,
     "algorithm": "simplified_greedy",
     "notes": [
