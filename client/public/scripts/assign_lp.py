@@ -22,6 +22,7 @@ OUTPUT_ASSIGN = BASE / "output" / "low_priority_assignments.json"
 # CONFIG - REGOLE SEMPLIFICATE
 # =============================
 MAX_TASKS_PER_CLEANER = 3  # Massimo 3 task per LP
+CLUSTER_MAX_TRAVEL = 5.0  # Se task <= 5' da qualsiasi altra, ignora limite di task
 PREFERRED_TRAVEL = 15.0  # Preferenza per percorsi < 15'
 
 # Travel model (min)
@@ -243,8 +244,22 @@ def can_add_task(cleaner: Cleaner, task: Task) -> bool:
         if task.straordinaria:
             return False
 
-    # Max 3 task per LP
+    # Max 3 task per LP, MA: se task <= 5' da qualsiasi altra, ignora limite
     if len(cleaner.route) >= MAX_TASKS_PER_CLEANER:
+        # Controlla se la task è <= 5' da qualsiasi task esistente
+        is_within_cluster = any(
+            travel_minutes(existing_task.lat, existing_task.lng, task.lat, task.lng,
+                         existing_task.address, task.address) <= CLUSTER_MAX_TRAVEL or
+            travel_minutes(task.lat, task.lng, existing_task.lat, existing_task.lng,
+                         task.address, existing_task.address) <= CLUSTER_MAX_TRAVEL
+            for existing_task in cleaner.route
+        )
+        
+        if is_within_cluster:
+            # Task in cluster: ignora limite di task
+            return True
+        
+        # Altrimenti: limite rigido
         return False
 
     return True
