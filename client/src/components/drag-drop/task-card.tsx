@@ -45,7 +45,9 @@ export default function TaskCard({
           : false;
 
   // Determina il tipo di task in base ai campi premium e straordinaria
-  const isStraordinaria = (task as any).straordinaria === true || task.is_straordinaria === true;
+  // Nota: is_straordinaria è un campo creato dagli script Python per la timeline
+  // straordinaria è il campo originale presente in containers.json
+  const isStraordinaria = (task as any).straordinaria === true;
   const isPremium = task.premium === true;
   
   // Funzione per assegnare colore e label in base al tipo
