@@ -12,7 +12,7 @@ from datetime import datetime, timedelta
 BASE = Path(__file__).parent.parent / "data"
 
 INPUT_TASKS = BASE / "output" / "high_priority.json"
-INPUT_CONTAINERS = BASE / "containers.json" # New path for containers.json
+INPUT_CONTAINERS = BASE / "output" / "containers.json"
 INPUT_CLEANERS = BASE / "cleaners" / "selected_cleaners.json"
 INPUT_EO_ASSIGN = BASE / "output" / "early_out_assignments.json"
 OUTPUT_ASSIGN = BASE / "output" / "high_priority_assignments.json"
