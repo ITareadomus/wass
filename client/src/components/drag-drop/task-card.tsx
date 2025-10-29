@@ -40,7 +40,7 @@ export default function TaskCard({
         if (eoResponse.ok) {
           const eoData = await eoResponse.json();
           const taskId = (task as any).task_id ?? task.id;
-          
+
           // Cerca la task nelle assegnazioni Early Out
           for (const cleanerEntry of eoData.early_out_tasks_assigned || []) {
             const assignedTask = cleanerEntry.tasks?.find((t: AssignedTask) => 
@@ -62,7 +62,7 @@ export default function TaskCard({
         if (hpResponse.ok) {
           const hpData = await hpResponse.json();
           const taskId = (task as any).task_id ?? task.id;
-          
+
           // Cerca la task nelle assegnazioni High Priority
           for (const cleanerEntry of hpData.high_priority_tasks_assigned || []) {
             const assignedTask = cleanerEntry.tasks?.find((t: AssignedTask) => 
@@ -84,7 +84,7 @@ export default function TaskCard({
         if (lpResponse.ok) {
           const lpData = await lpResponse.json();
           const taskId = (task as any).task_id ?? task.id;
-          
+
           // Cerca la task nelle assegnazioni Low Priority
           for (const cleanerEntry of lpData.low_priority_tasks_assigned || []) {
             const assignedTask = cleanerEntry.tasks?.find((t: AssignedTask) => 
@@ -158,7 +158,7 @@ export default function TaskCard({
       <Draggable draggableId={task.id} index={index}>
         {(provided, snapshot) => {
           const cardWidth = calculateWidth(task.duration, isInTimeline);
-          
+
           return (
             <div
               ref={provided.innerRef}
@@ -371,7 +371,7 @@ export default function TaskCard({
               </div>
             </div>
 
-            
+
           </div>
         </DialogContent>
       </Dialog>
