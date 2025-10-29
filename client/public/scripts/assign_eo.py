@@ -254,9 +254,21 @@ def build_output(cleaners: List[Cleaner], unassigned: List[Task], meta: Optional
                 "tasks": tasks_payload
             })
 
+    # Carica il numero totale di cleaners disponibili da selected_cleaners.json
+    from pathlib import Path
+    selected_cleaners_path = Path(__file__).resolve().parents[1] / "data" / "cleaners" / "selected_cleaners.json"
+    total_available_cleaners = len(out["cleaners_assignments"])
+    
+    if selected_cleaners_path.exists():
+        try:
+            selected_data = json.loads(selected_cleaners_path.read_text(encoding="utf-8"))
+            total_available_cleaners = len(selected_data.get("cleaners", []))
+        except:
+            pass
+
     # meta safe-guards
     out.setdefault("meta", {})
-    out["meta"].setdefault("total_cleaners", len(out["cleaners_assignments"]))
+    out["meta"]["total_cleaners"] = total_available_cleaners
     out["meta"].setdefault("total_tasks", sum(len(e["tasks"]) for e in out["cleaners_assignments"]))
 
     return out
