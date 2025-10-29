@@ -407,7 +407,7 @@ def build_output(cleaners: List[Cleaner], unassigned: List[Task], original_tasks
             # Carica i dati originali completi della task da containers.json
             containers_data = json.loads(INPUT_CONTAINERS.read_text(encoding="utf-8"))
             original_task_data = None
-            
+
             # Cerca la task nei containers
             for container_type in ['early_out', 'high_priority', 'low_priority']:
                 container = containers_data.get('containers', {}).get(container_type, {})
@@ -417,11 +417,11 @@ def build_output(cleaners: List[Cleaner], unassigned: List[Task], original_tasks
                         break
                 if original_task_data:
                     break
-            
+
             # Se non trovato nei containers, usa i dati del dataclass
             if not original_task_data:
                 original_task_data = {field.name: getattr(t, field.name) for field in Task.__dataclass_fields__.values()}
-            
+
             start_time_str = min_to_hhmm(start)
             end_time_str = min_to_hhmm(fin)
 
@@ -578,7 +578,7 @@ def main():
                 new_eo_cleaner_ids = set(c["cleaner"]["id"] for c in output["early_out_tasks_assigned"])
                 timeline_data["cleaners_assignments"] = [
                     c for c in existing.get("cleaners_assignments", [])
-                    if c["cleaner"]["id"] not in new_eo_cleaner_ids or 
+                    if c["cleaner"]["id"] not in new_eo_cleaner_ids or
                        not any(t.get("reasons") and "automatic_assignment_eo" in t.get("reasons", []) for t in c.get("tasks", []))
                 ]
         except:
@@ -592,25 +592,33 @@ def main():
         })
 
     # Aggiorna meta
-    timeline_data["meta"]["total_cleaners"] = len(timeline_data["cleaners_assignments"])
-    timeline_data["meta"]["total_tasks"] = sum(
-        len(c.get("tasks", [])) for c in timeline_data["cleaners_assignments"]
-    )
-    timeline_data["meta"]["last_updated"] = dt.now().isoformat()
-    timeline_data["current_date"] = ref_date
+    # Combina con le assegnazioni esistenti
+    combined = timeline_data["cleaners_assignments"]
 
-    # Scrivi il file aggiornato
+    # Conta i cleaners totali disponibili
+    total_available_cleaners = len(cleaners)
+
+    # Salva timeline.json
+    timeline_data = {
+        "cleaners_assignments": combined,
+        "current_date": ref_date,
+        "meta": {
+            "total_cleaners": total_available_cleaners,
+            "total_tasks": sum(len(c["tasks"]) for c in combined),
+            "last_updated": dt.now().isoformat()
+        }
+    }
     timeline_path.write_text(json.dumps(timeline_data, ensure_ascii=False, indent=2), encoding="utf-8")
+    print(f"✅ Timeline aggiornata: {timeline_path}")
 
     # Conta i cleaner con task di ogni tipo basandosi sui reasons
-    eo_count = len([c for c in timeline_data["cleaners_assignments"] 
+    eo_count = len([c for c in timeline_data["cleaners_assignments"]
                    if any(t.get("reasons") and "automatic_assignment_eo" in t.get("reasons", []) for t in c.get("tasks", []))])
-    hp_count = len([c for c in timeline_data["cleaners_assignments"] 
+    hp_count = len([c for c in timeline_data["cleaners_assignments"]
                    if any(t.get("reasons") and "automatic_assignment_hp" in t.get("reasons", []) for t in c.get("tasks", []))])
-    lp_count = len([c for c in timeline_data["cleaners_assignments"] 
+    lp_count = len([c for c in timeline_data["cleaners_assignments"]
                    if any(t.get("reasons") and "automatic_assignment_lp" in t.get("reasons", []) for t in c.get("tasks", []))])
 
-    print(f"✅ Timeline aggiornata: {timeline_path}")
     print(f"   - Cleaner con assegnazioni EO: {eo_count}")
     print(f"   - Cleaner con assegnazioni HP: {hp_count}")
     print(f"   - Cleaner con assegnazioni LP: {lp_count}")
