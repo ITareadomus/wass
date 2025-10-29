@@ -1435,7 +1435,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const timelinePath = path.join(process.cwd(), 'client/public/data/output/timeline.json');
 
       // Carica le assegnazioni della timeline (manuali)
-      let timelineData: any = { assignments: [], current_date: date };
+      let timelineData: any = { 
+        metadata: { last_updated: new Date().toISOString(), date },
+        cleaners_assignments: [],
+        meta: { total_cleaners: 0, used_cleaners: 0, assigned_tasks: 0 }
+      };
       try {
         const existingData = await fs.readFile(timelinePath, 'utf8');
         timelineData = JSON.parse(existingData);
@@ -1448,7 +1452,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const hpAssignmentsPath = path.join(process.cwd(), 'client/public/data/output/high_priority_assignments.json');
       const lpAssignmentsPath = path.join(process.cwd(), 'client/public/data/output/low_priority_assignments.json');
 
-      let allAssignments = [...timelineData.assignments];
+      // Trasforma cleaners_assignments in formato piatto per compatibilità
+      let allAssignments: any[] = [];
+      if (timelineData.cleaners_assignments) {
+        for (const cleanerEntry of timelineData.cleaners_assignments) {
+          for (const task of cleanerEntry.tasks || []) {
+            allAssignments.push({
+              task_id: task.task_id,
+              logistic_code: String(task.logistic_code),
+              cleanerId: cleanerEntry.cleaner.id,
+              assignment_type: task.priority || "manual",
+              sequence: task.sequence,
+              address: task.address,
+              lat: task.lat,
+              lng: task.lng,
+              premium: task.premium,
+              cleaning_time: task.cleaning_time,
+              start_time: task.start_time,
+              end_time: task.end_time,
+              travel_time: task.travel_time,
+              followup: task.followup
+            });
+          }
+        }
+      }
 
       // Aggiungi assegnazioni EO
       try {
