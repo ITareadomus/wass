@@ -181,9 +181,9 @@ export default function GenerateAssignments() {
 
       // Aggiungi timestamp UNIVOCO per evitare QUALSIASI cache
       const timestamp = Date.now() + Math.random();
-      
+
       console.log(`🔄 Caricamento task dai file JSON (timestamp: ${timestamp})...`);
-      
+
       const [containersResponse, timelineResponse] = await Promise.all([
         fetch(`/data/output/containers.json?t=${timestamp}`, {
           cache: 'no-store',
@@ -287,7 +287,7 @@ export default function GenerateAssignments() {
       setEarlyOutTasks(filteredEarlyOut);
       setHighPriorityTasks(filteredHigh);
       setLowPriorityTasks(filteredLow);
-      
+
       console.log(`📊 SINCRONIZZAZIONE CONTAINERS:`);
       console.log(`   - Early Out: ${filteredEarlyOut.length} task`);
       console.log(`   - High Priority: ${filteredHigh.length} task`);
@@ -356,12 +356,12 @@ export default function GenerateAssignments() {
       console.log(`   - Task totali: ${tasksWithAssignments.length}`);
       console.log(`   - Task assegnate: ${tasksWithAssignments.filter(t => (t as any).assignedCleaner).length}`);
       console.log(`   - Task nei containers: ${tasksWithAssignments.filter(t => !(t as any).assignedCleaner).length}`);
-      
+
       setAllTasksWithAssignments(tasksWithAssignments);
 
       setIsLoadingTasks(false);
       setExtractionStep("Task caricati con successo!");
-      
+
       console.log(`✅ SINCRONIZZAZIONE COMPLETATA - Containers e Timeline allineati con i file JSON`);
     } catch (error) {
       console.error("Errore nel caricamento dei task:", error);
@@ -426,8 +426,6 @@ export default function GenerateAssignments() {
     }
   };
 
-
-
   // Funzione per confermare le assegnazioni
   const confirmAssignments = async () => {
     try {
@@ -464,10 +462,117 @@ export default function GenerateAssignments() {
     }
   };
 
+  // Funzione per assegnare le task Early Out alla timeline
+  const assignEarlyOutToTimeline = async () => {
+    try {
+      const dateStr = format(selectedDate, "yyyy-MM-dd");
+      const response = await fetch('/api/assign-early-out-to-timeline', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ date: dateStr })
+      });
 
+      const result = await response.json();
+
+      if (result.success) {
+        toast({
+          title: "Early Out Assegnati!",
+          description: result.message,
+          duration: 3000,
+        });
+
+        // Ricarica i task per mostrare le assegnazioni nella timeline
+        await loadTasks(true);
+      } else {
+        throw new Error(result.message || 'Errore sconosciuto');
+      }
+    } catch (error: any) {
+      console.error("Errore nell'assegnazione Early Out:", error);
+      toast({
+        title: "Errore",
+        description: error.message || "Errore durante l'assegnazione Early Out",
+        variant: "destructive",
+        duration: 3000,
+      });
+    }
+  };
+
+  // Funzione per assegnare le task High Priority alla timeline
+  const assignHighPriorityToTimeline = async () => {
+    try {
+      const dateStr = format(selectedDate, "yyyy-MM-dd");
+      const response = await fetch('/api/assign-high-priority-to-timeline', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ date: dateStr })
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        toast({
+          title: "High Priority Assegnati!",
+          description: result.message,
+          duration: 3000,
+        });
+
+        // Ricarica i task per mostrare le assegnazioni nella timeline
+        await loadTasks(true);
+      } else {
+        throw new Error(result.message || 'Errore sconosciuto');
+      }
+    } catch (error: any) {
+      console.error("Errore nell'assegnazione High Priority:", error);
+      toast({
+        title: "Errore",
+        description: error.message || "Errore durante l'assegnazione High Priority",
+        variant: "destructive",
+        duration: 3000,
+      });
+    }
+  };
+
+  // Funzione per assegnare le task Low Priority alla timeline
+  const assignLowPriorityToTimeline = async () => {
+    try {
+      const dateStr = format(selectedDate, "yyyy-MM-dd");
+      const response = await fetch('/api/assign-low-priority-to-timeline', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ date: dateStr })
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        toast({
+          title: "Low Priority Assegnati!",
+          description: result.message,
+          duration: 3000,
+        });
+
+        // Ricarica i task per mostrare le assegnazioni nella timeline
+        await loadTasks(true);
+      } else {
+        throw new Error(result.message || 'Errore sconosciuto');
+      }
+    } catch (error: any) {
+      console.error("Errore nell'assegnazione Low Priority:", error);
+      toast({
+        title: "Errore",
+        description: error.message || "Errore durante l'assegnazione Low Priority",
+        variant: "destructive",
+        duration: 3000,
+      });
+    }
+  };
 
   // Esponi le funzioni per poterle chiamare da altri componenti
   (window as any).reloadAllTasks = reloadAllTasks;
+  (window as any).assignEarlyOutToTimeline = assignEarlyOutToTimeline;
+  (window as any).assignHighPriorityToTimeline = assignHighPriorityToTimeline;
+  (window as any).assignLowPriorityToTimeline = assignLowPriorityToTimeline;
+
 
   const saveTaskAssignments = async (tasks: Task[]) => {
     try {
@@ -489,10 +594,10 @@ export default function GenerateAssignments() {
   const saveTimelineAssignment = async (taskId: string, cleanerId: number, logisticCode?: string, dropIndex?: number) => {
     try {
       const dateStr = format(selectedDate, "yyyy-MM-dd");
-      
+
       // Trova il task completo dai containers
       const task = allTasksWithAssignments.find(t => t.id === taskId);
-      
+
       const response = await fetch('/api/save-timeline-assignment', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -611,7 +716,7 @@ export default function GenerateAssignments() {
 
         // 3. FORZA ricaricamento completo e sincronizzato
         await loadTasks(true);
-        
+
         console.log(`✅ Sincronizzazione completata`);
         return;
       }
@@ -628,7 +733,7 @@ export default function GenerateAssignments() {
 
         // 2. FORZA ricaricamento completo e sincronizzato
         await loadTasks(true);
-        
+
         console.log(`✅ Sincronizzazione completata`);
         return;
       }
@@ -639,10 +744,10 @@ export default function GenerateAssignments() {
 
         // 1. Aggiorna containers.json
         await updateTaskJson(taskId, logisticCode, fromContainer, toContainer);
-        
+
         // 2. FORZA ricaricamento completo e sincronizzato
         await loadTasks(true);
-        
+
         console.log(`✅ Sincronizzazione completata`);
       }
     } catch (error) {
@@ -770,6 +875,7 @@ export default function GenerateAssignments() {
               tasks={earlyOutTasks}
               droppableId="early-out"
               icon="clock"
+              assignAction={assignEarlyOutToTimeline}
             />
             <PriorityColumn
               title="HIGH PRIORITY"
@@ -777,6 +883,7 @@ export default function GenerateAssignments() {
               tasks={highPriorityTasks}
               droppableId="high"
               icon="alert-circle"
+              assignAction={assignHighPriorityToTimeline}
             />
             <PriorityColumn
               title="LOW PRIORITY"
@@ -784,6 +891,7 @@ export default function GenerateAssignments() {
               tasks={lowPriorityTasks}
               droppableId="low"
               icon="arrow-down"
+              assignAction={assignLowPriorityToTimeline}
             />
           </div>
 
