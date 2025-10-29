@@ -641,8 +641,8 @@ def main():
     tasks = load_tasks()
 
     print(f"📋 Caricamento dati...")
-    print(f"👥 Cleaner disponibili: {len(cleaners)}")
-    print(f"📦 Task Low-Priority da assegnare: {len(tasks)}")
+    print(f"   - Cleaner disponibili: {len(cleaners)}")
+    print(f"   - Task Low-Priority da assegnare: {len(tasks)}")
     print()
     print(f"🔄 Assegnazione in corso...")
 
@@ -675,6 +675,7 @@ def main():
         }
     }
 
+    existing = {}
     if timeline_path.exists():
         try:
             existing = json.loads(timeline_path.read_text(encoding="utf-8"))
@@ -684,11 +685,13 @@ def main():
                 new_lp_cleaner_ids = set(c["cleaner"]["id"] for c in output["low_priority_tasks_assigned"])
                 timeline_data["cleaners_assignments"] = [
                     c for c in existing.get("cleaners_assignments", [])
-                    if c["cleaner"]["id"] not in new_lp_cleaner_ids or 
+                    if c["cleaner"]["id"] not in new_lp_cleaner_ids or
                        not any(t.get("reasons") and "automatic_assignment_lp" in t.get("reasons", []) for t in c.get("tasks", []))
                 ]
-        except:
+        except Exception as e:
+            print(f"Errore nel caricare la timeline esistente: {e}")
             pass
+
 
     # Aggiungi le nuove assegnazioni LP organizzate per cleaner
     for cleaner_entry in output["low_priority_tasks_assigned"]:
@@ -710,7 +713,10 @@ def main():
             })
 
     # Aggiorna meta
-    timeline_data["meta"]["total_cleaners"] = len(timeline_data["cleaners_assignments"])
+    # Conta i cleaners totali disponibili
+    total_available_cleaners = len(cleaners)
+
+    timeline_data["meta"]["total_cleaners"] = total_available_cleaners
     timeline_data["meta"]["total_tasks"] = sum(
         len(c.get("tasks", [])) for c in timeline_data["cleaners_assignments"]
     )
@@ -720,8 +726,8 @@ def main():
     # Scrivi il file timeline.json
     timeline_path.write_text(json.dumps(timeline_data, ensure_ascii=False, indent=2), encoding="utf-8")
 
-    lp_count = len([c for c in timeline_data["cleaners_assignments"] 
-                   if any(t.get("reasons") and "automatic_assignment_lp" in t.get("reasons", []) for t in c.get("tasks", []))])
+    lp_count = sum(1 for c in timeline_data["cleaners_assignments"]
+                   if any(t.get("reasons") and "automatic_assignment_lp" in t.get("reasons", []) for t in c.get("tasks", [])))
     print(f"✅ Aggiornato {timeline_path}")
     print(f"   - Cleaner con assegnazioni LP: {lp_count}")
     print(f"   - Totale task: {timeline_data['meta']['total_tasks']}")
