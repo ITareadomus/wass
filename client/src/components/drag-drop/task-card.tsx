@@ -9,6 +9,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { useState, useEffect } from "react";
 import { HelpCircle } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 interface TaskCardProps {
   task: Task;
@@ -221,17 +222,19 @@ export default function TaskCard({
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               Dettagli Task #{(task as any).task_id ?? task.id}
-              {task.is_straordinaria ? (
-                <Badge className="bg-red-500 text-white border-2 border-black">
-                  Straordinaria
-                </Badge>
-              ) : task.premium ? (
-                <Badge className="bg-yellow-400 text-black border-2 border-black">
-                  Premium
-                </Badge>
-              ) : (
-                <Badge className="bg-green-500 text-white">Standard</Badge>
-              )}
+              <Badge
+                variant="outline"
+                className={cn(
+                  "text-xs shrink-0",
+                  ((task as any).straordinaria || task.is_straordinaria)
+                    ? "bg-red-500 text-white border-red-700"
+                    : task.premium
+                      ? "bg-yellow-400 text-black border-yellow-600"
+                      : "bg-green-500 text-white border-green-700"
+                )}
+              >
+                {((task as any).straordinaria || task.is_straordinaria) ? "STRAORD" : task.premium ? "PREMIUM" : "STANDARD"}
+              </Badge>
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
