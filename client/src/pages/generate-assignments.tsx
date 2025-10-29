@@ -471,12 +471,10 @@ export default function GenerateAssignments() {
   const assignEarlyOutToTimeline = async () => {
     try {
       // Format date in local timezone to avoid UTC shift
-      const year = selectedDate.getFullYear();
-      const month = String(selectedDate.getMonth() + 1).padStart(2, '0');
-      const day = String(selectedDate.getDate()).padStart(2, '0');
-      const dateStr = `${year}-${month}-${day}`;
+      const dateStr = format(selectedDate, 'yyyy-MM-dd');
       
       console.log(`📅 Assegnazione EO per data: ${dateStr}`);
+      console.log(`📅 selectedDate oggetto:`, selectedDate);
       
       const response = await fetch('/api/assign-early-out-to-timeline', {
         method: 'POST',
@@ -513,12 +511,10 @@ export default function GenerateAssignments() {
   const assignHighPriorityToTimeline = async () => {
     try {
       // Format date in local timezone to avoid UTC shift
-      const year = selectedDate.getFullYear();
-      const month = String(selectedDate.getMonth() + 1).padStart(2, '0');
-      const day = String(selectedDate.getDate()).padStart(2, '0');
-      const dateStr = `${year}-${month}-${day}`;
+      const dateStr = format(selectedDate, 'yyyy-MM-dd');
       
       console.log(`📅 Assegnazione HP per data: ${dateStr}`);
+      console.log(`📅 selectedDate oggetto:`, selectedDate);
       
       const response = await fetch('/api/assign-high-priority-to-timeline', {
         method: 'POST',
@@ -559,12 +555,10 @@ export default function GenerateAssignments() {
   const assignLowPriorityToTimeline = async () => {
     try {
       // Format date in local timezone to avoid UTC shift
-      const year = selectedDate.getFullYear();
-      const month = String(selectedDate.getMonth() + 1).padStart(2, '0');
-      const day = String(selectedDate.getDate()).padStart(2, '0');
-      const dateStr = `${year}-${month}-${day}`;
+      const dateStr = format(selectedDate, 'yyyy-MM-dd');
       
       console.log(`📅 Assegnazione LP per data: ${dateStr}`);
+      console.log(`📅 selectedDate oggetto:`, selectedDate);
       
       const response = await fetch('/api/assign-low-priority-to-timeline', {
         method: 'POST',
