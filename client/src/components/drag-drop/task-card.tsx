@@ -125,7 +125,7 @@ export default function TaskCard({
     if (task.premium) {
       return "task-premium";
     }
-    // Se premium è false o non presente, verde
+    // Altrimenti verde
     return "task-standard";
   };
 

@@ -540,9 +540,12 @@ def build_output(cleaners: List[Cleaner], unassigned: List[Task], original_tasks
                 # Aggiungi/sovrascrivi campi specifici della timeline
                 "start_time": start_time_str,
                 "end_time": end_time_str,
-                "followup": (overall_seq > 1),
-                "sequence": current_seq,
+                "followup": idx > 0,
+                "sequence": idx + 1,
                 "travel_time": travel_time,
+                # Normalizza i campi straordinaria e premium per la timeline
+                "is_straordinaria": original_task_data.get("straordinaria", False) or original_task_data.get("is_straordinaria", False),
+                "premium": original_task_data.get("premium", False),
                 "reasons": [
                     *(original_task_data.get("reasons", [])),  # Mantieni reasons originali
                     "automatic_assignment_lp"  # Aggiungi reason timeline
@@ -715,7 +718,7 @@ def main():
     # Aggiorna meta
     # Conta i cleaners totali disponibili
     total_available_cleaners = len(cleaners)
-    
+
     # Conta i cleaners effettivamente usati (con almeno una task)
     used_cleaners = len([c for c in timeline_data["cleaners_assignments"] if len(c.get("tasks", [])) > 0])
 

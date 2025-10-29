@@ -567,15 +567,21 @@ def build_output(cleaners: List[Cleaner], unassigned: List[Task], original_tasks
                     "cleaning_time": t.cleaning_time,
                 }
 
+            start_time_str = fmt_hhmm(start)
+            end_time_str = fmt_hhmm(fin)
+
             # Mantieni TUTTI gli attributi originali + aggiungi campi timeline
             task_for_timeline = {
                 **original_task_data,  # Copia TUTTI i campi da containers.json
                 # Aggiungi/sovrascrivi campi specifici della timeline
-                "start_time": fmt_hhmm(start),
-                "end_time": fmt_hhmm(fin),
-                "followup": (overall_seq > 1),
-                "sequence": overall_seq,
+                "start_time": start_time_str,
+                "end_time": end_time_str,
+                "followup": idx > 0,
+                "sequence": idx + 1,
                 "travel_time": travel_time,
+                # Normalizza i campi straordinaria e premium per la timeline
+                "is_straordinaria": original_task_data.get("straordinaria", False) or original_task_data.get("is_straordinaria", False),
+                "premium": original_task_data.get("premium", False),
                 "reasons": [
                     *(original_task_data.get("reasons", [])),  # Mantieni reasons originali
                     "automatic_assignment_hp"  # Aggiungi reason timeline
@@ -715,7 +721,7 @@ def main():
                 new_hp_cleaner_ids = set(c["cleaner"]["id"] for c in output["high_priority_tasks_assigned"])
                 timeline_data["cleaners_assignments"] = [
                     c for c in existing.get("cleaners_assignments", [])
-                    if c["cleaner"]["id"] not in new_hp_cleaner_ids or 
+                    if c["cleaner"]["id"] not in new_hp_cleaner_ids or
                        not any(t.get("reasons") and "automatic_assignment_hp" in t.get("reasons", []) for t in c.get("tasks", []))
                 ]
         except:
@@ -743,7 +749,7 @@ def main():
     # Aggiorna meta
     # Conta i cleaners effettivamente usati (con almeno una task)
     used_cleaners = len([c for c in timeline_data["cleaners_assignments"] if len(c.get("tasks", [])) > 0])
-    
+
     timeline_data["meta"]["total_cleaners"] = len(cleaners)  # Tutti i cleaners disponibili
     timeline_data["meta"]["used_cleaners"] = used_cleaners  # Cleaners effettivamente usati
     timeline_data["meta"]["total_tasks"] = sum(
@@ -755,7 +761,7 @@ def main():
     # Scrivi il file timeline.json
     timeline_path.write_text(json.dumps(timeline_data, ensure_ascii=False, indent=2), encoding="utf-8")
 
-    hp_count = len([c for c in timeline_data["cleaners_assignments"] 
+    hp_count = len([c for c in timeline_data["cleaners_assignments"]
                    if any(t.get("reasons") and "automatic_assignment_hp" in t.get("reasons", []) for t in c.get("tasks", []))])
     print(f"✅ Aggiornato {timeline_path}")
     print(f"   - Cleaner con assegnazioni HP: {hp_count}")
