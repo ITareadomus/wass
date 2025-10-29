@@ -572,11 +572,14 @@ def main():
     if timeline_path.exists():
         try:
             existing = json.loads(timeline_path.read_text(encoding="utf-8"))
-            # Mantieni le assegnazioni esistenti non-EO
+            # Mantieni le assegnazioni esistenti non-EO (rimuovi quelle con task EO)
             if "cleaners_assignments" in existing:
+                # Crea un set di cleaner_id che avranno nuove assegnazioni EO
+                new_eo_cleaner_ids = set(c["cleaner"]["id"] for c in output["early_out_tasks_assigned"])
                 timeline_data["cleaners_assignments"] = [
                     c for c in existing.get("cleaners_assignments", [])
-                    if c.get("assignment_type") != "early_out"
+                    if c["cleaner"]["id"] not in new_eo_cleaner_ids or 
+                       not any(t.get("reasons") and "automatic_assignment_eo" in t.get("reasons", []) for t in c.get("tasks", []))
                 ]
         except:
             pass
@@ -585,7 +588,6 @@ def main():
     for cleaner_entry in output["early_out_tasks_assigned"]:
         timeline_data["cleaners_assignments"].append({
             "cleaner": cleaner_entry["cleaner"],
-            "assignment_type": "early_out",
             "tasks": cleaner_entry["tasks"]
         })
 
@@ -600,9 +602,13 @@ def main():
     # Scrivi il file aggiornato
     timeline_path.write_text(json.dumps(timeline_data, ensure_ascii=False, indent=2), encoding="utf-8")
 
-    eo_count = len([c for c in timeline_data["cleaners_assignments"] if c.get("assignment_type") == "early_out"])
-    hp_count = len([c for c in timeline_data["cleaners_assignments"] if c.get("assignment_type") == "high_priority"])
-    lp_count = len([c for c in timeline_data["cleaners_assignments"] if c.get("assignment_type") == "low_priority"])
+    # Conta i cleaner con task di ogni tipo basandosi sui reasons
+    eo_count = len([c for c in timeline_data["cleaners_assignments"] 
+                   if any(t.get("reasons") and "automatic_assignment_eo" in t.get("reasons", []) for t in c.get("tasks", []))])
+    hp_count = len([c for c in timeline_data["cleaners_assignments"] 
+                   if any(t.get("reasons") and "automatic_assignment_hp" in t.get("reasons", []) for t in c.get("tasks", []))])
+    lp_count = len([c for c in timeline_data["cleaners_assignments"] 
+                   if any(t.get("reasons") and "automatic_assignment_lp" in t.get("reasons", []) for t in c.get("tasks", []))])
 
     print(f"✅ Timeline aggiornata: {timeline_path}")
     print(f"   - Cleaner con assegnazioni EO: {eo_count}")
