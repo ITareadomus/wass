@@ -10,25 +10,37 @@
       },
       "tasks": [
         {
-          "task_id": "217964",
-          "logistic_code": "1644",
-          "lat": 45.454344,
-          "lng": 9.1798238,
-          "cleaning_time": 60,
-          "is_premium": false,
-          "apt_type": "A",
+          "task_id": 217964,
+          "logistic_code": 1644,
+          "client_id": 87,
+          "premium": false,
           "address": "Via Scaldasole, 6",
-          "alias": "HACCA",
+          "lat": "45.454344",
+          "lng": "9.1798238",
+          "cleaning_time": 60,
+          "checkin_date": "2025-10-29",
+          "checkout_date": "2025-10-29",
+          "checkin_time": null,
+          "checkout_time": null,
+          "pax_in": 1,
+          "pax_out": 4,
           "small_equipment": true,
+          "operation_id": 2,
+          "confirmed_operation": true,
           "straordinaria": false,
+          "type_apt": "A",
+          "alias": "HACCA",
+          "customer_name": "HACCA SRL",
+          "reasons": [
+            "client_forced_eo",
+            "automatic_assignment_eo"
+          ],
+          "priority": "early_out",
           "start_time": "10:00",
           "end_time": "11:00",
           "followup": false,
           "sequence": 1,
-          "travel_time": 0,
-          "reasons": [
-            "automatic_assignment_eo"
-          ]
+          "travel_time": 0
         }
       ]
     },
@@ -42,25 +54,37 @@
       },
       "tasks": [
         {
-          "task_id": "217962",
-          "logistic_code": "1643",
-          "lat": 45.47048,
-          "lng": 9.2052883,
-          "cleaning_time": 180,
-          "is_premium": true,
-          "apt_type": "E",
+          "task_id": 217962,
+          "logistic_code": 1643,
+          "client_id": 87,
+          "premium": true,
           "address": "Viale Majno 23",
-          "alias": "HACCA",
+          "lat": "45.47048",
+          "lng": "9.2052883",
+          "cleaning_time": 180,
+          "checkin_date": "2025-10-29",
+          "checkout_date": "2025-10-29",
+          "checkin_time": "15:00",
+          "checkout_time": null,
+          "pax_in": 4,
+          "pax_out": 5,
           "small_equipment": false,
+          "operation_id": 2,
+          "confirmed_operation": true,
           "straordinaria": false,
+          "type_apt": "E",
+          "alias": "HACCA",
+          "customer_name": "HACCA SRL",
+          "reasons": [
+            "client_forced_eo",
+            "automatic_assignment_eo"
+          ],
+          "priority": "early_out",
           "start_time": "10:00",
           "end_time": "13:00",
           "followup": false,
           "sequence": 1,
-          "travel_time": 0,
-          "reasons": [
-            "automatic_assignment_eo"
-          ]
+          "travel_time": 0
         }
       ]
     },
@@ -74,25 +98,37 @@
       },
       "tasks": [
         {
-          "task_id": "217965",
-          "logistic_code": "1650",
-          "lat": 45.449398,
-          "lng": 9.196514,
-          "cleaning_time": 120,
-          "is_premium": false,
-          "apt_type": "C",
+          "task_id": 217965,
+          "logistic_code": 1650,
+          "client_id": 87,
+          "premium": false,
           "address": "VIA VIGNOLA 4",
-          "alias": "HACCA",
+          "lat": "45.449398",
+          "lng": "9.196514",
+          "cleaning_time": 120,
+          "checkin_date": "2025-10-29",
+          "checkout_date": "2025-10-29",
+          "checkin_time": "19:00",
+          "checkout_time": null,
+          "pax_in": 1,
+          "pax_out": 2,
           "small_equipment": false,
+          "operation_id": 2,
+          "confirmed_operation": true,
           "straordinaria": false,
+          "type_apt": "C",
+          "alias": "HACCA",
+          "customer_name": "HACCA SRL",
+          "reasons": [
+            "client_forced_eo",
+            "automatic_assignment_eo"
+          ],
+          "priority": "early_out",
           "start_time": "10:00",
           "end_time": "12:00",
           "followup": false,
           "sequence": 1,
-          "travel_time": 0,
-          "reasons": [
-            "automatic_assignment_eo"
-          ]
+          "travel_time": 0
         }
       ]
     },
@@ -106,25 +142,37 @@
       },
       "tasks": [
         {
-          "task_id": "217963",
-          "logistic_code": "1641",
-          "lat": 45.4725608,
-          "lng": 9.1933648,
-          "cleaning_time": 120,
-          "is_premium": true,
-          "apt_type": "C",
+          "task_id": 217963,
+          "logistic_code": 1641,
+          "client_id": 87,
+          "premium": true,
           "address": "VIA DELL'ANNUNCIATA 10",
-          "alias": "HACCA",
+          "lat": "45.4725608",
+          "lng": "9.1933648",
+          "cleaning_time": 120,
+          "checkin_date": "2025-10-29",
+          "checkout_date": "2025-10-29",
+          "checkin_time": "15:00",
+          "checkout_time": null,
+          "pax_in": 3,
+          "pax_out": 3,
           "small_equipment": false,
+          "operation_id": 2,
+          "confirmed_operation": true,
           "straordinaria": false,
+          "type_apt": "C",
+          "alias": "HACCA",
+          "customer_name": "HACCA SRL",
+          "reasons": [
+            "client_forced_eo",
+            "automatic_assignment_eo"
+          ],
+          "priority": "early_out",
           "start_time": "10:00",
           "end_time": "12:00",
           "followup": false,
           "sequence": 1,
-          "travel_time": 0,
-          "reasons": [
-            "automatic_assignment_eo"
-          ]
+          "travel_time": 0
         }
       ]
     },
@@ -138,25 +186,37 @@
       },
       "tasks": [
         {
-          "task_id": "217969",
-          "logistic_code": "609",
-          "lat": 45.494052,
-          "lng": 9.186503,
-          "cleaning_time": 60,
-          "is_premium": false,
-          "apt_type": "A",
+          "task_id": 217969,
+          "logistic_code": 609,
+          "client_id": 61,
+          "premium": false,
           "address": "VIALE STELVIO 53",
-          "alias": "NTM",
+          "lat": "45.494052",
+          "lng": "9.186503",
+          "cleaning_time": 60,
+          "checkin_date": "2025-10-29",
+          "checkout_date": "2025-10-29",
+          "checkin_time": null,
+          "checkout_time": null,
+          "pax_in": 1,
+          "pax_out": 1,
           "small_equipment": true,
+          "operation_id": 2,
+          "confirmed_operation": true,
           "straordinaria": false,
+          "type_apt": "A",
+          "alias": "NTM",
+          "customer_name": "NOTA-MI",
+          "reasons": [
+            "client_forced_eo",
+            "automatic_assignment_eo"
+          ],
+          "priority": "early_out",
           "start_time": "10:00",
           "end_time": "11:00",
           "followup": false,
           "sequence": 1,
-          "travel_time": 0,
-          "reasons": [
-            "automatic_assignment_eo"
-          ]
+          "travel_time": 0
         }
       ]
     },
@@ -170,25 +230,37 @@
       },
       "tasks": [
         {
-          "task_id": "217973",
-          "logistic_code": "1620",
-          "lat": 45.488597,
-          "lng": 9.1889226,
-          "cleaning_time": 90,
-          "is_premium": false,
-          "apt_type": "B",
+          "task_id": 217973,
+          "logistic_code": 1620,
+          "client_id": 61,
+          "premium": false,
           "address": "Via Pietro Borsieri, 29,",
-          "alias": "NTM",
+          "lat": "45.488597",
+          "lng": "9.1889226",
+          "cleaning_time": 90,
+          "checkin_date": "2025-10-31",
+          "checkout_date": "2025-10-29",
+          "checkin_time": null,
+          "checkout_time": null,
+          "pax_in": 2,
+          "pax_out": 2,
           "small_equipment": false,
+          "operation_id": 2,
+          "confirmed_operation": true,
           "straordinaria": false,
+          "type_apt": "B",
+          "alias": "NTM",
+          "customer_name": "NOTA-MI",
+          "reasons": [
+            "client_forced_eo",
+            "automatic_assignment_eo"
+          ],
+          "priority": "early_out",
           "start_time": "10:00",
           "end_time": "11:30",
           "followup": false,
           "sequence": 1,
-          "travel_time": 0,
-          "reasons": [
-            "automatic_assignment_eo"
-          ]
+          "travel_time": 0
         }
       ]
     },
@@ -202,25 +274,37 @@
       },
       "tasks": [
         {
-          "task_id": "217966",
-          "logistic_code": "1647",
-          "lat": 45.472932,
-          "lng": 9.2062841,
-          "cleaning_time": 180,
-          "is_premium": true,
-          "apt_type": "E",
+          "task_id": 217966,
+          "logistic_code": 1647,
+          "client_id": 87,
+          "premium": true,
           "address": "Viale Piave 35",
-          "alias": "HACCA",
+          "lat": "45.472932",
+          "lng": "9.2062841",
+          "cleaning_time": 180,
+          "checkin_date": "2025-11-01",
+          "checkout_date": "2025-10-29",
+          "checkin_time": "19:00",
+          "checkout_time": null,
+          "pax_in": 5,
+          "pax_out": 4,
           "small_equipment": false,
+          "operation_id": 2,
+          "confirmed_operation": true,
           "straordinaria": false,
+          "type_apt": "E",
+          "alias": "HACCA",
+          "customer_name": "HACCA SRL",
+          "reasons": [
+            "client_forced_eo",
+            "automatic_assignment_eo"
+          ],
+          "priority": "early_out",
           "start_time": "10:00",
           "end_time": "13:00",
           "followup": false,
           "sequence": 1,
-          "travel_time": 0,
-          "reasons": [
-            "automatic_assignment_eo"
-          ]
+          "travel_time": 0
         }
       ]
     },
@@ -234,25 +318,37 @@
       },
       "tasks": [
         {
-          "task_id": "217967",
-          "logistic_code": "1649",
-          "lat": 45.4822754,
-          "lng": 9.1688625,
-          "cleaning_time": 120,
-          "is_premium": true,
-          "apt_type": "C",
+          "task_id": 217967,
+          "logistic_code": 1649,
+          "client_id": 87,
+          "premium": true,
           "address": "PIAZZA GRAMSCI 10",
-          "alias": "HACCA",
+          "lat": "45.4822754",
+          "lng": "9.1688625",
+          "cleaning_time": 120,
+          "checkin_date": "2025-11-04",
+          "checkout_date": "2025-10-29",
+          "checkin_time": null,
+          "checkout_time": null,
+          "pax_in": 4,
+          "pax_out": 4,
           "small_equipment": false,
+          "operation_id": 2,
+          "confirmed_operation": true,
           "straordinaria": false,
+          "type_apt": "C",
+          "alias": "HACCA",
+          "customer_name": "HACCA SRL",
+          "reasons": [
+            "client_forced_eo",
+            "automatic_assignment_eo"
+          ],
+          "priority": "early_out",
           "start_time": "10:00",
           "end_time": "12:00",
           "followup": false,
           "sequence": 1,
-          "travel_time": 0,
-          "reasons": [
-            "automatic_assignment_eo"
-          ]
+          "travel_time": 0
         }
       ]
     },
@@ -266,25 +362,37 @@
       },
       "tasks": [
         {
-          "task_id": "217980",
-          "logistic_code": "624",
-          "lat": 45.4583211,
-          "lng": 9.206311,
-          "cleaning_time": 60,
-          "is_premium": false,
-          "apt_type": "A",
+          "task_id": 217980,
+          "logistic_code": 624,
+          "client_id": 61,
+          "premium": false,
           "address": "VIALE MONTENERO 50",
-          "alias": "NTM",
+          "lat": "45.4583211",
+          "lng": "9.206311",
+          "cleaning_time": 60,
+          "checkin_date": "2025-10-30",
+          "checkout_date": "2025-10-29",
+          "checkin_time": "20:00",
+          "checkout_time": null,
+          "pax_in": 2,
+          "pax_out": 1,
           "small_equipment": true,
+          "operation_id": 2,
+          "confirmed_operation": true,
           "straordinaria": false,
+          "type_apt": "A",
+          "alias": "NTM",
+          "customer_name": "NOTA-MI",
+          "reasons": [
+            "client_forced_eo",
+            "automatic_assignment_eo"
+          ],
+          "priority": "early_out",
           "start_time": "10:00",
           "end_time": "11:00",
           "followup": false,
           "sequence": 1,
-          "travel_time": 0,
-          "reasons": [
-            "automatic_assignment_eo"
-          ]
+          "travel_time": 0
         }
       ]
     },
@@ -298,25 +406,37 @@
       },
       "tasks": [
         {
-          "task_id": "217981",
-          "logistic_code": "1135",
-          "lat": 45.4517049,
-          "lng": 9.1727477,
-          "cleaning_time": 60,
-          "is_premium": false,
-          "apt_type": "A",
+          "task_id": 217981,
+          "logistic_code": 1135,
+          "client_id": 61,
+          "premium": false,
           "address": "VIA CORSICO,  5",
-          "alias": "NTM",
+          "lat": "45.4517049",
+          "lng": "9.1727477",
+          "cleaning_time": 60,
+          "checkin_date": "2025-10-30",
+          "checkout_date": "2025-10-29",
+          "checkin_time": null,
+          "checkout_time": null,
+          "pax_in": 1,
+          "pax_out": 2,
           "small_equipment": true,
+          "operation_id": 2,
+          "confirmed_operation": true,
           "straordinaria": false,
+          "type_apt": "A",
+          "alias": "NTM",
+          "customer_name": "NOTA-MI",
+          "reasons": [
+            "client_forced_eo",
+            "automatic_assignment_eo"
+          ],
+          "priority": "early_out",
           "start_time": "10:00",
           "end_time": "11:00",
           "followup": false,
           "sequence": 1,
-          "travel_time": 0,
-          "reasons": [
-            "automatic_assignment_eo"
-          ]
+          "travel_time": 0
         }
       ]
     },
@@ -330,25 +450,37 @@
       },
       "tasks": [
         {
-          "task_id": "217982",
-          "logistic_code": "1487",
-          "lat": 45.4920654,
-          "lng": 9.1541396,
-          "cleaning_time": 60,
-          "is_premium": false,
-          "apt_type": "A",
+          "task_id": 217982,
+          "logistic_code": 1487,
+          "client_id": 61,
+          "premium": false,
           "address": "viale monteceneri 58",
-          "alias": "NTM",
+          "lat": "45.4920654",
+          "lng": "9.1541396",
+          "cleaning_time": 60,
+          "checkin_date": "2025-10-31",
+          "checkout_date": "2025-10-29",
+          "checkin_time": null,
+          "checkout_time": null,
+          "pax_in": 1,
+          "pax_out": 2,
           "small_equipment": true,
+          "operation_id": 2,
+          "confirmed_operation": true,
           "straordinaria": false,
+          "type_apt": "A",
+          "alias": "NTM",
+          "customer_name": "NOTA-MI",
+          "reasons": [
+            "client_forced_eo",
+            "automatic_assignment_eo"
+          ],
+          "priority": "early_out",
           "start_time": "10:00",
           "end_time": "11:00",
           "followup": false,
           "sequence": 1,
-          "travel_time": 0,
-          "reasons": [
-            "automatic_assignment_eo"
-          ]
+          "travel_time": 0
         }
       ]
     },
@@ -362,25 +494,37 @@
       },
       "tasks": [
         {
-          "task_id": "217983",
-          "logistic_code": "1631",
-          "lat": 45.4503469,
-          "lng": 9.136612,
-          "cleaning_time": 60,
-          "is_premium": false,
-          "apt_type": "A",
+          "task_id": 217983,
+          "logistic_code": 1631,
+          "client_id": 61,
+          "premium": false,
           "address": "VIA FIORDALISI 1",
-          "alias": "NTM",
+          "lat": "45.4503469",
+          "lng": "9.136612",
+          "cleaning_time": 60,
+          "checkin_date": "2025-11-02",
+          "checkout_date": "2025-10-29",
+          "checkin_time": null,
+          "checkout_time": null,
+          "pax_in": 1,
+          "pax_out": 1,
           "small_equipment": true,
+          "operation_id": 2,
+          "confirmed_operation": true,
           "straordinaria": false,
+          "type_apt": "A",
+          "alias": "NTM",
+          "customer_name": "NOTA-MI",
+          "reasons": [
+            "client_forced_eo",
+            "automatic_assignment_eo"
+          ],
+          "priority": "early_out",
           "start_time": "10:00",
           "end_time": "11:00",
           "followup": false,
           "sequence": 1,
-          "travel_time": 0,
-          "reasons": [
-            "automatic_assignment_eo"
-          ]
+          "travel_time": 0
         }
       ]
     },
@@ -394,25 +538,37 @@
       },
       "tasks": [
         {
-          "task_id": "218087",
-          "logistic_code": "619",
-          "lat": 45.4542397,
-          "lng": 9.1686792,
-          "cleaning_time": 40,
-          "is_premium": false,
-          "apt_type": "B",
+          "task_id": 218087,
+          "logistic_code": 619,
+          "client_id": 67,
+          "premium": false,
           "address": "VIA TORTONA, 10",
-          "alias": "EXPRDS",
+          "lat": "45.4542397",
+          "lng": "9.1686792",
+          "cleaning_time": 40,
+          "checkin_date": "2025-10-29",
+          "checkout_date": "2025-10-29",
+          "checkin_time": null,
+          "checkout_time": "09:30",
+          "pax_in": 1,
+          "pax_out": 0,
           "small_equipment": false,
+          "operation_id": 2,
+          "confirmed_operation": true,
           "straordinaria": false,
+          "type_apt": "B",
+          "alias": "EXPRDS",
+          "customer_name": "EXPERIENCE DESIGN BED & SHOW",
+          "reasons": [
+            "checkout_time<=eo_time",
+            "automatic_assignment_eo"
+          ],
+          "priority": "early_out",
           "start_time": "10:00",
           "end_time": "10:40",
           "followup": false,
           "sequence": 1,
-          "travel_time": 0,
-          "reasons": [
-            "automatic_assignment_eo"
-          ]
+          "travel_time": 0
         }
       ]
     },
@@ -426,25 +582,37 @@
       },
       "tasks": [
         {
-          "task_id": "218089",
-          "logistic_code": "618",
-          "lat": 45.454632,
-          "lng": 9.168536,
-          "cleaning_time": 30,
-          "is_premium": false,
-          "apt_type": "A",
+          "task_id": 218089,
+          "logistic_code": 618,
+          "client_id": 67,
+          "premium": false,
           "address": "VIA VOGHERA, 4",
-          "alias": "EXPRDS",
+          "lat": "45.454632",
+          "lng": "9.168536",
+          "cleaning_time": 30,
+          "checkin_date": "2025-10-29",
+          "checkout_date": "2025-10-29",
+          "checkin_time": null,
+          "checkout_time": "09:30",
+          "pax_in": 1,
+          "pax_out": 0,
           "small_equipment": true,
+          "operation_id": 2,
+          "confirmed_operation": true,
           "straordinaria": false,
+          "type_apt": "A",
+          "alias": "EXPRDS",
+          "customer_name": "EXPERIENCE DESIGN BED & SHOW",
+          "reasons": [
+            "checkout_time<=eo_time",
+            "automatic_assignment_eo"
+          ],
+          "priority": "early_out",
           "start_time": "10:00",
           "end_time": "10:30",
           "followup": false,
           "sequence": 1,
-          "travel_time": 0,
-          "reasons": [
-            "automatic_assignment_eo"
-          ]
+          "travel_time": 0
         }
       ]
     },
@@ -458,25 +626,38 @@
       },
       "tasks": [
         {
-          "task_id": "218128",
-          "logistic_code": "1646",
-          "lat": 45.465877,
-          "lng": 9.1667974,
-          "cleaning_time": 60,
-          "is_premium": false,
-          "apt_type": "A",
+          "task_id": 218128,
+          "logistic_code": 1646,
+          "client_id": 87,
+          "premium": false,
           "address": "Via Matteo Bandello 4/1",
-          "alias": "HACCA",
+          "lat": "45.465877",
+          "lng": "9.1667974",
+          "cleaning_time": 60,
+          "checkin_date": "2025-10-29",
+          "checkout_date": "2025-10-29",
+          "checkin_time": "15:00",
+          "checkout_time": "08:00",
+          "pax_in": 2,
+          "pax_out": 0,
           "small_equipment": true,
+          "operation_id": 2,
+          "confirmed_operation": true,
           "straordinaria": false,
+          "type_apt": "A",
+          "alias": "HACCA",
+          "customer_name": "HACCA SRL",
+          "reasons": [
+            "checkout_time<=eo_time",
+            "client_forced_eo",
+            "automatic_assignment_eo"
+          ],
+          "priority": "early_out",
           "start_time": "10:00",
           "end_time": "11:00",
           "followup": false,
           "sequence": 1,
-          "travel_time": 0,
-          "reasons": [
-            "automatic_assignment_eo"
-          ]
+          "travel_time": 0
         }
       ]
     },
@@ -490,25 +671,38 @@
       },
       "tasks": [
         {
-          "task_id": "218135",
-          "logistic_code": "1646",
-          "lat": 45.465877,
-          "lng": 9.1667974,
-          "cleaning_time": 60,
-          "is_premium": false,
-          "apt_type": "A",
+          "task_id": 218128,
+          "logistic_code": 1646,
+          "client_id": 87,
+          "premium": false,
           "address": "Via Matteo Bandello 4/1",
-          "alias": "HACCA",
+          "lat": "45.465877",
+          "lng": "9.1667974",
+          "cleaning_time": 60,
+          "checkin_date": "2025-10-29",
+          "checkout_date": "2025-10-29",
+          "checkin_time": "15:00",
+          "checkout_time": "08:00",
+          "pax_in": 2,
+          "pax_out": 0,
           "small_equipment": true,
+          "operation_id": 2,
+          "confirmed_operation": true,
           "straordinaria": false,
+          "type_apt": "A",
+          "alias": "HACCA",
+          "customer_name": "HACCA SRL",
+          "reasons": [
+            "checkout_time<=eo_time",
+            "client_forced_eo",
+            "automatic_assignment_eo"
+          ],
+          "priority": "early_out",
           "start_time": "10:00",
           "end_time": "11:00",
           "followup": false,
           "sequence": 1,
-          "travel_time": 0,
-          "reasons": [
-            "automatic_assignment_eo"
-          ]
+          "travel_time": 0
         }
       ]
     }
