@@ -211,7 +211,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           // Fallback to default cleaner info if file is missing
           cleanersData = { cleaners: [] };
         }
-        
+
         const cleanerInfo = cleanersData.cleaners.find((c: any) => c.id === normalizedCleanerId);
 
         cleanerEntry = {
@@ -300,7 +300,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               containersData.summary[sourceContainerType] = newCount;
               containersData.summary.total_tasks = (containersData.summary.total_tasks || 0) - (originalCount - newCount);
             }
-            
+
             // Salva containers.json aggiornato
             await fs.writeFile(containersPath, JSON.stringify(containersData, null, 2));
             console.log(`✅ Containers.json aggiornato, task rimossa da ${sourceContainerType}`);
@@ -591,7 +591,71 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return;
       }
 
-      // CASO 2: Spostamento DA containers A timeline (già gestito da save-timeline-assignment)
+      // CASO 2: Spostamento DA containers A timeline
+      if (destContainer.startsWith('timeline-')) {
+        const cleanerId = Number(destContainer.split('-')[1]);
+
+        // Cerca la task in containers e rimuovila
+        for (const [containerType, container] of Object.entries(containersData.containers || {})) {
+          const taskIndex = (container as any).tasks?.findIndex((t: any) => 
+            String(t.task_id) === String(taskId) || String(t.logistic_code) === String(logisticCode)
+          );
+          if (taskIndex !== -1) {
+            taskToMove = (container as any).tasks[taskIndex];
+            sourceContainerType = containerType; // Track where it came from
+            (container as any).tasks.splice(taskIndex, 1);
+            (container as any).count = (container as any).tasks.length;
+            break;
+          }
+        }
+
+        if (!taskToMove) {
+          return res.status(404).json({ error: 'Task non trovata nei containers.' });
+        }
+
+        // Aggiungi la task alla timeline del cleaner
+        let cleanerEntry = timelineData.cleaners_assignments.find((c: any) => c.cleaner.id === cleanerId);
+        if (!cleanerEntry) {
+          // Se il cleaner non esiste, cercalo in selected_cleaners.json
+          const cleanersPath = path.join(process.cwd(), 'client/public/data/cleaners/selected_cleaners.json');
+          const cleanersData = JSON.parse(await fs.readFile(cleanersPath, 'utf8'));
+          const cleaner = cleanersData.cleaners.find((c: any) => c.id === cleanerId);
+          if (!cleaner) {
+            return res.status(404).json({ error: 'Cleaner non trovato.' });
+          }
+          cleanerEntry = {
+            cleaner: {
+              id: cleaner.id,
+              name: cleaner.name,
+              lastname: cleaner.lastname,
+              role: cleaner.role,
+              premium: cleaner.premium
+            },
+            tasks: []
+          };
+          timelineData.cleaners_assignments.push(cleanerEntry);
+        }
+
+        // Trova la sequenza corretta
+        const maxSequence = cleanerEntry.tasks.reduce((max: number, t: any) => Math.max(max, t.sequence || 0), 0);
+        const newSequence = maxSequence + 1;
+
+        // Costruisci la task per la timeline mantenendo TUTTI i campi originali (incluso confirmed_operation)
+        const task_for_timeline = {
+          ...taskToMove, // Mantiene TUTTI i campi originali, incluso confirmed_operation
+          sequence: newSequence,
+          followup: newSequence > 1,
+          travel_time: 0,
+          start_time: taskToMove.start_time || "10:00",
+          end_time: taskToMove.end_time || "11:00",
+          reasons: [
+            ...(taskToMove.reasons || []),
+            "manual_assignment"
+          ]
+        };
+
+        cleanerEntry.tasks.push(task_for_timeline);
+      }
       // CASO 3: Spostamento TRA containers
       if (sourceContainer && containersData.containers[sourceContainer]) {
         sourceContainerType = sourceContainer; // Mark that the task originates from a container
