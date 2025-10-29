@@ -33,6 +33,17 @@ export default function TaskCard({
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [assignmentTimes, setAssignmentTimes] = useState<{ start_time?: string; end_time?: string; travel_time?: number }>({});
 
+  // Normalizza confirmed_operation da boolean/number/string a boolean sicuro
+  const rawConfirmed = (task as any).confirmed_operation;
+  const isConfirmedOperation =
+    typeof rawConfirmed === "boolean"
+      ? rawConfirmed
+      : typeof rawConfirmed === "number"
+        ? rawConfirmed !== 0
+        : typeof rawConfirmed === "string"
+          ? ["true", "1", "yes"].includes(rawConfirmed.toLowerCase().trim())
+          : Boolean(rawConfirmed);
+
   useEffect(() => {
     const loadAssignmentTimes = async () => {
       try {
@@ -184,7 +195,7 @@ export default function TaskCard({
                 }
               }}
             >
-            {task.confirmed_operation === false && (
+            {!isConfirmedOperation && (
               <div className="absolute top-0.5 right-0.5 z-50">
                 <HelpCircle
                   className="w-3 h-3 text-gray-900"
@@ -351,9 +362,7 @@ export default function TaskCard({
                   Tipologia intervento
                 </p>
                 <p className="text-sm">
-                  {(task as any).confirmed_operation === false
-                    ? "non migrato"
-                    : (task as any).operation_id}
+                  {!isConfirmedOperation ? "non migrato" : (task as any).operation_id ?? "-"}
                 </p>
               </div>
             </div>
