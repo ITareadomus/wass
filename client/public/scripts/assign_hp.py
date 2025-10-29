@@ -400,20 +400,42 @@ def load_cleaners(ref_date: str) -> List[Cleaner]:
 
 
 def seed_cleaners_from_eo(cleaners: List[Cleaner], ref_date: str):
-    if not INPUT_EO_ASSIGN.exists():
-        return
-    data = json.loads(INPUT_EO_ASSIGN.read_text(encoding="utf-8"))
-    for block in data.get("early_out_tasks_assigned", []):
+    # Leggi dalla timeline.json invece che da early_out_assignments.json
+    timeline_path = OUTPUT_ASSIGN.parent / "timeline.json"
+    if not timeline_path.exists():
+        # Fallback: prova con il file EO assignments
+        if not INPUT_EO_ASSIGN.exists():
+            return
+        data = json.loads(INPUT_EO_ASSIGN.read_text(encoding="utf-8"))
+        blocks = data.get("early_out_tasks_assigned", [])
+    else:
+        # Leggi dalla timeline.json
+        timeline_data = json.loads(timeline_path.read_text(encoding="utf-8"))
+        blocks = timeline_data.get("cleaners_assignments", [])
+    
+    for block in blocks:
         cid = int(block["cleaner"]["id"])
         tasks = block.get("tasks", [])
         if not tasks:
             continue
-        last = tasks[-1]
+        
+        # Filtra solo task EO (con priority="early_out" o reasons che include "automatic_assignment_eo")
+        eo_tasks = [t for t in tasks if 
+                    t.get("priority") == "early_out" or 
+                    ("automatic_assignment_eo" in t.get("reasons", []))]
+        
+        if not eo_tasks:
+            continue
+            
+        # Ordina per end_time per trovare l'ultima
+        eo_tasks.sort(key=lambda t: t.get("end_time", "00:00"))
+        last = eo_tasks[-1]
+        
         end_time = last.get("end_time")  # "HH:MM"
         last_addr = last.get("address")
         last_lat = last.get("lat")
         last_lng = last.get("lng")
-        last_seq = last.get("sequence") or len(tasks)
+        last_seq = last.get("sequence") or len(eo_tasks)
         for cl in cleaners:
             if cl.id == cid:
                 cl.available_from = hhmm_to_dt(ref_date, end_time)
@@ -738,6 +760,8 @@ def main():
         if existing_entry:
             # Aggiungi le task HP alle task esistenti
             existing_entry["tasks"].extend(cleaner_entry["tasks"])
+            # Ordina le task per orario di inizio (start_time)
+            existing_entry["tasks"].sort(key=lambda t: t.get("start_time", "00:00"))
         else:
             # Crea nuova entry
             timeline_data["cleaners_assignments"].append({
