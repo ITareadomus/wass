@@ -1,0 +1,240 @@
+1) Server – passa la stessa data agli script
+
+In server/routes.ts (o file equivalente delle API), per tutti e 3 gli endpoint (/assign/eo, /assign/hp, /assign/lp) fai queste modifiche:
+
+Leggi date dal body (o query, se preferisci), validala in formato YYYY-MM-DD
+
+Passala come argomento allo script Python (niente default “ieri”, niente toISOString() lato server)
+
+// server/routes.ts
+import { Router } from "express";
+import { spawn } from "child_process";
+import path from "path";
+
+const router = Router();
+
+function assertYmd(date: string): asserts date is string {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    throw new Error("Invalid date format, expected YYYY-MM-DD");
+  }
+}
+
+function runPy(script: string, date: string) {
+  const scriptPath = path.join(process.cwd(), "scripts", script);
+  return spawn("python", [scriptPath, date], { cwd: process.cwd() });
+}
+
+router.post("/assign/eo", async (req, res) => {
+  try {
+    const date = (req.body?.date ?? req.query?.date) as string;
+    assertYmd(date);
+    const p = runPy("assign_eo.py", date);
+
+    p.stdout.on("data", (d) => process.stdout.write(`[EO ${date}] ${d}`));
+    p.stderr.on("data", (d) => process.stderr.write(`[EO ${date}] ${d}`));
+    p.on("close", (code) => res.status(code === 0 ? 200 : 500).json({ ok: code === 0 }));
+
+  } catch (e: any) {
+    res.status(400).json({ ok: false, error: String(e.message ?? e) });
+  }
+});
+
+router.post("/assign/hp", async (req, res) => {
+  try {
+    const date = (req.body?.date ?? req.query?.date) as string;
+    assertYmd(date);
+    const p = runPy("assign_hp.py", date);
+
+    p.stdout.on("data", (d) => process.stdout.write(`[HP ${date}] ${d}`));
+    p.stderr.on("data", (d) => process.stderr.write(`[HP ${date}] ${d}`));
+    p.on("close", (code) => res.status(code === 0 ? 200 : 500).json({ ok: code === 0 }));
+
+  } catch (e: any) {
+    res.status(400).json({ ok: false, error: String(e.message ?? e) });
+  }
+});
+
+router.post("/assign/lp", async (req, res) => {
+  try {
+    const date = (req.body?.date ?? req.query?.date) as string;
+    assertYmd(date);
+    const p = runPy("assign_lp.py", date);
+
+    p.stdout.on("data", (d) => process.stdout.write(`[LP ${date}] ${d}`));
+    p.stderr.on("data", (d) => process.stderr.write(`[LP ${date}] ${d}`));
+    p.on("close", (code) => res.status(code === 0 ? 200 : 500).json({ ok: code === 0 }));
+
+  } catch (e: any) {
+    res.status(400).json({ ok: false, error: String(e.message ?? e) });
+  }
+});
+
+export default router;
+
+
+Nota: niente più offset (-1 giorno) o calcoli timezone lato server. La route riceve una YYYY-MM-DD e la passa tale e quale allo script.
+
+2) Frontend – invia selectedDate in Europe/Rome formattato YYYY-MM-DD
+
+Nel punto in cui richiami gli endpoint (EO/HP/LP), non usare toISOString().slice(0,10) (crea shift in UTC). Usa date-fns-tz o date-fns con timezone.
+
+// frontend (es. containers/timeline actions)
+import { formatInTimeZone } from "date-fns-tz";
+
+const dateStr = formatInTimeZone(selectedDate, "Europe/Rome", "yyyy-MM-dd");
+
+// EO
+await fetch("/api/assign/eo", {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ date: dateStr }),
+});
+
+// HP
+await fetch("/api/assign/hp", {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ date: dateStr }),
+});
+
+// LP
+await fetch("/api/assign/lp", {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ date: dateStr }),
+});
+
+
+Se non usi date-fns-tz, almeno usa Intl.DateTimeFormat('it-IT', { timeZone: 'Europe/Rome' }) per costruire YYYY-MM-DD corretta in locale.
+
+3) Script Python – usa sempre la data ricevuta per estrarre e scrivere
+
+In tutti e 3 gli script (assign_eo.py, assign_hp.py, assign_lp.py):
+
+Leggi la data dal primo argomento.
+
+Filtra i task del container per quella data (se i tuoi JSON hanno il campo date).
+
+Scrivi in timeline.json includendo la stessa data sui task (campo date) così la UI può filtrare.
+
+Patch (uguale per tutti, cambia solo extract_*)
+# all'inizio degli script
+import os
+import sys
+from datetime import datetime
+# ...
+def get_run_date() -> str:
+    # 1° argomento CLI prevale, altrimenti RUN_DATE env, altrimenti today (Europe/Rome se vuoi)
+    if len(sys.argv) > 1 and sys.argv[1]:
+        d = sys.argv[1]
+    else:
+        d = os.getenv("RUN_DATE", datetime.now().strftime("%Y-%m-%d"))
+    # validazione semplice
+    assert len(d) == 10 and d[4] == "-" and d[7] == "-", f"Invalid date: {d}"
+    return d
+
+RUN_DATE = get_run_date()
+print(f"▶ Running {__file__} for date: {RUN_DATE}")
+
+Esempio per assign_eo.py (stessa logica per HP/LP)
+
+1) Filtra per data in estrazione:
+
+def extract_early_out(containers: Dict[str, Any], run_date: str) -> List[Task]:
+    eo = containers.get("early_out", [])
+    tasks: List[Task] = []
+    for t in eo:
+        # se esiste t["date"], filtra; altrimenti togli il check
+        if t.get("date") and str(t["date"]) != run_date:
+            continue
+        tasks.append(Task(
+            id=str(t["id"]),
+            address=t["address"],
+            coords=tuple(t["coords"]),
+            duration_min=int(t["duration_min"]),
+            window_start=t["window_start"],
+            window_end=t["window_end"],
+            premium=bool(t.get("premium", False)),
+            straordinaria=bool(t.get("straordinaria", False)),
+            operation_id=str(t.get("operation_id")) if t.get("operation_id") is not None else None,
+            confirmed_operation=bool(t.get("confirmed_operation")) if t.get("confirmed_operation") is not None else None,
+            meta=t
+        ))
+    return tasks
+
+
+2) In write_timeline(...) aggiungi la data ai task scritti:
+
+def write_timeline(path: Path, assignments: List[Tuple[Cleaner, Task]], run_date: str) -> None:
+    data = read_timeline(path)
+    for cleaner, task in assignments:
+        cid = cleaner.id
+        if cid not in data["cleaners"]:
+            data["cleaners"][cid] = {"name": cleaner.name, "tasks": []}
+        data["cleaners"][cid]["tasks"].append({
+            "id": task.id,
+            "date": run_date,  # <— aggiungi SEMPRE la data
+            "address": task.address,
+            "coords": task.coords,
+            "duration_min": task.duration_min,
+            "window_start": task.window_start,
+            "window_end": task.window_end,
+            "premium": task.premium,
+            "straordinaria": task.straordinaria,
+            "operation_id": task.operation_id,
+            "confirmed_operation": task.confirmed_operation,
+        })
+        data["summary"]["total_tasks"] = data["summary"].get("total_tasks", 0) + 1
+    path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
+3) Nel main() passa RUN_DATE ovunque:
+
+def main():
+    containers_data = load_containers()
+    cleaners_objs = load_cleaners()
+
+    tasks = extract_early_out(containers_data, RUN_DATE)  # <—
+    cleaners = build_cleaners(cleaners_objs)
+
+    assigned = []
+    for task in tasks:
+        c = best_cleaner(cleaners, task)
+        if c:
+            c.route.append(task)
+            assigned.append((c, task))
+
+    # (keep) report disabilitato …
+    OUTPUT_ASSIGN.parent.mkdir(parents=True, exist_ok=True)
+
+    timeline_path = OUTPUT_ASSIGN.parent / "timeline.json"
+    write_timeline(timeline_path, assigned, RUN_DATE)  # <—
+
+    # pulizia containers solo dei task di quella data
+    assigned_ids = {t.id for _, t in assigned}
+    containers = containers_data
+    containers["early_out"] = [
+        t for t in containers.get("early_out", [])
+        if not (str(t["id"]) in assigned_ids and (t.get("date") in (None, RUN_DATE) or str(t.get("date")) == RUN_DATE))
+    ]
+    containers["summary"]["total_tasks"] = (
+        containers["summary"].get("total_tasks", 0) - len(assigned_ids)
+    )
+    INPUT_CONTAINERS.write_text(json.dumps(containers, ensure_ascii=False, indent=2), encoding="utf-8")
+
+    print(f"✅ EO {RUN_DATE}: assegnate {len(assigned)} task. Timeline aggiornata: {timeline_path}")
+
+
+Ripeti identico per assign_hp.py e assign_lp.py: passa RUN_DATE a extract_hp/extract_lp e write_timeline.
+
+Checklist finale
+
+ Server: gli endpoint passano esattamente la YYYY-MM-DD ricevuta → spawn("python", ["assign_*.py", date]).
+
+ Frontend: selectedDate → formatInTimeZone(..., "Europe/Rome", "yyyy-MM-dd") per tutti gli endpoint.
+
+ Python: RUN_DATE letto dall’argomento; usato sia per filtrare i task sia per scrivere i task in timeline.json (campo date).
+
+ Log coerenti: “Running … for date: 2025-10-30”, “EO/HP/LP 2025-10-30: assegnate …”.
+
+Così elimini il mismatch 29/30 e la pagina della timeline per 2025-10-30 trova le assegnazioni giuste.
