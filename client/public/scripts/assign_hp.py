@@ -22,6 +22,7 @@ OUTPUT_ASSIGN = BASE / "output" / "high_priority_assignments.json"
 # =============================
 MAX_TASKS_PER_CLEANER = 2  # Massimo 2 task
 THIRD_TASK_MAX_TRAVEL = 10.0  # 3ª task solo se entro 10' dalla 2ª
+CLUSTER_MAX_TRAVEL = 5.0  # Se task <= 5' da qualsiasi altra, ignora limite di task
 
 PREFERRED_TRAVEL = 15.0  # Preferenza per percorsi < 15'
 
@@ -283,9 +284,22 @@ def can_add_task(cleaner: Cleaner, task: Task) -> bool:
         if task.straordinaria:
             return False
 
-    # Max 2 task (3ª solo se entro 10')
+    # Max 2 task, MA: se task <= 5' da qualsiasi altra, ignora limite
     if len(cleaner.route) >= MAX_TASKS_PER_CLEANER:
-        # Può aggiungere una 3ª task solo se il viaggio è ≤ 10'
+        # Controlla se la task è <= 5' da qualsiasi task esistente
+        is_within_cluster = any(
+            travel_minutes(existing_task.lat, existing_task.lng, task.lat, task.lng,
+                         existing_task.address, task.address) <= CLUSTER_MAX_TRAVEL or
+            travel_minutes(task.lat, task.lng, existing_task.lat, existing_task.lng,
+                         task.address, existing_task.address) <= CLUSTER_MAX_TRAVEL
+            for existing_task in cleaner.route
+        )
+        
+        if is_within_cluster:
+            # Task in cluster: ignora limite di task
+            return True
+        
+        # Altrimenti: regola normale (3ª solo se entro 10')
         if len(cleaner.route) == 2:
             last_task = cleaner.route[-1]
             tt = travel_minutes(last_task.lat, last_task.lng, task.lat, task.lng,
