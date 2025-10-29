@@ -345,7 +345,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       let removedCount = 0;
-      const initialTaskCount = assignmentsData.cleaners_assignments.reduce((sum, cleaner) => sum + (cleaner.tasks?.length || 0), 0);
+      const initialTaskCount = assignmentsData.cleaners_assignments.reduce((sum: number, cleaner: any) => sum + (cleaner.tasks?.length || 0), 0);
 
       // Rimuovi l'assegnazione per questo task da tutti i cleaner
       assignmentsData.cleaners_assignments = assignmentsData.cleaners_assignments.map((cleanerEntry: any) => {
@@ -1199,7 +1199,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const assignedDir = path.join(process.cwd(), 'client/public/data/assigned');
 
       // Carica timeline per questa data specifica
-      let timelineData: any = { assignments: [], current_date: date };
+      let timelineData: any = { 
+        metadata: { last_updated: new Date().toISOString(), date },
+        cleaners_assignments: [],
+        meta: { total_cleaners: 0, used_cleaners: 0, assigned_tasks: 0 }
+      };
       let loadedFrom = 'new';
 
       try {
@@ -1208,12 +1212,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         timelineData = JSON.parse(existingData);
 
         // Se il file esiste ma è vuoto o per un'altra data, prova a caricare da assigned
-        if (!timelineData.assignments || timelineData.assignments.length === 0 || timelineData.current_date !== date) {
+        if (!timelineData.cleaners_assignments || timelineData.cleaners_assignments.length === 0 || 
+            (timelineData.metadata && timelineData.metadata.date !== date)) {
           console.log(`Timeline per ${date} è vuota o per altra data, cercando in assigned...`);
           throw new Error('No assignments in timeline file');
         }
 
-        console.log(`Caricato timeline per ${date} con ${timelineData.assignments.length} assegnazioni`);
+        console.log(`Caricato timeline per ${date} con ${timelineData.cleaners_assignments.length} assegnazioni`);
         loadedFrom = 'timeline';
       } catch (error) {
         // Secondo tentativo: carica da assigned/assignments_{ddmmyy}.json
@@ -1231,10 +1236,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
           if (confirmedJson.assignments && confirmedJson.assignments.length > 0) {
             timelineData = {
-              assignments: confirmedJson.assignments,
-              current_date: date
+              metadata: { last_updated: new Date().toISOString(), date },
+              cleaners_assignments: confirmedJson.assignments || [],
+              meta: { total_cleaners: 0, used_cleaners: 0, assigned_tasks: confirmedJson.assignments.length }
             };
-            console.log(`✅ Caricato da assigned/${filename} con ${timelineData.assignments.length} assegnazioni`);
+            console.log(`✅ Caricato da assigned/${filename} con ${timelineData.cleaners_assignments.length} assegnazioni`);
             loadedFrom = 'assigned';
 
             // Salva in timeline
@@ -1248,7 +1254,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           loadedFrom = 'new';
           timelineData = { 
             metadata: { last_updated: new Date().toISOString(), date },
-            assignments: [] 
+            cleaners_assignments: [],
+            meta: { total_cleaners: 0, used_cleaners: 0, assigned_tasks: 0 }
           };
           await fs.writeFile(timelinePath, JSON.stringify(timelineData, null, 2));
         }
