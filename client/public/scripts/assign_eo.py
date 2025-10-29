@@ -350,8 +350,14 @@ def plan_day(tasks: List[Task], cleaners: List[Cleaner]) -> Tuple[List[Cleaner],
     - Max 2 task per cleaner (3ª solo se entro 10')
     """
     unassigned = []
+    assigned_task_ids = set()  # Traccia le task già assegnate
 
     for task in tasks:
+        # Salta se questa task è già stata assegnata
+        if task.task_id in assigned_task_ids:
+            print(f"⚠️  SKIP: task_id {task.task_id} già assegnata durante il planning")
+            continue
+
         # Trova tutti i cleaner che possono prendere questa task
         candidates = []
 
@@ -381,6 +387,7 @@ def plan_day(tasks: List[Task], cleaners: List[Cleaner]) -> Tuple[List[Cleaner],
 
         cleaner, pos, travel = chosen
         cleaner.route.insert(pos, task)
+        assigned_task_ids.add(task.task_id)  # Marca come assegnata
 
     return cleaners, unassigned
 
@@ -401,12 +408,10 @@ def build_output(cleaners: List[Cleaner], unassigned: List[Task], original_tasks
         prev_finish_time = None
 
         for idx, (t, (arr, start, fin)) in enumerate(zip(cl.route, schedule)):
-            # Controlla se questa task è già stata assegnata
+            # Segna la task come assegnata (dovrebbe essere già unica grazie a plan_day)
             if t.task_id in already_assigned_task_ids:
-                print(f"⚠️  SKIP: task_id {t.task_id} già assegnata, salto l'assegnazione al cleaner {cl.id}")
+                print(f"⚠️  SKIP: task_id {t.task_id} duplicata in build_output, saltata")
                 continue
-
-            # Segna la task come assegnata
             already_assigned_task_ids.add(t.task_id)
 
             travel_time = 0
