@@ -334,6 +334,7 @@ export default function GenerateAssignments() {
             premium: timelineAssignment.premium,
             straordinaria: timelineAssignment.straordinaria,
             is_straordinaria: timelineAssignment.is_straordinaria || timelineAssignment.straordinaria,
+            confirmed_operation: timelineAssignment.confirmed_operation,
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString()
           };
@@ -352,6 +353,7 @@ export default function GenerateAssignments() {
             premium: timelineAssignment.premium !== undefined ? timelineAssignment.premium : baseTask.premium,
             straordinaria: timelineAssignment.straordinaria !== undefined ? timelineAssignment.straordinaria : (baseTask as any).straordinaria,
             is_straordinaria: timelineAssignment.is_straordinaria !== undefined ? timelineAssignment.is_straordinaria : (timelineAssignment.straordinaria !== undefined ? timelineAssignment.straordinaria : (baseTask as any).is_straordinaria),
+            confirmed_operation: timelineAssignment.confirmed_operation !== undefined ? timelineAssignment.confirmed_operation : (baseTask as any).confirmed_operation,
             customer_name: timelineAssignment.customer_name,
             type_apt: timelineAssignment.type_apt,
             checkin_date: timelineAssignment.checkin_date,
