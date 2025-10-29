@@ -44,26 +44,21 @@ export default function TaskCard({
           ? ["true", "1", "yes"].includes(rawConfirmed.toLowerCase().trim())
           : false;
 
-  // Normalizza il tipo della task
-  const taskType = String((task as any).type ?? (task as any).task_type ?? "")
-    .toLowerCase()
-    .trim();
-
+  // Determina il tipo di task in base ai campi premium e straordinaria
+  const isStraordinaria = (task as any).straordinaria === true || task.is_straordinaria === true;
+  const isPremium = task.premium === true;
+  
   // Funzione per assegnare colore e label in base al tipo
-  const getTaskTypeStyle = (type: string) => {
-    switch (type) {
-      case "standard":
-        return { label: "STANDARD", colorClass: "task-standard" };
-      case "premium":
-        return { label: "PREMIUM", colorClass: "task-premium" };
-      case "straordinaria":
-      case "extra":
-        return { label: "STRAORD", colorClass: "task-straordinaria" };
-      default:
-        return { label: "-", colorClass: "task-standard" };
+  const getTaskTypeStyle = () => {
+    if (isStraordinaria) {
+      return { label: "STRAORDINARIA", colorClass: "task-straordinaria" };
     }
+    if (isPremium) {
+      return { label: "PREMIUM", colorClass: "task-premium" };
+    }
+    return { label: "STANDARD", colorClass: "task-standard" };
   };
-  const { label: typeLabel, colorClass } = getTaskTypeStyle(taskType);
+  const { label: typeLabel, colorClass } = getTaskTypeStyle();
 
   useEffect(() => {
     const loadAssignmentTimes = async () => {
@@ -245,9 +240,9 @@ export default function TaskCard({
                 variant="outline"
                 className={cn(
                   "text-xs shrink-0",
-                  taskType === "straordinaria" || taskType === "extra"
+                  isStraordinaria
                     ? "bg-red-500 text-white border-red-700"
-                    : taskType === "premium"
+                    : isPremium
                       ? "bg-yellow-400 text-black border-yellow-600"
                       : "bg-green-500 text-white border-green-700"
                 )}
