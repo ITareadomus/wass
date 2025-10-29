@@ -597,6 +597,9 @@ def main():
 
     # Conta i cleaners totali disponibili
     total_available_cleaners = len(cleaners)
+    
+    # Conta i cleaners effettivamente usati (con almeno una task)
+    used_cleaners = len([c for c in combined if len(c.get("tasks", [])) > 0])
 
     # Salva timeline.json
     timeline_data = {
@@ -604,6 +607,7 @@ def main():
         "current_date": ref_date,
         "meta": {
             "total_cleaners": total_available_cleaners,
+            "used_cleaners": used_cleaners,
             "total_tasks": sum(len(c["tasks"]) for c in combined),
             "last_updated": dt.now().isoformat()
         }

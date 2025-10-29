@@ -715,8 +715,12 @@ def main():
     # Aggiorna meta
     # Conta i cleaners totali disponibili
     total_available_cleaners = len(cleaners)
+    
+    # Conta i cleaners effettivamente usati (con almeno una task)
+    used_cleaners = len([c for c in timeline_data["cleaners_assignments"] if len(c.get("tasks", [])) > 0])
 
     timeline_data["meta"]["total_cleaners"] = total_available_cleaners
+    timeline_data["meta"]["used_cleaners"] = used_cleaners
     timeline_data["meta"]["total_tasks"] = sum(
         len(c.get("tasks", [])) for c in timeline_data["cleaners_assignments"]
     )
