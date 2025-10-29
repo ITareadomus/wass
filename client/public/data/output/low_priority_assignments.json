@@ -77,11 +77,11 @@
     },
     {
       "cleaner": {
-        "id": 495,
-        "name": "EL HADJI",
-        "lastname": "BA",
-        "role": "Premium",
-        "premium": true
+        "id": 287,
+        "name": "BAH",
+        "lastname": "ISMAILA",
+        "role": "Standard",
+        "premium": false
       },
       "tasks": [
         {
@@ -102,11 +102,11 @@
     },
     {
       "cleaner": {
-        "id": 249,
-        "name": "Ogbodo Chidi",
-        "lastname": "Igwe",
-        "role": "Premium",
-        "premium": true
+        "id": 326,
+        "name": "FESTUS OSARO",
+        "lastname": "AIHIVBERE",
+        "role": "Standard",
+        "premium": false
       },
       "tasks": [
         {
@@ -122,18 +122,7 @@
           "followup": false,
           "sequence": 1,
           "travel_time": 0
-        }
-      ]
-    },
-    {
-      "cleaner": {
-        "id": 287,
-        "name": "BAH",
-        "lastname": "ISMAILA",
-        "role": "Standard",
-        "premium": false
-      },
-      "tasks": [
+        },
         {
           "task_id": 218115,
           "logistic_code": 1446,
@@ -142,11 +131,11 @@
           "lng": 9.1963418,
           "premium": false,
           "cleaning_time": 120,
-          "start_time": "10:12",
-          "end_time": "12:12",
-          "followup": false,
-          "sequence": 1,
-          "travel_time": 0
+          "start_time": "12:19",
+          "end_time": "14:19",
+          "followup": true,
+          "sequence": 2,
+          "travel_time": 8
         }
       ]
     }
@@ -157,7 +146,7 @@
     "total_tasks": 6,
     "assigned": 6,
     "unassigned": 0,
-    "cleaners_used": 6,
+    "cleaners_used": 5,
     "max_tasks_per_cleaner": 3,
     "algorithm": "simplified_greedy",
     "notes": [
