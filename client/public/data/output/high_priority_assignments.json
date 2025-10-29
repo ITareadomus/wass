@@ -38,9 +38,10 @@
           "priority": "high_priority",
           "start_time": "12:12",
           "end_time": "14:42",
-          "followup": true,
-          "sequence": 2,
-          "travel_time": 12
+          "followup": false,
+          "sequence": 1,
+          "travel_time": 12,
+          "is_straordinaria": false
         }
       ]
     },
@@ -83,9 +84,10 @@
           "priority": "high_priority",
           "start_time": "11:00",
           "end_time": "13:30",
-          "followup": true,
-          "sequence": 2,
-          "travel_time": 18
+          "followup": false,
+          "sequence": 1,
+          "travel_time": 18,
+          "is_straordinaria": false
         },
         {
           "task_id": 218147,
@@ -118,8 +120,9 @@
           "start_time": "13:41",
           "end_time": "16:11",
           "followup": true,
-          "sequence": 3,
-          "travel_time": 12
+          "sequence": 2,
+          "travel_time": 12,
+          "is_straordinaria": false
         }
       ]
     },
@@ -163,7 +166,8 @@
           "end_time": "13:30",
           "followup": false,
           "sequence": 1,
-          "travel_time": 0
+          "travel_time": 0,
+          "is_straordinaria": false
         }
       ]
     },
@@ -207,7 +211,8 @@
           "end_time": "13:00",
           "followup": false,
           "sequence": 1,
-          "travel_time": 0
+          "travel_time": 0,
+          "is_straordinaria": false
         }
       ]
     }
