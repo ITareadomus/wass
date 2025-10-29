@@ -118,11 +118,10 @@ export default function PriorityColumn({
 
       // Ricarica i task per riflettere le nuove assegnazioni
       if ((window as any).reloadAllTasks) {
+        console.log('🔄 Ricaricamento task dopo assegnazione...');
         await (window as any).reloadAllTasks();
+        console.log('✅ Task ricaricati con successo');
       }
-
-      // Ricarica la pagina per aggiornare la timeline e i marker sulla mappa
-      window.location.reload();
     } catch (error: any) {
       console.error(`Errore nell'assegnazione ${priority}:`, error);
       toast({
