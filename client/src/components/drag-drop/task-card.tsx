@@ -350,7 +350,7 @@ export default function TaskCard({
                 <p className="text-sm">
                   {(task as any).confirmed_operation === false
                     ? "non migrato"
-                    : (task as any).operation_id ?? "non migrato"}
+                    : ((task as any).operation_id ?? "non migrato")}
                 </p>
               </div>
             </div>

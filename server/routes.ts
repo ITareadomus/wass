@@ -244,9 +244,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         sequence: 0,
         travel_time: 0,
 
-        // Preserva esplicitamente i campi critici
-        confirmed_operation: fullTaskData.confirmed_operation,
-        operation_id: fullTaskData.operation_id,
+        // Preserva esplicitamente i campi critici (non sovrascrivere se già presenti)
+        confirmed_operation: fullTaskData.confirmed_operation !== undefined ? fullTaskData.confirmed_operation : true,
+        operation_id: fullTaskData.operation_id !== undefined ? fullTaskData.operation_id : 2,
 
         // Reasons (combina quelle da containers con quella timeline)
         reasons: [
