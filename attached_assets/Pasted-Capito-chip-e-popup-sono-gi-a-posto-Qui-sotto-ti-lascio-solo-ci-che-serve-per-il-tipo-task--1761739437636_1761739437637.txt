@@ -1,0 +1,72 @@
+Capito—chip e popup sono già a posto. Qui sotto ti lascio **solo** ciò che serve per il **tipo task** (verde/oro/rosso) in base ai flag `premium`/`straordinaria`, evitando che tutto diventi verde.
+
+---
+
+## Cosa dire esattamente all’AI
+
+> Applica queste modifiche per calcolare **solo** il tipo task dai flag e per evitare fallback/variant che forzano il verde:
+>
+> ### 1) Determina il tipo dai flag (priorità: `straordinaria` → `premium` → `standard`)
+>
+> Nel componente della card (timeline), subito all’inizio:
+>
+> ```ts
+> const isPremium = Boolean((task as any).premium);
+> const isStraordinaria = Boolean((task as any).straordinaria);
+>
+> let taskType: "standard" | "premium" | "straordinaria" = "standard";
+> if (isStraordinaria) taskType = "straordinaria";
+> else if (isPremium) taskType = "premium";
+> ```
+>
+> ### 2) Colori e label del badge SOLO in base al tipo (niente default “primary”)
+>
+> Definisci lo stile e usalo nel render:
+>
+> ```ts
+> const getTaskTypeStyle = (type: string) => {
+>   switch (type) {
+>     case "standard":
+>       return { label: "standard", className: "bg-emerald-100 text-emerald-800 border border-emerald-200" };
+>     case "premium":
+>       return { label: "premium", className: "bg-amber-100 text-amber-800 border border-amber-200" };
+>     case "straordinaria":
+>       return { label: "straordinaria", className: "bg-rose-100 text-rose-800 border border-rose-200" };
+>     default:
+>       return { label: "-", className: "bg-gray-100 text-gray-700 border border-gray-200" };
+>   }
+> };
+> const { label: typeLabel, className: typeClass } = getTaskTypeStyle(taskType);
+> ```
+>
+> **Render del badge (importante: no variant “default/primary”):**
+>
+> ```tsx
+> <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${typeClass}`}>
+>   {typeLabel}
+> </span>
+> ```
+>
+> > Se stai usando shadcn `<Badge>`, usa `variant="secondary"` + `className={typeClass}`. Non lasciare il `variant` di default perché mappa su `bg-primary` (verde).
+>
+> ### 3) Rimuovi fallback e deduzioni sbagliate
+>
+> * Elimina dovunque:
+>
+>   ```ts
+>   task.type = task.type || "standard";
+>   ```
+> * Non dedurre mai il tipo da `operation_id`.
+>
+> ### 4) Check rapido (debug temporaneo)
+>
+> ```ts
+> console.debug("TYPE FLAGS", { id: (task as any).id, premium: (task as any).premium, straordinaria: (task as any).straordinaria, taskType });
+> ```
+>
+> **Risultato atteso:**
+>
+> * `premium: false` & `straordinaria: false` → badge **standard** (verde)
+> * `premium: true` → badge **premium** (oro)
+> * `straordinaria: true` → badge **straordinaria** (rosso)
+> * Nessuna card diventa verde per colpa del `variant` o di default nascosti.
