@@ -61,9 +61,13 @@ export default function GenerateAssignments() {
     return tomorrow;
   });
 
-  // Salva la data in localStorage ogni volta che cambia
+  // Salva la data in localStorage ogni volta che cambia (formato locale senza timezone)
   useEffect(() => {
-    localStorage.setItem('selected_work_date', selectedDate.toISOString());
+    const year = selectedDate.getFullYear();
+    const month = String(selectedDate.getMonth() + 1).padStart(2, '0');
+    const day = String(selectedDate.getDate()).padStart(2, '0');
+    const dateStr = `${year}-${month}-${day}`;
+    localStorage.setItem('selected_work_date', dateStr);
   }, [selectedDate]);
   const [earlyOutTasks, setEarlyOutTasks] = useState<Task[]>([]);
   const [highPriorityTasks, setHighPriorityTasks] = useState<Task[]>([]);
