@@ -516,8 +516,12 @@ export default function GenerateAssignments() {
           duration: 3000,
         });
 
-        // Ricarica i task per mostrare le assegnazioni nella timeline
-        await loadTasks(true);
+        // Ricarica i task per riflettere le nuove assegnazioni
+        if ((window as any).reloadAllTasks) {
+          console.log('🔄 Ricaricamento task dopo assegnazione HP...');
+          await (window as any).reloadAllTasks();
+          console.log('✅ Task ricaricati con successo');
+        }
       } else {
         throw new Error(result.message || 'Errore sconosciuto');
       }
@@ -551,8 +555,12 @@ export default function GenerateAssignments() {
           duration: 3000,
         });
 
-        // Ricarica i task per mostrare le assegnazioni nella timeline
-        await loadTasks(true);
+        // Ricarica i task per riflettere le nuove assegnazioni
+        if ((window as any).reloadAllTasks) {
+          console.log('🔄 Ricaricamento task dopo assegnazione LP...');
+          await (window as any).reloadAllTasks();
+          console.log('✅ Task ricaricati con successo');
+        }
       } else {
         throw new Error(result.message || 'Errore sconosciuto');
       }
