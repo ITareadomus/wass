@@ -471,7 +471,10 @@ export default function GenerateAssignments() {
   const assignEarlyOutToTimeline = async () => {
     try {
       // Format date in local timezone to avoid UTC shift
-      const dateStr = format(selectedDate, 'yyyy-MM-dd');
+      const year = selectedDate.getFullYear();
+      const month = String(selectedDate.getMonth() + 1).padStart(2, '0');
+      const day = String(selectedDate.getDate()).padStart(2, '0');
+      const dateStr = `${year}-${month}-${day}`;
       
       console.log(`📅 Assegnazione EO per data: ${dateStr}`);
       console.log(`📅 selectedDate oggetto:`, selectedDate);
@@ -511,7 +514,10 @@ export default function GenerateAssignments() {
   const assignHighPriorityToTimeline = async () => {
     try {
       // Format date in local timezone to avoid UTC shift
-      const dateStr = format(selectedDate, 'yyyy-MM-dd');
+      const year = selectedDate.getFullYear();
+      const month = String(selectedDate.getMonth() + 1).padStart(2, '0');
+      const day = String(selectedDate.getDate()).padStart(2, '0');
+      const dateStr = `${year}-${month}-${day}`;
       
       console.log(`📅 Assegnazione HP per data: ${dateStr}`);
       console.log(`📅 selectedDate oggetto:`, selectedDate);
@@ -555,7 +561,10 @@ export default function GenerateAssignments() {
   const assignLowPriorityToTimeline = async () => {
     try {
       // Format date in local timezone to avoid UTC shift
-      const dateStr = format(selectedDate, 'yyyy-MM-dd');
+      const year = selectedDate.getFullYear();
+      const month = String(selectedDate.getMonth() + 1).padStart(2, '0');
+      const day = String(selectedDate.getDate()).padStart(2, '0');
+      const dateStr = `${year}-${month}-${day}`;
       
       console.log(`📅 Assegnazione LP per data: ${dateStr}`);
       console.log(`📅 selectedDate oggetto:`, selectedDate);
