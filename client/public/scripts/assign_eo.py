@@ -564,12 +564,14 @@ def main():
 
     # Carica timeline esistente o crea nuova struttura
     timeline_data = {
+        "metadata": {
+            "last_updated": dt.now().isoformat(),
+            "date": ref_date
+        },
         "cleaners_assignments": [],
-        "current_date": ref_date,
         "meta": {
             "total_cleaners": 0,
-            "total_tasks": 0,
-            "last_updated": dt.now().isoformat()
+            "total_tasks": 0
         }
     }
 
@@ -607,13 +609,15 @@ def main():
 
     # Salva timeline.json
     timeline_data = {
+        "metadata": {
+            "last_updated": dt.now().isoformat(),
+            "date": ref_date
+        },
         "cleaners_assignments": combined,
-        "current_date": ref_date,
         "meta": {
             "total_cleaners": total_available_cleaners,
             "used_cleaners": used_cleaners,
-            "total_tasks": sum(len(c["tasks"]) for c in combined),
-            "last_updated": dt.now().isoformat()
+            "total_tasks": sum(len(c["tasks"]) for c in combined)
         }
     }
     timeline_path.write_text(json.dumps(timeline_data, ensure_ascii=False, indent=2), encoding="utf-8")

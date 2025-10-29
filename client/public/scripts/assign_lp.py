@@ -670,12 +670,14 @@ def main():
 
     # Carica timeline esistente o crea nuova struttura
     timeline_data = {
+        "metadata": {
+            "last_updated": dt.now().isoformat(),
+            "date": ref_date
+        },
         "cleaners_assignments": [],
-        "current_date": ref_date,
         "meta": {
             "total_cleaners": 0,
-            "total_tasks": 0,
-            "last_updated": dt.now().isoformat()
+            "total_tasks": 0
         }
     }
 
@@ -723,13 +725,13 @@ def main():
     # Conta i cleaners effettivamente usati (con almeno una task)
     used_cleaners = len([c for c in timeline_data["cleaners_assignments"] if len(c.get("tasks", [])) > 0])
 
+    timeline_data["metadata"]["last_updated"] = dt.now().isoformat()
+    timeline_data["metadata"]["date"] = ref_date
     timeline_data["meta"]["total_cleaners"] = total_available_cleaners
     timeline_data["meta"]["used_cleaners"] = used_cleaners
     timeline_data["meta"]["total_tasks"] = sum(
         len(c.get("tasks", [])) for c in timeline_data["cleaners_assignments"]
     )
-    timeline_data["meta"]["last_updated"] = dt.now().isoformat()
-    timeline_data["current_date"] = ref_date
 
     # Scrivi il file timeline.json
     timeline_path.write_text(json.dumps(timeline_data, ensure_ascii=False, indent=2), encoding="utf-8")

@@ -273,13 +273,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         t.sequence = i + 1;
       });
 
-      // Aggiorna meta
-      timelineData.current_date = workDate;
+      // Aggiorna metadata e meta
+      timelineData.metadata = timelineData.metadata || {};
+      timelineData.metadata.last_updated = new Date().toISOString();
+      timelineData.metadata.date = workDate;
       timelineData.meta.total_cleaners = timelineData.cleaners_assignments.length;
       timelineData.meta.total_tasks = timelineData.cleaners_assignments.reduce(
         (sum: number, c: any) => sum + c.tasks.length, 0
       );
-      timelineData.meta.last_updated = new Date().toISOString();
 
       // Scrittura atomica
       const tmpPath = `${timelinePath}.tmp`;
@@ -362,13 +363,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       console.log(`Rimosse ${removedCount} assegnazioni`);
 
-      // Aggiorna meta
-      assignmentsData.current_date = workDate;
+      // Aggiorna metadata e meta
+      assignmentsData.metadata = assignmentsData.metadata || {};
+      assignmentsData.metadata.last_updated = new Date().toISOString();
+      assignmentsData.metadata.date = workDate;
       assignmentsData.meta.total_cleaners = assignmentsData.cleaners_assignments.length;
       assignmentsData.meta.total_tasks = assignmentsData.cleaners_assignments.reduce(
         (sum: number, c: any) => sum + c.tasks.length, 0
       );
-      assignmentsData.meta.last_updated = new Date().toISOString();
 
       // Salva il file
       await fs.writeFile(timelinePath, JSON.stringify(assignmentsData, null, 2));
@@ -1217,7 +1219,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           // Nessun file trovato in nessuna delle due posizioni, crea nuovo file vuoto
           console.log(`Nessuna assegnazione trovata per ${date} in timeline o assigned, creando timeline vuota`);
           loadedFrom = 'new';
-          timelineData = { assignments: [], current_date: date };
+          timelineData = { 
+            metadata: { last_updated: new Date().toISOString(), date },
+            assignments: [] 
+          };
           await fs.writeFile(timelinePath, JSON.stringify(timelineData, null, 2));
         }
       }
@@ -1225,9 +1230,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Non resettiamo mai - ogni data ha il suo file
       console.log(`Data selezionata: ${date}, preservo le assegnazioni esistenti (fonte: ${loadedFrom})`);
 
-      // Assicurati che current_date sia sempre aggiornato, specialmente se è stato appena creato
-      if (!timelineData.current_date) {
-        timelineData.current_date = date;
+      // Assicurati che metadata sia sempre aggiornato, specialmente se è stato appena creato
+      if (!timelineData.metadata) {
+        timelineData.metadata = { last_updated: new Date().toISOString(), date };
         await fs.writeFile(timelinePath, JSON.stringify(timelineData, null, 2));
       }
 
@@ -1613,7 +1618,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const timelineData = await fs.readFile(timelinePath, 'utf8');
           const timeline = JSON.parse(timelineData);
 
-          if (timeline.current_date === date && timeline.assignments && timeline.assignments.length > 0) {
+          if (timeline.metadata?.date === date && timeline.assignments && timeline.assignments.length > 0) {
             res.json({
               success: true,
               data: timeline,
