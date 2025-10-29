@@ -980,7 +980,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { date } = req.body;
       const workDate = date || format(new Date(), 'yyyy-MM-dd');
 
-      console.log(`Eseguendo assign_eo.py per timeline.json - data richiesta: ${date}, usando: ${workDate}`);
+      console.log(`Eseguendo assign_eo.py per timeline.json - data: ${workDate}`);
 
       const { spawn } = await import('child_process');
       const scriptPath = path.join(process.cwd(), 'client/public/scripts/assign_eo.py');
