@@ -39,9 +39,10 @@
           ],
           "start_time": "11:08",
           "end_time": "13:38",
-          "followup": true,
-          "sequence": 2,
-          "travel_time": 9
+          "followup": false,
+          "sequence": 1,
+          "travel_time": 9,
+          "is_straordinaria": false
         }
       ]
     },
@@ -84,9 +85,10 @@
           ],
           "start_time": "15:04",
           "end_time": "16:34",
-          "followup": true,
-          "sequence": 3,
-          "travel_time": 23
+          "followup": false,
+          "sequence": 1,
+          "travel_time": 23,
+          "is_straordinaria": false
         }
       ]
     },
@@ -129,9 +131,10 @@
           ],
           "start_time": "12:30",
           "end_time": "18:00",
-          "followup": true,
-          "sequence": 2,
-          "travel_time": 30
+          "followup": false,
+          "sequence": 1,
+          "travel_time": 30,
+          "is_straordinaria": true
         }
       ]
     },
@@ -174,9 +177,10 @@
           ],
           "start_time": "11:16",
           "end_time": "12:46",
-          "followup": true,
-          "sequence": 2,
-          "travel_time": 17
+          "followup": false,
+          "sequence": 1,
+          "travel_time": 17,
+          "is_straordinaria": false
         }
       ]
     },
@@ -219,9 +223,10 @@
           ],
           "start_time": "12:24",
           "end_time": "14:24",
-          "followup": true,
-          "sequence": 2,
-          "travel_time": 25
+          "followup": false,
+          "sequence": 1,
+          "travel_time": 25,
+          "is_straordinaria": false
         }
       ]
     },
@@ -264,9 +269,10 @@
           ],
           "start_time": "16:15",
           "end_time": "17:15",
-          "followup": true,
-          "sequence": 4,
-          "travel_time": 5
+          "followup": false,
+          "sequence": 1,
+          "travel_time": 5,
+          "is_straordinaria": false
         }
       ]
     },
@@ -309,9 +315,10 @@
           ],
           "start_time": "13:38",
           "end_time": "15:08",
-          "followup": true,
-          "sequence": 2,
-          "travel_time": 8
+          "followup": false,
+          "sequence": 1,
+          "travel_time": 8,
+          "is_straordinaria": false
         },
         {
           "task_id": 218026,
@@ -344,8 +351,9 @@
           "start_time": "15:13",
           "end_time": "16:43",
           "followup": true,
-          "sequence": 3,
-          "travel_time": 6
+          "sequence": 2,
+          "travel_time": 6,
+          "is_straordinaria": false
         }
       ]
     },
@@ -390,7 +398,8 @@
           "end_time": "12:12",
           "followup": false,
           "sequence": 1,
-          "travel_time": 0
+          "travel_time": 0,
+          "is_straordinaria": false
         },
         {
           "task_id": 218018,
@@ -424,7 +433,8 @@
           "end_time": "13:54",
           "followup": true,
           "sequence": 2,
-          "travel_time": 13
+          "travel_time": 13,
+          "is_straordinaria": false
         }
       ]
     },
@@ -469,7 +479,8 @@
           "end_time": "11:42",
           "followup": false,
           "sequence": 1,
-          "travel_time": 0
+          "travel_time": 0,
+          "is_straordinaria": false
         }
       ]
     }
