@@ -40,8 +40,7 @@
           "end_time": "14:42",
           "followup": false,
           "sequence": 1,
-          "travel_time": 12,
-          "is_straordinaria": false
+          "travel_time": 12
         }
       ]
     },
@@ -86,8 +85,7 @@
           "end_time": "13:30",
           "followup": false,
           "sequence": 1,
-          "travel_time": 18,
-          "is_straordinaria": false
+          "travel_time": 18
         },
         {
           "task_id": 218147,
@@ -121,8 +119,7 @@
           "end_time": "16:11",
           "followup": true,
           "sequence": 2,
-          "travel_time": 12,
-          "is_straordinaria": false
+          "travel_time": 12
         }
       ]
     },
@@ -166,8 +163,7 @@
           "end_time": "13:30",
           "followup": false,
           "sequence": 1,
-          "travel_time": 0,
-          "is_straordinaria": false
+          "travel_time": 0
         }
       ]
     },
@@ -211,8 +207,7 @@
           "end_time": "13:00",
           "followup": false,
           "sequence": 1,
-          "travel_time": 0,
-          "is_straordinaria": false
+          "travel_time": 0
         }
       ]
     }
