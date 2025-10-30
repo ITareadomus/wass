@@ -211,6 +211,15 @@ export default function TimelineView({
             ? ["true", "1", "yes"].includes(rawConfirmed.toLowerCase().trim())
             : false;
 
+    // Converti cleaning_time (minuti) in duration (formato "H.MM")
+    let duration = task.duration;
+    if (!duration && task.cleaning_time) {
+      const totalMinutes = parseInt(task.cleaning_time);
+      const hours = Math.floor(totalMinutes / 60);
+      const minutes = totalMinutes % 60;
+      duration = `${hours}.${minutes.toString().padStart(2, '0')}`;
+    }
+
     return {
       ...task,
       // NON sovrascrivere task.type - lascialo undefined se non esiste
@@ -218,6 +227,7 @@ export default function TimelineView({
       straordinaria: isStraordinaria,
       is_straordinaria: isStraordinaria,
       confirmed_operation: isConfirmedOperation,
+      duration: duration || "0.00", // Aggiungi duration se mancante
     };
   };
 
@@ -310,7 +320,7 @@ export default function TimelineView({
                       {/* Task posizionate in sequenza */}
                       <div className="relative z-10 flex items-center h-full">
                         {cleanerTasks
-                          .sort((a, b) => {
+                          .sort((a: any, b: any) => {
                             // Ordina prima per sequence (se presente), poi per orario
                             const taskA = a as any;
                             const taskB = b as any;
@@ -325,7 +335,7 @@ export default function TimelineView({
                             const timeB = taskB.start_time || taskB.fw_start_time || taskB.startTime || "00:00";
                             return timeA.localeCompare(timeB);
                           })
-                          .map((task, index) => (
+                          .map((task: any, index: number) => (
                             <TaskCard 
                               key={`${task.id}-${cleaner.id}-${index}`}
                               task={task} 
