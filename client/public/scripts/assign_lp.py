@@ -442,7 +442,7 @@ def plan_day(tasks: List[Task], cleaners: List[Cleaner]) -> Tuple[List[Cleaner],
     Assegna le task ai cleaner con regole semplificate:
     - Favorisce percorsi < 15'
     - Se non ci sono percorsi < 15', sceglie il minore dei > 15'
-    - Max 4 task per cleaner per LP
+    - Max 3 task per cleaner per LP
     """
     unassigned = []
 
@@ -476,10 +476,10 @@ def plan_day(tasks: List[Task], cleaners: List[Cleaner]) -> Tuple[List[Cleaner],
             same_address_candidates.sort(key=lambda x: (len(x[0].route), x[2]))
             chosen = same_address_candidates[0]
         else:
-            # Priorità 2: Cleaner con task entro 15 minuti (cluster)
+            # Priorità 2: Cleaner con task entro 10 minuti (cluster)
             cluster_candidates = []
             for c, p, t in candidates:
-                # Controlla se il cleaner ha task entro 15 minuti
+                # Controlla se il cleaner ha task entro 10 minuti
                 has_cluster = any(
                     travel_minutes(existing_task.lat, existing_task.lng, task.lat, task.lng,
                                  existing_task.address, task.address) <= CLUSTER_MAX_TRAVEL or

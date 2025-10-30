@@ -105,44 +105,29 @@ export default function TimelineView({
   useEffect(() => {
     const loadCleaners = async () => {
       try {
-        // 1. Carica TUTTI i cleaners selezionati
-        const selectedResponse = await fetch(`/data/cleaners/selected_cleaners.json?t=${Date.now()}`);
-        if (!selectedResponse.ok) {
-          throw new Error(`Failed to load selected cleaners: ${selectedResponse.status}`);
+        // Aggiungi timestamp per evitare caching
+        const response = await fetch(`/data/cleaners/selected_cleaners.json?t=${Date.now()}`);
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
         }
-        const selectedData = await selectedResponse.json();
-        const allCleaners = selectedData.cleaners || [];
-        
-        // 2. Carica le assegnazioni da timeline.json
-        const timelineResponse = await fetch(`/data/output/timeline.json?t=${Date.now()}`);
-        let assignmentsMap = new Map();
-        
-        if (timelineResponse.ok) {
-          const timelineData = await timelineResponse.json();
-          console.log("Timeline caricata:", timelineData);
-          
-          // Crea una mappa delle assegnazioni per ID cleaner
-          if (timelineData.cleaners_assignments && Array.isArray(timelineData.cleaners_assignments)) {
-            timelineData.cleaners_assignments.forEach((assignment: any) => {
-              const cleanerId = assignment.cleaner?.id;
-              if (cleanerId) {
-                assignmentsMap.set(cleanerId, assignment.tasks || []);
-              }
-            });
-          }
+
+        // Verifica che la risposta sia JSON
+        const contentType = response.headers.get('content-type');
+        if (!contentType || !contentType.includes('application/json')) {
+          console.error('Risposta non JSON:', contentType);
+          setCleaners([]);
+          return;
         }
-        
-        // 3. Unisci: tutti i cleaners selezionati + le loro task (se presenti)
-        const cleanersList = allCleaners.map((cleaner: any) => ({
-          ...cleaner,
-          tasks: assignmentsMap.get(cleaner.id) || []
-        }));
-        
-        console.log(`Cleaners totali: ${cleanersList.length}, con task: ${Array.from(assignmentsMap.keys()).length}`);
+
+        const selectedData = await response.json();
+        console.log("Cleaners caricati da selected_cleaners.json:", selectedData);
+
+        // I cleaners sono già nel formato corretto
+        const cleanersList = selectedData.cleaners || [];
         setCleaners(cleanersList);
       } catch (error) {
-        console.error("Errore nel caricamento della timeline:", error);
-        setCleaners([]);
+        console.error("Errore nel caricamento dei cleaners selezionati:", error);
+        setCleaners([]); // Imposta array vuoto invece di lasciare undefined
       }
     };
     loadCleaners();
@@ -211,15 +196,6 @@ export default function TimelineView({
             ? ["true", "1", "yes"].includes(rawConfirmed.toLowerCase().trim())
             : false;
 
-    // Converti cleaning_time (minuti) in duration (formato "H.MM")
-    let duration = task.duration;
-    if (!duration && task.cleaning_time) {
-      const totalMinutes = parseInt(task.cleaning_time);
-      const hours = Math.floor(totalMinutes / 60);
-      const minutes = totalMinutes % 60;
-      duration = `${hours}.${minutes.toString().padStart(2, '0')}`;
-    }
-
     return {
       ...task,
       // NON sovrascrivere task.type - lascialo undefined se non esiste
@@ -227,7 +203,6 @@ export default function TimelineView({
       straordinaria: isStraordinaria,
       is_straordinaria: isStraordinaria,
       confirmed_operation: isConfirmedOperation,
-      duration: duration || "0.00", // Aggiungi duration se mancante
     };
   };
 
@@ -274,8 +249,10 @@ export default function TimelineView({
             const color = getCleanerColor(index);
             const droppableId = `cleaner-${cleaner.id}`;
 
-            // Le task sono già caricate su cleaner.tasks
-            const cleanerTasks = ((cleaner as any).tasks || []).map(normalizeTask);
+            // Trova tutte le task assegnate a questo cleaner
+            const cleanerTasks = tasks.filter(task => 
+              (task as any).assignedCleaner === cleaner.id
+            ).map(normalizeTask); // Applica la normalizzazione qui
 
             return (
               <div key={cleaner.id} className="flex mb-0.5">
@@ -319,8 +296,10 @@ export default function TimelineView({
 
                       {/* Task posizionate in sequenza */}
                       <div className="relative z-10 flex items-center h-full">
-                        {cleanerTasks
-                          .sort((a: any, b: any) => {
+                        {tasks
+                          .filter((task) => (task as any).assignedCleaner === cleaner.id)
+                          .map(normalizeTask) // Applica la normalizzazione prima di ordinare e mappare
+                          .sort((a, b) => {
                             // Ordina prima per sequence (se presente), poi per orario
                             const taskA = a as any;
                             const taskB = b as any;
@@ -335,7 +314,7 @@ export default function TimelineView({
                             const timeB = taskB.start_time || taskB.fw_start_time || taskB.startTime || "00:00";
                             return timeA.localeCompare(timeB);
                           })
-                          .map((task: any, index: number) => (
+                          .map((task, index) => (
                             <TaskCard 
                               key={`${task.id}-${cleaner.id}-${index}`}
                               task={task} 
