@@ -393,8 +393,8 @@ def seed_cleaners_from_assignments(cleaners: List[Cleaner]):
         if not non_lp_tasks:
             continue
         
-        # Ordina per end_time per trovare l'ultima
-        non_lp_tasks.sort(key=lambda t: t.get("end_time", "00:00"))
+        # Ordina per end_time per trovare l'ultima (gestisci None)
+        non_lp_tasks.sort(key=lambda t: t.get("end_time") or "00:00")
         last = non_lp_tasks[-1]
         
         end_time = hhmm_to_min(last.get("end_time"))
