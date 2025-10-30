@@ -345,8 +345,7 @@ def load_cleaners() -> List[Cleaner]:
     for c in data.get("cleaners", []):
         role = (c.get("role") or "").strip()
         is_premium = bool(c.get("premium", (role.lower() == "premium")))
-        if (role or "").lower() == "formatore":
-            continue
+        # Includi Formatori in Low-Priority (non li filtriamo)
 
         cleaners.append(
             Cleaner(
