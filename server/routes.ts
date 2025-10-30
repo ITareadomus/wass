@@ -1233,52 +1233,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
         await fs.writeFile(timelinePath, JSON.stringify(timelineData, null, 2));
       }
 
-      // Esegui create_containers.py SOLO se containers.json non esiste o è per un'altra data
-      const containersPath = path.join(process.cwd(), 'client/public/data/output/containers.json');
-      let shouldCreateContainers = false;
-      let containersMessage = "";
-
-      try {
-        const containersData = JSON.parse(await fs.readFile(containersPath, 'utf8'));
-        const containersDate = containersData.metadata?.date;
-        
-        if (containersDate !== date) {
-          console.log(`⚠️ containers.json è per data diversa (${containersDate} vs ${date}), rigenerazione necessaria`);
-          shouldCreateContainers = true;
-          containersMessage = `Containers rigenerati per cambio data (${containersDate} → ${date})`;
-        } else {
-          console.log(`✅ containers.json già presente per ${date}, mantengo stato esistente`);
-          containersMessage = `Containers già presenti per ${date}, stato preservato`;
-        }
-      } catch (error) {
-        console.log(`⚠️ containers.json non trovato o non valido, creazione necessaria`);
-        shouldCreateContainers = true;
-        containersMessage = `Containers creati per ${date}`;
-      }
-
-      if (shouldCreateContainers) {
-        console.log(`Eseguendo create_containers.py per data ${date}...`);
-        const containersResult = await new Promise<string>((resolve, reject) => {
-          exec(
-            `python3 client/public/scripts/create_containers.py ${date}`,
-            (error, stdout, stderr) => {
-              if (error) {
-                console.error("Errore create_containers:", stderr);
-                reject(new Error(stderr || error.message));
-              } else {
-                resolve(stdout);
-              }
+      // Esegui SEMPRE create_containers.py per avere dati freschi dal database
+      console.log(`Eseguendo create_containers.py per data ${date}...`);
+      const containersResult = await new Promise<string>((resolve, reject) => {
+        exec(
+          `python3 client/public/scripts/create_containers.py ${date}`,
+          (error, stdout, stderr) => {
+            if (error) {
+              console.error("Errore create_containers:", stderr);
+              reject(new Error(stderr || error.message));
+            } else {
+              resolve(stdout);
             }
-          );
-        });
-        console.log("create_containers output:", containersResult);
-      }
+          }
+        );
+      });
+      console.log("create_containers output:", containersResult);
 
       res.json({
         success: true,
-        message: containersMessage,
+        message: "Dati estratti con successo dal database",
         outputs: {
-          note: shouldCreateContainers ? "containers.json rigenerato" : "containers.json preservato"
+          create_containers: containersResult
         }
       });
     } catch (error: any) {
