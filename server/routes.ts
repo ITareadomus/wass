@@ -986,6 +986,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       const workDate = date;
 
+      // Assicurati che timeline.json esista
+      const timelinePath = path.join(process.cwd(), 'client/public/data/output/timeline.json');
+      if (!fs.existsSync(timelinePath)) {
+        await fs.writeFile(timelinePath, JSON.stringify({
+          metadata: {
+            last_updated: new Date().toISOString(),
+            date: workDate
+          },
+          cleaners_assignments: [],
+          meta: {
+            total_cleaners: 0,
+            used_cleaners: 0,
+            assigned_tasks: 0,
+            total_tasks: 0
+          }
+        }, null, 2), 'utf8');
+      }
+
       console.log(`📅 EO Assignment - Ricevuta data dal frontend: ${workDate}`);
       console.log(`▶ Eseguendo assign_eo.py per data: ${workDate}`);
 
@@ -1048,6 +1066,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       const workDate = date;
 
+      // Assicurati che timeline.json esista
+      const timelinePath = path.join(process.cwd(), 'client/public/data/output/timeline.json');
+      if (!fs.existsSync(timelinePath)) {
+        await fs.writeFile(timelinePath, JSON.stringify({
+          metadata: {
+            last_updated: new Date().toISOString(),
+            date: workDate
+          },
+          cleaners_assignments: [],
+          meta: {
+            total_cleaners: 0,
+            used_cleaners: 0,
+            assigned_tasks: 0,
+            total_tasks: 0
+          }
+        }, null, 2), 'utf8');
+      }
+
       console.log(`📅 HP Assignment - Ricevuta data dal frontend: ${workDate}`);
       console.log(`▶ Eseguendo assign_hp.py per data: ${workDate}`);
 
@@ -1109,6 +1145,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
       const workDate = date;
+
+      // Assicurati che timeline.json esista
+      const timelinePath = path.join(process.cwd(), 'client/public/data/output/timeline.json');
+      if (!fs.existsSync(timelinePath)) {
+        await fs.writeFile(timelinePath, JSON.stringify({
+          metadata: {
+            last_updated: new Date().toISOString(),
+            date: workDate
+          },
+          cleaners_assignments: [],
+          meta: {
+            total_cleaners: 0,
+            used_cleaners: 0,
+            assigned_tasks: 0,
+            total_tasks: 0
+          }
+        }, null, 2), 'utf8');
+      }
 
       console.log(`📅 LP Assignment - Ricevuta data dal frontend: ${workDate}`);
       console.log(`▶ Eseguendo assign_lp.py per data: ${workDate}`);
