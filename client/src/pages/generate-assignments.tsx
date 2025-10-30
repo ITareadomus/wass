@@ -85,10 +85,10 @@ export default function GenerateAssignments() {
   const { toast } = useToast();
 
   // Funzione per estrarre i dati dal backend
-  const extractData = async (date: Date, resetTimeline: boolean = false) => {
+  const extractData = async (date: Date) => {
     try {
       setIsExtracting(true);
-      setExtractionStep(resetTimeline ? "Reset assegnazioni in corso..." : "Estrazione dati dal database...");
+      setExtractionStep("Estrazione dati dal database...");
 
       // Format date in local timezone to avoid UTC shift
       const year = date.getFullYear();
@@ -96,12 +96,12 @@ export default function GenerateAssignments() {
       const day = String(date.getDate()).padStart(2, '0');
       const dateStr = `${year}-${month}-${day}`;
 
-      console.log(resetTimeline ? "Reset assegnazioni per la data:" : "Estraendo task per la data:", dateStr);
+      console.log("Estraendo task per la data:", dateStr);
 
       const response = await fetch('/api/extract-data', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ date: dateStr, resetTimeline })
+        body: JSON.stringify({ date: dateStr })
       });
 
       if (!response.ok) {

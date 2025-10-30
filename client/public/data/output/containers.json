@@ -1,6 +1,6 @@
 {
   "metadata": {
-    "last_updated": "2025-10-30T10:40:51.538947",
+    "last_updated": "2025-10-29T21:27:48.286435",
     "date": "2025-10-30"
   },
   "containers": {
@@ -383,36 +383,9 @@
             "client_forced_eo"
           ],
           "priority": "early_out"
-        },
-        {
-          "task_id": 218199,
-          "logistic_code": 1240,
-          "client_id": 61,
-          "premium": false,
-          "address": "VIALE CONI ZUGNA 52",
-          "lat": "45.4566617",
-          "lng": "9.1699158",
-          "cleaning_time": 60,
-          "checkin_date": "2025-10-30",
-          "checkout_date": "2025-10-30",
-          "checkin_time": null,
-          "checkout_time": null,
-          "pax_in": 0,
-          "pax_out": 0,
-          "small_equipment": true,
-          "operation_id": 2,
-          "confirmed_operation": true,
-          "straordinaria": false,
-          "type_apt": "A",
-          "alias": "NTM",
-          "customer_name": "NOTA-MI",
-          "reasons": [
-            "client_forced_eo"
-          ],
-          "priority": "early_out"
         }
       ],
-      "count": 15
+      "count": 14
     },
     "high_priority": {
       "tasks": [
@@ -719,36 +692,9 @@
             "premium"
           ],
           "priority": "high_priority"
-        },
-        {
-          "task_id": 218198,
-          "logistic_code": 1681,
-          "client_id": 123,
-          "premium": true,
-          "address": "Via Morigi, 3",
-          "lat": "45.462448",
-          "lng": "9.1811314",
-          "cleaning_time": 480,
-          "checkin_date": "2025-10-30",
-          "checkout_date": "2025-10-30",
-          "checkin_time": null,
-          "checkout_time": null,
-          "pax_in": 0,
-          "pax_out": 0,
-          "small_equipment": false,
-          "operation_id": 2,
-          "confirmed_operation": true,
-          "straordinaria": false,
-          "type_apt": "X",
-          "alias": "YOUHO",
-          "customer_name": "YOUHOSTY",
-          "reasons": [
-            "premium"
-          ],
-          "priority": "high_priority"
         }
       ],
-      "count": 12
+      "count": 11
     },
     "low_priority": {
       "tasks": [
@@ -1037,9 +983,9 @@
     }
   },
   "summary": {
-    "total_tasks": 37,
-    "early_out": 15,
-    "high_priority": 12,
+    "total_tasks": 35,
+    "early_out": 14,
+    "high_priority": 11,
     "low_priority": 10
   }
 }
