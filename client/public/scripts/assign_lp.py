@@ -257,8 +257,12 @@ def can_add_task(cleaner: Cleaner, task: Task) -> bool:
     # Se ha già 2 task EO+HP, può prendere max 3 LP (totale 5)
     # Se ha già 4 task EO+HP, può prendere max 1 LP (totale 5)
     max_lp_allowed = MAX_DAILY_TASKS - cleaner.total_daily_tasks
-    # Ma non più di BASE_MAX_TASKS_PER_PRIORITY (2) se non necessario
-    dynamic_max_lp = max(BASE_MAX_TASKS_PER_PRIORITY, max_lp_allowed)
+    # Il limite è il MINORE tra BASE (2) e lo spazio rimanente
+    dynamic_max_lp = min(BASE_MAX_TASKS_PER_PRIORITY, max_lp_allowed)
+    
+    # Se lo spazio rimanente è maggiore di 2, usa quello spazio
+    if max_lp_allowed > BASE_MAX_TASKS_PER_PRIORITY:
+        dynamic_max_lp = max_lp_allowed
     
     if len(cleaner.route) >= dynamic_max_lp:
         return False
@@ -599,11 +603,8 @@ def build_output(cleaners: List[Cleaner], unassigned: List[Task], original_tasks
         if not cl.route:
             continue
 
-        # Scarta cleaner con solo 1 task (minimo 2)
-        if len(cl.route) < MIN_TASKS_PER_CLEANER:
-            # Riporta task come non assegnate
-            unassigned.extend(cl.route)
-            continue
+        # RIMOSSO: Non scartare più cleaner con 1 sola task
+        # Ora accettiamo qualsiasi numero di task >= 1
 
         feasible, schedule = evaluate_route(cl, cl.route)
         if not feasible or not schedule:
@@ -747,13 +748,14 @@ def build_output(cleaners: List[Cleaner], unassigned: List[Task], original_tasks
             "algorithm": "simplified_greedy",
             "notes": [
                 "REGOLE LOW PRIORITY OTTIMIZZATE:",
-                "1. LIMITE LP DINAMICO: min(2, 5 - task_già_assegnate) per cleaner",
+                "1. LIMITE LP DINAMICO: (5 - task_già_assegnate) per cleaner",
+                "   - Se cleaner ha 0 task EO+HP: può prendere max 2 task LP (base)",
                 "   - Se cleaner ha 1 task EO+HP: può prendere fino a 4 task LP",
                 "   - Se cleaner ha 2 task EO+HP: può prendere fino a 3 task LP",
                 "   - Se cleaner ha 3 task EO+HP: può prendere fino a 2 task LP",
                 "   - Se cleaner ha 4 task EO+HP: può prendere fino a 1 task LP",
                 "2. LIMITE GIORNALIERO: Max 5 task totali (EO+HP+LP), preferibilmente 4",
-                "3. Minimo 2 task per cleaner (evita cleaner con 1 sola task)",
+                "3. RIMOSSO vincolo minimo 2 task: ora accetta anche 1 sola task LP",
                 "4. Considera task EO e HP precedenti per calcolare il totale",
                 "5. Favorisce cleaners con meno task totali (per rispettare limite 4)",
                 "6. Straordinarie solo a premium cleaner, devono essere la prima task",
