@@ -122,8 +122,20 @@ export default function TimelineView({
         const timelineData = await response.json();
         console.log("Timeline caricata da timeline.json:", timelineData);
 
-        // I cleaners sono in cleaners_assignments oppure cleaners
-        const cleanersList = timelineData.cleaners_assignments || timelineData.cleaners || [];
+        // Mappa la struttura di timeline.json al formato atteso dal componente
+        let cleanersList = [];
+        if (timelineData.cleaners_assignments && Array.isArray(timelineData.cleaners_assignments)) {
+          // La struttura è: { cleaners_assignments: [{ cleaner: {...}, tasks: [...] }] }
+          cleanersList = timelineData.cleaners_assignments.map((assignment: any) => ({
+            ...assignment.cleaner,
+            tasks: assignment.tasks || []
+          }));
+        } else if (timelineData.cleaners && Array.isArray(timelineData.cleaners)) {
+          // La struttura è già corretta: { cleaners: [...] }
+          cleanersList = timelineData.cleaners;
+        }
+        
+        console.log("Cleaners mappati:", cleanersList);
         setCleaners(cleanersList);
       } catch (error) {
         console.error("Errore nel caricamento della timeline:", error);
