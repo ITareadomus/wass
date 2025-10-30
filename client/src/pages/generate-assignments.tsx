@@ -336,10 +336,14 @@ export default function GenerateAssignments() {
           };
 
           console.log(`➕ Aggiungendo task ${logisticCode} dalla timeline a cleaner ${timelineAssignment.cleanerId} con sequence ${timelineAssignment.sequence}`);
-          tasksWithAssignments.push({
+          
+          // IMPORTANTE: Assicurati che assignedCleaner sia propagato correttamente
+          const taskWithAssignment = {
             ...baseTask,
-            assignedCleaner: timelineAssignment.cleanerId,
+            assignedCleaner: timelineAssignment.cleanerId, // Campo CRITICO per la visualizzazione
             sequence: timelineAssignment.sequence,
+            start_time: timelineAssignment.start_time,
+            end_time: timelineAssignment.end_time,
             startTime: timelineAssignment.start_time || (baseTask as any).startTime,
             endTime: timelineAssignment.end_time || (baseTask as any).endTime,
             travelTime: timelineAssignment.travel_time || 0,
@@ -360,7 +364,9 @@ export default function GenerateAssignments() {
             pax_out: timelineAssignment.pax_out,
             operation_id: timelineAssignment.operation_id,
             alias: timelineAssignment.alias,
-          } as any);
+          } as any;
+          
+          tasksWithAssignments.push(taskWithAssignment);
         }
       }
 
@@ -368,6 +374,17 @@ export default function GenerateAssignments() {
       console.log(`   - Task totali: ${tasksWithAssignments.length}`);
       console.log(`   - Task assegnate: ${tasksWithAssignments.filter(t => (t as any).assignedCleaner).length}`);
       console.log(`   - Task nei containers: ${tasksWithAssignments.filter(t => !(t as any).assignedCleaner).length}`);
+      
+      // Debug: mostra alcune task assegnate
+      const assignedTasks = tasksWithAssignments.filter(t => (t as any).assignedCleaner);
+      if (assignedTasks.length > 0) {
+        console.log(`📌 Esempio task assegnate (prime 3):`, assignedTasks.slice(0, 3).map(t => ({
+          name: t.name,
+          assignedCleaner: (t as any).assignedCleaner,
+          sequence: (t as any).sequence,
+          start_time: (t as any).start_time
+        })));
+      }
 
       setAllTasksWithAssignments(tasksWithAssignments);
 
