@@ -244,9 +244,16 @@ def can_add_task(cleaner: Cleaner, task: Task) -> bool:
     3. Max 2 task base, +1 se travel <= 10', max assoluto 4 (o 5 se finisce entro 18:00)
     4. NUOVO: Max LP dinamico = min(2, MAX_DAILY_TASKS - task_già_assegnate)
     5. Max 5 task totali giornaliere (preferibilmente 4)
+    6. FORMATORI: Max 2 task totali giornaliere
     """
     if not can_handle_premium(cleaner, task):
         return False
+
+    # NUOVO: Limite FORMATORI - max 2 task totali giornaliere
+    if cleaner.role.lower() == "formatore":
+        total_after = cleaner.total_daily_tasks + len(cleaner.route) + 1
+        if total_after > 2:
+            return False
 
     # NUOVO: Controllo limite giornaliero HARD (max 5 task totali)
     total_after_assignment = cleaner.total_daily_tasks + len(cleaner.route) + 1
