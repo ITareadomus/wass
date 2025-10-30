@@ -86,7 +86,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { taskId, logisticCode, sourceCleanerId, destCleanerId, destIndex, date } = req.body;
       const workDate = date || format(new Date(), 'yyyy-MM-dd');
       const timelinePath = path.join(process.cwd(), 'client/public/data/output/timeline.json');
-      const cleanersPath = path.join(process.cwd(), 'client/public/data/cleaners/selected_cleaners.json');
 
       // Carica timeline.json
       let timelineData: any = JSON.parse(await fs.readFile(timelinePath, 'utf8'));
@@ -101,14 +100,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         );
         if (taskIndex !== -1) {
           taskToMove = sourceEntry.tasks.splice(taskIndex, 1)[0];
-          
-          // Ricalcola sequence, travel_time e orari per il cleaner di origine
-          const { recomputeScheduleForCleaner } = await import('./schedule/recompute.js');
-          const cleanersData = JSON.parse(await fs.readFile(cleanersPath, 'utf8'));
-          const sourceCleaner = cleanersData.cleaners.find((c: any) => c.id === sourceCleanerId);
-          const sourceStartTime = sourceCleaner?.start_time || "10:00";
-          
-          sourceEntry.tasks = await recomputeScheduleForCleaner(sourceEntry.tasks, sourceStartTime, workDate);
+          // Ricalcola sequence per il cleaner di origine
+          sourceEntry.tasks.forEach((t: any, i: number) => {
+            t.sequence = i + 1;
+            t.followup = i > 0;
+          });
         }
       }
 
@@ -121,6 +117,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Se il cleaner di destinazione non esiste ancora, crealo
       if (!destEntry) {
+        // Carica i dati del cleaner da selected_cleaners.json
+        const cleanersPath = path.join(process.cwd(), 'client/public/data/cleaners/selected_cleaners.json');
         const cleanersData = JSON.parse(await fs.readFile(cleanersPath, 'utf8'));
         const cleanerInfo = cleanersData.cleaners.find((c: any) => c.id === destCleanerId);
 
@@ -145,19 +143,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!taskToMove.reasons.includes('manual_assignment')) {
         taskToMove.reasons.push('manual_assignment');
       }
+      // Rimuovi eventuali reason automatiche
       taskToMove.reasons = taskToMove.reasons.filter((r: string) => 
         !['auto_assignment', 'early_out_assignment', 'high_priority_assignment', 'low_priority_assignment'].includes(r)
       );
 
       destEntry.tasks.splice(targetIndex, 0, taskToMove);
 
-      // 4. Ricalcola sequence, travel_time e orari per il cleaner di destinazione
-      const { recomputeScheduleForCleaner } = await import('./schedule/recompute.js');
-      const cleanersData = JSON.parse(await fs.readFile(cleanersPath, 'utf8'));
-      const destCleaner = cleanersData.cleaners.find((c: any) => c.id === destCleanerId);
-      const destStartTime = destCleaner?.start_time || "10:00";
-      
-      destEntry.tasks = await recomputeScheduleForCleaner(destEntry.tasks, destStartTime, workDate);
+      // 4. Ricalcola sequence per il cleaner di destinazione
+      destEntry.tasks.forEach((t: any, i: number) => {
+        t.sequence = i + 1;
+        t.followup = i > 0;
+      });
 
       // 5. Rimuovi cleaner entries vuote
       timelineData.cleaners_assignments = timelineData.cleaners_assignments.filter(
@@ -178,7 +175,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       await fs.writeFile(tmpPath, JSON.stringify(timelineData, null, 2));
       await fs.rename(tmpPath, timelinePath);
 
-      console.log(`✅ Task ${logisticCode} spostata da cleaner ${sourceCleanerId} a cleaner ${destCleanerId} con orari ricalcolati`);
+      console.log(`✅ Task ${logisticCode} spostata da cleaner ${sourceCleanerId} a cleaner ${destCleanerId}`);
       res.json({ success: true, message: "Task spostata con successo tra cleaners" });
     } catch (error: any) {
       console.error("Errore nello spostamento tra cleaners:", error);
@@ -1862,7 +1859,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { date, cleanerId, taskId, logisticCode, fromIndex, toIndex } = req.body;
       const workDate = date || format(new Date(), 'yyyy-MM-dd');
       const timelinePath = path.join(process.cwd(), 'client/public/data/output/timeline.json');
-      const cleanersPath = path.join(process.cwd(), 'client/public/data/cleaners/selected_cleaners.json');
 
       // Carica timeline.json
       let timelineData: any = JSON.parse(await fs.readFile(timelinePath, 'utf8'));
@@ -1889,13 +1885,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Inserisci nella nuova posizione
       cleanerEntry.tasks.splice(toIndex, 0, task);
 
-      // Ricalcola sequence, travel_time, start_time e end_time per tutte le task
-      const { recomputeScheduleForCleaner } = await import('./schedule/recompute.js');
-      const cleanersData = JSON.parse(await fs.readFile(cleanersPath, 'utf8'));
-      const cleaner = cleanersData.cleaners.find((c: any) => c.id === cleanerId);
-      const cleanerStartTime = cleaner?.start_time || "10:00";
-      
-      cleanerEntry.tasks = await recomputeScheduleForCleaner(cleanerEntry.tasks, cleanerStartTime, workDate);
+      // Ricalcola sequence per tutte le task
+      cleanerEntry.tasks.forEach((t: any, i: number) => {
+        t.sequence = i + 1;
+        t.followup = i > 0; // Aggiorna anche followup
+      });
 
       // Aggiorna metadata e meta
       timelineData.metadata = timelineData.metadata || {};
@@ -1914,7 +1908,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       await fs.rename(tmpPath, timelinePath);
 
       console.log(`✅ Task ${logisticCode} riordinata da posizione ${fromIndex} a ${toIndex} per cleaner ${cleanerId}`);
-      console.log(`   Nuova sequenza delle task: ${cleanerEntry.tasks.map((t: any) => `${t.logistic_code}(${t.sequence}) ${t.start_time}-${t.end_time}`).join(', ')}`);
+      console.log(`   Nuova sequenza delle task: ${cleanerEntry.tasks.map((t: any) => `${t.logistic_code}(${t.sequence})`).join(', ')}`);
 
       res.json({ success: true, message: "Task riordinata con successo" });
     } catch (error: any) {
