@@ -622,11 +622,8 @@ def build_output(cleaners: List[Cleaner], unassigned: List[Task], original_tasks
         if not cl.route:
             continue
 
-        # Scarta cleaner con solo 1 task (minimo 2)
-        if len(cl.route) < MIN_TASKS_PER_CLEANER:
-            # Riporta task come non assegnate
-            unassigned.extend(cl.route)
-            continue
+        # HP: accetta anche 1 sola task (task urgenti)
+        # Non applicare vincolo minimo per High-Priority
 
         feasible, schedule = evaluate_route(cl, cl.route)
         if not feasible or not schedule:
@@ -758,7 +755,7 @@ def build_output(cleaners: List[Cleaner], unassigned: List[Task], original_tasks
             "notes": [
                 "REGOLE HIGH-PRIORITY OTTIMIZZATE:",
                 "1. Max 2 task HP per cleaner",
-                "2. Minimo 2 task per cleaner (evita cleaner con 1 sola task)",
+                "2. NESSUN vincolo minimo (può assegnare anche 1 sola task)",
                 "3. Considera finestre checkout/checkin e tempi percorrenza",
                 "4. Considera task EO precedenti (disponibilità e posizione)",
                 "5. Straordinarie solo a premium cleaner, devono essere la prima task",
