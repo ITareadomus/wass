@@ -244,7 +244,17 @@ def can_add_task(cleaner: Cleaner, task: Task) -> bool:
     3. Max 2 task base, +1 se travel <= 10', max assoluto 4 (o 5 se finisce entro 18:00)
     4. NUOVO: Max LP dinamico = min(2, MAX_DAILY_TASKS - task_già_assegnate)
     5. Max 5 task totali giornaliere (preferibilmente 4)
+    6. FORMATORE: solo task con type_apt A o B, massimo 2 al giorno
     """
+    # NUOVO: Regole per Formatore
+    if cleaner.role.lower() == "formatore":
+        # Formatore può solo task type_apt A o B
+        if task.apt_type not in ["A", "B"]:
+            return False
+        # Formatore max 2 task LP al giorno (totale)
+        if len(cleaner.route) >= 2:
+            return False
+    
     if not can_handle_premium(cleaner, task):
         return False
 
@@ -761,7 +771,8 @@ def build_output(cleaners: List[Cleaner], unassigned: List[Task], original_tasks
                 "6. Straordinarie solo a premium cleaner, devono essere la prima task",
                 "7. Premium task solo a premium cleaner",
                 "8. Vincolo orario: nessuna task deve finire dopo le 19:00",
-                "9. Seed da EO e HP: disponibilità e posizione dall'ultima task"
+                "9. Seed da EO e HP: disponibilità e posizione dall'ultima task",
+                "10. FORMATORE: solo task type_apt A o B, massimo 2 task LP al giorno"
             ]
         }
     }
