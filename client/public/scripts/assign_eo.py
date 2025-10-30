@@ -588,15 +588,14 @@ def build_output(cleaners: List[Cleaner], unassigned: List[Task], original_tasks
             "algorithm": "simplified_greedy",
             "notes": [
                 "REGOLE EARLY-OUT OTTIMIZZATE:",
-                "1. Max 2 task base, +1 se travel <= 10', max assoluto 4 (o 5 se finisce entro 18:00)",
-                "2. NO vincolo minimo task (accetta anche 1 sola task, sono task urgenti)",
-                "3. Favorisce percorsi < 20' (aumentato per aggregazione)",
-                "4. PRIORITÀ: cleaner con più task (per usare meno cleaner)",
-                "5. Cluster esteso a 15' (favorisce aggregazione)",
-                "6. Straordinarie solo a premium cleaner, devono essere la prima task",
-                "7. Premium task solo a premium cleaner",
-                "8. Check-in strict: deve finire prima del check-in time",
-                "9. Vincolo orario: nessuna task deve finire dopo le 19:00"
+                "1. Max 2 task EO per cleaner (3 se travel <= 10')",
+                "2. NO vincolo minimo task (può assegnare anche 1 sola task)",
+                "3. Favorisce distribuzione: meglio 1 task per cleaner che aggregare",
+                "4. Cluster esteso a 15' (favorisce aggregazione quando possibile)",
+                "5. Straordinarie solo a premium cleaner, devono essere la prima task",
+                "6. Premium task solo a premium cleaner",
+                "7. Check-in strict: deve finire prima del check-in time",
+                "8. Vincolo orario: nessuna task deve finire dopo le 19:00"
             ]
         }
     }
