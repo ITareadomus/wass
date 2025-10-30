@@ -254,9 +254,15 @@ def can_add_task(cleaner: Cleaner, task: Task) -> bool:
         if tt <= BONUS_TASK_MAX_TRAVEL:
             return True
 
-    # 4ª task o più: verifica max assoluto
+    # 4ª task o più: DEVE rispettare il vincolo dei 10' E max assoluto
     if current_count >= BASE_MAX_TASKS + 1 and current_count < ABSOLUTE_MAX_TASKS:
-        # Verifica se può finire entro le 18:00 per il 5° task
+        # Prima verifica: travel <= 10' dalla task precedente
+        last_task = cleaner.route[-1]
+        tt = travel_minutes(last_task, task)
+        if tt > BONUS_TASK_MAX_TRAVEL:
+            return False  # Blocca se travel > 10'
+        
+        # Seconda verifica: fattibilità temporale
         test_route = cleaner.route + [task]
         feasible, schedule = evaluate_route(test_route)
         if feasible and schedule:
