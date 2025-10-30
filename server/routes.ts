@@ -89,15 +89,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let fullTaskData: any = null;
       let sourceContainerType: string | null = null;
 
-      // Load containers data only if taskData is not provided or incomplete
+      // SEMPRE carica containers.json per poter rimuovere la task dopo l'assegnazione
       let containersData = null;
-      if (!taskData) {
-        try {
-          containersData = JSON.parse(await fs.readFile(containersPath, 'utf8'));
-        } catch (error) {
-          console.error(`Failed to read ${containersPath}:`, error);
-          // Continue without containers data, will rely on taskData
-        }
+      try {
+        containersData = JSON.parse(await fs.readFile(containersPath, 'utf8'));
+      } catch (error) {
+        console.error(`Failed to read ${containersPath}:`, error);
+        // Continue without containers data, will rely on taskData
       }
 
       // Cerca la task nei containers per ottenere tutti i dati
