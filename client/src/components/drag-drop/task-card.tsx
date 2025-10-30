@@ -48,7 +48,7 @@ export default function TaskCard({
   // Priorità: straordinaria → premium → standard
   const isPremium = Boolean((task as any).premium);
   const isStraordinaria = Boolean((task as any).straordinaria || (task as any).is_straordinaria);
-  
+
   // Funzione per assegnare colore e label SOLO in base al tipo
   const getTaskTypeStyle = () => {
     if (isStraordinaria) {
@@ -262,7 +262,7 @@ export default function TaskCard({
               >
                 {typeLabel}
               </Badge>
-              {(task as any).priority && (
+              {isInTimeline && (task as any).priority && (
                 <Badge
                   variant="outline"
                   className={cn(
@@ -271,18 +271,14 @@ export default function TaskCard({
                       ? "bg-blue-500 text-white border-blue-700"
                       : (task as any).priority === "high_priority"
                         ? "bg-orange-500 text-white border-orange-700"
-                        : (task as any).priority === "low_priority"
-                          ? "bg-gray-500 text-white border-gray-700"
-                          : "bg-gray-400 text-white border-gray-600"
+                        : "bg-gray-500 text-white border-gray-700"
                   )}
                 >
                   {(task as any).priority === "early_out" 
                     ? "EO" 
                     : (task as any).priority === "high_priority" 
                       ? "HP" 
-                      : (task as any).priority === "low_priority"
-                        ? "LP"
-                        : "N/A"}
+                      : "LP"}
                 </Badge>
               )}
             </DialogTitle>
