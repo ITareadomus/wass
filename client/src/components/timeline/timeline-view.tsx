@@ -298,27 +298,24 @@ export default function TimelineView({
                       <div className="relative z-10 flex items-center h-full">
                         {tasks
                           .filter((task) => (task as any).assignedCleaner === cleaner.id)
-                          .map(normalizeTask) // Applica la normalizzazione prima di ordinare e mappare
+                          .map(normalizeTask)
                           .sort((a, b) => {
-                            // Ordina prima per sequence (se presente), poi per orario
                             const taskA = a as any;
                             const taskB = b as any;
 
-                            // Se entrambe hanno sequence, usa quello
                             if (taskA.sequence !== undefined && taskB.sequence !== undefined) {
                               return taskA.sequence - taskB.sequence;
                             }
 
-                            // Altrimenti ordina per orario di inizio
                             const timeA = taskA.start_time || taskA.fw_start_time || taskA.startTime || "00:00";
                             const timeB = taskB.start_time || taskB.fw_start_time || taskB.startTime || "00:00";
                             return timeA.localeCompare(timeB);
                           })
-                          .map((task, index) => (
+                          .map((task, idx) => (
                             <TaskCard 
-                              key={`${task.id}-${cleaner.id}-${index}`}
+                              key={task.id}
                               task={task} 
-                              index={index}
+                              index={idx}
                               isInTimeline={true}
                             />
                           ))}
