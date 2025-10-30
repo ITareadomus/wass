@@ -40,12 +40,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Svuota il file timeline.json
       await fs.writeFile(timelinePath, JSON.stringify({ 
+        metadata: {
+          last_updated: new Date().toISOString(),
+          date: workDate
+        },
         cleaners_assignments: [], 
-        current_date: workDate,
         meta: {
           total_cleaners: 0,
-          total_tasks: 0,
-          last_updated: new Date().toISOString()
+          used_cleaners: 0,
+          assigned_tasks: 0
         }
       }, null, 2));
       console.log(`Timeline resettata: timeline.json`);
