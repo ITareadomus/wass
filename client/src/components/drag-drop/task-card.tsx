@@ -262,6 +262,25 @@ export default function TaskCard({
               >
                 {typeLabel}
               </Badge>
+              {(task as any).priority && (
+                <Badge
+                  variant="outline"
+                  className={cn(
+                    "text-xs shrink-0",
+                    (task as any).priority === "early_out"
+                      ? "bg-blue-500 text-white border-blue-700"
+                      : (task as any).priority === "high_priority"
+                        ? "bg-orange-500 text-white border-orange-700"
+                        : "bg-gray-500 text-white border-gray-700"
+                  )}
+                >
+                  {(task as any).priority === "early_out" 
+                    ? "EO" 
+                    : (task as any).priority === "high_priority" 
+                      ? "HP" 
+                      : "LP"}
+                </Badge>
+              )}
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
