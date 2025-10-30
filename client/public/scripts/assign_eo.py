@@ -17,11 +17,11 @@ OUTPUT_ASSIGN = BASE / "output" / "early_out_assignments.json"
 # =============================
 # CONFIG - REGOLE SEMPLIFICATE
 # =============================
-MAX_TASKS_PER_CLEANER = 3  # Massimo 3 task (preferito per usare meno cleaner)
-FOURTH_TASK_MAX_TRAVEL = 10.0  # 4ª task solo se entro 10' dalla 3ª
-CLUSTER_MAX_TRAVEL = 15.0  # Se task <= 15' da qualsiasi altra, ignora limite di task
+MAX_TASKS_PER_CLEANER = 2  # Massimo 2 task
+THIRD_TASK_MAX_TRAVEL = 10.0  # 3ª task solo se entro 10' dalla 2ª
+CLUSTER_MAX_TRAVEL = 10.0  # Se task <= 10' da qualsiasi altra, ignora limite di task
 
-PREFERRED_TRAVEL = 20.0  # Preferenza per percorsi < 20' (aumentato per favorire aggregazione)
+PREFERRED_TRAVEL = 15.0  # Preferenza per percorsi < 15'
 
 # Travel model (min)
 SHORT_RANGE_KM = 0.30
@@ -228,9 +228,9 @@ def can_add_task(cleaner: Cleaner, task: Task) -> bool:
         if task.straordinaria:
             return False
 
-    # Max 3 task, MA: se task <= 15' da qualsiasi altra, ignora limite
+    # Max 2 task, MA: se task <= 5' da qualsiasi altra, ignora limite
     if len(cleaner.route) >= MAX_TASKS_PER_CLEANER:
-        # Controlla se la task è <= 15' da qualsiasi task esistente
+        # Controlla se la task è <= 5' da qualsiasi task esistente
         is_within_cluster = any(
             travel_minutes(existing_task, task) <= CLUSTER_MAX_TRAVEL or
             travel_minutes(task, existing_task) <= CLUSTER_MAX_TRAVEL
@@ -241,11 +241,11 @@ def can_add_task(cleaner: Cleaner, task: Task) -> bool:
             # Task in cluster: ignora limite di task
             return True
         
-        # Altrimenti: regola normale (4ª solo se entro 10')
-        if len(cleaner.route) == 3:
+        # Altrimenti: regola normale (3ª solo se entro 10')
+        if len(cleaner.route) == 2:
             last_task = cleaner.route[-1]
             tt = travel_minutes(last_task, task)
-            if tt <= FOURTH_TASK_MAX_TRAVEL:
+            if tt <= THIRD_TASK_MAX_TRAVEL:
                 return True
         return False
 
@@ -308,7 +308,6 @@ def load_cleaners() -> List[Cleaner]:
     for c in data.get("cleaners", []):
         role = (c.get("role") or "").strip()
         is_premium = bool(c.get("premium", (role.lower() == "premium")))
-        # Escludi Formatori da Early-Out
         if (role or "").lower() == "formatore":
             continue
         cleaners.append(
@@ -412,19 +411,18 @@ def plan_day(tasks: List[Task], cleaners: List[Cleaner]) -> Tuple[List[Cleaner],
                 chosen = cluster_candidates[0]
             else:
                 # Nessun cluster, usa logica normale
-                # Dividi i candidati in due gruppi: < 20' e >= 20'
+                # Dividi i candidati in due gruppi: < 15' e >= 15'
                 preferred = [(c, p, t) for c, p, t in candidates if t < PREFERRED_TRAVEL]
                 others = [(c, p, t) for c, p, t in candidates if t >= PREFERRED_TRAVEL]
 
                 # Scegli dal gruppo preferito se esiste, altrimenti dal gruppo altri
                 if preferred:
-                    # PRIORITÀ: cleaner con più task (per usare meno cleaner)
-                    # Ordina per numero di task DECRESCENTE, poi per minor viaggio
-                    preferred.sort(key=lambda x: (-len(x[0].route), x[2]))
+                    # Scegli quello con minor viaggio tra i preferiti
+                    preferred.sort(key=lambda x: (len(x[0].route), x[2]))
                     chosen = preferred[0]
                 else:
-                    # Stesso per gli altri
-                    others.sort(key=lambda x: (-len(x[0].route), x[2]))
+                    # Scegli quello con minor viaggio tra gli altri
+                    others.sort(key=lambda x: (len(x[0].route), x[2]))
                     chosen = others[0]
 
         cleaner, pos, travel = chosen
@@ -553,15 +551,14 @@ def build_output(cleaners: List[Cleaner], unassigned: List[Task], original_tasks
             "max_tasks_per_cleaner": 3,
             "algorithm": "simplified_greedy",
             "notes": [
-                "REGOLE OTTIMIZZATE:",
-                "1. Max 3 task per cleaner (4ª solo se entro 10' dalla 3ª)",
-                "2. Favorisce percorsi < 20' (aumentato per aggregazione)",
-                "3. PRIORITÀ: cleaner con più task (per usare meno cleaner)",
-                "4. Cluster esteso a 15' (favorisce aggregazione)",
-                "5. Straordinarie solo a premium cleaner, devono essere la prima task",
-                "6. Premium task solo a premium cleaner",
-                "7. Check-in strict: deve finire prima del check-in time",
-                "8. Vincolo orario: nessuna task deve finire dopo le 19:00"
+                "REGOLE SEMPLIFICATE:",
+                "1. Max 2 task per cleaner (3ª solo se entro 10' dalla 2ª)",
+                "2. Favorisce percorsi < 15'",
+                "3. Se non ci sono percorsi < 15', sceglie il minore dei > 15'",
+                "4. Straordinarie solo a premium cleaner, devono essere la prima task",
+                "5. Premium task solo a premium cleaner",
+                "6. Check-in strict: deve finire prima del check-in time",
+                "7. Vincolo orario: nessuna task deve finire dopo le 19:00"
             ]
         }
     }
