@@ -748,18 +748,41 @@ export default function GenerateAssignments() {
       : containerToJsonName[destination.droppableId] || null;
 
     try {
-      // Caso 1: Reorder intra-timeline (stessa colonna cleaner)
+      // Caso 1: Reorder intra-timeline (stessa colonna cleaner) O spostamento tra cleaners diversi
       if (source.droppableId.startsWith('timeline-') && destination.droppableId.startsWith('timeline-')) {
         const sourceCleanerId = parseInt(source.droppableId.replace('timeline-', ''));
         const destCleanerId = parseInt(destination.droppableId.replace('timeline-', ''));
 
         if (sourceCleanerId === destCleanerId) {
           // Reorder nella stessa timeline
+          console.log(`🔄 Reorder task ${logisticCode} nella timeline del cleaner ${sourceCleanerId}`);
           await reorderTimelineAssignment(taskId, sourceCleanerId, logisticCode || '', source.index, destination.index);
-          // FORZA ricaricamento completo
-          await loadTasks(true);
-          return;
+        } else {
+          // Spostamento tra cleaners diversi
+          console.log(`🔄 Spostamento task ${logisticCode} da cleaner ${sourceCleanerId} a cleaner ${destCleanerId}`);
+          
+          const dateStr = format(selectedDate, "yyyy-MM-dd");
+          const response = await fetch('/api/move-task-between-cleaners', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+              taskId, 
+              logisticCode,
+              sourceCleanerId, 
+              destCleanerId, 
+              destIndex: destination.index,
+              date: dateStr 
+            }),
+          });
+          
+          if (!response.ok) {
+            throw new Error('Errore nello spostamento tra cleaners');
+          }
         }
+        
+        // FORZA ricaricamento completo
+        await loadTasks(true);
+        return;
       }
 
       // Caso 2: Da timeline a container

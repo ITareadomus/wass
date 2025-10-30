@@ -80,6 +80,109 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Endpoint per spostare una task tra cleaners diversi nella timeline
+  app.post("/api/move-task-between-cleaners", async (req, res) => {
+    try {
+      const { taskId, logisticCode, sourceCleanerId, destCleanerId, destIndex, date } = req.body;
+      const workDate = date || format(new Date(), 'yyyy-MM-dd');
+      const timelinePath = path.join(process.cwd(), 'client/public/data/output/timeline.json');
+
+      // Carica timeline.json
+      let timelineData: any = JSON.parse(await fs.readFile(timelinePath, 'utf8'));
+
+      let taskToMove: any = null;
+
+      // 1. Trova e rimuovi la task dal cleaner di origine
+      const sourceEntry = timelineData.cleaners_assignments.find((c: any) => c.cleaner.id === sourceCleanerId);
+      if (sourceEntry) {
+        const taskIndex = sourceEntry.tasks.findIndex((t: any) => 
+          String(t.task_id) === String(taskId) || String(t.logistic_code) === String(logisticCode)
+        );
+        if (taskIndex !== -1) {
+          taskToMove = sourceEntry.tasks.splice(taskIndex, 1)[0];
+          // Ricalcola sequence per il cleaner di origine
+          sourceEntry.tasks.forEach((t: any, i: number) => {
+            t.sequence = i + 1;
+            t.followup = i > 0;
+          });
+        }
+      }
+
+      if (!taskToMove) {
+        return res.status(404).json({ success: false, message: "Task non trovata nel cleaner di origine" });
+      }
+
+      // 2. Aggiungi la task al cleaner di destinazione
+      let destEntry = timelineData.cleaners_assignments.find((c: any) => c.cleaner.id === destCleanerId);
+      
+      // Se il cleaner di destinazione non esiste ancora, crealo
+      if (!destEntry) {
+        // Carica i dati del cleaner da selected_cleaners.json
+        const cleanersPath = path.join(process.cwd(), 'client/public/data/cleaners/selected_cleaners.json');
+        const cleanersData = JSON.parse(await fs.readFile(cleanersPath, 'utf8'));
+        const cleanerInfo = cleanersData.cleaners.find((c: any) => c.id === destCleanerId);
+        
+        if (!cleanerInfo) {
+          return res.status(404).json({ success: false, message: "Cleaner di destinazione non trovato" });
+        }
+
+        destEntry = {
+          cleaner: cleanerInfo,
+          tasks: []
+        };
+        timelineData.cleaners_assignments.push(destEntry);
+      }
+
+      // 3. Inserisci la task nella posizione specificata e aggiorna reason
+      const targetIndex = destIndex !== undefined 
+        ? Math.max(0, Math.min(destIndex, destEntry.tasks.length))
+        : destEntry.tasks.length;
+
+      // Aggiorna la reason per indicare lo spostamento manuale
+      taskToMove.reasons = taskToMove.reasons || [];
+      if (!taskToMove.reasons.includes('manual_assignment')) {
+        taskToMove.reasons.push('manual_assignment');
+      }
+      // Rimuovi eventuali reason automatiche
+      taskToMove.reasons = taskToMove.reasons.filter((r: string) => 
+        !['auto_assignment', 'early_out_assignment', 'high_priority_assignment', 'low_priority_assignment'].includes(r)
+      );
+
+      destEntry.tasks.splice(targetIndex, 0, taskToMove);
+
+      // 4. Ricalcola sequence per il cleaner di destinazione
+      destEntry.tasks.forEach((t: any, i: number) => {
+        t.sequence = i + 1;
+        t.followup = i > 0;
+      });
+
+      // 5. Rimuovi cleaner entries vuote
+      timelineData.cleaners_assignments = timelineData.cleaners_assignments.filter(
+        (c: any) => c.tasks && c.tasks.length > 0
+      );
+
+      // 6. Aggiorna metadata
+      timelineData.metadata = timelineData.metadata || {};
+      timelineData.metadata.last_updated = new Date().toISOString();
+      timelineData.metadata.date = workDate;
+      timelineData.meta.total_cleaners = timelineData.cleaners_assignments.length;
+      timelineData.meta.total_tasks = timelineData.cleaners_assignments.reduce(
+        (sum: number, c: any) => sum + c.tasks.length, 0
+      );
+
+      // Scrittura atomica
+      const tmpPath = `${timelinePath}.tmp`;
+      await fs.writeFile(tmpPath, JSON.stringify(timelineData, null, 2));
+      await fs.rename(tmpPath, timelinePath);
+
+      console.log(`✅ Task ${logisticCode} spostata da cleaner ${sourceCleanerId} a cleaner ${destCleanerId}`);
+      res.json({ success: true, message: "Task spostata con successo tra cleaners" });
+    } catch (error: any) {
+      console.error("Errore nello spostamento tra cleaners:", error);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
   // Endpoint per salvare un'assegnazione nella timeline
   app.post("/api/save-timeline-assignment", async (req, res) => {
     try {
