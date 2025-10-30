@@ -899,39 +899,6 @@ export default function GenerateAssignments() {
               </PopoverContent>
             </Popover>
             <Button
-              onClick={async () => {
-                if (confirm('Vuoi resettare tutte le assegnazioni e ripristinare i container? Questa azione non può essere annullata.')) {
-                  try {
-                    const response = await fetch('/api/reset-timeline-assignments', {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ date: format(selectedDate, "yyyy-MM-dd") })
-                    });
-                    const result = await response.json();
-                    if (result.success) {
-                      toast({
-                        title: "Timeline Resettata",
-                        description: result.message,
-                        duration: 3000,
-                      });
-                      // FORZA ricaricamento completo dopo reset
-                      await loadTasks(true);
-                    }
-                  } catch (error: any) {
-                    toast({
-                      title: "Errore",
-                      description: error.message,
-                      variant: "destructive",
-                    });
-                  }
-                }
-              }}
-              variant="outline"
-              className="border-red-600 text-red-600 hover:bg-red-50"
-            >
-              🔄 Reset Assegnazioni
-            </Button>
-            <Button
               onClick={confirmAssignments}
               disabled={isConfirming || allTasksWithAssignments.filter(t => (t as any).assignedCleaner).length === 0}
               className="bg-green-600 hover:bg-green-700 text-white"
