@@ -443,6 +443,7 @@ def plan_day(tasks: List[Task], cleaners: List[Cleaner]) -> Tuple[List[Cleaner],
     - Favorisce percorsi < 15'
     - Se non ci sono percorsi < 15', sceglie il minore dei > 15'
     - Max 3 task per cleaner per LP
+    - FORMATRICE: priorità assoluta a task vicine (< 10')
     """
     unassigned = []
 
@@ -476,40 +477,75 @@ def plan_day(tasks: List[Task], cleaners: List[Cleaner]) -> Tuple[List[Cleaner],
             same_address_candidates.sort(key=lambda x: (len(x[0].route), x[2]))
             chosen = same_address_candidates[0]
         else:
-            # Priorità 2: Cleaner con task entro 10 minuti (cluster)
-            cluster_candidates = []
+            # PRIORITÀ SPECIALE PER FORMATRICE: solo task molto vicine
+            formatrice_candidates = []
             for c, p, t in candidates:
-                # Controlla se il cleaner ha task entro 10 minuti
-                has_cluster = any(
-                    travel_minutes(existing_task.lat, existing_task.lng, task.lat, task.lng,
-                                 existing_task.address, task.address) <= CLUSTER_MAX_TRAVEL or
-                    travel_minutes(task.lat, task.lng, existing_task.lat, existing_task.lng,
-                                 task.address, existing_task.address) <= CLUSTER_MAX_TRAVEL
-                    for existing_task in c.route
-                )
-                if has_cluster:
-                    cluster_candidates.append((c, p, t))
+                if (c.role or "").lower() == "formatore":
+                    # Formatrice: accetta SOLO task entro 10' da task esistenti
+                    # Se non ha task, accetta la prima
+                    if len(c.route) == 0:
+                        formatrice_candidates.append((c, p, t))
+                    else:
+                        # Controlla se la task è entro 10' da QUALSIASI task esistente
+                        has_nearby = any(
+                            travel_minutes(existing_task.lat, existing_task.lng, task.lat, task.lng,
+                                         existing_task.address, task.address) <= 10.0 or
+                            travel_minutes(task.lat, task.lng, existing_task.lat, existing_task.lng,
+                                         task.address, existing_task.address) <= 10.0
+                            for existing_task in c.route
+                        )
+                        if has_nearby:
+                            formatrice_candidates.append((c, p, t))
             
-            if cluster_candidates:
-                # Priorità alta a cleaner in cluster (minor numero di task, poi minor viaggio)
-                cluster_candidates.sort(key=lambda x: (len(x[0].route), x[2]))
-                chosen = cluster_candidates[0]
+            if formatrice_candidates:
+                # Priorità a Formatrice con task vicine (minor viaggio)
+                formatrice_candidates.sort(key=lambda x: (len(x[0].route), x[2]))
+                chosen = formatrice_candidates[0]
             else:
-                # Nessun cluster, usa logica normale
-                # Dividi i candidati in due gruppi: < 20' e >= 20'
-                preferred = [(c, p, t) for c, p, t in candidates if t < PREFERRED_TRAVEL]
-                others = [(c, p, t) for c, p, t in candidates if t >= PREFERRED_TRAVEL]
-
-                # Scegli dal gruppo preferito se esiste, altrimenti dal gruppo altri
-                if preferred:
-                    # PRIORITÀ: cleaner con più task (per usare meno cleaner)
-                    # Ordina per numero di task DECRESCENTE, poi per minor viaggio
-                    preferred.sort(key=lambda x: (-len(x[0].route), x[2]))
-                    chosen = preferred[0]
+                # Priorità 2: Cleaner con task entro 10 minuti (cluster)
+                cluster_candidates = []
+                for c, p, t in candidates:
+                    # Escludi Formatrice da questa ricerca (gestita sopra)
+                    if (c.role or "").lower() == "formatore":
+                        continue
+                    
+                    # Controlla se il cleaner ha task entro 10 minuti
+                    has_cluster = any(
+                        travel_minutes(existing_task.lat, existing_task.lng, task.lat, task.lng,
+                                     existing_task.address, task.address) <= CLUSTER_MAX_TRAVEL or
+                        travel_minutes(task.lat, task.lng, existing_task.lat, existing_task.lng,
+                                     task.address, existing_task.address) <= CLUSTER_MAX_TRAVEL
+                        for existing_task in c.route
+                    )
+                    if has_cluster:
+                        cluster_candidates.append((c, p, t))
+                
+                if cluster_candidates:
+                    # Priorità alta a cleaner in cluster (minor numero di task, poi minor viaggio)
+                    cluster_candidates.sort(key=lambda x: (len(x[0].route), x[2]))
+                    chosen = cluster_candidates[0]
                 else:
-                    # Stesso per gli altri
-                    others.sort(key=lambda x: (-len(x[0].route), x[2]))
-                    chosen = others[0]
+                    # Nessun cluster, usa logica normale (escludi Formatrice)
+                    non_formatrice_candidates = [(c, p, t) for c, p, t in candidates if (c.role or "").lower() != "formatore"]
+                    
+                    # Dividi i candidati in due gruppi: < 20' e >= 20'
+                    preferred = [(c, p, t) for c, p, t in non_formatrice_candidates if t < PREFERRED_TRAVEL]
+                    others = [(c, p, t) for c, p, t in non_formatrice_candidates if t >= PREFERRED_TRAVEL]
+
+                    # Scegli dal gruppo preferito se esiste, altrimenti dal gruppo altri
+                    if preferred:
+                        # PRIORITÀ: cleaner con più task (per usare meno cleaner)
+                        # Ordina per numero di task DECRESCENTE, poi per minor viaggio
+                        preferred.sort(key=lambda x: (-len(x[0].route), x[2]))
+                        chosen = preferred[0]
+                    elif others:
+                        # Stesso per gli altri
+                        others.sort(key=lambda x: (-len(x[0].route), x[2]))
+                        chosen = others[0]
+                    else:
+                        # Nessun candidato trovato (solo Formatrice con task lontane)
+                        unassigned.append(task)
+                        continue
 
         cleaner, pos, travel = chosen
         cleaner.route.insert(pos, task)
