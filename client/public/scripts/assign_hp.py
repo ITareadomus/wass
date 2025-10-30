@@ -756,18 +756,16 @@ def build_output(cleaners: List[Cleaner], unassigned: List[Task], original_tasks
             "max_tasks_per_cleaner": 3,
             "algorithm": "simplified_greedy",
             "notes": [
-                "REGOLE OTTIMIZZATE:",
-                "1. Max 2 task base, +1 se travel <= 10', max assoluto 4 (o 5 se finisce entro 18:00)",
+                "REGOLE HIGH-PRIORITY OTTIMIZZATE:",
+                "1. Max 2 task HP per cleaner",
                 "2. Minimo 2 task per cleaner (evita cleaner con 1 sola task)",
-                "3. Favorisce percorsi < 20' (aumentato per aggregazione)",
-                "4. PRIORITÀ: cleaner con più task (per usare meno cleaner)",
-                "5. Cluster esteso a 15' (favorisce aggregazione)",
-                "6. Straordinarie solo a premium cleaner, devono essere la prima task",
-                "7. Premium task solo a premium cleaner",
-                "8. Check-in strict: deve finire prima del check-in time",
-                "9. HP hard earliest: 11:00",
-                "10. Seed da EO: disponibilità e posizione dall'ultima EO",
-                "11. Vincolo orario: nessuna task deve finire dopo le 19:00"
+                "3. Considera finestre checkout/checkin e tempi percorrenza",
+                "4. Considera task EO precedenti (disponibilità e posizione)",
+                "5. Straordinarie solo a premium cleaner, devono essere la prima task",
+                "6. Premium task solo a premium cleaner",
+                "7. Check-in strict: deve finire prima del check-in time",
+                "8. HP hard earliest: 11:00",
+                "9. Vincolo orario: nessuna task deve finire dopo le 19:00"
             ]
         }
     }

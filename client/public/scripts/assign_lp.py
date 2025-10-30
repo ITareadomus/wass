@@ -32,6 +32,10 @@ PREFERRED_TRAVEL = 20.0  # Preferenza per percorsi < 20' (aumentato per favorire
 # NUOVO: Limite per tipologia di priorità
 MAX_TASKS_PER_PRIORITY = 2  # Max 2 task Low-Priority per cleaner
 
+# NUOVO: Limite giornaliero totale
+MAX_DAILY_TASKS = 5  # Max 5 task totali per cleaner al giorno (hard limit)
+PREFERRED_DAILY_TASKS = 4  # Preferibile max 4 task totali (soft limit)
+
 # Travel model (min)
 SHORT_RANGE_KM = 0.30
 SHORT_BASE_MIN = 3.5
@@ -78,6 +82,7 @@ class Cleaner:
     last_lng: Optional[float] = None
     last_sequence: int = 0
     route: List[Task] = field(default_factory=list)
+    total_daily_tasks: int = 0  # Totale task giornaliere (EO + HP + LP)
 
 
 # -------- Utils --------
@@ -238,8 +243,14 @@ def can_add_task(cleaner: Cleaner, task: Task) -> bool:
     2. Straordinaria -> premium cleaner, deve essere la prima (pos=0)
     3. Max 2 task base, +1 se travel <= 10', max assoluto 4 (o 5 se finisce entro 18:00)
     4. Max 2 task Low-Priority per cleaner
+    5. NUOVO: Max 5 task totali giornaliere (preferibilmente 4)
     """
     if not can_handle_premium(cleaner, task):
+        return False
+
+    # NUOVO: Controllo limite giornaliero HARD (max 5 task totali)
+    total_after_assignment = cleaner.total_daily_tasks + len(cleaner.route) + 1
+    if total_after_assignment > MAX_DAILY_TASKS:
         return False
 
     # NUOVO: Limite max 2 task Low-Priority per cleaner
@@ -401,6 +412,7 @@ def load_cleaners() -> List[Cleaner]:
 def seed_cleaners_from_assignments(cleaners: List[Cleaner]):
     """
     Seed cleaners con informazioni da timeline.json (EO e HP assignments)
+    Conta anche il totale task giornaliere per applicare il limite di 5
     """
     # Leggi dalla timeline.json invece che dai file individuali
     timeline_path = OUTPUT_ASSIGN.parent / "timeline.json"
@@ -442,6 +454,7 @@ def seed_cleaners_from_assignments(cleaners: List[Cleaner]):
         last_lat = last.get("lat")
         last_lng = last.get("lng")
         last_seq = last.get("sequence") or len(non_lp_tasks)
+        
         for cl in cleaners:
             if cl.id == cid:
                 cl.available_from = end_time
@@ -449,6 +462,8 @@ def seed_cleaners_from_assignments(cleaners: List[Cleaner]):
                 cl.last_lat = float(last_lat) if last_lat is not None else None
                 cl.last_lng = float(last_lng) if last_lng is not None else None
                 cl.last_sequence = int(last_seq)
+                # NUOVO: Conta il totale task giornaliere (EO + HP)
+                cl.total_daily_tasks = len(non_lp_tasks)
                 break
 
 
@@ -531,8 +546,13 @@ def plan_day(tasks: List[Task], cleaners: List[Cleaner]) -> Tuple[List[Cleaner],
                     cluster_candidates.append((c, p, t))
             
             if cluster_candidates:
-                # Priorità alta a cleaner in cluster (minor numero di task, poi minor viaggio)
-                cluster_candidates.sort(key=lambda x: (len(x[0].route), x[2]))
+                # Priorità alta a cleaner in cluster
+                # NUOVO: preferisci chi ha meno task totali (per evitare di superare 4)
+                cluster_candidates.sort(key=lambda x: (
+                    x[0].total_daily_tasks + len(x[0].route),  # Totale task (EO+HP+LP)
+                    len(x[0].route),  # Task LP
+                    x[2]  # Travel time
+                ))
                 chosen = cluster_candidates[0]
             else:
                 # Nessun cluster, usa logica normale
@@ -542,13 +562,23 @@ def plan_day(tasks: List[Task], cleaners: List[Cleaner]) -> Tuple[List[Cleaner],
 
                 # Scegli dal gruppo preferito se esiste, altrimenti dal gruppo altri
                 if preferred:
-                    # PRIORITÀ: cleaner con più task (per usare meno cleaner)
-                    # Ordina per numero di task DECRESCENTE, poi per minor viaggio
-                    preferred.sort(key=lambda x: (-len(x[0].route), x[2]))
+                    # NUOVO: preferisci chi ha meno task totali (per evitare di superare 4)
+                    # Ma tra quelli con stesso totale, preferisci chi ha più LP (per aggregare)
+                    preferred.sort(key=lambda x: (
+                        x[0].total_daily_tasks + len(x[0].route) >= PREFERRED_DAILY_TASKS,  # Evita >= 4
+                        x[0].total_daily_tasks + len(x[0].route),  # Totale task
+                        -len(x[0].route),  # Più task LP (aggregazione)
+                        x[2]  # Travel time
+                    ))
                     chosen = preferred[0]
                 else:
                     # Stesso per gli altri
-                    others.sort(key=lambda x: (-len(x[0].route), x[2]))
+                    others.sort(key=lambda x: (
+                        x[0].total_daily_tasks + len(x[0].route) >= PREFERRED_DAILY_TASKS,
+                        x[0].total_daily_tasks + len(x[0].route),
+                        -len(x[0].route),
+                        x[2]
+                    ))
                     chosen = others[0]
 
         cleaner, pos, travel = chosen
@@ -711,16 +741,15 @@ def build_output(cleaners: List[Cleaner], unassigned: List[Task], original_tasks
             "algorithm": "simplified_greedy",
             "notes": [
                 "REGOLE LOW PRIORITY OTTIMIZZATE:",
-                "1. Max 2 task base, +1 se travel <= 10', max assoluto 4 (o 5 se finisce entro 18:00)",
-                "2. Minimo 2 task per cleaner (evita cleaner con 1 sola task)",
-                "3. Favorisce percorsi < 20' (aumentato per aggregazione)",
-                "4. PRIORITÀ: cleaner con più task (per usare meno cleaner)",
-                "5. Cluster esteso a 15' (favorisce aggregazione)",
+                "1. Max 2 task LP per cleaner",
+                "2. LIMITE GIORNALIERO: Max 5 task totali (EO+HP+LP), preferibilmente 4",
+                "3. Minimo 2 task per cleaner (evita cleaner con 1 sola task)",
+                "4. Considera task EO e HP precedenti per calcolare il totale",
+                "5. Favorisce cleaners con meno task totali (per rispettare limite 4)",
                 "6. Straordinarie solo a premium cleaner, devono essere la prima task",
                 "7. Premium task solo a premium cleaner",
                 "8. Vincolo orario: nessuna task deve finire dopo le 19:00",
-                "9. Seed da EO e HP: disponibilità e posizione dall'ultima task assegnata",
-                "10. Nessun vincolo particolare d'orario (flessibilità massima)"
+                "9. Seed da EO e HP: disponibilità e posizione dall'ultima task"
             ]
         }
     }
