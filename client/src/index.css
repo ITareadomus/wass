@@ -2,6 +2,21 @@
 @tailwind components;
 @tailwind utilities;
 
+@keyframes blink-border {
+  0%, 100% {
+    border-color: rgb(220, 38, 38);
+    box-shadow: 0 0 8px rgba(220, 38, 38, 0.8);
+  }
+  50% {
+    border-color: rgb(239, 68, 68);
+    box-shadow: 0 0 16px rgba(239, 68, 68, 1);
+  }
+}
+
+.animate-blink {
+  animation: blink-border 1s ease-in-out infinite;
+}
+
 :root {
   --background: hsl(0 0% 100%);
   --foreground: hsl(222.2 84% 4.9%);
