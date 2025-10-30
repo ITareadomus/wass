@@ -306,7 +306,7 @@ def can_add_task(cleaner: Cleaner, task: Task) -> bool:
                      task.address, existing_task.address) <= CLUSTER_MAX_TRAVEL
         for existing_task in cleaner.route
     ) if current_count > 0 else False
-    
+
     if is_within_cluster and current_count < ABSOLUTE_MAX_TASKS:
         return True
 
@@ -330,7 +330,7 @@ def can_add_task(cleaner: Cleaner, task: Task) -> bool:
                           last_task.address, task.address)
         if tt > BONUS_TASK_MAX_TRAVEL:
             return False  # Blocca se travel > 10'
-        
+
         # Seconda verifica: fattibilità temporale
         test_route = cleaner.route + [task]
         feasible, schedule = evaluate_route(cleaner, test_route)
@@ -460,25 +460,25 @@ def seed_cleaners_from_eo(cleaners: List[Cleaner], ref_date: str):
         # Leggi dalla timeline.json
         timeline_data = json.loads(timeline_path.read_text(encoding="utf-8"))
         blocks = timeline_data.get("cleaners_assignments", [])
-    
+
     for block in blocks:
         cid = int(block["cleaner"]["id"])
         tasks = block.get("tasks", [])
         if not tasks:
             continue
-        
+
         # Filtra solo task EO (con priority="early_out" o reasons che include "automatic_assignment_eo")
-        eo_tasks = [t for t in tasks if 
-                    t.get("priority") == "early_out" or 
+        eo_tasks = [t for t in tasks if
+                    t.get("priority") == "early_out" or
                     ("automatic_assignment_eo" in t.get("reasons", []))]
-        
+
         if not eo_tasks:
             continue
-            
+
         # Ordina per end_time per trovare l'ultima
         eo_tasks.sort(key=lambda t: t.get("end_time", "00:00"))
         last = eo_tasks[-1]
-        
+
         end_time = last.get("end_time")  # "HH:MM"
         last_addr = last.get("address")
         last_lat = last.get("lat")
@@ -563,12 +563,12 @@ def plan_day(tasks: List[Task], cleaners: List[Cleaner]) -> Tuple[List[Cleaner],
         for c, p, t in candidates:
             # Controlla se il cleaner ha già task nello stesso indirizzo
             has_same_address = any(
-                existing_task.address == task.address 
+                existing_task.address == task.address
                 for existing_task in c.route
             )
             if has_same_address:
                 same_address_candidates.append((c, p, t))
-        
+
         if same_address_candidates:
             # Priorità assoluta a cleaner con stesso indirizzo (minor numero di task)
             same_address_candidates.sort(key=lambda x: (len(x[0].route), x[2]))
@@ -587,7 +587,7 @@ def plan_day(tasks: List[Task], cleaners: List[Cleaner]) -> Tuple[List[Cleaner],
                 )
                 if has_cluster:
                     cluster_candidates.append((c, p, t))
-            
+
             if cluster_candidates:
                 # Priorità alta a cleaner in cluster (minor numero di task, poi minor viaggio)
                 cluster_candidates.sort(key=lambda x: (len(x[0].route), x[2]))
@@ -684,6 +684,7 @@ def build_output(cleaners: List[Cleaner], unassigned: List[Task], original_tasks
             task_for_timeline = {
                 **original_task_data,  # Copia TUTTI i campi da containers.json
                 # Aggiungi/sovrascrivi campi specifici della timeline
+                "priority": "high_priority",
                 "start_time": start_time_str,
                 "end_time": end_time_str,
                 "followup": idx > 0,
