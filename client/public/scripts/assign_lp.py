@@ -691,7 +691,7 @@ def build_output(cleaners: List[Cleaner], unassigned: List[Task], original_tasks
             "assigned": total_assigned,
             "unassigned": len(original_tasks) - total_assigned,
             "cleaners_used": len(cleaners_with_tasks),
-            "max_tasks_per_cleaner": MAX_TASKS_PER_CLEANER,
+            "max_tasks_per_cleaner": ABSOLUTE_MAX_TASKS,
             "algorithm": "simplified_greedy",
             "notes": [
                 "REGOLE LOW PRIORITY OTTIMIZZATE:",
