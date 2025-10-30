@@ -262,7 +262,7 @@ export default function TaskCard({
               >
                 {typeLabel}
               </Badge>
-              {isInTimeline && (task as any).priority && (
+              {(task as any).priority && (
                 <Badge
                   variant="outline"
                   className={cn(
