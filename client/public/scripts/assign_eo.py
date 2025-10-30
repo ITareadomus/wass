@@ -457,11 +457,8 @@ def build_output(cleaners: List[Cleaner], unassigned: List[Task], original_tasks
         if not cl.route:
             continue
 
-        # Scarta cleaner con solo 1 task (minimo 2)
-        if len(cl.route) < MIN_TASKS_PER_CLEANER:
-            # Riporta task come non assegnate
-            unassigned.extend(cl.route)
-            continue
+        # Per Early-Out accettiamo anche 1 sola task (task urgenti)
+        # Nessun vincolo minimo qui
 
         feasible, schedule = evaluate_route(cl.route)
         if not feasible or not schedule:
@@ -576,9 +573,9 @@ def build_output(cleaners: List[Cleaner], unassigned: List[Task], original_tasks
             "max_tasks_per_cleaner": 3,
             "algorithm": "simplified_greedy",
             "notes": [
-                "REGOLE OTTIMIZZATE:",
+                "REGOLE EARLY-OUT OTTIMIZZATE:",
                 "1. Max 2 task base, +1 se travel <= 10', max assoluto 4 (o 5 se finisce entro 18:00)",
-                "2. Minimo 2 task per cleaner (evita cleaner con 1 sola task)",
+                "2. NO vincolo minimo task (accetta anche 1 sola task, sono task urgenti)",
                 "3. Favorisce percorsi < 20' (aumentato per aggregazione)",
                 "4. PRIORITÀ: cleaner con più task (per usare meno cleaner)",
                 "5. Cluster esteso a 15' (favorisce aggregazione)",
