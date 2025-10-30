@@ -181,6 +181,24 @@ export default function TaskCard({
     }
   };
 
+  // Verifica se end_time sfora checkin_time
+  const isOverdue = (() => {
+    const taskObj = task as any;
+    const endTime = assignmentTimes.end_time || taskObj.end_time || taskObj.endTime;
+    const checkinTime = taskObj.checkin_time;
+    
+    if (!endTime || !checkinTime || !isInTimeline) return false;
+    
+    // Converti in minuti per confronto
+    const [endH, endM] = endTime.split(':').map(Number);
+    const [checkinH, checkinM] = checkinTime.split(':').map(Number);
+    
+    const endMinutes = endH * 60 + endM;
+    const checkinMinutes = checkinH * 60 + checkinM;
+    
+    return endMinutes > checkinMinutes;
+  })();
+
   return (
     <>
       <Draggable draggableId={task.id} index={index}>
@@ -196,6 +214,7 @@ export default function TaskCard({
                 ${colorClass} 
                 rounded-sm px-2 py-1 shadow-sm border transition-all duration-200
                 ${snapshot.isDragging ? "shadow-lg scale-105" : ""}
+                ${isOverdue ? "animate-blink" : ""}
                 hover:shadow-md cursor-pointer
                 flex-shrink-0 relative
               `}
