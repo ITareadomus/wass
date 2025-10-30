@@ -105,8 +105,8 @@ export default function TimelineView({
   useEffect(() => {
     const loadCleaners = async () => {
       try {
-        // Aggiungi timestamp per evitare caching
-        const response = await fetch(`/data/cleaners/selected_cleaners.json?t=${Date.now()}`);
+        // Carica le assegnazioni da timeline.json
+        const response = await fetch(`/data/output/timeline.json?t=${Date.now()}`);
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
         }
@@ -119,14 +119,14 @@ export default function TimelineView({
           return;
         }
 
-        const selectedData = await response.json();
-        console.log("Cleaners caricati da selected_cleaners.json:", selectedData);
+        const timelineData = await response.json();
+        console.log("Timeline caricata da timeline.json:", timelineData);
 
-        // I cleaners sono già nel formato corretto
-        const cleanersList = selectedData.cleaners || [];
+        // I cleaners sono in cleaners_assignments oppure cleaners
+        const cleanersList = timelineData.cleaners_assignments || timelineData.cleaners || [];
         setCleaners(cleanersList);
       } catch (error) {
-        console.error("Errore nel caricamento dei cleaners selezionati:", error);
+        console.error("Errore nel caricamento della timeline:", error);
         setCleaners([]); // Imposta array vuoto invece di lasciare undefined
       }
     };
