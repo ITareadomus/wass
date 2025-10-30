@@ -264,10 +264,8 @@ export default function TimelineView({
             const color = getCleanerColor(index);
             const droppableId = `cleaner-${cleaner.id}`;
 
-            // Trova tutte le task assegnate a questo cleaner
-            const cleanerTasks = tasks.filter(task => 
-              (task as any).assignedCleaner === cleaner.id
-            ).map(normalizeTask); // Applica la normalizzazione qui
+            // Le task sono già caricate su cleaner.tasks
+            const cleanerTasks = ((cleaner as any).tasks || []).map(normalizeTask);
 
             return (
               <div key={cleaner.id} className="flex mb-0.5">
@@ -311,9 +309,7 @@ export default function TimelineView({
 
                       {/* Task posizionate in sequenza */}
                       <div className="relative z-10 flex items-center h-full">
-                        {tasks
-                          .filter((task) => (task as any).assignedCleaner === cleaner.id)
-                          .map(normalizeTask) // Applica la normalizzazione prima di ordinare e mappare
+                        {cleanerTasks
                           .sort((a, b) => {
                             // Ordina prima per sequence (se presente), poi per orario
                             const taskA = a as any;
