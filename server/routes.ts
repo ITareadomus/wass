@@ -1159,7 +1159,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { date } = req.body;
 
       const timelinePath = path.join(process.cwd(), 'client/public/data/output/timeline.json');
+      const containersPath = path.join(process.cwd(), 'client/public/data/output/containers.json');
       const assignedDir = path.join(process.cwd(), 'client/public/data/assigned');
+
+      // Esegui PRIMA create_containers.py per avere dati freschi dal database
+      console.log(`Eseguendo create_containers.py per data ${date}...`);
+      const containersResult = await new Promise<string>((resolve, reject) => {
+        exec(
+          `python3 client/public/scripts/create_containers.py ${date}`,
+          (error, stdout, stderr) => {
+            if (error) {
+              console.error("Errore create_containers:", stderr);
+              reject(new Error(stderr || error.message));
+            } else {
+              resolve(stdout);
+            }
+          }
+        );
+      });
+      console.log("create_containers output:", containersResult);
+
+      // Carica containers.json per verificare quali task sono effettivamente disponibili
+      const containersData = JSON.parse(await fs.readFile(containersPath, 'utf8'));
+      const tasksInContainers = new Set<string>();
+      
+      for (const containerType of ['early_out', 'high_priority', 'low_priority']) {
+        const container = containersData.containers?.[containerType];
+        if (container && container.tasks) {
+          container.tasks.forEach((task: any) => {
+            tasksInContainers.add(String(task.logistic_code));
+          });
+        }
+      }
+
+      console.log(`Task in containers.json (${tasksInContainers.size}):`, Array.from(tasksInContainers).slice(0, 10));
 
       // Carica timeline per questa data specifica
       let timelineData: any = { 
@@ -1181,7 +1214,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
           throw new Error('No assignments in timeline file');
         }
 
-        console.log(`Caricato timeline per ${date} con ${timelineData.cleaners_assignments.length} assegnazioni`);
+        // SINCRONIZZA: rimuovi task che sono tornate nei containers
+        let removedCount = 0;
+        for (const cleanerEntry of timelineData.cleaners_assignments) {
+          const originalTaskCount = cleanerEntry.tasks?.length || 0;
+          cleanerEntry.tasks = (cleanerEntry.tasks || []).filter((task: any) => {
+            const logisticCode = String(task.logistic_code);
+            const isInContainers = tasksInContainers.has(logisticCode);
+            if (isInContainers) {
+              console.log(`⚠️ Task ${logisticCode} è in containers.json, rimuovo da timeline`);
+            }
+            return !isInContainers; // Mantieni solo task NON presenti in containers
+          });
+          removedCount += (originalTaskCount - (cleanerEntry.tasks?.length || 0));
+        }
+
+        // Rimuovi cleaner entries vuote
+        timelineData.cleaners_assignments = timelineData.cleaners_assignments.filter(
+          (c: any) => c.tasks && c.tasks.length > 0
+        );
+
+        if (removedCount > 0) {
+          console.log(`🔄 SINCRONIZZAZIONE: Rimosse ${removedCount} task obsolete da timeline.json`);
+          // Salva timeline sincronizzata
+          timelineData.metadata.last_updated = new Date().toISOString();
+          timelineData.meta.used_cleaners = timelineData.cleaners_assignments.length;
+          timelineData.meta.assigned_tasks = timelineData.cleaners_assignments.reduce(
+            (sum: number, c: any) => sum + c.tasks.length, 0
+          );
+          await fs.writeFile(timelinePath, JSON.stringify(timelineData, null, 2));
+        }
+
+        console.log(`Caricato timeline per ${date} con ${timelineData.cleaners_assignments.length} assegnazioni (${removedCount} task rimosse)`);
         loadedFrom = 'timeline';
       } catch (error) {
         // Secondo tentativo: carica da assigned/assignments_{ddmmyy}.json
@@ -1227,28 +1291,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Non resettiamo mai - ogni data ha il suo file
       console.log(`Data selezionata: ${date}, preservo le assegnazioni esistenti (fonte: ${loadedFrom})`);
 
-      // Assicurati che metadata sia sempre aggiornato, specialmente se è stato appena creato
+      // Assicurati che metadata sia sempre aggiornato
       if (!timelineData.metadata) {
         timelineData.metadata = { last_updated: new Date().toISOString(), date };
         await fs.writeFile(timelinePath, JSON.stringify(timelineData, null, 2));
       }
-
-      // Esegui SEMPRE create_containers.py per avere dati freschi dal database
-      console.log(`Eseguendo create_containers.py per data ${date}...`);
-      const containersResult = await new Promise<string>((resolve, reject) => {
-        exec(
-          `python3 client/public/scripts/create_containers.py ${date}`,
-          (error, stdout, stderr) => {
-            if (error) {
-              console.error("Errore create_containers:", stderr);
-              reject(new Error(stderr || error.message));
-            } else {
-              resolve(stdout);
-            }
-          }
-        );
-      });
-      console.log("create_containers output:", containersResult);
 
       res.json({
         success: true,
