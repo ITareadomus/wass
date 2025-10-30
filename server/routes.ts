@@ -233,7 +233,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         String(t.logistic_code) !== normalizedLogisticCode && String(t.task_id) !== normalizedTaskId
       );
 
-      // Normalizza la task al formato usato dagli script Python
+      // Normalizza la task al formato usato dagli script Python (IDENTICO agli script)
       const taskForTimeline = {
         // Campi identificativi (sempre come numeri)
         task_id: parseInt(String(fullTaskData.task_id || fullTaskData.id)),
@@ -251,13 +251,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Tempo di pulizia (sempre in minuti)
         cleaning_time: fullTaskData.cleaning_time || 0,
         
-        // Date e orari
+        // Date e orari (formato ISO per le date)
         checkin_date: fullTaskData.checkin_date || null,
         checkout_date: fullTaskData.checkout_date || null,
         checkin_time: fullTaskData.checkin_time || null,
         checkout_time: fullTaskData.checkout_time || null,
         
-        // Pax
+        // Pax (sempre numeri)
         pax_in: fullTaskData.pax_in || 0,
         pax_out: fullTaskData.pax_out || 0,
         
@@ -266,7 +266,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         operation_id: fullTaskData.operation_id !== undefined ? fullTaskData.operation_id : 2,
         confirmed_operation: fullTaskData.confirmed_operation !== undefined ? Boolean(fullTaskData.confirmed_operation) : true,
         
-        // Straordinaria (sia come campo diretto che is_straordinaria)
+        // Straordinaria (solo questo campo, come negli script)
         straordinaria: Boolean(fullTaskData.straordinaria || fullTaskData.is_straordinaria),
         
         // Tipo appartamento e alias
@@ -280,16 +280,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
           'manually_moved_to_timeline'
         ],
         
-        // Campi specifici timeline
-        priority: fullTaskData.priority || 'manual',
+        // Campi specifici timeline (formato orario HH:MM)
+        priority: sourceContainerType || 'manual',
         start_time: null,
         end_time: null,
         followup: false,
         sequence: 0,
         travel_time: 0,
         
-        // is_straordinaria (uguale a straordinaria per compatibilità)
-        is_straordinaria: Boolean(fullTaskData.is_straordinaria || fullTaskData.straordinaria)
+        // is_straordinaria (IDENTICO a straordinaria, come negli script)
+        is_straordinaria: Boolean(fullTaskData.straordinaria || fullTaskData.is_straordinaria)
       };
 
       console.log(`📝 Task salvato in timeline:`, {
