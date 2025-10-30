@@ -320,7 +320,7 @@ export default function GenerateAssignments() {
             name: String(timelineAssignment.logistic_code),
             type: timelineAssignment.customer_name || 'Unknown',
             duration: formatDuration(timelineAssignment.cleaning_time || 0),
-            priority: 'unknown' as any,
+            priority: (timelineAssignment.priority || 'unknown') as any,
             assignedTo: null,
             status: "pending" as const,
             scheduledTime: null,
@@ -340,7 +340,8 @@ export default function GenerateAssignments() {
           // IMPORTANTE: Assicurati che assignedCleaner sia propagato correttamente
           const taskWithAssignment = {
             ...baseTask,
-            assignedCleaner: timelineAssignment.cleanerId, // Campo CRITICO per la visualizzazione
+            priority: timelineAssignment.priority || baseTask.priority,
+            assignedCleaner: timelineAssignment.cleanerId,
             sequence: timelineAssignment.sequence,
             start_time: timelineAssignment.start_time,
             end_time: timelineAssignment.end_time,
