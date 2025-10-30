@@ -1223,8 +1223,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
           throw new Error('No assignments in timeline file');
         }
 
-        // SINCRONIZZA: rimuovi task che sono tornate nei containers
+        // SINCRONIZZAZIONE BIDIREZIONALE: timeline.json deve contenere SOLO task NON presenti in containers.json
         let removedCount = 0;
+        const cleanersBeforeSync = timelineData.cleaners_assignments.length;
+        const tasksBeforeSync = timelineData.cleaners_assignments.reduce((sum: number, c: any) => sum + c.tasks.length, 0);
+
         for (const cleanerEntry of timelineData.cleaners_assignments) {
           const originalTaskCount = cleanerEntry.tasks?.length || 0;
           cleanerEntry.tasks = (cleanerEntry.tasks || []).filter((task: any) => {
@@ -1243,18 +1246,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
           (c: any) => c.tasks && c.tasks.length > 0
         );
 
-        if (removedCount > 0) {
-          console.log(`🔄 SINCRONIZZAZIONE: Rimosse ${removedCount} task obsolete da timeline.json`);
-          // Salva timeline sincronizzata
-          timelineData.metadata.last_updated = new Date().toISOString();
-          timelineData.meta.used_cleaners = timelineData.cleaners_assignments.length;
-          timelineData.meta.assigned_tasks = timelineData.cleaners_assignments.reduce(
-            (sum: number, c: any) => sum + c.tasks.length, 0
-          );
-          await fs.writeFile(timelinePath, JSON.stringify(timelineData, null, 2));
-        }
+        const tasksAfterSync = timelineData.cleaners_assignments.reduce((sum: number, c: any) => sum + c.tasks.length, 0);
 
-        console.log(`Caricato timeline per ${date} con ${timelineData.cleaners_assignments.length} assegnazioni (${removedCount} task rimosse)`);
+        // Salva sempre la timeline sincronizzata per garantire coerenza
+        timelineData.metadata.last_updated = new Date().toISOString();
+        timelineData.meta.used_cleaners = timelineData.cleaners_assignments.length;
+        timelineData.meta.assigned_tasks = tasksAfterSync;
+        await fs.writeFile(timelinePath, JSON.stringify(timelineData, null, 2));
+
+        console.log(`🔄 SINCRONIZZAZIONE TIMELINE:`);
+        console.log(`   - Task prima: ${tasksBeforeSync}, dopo: ${tasksAfterSync} (rimosse: ${removedCount})`);
+        console.log(`   - Cleaners: ${timelineData.cleaners_assignments.length}`);
+        console.log(`   - Task in containers: ${tasksInContainers.size}`);
+
+        console.log(`Caricato timeline per ${date} con ${timelineData.cleaners_assignments.length} assegnazioni`);
         loadedFrom = 'timeline';
       } catch (error) {
         // Secondo tentativo: carica da assigned/assignments_{ddmmyy}.json
