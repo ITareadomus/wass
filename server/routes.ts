@@ -1154,7 +1154,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Endpoint per estrarre i dati
   app.post("/api/extract-data", async (req, res) => {
     try {
-      const { date } = req.body;
+      const { date, resetTimeline } = req.body;
 
       const timelinePath = path.join(process.cwd(), 'client/public/data/output/timeline.json');
       const containersPath = path.join(process.cwd(), 'client/public/data/output/containers.json');
@@ -1200,10 +1200,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
       };
       let loadedFrom = 'new';
 
-      try {
-        // Primo tentativo: carica da timeline.json
-        const existingData = await fs.readFile(timelinePath, 'utf8');
-        timelineData = JSON.parse(existingData);
+      // Se resetTimeline=true, svuota timeline.json e salta al caricamento vuoto
+      if (resetTimeline) {
+        console.log(`🔄 Reset timeline richiesto, svuotando timeline.json...`);
+        timelineData = { 
+          metadata: { last_updated: new Date().toISOString(), date },
+          cleaners_assignments: [],
+          meta: { total_cleaners: 0, used_cleaners: 0, assigned_tasks: 0 }
+        };
+        await fs.writeFile(timelinePath, JSON.stringify(timelineData, null, 2));
+        loadedFrom = 'reset';
+      } else {
+        try {
+          // Primo tentativo: carica da timeline.json
+          const existingData = await fs.readFile(timelinePath, 'utf8');
+          timelineData = JSON.parse(existingData);
 
         // Se il file esiste ma è vuoto o per un'altra data, prova a caricare da assigned
         if (!timelineData.cleaners_assignments || timelineData.cleaners_assignments.length === 0 || 
@@ -1283,6 +1294,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             meta: { total_cleaners: 0, used_cleaners: 0, assigned_tasks: 0 }
           };
           await fs.writeFile(timelinePath, JSON.stringify(timelineData, null, 2));
+        }
         }
       }
 
