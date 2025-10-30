@@ -914,6 +914,7 @@ export default function GenerateAssignments() {
                         description: result.message,
                         duration: 3000,
                       });
+                      // FORZA ricaricamento completo dopo reset
                       await loadTasks(true);
                     }
                   } catch (error: any) {
@@ -928,7 +929,7 @@ export default function GenerateAssignments() {
               variant="outline"
               className="border-red-600 text-red-600 hover:bg-red-50"
             >
-              🔄 Reset Timeline
+              🔄 Reset Assegnazioni
             </Button>
             <Button
               onClick={confirmAssignments}
