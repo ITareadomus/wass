@@ -1,4 +1,3 @@
-replit_final_file>
 # -*- coding: utf-8 -*-
 from __future__ import annotations
 import json, math
