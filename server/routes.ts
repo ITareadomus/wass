@@ -1185,12 +1185,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const container = containersData.containers?.[containerType];
         if (container && container.tasks) {
           container.tasks.forEach((task: any) => {
-            tasksInContainers.add(String(task.logistic_code));
+            // Aggiungi sia logistic_code che task_id per sicurezza
+            if (task.logistic_code) {
+              tasksInContainers.add(String(task.logistic_code));
+            }
+            if (task.task_id) {
+              tasksInContainers.add(String(task.task_id));
+            }
           });
         }
       }
 
-      console.log(`Task in containers.json (${tasksInContainers.size}):`, Array.from(tasksInContainers).slice(0, 10));
+      console.log(`📦 Task in containers.json (${tasksInContainers.size} identificatori unici)`);
 
       // Carica timeline per questa data specifica
       let timelineData: any = { 
@@ -1223,28 +1229,48 @@ export async function registerRoutes(app: Express): Promise<Server> {
           throw new Error('No assignments in timeline file');
         }
 
-        // SINCRONIZZAZIONE BIDIREZIONALE: timeline.json deve contenere SOLO task NON presenti in containers.json
+        // SINCRONIZZAZIONE RAFFORZATA: rimuovi task che sono in containers.json
+        // Questo include task che non erano mai state assegnate ma appaiono erroneamente in timeline
         let removedCount = 0;
         const cleanersBeforeSync = timelineData.cleaners_assignments.length;
         const tasksBeforeSync = timelineData.cleaners_assignments.reduce((sum: number, c: any) => sum + c.tasks.length, 0);
 
+        // Log delle task in containers per debugging
+        console.log(`📦 Task in containers.json: ${Array.from(tasksInContainers).slice(0, 5).join(', ')}... (totale: ${tasksInContainers.size})`);
+
         for (const cleanerEntry of timelineData.cleaners_assignments) {
           const originalTaskCount = cleanerEntry.tasks?.length || 0;
+          
+          // Filtra le task mantenendo solo quelle NON presenti in containers
           cleanerEntry.tasks = (cleanerEntry.tasks || []).filter((task: any) => {
             const logisticCode = String(task.logistic_code);
-            const isInContainers = tasksInContainers.has(logisticCode);
+            const taskId = String(task.task_id);
+            
+            // Controlla sia logistic_code che task_id per sicurezza
+            const isInContainersByCode = tasksInContainers.has(logisticCode);
+            const isInContainersById = tasksInContainers.has(taskId);
+            const isInContainers = isInContainersByCode || isInContainersById;
+            
             if (isInContainers) {
-              console.log(`⚠️ Task ${logisticCode} è in containers.json, rimuovo da timeline`);
+              console.log(`🔄 SYNC: Rimuovendo task ${logisticCode} (id: ${taskId}) da timeline - trovata in containers`);
+              removedCount++;
+              return false; // Rimuovi dalla timeline
             }
-            return !isInContainers; // Mantieni solo task NON presenti in containers
+            
+            return true; // Mantieni nella timeline
           });
-          removedCount += (originalTaskCount - (cleanerEntry.tasks?.length || 0));
         }
 
         // Rimuovi cleaner entries vuote
+        const cleanersBeforeRemoval = timelineData.cleaners_assignments.length;
         timelineData.cleaners_assignments = timelineData.cleaners_assignments.filter(
           (c: any) => c.tasks && c.tasks.length > 0
         );
+        const emptyCleanersRemoved = cleanersBeforeRemoval - timelineData.cleaners_assignments.length;
+        
+        if (emptyCleanersRemoved > 0) {
+          console.log(`🧹 Rimossi ${emptyCleanersRemoved} cleaner senza task`);
+        }
 
         const tasksAfterSync = timelineData.cleaners_assignments.reduce((sum: number, c: any) => sum + c.tasks.length, 0);
 
