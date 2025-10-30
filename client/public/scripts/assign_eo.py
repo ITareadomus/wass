@@ -17,8 +17,11 @@ OUTPUT_ASSIGN = BASE / "output" / "early_out_assignments.json"
 # =============================
 # CONFIG - REGOLE SEMPLIFICATE
 # =============================
-MAX_TASKS_PER_CLEANER = 3  # Massimo 3 task (preferito per usare meno cleaner)
-FOURTH_TASK_MAX_TRAVEL = 10.0  # 4ª task solo se entro 10' dalla 3ª
+BASE_MAX_TASKS = 2  # Base: max 2 task per cleaner
+BONUS_TASK_MAX_TRAVEL = 10.0  # +1 task se travel <= 10'
+ABSOLUTE_MAX_TASKS = 4  # Max assoluto 4 task
+ABSOLUTE_MAX_TASKS_IF_BEFORE_18 = 5  # Max 5 task se finisce entro le 18:00
+MIN_TASKS_PER_CLEANER = 2  # Minimo 2 task per cleaner
 CLUSTER_MAX_TRAVEL = 15.0  # Se task <= 15' da qualsiasi altra, ignora limite di task
 
 PREFERRED_TRAVEL = 20.0  # Preferenza per percorsi < 20' (aumentato per favorire aggregazione)
@@ -212,7 +215,7 @@ def can_add_task(cleaner: Cleaner, task: Task) -> bool:
     Verifica se è possibile aggiungere una task al cleaner secondo le regole:
     1. Premium task -> premium cleaner
     2. Straordinaria -> premium cleaner, deve essere la prima (pos=0)
-    3. Max 2 task per cleaner (3ª solo se entro 10')
+    3. Max 2 task base, +1 se travel <= 10', max assoluto 4 (o 5 se finisce entro 18:00)
     """
     # Check premium/straordinaria
     if not can_handle_premium(cleaner, task):
@@ -228,28 +231,42 @@ def can_add_task(cleaner: Cleaner, task: Task) -> bool:
         if task.straordinaria:
             return False
 
-    # Max 3 task, MA: se task <= 15' da qualsiasi altra, ignora limite
-    if len(cleaner.route) >= MAX_TASKS_PER_CLEANER:
-        # Controlla se la task è <= 15' da qualsiasi task esistente
-        is_within_cluster = any(
-            travel_minutes(existing_task, task) <= CLUSTER_MAX_TRAVEL or
-            travel_minutes(task, existing_task) <= CLUSTER_MAX_TRAVEL
-            for existing_task in cleaner.route
-        )
-        
-        if is_within_cluster:
-            # Task in cluster: ignora limite di task
-            return True
-        
-        # Altrimenti: regola normale (4ª solo se entro 10')
-        if len(cleaner.route) == 3:
-            last_task = cleaner.route[-1]
-            tt = travel_minutes(last_task, task)
-            if tt <= FOURTH_TASK_MAX_TRAVEL:
-                return True
-        return False
+    current_count = len(cleaner.route)
 
-    return True
+    # Task in cluster <= 15': ignora limiti (ma rispetta max assoluto)
+    is_within_cluster = any(
+        travel_minutes(existing_task, task) <= CLUSTER_MAX_TRAVEL or
+        travel_minutes(task, existing_task) <= CLUSTER_MAX_TRAVEL
+        for existing_task in cleaner.route
+    ) if current_count > 0 else False
+    
+    if is_within_cluster and current_count < ABSOLUTE_MAX_TASKS:
+        return True
+
+    # Regola base: max 2 task
+    if current_count < BASE_MAX_TASKS:
+        return True
+
+    # 3ª task: solo se travel <= 10' dalla task precedente
+    if current_count == BASE_MAX_TASKS:
+        last_task = cleaner.route[-1]
+        tt = travel_minutes(last_task, task)
+        if tt <= BONUS_TASK_MAX_TRAVEL:
+            return True
+
+    # 4ª task o più: verifica max assoluto
+    if current_count >= BASE_MAX_TASKS + 1 and current_count < ABSOLUTE_MAX_TASKS:
+        # Verifica se può finire entro le 18:00 per il 5° task
+        test_route = cleaner.route + [task]
+        feasible, schedule = evaluate_route(test_route)
+        if feasible and schedule:
+            last_finish = schedule[-1][2]  # finish time in minuti
+            if current_count < ABSOLUTE_MAX_TASKS_IF_BEFORE_18 and last_finish <= 18 * 60:
+                return True
+            elif current_count < ABSOLUTE_MAX_TASKS:
+                return True
+
+    return False
 
 
 def find_best_position(cleaner: Cleaner, task: Task) -> Optional[Tuple[int, float]]:
@@ -440,6 +457,12 @@ def build_output(cleaners: List[Cleaner], unassigned: List[Task], original_tasks
         if not cl.route:
             continue
 
+        # Scarta cleaner con solo 1 task (minimo 2)
+        if len(cl.route) < MIN_TASKS_PER_CLEANER:
+            # Riporta task come non assegnate
+            unassigned.extend(cl.route)
+            continue
+
         feasible, schedule = evaluate_route(cl.route)
         if not feasible or not schedule:
             continue
@@ -554,14 +577,15 @@ def build_output(cleaners: List[Cleaner], unassigned: List[Task], original_tasks
             "algorithm": "simplified_greedy",
             "notes": [
                 "REGOLE OTTIMIZZATE:",
-                "1. Max 3 task per cleaner (4ª solo se entro 10' dalla 3ª)",
-                "2. Favorisce percorsi < 20' (aumentato per aggregazione)",
-                "3. PRIORITÀ: cleaner con più task (per usare meno cleaner)",
-                "4. Cluster esteso a 15' (favorisce aggregazione)",
-                "5. Straordinarie solo a premium cleaner, devono essere la prima task",
-                "6. Premium task solo a premium cleaner",
-                "7. Check-in strict: deve finire prima del check-in time",
-                "8. Vincolo orario: nessuna task deve finire dopo le 19:00"
+                "1. Max 2 task base, +1 se travel <= 10', max assoluto 4 (o 5 se finisce entro 18:00)",
+                "2. Minimo 2 task per cleaner (evita cleaner con 1 sola task)",
+                "3. Favorisce percorsi < 20' (aumentato per aggregazione)",
+                "4. PRIORITÀ: cleaner con più task (per usare meno cleaner)",
+                "5. Cluster esteso a 15' (favorisce aggregazione)",
+                "6. Straordinarie solo a premium cleaner, devono essere la prima task",
+                "7. Premium task solo a premium cleaner",
+                "8. Check-in strict: deve finire prima del check-in time",
+                "9. Vincolo orario: nessuna task deve finire dopo le 19:00"
             ]
         }
     }
