@@ -12,6 +12,67 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const execAsync = promisify(exec);
 
+/**
+ * Helper function to recalculate travel_time, start_time, end_time for a cleaner's tasks
+ */
+async function recalculateCleanerTimes(cleanerData: any): Promise<any> {
+  const { spawn } = await import('child_process');
+  
+  return new Promise((resolve, reject) => {
+    const scriptPath = path.join(process.cwd(), 'client/public/scripts/recalculate_times.py');
+    const cleanerDataJson = JSON.stringify(cleanerData);
+    
+    // Usa spawn con stdin per evitare ARG_MAX limit e command injection
+    const pythonProcess = spawn('python3', [scriptPath], {
+      stdio: ['pipe', 'pipe', 'pipe']
+    });
+    
+    let stdout = '';
+    let stderr = '';
+    
+    pythonProcess.stdout.on('data', (data) => {
+      stdout += data.toString();
+    });
+    
+    pythonProcess.stderr.on('data', (data) => {
+      stderr += data.toString();
+    });
+    
+    pythonProcess.on('close', (code) => {
+      if (code !== 0) {
+        console.error('Python stderr:', stderr);
+        reject(new Error(`Python script exited with code ${code}: ${stderr}`));
+        return;
+      }
+      
+      if (stderr && stderr.trim()) {
+        console.warn('Python stderr:', stderr);
+      }
+      
+      try {
+        const result = JSON.parse(stdout);
+        
+        if (!result.success) {
+          reject(new Error(result.error || 'Unknown error from Python script'));
+          return;
+        }
+        
+        resolve(result.cleaner_data);
+      } catch (parseError: any) {
+        reject(new Error(`Failed to parse Python output: ${parseError.message}`));
+      }
+    });
+    
+    pythonProcess.on('error', (error) => {
+      reject(new Error(`Failed to spawn Python process: ${error.message}`));
+    });
+    
+    // Scrivi il JSON su stdin e chiudi
+    pythonProcess.stdin.write(cleanerDataJson);
+    pythonProcess.stdin.end();
+  });
+}
+
 export async function registerRoutes(app: Express): Promise<Server> {
   // Endpoint per svuotare early_out.json dopo l'assegnazione
   app.post("/api/clear-early-out-json", async (req, res) => {
@@ -150,11 +211,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       destEntry.tasks.splice(targetIndex, 0, taskToMove);
 
-      // 4. Ricalcola sequence per il cleaner di destinazione
-      destEntry.tasks.forEach((t: any, i: number) => {
-        t.sequence = i + 1;
-        t.followup = i > 0;
-      });
+      // 4. Ricalcola tempi per il cleaner di origine e destinazione
+      try {
+        // Ricalcola cleaner di origine (se ha ancora task)
+        if (sourceEntry && sourceEntry.tasks.length > 0) {
+          const updatedSourceData = await recalculateCleanerTimes(sourceEntry);
+          sourceEntry.tasks = updatedSourceData.tasks;
+          console.log(`✅ Tempi ricalcolati per cleaner sorgente ${sourceCleanerId}`);
+        }
+        
+        // Ricalcola cleaner di destinazione
+        const updatedDestData = await recalculateCleanerTimes(destEntry);
+        destEntry.tasks = updatedDestData.tasks;
+        console.log(`✅ Tempi ricalcolati per cleaner destinazione ${destCleanerId}`);
+      } catch (pythonError: any) {
+        console.error(`⚠️ Errore nel ricalcolo dei tempi, continuo senza ricalcolare:`, pythonError.message);
+        // Fallback: ricalcola solo sequence manualmente
+        if (sourceEntry && sourceEntry.tasks.length > 0) {
+          sourceEntry.tasks.forEach((t: any, i: number) => {
+            t.sequence = i + 1;
+            t.followup = i > 0;
+          });
+        }
+        destEntry.tasks.forEach((t: any, i: number) => {
+          t.sequence = i + 1;
+          t.followup = i > 0;
+        });
+      }
 
       // 5. Rimuovi cleaner entries vuote
       timelineData.cleaners_assignments = timelineData.cleaners_assignments.filter(
@@ -411,10 +494,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       cleanerEntry.tasks.splice(targetIndex, 0, taskForTimeline);
 
-      // Ricalcola sequence
-      cleanerEntry.tasks.forEach((t: any, i: number) => {
-        t.sequence = i + 1;
-      });
+      // Ricalcola travel_time, start_time, end_time usando lo script Python
+      try {
+        const updatedCleanerData = await recalculateCleanerTimes(cleanerEntry);
+        cleanerEntry.tasks = updatedCleanerData.tasks;
+        console.log(`✅ Tempi ricalcolati per cleaner ${normalizedCleanerId}`);
+      } catch (pythonError: any) {
+        console.error(`⚠️ Errore nel ricalcolo dei tempi, continuo senza ricalcolare:`, pythonError.message);
+        // Fallback: ricalcola solo sequence manualmente
+        cleanerEntry.tasks.forEach((t: any, i: number) => {
+          t.sequence = i + 1;
+          t.followup = i > 0;
+        });
+      }
 
       // Aggiorna metadata e meta
       timelineData.metadata = timelineData.metadata || {};
@@ -1885,11 +1977,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Inserisci nella nuova posizione
       cleanerEntry.tasks.splice(toIndex, 0, task);
 
-      // Ricalcola sequence per tutte le task
-      cleanerEntry.tasks.forEach((t: any, i: number) => {
-        t.sequence = i + 1;
-        t.followup = i > 0; // Aggiorna anche followup
-      });
+      // Ricalcola travel_time, start_time, end_time usando lo script Python
+      try {
+        const updatedCleanerData = await recalculateCleanerTimes(cleanerEntry);
+        // Sostituisci le task con quelle ricalcolate
+        cleanerEntry.tasks = updatedCleanerData.tasks;
+        console.log(`✅ Tempi ricalcolati per cleaner ${cleanerId}`);
+      } catch (pythonError: any) {
+        console.error(`⚠️ Errore nel ricalcolo dei tempi, continuo senza ricalcolare:`, pythonError.message);
+        // Fallback: ricalcola solo sequence manualmente
+        cleanerEntry.tasks.forEach((t: any, i: number) => {
+          t.sequence = i + 1;
+          t.followup = i > 0;
+        });
+      }
 
       // Aggiorna metadata e meta
       timelineData.metadata = timelineData.metadata || {};
