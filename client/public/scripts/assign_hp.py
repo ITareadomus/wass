@@ -391,6 +391,7 @@ def load_cleaners(ref_date: str) -> List[Cleaner]:
     for c in data.get("cleaners", []):
         role = (c.get("role") or "").strip()
         is_premium = bool(c.get("premium", (role.lower() == "premium")))
+        # Escludi Formatori da High-Priority
         if (role or "").lower() == "formatore":
             continue
 
