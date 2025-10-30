@@ -219,15 +219,15 @@ export default function GenerateAssignments() {
 
       // Estrai task dai container
       const initialEarlyOut: Task[] = (containersData.containers?.early_out?.tasks || []).map((task: RawTask) =>
-        convertRawTask(task, "early-out")
+        convertRawTask(task, "early_out")
       );
 
       const initialHigh: Task[] = (containersData.containers?.high_priority?.tasks || []).map((task: RawTask) =>
-        convertRawTask(task, "high")
+        convertRawTask(task, "high_priority")
       );
 
       const initialLow: Task[] = (containersData.containers?.low_priority?.tasks || []).map((task: RawTask) =>
-        convertRawTask(task, "low")
+        convertRawTask(task, "low_priority")
       );
 
       console.log("Task convertiti - Early:", initialEarlyOut.length, "High:", initialHigh.length, "Low:", initialLow.length);
