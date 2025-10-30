@@ -271,14 +271,18 @@ export default function TaskCard({
                       ? "bg-blue-500 text-white border-blue-700"
                       : (task as any).priority === "high_priority"
                         ? "bg-orange-500 text-white border-orange-700"
-                        : "bg-gray-500 text-white border-gray-700"
+                        : (task as any).priority === "low_priority"
+                          ? "bg-gray-500 text-white border-gray-700"
+                          : "bg-gray-400 text-white border-gray-600"
                   )}
                 >
                   {(task as any).priority === "early_out" 
                     ? "EO" 
                     : (task as any).priority === "high_priority" 
                       ? "HP" 
-                      : "LP"}
+                      : (task as any).priority === "low_priority"
+                        ? "LP"
+                        : "N/A"}
                 </Badge>
               )}
             </DialogTitle>
