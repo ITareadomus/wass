@@ -21,9 +21,9 @@ OUTPUT_ASSIGN = BASE / "output" / "low_priority_assignments.json"
 # =============================
 # CONFIG - REGOLE SEMPLIFICATE
 # =============================
-MAX_TASKS_PER_CLEANER = 3  # Massimo 3 task per LP
-CLUSTER_MAX_TRAVEL = 10.0  # Se task <= 10' da qualsiasi altra, ignora limite di task
-PREFERRED_TRAVEL = 15.0  # Preferenza per percorsi < 15'
+MAX_TASKS_PER_CLEANER = 4  # Massimo 4 task per LP (preferito per usare meno cleaner)
+CLUSTER_MAX_TRAVEL = 15.0  # Se task <= 15' da qualsiasi altra, ignora limite di task
+PREFERRED_TRAVEL = 20.0  # Preferenza per percorsi < 20' (aumentato per favorire aggregazione)
 
 # Travel model (min)
 SHORT_RANGE_KM = 0.30
@@ -244,9 +244,9 @@ def can_add_task(cleaner: Cleaner, task: Task) -> bool:
         if task.straordinaria:
             return False
 
-    # Max 3 task per LP, MA: se task <= 5' da qualsiasi altra, ignora limite
+    # Max 4 task per LP, MA: se task <= 15' da qualsiasi altra, ignora limite
     if len(cleaner.route) >= MAX_TASKS_PER_CLEANER:
-        # Controlla se la task è <= 5' da qualsiasi task esistente
+        # Controlla se la task è <= 15' da qualsiasi task esistente
         is_within_cluster = any(
             travel_minutes(existing_task.lat, existing_task.lng, task.lat, task.lng,
                          existing_task.address, task.address) <= CLUSTER_MAX_TRAVEL or
@@ -345,8 +345,7 @@ def load_cleaners() -> List[Cleaner]:
     for c in data.get("cleaners", []):
         role = (c.get("role") or "").strip()
         is_premium = bool(c.get("premium", (role.lower() == "premium")))
-        if (role or "").lower() == "formatore":
-            continue
+        # Includi Formatori in Low-Priority (non li filtriamo)
 
         cleaners.append(
             Cleaner(
@@ -443,7 +442,7 @@ def plan_day(tasks: List[Task], cleaners: List[Cleaner]) -> Tuple[List[Cleaner],
     Assegna le task ai cleaner con regole semplificate:
     - Favorisce percorsi < 15'
     - Se non ci sono percorsi < 15', sceglie il minore dei > 15'
-    - Max 3 task per cleaner per LP
+    - Max 4 task per cleaner per LP
     """
     unassigned = []
 
@@ -477,10 +476,10 @@ def plan_day(tasks: List[Task], cleaners: List[Cleaner]) -> Tuple[List[Cleaner],
             same_address_candidates.sort(key=lambda x: (len(x[0].route), x[2]))
             chosen = same_address_candidates[0]
         else:
-            # Priorità 2: Cleaner con task entro 10 minuti (cluster)
+            # Priorità 2: Cleaner con task entro 15 minuti (cluster)
             cluster_candidates = []
             for c, p, t in candidates:
-                # Controlla se il cleaner ha task entro 10 minuti
+                # Controlla se il cleaner ha task entro 15 minuti
                 has_cluster = any(
                     travel_minutes(existing_task.lat, existing_task.lng, task.lat, task.lng,
                                  existing_task.address, task.address) <= CLUSTER_MAX_TRAVEL or
@@ -497,18 +496,19 @@ def plan_day(tasks: List[Task], cleaners: List[Cleaner]) -> Tuple[List[Cleaner],
                 chosen = cluster_candidates[0]
             else:
                 # Nessun cluster, usa logica normale
-                # Dividi i candidati in due gruppi: < 15' e >= 15'
+                # Dividi i candidati in due gruppi: < 20' e >= 20'
                 preferred = [(c, p, t) for c, p, t in candidates if t < PREFERRED_TRAVEL]
                 others = [(c, p, t) for c, p, t in candidates if t >= PREFERRED_TRAVEL]
 
                 # Scegli dal gruppo preferito se esiste, altrimenti dal gruppo altri
                 if preferred:
-                    # Scegli quello con minor viaggio tra i preferiti
-                    preferred.sort(key=lambda x: (len(x[0].route), x[2]))
+                    # PRIORITÀ: cleaner con più task (per usare meno cleaner)
+                    # Ordina per numero di task DECRESCENTE, poi per minor viaggio
+                    preferred.sort(key=lambda x: (-len(x[0].route), x[2]))
                     chosen = preferred[0]
                 else:
-                    # Scegli quello con minor viaggio tra gli altri
-                    others.sort(key=lambda x: (len(x[0].route), x[2]))
+                    # Stesso per gli altri
+                    others.sort(key=lambda x: (-len(x[0].route), x[2]))
                     chosen = others[0]
 
         cleaner, pos, travel = chosen
@@ -664,15 +664,16 @@ def build_output(cleaners: List[Cleaner], unassigned: List[Task], original_tasks
             "max_tasks_per_cleaner": MAX_TASKS_PER_CLEANER,
             "algorithm": "simplified_greedy",
             "notes": [
-                "REGOLE LOW PRIORITY:",
-                "1. Max 3 task per cleaner",
-                "2. Favorisce percorsi < 15'",
-                "3. Se non ci sono percorsi < 15', sceglie il minore dei > 15'",
-                "4. Straordinarie solo a premium cleaner, devono essere la prima task",
-                "5. Premium task solo a premium cleaner",
-                "6. Vincolo orario: nessuna task deve finire dopo le 19:00",
-                "7. Seed da EO e HP: disponibilità e posizione dall'ultima task assegnata",
-                "8. Nessun vincolo particolare d'orario (flessibilità massima)"
+                "REGOLE LOW PRIORITY OTTIMIZZATE:",
+                "1. Max 4 task per cleaner (preferito per usare meno cleaner)",
+                "2. Favorisce percorsi < 20' (aumentato per aggregazione)",
+                "3. PRIORITÀ: cleaner con più task (per usare meno cleaner)",
+                "4. Cluster esteso a 15' (favorisce aggregazione)",
+                "5. Straordinarie solo a premium cleaner, devono essere la prima task",
+                "6. Premium task solo a premium cleaner",
+                "7. Vincolo orario: nessuna task deve finire dopo le 19:00",
+                "8. Seed da EO e HP: disponibilità e posizione dall'ultima task assegnata",
+                "9. Nessun vincolo particolare d'orario (flessibilità massima)"
             ]
         }
     }

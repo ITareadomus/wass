@@ -233,27 +233,64 @@ export async function registerRoutes(app: Express): Promise<Server> {
         String(t.logistic_code) !== normalizedLogisticCode && String(t.task_id) !== normalizedTaskId
       );
 
-      // Costruisci la task completo per la timeline con TUTTI i dati da containers
+      // Normalizza la task al formato usato dagli script Python
       const taskForTimeline = {
-        ...fullTaskData,  // Copia TUTTI i campi da containers.json
-
-        // Aggiungi/sovrascrivi campi specifici timeline
+        // Campi identificativi (sempre come numeri)
+        task_id: parseInt(String(fullTaskData.task_id || fullTaskData.id)),
+        logistic_code: parseInt(String(fullTaskData.logistic_code || fullTaskData.name)),
+        client_id: fullTaskData.client_id || null,
+        
+        // Flag booleani
+        premium: Boolean(fullTaskData.premium),
+        
+        // Coordinate e indirizzo
+        address: fullTaskData.address || null,
+        lat: fullTaskData.lat || null,
+        lng: fullTaskData.lng || null,
+        
+        // Tempo di pulizia (sempre in minuti)
+        cleaning_time: fullTaskData.cleaning_time || 0,
+        
+        // Date e orari
+        checkin_date: fullTaskData.checkin_date || null,
+        checkout_date: fullTaskData.checkout_date || null,
+        checkin_time: fullTaskData.checkin_time || null,
+        checkout_time: fullTaskData.checkout_time || null,
+        
+        // Pax
+        pax_in: fullTaskData.pax_in || 0,
+        pax_out: fullTaskData.pax_out || 0,
+        
+        // Equipment e operazioni
+        small_equipment: Boolean(fullTaskData.small_equipment),
+        operation_id: fullTaskData.operation_id !== undefined ? fullTaskData.operation_id : 2,
+        confirmed_operation: fullTaskData.confirmed_operation !== undefined ? Boolean(fullTaskData.confirmed_operation) : true,
+        
+        // Straordinaria (sia come campo diretto che is_straordinaria)
+        straordinaria: Boolean(fullTaskData.straordinaria || fullTaskData.is_straordinaria),
+        
+        // Tipo appartamento e alias
+        type_apt: fullTaskData.type_apt || null,
+        alias: fullTaskData.alias || null,
+        customer_name: fullTaskData.customer_name || fullTaskData.type || null,
+        
+        // Reasons (combina quelle da containers con quella timeline)
+        reasons: [
+          ...(fullTaskData.reasons || []),
+          'manually_moved_to_timeline'
+        ],
+        
+        // Campi specifici timeline
+        priority: fullTaskData.priority || 'manual',
         start_time: null,
         end_time: null,
         followup: false,
         sequence: 0,
         travel_time: 0,
-
-        // Preserva esplicitamente i campi critici (non sovrascrivere se già presenti)
-        confirmed_operation: fullTaskData.confirmed_operation !== undefined ? fullTaskData.confirmed_operation : true,
-        operation_id: fullTaskData.operation_id !== undefined ? fullTaskData.operation_id : 2,
-
-        // Reasons (combina quelle da containers con quella timeline)
-        reasons: [
-          ...(fullTaskData.reasons || []),
-          'manually_moved_to_timeline'
-        ]
-      }
+        
+        // is_straordinaria (uguale a straordinaria per compatibilità)
+        is_straordinaria: Boolean(fullTaskData.is_straordinaria || fullTaskData.straordinaria)
+      };
 
       console.log(`📝 Task salvato in timeline:`, {
         task_id: taskForTimeline.task_id,
