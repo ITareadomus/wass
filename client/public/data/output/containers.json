@@ -1,6 +1,6 @@
 {
   "metadata": {
-    "last_updated": "2025-10-30T14:35:10.337639",
+    "last_updated": "2025-10-30T14:41:07.229803",
     "date": "2025-10-30"
   },
   "containers": {
@@ -174,6 +174,62 @@
           "priority": "high_priority"
         },
         {
+          "task_id": 218037,
+          "logistic_code": 782,
+          "client_id": 64,
+          "premium": false,
+          "address": "Via Melchiorre Gioia 1",
+          "lat": "45.4813881",
+          "lng": "9.1910586",
+          "cleaning_time": 60,
+          "checkin_date": "2025-10-30",
+          "checkout_date": "2025-10-30",
+          "checkin_time": "14:00",
+          "checkout_time": "11:00",
+          "pax_in": 4,
+          "pax_out": 4,
+          "small_equipment": true,
+          "operation_id": 2,
+          "confirmed_operation": true,
+          "straordinaria": false,
+          "type_apt": "A",
+          "alias": "RELSTAY",
+          "customer_name": "RELSTAY - FERRARA GIULIA",
+          "reasons": [
+            "same_day_checkin_between_eo_hp",
+            "client_forced_hp"
+          ],
+          "priority": "high_priority"
+        },
+        {
+          "task_id": 218038,
+          "logistic_code": 937,
+          "client_id": 64,
+          "premium": false,
+          "address": "VIA VINCENZO MONTI, 77",
+          "lat": "45.4759969",
+          "lng": "9.1622847",
+          "cleaning_time": 90,
+          "checkin_date": "2025-10-30",
+          "checkout_date": "2025-10-30",
+          "checkin_time": "14:00",
+          "checkout_time": "11:00",
+          "pax_in": 4,
+          "pax_out": 4,
+          "small_equipment": false,
+          "operation_id": 2,
+          "confirmed_operation": true,
+          "straordinaria": false,
+          "type_apt": "B",
+          "alias": "RELSTAY",
+          "customer_name": "RELSTAY - FERRARA GIULIA",
+          "reasons": [
+            "same_day_checkin_between_eo_hp",
+            "client_forced_hp"
+          ],
+          "priority": "high_priority"
+        },
+        {
           "task_id": 218039,
           "logistic_code": 795,
           "client_id": 64,
@@ -230,6 +286,89 @@
           "priority": "high_priority"
         },
         {
+          "task_id": 218041,
+          "logistic_code": 751,
+          "client_id": 64,
+          "premium": false,
+          "address": "Via L. Cagnola, 12",
+          "lat": "45.4776",
+          "lng": "9.17287",
+          "cleaning_time": 60,
+          "checkin_date": "2025-10-30",
+          "checkout_date": "2025-10-30",
+          "checkin_time": "14:00",
+          "checkout_time": "11:00",
+          "pax_in": 2,
+          "pax_out": 2,
+          "small_equipment": true,
+          "operation_id": 2,
+          "confirmed_operation": true,
+          "straordinaria": false,
+          "type_apt": "A",
+          "alias": "RELSTAY",
+          "customer_name": "RELSTAY - FERRARA GIULIA",
+          "reasons": [
+            "same_day_checkin_between_eo_hp",
+            "client_forced_hp"
+          ],
+          "priority": "high_priority"
+        },
+        {
+          "task_id": 218141,
+          "logistic_code": 144,
+          "client_id": 3,
+          "premium": true,
+          "address": "CORSO DI PORTA ROMANA 107",
+          "lat": "45.4541963",
+          "lng": "9.199497",
+          "cleaning_time": 120,
+          "checkin_date": "2025-10-31",
+          "checkout_date": "2025-10-30",
+          "checkin_time": null,
+          "checkout_time": null,
+          "pax_in": 4,
+          "pax_out": 2,
+          "small_equipment": false,
+          "operation_id": 2,
+          "confirmed_operation": true,
+          "straordinaria": false,
+          "type_apt": "B",
+          "alias": "TBR",
+          "customer_name": "THE BEST RENT S.r.l.",
+          "reasons": [
+            "premium"
+          ],
+          "priority": "high_priority"
+        },
+        {
+          "task_id": 218143,
+          "logistic_code": 534,
+          "client_id": 3,
+          "premium": true,
+          "address": "VIA DE AMICIS, 4",
+          "lat": "45.4579076",
+          "lng": "9.1804356",
+          "cleaning_time": 150,
+          "checkin_date": "2025-10-30",
+          "checkout_date": "2025-10-30",
+          "checkin_time": "15:00",
+          "checkout_time": null,
+          "pax_in": 4,
+          "pax_out": 4,
+          "small_equipment": false,
+          "operation_id": 2,
+          "confirmed_operation": true,
+          "straordinaria": false,
+          "type_apt": "C",
+          "alias": "TBR",
+          "customer_name": "THE BEST RENT S.r.l.",
+          "reasons": [
+            "same_day_checkin_between_eo_hp",
+            "premium"
+          ],
+          "priority": "high_priority"
+        },
+        {
           "task_id": 218146,
           "logistic_code": 1028,
           "client_id": 3,
@@ -252,6 +391,34 @@
           "alias": "TBR",
           "customer_name": "THE BEST RENT S.r.l.",
           "reasons": [
+            "premium"
+          ],
+          "priority": "high_priority"
+        },
+        {
+          "task_id": 218147,
+          "logistic_code": 1537,
+          "client_id": 3,
+          "premium": true,
+          "address": "Via dei Piatti, 4 20123 (MI)",
+          "lat": "45.460795",
+          "lng": "9.1850985",
+          "cleaning_time": 150,
+          "checkin_date": "2025-10-30",
+          "checkout_date": "2025-10-30",
+          "checkin_time": "15:00",
+          "checkout_time": null,
+          "pax_in": 2,
+          "pax_out": 2,
+          "small_equipment": false,
+          "operation_id": 2,
+          "confirmed_operation": true,
+          "straordinaria": false,
+          "type_apt": "C",
+          "alias": "TBR",
+          "customer_name": "THE BEST RENT S.r.l.",
+          "reasons": [
+            "same_day_checkin_between_eo_hp",
             "premium"
           ],
           "priority": "high_priority"
@@ -284,7 +451,7 @@
           "priority": "high_priority"
         }
       ],
-      "count": 6
+      "count": 12
     },
     "low_priority": {
       "tasks": [
@@ -601,9 +768,9 @@
     }
   },
   "summary": {
-    "total_tasks": 21,
+    "total_tasks": 27,
     "early_out": 4,
-    "high_priority": 6,
+    "high_priority": 12,
     "low_priority": 11
   }
 }
