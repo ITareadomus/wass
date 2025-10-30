@@ -74,6 +74,7 @@ class Cleaner:
     home_lat: Optional[float] = None
     home_lng: Optional[float] = None
     route: List[Task] = field(default_factory=list)
+    total_daily_tasks: int = 0  # Totale task giornaliere (per tracciare limite Formatori)
 
 
 # -------- Utils --------
@@ -220,10 +221,17 @@ def can_add_task(cleaner: Cleaner, task: Task) -> bool:
     2. Straordinaria -> premium cleaner, deve essere la prima (pos=0)
     3. Max 2 task base, +1 se travel <= 10', max assoluto 4 (o 5 se finisce entro 18:00)
     4. Max 2 task Early-Out per cleaner
+    5. FORMATORI: Max 2 task totali giornaliere
     """
     # Check premium/straordinaria
     if not can_handle_premium(cleaner, task):
         return False
+
+    # NUOVO: Limite FORMATORI - max 2 task totali giornaliere
+    if cleaner.role.lower() == "formatore":
+        total_after = cleaner.total_daily_tasks + len(cleaner.route) + 1
+        if total_after > 2:
+            return False
 
     # NUOVO: Limite max 2 task Early-Out per cleaner
     if len(cleaner.route) >= MAX_TASKS_PER_PRIORITY:

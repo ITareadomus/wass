@@ -1,3 +1,4 @@
+replit_final_file>
 # -*- coding: utf-8 -*-
 from __future__ import annotations
 import json, math
@@ -85,6 +86,7 @@ class Cleaner:
     last_eo_lng: Optional[float] = None
     eo_last_sequence: int = 0
     route: List[Task] = field(default_factory=list)
+    total_daily_tasks: int = 0 # Aggiunto per contare le task totali giornaliere
 
 
 # -------- Utils --------
@@ -277,9 +279,21 @@ def can_add_task(cleaner: Cleaner, task: Task) -> bool:
     2. Straordinaria -> premium cleaner, deve essere la prima (pos=0)
     3. Max 2 task base, +1 se travel <= 10', max assoluto 4 (o 5 se finisce entro 18:00)
     4. Max 2 task High-Priority per cleaner
+    5. FORMATORI: Max 2 task totali giornaliere
     """
+    # Check premium/straordinaria
     if not can_handle_premium(cleaner, task):
         return False
+
+    # NUOVO: Limite FORMATORI - max 2 task totali giornaliere
+    if cleaner.role.lower() == "formatore":
+        # Assumiamo che total_daily_tasks sia già stato popolato con le task EO
+        # e che la route contenga già task assegnate in precedenza.
+        # Dobbiamo quindi contare le task già presenti nella route + la nuova task.
+        current_route_tasks = len(cleaner.route)
+        total_tasks_if_added = cleaner.total_daily_tasks + current_route_tasks + 1
+        if total_tasks_if_added > 2:
+            return False
 
     # NUOVO: Limite max 2 task High-Priority per cleaner
     # Conta solo le task HP già nella route (non contare EO)
@@ -424,9 +438,9 @@ def load_cleaners(ref_date: str) -> List[Cleaner]:
     for c in data.get("cleaners", []):
         role = (c.get("role") or "").strip()
         is_premium = bool(c.get("premium", (role.lower() == "premium")))
-        # Escludi Formatori da High-Priority
-        if (role or "").lower() == "formatore":
-            continue
+        # Escludi Formatori da High-Priority solo se non gestiti qui
+        # if (role or "").lower() == "formatore":
+        #     continue
 
         st = (c.get("start_time") or "10:00")
         try:
@@ -443,6 +457,7 @@ def load_cleaners(ref_date: str) -> List[Cleaner]:
                 role=role or ("Premium" if is_premium else "Standard"),
                 is_premium=is_premium,
                 start_time=start_dt,
+                total_daily_tasks=0, # Inizializza a 0, verrà popolato da seed_cleaners_from_eo
             ))
     return cleaners
 
@@ -491,6 +506,8 @@ def seed_cleaners_from_eo(cleaners: List[Cleaner], ref_date: str):
                 cl.last_eo_lat = float(last_lat) if last_lat is not None else None
                 cl.last_eo_lng = float(last_lng) if last_lng is not None else None
                 cl.eo_last_sequence = int(last_seq)
+                # NUOVO: Aggiorna total_daily_tasks con le task EO completate
+                cl.total_daily_tasks = len(eo_tasks)
                 break
 
 
@@ -763,7 +780,8 @@ def build_output(cleaners: List[Cleaner], unassigned: List[Task], original_tasks
                 "6. Premium task solo a premium cleaner",
                 "7. Check-in strict: deve finire prima del check-in time",
                 "8. HP hard earliest: 11:00",
-                "9. Vincolo orario: nessuna task deve finire dopo le 19:00"
+                "9. Vincolo orario: nessuna task deve finire dopo le 19:00",
+                "10. FORMATORI: Max 2 task totali giornaliere (incluse EO)"
             ]
         }
     }
@@ -790,8 +808,8 @@ def main():
     seed_cleaners_from_eo(cleaners, ref_date)
 
     print(f"📋 Caricamento dati...")
-    print(f"👥 Cleaner disponibili: {len(cleaners)}")
-    print(f"📦 Task High-Priority da assegnare: {len(tasks)}")
+    print(f"   - Cleaner disponibili: {len(cleaners)}")
+    print(f"   - Task High-Priority da assegnare: {len(tasks)}")
     print()
     print(f"🔄 Assegnazione in corso...")
 
@@ -800,7 +818,7 @@ def main():
 
     print()
     print(f"✅ Assegnazione completata!")
-    print(f"   - Task assegnati: {output['meta']['assigned']}/{output['meta']['total_tasks']}")
+    print(f"   - Task assegnate: {output['meta']['assigned']}/{output['meta']['total_tasks']}")
     print(f"   - Cleaner utilizzati: {output['meta']['cleaners_used']}")
     print(f"   - Task non assegnati: {output['meta']['unassigned']}")
     print()
@@ -818,7 +836,8 @@ def main():
         "cleaners_assignments": [],
         "meta": {
             "total_cleaners": 0,
-            "total_tasks": 0
+            "used_cleaners": 0,
+            "assigned_tasks": 0
         }
     }
 
@@ -834,7 +853,8 @@ def main():
                     if c["cleaner"]["id"] not in new_hp_cleaner_ids or
                        not any(t.get("reasons") and "automatic_assignment_hp" in t.get("reasons", []) for t in c.get("tasks", []))
                 ]
-        except:
+        except Exception as e:
+            print(f"⚠️ Errore nel caricamento/parsing di {timeline_path}: {e}")
             pass
 
     # Aggiungi le nuove assegnazioni HP organizzate per cleaner
@@ -860,57 +880,70 @@ def main():
 
     # Aggiorna meta
     # Conta i cleaners effettivamente usati (con almeno una task)
-    used_cleaners = len([c for c in timeline_data["cleaners_assignments"] if len(c.get("tasks", [])) > 0])
+    used_cleaners_count = len([c for c in timeline_data["cleaners_assignments"] if len(c.get("tasks", [])) > 0])
+    total_assigned_tasks = sum(len(c.get("tasks", [])) for c in timeline_data["cleaners_assignments"])
 
     timeline_data["metadata"]["last_updated"] = dt.now().isoformat()
     timeline_data["metadata"]["date"] = ref_date
     timeline_data["meta"]["total_cleaners"] = len(cleaners)  # Tutti i cleaners disponibili
-    timeline_data["meta"]["used_cleaners"] = used_cleaners  # Cleaners effettivamente usati
-    timeline_data["meta"]["assigned_tasks"] = sum(
-        len(c.get("tasks", [])) for c in timeline_data["cleaners_assignments"]
-    )
+    timeline_data["meta"]["used_cleaners"] = used_cleaners_count  # Cleaners effettivamente usati
+    timeline_data["meta"]["assigned_tasks"] = total_assigned_tasks
 
     # Scrivi il file timeline.json
-    timeline_path.write_text(json.dumps(timeline_data, ensure_ascii=False, indent=2), encoding="utf-8")
+    try:
+        timeline_path.write_text(json.dumps(timeline_data, ensure_ascii=False, indent=2), encoding="utf-8")
+        print(f"✅ Aggiornato {timeline_path}")
+        hp_count = len([c for c in timeline_data["cleaners_assignments"]
+                       if any(t.get("reasons") and "automatic_assignment_hp" in t.get("reasons", []) for t in c.get("tasks", []))])
+        print(f"   - Cleaner con assegnazioni HP: {hp_count}")
+        print(f"   - Totale task assegnate: {timeline_data['meta']['assigned_tasks']}")
+    except Exception as e:
+        print(f"⚠️ Errore nello scrivere {timeline_path}: {e}")
 
-    hp_count = len([c for c in timeline_data["cleaners_assignments"]
-                   if any(t.get("reasons") and "automatic_assignment_hp" in t.get("reasons", []) for t in c.get("tasks", []))])
-    print(f"✅ Aggiornato {timeline_path}")
-    print(f"   - Cleaner con assegnazioni HP: {hp_count}")
-    print(f"   - Totale task: {timeline_data['meta']['assigned_tasks']}")
 
     # SPOSTAMENTO: Rimuovi le task assegnate da containers.json
     containers_path = INPUT_CONTAINERS
     if containers_path.exists():
-        containers_data = json.loads(containers_path.read_text(encoding="utf-8"))
+        try:
+            containers_data = json.loads(containers_path.read_text(encoding="utf-8"))
 
-        # Trova tutti i logistic_code assegnati
-        assigned_codes = set()
-        for cleaner_entry in output["high_priority_tasks_assigned"]:
-            for task in cleaner_entry.get("tasks", []):
-                assigned_codes.add(int(task["logistic_code"]))
+            # Trova tutti i logistic_code assegnati
+            assigned_codes = set()
+            for cleaner_entry in output["high_priority_tasks_assigned"]:
+                for task in cleaner_entry.get("tasks", []):
+                    assigned_codes.add(int(task["logistic_code"]))
 
-        # Rimuovi le task assegnate dal container high_priority
-        if "containers" in containers_data and "high_priority" in containers_data["containers"]:
-            original_count = len(containers_data["containers"]["high_priority"]["tasks"])
-            containers_data["containers"]["high_priority"]["tasks"] = [
-                t for t in containers_data["containers"]["high_priority"]["tasks"]
-                if int(t.get("logistic_code", 0)) not in assigned_codes
-            ]
-            new_count = len(containers_data["containers"]["high_priority"]["tasks"])
-            containers_data["containers"]["high_priority"]["count"] = new_count
+            # Rimuovi le task assegnate dal container high_priority
+            if "containers" in containers_data and "high_priority" in containers_data["containers"]:
+                original_task_list = containers_data["containers"]["high_priority"].get("tasks", [])
+                original_count = len(original_task_list)
+                containers_data["containers"]["high_priority"]["tasks"] = [
+                    t for t in original_task_list
+                    if int(t.get("logistic_code", 0)) not in assigned_codes
+                ]
+                new_count = len(containers_data["containers"]["high_priority"]["tasks"])
+                containers_data["containers"]["high_priority"]["count"] = new_count
 
-            # Aggiorna summary
-            containers_data["summary"]["high_priority"] = new_count
-            containers_data["summary"]["total_tasks"] = (
-                containers_data["summary"].get("total_tasks", 0) - (original_count - new_count)
-            )
+                # Aggiorna summary se esiste
+                if "summary" in containers_data:
+                    containers_data["summary"]["high_priority"] = new_count
+                    # Calcola la differenza per aggiornare total_tasks in summary
+                    tasks_removed_count = original_count - new_count
+                    containers_data["summary"]["total_tasks"] = (
+                        containers_data["summary"].get("total_tasks", 0) - tasks_removed_count
+                    )
 
-            # Scrivi containers.json aggiornato
-            containers_path.write_text(json.dumps(containers_data, ensure_ascii=False, indent=2), encoding="utf-8")
-            print(f"✅ Rimosse {original_count - new_count} task da containers.json (high_priority)")
-            print(f"   - Task rimaste in high_priority: {new_count}")
+                # Scrivi containers.json aggiornato
+                containers_path.write_text(json.dumps(containers_data, ensure_ascii=False, indent=2), encoding="utf-8")
+                print(f"✅ Rimosse {tasks_removed_count} task da containers.json (high_priority)")
+                print(f"   - Task rimaste in high_priority: {new_count}")
+            else:
+                 print(f"   - Nessuna sezione 'high_priority' trovata in {containers_path} per la rimozione.")
+
+        except Exception as e:
+            print(f"⚠️ Errore nell'aggiornamento di {containers_path}: {e}")
 
 
 if __name__ == "__main__":
     main()
+</replit_final_file>
