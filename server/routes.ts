@@ -37,6 +37,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { date } = req.body;
       const workDate = date || format(new Date(), 'yyyy-MM-dd');
       const timelinePath = path.join(process.cwd(), 'client/public/data/output/timeline.json');
+      const selectedCleanersPath = path.join(process.cwd(), 'client/public/data/cleaners/selected_cleaners.json');
 
       // Svuota il file timeline.json
       await fs.writeFile(timelinePath, JSON.stringify({ 
@@ -49,6 +50,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }, null, 2));
       console.log(`Timeline resettata: timeline.json`);
+
+      // Svuota anche selected_cleaners.json
+      await fs.writeFile(selectedCleanersPath, JSON.stringify({ 
+        cleaners: [],
+        total_selected: 0,
+        work_date: workDate,
+        last_updated: new Date().toISOString()
+      }, null, 2));
+      console.log(`Cleaners resettati: selected_cleaners.json`);
 
       // FORZA la ricreazione di containers.json rieseguendo create_containers.py
       console.log(`Rieseguendo create_containers.py per ripristinare i containers...`);
