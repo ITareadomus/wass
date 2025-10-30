@@ -6,6 +6,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 import { dirname } from "path";
 import * as fs from 'fs/promises';
+import { existsSync } from 'fs';
 import { format } from "date-fns";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -988,7 +989,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Assicurati che timeline.json esista
       const timelinePath = path.join(process.cwd(), 'client/public/data/output/timeline.json');
-      if (!fs.existsSync(timelinePath)) {
+      if (!existsSync(timelinePath)) {
         await fs.writeFile(timelinePath, JSON.stringify({
           metadata: {
             last_updated: new Date().toISOString(),
@@ -1068,7 +1069,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Assicurati che timeline.json esista
       const timelinePath = path.join(process.cwd(), 'client/public/data/output/timeline.json');
-      if (!fs.existsSync(timelinePath)) {
+      if (!existsSync(timelinePath)) {
         await fs.writeFile(timelinePath, JSON.stringify({
           metadata: {
             last_updated: new Date().toISOString(),
@@ -1148,7 +1149,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Assicurati che timeline.json esista
       const timelinePath = path.join(process.cwd(), 'client/public/data/output/timeline.json');
-      if (!fs.existsSync(timelinePath)) {
+      if (!existsSync(timelinePath)) {
         await fs.writeFile(timelinePath, JSON.stringify({
           metadata: {
             last_updated: new Date().toISOString(),
