@@ -305,62 +305,70 @@ export default function GenerateAssignments() {
       // Aggiungi task NON assegnate dai containers
       tasksWithAssignments.push(...filteredEarlyOut, ...filteredHigh, ...filteredLow);
 
-      // Aggiungi SOLO task che sono effettivamente in timeline.json con i loro dati completi
-      for (const [logisticCode, timelineAssignment] of timelineAssignmentsMap.entries()) {
-        // Trova la task originale dai containers per prendere i dati base
-        const originalTask = [...initialEarlyOut, ...initialHigh, ...initialLow].find(
-          t => String(t.name) === logisticCode
-        );
+      // Aggiungi task dalla NUOVA struttura cleaners_assignments
+      if (timelineAssignmentsData.cleaners_assignments) {
+        for (const cleanerEntry of timelineAssignmentsData.cleaners_assignments) {
+          const cleanerId = cleanerEntry.cleaner.id;
+          
+          for (const timelineTask of cleanerEntry.tasks || []) {
+            const logisticCode = String(timelineTask.logistic_code);
+            
+            // Trova la task originale dai containers per prendere i dati base
+            const originalTask = [...initialEarlyOut, ...initialHigh, ...initialLow].find(
+              t => String(t.name) === logisticCode
+            );
 
-        if (timelineAssignment.cleanerId) {
-          // Se la task esiste nei containers, usa quei dati come base
-          // Altrimenti usa i dati dalla timeline (task già assegnata in sessioni precedenti)
-          const baseTask = originalTask || {
-            id: String(timelineAssignment.task_id),
-            name: String(timelineAssignment.logistic_code),
-            type: timelineAssignment.customer_name || 'Unknown',
-            duration: formatDuration(timelineAssignment.cleaning_time || 0),
-            priority: 'unknown' as any,
-            assignedTo: null,
-            status: "pending" as const,
-            scheduledTime: null,
-            address: timelineAssignment.address,
-            lat: timelineAssignment.lat,
-            lng: timelineAssignment.lng,
-            premium: timelineAssignment.premium,
-            straordinaria: timelineAssignment.straordinaria,
-            is_straordinaria: timelineAssignment.is_straordinaria || timelineAssignment.straordinaria,
-            confirmed_operation: timelineAssignment.confirmed_operation,
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString()
-          };
+            // Se la task esiste nei containers, usa quei dati come base
+            // Altrimenti usa i dati dalla timeline (task già assegnata in sessioni precedenti)
+            const baseTask = originalTask || {
+              id: String(timelineTask.task_id),
+              name: String(timelineTask.logistic_code),
+              type: timelineTask.customer_name || 'Unknown',
+              duration: formatDuration(timelineTask.cleaning_time || 0),
+              priority: (timelineTask.priority || 'unknown') as any,
+              assignedTo: null,
+              status: "pending" as const,
+              scheduledTime: null,
+              address: timelineTask.address,
+              lat: timelineTask.lat,
+              lng: timelineTask.lng,
+              premium: timelineTask.premium,
+              straordinaria: timelineTask.straordinaria || timelineTask.is_straordinaria,
+              is_straordinaria: timelineTask.is_straordinaria || timelineTask.straordinaria,
+              confirmed_operation: timelineTask.confirmed_operation,
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString()
+            };
 
-          console.log(`➕ Aggiungendo task ${logisticCode} dalla timeline a cleaner ${timelineAssignment.cleanerId} con sequence ${timelineAssignment.sequence}`);
-          tasksWithAssignments.push({
-            ...baseTask,
-            assignedCleaner: timelineAssignment.cleanerId,
-            sequence: timelineAssignment.sequence,
-            startTime: timelineAssignment.start_time || (baseTask as any).startTime,
-            endTime: timelineAssignment.end_time || (baseTask as any).endTime,
-            travelTime: timelineAssignment.travel_time || 0,
-            address: timelineAssignment.address || baseTask.address,
-            lat: timelineAssignment.lat || baseTask.lat,
-            lng: timelineAssignment.lng || baseTask.lng,
-            premium: timelineAssignment.premium !== undefined ? timelineAssignment.premium : baseTask.premium,
-            straordinaria: timelineAssignment.straordinaria !== undefined ? timelineAssignment.straordinaria : (baseTask as any).straordinaria,
-            is_straordinaria: timelineAssignment.is_straordinaria !== undefined ? timelineAssignment.is_straordinaria : (timelineAssignment.straordinaria !== undefined ? timelineAssignment.straordinaria : (baseTask as any).is_straordinaria),
-            confirmed_operation: timelineAssignment.confirmed_operation !== undefined ? timelineAssignment.confirmed_operation : (baseTask as any).confirmed_operation,
-            customer_name: timelineAssignment.customer_name,
-            type_apt: timelineAssignment.type_apt,
-            checkin_date: timelineAssignment.checkin_date,
-            checkout_date: timelineAssignment.checkout_date,
-            checkin_time: timelineAssignment.checkin_time,
-            checkout_time: timelineAssignment.checkout_time,
-            pax_in: timelineAssignment.pax_in,
-            pax_out: timelineAssignment.pax_out,
-            operation_id: timelineAssignment.operation_id,
-            alias: timelineAssignment.alias,
-          } as any);
+            console.log(`➕ Aggiungendo task ${logisticCode} dalla timeline a cleaner ${cleanerId} con sequence ${timelineTask.sequence}`);
+            tasksWithAssignments.push({
+              ...baseTask,
+              assignedCleaner: cleanerId,
+              sequence: timelineTask.sequence,
+              startTime: timelineTask.start_time || (baseTask as any).startTime,
+              endTime: timelineTask.end_time || (baseTask as any).endTime,
+              travelTime: timelineTask.travel_time || 0,
+              followup: timelineTask.followup || false,
+              address: timelineTask.address || baseTask.address,
+              lat: timelineTask.lat || baseTask.lat,
+              lng: timelineTask.lng || baseTask.lng,
+              premium: timelineTask.premium !== undefined ? timelineTask.premium : baseTask.premium,
+              straordinaria: timelineTask.straordinaria !== undefined ? timelineTask.straordinaria : (baseTask as any).straordinaria,
+              is_straordinaria: timelineTask.is_straordinaria !== undefined ? timelineTask.is_straordinaria : (timelineTask.straordinaria !== undefined ? timelineTask.straordinaria : (baseTask as any).is_straordinaria),
+              confirmed_operation: timelineTask.confirmed_operation !== undefined ? timelineTask.confirmed_operation : (baseTask as any).confirmed_operation,
+              customer_name: timelineTask.customer_name,
+              type_apt: timelineTask.type_apt,
+              checkin_date: timelineTask.checkin_date,
+              checkout_date: timelineTask.checkout_date,
+              checkin_time: timelineTask.checkin_time,
+              checkout_time: timelineTask.checkout_time,
+              pax_in: timelineTask.pax_in,
+              pax_out: timelineTask.pax_out,
+              operation_id: timelineTask.operation_id,
+              alias: timelineTask.alias,
+              reasons: timelineTask.reasons,
+            } as any);
+          }
         }
       }
 
