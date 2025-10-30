@@ -1,6 +1,6 @@
 {
   "metadata": {
-    "last_updated": "2025-10-30T16:12:39.502117",
+    "last_updated": "2025-10-30T16:17:27.772372",
     "date": "2025-10-30"
   },
   "containers": {
@@ -41,99 +41,14 @@
       "count": 1
     },
     "low_priority": {
-      "tasks": [
-        {
-          "task_id": 218023,
-          "logistic_code": 1676,
-          "client_id": 123,
-          "premium": false,
-          "address": "Via Francesco Albani, 55",
-          "lat": "45.481653",
-          "lng": "9.1449777",
-          "cleaning_time": 90,
-          "checkin_date": "2025-10-31",
-          "checkout_date": "2025-10-30",
-          "checkin_time": null,
-          "checkout_time": null,
-          "pax_in": 2,
-          "pax_out": 1,
-          "small_equipment": false,
-          "operation_id": 2,
-          "confirmed_operation": true,
-          "straordinaria": false,
-          "type_apt": "B",
-          "alias": "YOUHO",
-          "customer_name": "YOUHOSTY",
-          "priority": "low_priority",
-          "reasons": [
-            "not_eo",
-            "not_hp"
-          ]
-        },
-        {
-          "task_id": 218029,
-          "logistic_code": 1634,
-          "client_id": 123,
-          "premium": false,
-          "address": "Via Abbondio Sangiorgio, 2",
-          "lat": "45.475911",
-          "lng": "9.1710371",
-          "cleaning_time": 90,
-          "checkin_date": "2025-10-31",
-          "checkout_date": "2025-10-30",
-          "checkin_time": "19:30",
-          "checkout_time": null,
-          "pax_in": 4,
-          "pax_out": 2,
-          "small_equipment": false,
-          "operation_id": 2,
-          "confirmed_operation": true,
-          "straordinaria": false,
-          "type_apt": "B",
-          "alias": "YOUHO",
-          "customer_name": "YOUHOSTY",
-          "priority": "low_priority",
-          "reasons": [
-            "not_eo",
-            "not_hp"
-          ]
-        },
-        {
-          "task_id": 218249,
-          "logistic_code": 1353,
-          "client_id": 3,
-          "premium": false,
-          "address": "Via Crivelli, 15/1",
-          "lat": "45.4534737",
-          "lng": "9.1937547",
-          "cleaning_time": 30,
-          "checkin_date": "2025-10-30",
-          "checkout_date": "2025-10-30",
-          "checkin_time": null,
-          "checkout_time": null,
-          "pax_in": 0,
-          "pax_out": 0,
-          "small_equipment": false,
-          "operation_id": 4,
-          "confirmed_operation": true,
-          "straordinaria": false,
-          "type_apt": "B",
-          "alias": "TBR",
-          "customer_name": "THE BEST RENT S.r.l.",
-          "priority": "low_priority",
-          "reasons": [
-            "not_eo",
-            "not_hp"
-          ]
-        }
-      ],
-      "count": 3
+      "tasks": [],
+      "count": 0
     }
   },
   "summary": {
-    "total_tasks": 4,
+    "total_tasks": 1,
     "early_out": 0,
     "high_priority": 1,
-    "low_priority": 3
+    "low_priority": 0
   }
 }
