@@ -1,6 +1,6 @@
 {
   "metadata": {
-    "last_updated": "2025-10-30T09:32:51.114360",
+    "last_updated": "2025-10-30T11:19:28.254Z",
     "date": "2025-10-30"
   },
   "cleaners_assignments": [
@@ -842,6 +842,44 @@
           "sequence": 1,
           "travel_time": 0,
           "is_straordinaria": false
+        },
+        {
+          "id": "218147",
+          "name": "1537",
+          "alias": "TBR",
+          "type": "THE BEST RENT S.r.l.",
+          "duration": "2.30",
+          "priority": "high",
+          "assignedTo": null,
+          "status": "pending",
+          "scheduledTime": null,
+          "address": "Via dei Piatti, 4 20123 (MI)",
+          "lat": "45.460795",
+          "lng": "9.1850985",
+          "premium": true,
+          "confirmed_operation": true,
+          "checkout_date": "2025-10-30",
+          "checkout_time": null,
+          "checkin_date": "2025-10-30",
+          "checkin_time": "15:00",
+          "pax_in": 2,
+          "pax_out": 2,
+          "operation_id": 2,
+          "customer_name": "THE BEST RENT S.r.l.",
+          "type_apt": "C",
+          "createdAt": "2025-10-30T11:18:27.051Z",
+          "updatedAt": "2025-10-30T11:18:27.051Z",
+          "task_id": "218147",
+          "logistic_code": "1537",
+          "cleaning_time": 150,
+          "start_time": null,
+          "end_time": null,
+          "followup": false,
+          "sequence": 2,
+          "travel_time": 0,
+          "reasons": [
+            "manually_moved_to_timeline"
+          ]
         }
       ]
     },
@@ -1356,7 +1394,7 @@
   ],
   "meta": {
     "total_cleaners": 13,
-    "total_tasks": 0,
+    "total_tasks": 36,
     "used_cleaners": 13,
     "assigned_tasks": 35
   }
