@@ -29,6 +29,9 @@ MIN_TASKS_PER_CLEANER = 2  # Minimo 2 task per cleaner
 CLUSTER_MAX_TRAVEL = 15.0  # Se task <= 15' da qualsiasi altra, ignora limite di task
 PREFERRED_TRAVEL = 20.0  # Preferenza per percorsi < 20' (aumentato per favorire aggregazione)
 
+# NUOVO: Limite per tipologia di priorità
+MAX_TASKS_PER_PRIORITY = 2  # Max 2 task Low-Priority per cleaner
+
 # Travel model (min)
 SHORT_RANGE_KM = 0.30
 SHORT_BASE_MIN = 3.5
@@ -234,8 +237,14 @@ def can_add_task(cleaner: Cleaner, task: Task) -> bool:
     1. Premium task -> premium cleaner
     2. Straordinaria -> premium cleaner, deve essere la prima (pos=0)
     3. Max 2 task base, +1 se travel <= 10', max assoluto 4 (o 5 se finisce entro 18:00)
+    4. Max 2 task Low-Priority per cleaner
     """
     if not can_handle_premium(cleaner, task):
+        return False
+
+    # NUOVO: Limite max 2 task Low-Priority per cleaner
+    # Conta solo le task LP già nella route (non contare EO/HP)
+    if len(cleaner.route) >= MAX_TASKS_PER_PRIORITY:
         return False
 
     # Straordinaria deve andare per forza in pos 0
