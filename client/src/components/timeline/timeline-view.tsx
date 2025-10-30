@@ -105,41 +105,44 @@ export default function TimelineView({
   useEffect(() => {
     const loadCleaners = async () => {
       try {
-        // Carica le assegnazioni da timeline.json
-        const response = await fetch(`/data/output/timeline.json?t=${Date.now()}`);
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
+        // 1. Carica TUTTI i cleaners selezionati
+        const selectedResponse = await fetch(`/data/cleaners/selected_cleaners.json?t=${Date.now()}`);
+        if (!selectedResponse.ok) {
+          throw new Error(`Failed to load selected cleaners: ${selectedResponse.status}`);
         }
-
-        // Verifica che la risposta sia JSON
-        const contentType = response.headers.get('content-type');
-        if (!contentType || !contentType.includes('application/json')) {
-          console.error('Risposta non JSON:', contentType);
-          setCleaners([]);
-          return;
-        }
-
-        const timelineData = await response.json();
-        console.log("Timeline caricata da timeline.json:", timelineData);
-
-        // Mappa la struttura di timeline.json al formato atteso dal componente
-        let cleanersList = [];
-        if (timelineData.cleaners_assignments && Array.isArray(timelineData.cleaners_assignments)) {
-          // La struttura è: { cleaners_assignments: [{ cleaner: {...}, tasks: [...] }] }
-          cleanersList = timelineData.cleaners_assignments.map((assignment: any) => ({
-            ...assignment.cleaner,
-            tasks: assignment.tasks || []
-          }));
-        } else if (timelineData.cleaners && Array.isArray(timelineData.cleaners)) {
-          // La struttura è già corretta: { cleaners: [...] }
-          cleanersList = timelineData.cleaners;
+        const selectedData = await selectedResponse.json();
+        const allCleaners = selectedData.cleaners || [];
+        
+        // 2. Carica le assegnazioni da timeline.json
+        const timelineResponse = await fetch(`/data/output/timeline.json?t=${Date.now()}`);
+        let assignmentsMap = new Map();
+        
+        if (timelineResponse.ok) {
+          const timelineData = await timelineResponse.json();
+          console.log("Timeline caricata:", timelineData);
+          
+          // Crea una mappa delle assegnazioni per ID cleaner
+          if (timelineData.cleaners_assignments && Array.isArray(timelineData.cleaners_assignments)) {
+            timelineData.cleaners_assignments.forEach((assignment: any) => {
+              const cleanerId = assignment.cleaner?.id;
+              if (cleanerId) {
+                assignmentsMap.set(cleanerId, assignment.tasks || []);
+              }
+            });
+          }
         }
         
-        console.log("Cleaners mappati:", cleanersList);
+        // 3. Unisci: tutti i cleaners selezionati + le loro task (se presenti)
+        const cleanersList = allCleaners.map((cleaner: any) => ({
+          ...cleaner,
+          tasks: assignmentsMap.get(cleaner.id) || []
+        }));
+        
+        console.log(`Cleaners totali: ${cleanersList.length}, con task: ${Array.from(assignmentsMap.keys()).length}`);
         setCleaners(cleanersList);
       } catch (error) {
         console.error("Errore nel caricamento della timeline:", error);
-        setCleaners([]); // Imposta array vuoto invece di lasciare undefined
+        setCleaners([]);
       }
     };
     loadCleaners();
