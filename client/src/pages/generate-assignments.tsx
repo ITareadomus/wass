@@ -755,8 +755,12 @@ export default function GenerateAssignments() {
 
         if (sourceCleanerId === destCleanerId) {
           // Reorder nella stessa timeline
-          console.log(`🔄 Reorder task ${logisticCode} nella timeline del cleaner ${sourceCleanerId}`);
+          console.log(`🔄 Reorder task ${logisticCode} nella timeline del cleaner ${sourceCleanerId} da posizione ${source.index} a ${destination.index}`);
           await reorderTimelineAssignment(taskId, sourceCleanerId, logisticCode || '', source.index, destination.index);
+          
+          // Ricarica immediatamente per mostrare il nuovo ordine
+          await loadTasks(true);
+          return;
         } else {
           // Spostamento tra cleaners diversi
           console.log(`🔄 Spostamento task ${logisticCode} da cleaner ${sourceCleanerId} a cleaner ${destCleanerId}`);
@@ -778,11 +782,11 @@ export default function GenerateAssignments() {
           if (!response.ok) {
             throw new Error('Errore nello spostamento tra cleaners');
           }
+          
+          // Ricarica immediatamente per mostrare il nuovo ordine
+          await loadTasks(true);
+          return;
         }
-        
-        // FORZA ricaricamento completo
-        await loadTasks(true);
-        return;
       }
 
       // Caso 2: Da timeline a container
