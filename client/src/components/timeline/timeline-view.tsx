@@ -314,6 +314,9 @@ export default function TimelineView({
                           .map((task, idx) => {
                             const taskObj = task as any;
                             
+                            // Trova l'indice corretto della task nell'array completo
+                            const globalIndex = tasks.findIndex(t => t.id === task.id);
+                            
                             // Leggi travel_time dalla task normalizzata (che viene da timeline_assignments.json)
                             // Prova sia travel_time che travelTime per compatibilità
                             let travelTime = 0;
@@ -383,7 +386,7 @@ export default function TimelineView({
                                 <TaskCard 
                                   key={task.id}
                                   task={task} 
-                                  index={idx}
+                                  index={globalIndex}
                                   isInTimeline={true}
                                   allTasks={tasks}
                                 />
