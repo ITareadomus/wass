@@ -394,7 +394,7 @@ export default function TimelineView({
                 >
                   <div className="w-full">
                     <div className="break-words font-bold text-[13px]">
-                      {cleanersAliases[cleaner.id] || `${cleaner.name.toUpperCase()} ${cleaner.lastname.toUpperCase()}`}
+                      {cleanersAliases[cleaner.id]?.alias || `${cleaner.name.toUpperCase()} ${cleaner.lastname.toUpperCase()}`}
                     </div>
                   </div>
                 </div>
