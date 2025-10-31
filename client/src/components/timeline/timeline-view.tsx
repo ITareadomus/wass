@@ -53,6 +53,7 @@ export default function TimelineView({
   const [selectedSwapCleaner, setSelectedSwapCleaner] = useState<string>("");
   const [filteredCleanerId, setFilteredCleanerId] = useState<number | null>(null);
   const [clickTimer, setClickTimer] = useState<NodeJS.Timeout | null>(null);
+  const [cleanersAliases, setCleanersAliases] = useState<Record<string, string>>({});
   const { toast } = useToast();
 
   // Mutation per scambiare task tra cleaners
@@ -204,7 +205,24 @@ export default function TimelineView({
         setCleaners([]); // Imposta array vuoto invece di lasciare undefined
       }
     };
+
+    const loadAliases = async () => {
+      try {
+        const response = await fetch(`/data/cleaners/cleaners_aliases.json?t=${Date.now()}`);
+        if (!response.ok) {
+          console.warn('File aliases non trovato, uso nomi default');
+          return;
+        }
+        const aliasesData = await response.json();
+        setCleanersAliases(aliasesData.aliases || {});
+        console.log("Alias cleaners caricati:", aliasesData.aliases);
+      } catch (error) {
+        console.error("Errore nel caricamento degli alias:", error);
+      }
+    };
+
     loadCleaners();
+    loadAliases();
   }, []);
 
   const handleCleanerClick = (cleaner: Cleaner, e: React.MouseEvent) => {
@@ -376,7 +394,7 @@ export default function TimelineView({
                 >
                   <div className="w-full">
                     <div className="break-words font-bold text-[13px]">
-                      {cleaner.name.toUpperCase()} {cleaner.lastname.toUpperCase()}
+                      {cleanersAliases[cleaner.id] || `${cleaner.name.toUpperCase()} ${cleaner.lastname.toUpperCase()}`}
                     </div>
                   </div>
                 </div>
