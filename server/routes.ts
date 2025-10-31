@@ -1970,32 +1970,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       );
 
       if (taskIndex === -1) {
-        return res.status(404).json({ 
-          success: false, 
-          error: `Task ${logisticCode} non trovata per cleaner ${cleanerId}` 
-        });
+        return res.status(404).json({ success: false, message: "Task non trovata" });
       }
 
-      console.log(`🔄 Reordering: taskIndex=${taskIndex}, toIndex=${toIndex}, array length=${cleanerEntry.tasks.length}`);
+      // Rimuovi la task dalla posizione originale
+      const [task] = cleanerEntry.tasks.splice(taskIndex, 1);
 
-      // Se fromIndex === toIndex, non fare nulla
-      if (taskIndex === toIndex) {
-        console.log(`⚠️ fromIndex === toIndex, nessun cambio necessario`);
-        return res.json({ success: true, message: "Posizione invariata" });
-      }
-
-      // Rimuovi la task dalla posizione corrente
-      const [movedTask] = cleanerEntry.tasks.splice(taskIndex, 1);
-
-      // IMPORTANTE: Se stiamo spostando verso l'alto (toIndex < taskIndex),
-      // l'indice di destinazione rimane invariato.
-      // Se stiamo spostando verso il basso (toIndex > taskIndex),
-      // dopo lo splice(taskIndex, 1), tutti gli elementi dopo taskIndex 
-      // sono shiftati di 1 a sinistra, quindi dobbiamo decrementare toIndex di 1.
-      const adjustedToIndex = toIndex > taskIndex ? toIndex - 1 : toIndex;
-
-      console.log(`📍 Inserting at adjusted index: ${adjustedToIndex}`);
-      cleanerEntry.tasks.splice(adjustedToIndex, 0, movedTask);
+      // Inserisci nella nuova posizione
+      cleanerEntry.tasks.splice(toIndex, 0, task);
 
       // Ricalcola travel_time, start_time, end_time usando lo script Python
       try {
@@ -2028,7 +2010,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       await fs.writeFile(tmpPath, JSON.stringify(timelineData, null, 2));
       await fs.rename(tmpPath, timelinePath);
 
-      console.log(`✅ Task ${logisticCode} riordinata da posizione ${taskIndex} a ${adjustedToIndex} per cleaner ${cleanerId}`);
+      console.log(`✅ Task ${logisticCode} riordinata da posizione ${fromIndex} a ${toIndex} per cleaner ${cleanerId}`);
       console.log(`   Nuova sequenza delle task: ${cleanerEntry.tasks.map((t: any) => `${t.logistic_code}(${t.sequence})`).join(', ')}`);
 
       res.json({ success: true, message: "Task riordinata con successo" });
