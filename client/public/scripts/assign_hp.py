@@ -153,26 +153,38 @@ def haversine_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
 
 def travel_minutes(a_lat: float, a_lng: float, b_lat: float, b_lng: float,
                    a_addr: Optional[str] = None, b_addr: Optional[str] = None) -> float:
-    km = haversine_km(a_lat, a_lng, b_lat, b_lng)
-
+    """
+    Modello realistico Milano urbano:
+    - Percorsi non rettilinei (1.5x haversine)
+    - Velocità variabile per distanza
+    - Tempo base preparazione
+    """
+    # Stesso edificio
     if a_addr and b_addr and same_building(a_addr, b_addr):
-        t = SHORT_BASE_MIN
-        return max(MIN_TRAVEL, min(MAX_TRAVEL, t))
-
-    if km < SHORT_RANGE_KM:
-        t = SHORT_BASE_MIN + WALK_SLOW_MIN_PER_KM * km
+        return max(MIN_TRAVEL, min(MAX_TRAVEL, SHORT_BASE_MIN))
+    
+    km = haversine_km(a_lat, a_lng, b_lat, b_lng)
+    
+    # Fattore correzione percorsi non rettilinei
+    dist_reale = km * 1.5
+    
+    # Modello progressivo
+    if dist_reale < 0.8:
+        travel_time = dist_reale * 6.0  # ~10 km/h a piedi
+    elif dist_reale < 2.5:
+        travel_time = dist_reale * 10.0  # ~6 km/h misto
     else:
-        overhead = BASE_OVERHEAD_MIN * (km / SCALED_OH_KM) if km < SCALED_OH_KM else BASE_OVERHEAD_MIN
-        t = overhead
-        if km <= K_SWITCH_KM:
-            t += WALK_MIN_PER_KM * km
-        else:
-            t += WALK_MIN_PER_KM * K_SWITCH_KM + RIDE_MIN_PER_KM * (km - K_SWITCH_KM)
-
+        travel_time = dist_reale * 5.0  # ~12 km/h mezzi
+    
+    # Tempo base
+    base_time = 5.0
+    total_time = base_time + travel_time
+    
+    # Bonus stesso strada (riduce tempo base)
     if a_addr and b_addr and same_street(a_addr, b_addr) and km < 0.10:
-        t += 1.0
-
-    return max(MIN_TRAVEL, min(MAX_TRAVEL, t))
+        total_time = max(total_time - 2.0, MIN_TRAVEL)
+    
+    return max(MIN_TRAVEL, min(MAX_TRAVEL, total_time))
 
 
 def can_handle_premium(cleaner: Cleaner, task: Task) -> bool:

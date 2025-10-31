@@ -47,9 +47,11 @@ def same_street(addr1: Optional[str], addr2: Optional[str]) -> bool:
 def travel_minutes(lat1: float, lng1: float, lat2: float, lng2: float,
                    addr1: Optional[str], addr2: Optional[str]) -> float:
     """
-    Calcola il tempo di viaggio in minuti tra due punti.
-    - 0 minuti se stesso indirizzo (stessa via)
-    - Altrimenti: distanza_km * 2.5 (circa 24 km/h di media urbana)
+    Calcola il tempo di viaggio in minuti tra due punti usando un modello 
+    realistico per Milano urbano che tiene conto di:
+    - Percorsi non rettilinei (fattore 1.5x sulla distanza haversine)
+    - Velocità medie variabili per distanza
+    - Tempo base per preparazione/attesa (5 min)
     """
     if same_street(addr1, addr2):
         return 0.0
@@ -59,7 +61,27 @@ def travel_minutes(lat1: float, lng1: float, lat2: float, lng2: float,
     if dist_km > MAX_DISTANCE_KM:
         return 9999.0
     
-    return dist_km * 2.5
+    # Fattore correzione percorsi non rettilinei (Milano centro storico)
+    dist_reale = dist_km * 1.5
+    
+    # Modello progressivo basato su distanza effettiva:
+    # - Brevi (<0.8km): a piedi rapido, ~10 km/h → 6 min/km
+    # - Medie (0.8-2.5km): misto piedi/mezzi, ~6 km/h → 10 min/km  
+    # - Lunghe (>2.5km): mezzi pubblici/taxi, ~12 km/h → 5 min/km
+    
+    if dist_reale < 0.8:
+        travel_time = dist_reale * 6.0  # ~10 km/h
+    elif dist_reale < 2.5:
+        travel_time = dist_reale * 10.0  # ~6 km/h
+    else:
+        travel_time = dist_reale * 5.0  # ~12 km/h
+    
+    # Aggiungi tempo base (preparazione, attesa semafori, ecc.)
+    base_time = 5.0
+    total_time = base_time + travel_time
+    
+    # Limiti ragionevoli: min 3 min, max 50 min
+    return max(3.0, min(50.0, total_time))
 
 
 def time_to_minutes(time_str: str) -> int:
