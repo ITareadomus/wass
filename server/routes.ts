@@ -17,56 +17,56 @@ const execAsync = promisify(exec);
  */
 async function recalculateCleanerTimes(cleanerData: any): Promise<any> {
   const { spawn } = await import('child_process');
-  
+
   return new Promise((resolve, reject) => {
     const scriptPath = path.join(process.cwd(), 'client/public/scripts/recalculate_times.py');
     const cleanerDataJson = JSON.stringify(cleanerData);
-    
+
     // Usa spawn con stdin per evitare ARG_MAX limit e command injection
     const pythonProcess = spawn('python3', [scriptPath], {
       stdio: ['pipe', 'pipe', 'pipe']
     });
-    
+
     let stdout = '';
     let stderr = '';
-    
+
     pythonProcess.stdout.on('data', (data) => {
       stdout += data.toString();
     });
-    
+
     pythonProcess.stderr.on('data', (data) => {
       stderr += data.toString();
     });
-    
+
     pythonProcess.on('close', (code) => {
       if (code !== 0) {
         console.error('Python stderr:', stderr);
         reject(new Error(`Python script exited with code ${code}: ${stderr}`));
         return;
       }
-      
+
       if (stderr && stderr.trim()) {
         console.warn('Python stderr:', stderr);
       }
-      
+
       try {
         const result = JSON.parse(stdout);
-        
+
         if (!result.success) {
           reject(new Error(result.error || 'Unknown error from Python script'));
           return;
         }
-        
+
         resolve(result.cleaner_data);
       } catch (parseError: any) {
         reject(new Error(`Failed to parse Python output: ${parseError.message}`));
       }
     });
-    
+
     pythonProcess.on('error', (error) => {
       reject(new Error(`Failed to spawn Python process: ${error.message}`));
     });
-    
+
     // Scrivi il JSON su stdin e chiudi
     pythonProcess.stdin.write(cleanerDataJson);
     pythonProcess.stdin.end();
@@ -219,7 +219,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           sourceEntry.tasks = updatedSourceData.tasks;
           console.log(`✅ Tempi ricalcolati per cleaner sorgente ${sourceCleanerId}`);
         }
-        
+
         // Ricalcola cleaner di destinazione
         const updatedDestData = await recalculateCleanerTimes(destEntry);
         destEntry.tasks = updatedDestData.tasks;
@@ -269,14 +269,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Endpoint per salvare un'assegnazione nella timeline
   app.post("/api/save-timeline-assignment", async (req, res) => {
     try {
-      const { taskId, cleanerId, logisticCode, date, dropIndex, taskData } = req.body;
+      const { taskId, cleanerId, logisticCode, date, dropIndex, taskData, priority } = req.body;
       const workDate = date || format(new Date(), 'yyyy-MM-dd');
       const timelinePath = path.join(process.cwd(), 'client/public/data/output/timeline.json');
       const containersPath = path.join(process.cwd(), 'client/public/data/output/containers.json');
 
       // Carica containers per ottenere i dati completi del task
       let fullTaskData: any = null;
-      let sourceContainerType: string | null = null;
+      let sourceContainerType: string | null = null; // To track where the task came from
 
       // Load containers data only if taskData is not provided or incomplete
       let containersData = null;
@@ -470,7 +470,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ],
 
         // Campi specifici timeline (formato orario HH:MM)
-        priority: sourceContainerType || 'manual',
+        priority: priority || sourceContainerType || 'low_priority',
         start_time: null,
         end_time: null,
         followup: false,
@@ -481,10 +481,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         is_straordinaria: Boolean(fullTaskData.straordinaria || fullTaskData.is_straordinaria)
       };
 
-      console.log(`📝 Task salvato in timeline:`, {
+      console.log('📝 Task salvato in timeline:', {
         task_id: taskForTimeline.task_id,
         logistic_code: taskForTimeline.logistic_code,
-        cleaning_time: taskForTimeline.cleaning_time
+        cleaning_time: taskForTimeline.cleaning_time,
+        priority: taskForTimeline.priority
       });
 
       // Inserisci in posizione dropIndex
@@ -899,7 +900,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           reasons: [
             ...(taskToMove.reasons || []),
             "manual_assignment"
-          ]
+          ],
+          priority: taskToMove.priority || sourceContainerType || 'low_priority' // Assign correct priority
         };
 
         cleanerEntry.tasks.push(task_for_timeline);
@@ -932,7 +934,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const tmpContainersPath = `${containersPath}.tmp`;
         await fs.writeFile(tmpContainersPath, JSON.stringify(containersData, null, 2));
         await fs.rename(tmpContainersPath, containersPath);
-        
+
         console.log(`✅ Task ${logisticCode} spostata da ${sourceContainerType} a timeline (cleaner ${cleanerId})`);
       }
       // CASO 3: Spostamento TRA containers

@@ -660,6 +660,14 @@ export default function GenerateAssignments() {
       // Trova il task completo dai containers
       const task = allTasksWithAssignments.find(t => t.id === taskId);
 
+      // Determina la priorità originale della task
+      let priority = 'low_priority'; // default
+      if (earlyOutTasks.find(t => t.id === taskId)) {
+        priority = 'early_out';
+      } else if (highPriorityTasks.find(t => t.id === taskId)) {
+        priority = 'high_priority';
+      }
+
       const response = await fetch('/api/save-timeline-assignment', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -669,6 +677,7 @@ export default function GenerateAssignments() {
           logisticCode, 
           date: dateStr, 
           dropIndex,
+          priority, // Passa la priorità originale
           taskData: task // Passa tutti i dati del task
         }),
       });
