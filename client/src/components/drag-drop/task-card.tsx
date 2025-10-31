@@ -262,51 +262,59 @@ export default function TaskCard({
         {(provided, snapshot) => {
           const cardWidth = calculateWidth(task.duration, isInTimeline);
 
+          // Calcola la larghezza proporzionale per l'indicatore di travel time
+          // La timeline copre 600 minuti (10:00-19:00), quindi convertiamo i minuti in percentuale
           const effectiveTravelMinutes = travelTime === 0 ? 1 : travelTime;
-          const travelWidth = `${(effectiveTravelMinutes / 600) * 100}%`;
+          const travelWidthPercent = (effectiveTravelMinutes / 600) * 100;
 
           return (
             <div
               ref={provided.innerRef}
               {...provided.draggableProps}
               {...provided.dragHandleProps}
-              className={`
-                ${colorClass} 
-                rounded-sm px-2 py-1 shadow-sm border transition-all duration-200
-                ${snapshot.isDragging ? "shadow-lg scale-105" : ""}
-                ${isOverdue ? "animate-blink" : ""}
-                hover:shadow-md cursor-pointer
-                flex-shrink-0 relative
-              `}
-              style={{
-                ...provided.draggableProps.style,
-                width: cardWidth,
-                minHeight: "40px",
-              }}
-              data-testid={`task-card-${task.id}`}
-              onClick={(e) => {
-                if (!snapshot.isDragging) {
-                  handleCardClick(e);
-                }
-              }}
+              className="flex items-center flex-shrink-0"
+              style={provided.draggableProps.style}
             >
-            {/* Indicatore di travel time - posizionato a sinistra */}
-            {showTravelIndicator && (
-              <div 
-                className="absolute -left-5 top-1/2 -translate-y-1/2 flex items-center justify-center"
-                title={`Tempo di viaggio: ${travelTime} min`}
-              >
-                <svg
-                  width="14"
-                  height="14"
-                  viewBox="0 0 24 24"
-                  fill="currentColor"
-                  className="text-gray-600 dark:text-gray-400"
+              {/* Indicatore di travel time - occupa spazio proporzionale nella timeline */}
+              {showTravelIndicator && (
+                <div 
+                  className="flex items-center justify-center flex-shrink-0"
+                  style={{ width: `${travelWidthPercent}%` }}
+                  title={`Tempo di viaggio: ${travelTime} min`}
                 >
-                  <path d="M13.5 5.5c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zM9.8 8.9L7 23h2.1l1.8-8 2.1 2v6h2v-7.5l-2.1-2 .6-3C14.8 12 16.8 13 19 13v-2c-1.9 0-3.5-1-4.3-2.4l-1-1.6c-.4-.6-1-1-1.7-1-.3 0-.5.1-.8.1L6 8.3V13h2V9.6l1.8-.7"/>
-                </svg>
-              </div>
-            )}
+                  <svg
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="currentColor"
+                    className="text-gray-600 dark:text-gray-400"
+                  >
+                    <path d="M13.5 5.5c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zM9.8 8.9L7 23h2.1l1.8-8 2.1 2v6h2v-7.5l-2.1-2 .6-3C14.8 12 16.8 13 19 13v-2c-1.9 0-3.5-1-4.3-2.4l-1-1.6c-.4-.6-1-1-1.7-1-.3 0-.5.1-.8.1L6 8.3V13h2V9.6l1.8-.7"/>
+                  </svg>
+                </div>
+              )}
+              
+              {/* Task Card */}
+              <div
+                className={`
+                  ${colorClass} 
+                  rounded-sm px-2 py-1 shadow-sm border transition-all duration-200
+                  ${snapshot.isDragging ? "shadow-lg scale-105" : ""}
+                  ${isOverdue ? "animate-blink" : ""}
+                  hover:shadow-md cursor-pointer
+                  flex-shrink-0 relative
+                `}
+                style={{
+                  width: cardWidth,
+                  minHeight: "40px",
+                }}
+                data-testid={`task-card-${task.id}`}
+                onClick={(e) => {
+                  if (!snapshot.isDragging) {
+                    handleCardClick(e);
+                  }
+                }}
+              >
             
             {!isConfirmedOperation && (
               <div className="absolute top-0.5 right-0.5 z-50">
@@ -336,6 +344,7 @@ export default function TaskCard({
                 </span>
               )}
             </div>
+              </div>
             </div>
             );
           }}
