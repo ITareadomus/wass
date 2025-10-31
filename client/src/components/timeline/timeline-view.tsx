@@ -266,12 +266,11 @@ export default function TimelineView({
                   onClick={() => handleCleanerClick(cleaner)}
                 >
                   <div className="w-full">
-                    <div className="text-[9px] font-medium break-words leading-tight">
+                    <div className="break-words font-bold text-[13px]">
                       {cleaner.name.toUpperCase()} {cleaner.lastname.toUpperCase()}
                     </div>
                   </div>
                 </div>
-
                 {/* Timeline per questo cleaner - area unica droppable */}
                 <Droppable droppableId={`timeline-${cleaner.id}`} direction="horizontal">
                   {(provided, snapshot) => (
@@ -403,7 +402,6 @@ export default function TimelineView({
           })}
         </div>
       </div>
-
       {/* Cleaner Details Dialog */}
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
         <DialogContent className={`sm:max-w-2xl max-h-[80vh] overflow-y-auto ${
