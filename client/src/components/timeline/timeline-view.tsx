@@ -382,8 +382,8 @@ export default function TimelineView({
                           .map((task, idx) => {
                             const taskObj = task as any;
                             
-                            // Trova l'indice corretto della task nell'array completo
-                            const globalIndex = tasks.findIndex(t => t.id === task.id);
+                            // Per il drag and drop, usa l'indice locale (idx) non globalIndex
+                            // React-beautiful-dnd richiede indici sequenziali 0,1,2,3... per ogni Droppable
                             
                             // Leggi travel_time dalla task normalizzata (che viene da timeline_assignments.json)
                             // Prova sia travel_time che travelTime per compatibilità
@@ -454,7 +454,7 @@ export default function TimelineView({
                                 <TaskCard 
                                   key={task.id}
                                   task={task} 
-                                  index={globalIndex}
+                                  index={idx}
                                   isInTimeline={true}
                                   allTasks={tasks}
                                 />
