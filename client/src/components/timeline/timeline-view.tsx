@@ -337,18 +337,6 @@ export default function TimelineView({
                               console.log(`Task ${taskObj.task_id || taskObj.id}: travel_time=${travelTime} min`);
                             }
 
-                            // Calcola i puntini in base al travel time (solo visivo)
-                            // 0-15 min: "..."
-                            // 16-30 min: "......"
-                            // >30 min: "........."
-                            let dots = "...";
-
-                            if (travelTime > 15 && travelTime <= 30) {
-                              dots = "......";
-                            } else if (travelTime > 30) {
-                              dots = ".........";
-                            }
-
                             // Calcola larghezza EFFETTIVA in base ai minuti reali di travel_time
                             // La timeline copre 600 minuti (10:00-19:00)
                             // Se travelTime è 0, usa almeno 1 minuto per visibilità
@@ -357,11 +345,11 @@ export default function TimelineView({
 
                             return (
                               <>
-                                {/* Indicatori di travel time: omino + puntini con larghezza fissa */}
+                                {/* Indicatore di travel time: solo omino che cammina */}
                                 {idx > 0 && (
                                   <div 
                                     key={`marker-${task.id}`} 
-                                    className="flex items-center justify-start gap-0 flex-shrink-0"
+                                    className="flex items-center justify-center flex-shrink-0"
                                     style={{ width: `${totalWidth}%` }}
                                     title={`Task #${taskObj.task_id || task.id} - Travel time: ${travelTime} minuti`}
                                   >
@@ -374,9 +362,6 @@ export default function TimelineView({
                                     >
                                       <path d="M13.5 5.5c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zM9.8 8.9L7 23h2.1l1.8-8 2.1 2v6h2v-7.5l-2.1-2 .6-3C14.8 12 16.8 13 19 13v-2c-1.9 0-3.5-1-4.3-2.4l-1-1.6c-.4-.6-1-1-1.7-1-.3 0-.5.1-.8.1L6 8.3V13h2V9.6l1.8-.7"/>
                                     </svg>
-                                    <span className="text-[10px] font-bold text-gray-600 leading-none">
-                                      {dots}
-                                    </span>
                                   </div>
                                 )}
 
