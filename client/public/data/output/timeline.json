@@ -1,6 +1,6 @@
 {
   "metadata": {
-    "last_updated": "2025-10-31T13:32:13.907Z",
+    "last_updated": "2025-10-31T13:46:05.105633",
     "date": "2025-10-31"
   },
   "cleaners_assignments": [
@@ -224,44 +224,11 @@
             "automatic_assignment_eo"
           ],
           "priority": "early_out",
-          "start_time": "12:18",
-          "end_time": "15:18",
+          "start_time": "12:17",
+          "end_time": "15:17",
           "followup": true,
           "sequence": 2,
-          "travel_time": 18,
-          "is_straordinaria": false
-        },
-        {
-          "task_id": 218206,
-          "logistic_code": 1090,
-          "client_id": null,
-          "premium": true,
-          "address": "via Caminadella 13",
-          "lat": "45.4597769",
-          "lng": "9.1770378",
-          "cleaning_time": 270,
-          "checkin_date": "2025-10-31",
-          "checkout_date": "2025-10-31",
-          "checkin_time": "16:00",
-          "checkout_time": null,
-          "pax_in": 7,
-          "pax_out": 5,
-          "small_equipment": false,
-          "operation_id": 2,
-          "confirmed_operation": true,
-          "straordinaria": false,
-          "type_apt": "E",
-          "alias": "TBR",
-          "customer_name": "THE BEST RENT S.r.l.",
-          "reasons": [
-            "manually_moved_to_timeline"
-          ],
-          "priority": "high_priority",
-          "start_time": "15:40",
-          "end_time": "20:10",
-          "followup": true,
-          "sequence": 3,
-          "travel_time": 22,
+          "travel_time": 17,
           "is_straordinaria": false
         }
       ]
@@ -1318,7 +1285,7 @@
   ],
   "meta": {
     "total_cleaners": 13,
-    "total_tasks": 34,
+    "total_tasks": 0,
     "used_cleaners": 13,
     "assigned_tasks": 33
   }
