@@ -1,6 +1,6 @@
 {
   "metadata": {
-    "last_updated": "2025-10-31T13:20:14.182331",
+    "last_updated": "2025-10-31T13:32:13.907Z",
     "date": "2025-10-31"
   },
   "cleaners_assignments": [
@@ -77,7 +77,7 @@
           "priority": "high_priority",
           "start_time": "11:19",
           "end_time": "12:19",
-          "followup": true,
+          "followup": false,
           "sequence": 2,
           "travel_time": 19,
           "is_straordinaria": false
@@ -224,11 +224,44 @@
             "automatic_assignment_eo"
           ],
           "priority": "early_out",
-          "start_time": "12:17",
-          "end_time": "15:17",
+          "start_time": "12:18",
+          "end_time": "15:18",
           "followup": true,
           "sequence": 2,
-          "travel_time": 17,
+          "travel_time": 18,
+          "is_straordinaria": false
+        },
+        {
+          "task_id": 218206,
+          "logistic_code": 1090,
+          "client_id": null,
+          "premium": true,
+          "address": "via Caminadella 13",
+          "lat": "45.4597769",
+          "lng": "9.1770378",
+          "cleaning_time": 270,
+          "checkin_date": "2025-10-31",
+          "checkout_date": "2025-10-31",
+          "checkin_time": "16:00",
+          "checkout_time": null,
+          "pax_in": 7,
+          "pax_out": 5,
+          "small_equipment": false,
+          "operation_id": 2,
+          "confirmed_operation": true,
+          "straordinaria": false,
+          "type_apt": "E",
+          "alias": "TBR",
+          "customer_name": "THE BEST RENT S.r.l.",
+          "reasons": [
+            "manually_moved_to_timeline"
+          ],
+          "priority": "high_priority",
+          "start_time": "15:40",
+          "end_time": "20:10",
+          "followup": true,
+          "sequence": 3,
+          "travel_time": 22,
           "is_straordinaria": false
         }
       ]
@@ -881,8 +914,8 @@
             "automatic_assignment_hp"
           ],
           "priority": "high_priority",
-          "start_time": "11:00",
-          "end_time": "12:30",
+          "start_time": "10:00",
+          "end_time": "11:30",
           "followup": false,
           "sequence": 1,
           "travel_time": 0,
@@ -967,86 +1000,6 @@
           "sequence": 2,
           "travel_time": 24,
           "is_straordinaria": false
-        }
-      ]
-    },
-    {
-      "cleaner": {
-        "id": 132,
-        "name": "JOHOISER ERNESTO",
-        "lastname": "LOPEZ GIRON",
-        "role": "Premium",
-        "premium": true
-      },
-      "tasks": [
-        {
-          "task_id": 218075,
-          "logistic_code": 771,
-          "client_id": 64,
-          "premium": false,
-          "address": "VIA PIERLOMBARDO, 3",
-          "lat": "45.4549994",
-          "lng": "9.2049206",
-          "cleaning_time": 60,
-          "checkin_date": "2025-10-31",
-          "checkout_date": "2025-10-31",
-          "checkin_time": "14:00",
-          "checkout_time": "11:00",
-          "pax_in": 2,
-          "pax_out": 2,
-          "small_equipment": true,
-          "operation_id": 2,
-          "confirmed_operation": true,
-          "straordinaria": false,
-          "type_apt": "A",
-          "alias": "RELSTAY",
-          "customer_name": "RELSTAY - FERRARA GIULIA",
-          "reasons": [
-            "same_day_checkin_between_eo_hp",
-            "client_forced_hp",
-            "automatic_assignment_hp"
-          ],
-          "priority": "high_priority",
-          "start_time": "11:00",
-          "end_time": "12:00",
-          "followup": false,
-          "sequence": 1,
-          "travel_time": 0,
-          "is_straordinaria": false
-        },
-        {
-          "task_id": 218204,
-          "logistic_code": 716,
-          "client_id": 3,
-          "premium": true,
-          "address": "PIAZZA MENTANA, 8",
-          "lat": "45.4623463",
-          "lng": "9.1819616",
-          "cleaning_time": 120,
-          "checkin_date": "2025-10-31",
-          "checkout_date": "2025-10-31",
-          "checkin_time": null,
-          "checkout_time": null,
-          "pax_in": 3,
-          "pax_out": 4,
-          "small_equipment": false,
-          "operation_id": 2,
-          "confirmed_operation": true,
-          "straordinaria": false,
-          "type_apt": "B",
-          "alias": "TBR",
-          "customer_name": "THE BEST RENT S.r.l.",
-          "reasons": [
-            "premium",
-            "automatic_assignment_hp"
-          ],
-          "priority": "high_priority",
-          "start_time": "12:19",
-          "end_time": "14:19",
-          "followup": true,
-          "sequence": 2,
-          "travel_time": 20,
-          "is_straordinaria": false
         },
         {
           "task_id": 218211,
@@ -1076,12 +1029,127 @@
             "not_hp",
             "automatic_assignment_lp"
           ],
-          "start_time": "14:25",
-          "end_time": "16:25",
+          "start_time": "15:01",
+          "end_time": "17:01",
           "followup": false,
           "sequence": 3,
-          "travel_time": 7,
+          "travel_time": 8,
           "is_straordinaria": false
+        }
+      ]
+    },
+    {
+      "cleaner": {
+        "id": 132,
+        "name": "JOHOISER ERNESTO",
+        "lastname": "LOPEZ GIRON",
+        "role": "Premium",
+        "premium": true
+      },
+      "tasks": [
+        {
+          "task_id": 218204,
+          "logistic_code": 716,
+          "client_id": 3,
+          "premium": true,
+          "address": "PIAZZA MENTANA, 8",
+          "lat": "45.4623463",
+          "lng": "9.1819616",
+          "cleaning_time": 120,
+          "checkin_date": "2025-10-31",
+          "checkout_date": "2025-10-31",
+          "checkin_time": null,
+          "checkout_time": null,
+          "pax_in": 3,
+          "pax_out": 4,
+          "small_equipment": false,
+          "operation_id": 2,
+          "confirmed_operation": true,
+          "straordinaria": false,
+          "type_apt": "B",
+          "alias": "TBR",
+          "customer_name": "THE BEST RENT S.r.l.",
+          "reasons": [
+            "premium",
+            "automatic_assignment_hp"
+          ],
+          "priority": "high_priority",
+          "start_time": "10:00",
+          "end_time": "12:00",
+          "followup": false,
+          "sequence": 1,
+          "travel_time": 0,
+          "is_straordinaria": false
+        },
+        {
+          "task_id": 218075,
+          "logistic_code": 771,
+          "client_id": 64,
+          "premium": false,
+          "address": "VIA PIERLOMBARDO, 3",
+          "lat": "45.4549994",
+          "lng": "9.2049206",
+          "cleaning_time": 60,
+          "checkin_date": "2025-10-31",
+          "checkout_date": "2025-10-31",
+          "checkin_time": "14:00",
+          "checkout_time": "11:00",
+          "pax_in": 2,
+          "pax_out": 2,
+          "small_equipment": true,
+          "operation_id": 2,
+          "confirmed_operation": true,
+          "straordinaria": false,
+          "type_apt": "A",
+          "alias": "RELSTAY",
+          "customer_name": "RELSTAY - FERRARA GIULIA",
+          "reasons": [
+            "same_day_checkin_between_eo_hp",
+            "client_forced_hp",
+            "automatic_assignment_hp"
+          ],
+          "priority": "high_priority",
+          "start_time": "12:19",
+          "end_time": "13:19",
+          "followup": true,
+          "sequence": 2,
+          "travel_time": 20,
+          "is_straordinaria": false
+        },
+        {
+          "task_id": 218207,
+          "logistic_code": 1241,
+          "client_id": 3,
+          "premium": false,
+          "address": "Via Goldoni, 38 20129 (MI)",
+          "lat": "45.4691278",
+          "lng": "9.2138941",
+          "cleaning_time": 300,
+          "checkin_date": null,
+          "checkout_date": "2025-10-31",
+          "checkin_time": null,
+          "checkout_time": null,
+          "pax_in": 0,
+          "pax_out": 1,
+          "small_equipment": false,
+          "operation_id": 3,
+          "confirmed_operation": true,
+          "straordinaria": true,
+          "type_apt": "C",
+          "alias": "TBR",
+          "customer_name": "THE BEST RENT S.r.l.",
+          "priority": "low_priority",
+          "reasons": [
+            "not_eo",
+            "not_hp",
+            "automatic_assignment_lp"
+          ],
+          "start_time": "13:36",
+          "end_time": "18:36",
+          "followup": false,
+          "sequence": 3,
+          "travel_time": 18,
+          "is_straordinaria": true
         }
       ]
     },
@@ -1250,8 +1318,8 @@
   ],
   "meta": {
     "total_cleaners": 13,
-    "total_tasks": 0,
+    "total_tasks": 34,
     "used_cleaners": 13,
-    "assigned_tasks": 32
+    "assigned_tasks": 33
   }
 }
