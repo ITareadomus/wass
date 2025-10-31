@@ -1,6 +1,6 @@
 {
   "metadata": {
-    "last_updated": "2025-10-31T10:32:39.208637",
+    "last_updated": "2025-10-31T10:34:29.338Z",
     "date": "2025-10-31"
   },
   "cleaners_assignments": [
@@ -45,6 +45,39 @@
           "followup": false,
           "sequence": 1,
           "travel_time": 0,
+          "is_straordinaria": false
+        },
+        {
+          "task_id": 218263,
+          "logistic_code": 144,
+          "client_id": null,
+          "premium": true,
+          "address": "CORSO DI PORTA ROMANA 107",
+          "lat": "45.4541963",
+          "lng": "9.199497",
+          "cleaning_time": 120,
+          "checkin_date": "2025-10-31",
+          "checkout_date": "2025-10-31",
+          "checkin_time": null,
+          "checkout_time": "11:00",
+          "pax_in": 4,
+          "pax_out": 0,
+          "small_equipment": false,
+          "operation_id": 2,
+          "confirmed_operation": true,
+          "straordinaria": false,
+          "type_apt": "B",
+          "alias": "TBR",
+          "customer_name": "THE BEST RENT S.r.l.",
+          "reasons": [
+            "manually_moved_to_timeline"
+          ],
+          "priority": "high_priority",
+          "start_time": "11:17",
+          "end_time": "13:17",
+          "followup": true,
+          "sequence": 2,
+          "travel_time": 17,
           "is_straordinaria": false
         }
       ]
@@ -434,8 +467,9 @@
     }
   ],
   "meta": {
-    "total_cleaners": 12,
+    "total_cleaners": 8,
     "used_cleaners": 8,
-    "assigned_tasks": 10
+    "assigned_tasks": 10,
+    "total_tasks": 11
   }
 }
