@@ -53,7 +53,7 @@ export default function TimelineView({
   const [selectedSwapCleaner, setSelectedSwapCleaner] = useState<string>("");
   const [filteredCleanerId, setFilteredCleanerId] = useState<number | null>(null);
   const [clickTimer, setClickTimer] = useState<NodeJS.Timeout | null>(null);
-  const [cleanersAliases, setCleanersAliases] = useState<Record<string, string>>({});
+  const [cleanersAliases, setCleanersAliases] = useState<Record<string, { name: string; lastname: string; alias: string }>>({});
   const { toast } = useToast();
 
   // Mutation per scambiare task tra cleaners
