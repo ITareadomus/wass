@@ -385,6 +385,7 @@ export default function TimelineView({
                                   task={task} 
                                   index={idx}
                                   isInTimeline={true}
+                                  allTasks={tasks}
                                 />
                               </>
                             );
