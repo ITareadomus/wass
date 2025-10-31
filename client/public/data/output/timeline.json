@@ -1,6 +1,6 @@
 {
   "metadata": {
-    "last_updated": "2025-10-31T07:44:01.122Z",
+    "last_updated": "2025-10-31T08:17:05.291Z",
     "date": "2025-10-31"
   },
   "cleaners_assignments": [
@@ -75,11 +75,11 @@
             "not_hp",
             "automatic_assignment_lp"
           ],
-          "start_time": "11:38",
-          "end_time": "14:08",
-          "followup": true,
+          "start_time": "11:59",
+          "end_time": "14:29",
+          "followup": false,
           "sequence": 2,
-          "travel_time": 8,
+          "travel_time": 30,
           "is_straordinaria": false
         },
         {
@@ -110,11 +110,11 @@
             "not_hp",
             "automatic_assignment_lp"
           ],
-          "start_time": "14:12",
-          "end_time": "16:42",
+          "start_time": "14:52",
+          "end_time": "17:22",
           "followup": true,
           "sequence": 3,
-          "travel_time": 4,
+          "travel_time": 22,
           "is_straordinaria": false
         }
       ]
@@ -163,40 +163,6 @@
           "is_straordinaria": false
         },
         {
-          "task_id": 218206,
-          "logistic_code": 1090,
-          "client_id": null,
-          "premium": true,
-          "address": "via Caminadella 13",
-          "lat": "45.4597769",
-          "lng": "9.1770378",
-          "cleaning_time": 270,
-          "checkin_date": "2025-10-31",
-          "checkout_date": "2025-10-31",
-          "checkin_time": "16:00",
-          "checkout_time": null,
-          "pax_in": 7,
-          "pax_out": 5,
-          "small_equipment": false,
-          "operation_id": 2,
-          "confirmed_operation": true,
-          "straordinaria": false,
-          "type_apt": "E",
-          "alias": "TBR",
-          "customer_name": "THE BEST RENT S.r.l.",
-          "reasons": [
-            "manually_moved_to_timeline",
-            "manual_assignment"
-          ],
-          "priority": "manual",
-          "start_time": "11:03",
-          "end_time": "15:33",
-          "followup": true,
-          "sequence": 2,
-          "travel_time": 3,
-          "is_straordinaria": false
-        },
-        {
           "task_id": 218054,
           "logistic_code": 1642,
           "client_id": 87,
@@ -223,11 +189,45 @@
             "automatic_assignment_eo"
           ],
           "priority": "early_out",
-          "start_time": "15:36",
-          "end_time": "18:36",
+          "start_time": "11:10",
+          "end_time": "14:10",
           "followup": true,
+          "sequence": 2,
+          "travel_time": 10,
+          "is_straordinaria": false
+        },
+        {
+          "task_id": 218210,
+          "logistic_code": 1483,
+          "client_id": 3,
+          "premium": true,
+          "address": "Via Santa Croce,8",
+          "lat": "45.4560183",
+          "lng": "9.1835278",
+          "cleaning_time": 270,
+          "checkin_date": "2025-10-31",
+          "checkout_date": "2025-10-31",
+          "checkin_time": null,
+          "checkout_time": null,
+          "pax_in": 5,
+          "pax_out": 6,
+          "small_equipment": false,
+          "operation_id": 2,
+          "confirmed_operation": true,
+          "straordinaria": false,
+          "type_apt": "E",
+          "alias": "TBR",
+          "customer_name": "THE BEST RENT S.r.l.",
+          "reasons": [
+            "premium",
+            "automatic_assignment_hp"
+          ],
+          "priority": "high_priority",
+          "start_time": "14:21",
+          "end_time": "18:51",
+          "followup": false,
           "sequence": 3,
-          "travel_time": 3,
+          "travel_time": 12,
           "is_straordinaria": false
         }
       ]
@@ -302,11 +302,11 @@
             "automatic_assignment_hp"
           ],
           "priority": "high_priority",
-          "start_time": "11:02",
-          "end_time": "13:32",
-          "followup": true,
+          "start_time": "11:15",
+          "end_time": "13:45",
+          "followup": false,
           "sequence": 2,
-          "travel_time": 2,
+          "travel_time": 15,
           "is_straordinaria": false
         }
       ]
@@ -548,20 +548,20 @@
           "is_straordinaria": false
         },
         {
-          "task_id": 218210,
-          "logistic_code": 1483,
-          "client_id": 3,
+          "task_id": 218206,
+          "logistic_code": 1090,
+          "client_id": null,
           "premium": true,
-          "address": "Via Santa Croce,8",
-          "lat": "45.4560183",
-          "lng": "9.1835278",
+          "address": "via Caminadella 13",
+          "lat": "45.4597769",
+          "lng": "9.1770378",
           "cleaning_time": 270,
           "checkin_date": "2025-10-31",
           "checkout_date": "2025-10-31",
-          "checkin_time": null,
+          "checkin_time": "16:00",
           "checkout_time": null,
-          "pax_in": 5,
-          "pax_out": 6,
+          "pax_in": 7,
+          "pax_out": 5,
           "small_equipment": false,
           "operation_id": 2,
           "confirmed_operation": true,
@@ -570,11 +570,9 @@
           "alias": "TBR",
           "customer_name": "THE BEST RENT S.r.l.",
           "reasons": [
-            "premium",
-            "automatic_assignment_hp",
-            "manual_assignment"
+            "manually_moved_to_timeline"
           ],
-          "priority": "high_priority",
+          "priority": "manual",
           "start_time": "11:03",
           "end_time": "15:33",
           "followup": true,
@@ -609,11 +607,11 @@
             "automatic_assignment_eo"
           ],
           "priority": "early_out",
-          "start_time": "15:38",
-          "end_time": "16:38",
+          "start_time": "15:37",
+          "end_time": "16:37",
           "followup": true,
           "sequence": 3,
-          "travel_time": 5,
+          "travel_time": 4,
           "is_straordinaria": false
         },
         {
@@ -643,8 +641,8 @@
             "automatic_assignment_hp"
           ],
           "priority": "high_priority",
-          "start_time": "16:46",
-          "end_time": "18:46",
+          "start_time": "16:45",
+          "end_time": "18:45",
           "followup": true,
           "sequence": 4,
           "travel_time": 8,
@@ -1111,11 +1109,11 @@
             "automatic_assignment_hp"
           ],
           "priority": "high_priority",
-          "start_time": "12:05",
-          "end_time": "15:05",
+          "start_time": "12:24",
+          "end_time": "15:24",
           "followup": true,
           "sequence": 2,
-          "travel_time": 5,
+          "travel_time": 25,
           "is_straordinaria": false
         }
       ]
