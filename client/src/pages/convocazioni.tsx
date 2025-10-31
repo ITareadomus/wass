@@ -5,7 +5,7 @@ import { Card } from "@/components/ui/card";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Users, CalendarIcon, ArrowLeft, Save, UserPlus } from "lucide-react";
+import { Users, CalendarIcon, ArrowLeft, Save, UserPlus, Home } from "lucide-react";
 import { format } from "date-fns";
 import { it } from "date-fns/locale";
 import { cn } from "@/lib/utils";
@@ -267,6 +267,14 @@ export default function Convocazioni() {
 
             {/* Selettore Data e Dark Mode Toggle */}
             <div className="flex items-center gap-3">
+              <Button
+                variant="outline"
+                onClick={() => setLocation('/')}
+                className="flex items-center gap-2"
+              >
+                <Home className="w-4 h-4" />
+                Assegnazioni
+              </Button>
               <ThemeToggle />
               <Popover>
               <PopoverTrigger asChild>
