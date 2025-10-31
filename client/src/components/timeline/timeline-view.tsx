@@ -323,53 +323,40 @@ export default function TimelineView({
                               }
                               if (isNaN(travelTime)) travelTime = 0;
                               
-                              const effectiveTravelMinutes = travelTime === 0 ? 1 : travelTime;
-                              const travelWidth = `${(effectiveTravelMinutes / 600) * 100}%`;
+                              // Calcola larghezza minima visibile (almeno 30px)
+                              const widthPercent = (travelTime / 600) * 100;
+                              const minWidthPx = 30; // Larghezza minima in pixel
                               
-                              // Omino come Draggable non trascinabile
-                              const travelIndicatorIdx = taskIdx * 2 - 1; // Indici dispari per gli omini
+                              // Omino come div semplice (non trascinabile)
                               elements.push(
-                                <Draggable 
+                                <div
                                   key={`travel-${task.id}`}
-                                  draggableId={`travel-${task.id}`}
-                                  index={travelIndicatorIdx}
-                                  isDragDisabled={true}
+                                  className="flex items-center justify-center flex-shrink-0 px-1"
+                                  style={{
+                                    minWidth: `${minWidthPx}px`,
+                                    width: `max(${minWidthPx}px, ${widthPercent}%)`,
+                                  }}
+                                  title={`Tempo di viaggio: ${travelTime} min`}
                                 >
-                                  {(provided) => (
-                                    <div
-                                      ref={provided.innerRef}
-                                      {...provided.draggableProps}
-                                      {...provided.dragHandleProps}
-                                      className="flex items-center justify-center flex-shrink-0"
-                                      style={{
-                                        ...provided.draggableProps.style,
-                                        width: travelWidth,
-                                        cursor: 'default'
-                                      }}
-                                      title={`Tempo di viaggio: ${travelTime} min`}
-                                    >
-                                      <svg
-                                        width="16"
-                                        height="16"
-                                        viewBox="0 0 24 24"
-                                        fill="currentColor"
-                                        className="text-gray-600 dark:text-gray-400"
-                                      >
-                                        <path d="M13.5 5.5c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zM9.8 8.9L7 23h2.1l1.8-8 2.1 2v6h2v-7.5l-2.1-2 .6-3C14.8 12 16.8 13 19 13v-2c-1.9 0-3.5-1-4.3-2.4l-1-1.6c-.4-.6-1-1-1.7-1-.3 0-.5.1-.8.1L6 8.3V13h2V9.6l1.8-.7"/>
-                                      </svg>
-                                    </div>
-                                  )}
-                                </Draggable>
+                                  <svg
+                                    width="20"
+                                    height="20"
+                                    viewBox="0 0 24 24"
+                                    fill="currentColor"
+                                    className="text-blue-600 dark:text-blue-400"
+                                  >
+                                    <path d="M13.5 5.5c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zM9.8 8.9L7 23h2.1l1.8-8 2.1 2v6h2v-7.5l-2.1-2 .6-3C14.8 12 16.8 13 19 13v-2c-1.9 0-3.5-1-4.3-2.4l-1-1.6c-.4-.6-1-1-1.7-1-.3 0-.5.1-.8.1L6 8.3V13h2V9.6l1.8-.7"/>
+                                  </svg>
+                                </div>
                               );
                             }
                             
-                            // Task vera - indici pari per le task
-                            const realTaskIdx = taskIdx * 2;
+                            // Task vera
                             elements.push(
                               <TaskCard 
                                 key={task.id}
                                 task={task} 
-                                index={realTaskIdx}
+                                index={taskIdx}
                                 isInTimeline={true}
                                 allTasks={cleanerTasks}
                               />
