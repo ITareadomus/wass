@@ -332,6 +332,12 @@ export default function TimelineView({
                               travelTime = 0;
                             }
 
+                            // Se la task ha sequence=1 e start_time=11:00, aggiungi 1 ora di offset (60 minuti)
+                            let timeOffset = 0;
+                            if (taskObj.sequence === 1 && taskObj.start_time === "11:00") {
+                              timeOffset = 60; // 60 minuti di spazio vuoto
+                            }
+
                             // DEBUG: log per capire cosa sta succedendo
                             if (idx > 0) {
                               console.log(`Task ${taskObj.task_id || taskObj.id}: travel_time=${travelTime} min`);
@@ -359,6 +365,15 @@ export default function TimelineView({
 
                             return (
                               <>
+                                {/* Spazio vuoto per task con sequence=1 e start_time=11:00 */}
+                                {timeOffset > 0 && (
+                                  <div 
+                                    key={`offset-${task.id}`}
+                                    className="flex-shrink-0"
+                                    style={{ width: `${(timeOffset / 600) * 100}%` }}
+                                  />
+                                )}
+
                                 {/* Indicatore di travel time: omino + underscore */}
                                 {idx > 0 && (
                                   <div 
