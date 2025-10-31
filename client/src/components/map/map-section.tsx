@@ -22,6 +22,7 @@ export default function MapSection({ tasks }: MapSectionProps) {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [cleaners, setCleaners] = useState<any[]>([]);
+  const [filteredCleanerId, setFilteredCleanerId] = useState<number | null>(null);
 
   // Carica i cleaners
   useEffect(() => {
@@ -39,11 +40,15 @@ export default function MapSection({ tasks }: MapSectionProps) {
 
     // Listener per aggiornamenti del filtro dalla timeline
     const checkFilterUpdates = setInterval(() => {
-      // Forza re-render quando cambia il filtro
-      if ((window as any).mapFilteredCleanerId !== undefined) {
-        setCleaners(prev => [...prev]);
-      }
-    }, 100);
+      const newFilterId = (window as any).mapFilteredCleanerId;
+      setFilteredCleanerId(prev => {
+        // Aggiorna solo se cambia davvero
+        if (prev !== newFilterId) {
+          return newFilterId;
+        }
+        return prev;
+      });
+    }, 300);
 
     return () => clearInterval(checkFilterUpdates);
   }, []);
@@ -103,16 +108,13 @@ export default function MapSection({ tasks }: MapSectionProps) {
     googleMapRef.current = map;
   }, [isMapLoaded]);
 
-  // Aggiorna i marker quando cambiano le task o i cleaners
+  // Aggiorna i marker quando cambiano le task, cleaners o filtro
   useEffect(() => {
     if (!googleMapRef.current || !isMapLoaded || cleaners.length === 0) return;
 
     // Rimuovi marker esistenti
     markersRef.current.forEach(marker => marker.setMap(null));
     markersRef.current = [];
-
-    // Ottieni il filtro dal window object (impostato dalla timeline)
-    const filteredCleanerId = (window as any).mapFilteredCleanerId;
 
     // Filtra task con coordinate valide
     let tasksWithCoordinates = tasks.filter(task => {
@@ -226,7 +228,7 @@ export default function MapSection({ tasks }: MapSectionProps) {
     if (tasksWithCoordinates.length > 0) {
       googleMapRef.current.fitBounds(bounds);
     }
-  }, [tasks, isMapLoaded, cleaners, (window as any).mapFilteredCleanerId]);
+  }, [tasks, isMapLoaded, cleaners, filteredCleanerId]);
 
   const toggleFullscreen = () => {
     if (!mapRef.current) return;
