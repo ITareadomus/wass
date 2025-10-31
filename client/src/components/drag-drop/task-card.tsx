@@ -283,7 +283,6 @@ export default function TaskCard({
                 }
               }}
             >
-            
             {!isConfirmedOperation && (
               <div className="absolute top-0.5 right-0.5 z-50">
                 <HelpCircle
@@ -312,7 +311,7 @@ export default function TaskCard({
                 </span>
               )}
             </div>
-            </div>
+          </div>
             );
           }}
       </Draggable>

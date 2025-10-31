@@ -1,7 +1,7 @@
 import { Personnel, TaskType as Task } from "@shared/schema";
 import { Calendar, RotateCcw, Users } from "lucide-react";
 import { useState, useEffect } from "react";
-import { Droppable, Draggable } from "react-beautiful-dnd";
+import { Droppable } from "react-beautiful-dnd";
 import TaskCard from "@/components/drag-drop/task-card";
 import {
   Dialog,
@@ -294,9 +294,11 @@ export default function TimelineView({
                         ))}
                       </div>
 
-                      {/* Task posizionate in sequenza - SEMPLIFICATO per compatibilità react-beautiful-dnd */}
+                      {/* Task posizionate in sequenza con indicatori di travel time */}
                       <div className="relative z-10 flex items-center h-full">
-                        {cleanerTasks
+                        {tasks
+                          .filter((task) => (task as any).assignedCleaner === cleaner.id)
+                          .map(normalizeTask)
                           .sort((a, b) => {
                             const taskA = a as any;
                             const taskB = b as any;
@@ -309,62 +311,87 @@ export default function TimelineView({
                             const timeB = taskB.start_time || taskB.fw_start_time || taskB.startTime || "00:00";
                             return timeA.localeCompare(timeB);
                           })
-                          .flatMap((task, taskIdx) => {
+                          .map((task, idx) => {
                             const taskObj = task as any;
-                            const elements = [];
                             
-                            // Calcola travel time per l'indicatore
-                            if (taskIdx > 0) {
-                              let travelTime = 0;
-                              if (taskObj.travel_time !== undefined && taskObj.travel_time !== null) {
-                                travelTime = typeof taskObj.travel_time === 'number' 
-                                  ? taskObj.travel_time 
-                                  : parseInt(String(taskObj.travel_time), 10);
-                              }
-                              if (isNaN(travelTime)) travelTime = 0;
-                              
-                              // Calcola larghezza proporzionale al travel_time
-                              // Se travel_time è 0, usa 1 minuto per avere comunque un indicatore minimo
-                              const effectiveTravelTime = travelTime === 0 ? 1 : travelTime;
-                              const widthPercent = (effectiveTravelTime / 600) * 100;
-                              
-                              // Omino come div semplice (non trascinabile) con tooltip
-                              elements.push(
-                                <div
-                                  key={`travel-${task.id}`}
-                                  className="flex items-center justify-center flex-shrink-0 px-1 relative group"
-                                  style={{
-                                    width: `${widthPercent}%`,
-                                  }}
-                                >
-                                  <svg
-                                    width="20"
-                                    height="20"
-                                    viewBox="0 0 24 24"
-                                    fill="currentColor"
-                                    className="text-blue-600 dark:text-blue-400"
-                                  >
-                                    <path d="M13.5 5.5c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zM9.8 8.9L7 23h2.1l1.8-8 2.1 2v6h2v-7.5l-2.1-2 .6-3C14.8 12 16.8 13 19 13v-2c-1.9 0-3.5-1-4.3-2.4l-1-1.6c-.4-.6-1-1-1.7-1-.3 0-.5.1-.8.1L6 8.3V13h2V9.6l1.8-.7"/>
-                                  </svg>
-                                  <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 bg-gray-900 text-white text-xs rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
-                                    Tempo di viaggio: {travelTime} min
-                                  </div>
-                                </div>
-                              );
+                            // Trova l'indice corretto della task nell'array completo
+                            const globalIndex = tasks.findIndex(t => t.id === task.id);
+                            
+                            // Leggi travel_time dalla task normalizzata (che viene da timeline_assignments.json)
+                            // Prova sia travel_time che travelTime per compatibilità
+                            let travelTime = 0;
+                            if (taskObj.travel_time !== undefined && taskObj.travel_time !== null) {
+                              travelTime = typeof taskObj.travel_time === 'number' 
+                                ? taskObj.travel_time 
+                                : parseInt(String(taskObj.travel_time), 10);
+                            } else if (taskObj.travelTime !== undefined && taskObj.travelTime !== null) {
+                              travelTime = typeof taskObj.travelTime === 'number' 
+                                ? taskObj.travelTime 
+                                : parseInt(String(taskObj.travelTime), 10);
                             }
                             
-                            // Task vera
-                            elements.push(
-                              <TaskCard 
-                                key={task.id}
-                                task={task} 
-                                index={taskIdx}
-                                isInTimeline={true}
-                                allTasks={cleanerTasks}
-                              />
+                            // Se il parsing fallisce, usa 0
+                            if (isNaN(travelTime)) {
+                              travelTime = 0;
+                            }
+
+                            // Se la task ha sequence=1 e start_time=11:00, aggiungi 1 ora di offset (60 minuti)
+                            let timeOffset = 0;
+                            if (taskObj.sequence === 1 && taskObj.start_time === "11:00") {
+                              timeOffset = 60; // 60 minuti di spazio vuoto
+                            }
+
+                            // DEBUG: log per capire cosa sta succedendo
+                            if (idx > 0) {
+                              console.log(`Task ${taskObj.task_id || taskObj.id}: travel_time=${travelTime} min`);
+                            }
+
+                            // Calcola larghezza EFFETTIVA in base ai minuti reali di travel_time
+                            // La timeline copre 600 minuti (10:00-19:00)
+                            // Se travelTime è 0, usa almeno 1 minuto per visibilità
+                            const effectiveTravelMinutes = travelTime === 0 ? 1 : travelTime;
+                            const totalWidth = (effectiveTravelMinutes / 600) * 100;
+
+                            return (
+                              <>
+                                {/* Spazio vuoto per task con sequence=1 e start_time=11:00 */}
+                                {timeOffset > 0 && (
+                                  <div 
+                                    key={`offset-${task.id}`}
+                                    className="flex-shrink-0"
+                                    style={{ width: `${(timeOffset / 600) * 100}%` }}
+                                  />
+                                )}
+
+                                {/* Indicatore di travel time: solo omino */}
+                                {idx > 0 && (
+                                  <div 
+                                    key={`marker-${task.id}`} 
+                                    className="flex items-center justify-center flex-shrink-0"
+                                    style={{ width: `${totalWidth}%` }}
+                                    title={`${travelTime} min`}
+                                  >
+                                    <svg
+                                      width="16"
+                                      height="16"
+                                      viewBox="0 0 24 24"
+                                      fill="currentColor"
+                                      className="text-gray-600 flex-shrink-0"
+                                    >
+                                      <path d="M13.5 5.5c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zM9.8 8.9L7 23h2.1l1.8-8 2.1 2v6h2v-7.5l-2.1-2 .6-3C14.8 12 16.8 13 19 13v-2c-1.9 0-3.5-1-4.3-2.4l-1-1.6c-.4-.6-1-1-1.7-1-.3 0-.5.1-.8.1L6 8.3V13h2V9.6l1.8-.7"/>
+                                    </svg>
+                                  </div>
+                                )}
+
+                                <TaskCard 
+                                  key={task.id}
+                                  task={task} 
+                                  index={globalIndex}
+                                  isInTimeline={true}
+                                  allTasks={tasks}
+                                />
+                              </>
                             );
-                            
-                            return elements;
                           })}
                         {provided.placeholder}
                       </div>
