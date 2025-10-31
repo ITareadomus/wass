@@ -292,21 +292,21 @@ export default function TaskCard({
               </div>
             )}
             <div 
-              className="flex flex-col items-center justify-center h-full gap-0.5"
+              className="flex flex-col items-center justify-center h-full gap-1"
             >
-              <div className="flex items-center gap-1">
+              <div className="flex items-center gap-1.5">
                 <span
-                  className="font-medium text-[10px] leading-none"
+                  className="font-bold text-[13px] leading-none text-black"
                   data-testid={`task-name-${task.id}`}
                 >
                   {task.name}
                 </span>
-                <span className="text-[8px] opacity-60 leading-none">
+                <span className="text-[11px] text-black leading-none font-medium">
                   ({task.duration.replace(".", ":")}h)
                 </span>
               </div>
               {task.alias && (
-                <span className="text-[8px] opacity-70 leading-none">
+                <span className="text-[11px] text-black leading-none font-medium">
                   {task.alias}{(task as any).type_apt ? ` (${(task as any).type_apt})` : ''}
                 </span>
               )}
