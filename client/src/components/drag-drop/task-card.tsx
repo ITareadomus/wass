@@ -8,35 +8,9 @@ import {
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { useState, useEffect } from "react";
-import { HelpCircle, ChevronLeft, ChevronRight, RefreshCw } from "lucide-react";
+import { HelpCircle, ChevronLeft, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useMutation } from "@tanstack/react-query";
-import { apiRequest, queryClient } from "@/lib/queryClient";
-import { useToast } from "@/hooks/use-toast";
-
-interface Cleaner {
-  id: number;
-  name: string;
-  lastname: string;
-  role: string;
-  active: boolean;
-  ranking: number;
-  counter_hours: number;
-  counter_days: number;
-  available: boolean;
-  contract_type: string;
-  preferred_customers: number[];
-  telegram_id: number | null;
-  start_time: string | null;
-}
 
 interface TaskCardProps {
   task: Task;
@@ -44,8 +18,6 @@ interface TaskCardProps {
   isInTimeline?: boolean;
   allTasks?: Task[];
   currentContainer?: string;
-  availableCleaners?: Cleaner[];
-  currentCleanerId?: number;
 }
 
 interface AssignedTask {
@@ -62,47 +34,10 @@ export default function TaskCard({
   isInTimeline = false,
   allTasks = [],
   currentContainer = '',
-  availableCleaners = [],
-  currentCleanerId,
 }: TaskCardProps) {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [currentTaskIndex, setCurrentTaskIndex] = useState(index);
   const [assignmentTimes, setAssignmentTimes] = useState<{ start_time?: string; end_time?: string; travel_time?: number }>({});
-  const [selectedSwapCleaner, setSelectedSwapCleaner] = useState<string>("");
-  const { toast } = useToast();
-
-  // Mutation per scambiare task tra cleaners
-  const swapCleanersMutation = useMutation({
-    mutationFn: async ({ sourceCleanerId, destCleanerId }: { sourceCleanerId: number; destCleanerId: number }) => {
-      // Leggi la data selezionata da localStorage, fallback a oggi se non presente
-      const savedDate = localStorage.getItem('selected_work_date');
-      const workDate = savedDate || new Date().toISOString().split('T')[0];
-      
-      const response = await apiRequest("POST", "/api/swap-cleaners-tasks", {
-        sourceCleanerId,
-        destCleanerId,
-        date: workDate
-      });
-      return await response.json();
-    },
-    onSuccess: () => {
-      // Invalida cache per ricaricare le assegnazioni
-      queryClient.invalidateQueries({ queryKey: ["/api/timeline-assignments"] });
-      toast({
-        title: "Successo",
-        description: "Task scambiate con successo tra i cleaners",
-      });
-      setSelectedSwapCleaner("");
-      setIsModalOpen(false);
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Errore",
-        description: error.message || "Errore nello scambio delle task",
-        variant: "destructive",
-      });
-    },
-  });
 
   // Determina le task navigabili in base al contesto
   const getNavigableTasks = () => {
@@ -139,16 +74,6 @@ export default function TaskCard({
     const nextTask = navigableTasks[currentTaskInNavigable + 1];
     const nextIndex = allTasks.findIndex(t => t.id === nextTask.id);
     setCurrentTaskIndex(nextIndex);
-  };
-
-  const handleSwapCleaners = () => {
-    if (!selectedSwapCleaner || !currentCleanerId) return;
-    
-    const destCleanerId = parseInt(selectedSwapCleaner, 10);
-    swapCleanersMutation.mutate({
-      sourceCleanerId: currentCleanerId,
-      destCleanerId: destCleanerId,
-    });
   };
 
   // Reset currentTaskIndex quando il modale si apre
@@ -591,65 +516,6 @@ export default function TaskCard({
                 <p className="text-sm">{(displayTask as any).pax_out ?? "non migrato"}</p>
               </div>
             </div>
-
-            {/* Sesta riga: Scambia cleaner (solo in timeline) */}
-            {isInTimeline && currentCleanerId && availableCleaners.length > 0 && (
-              <div className="border-t pt-4 mt-4">
-                <p className="text-sm font-semibold text-muted-foreground mb-3">
-                  Scambia Cleaner
-                </p>
-                <div className="flex gap-3 items-end">
-                  <div className="flex-1">
-                    <Select 
-                      value={selectedSwapCleaner} 
-                      onValueChange={setSelectedSwapCleaner}
-                      disabled={swapCleanersMutation.isPending}
-                    >
-                      <SelectTrigger data-testid="select-swap-cleaner">
-                        <SelectValue placeholder="Seleziona cleaner..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {availableCleaners
-                          .filter(c => c.id !== currentCleanerId) // Escludi cleaner corrente
-                          .filter(c => {
-                            // Mostra solo cleaners con task assegnate
-                            const hasTasks = allTasks.some((t: any) => t.assignedCleaner === c.id);
-                            return hasTasks;
-                          })
-                          .map(cleaner => (
-                            <SelectItem 
-                              key={cleaner.id} 
-                              value={String(cleaner.id)}
-                              data-testid={`option-cleaner-${cleaner.id}`}
-                            >
-                              {cleaner.name} {cleaner.lastname}
-                            </SelectItem>
-                          ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <Button
-                    onClick={handleSwapCleaners}
-                    disabled={!selectedSwapCleaner || swapCleanersMutation.isPending}
-                    variant="default"
-                    className="flex gap-2"
-                    data-testid="button-swap-cleaner"
-                  >
-                    {swapCleanersMutation.isPending ? (
-                      <>
-                        <RefreshCw className="h-4 w-4 animate-spin" />
-                        Scambio...
-                      </>
-                    ) : (
-                      <>
-                        <RefreshCw className="h-4 w-4" />
-                        Scambia
-                      </>
-                    )}
-                  </Button>
-                </div>
-              </div>
-            )}
 
           </div>
         </DialogContent>

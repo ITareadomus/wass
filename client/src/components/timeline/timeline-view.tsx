@@ -1,7 +1,10 @@
 import { Personnel, TaskType as Task } from "@shared/schema";
-import { Calendar, RotateCcw, Users } from "lucide-react";
+import { Calendar, RotateCcw, Users, RefreshCw } from "lucide-react";
 import { useState, useEffect } from "react";
-import { Droppable } from "react-beautiful-dnd";
+import { Droppable, Draggable } from "react-beautiful-dnd";
+import { useMutation } from "@tanstack/react-query";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 import TaskCard from "@/components/drag-drop/task-card";
 import {
   Dialog,
@@ -11,6 +14,13 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 interface TimelineViewProps {
   personnel: Personnel[];
@@ -40,6 +50,65 @@ export default function TimelineView({
   const [cleaners, setCleaners] = useState<Cleaner[]>([]);
   const [selectedCleaner, setSelectedCleaner] = useState<Cleaner | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [selectedSwapCleaner, setSelectedSwapCleaner] = useState<string>("");
+  const { toast } = useToast();
+
+  // Mutation per scambiare task tra cleaners
+  const swapCleanersMutation = useMutation({
+    mutationFn: async ({ sourceCleanerId, destCleanerId }: { sourceCleanerId: number; destCleanerId: number }) => {
+      // Leggi la data selezionata da localStorage, fallback a oggi se non presente
+      const savedDate = localStorage.getItem('selected_work_date');
+      const workDate = savedDate || new Date().toISOString().split('T')[0];
+      
+      const response = await apiRequest("POST", "/api/swap-cleaners-tasks", {
+        sourceCleanerId,
+        destCleanerId,
+        date: workDate
+      });
+      return await response.json();
+    },
+    onSuccess: () => {
+      // Invalida cache per ricaricare le assegnazioni
+      queryClient.invalidateQueries({ queryKey: ["/api/timeline-assignments"] });
+      toast({
+        title: "Successo",
+        description: "Task scambiate con successo tra i cleaners",
+      });
+      setSelectedSwapCleaner("");
+      setIsModalOpen(false);
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Errore",
+        description: error.message || "Errore nello scambio delle task",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleSwapCleaners = () => {
+    if (!selectedSwapCleaner || !selectedCleaner) return;
+    
+    const destCleanerId = parseInt(selectedSwapCleaner, 10);
+    
+    // Defensive guard: verifica che entrambi i cleaners abbiano task assegnate
+    const sourceHasTasks = tasks.some((t: any) => t.assignedCleaner === selectedCleaner.id);
+    const destHasTasks = tasks.some((t: any) => t.assignedCleaner === destCleanerId);
+    
+    if (!sourceHasTasks || !destHasTasks) {
+      toast({
+        title: "Errore",
+        description: "Entrambi i cleaners devono avere task assegnate per poter scambiare",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    swapCleanersMutation.mutate({
+      sourceCleanerId: selectedCleaner.id,
+      destCleanerId: destCleanerId,
+    });
+  };
 
   const timeSlots = [
     "10:00", "11:00", "12:00", "13:00", "14:00",
@@ -388,8 +457,6 @@ export default function TimelineView({
                                   index={globalIndex}
                                   isInTimeline={true}
                                   allTasks={tasks}
-                                  availableCleaners={cleaners}
-                                  currentCleanerId={cleaner.id}
                                 />
                               </>
                             );
@@ -457,6 +524,65 @@ export default function TimelineView({
                 <div>
                   <p className="text-sm font-semibold text-muted-foreground">Tipo contratto</p>
                   <p className="text-sm">{selectedCleaner.contract_type}</p>
+                </div>
+              </div>
+
+              {/* Sezione Scambia Cleaner */}
+              <div className="border-t pt-4 mt-4">
+                <p className="text-sm font-semibold text-muted-foreground mb-3">
+                  Scambia Cleaner
+                </p>
+                <div className="flex gap-3 items-end">
+                  <div className="flex-1">
+                    <Select 
+                      value={selectedSwapCleaner} 
+                      onValueChange={setSelectedSwapCleaner}
+                      disabled={swapCleanersMutation.isPending}
+                    >
+                      <SelectTrigger data-testid="select-swap-cleaner">
+                        <SelectValue placeholder="Seleziona cleaner..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {cleaners
+                          .filter(c => c.id !== selectedCleaner.id) // Escludi cleaner corrente
+                          .filter(c => {
+                            // Mostra solo cleaners con task effettivamente assegnate nella timeline
+                            const hasTasks = tasks.some((t: any) => 
+                              t.assignedCleaner === c.id && t.assignedCleaner !== undefined && t.assignedCleaner !== null
+                            );
+                            return hasTasks;
+                          })
+                          .map(cleaner => (
+                            <SelectItem 
+                              key={cleaner.id} 
+                              value={String(cleaner.id)}
+                              data-testid={`option-cleaner-${cleaner.id}`}
+                            >
+                              {cleaner.name} {cleaner.lastname}
+                            </SelectItem>
+                          ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <Button
+                    onClick={handleSwapCleaners}
+                    disabled={!selectedSwapCleaner || swapCleanersMutation.isPending}
+                    variant="default"
+                    className="flex gap-2"
+                    data-testid="button-swap-cleaner"
+                  >
+                    {swapCleanersMutation.isPending ? (
+                      <>
+                        <RefreshCw className="h-4 w-4 animate-spin" />
+                        Scambio...
+                      </>
+                    ) : (
+                      <>
+                        <RefreshCw className="h-4 w-4" />
+                        Scambia
+                      </>
+                    )}
+                  </Button>
                 </div>
               </div>
             </div>
