@@ -283,39 +283,38 @@ export default function TaskCard({
                 }
               }}
             >
-            {!isConfirmedOperation && (
-              <div className="absolute top-0.5 right-0.5 z-50">
-                <HelpCircle
-                  className="w-3 h-3 text-gray-900"
-                  strokeWidth={2.5}
-                />
-              </div>
-            )}
-            <div 
-              className="flex flex-col items-center justify-center h-full gap-0"
-            >
-              <div className="flex items-center gap-1">
-                <span
-                  className="font-bold text-[13px] leading-none text-black"
-                  data-testid={`task-name-${task.id}`}
-                >
-                  {task.name}
-                </span>
-                <span className="text-[11px] opacity-60 leading-none">
-                  ({task.duration.replace(".", ":")}h)
-                </span>
-              </div>
-              {task.alias && (
-                <span className="text-[11px] opacity-70 leading-none mt-0.5">
-                  {task.alias}{(task as any).type_apt ? ` (${(task as any).type_apt})` : ''}
-                </span>
+              {!isConfirmedOperation && (
+                <div className="absolute top-0.5 right-0.5 z-50">
+                  <HelpCircle
+                    className="w-3 h-3 text-gray-900"
+                    strokeWidth={2.5}
+                  />
+                </div>
               )}
+              <div 
+                className="flex flex-col items-center justify-center h-full gap-0"
+              >
+                <div className="flex items-center gap-1">
+                  <span
+                    className="text-black text-[12px] font-semibold"
+                    data-testid={`task-name-${task.id}`}
+                  >
+                    {task.name}
+                  </span>
+                  <span className="text-[11px] opacity-60 leading-none">
+                    ({task.duration.replace(".", ":")}h)
+                  </span>
+                </div>
+                {task.alias && (
+                  <span className="text-[11px] opacity-70 leading-none mt-0.5">
+                    {task.alias}{(task as any).type_apt ? ` (${(task as any).type_apt})` : ''}
+                  </span>
+                )}
+              </div>
             </div>
-          </div>
-            );
+          );
           }}
       </Draggable>
-
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
         <DialogContent className="sm:max-w-2xl max-h-[80vh] overflow-y-auto [&>button]:hidden">
           <DialogHeader>
