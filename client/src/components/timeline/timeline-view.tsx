@@ -1,7 +1,7 @@
 import { Personnel, TaskType as Task } from "@shared/schema";
-import { Calendar, RotateCcw, Users, GripVertical } from "lucide-react";
+import { Calendar, RotateCcw, Users } from "lucide-react";
 import { useState, useEffect } from "react";
-import { DragDropContext, Droppable, Draggable, DropResult } from "react-beautiful-dnd";
+import { Droppable } from "react-beautiful-dnd";
 import TaskCard from "@/components/drag-drop/task-card";
 import {
   Dialog,
@@ -40,7 +40,6 @@ export default function TimelineView({
   const [cleaners, setCleaners] = useState<Cleaner[]>([]);
   const [selectedCleaner, setSelectedCleaner] = useState<Cleaner | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [isDraggingCleaner, setIsDraggingCleaner] = useState(false);
 
   const timeSlots = [
     "10:00", "11:00", "12:00", "13:00", "14:00",
@@ -174,43 +173,6 @@ export default function TimelineView({
     window.open('/convocazioni', '_blank');
   };
 
-  const onCleanerDragEnd = async (result: DropResult) => {
-    setIsDraggingCleaner(false);
-    
-    if (!result.destination) return;
-    
-    if (result.source.index === result.destination.index) return;
-
-    const sourceIndex = result.source.index;
-    const destIndex = result.destination.index;
-
-    // Scambio 1:1 - swappa solo i due cleaners coinvolti
-    const newCleaners = Array.from(cleaners);
-    [newCleaners[sourceIndex], newCleaners[destIndex]] = [newCleaners[destIndex], newCleaners[sourceIndex]];
-    setCleaners(newCleaners);
-
-    // Salva sul backend
-    try {
-      const cleaner1Id = cleaners[sourceIndex].id;
-      const cleaner2Id = cleaners[destIndex].id;
-
-      const response = await fetch('/api/swap-cleaners', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ cleaner1Id, cleaner2Id }),
-      });
-
-      if (!response.ok) {
-        console.error('Errore nello scambio dei cleaners');
-        // Ricarica per ripristinare lo stato corretto
-        window.location.reload();
-      }
-    } catch (error) {
-      console.error('Errore nella chiamata API swap-cleaners:', error);
-      window.location.reload();
-    }
-  };
-
   // Non mostrare nulla se non ci sono cleaners
   if (cleaners.length === 0) {
     return null;
@@ -269,7 +231,7 @@ export default function TimelineView({
         <div className="p-4 overflow-x-auto">
           {/* Header con orari */}
           <div className="flex mb-2">
-            <div className="w-32 flex-shrink-0"></div>
+            <div className="w-24 flex-shrink-0"></div>
             <div className="flex-1 flex">
               {timeSlots.map((slot) => (
                 <div
@@ -282,13 +244,10 @@ export default function TimelineView({
             </div>
           </div>
 
-          {/* Righe dei cleaners con drag-and-drop */}
-          <DragDropContext onDragEnd={onCleanerDragEnd} onDragStart={() => setIsDraggingCleaner(true)}>
-            <Droppable droppableId="cleaners-list" type="CLEANER">
-              {(provided) => (
-                <div ref={provided.innerRef} {...provided.droppableProps}>
-                  {cleaners.map((cleaner, index) => {
+          {/* Righe dei cleaners */}
+          {cleaners.map((cleaner, index) => {
             const color = getCleanerColor(index);
+            const droppableId = `cleaner-${cleaner.id}`;
 
             // Trova tutte le task assegnate a questo cleaner
             const cleanerTasks = tasks.filter(task => 
@@ -296,43 +255,26 @@ export default function TimelineView({
             ).map(normalizeTask); // Applica la normalizzazione qui
 
             return (
-              <Draggable 
-                key={cleaner.id} 
-                draggableId={`cleaner-${cleaner.id}`} 
-                index={index}
-                isDragDisabled={false}
-              >
-                {(dragProvided, dragSnapshot) => (
-                  <div 
-                    ref={dragProvided.innerRef}
-                    {...dragProvided.draggableProps}
-                    className={`flex mb-0.5 ${dragSnapshot.isDragging ? 'opacity-50' : ''}`}
-                  >
-                    {/* Info cleaner con drag handle */}
-                    <div
-                      className="w-32 flex-shrink-0 p-1 flex items-center border border-border hover:opacity-90 transition-opacity"
-                      style={{ 
-                        backgroundColor: color.bg,
-                        color: color.text
-                      }}
-                    >
-                      <div {...dragProvided.dragHandleProps} className="mr-1 cursor-move">
-                        <GripVertical className="w-4 h-4" />
-                      </div>
-                      <div 
-                        className="flex-1 cursor-pointer"
-                        onClick={() => handleCleanerClick(cleaner)}
-                      >
-                        <div className="text-[9px] font-medium break-words leading-tight">
-                          {cleaner.name.toUpperCase()} {cleaner.lastname.toUpperCase()}
-                        </div>
-                      </div>
+              <div key={cleaner.id} className="flex mb-0.5">
+                {/* Info cleaner */}
+                <div
+                  className="w-24 flex-shrink-0 p-1 flex items-center border border-border cursor-pointer hover:opacity-90 transition-opacity"
+                  style={{ 
+                    backgroundColor: color.bg,
+                    color: color.text
+                  }}
+                  onClick={() => handleCleanerClick(cleaner)}
+                >
+                  <div className="w-full">
+                    <div className="text-[9px] font-medium break-words leading-tight">
+                      {cleaner.name.toUpperCase()} {cleaner.lastname.toUpperCase()}
                     </div>
+                  </div>
+                </div>
 
-                    {/* Timeline per questo cleaner - area unica droppable */}
-                    {!isDraggingCleaner && (
-                      <Droppable droppableId={`timeline-${cleaner.id}`} direction="horizontal" type="TASK">
-                        {(provided, snapshot) => (
+                {/* Timeline per questo cleaner - area unica droppable */}
+                <Droppable droppableId={`timeline-${cleaner.id}`} direction="horizontal">
+                  {(provided, snapshot) => (
                     <div
                       ref={provided.innerRef}
                       {...provided.droppableProps}
@@ -448,21 +390,13 @@ export default function TimelineView({
                             );
                           })}
                         {provided.placeholder}
-                          </div>
-                        </div>
-                      )}
-                    </Droppable>
-                    )}
-                  </div>
-                )}
-              </Draggable>
+                      </div>
+                    </div>
+                  )}
+                </Droppable>
+              </div>
             );
           })}
-          {provided.placeholder}
-                </div>
-              )}
-            </Droppable>
-          </DragDropContext>
         </div>
       </div>
 
