@@ -301,12 +301,12 @@ export default function TaskCard({
                 >
                   {task.name}
                 </span>
-                <span className="text-[11px] text-black leading-none font-medium">
+                <span className="text-[11px] opacity-60 leading-none">
                   ({task.duration.replace(".", ":")}h)
                 </span>
               </div>
               {task.alias && (
-                <span className="text-[11px] text-black leading-none font-medium">
+                <span className="text-[11px] opacity-70 leading-none">
                   {task.alias}{(task as any).type_apt ? ` (${(task as any).type_apt})` : ''}
                 </span>
               )}
