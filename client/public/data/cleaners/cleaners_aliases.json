@@ -5,39 +5,175 @@
     "description": "Alias personalizzati per i cleaners da visualizzare sulla timeline"
   },
   "aliases": {
-    "24": "",
-    "132": "",
-    "249": "",
-    "287": "",
-    "326": "",
-    "404": "",
-    "445": "",
-    "469": "",
-    "495": "",
-    "596": "",
-    "626": "",
-    "644": "",
-    "722": "",
-    "771": "",
-    "785": "",
-    "789": "",
-    "829": "",
-    "937": "",
-    "987": "",
-    "1031": "",
-    "1034": "",
-    "1045": "",
-    "1046": "",
-    "1053": "",
-    "1054": "",
-    "1055": "",
-    "1058": "",
-    "1059": "",
-    "1060": "",
-    "1061": "",
-    "1062": "",
-    "1063": "",
-    "1064": "",
-    "1065": ""
+    "24": {
+      "name": "HUSSAIN",
+      "lastname": "SYED SHUJIAHAT",
+      "alias": ""
+    },
+    "132": {
+      "name": "JOHOISER ERNESTO",
+      "lastname": "LOPEZ GIRON",
+      "alias": ""
+    },
+    "249": {
+      "name": "Ogbodo Chidi",
+      "lastname": "Igwe",
+      "alias": ""
+    },
+    "287": {
+      "name": "BAH",
+      "lastname": "ISMAILA",
+      "alias": ""
+    },
+    "326": {
+      "name": "FESTUS OSARO",
+      "lastname": "AIHIVBERE",
+      "alias": ""
+    },
+    "404": {
+      "name": "RASEL",
+      "lastname": "MOLLA",
+      "alias": ""
+    },
+    "445": {
+      "name": "IBRAHIM",
+      "lastname": "SANYANG",
+      "alias": ""
+    },
+    "469": {
+      "name": "LAMIN",
+      "lastname": "SOLY",
+      "alias": ""
+    },
+    "495": {
+      "name": "EL HADJI",
+      "lastname": "BA",
+      "alias": ""
+    },
+    "596": {
+      "name": "TRACY",
+      "lastname": "OKE",
+      "alias": ""
+    },
+    "626": {
+      "name": "DORA PATRICIA",
+      "lastname": "JIMENEZ",
+      "alias": ""
+    },
+    "644": {
+      "name": "HENRY",
+      "lastname": "CHIDUBEM",
+      "alias": ""
+    },
+    "722": {
+      "name": "KONE LASSINE",
+      "lastname": "KONE",
+      "alias": ""
+    },
+    "771": {
+      "name": "PRECIOUS",
+      "lastname": "GYABAAH",
+      "alias": ""
+    },
+    "785": {
+      "name": "RACHEL",
+      "lastname": "OTSHINGA",
+      "alias": ""
+    },
+    "789": {
+      "name": "LAFORTUNE",
+      "lastname": "DJOUKOUO NGUEMTHE",
+      "alias": ""
+    },
+    "829": {
+      "name": "MUSTAPHA",
+      "lastname": "BAH",
+      "alias": ""
+    },
+    "937": {
+      "name": "LOVETH",
+      "lastname": "IGUDIA",
+      "alias": ""
+    },
+    "987": {
+      "name": "MARIE LAURE",
+      "lastname": "PENKA",
+      "alias": ""
+    },
+    "1031": {
+      "name": "YAH PRISCA LEA",
+      "lastname": "ADOU",
+      "alias": ""
+    },
+    "1034": {
+      "name": "PRINCE",
+      "lastname": "OPOKU",
+      "alias": ""
+    },
+    "1045": {
+      "name": "ARACELY ROCIO",
+      "lastname": "MORLA ZAMBRANO",
+      "alias": ""
+    },
+    "1046": {
+      "name": "JOY",
+      "lastname": "EDIAGBANYA",
+      "alias": ""
+    },
+    "1053": {
+      "name": "JACQUELINE ESTEFANI",
+      "lastname": "BONILLA GALVEZ",
+      "alias": ""
+    },
+    "1054": {
+      "name": "TOUDO",
+      "lastname": "BARADJI",
+      "alias": ""
+    },
+    "1055": {
+      "name": "BEAUTY",
+      "lastname": "OMOREGIE",
+      "alias": ""
+    },
+    "1058": {
+      "name": "MONDAY",
+      "lastname": "SIMEON",
+      "alias": ""
+    },
+    "1059": {
+      "name": "MUHAMMED LAMIN",
+      "lastname": "CEESAY",
+      "alias": ""
+    },
+    "1060": {
+      "name": "NELLY GABRIELLE",
+      "lastname": "TENKAM",
+      "alias": ""
+    },
+    "1061": {
+      "name": "GODSTIME",
+      "lastname": "EDIAE",
+      "alias": ""
+    },
+    "1062": {
+      "name": "BRIAN ALEXIS",
+      "lastname": "TASTACA",
+      "alias": ""
+    },
+    "1063": {
+      "name": "ALEXANDER DENNYS",
+      "lastname": "CARDENAS OLAYA",
+      "alias": ""
+    },
+    "1064": {
+      "name": "CARLA DANIELA",
+      "lastname": "VIGO OSORIO",
+      "alias": ""
+    },
+    "1065": {
+      "name": "ANDREW",
+      "lastname": "OGUNKANMI",
+      "alias": ""
+    }
   }
 }
