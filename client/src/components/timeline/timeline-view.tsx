@@ -313,10 +313,29 @@ export default function TimelineView({
                           })
                           .map((task, idx) => {
                             const taskObj = task as any;
-                            // Assicurati di leggere travel_time come numero, default a 0
-                            const travelTime = typeof taskObj.travel_time === 'number' 
-                              ? taskObj.travel_time 
-                              : (taskObj.travel_time ? parseInt(taskObj.travel_time, 10) : 0);
+                            
+                            // Leggi travel_time dalla task normalizzata (che viene da timeline_assignments.json)
+                            // Prova sia travel_time che travelTime per compatibilità
+                            let travelTime = 0;
+                            if (taskObj.travel_time !== undefined && taskObj.travel_time !== null) {
+                              travelTime = typeof taskObj.travel_time === 'number' 
+                                ? taskObj.travel_time 
+                                : parseInt(String(taskObj.travel_time), 10);
+                            } else if (taskObj.travelTime !== undefined && taskObj.travelTime !== null) {
+                              travelTime = typeof taskObj.travelTime === 'number' 
+                                ? taskObj.travelTime 
+                                : parseInt(String(taskObj.travelTime), 10);
+                            }
+                            
+                            // Se il parsing fallisce, usa 0
+                            if (isNaN(travelTime)) {
+                              travelTime = 0;
+                            }
+
+                            // DEBUG: log per capire cosa sta succedendo
+                            if (idx > 0) {
+                              console.log(`Task ${taskObj.task_id || taskObj.id}: travel_time=${travelTime} min`);
+                            }
 
                             // Calcola i puntini in base al travel time
                             // 0-15 min: "..." (larghezza: 15 min)
