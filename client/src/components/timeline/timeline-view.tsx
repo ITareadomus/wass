@@ -309,30 +309,15 @@ export default function TimelineView({
                             const timeB = taskB.start_time || taskB.fw_start_time || taskB.startTime || "00:00";
                             return timeA.localeCompare(timeB);
                           })
-                          .map((task, idx) => {
-                            const taskObj = task as any;
-                            
-                            // Leggi travel_time dalla task
-                            let travelTime = 0;
-                            if (taskObj.travel_time !== undefined && taskObj.travel_time !== null) {
-                              travelTime = typeof taskObj.travel_time === 'number' 
-                                ? taskObj.travel_time 
-                                : parseInt(String(taskObj.travel_time), 10);
-                            }
-                            if (isNaN(travelTime)) travelTime = 0;
-                            
-                            return (
-                              <TaskCard 
-                                key={task.id}
-                                task={task} 
-                                index={idx}
-                                isInTimeline={true}
-                                allTasks={cleanerTasks}
-                                showTravelIndicator={idx > 0}
-                                travelTime={travelTime}
-                              />
-                            );
-                          })}
+                          .map((task, idx) => (
+                            <TaskCard 
+                              key={task.id}
+                              task={task} 
+                              index={idx}
+                              isInTimeline={true}
+                              allTasks={cleanerTasks}
+                            />
+                          ))}
                         {provided.placeholder}
                       </div>
                     </div>
