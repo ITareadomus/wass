@@ -215,21 +215,22 @@ def evaluate_route(cleaner: Cleaner, route: List[Task]) -> Tuple[bool, List[Tupl
     if cleaner.available_from:
         base = max(base, cleaner.available_from)
 
-    # Viaggio da EO a HP
+    # Viaggio da EO a HP (solo se ha avuto task EO precedenti)
     if cleaner.last_eo_lat is not None and cleaner.last_eo_lng is not None:
         tt = travel_minutes(cleaner.last_eo_lat, cleaner.last_eo_lng,
                           first.lat, first.lng,
                           cleaner.last_eo_address, first.address)
+        arrival = base + timedelta(minutes=tt)
     else:
-        tt = 3.0 if same_street(cleaner.last_eo_address, first.address) else 12.0
-
-    arrival = base + timedelta(minutes=tt)
+        # Nessuna task EO precedente: il cleaner può iniziare dal suo start_time
+        # (o dall'orario disponibile se ha avuto HP precedenti)
+        arrival = base
 
     # Orario massimo di fine task: 19:00
     max_end_time = datetime(arrival.year, arrival.month, arrival.day, 19, 0)
 
     # HP: Considera SOLO il checkout (se presente) come vincolo
-    # Se il cleaner è libero prima delle 11:00 e il checkout lo permette, può iniziare prima
+    # Se il cleaner è libero (senza EO o con EO finite) e il checkout lo permette, può iniziare quando vuole
     if first.checkout_dt:
         arrival = max(arrival, first.checkout_dt)
 
