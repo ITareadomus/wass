@@ -239,7 +239,7 @@ def evaluate_route(cleaner: Cleaner, route: List[Task]) -> Tuple[bool, List[Tupl
     start = arrival
     finish = start + timedelta(minutes=first.cleaning_time)
 
-    # Check-in strict
+    # Check-in strict - INFRANGIBILE
     if first.checkin_dt and finish > first.checkin_dt:
         return False, []
 
@@ -267,7 +267,7 @@ def evaluate_route(cleaner: Cleaner, route: List[Task]) -> Tuple[bool, List[Tupl
         start = cur
         finish = start + timedelta(minutes=t.cleaning_time)
 
-        # Check-in strict
+        # Check-in strict - INFRANGIBILE
         if t.checkin_dt and finish > t.checkin_dt:
             return False, []
 

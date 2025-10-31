@@ -4,6 +4,7 @@ import json, math
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Tuple
 from pathlib import Path
+from datetime import datetime
 
 # =============================
 # I/O paths
@@ -57,6 +58,8 @@ class Task:
     checkout_time: int
     checkin_time: int
     is_premium: bool
+    checkin_dt: Optional[datetime] = None
+    checkout_dt: Optional[datetime] = None
     apt_type: Optional[str] = None
     address: Optional[str] = None
     alias: Optional[str] = None
@@ -220,6 +223,16 @@ def evaluate_route(route: List[Task]) -> Tuple[bool, List[Tuple[int, int, int]]]
         if finish > MAX_END_TIME:
             return False, []
 
+        # Check-in strict: deve finire prima del check-in
+        if hasattr(t, 'checkin_dt') and t.checkin_dt:
+            checkin_minutes = t.checkin_dt.hour * 60 + t.checkin_dt.minute
+            if finish > checkin_minutes:
+                return False, []
+
+        # Vincolo orario: nessuna task deve finire dopo le 19:00
+        if finish > MAX_END_TIME:
+            return False, []
+
         schedule.append((int(arrival), int(start), int(finish)))
         prev = t
         cur = finish
@@ -377,6 +390,26 @@ def load_tasks() -> List[Task]:
         checkout = eo_start_min
         checkin = hhmm_to_min(t.get("checkin_time"), default="23:59")
 
+        # Parse checkin e checkout datetime
+        checkin_dt = None
+        checkout_dt = None
+        
+        checkin_date = t.get("checkin_date")
+        checkin_time = t.get("checkin_time")
+        if checkin_date and checkin_time:
+            try:
+                checkin_dt = datetime.strptime(f"{checkin_date} {checkin_time}", "%Y-%m-%d %H:%M")
+            except:
+                pass
+        
+        checkout_date = t.get("checkout_date")
+        checkout_time = t.get("checkout_time")
+        if checkout_date and checkout_time:
+            try:
+                checkout_dt = datetime.strptime(f"{checkout_date} {checkout_time}", "%Y-%m-%d %H:%M")
+            except:
+                pass
+
         tasks.append(
             Task(
                 task_id=str(t.get("task_id")),
@@ -387,6 +420,8 @@ def load_tasks() -> List[Task]:
                 checkout_time=checkout,
                 checkin_time=checkin,
                 is_premium=bool(t.get("premium", False)),
+                checkin_dt=checkin_dt,
+                checkout_dt=checkout_dt,
                 apt_type=t.get("type_apt"),
                 address=t.get("address"),
                 alias=t.get("alias"),
