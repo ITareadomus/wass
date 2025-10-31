@@ -252,36 +252,64 @@ export default function TaskCard({
     return endMinutes > checkinMinutes;
   })();
 
+  // Determina il chip da mostrare in base al tipo di task
+  const typeChip = (() => {
+    const taskObj = displayTask as any;
+    const isSmallCard = isInTimeline && cardWidth && parseFloat(cardWidth) < 8;
+    const chipClass = isSmallCard ? "text-[0.5rem] px-0.5 py-0" : "text-[9px] px-1 py-0";
+
+    if (taskObj.straordinaria || taskObj.is_straordinaria) {
+      return (
+        <Badge variant="outline" className={`${chipClass} bg-purple-100 border-purple-400 text-purple-700`}>
+          STR
+        </Badge>
+      );
+    }
+
+    if (taskObj.premium) {
+      return (
+        <Badge variant="outline" className={`${chipClass} bg-yellow-100 border-yellow-400 text-yellow-700`}>
+          PRE
+        </Badge>
+      );
+    }
+
+    return (
+      <Badge variant="outline" className={`${chipClass} bg-green-100 border-green-400 text-green-700`}>
+        STD
+      </Badge>
+    );
+  })();
+
+  const cardWidth = calculateWidth(task.duration, isInTimeline);
+  const backgroundColor = isOverdue ? "#FFDDDD" : "white";
+
   return (
     <>
       <Draggable draggableId={task.id} index={index}>
         {(provided, snapshot) => {
-          const cardWidth = calculateWidth(task.duration, isInTimeline);
 
           return (
             <div
               ref={provided.innerRef}
               {...provided.draggableProps}
               {...provided.dragHandleProps}
-              className={`
-                ${colorClass} 
-                rounded-sm px-2 py-1 shadow-sm border transition-all duration-200
-                ${snapshot.isDragging ? "shadow-lg scale-105" : ""}
-                ${isOverdue ? "animate-blink" : ""}
-                hover:shadow-md cursor-pointer
-                flex-shrink-0 relative
-              `}
+              onClick={handleCardClick}
+              className={cn(
+                "p-2 rounded shadow-md cursor-pointer transition-all",
+                "hover:shadow-lg hover:scale-[1.02]",
+                "border-2",
+                isOverdue ? "border-red-500" : "border-gray-300"
+              )}
               style={{
-                ...provided.draggableProps.style,
+                backgroundColor,
                 width: cardWidth,
-                minHeight: "40px",
+                minWidth: isInTimeline ? "50px" : "100px",
+                flexShrink: 0,
+                fontSize: isInTimeline && cardWidth && parseFloat(cardWidth) < 8 ? '0.6rem' : undefined,
+                ...provided.draggableProps.style,
               }}
               data-testid={`task-card-${task.id}`}
-              onClick={(e) => {
-                if (!snapshot.isDragging) {
-                  handleCardClick(e);
-                }
-              }}
             >
               {!isConfirmedOperation && (
                 <div className="absolute top-0.5 right-0.5 z-50">
@@ -291,25 +319,30 @@ export default function TaskCard({
                   />
                 </div>
               )}
-              <div 
-                className="flex flex-col items-center justify-center h-full gap-0"
-              >
-                <div className="flex items-center gap-1">
-                  <span
-                    className="text-[13px] text-[#ff0000] font-extrabold"
-                    data-testid={`task-name-${task.id}`}
-                  >
-                    {task.name}
+              <div className="flex flex-col gap-0.5">
+                <div className="flex items-center justify-between gap-1">
+                  <span className={cn(
+                    "font-bold truncate flex-1",
+                    isInTimeline && cardWidth && parseFloat(cardWidth) < 8 ? "text-[0.6rem]" : "text-xs"
+                  )}>
+                    {displayTask.name}
                   </span>
-                  <span className="text-[11px] opacity-60 leading-none font-bold text-[#000000]">
-                    ({task.duration.replace(".", ":")}h)
+                  {typeChip}
+                </div>
+                <div className={cn(
+                  "font-medium truncate",
+                  isInTimeline && cardWidth && parseFloat(cardWidth) < 8 ? "text-[0.55rem]" : "text-[10px]"
+                )}>
+                  {displayTask.address}
+                </div>
+                <div className="flex items-center gap-1 mt-0.5">
+                  <span className={cn(
+                    "text-gray-600",
+                    isInTimeline && cardWidth && parseFloat(cardWidth) < 8 ? "text-[0.55rem]" : "text-[10px]"
+                  )}>
+                    {displayTask.duration.replace(".", ":")}h
                   </span>
                 </div>
-                {task.alias && (
-                  <span className="text-[11px] opacity-70 leading-none mt-0.5 text-[#000000] font-bold">
-                    {task.alias}{(task as any).type_apt ? ` (${(task as any).type_apt})` : ''}
-                  </span>
-                )}
               </div>
             </div>
           );
