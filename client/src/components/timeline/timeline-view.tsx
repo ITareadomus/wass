@@ -51,6 +51,7 @@ export default function TimelineView({
   const [selectedCleaner, setSelectedCleaner] = useState<Cleaner | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedSwapCleaner, setSelectedSwapCleaner] = useState<string>("");
+  const [filteredCleanerId, setFilteredCleanerId] = useState<number | null>(null);
   const { toast } = useToast();
 
   // Mutation per scambiare task tra cleaners
@@ -210,6 +211,29 @@ export default function TimelineView({
     setIsModalOpen(true);
   };
 
+  const handleCleanerDoubleClick = (cleanerId: number, e: React.MouseEvent) => {
+    e.stopPropagation();
+    
+    // Se è già selezionato questo cleaner, rimuovi il filtro
+    if (filteredCleanerId === cleanerId) {
+      setFilteredCleanerId(null);
+      (window as any).mapFilteredCleanerId = null;
+      toast({
+        title: "Filtro rimosso",
+        description: "Ora visualizzi tutti gli appartamenti sulla mappa",
+      });
+    } else {
+      // Altrimenti imposta il filtro su questo cleaner
+      setFilteredCleanerId(cleanerId);
+      (window as any).mapFilteredCleanerId = cleanerId;
+      const cleaner = cleaners.find(c => c.id === cleanerId);
+      toast({
+        title: "Filtro attivato",
+        description: `Visualizzi solo gli appartamenti di ${cleaner?.name} ${cleaner?.lastname}`,
+      });
+    }
+  };
+
   const handleResetAssignments = async () => {
     try {
       // La data è già nel formato corretto yyyy-MM-dd nel localStorage
@@ -332,10 +356,13 @@ export default function TimelineView({
                 <div
                   className="w-24 flex-shrink-0 p-1 flex items-center border border-border cursor-pointer hover:opacity-90 transition-opacity"
                   style={{ 
-                    backgroundColor: color.bg,
-                    color: color.text
+                    backgroundColor: filteredCleanerId === cleaner.id ? `${color.bg}` : color.bg,
+                    color: color.text,
+                    boxShadow: filteredCleanerId === cleaner.id ? '0 0 0 3px rgba(59, 130, 246, 0.5)' : 'none'
                   }}
                   onClick={() => handleCleanerClick(cleaner)}
+                  onDoubleClick={(e) => handleCleanerDoubleClick(cleaner.id, e)}
+                  title="Doppio click per filtrare sulla mappa"
                 >
                   <div className="w-full">
                     <div className="break-words font-bold text-[13px]">
