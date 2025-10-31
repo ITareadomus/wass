@@ -36,6 +36,16 @@ export default function MapSection({ tasks }: MapSectionProps) {
       }
     };
     loadCleaners();
+
+    // Listener per aggiornamenti del filtro dalla timeline
+    const checkFilterUpdates = setInterval(() => {
+      // Forza re-render quando cambia il filtro
+      if ((window as any).mapFilteredCleanerId !== undefined) {
+        setCleaners(prev => [...prev]);
+      }
+    }, 100);
+
+    return () => clearInterval(checkFilterUpdates);
   }, []);
 
   // Funzione per ottenere il colore del cleaner
@@ -101,11 +111,21 @@ export default function MapSection({ tasks }: MapSectionProps) {
     markersRef.current.forEach(marker => marker.setMap(null));
     markersRef.current = [];
 
+    // Ottieni il filtro dal window object (impostato dalla timeline)
+    const filteredCleanerId = (window as any).mapFilteredCleanerId;
+
     // Filtra task con coordinate valide
-    const tasksWithCoordinates = tasks.filter(task => {
+    let tasksWithCoordinates = tasks.filter(task => {
       const hasCoordinates = task.address && task.lat && task.lng;
       return hasCoordinates;
     });
+
+    // Se c'è un filtro attivo, mostra solo gli appartamenti del cleaner selezionato
+    if (filteredCleanerId !== null && filteredCleanerId !== undefined) {
+      tasksWithCoordinates = tasksWithCoordinates.filter(task => 
+        (task as any).assignedCleaner === filteredCleanerId
+      );
+    }
 
     console.log('Task totali:', tasks.length);
     console.log('Task con coordinate:', tasksWithCoordinates.length);
@@ -206,7 +226,7 @@ export default function MapSection({ tasks }: MapSectionProps) {
     if (tasksWithCoordinates.length > 0) {
       googleMapRef.current.fitBounds(bounds);
     }
-  }, [tasks, isMapLoaded, cleaners]);
+  }, [tasks, isMapLoaded, cleaners, (window as any).mapFilteredCleanerId]);
 
   const toggleFullscreen = () => {
     if (!mapRef.current) return;
