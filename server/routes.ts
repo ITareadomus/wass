@@ -1950,6 +1950,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { cleaner1Id, cleaner2Id } = req.body;
       const cleanersPath = path.join(process.cwd(), 'client/public/data/cleaners/selected_cleaners.json');
+      const timelinePath = path.join(process.cwd(), 'client/public/data/output/timeline.json');
 
       // Carica selected_cleaners.json
       let cleanersData = JSON.parse(await fs.readFile(cleanersPath, 'utf8'));
@@ -1962,15 +1963,51 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ success: false, message: "Uno o entrambi i cleaners non trovati" });
       }
 
-      // Scambia le posizioni
+      // Scambia le posizioni nella lista cleaners
       [cleanersData.cleaners[index1], cleanersData.cleaners[index2]] = 
       [cleanersData.cleaners[index2], cleanersData.cleaners[index1]];
 
-      // Salva il file aggiornato
+      // Salva il file cleaners aggiornato
       await fs.writeFile(cleanersPath, JSON.stringify(cleanersData, null, 2));
 
-      console.log(`✅ Cleaners ${cleaner1Id} e ${cleaner2Id} hanno scambiato posizione`);
-      res.json({ success: true, message: "Posizioni dei cleaners scambiate con successo" });
+      // Carica timeline.json per scambiare le task
+      let timelineData: any = { 
+        metadata: { last_updated: new Date().toISOString() },
+        cleaners_assignments: [],
+        meta: { total_cleaners: 0, used_cleaners: 0, assigned_tasks: 0 }
+      };
+
+      try {
+        const existingData = await fs.readFile(timelinePath, 'utf8');
+        timelineData = JSON.parse(existingData);
+      } catch (error) {
+        console.log('Nessuna timeline trovata, solo scambio posizioni cleaners');
+      }
+
+      // Trova le assegnazioni dei due cleaners
+      const cleaner1Entry = timelineData.cleaners_assignments?.find((c: any) => c.cleaner.id === cleaner1Id);
+      const cleaner2Entry = timelineData.cleaners_assignments?.find((c: any) => c.cleaner.id === cleaner2Id);
+
+      // Scambia le task tra i due cleaners se entrambi hanno assegnazioni
+      if (cleaner1Entry && cleaner2Entry) {
+        // Scambia gli array di task
+        [cleaner1Entry.tasks, cleaner2Entry.tasks] = [cleaner2Entry.tasks, cleaner1Entry.tasks];
+
+        // Aggiorna metadata
+        timelineData.metadata = timelineData.metadata || {};
+        timelineData.metadata.last_updated = new Date().toISOString();
+
+        // Scrittura atomica della timeline
+        const tmpTimelinePath = `${timelinePath}.tmp`;
+        await fs.writeFile(tmpTimelinePath, JSON.stringify(timelineData, null, 2));
+        await fs.rename(tmpTimelinePath, timelinePath);
+
+        console.log(`✅ Cleaners ${cleaner1Id} e ${cleaner2Id} hanno scambiato posizione E task`);
+      } else {
+        console.log(`✅ Cleaners ${cleaner1Id} e ${cleaner2Id} hanno scambiato solo posizione (uno o entrambi senza task)`);
+      }
+
+      res.json({ success: true, message: "Posizioni e task dei cleaners scambiate con successo" });
     } catch (error: any) {
       console.error("Errore nello scambio di posizione dei cleaners:", error);
       res.status(500).json({ success: false, error: error.message });
