@@ -294,22 +294,60 @@ def main():
     all_tasks = get_tasks_from_db(selected_date)
     print(f"✅ Estratte {len(all_tasks)} task dal database")
 
-    # Filtra task già presenti in timeline.json
+    # Filtra task già presenti in timeline.json E aggiorna i loro dati
     timeline_path = OUTPUT_DIR / "timeline.json"
     timeline_task_ids = set()
+    timeline_updated = False
     
     if timeline_path.exists():
         try:
             timeline_data = json.loads(timeline_path.read_text(encoding="utf-8"))
-            # Estrai tutti i task_id dalla timeline
+            
+            # Crea una mappa task_id -> dati aggiornati dal DB
+            db_tasks_map = {task["task_id"]: task for task in all_tasks}
+            
+            # Aggiorna i dati delle task in timeline con quelli freschi dal DB
             for cleaner_entry in timeline_data.get("cleaners_assignments", []):
                 for task in cleaner_entry.get("tasks", []):
-                    timeline_task_ids.add(task.get("task_id"))
+                    task_id = task.get("task_id")
+                    timeline_task_ids.add(task_id)
+                    
+                    # Se questa task esiste nel DB, aggiorna i suoi dati
+                    if task_id in db_tasks_map:
+                        db_task = db_tasks_map[task_id]
+                        
+                        # Aggiorna SOLO i campi che possono cambiare nel DB
+                        # Manteniamo i campi specifici della timeline (sequence, start_time, end_time, etc.)
+                        fields_to_update = [
+                            "logistic_code", "client_id", "premium", "address", "lat", "lng",
+                            "cleaning_time", "checkin_date", "checkout_date", "checkin_time", 
+                            "checkout_time", "pax_in", "pax_out", "small_equipment", 
+                            "operation_id", "confirmed_operation", "straordinaria", 
+                            "type_apt", "alias", "customer_name"
+                        ]
+                        
+                        updated_fields = []
+                        for field in fields_to_update:
+                            if field in db_task and task.get(field) != db_task[field]:
+                                old_value = task.get(field)
+                                task[field] = db_task[field]
+                                updated_fields.append(f"{field}: {old_value} → {db_task[field]}")
+                                timeline_updated = True
+                        
+                        if updated_fields:
+                            print(f"  ✏️ Aggiornata task {task_id} (logistic: {task.get('logistic_code')})")
+                            for upd in updated_fields[:3]:  # Mostra max 3 campi aggiornati
+                                print(f"     - {upd}")
+            
+            # Salva timeline aggiornata se ci sono stati cambiamenti
+            if timeline_updated:
+                timeline_path.write_text(json.dumps(timeline_data, ensure_ascii=False, indent=2), encoding="utf-8")
+                print(f"💾 Timeline aggiornata con i dati freschi dal DB")
             
             if timeline_task_ids:
-                print(f"🔍 Trovate {len(timeline_task_ids)} task già in timeline, verranno escluse dai containers")
+                print(f"🔍 Trovate {len(timeline_task_ids)} task già in timeline")
         except Exception as e:
-            print(f"⚠️ Errore nel caricamento timeline: {e}")
+            print(f"⚠️ Errore nel caricamento/aggiornamento timeline: {e}")
     
     # Filtra le task che sono già in timeline
     all_tasks = [task for task in all_tasks if task.get("task_id") not in timeline_task_ids]
