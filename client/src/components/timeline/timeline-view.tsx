@@ -303,7 +303,10 @@ export default function TimelineView({
                             const taskA = a as any;
                             const taskB = b as any;
 
-                            // Ordina SOLO per start_time (ignora sequence)
+                            if (taskA.sequence !== undefined && taskB.sequence !== undefined) {
+                              return taskA.sequence - taskB.sequence;
+                            }
+
                             const timeA = taskA.start_time || taskA.fw_start_time || taskA.startTime || "00:00";
                             const timeB = taskB.start_time || taskB.fw_start_time || taskB.startTime || "00:00";
                             return timeA.localeCompare(timeB);
