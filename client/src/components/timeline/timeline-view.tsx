@@ -392,10 +392,20 @@ export default function TimelineView({
                   onClick={(e) => handleCleanerClick(cleaner, e)}
                   title="Click: dettagli | Doppio click: filtra mappa"
                 >
-                  <div className="w-full">
-                    <div className="break-words font-bold text-[13px]">
+                  <div className="w-full flex items-center gap-1">
+                    <div className="break-words font-bold text-[13px] flex-1">
                       {cleanersAliases[cleaner.id]?.alias || `${cleaner.name.toUpperCase()} ${cleaner.lastname.toUpperCase()}`}
                     </div>
+                    {cleaner.role === "Premium" && (
+                      <div className="bg-yellow-500 text-black font-bold text-[10px] px-1 py-0.5 rounded flex-shrink-0">
+                        P
+                      </div>
+                    )}
+                    {cleaner.role === "Formatore" && (
+                      <div className="bg-orange-500 text-black font-bold text-[10px] px-1 py-0.5 rounded flex-shrink-0">
+                        F
+                      </div>
+                    )}
                   </div>
                 </div>
                 {/* Timeline per questo cleaner - area unica droppable */}
