@@ -470,7 +470,7 @@ export default function Convocazioni() {
         </Card>
       </div>
 
-      {/* Pulsanti ASSEGNAZIONI, Aggiungi, Sostituisci */}
+      {/* Pulsanti Annulla, Aggiungi, Sostituisci */}
       <div className="p-4 border-t flex justify-between items-center">
             <Button
               variant="outline"
@@ -478,7 +478,7 @@ export default function Convocazioni() {
               className="flex items-center gap-2"
             >
               <ArrowLeft className="w-4 h-4" />
-              ASSEGNAZIONI
+              Annulla
             </Button>
             <div className="flex gap-2">
               <Button
