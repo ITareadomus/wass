@@ -368,7 +368,8 @@ export default function TimelineView({
                   style={{ 
                     backgroundColor: filteredCleanerId === cleaner.id ? `${color.bg}` : color.bg,
                     color: color.text,
-                    boxShadow: filteredCleanerId === cleaner.id ? '0 0 0 3px rgba(59, 130, 246, 0.5)' : 'none'
+                    boxShadow: filteredCleanerId === cleaner.id ? '0 0 0 3px rgba(59, 130, 246, 0.5)' : 'none',
+                    userSelect: 'none'
                   }}
                   onClick={(e) => handleCleanerClick(cleaner, e)}
                   title="Click: dettagli | Doppio click: filtra mappa"
