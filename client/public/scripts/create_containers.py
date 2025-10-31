@@ -294,6 +294,27 @@ def main():
     all_tasks = get_tasks_from_db(selected_date)
     print(f"✅ Estratte {len(all_tasks)} task dal database")
 
+    # Filtra task già presenti in timeline.json
+    timeline_path = OUTPUT_DIR / "timeline.json"
+    timeline_task_ids = set()
+    
+    if timeline_path.exists():
+        try:
+            timeline_data = json.loads(timeline_path.read_text(encoding="utf-8"))
+            # Estrai tutti i task_id dalla timeline
+            for cleaner_entry in timeline_data.get("cleaners_assignments", []):
+                for task in cleaner_entry.get("tasks", []):
+                    timeline_task_ids.add(task.get("task_id"))
+            
+            if timeline_task_ids:
+                print(f"🔍 Trovate {len(timeline_task_ids)} task già in timeline, verranno escluse dai containers")
+        except Exception as e:
+            print(f"⚠️ Errore nel caricamento timeline: {e}")
+    
+    # Filtra le task che sono già in timeline
+    all_tasks = [task for task in all_tasks if task.get("task_id") not in timeline_task_ids]
+    print(f"✅ Task disponibili per containers (dopo filtro timeline): {len(all_tasks)}")
+
     # Classifica task
     print(f"🔄 Classificazione task in containers...")
     early_out, high_priority, low_priority = classify_tasks(all_tasks, selected_date)
