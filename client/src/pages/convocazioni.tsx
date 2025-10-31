@@ -478,7 +478,7 @@ export default function Convocazioni() {
               className="flex items-center gap-2"
             >
               <ArrowLeft className="w-4 h-4" />
-              Annulla
+              Torna alle Assegnazioni
             </Button>
             <div className="flex gap-2">
               <Button

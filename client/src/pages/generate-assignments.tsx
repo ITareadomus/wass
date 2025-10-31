@@ -5,7 +5,8 @@ import TimelineView from "@/components/timeline/timeline-view";
 import MapSection from "@/components/map/map-section";
 import { useState, useEffect } from "react";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { CalendarIcon } from "lucide-react";
+import { CalendarIcon, Users } from "lucide-react";
+import { useLocation } from 'wouter';
 import { format } from "date-fns";
 import { it } from "date-fns/locale";
 import { Calendar } from "@/components/ui/calendar";
@@ -83,6 +84,7 @@ export default function GenerateAssignments() {
   const [isLoadingTasks, setIsLoadingTasks] = useState(false);
   const [isConfirming, setIsConfirming] = useState(false);
   const { toast } = useToast();
+  const [, setLocation] = useLocation();
 
   // Funzione per estrarre i dati dal backend
   const extractData = async (date: Date) => {
@@ -920,6 +922,14 @@ export default function GenerateAssignments() {
             </span>
           </h1>
           <div className="flex items-center gap-3">
+            <Button
+              onClick={() => setLocation('/convocazioni')}
+              variant="outline"
+              className="flex items-center gap-2"
+            >
+              <Users className="w-4 h-4" />
+              Convocazioni
+            </Button>
             <ThemeToggle />
             <Popover>
               <PopoverTrigger asChild>
