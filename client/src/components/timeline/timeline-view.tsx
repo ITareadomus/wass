@@ -184,10 +184,9 @@ export default function TimelineView({
     const sourceIndex = result.source.index;
     const destIndex = result.destination.index;
 
-    // Aggiorna UI immediatamente
+    // Scambio 1:1 - swappa solo i due cleaners coinvolti
     const newCleaners = Array.from(cleaners);
-    const [removed] = newCleaners.splice(sourceIndex, 1);
-    newCleaners.splice(destIndex, 0, removed);
+    [newCleaners[sourceIndex], newCleaners[destIndex]] = [newCleaners[destIndex], newCleaners[sourceIndex]];
     setCleaners(newCleaners);
 
     // Salva sul backend
