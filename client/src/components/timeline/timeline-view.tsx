@@ -1,5 +1,5 @@
 import { Personnel, TaskType as Task } from "@shared/schema";
-import { Calendar, RotateCcw, Users } from "lucide-react";
+import { Calendar, RotateCcw, Users, User } from "lucide-react";
 import { useState, useEffect } from "react";
 import { Droppable } from "react-beautiful-dnd";
 import TaskCard from "@/components/drag-drop/task-card";
@@ -315,25 +315,34 @@ export default function TimelineView({
                             const taskObj = task as any;
                             const travelTime = taskObj.travel_time || 0;
                             
-                            // Calcola numero di segnetti in base al travel time
-                            // 0-14 min: 1 segnetto, 15-29: 2 segnetti, 30-44: 3 segnetti, 45+: 3 segnetti
-                            let numMarkers = 1;
+                            // Calcola il numero di omini in base al travel time
+                            // 0-14 min: 1 omino, 15-29: 2 omini, 30-44: 3 omini, 45+: 3 omini
+                            let numWalkers = 1;
                             if (travelTime >= 15 && travelTime < 30) {
-                              numMarkers = 2;
+                              numWalkers = 2;
                             } else if (travelTime >= 30) {
-                              numMarkers = 3;
+                              numWalkers = 3;
                             }
+                            
+                            // Calcola larghezza per un blocco di 15 minuti (timeline copre 600 minuti)
+                            const widthFor15Min = (15 / 600) * 100; // percentuale della timeline
                             
                             return (
                               <>
-                                {/* Indicatori di travel time (solo se non è la prima task) */}
+                                {/* Indicatori di travel time come omini che camminano */}
                                 {idx > 0 && (
-                                  <div key={`marker-${task.id}`} className="flex items-center gap-0.5 mx-1 flex-shrink-0">
-                                    {Array.from({ length: numMarkers }).map((_, markerIdx) => (
-                                      <div
+                                  <div 
+                                    key={`marker-${task.id}`} 
+                                    className="flex items-center justify-center gap-1 flex-shrink-0"
+                                    style={{ width: `${widthFor15Min}%` }}
+                                    title={`Travel time: ${travelTime} minuti`}
+                                  >
+                                    {Array.from({ length: numWalkers }).map((_, markerIdx) => (
+                                      <User
                                         key={markerIdx}
-                                        className="w-1 h-6 bg-gray-400 rounded-sm opacity-60"
-                                        title={`Travel time: ${travelTime} minuti`}
+                                        className="text-gray-500"
+                                        size={20}
+                                        strokeWidth={1.5}
                                       />
                                     ))}
                                   </div>
