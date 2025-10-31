@@ -1,6 +1,6 @@
 {
   "metadata": {
-    "last_updated": "2025-10-31T12:56:09.964380",
+    "last_updated": "2025-10-31T13:00:48.909Z",
     "date": "2025-10-31"
   },
   "cleaners_assignments": [
@@ -77,7 +77,7 @@
           "priority": "high_priority",
           "start_time": "11:19",
           "end_time": "12:19",
-          "followup": false,
+          "followup": true,
           "sequence": 2,
           "travel_time": 19,
           "is_straordinaria": false
@@ -959,7 +959,7 @@
   ],
   "meta": {
     "total_cleaners": 12,
-    "total_tasks": 0,
+    "total_tasks": 24,
     "used_cleaners": 12,
     "assigned_tasks": 24
   }
