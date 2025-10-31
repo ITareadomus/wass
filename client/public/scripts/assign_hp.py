@@ -162,12 +162,12 @@ def travel_minutes(a_lat: float, a_lng: float, b_lat: float, b_lng: float,
     # Stesso edificio
     if a_addr and b_addr and same_building(a_addr, b_addr):
         return max(MIN_TRAVEL, min(MAX_TRAVEL, SHORT_BASE_MIN))
-    
+
     km = haversine_km(a_lat, a_lng, b_lat, b_lng)
-    
+
     # Fattore correzione percorsi non rettilinei
     dist_reale = km * 1.5
-    
+
     # Modello progressivo
     if dist_reale < 0.8:
         travel_time = dist_reale * 6.0  # ~10 km/h a piedi
@@ -175,15 +175,15 @@ def travel_minutes(a_lat: float, a_lng: float, b_lat: float, b_lng: float,
         travel_time = dist_reale * 10.0  # ~6 km/h misto
     else:
         travel_time = dist_reale * 5.0  # ~12 km/h mezzi
-    
+
     # Tempo base
     base_time = 5.0
     total_time = base_time + travel_time
-    
+
     # Bonus stesso strada (riduce tempo base)
     if a_addr and b_addr and same_street(a_addr, b_addr) and km < 0.10:
         total_time = max(total_time - 2.0, MIN_TRAVEL)
-    
+
     return max(MIN_TRAVEL, min(MAX_TRAVEL, total_time))
 
 
@@ -225,14 +225,11 @@ def evaluate_route(cleaner: Cleaner, route: List[Task]) -> Tuple[bool, List[Tupl
 
     arrival = base + timedelta(minutes=tt)
 
-    # HP hard earliest: 11:00
-    hp_earliest = datetime(arrival.year, arrival.month, arrival.day, HP_HARD_EARLIEST_H, HP_HARD_EARLIEST_M)
-    arrival = max(arrival, hp_earliest)
-
     # Orario massimo di fine task: 19:00
     max_end_time = datetime(arrival.year, arrival.month, arrival.day, 19, 0)
 
-    # Considera checkout se presente
+    # HP: Considera SOLO il checkout (se presente) come vincolo
+    # Se il cleaner è libero prima delle 11:00 e il checkout lo permette, può iniziare prima
     if first.checkout_dt:
         arrival = max(arrival, first.checkout_dt)
 
