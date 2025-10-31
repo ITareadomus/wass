@@ -306,7 +306,7 @@ export default function TaskCard({
                   </span>
                 </div>
                 {task.alias && (
-                  <span className="text-[11px] opacity-70 leading-none mt-0.5">
+                  <span className="text-[11px] opacity-70 leading-none mt-0.5 text-[#000000] font-bold">
                     {task.alias}{(task as any).type_apt ? ` (${(task as any).type_apt})` : ''}
                   </span>
                 )}
