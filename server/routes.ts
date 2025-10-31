@@ -1970,15 +1970,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       );
 
       if (taskIndex === -1) {
-        return res.status(404).json({ success: false, message: "Task non trovata" });
-      }
-
-      // Riordina le task del cleaner
-      const taskIndex = cleanerEntry.tasks.findIndex((t: any) => 
-        String(t.task_id) === taskId || String(t.logistic_code) === logisticCode
-      );
-
-      if (taskIndex === -1) {
         return res.status(404).json({ 
           success: false, 
           error: `Task ${logisticCode} non trovata per cleaner ${cleanerId}` 
