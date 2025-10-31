@@ -1,29 +1,6 @@
 {
   "cleaners": [
     {
-      "id": 24,
-      "name": "HUSSAIN",
-      "lastname": "SYED SHUJIAHAT",
-      "role": "Standard",
-      "active": true,
-      "ranking": 0,
-      "counter_hours": 14.25,
-      "counter_days": 4,
-      "available": true,
-      "contract_type": "B",
-      "preferred_customers": [
-        2,
-        67,
-        72,
-        80,
-        84,
-        94,
-        115
-      ],
-      "telegram_id": null,
-      "start_time": "10:00"
-    },
-    {
       "id": 937,
       "name": "LOVETH",
       "lastname": "IGUDIA",
@@ -48,6 +25,29 @@
         121
       ],
       "telegram_id": 7573041558,
+      "start_time": "10:00"
+    },
+    {
+      "id": 24,
+      "name": "HUSSAIN",
+      "lastname": "SYED SHUJIAHAT",
+      "role": "Standard",
+      "active": true,
+      "ranking": 0,
+      "counter_hours": 14.25,
+      "counter_days": 4,
+      "available": true,
+      "contract_type": "B",
+      "preferred_customers": [
+        2,
+        67,
+        72,
+        80,
+        84,
+        94,
+        115
+      ],
+      "telegram_id": null,
       "start_time": "10:00"
     },
     {
