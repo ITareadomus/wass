@@ -349,20 +349,6 @@ export default function TimelineView({
                             const effectiveTravelMinutes = travelTime === 0 ? 1 : travelTime;
                             const totalWidth = (effectiveTravelMinutes / 600) * 100;
 
-                            // Determina gli underscore in base al travel time
-                            // < 15 min: nessun underscore
-                            // 15-29 min: _
-                            // 30-44 min: __
-                            // >= 45 min: ___
-                            let underscores = "";
-                            if (travelTime >= 15 && travelTime < 30) {
-                              underscores = "_";
-                            } else if (travelTime >= 30 && travelTime < 45) {
-                              underscores = "__";
-                            } else if (travelTime >= 45) {
-                              underscores = "___";
-                            }
-
                             return (
                               <>
                                 {/* Spazio vuoto per task con sequence=1 e start_time=11:00 */}
@@ -374,13 +360,13 @@ export default function TimelineView({
                                   />
                                 )}
 
-                                {/* Indicatore di travel time: omino + underscore */}
+                                {/* Indicatore di travel time: solo omino */}
                                 {idx > 0 && (
                                   <div 
                                     key={`marker-${task.id}`} 
-                                    className="flex items-center justify-center gap-0.5 flex-shrink-0"
+                                    className="flex items-center justify-center flex-shrink-0"
                                     style={{ width: `${totalWidth}%` }}
-                                    title={`Task #${taskObj.task_id || task.id} - Travel time: ${travelTime} minuti`}
+                                    title={`${travelTime} min`}
                                   >
                                     <svg
                                       width="16"
@@ -391,11 +377,6 @@ export default function TimelineView({
                                     >
                                       <path d="M13.5 5.5c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zM9.8 8.9L7 23h2.1l1.8-8 2.1 2v6h2v-7.5l-2.1-2 .6-3C14.8 12 16.8 13 19 13v-2c-1.9 0-3.5-1-4.3-2.4l-1-1.6c-.4-.6-1-1-1.7-1-.3 0-.5.1-.8.1L6 8.3V13h2V9.6l1.8-.7"/>
                                     </svg>
-                                    {underscores && (
-                                      <span className="text-[10px] font-bold text-gray-600 leading-none">
-                                        {underscores}
-                                      </span>
-                                    )}
                                   </div>
                                 )}
 
