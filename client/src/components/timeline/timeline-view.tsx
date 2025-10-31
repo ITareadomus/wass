@@ -314,44 +314,50 @@ export default function TimelineView({
                           .map((task, idx) => {
                             const taskObj = task as any;
                             const travelTime = taskObj.travel_time || 0;
-                            
-                            // Calcola il numero di omini in base al travel time
-                            // 0-14 min: 1 omino, 15-29: 2 omini, 30-44: 3 omini, 45+: 3 omini
-                            let numWalkers = 1;
-                            if (travelTime >= 15 && travelTime < 30) {
-                              numWalkers = 2;
+
+                            // Calcola i puntini in base al travel time
+                            // <= 15 min: "..." (larghezza: 15 min)
+                            // 15 < x < 30: "......" (larghezza: 30 min)
+                            // >= 30: "........." (larghezza: 45 min)
+                            let dots = "...";
+                            let widthMinutes = 15;
+
+                            if (travelTime > 15 && travelTime < 30) {
+                              dots = "......";
+                              widthMinutes = 30;
                             } else if (travelTime >= 30) {
-                              numWalkers = 3;
+                              dots = ".........";
+                              widthMinutes = 45;
                             }
-                            
-                            // Calcola larghezza per un blocco di 15 minuti (timeline copre 600 minuti)
-                            const widthFor15Min = (15 / 600) * 100; // percentuale della timeline
-                            
+
+                            // Calcola larghezza: la timeline copre 600 minuti (10:00-19:00)
+                            const totalWidth = (widthMinutes / 600) * 100;
+
                             return (
                               <>
-                                {/* Indicatori di travel time come omini che camminano */}
+                                {/* Indicatori di travel time: omino + puntini con larghezza fissa */}
                                 {idx > 0 && (
                                   <div 
                                     key={`marker-${task.id}`} 
-                                    className="flex items-center justify-center gap-1 flex-shrink-0"
-                                    style={{ width: `${widthFor15Min}%` }}
+                                    className="flex items-center justify-start gap-0 flex-shrink-0"
+                                    style={{ width: `${totalWidth}%` }}
                                     title={`Travel time: ${travelTime} minuti`}
                                   >
-                                    {Array.from({ length: numWalkers }).map((_, markerIdx) => (
-                                      <svg
-                                        key={markerIdx}
-                                        width="20"
-                                        height="20"
-                                        viewBox="0 0 24 24"
-                                        fill="currentColor"
-                                        className="text-gray-600"
-                                      >
-                                        <path d="M13.5 5.5c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zM9.8 8.9L7 23h2.1l1.8-8 2.1 2v6h2v-7.5l-2.1-2 .6-3C14.8 12 16.8 13 19 13v-2c-1.9 0-3.5-1-4.3-2.4l-1-1.6c-.4-.6-1-1-1.7-1-.3 0-.5.1-.8.1L6 8.3V13h2V9.6l1.8-.7"/>
-                                      </svg>
-                                    ))}
+                                    <svg
+                                      width="16"
+                                      height="16"
+                                      viewBox="0 0 24 24"
+                                      fill="currentColor"
+                                      className="text-gray-600 flex-shrink-0"
+                                    >
+                                      <path d="M13.5 5.5c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zM9.8 8.9L7 23h2.1l1.8-8 2.1 2v6h2v-7.5l-2.1-2 .6-3C14.8 12 16.8 13 19 13v-2c-1.9 0-3.5-1-4.3-2.4l-1-1.6c-.4-.6-1-1-1.7-1-.3 0-.5.1-.8.1L6 8.3V13h2V9.6l1.8-.7"/>
+                                    </svg>
+                                    <span className="text-[10px] font-bold text-gray-600 leading-none">
+                                      {dots}
+                                    </span>
                                   </div>
                                 )}
-                                
+
                                 <TaskCard 
                                   key={task.id}
                                   task={task} 
