@@ -1,6 +1,6 @@
 {
   "metadata": {
-    "last_updated": "2025-10-31T10:45:13.577Z",
+    "last_updated": "2025-10-31T10:49:35.689Z",
     "date": "2025-10-31"
   },
   "cleaners_assignments": [
@@ -108,11 +108,11 @@
             "automatic_assignment_hp"
           ],
           "priority": "high_priority",
-          "start_time": "11:19",
-          "end_time": "12:19",
-          "followup": false,
-          "sequence": 2,
-          "travel_time": 19,
+          "start_time": "13:35",
+          "end_time": "14:35",
+          "followup": true,
+          "sequence": 3,
+          "travel_time": 18,
           "is_straordinaria": false
         }
       ]
