@@ -294,8 +294,8 @@ export default function TimelineView({
                         ))}
                       </div>
 
-                      {/* Task posizionate in sequenza con indicatori di travel time */}
-                      <div className="relative z-10 flex items-center h-full">
+                      {/* Task posizionate in base a start_time con spazi vuoti */}
+                      <div className="relative z-10 h-full">
                         {tasks
                           .filter((task) => (task as any).assignedCleaner === cleaner.id)
                           .map(normalizeTask)
@@ -314,8 +314,17 @@ export default function TimelineView({
                           .map((task, idx) => {
                             const taskObj = task as any;
                             
-                            // Leggi travel_time dalla task normalizzata (che viene da timeline_assignments.json)
-                            // Prova sia travel_time che travelTime per compatibilità
+                            // Calcola la posizione in base a start_time
+                            const startTime = taskObj.start_time || taskObj.fw_start_time || taskObj.startTime || "10:00";
+                            const [hours, minutes] = startTime.split(':').map(Number);
+                            const startMinutesFromTen = (hours - 10) * 60 + minutes; // Minuti da 10:00
+                            const leftPosition = (startMinutesFromTen / 600) * 100; // 600 minuti totali (10:00-20:00)
+                            
+                            // Calcola la durata della task
+                            const cleaningTime = taskObj.cleaning_time || 60;
+                            const taskWidth = (cleaningTime / 600) * 100;
+                            
+                            // Leggi travel_time
                             let travelTime = 0;
                             if (taskObj.travel_time !== undefined && taskObj.travel_time !== null) {
                               travelTime = typeof taskObj.travel_time === 'number' 
@@ -327,27 +336,15 @@ export default function TimelineView({
                                 : parseInt(String(taskObj.travelTime), 10);
                             }
                             
-                            // Se il parsing fallisce, usa 0
                             if (isNaN(travelTime)) {
                               travelTime = 0;
                             }
 
-                            // DEBUG: log per capire cosa sta succedendo
-                            if (idx > 0) {
-                              console.log(`Task ${taskObj.task_id || taskObj.id}: travel_time=${travelTime} min`);
-                            }
-
-                            // Calcola larghezza EFFETTIVA in base ai minuti reali di travel_time
-                            // La timeline copre 600 minuti (10:00-19:00)
-                            // Se travelTime è 0, usa almeno 1 minuto per visibilità
+                            // Calcola larghezza travel time
                             const effectiveTravelMinutes = travelTime === 0 ? 1 : travelTime;
-                            const totalWidth = (effectiveTravelMinutes / 600) * 100;
+                            const travelWidth = (effectiveTravelMinutes / 600) * 100;
 
-                            // Determina gli underscore in base al travel time
-                            // < 15 min: nessun underscore
-                            // 15-29 min: _
-                            // 30-44 min: __
-                            // >= 45 min: ___
+                            // Determina gli underscore
                             let underscores = "";
                             if (travelTime >= 15 && travelTime < 30) {
                               underscores = "_";
@@ -358,13 +355,20 @@ export default function TimelineView({
                             }
 
                             return (
-                              <>
+                              <div
+                                key={task.id}
+                                className="absolute flex items-center"
+                                style={{ 
+                                  left: `${leftPosition}%`,
+                                  top: 0,
+                                  bottom: 0
+                                }}
+                              >
                                 {/* Indicatore di travel time: omino + underscore */}
-                                {idx > 0 && (
+                                {idx > 0 && travelTime > 0 && (
                                   <div 
-                                    key={`marker-${task.id}`} 
                                     className="flex items-center justify-center gap-0.5 flex-shrink-0"
-                                    style={{ width: `${totalWidth}%` }}
+                                    style={{ width: `${travelWidth}%` }}
                                     title={`Task #${taskObj.task_id || task.id} - Travel time: ${travelTime} minuti`}
                                   >
                                     <svg
@@ -384,13 +388,14 @@ export default function TimelineView({
                                   </div>
                                 )}
 
-                                <TaskCard 
-                                  key={task.id}
-                                  task={task} 
-                                  index={idx}
-                                  isInTimeline={true}
-                                />
-                              </>
+                                <div style={{ width: `${taskWidth}%` }}>
+                                  <TaskCard 
+                                    task={task} 
+                                    index={idx}
+                                    isInTimeline={true}
+                                  />
+                                </div>
+                              </div>
                             );
                           })}
                         {provided.placeholder}
