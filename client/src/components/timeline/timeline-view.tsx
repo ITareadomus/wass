@@ -388,6 +388,8 @@ export default function TimelineView({
                                   index={globalIndex}
                                   isInTimeline={true}
                                   allTasks={tasks}
+                                  availableCleaners={cleaners}
+                                  currentCleanerId={cleaner.id}
                                 />
                               </>
                             );

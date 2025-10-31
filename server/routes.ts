@@ -266,6 +266,133 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Endpoint per scambiare tutte le task tra due cleaners
+  app.post("/api/swap-cleaners-tasks", async (req, res) => {
+    try {
+      const { sourceCleanerId, destCleanerId, date } = req.body;
+      
+      if (!sourceCleanerId || !destCleanerId) {
+        return res.status(400).json({ 
+          success: false, 
+          message: "sourceCleanerId e destCleanerId sono obbligatori" 
+        });
+      }
+      
+      if (sourceCleanerId === destCleanerId) {
+        return res.status(400).json({ 
+          success: false, 
+          message: "Non puoi scambiare le task con lo stesso cleaner" 
+        });
+      }
+
+      const workDate = date || format(new Date(), 'yyyy-MM-dd');
+      const timelinePath = path.join(process.cwd(), 'client/public/data/output/timeline.json');
+
+      // Carica timeline.json
+      let timelineData: any = JSON.parse(await fs.readFile(timelinePath, 'utf8'));
+
+      // Trova entrambi i cleaners
+      const sourceEntry = timelineData.cleaners_assignments.find((c: any) => c.cleaner.id === sourceCleanerId);
+      const destEntry = timelineData.cleaners_assignments.find((c: any) => c.cleaner.id === destCleanerId);
+
+      if (!sourceEntry) {
+        return res.status(404).json({ 
+          success: false, 
+          message: `Cleaner sorgente ${sourceCleanerId} non trovato nella timeline` 
+        });
+      }
+
+      if (!destEntry) {
+        return res.status(404).json({ 
+          success: false, 
+          message: `Cleaner destinazione ${destCleanerId} non trovato nella timeline` 
+        });
+      }
+
+      // Scambia le task array
+      const sourceTasks = sourceEntry.tasks;
+      const destTasks = destEntry.tasks;
+      
+      sourceEntry.tasks = destTasks;
+      destEntry.tasks = sourceTasks;
+
+      // Marca tutte le task come manual_assignment
+      const markTasksAsManual = (tasks: any[]) => {
+        tasks.forEach((task: any) => {
+          task.reasons = task.reasons || [];
+          if (!task.reasons.includes('manual_assignment')) {
+            task.reasons.push('manual_assignment');
+          }
+          // Rimuovi eventuali reason automatiche
+          task.reasons = task.reasons.filter((r: string) => 
+            !['auto_assignment', 'early_out_assignment', 'high_priority_assignment', 'low_priority_assignment'].includes(r)
+          );
+        });
+      };
+      
+      markTasksAsManual(sourceEntry.tasks);
+      markTasksAsManual(destEntry.tasks);
+
+      // Ricalcola tempi per entrambi i cleaners
+      try {
+        if (sourceEntry.tasks.length > 0) {
+          const updatedSourceData = await recalculateCleanerTimes(sourceEntry);
+          sourceEntry.tasks = updatedSourceData.tasks;
+          console.log(`✅ Tempi ricalcolati per cleaner ${sourceCleanerId} (dopo swap)`);
+        }
+
+        if (destEntry.tasks.length > 0) {
+          const updatedDestData = await recalculateCleanerTimes(destEntry);
+          destEntry.tasks = updatedDestData.tasks;
+          console.log(`✅ Tempi ricalcolati per cleaner ${destCleanerId} (dopo swap)`);
+        }
+      } catch (pythonError: any) {
+        console.error(`⚠️ Errore nel ricalcolo dei tempi, continuo senza ricalcolare:`, pythonError.message);
+        // Fallback: ricalcola solo sequence manualmente
+        const updateSequence = (tasks: any[]) => {
+          tasks.forEach((t: any, i: number) => {
+            t.sequence = i + 1;
+            t.followup = i > 0;
+          });
+        };
+        updateSequence(sourceEntry.tasks);
+        updateSequence(destEntry.tasks);
+      }
+
+      // Rimuovi cleaner entries vuote (se dopo lo swap uno è rimasto senza task)
+      timelineData.cleaners_assignments = timelineData.cleaners_assignments.filter(
+        (c: any) => c.tasks && c.tasks.length > 0
+      );
+
+      // Aggiorna metadata
+      timelineData.metadata = timelineData.metadata || {};
+      timelineData.metadata.last_updated = new Date().toISOString();
+      timelineData.metadata.date = workDate;
+      timelineData.meta.total_cleaners = timelineData.cleaners_assignments.length;
+      timelineData.meta.total_tasks = timelineData.cleaners_assignments.reduce(
+        (sum: number, c: any) => sum + c.tasks.length, 0
+      );
+
+      // Scrittura atomica
+      const tmpPath = `${timelinePath}.tmp`;
+      await fs.writeFile(tmpPath, JSON.stringify(timelineData, null, 2));
+      await fs.rename(tmpPath, timelinePath);
+
+      console.log(`✅ Task scambiate tra cleaner ${sourceCleanerId} e cleaner ${destCleanerId}`);
+      res.json({ 
+        success: true, 
+        message: "Task scambiate con successo tra cleaners",
+        swapped: {
+          source: { cleanerId: sourceCleanerId, tasksCount: sourceEntry.tasks.length },
+          dest: { cleanerId: destCleanerId, tasksCount: destEntry.tasks.length }
+        }
+      });
+    } catch (error: any) {
+      console.error("Errore nello scambio task tra cleaners:", error);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
   // Endpoint per salvare un'assegnazione nella timeline
   app.post("/api/save-timeline-assignment", async (req, res) => {
     try {
