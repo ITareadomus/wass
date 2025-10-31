@@ -294,7 +294,7 @@ export default function TimelineView({
                         ))}
                       </div>
 
-                      {/* Task posizionate in sequenza */}
+                      {/* Task posizionate in sequenza con indicatori di travel time */}
                       <div className="relative z-10 flex items-center h-full">
                         {tasks
                           .filter((task) => (task as any).assignedCleaner === cleaner.id)
@@ -311,14 +311,42 @@ export default function TimelineView({
                             const timeB = taskB.start_time || taskB.fw_start_time || taskB.startTime || "00:00";
                             return timeA.localeCompare(timeB);
                           })
-                          .map((task, idx) => (
-                            <TaskCard 
-                              key={task.id}
-                              task={task} 
-                              index={idx}
-                              isInTimeline={true}
-                            />
-                          ))}
+                          .map((task, idx) => {
+                            const taskObj = task as any;
+                            const travelTime = taskObj.travel_time || 0;
+                            
+                            // Calcola numero di segnetti in base al travel time
+                            // 0-14 min: 1 segnetto, 15-29: 2 segnetti, 30-44: 3 segnetti, 45+: 3 segnetti
+                            let numMarkers = 1;
+                            if (travelTime >= 15 && travelTime < 30) {
+                              numMarkers = 2;
+                            } else if (travelTime >= 30) {
+                              numMarkers = 3;
+                            }
+                            
+                            return (
+                              <div key={task.id} className="flex items-center">
+                                {/* Indicatori di travel time (solo se non è la prima task) */}
+                                {idx > 0 && (
+                                  <div className="flex items-center gap-0.5 mx-1">
+                                    {Array.from({ length: numMarkers }).map((_, markerIdx) => (
+                                      <div
+                                        key={markerIdx}
+                                        className="w-1 h-6 bg-gray-400 rounded-sm opacity-60"
+                                        title={`Travel time: ${travelTime} minuti`}
+                                      />
+                                    ))}
+                                  </div>
+                                )}
+                                
+                                <TaskCard 
+                                  task={task} 
+                                  index={idx}
+                                  isInTimeline={true}
+                                />
+                              </div>
+                            );
+                          })}
                         {provided.placeholder}
                       </div>
                     </div>
