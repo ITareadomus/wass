@@ -7,14 +7,17 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { useState, useEffect } from "react";
-import { HelpCircle } from "lucide-react";
+import { HelpCircle, ChevronLeft, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface TaskCardProps {
   task: Task;
   index: number;
   isInTimeline?: boolean;
+  allTasks?: Task[];
+  currentContainer?: string;
 }
 
 interface AssignedTask {
@@ -29,9 +32,59 @@ export default function TaskCard({
   task,
   index,
   isInTimeline = false,
+  allTasks = [],
+  currentContainer = '',
 }: TaskCardProps) {
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [currentTaskIndex, setCurrentTaskIndex] = useState(index);
   const [assignmentTimes, setAssignmentTimes] = useState<{ start_time?: string; end_time?: string; travel_time?: number }>({});
+
+  // Determina le task navigabili in base al contesto
+  const getNavigableTasks = () => {
+    if (!allTasks || allTasks.length === 0) return [];
+    
+    if (isInTimeline) {
+      // In timeline: filtra per cleaner
+      const taskObj = allTasks[currentTaskIndex] as any;
+      const cleanerId = taskObj?.assignedCleaner;
+      if (!cleanerId) return allTasks;
+      
+      return allTasks.filter((t: any) => t.assignedCleaner === cleanerId);
+    } else {
+      // Nei container: ritorna tutte le task del container
+      return allTasks;
+    }
+  };
+
+  const navigableTasks = getNavigableTasks();
+  const currentTaskInNavigable = navigableTasks.findIndex(t => t.id === allTasks[currentTaskIndex]?.id);
+  
+  const canGoPrev = currentTaskInNavigable > 0;
+  const canGoNext = currentTaskInNavigable < navigableTasks.length - 1;
+
+  const handlePrevTask = () => {
+    if (!canGoPrev) return;
+    const prevTask = navigableTasks[currentTaskInNavigable - 1];
+    const prevIndex = allTasks.findIndex(t => t.id === prevTask.id);
+    setCurrentTaskIndex(prevIndex);
+  };
+
+  const handleNextTask = () => {
+    if (!canGoNext) return;
+    const nextTask = navigableTasks[currentTaskInNavigable + 1];
+    const nextIndex = allTasks.findIndex(t => t.id === nextTask.id);
+    setCurrentTaskIndex(nextIndex);
+  };
+
+  // Reset currentTaskIndex quando il modale si apre
+  useEffect(() => {
+    if (isModalOpen) {
+      setCurrentTaskIndex(index);
+    }
+  }, [isModalOpen, index]);
+
+  // Task corrente da visualizzare
+  const displayTask = allTasks[currentTaskIndex] || task;
 
   // Normalizza confirmed_operation da boolean/number/string a boolean sicuro
   const rawConfirmed = (task as any).confirmed_operation;
@@ -65,7 +118,7 @@ export default function TaskCard({
     const loadAssignmentTimes = async () => {
       try {
         // Prima controlla se i dati sono già presenti nell'oggetto task (dalla timeline)
-        const taskObj = task as any;
+        const taskObj = displayTask as any;
         if (taskObj.startTime || taskObj.start_time) {
           setAssignmentTimes({
             start_time: taskObj.start_time || taskObj.startTime,
@@ -149,7 +202,7 @@ export default function TaskCard({
     if (isModalOpen) {
       loadAssignmentTimes();
     }
-  }, [isModalOpen, task]);
+  }, [isModalOpen, displayTask, currentTaskIndex]);
 
   const handleCardClick = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -183,7 +236,7 @@ export default function TaskCard({
 
   // Verifica se end_time sfora checkin_time
   const isOverdue = (() => {
-    const taskObj = task as any;
+    const taskObj = displayTask as any;
     const endTime = assignmentTimes.end_time || taskObj.end_time || taskObj.endTime;
     const checkinTime = taskObj.checkin_time;
     
@@ -266,41 +319,69 @@ export default function TaskCard({
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
         <DialogContent className="sm:max-w-2xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              Dettagli Task #{(task as any).task_id ?? task.id}
-              <Badge
-                variant="outline"
+            <div className="flex items-center justify-between w-full">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={handlePrevTask}
+                disabled={!canGoPrev}
                 className={cn(
-                  "text-xs shrink-0",
-                  isStraordinaria
-                    ? "bg-red-500 text-white border-red-700"
-                    : isPremium
-                      ? "bg-yellow-400 text-black border-yellow-600"
-                      : "bg-green-500 text-white border-green-700"
+                  "h-8 w-8",
+                  !canGoPrev && "opacity-30 cursor-not-allowed"
                 )}
               >
-                {typeLabel}
-              </Badge>
-              {(task as any).priority && (
+                <ChevronLeft className="h-5 w-5" />
+              </Button>
+              
+              <DialogTitle className="flex items-center gap-2 flex-1 justify-center">
+                Dettagli Task #{(displayTask as any).task_id ?? displayTask.id}
                 <Badge
                   variant="outline"
                   className={cn(
                     "text-xs shrink-0",
-                    (task as any).priority === "early_out"
-                      ? "bg-blue-500 text-white border-blue-700"
-                      : (task as any).priority === "high_priority"
-                        ? "bg-orange-500 text-white border-orange-700"
-                        : "bg-gray-500 text-white border-gray-700"
+                    isStraordinaria
+                      ? "bg-red-500 text-white border-red-700"
+                      : isPremium
+                        ? "bg-yellow-400 text-black border-yellow-600"
+                        : "bg-green-500 text-white border-green-700"
                   )}
                 >
-                  {(task as any).priority === "early_out" 
-                    ? "EO" 
-                    : (task as any).priority === "high_priority" 
-                      ? "HP" 
-                      : "LP"}
+                  {typeLabel}
                 </Badge>
-              )}
-            </DialogTitle>
+                {(displayTask as any).priority && (
+                  <Badge
+                    variant="outline"
+                    className={cn(
+                      "text-xs shrink-0",
+                      (displayTask as any).priority === "early_out"
+                        ? "bg-blue-500 text-white border-blue-700"
+                        : (displayTask as any).priority === "high_priority"
+                          ? "bg-orange-500 text-white border-orange-700"
+                          : "bg-gray-500 text-white border-gray-700"
+                    )}
+                  >
+                    {(displayTask as any).priority === "early_out" 
+                      ? "EO" 
+                      : (displayTask as any).priority === "high_priority" 
+                        ? "HP" 
+                        : "LP"}
+                  </Badge>
+                )}
+              </DialogTitle>
+
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={handleNextTask}
+                disabled={!canGoNext}
+                className={cn(
+                  "h-8 w-8",
+                  !canGoNext && "opacity-30 cursor-not-allowed"
+                )}
+              >
+                <ChevronRight className="h-5 w-5" />
+              </Button>
+            </div>
           </DialogHeader>
           <div className="space-y-4">
             {/* Prima riga: Codice ADAM - Cliente */}
@@ -309,13 +390,13 @@ export default function TaskCard({
                 <p className="text-sm font-semibold text-muted-foreground">
                   Codice ADAM
                 </p>
-                <p className="text-sm">{task.name}</p>
+                <p className="text-sm">{displayTask.name}</p>
               </div>
               <div>
                 <p className="text-sm font-semibold text-muted-foreground">
                   Cliente
                 </p>
-                <p className="text-sm">{task.customer_name || "non migrato"}</p>
+                <p className="text-sm">{displayTask.customer_name || "non migrato"}</p>
               </div>
             </div>
 
@@ -325,13 +406,13 @@ export default function TaskCard({
                 <p className="text-sm font-semibold text-muted-foreground">
                   Indirizzo
                 </p>
-                <p className="text-sm">{task.address || "non migrato"}</p>
+                <p className="text-sm">{displayTask.address || "non migrato"}</p>
               </div>
               <div>
                 <p className="text-sm font-semibold text-muted-foreground">
                   Durata di pulizia
                 </p>
-                <p className="text-sm">{task.duration.replace(".", ":")} ore</p>
+                <p className="text-sm">{displayTask.duration.replace(".", ":")} ore</p>
               </div>
             </div>
 
@@ -342,15 +423,15 @@ export default function TaskCard({
                   Checkout
                 </p>
                 <p className="text-sm">
-                  {(task as any).checkout_date
-                    ? new Date((task as any).checkout_date).toLocaleDateString(
+                  {(displayTask as any).checkout_date
+                    ? new Date((displayTask as any).checkout_date).toLocaleDateString(
                         "it-IT",
                         { day: "2-digit", month: "2-digit", year: "numeric" },
                       )
                     : "non migrato"}
-                  {(task as any).checkout_date
-                    ? ((task as any).checkout_time
-                        ? ` - ${(task as any).checkout_time}`
+                  {(displayTask as any).checkout_date
+                    ? ((displayTask as any).checkout_time
+                        ? ` - ${(displayTask as any).checkout_time}`
                         : " - orario non migrato")
                     : ""}
                 </p>
@@ -360,15 +441,15 @@ export default function TaskCard({
                   Checkin
                 </p>
                 <p className="text-sm">
-                  {(task as any).checkin_date
-                    ? new Date((task as any).checkin_date).toLocaleDateString(
+                  {(displayTask as any).checkin_date
+                    ? new Date((displayTask as any).checkin_date).toLocaleDateString(
                         "it-IT",
                         { day: "2-digit", month: "2-digit", year: "numeric" },
                       )
                     : "non migrato"}
-                  {(task as any).checkin_date
-                    ? ((task as any).checkin_time
-                        ? ` - ${(task as any).checkin_time}`
+                  {(displayTask as any).checkin_date
+                    ? ((displayTask as any).checkin_time
+                        ? ` - ${(displayTask as any).checkin_time}`
                         : " - orario non migrato")
                     : ""}
                 </p>
@@ -409,14 +490,14 @@ export default function TaskCard({
                 <p className="text-sm font-semibold text-muted-foreground">
                   Tipologia appartamento
                 </p>
-                <p className="text-sm">{(task as any).type_apt ?? "non migrato"}</p>
+                <p className="text-sm">{(displayTask as any).type_apt ?? "non migrato"}</p>
               </div>
               <div>
                 <p className="text-sm font-semibold text-muted-foreground">
                   Tipologia intervento
                 </p>
                 <p className="text-sm">
-                  {!isConfirmedOperation ? "non migrato" : (task as any).operation_id ?? "-"}
+                  {!isConfirmedOperation ? "non migrato" : (displayTask as any).operation_id ?? "-"}
                 </p>
               </div>
             </div>
@@ -427,13 +508,13 @@ export default function TaskCard({
                 <p className="text-sm font-semibold text-muted-foreground">
                   Pax-In
                 </p>
-                <p className="text-sm">{(task as any).pax_in ?? "non migrato"}</p>
+                <p className="text-sm">{(displayTask as any).pax_in ?? "non migrato"}</p>
               </div>
               <div>
                 <p className="text-sm font-semibold text-muted-foreground">
                   Pax-Out
                 </p>
-                <p className="text-sm">{(task as any).pax_out ?? "non migrato"}</p>
+                <p className="text-sm">{(displayTask as any).pax_out ?? "non migrato"}</p>
               </div>
             </div>
 
