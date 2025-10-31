@@ -252,6 +252,9 @@ export default function TaskCard({
     return endMinutes > checkinMinutes;
   })();
 
+  const cardWidth = calculateWidth(task.duration, isInTimeline);
+  const backgroundColor = isOverdue ? "#FFDDDD" : "white";
+
   // Determina il chip da mostrare in base al tipo di task
   const typeChip = (() => {
     const taskObj = displayTask as any;
@@ -280,9 +283,6 @@ export default function TaskCard({
       </Badge>
     );
   })();
-
-  const cardWidth = calculateWidth(task.duration, isInTimeline);
-  const backgroundColor = isOverdue ? "#FFDDDD" : "white";
 
   return (
     <>
