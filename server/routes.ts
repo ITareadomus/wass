@@ -1945,6 +1945,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
 
+  // Endpoint per scambiare la posizione di due cleaners nella lista
+  app.post("/api/swap-cleaners", async (req, res) => {
+    try {
+      const { cleaner1Id, cleaner2Id } = req.body;
+      const cleanersPath = path.join(process.cwd(), 'client/public/data/cleaners/selected_cleaners.json');
+
+      // Carica selected_cleaners.json
+      let cleanersData = JSON.parse(await fs.readFile(cleanersPath, 'utf8'));
+
+      // Trova gli indici dei due cleaners
+      const index1 = cleanersData.cleaners.findIndex((c: any) => c.id === cleaner1Id);
+      const index2 = cleanersData.cleaners.findIndex((c: any) => c.id === cleaner2Id);
+
+      if (index1 === -1 || index2 === -1) {
+        return res.status(404).json({ success: false, message: "Uno o entrambi i cleaners non trovati" });
+      }
+
+      // Scambia le posizioni
+      [cleanersData.cleaners[index1], cleanersData.cleaners[index2]] = 
+      [cleanersData.cleaners[index2], cleanersData.cleaners[index1]];
+
+      // Salva il file aggiornato
+      await fs.writeFile(cleanersPath, JSON.stringify(cleanersData, null, 2));
+
+      console.log(`✅ Cleaners ${cleaner1Id} e ${cleaner2Id} hanno scambiato posizione`);
+      res.json({ success: true, message: "Posizioni dei cleaners scambiate con successo" });
+    } catch (error: any) {
+      console.error("Errore nello scambio di posizione dei cleaners:", error);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
   // Endpoint per riordinare le task nella timeline di un cleaner
   app.post("/api/reorder-timeline", async (req, res) => {
     try {
