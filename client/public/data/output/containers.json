@@ -1,6 +1,6 @@
 {
   "metadata": {
-    "last_updated": "2025-10-31T08:14:33.261575",
+    "last_updated": "2025-10-31T08:21:13.329027",
     "date": "2025-10-31"
   },
   "containers": {
@@ -68,14 +68,43 @@
       "count": 2
     },
     "low_priority": {
-      "tasks": [],
-      "count": 0
+      "tasks": [
+        {
+          "task_id": 218207,
+          "logistic_code": 1241,
+          "client_id": 3,
+          "premium": false,
+          "address": "Via Goldoni, 38 20129 (MI)",
+          "lat": "45.4691278",
+          "lng": "9.2138941",
+          "cleaning_time": 300,
+          "checkin_date": null,
+          "checkout_date": "2025-10-31",
+          "checkin_time": null,
+          "checkout_time": null,
+          "pax_in": 0,
+          "pax_out": 1,
+          "small_equipment": false,
+          "operation_id": 3,
+          "confirmed_operation": true,
+          "straordinaria": true,
+          "type_apt": "C",
+          "alias": "TBR",
+          "customer_name": "THE BEST RENT S.r.l.",
+          "priority": "low_priority",
+          "reasons": [
+            "not_eo",
+            "not_hp"
+          ]
+        }
+      ],
+      "count": 1
     }
   },
   "summary": {
-    "total_tasks": 2,
+    "total_tasks": 3,
     "early_out": 0,
     "high_priority": 2,
-    "low_priority": 0
+    "low_priority": 1
   }
 }
