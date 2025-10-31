@@ -42,13 +42,13 @@ export default function TaskCard({
   // Determina le task navigabili in base al contesto
   const getNavigableTasks = () => {
     if (!allTasks || allTasks.length === 0) return [];
-    
+
     if (isInTimeline) {
       // In timeline: filtra per cleaner
       const taskObj = allTasks[currentTaskIndex] as any;
       const cleanerId = taskObj?.assignedCleaner;
       if (!cleanerId) return allTasks;
-      
+
       return allTasks.filter((t: any) => t.assignedCleaner === cleanerId);
     } else {
       // Nei container: ritorna tutte le task del container
@@ -58,7 +58,7 @@ export default function TaskCard({
 
   const navigableTasks = getNavigableTasks();
   const currentTaskInNavigable = navigableTasks.findIndex(t => t.id === allTasks[currentTaskIndex]?.id);
-  
+
   const canGoPrev = currentTaskInNavigable > 0;
   const canGoNext = currentTaskInNavigable < navigableTasks.length - 1;
 
@@ -239,16 +239,16 @@ export default function TaskCard({
     const taskObj = displayTask as any;
     const endTime = assignmentTimes.end_time || taskObj.end_time || taskObj.endTime;
     const checkinTime = taskObj.checkin_time;
-    
+
     if (!endTime || !checkinTime || !isInTimeline) return false;
-    
+
     // Converti in minuti per confronto
     const [endH, endM] = endTime.split(':').map(Number);
     const [checkinH, checkinM] = checkinTime.split(':').map(Number);
-    
+
     const endMinutes = endH * 60 + endM;
     const checkinMinutes = checkinH * 60 + checkinM;
-    
+
     return endMinutes > checkinMinutes;
   })();
 
@@ -294,19 +294,19 @@ export default function TaskCard({
             <div 
               className="flex flex-col items-center justify-center h-full gap-0.5"
             >
-              <div className="flex items-center gap-1">
+              <div className="flex items-center gap-1.5">
                 <span
-                  className="font-medium text-[10px] leading-none"
+                  className="font-bold text-[15px] leading-none text-black"
                   data-testid={`task-name-${task.id}`}
                 >
                   {task.name}
                 </span>
-                <span className="text-[8px] opacity-60 leading-none">
+                <span className="text-[13px] opacity-60 leading-none">
                   ({task.duration.replace(".", ":")}h)
                 </span>
               </div>
               {task.alias && (
-                <span className="text-[8px] opacity-70 leading-none">
+                <span className="text-[13px] opacity-70 leading-none">
                   {task.alias}{(task as any).type_apt ? ` (${(task as any).type_apt})` : ''}
                 </span>
               )}
@@ -332,7 +332,7 @@ export default function TaskCard({
               >
                 <ChevronLeft className="h-5 w-5" />
               </Button>
-              
+
               <DialogTitle className="flex items-center gap-2 flex-1 justify-center">
                 Dettagli Task #{(displayTask as any).task_id ?? displayTask.id}
                 <Badge
