@@ -1,6 +1,6 @@
 {
   "metadata": {
-    "last_updated": "2025-10-31T08:27:35.472706",
+    "last_updated": "2025-10-31T08:58:40.874Z",
     "date": "2025-10-31"
   },
   "cleaners_assignments": [
@@ -77,7 +77,7 @@
           "priority": "high_priority",
           "start_time": "11:19",
           "end_time": "12:19",
-          "followup": false,
+          "followup": true,
           "sequence": 2,
           "travel_time": 19,
           "is_straordinaria": false
@@ -110,9 +110,9 @@
             "not_hp",
             "automatic_assignment_lp"
           ],
-          "start_time": "12:26",
-          "end_time": "14:26",
-          "followup": false,
+          "start_time": "12:27",
+          "end_time": "14:27",
+          "followup": true,
           "sequence": 3,
           "travel_time": 8,
           "is_straordinaria": false
@@ -145,11 +145,11 @@
             "not_hp",
             "automatic_assignment_lp"
           ],
-          "start_time": "14:30",
-          "end_time": "16:00",
+          "start_time": "14:33",
+          "end_time": "16:03",
           "followup": true,
           "sequence": 4,
-          "travel_time": 4,
+          "travel_time": 6,
           "is_straordinaria": false
         }
       ]
@@ -1250,7 +1250,7 @@
   ],
   "meta": {
     "total_cleaners": 13,
-    "total_tasks": 0,
+    "total_tasks": 32,
     "used_cleaners": 13,
     "assigned_tasks": 32
   }
