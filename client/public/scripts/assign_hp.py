@@ -210,7 +210,7 @@ def evaluate_route(cleaner: Cleaner, route: List[Task]) -> Tuple[bool, List[Tupl
     # Primo task HP
     first = route[0]
 
-    # Calcola l'arrivo al primo task
+    # Calcola l'orario base da cui il cleaner può partire
     base = cleaner.start_time
     if cleaner.available_from:
         base = max(base, cleaner.available_from)
@@ -223,16 +223,28 @@ def evaluate_route(cleaner: Cleaner, route: List[Task]) -> Tuple[bool, List[Tupl
         arrival = base + timedelta(minutes=tt)
     else:
         # Nessuna task EO precedente: il cleaner può iniziare dal suo start_time
-        # (o dall'orario disponibile se ha avuto HP precedenti)
         arrival = base
 
     # Orario massimo di fine task: 19:00
     max_end_time = datetime(arrival.year, arrival.month, arrival.day, 19, 0)
 
-    # HP: Considera SOLO il checkout (se presente) come vincolo
-    # Se il cleaner è libero (senza EO o con EO finite) e il checkout lo permette, può iniziare quando vuole
+    # NUOVA LOGICA: HP può iniziare prima delle 11:00 se:
+    # 1. Il cleaner è libero (arrival < 11:00)
+    # 2. Il checkout lo permette
+    hp_hard_earliest = datetime(arrival.year, arrival.month, arrival.day, HP_HARD_EARLIEST_H, HP_HARD_EARLIEST_M)
+    
+    # Se il cleaner è libero prima delle 11:00, può iniziare prima (rispettando il checkout)
     if first.checkout_dt:
+        # Rispetta il checkout, ma può iniziare prima delle 11:00 se libero
         arrival = max(arrival, first.checkout_dt)
+    else:
+        # Nessun checkout: applica vincolo HP hard earliest solo se non è libero prima
+        if arrival < hp_hard_earliest:
+            # Cleaner libero prima delle 11:00: può iniziare subito
+            arrival = arrival
+        else:
+            # Cleaner non libero prima delle 11:00: applica vincolo
+            arrival = max(arrival, hp_hard_earliest)
 
     start = arrival
     finish = start + timedelta(minutes=first.cleaning_time)
