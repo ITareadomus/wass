@@ -62,6 +62,8 @@ class Task:
     lng: float
     cleaning_time: int
     is_premium: bool
+    checkin_dt: Optional[datetime] = None
+    checkout_dt: Optional[datetime] = None
     apt_type: Optional[str] = None
     address: Optional[str] = None
     alias: Optional[str] = None
@@ -221,6 +223,12 @@ def evaluate_route(cleaner: Cleaner, route: List[Task]) -> Tuple[bool, List[Tupl
     start = arrival
     finish = start + first.cleaning_time
 
+    # NUOVO: Check-in strict - deve finire prima del check-in
+    if hasattr(first, 'checkin_dt') and first.checkin_dt:
+        checkin_minutes = first.checkin_dt.hour * 60 + first.checkin_dt.minute
+        if finish > checkin_minutes:
+            return False, []
+
     # Vincolo orario: nessuna task deve finire dopo le 19:00
     if finish > MAX_END_TIME:
         return False, []
@@ -237,6 +245,12 @@ def evaluate_route(cleaner: Cleaner, route: List[Task]) -> Tuple[bool, List[Tupl
         arrival = cur
         start = cur
         finish = start + t.cleaning_time
+
+        # NUOVO: Check-in strict - deve finire prima del check-in
+        if hasattr(t, 'checkin_dt') and t.checkin_dt:
+            checkin_minutes = t.checkin_dt.hour * 60 + t.checkin_dt.minute
+            if finish > checkin_minutes:
+                return False, []
 
         # Vincolo orario: nessuna task deve finire dopo le 19:00
         if finish > MAX_END_TIME:
@@ -502,6 +516,26 @@ def load_tasks() -> List[Task]:
     data = json.loads(INPUT_CONTAINERS.read_text(encoding="utf-8"))
     tasks: List[Task] = []
     for t in data.get("containers", {}).get("low_priority", {}).get("tasks", []):
+        # Parse checkin e checkout datetime
+        checkin_dt = None
+        checkout_dt = None
+        
+        checkin_date = t.get("checkin_date")
+        checkin_time = t.get("checkin_time")
+        if checkin_date and checkin_time:
+            try:
+                checkin_dt = datetime.strptime(f"{checkin_date} {checkin_time}", "%Y-%m-%d %H:%M")
+            except:
+                pass
+        
+        checkout_date = t.get("checkout_date")
+        checkout_time = t.get("checkout_time")
+        if checkout_date and checkout_time:
+            try:
+                checkout_dt = datetime.strptime(f"{checkout_date} {checkout_time}", "%Y-%m-%d %H:%M")
+            except:
+                pass
+        
         tasks.append(
             Task(
                 task_id=str(t.get("task_id")),
@@ -510,6 +544,8 @@ def load_tasks() -> List[Task]:
                 lng=float(t.get("lng")),
                 cleaning_time=int(t.get("cleaning_time") or 60),
                 is_premium=bool(t.get("premium", False)),
+                checkin_dt=checkin_dt,
+                checkout_dt=checkout_dt,
                 apt_type=t.get("type_apt"),
                 address=t.get("address"),
                 alias=t.get("alias"),
@@ -782,9 +818,10 @@ def build_output(cleaners: List[Cleaner], unassigned: List[Task], original_tasks
                 "5. Favorisce cleaners con meno task totali (per rispettare limite 4)",
                 "6. Straordinarie solo a premium cleaner, devono essere la prima task",
                 "7. Premium task solo a premium cleaner",
-                "8. Vincolo orario: nessuna task deve finire dopo le 19:00",
-                "9. Seed da EO e HP: disponibilità e posizione dall'ultima task",
-                "10. FORMATORE: solo task type_apt A o B, massimo 2 task LP al giorno"
+                "8. Check-in strict: deve finire prima del check-in time (INFRANGIBILE)",
+                "9. Vincolo orario: nessuna task deve finire dopo le 19:00",
+                "10. Seed da EO e HP: disponibilità e posizione dall'ultima task",
+                "11. FORMATORE: solo task type_apt A o B, massimo 2 task LP al giorno"
             ]
         }
     }
