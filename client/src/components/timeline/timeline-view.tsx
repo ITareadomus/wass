@@ -325,10 +325,10 @@ export default function TimelineView({
                             }
                             
                             return (
-                              <div key={task.id} className="flex items-center">
+                              <>
                                 {/* Indicatori di travel time (solo se non è la prima task) */}
                                 {idx > 0 && (
-                                  <div className="flex items-center gap-0.5 mx-1">
+                                  <div key={`marker-${task.id}`} className="flex items-center gap-0.5 mx-1 flex-shrink-0">
                                     {Array.from({ length: numMarkers }).map((_, markerIdx) => (
                                       <div
                                         key={markerIdx}
@@ -340,11 +340,12 @@ export default function TimelineView({
                                 )}
                                 
                                 <TaskCard 
+                                  key={task.id}
                                   task={task} 
                                   index={idx}
                                   isInTimeline={true}
                                 />
-                              </div>
+                              </>
                             );
                           })}
                         {provided.placeholder}
