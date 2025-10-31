@@ -323,20 +323,19 @@ export default function TimelineView({
                               }
                               if (isNaN(travelTime)) travelTime = 0;
                               
-                              // Calcola larghezza minima visibile (almeno 30px)
-                              const widthPercent = (travelTime / 600) * 100;
-                              const minWidthPx = 30; // Larghezza minima in pixel
+                              // Calcola larghezza proporzionale al travel_time
+                              // Se travel_time è 0, usa 1 minuto per avere comunque un indicatore minimo
+                              const effectiveTravelTime = travelTime === 0 ? 1 : travelTime;
+                              const widthPercent = (effectiveTravelTime / 600) * 100;
                               
-                              // Omino come div semplice (non trascinabile)
+                              // Omino come div semplice (non trascinabile) con tooltip
                               elements.push(
                                 <div
                                   key={`travel-${task.id}`}
-                                  className="flex items-center justify-center flex-shrink-0 px-1"
+                                  className="flex items-center justify-center flex-shrink-0 px-1 relative group"
                                   style={{
-                                    minWidth: `${minWidthPx}px`,
-                                    width: `max(${minWidthPx}px, ${widthPercent}%)`,
+                                    width: `${widthPercent}%`,
                                   }}
-                                  title={`Tempo di viaggio: ${travelTime} min`}
                                 >
                                   <svg
                                     width="20"
@@ -347,6 +346,9 @@ export default function TimelineView({
                                   >
                                     <path d="M13.5 5.5c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zM9.8 8.9L7 23h2.1l1.8-8 2.1 2v6h2v-7.5l-2.1-2 .6-3C14.8 12 16.8 13 19 13v-2c-1.9 0-3.5-1-4.3-2.4l-1-1.6c-.4-.6-1-1-1.7-1-.3 0-.5.1-.8.1L6 8.3V13h2V9.6l1.8-.7"/>
                                   </svg>
+                                  <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 bg-gray-900 text-white text-xs rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
+                                    Tempo di viaggio: {travelTime} min
+                                  </div>
                                 </div>
                               );
                             }
