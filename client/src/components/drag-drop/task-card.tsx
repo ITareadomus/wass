@@ -18,6 +18,8 @@ interface TaskCardProps {
   isInTimeline?: boolean;
   allTasks?: Task[];
   currentContainer?: string;
+  showTravelIndicator?: boolean;
+  travelTime?: number;
 }
 
 interface AssignedTask {
@@ -34,6 +36,8 @@ export default function TaskCard({
   isInTimeline = false,
   allTasks = [],
   currentContainer = '',
+  showTravelIndicator = false,
+  travelTime = 0,
 }: TaskCardProps) {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [currentTaskIndex, setCurrentTaskIndex] = useState(index);
@@ -258,6 +262,9 @@ export default function TaskCard({
         {(provided, snapshot) => {
           const cardWidth = calculateWidth(task.duration, isInTimeline);
 
+          const effectiveTravelMinutes = travelTime === 0 ? 1 : travelTime;
+          const travelWidth = `${(effectiveTravelMinutes / 600) * 100}%`;
+
           return (
             <div
               ref={provided.innerRef}
@@ -283,6 +290,24 @@ export default function TaskCard({
                 }
               }}
             >
+            {/* Indicatore di travel time - posizionato a sinistra */}
+            {showTravelIndicator && (
+              <div 
+                className="absolute -left-5 top-1/2 -translate-y-1/2 flex items-center justify-center"
+                title={`Tempo di viaggio: ${travelTime} min`}
+              >
+                <svg
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="currentColor"
+                  className="text-gray-600 dark:text-gray-400"
+                >
+                  <path d="M13.5 5.5c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zM9.8 8.9L7 23h2.1l1.8-8 2.1 2v6h2v-7.5l-2.1-2 .6-3C14.8 12 16.8 13 19 13v-2c-1.9 0-3.5-1-4.3-2.4l-1-1.6c-.4-.6-1-1-1.7-1-.3 0-.5.1-.8.1L6 8.3V13h2V9.6l1.8-.7"/>
+                </svg>
+              </div>
+            )}
+            
             {!isConfirmedOperation && (
               <div className="absolute top-0.5 right-0.5 z-50">
                 <HelpCircle
@@ -311,7 +336,7 @@ export default function TaskCard({
                 </span>
               )}
             </div>
-          </div>
+            </div>
             );
           }}
       </Draggable>
