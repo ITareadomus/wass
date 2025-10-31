@@ -296,7 +296,7 @@ export default function TaskCard({
               >
                 <div className="flex items-center gap-1">
                   <span
-                    className="text-black text-[13px] font-semibold"
+                    className="text-[13px] text-[#ff0000] font-extrabold"
                     data-testid={`task-name-${task.id}`}
                   >
                     {task.name}
