@@ -362,7 +362,7 @@ export default function TimelineView({
                                 key={task.id}
                                 className="absolute flex items-center"
                                 style={{ 
-                                  left: `${leftPosition}%`,
+                                  left: idx > 0 ? `${travelLeftPosition}%` : `${leftPosition}%`,
                                   top: 0,
                                   bottom: 0
                                 }}
@@ -371,11 +371,7 @@ export default function TimelineView({
                                 {idx > 0 && travelTime > 0 && (
                                   <div 
                                     className="flex items-center justify-center gap-0.5 flex-shrink-0"
-                                    style={{ 
-                                      width: `${travelWidth}%`,
-                                      position: 'absolute',
-                                      right: '100%'
-                                    }}
+                                    style={{ width: `${travelWidth}%` }}
                                     title={`Task #${taskObj.task_id || task.id} - Travel time: ${travelTime} minuti`}
                                   >
                                     <svg
