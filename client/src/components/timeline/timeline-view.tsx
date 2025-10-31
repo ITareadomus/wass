@@ -337,23 +337,23 @@ export default function TimelineView({
                               console.log(`Task ${taskObj.task_id || taskObj.id}: travel_time=${travelTime} min`);
                             }
 
-                            // Calcola i puntini in base al travel time
-                            // 0-15 min: "..." (larghezza: 15 min)
-                            // 16-30 min: "......" (larghezza: 30 min)
-                            // >30 min: "........." (larghezza: 45 min)
+                            // Calcola i puntini in base al travel time (solo visivo)
+                            // 0-15 min: "..."
+                            // 16-30 min: "......"
+                            // >30 min: "........."
                             let dots = "...";
-                            let widthMinutes = 15;
 
                             if (travelTime > 15 && travelTime <= 30) {
                               dots = "......";
-                              widthMinutes = 30;
                             } else if (travelTime > 30) {
                               dots = ".........";
-                              widthMinutes = 45;
                             }
 
-                            // Calcola larghezza: la timeline copre 600 minuti (10:00-19:00)
-                            const totalWidth = (widthMinutes / 600) * 100;
+                            // Calcola larghezza EFFETTIVA in base ai minuti reali di travel_time
+                            // La timeline copre 600 minuti (10:00-19:00)
+                            // Se travelTime è 0, usa almeno 1 minuto per visibilità
+                            const effectiveTravelMinutes = travelTime === 0 ? 1 : travelTime;
+                            const totalWidth = (effectiveTravelMinutes / 600) * 100;
 
                             return (
                               <>
