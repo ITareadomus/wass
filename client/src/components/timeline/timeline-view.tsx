@@ -52,6 +52,7 @@ export default function TimelineView({
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedSwapCleaner, setSelectedSwapCleaner] = useState<string>("");
   const [filteredCleanerId, setFilteredCleanerId] = useState<number | null>(null);
+  const [clickTimer, setClickTimer] = useState<NodeJS.Timeout | null>(null);
   const { toast } = useToast();
 
   // Mutation per scambiare task tra cleaners
@@ -206,31 +207,40 @@ export default function TimelineView({
     loadCleaners();
   }, []);
 
-  const handleCleanerClick = (cleaner: Cleaner) => {
-    setSelectedCleaner(cleaner);
-    setIsModalOpen(true);
-  };
-
-  const handleCleanerDoubleClick = (cleanerId: number, e: React.MouseEvent) => {
-    e.stopPropagation();
+  const handleCleanerClick = (cleaner: Cleaner, e: React.MouseEvent) => {
+    e.preventDefault();
     
-    // Se è già selezionato questo cleaner, rimuovi il filtro
-    if (filteredCleanerId === cleanerId) {
-      setFilteredCleanerId(null);
-      (window as any).mapFilteredCleanerId = null;
-      toast({
-        title: "Filtro rimosso",
-        description: "Ora visualizzi tutti gli appartamenti sulla mappa",
-      });
+    // Se c'è già un timer attivo, è un doppio click
+    if (clickTimer) {
+      clearTimeout(clickTimer);
+      setClickTimer(null);
+      
+      // Gestione doppio click: filtro mappa
+      if (filteredCleanerId === cleaner.id) {
+        setFilteredCleanerId(null);
+        (window as any).mapFilteredCleanerId = null;
+        toast({
+          title: "Filtro rimosso",
+          description: "Ora visualizzi tutti gli appartamenti sulla mappa",
+        });
+      } else {
+        setFilteredCleanerId(cleaner.id);
+        (window as any).mapFilteredCleanerId = cleaner.id;
+        toast({
+          title: "Filtro attivato",
+          description: `Visualizzi solo gli appartamenti di ${cleaner.name} ${cleaner.lastname}`,
+        });
+      }
     } else {
-      // Altrimenti imposta il filtro su questo cleaner
-      setFilteredCleanerId(cleanerId);
-      (window as any).mapFilteredCleanerId = cleanerId;
-      const cleaner = cleaners.find(c => c.id === cleanerId);
-      toast({
-        title: "Filtro attivato",
-        description: `Visualizzi solo gli appartamenti di ${cleaner?.name} ${cleaner?.lastname}`,
-      });
+      // Primo click: avvia timer
+      const timer = setTimeout(() => {
+        // Singolo click: apri modal
+        setSelectedCleaner(cleaner);
+        setIsModalOpen(true);
+        setClickTimer(null);
+      }, 250); // 250ms per distinguere singolo da doppio click
+      
+      setClickTimer(timer);
     }
   };
 
@@ -360,9 +370,8 @@ export default function TimelineView({
                     color: color.text,
                     boxShadow: filteredCleanerId === cleaner.id ? '0 0 0 3px rgba(59, 130, 246, 0.5)' : 'none'
                   }}
-                  onClick={() => handleCleanerClick(cleaner)}
-                  onDoubleClick={(e) => handleCleanerDoubleClick(cleaner.id, e)}
-                  title="Doppio click per filtrare sulla mappa"
+                  onClick={(e) => handleCleanerClick(cleaner, e)}
+                  title="Click: dettagli | Doppio click: filtra mappa"
                 >
                   <div className="w-full">
                     <div className="break-words font-bold text-[13px]">
