@@ -1,4 +1,3 @@
-replit_final_file>
 import { DragDropContext, DropResult } from "react-beautiful-dnd";
 import { TaskType as Task } from "@shared/schema";
 import PriorityColumn from "@/components/drag-drop/priority-column";
@@ -6,7 +5,7 @@ import TimelineView from "@/components/timeline/timeline-view";
 import MapSection from "@/components/map/map-section";
 import { useState, useEffect } from "react";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { CalendarIcon, Users } from "lucide-react";
+import { CalendarIcon } from "lucide-react";
 import { format } from "date-fns";
 import { it } from "date-fns/locale";
 import { Calendar } from "@/components/ui/calendar";
@@ -14,7 +13,6 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
-import { useLocation } from "react-router-dom";
 
 interface RawTask {
   task_id: number;
@@ -85,7 +83,6 @@ export default function GenerateAssignments() {
   const [isLoadingTasks, setIsLoadingTasks] = useState(false);
   const [isConfirming, setIsConfirming] = useState(false);
   const { toast } = useToast();
-  const [, setLocation] = useLocation();
 
   // Funzione per estrarre i dati dal backend
   const extractData = async (date: Date) => {
@@ -190,7 +187,7 @@ export default function GenerateAssignments() {
       // Aggiungi timestamp UNIVOCO per evitare QUALSIASI cache
       const timestamp = Date.now() + Math.random();
 
-      console.log("🔄 Caricamento task dai file JSON (timestamp: ${timestamp})...");
+      console.log(`🔄 Caricamento task dai file JSON (timestamp: ${timestamp})...`);
 
       const [containersResponse, timelineResponse] = await Promise.all([
         fetch(`/data/output/containers.json?t=${timestamp}`, {
@@ -339,7 +336,7 @@ export default function GenerateAssignments() {
           };
 
           console.log(`➕ Aggiungendo task ${logisticCode} dalla timeline a cleaner ${timelineAssignment.cleanerId} con sequence ${timelineAssignment.sequence}`);
-
+          
           // IMPORTANTE: Assicurati che assignedCleaner sia propagato correttamente
           const taskWithAssignment = {
             ...baseTask,
@@ -369,7 +366,7 @@ export default function GenerateAssignments() {
             operation_id: timelineAssignment.operation_id,
             alias: timelineAssignment.alias,
           } as any;
-
+          
           tasksWithAssignments.push(taskWithAssignment);
         }
       }
@@ -378,7 +375,7 @@ export default function GenerateAssignments() {
       console.log(`   - Task totali: ${tasksWithAssignments.length}`);
       console.log(`   - Task assegnate: ${tasksWithAssignments.filter(t => (t as any).assignedCleaner).length}`);
       console.log(`   - Task nei containers: ${tasksWithAssignments.filter(t => !(t as any).assignedCleaner).length}`);
-
+      
       // Debug: mostra alcune task assegnate
       const assignedTasks = tasksWithAssignments.filter(t => (t as any).assignedCleaner);
       if (assignedTasks.length > 0) {
@@ -503,10 +500,10 @@ export default function GenerateAssignments() {
       const month = String(selectedDate.getMonth() + 1).padStart(2, '0');
       const day = String(selectedDate.getDate()).padStart(2, '0');
       const dateStr = `${year}-${month}-${day}`;
-
+      
       console.log(`📅 Assegnazione EO per data: ${dateStr}`);
       console.log(`📅 selectedDate oggetto:`, selectedDate);
-
+      
       const response = await fetch('/api/assign-early-out-to-timeline', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -546,10 +543,10 @@ export default function GenerateAssignments() {
       const month = String(selectedDate.getMonth() + 1).padStart(2, '0');
       const day = String(selectedDate.getDate()).padStart(2, '0');
       const dateStr = `${year}-${month}-${day}`;
-
+      
       console.log(`📅 Assegnazione HP per data: ${dateStr}`);
       console.log(`📅 selectedDate oggetto:`, selectedDate);
-
+      
       const response = await fetch('/api/assign-high-priority-to-timeline', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -593,10 +590,10 @@ export default function GenerateAssignments() {
       const month = String(selectedDate.getMonth() + 1).padStart(2, '0');
       const day = String(selectedDate.getDate()).padStart(2, '0');
       const dateStr = `${year}-${month}-${day}`;
-
+      
       console.log(`📅 Assegnazione LP per data: ${dateStr}`);
       console.log(`📅 selectedDate oggetto:`, selectedDate);
-
+      
       const response = await fetch('/api/assign-low-priority-to-timeline', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -769,14 +766,14 @@ export default function GenerateAssignments() {
           // Reorder nella stessa timeline
           console.log(`🔄 Reorder task ${logisticCode} nella timeline del cleaner ${sourceCleanerId} da posizione ${source.index} a ${destination.index}`);
           await reorderTimelineAssignment(taskId, sourceCleanerId, logisticCode || '', source.index, destination.index);
-
+          
           // Ricarica immediatamente per mostrare il nuovo ordine
           await loadTasks(true);
           return;
         } else {
           // Spostamento tra cleaners diversi
           console.log(`🔄 Spostamento task ${logisticCode} da cleaner ${sourceCleanerId} a cleaner ${destCleanerId}`);
-
+          
           const dateStr = format(selectedDate, "yyyy-MM-dd");
           const response = await fetch('/api/move-task-between-cleaners', {
             method: 'POST',
@@ -790,11 +787,11 @@ export default function GenerateAssignments() {
               date: dateStr 
             }),
           });
-
+          
           if (!response.ok) {
             throw new Error('Errore nello spostamento tra cleaners');
           }
-
+          
           // Ricarica immediatamente per mostrare il nuovo ordine
           await loadTasks(true);
           return;
@@ -923,58 +920,47 @@ export default function GenerateAssignments() {
             </span>
           </h1>
           <div className="flex items-center gap-3">
-            {/* Selettore Data e Dark Mode Toggle */}
-            <div className="flex items-center gap-3">
-              <Button
-                variant="outline"
-                onClick={() => setLocation('/convocazioni')}
-                className="flex items-center gap-2"
-              >
-                <Users className="w-4 h-4" />
-                Convocazioni
-              </Button>
-              <ThemeToggle />
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    className={cn(
-                      "w-[240px] justify-start text-left font-normal",
-                      !selectedDate && "text-muted-foreground"
-                    )}
-                  >
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {selectedDate ? format(selectedDate, "PPP", { locale: it }) : <span>Seleziona data</span>}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="end">
-                  <Calendar
-                    mode="single"
-                    selected={selectedDate}
-                    onSelect={(date) => date && setSelectedDate(date)}
-                    initialFocus
-                    locale={it}
-                  />
-                </PopoverContent>
-              </Popover>
-              <Button
-                onClick={confirmAssignments}
-                disabled={isConfirming || allTasksWithAssignments.filter(t => (t as any).assignedCleaner).length === 0}
-                className="bg-green-600 hover:bg-green-700 text-white"
-              >
-                {isConfirming ? (
-                  <>
-                    <span className="animate-spin mr-2">⏳</span>
-                    Salvando...
-                  </>
-                ) : (
-                  '✓ Conferma Assegnazioni'
-                )}
-              </Button>
-              <div className="bg-card rounded-lg border shadow-sm px-4 py-2 text-center">
-                <div className="text-sm text-muted-foreground">Task Totali</div>
-                <div className="text-2xl font-bold text-primary">{allTasks.length}</div>
-              </div>
+            <ThemeToggle />
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  className={cn(
+                    "w-[240px] justify-start text-left font-normal",
+                    !selectedDate && "text-muted-foreground"
+                  )}
+                >
+                  <CalendarIcon className="mr-2 h-4 w-4" />
+                  {selectedDate ? format(selectedDate, "PPP", { locale: it }) : <span>Seleziona data</span>}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="end">
+                <Calendar
+                  mode="single"
+                  selected={selectedDate}
+                  onSelect={(date) => date && setSelectedDate(date)}
+                  initialFocus
+                  locale={it}
+                />
+              </PopoverContent>
+            </Popover>
+            <Button
+              onClick={confirmAssignments}
+              disabled={isConfirming || allTasksWithAssignments.filter(t => (t as any).assignedCleaner).length === 0}
+              className="bg-green-600 hover:bg-green-700 text-white"
+            >
+              {isConfirming ? (
+                <>
+                  <span className="animate-spin mr-2">⏳</span>
+                  Salvando...
+                </>
+              ) : (
+                '✓ Conferma Assegnazioni'
+              )}
+            </Button>
+            <div className="bg-card rounded-lg border shadow-sm px-4 py-2 text-center">
+              <div className="text-sm text-muted-foreground">Task Totali</div>
+              <div className="text-2xl font-bold text-primary">{allTasks.length}</div>
             </div>
           </div>
         </div>
@@ -1022,4 +1008,3 @@ export default function GenerateAssignments() {
     </div>
   );
 }
-</replit_final_file>
