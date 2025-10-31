@@ -650,28 +650,47 @@ export async function registerRoutes(app: Express): Promise<Server> {
       await fs.writeFile(tmpPath, JSON.stringify(timelineData, null, 2));
       await fs.rename(tmpPath, timelinePath);
 
-      // RIMUOVI la task da containers.json se trovata originariamente lì
-      if (sourceContainerType && containersData && containersData.containers?.[sourceContainerType]?.tasks) {
+      // RIMUOVI SEMPRE la task da containers.json quando salvata in timeline
+      if (containersData && containersData.containers) {
         try {
-          const container = containersData.containers[sourceContainerType];
-          const originalCount = container.tasks.length;
-          container.tasks = container.tasks.filter((t: any) => 
-            String(t.task_id) !== normalizedTaskId && 
-            String(t.logistic_code) !== normalizedLogisticCode
-          );
-          const newCount = container.tasks.length;
+          let taskRemoved = false;
+          
+          // Cerca in tutti i container
+          for (const [containerType, container] of Object.entries(containersData.containers)) {
+            const containerObj = container as any;
+            if (!containerObj.tasks) continue;
+            
+            const originalCount = containerObj.tasks.length;
+            containerObj.tasks = containerObj.tasks.filter((t: any) => 
+              String(t.task_id) !== normalizedTaskId && 
+              String(t.logistic_code) !== normalizedLogisticCode
+            );
+            const newCount = containerObj.tasks.length;
 
-          if (originalCount > newCount) {
-            container.count = newCount;
-            // Aggiorna summary se esiste
+            if (originalCount > newCount) {
+              containerObj.count = newCount;
+              taskRemoved = true;
+              console.log(`✅ Task ${normalizedLogisticCode} rimossa da ${containerType}`);
+            }
+          }
+
+          if (taskRemoved) {
+            // Aggiorna summary
             if (containersData.summary) {
-              containersData.summary[sourceContainerType] = newCount;
-              containersData.summary.total_tasks = (containersData.summary.total_tasks || 0) - (originalCount - newCount);
+              containersData.summary.early_out = containersData.containers.early_out?.count || 0;
+              containersData.summary.high_priority = containersData.containers.high_priority?.count || 0;
+              containersData.summary.low_priority = containersData.containers.low_priority?.count || 0;
+              containersData.summary.total_tasks = 
+                containersData.summary.early_out + 
+                containersData.summary.high_priority + 
+                containersData.summary.low_priority;
             }
 
-            // Salva containers.json aggiornato
-            await fs.writeFile(containersPath, JSON.stringify(containersData, null, 2));
-            console.log(`✅ Containers.json aggiornato, task rimossa da ${sourceContainerType}`);
+            // Salva containers.json aggiornato in modo atomico
+            const tmpContainersPath = `${containersPath}.tmp`;
+            await fs.writeFile(tmpContainersPath, JSON.stringify(containersData, null, 2));
+            await fs.rename(tmpContainersPath, containersPath);
+            console.log(`✅ Containers.json aggiornato e sincronizzato con timeline`);
           }
         } catch (containerError) {
           console.warn('Errore nella rimozione da containers.json:', containerError);
@@ -695,6 +714,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { taskId, logisticCode, date } = req.body;
       const workDate = date || format(new Date(), 'yyyy-MM-dd');
       const timelinePath = path.join(process.cwd(), 'client/public/data/output/timeline.json');
+      const containersPath = path.join(process.cwd(), 'client/public/data/output/containers.json');
 
       console.log(`Rimozione assegnazione timeline - taskId: ${taskId}, logisticCode: ${logisticCode}, date: ${workDate}`);
 
@@ -708,7 +728,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       let removedCount = 0;
-      const initialTaskCount = assignmentsData.cleaners_assignments.reduce((sum: number, cleaner: any) => sum + (cleaner.tasks?.length || 0), 0);
+      let removedTask: any = null;
 
       // Rimuovi l'assegnazione per questo task da tutti i cleaner
       assignmentsData.cleaners_assignments = assignmentsData.cleaners_assignments.map((cleanerEntry: any) => {
@@ -717,6 +737,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           (t: any) => {
             const matchCode = String(t.logistic_code) === String(logisticCode);
             const matchId = String(t.task_id) === String(taskId);
+            if (matchCode || matchId) {
+              removedTask = t; // Salva la task rimossa
+            }
             return !matchCode && !matchId;
           }
         );
@@ -735,8 +758,59 @@ export async function registerRoutes(app: Express): Promise<Server> {
         (sum: number, c: any) => sum + c.tasks.length, 0
       );
 
-      // Salva il file
+      // Salva timeline
       await fs.writeFile(timelinePath, JSON.stringify(assignmentsData, null, 2));
+
+      // RIPORTA la task nel container corretto
+      if (removedTask) {
+        try {
+          const containersData = JSON.parse(await fs.readFile(containersPath, 'utf8'));
+          
+          // Determina il container corretto in base alla priority della task
+          const priority = removedTask.priority || 'low_priority';
+          const containerType = priority === 'early_out' ? 'early_out' 
+            : priority === 'high_priority' ? 'high_priority' 
+            : 'low_priority';
+
+          // Rimuovi campi specifici della timeline
+          delete removedTask.start_time;
+          delete removedTask.end_time;
+          delete removedTask.travel_time;
+          delete removedTask.sequence;
+          delete removedTask.followup;
+
+          // Filtra reasons automatiche
+          if (removedTask.reasons) {
+            removedTask.reasons = removedTask.reasons.filter((r: string) => 
+              !['automatic_assignment_eo', 'automatic_assignment_hp', 'automatic_assignment_lp', 'manual_assignment'].includes(r)
+            );
+          }
+
+          // Aggiungi al container
+          if (!containersData.containers[containerType].tasks) {
+            containersData.containers[containerType].tasks = [];
+          }
+          containersData.containers[containerType].tasks.push(removedTask);
+          containersData.containers[containerType].count = containersData.containers[containerType].tasks.length;
+
+          // Aggiorna summary
+          if (containersData.summary) {
+            containersData.summary.early_out = containersData.containers.early_out?.count || 0;
+            containersData.summary.high_priority = containersData.containers.high_priority?.count || 0;
+            containersData.summary.low_priority = containersData.containers.low_priority?.count || 0;
+            containersData.summary.total_tasks = 
+              containersData.summary.early_out + 
+              containersData.summary.high_priority + 
+              containersData.summary.low_priority;
+          }
+
+          // Salva containers.json
+          await fs.writeFile(containersPath, JSON.stringify(containersData, null, 2));
+          console.log(`✅ Task ${logisticCode} riportata nel container ${containerType}`);
+        } catch (containerError) {
+          console.warn('Errore nel ripristino del container:', containerError);
+        }
+      }
 
       res.json({ success: true, message: "Assegnazione rimossa dalla timeline con successo" });
     } catch (error: any) {
