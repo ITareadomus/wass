@@ -67,9 +67,12 @@ export default function TimelineView({
       });
       return await response.json();
     },
-    onSuccess: () => {
-      // Invalida cache per ricaricare le assegnazioni
-      queryClient.invalidateQueries({ queryKey: ["/api/timeline-assignments"] });
+    onSuccess: async () => {
+      // Ricarica i task per mostrare immediatamente lo swap
+      if ((window as any).reloadAllTasks) {
+        await (window as any).reloadAllTasks();
+      }
+      
       toast({
         title: "Successo",
         description: "Task scambiate con successo tra i cleaners",
