@@ -313,19 +313,22 @@ export default function TimelineView({
                           })
                           .map((task, idx) => {
                             const taskObj = task as any;
-                            const travelTime = taskObj.travel_time || 0;
+                            // Assicurati di leggere travel_time come numero, default a 0
+                            const travelTime = typeof taskObj.travel_time === 'number' 
+                              ? taskObj.travel_time 
+                              : (taskObj.travel_time ? parseInt(taskObj.travel_time, 10) : 0);
 
                             // Calcola i puntini in base al travel time
-                            // <= 15 min: "..." (larghezza: 15 min)
-                            // 15 < x < 30: "......" (larghezza: 30 min)
-                            // >= 30: "........." (larghezza: 45 min)
+                            // 0-15 min: "..." (larghezza: 15 min)
+                            // 16-30 min: "......" (larghezza: 30 min)
+                            // >30 min: "........." (larghezza: 45 min)
                             let dots = "...";
                             let widthMinutes = 15;
 
-                            if (travelTime > 15 && travelTime < 30) {
+                            if (travelTime > 15 && travelTime <= 30) {
                               dots = "......";
                               widthMinutes = 30;
-                            } else if (travelTime >= 30) {
+                            } else if (travelTime > 30) {
                               dots = ".........";
                               widthMinutes = 45;
                             }
@@ -341,7 +344,7 @@ export default function TimelineView({
                                     key={`marker-${task.id}`} 
                                     className="flex items-center justify-start gap-0 flex-shrink-0"
                                     style={{ width: `${totalWidth}%` }}
-                                    title={`Travel time: ${travelTime} minuti`}
+                                    title={`Task #${taskObj.task_id || task.id} - Travel time: ${travelTime} minuti`}
                                   >
                                     <svg
                                       width="16"
