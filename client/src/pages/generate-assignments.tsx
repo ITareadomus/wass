@@ -970,7 +970,7 @@ export default function GenerateAssignments() {
             </Button>
             <div className="bg-card rounded-lg border shadow-sm px-4 py-2 text-center">
               <div className="text-sm text-muted-foreground">Task Totali</div>
-              <div className="text-2xl font-bold text-primary">{allTasks.length}</div>
+              <div className="text-2xl font-bold text-primary">{allTasksWithAssignments.length}</div>
             </div>
           </div>
         </div>
