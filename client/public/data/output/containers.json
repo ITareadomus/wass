@@ -1,7 +1,7 @@
 {
   "metadata": {
-    "last_updated": "2025-10-31T15:42:06.936263",
-    "date": "2025-10-31"
+    "last_updated": "2025-11-01T12:19:13.022122",
+    "date": "2025-11-01"
   },
   "containers": {
     "early_out": {
@@ -9,63 +9,8 @@
       "count": 0
     },
     "high_priority": {
-      "tasks": [
-        {
-          "task_id": 218203,
-          "logistic_code": 1101,
-          "client_id": 3,
-          "premium": true,
-          "address": "Via Paolo Sarpi, 26, 20154 (MI)",
-          "lat": "45.481556",
-          "lng": "9.1767745",
-          "cleaning_time": 270,
-          "checkin_date": "2025-10-31",
-          "checkout_date": "2025-10-31",
-          "checkin_time": "01:00",
-          "checkout_time": null,
-          "pax_in": 4,
-          "pax_out": 6,
-          "small_equipment": false,
-          "operation_id": 2,
-          "confirmed_operation": true,
-          "straordinaria": false,
-          "type_apt": "E",
-          "alias": "TBR",
-          "customer_name": "THE BEST RENT S.r.l.",
-          "reasons": [
-            "premium"
-          ],
-          "priority": "high_priority"
-        },
-        {
-          "task_id": 218206,
-          "logistic_code": 1090,
-          "client_id": 3,
-          "premium": true,
-          "address": "via Caminadella 13",
-          "lat": "45.4597769",
-          "lng": "9.1770378",
-          "cleaning_time": 270,
-          "checkin_date": "2025-10-31",
-          "checkout_date": "2025-10-31",
-          "checkin_time": "16:00",
-          "checkout_time": null,
-          "pax_in": 7,
-          "pax_out": 5,
-          "small_equipment": false,
-          "operation_id": 2,
-          "confirmed_operation": true,
-          "straordinaria": false,
-          "type_apt": "E",
-          "alias": "TBR",
-          "customer_name": "THE BEST RENT S.r.l.",
-          "reasons": [
-            "premium"
-          ],
-          "priority": "high_priority"
-        }
-      ],
-      "count": 2
+      "tasks": [],
+      "count": 0
     },
     "low_priority": {
       "tasks": [],
@@ -73,9 +18,9 @@
     }
   },
   "summary": {
-    "total_tasks": 2,
+    "total_tasks": 0,
     "early_out": 0,
-    "high_priority": 2,
+    "high_priority": 0,
     "low_priority": 0
   }
 }

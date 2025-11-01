@@ -276,9 +276,6 @@ export default function MapSection({ tasks }: MapSectionProps) {
               />
             </svg>
             Mappa Appartamenti
-            <span className="ml-2 text-sm font-normal text-muted-foreground">
-              ({tasks.filter(t => (t as any).lat && (t as any).lng).length} appartamenti)
-            </span>
           </span>
           <button
             onClick={toggleFullscreen}
