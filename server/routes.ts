@@ -2235,14 +2235,143 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const {
         taskId,
+        logisticCode,
         fromCleanerId,
         toCleanerId,
         sourceIndex,
         destIndex,
+        fromContainer,
       } = req.body as {
-        taskId: string | number;
-        fromCleanerId: number;
+        taskId?: string | number;
+        logisticCode?: string | number;
+        fromCleanerId?: number;
         toCleanerId: number;
+        sourceIndex?: number;
+        destIndex?: number;
+        fromContainer?: 'early_out' | 'high_priority' | 'low_priority';
+      };
+
+      if (typeof toCleanerId !== 'number') {
+        return res.status(400).json({ success: false, message: 'toCleanerId obbligatorio' });
+      }
+      if (typeof taskId === 'undefined' && typeof logisticCode === 'undefined') {
+        return res.status(400).json({ success: false, message: 'taskId o logisticCode obbligatorio' });
+      }
+
+      const workDate = req.body.date || format(new Date(), 'yyyy-MM-dd');
+      const timelinePath = path.join(process.cwd(), 'client/public/data/output/timeline.json');
+      const containersPath = path.join(process.cwd(), 'client/public/data/output/containers.json');
+
+      const [timelineRaw, containersRaw] = await Promise.all([
+        fs.readFile(timelinePath, 'utf8'),
+        fs.readFile(containersPath, 'utf8').catch(() => 'null'),
+      ]);
+
+      const timelineData: any = JSON.parse(timelineRaw);
+      const containersData: any = containersRaw !== 'null' ? JSON.parse(containersRaw) : null;
+
+      const cleaners = timelineData?.cleaners_assignments;
+      if (!cleaners || !Array.isArray(cleaners)) {
+        return res.status(500).json({ success: false, message: 'Struttura timeline non valida' });
+      }
+
+      const getCleanerEntry = (id: number) => cleaners.find((c: any) => c.cleaner_id === id);
+
+      const idMatches = (t: any, key: string) =>
+        String(t?.task_id) === key || String(t?.logistic_code) === key || String(t?.id) === key;
+
+      const findTaskIndex = (arr: any[], key: string) => arr.findIndex(t => idMatches(t, key));
+
+      const taskKey = String(typeof taskId !== 'undefined' ? taskId : logisticCode);
+
+      const dstEntry = getCleanerEntry(toCleanerId);
+      if (!dstEntry || !Array.isArray(dstEntry.tasks)) {
+        return res.status(400).json({ success: false, message: 'Cleaner di destinazione non valido' });
+      }
+
+      let moved: any | null = null;
+
+      // Caso A: provengo da TIMELINE
+      if (typeof fromCleanerId === 'number') {
+        const srcEntry = getCleanerEntry(fromCleanerId);
+        if (!srcEntry || !Array.isArray(srcEntry.tasks)) {
+          return res.status(400).json({ success: false, message: 'Cleaner sorgente non valido' });
+        }
+
+        let takeIdx: number | null = null;
+        if (typeof sourceIndex === 'number' && sourceIndex >= 0 && sourceIndex < srcEntry.tasks.length) {
+          takeIdx = sourceIndex;
+        } else {
+          const idx = findTaskIndex(srcEntry.tasks, taskKey);
+          takeIdx = idx >= 0 ? idx : null;
+        }
+        if (takeIdx === null) {
+          return res.status(404).json({ success: false, message: 'Task non trovata nel cleaner sorgente' });
+        }
+        [moved] = srcEntry.tasks.splice(takeIdx, 1);
+
+        // Aggiorna sequence nel cleaner sorgente
+        srcEntry.tasks.forEach((t: any, i: number) => { t.sequence = i + 1; });
+      }
+
+      // Caso B: provengo da CONTAINER
+      if (!moved && fromContainer && containersData?.containers?.[fromContainer]?.tasks) {
+        const srcArr = containersData.containers[fromContainer].tasks as any[];
+        let idx = findTaskIndex(srcArr, taskKey);
+        if (idx === -1 && typeof sourceIndex === 'number' && srcArr[sourceIndex]) idx = sourceIndex;
+        if (idx === -1) {
+          return res.status(404).json({ success: false, message: 'Task non trovata nel container sorgente' });
+        }
+        [moved] = srcArr.splice(idx, 1);
+        containersData.containers[fromContainer].summary.total = srcArr.length;
+      }
+
+      // Caso C: riordino interno
+      if (!moved) {
+        const idx = findTaskIndex(dstEntry.tasks, taskKey);
+        if (idx === -1) {
+          return res.status(404).json({ success: false, message: 'Task non trovata' });
+        }
+        [moved] = dstEntry.tasks.splice(idx, 1);
+      }
+
+      // Inserimento nella posizione richiesta
+      let insertAt = typeof destIndex === 'number' ? destIndex : dstEntry.tasks.length;
+      if (insertAt < 0) insertAt = 0;
+      if (insertAt > dstEntry.tasks.length) insertAt = dstEntry.tasks.length;
+      dstEntry.tasks.splice(insertAt, 0, moved);
+
+      // Aggiorna sequence nel cleaner destinazione
+      dstEntry.tasks.forEach((t: any, i: number) => { t.sequence = i + 1; });
+
+      // Aggiorna metadata
+      timelineData.metadata = timelineData.metadata || {};
+      timelineData.metadata.last_updated = new Date().toISOString();
+      timelineData.metadata.date = workDate;
+
+      // Salvataggi atomici
+      const tmp1 = `${timelinePath}.tmp`;
+      await fs.writeFile(tmp1, JSON.stringify(timelineData, null, 2));
+      await fs.rename(tmp1, timelinePath);
+
+      if (containersData) {
+        const tmp2 = `${containersPath}.tmp`;
+        await fs.writeFile(tmp2, JSON.stringify(containersData, null, 2));
+        await fs.rename(tmp2, containersPath);
+      }
+
+      const message = typeof fromCleanerId === 'number'
+        ? (fromCleanerId === toCleanerId ? 'Riordino nel cleaner eseguito' : 'Task spostata tra cleaners')
+        : 'Task inserita dal container alla posizione richiesta';
+
+      console.log(`✅ ${message} - Task ${taskKey} inserita in posizione ${insertAt} per cleaner ${toCleanerId}`);
+
+      return res.json({ success: true, message });
+    } catch (err: any) {
+      console.error('timeline/move-task error:', err);
+      return res.status(500).json({ success: false, message: 'Errore interno', error: String(err?.message ?? err) });
+    }
+  });CleanerId: number;
         sourceIndex?: number;
         destIndex?: number;
       };
