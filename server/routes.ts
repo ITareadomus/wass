@@ -583,7 +583,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         confirmed_operation: fullTaskData.confirmed_operation !== undefined ? Boolean(fullTaskData.confirmed_operation) : true,
 
         // Straordinaria (solo questo campo, come negli script)
-        straordinaria: Boolean(fullTaskData.straordinaria || fullTaskData.is_straordinaria),
+        straordinaria: Boolean(fullTaskData.straordinaria),
 
         // Tipo appartamento e alias
         type_apt: fullTaskData.type_apt || null,
@@ -602,10 +602,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         end_time: null,
         followup: false,
         sequence: 0,
-        travel_time: 0,
-
-        // is_straordinaria (IDENTICO a straordinaria, come negli script)
-        is_straordinaria: Boolean(fullTaskData.straordinaria || fullTaskData.is_straordinaria)
+        travel_time: 0
       };
 
       console.log('📝 Task salvato in timeline:', {

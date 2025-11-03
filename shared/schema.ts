@@ -69,7 +69,6 @@ export const taskSchema = z.object({
   lat: z.string().optional(),
   lng: z.string().optional(),
   premium: z.boolean().optional(),
-  is_straordinaria: z.boolean().optional(),
   confirmed_operation: z.boolean().optional(),
   checkout_date: z.string().optional(),
   checkout_time: z.string().optional().nullable(),
