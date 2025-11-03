@@ -407,51 +407,66 @@ export default function Convocazioni() {
             {/* Disponibili */}
             <div className="bg-green-50 dark:bg-green-950/20 rounded-lg p-4 flex flex-col items-center justify-center border border-green-200 dark:border-green-800">
               <div className="w-20 h-20 rounded-full bg-green-500 dark:bg-green-600 flex items-center justify-center mb-2 shadow-lg">
-                <span className="text-3xl font-bold text-white">
-                  {cleaners.filter(c => c.available !== false).length}
+                <span className="text-2xl font-bold text-white">
+                  {cleaners.length > 0 ? Math.round((cleaners.filter(c => c.available !== false).length / cleaners.length) * 100) : 0}%
                 </span>
               </div>
               <span className="text-sm font-semibold text-green-700 dark:text-green-300 text-center">Disponibili</span>
+              <span className="text-xs text-green-600 dark:text-green-400 mt-1">
+                {cleaners.filter(c => c.available !== false).length}/{cleaners.length}
+              </span>
             </div>
 
             {/* Non Disponibili */}
             <div className="bg-gray-50 dark:bg-gray-950/20 rounded-lg p-4 flex flex-col items-center justify-center border border-gray-200 dark:border-gray-700">
               <div className="w-20 h-20 rounded-full bg-gray-500 dark:bg-gray-600 flex items-center justify-center mb-2 shadow-lg">
-                <span className="text-3xl font-bold text-white">
-                  {cleaners.filter(c => c.available === false).length}
+                <span className="text-2xl font-bold text-white">
+                  {cleaners.length > 0 ? Math.round((cleaners.filter(c => c.available === false).length / cleaners.length) * 100) : 0}%
                 </span>
               </div>
               <span className="text-sm font-semibold text-gray-700 dark:text-gray-300 text-center">Non Disponibili</span>
+              <span className="text-xs text-gray-600 dark:text-gray-400 mt-1">
+                {cleaners.filter(c => c.available === false).length}/{cleaners.length}
+              </span>
             </div>
 
             {/* Premium */}
             <div className="bg-yellow-50 dark:bg-yellow-950/20 rounded-lg p-4 flex flex-col items-center justify-center border border-yellow-200 dark:border-yellow-800">
               <div className="w-20 h-20 rounded-full bg-yellow-500 dark:bg-yellow-600 flex items-center justify-center mb-2 shadow-lg">
-                <span className="text-3xl font-bold text-white">
-                  {cleaners.filter(c => c.role === "Premium").length}
+                <span className="text-2xl font-bold text-white">
+                  {cleaners.length > 0 ? Math.round((cleaners.filter(c => c.role === "Premium").length / cleaners.length) * 100) : 0}%
                 </span>
               </div>
               <span className="text-sm font-semibold text-yellow-700 dark:text-yellow-300 text-center">Premium</span>
+              <span className="text-xs text-yellow-600 dark:text-yellow-400 mt-1">
+                {cleaners.filter(c => c.role === "Premium").length}/{cleaners.length}
+              </span>
             </div>
 
             {/* Standard */}
             <div className="bg-green-50 dark:bg-green-950/20 rounded-lg p-4 flex flex-col items-center justify-center border border-green-200 dark:border-green-800">
               <div className="w-20 h-20 rounded-full bg-green-500 dark:bg-green-600 flex items-center justify-center mb-2 shadow-lg">
-                <span className="text-3xl font-bold text-white">
-                  {cleaners.filter(c => c.role === "Standard").length}
+                <span className="text-2xl font-bold text-white">
+                  {cleaners.length > 0 ? Math.round((cleaners.filter(c => c.role === "Standard").length / cleaners.length) * 100) : 0}%
                 </span>
               </div>
               <span className="text-sm font-semibold text-green-700 dark:text-green-300 text-center">Standard</span>
+              <span className="text-xs text-green-600 dark:text-green-400 mt-1">
+                {cleaners.filter(c => c.role === "Standard").length}/{cleaners.length}
+              </span>
             </div>
 
             {/* Formatori */}
             <div className="bg-orange-50 dark:bg-orange-950/20 rounded-lg p-4 flex flex-col items-center justify-center border border-orange-200 dark:border-orange-800 col-span-2">
               <div className="w-20 h-20 rounded-full bg-orange-500 dark:bg-orange-600 flex items-center justify-center mb-2 shadow-lg">
-                <span className="text-3xl font-bold text-white">
-                  {cleaners.filter(c => c.role === "Formatore").length}
+                <span className="text-2xl font-bold text-white">
+                  {cleaners.length > 0 ? Math.round((cleaners.filter(c => c.role === "Formatore").length / cleaners.length) * 100) : 0}%
                 </span>
               </div>
               <span className="text-sm font-semibold text-orange-700 dark:text-orange-300 text-center">Formatori</span>
+              <span className="text-xs text-orange-600 dark:text-orange-400 mt-1">
+                {cleaners.filter(c => c.role === "Formatore").length}/{cleaners.length}
+              </span>
             </div>
           </div>
         </Card>
