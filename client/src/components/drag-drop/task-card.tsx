@@ -42,7 +42,7 @@ export default function TaskCard({
   currentContainer = '',
 }: TaskCardProps) {
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [currentTaskIndex, setCurrentTaskIndex] = useState(index);
+  const [currentTaskId, setCurrentTaskId] = useState(task.id);
   const [assignmentTimes, setAssignmentTimes] = useState<{ start_time?: string; end_time?: string; travel_time?: number }>({});
 
   // Determina le task navigabili in base al contesto
@@ -50,12 +50,8 @@ export default function TaskCard({
     if (!allTasks || allTasks.length === 0) return [];
 
     if (isInTimeline) {
-      // In timeline: filtra per cleaner
-      const taskObj = allTasks[currentTaskIndex] as any;
-      const cleanerId = taskObj?.assignedCleaner;
-      if (!cleanerId) return allTasks;
-
-      return allTasks.filter((t: any) => t.assignedCleaner === cleanerId);
+      // In timeline: le task sono già filtrate per cleaner, usa direttamente allTasks
+      return allTasks;
     } else {
       // Nei container: ritorna tutte le task del container
       return allTasks;
@@ -63,7 +59,7 @@ export default function TaskCard({
   };
 
   const navigableTasks = getNavigableTasks();
-  const currentTaskInNavigable = navigableTasks.findIndex(t => t.id === allTasks[currentTaskIndex]?.id);
+  const currentTaskInNavigable = navigableTasks.findIndex(t => t.id === currentTaskId);
 
   const canGoPrev = currentTaskInNavigable > 0;
   const canGoNext = currentTaskInNavigable < navigableTasks.length - 1;
@@ -71,26 +67,24 @@ export default function TaskCard({
   const handlePrevTask = () => {
     if (!canGoPrev) return;
     const prevTask = navigableTasks[currentTaskInNavigable - 1];
-    const prevIndex = allTasks.findIndex(t => t.id === prevTask.id);
-    setCurrentTaskIndex(prevIndex);
+    setCurrentTaskId(prevTask.id);
   };
 
   const handleNextTask = () => {
     if (!canGoNext) return;
     const nextTask = navigableTasks[currentTaskInNavigable + 1];
-    const nextIndex = allTasks.findIndex(t => t.id === nextTask.id);
-    setCurrentTaskIndex(nextIndex);
+    setCurrentTaskId(nextTask.id);
   };
 
-  // Reset currentTaskIndex quando il modale si apre
+  // Reset currentTaskId quando il modale si apre
   useEffect(() => {
     if (isModalOpen) {
-      setCurrentTaskIndex(index);
+      setCurrentTaskId(task.id);
     }
-  }, [isModalOpen, index]);
+  }, [isModalOpen, task.id]);
 
-  // Task corrente da visualizzare
-  const displayTask = allTasks[currentTaskIndex] || task;
+  // Task corrente da visualizzare - trova sempre per ID
+  const displayTask = allTasks.find(t => t.id === currentTaskId) || task;
 
   // DEBUG: Log per verificare i flag della task durante navigazione
   useEffect(() => {
@@ -98,10 +92,10 @@ export default function TaskCard({
       console.log(`Task ${(displayTask as any).logistic_code || displayTask.name}:`, {
         premium: displayTask.premium,
         straordinaria: displayTask.straordinaria,
-        currentIndex: currentTaskIndex
+        currentTaskId: currentTaskId
       });
     }
-  }, [currentTaskIndex, isModalOpen]);
+  }, [currentTaskId, isModalOpen, displayTask]);
 
   // Normalizza confirmed_operation da boolean/number/string a boolean sicuro
   // USA displayTask invece di task
@@ -143,7 +137,7 @@ export default function TaskCard({
         travel_time: taskObj.travel_time || taskObj.travelTime
       });
     }
-  }, [displayTask, currentTaskIndex]);
+  }, [displayTask, currentTaskId]);
 
   const handleCardClick = (e: React.MouseEvent) => {
     e.stopPropagation();
