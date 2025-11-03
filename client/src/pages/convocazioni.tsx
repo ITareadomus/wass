@@ -651,5 +651,6 @@ export default function Convocazioni() {
         </Card>
       </div>
     </div>
+  </div>
   );
 }
