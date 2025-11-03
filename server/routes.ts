@@ -244,12 +244,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      // 5. Rimuovi cleaner entries vuote
-      timelineData.cleaners_assignments = timelineData.cleaners_assignments.filter(
-        (c: any) => c.tasks && c.tasks.length > 0
-      );
-
-      // 6. Aggiorna metadata
+      // 5. Aggiorna metadata (mantieni cleaner anche se vuoti)
       timelineData.metadata = timelineData.metadata || {};
       timelineData.metadata.last_updated = new Date().toISOString();
       timelineData.metadata.date = workDate;
@@ -364,12 +359,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         updateSequence(destEntry.tasks);
       }
 
-      // Rimuovi cleaner entries vuote (se dopo lo swap uno è rimasto senza task)
-      timelineData.cleaners_assignments = timelineData.cleaners_assignments.filter(
-        (c: any) => c.tasks && c.tasks.length > 0
-      );
-
-      // Aggiorna metadata
+      // Aggiorna metadata (mantieni cleaner anche se vuoti)
       timelineData.metadata = timelineData.metadata || {};
       timelineData.metadata.last_updated = new Date().toISOString();
       timelineData.metadata.date = workDate;
@@ -2351,12 +2341,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      // Rimuovi cleaner vuoti
-      timelineData.cleaners_assignments = cleaners.filter(
-        (c: any) => c.tasks && c.tasks.length > 0
-      );
-
-      // Aggiorna metadata
+      // Aggiorna metadata (mantieni cleaner anche se vuoti)
+      timelineData.cleaners_assignments = cleaners;
       timelineData.metadata = timelineData.metadata || {};
       timelineData.metadata.last_updated = new Date().toISOString();
       timelineData.meta = timelineData.meta || {};
