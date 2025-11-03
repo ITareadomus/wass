@@ -784,44 +784,51 @@ export default function GenerateAssignments() {
 
       if (fromCleanerId !== null && toCleanerId !== null) {
         console.log(`🔄 Timeline move: task ${logisticCode} da cleaner ${fromCleanerId} (idx ${source.index}) a cleaner ${toCleanerId} (idx ${destination.index})`);
-        
+
         try {
           const payload = {
             taskId: draggableId,
+            logisticCode,
             fromCleanerId,
             toCleanerId,
             sourceIndex: source.index,
             destIndex: destination.index,
           };
 
-          const resp = await fetch('/api/timeline/move-task', {
+          console.log('Payload inviato:', payload);
+
+          const response = await fetch('/api/timeline/move-task', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload),
           });
-          const json = await resp.json();
-          if (!resp.ok || !json?.success) {
-            console.error('timeline/move-task error', json);
+
+          const data = await response.json();
+          console.log('Risposta server:', data);
+
+          if (!response.ok || !data?.success) {
+            console.error('Errore timeline/move-task:', data);
             toast({
               title: "Errore",
-              description: json?.message || "Errore nello spostamento nella timeline",
+              description: data.message || "Impossibile spostare la task",
               variant: "destructive"
             });
-            return;
+            // Ricarica per sincronizzare
+            await loadTasks(true);
+          } else {
+            // Ricarica i dati dopo lo spostamento
+            await loadTasks(true);
+            console.log('Timeline aggiornata con successo');
           }
-
-          // Ricarica per mostrare il nuovo ordine
-          await loadTasks(true);
-          return;
-        } catch (err) {
-          console.error('timeline/move-task fetch failed', err);
+        } catch (error) {
+          console.error('Errore nella chiamata API:', error);
           toast({
-            title: "Errore",
-            description: "Errore di rete nello spostamento timeline",
+            title: "Errore di rete",
+            description: "Impossibile spostare la task. Verifica la connessione.",
             variant: "destructive"
           });
-          return;
         }
+        return;
       }
 
       // 🔹 Ramo CONTAINERS (Early-Out / High / Low)
@@ -885,7 +892,7 @@ export default function GenerateAssignments() {
       // Caso: Da container a timeline
       if (fromContainer && toCleanerId !== null) {
         console.log(`🔄 Spostamento da container ${fromContainer} a cleaner ${toCleanerId}`);
-        
+
         // Salva in timeline.json (rimuove automaticamente da containers.json)
         await saveTimelineAssignment(taskId, toCleanerId, logisticCode, destination.index);
         await loadTasks(true);
@@ -895,7 +902,7 @@ export default function GenerateAssignments() {
       // Caso: Da timeline a container
       if (fromCleanerId !== null && toContainer) {
         console.log(`🔄 Spostamento da cleaner ${fromCleanerId} a container ${toContainer}`);
-        
+
         // Rimuovi da timeline.json
         await removeTimelineAssignment(taskId, logisticCode);
         await loadTasks(true);
