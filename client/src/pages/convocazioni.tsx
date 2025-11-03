@@ -439,7 +439,14 @@ export default function Convocazioni() {
               </DialogFooter>
             </DialogContent>
           </Dialog>
-          <div className="flex justify-end gap-2 mt-4 pt-4 border-t">
+          <div className="flex justify-between mt-4 pt-4 border-t">
+            <Button
+              onClick={handleSaveSelection}
+              size="lg"
+              disabled={selectedCleaners.size === 0}
+            >
+              Conferma
+            </Button>
             <Button
               variant="outline"
               onClick={() => setLocation('/')}
@@ -447,13 +454,6 @@ export default function Convocazioni() {
             >
               <ArrowLeft className="w-4 h-4" />
               Torna alle Assegnazioni
-            </Button>
-            <Button
-              onClick={handleSaveSelection}
-              size="lg"
-              disabled={selectedCleaners.size === 0}
-            >
-              Conferma
             </Button>
           </div>
         </Card>
