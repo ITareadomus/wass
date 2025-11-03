@@ -420,7 +420,7 @@ export default function TimelineView({
   const normalizeTask = (task: any) => {
     // Normalizza SOLO i flag straordinaria/premium, NON il type
     const isPremium = Boolean(task.premium);
-    const isStraordinaria = Boolean(task.straordinaria || task.is_straordinaria);
+    const isStraordinaria = Boolean(task.straordinaria);
 
     // Normalizza confirmed_operation
     const rawConfirmed = task.confirmed_operation;
@@ -438,7 +438,6 @@ export default function TimelineView({
       // NON sovrascrivere task.type - lascialo undefined se non esiste
       premium: isPremium,
       straordinaria: isStraordinaria,
-      is_straordinaria: isStraordinaria,
       confirmed_operation: isConfirmedOperation,
     };
   };

@@ -331,7 +331,6 @@ export default function GenerateAssignments() {
             lng: timelineAssignment.lng,
             premium: timelineAssignment.premium,
             straordinaria: timelineAssignment.straordinaria,
-            is_straordinaria: timelineAssignment.is_straordinaria || timelineAssignment.straordinaria,
             confirmed_operation: timelineAssignment.confirmed_operation,
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString()
