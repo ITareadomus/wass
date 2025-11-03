@@ -1,12 +1,25 @@
 {
   "metadata": {
-    "last_updated": "2025-11-03T09:08:26.416Z",
+    "last_updated": "2025-11-03T09:16:32.448Z",
     "date": "2025-11-03"
   },
-  "cleaners_assignments": [],
+  "cleaners_assignments": [
+    {
+      "cleaner": {
+        "id": 785,
+        "name": "RACHEL",
+        "lastname": "OTSHINGA",
+        "role": "Premium",
+        "premium": true
+      },
+      "tasks": []
+    }
+  ],
   "meta": {
-    "total_cleaners": 0,
+    "total_cleaners": 1,
     "used_cleaners": 0,
-    "assigned_tasks": 0
+    "assigned_tasks": 0,
+    "total_tasks": 0,
+    "last_updated": "2025-11-03T09:16:32.448Z"
   }
 }

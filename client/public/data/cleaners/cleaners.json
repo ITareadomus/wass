@@ -1,6 +1,6 @@
 {
     "metadata": {
-        "last_updated": "2025-11-03T09:00:34.600581",
+        "last_updated": "2025-11-03T09:19:02.147592",
         "db_config": {
             "host": "139.59.132.41",
             "user": "admin",
@@ -11,7 +11,7 @@
     },
     "dates": {
         "2025-11-03": {
-            "timestamp": "2025-11-03T09:00:34.600591",
+            "timestamp": "2025-11-03T09:19:02.147600",
             "cleaners": [
                 {
                     "id": 24,
@@ -361,7 +361,7 @@
                 },
                 {
                     "id": 722,
-                    "name": "KONE LASSINE",
+                    "name": "LACINE",
                     "lastname": "KONE",
                     "role": "Premium",
                     "active": true,
