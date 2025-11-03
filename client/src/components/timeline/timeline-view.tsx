@@ -356,7 +356,7 @@ export default function TimelineView({
     const baseWidth = 60; // padding e margini
     const charWidth = 7.5; // circa 7.5px per carattere con font bold 13px
     const badgeSpace = 30; // spazio per il badge P/F
-    
+
     return Math.max(96, baseWidth + (maxLength * charWidth) + badgeSpace);
   };
 
