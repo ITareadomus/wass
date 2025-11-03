@@ -297,7 +297,7 @@ export default function MapSection({ tasks }: MapSectionProps) {
                   <span className="font-semibold">Cliente:</span> {selectedTask.customer_name || selectedTask.type}
                 </div>
                 <div>
-                  <span className="font-semibold">Indirizzo:</span> {selectedTask.address}
+                  <span className="font-semibold">Indirizzo:</span> {selectedTask.address?.toLowerCase()}
                 </div>
                 <div>
                   <span className="font-semibold">Durata pulizie:</span> {selectedTask.duration.replace(".", ":")} ore
