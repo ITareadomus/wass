@@ -341,6 +341,27 @@ export default function TimelineView({
     addCleanerMutation.mutate(cleanerId);
   };
 
+  // Calcola la larghezza dinamica della colonna cleaners in base all'alias più lungo
+  const calculateCleanerColumnWidth = () => {
+    if (cleaners.length === 0) return 96; // default 24 (w-24 = 96px)
+
+    const maxLength = cleaners.reduce((max, cleaner) => {
+      const alias = cleanersAliases[cleaner.id]?.alias || 
+                    `${cleaner.name} ${cleaner.lastname}`;
+      return Math.max(max, alias.length);
+    }, 0);
+
+    // Formula: larghezza base + (caratteri * pixel per carattere)
+    // Aggiungi spazio extra per il badge
+    const baseWidth = 60; // padding e margini
+    const charWidth = 7.5; // circa 7.5px per carattere con font bold 13px
+    const badgeSpace = 30; // spazio per il badge P/F
+    
+    return Math.max(96, baseWidth + (maxLength * charWidth) + badgeSpace);
+  };
+
+  const cleanerColumnWidth = calculateCleanerColumnWidth();
+
   const handleResetAssignments = async () => {
     try {
       // La data è già nel formato corretto yyyy-MM-dd nel localStorage
@@ -467,7 +488,7 @@ export default function TimelineView({
         <div className="p-4 overflow-x-auto">
           {/* Header con orari */}
           <div className="flex mb-2">
-            <div className="w-24 flex-shrink-0"></div>
+            <div className="flex-shrink-0" style={{ width: `${cleanerColumnWidth}px` }}></div>
             <div className="flex-1 flex">
               {timeSlots.map((slot) => (
                 <div
@@ -494,7 +515,8 @@ export default function TimelineView({
               <div key={cleaner.id} className="flex mb-0.5">
                 {/* Info cleaner */}
                 <div
-                  className="w-24 flex-shrink-0 p-1 flex items-center border border-border cursor-pointer hover:opacity-90 transition-opacity"
+                  className="flex-shrink-0 p-1 flex items-center border border-border cursor-pointer hover:opacity-90 transition-opacity"
+                  style={{ width: `${cleanerColumnWidth}px` }}
                   style={{ 
                     backgroundColor: filteredCleanerId === cleaner.id ? `${color.bg}` : color.bg,
                     color: color.text,
@@ -653,7 +675,7 @@ export default function TimelineView({
           {/* Riga finale con pulsanti */}
           <div className="flex mb-2">
             {/* Pulsante + sotto il nome dell'ultimo cleaner */}
-            <div className="w-24 flex-shrink-0 p-1 flex items-center justify-center border border-border">
+            <div className="flex-shrink-0 p-1 flex items-center justify-center border border-border" style={{ width: `${cleanerColumnWidth}px` }}>
               <Button
                 onClick={handleOpenAddCleanerDialog}
                 variant="ghost"
