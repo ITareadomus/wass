@@ -1,6 +1,6 @@
 {
   "metadata": {
-    "last_updated": "2025-11-03T13:26:00.556Z",
+    "last_updated": "2025-11-03T13:27:09.024Z",
     "date": "2025-11-03"
   },
   "cleaners_assignments": [
@@ -1227,6 +1227,41 @@
           "followup": true,
           "sequence": 2,
           "travel_time": 22
+        },
+        {
+          "task_id": 218242,
+          "logistic_code": 1634,
+          "client_id": 123,
+          "premium": false,
+          "address": "Via Abbondio Sangiorgio, 2",
+          "lat": "45.475911",
+          "lng": "9.1710371",
+          "cleaning_time": 90,
+          "checkin_date": "2025-11-04",
+          "checkout_date": "2025-11-03",
+          "checkin_time": "15:00",
+          "checkout_time": null,
+          "pax_in": 2,
+          "pax_out": 4,
+          "small_equipment": false,
+          "operation_id": 2,
+          "confirmed_operation": true,
+          "straordinaria": false,
+          "type_apt": "B",
+          "alias": "YOUHO",
+          "customer_name": "YOUHOSTY",
+          "priority": "low_priority",
+          "reasons": [
+            "not_eo",
+            "not_hp",
+            "automatic_assignment_lp",
+            "manual_assignment"
+          ],
+          "start_time": "13:12",
+          "end_time": "14:42",
+          "followup": true,
+          "sequence": 3,
+          "travel_time": 20
         }
       ]
     },
@@ -1304,41 +1339,6 @@
           "followup": true,
           "sequence": 2,
           "travel_time": 25
-        },
-        {
-          "task_id": 218242,
-          "logistic_code": 1634,
-          "client_id": 123,
-          "premium": false,
-          "address": "Via Abbondio Sangiorgio, 2",
-          "lat": "45.475911",
-          "lng": "9.1710371",
-          "cleaning_time": 90,
-          "checkin_date": "2025-11-04",
-          "checkout_date": "2025-11-03",
-          "checkin_time": "15:00",
-          "checkout_time": null,
-          "pax_in": 2,
-          "pax_out": 4,
-          "small_equipment": false,
-          "operation_id": 2,
-          "confirmed_operation": true,
-          "straordinaria": false,
-          "type_apt": "B",
-          "alias": "YOUHO",
-          "customer_name": "YOUHOSTY",
-          "priority": "low_priority",
-          "reasons": [
-            "not_eo",
-            "not_hp",
-            "automatic_assignment_lp",
-            "manual_assignment"
-          ],
-          "start_time": "14:30",
-          "end_time": "16:00",
-          "followup": true,
-          "sequence": 3,
-          "travel_time": 35
         }
       ]
     }
