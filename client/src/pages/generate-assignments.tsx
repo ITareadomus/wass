@@ -749,6 +749,16 @@ export default function GenerateAssignments() {
     }
   };
 
+  // helper: estrae l'id cleaner dal droppableId della timeline (es: "timeline-24")
+  const parseCleanerId = (droppableId: string) => {
+    if (!droppableId) return null;
+    if (droppableId.startsWith('timeline-')) {
+      const n = Number(droppableId.slice('timeline-'.length));
+      return Number.isFinite(n) ? n : null;
+    }
+    return null;
+  };
+
   const onDragEnd = async (result: any) => {
     const { destination, source, draggableId } = result;
 
@@ -763,123 +773,88 @@ export default function GenerateAssignments() {
       return;
     }
 
-    // Mappa droppable IDs a nomi dei containers nel JSON
-    const containerToJsonName: Record<string, string> = {
-      'early-out': 'early_out',
-      'high': 'high_priority',
-      'low': 'low_priority'
-    };
-
-    const fromContainer = source.droppableId.startsWith('timeline-')
-      ? source.droppableId
-      : containerToJsonName[source.droppableId] || null;
-    const toContainer = destination.droppableId.startsWith('timeline-')
-      ? destination.droppableId
-      : containerToJsonName[destination.droppableId] || null;
-
     const taskId = draggableId;
     const task = allTasksWithAssignments.find(t => t.id === taskId);
     const logisticCode = task?.name;
 
     try {
-      // Caso 1: Reorder intra-timeline (stessa colonna cleaner) O spostamento tra cleaners diversi
-      if (source.droppableId.startsWith('timeline-') && destination.droppableId.startsWith('timeline-')) {
-        const sourceCleanerId = parseInt(source.droppableId.replace('timeline-', ''));
-        const destCleanerId = parseInt(destination.droppableId.replace('timeline-', ''));
+      // 🔹 Ramo TIMELINE (drag tra cleaners o riordino nello stesso cleaner)
+      const fromCleanerId = parseCleanerId(source.droppableId);
+      const toCleanerId = parseCleanerId(destination.droppableId);
 
-        if (sourceCleanerId === destCleanerId) {
-          // Reorder nella stessa timeline
-          console.log(`🔄 Reorder task ${logisticCode} nella timeline del cleaner ${sourceCleanerId} da posizione ${source.index} a ${destination.index}`);
-          await reorderTimelineAssignment(taskId, sourceCleanerId, logisticCode || '', source.index, destination.index);
+      if (fromCleanerId !== null && toCleanerId !== null) {
+        console.log(`🔄 Timeline move: task ${logisticCode} da cleaner ${fromCleanerId} (idx ${source.index}) a cleaner ${toCleanerId} (idx ${destination.index})`);
+        
+        try {
+          const payload = {
+            taskId: draggableId,
+            fromCleanerId,
+            toCleanerId,
+            sourceIndex: source.index,
+            destIndex: destination.index,
+          };
 
-          // Ricarica immediatamente per mostrare il nuovo ordine
-          await loadTasks(true);
-          return;
-        } else {
-          // Spostamento tra cleaners diversi
-          console.log(`🔄 Spostamento task ${logisticCode} da cleaner ${sourceCleanerId} a cleaner ${destCleanerId}`);
-
-          const dateStr = format(selectedDate, "yyyy-MM-dd");
-          const response = await fetch('/api/move-task-between-cleaners', {
+          const resp = await fetch('/api/timeline/move-task', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              taskId,
-              logisticCode,
-              sourceCleanerId,
-              destCleanerId,
-              destIndex: destination.index,
-              date: dateStr
-            }),
+            body: JSON.stringify(payload),
           });
-
-          if (!response.ok) {
-            throw new Error('Errore nello spostamento tra cleaners');
+          const json = await resp.json();
+          if (!resp.ok || !json?.success) {
+            console.error('timeline/move-task error', json);
+            toast({
+              title: "Errore",
+              description: json?.message || "Errore nello spostamento nella timeline",
+              variant: "destructive"
+            });
+            return;
           }
 
-          // Ricarica immediatamente per mostrare il nuovo ordine
+          // Ricarica per mostrare il nuovo ordine
           await loadTasks(true);
+          return;
+        } catch (err) {
+          console.error('timeline/move-task fetch failed', err);
+          toast({
+            title: "Errore",
+            description: "Errore di rete nello spostamento timeline",
+            variant: "destructive"
+          });
           return;
         }
       }
 
-      // Caso 2: Da timeline a container
-      if (source.droppableId.startsWith('timeline-') &&
-          (destination.droppableId === 'early-out' ||
-           destination.droppableId === 'high' ||
-           destination.droppableId === 'low')) {
+      // 🔹 Ramo CONTAINERS (Early-Out / High / Low)
+      const containerToJsonName: Record<string, string> = {
+        'early-out': 'early_out',
+        'high': 'high_priority',
+        'low': 'low_priority'
+      };
 
-        console.log(`🔄 Spostamento da timeline a container: ${source.droppableId} -> ${destination.droppableId}`);
+      const fromContainer = containerToJsonName[source.droppableId] || null;
+      const toContainer = containerToJsonName[destination.droppableId] || null;
 
-        // 1. Rimuovi da timeline.json
-        await removeTimelineAssignment(taskId, logisticCode);
-
-        // 2. Aggiorna containers.json
-        await updateTaskJson(taskId, logisticCode, source.droppableId, destination.droppableId); // source.droppableId per identificare il cleaner
-
-        // 3. FORZA ricaricamento completo e sincronizzato
-        await loadTasks(true);
-
-        console.log(`✅ Sincronizzazione completata`);
-        return;
-      }
-
-      // Caso 3: Da container a timeline
-      if ((source.droppableId === 'early-out' || source.droppableId === 'high' || source.droppableId === 'low') &&
-          destination.droppableId.startsWith('timeline-')) {
-
-        const cleanerId = parseInt(destination.droppableId.split('-')[1]);
-        console.log(`🔄 Spostamento da container a timeline: ${source.droppableId} -> cleaner ${cleanerId}`);
-
-        // 1. Salva in timeline.json (questo rimuove automaticamente da containers.json)
-        await saveTimelineAssignment(taskId, cleanerId, logisticCode, destination.index);
-
-        // 2. FORZA ricaricamento completo e sincronizzato
-        await loadTasks(true);
-
-        console.log(`✅ Sincronizzazione completata`);
-        return;
-      }
-
-      // Caso 4: Spostamento tra containers di priorità (non timeline)
-      if (!fromContainer.startsWith('timeline-') && !toContainer.startsWith('timeline-')) {
+      // Caso: spostamento tra containers di priorità
+      if (fromContainer && toContainer) {
         console.log(`📦 Spostamento tra containers: ${fromContainer} → ${toContainer}`);
 
         try {
-          const response = await fetch('/api/update-task-json', {
+          const payload = {
+            taskId: draggableId,
+            fromContainer,
+            toContainer,
+            sourceIndex: source.index,
+            destIndex: destination.index,
+          };
+
+          const resp = await fetch('/api/update-task-json', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              taskId: draggableId,
-              fromContainer,
-              toContainer,
-              sourceIndex: source.index,
-              destIndex: destination.index,
-            }),
+            body: JSON.stringify(payload),
           });
 
-          const json = await response.json();
-          if (!response.ok || !json?.success) {
+          const json = await resp.json();
+          if (!resp.ok || !json?.success) {
             console.error('update-task-json error', json);
             toast({
               title: "Errore",
@@ -894,7 +869,7 @@ export default function GenerateAssignments() {
 
           toast({
             title: "Task spostata",
-            description: `Task spostata da ${fromContainer} a ${toContainer}`,
+            description: `Task spostata tra containers`,
           });
         } catch (err) {
           console.error('update-task-json fetch failed', err);
@@ -906,6 +881,27 @@ export default function GenerateAssignments() {
         }
         return;
       }
+
+      // Caso: Da container a timeline
+      if (fromContainer && toCleanerId !== null) {
+        console.log(`🔄 Spostamento da container ${fromContainer} a cleaner ${toCleanerId}`);
+        
+        // Salva in timeline.json (rimuove automaticamente da containers.json)
+        await saveTimelineAssignment(taskId, toCleanerId, logisticCode, destination.index);
+        await loadTasks(true);
+        return;
+      }
+
+      // Caso: Da timeline a container
+      if (fromCleanerId !== null && toContainer) {
+        console.log(`🔄 Spostamento da cleaner ${fromCleanerId} a container ${toContainer}`);
+        
+        // Rimuovi da timeline.json
+        await removeTimelineAssignment(taskId, logisticCode);
+        await loadTasks(true);
+        return;
+      }
+
     } catch (error) {
       console.error('❌ Errore durante lo spostamento:', error);
       // In caso di errore, ricarica comunque per ripristinare lo stato corretto

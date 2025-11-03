@@ -2240,7 +2240,152 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
 
-  // Endpoint per riordinare le task nella timeline di un cleaner
+  // Endpoint per spostare/riordinare task nella timeline con indici precisi
+  app.post("/api/timeline/move-task", async (req, res) => {
+    try {
+      const {
+        taskId,
+        fromCleanerId,
+        toCleanerId,
+        sourceIndex,
+        destIndex,
+      } = req.body as {
+        taskId: string | number;
+        fromCleanerId: number;
+        toCleanerId: number;
+        sourceIndex?: number;
+        destIndex?: number;
+      };
+
+      if (
+        typeof taskId === 'undefined' ||
+        typeof fromCleanerId !== 'number' ||
+        typeof toCleanerId !== 'number'
+      ) {
+        return res
+          .status(400)
+          .json({ success: false, message: 'Parametri obbligatori mancanti' });
+      }
+
+      const timelinePath = path.join(process.cwd(), 'client/public/data/output/timeline.json');
+      const raw = await fs.readFile(timelinePath, 'utf8');
+      const timelineData: any = JSON.parse(raw);
+
+      // Struttura: { cleaners_assignments: [ { cleaner: {...}, tasks: [...] }, ... ] }
+      const cleaners = timelineData?.cleaners_assignments;
+      if (!cleaners || !Array.isArray(cleaners)) {
+        return res.status(500).json({ success: false, message: 'Struttura timeline non valida' });
+      }
+
+      // Trova cleaner entries
+      const srcEntry = cleaners.find((c: any) => c.cleaner?.id === fromCleanerId);
+      const dstEntry = cleaners.find((c: any) => c.cleaner?.id === toCleanerId);
+
+      if (!srcEntry?.tasks || !dstEntry?.tasks) {
+        return res.status(400).json({ success: false, message: 'Cleaner non valido' });
+      }
+
+      const srcTasks: any[] = srcEntry.tasks;
+      const dstTasks: any[] = dstEntry.tasks;
+
+      // helper: trova indice per id
+      const findIndexById = (arr: any[]) => {
+        const idStr = String(taskId);
+        let idx = arr.findIndex((t) => String(t?.task_id) === idStr);
+        if (idx !== -1) return idx;
+        idx = arr.findIndex((t) => String(t?.logistic_code) === idStr);
+        return idx;
+      };
+
+      // 1) PRELIEVO DAL CLEANER SORGENTE
+      let takeIndex =
+        typeof sourceIndex === 'number' &&
+        sourceIndex >= 0 &&
+        sourceIndex < srcTasks.length
+          ? sourceIndex
+          : findIndexById(srcTasks);
+
+      if (takeIndex === -1) {
+        return res
+          .status(404)
+          .json({ success: false, message: 'Task non trovata nel cleaner sorgente' });
+      }
+
+      const [moved] = srcTasks.splice(takeIndex, 1);
+
+      // 2) INSERIMENTO NEL CLEANER DESTINAZIONE
+      let insertAt =
+        typeof destIndex === 'number' ? destIndex : dstTasks.length;
+      if (insertAt < 0) insertAt = 0;
+      if (insertAt > dstTasks.length) insertAt = dstTasks.length;
+
+      dstTasks.splice(insertAt, 0, moved);
+
+      // 3) Ricalcola tempi se necessario
+      try {
+        if (fromCleanerId === toCleanerId) {
+          // Riordino stesso cleaner
+          const updated = await recalculateCleanerTimes(dstEntry);
+          dstEntry.tasks = updated.tasks;
+        } else {
+          // Spostamento tra cleaners
+          if (srcTasks.length > 0) {
+            const updatedSrc = await recalculateCleanerTimes(srcEntry);
+            srcEntry.tasks = updatedSrc.tasks;
+          }
+          const updatedDst = await recalculateCleanerTimes(dstEntry);
+          dstEntry.tasks = updatedDst.tasks;
+        }
+      } catch (pythonError: any) {
+        console.error('⚠️ Errore ricalcolo tempi:', pythonError.message);
+        // Fallback: aggiorna sequence manualmente
+        if (srcTasks.length > 0) {
+          srcTasks.forEach((t: any, i: number) => {
+            t.sequence = i + 1;
+            t.followup = i > 0;
+          });
+        }
+        dstTasks.forEach((t: any, i: number) => {
+          t.sequence = i + 1;
+          t.followup = i > 0;
+        });
+      }
+
+      // Rimuovi cleaner vuoti
+      timelineData.cleaners_assignments = cleaners.filter(
+        (c: any) => c.tasks && c.tasks.length > 0
+      );
+
+      // Aggiorna metadata
+      timelineData.metadata = timelineData.metadata || {};
+      timelineData.metadata.last_updated = new Date().toISOString();
+      timelineData.meta = timelineData.meta || {};
+      timelineData.meta.total_tasks = timelineData.cleaners_assignments.reduce(
+        (sum: number, c: any) => sum + (c.tasks?.length || 0), 0
+      );
+      timelineData.meta.total_cleaners = timelineData.cleaners_assignments.length;
+
+      // Scrittura atomica
+      const tmp = timelinePath + '.tmp';
+      await fs.writeFile(tmp, JSON.stringify(timelineData, null, 2));
+      await fs.rename(tmp, timelinePath);
+
+      return res.json({
+        success: true,
+        message:
+          fromCleanerId === toCleanerId
+            ? 'Riordino nel cleaner eseguito'
+            : 'Task spostata su cleaner di destinazione alla posizione richiesta',
+      });
+    } catch (err: any) {
+      console.error('timeline/move-task error:', err);
+      return res
+        .status(500)
+        .json({ success: false, message: 'Errore interno', error: String(err?.message ?? err) });
+    }
+  });
+
+  // Endpoint per riordinare le task nella timeline di un cleaner (DEPRECATO - usa /api/timeline/move-task)
   app.post("/api/reorder-timeline", async (req, res) => {
     try {
       const { date, cleanerId, taskId, logisticCode, fromIndex, toIndex } = req.body;
