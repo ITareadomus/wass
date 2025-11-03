@@ -568,22 +568,25 @@ export default function TimelineView({
 
                       {/* Task posizionate in sequenza con indicatori di travel time */}
                       <div className="relative z-10 flex items-center h-full">
-                        {tasks
-                          .filter((task) => (task as any).assignedCleaner === cleaner.id)
-                          .map(normalizeTask)
-                          .sort((a, b) => {
-                            const taskA = a as any;
-                            const taskB = b as any;
+                        {(() => {
+                          // Calcola l'array delle task per questo cleaner una sola volta
+                          const cleanerTasks = tasks
+                            .filter((task) => (task as any).assignedCleaner === cleaner.id)
+                            .map(normalizeTask)
+                            .sort((a, b) => {
+                              const taskA = a as any;
+                              const taskB = b as any;
 
-                            if (taskA.sequence !== undefined && taskB.sequence !== undefined) {
-                              return taskA.sequence - taskB.sequence;
-                            }
+                              if (taskA.sequence !== undefined && taskB.sequence !== undefined) {
+                                return taskA.sequence - taskB.sequence;
+                              }
 
-                            const timeA = taskA.start_time || taskA.fw_start_time || taskA.startTime || "00:00";
-                            const timeB = taskB.start_time || taskB.fw_start_time || taskB.startTime || "00:00";
-                            return timeA.localeCompare(timeB);
-                          })
-                          .map((task, idx) => {
+                              const timeA = taskA.start_time || taskA.fw_start_time || taskA.startTime || "00:00";
+                              const timeB = taskB.start_time || taskB.fw_start_time || taskB.startTime || "00:00";
+                              return timeA.localeCompare(timeB);
+                            });
+
+                          return cleanerTasks.map((task, idx) => {
                             const taskObj = task as any;
 
                             // Per il drag and drop, usa l'indice locale (idx) non globalIndex
@@ -660,11 +663,12 @@ export default function TimelineView({
                                   task={task} 
                                   index={idx}
                                   isInTimeline={true}
-                                  allTasks={tasks}
+                                  allTasks={cleanerTasks}
                                 />
                               </>
                             );
-                          })}
+                          });
+                        })()}
                         {provided.placeholder}
                       </div>
                     </div>
