@@ -1,0 +1,247 @@
+ottimo! ora sistemiamo anche **la timeline** così puoi inserire la task nella posizione precisa (prima, seconda, ecc.) dentro al cleaner di destinazione.
+
+Ti lascio patch “copia-incolla” pronte: una sul **frontend** per inviare anche gli indici quando il drop avviene nella timeline, e una sul **backend** per usare quegli indici (con `splice`) invece di fare `push()` in fondo.
+
+---
+
+# 1) Frontend — `client/src/pages/generate-assignments.tsx`
+
+Sostituisci/aggiorna la tua `onDragEnd` con il blocco seguente: aggiunge il ramo **timeline** che invia `fromCleanerId`, `toCleanerId`, `sourceIndex`, `destIndex`.
+
+```tsx
+// helper: estrae l'id cleaner dal droppableId della timeline (es: "cleaner-24")
+const parseCleanerId = (droppableId: string) => {
+  if (!droppableId) return null;
+  if (droppableId.startsWith('cleaner-')) {
+    const n = Number(droppableId.slice('cleaner-'.length));
+    return Number.isFinite(n) ? n : null;
+  }
+  return null;
+};
+
+// ⬇️ sostituisci TUTTA la tua onDragEnd con questa versione che gestisce anche la timeline
+const onDragEnd = async (result: any) => {
+  const { destination, source, draggableId } = result;
+  if (!destination) return;
+
+  if (
+    destination.droppableId === source.droppableId &&
+    destination.index === source.index
+  ) {
+    return;
+  }
+
+  // 🔹 Ramo TIMELINE (drag tra cleaners o riordino nello stesso cleaner)
+  const fromCleanerId = parseCleanerId(source.droppableId);
+  const toCleanerId = parseCleanerId(destination.droppableId);
+
+  if (fromCleanerId !== null && toCleanerId !== null) {
+    try {
+      const payload = {
+        taskId: draggableId,       // se il tuo draggableId NON è il vero taskId, metti qui quello giusto
+        fromCleanerId,
+        toCleanerId,
+        sourceIndex: source.index, // posizione corrente
+        destIndex: destination.index, // posizione desiderata
+      };
+
+      const resp = await fetch('/api/timeline/move-task', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const json = await resp.json();
+      if (!resp.ok || !json?.success) {
+        console.error('timeline/move-task error', json);
+      }
+      return; // evita di proseguire nel ramo "containers"
+    } catch (err) {
+      console.error('timeline/move-task fetch failed', err);
+      return;
+    }
+  }
+
+  // 🔹 Ramo CONTAINERS (Early-Out / High / Low) — resta uguale alla tua versione sistemata
+  const fromContainer = source.droppableId;
+  const toContainer = destination.droppableId;
+
+  try {
+    const payload = {
+      taskId: draggableId,            // o logisticCode se usi quello
+      fromContainer,
+      toContainer,
+      sourceIndex: source.index,
+      destIndex: destination.index,
+    };
+
+    const resp = await fetch('/api/update-task-json', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+
+    const json = await resp.json();
+    if (!resp.ok || !json?.success) {
+      console.error('update-task-json error', json);
+    }
+  } catch (err) {
+    console.error('update-task-json fetch failed', err);
+  }
+};
+```
+
+> Se i tuoi `droppableId` della timeline hanno un formato diverso da `cleaner-<id>`, adegua la funzione `parseCleanerId` di conseguenza.
+
+---
+
+# 2) Backend — `server/routes.ts`
+
+Aggiungi/sostituisci l’handler **POST `/api/timeline/move-task`** con questo qui sotto.
+(Se l’endpoint esiste già ma fa `push()`, rimpiazzalo con questo; altrimenti incollalo a fine file vicino agli altri router.post.)
+
+> **Percorso dati**: ho usato `server/data/timeline.json` come esempio. Se il tuo file è altrove (es. `server/storage/timeline.json`), **cambia `timelinePath`**.
+
+```ts
+// ⬇️ AGGIUNGI o SOSTITUISCI questo endpoint
+router.post('/api/timeline/move-task', async (req, res) => {
+  try {
+    const {
+      taskId,
+      fromCleanerId,
+      toCleanerId,
+      sourceIndex,
+      destIndex,
+    } = req.body as {
+      taskId: string | number;
+      fromCleanerId: number;
+      toCleanerId: number;
+      sourceIndex?: number;
+      destIndex?: number;
+    };
+
+    if (
+      typeof taskId === 'undefined' ||
+      typeof fromCleanerId !== 'number' ||
+      typeof toCleanerId !== 'number'
+    ) {
+      return res
+        .status(400)
+        .json({ success: false, message: 'Parametri obbligatori mancanti' });
+    }
+
+    const fs = await import('fs/promises');
+    const path = await import('path');
+
+    // ⚠️ ADATTA IL PERCORSO SE DIVERSO NEL TUO PROGETTO
+    const timelinePath = path.resolve(process.cwd(), 'server', 'data', 'timeline.json');
+    const raw = await fs.readFile(timelinePath, 'utf8');
+    const timelineData: any = JSON.parse(raw);
+
+    // Struttura attesa:
+    // {
+    //   "cleaners": {
+    //     "24": { "tasks": [ ... ] },
+    //     "495": { "tasks": [ ... ] },
+    //     ...
+    //   },
+    //   "summary": { ... } // opzionale
+    // }
+    const cleaners = timelineData?.cleaners;
+    if (!cleaners) {
+      return res.status(500).json({ success: false, message: 'Struttura timeline non valida (manca "cleaners")' });
+    }
+
+    const srcKey = String(fromCleanerId);
+    const dstKey = String(toCleanerId);
+
+    const src = cleaners[srcKey];
+    const dst = cleaners[dstKey];
+
+    if (!src?.tasks || !dst?.tasks) {
+      return res.status(400).json({ success: false, message: 'Cleaner non valido' });
+    }
+
+    const srcTasks: any[] = src.tasks;
+    const dstTasks: any[] = dst.tasks;
+
+    // helper: trova indice per id se non viene passato sourceIndex
+    const findIndexById = (arr: any[]) => {
+      const idStr = String(taskId);
+      let idx = arr.findIndex((t) => String(t?.task_id) === idStr);
+      if (idx !== -1) return idx;
+      // fallback se usi logistic_code
+      idx = arr.findIndex((t) => String(t?.logistic_code) === idStr);
+      return idx;
+    };
+
+    // 1) PRELIEVO DAL CLEANER SORGENTE
+    let takeIndex =
+      typeof sourceIndex === 'number' &&
+      sourceIndex >= 0 &&
+      sourceIndex < srcTasks.length
+        ? sourceIndex
+        : findIndexById(srcTasks);
+
+    if (takeIndex === -1) {
+      return res
+        .status(404)
+        .json({ success: false, message: 'Task non trovata nel cleaner sorgente' });
+    }
+
+    const [moved] = srcTasks.splice(takeIndex, 1);
+
+    // 2) INSERIMENTO NEL CLEANER DESTINAZIONE
+    let insertAt =
+      typeof destIndex === 'number' ? destIndex : dstTasks.length; // default: in coda se non fornito
+    if (insertAt < 0) insertAt = 0;
+    if (insertAt > dstTasks.length) insertAt = dstTasks.length;
+
+    dstTasks.splice(insertAt, 0, moved);
+
+    // (opzionale) aggiorna summary/contatori se li tieni
+    if (timelineData.summary) {
+      const count = (key: string) => (cleaners[key]?.tasks?.length ?? 0);
+      timelineData.summary.cleaners = Object.fromEntries(
+        Object.keys(cleaners).map((k) => [k, count(k)])
+      );
+      timelineData.summary.total_tasks = Object.keys(cleaners)
+        .map((k) => count(k))
+        .reduce((a, b) => a + b, 0);
+    }
+
+    // Scrittura atomica
+    const tmp = timelinePath + '.tmp';
+    await fs.writeFile(tmp, JSON.stringify(timelineData, null, 2));
+    await fs.rename(tmp, timelinePath);
+
+    return res.json({
+      success: true,
+      message:
+        fromCleanerId === toCleanerId
+          ? 'Riordino nel cleaner eseguito'
+          : 'Task spostata su cleaner di destinazione alla posizione richiesta',
+    });
+  } catch (err: any) {
+    console.error('timeline/move-task error:', err);
+    return res
+      .status(500)
+      .json({ success: false, message: 'Errore interno', error: String(err?.message ?? err) });
+  }
+});
+```
+
+**Perché funziona:** invece di fare `push()` in coda, il server usa `splice(destIndex, 0, moved)` sulla lista `tasks` del cleaner di destinazione. Se i cleaners coincidono, questo diventa un vero **riordino** interno. Il frontend passa sempre `sourceIndex` e `destIndex`, quindi il backend sa esattamente dove inserire.
+
+---
+
+## Checklist rapida
+
+1. Incolla la nuova `onDragEnd` (frontend).
+2. Aggiungi/sostituisci l’endpoint `/api/timeline/move-task` (backend) e **verifica/correggi il path** del file `timeline.json`.
+3. Riavvia il server.
+4. Test:
+
+   * Sposta una task **all’interno** dello stesso cleaner → deve restare alla posizione di drop.
+   * Sposta dal cleaner **24 → 495** e rilasciala come **prima/seconda** → deve inserirsi esattamente lì.
+
+Se i tuoi `droppableId` non hanno forma `cleaner-<id>` o il file dati non è `server/data/timeline.json`, dimmelo e ti adatto le due righe interessate.
