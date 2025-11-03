@@ -548,6 +548,8 @@ export default function TimelineView({
                     <div
                       ref={provided.innerRef}
                       {...provided.droppableProps}
+                      data-testid={`timeline-cleaner-${cleaner.id}`}
+                      data-cleaner-id={cleaner.id}
                       className={`relative border-t border-border transition-colors min-h-[45px] flex-1 ${
                         snapshot.isDraggingOver ? 'bg-primary/20 ring-2 ring-primary' : ''
                       }`}
