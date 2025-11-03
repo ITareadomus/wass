@@ -136,7 +136,7 @@ export default function TaskCard({
   useEffect(() => {
     const loadAssignmentTimes = async () => {
       try {
-        // Prima controlla se i dati sono già presenti nell'oggetto task (dalla timeline)
+        // I dati sono già presenti nell'oggetto task (dalla timeline o dai containers)
         const taskObj = displayTask as any;
         if (taskObj.startTime || taskObj.start_time) {
           setAssignmentTimes({
@@ -144,74 +144,6 @@ export default function TaskCard({
             end_time: taskObj.end_time || taskObj.endTime,
             travel_time: taskObj.travel_time || taskObj.travelTime
           });
-          return;
-        }
-
-        // Se non ci sono, cerca nei file JSON
-        // Prova prima con early_out_assignments.json
-        const eoResponse = await fetch('/data/output/early_out_assignments.json');
-        if (eoResponse.ok) {
-          const eoData = await eoResponse.json();
-          const taskId = (task as any).task_id ?? task.id;
-
-          // Cerca la task nelle assegnazioni Early Out
-          for (const cleanerEntry of eoData.early_out_tasks_assigned || []) {
-            const assignedTask = cleanerEntry.tasks?.find((t: AssignedTask) => 
-              String(t.task_id) === String(taskId) || String(t.logistic_code) === String(task.name)
-            );
-            if (assignedTask) {
-              setAssignmentTimes({
-                start_time: assignedTask.start_time,
-                end_time: assignedTask.end_time,
-                travel_time: assignedTask.travel_time
-              });
-              return; // Trovata, esci
-            }
-          }
-        }
-
-        // Se non trovata in EO, prova con high_priority_assignments.json
-        const hpResponse = await fetch('/data/output/high_priority_assignments.json');
-        if (hpResponse.ok) {
-          const hpData = await hpResponse.json();
-          const taskId = (task as any).task_id ?? task.id;
-
-          // Cerca la task nelle assegnazioni High Priority
-          for (const cleanerEntry of hpData.high_priority_tasks_assigned || []) {
-            const assignedTask = cleanerEntry.tasks?.find((t: AssignedTask) => 
-              String(t.task_id) === String(taskId) || String(t.logistic_code) === String(task.name)
-            );
-            if (assignedTask) {
-              setAssignmentTimes({
-                start_time: assignedTask.start_time,
-                end_time: assignedTask.end_time,
-                travel_time: assignedTask.travel_time
-              });
-              return; // Trovata, esci
-            }
-          }
-        }
-
-        // Se non trovata in HP, prova con low_priority_assignments.json
-        const lpResponse = await fetch('/data/output/low_priority_assignments.json');
-        if (lpResponse.ok) {
-          const lpData = await lpResponse.json();
-          const taskId = (task as any).task_id ?? task.id;
-
-          // Cerca la task nelle assegnazioni Low Priority
-          for (const cleanerEntry of lpData.low_priority_tasks_assigned || []) {
-            const assignedTask = cleanerEntry.tasks?.find((t: AssignedTask) => 
-              String(t.task_id) === String(taskId) || String(t.logistic_code) === String(task.name)
-            );
-            if (assignedTask) {
-              setAssignmentTimes({
-                start_time: assignedTask.start_time,
-                end_time: assignedTask.end_time,
-                travel_time: assignedTask.travel_time
-              });
-              return; // Trovata, esci
-            }
-          }
         }
       } catch (error) {
         console.error('Errore nel caricamento dei tempi di assegnazione:', error);
