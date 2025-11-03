@@ -706,12 +706,28 @@ export default function GenerateAssignments() {
         body: JSON.stringify({ date: dateStr, cleanerId, taskId, logisticCode, fromIndex, toIndex }),
       });
       if (!response.ok) {
-        console.error('Errore nel reorder della timeline');
+        const errorData = await response.json();
+        console.error('Errore nel reorder della timeline:', errorData);
+        
+        if (response.status === 400) {
+          toast({
+            title: "Errore di sincronizzazione",
+            description: errorData.message || "La timeline non è sincronizzata. Ricarica la pagina.",
+            variant: "destructive"
+          });
+          // Ricarica i dati per sincronizzare lo stato
+          await loadTasks(true);
+        }
       } else {
         console.log('Timeline riordinata con successo');
       }
     } catch (error) {
       console.error('Errore nella chiamata API di reorder timeline:', error);
+      toast({
+        title: "Errore di rete",
+        description: "Impossibile riordinare la task. Verifica la connessione.",
+        variant: "destructive"
+      });
     }
   };
 

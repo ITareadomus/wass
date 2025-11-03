@@ -2390,19 +2390,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ success: false, message: "Cleaner non trovato" });
       }
 
-      // Trova la task da spostare
-      const taskIndex = cleanerEntry.tasks.findIndex((t: any) => 
-        String(t.task_id) === String(taskId) || String(t.logistic_code) === String(logisticCode)
-      );
-
-      if (taskIndex === -1) {
-        return res.status(404).json({ success: false, message: "Task non trovata" });
+      // Verifica che gli indici siano validi
+      if (fromIndex < 0 || fromIndex >= cleanerEntry.tasks.length) {
+        return res.status(400).json({ success: false, message: "Indice fromIndex non valido" });
       }
 
-      // Rimuovi la task dalla posizione originale
-      const [task] = cleanerEntry.tasks.splice(taskIndex, 1);
+      if (toIndex < 0 || toIndex > cleanerEntry.tasks.length) {
+        return res.status(400).json({ success: false, message: "Indice toIndex non valido" });
+      }
 
-      // Inserisci nella nuova posizione
+      // Verifica che la task a fromIndex corrisponda al taskId/logisticCode fornito
+      const taskAtFromIndex = cleanerEntry.tasks[fromIndex];
+      const taskMatches = 
+        String(taskAtFromIndex.task_id) === String(taskId) || 
+        String(taskAtFromIndex.logistic_code) === String(logisticCode);
+
+      if (!taskMatches) {
+        console.error(`Task mismatch: expected task ${taskId}/${logisticCode} at index ${fromIndex}, found ${taskAtFromIndex.task_id}/${taskAtFromIndex.logistic_code}`);
+        return res.status(400).json({ 
+          success: false, 
+          message: "La task all'indice specificato non corrisponde all'ID fornito. Ricarica la pagina." 
+        });
+      }
+
+      // Rimuovi la task dalla posizione fromIndex
+      const [task] = cleanerEntry.tasks.splice(fromIndex, 1);
+
+      // Inserisci nella nuova posizione toIndex
       cleanerEntry.tasks.splice(toIndex, 0, task);
 
       // Ricalcola travel_time, start_time, end_time usando lo script Python
