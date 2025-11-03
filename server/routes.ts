@@ -112,7 +112,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           assigned_tasks: 0
         }
       };
-      
+
       // Scrittura atomica
       const tmpPath = `${timelinePath}.tmp`;
       await fs.writeFile(tmpPath, JSON.stringify(emptyTimeline, null, 2));
@@ -275,14 +275,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/swap-cleaners-tasks", async (req, res) => {
     try {
       const { sourceCleanerId, destCleanerId, date } = req.body;
-      
+
       if (!sourceCleanerId || !destCleanerId) {
         return res.status(400).json({ 
           success: false, 
           message: "sourceCleanerId e destCleanerId sono obbligatori" 
         });
       }
-      
+
       if (sourceCleanerId === destCleanerId) {
         return res.status(400).json({ 
           success: false, 
@@ -317,7 +317,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Scambia le task array
       const sourceTasks = sourceEntry.tasks;
       const destTasks = destEntry.tasks;
-      
+
       sourceEntry.tasks = destTasks;
       destEntry.tasks = sourceTasks;
 
@@ -334,7 +334,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           );
         });
       };
-      
+
       markTasksAsManual(sourceEntry.tasks);
       markTasksAsManual(destEntry.tasks);
 
@@ -656,12 +656,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (containersData && containersData.containers) {
         try {
           let taskRemoved = false;
-          
+
           // Cerca in tutti i container
           for (const [containerType, container] of Object.entries(containersData.containers)) {
             const containerObj = container as any;
             if (!containerObj.tasks) continue;
-            
+
             const originalCount = containerObj.tasks.length;
             containerObj.tasks = containerObj.tasks.filter((t: any) => 
               String(t.task_id) !== normalizedTaskId && 
@@ -767,7 +767,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (removedTask) {
         try {
           const containersData = JSON.parse(await fs.readFile(containersPath, 'utf8'));
-          
+
           // Determina il container corretto in base alla priority della task
           const priority = removedTask.priority || 'low_priority';
           const containerType = priority === 'early_out' ? 'early_out' 
@@ -856,7 +856,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         meta: { total_cleaners: 0, total_tasks: 0, last_updated: new Date().toISOString() },
         metadata: { last_updated: new Date().toISOString(), date: workDate }
       };
-      
+
       try {
         const existingData = await fs.readFile(timelinePath, 'utf8');
         timelineData = JSON.parse(existingData);
@@ -905,7 +905,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Aggiorna anche selected_cleaners.json per persistere il cleaner
       const selectedCleanersPath = path.join(process.cwd(), 'client/public/data/cleaners/selected_cleaners.json');
       let selectedCleanersData: any;
-      
+
       try {
         const selectedContent = await fs.readFile(selectedCleanersPath, 'utf8');
         selectedCleanersData = JSON.parse(selectedContent);
@@ -916,12 +916,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Verifica che il cleaner non sia già in selected_cleaners.json
       const isAlreadySelected = selectedCleanersData.cleaners.some((c: any) => c.id === cleanerId);
-      
+
       if (!isAlreadySelected) {
         // Aggiungi il cleaner COMPLETO con tutti i suoi campi, non solo i campi base
         selectedCleanersData.cleaners.push(cleanerData);
         selectedCleanersData.total_selected = selectedCleanersData.cleaners.length;
-        
+
         // Salva selected_cleaners.json
         await fs.writeFile(selectedCleanersPath, JSON.stringify(selectedCleanersData, null, 2));
         console.log(`✅ Cleaner ${cleanerId} aggiunto anche a selected_cleaners.json`);
@@ -1043,283 +1043,150 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Endpoint per aggiornare i file JSON quando un task viene spostato
   app.post("/api/update-task-json", async (req, res) => {
     try {
-      const { taskId, logisticCode, fromContainer: sourceContainer, toContainer: destContainer } = req.body;
+      const {
+        taskId,
+        logisticCode,
+        fromContainer,
+        toContainer,
+        sourceIndex,
+        destIndex,
+      } = req.body as {
+        taskId?: string | number;
+        logisticCode?: string | number;
+        fromContainer?: 'early_out' | 'high_priority' | 'low_priority';
+        toContainer?: 'early_out' | 'high_priority' | 'low_priority';
+        sourceIndex?: number;
+        destIndex?: number;
+      };
 
-      const containersPath = path.join(process.cwd(), 'client/public/data/output/containers.json');
-      const timelinePath = path.join(process.cwd(), 'client/public/data/output/timeline.json');
+      if (!fromContainer || !toContainer) {
+        return res.status(400).json({ success: false, message: 'fromContainer e toContainer sono obbligatori' });
+      }
 
       // Carica containers.json
-      let containersData: any = {
-        containers: {
-          early_out: { tasks: [], count: 0 },
-          high_priority: { tasks: [], count: 0 },
-          low_priority: { tasks: [], count: 0 }
-        },
-        summary: { total_tasks: 0, early_out: 0, high_priority: 0, low_priority: 0 }
-      };
-      try {
-        const existingData = await fs.readFile(containersPath, 'utf8');
-        containersData = JSON.parse(existingData);
-      } catch (error) {
-        console.log('File containers.json non trovato, creazione di una nuova struttura.');
+      const containersPath = path.join(process.cwd(), 'client/public/data/output/containers.json');
+      const raw = await fs.readFile(containersPath, 'utf8');
+      const containersData: any = JSON.parse(raw);
+
+      const containers = containersData?.containers;
+      if (!containers) {
+        return res.status(500).json({ success: false, message: 'Struttura containers mancante in containers.json' });
       }
 
-      // Carica timeline.json
-      let timelineData: any = {
-        cleaners_assignments: [],
-        current_date: format(new Date(), 'yyyy-MM-dd'),
-        meta: { total_cleaners: 0, total_tasks: 0, last_updated: new Date().toISOString() }
-      };
-      try {
-        const existingData = await fs.readFile(timelinePath, 'utf8');
-        timelineData = JSON.parse(existingData);
-      } catch (error) {
-        console.log('File timeline.json non trovato, creazione di una nuova struttura.');
-      }
+      // Utility: ricalcolo summary
+      const recalc = () => {
+        const eo = containers.early_out?.tasks?.length ?? 0;
+        const hp = containers.high_priority?.tasks?.length ?? 0;
+        const lp = containers.low_priority?.tasks?.length ?? 0;
 
-      let taskToMove = null;
-      let sourceContainerType: string | null = null; // To track where the task came from if it's from containers
+        containers.early_out.count = eo;
+        containers.high_priority.count = hp;
+        containers.low_priority.count = lp;
 
-      // CASO 1: Spostamento DA timeline A containers
-      if (sourceContainer && sourceContainer.startsWith('timeline-')) {
-        const cleanerId = Number(sourceContainer.split('-')[1]); // Extract cleaner ID from timeline-id
-
-        // Trova la task in timeline e rimuovila
-        for (const cleanerEntry of timelineData.cleaners_assignments) {
-          if (cleanerEntry.cleaner.id === cleanerId) {
-            const taskIndex = cleanerEntry.tasks.findIndex((t: any) => 
-              String(t.task_id) === String(taskId) || String(t.logistic_code) === String(logisticCode)
-            );
-            if (taskIndex !== -1) {
-              taskToMove = cleanerEntry.tasks[taskIndex];
-              cleanerEntry.tasks.splice(taskIndex, 1);
-
-              // Rimuovi campi specifici della timeline
-              delete taskToMove.sequence;
-              delete taskToMove.start_time;
-              delete taskToMove.end_time;
-              delete taskToMove.travel_time;
-              delete taskToMove.followup;
-
-              // Aggiorna la reason
-              taskToMove.reasons = taskToMove.reasons || [];
-              if (!taskToMove.reasons.includes('manually_moved_to_container')) {
-                taskToMove.reasons.push('manually_moved_to_container');
-              }
-
-              break; // Task found and removed from this cleaner
-            }
-          }
-        }
-
-        // Rimuovi cleaner entries vuote
-        timelineData.cleaners_assignments = timelineData.cleaners_assignments.filter(
-          (c: any) => c.tasks && c.tasks.length > 0
-        );
-
-        // Aggiorna meta timeline
-        timelineData.meta.total_cleaners = timelineData.cleaners_assignments.length;
-        timelineData.meta.total_tasks = timelineData.cleaners_assignments.reduce(
-          (sum: number, c: any) => sum + c.tasks.length, 0
-        );
-        timelineData.meta.last_updated = new Date().toISOString();
-
-        // Scrittura atomica per timeline
-        const tmpTimelinePath = `${timelinePath}.tmp`;
-        await fs.writeFile(tmpTimelinePath, JSON.stringify(timelineData, null, 2));
-        await fs.rename(tmpTimelinePath, timelinePath);
-
-
-        // Aggiungi la task al container di destinazione
-        if (destContainer && containersData.containers[destContainer]) {
-          taskToMove.priority = destContainer;
-          containersData.containers[destContainer].tasks.push(taskToMove);
-          containersData.containers[destContainer].count = containersData.containers[destContainer].tasks.length;
-
-          // Aggiorna summary
-          if(containersData.summary) {
-            containersData.summary[destContainer] = containersData.containers[destContainer].count;
-            containersData.summary.total_tasks = 
-              containersData.containers.early_out.count + 
-              containersData.containers.high_priority.count + 
-              containersData.containers.low_priority.count;
-          }
-
-          // Scrittura atomica per containers
-          const tmpContainersPath = `${containersPath}.tmp`;
-          await fs.writeFile(tmpContainersPath, JSON.stringify(containersData, null, 2));
-          await fs.rename(tmpContainersPath, containersPath);
-
-          console.log(`✅ Task ${logisticCode} spostata da timeline a ${destContainer}`);
-        }
-
-        res.json({ success: true, message: "Task spostata da timeline a container" });
-        return;
-      }
-
-      // CASO 2: Spostamento DA containers A timeline
-      if (destContainer.startsWith('timeline-')) {
-        const cleanerId = Number(destContainer.split('-')[1]);
-
-        // Cerca la task in containers e rimuovila
-        for (const [containerType, container] of Object.entries(containersData.containers || {})) {
-          const taskIndex = (container as any).tasks?.findIndex((t: any) => 
-            String(t.task_id) === String(taskId) || String(t.logistic_code) === String(logisticCode)
-          );
-          if (taskIndex !== -1) {
-            taskToMove = (container as any).tasks[taskIndex];
-            sourceContainerType = containerType; // Track where it came from
-            (container as any).tasks.splice(taskIndex, 1);
-            (container as any).count = (container as any).tasks.length;
-            break;
-          }
-        }
-
-        if (!taskToMove) {
-          return res.status(404).json({ error: 'Task non trovata nei containers.' });
-        }
-
-        // Aggiungi la task alla timeline del cleaner
-        let cleanerEntry = timelineData.cleaners_assignments.find((c: any) => c.cleaner.id === cleanerId);
-        if (!cleanerEntry) {
-          // Se il cleaner non esiste, cercalo in selected_cleaners.json
-          const cleanersPath = path.join(process.cwd(), 'client/public/data/cleaners/selected_cleaners.json');
-          const cleanersData = JSON.parse(await fs.readFile(cleanersPath, 'utf8'));
-          const cleaner = cleanersData.cleaners.find((c: any) => c.id === cleanerId);
-          if (!cleaner) {
-            return res.status(404).json({ error: 'Cleaner non trovato.' });
-          }
-          cleanerEntry = {
-            cleaner: {
-              id: cleaner.id,
-              name: cleaner.name,
-              lastname: cleaner.lastname,
-              role: cleaner.role,
-              premium: cleaner.premium
-            },
-            tasks: []
-          };
-          timelineData.cleaners_assignments.push(cleanerEntry);
-        }
-
-        // Trova la sequenza corretta
-        const maxSequence = cleanerEntry.tasks.reduce((max: number, t: any) => Math.max(max, t.sequence || 0), 0);
-        const newSequence = maxSequence + 1;
-
-        // Costruisci la task per la timeline mantenendo TUTTI i campi originali (incluso confirmed_operation)
-        const task_for_timeline = {
-          ...taskToMove, // Mantiene TUTTI i campi originali, incluso confirmed_operation
-          sequence: newSequence,
-          followup: newSequence > 1,
-          travel_time: 0,
-          start_time: taskToMove.start_time || "10:00",
-          end_time: taskToMove.end_time || "11:00",
-          reasons: [
-            ...(taskToMove.reasons || []),
-            "manual_assignment"
-          ],
-          priority: taskToMove.priority || sourceContainerType || 'low_priority' // Assign correct priority
+        containersData.summary = {
+          total_tasks: eo + hp + lp,
+          early_out: eo,
+          high_priority: hp,
+          low_priority: lp,
         };
+      };
 
-        cleanerEntry.tasks.push(task_for_timeline);
-
-        // Aggiorna meta timeline
-        timelineData.meta.total_cleaners = timelineData.cleaners_assignments.length;
-        timelineData.meta.total_tasks = timelineData.cleaners_assignments.reduce(
-          (sum: number, c: any) => sum + c.tasks.length, 0
-        );
-        timelineData.meta.last_updated = new Date().toISOString();
-
-        // Scrittura atomica per timeline
-        const tmpTimelinePath = `${timelinePath}.tmp`;
-        await fs.writeFile(tmpTimelinePath, JSON.stringify(timelineData, null, 2));
-        await fs.rename(tmpTimelinePath, timelinePath);
-
-        // Aggiorna summary containers
-        if(containersData.summary) {
-          containersData.summary = {
-            total_tasks: containersData.containers.early_out.count + 
-                          containersData.containers.high_priority.count + 
-                          containersData.containers.low_priority.count,
-            early_out: containersData.containers.early_out.count,
-            high_priority: containersData.containers.high_priority.count,
-            low_priority: containersData.containers.low_priority.count
-          };
+      const findIndexById = (arr: any[]) => {
+        if (typeof taskId !== 'undefined') {
+          const idStr = String(taskId);
+          const idx = arr.findIndex((t) => String(t?.task_id) === idStr || String(t?.id) === idStr);
+          if (idx !== -1) return idx;
         }
-
-        // Scrittura atomica per containers
-        const tmpContainersPath = `${containersPath}.tmp`;
-        await fs.writeFile(tmpContainersPath, JSON.stringify(containersData, null, 2));
-        await fs.rename(tmpContainersPath, containersPath);
-
-        console.log(`✅ Task ${logisticCode} spostata da ${sourceContainerType} a timeline (cleaner ${cleanerId})`);
-      }
-      // CASO 3: Spostamento TRA containers
-      if (sourceContainer && containersData.containers[sourceContainer]) {
-        sourceContainerType = sourceContainer; // Mark that the task originates from a container
-        const taskIndex = containersData.containers[sourceContainer].tasks.findIndex(
-          (t: any) => String(t.task_id) === String(taskId) || String(t.logistic_code) === String(logisticCode)
-        );
-
-        if (taskIndex !== -1) {
-          taskToMove = containersData.containers[sourceContainer].tasks[taskIndex];
-          containersData.containers[sourceContainer].tasks.splice(taskIndex, 1);
-          containersData.containers[sourceContainer].count = containersData.containers[sourceContainer].tasks.length;
-
-          // Aggiungi al container di destinazione
-          if (destContainer && containersData.containers[destContainer]) {
-            taskToMove.priority = destContainer;
-            containersData.containers[destContainer].tasks.push(taskToMove);
-            containersData.containers[destContainer].count = containersData.containers[destContainer].tasks.length;
-          }
-
-          // Aggiorna summary
-          if(containersData.summary) {
-            containersData.summary = {
-              total_tasks: containersData.containers.early_out.count + 
-                          containersData.containers.high_priority.count + 
-                          containersData.containers.low_priority.count,
-              early_out: containersData.containers.early_out.count,
-              high_priority: containersData.containers.high_priority.count,
-              low_priority: containersData.containers.low_priority.count
-            };
-          }
-
-          // Scrittura atomica per containers
-          const tmpContainersPath = `${containersPath}.tmp`;
-          await fs.writeFile(tmpContainersPath, JSON.stringify(containersData, null, 2));
-          await fs.rename(tmpContainersPath, containersPath);
-          console.log(`✅ Task ${logisticCode} spostata da ${sourceContainer} a ${destContainer}`);
+        if (typeof logisticCode !== 'undefined') {
+          const codeStr = String(logisticCode);
+          const idx = arr.findIndex((t) => String(t?.logistic_code) === codeStr);
+          if (idx !== -1) return idx;
         }
+        return -1;
+      };
+
+      // Colonne sorgente/destinazione
+      const srcCol = containers[fromContainer];
+      const dstCol = containers[toContainer];
+
+      if (!srcCol?.tasks || !dstCol?.tasks) {
+        return res.status(400).json({ success: false, message: 'Container non valido (early_out | high_priority | low_priority)' });
       }
 
-      res.json({ success: true, message: "Task spostata con successo" });
-    } catch (error: any) {
-      console.error("Errore nello spostamento del task:", error);
-      res.status(500).json({ success: false, error: error.message });
-    }
-  });
+      // --- Caso A: RIORDINO nello STESSO container --------------------------
+      if (fromContainer === toContainer) {
+        const tasks = srcCol.tasks as any[];
 
-  // Endpoint per salvare i cleaners selezionati
-  app.post("/api/save-selected-cleaners", async (req, res) => {
-    try {
-      const selectedCleanersPath = path.join(process.cwd(), 'client/public/data/cleaners/selected_cleaners.json');
-      const dataToSave = req.body;
+        if (typeof sourceIndex === 'number' && typeof destIndex === 'number') {
+          if (sourceIndex < 0 || sourceIndex >= tasks.length) {
+            return res.status(400).json({ success: false, message: 'sourceIndex fuori range' });
+          }
+          const [moved] = tasks.splice(sourceIndex, 1);
+          const safeDest = Math.min(Math.max(destIndex, 0), tasks.length);
+          tasks.splice(safeDest, 0, moved);
 
-      await fs.writeFile(selectedCleanersPath, JSON.stringify(dataToSave, null, 2));
+          recalc();
+          // Scrittura atomica
+          const tmp = containersPath + '.tmp';
+          await fs.writeFile(tmp, JSON.stringify(containersData, null, 2));
+          await fs.rename(tmp, containersPath);
 
-      res.json({
-        success: true,
-        message: `Salvati ${dataToSave.total_selected} cleaners in selected_cleaners.json`,
-        total_selected: dataToSave.total_selected
-      });
-    } catch (error: any) {
-      console.error("Errore nel salvataggio dei cleaners selezionati:", error);
-      res.status(500).json({
-        success: false,
-        message: 'Errore nel salvataggio dei cleaners selezionati',
-        error: error.message
-      });
+          return res.json({ success: true, message: 'Riordino nello stesso container eseguito' });
+        }
+
+        // fallback: trova la task e mettila in fondo (non ideale ma sicuro)
+        const idx = findIndexById(tasks);
+        if (idx === -1) {
+          return res.status(404).json({ success: false, message: 'Task non trovata nel container' });
+        }
+        const [moved] = tasks.splice(idx, 1);
+        tasks.push(moved);
+
+        recalc();
+        const tmp = containersPath + '.tmp';
+        await fs.writeFile(tmp, JSON.stringify(containersData, null, 2));
+        await fs.rename(tmp, containersPath);
+
+        return res.json({ success: true, message: 'Riordino fallback (append) eseguito' });
+      }
+
+      // --- Caso B: SPOSTAMENTO TRA container diversi ------------------------
+      const srcTasks = srcCol.tasks as any[];
+      const dstTasks = dstCol.tasks as any[];
+
+      // prova prima con sourceIndex se disponibile, altrimenti cerca per id/codice
+      let takeIndex = -1;
+      if (typeof sourceIndex === 'number' && sourceIndex >= 0 && sourceIndex < srcTasks.length) {
+        takeIndex = sourceIndex;
+      } else {
+        takeIndex = findIndexById(srcTasks);
+      }
+
+      if (takeIndex === -1) {
+        return res.status(404).json({ success: false, message: 'Task non trovata nel container sorgente' });
+      }
+
+      const [taskToMove] = srcTasks.splice(takeIndex, 1);
+
+      // inserisci in posizione precisa se destIndex è valido; altrimenti in fondo
+      if (typeof destIndex === 'number' && destIndex >= 0 && destIndex <= dstTasks.length) {
+        dstTasks.splice(destIndex, 0, taskToMove);
+      } else {
+        dstTasks.push(taskToMove);
+      }
+
+      // Aggiorna count + summary
+      recalc();
+
+      // Scrittura atomica del JSON
+      const tmp = containersPath + '.tmp';
+      await fs.writeFile(tmp, JSON.stringify(containersData, null, 2));
+      await fs.rename(tmp, containersPath);
+
+      return res.json({ success: true, message: 'Task spostata tra containers' });
+    } catch (err: any) {
+      console.error('update-task-json error:', err);
+      return res.status(500).json({ success: false, message: 'Errore interno', error: String(err?.message ?? err) });
     }
   });
 
@@ -1852,7 +1719,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             const cleanersAssignments = [];
             for (const [cleanerId, tasks] of cleanerGroups.entries()) {
               const cleanerInfo = cleanersData.cleaners.find((c: any) => c.id === cleanerId);
-              
+
               cleanersAssignments.push({
                 cleaner: {
                   id: cleanerId,
