@@ -1,6 +1,6 @@
 {
   "metadata": {
-    "last_updated": "2025-11-03T09:30:36.757727",
+    "last_updated": "2025-11-03T09:35:04.440979",
     "date": "2025-11-03"
   },
   "containers": {
@@ -394,63 +394,9 @@
             "premium"
           ],
           "priority": "high_priority"
-        },
-        {
-          "task_id": 218361,
-          "logistic_code": 1483,
-          "client_id": 3,
-          "premium": true,
-          "address": "Via Santa Croce,8",
-          "lat": "45.4560183",
-          "lng": "9.1835278",
-          "cleaning_time": 270,
-          "checkin_date": "2025-11-03",
-          "checkout_date": "2025-11-03",
-          "checkin_time": "21:30",
-          "checkout_time": null,
-          "pax_in": 3,
-          "pax_out": 5,
-          "small_equipment": false,
-          "operation_id": 2,
-          "confirmed_operation": true,
-          "straordinaria": false,
-          "type_apt": "E",
-          "alias": "TBR",
-          "customer_name": "THE BEST RENT S.r.l.",
-          "reasons": [
-            "premium"
-          ],
-          "priority": "high_priority"
-        },
-        {
-          "task_id": 218365,
-          "logistic_code": 1537,
-          "client_id": 3,
-          "premium": true,
-          "address": "Via dei Piatti, 4 20123 (MI)",
-          "lat": "45.460795",
-          "lng": "9.1850985",
-          "cleaning_time": 150,
-          "checkin_date": "2025-11-03",
-          "checkout_date": "2025-11-03",
-          "checkin_time": "17:00",
-          "checkout_time": null,
-          "pax_in": 2,
-          "pax_out": 1,
-          "small_equipment": false,
-          "operation_id": 2,
-          "confirmed_operation": true,
-          "straordinaria": false,
-          "type_apt": "C",
-          "alias": "TBR",
-          "customer_name": "THE BEST RENT S.r.l.",
-          "reasons": [
-            "premium"
-          ],
-          "priority": "high_priority"
         }
       ],
-      "count": 16
+      "count": 14
     },
     "low_priority": {
       "tasks": [
@@ -739,9 +685,9 @@
     }
   },
   "summary": {
-    "total_tasks": 26,
+    "total_tasks": 24,
     "early_out": 0,
-    "high_priority": 16,
+    "high_priority": 14,
     "low_priority": 10
   }
 }

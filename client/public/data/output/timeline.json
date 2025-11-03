@@ -467,7 +467,7 @@
         {
           "task_id": 218361,
           "logistic_code": 1483,
-          "client_id": null,
+          "client_id": 3,
           "premium": true,
           "address": "Via Santa Croce,8",
           "lat": "45.4560183",
@@ -501,7 +501,7 @@
         {
           "task_id": 218365,
           "logistic_code": 1537,
-          "client_id": null,
+          "client_id": 3,
           "premium": true,
           "address": "Via dei Piatti, 4 20123 (MI)",
           "lat": "45.460795",
