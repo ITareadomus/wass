@@ -402,69 +402,56 @@ export default function Convocazioni() {
 
         {/* Pannello Statistiche - 1/3 dello spazio - FISSO */}
         <Card className="p-6 border-2 flex flex-col h-full overflow-hidden">
-          <h3 className="text-lg font-semibold text-foreground mb-4">Statistiche Cleaners</h3>
-          <div className="space-y-3 text-sm flex-1 overflow-y-auto">
-            <div className="space-y-3">
-              <div className="flex justify-between items-center">
-                <span className="text-muted-foreground">Disponibili:</span>
-                <span className="font-bold text-green-600">
+          <h3 className="text-lg font-semibold text-foreground mb-6">Statistiche Cleaners</h3>
+          <div className="grid grid-cols-2 gap-4 flex-1">
+            {/* Disponibili */}
+            <div className="bg-green-50 dark:bg-green-950/20 rounded-lg p-4 flex flex-col items-center justify-center border border-green-200 dark:border-green-800">
+              <div className="w-20 h-20 rounded-full bg-green-500 dark:bg-green-600 flex items-center justify-center mb-2 shadow-lg">
+                <span className="text-3xl font-bold text-white">
                   {cleaners.filter(c => c.available !== false).length}
                 </span>
               </div>
-              <div className="flex justify-between items-center">
-                <span className="text-muted-foreground">Non Disponibili:</span>
-                <span className="font-bold text-gray-500">
+              <span className="text-sm font-semibold text-green-700 dark:text-green-300 text-center">Disponibili</span>
+            </div>
+
+            {/* Non Disponibili */}
+            <div className="bg-gray-50 dark:bg-gray-950/20 rounded-lg p-4 flex flex-col items-center justify-center border border-gray-200 dark:border-gray-700">
+              <div className="w-20 h-20 rounded-full bg-gray-500 dark:bg-gray-600 flex items-center justify-center mb-2 shadow-lg">
+                <span className="text-3xl font-bold text-white">
                   {cleaners.filter(c => c.available === false).length}
                 </span>
               </div>
-              <div className="flex justify-between items-center">
-                <span className="text-muted-foreground">Premium:</span>
-                <span className="font-bold text-yellow-600">
+              <span className="text-sm font-semibold text-gray-700 dark:text-gray-300 text-center">Non Disponibili</span>
+            </div>
+
+            {/* Premium */}
+            <div className="bg-yellow-50 dark:bg-yellow-950/20 rounded-lg p-4 flex flex-col items-center justify-center border border-yellow-200 dark:border-yellow-800">
+              <div className="w-20 h-20 rounded-full bg-yellow-500 dark:bg-yellow-600 flex items-center justify-center mb-2 shadow-lg">
+                <span className="text-3xl font-bold text-white">
                   {cleaners.filter(c => c.role === "Premium").length}
                 </span>
               </div>
-              <div className="flex justify-between items-center">
-                <span className="text-muted-foreground">Standard:</span>
-                <span className="font-bold text-green-600">
+              <span className="text-sm font-semibold text-yellow-700 dark:text-yellow-300 text-center">Premium</span>
+            </div>
+
+            {/* Standard */}
+            <div className="bg-green-50 dark:bg-green-950/20 rounded-lg p-4 flex flex-col items-center justify-center border border-green-200 dark:border-green-800">
+              <div className="w-20 h-20 rounded-full bg-green-500 dark:bg-green-600 flex items-center justify-center mb-2 shadow-lg">
+                <span className="text-3xl font-bold text-white">
                   {cleaners.filter(c => c.role === "Standard").length}
                 </span>
               </div>
-              <div className="flex justify-between items-center">
-                <span className="text-muted-foreground">Formatori:</span>
-                <span className="font-bold text-orange-600">
+              <span className="text-sm font-semibold text-green-700 dark:text-green-300 text-center">Standard</span>
+            </div>
+
+            {/* Formatori */}
+            <div className="bg-orange-50 dark:bg-orange-950/20 rounded-lg p-4 flex flex-col items-center justify-center border border-orange-200 dark:border-orange-800 col-span-2">
+              <div className="w-20 h-20 rounded-full bg-orange-500 dark:bg-orange-600 flex items-center justify-center mb-2 shadow-lg">
+                <span className="text-3xl font-bold text-white">
                   {cleaners.filter(c => c.role === "Formatore").length}
                 </span>
               </div>
-              <div className="flex justify-between items-center">
-                <span className="text-muted-foreground">Premium Disp.:</span>
-                <span className="font-bold text-yellow-600">
-                  {cleaners.filter(c => c.role === "Premium" && c.available !== false).length}
-                </span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-muted-foreground">Standard Disp.:</span>
-                <span className="font-bold text-green-600">
-                  {cleaners.filter(c => c.role === "Standard" && c.available !== false).length}
-                </span>
-              </div>
-              <div className="flex justify-between items-center pt-2 border-t">
-                <span className="text-muted-foreground">Contratto A:</span>
-                <span className="font-bold text-blue-600">
-                  {cleaners.filter(c => c.contract_type === "A").length}
-                </span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-muted-foreground">Contratto B:</span>
-                <span className="font-bold text-blue-600">
-                  {cleaners.filter(c => c.contract_type === "B").length}
-                </span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-muted-foreground">A Chiamata:</span>
-                <span className="font-bold text-purple-600">
-                  {cleaners.filter(c => c.contract_type === "a chiamata").length}
-                </span>
-              </div>
+              <span className="text-sm font-semibold text-orange-700 dark:text-orange-300 text-center">Formatori</span>
             </div>
           </div>
         </Card>
