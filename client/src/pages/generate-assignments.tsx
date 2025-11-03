@@ -242,6 +242,12 @@ export default function GenerateAssignments() {
         // Nuova struttura organizzata per cleaner
         console.log('📋 Caricamento da cleaners_assignments:', timelineAssignmentsData.cleaners_assignments.length, 'cleaners');
         for (const cleanerEntry of timelineAssignmentsData.cleaners_assignments) {
+          // Verifica che cleanerEntry.cleaner esista
+          if (!cleanerEntry.cleaner) {
+            console.warn('⚠️ Trovata entry senza cleaner, salto:', cleanerEntry);
+            continue;
+          }
+          
           console.log(`   Cleaner ${cleanerEntry.cleaner.id} (${cleanerEntry.cleaner.name}) ha ${cleanerEntry.tasks?.length || 0} task`);
           for (const task of cleanerEntry.tasks || []) {
             const logisticCode = String(task.logistic_code);
