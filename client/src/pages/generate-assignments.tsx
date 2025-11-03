@@ -954,20 +954,7 @@ export default function GenerateAssignments() {
                 />
               </PopoverContent>
             </Popover>
-            <Button
-              onClick={confirmAssignments}
-              disabled={isConfirming || allTasksWithAssignments.filter(t => (t as any).assignedCleaner).length === 0}
-              className="bg-green-600 hover:bg-green-700 text-white"
-            >
-              {isConfirming ? (
-                <>
-                  <span className="animate-spin mr-2">⏳</span>
-                  Salvando...
-                </>
-              ) : (
-                '✓ Conferma Assegnazioni'
-              )}
-            </Button>
+            
             <div className="bg-card rounded-lg border shadow-sm px-4 py-2 text-center">
               <div className="text-sm text-muted-foreground">Task Totali</div>
               <div className="text-2xl font-bold text-primary">{allTasksWithAssignments.length}</div>
