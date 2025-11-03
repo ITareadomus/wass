@@ -87,7 +87,8 @@ export default function TaskCard({
   const displayTask = allTasks[currentTaskIndex] || task;
 
   // Normalizza confirmed_operation da boolean/number/string a boolean sicuro
-  const rawConfirmed = (task as any).confirmed_operation;
+  // USA displayTask invece di task
+  const rawConfirmed = (displayTask as any).confirmed_operation;
   const isConfirmedOperation =
     typeof rawConfirmed === "boolean"
       ? rawConfirmed
@@ -99,8 +100,9 @@ export default function TaskCard({
 
   // Determina il tipo di task SOLO dai flag premium/straordinaria
   // Priorità: straordinaria → premium → standard
-  const isPremium = Boolean(task.premium);
-  const isStraordinaria = Boolean(task.straordinaria);
+  // USA displayTask invece di task
+  const isPremium = Boolean(displayTask.premium);
+  const isStraordinaria = Boolean(displayTask.straordinaria);
 
   // Funzione per assegnare colore e label SOLO in base al tipo
   const getTaskTypeStyle = () => {
