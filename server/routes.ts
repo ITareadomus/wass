@@ -2275,7 +2275,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(500).json({ success: false, message: 'Struttura timeline non valida' });
       }
 
-      const getCleanerEntry = (id: number) => cleaners.find((c: any) => c.cleaner_id === id);
+      const getCleanerEntry = (id: number) => cleaners.find((c: any) => c.cleaner?.id === id);
 
       const idMatches = (t: any, key: string) =>
         String(t?.task_id) === key || String(t?.logistic_code) === key || String(t?.id) === key;
