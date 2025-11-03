@@ -516,8 +516,8 @@ export default function TimelineView({
                 {/* Info cleaner */}
                 <div
                   className="flex-shrink-0 p-1 flex items-center border border-border cursor-pointer hover:opacity-90 transition-opacity"
-                  style={{ width: `${cleanerColumnWidth}px` }}
                   style={{ 
+                    width: `${cleanerColumnWidth}px`,
                     backgroundColor: filteredCleanerId === cleaner.id ? `${color.bg}` : color.bg,
                     color: color.text,
                     boxShadow: filteredCleanerId === cleaner.id ? '0 0 0 3px rgba(59, 130, 246, 0.5)' : 'none',
