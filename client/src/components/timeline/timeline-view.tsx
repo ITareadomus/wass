@@ -371,9 +371,43 @@ export default function TimelineView({
     }
   };
 
-  const handleGoToConvocazioni = () => {
-    // Apri la pagina delle convocazioni in una nuova finestra
-    window.open('/convocazioni', '_blank');
+  const handleConfirmAssignments = async () => {
+    try {
+      const savedDate = localStorage.getItem('selected_work_date');
+      const dateStr = savedDate || (() => {
+        const today = new Date();
+        const year = today.getFullYear();
+        const month = String(today.getMonth() + 1).padStart(2, '0');
+        const day = String(today.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+      })();
+
+      const response = await fetch('/api/confirm-assignments', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ date: dateStr })
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        toast({
+          title: "Assegnazioni Confermate!",
+          description: `${result.total_assignments} assegnazioni salvate in ${result.filename}`,
+          duration: 5000,
+        });
+      } else {
+        throw new Error(result.error || 'Errore sconosciuto');
+      }
+    } catch (error: any) {
+      console.error("Errore nella conferma delle assegnazioni:", error);
+      toast({
+        title: "Errore",
+        description: error.message || "Errore durante il salvataggio delle assegnazioni",
+        variant: "destructive",
+        duration: 5000,
+      });
+    }
   };
 
   // Non mostrare nulla se non ci sono cleaners
@@ -427,16 +461,6 @@ export default function TimelineView({
               >
                 <RotateCcw className="w-4 h-4" />
                 Reset Assegnazioni
-              </Button>
-              <Button
-                onClick={handleGoToConvocazioni}
-                variant="default"
-                size="sm"
-                className="flex items-center gap-2 bg-green-500 hover:bg-green-600"
-                data-testid="button-confirm-assignments"
-              >
-                <Users className="w-4 h-4" />
-                Conferma Assegnazioni
               </Button>
             </div>
           </div>
@@ -643,7 +667,7 @@ export default function TimelineView({
             {/* Pulsante Conferma Assegnazioni che prende tutto lo spazio della timeline */}
             <div className="flex-1 p-1 border-t border-border">
               <Button
-                onClick={handleGoToConvocazioni}
+                onClick={handleConfirmAssignments}
                 className="w-full h-full bg-green-500 hover:bg-green-600"
                 data-testid="button-confirm-assignments"
               >
