@@ -67,7 +67,48 @@
       ],
       "telegram_id": 7895288780,
       "start_time": "10:00"
+    },
+    {
+      "id": 132,
+      "name": "JOHOISER ERNESTO",
+      "lastname": "LOPEZ GIRON",
+      "role": "Premium",
+      "premium": true
+    },
+    {
+      "id": 249,
+      "name": "Ogbodo Chidi",
+      "lastname": "Igwe",
+      "role": "Premium",
+      "premium": true
+    },
+    {
+      "id": 404,
+      "name": "RASEL",
+      "lastname": "MOLLA",
+      "role": "Standard",
+      "active": true,
+      "ranking": 0,
+      "counter_hours": 0,
+      "counter_days": 1,
+      "available": true,
+      "contract_type": "B",
+      "preferred_customers": [
+        2,
+        3,
+        61,
+        72,
+        75,
+        80,
+        84,
+        94,
+        115,
+        118,
+        119
+      ],
+      "telegram_id": 7559507853,
+      "start_time": "10:00"
     }
   ],
-  "total_selected": 3
+  "total_selected": 6
 }

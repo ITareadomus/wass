@@ -53,8 +53,46 @@ export default function TimelineView({
   const [selectedSwapCleaner, setSelectedSwapCleaner] = useState<string>("");
   const [filteredCleanerId, setFilteredCleanerId] = useState<number | null>(null);
   const [clickTimer, setClickTimer] = useState<NodeJS.Timeout | null>(null);
-  const [cleanersAliases, setCleanersAliases] = useState<Record<string, string>>({});
+  const [cleanersAliases, setCleanersAliases] = useState<Record<number, {alias: string}>>({});
+  const [isAddCleanerDialogOpen, setIsAddCleanerDialogOpen] = useState(false);
+  const [availableCleaners, setAvailableCleaners] = useState<Cleaner[]>([]);
   const { toast } = useToast();
+
+  // Mutation per aggiungere un cleaner alla timeline
+  const addCleanerMutation = useMutation({
+    mutationFn: async (cleanerId: number) => {
+      const savedDate = localStorage.getItem('selected_work_date');
+      const workDate = savedDate || new Date().toISOString().split('T')[0];
+      
+      const response = await apiRequest("POST", "/api/add-cleaner-to-timeline", {
+        cleanerId,
+        date: workDate
+      });
+      return await response.json();
+    },
+    onSuccess: async () => {
+      // Ricarica i cleaner per mostrare immediatamente il nuovo cleaner
+      await loadCleaners();
+      
+      // Ricarica anche le task se necessario
+      if ((window as any).reloadAllTasks) {
+        await (window as any).reloadAllTasks(true);
+      }
+      
+      toast({
+        title: "Cleaner aggiunto!",
+        description: "Il cleaner è stato aggiunto alla timeline con successo.",
+      });
+      setIsAddCleanerDialogOpen(false);
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Errore",
+        description: error.message || "Impossibile aggiungere il cleaner alla timeline",
+        variant: "destructive",
+      });
+    },
+  });
 
   // Mutation per scambiare task tra cleaners
   const swapCleanersMutation = useMutation({
@@ -177,50 +215,51 @@ export default function TimelineView({
     return colors[index % colors.length];
   };
 
+  // Funzione per caricare i cleaner da selected_cleaners.json
+  const loadCleaners = async () => {
+    try {
+      // Aggiungi timestamp per evitare caching
+      const response = await fetch(`/data/cleaners/selected_cleaners.json?t=${Date.now()}`);
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      // Verifica che la risposta sia JSON
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        console.error('Risposta non JSON:', contentType);
+        setCleaners([]);
+        return;
+      }
+
+      const selectedData = await response.json();
+      console.log("Cleaners caricati da selected_cleaners.json:", selectedData);
+
+      // I cleaners sono già nel formato corretto
+      const cleanersList = selectedData.cleaners || [];
+      setCleaners(cleanersList);
+    } catch (error) {
+      console.error("Errore nel caricamento dei cleaners selezionati:", error);
+      setCleaners([]); // Imposta array vuoto invece di lasciare undefined
+    }
+  };
+
+  const loadAliases = async () => {
+    try {
+      const response = await fetch(`/data/cleaners/cleaners_aliases.json?t=${Date.now()}`);
+      if (!response.ok) {
+        console.warn('File aliases non trovato, uso nomi default');
+        return;
+      }
+      const aliasesData = await response.json();
+      setCleanersAliases(aliasesData.aliases || {});
+      console.log("Alias cleaners caricati:", aliasesData.aliases);
+    } catch (error) {
+      console.error("Errore nel caricamento degli alias:", error);
+    }
+  };
+
   useEffect(() => {
-    const loadCleaners = async () => {
-      try {
-        // Aggiungi timestamp per evitare caching
-        const response = await fetch(`/data/cleaners/selected_cleaners.json?t=${Date.now()}`);
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
-
-        // Verifica che la risposta sia JSON
-        const contentType = response.headers.get('content-type');
-        if (!contentType || !contentType.includes('application/json')) {
-          console.error('Risposta non JSON:', contentType);
-          setCleaners([]);
-          return;
-        }
-
-        const selectedData = await response.json();
-        console.log("Cleaners caricati da selected_cleaners.json:", selectedData);
-
-        // I cleaners sono già nel formato corretto
-        const cleanersList = selectedData.cleaners || [];
-        setCleaners(cleanersList);
-      } catch (error) {
-        console.error("Errore nel caricamento dei cleaners selezionati:", error);
-        setCleaners([]); // Imposta array vuoto invece di lasciare undefined
-      }
-    };
-
-    const loadAliases = async () => {
-      try {
-        const response = await fetch(`/data/cleaners/cleaners_aliases.json?t=${Date.now()}`);
-        if (!response.ok) {
-          console.warn('File aliases non trovato, uso nomi default');
-          return;
-        }
-        const aliasesData = await response.json();
-        setCleanersAliases(aliasesData.aliases || {});
-        console.log("Alias cleaners caricati:", aliasesData.aliases);
-      } catch (error) {
-        console.error("Errore nel caricamento degli alias:", error);
-      }
-    };
-
     loadCleaners();
     loadAliases();
   }, []);
@@ -260,6 +299,46 @@ export default function TimelineView({
       
       setClickTimer(timer);
     }
+  };
+
+  // Carica cleaner disponibili per aggiungerli alla timeline
+  const loadAvailableCleaners = async () => {
+    try {
+      const savedDate = localStorage.getItem('selected_work_date');
+      const workDate = savedDate || new Date().toISOString().split('T')[0];
+      
+      const response = await fetch(`/data/cleaners/cleaners.json`);
+      const data = await response.json();
+      
+      // Trova i cleaner per la data selezionata
+      const dateCleaners = data.dates[workDate]?.cleaners || [];
+      
+      // Filtra i cleaner che NON sono già nella timeline
+      const currentCleanerIds = cleaners.map(c => c.id);
+      const available = dateCleaners.filter((c: Cleaner) => 
+        !currentCleanerIds.includes(c.id) && c.available
+      );
+      
+      setAvailableCleaners(available);
+    } catch (error) {
+      console.error('Errore nel caricamento dei cleaner disponibili:', error);
+      toast({
+        title: "Errore",
+        description: "Impossibile caricare i cleaner disponibili",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Handler per aprire il dialog di aggiunta cleaner
+  const handleOpenAddCleanerDialog = () => {
+    loadAvailableCleaners();
+    setIsAddCleanerDialogOpen(true);
+  };
+
+  // Handler per aggiungere un cleaner
+  const handleAddCleaner = (cleanerId: number) => {
+    addCleanerMutation.mutate(cleanerId);
   };
 
   const handleResetAssignments = async () => {
@@ -537,8 +616,82 @@ export default function TimelineView({
               </div>
             );
           })}
+
+          {/* Pulsante Aggiungi Cleaner */}
+          <div className="flex mt-4">
+            <div className="w-24 flex-shrink-0"></div>
+            <div className="flex-1">
+              <Button
+                onClick={handleOpenAddCleanerDialog}
+                variant="outline"
+                size="sm"
+                className="w-full border-dashed border-2 hover:bg-accent"
+                data-testid="button-add-cleaner"
+              >
+                <Users className="w-4 h-4 mr-2" />
+                Aggiungi Cleaner alla Timeline
+              </Button>
+            </div>
+          </div>
         </div>
       </div>
+
+      {/* Add Cleaner Dialog */}
+      <Dialog open={isAddCleanerDialogOpen} onOpenChange={setIsAddCleanerDialogOpen}>
+        <DialogContent className="sm:max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Aggiungi Cleaner alla Timeline</DialogTitle>
+            <DialogDescription>
+              Seleziona un cleaner disponibile da aggiungere alla timeline
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2 mt-4">
+            {availableCleaners.length === 0 ? (
+              <p className="text-center text-muted-foreground py-8">
+                Nessun cleaner disponibile da aggiungere
+              </p>
+            ) : (
+              availableCleaners.map((cleaner) => (
+                <div
+                  key={cleaner.id}
+                  className="flex items-center justify-between p-3 border rounded-lg hover:bg-accent cursor-pointer"
+                  onClick={() => handleAddCleaner(cleaner.id)}
+                  data-testid={`cleaner-option-${cleaner.id}`}
+                >
+                  <div className="flex items-center gap-3">
+                    <div>
+                      <p className="font-semibold">
+                        {cleaner.name} {cleaner.lastname}
+                      </p>
+                      <p className="text-sm text-muted-foreground">
+                        {cleaner.role} • Contratto: {cleaner.contract_type}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {cleaner.role === "Premium" && (
+                      <span className="px-2 py-1 rounded bg-yellow-400 text-black text-xs font-bold">
+                        Premium
+                      </span>
+                    )}
+                    {cleaner.role === "Formatore" && (
+                      <span className="px-2 py-1 rounded bg-orange-500 text-white text-xs font-bold">
+                        Formatore
+                      </span>
+                    )}
+                    {cleaner.role === "Standard" && (
+                      <span className="px-2 py-1 rounded bg-green-500 text-white text-xs font-bold">
+                        Standard
+                      </span>
+                    )}
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {/* Cleaner Details Dialog */}
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
         <DialogContent className={`sm:max-w-2xl max-h-[80vh] overflow-y-auto ${
