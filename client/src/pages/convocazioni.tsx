@@ -317,7 +317,6 @@ export default function Convocazioni() {
 
             {/* Selettore Data e Dark Mode Toggle */}
             <div className="flex items-center gap-3">
-              <ThemeToggle />
               <Popover>
               <PopoverTrigger asChild>
                 <Button
@@ -341,6 +340,7 @@ export default function Convocazioni() {
                 />
               </PopoverContent>
             </Popover>
+              <ThemeToggle />
             </div>
           </div>
 
