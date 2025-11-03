@@ -73,6 +73,15 @@ export default function TaskCard({
   const handleNextTask = () => {
     if (!canGoNext) return;
     const nextTask = navigableTasks[currentTaskInNavigable + 1];
+    console.log('🔄 Navigazione NEXT:', {
+      from: currentTaskId,
+      to: nextTask.id,
+      nextTaskData: {
+        name: (nextTask as any).logistic_code || nextTask.name,
+        premium: nextTask.premium,
+        straordinaria: nextTask.straordinaria
+      }
+    });
     setCurrentTaskId(nextTask.id);
   };
 
@@ -85,6 +94,18 @@ export default function TaskCard({
 
   // Task corrente da visualizzare - trova sempre per ID
   const displayTask = allTasks.find(t => t.id === currentTaskId) || task;
+  
+  // DEBUG: verifica se displayTask è corretto
+  useEffect(() => {
+    if (displayTask.id !== currentTaskId) {
+      console.warn('⚠️ MISMATCH: displayTask.id !== currentTaskId', {
+        displayTaskId: displayTask.id,
+        currentTaskId: currentTaskId,
+        displayTaskName: (displayTask as any).logistic_code || displayTask.name,
+        allTasksIds: allTasks.map(t => t.id)
+      });
+    }
+  }, [displayTask, currentTaskId, allTasks]);
 
   // DEBUG: Log per verificare i flag della task durante navigazione
   useEffect(() => {
