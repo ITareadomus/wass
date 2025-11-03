@@ -1,6 +1,6 @@
 {
   "metadata": {
-    "last_updated": "2025-11-03T13:21:40.159418",
+    "last_updated": "2025-11-03T13:25:16.769084",
     "date": "2025-11-03"
   },
   "containers": {
@@ -9,46 +9,47 @@
       "count": 0
     },
     "high_priority": {
+      "tasks": [],
+      "count": 0
+    },
+    "low_priority": {
       "tasks": [
         {
-          "task_id": 218130,
-          "logistic_code": 730,
-          "client_id": 72,
+          "task_id": 218378,
+          "logistic_code": 1129,
+          "client_id": 94,
           "premium": false,
-          "address": "VIA VERTOIBA 9",
-          "lat": "45.4587042",
-          "lng": "9.2168473",
-          "cleaning_time": 90,
-          "checkin_date": "2025-11-03",
+          "address": "VIA SAVONA, 112",
+          "lat": "45.4493298",
+          "lng": "9.1483939",
+          "cleaning_time": 150,
+          "checkin_date": "2025-11-05",
           "checkout_date": "2025-11-03",
-          "checkin_time": "12:00",
-          "checkout_time": "11:00",
-          "pax_in": 1,
-          "pax_out": 2,
+          "checkin_time": "22:00",
+          "checkout_time": null,
+          "pax_in": 5,
+          "pax_out": 1,
           "small_equipment": false,
           "operation_id": 2,
           "confirmed_operation": true,
           "straordinaria": false,
-          "type_apt": "B",
-          "alias": "PRTTLZ",
-          "customer_name": "PERETTI LORENZO",
+          "type_apt": "C",
+          "alias": "IHST",
+          "customer_name": "IHOST",
+          "priority": "low_priority",
           "reasons": [
-            "same_day_checkin_between_eo_hp"
-          ],
-          "priority": "high_priority"
+            "not_eo",
+            "not_hp"
+          ]
         }
       ],
       "count": 1
-    },
-    "low_priority": {
-      "tasks": [],
-      "count": 0
     }
   },
   "summary": {
     "total_tasks": 1,
     "early_out": 0,
-    "high_priority": 1,
-    "low_priority": 0
+    "high_priority": 0,
+    "low_priority": 1
   }
 }
