@@ -99,8 +99,8 @@ export default function TaskCard({
 
   // Determina il tipo di task SOLO dai flag premium/straordinaria
   // Priorità: straordinaria → premium → standard
-  const isPremium = Boolean((task as any).premium);
-  const isStraordinaria = Boolean((task as any).straordinaria || (task as any).is_straordinaria);
+  const isPremium = Boolean(task.premium);
+  const isStraordinaria = Boolean(task.straordinaria);
 
   // Funzione per assegnare colore e label SOLO in base al tipo
   const getTaskTypeStyle = () => {

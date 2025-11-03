@@ -343,7 +343,7 @@ export default function MapSection({ tasks }: MapSectionProps) {
                   </div>
                 )}
                 <div className="pt-2 flex gap-2">
-                  {((selectedTask as any).straordinaria || selectedTask.is_straordinaria) && (
+                  {selectedTask.straordinaria && (
                     <span className="bg-red-500 text-white px-2 py-1 rounded text-xs">
                       Straordinaria
                     </span>
@@ -353,7 +353,7 @@ export default function MapSection({ tasks }: MapSectionProps) {
                       Premium
                     </span>
                   )}
-                  {!selectedTask.premium && !((selectedTask as any).straordinaria || selectedTask.is_straordinaria) && (
+                  {!selectedTask.premium && !selectedTask.straordinaria && (
                     <span className="bg-green-500 text-white px-2 py-1 rounded text-xs">
                       Standard
                     </span>
