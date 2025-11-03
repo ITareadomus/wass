@@ -590,7 +590,7 @@ export default function TimelineView({
                             }
 
                             // DEBUG: log per capire cosa sta succedendo
-                            if (idx > 0) {
+                            if (localIndex > 0) {
                               console.log(`Task ${taskObj.task_id || taskObj.id}: travel_time=${travelTime} min`);
                             }
 
@@ -612,7 +612,7 @@ export default function TimelineView({
                                 )}
 
                                 {/* Indicatore di travel time: solo omino */}
-                                {idx > 0 && (
+                                {localIndex > 0 && (
                                   <div 
                                     key={`marker-${task.id}`} 
                                     className="flex items-center justify-center flex-shrink-0 py-3 px-2"
