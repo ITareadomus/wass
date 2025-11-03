@@ -19,7 +19,6 @@ export default function MapSection({ tasks }: MapSectionProps) {
   const googleMapRef = useRef<any>(null);
   const markersRef = useRef<any[]>([]);
   const [isMapLoaded, setIsMapLoaded] = useState(false);
-  const [isFullscreen, setIsFullscreen] = useState(false);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [cleaners, setCleaners] = useState<any[]>([]);
   const [filteredCleanerId, setFilteredCleanerId] = useState<number | null>(null);
@@ -230,59 +229,30 @@ export default function MapSection({ tasks }: MapSectionProps) {
     }
   }, [tasks, isMapLoaded, cleaners, filteredCleanerId]);
 
-  const toggleFullscreen = () => {
-    if (!mapRef.current) return;
-
-    if (!document.fullscreenElement) {
-      mapRef.current.requestFullscreen?.();
-      setIsFullscreen(true);
-    } else {
-      document.exitFullscreen?.();
-      setIsFullscreen(false);
-    }
-  };
-
-  useEffect(() => {
-    const handleFullscreenChange = () => {
-      setIsFullscreen(!!document.fullscreenElement);
-    };
-
-    document.addEventListener('fullscreenchange', handleFullscreenChange);
-    return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
-  }, []);
-
   return (
     <div className="bg-card rounded-lg border shadow-sm">
       <div className="p-4 border-b border-border">
         <h3 className="font-semibold text-foreground flex items-center justify-between">
-          <span className="flex items-center">
-            <svg 
-              className="w-5 h-5 mr-2 text-primary" 
-              fill="none" 
-              stroke="currentColor" 
-              viewBox="0 0 24 24"
-            >
-              <path 
-                strokeLinecap="round" 
-                strokeLinejoin="round" 
-                strokeWidth={2} 
-                d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" 
-              />
-              <path 
-                strokeLinecap="round" 
-                strokeLinejoin="round" 
-                strokeWidth={2} 
-                d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" 
-              />
-            </svg>
-            Mappa Appartamenti
-          </span>
-          <button
-            onClick={toggleFullscreen}
-            className="px-3 py-1 text-sm bg-primary text-primary-foreground rounded hover:bg-primary/90 transition-colors"
+          <svg 
+            className="w-5 h-5 mr-2 text-primary" 
+            fill="none" 
+            stroke="currentColor" 
+            viewBox="0 0 24 24"
           >
-            {isFullscreen ? 'Esci' : 'Schermo intero'}
-          </button>
+            <path 
+              strokeLinecap="round" 
+              strokeLinejoin="round" 
+              strokeWidth={2} 
+              d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" 
+            />
+            <path 
+              strokeLinecap="round" 
+              strokeLinejoin="round" 
+              strokeWidth={2} 
+              d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" 
+            />
+          </svg>
+          Mappa Appartamenti
         </h3>
       </div>
       <div className="p-4 relative">
