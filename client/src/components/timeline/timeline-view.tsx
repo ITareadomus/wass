@@ -615,13 +615,13 @@ export default function TimelineView({
                                 {idx > 0 && (
                                   <div 
                                     key={`marker-${task.id}`} 
-                                    className="flex items-center justify-center flex-shrink-0"
-                                    style={{ width: `${totalWidth}%` }}
-                                    title={`${travelTime} min`}
+                                    className="flex items-center justify-center flex-shrink-0 cursor-help py-3 px-2"
+                                    style={{ width: `${totalWidth}%`, minWidth: '50px', minHeight: '50px' }}
+                                    title={`Tempo di viaggio: ${travelTime} min`}
                                   >
                                     <svg
-                                      width="16"
-                                      height="16"
+                                      width="20"
+                                      height="20"
                                       viewBox="0 0 24 24"
                                       fill="currentColor"
                                       className="text-gray-600 flex-shrink-0"
