@@ -1903,14 +1903,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
             console.log(`✅ Caricato da assigned/${filename} con ${timelineData.cleaners_assignments.length} cleaner e ${confirmedJson.assignments.length} task`);
             loadedFrom = 'assigned';
 
-            // IMPORTANTE: Anche se carichiamo da assigned, forziamo timeline.json vuoto all'avvio
-            const emptyTimeline = { 
-              metadata: { last_updated: new Date().toISOString(), date },
-              cleaners_assignments: [],
-              meta: { total_cleaners: 0, used_cleaners: 0, assigned_tasks: 0 }
-            };
-            await fs.writeFile(timelinePath, JSON.stringify(emptyTimeline, null, 2));
-            console.log(`✅ Timeline.json forzato vuoto (dati caricati da assigned disponibili in memoria)`);
+            // NON salvare in timeline.json - la timeline deve rimanere vuota se è vuota
+            // await fs.writeFile(timelinePath, JSON.stringify(timelineData, null, 2));
           } else {
             throw new Error('No assignments in assigned file');
           }
@@ -1927,14 +1921,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
-      // Forza sempre timeline.json vuoto all'extract-data, indipendentemente dalla fonte
-      const emptyTimelineForExtract = { 
-        metadata: { last_updated: new Date().toISOString(), date },
-        cleaners_assignments: [],
-        meta: { total_cleaners: 0, used_cleaners: 0, assigned_tasks: 0 }
-      };
-      await fs.writeFile(timelinePath, JSON.stringify(emptyTimelineForExtract, null, 2));
-      console.log(`✅ Timeline.json resettato vuoto all'avvio (fonte dati: ${loadedFrom})`);
+      // Non resettiamo mai - ogni data ha il suo file
+      console.log(`Data selezionata: ${date}, preservo le assegnazioni esistenti (fonte: ${loadedFrom})`);
+
+      // Assicurati che metadata sia sempre aggiornato, specialmente se è stato appena creato
+      if (!timelineData.metadata) {
+        timelineData.metadata = { last_updated: new Date().toISOString(), date };
+        await fs.writeFile(timelinePath, JSON.stringify(timelineData, null, 2));
+      }
 
       // Esegui SEMPRE create_containers.py per avere dati freschi dal database
       console.log(`Eseguendo create_containers.py per data ${date}...`);
