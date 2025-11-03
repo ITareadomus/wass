@@ -184,19 +184,19 @@ export default function GenerateAssignments() {
       setIsLoadingTasks(true);
       setExtractionStep("Caricamento task nei contenitori...");
 
-      const workDate = format(selectedDate, "yyyy-MM-dd");
+      const dateStr = format(selectedDate, "yyyy-MM-dd");
 
       // Aggiungi timestamp UNIVOCO per evitare QUALSIASI cache
-      const timestamp = `?t=${Date.now()}`;
+      const timestamp = Date.now() + Math.random();
 
       console.log(`🔄 Caricamento task dai file JSON (timestamp: ${timestamp})...`);
 
-      const [containersResponse, timelineResponseRaw] = await Promise.all([
-        fetch(`/data/output/containers.json${timestamp}`, {
+      const [containersResponse, timelineResponse] = await Promise.all([
+        fetch(`/data/output/containers.json?t=${timestamp}`, {
           cache: 'no-store',
           headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' }
         }),
-        fetch(`/data/output/timeline.json${timestamp}`, {
+        fetch(`/data/output/timeline.json?t=${timestamp}`, {
           cache: 'no-store',
           headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' }
         })
@@ -208,27 +208,16 @@ export default function GenerateAssignments() {
 
       const containersData = await containersResponse.json();
 
-      // Carica da timeline.json con gestione errori
-      let timelineData: { date: string; assignments: any[]; cleaners_assignments?: any[] } = { date: workDate, assignments: [] };
+      // Carica da timeline.json
+      let timelineAssignmentsData = { assignments: [], current_date: dateStr };
 
-      try {
-        if (timelineResponseRaw.ok) {
-          const contentType = timelineResponseRaw.headers.get('content-type');
-          if (contentType && contentType.includes('application/json')) {
-            timelineData = await timelineResponseRaw.json();
-            console.log("Caricato da timeline.json");
-          } else {
-            console.warn('timeline.json non è un JSON valido, partendo da zero');
-          }
-        } else {
-          console.warn('timeline.json non trovato, partendo da zero');
-        }
-      } catch (error) {
-        console.warn('Errore nel caricamento di timeline.json:', error);
+      if (timelineResponse.ok) {
+        timelineAssignmentsData = await timelineResponse.json();
+        console.log("Caricato da timeline.json");
       }
 
       console.log("Containers data:", containersData);
-      console.log("Timeline assignments data:", timelineData);
+      console.log("Timeline assignments data:", timelineAssignmentsData);
 
       // Estrai task dai container
       const initialEarlyOut: Task[] = (containersData.containers?.early_out?.tasks || []).map((task: RawTask) =>
@@ -249,16 +238,16 @@ export default function GenerateAssignments() {
       // Nuova struttura: cleaners_assignments è un array di {cleaner, tasks}
       const timelineAssignmentsMap = new Map<string, any>();
 
-      if (timelineData.cleaners_assignments) {
+      if (timelineAssignmentsData.cleaners_assignments) {
         // Nuova struttura organizzata per cleaner
-        console.log('📋 Caricamento da cleaners_assignments:', timelineData.cleaners_assignments.length, 'cleaners');
-        for (const cleanerEntry of timelineData.cleaners_assignments) {
+        console.log('📋 Caricamento da cleaners_assignments:', timelineAssignmentsData.cleaners_assignments.length, 'cleaners');
+        for (const cleanerEntry of timelineAssignmentsData.cleaners_assignments) {
           // Verifica che cleanerEntry.cleaner esista
           if (!cleanerEntry.cleaner) {
             console.warn('⚠️ Trovata entry senza cleaner, salto:', cleanerEntry);
             continue;
           }
-
+          
           console.log(`   Cleaner ${cleanerEntry.cleaner.id} (${cleanerEntry.cleaner.name}) ha ${cleanerEntry.tasks?.length || 0} task`);
           for (const task of cleanerEntry.tasks || []) {
             const logisticCode = String(task.logistic_code);
@@ -270,10 +259,10 @@ export default function GenerateAssignments() {
             });
           }
         }
-      } else if (timelineData.assignments) {
+      } else if (timelineAssignmentsData.assignments) {
         // Vecchia struttura piatta (fallback)
-        console.log('📋 Caricamento da assignments (vecchia struttura):', timelineData.assignments.length);
-        for (const a of timelineData.assignments) {
+        console.log('📋 Caricamento da assignments (vecchia struttura):', timelineAssignmentsData.assignments.length);
+        for (const a of timelineAssignmentsData.assignments) {
           timelineAssignmentsMap.set(String(a.logistic_code), a);
         }
       }
@@ -354,7 +343,7 @@ export default function GenerateAssignments() {
           };
 
           console.log(`➕ Aggiungendo task ${logisticCode} dalla timeline a cleaner ${timelineAssignment.cleanerId} con sequence ${timelineAssignment.sequence}`);
-
+          
           // IMPORTANTE: Assicurati che assignedCleaner sia propagato correttamente
           const taskWithAssignment = {
             ...baseTask,
@@ -383,7 +372,7 @@ export default function GenerateAssignments() {
             operation_id: timelineAssignment.operation_id,
             alias: timelineAssignment.alias,
           } as any;
-
+          
           tasksWithAssignments.push(taskWithAssignment);
         }
       }
@@ -392,7 +381,7 @@ export default function GenerateAssignments() {
       console.log(`   - Task totali: ${tasksWithAssignments.length}`);
       console.log(`   - Task assegnate: ${tasksWithAssignments.filter(t => (t as any).assignedCleaner).length}`);
       console.log(`   - Task nei containers: ${tasksWithAssignments.filter(t => !(t as any).assignedCleaner).length}`);
-
+      
       // Debug: mostra alcune task assegnate
       const assignedTasks = tasksWithAssignments.filter(t => (t as any).assignedCleaner);
       if (assignedTasks.length > 0) {
@@ -517,10 +506,10 @@ export default function GenerateAssignments() {
       const month = String(selectedDate.getMonth() + 1).padStart(2, '0');
       const day = String(selectedDate.getDate()).padStart(2, '0');
       const dateStr = `${year}-${month}-${day}`;
-
+      
       console.log(`📅 Assegnazione EO per data: ${dateStr}`);
       console.log(`📅 selectedDate oggetto:`, selectedDate);
-
+      
       const response = await fetch('/api/assign-early-out-to-timeline', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -560,10 +549,10 @@ export default function GenerateAssignments() {
       const month = String(selectedDate.getMonth() + 1).padStart(2, '0');
       const day = String(selectedDate.getDate()).padStart(2, '0');
       const dateStr = `${year}-${month}-${day}`;
-
+      
       console.log(`📅 Assegnazione HP per data: ${dateStr}`);
       console.log(`📅 selectedDate oggetto:`, selectedDate);
-
+      
       const response = await fetch('/api/assign-high-priority-to-timeline', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -607,10 +596,10 @@ export default function GenerateAssignments() {
       const month = String(selectedDate.getMonth() + 1).padStart(2, '0');
       const day = String(selectedDate.getDate()).padStart(2, '0');
       const dateStr = `${year}-${month}-${day}`;
-
+      
       console.log(`📅 Assegnazione LP per data: ${dateStr}`);
       console.log(`📅 selectedDate oggetto:`, selectedDate);
-
+      
       const response = await fetch('/api/assign-low-priority-to-timeline', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -688,11 +677,11 @@ export default function GenerateAssignments() {
       const response = await fetch('/api/save-timeline-assignment', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          taskId,
-          cleanerId,
-          logisticCode,
-          date: dateStr,
+        body: JSON.stringify({ 
+          taskId, 
+          cleanerId, 
+          logisticCode, 
+          date: dateStr, 
           dropIndex,
           priority, // Passa la priorità originale
           taskData: task // Passa tutti i dati del task
@@ -783,32 +772,32 @@ export default function GenerateAssignments() {
           // Reorder nella stessa timeline
           console.log(`🔄 Reorder task ${logisticCode} nella timeline del cleaner ${sourceCleanerId} da posizione ${source.index} a ${destination.index}`);
           await reorderTimelineAssignment(taskId, sourceCleanerId, logisticCode || '', source.index, destination.index);
-
+          
           // Ricarica immediatamente per mostrare il nuovo ordine
           await loadTasks(true);
           return;
         } else {
           // Spostamento tra cleaners diversi
           console.log(`🔄 Spostamento task ${logisticCode} da cleaner ${sourceCleanerId} a cleaner ${destCleanerId}`);
-
+          
           const dateStr = format(selectedDate, "yyyy-MM-dd");
           const response = await fetch('/api/move-task-between-cleaners', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              taskId,
+            body: JSON.stringify({ 
+              taskId, 
               logisticCode,
-              sourceCleanerId,
-              destCleanerId,
+              sourceCleanerId, 
+              destCleanerId, 
               destIndex: destination.index,
-              date: dateStr
+              date: dateStr 
             }),
           });
-
+          
           if (!response.ok) {
             throw new Error('Errore nello spostamento tra cleaners');
           }
-
+          
           // Ricarica immediatamente per mostrare il nuovo ordine
           await loadTasks(true);
           return;
@@ -816,9 +805,9 @@ export default function GenerateAssignments() {
       }
 
       // Caso 2: Da timeline a container
-      if (source.droppableId.startsWith('timeline-') &&
-          (destination.droppableId === 'early-out' ||
-           destination.droppableId === 'high' ||
+      if (source.droppableId.startsWith('timeline-') && 
+          (destination.droppableId === 'early-out' || 
+           destination.droppableId === 'high' || 
            destination.droppableId === 'low')) {
 
         console.log(`🔄 Spostamento da timeline a container: ${source.droppableId} -> ${destination.droppableId}`);
@@ -969,7 +958,7 @@ export default function GenerateAssignments() {
                 />
               </PopoverContent>
             </Popover>
-
+            
             <div className="bg-card rounded-lg border shadow-sm px-4 py-2 text-center">
               <div className="text-sm text-muted-foreground">Task Totali</div>
               <div className="text-2xl font-bold text-primary">{allTasksWithAssignments.length}</div>
