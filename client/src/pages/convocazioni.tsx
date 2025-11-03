@@ -439,7 +439,15 @@ export default function Convocazioni() {
               </DialogFooter>
             </DialogContent>
           </Dialog>
-          <div className="flex justify-start mt-4 pt-4 border-t">
+          <div className="flex justify-end gap-2 mt-4 pt-4 border-t">
+            <Button
+              variant="outline"
+              onClick={() => setLocation('/')}
+              className="flex items-center gap-2"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              Torna alle Assegnazioni
+            </Button>
             <Button
               onClick={handleSaveSelection}
               size="lg"
@@ -641,19 +649,6 @@ export default function Convocazioni() {
             </div>
           </div>
         </Card>
-      </div>
-
-      {/* Pulsante Torna alle Assegnazioni */}
-      <div className="p-4 border-t flex justify-start items-center">
-            <Button
-              variant="outline"
-              onClick={() => setLocation('/')}
-              className="flex items-center gap-2"
-            >
-              <ArrowLeft className="w-4 h-4" />
-              Torna alle Assegnazioni
-            </Button>
-          </div>
       </div>
     </div>
   );
