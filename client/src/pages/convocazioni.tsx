@@ -116,42 +116,35 @@ export default function Convocazioni() {
 
   const loadTaskStats = async (dateStr: string) => {
     try {
-      // Esegui create_containers per avere i dati freschi
-      const extractDataResponse = await fetch('/api/extract-data', {
+      // Esegui extract_tasks_for_convocazioni per avere i dati freschi
+      const extractStatsResponse = await fetch('/api/extract-convocazioni-tasks', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ date: dateStr })
       });
 
-      if (!extractDataResponse.ok) {
-        throw new Error('Errore durante l\'estrazione dei task');
+      if (!extractStatsResponse.ok) {
+        throw new Error('Errore durante l\'estrazione delle statistiche task');
       }
 
-      // Carica containers.json
-      const containersResponse = await fetch('/data/output/containers.json');
-      if (!containersResponse.ok) {
-        console.warn('containers.json non trovato');
+      // Carica convocazioni_tasks.json
+      const statsResponse = await fetch('/data/output/convocazioni_tasks.json');
+      if (!statsResponse.ok) {
+        console.warn('convocazioni_tasks.json non trovato');
         return;
       }
 
-      const containersData = await containersResponse.json();
+      const statsData = await statsResponse.json();
       
-      // Raccogli tutti i task da tutti i container
-      const allTasks = [
-        ...(containersData.containers?.early_out?.tasks || []),
-        ...(containersData.containers?.high_priority?.tasks || []),
-        ...(containersData.containers?.low_priority?.tasks || [])
-      ];
-
-      // Calcola statistiche
-      const stats = {
-        total: allTasks.length,
-        premium: allTasks.filter((t: any) => t.premium === true).length,
-        standard: allTasks.filter((t: any) => t.premium !== true).length,
-        straordinarie: allTasks.filter((t: any) => t.straordinaria === true || t.is_straordinaria === true).length
+      // Usa le statistiche direttamente
+      const stats = statsData.task_stats || {
+        total: 0,
+        premium: 0,
+        standard: 0,
+        straordinarie: 0
       };
 
-      console.log('Statistiche task:', stats);
+      console.log('Statistiche task da convocazioni_tasks.json:', stats);
       setTaskStats(stats);
     } catch (error) {
       console.error('Errore nel caricamento delle statistiche task:', error);
