@@ -643,8 +643,8 @@ export default function Convocazioni() {
         </Card>
       </div>
 
-      {/* Pulsanti Annulla, Aggiungi, Sostituisci */}
-      <div className="p-4 border-t flex justify-between items-center">
+      {/* Pulsante Torna alle Assegnazioni */}
+      <div className="p-4 border-t flex justify-start items-center">
             <Button
               variant="outline"
               onClick={() => setLocation('/')}
@@ -653,25 +653,6 @@ export default function Convocazioni() {
               <ArrowLeft className="w-4 h-4" />
               Torna alle Assegnazioni
             </Button>
-            <div className="flex gap-2">
-              <Button
-                onClick={handleAddCleaners}
-                disabled={selectedCleaners.size === 0}
-                variant="secondary"
-                className="flex items-center gap-2"
-              >
-                <UserPlus className="w-4 h-4" />
-                Aggiungi ({selectedCleaners.size})
-              </Button>
-              <Button
-                onClick={handleSaveSelection}
-                disabled={selectedCleaners.size === 0}
-                className="flex items-center gap-2"
-              >
-                <Save className="w-4 h-4" />
-                Sostituisci ({selectedCleaners.size})
-              </Button>
-            </div>
           </div>
       </div>
     </div>
