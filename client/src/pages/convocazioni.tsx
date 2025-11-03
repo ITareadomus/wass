@@ -481,7 +481,7 @@ export default function Convocazioni() {
           <h4 className="text-xs font-semibold text-muted-foreground mb-2">Cleaners</h4>
           <div className="grid grid-cols-2 gap-2 flex-1">
             {/* Disponibili */}
-            <div className="bg-green-50 dark:bg-green-950/20 rounded-lg p-2 flex flex-col items-center justify-center border border-green-200 dark:border-green-800">
+            <div className="bg-blue-50 dark:bg-blue-950/20 rounded-lg p-2 flex flex-col items-center justify-center border border-blue-200 dark:border-blue-800">
               <svg className="w-16 h-16 mb-1" viewBox="0 0 100 100">
                 <circle
                   cx="50"
@@ -490,7 +490,7 @@ export default function Convocazioni() {
                   fill="none"
                   stroke="currentColor"
                   strokeWidth="8"
-                  className="text-green-200 dark:text-green-900"
+                  className="text-blue-200 dark:text-blue-900"
                 />
                 <circle
                   cx="50"
@@ -502,12 +502,12 @@ export default function Convocazioni() {
                   strokeDasharray={`${cleaners.length > 0 ? (cleaners.filter(c => c.available !== false).length / cleaners.length) * 251.2 : 0} 251.2`}
                   strokeDashoffset="0"
                   transform="rotate(-90 50 50)"
-                  className="text-green-500 dark:text-green-600 transition-all duration-500"
+                  className="text-blue-500 dark:text-blue-600 transition-all duration-500"
                   strokeLinecap="round"
                 />
               </svg>
-              <span className="text-[10px] font-semibold text-green-700 dark:text-green-300 text-center">Disponibili</span>
-              <span className="text-[9px] text-green-600 dark:text-green-400">
+              <span className="text-[10px] font-semibold text-blue-700 dark:text-blue-300 text-center">Disponibili</span>
+              <span className="text-[9px] text-blue-600 dark:text-blue-400">
                 {cleaners.filter(c => c.available !== false).length}/{cleaners.length}
               </span>
             </div>
