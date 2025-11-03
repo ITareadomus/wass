@@ -134,26 +134,16 @@ export default function TaskCard({
   const { label: typeLabel, colorClass } = getTaskTypeStyle();
 
   useEffect(() => {
-    const loadAssignmentTimes = async () => {
-      try {
-        // I dati sono già presenti nell'oggetto task (dalla timeline o dai containers)
-        const taskObj = displayTask as any;
-        if (taskObj.startTime || taskObj.start_time) {
-          setAssignmentTimes({
-            start_time: taskObj.start_time || taskObj.startTime,
-            end_time: taskObj.end_time || taskObj.endTime,
-            travel_time: taskObj.travel_time || taskObj.travelTime
-          });
-        }
-      } catch (error) {
-        console.error('Errore nel caricamento dei tempi di assegnazione:', error);
-      }
-    };
-
-    if (isModalOpen) {
-      loadAssignmentTimes();
+    // I dati sono già presenti nell'oggetto task (dalla timeline o dai containers)
+    const taskObj = displayTask as any;
+    if (taskObj.startTime || taskObj.start_time) {
+      setAssignmentTimes({
+        start_time: taskObj.start_time || taskObj.startTime,
+        end_time: taskObj.end_time || taskObj.endTime,
+        travel_time: taskObj.travel_time || taskObj.travelTime
+      });
     }
-  }, [isModalOpen, displayTask, currentTaskIndex]);
+  }, [displayTask, currentTaskIndex]);
 
   const handleCardClick = (e: React.MouseEvent) => {
     e.stopPropagation();
