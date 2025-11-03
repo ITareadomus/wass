@@ -29,8 +29,16 @@ interface Cleaner {
   start_time: string | null;
 }
 
+interface TaskStats {
+  total: number;
+  premium: number;
+  standard: number;
+  straordinarie: number;
+}
+
 export default function Convocazioni() {
   const [cleaners, setCleaners] = useState<Cleaner[]>([]);
+  const [taskStats, setTaskStats] = useState<TaskStats>({ total: 0, premium: 0, standard: 0, straordinarie: 0 });
   const [selectedCleaners, setSelectedCleaners] = useState<Set<number>>(new Set());
   const [isLoading, setIsLoading] = useState(true);
   const [loadingMessage, setLoadingMessage] = useState("Inizializzazione...");
@@ -89,8 +97,13 @@ export default function Convocazioni() {
 
         setCleaners(cleanersList);
         setSelectedCleaners(new Set()); // Reset selezioni quando cambia la data
+
+        // Carica statistiche task
+        setLoadingMessage("Caricamento statistiche task...");
+        await loadTaskStats(dateStr);
+
         setIsLoading(false);
-        setLoadingMessage("Cleaners caricati con successo!");
+        setLoadingMessage("Caricamento completato!");
       } catch (error) {
         console.error("Errore nel caricamento dei cleaners:", error);
         setLoadingMessage("Errore nel caricamento dei cleaners");
@@ -100,6 +113,50 @@ export default function Convocazioni() {
 
     loadCleaners();
   }, [selectedDate]);
+
+  const loadTaskStats = async (dateStr: string) => {
+    try {
+      // Esegui create_containers per avere i dati freschi
+      const extractDataResponse = await fetch('/api/extract-data', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ date: dateStr })
+      });
+
+      if (!extractDataResponse.ok) {
+        throw new Error('Errore durante l\'estrazione dei task');
+      }
+
+      // Carica containers.json
+      const containersResponse = await fetch('/data/output/containers.json');
+      if (!containersResponse.ok) {
+        console.warn('containers.json non trovato');
+        return;
+      }
+
+      const containersData = await containersResponse.json();
+      
+      // Raccogli tutti i task da tutti i container
+      const allTasks = [
+        ...(containersData.containers?.early_out?.tasks || []),
+        ...(containersData.containers?.high_priority?.tasks || []),
+        ...(containersData.containers?.low_priority?.tasks || [])
+      ];
+
+      // Calcola statistiche
+      const stats = {
+        total: allTasks.length,
+        premium: allTasks.filter((t: any) => t.premium === true).length,
+        standard: allTasks.filter((t: any) => t.premium !== true).length,
+        straordinarie: allTasks.filter((t: any) => t.straordinaria === true || t.is_straordinaria === true).length
+      };
+
+      console.log('Statistiche task:', stats);
+      setTaskStats(stats);
+    } catch (error) {
+      console.error('Errore nel caricamento delle statistiche task:', error);
+    }
+  };
 
   const toggleCleanerSelection = (cleanerId: number, isAvailable: boolean) => {
     if (!isAvailable) {
@@ -402,7 +459,33 @@ export default function Convocazioni() {
 
         {/* Pannello Statistiche - 1/3 dello spazio - FISSO */}
         <Card className="p-6 border-2 flex flex-col h-full overflow-hidden">
-          <h3 className="text-lg font-semibold text-foreground mb-6">Statistiche Cleaners</h3>
+          <h3 className="text-lg font-semibold text-foreground mb-4">Statistiche</h3>
+          
+          {/* Statistiche Task */}
+          <div className="mb-6 pb-4 border-b border-border">
+            <h4 className="text-sm font-semibold text-muted-foreground mb-3">Task Giornata</h4>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="bg-blue-50 dark:bg-blue-950/20 rounded-lg p-3 border border-blue-200 dark:border-blue-800">
+                <div className="text-2xl font-bold text-blue-600">{taskStats.total}</div>
+                <div className="text-xs text-blue-700 dark:text-blue-300">Totale</div>
+              </div>
+              <div className="bg-yellow-50 dark:bg-yellow-950/20 rounded-lg p-3 border border-yellow-200 dark:border-yellow-800">
+                <div className="text-2xl font-bold text-yellow-600">{taskStats.premium}</div>
+                <div className="text-xs text-yellow-700 dark:text-yellow-300">Premium</div>
+              </div>
+              <div className="bg-green-50 dark:bg-green-950/20 rounded-lg p-3 border border-green-200 dark:border-green-800">
+                <div className="text-2xl font-bold text-green-600">{taskStats.standard}</div>
+                <div className="text-xs text-green-700 dark:text-green-300">Standard</div>
+              </div>
+              <div className="bg-red-50 dark:bg-red-950/20 rounded-lg p-3 border border-red-200 dark:border-red-800">
+                <div className="text-2xl font-bold text-red-600">{taskStats.straordinarie}</div>
+                <div className="text-xs text-red-700 dark:text-red-300">Straordinarie</div>
+              </div>
+            </div>
+          </div>
+
+          {/* Statistiche Cleaners */}
+          <h4 className="text-sm font-semibold text-muted-foreground mb-3">Cleaners</h4>
           <div className="grid grid-cols-2 gap-4 flex-1">
             {/* Disponibili */}
             <div className="bg-green-50 dark:bg-green-950/20 rounded-lg p-4 flex flex-col items-center justify-center border border-green-200 dark:border-green-800">
