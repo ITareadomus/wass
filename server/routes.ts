@@ -997,7 +997,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const isAlreadySelected = selectedCleanersData.cleaners.some((c: any) => c.id === cleanerId);
       
       if (!isAlreadySelected) {
-        selectedCleanersData.cleaners.push(newCleanerEntry.cleaner);
+        // Aggiungi il cleaner COMPLETO con tutti i suoi campi, non solo i campi base
+        selectedCleanersData.cleaners.push(cleanerData);
         selectedCleanersData.total_selected = selectedCleanersData.cleaners.length;
         
         // Salva selected_cleaners.json
