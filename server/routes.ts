@@ -1073,7 +1073,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         checkin_time: task.checkin_time,
         checkout_time: task.checkout_time,
         premium: task.premium,
-        is_straordinaria: task.is_straordinaria,
+        straordinaria: task.straordinaria,
         confirmed_operation: task.confirmed_operation,
         pax_in: task.pax_in,
         pax_out: task.pax_out,

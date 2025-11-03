@@ -21,6 +21,7 @@ interface RawTask {
   logistic_code: number;
   client_id: number;
   premium: boolean;
+  straordinaria?: boolean;
   address: string;
   lat: string;
   lng: string;
@@ -33,7 +34,6 @@ interface RawTask {
   pax_out: number;
   small_equipment: boolean;
   operation_id: number;
-  is_straordinaria?: boolean;
   zone: number;
   reasons?: string[];
   alias?: string;
@@ -162,7 +162,7 @@ export default function GenerateAssignments() {
       lat: rawTask.lat,
       lng: rawTask.lng,
       premium: rawTask.premium,
-      is_straordinaria: (rawTask as any).straordinaria || rawTask.is_straordinaria,
+      straordinaria: rawTask.straordinaria ?? (rawTask as any).is_straordinaria,
       confirmed_operation: rawTask.confirmed_operation,
       checkout_date: (rawTask as any).checkout_date,
       checkout_time: rawTask.checkout_time,
@@ -360,7 +360,6 @@ export default function GenerateAssignments() {
             lng: timelineAssignment.lng || baseTask.lng,
             premium: timelineAssignment.premium !== undefined ? timelineAssignment.premium : baseTask.premium,
             straordinaria: timelineAssignment.straordinaria !== undefined ? timelineAssignment.straordinaria : (baseTask as any).straordinaria,
-            is_straordinaria: timelineAssignment.is_straordinaria !== undefined ? timelineAssignment.is_straordinaria : (timelineAssignment.straordinaria !== undefined ? timelineAssignment.straordinaria : (baseTask as any).is_straordinaria),
             confirmed_operation: timelineAssignment.confirmed_operation !== undefined ? timelineAssignment.confirmed_operation : (baseTask as any).confirmed_operation,
             customer_name: timelineAssignment.customer_name,
             type_apt: timelineAssignment.type_apt,
