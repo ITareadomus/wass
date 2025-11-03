@@ -99,8 +99,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const workDate = date || format(new Date(), 'yyyy-MM-dd');
       const timelinePath = path.join(process.cwd(), 'client/public/data/output/timeline.json');
 
-      // Svuota il file timeline.json
-      await fs.writeFile(timelinePath, JSON.stringify({ 
+      // Svuota il file timeline.json con struttura corretta
+      const emptyTimeline = { 
         metadata: {
           last_updated: new Date().toISOString(),
           date: workDate
@@ -111,8 +111,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
           used_cleaners: 0,
           assigned_tasks: 0
         }
-      }, null, 2));
-      console.log(`Timeline resettata: timeline.json`);
+      };
+      
+      // Scrittura atomica
+      const tmpPath = `${timelinePath}.tmp`;
+      await fs.writeFile(tmpPath, JSON.stringify(emptyTimeline, null, 2));
+      await fs.rename(tmpPath, timelinePath);
+      console.log(`Timeline resettata: timeline.json (struttura corretta)`);
 
       // FORZA la ricreazione di containers.json rieseguendo create_containers.py
       console.log(`Rieseguendo create_containers.py per ripristinare i containers...`);
@@ -1824,16 +1829,82 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const confirmedJson = JSON.parse(confirmedData);
 
           if (confirmedJson.assignments && confirmedJson.assignments.length > 0) {
+            // Raggruppa le assegnazioni per cleaner
+            const cleanerGroups = new Map<number, any[]>();
+            for (const task of confirmedJson.assignments) {
+              const cleanerId = task.cleanerId;
+              if (!cleanerGroups.has(cleanerId)) {
+                cleanerGroups.set(cleanerId, []);
+              }
+              cleanerGroups.get(cleanerId)!.push(task);
+            }
+
+            // Carica i dati dei cleaner
+            const selectedCleanersPath = path.join(process.cwd(), 'client/public/data/cleaners/selected_cleaners.json');
+            let cleanersData: any;
+            try {
+              cleanersData = JSON.parse(await fs.readFile(selectedCleanersPath, 'utf8'));
+            } catch (error) {
+              cleanersData = { cleaners: [] };
+            }
+
+            // Converti nel formato cleaners_assignments corretto
+            const cleanersAssignments = [];
+            for (const [cleanerId, tasks] of cleanerGroups.entries()) {
+              const cleanerInfo = cleanersData.cleaners.find((c: any) => c.id === cleanerId);
+              
+              cleanersAssignments.push({
+                cleaner: {
+                  id: cleanerId,
+                  name: cleanerInfo?.name || 'Unknown',
+                  lastname: cleanerInfo?.lastname || '',
+                  role: cleanerInfo?.role || 'Standard',
+                  premium: cleanerInfo?.premium || false
+                },
+                tasks: tasks.map((t: any) => ({
+                  task_id: t.task_id || parseInt(t.taskId),
+                  logistic_code: parseInt(t.logistic_code || t.logisticCode),
+                  address: t.address,
+                  lat: t.lat,
+                  lng: t.lng,
+                  premium: t.premium,
+                  straordinaria: t.straordinaria,
+                  cleaning_time: t.cleaning_time || t.cleaningTime,
+                  start_time: t.start_time || t.startTime,
+                  end_time: t.end_time || t.endTime,
+                  travel_time: t.travel_time || t.travelTime || 0,
+                  sequence: t.sequence,
+                  followup: t.followup,
+                  priority: t.assignment_type || t.priority,
+                  confirmed_operation: t.confirmed_operation,
+                  checkin_date: t.checkin_date,
+                  checkout_date: t.checkout_date,
+                  checkin_time: t.checkin_time,
+                  checkout_time: t.checkout_time,
+                  pax_in: t.pax_in,
+                  pax_out: t.pax_out,
+                  operation_id: t.operation_id,
+                  customer_name: t.customer_name,
+                  type_apt: t.type_apt,
+                  alias: t.alias
+                }))
+              });
+            }
+
             timelineData = {
               metadata: { last_updated: new Date().toISOString(), date },
-              cleaners_assignments: confirmedJson.assignments || [],
-              meta: { total_cleaners: 0, used_cleaners: 0, assigned_tasks: confirmedJson.assignments.length }
+              cleaners_assignments: cleanersAssignments,
+              meta: { 
+                total_cleaners: cleanersAssignments.length, 
+                used_cleaners: cleanersAssignments.length, 
+                assigned_tasks: confirmedJson.assignments.length 
+              }
             };
-            console.log(`✅ Caricato da assigned/${filename} con ${timelineData.cleaners_assignments.length} assegnazioni`);
+            console.log(`✅ Caricato da assigned/${filename} con ${timelineData.cleaners_assignments.length} cleaner e ${confirmedJson.assignments.length} task`);
             loadedFrom = 'assigned';
 
-            // Salva in timeline
-            await fs.writeFile(timelinePath, JSON.stringify(timelineData, null, 2));
+            // NON salvare in timeline.json - la timeline deve rimanere vuota se è vuota
+            // await fs.writeFile(timelinePath, JSON.stringify(timelineData, null, 2));
           } else {
             throw new Error('No assignments in assigned file');
           }
