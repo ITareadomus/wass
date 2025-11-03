@@ -658,7 +658,7 @@ export default function TimelineView({
                                 <TaskCard 
                                   key={task.id}
                                   task={task} 
-                                  index={tasks.findIndex(t => t.id === task.id)}
+                                  index={idx}
                                   isInTimeline={true}
                                   allTasks={tasks}
                                 />

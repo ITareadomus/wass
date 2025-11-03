@@ -2291,6 +2291,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       let moved: any | null = null;
 
+      // Traccia la posizione di rimozione per aggiustare destIndex se necessario
+      let removedFromIndex: number | null = null;
+
       // Caso A: provengo da TIMELINE
       if (typeof fromCleanerId === 'number') {
         const srcEntry = getCleanerEntry(fromCleanerId);
@@ -2308,6 +2311,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (takeIdx === null) {
           return res.status(404).json({ success: false, message: 'Task non trovata nel cleaner sorgente' });
         }
+        
+        // Se stesso cleaner, traccia l'indice di rimozione
+        if (fromCleanerId === toCleanerId) {
+          removedFromIndex = takeIdx;
+        }
+        
         [moved] = srcEntry.tasks.splice(takeIdx, 1);
 
         // Aggiorna sequence nel cleaner sorgente
@@ -2332,11 +2341,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (idx === -1) {
           return res.status(404).json({ success: false, message: 'Task non trovata' });
         }
+        removedFromIndex = idx;
         [moved] = dstEntry.tasks.splice(idx, 1);
       }
 
       // Inserimento nella posizione richiesta
       let insertAt = typeof destIndex === 'number' ? destIndex : dstEntry.tasks.length;
+      
+      // CRITICAL FIX: Quando spostiamo nello stesso cleaner, dopo aver rimosso la task
+      // l'array è più corto di 1, quindi dobbiamo aggiustare l'indice di destinazione
+      if (removedFromIndex !== null && removedFromIndex < insertAt) {
+        insertAt = insertAt - 1;
+        console.log(`🔧 Aggiustato destIndex da ${destIndex} a ${insertAt} (rimozione da ${removedFromIndex})`);
+      }
+      
       if (insertAt < 0) insertAt = 0;
       if (insertAt > dstEntry.tasks.length) insertAt = dstEntry.tasks.length;
       dstEntry.tasks.splice(insertAt, 0, moved);
