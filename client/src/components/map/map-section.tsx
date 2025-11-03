@@ -276,7 +276,7 @@ export default function MapSection({ tasks }: MapSectionProps) {
           <div className="absolute top-4 right-4 z-10 max-w-sm">
             <div className="bg-background rounded-lg shadow-2xl border-2 border-primary p-4">
               <div className="flex justify-between items-start mb-2">
-                <h4 className="font-bold text-lg">Dettagli Appartamento</h4>
+                <h4 className="font-bold text-base">Dettagli Appartamento</h4>
                 <button
                   onClick={() => setSelectedTask(null)}
                   className="text-muted-foreground hover:text-foreground"
