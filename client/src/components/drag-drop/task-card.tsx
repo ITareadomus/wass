@@ -92,6 +92,17 @@ export default function TaskCard({
   // Task corrente da visualizzare
   const displayTask = allTasks[currentTaskIndex] || task;
 
+  // DEBUG: Log per verificare i flag della task durante navigazione
+  useEffect(() => {
+    if (isModalOpen) {
+      console.log(`Task ${(displayTask as any).logistic_code || displayTask.name}:`, {
+        premium: displayTask.premium,
+        straordinaria: displayTask.straordinaria,
+        currentIndex: currentTaskIndex
+      });
+    }
+  }, [currentTaskIndex, isModalOpen]);
+
   // Normalizza confirmed_operation da boolean/number/string a boolean sicuro
   // USA displayTask invece di task
   const rawConfirmed = (displayTask as any).confirmed_operation;
