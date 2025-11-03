@@ -513,6 +513,15 @@ export default function Convocazioni() {
                   className="text-blue-500 dark:text-blue-600 transition-all duration-500"
                   strokeLinecap="round"
                 />
+                <text
+                  x="50"
+                  y="50"
+                  textAnchor="middle"
+                  dominantBaseline="middle"
+                  className="text-lg font-bold fill-blue-600 dark:fill-blue-400"
+                >
+                  {cleaners.length > 0 ? Math.round((cleaners.filter(c => c.available !== false).length / cleaners.length) * 100) : 0}%
+                </text>
               </svg>
               <span className="text-[10px] font-semibold text-blue-700 dark:text-blue-300 text-center">Disponibili</span>
               <span className="text-[9px] text-blue-600 dark:text-blue-400">
@@ -545,6 +554,15 @@ export default function Convocazioni() {
                   className="text-gray-500 dark:text-gray-600 transition-all duration-500"
                   strokeLinecap="round"
                 />
+                <text
+                  x="50"
+                  y="50"
+                  textAnchor="middle"
+                  dominantBaseline="middle"
+                  className="text-lg font-bold fill-gray-600 dark:fill-gray-400"
+                >
+                  {cleaners.length > 0 ? Math.round((cleaners.filter(c => c.available === false).length / cleaners.length) * 100) : 0}%
+                </text>
               </svg>
               <span className="text-[10px] font-semibold text-gray-700 dark:text-gray-300 text-center">Non Disponibili</span>
               <span className="text-[9px] text-gray-600 dark:text-gray-400">
@@ -577,6 +595,15 @@ export default function Convocazioni() {
                   className="text-yellow-500 dark:text-yellow-600 transition-all duration-500"
                   strokeLinecap="round"
                 />
+                <text
+                  x="50"
+                  y="50"
+                  textAnchor="middle"
+                  dominantBaseline="middle"
+                  className="text-lg font-bold fill-yellow-600 dark:fill-yellow-400"
+                >
+                  {cleaners.length > 0 ? Math.round((cleaners.filter(c => c.role === "Premium").length / cleaners.length) * 100) : 0}%
+                </text>
               </svg>
               <span className="text-[10px] font-semibold text-yellow-700 dark:text-yellow-300 text-center">Premium</span>
               <span className="text-[9px] text-yellow-600 dark:text-yellow-400">
@@ -609,6 +636,15 @@ export default function Convocazioni() {
                   className="text-green-500 dark:text-green-600 transition-all duration-500"
                   strokeLinecap="round"
                 />
+                <text
+                  x="50"
+                  y="50"
+                  textAnchor="middle"
+                  dominantBaseline="middle"
+                  className="text-lg font-bold fill-green-600 dark:fill-green-400"
+                >
+                  {cleaners.length > 0 ? Math.round((cleaners.filter(c => c.role === "Standard").length / cleaners.length) * 100) : 0}%
+                </text>
               </svg>
               <span className="text-[10px] font-semibold text-green-700 dark:text-green-300 text-center">Standard</span>
               <span className="text-[9px] text-green-600 dark:text-green-400">
@@ -641,6 +677,15 @@ export default function Convocazioni() {
                   className="text-orange-500 dark:text-orange-600 transition-all duration-500"
                   strokeLinecap="round"
                 />
+                <text
+                  x="50"
+                  y="50"
+                  textAnchor="middle"
+                  dominantBaseline="middle"
+                  className="text-lg font-bold fill-orange-600 dark:fill-orange-400"
+                >
+                  {cleaners.length > 0 ? Math.round((cleaners.filter(c => c.role === "Formatore").length / cleaners.length) * 100) : 0}%
+                </text>
               </svg>
               <span className="text-[10px] font-semibold text-orange-700 dark:text-orange-300 text-center">Formatori</span>
               <span className="text-[9px] text-orange-600 dark:text-orange-400">
