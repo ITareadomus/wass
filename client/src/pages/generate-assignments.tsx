@@ -247,7 +247,7 @@ export default function GenerateAssignments() {
             console.warn('⚠️ Trovata entry senza cleaner, salto:', cleanerEntry);
             continue;
           }
-          
+
           console.log(`   Cleaner ${cleanerEntry.cleaner.id} (${cleanerEntry.cleaner.name}) ha ${cleanerEntry.tasks?.length || 0} task`);
           for (const task of cleanerEntry.tasks || []) {
             const logisticCode = String(task.logistic_code);
@@ -343,7 +343,7 @@ export default function GenerateAssignments() {
           };
 
           console.log(`➕ Aggiungendo task ${logisticCode} dalla timeline a cleaner ${timelineAssignment.cleanerId} con sequence ${timelineAssignment.sequence}`);
-          
+
           // IMPORTANTE: Assicurati che assignedCleaner sia propagato correttamente
           const taskWithAssignment = {
             ...baseTask,
@@ -372,7 +372,7 @@ export default function GenerateAssignments() {
             operation_id: timelineAssignment.operation_id,
             alias: timelineAssignment.alias,
           } as any;
-          
+
           tasksWithAssignments.push(taskWithAssignment);
         }
       }
@@ -381,7 +381,7 @@ export default function GenerateAssignments() {
       console.log(`   - Task totali: ${tasksWithAssignments.length}`);
       console.log(`   - Task assegnate: ${tasksWithAssignments.filter(t => (t as any).assignedCleaner).length}`);
       console.log(`   - Task nei containers: ${tasksWithAssignments.filter(t => !(t as any).assignedCleaner).length}`);
-      
+
       // Debug: mostra alcune task assegnate
       const assignedTasks = tasksWithAssignments.filter(t => (t as any).assignedCleaner);
       if (assignedTasks.length > 0) {
@@ -506,10 +506,10 @@ export default function GenerateAssignments() {
       const month = String(selectedDate.getMonth() + 1).padStart(2, '0');
       const day = String(selectedDate.getDate()).padStart(2, '0');
       const dateStr = `${year}-${month}-${day}`;
-      
+
       console.log(`📅 Assegnazione EO per data: ${dateStr}`);
       console.log(`📅 selectedDate oggetto:`, selectedDate);
-      
+
       const response = await fetch('/api/assign-early-out-to-timeline', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -549,10 +549,10 @@ export default function GenerateAssignments() {
       const month = String(selectedDate.getMonth() + 1).padStart(2, '0');
       const day = String(selectedDate.getDate()).padStart(2, '0');
       const dateStr = `${year}-${month}-${day}`;
-      
+
       console.log(`📅 Assegnazione HP per data: ${dateStr}`);
       console.log(`📅 selectedDate oggetto:`, selectedDate);
-      
+
       const response = await fetch('/api/assign-high-priority-to-timeline', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -596,10 +596,10 @@ export default function GenerateAssignments() {
       const month = String(selectedDate.getMonth() + 1).padStart(2, '0');
       const day = String(selectedDate.getDate()).padStart(2, '0');
       const dateStr = `${year}-${month}-${day}`;
-      
+
       console.log(`📅 Assegnazione LP per data: ${dateStr}`);
       console.log(`📅 selectedDate oggetto:`, selectedDate);
-      
+
       const response = await fetch('/api/assign-low-priority-to-timeline', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -677,11 +677,11 @@ export default function GenerateAssignments() {
       const response = await fetch('/api/save-timeline-assignment', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          taskId, 
-          cleanerId, 
-          logisticCode, 
-          date: dateStr, 
+        body: JSON.stringify({
+          taskId,
+          cleanerId,
+          logisticCode,
+          date: dateStr,
           dropIndex,
           priority, // Passa la priorità originale
           taskData: task // Passa tutti i dati del task
@@ -708,7 +708,7 @@ export default function GenerateAssignments() {
       if (!response.ok) {
         const errorData = await response.json();
         console.error('Errore nel reorder della timeline:', errorData);
-        
+
         if (response.status === 400) {
           toast({
             title: "Errore di sincronizzazione",
@@ -749,34 +749,37 @@ export default function GenerateAssignments() {
     }
   };
 
-  const onDragEnd = async (result: DropResult) => {
-    const { source, destination, draggableId } = result;
+  const onDragEnd = async (result: any) => {
+    const { destination, source, draggableId } = result;
 
+    // niente destinazione => niente da fare
     if (!destination) return;
 
-    // Se droppo nella stessa posizione, non fare nulla
+    // se posizione identica, esci
     if (
-      source.droppableId === destination.droppableId &&
-      source.index === destination.index
+      destination.droppableId === source.droppableId &&
+      destination.index === source.index
     ) {
       return;
     }
 
-    const taskId = draggableId;
-    const task = allTasksWithAssignments.find(t => t.id === taskId);
-    const logisticCode = task?.name;
-
-    // Mappa dei container ID ai nomi dei file JSON
-    const containerToJsonName: { [key: string]: string } = {
-      'early-out': 'early-out',
-      'high': 'high',
-      'low': 'low'
+    // Mappa droppable IDs a nomi dei containers nel JSON
+    const containerToJsonName: Record<string, string> = {
+      'early-out': 'early_out',
+      'high': 'high_priority',
+      'low': 'low_priority'
     };
 
-    const fromContainer = containerToJsonName[source.droppableId] || null;
+    const fromContainer = source.droppableId.startsWith('timeline-')
+      ? source.droppableId
+      : containerToJsonName[source.droppableId] || null;
     const toContainer = destination.droppableId.startsWith('timeline-')
       ? destination.droppableId
       : containerToJsonName[destination.droppableId] || null;
+
+    const taskId = draggableId;
+    const task = allTasksWithAssignments.find(t => t.id === taskId);
+    const logisticCode = task?.name;
 
     try {
       // Caso 1: Reorder intra-timeline (stessa colonna cleaner) O spostamento tra cleaners diversi
@@ -788,32 +791,32 @@ export default function GenerateAssignments() {
           // Reorder nella stessa timeline
           console.log(`🔄 Reorder task ${logisticCode} nella timeline del cleaner ${sourceCleanerId} da posizione ${source.index} a ${destination.index}`);
           await reorderTimelineAssignment(taskId, sourceCleanerId, logisticCode || '', source.index, destination.index);
-          
+
           // Ricarica immediatamente per mostrare il nuovo ordine
           await loadTasks(true);
           return;
         } else {
           // Spostamento tra cleaners diversi
           console.log(`🔄 Spostamento task ${logisticCode} da cleaner ${sourceCleanerId} a cleaner ${destCleanerId}`);
-          
+
           const dateStr = format(selectedDate, "yyyy-MM-dd");
           const response = await fetch('/api/move-task-between-cleaners', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ 
-              taskId, 
+            body: JSON.stringify({
+              taskId,
               logisticCode,
-              sourceCleanerId, 
-              destCleanerId, 
+              sourceCleanerId,
+              destCleanerId,
               destIndex: destination.index,
-              date: dateStr 
+              date: dateStr
             }),
           });
-          
+
           if (!response.ok) {
             throw new Error('Errore nello spostamento tra cleaners');
           }
-          
+
           // Ricarica immediatamente per mostrare il nuovo ordine
           await loadTasks(true);
           return;
@@ -821,9 +824,9 @@ export default function GenerateAssignments() {
       }
 
       // Caso 2: Da timeline a container
-      if (source.droppableId.startsWith('timeline-') && 
-          (destination.droppableId === 'early-out' || 
-           destination.droppableId === 'high' || 
+      if (source.droppableId.startsWith('timeline-') &&
+          (destination.droppableId === 'early-out' ||
+           destination.droppableId === 'high' ||
            destination.droppableId === 'low')) {
 
         console.log(`🔄 Spostamento da timeline a container: ${source.droppableId} -> ${destination.droppableId}`);
@@ -832,7 +835,7 @@ export default function GenerateAssignments() {
         await removeTimelineAssignment(taskId, logisticCode);
 
         // 2. Aggiorna containers.json
-        await updateTaskJson(taskId, logisticCode, 'timeline', destination.droppableId);
+        await updateTaskJson(taskId, logisticCode, source.droppableId, destination.droppableId); // source.droppableId per identificare il cleaner
 
         // 3. FORZA ricaricamento completo e sincronizzato
         await loadTasks(true);
@@ -858,17 +861,50 @@ export default function GenerateAssignments() {
         return;
       }
 
-      // Caso 4: Tra containers
-      if (fromContainer && toContainer && !destination.droppableId.startsWith('timeline-')) {
-        console.log(`🔄 Spostamento tra containers: ${fromContainer} -> ${toContainer}`);
+      // Caso 4: Spostamento tra containers di priorità (non timeline)
+      if (!fromContainer.startsWith('timeline-') && !toContainer.startsWith('timeline-')) {
+        console.log(`📦 Spostamento tra containers: ${fromContainer} → ${toContainer}`);
 
-        // 1. Aggiorna containers.json
-        await updateTaskJson(taskId, logisticCode, fromContainer, toContainer);
+        try {
+          const response = await fetch('/api/update-task-json', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              taskId: draggableId,
+              fromContainer,
+              toContainer,
+              sourceIndex: source.index,
+              destIndex: destination.index,
+            }),
+          });
 
-        // 2. FORZA ricaricamento completo e sincronizzato
-        await loadTasks(true);
+          const json = await response.json();
+          if (!response.ok || !json?.success) {
+            console.error('update-task-json error', json);
+            toast({
+              title: "Errore",
+              description: json?.message || "Errore nello spostamento tra containers",
+              variant: "destructive"
+            });
+            return;
+          }
 
-        console.log(`✅ Sincronizzazione completata`);
+          // Ricarica i task dai containers aggiornati
+          await loadTasks(true);
+
+          toast({
+            title: "Task spostata",
+            description: `Task spostata da ${fromContainer} a ${toContainer}`,
+          });
+        } catch (err) {
+          console.error('update-task-json fetch failed', err);
+          toast({
+            title: "Errore",
+            description: "Errore di rete nello spostamento",
+            variant: "destructive"
+          });
+        }
+        return;
       }
     } catch (error) {
       console.error('❌ Errore durante lo spostamento:', error);
@@ -974,7 +1010,7 @@ export default function GenerateAssignments() {
                 />
               </PopoverContent>
             </Popover>
-            
+
             <div className="bg-card rounded-lg border shadow-sm px-4 py-2 text-center">
               <div className="text-sm text-muted-foreground">Task Totali</div>
               <div className="text-2xl font-bold text-primary">{allTasksWithAssignments.length}</div>
