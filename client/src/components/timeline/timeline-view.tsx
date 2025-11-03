@@ -627,18 +627,28 @@ export default function TimelineView({
             );
           })}
 
-          {/* Pulsante Aggiungi Cleaner sotto l'ultimo cleaner */}
+          {/* Riga finale con pulsanti */}
           <div className="flex mb-2">
-            <div className="w-24 flex-shrink-0"></div>
-            <div className="flex-1 flex items-center justify-center py-2">
+            {/* Pulsante + sotto il nome dell'ultimo cleaner */}
+            <div className="w-24 flex-shrink-0 p-1 flex items-center justify-center border border-border">
               <Button
                 onClick={handleOpenAddCleanerDialog}
-                variant="outline"
+                variant="ghost"
                 size="sm"
-                className="flex items-center gap-2 border-dashed border-2"
+                className="w-full h-full"
               >
-                <UserPlus className="w-4 h-4" />
-                Aggiungi Cleaner
+                <UserPlus className="w-5 h-5" />
+              </Button>
+            </div>
+            {/* Pulsante Conferma Assegnazioni che prende tutto lo spazio della timeline */}
+            <div className="flex-1 p-1 border-t border-border">
+              <Button
+                onClick={handleGoToConvocazioni}
+                className="w-full h-full bg-green-500 hover:bg-green-600"
+                data-testid="button-confirm-assignments"
+              >
+                <Users className="w-4 h-4 mr-2" />
+                Conferma Assegnazioni
               </Button>
             </div>
           </div>
