@@ -1,0 +1,338 @@
+Ok, se te le mette **sempre in coda** anche dopo le patch, quasi certamente succede una (o più) di queste cose:
+
+1. il **client non aggiorna lo stato locale** con `splice` e fa un “push” (o ricalcola la lista) dopo il drop, sovrascrivendo l’ordine deciso dal server;
+2. `draggableId` **non è** il vero `taskId` (il backend non trova la task e fa fallback in coda);
+3. il **parser dei cleaner** non intercetta i tuoi `droppableId` reali, quindi prendi il ramo sbagliato;
+4. nel backend l’endpoint **timeline** non rimuove/inserisce con `splice` in **tutti** i rami (same-cleaner, between-cleaners, container→cleaner).
+
+Qui sotto ti do due patch “a prova di bomba”:
+
+* Frontend: aggiorna **subito** l’UI locale con `splice` (optimistic update) e invia gli indici al server.
+* Backend: endpoint completo che copre **tutti i casi** e usa sempre `splice(destIndex, 0, moved)`.
+
+---
+
+# ✅ PATCH 1 — Frontend (`client/src/pages/generate-assignments.tsx`)
+
+Sostituisci interamente la tua `onDragEnd` con questa versione.
+Nota: adattala ai tuoi state/selector (`setTimeline`, `setContainers`) — nell’esempio uso due updater fittizi; se tu hai un unico store, applica gli stessi `splice`.
+
+```tsx
+// 👇 adatta questi due updater ai tuoi hook/store
+// Devono aggiornare lo stato locale PRIMA della fetch (optimistic UI)
+const setTimeline = (updater: (prev: any) => any) => {
+  // Esempio:
+  // setState(prev => updater(prev));
+};
+const setContainers = (updater: (prev: any) => any) => {
+  // Esempio:
+  // setState(prev => updater(prev));
+};
+
+// Estrae l'id cleaner da droppableId (supporta "cleaner-24", "tl-cleaner:24", ecc.)
+const parseCleanerId = (droppableId: string) => {
+  if (!droppableId) return null;
+  const m = droppableId.match(/cleaner[^0-9]*?(\d+)/i);
+  if (!m) return null;
+  const n = Number(m[1]);
+  return Number.isFinite(n) ? n : null;
+};
+
+// Ricava un "task key" affidabile dal draggable
+// Sostituisci questa funzione se il tuo vero id è logistic_code
+const toTaskKey = (draggableId: string) => String(draggableId);
+
+const onDragEnd = async (result: any) => {
+  const { destination, source, draggableId } = result;
+  if (!destination) return;
+  if (destination.droppableId === source.droppableId && destination.index === source.index) return;
+
+  const fromCleanerId = parseCleanerId(source.droppableId);
+  const toCleanerId   = parseCleanerId(destination.droppableId);
+  const taskKey = toTaskKey(draggableId);
+
+  // =========== Caso 1: TIMELINE ↔ TIMELINE ===========
+  if (fromCleanerId !== null && toCleanerId !== null) {
+    // 1) Optimistic UI: riordino/spostamento locale
+    setTimeline((prev: any) => {
+      const next = structuredClone(prev);
+      const srcArr = next.cleaners[String(fromCleanerId)].tasks;
+      const [moved] = srcArr.splice(source.index, 1);
+      const dstArr = next.cleaners[String(toCleanerId)].tasks;
+      const insertAt = Math.max(0, Math.min(destination.index, dstArr.length));
+      dstArr.splice(insertAt, 0, moved);
+      return next;
+    });
+
+    // 2) Persisti
+    try {
+      const resp = await fetch('/api/timeline/move-task', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          taskId: taskKey,
+          fromCleanerId,
+          toCleanerId,
+          sourceIndex: source.index,
+          destIndex: destination.index,
+        }),
+      });
+      const json = await resp.json();
+      if (!resp.ok || !json?.success) {
+        console.error('timeline/move-task error', json);
+        // TODO: opzionale: rollback UI
+      }
+    } catch (e) {
+      console.error('timeline/move-task failed', e);
+      // TODO: opzionale: rollback UI
+    }
+    return;
+  }
+
+  // =========== Caso 2: CONTAINER → TIMELINE ===========
+  if (fromCleanerId === null && toCleanerId !== null) {
+    const fromContainer = source.droppableId; // "early_out" | "high_priority" | "low_priority"
+
+    // 1) Optimistic UI
+    setContainers((prev: any) => {
+      const next = structuredClone(prev);
+      const srcArr = next.containers[fromContainer].tasks;
+      // Trova la task: può NON essere in source.index se hai filtri; quindi prova per id
+      let idx = source.index;
+      if (!srcArr[idx] || String(srcArr[idx]?.task_id) !== taskKey && String(srcArr[idx]?.logistic_code) !== taskKey) {
+        idx = srcArr.findIndex((t: any) =>
+          String(t?.task_id) === taskKey || String(t?.logistic_code) === taskKey
+        );
+      }
+      const [moved] = srcArr.splice(idx, 1);
+      next.containers[fromContainer].count = srcArr.length;
+
+      // Inserisci in timeline
+      setTimeline((p2: any) => {
+        const t2 = structuredClone(p2);
+        const dstArr = t2.cleaners[String(toCleanerId)].tasks;
+        const insertAt = Math.max(0, Math.min(destination.index, dstArr.length));
+        dstArr.splice(insertAt, 0, moved);
+        return t2;
+      });
+
+      return next;
+    });
+
+    // 2) Persisti
+    try {
+      const resp = await fetch('/api/timeline/move-task', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          taskId: taskKey,
+          fromContainer,
+          toCleanerId,
+          destIndex: destination.index,
+        }),
+      });
+      const json = await resp.json();
+      if (!resp.ok || !json?.success) {
+        console.error('timeline/move-task (container→timeline) error', json);
+        // TODO: opzionale: rollback UI
+      }
+    } catch (e) {
+      console.error('timeline/move-task (container→timeline) failed', e);
+      // TODO: opzionale: rollback UI
+    }
+    return;
+  }
+
+  // =========== Caso 3: CONTAINERS ↔ CONTAINERS ===========
+  // (già sistemato: usa index e non push)
+  try {
+    const resp = await fetch('/api/update-task-json', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        taskId: taskKey,
+        fromContainer: source.droppableId,
+        toContainer: destination.droppableId,
+        sourceIndex: source.index,
+        destIndex: destination.index,
+      }),
+    });
+    const json = await resp.json();
+    if (!resp.ok || !json?.success) console.error('update-task-json error', json);
+  } catch (e) {
+    console.error('update-task-json failed', e);
+  }
+};
+```
+
+**Perché serve l’optimistic update:** se il client dopo il drop ricrea l’elenco (es. applica sort, concat, push) rischi di **mettere in coda** anche se il server ha salvato correttamente. Con gli `splice` locali l’ordine resta subito giusto.
+
+---
+
+# ✅ PATCH 2 — Backend (`server/routes.ts`)
+
+Sostituisci completamente l’endpoint **POST `/api/timeline/move-task`** con questo (completo).
+Aggiorna i **percorsi** dei file se nel tuo repo sono diversi.
+
+```ts
+router.post('/api/timeline/move-task', async (req, res) => {
+  try {
+    const {
+      taskId,
+      logisticCode,          // opzionale se usi logistic_code
+      fromCleanerId,         // opzionale (se arrivi da container)
+      toCleanerId,           // obbligatorio
+      sourceIndex,           // opzionale
+      destIndex,             // opzionale -> default: in coda
+      fromContainer,         // opzionale: "early_out" | "high_priority" | "low_priority"
+    } = req.body as {
+      taskId?: string | number;
+      logisticCode?: string | number;
+      fromCleanerId?: number;
+      toCleanerId: number;
+      sourceIndex?: number;
+      destIndex?: number;
+      fromContainer?: 'early_out' | 'high_priority' | 'low_priority';
+    };
+
+    if (typeof toCleanerId !== 'number') {
+      return res.status(400).json({ success: false, message: 'toCleanerId obbligatorio' });
+    }
+    if (typeof taskId === 'undefined' && typeof logisticCode === 'undefined') {
+      return res.status(400).json({ success: false, message: 'taskId o logisticCode obbligatorio' });
+    }
+
+    const fs = await import('fs/promises');
+    const path = await import('path');
+
+    // 🔧 ADATTA QUI I PERCORSI AI TUOI FILE
+    const timelinePath   = path.resolve(process.cwd(), 'server', 'data', 'timeline.json');
+    const containersPath = path.resolve(process.cwd(), 'server', 'data', 'containers.json');
+
+    const [timelineRaw, containersRaw] = await Promise.all([
+      fs.readFile(timelinePath, 'utf8'),
+      fs.readFile(containersPath, 'utf8').catch(() => 'null'),
+    ]);
+
+    const timelineData: any = JSON.parse(timelineRaw);
+    const containersData: any = containersRaw !== 'null' ? JSON.parse(containersRaw) : null;
+
+    const cleaners = timelineData?.cleaners;
+    if (!cleaners) {
+      return res.status(500).json({ success: false, message: 'Struttura timeline non valida (manca "cleaners")' });
+    }
+
+    const getCleanerTasks = (id: number): any[] | null => {
+      const key = String(id);
+      const node = cleaners[key];
+      if (!node) return null;
+      if (Array.isArray(node)) return node;           // se cleaners["24"] è direttamente un array
+      if (Array.isArray(node?.tasks)) return node.tasks; // se cleaners["24"].tasks è l'array
+      return null;
+    };
+
+    const idMatches = (t: any, k: string) =>
+      String(t?.task_id) === k || String(t?.logistic_code) === k || String(t?.id) === k;
+
+    const findIndexByKey = (arr: any[], key: string) => arr.findIndex(t => idMatches(t, key));
+
+    const taskKey = String(typeof taskId !== 'undefined' ? taskId : logisticCode);
+
+    const dstTasks = getCleanerTasks(toCleanerId);
+    if (!dstTasks) {
+      return res.status(400).json({ success: false, message: 'Cleaner di destinazione non valido' });
+    }
+
+    let moved: any | null = null;
+
+    // ===== Caso A: provengo da TIMELINE (same cleaner o tra cleaners)
+    if (typeof fromCleanerId === 'number') {
+      const srcTasks = getCleanerTasks(fromCleanerId);
+      if (!srcTasks) {
+        return res.status(400).json({ success: false, message: 'Cleaner sorgente non valido' });
+      }
+
+      // rimuovi dalla sorgente
+      let takeIdx: number | null = null;
+      if (typeof sourceIndex === 'number' && sourceIndex >= 0 && sourceIndex < srcTasks.length) {
+        takeIdx = sourceIndex;
+      } else {
+        const idx = findIndexByKey(srcTasks, taskKey);
+        takeIdx = idx >= 0 ? idx : null;
+      }
+      if (takeIdx === null) {
+        return res.status(404).json({ success: false, message: 'Task non trovata nel cleaner sorgente' });
+      }
+      [moved] = srcTasks.splice(takeIdx, 1);
+    }
+
+    // ===== Caso B: provengo da CONTAINER (container → cleaner)
+    if (!moved && fromContainer && containersData?.containers?.[fromContainer]?.tasks) {
+      const srcArr = containersData.containers[fromContainer].tasks as any[];
+      let idx = srcArr.findIndex(t => idMatches(t, taskKey));
+      if (idx === -1 && typeof sourceIndex === 'number' && srcArr[sourceIndex]) idx = sourceIndex;
+      if (idx === -1) {
+        return res.status(404).json({ success: false, message: 'Task non trovata nel container sorgente' });
+      }
+      [moved] = srcArr.splice(idx, 1);
+      containersData.containers[fromContainer].count = srcArr.length;
+    }
+
+    // ===== Caso C: se moved ancora null, prova a trovarla DENTRO il cleaner di destinazione (riordino forzato)
+    if (!moved) {
+      const idx = findIndexByKey(dstTasks, taskKey);
+      if (idx === -1) {
+        return res.status(404).json({ success: false, message: 'Task non trovata né in sorgente né in destinazione' });
+      }
+      [moved] = dstTasks.splice(idx, 1);
+    }
+
+    // ===== Inserimento nella posizione richiesta
+    let insertAt = typeof destIndex === 'number' ? destIndex : dstTasks.length;
+    if (insertAt < 0) insertAt = 0;
+    if (insertAt > dstTasks.length) insertAt = dstTasks.length;
+    dstTasks.splice(insertAt, 0, moved);
+
+    // ===== Aggiorna eventuale summary
+    if (timelineData.summary) {
+      const count = (id: number) => (getCleanerTasks(id)?.length ?? 0);
+      timelineData.summary.cleaners = Object.fromEntries(
+        Object.keys(cleaners).map((k) => [k, (Array.isArray(cleaners[k]) ? cleaners[k] : cleaners[k]?.tasks)?.length ?? 0])
+      );
+      timelineData.summary.total_tasks = Object.values(timelineData.summary.cleaners).reduce((a: any, b: any) => a + b, 0);
+    }
+
+    // ===== Salvataggi atomici
+    const tmp1 = timelinePath + '.tmp';
+    await fs.writeFile(tmp1, JSON.stringify(timelineData, null, 2));
+    await fs.rename(tmp1, timelinePath);
+
+    if (containersData) {
+      const tmp2 = containersPath + '.tmp';
+      await fs.writeFile(tmp2, JSON.stringify(containersData, null, 2));
+      await fs.rename(tmp2, containersPath);
+    }
+
+    return res.json({
+      success: true,
+      message:
+        typeof fromCleanerId === 'number'
+          ? (fromCleanerId === toCleanerId ? 'Riordino nel cleaner eseguito' : 'Task spostata tra cleaners')
+          : 'Task inserita dal container nel cleaner alla posizione richiesta',
+    });
+  } catch (err: any) {
+    console.error('timeline/move-task error:', err);
+    return res.status(500).json({ success: false, message: 'Errore interno', error: String(err?.message ?? err) });
+  }
+});
+```
+
+---
+
+## 3 controlli veloci
+
+* **ID corretto:** assicurati che `draggableId` corrisponda al tuo vero id (`task_id` o `logistic_code`). Se usi `logistic_code`, cambia `toTaskKey` e il confronto nel backend.
+* **Niente sort in render:** se nel render della timeline ordini le task (es. `tasks.sort(...)`), quella sort annullerà l’inserimento a indice → rimuovi o applica l’ordinamento solo quando vuoi davvero ignorare il drop index.
+* **DroppableId parser:** verifica che i tuoi `droppableId` contengano “cleaner” + numero. Se usi un altro pattern, aggiorna la regex in `parseCleanerId`.
+
+Applica queste patch e dimmi com’è andata: con l’optimistic update + `splice` server side l’elemento **resta** esattamente alla posizione di drop in tutti i flussi (container→cleaner, stesso cleaner, cleaners diversi).
