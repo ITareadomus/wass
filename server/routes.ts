@@ -2344,6 +2344,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Aggiorna sequence nel cleaner destinazione
       dstEntry.tasks.forEach((t: any, i: number) => { t.sequence = i + 1; });
 
+      // Ricalcola tempi usando lo script Python per avere start_time/end_time coerenti con la sequenza
+      try {
+        const updatedDst = await recalculateCleanerTimes(dstEntry);
+        dstEntry.tasks = updatedDst.tasks;
+        console.log(`✅ Tempi ricalcolati per cleaner ${toCleanerId} dopo inserimento`);
+        
+        // Se c'è un cleaner sorgente diverso, ricalcola anche quello
+        if (typeof fromCleanerId === 'number' && fromCleanerId !== toCleanerId) {
+          const srcEntry = getCleanerEntry(fromCleanerId);
+          if (srcEntry && srcEntry.tasks.length > 0) {
+            const updatedSrc = await recalculateCleanerTimes(srcEntry);
+            srcEntry.tasks = updatedSrc.tasks;
+            console.log(`✅ Tempi ricalcolati per cleaner ${fromCleanerId} dopo rimozione`);
+          }
+        }
+      } catch (pythonError: any) {
+        console.error(`⚠️ Errore nel ricalcolo dei tempi:`, pythonError.message);
+        // Fallback: mantieni sequence manualmente (già fatto sopra)
+      }
+
       // Aggiorna metadata
       timelineData.metadata = timelineData.metadata || {};
       timelineData.metadata.last_updated = new Date().toISOString();
