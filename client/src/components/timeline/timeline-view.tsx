@@ -559,11 +559,11 @@ export default function TimelineView({
                             const timeB = taskB.start_time || taskB.fw_start_time || taskB.startTime || "00:00";
                             return timeA.localeCompare(timeB);
                           })
-                          .map((task, idx) => {
+                          .map((task, localIndex) => {
                             const taskObj = task as any;
 
-                            // Per il drag and drop, usa l'indice locale (idx) non globalIndex
-                            // React-beautiful-dnd richiede indici sequenziali 0,1,2,3... per ogni Droppable
+                            // IMPORTANTE: usa localIndex (0,1,2,3...) per react-beautiful-dnd
+                            // NON usare l'indice globale da tasks.findIndex()
 
                             // Leggi travel_time dalla task normalizzata (che viene da timeline_assignments.json)
                             // Prova sia travel_time che travelTime per compatibilità
@@ -634,7 +634,7 @@ export default function TimelineView({
                                 <TaskCard 
                                   key={task.id}
                                   task={task} 
-                                  index={tasks.findIndex(t => t.id === task.id)}
+                                  index={localIndex}
                                   isInTimeline={true}
                                   allTasks={tasks}
                                 />
