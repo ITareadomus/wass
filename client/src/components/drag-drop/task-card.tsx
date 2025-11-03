@@ -130,23 +130,24 @@ export default function TaskCard({
           ? ["true", "1", "yes"].includes(rawConfirmed.toLowerCase().trim())
           : false;
 
-  // Determina il tipo di task SOLO dai flag premium/straordinaria
-  // Priorità: straordinaria → premium → standard
-  // USA displayTask invece di task
-  const isPremium = Boolean(displayTask.premium);
-  const isStraordinaria = Boolean(displayTask.straordinaria);
+  // Determina il tipo della CARD dai flag dell'oggetto *task* (non quelli della navigazione nel modale)
+  const cardIsPremium = Boolean(task.premium);
+  const cardIsStraordinaria = Boolean(task.straordinaria);
 
-  // Funzione per assegnare colore e label SOLO in base al tipo
-  const getTaskTypeStyle = () => {
-    if (isStraordinaria) {
+  // Il modale invece usa displayTask (vedi più sotto)
+
+  const getTaskTypeStyle = (isStraord: boolean, isPrem: boolean) => {
+    if (isStraord) {
       return { label: "STRAORDINARIA", colorClass: "task-straordinaria" };
     }
-    if (isPremium) {
+    if (isPrem) {
       return { label: "PREMIUM", colorClass: "task-premium" };
     }
     return { label: "STANDARD", colorClass: "task-standard" };
   };
-  const { label: typeLabel, colorClass } = getTaskTypeStyle();
+
+  const { label: typeLabel, colorClass: cardColorClass } =
+    getTaskTypeStyle(cardIsStraordinaria, cardIsPremium);
 
   useEffect(() => {
     // I dati sono già presenti nell'oggetto task (dalla timeline o dai containers)
@@ -223,7 +224,7 @@ export default function TaskCard({
                     {...provided.draggableProps}
                     {...provided.dragHandleProps}
                     className={`
-                      ${colorClass} 
+                      ${cardColorClass} 
                       rounded-sm px-2 py-1 shadow-sm border transition-all duration-200
                       ${snapshot.isDragging ? "shadow-lg scale-105" : ""}
                       ${isOverdue ? "animate-blink" : ""}
@@ -303,14 +304,14 @@ export default function TaskCard({
                   variant="outline"
                   className={cn(
                     "text-xs shrink-0",
-                    isStraordinaria
+                    Boolean(displayTask.straordinaria)
                       ? "bg-red-500 text-white border-red-700"
-                      : isPremium
+                      : Boolean(displayTask.premium)
                         ? "bg-yellow-400 text-black border-yellow-600"
                         : "bg-green-500 text-white border-green-700"
                   )}
                 >
-                  {typeLabel}
+                  {getTaskTypeStyle(Boolean(displayTask.straordinaria), Boolean(displayTask.premium)).label}
                 </Badge>
                 {(displayTask as any).priority && (
                   <Badge
