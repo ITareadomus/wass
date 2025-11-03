@@ -232,9 +232,10 @@ export default function MapSection({ tasks }: MapSectionProps) {
   return (
     <div className="bg-card rounded-lg border shadow-sm">
       <div className="p-4 border-b border-border">
-        <h3 className="font-semibold text-foreground flex items-center justify-between">
+        <h3 className="font-semibold text-foreground flex items-center">
+          Mappa Appartamenti
           <svg 
-            className="w-5 h-5 mr-2 text-primary" 
+            className="w-5 h-5 ml-2 text-primary" 
             fill="none" 
             stroke="currentColor" 
             viewBox="0 0 24 24"
@@ -252,7 +253,6 @@ export default function MapSection({ tasks }: MapSectionProps) {
               d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" 
             />
           </svg>
-          Mappa Appartamenti
         </h3>
       </div>
       <div className="p-4 relative">
