@@ -1,5 +1,5 @@
 import { Personnel, TaskType as Task } from "@shared/schema";
-import { Calendar, RotateCcw, Users, RefreshCw } from "lucide-react";
+import { Calendar, RotateCcw, Users, RefreshCw, UserPlus } from "lucide-react";
 import { useState, useEffect } from "react";
 import { Droppable, Draggable } from "react-beautiful-dnd";
 import { useMutation } from "@tanstack/react-query";
@@ -63,7 +63,7 @@ export default function TimelineView({
     mutationFn: async (cleanerId: number) => {
       const savedDate = localStorage.getItem('selected_work_date');
       const workDate = savedDate || new Date().toISOString().split('T')[0];
-      
+
       const response = await apiRequest("POST", "/api/add-cleaner-to-timeline", {
         cleanerId,
         date: workDate
@@ -73,12 +73,12 @@ export default function TimelineView({
     onSuccess: async () => {
       // Ricarica i cleaner per mostrare immediatamente il nuovo cleaner
       await loadCleaners();
-      
+
       // Ricarica anche le task se necessario
       if ((window as any).reloadAllTasks) {
         await (window as any).reloadAllTasks(true);
       }
-      
+
       toast({
         title: "Cleaner aggiunto!",
         description: "Il cleaner è stato aggiunto alla timeline con successo.",
@@ -100,7 +100,7 @@ export default function TimelineView({
       // Leggi la data selezionata da localStorage, fallback a oggi se non presente
       const savedDate = localStorage.getItem('selected_work_date');
       const workDate = savedDate || new Date().toISOString().split('T')[0];
-      
+
       const response = await apiRequest("POST", "/api/swap-cleaners-tasks", {
         sourceCleanerId,
         destCleanerId,
@@ -113,7 +113,7 @@ export default function TimelineView({
       if ((window as any).reloadAllTasks) {
         await (window as any).reloadAllTasks();
       }
-      
+
       toast({
         title: "Successo",
         description: "Task scambiate con successo tra i cleaners",
@@ -132,13 +132,13 @@ export default function TimelineView({
 
   const handleSwapCleaners = () => {
     if (!selectedSwapCleaner || !selectedCleaner) return;
-    
+
     const destCleanerId = parseInt(selectedSwapCleaner, 10);
-    
+
     // Defensive guard: verifica che entrambi i cleaners abbiano task assegnate
     const sourceHasTasks = tasks.some((t: any) => t.assignedCleaner === selectedCleaner.id);
     const destHasTasks = tasks.some((t: any) => t.assignedCleaner === destCleanerId);
-    
+
     if (!sourceHasTasks || !destHasTasks) {
       toast({
         title: "Errore",
@@ -147,7 +147,7 @@ export default function TimelineView({
       });
       return;
     }
-    
+
     swapCleanersMutation.mutate({
       sourceCleanerId: selectedCleaner.id,
       destCleanerId: destCleanerId,
@@ -266,12 +266,12 @@ export default function TimelineView({
 
   const handleCleanerClick = (cleaner: Cleaner, e: React.MouseEvent) => {
     e.preventDefault();
-    
+
     // Se c'è già un timer attivo, è un doppio click
     if (clickTimer) {
       clearTimeout(clickTimer);
       setClickTimer(null);
-      
+
       // Gestione doppio click: filtro mappa
       if (filteredCleanerId === cleaner.id) {
         setFilteredCleanerId(null);
@@ -296,7 +296,7 @@ export default function TimelineView({
         setIsModalOpen(true);
         setClickTimer(null);
       }, 250); // 250ms per distinguere singolo da doppio click
-      
+
       setClickTimer(timer);
     }
   };
@@ -306,19 +306,19 @@ export default function TimelineView({
     try {
       const savedDate = localStorage.getItem('selected_work_date');
       const workDate = savedDate || new Date().toISOString().split('T')[0];
-      
+
       const response = await fetch(`/data/cleaners/cleaners.json`);
       const data = await response.json();
-      
+
       // Trova i cleaner per la data selezionata
       const dateCleaners = data.dates[workDate]?.cleaners || [];
-      
+
       // Filtra i cleaner che NON sono già nella timeline
       const currentCleanerIds = cleaners.map(c => c.id);
       const available = dateCleaners.filter((c: Cleaner) => 
         !currentCleanerIds.includes(c.id) && c.available
       );
-      
+
       setAvailableCleaners(available);
     } catch (error) {
       console.error('Errore nel caricamento dei cleaner disponibili:', error);
@@ -428,6 +428,16 @@ export default function TimelineView({
                 <RotateCcw className="w-4 h-4" />
                 Reset Assegnazioni
               </Button>
+              <Button
+                onClick={handleGoToConvocazioni}
+                variant="default"
+                size="sm"
+                className="flex items-center gap-2 bg-green-500 hover:bg-green-600"
+                data-testid="button-confirm-assignments"
+              >
+                <Users className="w-4 h-4" />
+                Conferma Assegnazioni
+              </Button>
             </div>
           </div>
         </div>
@@ -528,10 +538,10 @@ export default function TimelineView({
                           })
                           .map((task, idx) => {
                             const taskObj = task as any;
-                            
+
                             // Per il drag and drop, usa l'indice locale (idx) non globalIndex
                             // React-beautiful-dnd richiede indici sequenziali 0,1,2,3... per ogni Droppable
-                            
+
                             // Leggi travel_time dalla task normalizzata (che viene da timeline_assignments.json)
                             // Prova sia travel_time che travelTime per compatibilità
                             let travelTime = 0;
@@ -544,7 +554,7 @@ export default function TimelineView({
                                 ? taskObj.travelTime 
                                 : parseInt(String(taskObj.travelTime), 10);
                             }
-                            
+
                             // Se il parsing fallisce, usa 0
                             if (isNaN(travelTime)) {
                               travelTime = 0;
@@ -617,19 +627,18 @@ export default function TimelineView({
             );
           })}
 
-          {/* Pulsante Aggiungi Cleaner */}
-          <div className="flex mt-4">
+          {/* Pulsante Aggiungi Cleaner sotto l'ultimo cleaner */}
+          <div className="flex mb-2">
             <div className="w-24 flex-shrink-0"></div>
-            <div className="flex-1">
+            <div className="flex-1 flex items-center justify-center py-2">
               <Button
                 onClick={handleOpenAddCleanerDialog}
                 variant="outline"
                 size="sm"
-                className="w-full border-dashed border-2 hover:bg-accent"
-                data-testid="button-add-cleaner"
+                className="flex items-center gap-2 border-dashed border-2"
               >
-                <Users className="w-4 h-4 mr-2" />
-                Aggiungi Cleaner alla Timeline
+                <UserPlus className="w-4 h-4" />
+                Aggiungi Cleaner
               </Button>
             </div>
           </div>
