@@ -8,6 +8,12 @@ import {
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { useState, useEffect } from "react";
 import { HelpCircle, ChevronLeft, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -261,59 +267,68 @@ export default function TaskCard({
           const cardWidth = calculateWidth(task.duration, isInTimeline);
 
           return (
-            <div
-              ref={provided.innerRef}
-              {...provided.draggableProps}
-              {...provided.dragHandleProps}
-              className={`
-                ${colorClass} 
-                rounded-sm px-2 py-1 shadow-sm border transition-all duration-200
-                ${snapshot.isDragging ? "shadow-lg scale-105" : ""}
-                ${isOverdue ? "animate-blink" : ""}
-                hover:shadow-md cursor-pointer
-                flex-shrink-0 relative
-              `}
-              style={{
-                ...provided.draggableProps.style,
-                width: cardWidth,
-                minHeight: "40px",
-              }}
-              data-testid={`task-card-${task.id}`}
-              onClick={(e) => {
-                if (!snapshot.isDragging) {
-                  handleCardClick(e);
-                }
-              }}
-            >
-              {!isConfirmedOperation && (
-                <div className="absolute top-0.5 right-0.5 z-50">
-                  <HelpCircle
-                    className="w-3 h-3 text-gray-900"
-                    strokeWidth={2.5}
-                  />
-                </div>
-              )}
-              <div 
-                className="flex flex-col items-center justify-center h-full gap-0"
-              >
-                <div className="flex items-center gap-1">
-                  <span
-                    className="text-[13px] text-[#ff0000] font-extrabold"
-                    data-testid={`task-name-${task.id}`}
+            <TooltipProvider delayDuration={300}>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div
+                    ref={provided.innerRef}
+                    {...provided.draggableProps}
+                    {...provided.dragHandleProps}
+                    className={`
+                      ${colorClass} 
+                      rounded-sm px-2 py-1 shadow-sm border transition-all duration-200
+                      ${snapshot.isDragging ? "shadow-lg scale-105" : ""}
+                      ${isOverdue ? "animate-blink" : ""}
+                      hover:shadow-md cursor-pointer
+                      flex-shrink-0 relative
+                    `}
+                    style={{
+                      ...provided.draggableProps.style,
+                      width: cardWidth,
+                      minHeight: "40px",
+                    }}
+                    data-testid={`task-card-${task.id}`}
+                    onClick={(e) => {
+                      if (!snapshot.isDragging) {
+                        handleCardClick(e);
+                      }
+                    }}
                   >
-                    {task.name}
-                  </span>
-                  <span className="text-[11px] opacity-60 leading-none font-bold text-[#000000]">
-                    ({task.duration.replace(".", ":")}h)
-                  </span>
-                </div>
-                {task.alias && (
-                  <span className="text-[11px] opacity-70 leading-none mt-0.5 text-[#000000] font-bold">
-                    {task.alias}{(task as any).type_apt ? ` (${(task as any).type_apt})` : ''}
-                  </span>
-                )}
-              </div>
-            </div>
+                    {!isConfirmedOperation && (
+                      <div className="absolute top-0.5 right-0.5 z-50">
+                        <HelpCircle
+                          className="w-3 h-3 text-gray-900"
+                          strokeWidth={2.5}
+                        />
+                      </div>
+                    )}
+                    <div 
+                      className="flex flex-col items-center justify-center h-full gap-0"
+                    >
+                      <div className="flex items-center gap-1">
+                        <span
+                          className="text-[13px] text-[#ff0000] font-extrabold"
+                          data-testid={`task-name-${task.id}`}
+                        >
+                          {task.name}
+                        </span>
+                        <span className="text-[11px] opacity-60 leading-none font-bold text-[#000000]">
+                          ({task.duration.replace(".", ":")}h)
+                        </span>
+                      </div>
+                      {task.alias && (
+                        <span className="text-[11px] opacity-70 leading-none mt-0.5 text-[#000000] font-bold">
+                          {task.alias}{(task as any).type_apt ? ` (${(task as any).type_apt})` : ''}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent side="top" className="max-w-xs text-base px-3 py-2">
+                  <p className="font-semibold">{displayTask.address || "Indirizzo non disponibile"}</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
           );
           }}
       </Draggable>
