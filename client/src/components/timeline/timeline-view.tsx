@@ -559,11 +559,11 @@ export default function TimelineView({
                             const timeB = taskB.start_time || taskB.fw_start_time || taskB.startTime || "00:00";
                             return timeA.localeCompare(timeB);
                           })
-                          .map((task, localIndex) => {
+                          .map((task, idx) => {
                             const taskObj = task as any;
 
-                            // IMPORTANTE: usa localIndex (0,1,2,3...) per react-beautiful-dnd
-                            // NON usare l'indice globale da tasks.findIndex()
+                            // Per il drag and drop, usa l'indice locale (idx) non globalIndex
+                            // React-beautiful-dnd richiede indici sequenziali 0,1,2,3... per ogni Droppable
 
                             // Leggi travel_time dalla task normalizzata (che viene da timeline_assignments.json)
                             // Prova sia travel_time che travelTime per compatibilità
@@ -590,7 +590,7 @@ export default function TimelineView({
                             }
 
                             // DEBUG: log per capire cosa sta succedendo
-                            if (localIndex > 0) {
+                            if (idx > 0) {
                               console.log(`Task ${taskObj.task_id || taskObj.id}: travel_time=${travelTime} min`);
                             }
 
@@ -612,7 +612,7 @@ export default function TimelineView({
                                 )}
 
                                 {/* Indicatore di travel time: solo omino */}
-                                {localIndex > 0 && (
+                                {idx > 0 && (
                                   <div 
                                     key={`marker-${task.id}`} 
                                     className="flex items-center justify-center flex-shrink-0 py-3 px-2"
@@ -634,7 +634,7 @@ export default function TimelineView({
                                 <TaskCard 
                                   key={task.id}
                                   task={task} 
-                                  index={localIndex}
+                                  index={tasks.findIndex(t => t.id === task.id)}
                                   isInTimeline={true}
                                   allTasks={tasks}
                                 />
