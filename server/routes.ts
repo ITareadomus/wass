@@ -659,22 +659,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
         try {
           let taskRemoved = false;
 
-          // Cerca in tutti i container
+          // Cerca in tutti i container e rimuovi TUTTI i duplicati basandosi su task_id univoco
           for (const [containerType, container] of Object.entries(containersData.containers)) {
             const containerObj = container as any;
             if (!containerObj.tasks) continue;
 
             const originalCount = containerObj.tasks.length;
+            // Usa solo task_id come chiave univoca per rimuovere duplicati
             containerObj.tasks = containerObj.tasks.filter((t: any) => 
-              String(t.task_id) !== normalizedTaskId && 
-              String(t.logistic_code) !== normalizedLogisticCode
+              String(t.task_id) !== normalizedTaskId
             );
             const newCount = containerObj.tasks.length;
 
             if (originalCount > newCount) {
               containerObj.count = newCount;
               taskRemoved = true;
-              console.log(`✅ Task ${normalizedLogisticCode} rimossa da ${containerType}`);
+              const removedCount = originalCount - newCount;
+              console.log(`✅ Rimoss${removedCount > 1 ? 'e' : 'a'} ${removedCount} task ${normalizedLogisticCode} (duplicat${removedCount > 1 ? 'i' : 'o'}) da ${containerType}`);
             }
           }
 
@@ -786,14 +787,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
           // Filtra reasons automatiche
           if (removedTask.reasons) {
             removedTask.reasons = removedTask.reasons.filter((r: string) => 
-              !['automatic_assignment_eo', 'automatic_assignment_hp', 'automatic_assignment_lp', 'manual_assignment'].includes(r)
+              !['automatic_assignment_eo', 'automatic_assignment_hp', 'automatic_assignment_lp', 'manual_assignment', 'manually_moved_to_timeline'].includes(r)
             );
           }
 
-          // Aggiungi al container
+          // Inizializza array se non esiste
           if (!containersData.containers[containerType].tasks) {
             containersData.containers[containerType].tasks = [];
           }
+
+          // CRITICAL FIX: Rimuovi eventuali duplicati esistenti prima di aggiungere
+          const removedTaskId = String(removedTask.task_id);
+          containersData.containers[containerType].tasks = containersData.containers[containerType].tasks.filter(
+            (t: any) => String(t.task_id) !== removedTaskId
+          );
+
+          // Aggiungi la task (ora garantito senza duplicati)
           containersData.containers[containerType].tasks.push(removedTask);
           containersData.containers[containerType].count = containersData.containers[containerType].tasks.length;
 
