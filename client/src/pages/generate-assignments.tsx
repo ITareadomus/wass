@@ -346,15 +346,56 @@ export default function GenerateAssignments() {
       setLowPriorityTasks(filteredLow);
 
       console.log(`📊 SINCRONIZZAZIONE CONTAINERS:`);
-      console.log(`   - Early Out: ${filteredEarlyOut.length} task`);
-      console.log(`   - High Priority: ${filteredHigh.length} task`);
-      console.log(`   - Low Priority: ${filteredLow.length} task`);
+      console.log(`   - Early Out: ${filteredEarlyOut.length} task (filtrate ${initialEarlyOut.length - filteredEarlyOut.length})`);
+      console.log(`   - High Priority: ${filteredHigh.length} task (filtrate ${initialHigh.length - filteredHigh.length})`);
+      console.log(`   - Low Priority: ${filteredLow.length} task (filtrate ${initialLow.length - filteredLow.length})`);
+      console.log(`   - Timeline ha ${timelineAssignmentsMap.size} task assegnate`);
 
       // Crea l'array unificato usando dedupe per id (non per logisticCode!)
       const tasksWithAssignments: Task[] = [];
+      
+      // CRITICAL: usa Set per tracciare id già inseriti
+      const addedIds = new Set<string>();
 
       // Aggiungi task NON assegnate dai containers
-      tasksWithAssignments.push(...filteredEarlyOut, ...filteredHigh, ...filteredLow);
+      for (const task of [...filteredEarlyOut, ...filteredHigh, ...filteredLow]) {
+        const tid = String(task.id);
+        if (!addedIds.has(tid)) {
+          tasksWithAssignments.push(task);
+          addedIds.add(tid);
+        }
+      }
+
+      // Aggiungi task assegnate dalla timeline
+      for (const timelineTask of timelineTasksArray) {
+        const tid = String(timelineTask.id);
+        if (!addedIds.has(tid)) {
+          tasksWithAssignments.push(timelineTask);
+          addedIds.add(tid);
+        } else {
+          console.log(`⚠️ Task ${timelineTask.name} già presente, skipping duplicate`);
+        }
+      }
+
+      console.log(`📦 Array unificato: ${tasksWithAssignments.length} task totali (${addedIds.size} unique IDs)`);
+
+      setAllTasksWithAssignments(tasksWithAssignments);
+    } catch (error: any) {
+      console.error('❌ Errore nel caricamento dei task:', error);
+      toast({
+        title: "Errore",
+        description: error.message || "Errore nel caricamento dei task",
+        variant: "destructive",
+        duration: 3000,
+      });
+    } finally {
+      setIsLoadingTasks(false);
+    }
+  };
+
+  // Funzione esposta per ricaricare i task e le assegnazioni
+  const reloadAllTasks = async () => {
+    await loadTasks(true); // Skip extraction, just reload from filteredHigh, ...filteredLow);
 
       // Aggiungi SOLO task che sono effettivamente in timeline.json con i loro dati completi
       for (const [taskId, timelineAssignment] of timelineAssignmentsMap.entries()) {
