@@ -488,13 +488,25 @@ export default function TimelineView({
   const loadTimelineCleaners = async () => {
     try {
       const response = await fetch(`/data/output/timeline.json?t=${Date.now()}`);
-      if (!response.ok) return;
+      if (!response.ok) {
+        console.warn(`Timeline file not found (${response.status}), using empty timeline`);
+        setTimelineCleaners([]);
+        return;
+      }
+
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        console.warn('Timeline file is not JSON, using empty timeline');
+        setTimelineCleaners([]);
+        return;
+      }
 
       const timelineData = await response.json();
       const timelineCleanersList = timelineData.cleaners_assignments || [];
       setTimelineCleaners(timelineCleanersList);
     } catch (error) {
       console.error("Errore nel caricamento timeline cleaners:", error);
+      setTimelineCleaners([]);
     }
   };
 
