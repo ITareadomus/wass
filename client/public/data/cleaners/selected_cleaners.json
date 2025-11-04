@@ -270,7 +270,28 @@
       ],
       "telegram_id": 6481457174,
       "start_time": "10:00"
+    },
+    {
+      "id": 326,
+      "name": "FESTUS OSARO",
+      "lastname": "AIHIVBERE",
+      "role": "Standard",
+      "active": true,
+      "ranking": 0,
+      "counter_hours": 0,
+      "counter_days": 0,
+      "available": true,
+      "contract_type": "B",
+      "preferred_customers": [
+        2,
+        3,
+        75,
+        94,
+        115
+      ],
+      "telegram_id": 7895288780,
+      "start_time": "10:00"
     }
   ],
-  "total_selected": 9
+  "total_selected": 10
 }
