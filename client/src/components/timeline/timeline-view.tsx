@@ -58,6 +58,33 @@ export default function TimelineView({
   const [availableCleaners, setAvailableCleaners] = useState<Cleaner[]>([]);
   const { toast } = useToast();
 
+  // Mutation per rimuovere un cleaner da selected_cleaners.json
+  const removeCleanerMutation = useMutation({
+    mutationFn: async (cleanerId: number) => {
+      const response = await apiRequest("POST", "/api/remove-cleaner-from-selected", {
+        cleanerId
+      });
+      return await response.json();
+    },
+    onSuccess: async () => {
+      // Ricarica i cleaner per aggiornare la vista
+      await loadCleaners();
+
+      toast({
+        title: "Cleaner rimosso",
+        description: "Il cleaner è stato rimosso dalla selezione.",
+      });
+      setIsModalOpen(false);
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Errore",
+        description: error.message || "Impossibile rimuovere il cleaner",
+        variant: "destructive",
+      });
+    },
+  });
+
   // Mutation per aggiungere un cleaner alla timeline
   const addCleanerMutation = useMutation({
     mutationFn: async (cleanerId: number) => {
@@ -879,6 +906,25 @@ export default function TimelineView({
                     )}
                   </Button>
                 </div>
+              </div>
+
+              {/* Sezione Rimuovi Cleaner */}
+              <div className="border-t pt-4 mt-4">
+                <p className="text-sm font-semibold text-muted-foreground mb-3">
+                  Rimuovi Cleaner
+                </p>
+                <p className="text-xs text-muted-foreground mb-3">
+                  Il cleaner sarà rimosso dalla vista ma le sue task rimarranno in timeline.json finché non verrà sostituito.
+                </p>
+                <Button
+                  onClick={() => removeCleanerMutation.mutate(selectedCleaner.id)}
+                  disabled={removeCleanerMutation.isPending}
+                  variant="destructive"
+                  className="w-full"
+                  data-testid="button-remove-cleaner"
+                >
+                  {removeCleanerMutation.isPending ? "Rimozione..." : "Rimuovi dalla selezione"}
+                </Button>
               </div>
             </div>
           )}
