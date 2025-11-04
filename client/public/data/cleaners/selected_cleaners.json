@@ -13,7 +13,8 @@
       "contract_type": "B",
       "preferred_customers": [],
       "telegram_id": null,
-      "start_time": "10:00"
+      "start_time": "10:00",
+      "can_do_straordinaria": false
     },
     {
       "id": 132,
@@ -51,7 +52,8 @@
         124
       ],
       "telegram_id": 1577716674,
-      "start_time": "10:00"
+      "start_time": "10:00",
+      "can_do_straordinaria": true
     },
     {
       "id": 722,
@@ -86,7 +88,8 @@
         124
       ],
       "telegram_id": null,
-      "start_time": "10:00"
+      "start_time": "10:00",
+      "can_do_straordinaria": false
     },
     {
       "id": 24,
@@ -108,7 +111,8 @@
         115
       ],
       "telegram_id": null,
-      "start_time": "10:00"
+      "start_time": "10:00",
+      "can_do_straordinaria": false
     },
     {
       "id": 445,
@@ -141,7 +145,8 @@
         124
       ],
       "telegram_id": null,
-      "start_time": "10:00"
+      "start_time": "10:00",
+      "can_do_straordinaria": false
     },
     {
       "id": 495,
@@ -175,7 +180,8 @@
         123
       ],
       "telegram_id": 8035270407,
-      "start_time": "10:00"
+      "start_time": "10:00",
+      "can_do_straordinaria": true
     },
     {
       "id": 596,
@@ -213,7 +219,8 @@
         124
       ],
       "telegram_id": 6339409386,
-      "start_time": "10:00"
+      "start_time": "10:00",
+      "can_do_straordinaria": false
     },
     {
       "id": 644,
@@ -240,7 +247,8 @@
         115
       ],
       "telegram_id": 6658049814,
-      "start_time": "10:00"
+      "start_time": "10:00",
+      "can_do_straordinaria": true
     },
     {
       "id": 249,
@@ -269,7 +277,8 @@
         123
       ],
       "telegram_id": 6481457174,
-      "start_time": "10:00"
+      "start_time": "10:00",
+      "can_do_straordinaria": true
     },
     {
       "id": 326,
@@ -290,7 +299,8 @@
         115
       ],
       "telegram_id": 7895288780,
-      "start_time": "10:00"
+      "start_time": "10:00",
+      "can_do_straordinaria": false
     }
   ],
   "total_selected": 10
