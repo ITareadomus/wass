@@ -979,10 +979,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Trova il cleaner per la data specificata
       const dateCleaners = cleanersData.dates?.[workDate]?.cleaners || [];
-      const cleanerData = dateCleaners.find((c: any) => c.id === cleanerId);
+      let cleanerData = dateCleaners.find((c: any) => c.id === cleanerId);
+
+      // Se non trovato nella data corrente, cerca in tutte le date
+      if (!cleanerData) {
+        for (const date of Object.keys(cleanersData.dates || {})) {
+          const dateCl = cleanersData.dates[date]?.cleaners || [];
+          cleanerData = dateCl.find((c: any) => c.id === cleanerId);
+          if (cleanerData) {
+            console.log(`✅ Cleaner ${cleanerId} trovato nella data ${date}`);
+            break;
+          }
+        }
+      }
 
       if (!cleanerData) {
-        return res.status(404).json({ success: false, error: "Cleaner non trovato per questa data" });
+        return res.status(404).json({ success: false, error: "Cleaner non trovato in cleaners.json" });
       }
 
       // Carica selected_cleaners.json per trovare cleaners che non sono più nella selezione
