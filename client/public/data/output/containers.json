@@ -1,6 +1,6 @@
 {
   "metadata": {
-    "last_updated": "2025-11-04T11:15:46.229613",
+    "last_updated": "2025-11-04T10:27:35.984464",
     "date": "2025-11-04"
   },
   "containers": {
@@ -64,9 +64,36 @@
             "premium"
           ],
           "priority": "high_priority"
+        },
+        {
+          "task_id": 218402,
+          "logistic_code": 1577,
+          "client_id": null,
+          "premium": true,
+          "address": "VIA CROCEFISSO, 25",
+          "lat": "45.4570059",
+          "lng": "9.1848347",
+          "cleaning_time": 270,
+          "checkin_date": "2025-11-04",
+          "checkout_date": "2025-11-04",
+          "checkin_time": "15:00",
+          "checkout_time": null,
+          "pax_in": 4,
+          "pax_out": 6,
+          "small_equipment": false,
+          "operation_id": 2,
+          "confirmed_operation": true,
+          "straordinaria": false,
+          "type_apt": "E",
+          "alias": "TBR",
+          "customer_name": "THE BEST RENT S.r.l.",
+          "reasons": [
+            "manually_moved_to_timeline"
+          ],
+          "priority": "high_priority"
         }
       ],
-      "count": 2
+      "count": 3
     },
     "low_priority": {
       "tasks": [],
@@ -74,9 +101,9 @@
     }
   },
   "summary": {
-    "total_tasks": 2,
+    "total_tasks": 3,
     "early_out": 0,
-    "high_priority": 2,
+    "high_priority": 3,
     "low_priority": 0
   }
 }
