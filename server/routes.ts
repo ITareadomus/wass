@@ -16,61 +16,73 @@ const execAsync = promisify(exec);
  * Helper function to recalculate travel_time, start_time, end_time for a cleaner's tasks
  */
 async function recalculateCleanerTimes(cleanerData: any): Promise<any> {
-  const { spawn } = await import('child_process');
+  try {
+    const { spawn } = await import('child_process');
 
-  return new Promise((resolve, reject) => {
-    const scriptPath = path.join(process.cwd(), 'client/public/scripts/recalculate_times.py');
-    const cleanerDataJson = JSON.stringify(cleanerData);
+    return new Promise((resolve, reject) => {
+      const scriptPath = path.join(process.cwd(), 'client/public/scripts/recalculate_times.py');
+      const cleanerDataJson = JSON.stringify(cleanerData);
 
-    // Usa spawn con stdin per evitare ARG_MAX limit e command injection
-    const pythonProcess = spawn('python3', [scriptPath], {
-      stdio: ['pipe', 'pipe', 'pipe']
-    });
+      // Usa spawn con stdin per evitare ARG_MAX limit e command injection
+      const pythonProcess = spawn('python3', [scriptPath], {
+        stdio: ['pipe', 'pipe', 'pipe']
+      });
 
-    let stdout = '';
-    let stderr = '';
+      let stdout = '';
+      let stderr = '';
 
-    pythonProcess.stdout.on('data', (data) => {
-      stdout += data.toString();
-    });
+      pythonProcess.stdout.on('data', (data) => {
+        stdout += data.toString();
+      });
 
-    pythonProcess.stderr.on('data', (data) => {
-      stderr += data.toString();
-    });
+      pythonProcess.stderr.on('data', (data) => {
+        stderr += data.toString();
+      });
 
-    pythonProcess.on('close', (code) => {
-      if (code !== 0) {
-        console.error('Python stderr:', stderr);
-        reject(new Error(`Python script exited with code ${code}: ${stderr}`));
-        return;
-      }
-
-      if (stderr && stderr.trim()) {
-        console.warn('Python stderr:', stderr);
-      }
-
-      try {
-        const result = JSON.parse(stdout);
-
-        if (!result.success) {
-          reject(new Error(result.error || 'Unknown error from Python script'));
+      pythonProcess.on('close', (code) => {
+        if (code !== 0) {
+          console.error('Python stderr:', stderr);
+          reject(new Error(`Python script exited with code ${code}: ${stderr}`));
           return;
         }
 
-        resolve(result.cleaner_data);
-      } catch (parseError: any) {
-        reject(new Error(`Failed to parse Python output: ${parseError.message}`));
+        if (stderr && stderr.trim()) {
+          console.warn('Python stderr:', stderr);
+        }
+
+        try {
+          const result = JSON.parse(stdout);
+
+          if (!result.success) {
+            reject(new Error(result.error || 'Unknown error from Python script'));
+            return;
+          }
+
+          resolve(result.cleaner_data);
+        } catch (parseError: any) {
+          console.error('Failed to parse Python output:', parseError);
+          reject(new Error(`Failed to parse Python output: ${parseError.message}`));
+        }
+      });
+
+      pythonProcess.on('error', (error) => {
+        console.error('Failed to spawn Python process:', error);
+        reject(new Error(`Failed to spawn Python process: ${error.message}`));
+      });
+
+      // Scrivi il JSON su stdin e chiudi
+      try {
+        pythonProcess.stdin.write(cleanerDataJson);
+        pythonProcess.stdin.end();
+      } catch (writeError: any) {
+        console.error('Failed to write to Python process:', writeError);
+        reject(new Error(`Failed to write to Python process: ${writeError.message}`));
       }
     });
-
-    pythonProcess.on('error', (error) => {
-      reject(new Error(`Failed to spawn Python process: ${error.message}`));
-    });
-
-    // Scrivi il JSON su stdin e chiudi
-    pythonProcess.stdin.write(cleanerDataJson);
-    pythonProcess.stdin.end();
-  });
+  } catch (error: any) {
+    console.error('Error in recalculateCleanerTimes:', error);
+    throw error;
+  }
 }
 
 export async function registerRoutes(app: Express): Promise<Server> {
