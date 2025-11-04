@@ -786,18 +786,18 @@ export default function GenerateAssignments() {
         'low': 'low_priority'
       };
 
-      const fromContainer = containerToJsonName[source.droppableId] || null;
-      const toContainer = containerToJsonName[destination.droppableId] || null;
+      const fromContainerJson = containerToJsonName[source.droppableId] || null;
+      const toContainerJson = containerToJsonName[destination.droppableId] || null;
 
       // Caso: spostamento tra containers di priorità
-      if (fromContainer && toContainer) {
+      if (fromContainerJson && toContainerJson) {
         console.log(`📦 Spostamento tra containers: ${fromContainer} → ${toContainer}`);
 
         try {
           const payload = {
             taskId: draggableId,
-            fromContainer,
-            toContainer,
+            fromContainer: fromContainerJson,
+            toContainer: toContainerJson,
             sourceIndex: source.index,
             destIndex: destination.index,
           };
@@ -838,8 +838,8 @@ export default function GenerateAssignments() {
       }
 
       // Caso: Da container a timeline
-      if (fromContainer && toCleanerId !== null) {
-        console.log(`🔄 Spostamento da container ${fromContainer} a cleaner ${toCleanerId}`);
+      if (fromContainerJson && toCleanerId !== null) {
+        console.log(`🔄 Spostamento da container ${fromContainerJson} a cleaner ${toCleanerId}`);
 
         // Salva in timeline.json (rimuove automaticamente da containers.json)
         await saveTimelineAssignment(taskId, toCleanerId, logisticCode, destination.index);
@@ -848,8 +848,8 @@ export default function GenerateAssignments() {
       }
 
       // Caso: Da timeline a container
-      if (fromCleanerId !== null && toContainer) {
-        console.log(`🔄 Spostamento da cleaner ${fromCleanerId} a container ${toContainer}`);
+      if (fromCleanerId !== null && toContainerJson) {
+        console.log(`🔄 Spostamento da cleaner ${fromCleanerId} a container ${toContainerJson}`);
 
         // Rimuovi da timeline.json
         await removeTimelineAssignment(taskId, logisticCode);
