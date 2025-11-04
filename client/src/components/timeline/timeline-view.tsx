@@ -606,7 +606,7 @@ export default function TimelineView({
                 >
                   {isHidden ? (
                     <div className="w-full flex items-center justify-center">
-                      <UserPlus className="w-6 h-6 text-gray-400" />
+                      <UserPlus className="w-5 h-5 text-muted-foreground" />
                     </div>
                   ) : (
                     <div className="w-full flex items-center gap-1">
