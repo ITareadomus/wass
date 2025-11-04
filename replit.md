@@ -40,6 +40,17 @@ Preferred communication style: Simple, everyday language.
 - **Drag & Drop Workflow**: Tasks can be moved between priority columns and unassigned pool
 - **Auto-Assignment**: Backend support for automatic task assignment based on personnel availability and priority
 
+## Task Identification and Deduplication (November 2025)
+- **Unique Identifier**: Each task is uniquely identified by `task_id` (primary key)
+- **Logistic Code**: The `logistic_code` field can have duplicates across different tasks
+- **Deduplication Logic**: 
+  - Python assignment scripts (assign_eo.py, assign_hp.py, assign_lp.py) track assigned `logistic_code` values from timeline.json
+  - Only ONE task per `logistic_code` is assigned automatically during the assignment flow
+  - Duplicate tasks (same logistic_code, different task_id) remain in containers for manual drag-and-drop assignment
+  - Container cleanup uses `task_id` (not logistic_code) to ensure unassigned duplicates are preserved
+- **Assignment Flow**: create_containers.py → assign_eo.py → assign_hp.py → assign_lp.py → timeline.json
+- **Verification**: Tested with logistic_code 777 (task_ids 210458, 218427) - one assigned, one kept in container
+
 ## Component Architecture
 - **Modular Design**: Separate components for drag-drop interface, timeline view, statistics panel, and map section
 - **Reusable UI**: Comprehensive component library with consistent styling and accessibility features
