@@ -1,25 +1,12 @@
 {
   "metadata": {
-    "last_updated": "2025-11-04T08:58:06.117Z",
+    "last_updated": "2025-11-04T09:00:04.531Z",
     "date": "2025-11-04"
   },
-  "cleaners_assignments": [
-    {
-      "cleaner": {
-        "id": 287,
-        "name": "BAH",
-        "lastname": "ISMAILA",
-        "role": "Standard",
-        "premium": false
-      },
-      "tasks": []
-    }
-  ],
+  "cleaners_assignments": [],
   "meta": {
-    "total_cleaners": 1,
+    "total_cleaners": 0,
     "used_cleaners": 0,
-    "assigned_tasks": 0,
-    "total_tasks": 0,
-    "last_updated": "2025-11-04T08:58:06.118Z"
+    "assigned_tasks": 0
   }
 }
