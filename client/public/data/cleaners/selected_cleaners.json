@@ -305,31 +305,7 @@
       ],
       "telegram_id": 6481457174,
       "start_time": "10:00"
-    },
-    {
-      "id": 287,
-      "name": "BAH",
-      "lastname": "ISMAILA",
-      "role": "Standard",
-      "active": true,
-      "ranking": 0,
-      "counter_hours": 0,
-      "counter_days": 0,
-      "available": true,
-      "contract_type": "B",
-      "preferred_customers": [
-        2,
-        3,
-        64,
-        72,
-        75,
-        84,
-        94,
-        115
-      ],
-      "telegram_id": 5173164898,
-      "start_time": "10:00"
     }
   ],
-  "total_selected": 11
+  "total_selected": 10
 }
