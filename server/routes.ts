@@ -832,14 +832,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { Client } = await import('@replit/object-storage');
       const client = new Client();
       
-      // Converti i dati in stringa JSON e poi in Buffer
+      // Converti i dati in stringa JSON
       const jsonContent = JSON.stringify(timelineData, null, 2);
-      const buffer = Buffer.from(jsonContent, 'utf-8');
       
-      // Upload nel bucket wass_assignments
-      await client.uploadFromBytes(filename, buffer, {
+      // Upload nel bucket wass_assignments usando uploadFromText
+      const result = await client.uploadFromText(filename, jsonContent, {
         bucket: 'wass_assignments'
       });
+      
+      if (!result.ok) {
+        throw new Error(result.error || 'Errore sconosciuto nel salvataggio');
+      }
       
       console.log(`✅ Assegnazioni confermate e salvate in Object Storage: ${filename}`);
       
