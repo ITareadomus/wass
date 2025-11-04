@@ -1,6 +1,6 @@
 {
   "metadata": {
-    "last_updated": "2025-11-04T08:31:26.823Z",
+    "last_updated": "2025-11-04T08:35:46.438Z",
     "date": "2025-11-04"
   },
   "cleaners_assignments": [
@@ -304,21 +304,21 @@
             "automatic_assignment_eo"
           ],
           "priority": "early_out",
-          "start_time": "11:00",
-          "end_time": "12:00",
+          "start_time": "11:05",
+          "end_time": "12:05",
           "followup": true,
           "sequence": 2,
-          "travel_time": 0
+          "travel_time": 5
         }
       ]
     },
     {
       "cleaner": {
-        "id": 404,
-        "name": "RASEL",
-        "lastname": "MOLLA",
-        "role": "Standard",
-        "premium": false
+        "id": 249,
+        "name": "Ogbodo Chidi",
+        "lastname": "Igwe",
+        "role": "Premium",
+        "premium": true
       },
       "tasks": [
         {
@@ -446,8 +446,10 @@
     }
   ],
   "meta": {
-    "total_cleaners": 9,
+    "total_cleaners": 7,
     "used_cleaners": 7,
-    "assigned_tasks": 11
+    "assigned_tasks": 11,
+    "total_tasks": 11,
+    "last_updated": "2025-11-04T08:35:46.438Z"
   }
 }
