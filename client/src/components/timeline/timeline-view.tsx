@@ -392,7 +392,48 @@ export default function TimelineView({
     }
   };
 
-  
+  const handleConfirmAssignments = async () => {
+    try {
+      const dateStr = localStorage.getItem('selected_work_date') || (() => {
+        const today = new Date();
+        const year = today.getFullYear();
+        const month = String(today.getMonth() + 1).padStart(2, '0');
+        const day = String(today.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+      })();
+
+      toast({
+        title: "Conferma in corso...",
+        description: "Salvataggio delle assegnazioni in corso",
+      });
+
+      // Chiama l'API per salvare la copia immutabile
+      const response = await fetch('/api/confirm-assignments', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ date: dateStr }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Errore nel salvataggio delle assegnazioni');
+      }
+
+      const result = await response.json();
+
+      toast({
+        title: "✅ Assegnazioni confermate!",
+        description: `Salvate in ${result.filename}`,
+      });
+    } catch (error) {
+      console.error('Errore nella conferma:', error);
+      toast({
+        title: "Errore",
+        description: "Errore durante la conferma delle assegnazioni",
+        variant: "destructive",
+      });
+    }
+  };
+
 
   // Non mostrare nulla se non ci sono cleaners
   if (cleaners.length === 0) {
