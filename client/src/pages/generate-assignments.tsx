@@ -462,41 +462,7 @@ export default function GenerateAssignments() {
     }
   };
 
-  // Funzione per confermare le assegnazioni
-  const confirmAssignments = async () => {
-    try {
-      setIsConfirming(true);
-      const dateStr = format(selectedDate, "yyyy-MM-dd");
-
-      const response = await fetch('/api/confirm-assignments', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ date: dateStr })
-      });
-
-      const result = await response.json();
-
-      if (result.success) {
-        toast({
-          title: "Assegnazioni Confermate!",
-          description: `${result.total_assignments} assegnazioni salvate in ${result.filename}`,
-          duration: 5000,
-        });
-      } else {
-        throw new Error(result.error || 'Errore sconosciuto');
-      }
-    } catch (error: any) {
-      console.error("Errore nella conferma delle assegnazioni:", error);
-      toast({
-        title: "Errore",
-        description: error.message || "Errore durante il salvataggio delle assegnazioni",
-        variant: "destructive",
-        duration: 5000,
-      });
-    } finally {
-      setIsConfirming(false);
-    }
-  };
+  
 
   // Funzione per assegnare le task Early Out alla timeline
   const assignEarlyOutToTimeline = async () => {
