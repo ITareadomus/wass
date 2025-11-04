@@ -553,27 +553,6 @@ def load_tasks() -> List[Task]:
                 straordinaria=bool(t.get("straordinaria", False)),
             ))
 
-    # GESTIONE DUPLICATI: Ordina task duplicate per checkin vincolante
-    from collections import defaultdict
-    by_lc = defaultdict(list)
-    for t in tasks:
-        by_lc[t.logistic_code].append(t)
-    
-    filtered_tasks = []
-    for lc, group in by_lc.items():
-        if len(group) == 1:
-            filtered_tasks.append(group[0])
-        else:
-            # Ordina: checkin definito prima, poi per orario checkin
-            group.sort(key=lambda x: (
-                x.checkin_dt is None,
-                x.checkin_dt if x.checkin_dt else datetime.max
-            ))
-            filtered_tasks.append(group[0])
-            print(f"⚠️  Logistic code {lc} duplicato: assegnata task {group[0].task_id} (checkin: {group[0].checkin_dt}), ignorata task {group[1].task_id}")
-    
-    tasks = filtered_tasks
-
     # Ordina: straordinarie first, poi premium
     tasks.sort(key=lambda x: (not x.straordinaria, not x.is_premium))
     return tasks
