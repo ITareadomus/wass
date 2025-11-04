@@ -143,6 +143,10 @@ for u in cleaners:
         role = "Standard"
     available = 0 if uid in leave_set else 1
 
+    # Lista ID cleaner autorizzati per task straordinarie
+    # Lopez (132), El Hadji (495), Henry (644), Chidi (249)
+    straordinaria_authorized = {132, 495, 644, 249}
+    
     cleaner = {
         "id": uid,
         "name": u.get("name"),
@@ -157,6 +161,7 @@ for u in cleaners:
         "preferred_customers": prefs_map.get(uid, []),
         "telegram_id": u.get("telegram_id"),
         "start_time": u.get("tw_start"),
+        "can_do_straordinaria": uid in straordinaria_authorized,
     }
     cleaners_data.append(cleaner)
 

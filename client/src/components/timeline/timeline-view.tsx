@@ -42,6 +42,7 @@ interface Cleaner {
   preferred_customers: number[];
   telegram_id: number | null;
   start_time: string | null;
+  can_do_straordinaria?: boolean;
 }
 
 export default function TimelineView({
@@ -648,7 +649,7 @@ export default function TimelineView({
                           F
                         </div>
                       )}
-                      {(cleaner as any).can_do_straordinaria && (
+                      {cleaner.can_do_straordinaria && (
                         <div className="bg-red-500 text-white font-bold text-[10px] px-1 py-0.5 rounded flex-shrink-0">
                           S
                         </div>
