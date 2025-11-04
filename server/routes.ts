@@ -1690,19 +1690,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
 
         console.log("assign_eo output:", stdoutData);
-
-        // NUOVO: Esegui remix dopo fase EO
-        try {
-          const { maybeRemixAfterPhase } = await import('./services/assignment/common');
-          const { remixed, leftoversCount } = await maybeRemixAfterPhase();
-          
-          if (remixed) {
-            console.log(`✅ Remix eseguito dopo EO: ${leftoversCount} leftovers reintegrati`);
-          }
-        } catch (remixError: any) {
-          console.warn(`⚠️ Remix dopo EO fallito (non bloccante):`, remixError.message);
-        }
-
         res.json({
           success: true,
           message: "Early Out tasks assegnati con successo in timeline.json",
@@ -1765,19 +1752,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
 
         console.log("assign_hp output:", stdoutData);
-
-        // NUOVO: Esegui remix dopo fase HP
-        try {
-          const { maybeRemixAfterPhase } = await import('./services/assignment/common');
-          const { remixed, leftoversCount } = await maybeRemixAfterPhase();
-          
-          if (remixed) {
-            console.log(`✅ Remix eseguito dopo HP: ${leftoversCount} leftovers reintegrati`);
-          }
-        } catch (remixError: any) {
-          console.warn(`⚠️ Remix dopo HP fallito (non bloccante):`, remixError.message);
-        }
-
         res.json({
           success: true,
           message: "High Priority tasks assegnati con successo in timeline.json",
@@ -1840,19 +1814,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
 
         console.log("assign_lp output:", stdoutData);
-
-        // NUOVO: Esegui remix dopo fase LP (finale)
-        try {
-          const { maybeRemixAfterPhase } = await import('./services/assignment/common');
-          const { remixed, leftoversCount } = await maybeRemixAfterPhase();
-          
-          if (remixed) {
-            console.log(`✅ Remix eseguito dopo LP: ${leftoversCount} leftovers reintegrati`);
-          }
-        } catch (remixError: any) {
-          console.warn(`⚠️ Remix dopo LP fallito (non bloccante):`, remixError.message);
-        }
-
         res.json({
           success: true,
           message: "Low Priority tasks assegnati con successo in timeline.json",
