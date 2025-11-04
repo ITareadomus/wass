@@ -68,8 +68,11 @@ export default function TimelineView({
       return await response.json();
     },
     onSuccess: async () => {
-      // Ricarica i cleaner per aggiornare la vista
-      await loadCleaners();
+      // Ricarica ENTRAMBI i file per sincronizzare la vista
+      await Promise.all([
+        loadCleaners(),
+        loadTimelineCleaners()
+      ]);
 
       toast({
         title: "Cleaner rimosso",
@@ -99,8 +102,11 @@ export default function TimelineView({
       return await response.json();
     },
     onSuccess: async () => {
-      // Ricarica i cleaner per mostrare immediatamente il nuovo cleaner
-      await loadCleaners();
+      // Ricarica ENTRAMBI i file per sincronizzare la vista
+      await Promise.all([
+        loadCleaners(),
+        loadTimelineCleaners()
+      ]);
 
       // Ricarica anche le task se necessario
       if ((window as any).reloadAllTasks) {
