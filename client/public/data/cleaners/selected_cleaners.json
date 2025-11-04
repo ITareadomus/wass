@@ -276,33 +276,7 @@
       ],
       "telegram_id": null,
       "start_time": "10:00"
-    },
-    {
-      "id": 829,
-      "name": "MUSTAPHA",
-      "lastname": "BAH",
-      "role": "Premium",
-      "active": true,
-      "ranking": 0,
-      "counter_hours": 4,
-      "counter_days": 9,
-      "available": true,
-      "contract_type": "B",
-      "preferred_customers": [
-        3,
-        61,
-        64,
-        72,
-        75,
-        84,
-        91,
-        94,
-        113,
-        115
-      ],
-      "telegram_id": 7108751314,
-      "start_time": "10:00"
     }
   ],
-  "total_selected": 10
+  "total_selected": 9
 }
