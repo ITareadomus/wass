@@ -742,12 +742,15 @@ export default function TimelineView({
                             const effectiveTravelMinutes = travelTime === 0 ? 1 : travelTime;
                             const totalWidth = (effectiveTravelMinutes / 600) * 100;
 
+                            // Usa task.id o task.task_id come chiave univoca (non logistic_code che può essere duplicato)
+                            const uniqueKey = taskObj.task_id || taskObj.id;
+
                             return (
                               <>
                                 {/* Spazio vuoto per task con sequence=1 e start_time=11:00 */}
                                 {timeOffset > 0 && (
                                   <div 
-                                    key={`offset-${task.id}`}
+                                    key={`offset-${uniqueKey}`}
                                     className="flex-shrink-0"
                                     style={{ width: `${(timeOffset / 600) * 100}%` }}
                                   />
@@ -756,7 +759,7 @@ export default function TimelineView({
                                 {/* Indicatore di travel time: solo omino */}
                                 {idx > 0 && (
                                   <div 
-                                    key={`marker-${task.id}`} 
+                                    key={`marker-${uniqueKey}`} 
                                     className="flex items-center justify-center flex-shrink-0 py-3 px-2"
                                     style={{ width: `${totalWidth}%`, minHeight: '50px' }}
                                     title={`${travelTime} min`}
@@ -774,7 +777,7 @@ export default function TimelineView({
                                 )}
 
                                 <TaskCard 
-                                  key={task.id}
+                                  key={uniqueKey}
                                   task={task} 
                                   index={idx}
                                   isInTimeline={true}
