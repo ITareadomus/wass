@@ -392,44 +392,7 @@ export default function TimelineView({
     }
   };
 
-  const handleConfirmAssignments = async () => {
-    try {
-      const savedDate = localStorage.getItem('selected_work_date');
-      const dateStr = savedDate || (() => {
-        const today = new Date();
-        const year = today.getFullYear();
-        const month = String(today.getMonth() + 1).padStart(2, '0');
-        const day = String(today.getDate()).padStart(2, '0');
-        return `${year}-${month}-${day}`;
-      })();
-
-      const response = await fetch('/api/confirm-assignments', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ date: dateStr })
-      });
-
-      const result = await response.json();
-
-      if (result.success) {
-        toast({
-          title: "Assegnazioni Confermate!",
-          description: `${result.total_assignments} assegnazioni salvate in ${result.filename}`,
-          duration: 5000,
-        });
-      } else {
-        throw new Error(result.error || 'Errore sconosciuto');
-      }
-    } catch (error: any) {
-      console.error("Errore nella conferma delle assegnazioni:", error);
-      toast({
-        title: "Errore",
-        description: error.message || "Errore durante il salvataggio delle assegnazioni",
-        variant: "destructive",
-        duration: 5000,
-      });
-    }
-  };
+  
 
   // Non mostrare nulla se non ci sono cleaners
   if (cleaners.length === 0) {
