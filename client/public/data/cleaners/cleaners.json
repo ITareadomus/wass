@@ -1,6 +1,6 @@
 {
     "metadata": {
-        "last_updated": "2025-11-04T09:08:32.504431",
+        "last_updated": "2025-11-04T09:11:23.845788",
         "db_config": {
             "host": "139.59.132.41",
             "user": "admin",
@@ -11,7 +11,7 @@
     },
     "dates": {
         "2025-11-04": {
-            "timestamp": "2025-11-04T09:08:32.504443",
+            "timestamp": "2025-11-04T09:11:23.845798",
             "cleaners": [
                 {
                     "id": 24,
@@ -33,7 +33,8 @@
                         115
                     ],
                     "telegram_id": null,
-                    "start_time": "10:00"
+                    "start_time": "10:00",
+                    "can_do_straordinaria": false
                 },
                 {
                     "id": 132,
@@ -71,7 +72,8 @@
                         124
                     ],
                     "telegram_id": 1577716674,
-                    "start_time": "10:00"
+                    "start_time": "10:00",
+                    "can_do_straordinaria": true
                 },
                 {
                     "id": 249,
@@ -100,7 +102,8 @@
                         123
                     ],
                     "telegram_id": 6481457174,
-                    "start_time": "10:00"
+                    "start_time": "10:00",
+                    "can_do_straordinaria": true
                 },
                 {
                     "id": 287,
@@ -124,7 +127,8 @@
                         115
                     ],
                     "telegram_id": 5173164898,
-                    "start_time": "10:00"
+                    "start_time": "10:00",
+                    "can_do_straordinaria": false
                 },
                 {
                     "id": 326,
@@ -145,7 +149,8 @@
                         115
                     ],
                     "telegram_id": 7895288780,
-                    "start_time": "10:00"
+                    "start_time": "10:00",
+                    "can_do_straordinaria": false
                 },
                 {
                     "id": 404,
@@ -172,7 +177,8 @@
                         119
                     ],
                     "telegram_id": 7559507853,
-                    "start_time": "10:00"
+                    "start_time": "10:00",
+                    "can_do_straordinaria": false
                 },
                 {
                     "id": 445,
@@ -205,7 +211,8 @@
                         124
                     ],
                     "telegram_id": null,
-                    "start_time": "10:00"
+                    "start_time": "10:00",
+                    "can_do_straordinaria": false
                 },
                 {
                     "id": 469,
@@ -242,7 +249,8 @@
                         124
                     ],
                     "telegram_id": null,
-                    "start_time": "10:00"
+                    "start_time": "10:00",
+                    "can_do_straordinaria": false
                 },
                 {
                     "id": 495,
@@ -276,7 +284,8 @@
                         123
                     ],
                     "telegram_id": 8035270407,
-                    "start_time": "10:00"
+                    "start_time": "10:00",
+                    "can_do_straordinaria": true
                 },
                 {
                     "id": 596,
@@ -314,7 +323,8 @@
                         124
                     ],
                     "telegram_id": 6339409386,
-                    "start_time": "10:00"
+                    "start_time": "10:00",
+                    "can_do_straordinaria": false
                 },
                 {
                     "id": 626,
@@ -329,7 +339,8 @@
                     "contract_type": "B",
                     "preferred_customers": [],
                     "telegram_id": null,
-                    "start_time": "10:00"
+                    "start_time": "10:00",
+                    "can_do_straordinaria": false
                 },
                 {
                     "id": 644,
@@ -356,7 +367,8 @@
                         115
                     ],
                     "telegram_id": 6658049814,
-                    "start_time": "10:00"
+                    "start_time": "10:00",
+                    "can_do_straordinaria": true
                 },
                 {
                     "id": 722,
@@ -391,7 +403,8 @@
                         124
                     ],
                     "telegram_id": null,
-                    "start_time": "10:00"
+                    "start_time": "10:00",
+                    "can_do_straordinaria": false
                 },
                 {
                     "id": 771,
@@ -415,7 +428,8 @@
                         115
                     ],
                     "telegram_id": 5775694043,
-                    "start_time": "10:00"
+                    "start_time": "10:00",
+                    "can_do_straordinaria": false
                 },
                 {
                     "id": 785,
@@ -450,7 +464,8 @@
                         124
                     ],
                     "telegram_id": null,
-                    "start_time": "10:00"
+                    "start_time": "10:00",
+                    "can_do_straordinaria": false
                 },
                 {
                     "id": 789,
@@ -482,7 +497,8 @@
                         123
                     ],
                     "telegram_id": 7584855235,
-                    "start_time": "10:00"
+                    "start_time": "10:00",
+                    "can_do_straordinaria": false
                 },
                 {
                     "id": 829,
@@ -508,7 +524,8 @@
                         115
                     ],
                     "telegram_id": 7108751314,
-                    "start_time": "10:00"
+                    "start_time": "10:00",
+                    "can_do_straordinaria": false
                 },
                 {
                     "id": 937,
@@ -535,7 +552,8 @@
                         121
                     ],
                     "telegram_id": 7573041558,
-                    "start_time": "10:00"
+                    "start_time": "10:00",
+                    "can_do_straordinaria": false
                 },
                 {
                     "id": 987,
@@ -562,7 +580,8 @@
                         118
                     ],
                     "telegram_id": null,
-                    "start_time": "10:00"
+                    "start_time": "10:00",
+                    "can_do_straordinaria": false
                 },
                 {
                     "id": 1031,
@@ -579,7 +598,8 @@
                         2
                     ],
                     "telegram_id": null,
-                    "start_time": null
+                    "start_time": null,
+                    "can_do_straordinaria": false
                 },
                 {
                     "id": 1034,
@@ -594,7 +614,8 @@
                     "contract_type": "a chiamata",
                     "preferred_customers": [],
                     "telegram_id": null,
-                    "start_time": null
+                    "start_time": null,
+                    "can_do_straordinaria": false
                 },
                 {
                     "id": 1045,
@@ -609,7 +630,8 @@
                     "contract_type": "a chiamata",
                     "preferred_customers": [],
                     "telegram_id": null,
-                    "start_time": null
+                    "start_time": null,
+                    "can_do_straordinaria": false
                 },
                 {
                     "id": 1046,
@@ -624,7 +646,8 @@
                     "contract_type": "a chiamata",
                     "preferred_customers": [],
                     "telegram_id": null,
-                    "start_time": null
+                    "start_time": null,
+                    "can_do_straordinaria": false
                 },
                 {
                     "id": 1053,
@@ -639,7 +662,8 @@
                     "contract_type": "a chiamata",
                     "preferred_customers": [],
                     "telegram_id": null,
-                    "start_time": null
+                    "start_time": null,
+                    "can_do_straordinaria": false
                 },
                 {
                     "id": 1054,
@@ -654,7 +678,8 @@
                     "contract_type": "a chiamata",
                     "preferred_customers": [],
                     "telegram_id": null,
-                    "start_time": null
+                    "start_time": null,
+                    "can_do_straordinaria": false
                 },
                 {
                     "id": 1055,
@@ -669,7 +694,8 @@
                     "contract_type": "a chiamata",
                     "preferred_customers": [],
                     "telegram_id": null,
-                    "start_time": null
+                    "start_time": null,
+                    "can_do_straordinaria": false
                 },
                 {
                     "id": 1058,
@@ -684,7 +710,8 @@
                     "contract_type": "a chiamata",
                     "preferred_customers": [],
                     "telegram_id": null,
-                    "start_time": null
+                    "start_time": null,
+                    "can_do_straordinaria": false
                 },
                 {
                     "id": 1059,
@@ -699,7 +726,8 @@
                     "contract_type": "a chiamata",
                     "preferred_customers": [],
                     "telegram_id": null,
-                    "start_time": null
+                    "start_time": null,
+                    "can_do_straordinaria": false
                 },
                 {
                     "id": 1060,
@@ -714,7 +742,8 @@
                     "contract_type": "a chiamata",
                     "preferred_customers": [],
                     "telegram_id": null,
-                    "start_time": null
+                    "start_time": null,
+                    "can_do_straordinaria": false
                 },
                 {
                     "id": 1061,
@@ -729,7 +758,8 @@
                     "contract_type": "a chiamata",
                     "preferred_customers": [],
                     "telegram_id": null,
-                    "start_time": null
+                    "start_time": null,
+                    "can_do_straordinaria": false
                 },
                 {
                     "id": 1062,
@@ -744,7 +774,8 @@
                     "contract_type": "a chiamata",
                     "preferred_customers": [],
                     "telegram_id": null,
-                    "start_time": null
+                    "start_time": null,
+                    "can_do_straordinaria": false
                 },
                 {
                     "id": 1063,
@@ -759,7 +790,8 @@
                     "contract_type": "a chiamata",
                     "preferred_customers": [],
                     "telegram_id": null,
-                    "start_time": null
+                    "start_time": null,
+                    "can_do_straordinaria": false
                 },
                 {
                     "id": 1064,
@@ -774,7 +806,8 @@
                     "contract_type": "a chiamata",
                     "preferred_customers": [],
                     "telegram_id": null,
-                    "start_time": null
+                    "start_time": null,
+                    "can_do_straordinaria": false
                 },
                 {
                     "id": 1065,
@@ -789,7 +822,8 @@
                     "contract_type": "a chiamata",
                     "preferred_customers": [],
                     "telegram_id": null,
-                    "start_time": null
+                    "start_time": null,
+                    "can_do_straordinaria": false
                 },
                 {
                     "id": 1066,
@@ -804,7 +838,8 @@
                     "contract_type": "a chiamata",
                     "preferred_customers": [],
                     "telegram_id": null,
-                    "start_time": null
+                    "start_time": null,
+                    "can_do_straordinaria": false
                 },
                 {
                     "id": 1067,
@@ -819,7 +854,8 @@
                     "contract_type": "a chiamata",
                     "preferred_customers": [],
                     "telegram_id": null,
-                    "start_time": null
+                    "start_time": null,
+                    "can_do_straordinaria": false
                 },
                 {
                     "id": 1068,
@@ -834,7 +870,8 @@
                     "contract_type": "a chiamata",
                     "preferred_customers": [],
                     "telegram_id": null,
-                    "start_time": null
+                    "start_time": null,
+                    "can_do_straordinaria": false
                 },
                 {
                     "id": 1069,
@@ -849,7 +886,8 @@
                     "contract_type": "a chiamata",
                     "preferred_customers": [],
                     "telegram_id": null,
-                    "start_time": null
+                    "start_time": null,
+                    "can_do_straordinaria": false
                 },
                 {
                     "id": 1070,
@@ -864,7 +902,8 @@
                     "contract_type": "a chiamata",
                     "preferred_customers": [],
                     "telegram_id": null,
-                    "start_time": null
+                    "start_time": null,
+                    "can_do_straordinaria": false
                 }
             ],
             "total_cleaners": 39,
