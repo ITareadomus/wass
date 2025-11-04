@@ -57,6 +57,7 @@ export default function TimelineView({
   const [cleanersAliases, setCleanersAliases] = useState<Record<number, {alias: string}>>({});
   const [isAddCleanerDialogOpen, setIsAddCleanerDialogOpen] = useState(false);
   const [availableCleaners, setAvailableCleaners] = useState<Cleaner[]>([]);
+  const [cleanerToReplace, setCleanerToReplace] = useState<number | null>(null);
   const { toast } = useToast();
 
   // Mutation per rimuovere un cleaner da selected_cleaners.json
@@ -370,9 +371,20 @@ export default function TimelineView({
     setIsAddCleanerDialogOpen(true);
   };
 
-  // Handler per aggiungere un cleaner
+  // Handler per aggiungere/sostituire un cleaner
   const handleAddCleaner = (cleanerId: number) => {
-    addCleanerMutation.mutate(cleanerId);
+    if (cleanerToReplace) {
+      // Sostituzione: prima rimuovi il vecchio, poi aggiungi il nuovo
+      removeCleanerMutation.mutate(cleanerToReplace, {
+        onSuccess: () => {
+          addCleanerMutation.mutate(cleanerId);
+          setCleanerToReplace(null);
+        }
+      });
+    } else {
+      // Aggiunta normale
+      addCleanerMutation.mutate(cleanerId);
+    }
   };
 
   // Calcola la larghezza dinamica della colonna cleaners in base all'alias più lungo
@@ -607,8 +619,11 @@ export default function TimelineView({
                     borderWidth: isHidden ? '2px' : '1px',
                     borderColor: isHidden ? '#ccc' : 'inherit'
                   }}
-                  onClick={isHidden ? handleOpenAddCleanerDialog : ((e) => handleCleanerClick(cleaner, e))}
-                  title={isHidden ? "Cleaner rimosso - Click per aggiungere nuovo cleaner" : "Click: dettagli | Doppio click: filtra mappa"}
+                  onClick={isHidden ? (() => {
+                    setCleanerToReplace(cleaner.id);
+                    handleOpenAddCleanerDialog();
+                  }) : ((e) => handleCleanerClick(cleaner, e))}
+                  title={isHidden ? "Cleaner rimosso - Click per sostituire" : "Click: dettagli | Doppio click: filtra mappa"}
                 >
                   {isHidden ? (
                     <Button
@@ -777,7 +792,10 @@ export default function TimelineView({
             {/* Pulsante + sotto il nome dell'ultimo cleaner */}
             <div className="flex-shrink-0 p-1 flex items-center justify-center border border-border" style={{ width: `${cleanerColumnWidth}px` }}>
               <Button
-                onClick={handleOpenAddCleanerDialog}
+                onClick={() => {
+                  setCleanerToReplace(null);
+                  handleOpenAddCleanerDialog();
+                }}
                 variant="ghost"
                 size="sm"
                 className="w-full h-full"
@@ -801,12 +819,19 @@ export default function TimelineView({
       </div>
 
       {/* Add Cleaner Dialog */}
-      <Dialog open={isAddCleanerDialogOpen} onOpenChange={setIsAddCleanerDialogOpen}>
+      <Dialog open={isAddCleanerDialogOpen} onOpenChange={(open) => {
+        setIsAddCleanerDialogOpen(open);
+        if (!open) setCleanerToReplace(null);
+      }}>
         <DialogContent className="sm:max-w-2xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Aggiungi Cleaner alla Timeline</DialogTitle>
+            <DialogTitle>
+              {cleanerToReplace ? "Sostituisci Cleaner" : "Aggiungi Cleaner alla Timeline"}
+            </DialogTitle>
             <DialogDescription>
-              Seleziona un cleaner disponibile da aggiungere alla timeline
+              {cleanerToReplace 
+                ? "Seleziona un cleaner disponibile per sostituire quello rimosso"
+                : "Seleziona un cleaner disponibile da aggiungere alla timeline"}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-2 mt-4">
