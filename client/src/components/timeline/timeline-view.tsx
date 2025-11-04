@@ -614,7 +614,7 @@ export default function TimelineView({
                     <Button
                       variant="ghost"
                       size="sm"
-                      className="w-full h-full"
+                      className="w-full h-full bg-transparent hover:bg-transparent"
                     >
                       <UserPlus className="w-5 h-5" />
                     </Button>
