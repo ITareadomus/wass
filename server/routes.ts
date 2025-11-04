@@ -832,11 +832,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { Client } = await import('@replit/object-storage');
       const client = new Client();
       
-      // Converti i dati in stringa JSON
+      // Converti i dati in stringa JSON e poi in Buffer
       const jsonContent = JSON.stringify(timelineData, null, 2);
+      const buffer = Buffer.from(jsonContent, 'utf-8');
       
       // Upload nel bucket wass_assignments
-      await client.uploadFromText(filename, jsonContent, {
+      await client.uploadFromBytes(filename, buffer, {
         bucket: 'wass_assignments'
       });
       
