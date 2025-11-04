@@ -488,7 +488,7 @@ export default function TimelineView({
     try {
       const response = await fetch(`/data/output/timeline.json?t=${Date.now()}`);
       if (!response.ok) return;
-      
+
       const timelineData = await response.json();
       const timelineCleanersList = timelineData.cleaners_assignments || [];
       setTimelineCleaners(timelineCleanersList);
@@ -507,7 +507,7 @@ export default function TimelineView({
   const allCleanersToShow = React.useMemo(() => {
     const selectedIds = new Set(cleaners.map(c => c.id));
     const result = [...cleaners];
-    
+
     // Aggiungi cleaners dalla timeline che NON sono in selected_cleaners
     // Li mostriamo SEMPRE (anche senza task) per permettere l'aggiunta di un nuovo cleaner tramite +
     for (const timelineEntry of timelineCleaners) {
@@ -519,7 +519,7 @@ export default function TimelineView({
         });
       }
     }
-    
+
     return result;
   }, [cleaners, timelineCleaners]);
 
@@ -646,6 +646,11 @@ export default function TimelineView({
                       {cleaner.role === "Formatore" && (
                         <div className="bg-orange-500 text-black font-bold text-[10px] px-1 py-0.5 rounded flex-shrink-0">
                           F
+                        </div>
+                      )}
+                      {(cleaner as any).can_do_straordinaria && (
+                        <div className="bg-red-500 text-white font-bold text-[10px] px-1 py-0.5 rounded flex-shrink-0">
+                          S
                         </div>
                       )}
                     </div>
