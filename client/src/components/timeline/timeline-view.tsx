@@ -611,9 +611,13 @@ export default function TimelineView({
                   title={isHidden ? "Cleaner rimosso - Click per aggiungere nuovo cleaner" : "Click: dettagli | Doppio click: filtra mappa"}
                 >
                   {isHidden ? (
-                    <div className="w-full flex items-center justify-center">
-                      <UserPlus className="w-5 h-5 text-muted-foreground" />
-                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="w-full h-full"
+                    >
+                      <UserPlus className="w-5 h-5" />
+                    </Button>
                   ) : (
                     <div className="w-full flex items-center gap-1">
                       <div className="break-words font-bold text-[13px] flex-1">
