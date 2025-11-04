@@ -491,9 +491,10 @@ export default function TimelineView({
     const result = [...cleaners];
     
     // Aggiungi cleaners dalla timeline che NON sono in selected_cleaners
+    // Li mostriamo SEMPRE (anche senza task) per permettere l'aggiunta di un nuovo cleaner tramite +
     for (const timelineEntry of timelineCleaners) {
       const cleanerId = timelineEntry.cleaner?.id;
-      if (cleanerId && !selectedIds.has(cleanerId) && timelineEntry.tasks?.length > 0) {
+      if (cleanerId && !selectedIds.has(cleanerId)) {
         result.push({
           ...timelineEntry.cleaner,
           _isHidden: true // Flag per indicare che è nascosto
