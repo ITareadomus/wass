@@ -366,43 +366,19 @@ export default function GenerateAssignments() {
         }
       }
 
-      // Aggiungi task assegnate dalla timeline
-      for (const timelineTask of timelineTasksArray) {
-        const tid = String(timelineTask.id);
-        if (!addedIds.has(tid)) {
-          tasksWithAssignments.push(timelineTask);
-          addedIds.add(tid);
-        } else {
-          console.log(`⚠️ Task ${timelineTask.name} già presente, skipping duplicate`);
-        }
-      }
-
-      console.log(`📦 Array unificato: ${tasksWithAssignments.length} task totali (${addedIds.size} unique IDs)`);
-
-      setAllTasksWithAssignments(tasksWithAssignments);
-    } catch (error: any) {
-      console.error('❌ Errore nel caricamento dei task:', error);
-      toast({
-        title: "Errore",
-        description: error.message || "Errore nel caricamento dei task",
-        variant: "destructive",
-        duration: 3000,
-      });
-    } finally {
-      setIsLoadingTasks(false);
-    }
-  };
-
-  // Funzione esposta per ricaricare i task e le assegnazioni
-  const reloadAllTasks = async () => {
-    await loadTasks(true); // Skip extraction, just reload from filteredHigh, ...filteredLow);
-
       // Aggiungi SOLO task che sono effettivamente in timeline.json con i loro dati completi
+      console.log(`🔄 Elaborazione ${timelineAssignmentsMap.size} task dalla timeline...`);
       for (const [taskId, timelineAssignment] of timelineAssignmentsMap.entries()) {
         // Trova la task originale dai containers usando l'id univoco
         const originalTask = [...initialEarlyOut, ...initialHigh, ...initialLow].find(
           t => String(t.id) === String(taskId)
         );
+
+        console.log(`   → Task ${timelineAssignment.logistic_code} (ID: ${taskId}):`, {
+          hasOriginalTask: !!originalTask,
+          cleanerId: timelineAssignment.cleanerId,
+          priority: timelineAssignment.priority
+        });
 
         if (timelineAssignment.cleanerId) {
           // Se la task esiste nei containers, usa quei dati come base
