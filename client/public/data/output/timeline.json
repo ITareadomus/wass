@@ -1,6 +1,6 @@
 {
   "metadata": {
-    "last_updated": "2025-11-04T09:50:16.983910",
+    "last_updated": "2025-11-04T09:51:44.850067",
     "date": "2025-11-04"
   },
   "cleaners_assignments": [
@@ -447,7 +447,6 @@
   ],
   "meta": {
     "total_cleaners": 9,
-    "total_tasks": 0,
     "used_cleaners": 7,
     "assigned_tasks": 11
   }
