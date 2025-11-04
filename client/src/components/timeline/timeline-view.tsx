@@ -1015,7 +1015,7 @@ export default function TimelineView({
                   Rimuovi Cleaner
                 </p>
                 <p className="text-xs text-muted-foreground mb-3">
-                  Il cleaner sarà rimosso dalla vista ma le sue task rimarranno in timeline.json finché non verrà sostituito.
+                  Il cleaner sarà rimosso dalla timeline ma le sue task rimarranno finché non verrà sostituito.
                 </p>
                 <Button
                   onClick={() => removeCleanerMutation.mutate(selectedCleaner.id)}
