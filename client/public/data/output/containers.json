@@ -1,6 +1,6 @@
 {
   "metadata": {
-    "last_updated": "2025-11-04T08:39:21.139097",
+    "last_updated": "2025-11-04T08:44:16.496644",
     "date": "2025-11-04"
   },
   "containers": {
@@ -810,15 +810,43 @@
             "not_eo",
             "not_hp"
           ]
+        },
+        {
+          "task_id": 218429,
+          "logistic_code": 756,
+          "client_id": 3,
+          "premium": false,
+          "address": "VIA MANTOVA, 10",
+          "lat": "45.447935",
+          "lng": "9.2062925",
+          "cleaning_time": 120,
+          "checkin_date": "2025-11-04",
+          "checkout_date": "2025-11-04",
+          "checkin_time": null,
+          "checkout_time": "12:00",
+          "pax_in": 0,
+          "pax_out": 0,
+          "small_equipment": false,
+          "operation_id": 1,
+          "confirmed_operation": true,
+          "straordinaria": false,
+          "type_apt": "C",
+          "alias": "TBR",
+          "customer_name": "THE BEST RENT S.r.l.",
+          "priority": "low_priority",
+          "reasons": [
+            "not_eo",
+            "not_hp"
+          ]
         }
       ],
-      "count": 10
+      "count": 11
     }
   },
   "summary": {
-    "total_tasks": 29,
+    "total_tasks": 30,
     "early_out": 11,
     "high_priority": 8,
-    "low_priority": 10
+    "low_priority": 11
   }
 }
