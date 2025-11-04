@@ -860,6 +860,49 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Endpoint per salvare i cleaners selezionati
+  app.post("/api/save-selected-cleaners", async (req, res) => {
+    try {
+      const { cleaners: selectedCleaners, total_selected } = req.body;
+      
+      if (!selectedCleaners || !Array.isArray(selectedCleaners)) {
+        return res.status(400).json({ 
+          success: false, 
+          message: "Dati cleaners non validi" 
+        });
+      }
+
+      const selectedCleanersPath = path.join(
+        process.cwd(), 
+        'client/public/data/cleaners/selected_cleaners.json'
+      );
+
+      const dataToSave = {
+        cleaners: selectedCleaners,
+        total_selected: total_selected || selectedCleaners.length
+      };
+
+      // Scrittura atomica
+      const tmpPath = `${selectedCleanersPath}.tmp`;
+      await fs.writeFile(tmpPath, JSON.stringify(dataToSave, null, 2));
+      await fs.rename(tmpPath, selectedCleanersPath);
+
+      console.log(`✅ Salvati ${selectedCleaners.length} cleaners in selected_cleaners.json`);
+
+      res.json({ 
+        success: true, 
+        message: `${selectedCleaners.length} cleaners salvati con successo`,
+        count: selectedCleaners.length
+      });
+    } catch (error: any) {
+      console.error("Errore nel salvataggio di selected_cleaners.json:", error);
+      res.status(500).json({ 
+        success: false, 
+        error: error.message 
+      });
+    }
+  });
+
   // Endpoint per aggiungere un cleaner alla timeline
   app.post("/api/add-cleaner-to-timeline", async (req, res) => {
     try {
