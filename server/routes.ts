@@ -2057,9 +2057,55 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const taskKey = String(typeof taskId !== 'undefined' ? taskId : logisticCode);
 
-      const dstEntry = getCleanerEntry(toCleanerId);
-      if (!dstEntry || !Array.isArray(dstEntry.tasks)) {
-        return res.status(400).json({ success: false, message: 'Cleaner di destinazione non valido' });
+      let dstEntry = getCleanerEntry(toCleanerId);
+      
+      // Se il cleaner di destinazione non esiste, crealo (caso cleaner nascosto)
+      if (!dstEntry) {
+        // Carica i dati del cleaner da cleaners.json
+        const cleanersPath = path.join(process.cwd(), 'client/public/data/cleaners/cleaners.json');
+        const selectedCleanersPath = path.join(process.cwd(), 'client/public/data/cleaners/selected_cleaners.json');
+        
+        try {
+          const cleanersData = JSON.parse(await fs.readFile(cleanersPath, 'utf8'));
+          const selectedData = JSON.parse(await fs.readFile(selectedCleanersPath, 'utf8'));
+          
+          // Cerca prima nei selected_cleaners
+          let cleanerInfo = selectedData.cleaners.find((c: any) => c.id === toCleanerId);
+          
+          // Se non trovato, cerca in cleaners.json per la data
+          if (!cleanerInfo) {
+            for (const date of Object.keys(cleanersData.dates || {})) {
+              const dateCleaners = cleanersData.dates[date]?.cleaners || [];
+              cleanerInfo = dateCleaners.find((c: any) => c.id === toCleanerId);
+              if (cleanerInfo) break;
+            }
+          }
+          
+          if (!cleanerInfo) {
+            return res.status(400).json({ success: false, message: 'Cleaner di destinazione non trovato' });
+          }
+          
+          // Crea la nuova entry per il cleaner
+          dstEntry = {
+            cleaner: {
+              id: cleanerInfo.id,
+              name: cleanerInfo.name,
+              lastname: cleanerInfo.lastname,
+              role: cleanerInfo.role,
+              premium: cleanerInfo.role === "Premium"
+            },
+            tasks: []
+          };
+          cleaners.push(dstEntry);
+          console.log(`✅ Creato cleaner entry per ${toCleanerId} (era nascosto)`);
+        } catch (error: any) {
+          console.error('Errore caricamento dati cleaner:', error);
+          return res.status(400).json({ success: false, message: 'Errore nel caricamento dati cleaner' });
+        }
+      }
+      
+      if (!Array.isArray(dstEntry.tasks)) {
+        dstEntry.tasks = [];
       }
 
       let moved: any | null = null;
