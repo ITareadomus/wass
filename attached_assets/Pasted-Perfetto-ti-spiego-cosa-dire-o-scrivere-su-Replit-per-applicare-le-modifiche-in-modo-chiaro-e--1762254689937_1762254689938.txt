@@ -1,0 +1,272 @@
+Perfetto ✅ ti spiego cosa dire o scrivere su **Replit** per applicare le modifiche in modo chiaro e sicuro.
+
+---
+
+## 🧩 COSA DIRE A REPLIT (passaggi letterali)
+
+Nel terminale o nel prompt dei comandi della tua Replit app, digita (o copia/incolla) **queste istruzioni passo-passo**:
+
+---
+
+### **1️⃣ Vai nella cartella `server`**
+
+```bash
+cd server
+```
+
+---
+
+### **2️⃣ Crea le nuove cartelle per remix e utility**
+
+```bash
+mkdir -p scripts utils services/assignment
+```
+
+---
+
+### **3️⃣ Aggiungi lo script Python del remix**
+
+Copia e incolla questo file su Replit come:
+
+> `server/scripts/remix_timeline.py`
+
+oppure crea un file vuoto con quel nome e incolla dentro il contenuto di
+👉 [questo file già pronto](sandbox:/mnt/data/remix_timeline.py)
+
+---
+
+### **4️⃣ Crea il runner Node**
+
+Crea il file:
+
+> `server/utils/runRemix.ts`
+
+e incolla:
+
+```ts
+import { spawn } from "child_process";
+
+export async function runRemixPython(
+  payload: any,
+  absPath = process.env.REMIX_PY_PATH || "server/scripts/remix_timeline.py"
+) {
+  return new Promise<any>((resolve, reject) => {
+    const p = spawn("python3", [absPath], { stdio: ["pipe", "pipe", "pipe"] });
+    let out = "", err = "";
+
+    p.stdout.on("data", d => (out += d.toString()));
+    p.stderr.on("data", d => (err += d.toString()));
+    p.on("close", code => {
+      if (code !== 0) return reject(new Error(err || `remix_timeline.py exit ${code}`));
+      try { resolve(JSON.parse(out)); }
+      catch (e) { reject(new Error("Invalid JSON from remix_timeline.py: " + e + "\n" + out)); }
+    });
+
+    p.stdin.write(JSON.stringify(payload));
+    p.stdin.end();
+  });
+}
+```
+
+---
+
+### **5️⃣ Crea il file “common” per i tre script di assegnazione**
+
+Crea:
+
+> `server/services/assignment/common.ts`
+
+e incolla **questo contenuto**:
+
+```ts
+import fs from "fs/promises";
+import path from "path";
+import { runRemixPython } from "../../utils/runRemix";
+
+type Task = {
+  task_id: string | number;
+  lat: string | number;
+  lng: string | number;
+  cleaning_time: number;
+  checkout_time?: string | null;
+  priority?: "early_out" | "high_priority" | "low_priority";
+  [k: string]: any;
+};
+
+type ByCleaner = Record<string, Task[]>;
+
+const OUTPUT_DIR = "client/public/data/output";
+
+async function readJSON<T = any>(p: string): Promise<T> {
+  const s = await fs.readFile(p, "utf-8");
+  return JSON.parse(s);
+}
+
+async function writeJSON(p: string, data: any) {
+  await fs.mkdir(path.dirname(p), { recursive: true });
+  await fs.writeFile(p, JSON.stringify(data, null, 2), "utf-8");
+}
+
+export async function buildAssignedByCleaner(): Promise<ByCleaner> {
+  const timelinePath = path.join(OUTPUT_DIR, "timeline.json");
+  try {
+    const tl = await readJSON<{ [cleanerId: string]: Task[] }>(timelinePath);
+    return tl as ByCleaner;
+  } catch {
+    return {};
+  }
+}
+
+export async function buildLeftoversByCleaner(): Promise<ByCleaner> {
+  const earlyPath = path.join(OUTPUT_DIR, "container_early_out.json");
+  const highPath  = path.join(OUTPUT_DIR, "container_high_priority.json");
+  const lowPath   = path.join(OUTPUT_DIR, "container_low_priority.json");
+
+  const out: ByCleaner = {};
+  const push = (cId: string, t: Task) => (out[cId] ||= []).push(t);
+
+  const addFrom = async (p: string, priority: Task["priority"]) => {
+    try {
+      const arr = await readJSON<Task[]>(p);
+      for (const t of arr) {
+        const tt: Task = {
+          ...t,
+          task_id: String((t as any).task_id ?? (t as any).id ?? (t as any).code),
+          priority,
+        };
+        push("all", tt);
+      }
+    } catch {}
+  };
+
+  await addFrom(earlyPath, "early_out");
+  await addFrom(highPath,  "high_priority");
+  await addFrom(lowPath,   "low_priority");
+
+  return out;
+}
+
+export async function hasLeftoversInContainers(): Promise<boolean> {
+  const files = [
+    "container_early_out.json",
+    "container_high_priority.json",
+    "container_low_priority.json",
+  ].map(f => path.join(OUTPUT_DIR, f));
+
+  for (const f of files) {
+    try {
+      const arr = await readJSON<any[]>(f);
+      if (Array.isArray(arr) && arr.length > 0) return true;
+    } catch {}
+  }
+  return false;
+}
+
+export async function writeTimelineByCleaner(timelineByCleaner: ByCleaner) {
+  const p = path.join(OUTPUT_DIR, "timeline.json");
+  await writeJSON(p, timelineByCleaner);
+}
+
+export async function maybeRemixAfterPhase(): Promise<{ remixed: boolean; leftoversCount: number; }> {
+  const leftoversExist = await hasLeftoversInContainers();
+  if (!leftoversExist) return { remixed: false, leftoversCount: 0 };
+
+  const assignedByCleaner = await buildAssignedByCleaner();
+  const leftoversByCleaner = await buildLeftoversByCleaner();
+
+  const leftoversCount = Object
+    .values(leftoversByCleaner)
+    .reduce((acc, arr) => acc + (arr?.length || 0), 0);
+
+  if (leftoversCount === 0) return { remixed: false, leftoversCount: 0 };
+
+  const payload = {
+    day_start: "08:00",
+    assigned_by_cleaner: assignedByCleaner,
+    leftovers_by_cleaner: leftoversByCleaner,
+  };
+
+  const remixOut = await runRemixPython(payload);
+  const final = remixOut?.timeline_by_cleaner || assignedByCleaner;
+
+  await writeTimelineByCleaner(final);
+
+  return { remixed: true, leftoversCount };
+}
+```
+
+---
+
+### **6️⃣ Importa e usa `maybeRemixAfterPhase()` nei tuoi tre script di assegnazione**
+
+Per esempio:
+
+```ts
+import { assignEarlyOut } from "./yourEarlyOut";
+import { maybeRemixAfterPhase } from "./common";
+
+export async function runEarlyOutPhase() {
+  await assignEarlyOut();
+  return await maybeRemixAfterPhase();
+}
+```
+
+Fallo anche per HP e LP.
+
+---
+
+### **7️⃣ Aggiorna la tua route `/api/assign`**
+
+Nella parte dove chiami i tre script, aggiungi le nuove versioni con il remix:
+
+```ts
+import { runEarlyOutPhase } from "./services/assignment/runEarlyOut";
+import { runHighPriorityPhase } from "./services/assignment/runHighPriority";
+import { runLowPriorityPhase } from "./services/assignment/runLowPriority";
+
+router.post("/api/assign", async (req, res) => {
+  try {
+    const eo = await runEarlyOutPhase();
+    if (eo.remixed) return res.json({ ok: true, phase: "EO", remixed: true, leftovers_count: eo.leftoversCount });
+
+    const hp = await runHighPriorityPhase();
+    if (hp.remixed) return res.json({ ok: true, phase: "HP", remixed: true, leftovers_count: hp.leftoversCount });
+
+    const lp = await runLowPriorityPhase();
+    if (lp.remixed) return res.json({ ok: true, phase: "LP", remixed: true, leftovers_count: lp.leftoversCount });
+
+    res.json({ ok: true, remixed: false });
+  } catch (e: any) {
+    res.status(500).json({ error: e?.message });
+  }
+});
+```
+
+---
+
+### **8️⃣ Avvia Replit normalmente**
+
+Se usi `npm`:
+
+```bash
+npm run dev
+```
+
+oppure se hai script personalizzato:
+
+```bash
+npm start
+```
+
+---
+
+✅ **Risultato finale**
+
+* Premi “Assegna” → gli script EO→HP→LP girano normalmente.
+* Se alla fine resta qualcosa nei container → parte **automaticamente il remix Python**.
+* Nessun doppio click, nessuna modifica al client.
+
+---
+
+Vuoi che ti scriva il comando *esatto* da copiare su Replit per creare automaticamente tutte le cartelle e i file (con contenuti inclusi)?
+Posso generartelo come **bash script completo** da incollare nel terminale.
