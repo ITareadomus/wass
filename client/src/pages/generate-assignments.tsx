@@ -234,7 +234,7 @@ export default function GenerateAssignments() {
 
       console.log("Task convertiti - Early:", initialEarlyOut.length, "High:", initialHigh.length, "Low:", initialLow.length);
 
-      // Crea una mappa di logistic_code -> assegnazione timeline completa
+      // Crea una mappa di task_id -> assegnazione timeline completa
       // Nuova struttura: cleaners_assignments è un array di {cleaner, tasks}
       const timelineAssignmentsMap = new Map<string, any>();
 
@@ -250,9 +250,10 @@ export default function GenerateAssignments() {
 
           console.log(`   Cleaner ${cleanerEntry.cleaner.id} (${cleanerEntry.cleaner.name}) ha ${cleanerEntry.tasks?.length || 0} task`);
           for (const task of cleanerEntry.tasks || []) {
+            const taskId = String(task.task_id);
             const logisticCode = String(task.logistic_code);
-            console.log(`      → Task ${logisticCode} assegnata a cleaner ${cleanerEntry.cleaner.id}`);
-            timelineAssignmentsMap.set(logisticCode, {
+            console.log(`      → Task ${logisticCode} (ID: ${taskId}) assegnata a cleaner ${cleanerEntry.cleaner.id}`);
+            timelineAssignmentsMap.set(taskId, {
               ...task,
               cleanerId: cleanerEntry.cleaner.id,
               sequence: task.sequence
@@ -263,33 +264,33 @@ export default function GenerateAssignments() {
         // Vecchia struttura piatta (fallback)
         console.log('📋 Caricamento da assignments (vecchia struttura):', timelineAssignmentsData.assignments.length);
         for (const a of timelineAssignmentsData.assignments) {
-          timelineAssignmentsMap.set(String(a.logistic_code), a);
+          timelineAssignmentsMap.set(String(a.task_id), a);
         }
       }
 
-      console.log("✅ Task assegnate nella timeline (logistic_code):", Array.from(timelineAssignmentsMap.keys()));
+      console.log("✅ Task assegnate nella timeline (task_id):", Array.from(timelineAssignmentsMap.keys()));
 
       // Filtra le task già presenti nella timeline dai container
       const filteredEarlyOut = initialEarlyOut.filter(task => {
-        const isAssigned = timelineAssignmentsMap.has(String(task.name));
+        const isAssigned = timelineAssignmentsMap.has(String(task.id));
         if (isAssigned) {
-          console.log(`Task ${task.name} filtrata da Early Out (è nella timeline)`);
+          console.log(`Task ${task.name} (ID: ${task.id}) filtrata da Early Out (è nella timeline)`);
         }
         return !isAssigned;
       });
 
       const filteredHigh = initialHigh.filter(task => {
-        const isAssigned = timelineAssignmentsMap.has(String(task.name));
+        const isAssigned = timelineAssignmentsMap.has(String(task.id));
         if (isAssigned) {
-          console.log(`Task ${task.name} filtrata da High Priority (è nella timeline)`);
+          console.log(`Task ${task.name} (ID: ${task.id}) filtrata da High Priority (è nella timeline)`);
         }
         return !isAssigned;
       });
 
       const filteredLow = initialLow.filter(task => {
-        const isAssigned = timelineAssignmentsMap.has(String(task.name));
+        const isAssigned = timelineAssignmentsMap.has(String(task.id));
         if (isAssigned) {
-          console.log(`Task ${task.name} filtrata da Low Priority (è nella timeline)`);
+          console.log(`Task ${task.name} (ID: ${task.id}) filtrata da Low Priority (è nella timeline)`);
         }
         return !isAssigned;
       });
@@ -314,10 +315,10 @@ export default function GenerateAssignments() {
       tasksWithAssignments.push(...filteredEarlyOut, ...filteredHigh, ...filteredLow);
 
       // Aggiungi SOLO task che sono effettivamente in timeline.json con i loro dati completi
-      for (const [logisticCode, timelineAssignment] of timelineAssignmentsMap.entries()) {
+      for (const [taskId, timelineAssignment] of timelineAssignmentsMap.entries()) {
         // Trova la task originale dai containers per prendere i dati base
         const originalTask = [...initialEarlyOut, ...initialHigh, ...initialLow].find(
-          t => String(t.name) === logisticCode
+          t => String(t.id) === taskId
         );
 
         if (timelineAssignment.cleanerId) {
