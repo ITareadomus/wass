@@ -40,6 +40,52 @@ interface RawTask {
   confirmed_operation?: boolean;
 }
 
+// === HELPERS per gestire id univoco e logisticCode non univoco ===
+function getLogisticCode(t: RawTask | Task | null | undefined): string | null {
+  if (!t) return null;
+  return String(
+    (t as any).logisticCode ??
+    (t as any).logisticsCode ??
+    (t as any).logistic_code ??
+    (t as any).name ?? // name è usato come logistic_code in questo progetto
+    null
+  );
+}
+
+function getTaskId(t: RawTask | Task | null | undefined): string {
+  if (!t) return "";
+  return String(
+    (t as any).id ??
+    (t as any).taskId ??
+    (t as any).task_id ??
+    ""
+  );
+}
+
+// DEDUPE per id (non per logisticCode!)
+function dedupeById(list: Task[]): Task[] {
+  const seen = new Set<string>();
+  const out: Task[] = [];
+  for (const t of list) {
+    const tid = getTaskId(t);
+    if (tid && !seen.has(tid)) {
+      seen.add(tid);
+      out.push(t);
+    }
+  }
+  return out;
+}
+
+// Indice per id (1:1)
+function indexById(list: Task[]): Map<string, Task> {
+  const m = new Map<string, Task>();
+  for (const t of list) {
+    const tid = getTaskId(t);
+    if (tid) m.set(tid, t);
+  }
+  return m;
+}
+
 export default function GenerateAssignments() {
   // Leggi la data da localStorage se disponibile, altrimenti usa oggi
   const [selectedDate, setSelectedDate] = useState<Date>(() => {
@@ -264,27 +310,30 @@ export default function GenerateAssignments() {
 
       console.log("✅ Task assegnate nella timeline (task_id):", Array.from(timelineAssignmentsMap.keys()));
 
-      // Filtra le task già presenti nella timeline dai container
+      // Filtra le task già presenti nella timeline dai container usando l'id univoco
       const filteredEarlyOut = initialEarlyOut.filter(task => {
-        const isAssigned = timelineAssignmentsMap.has(String(task.id));
+        const tid = String(task.id);
+        const isAssigned = timelineAssignmentsMap.has(tid);
         if (isAssigned) {
-          console.log(`Task ${task.name} (ID: ${task.id}) filtrata da Early Out (è nella timeline)`);
+          console.log(`Task ${task.name} (ID: ${tid}) filtrata da Early Out (è nella timeline)`);
         }
         return !isAssigned;
       });
 
       const filteredHigh = initialHigh.filter(task => {
-        const isAssigned = timelineAssignmentsMap.has(String(task.id));
+        const tid = String(task.id);
+        const isAssigned = timelineAssignmentsMap.has(tid);
         if (isAssigned) {
-          console.log(`Task ${task.name} (ID: ${task.id}) filtrata da High Priority (è nella timeline)`);
+          console.log(`Task ${task.name} (ID: ${tid}) filtrata da High Priority (è nella timeline)`);
         }
         return !isAssigned;
       });
 
       const filteredLow = initialLow.filter(task => {
-        const isAssigned = timelineAssignmentsMap.has(String(task.id));
+        const tid = String(task.id);
+        const isAssigned = timelineAssignmentsMap.has(tid);
         if (isAssigned) {
-          console.log(`Task ${task.name} (ID: ${task.id}) filtrata da Low Priority (è nella timeline)`);
+          console.log(`Task ${task.name} (ID: ${tid}) filtrata da Low Priority (è nella timeline)`);
         }
         return !isAssigned;
       });
@@ -301,8 +350,7 @@ export default function GenerateAssignments() {
       console.log(`   - High Priority: ${filteredHigh.length} task`);
       console.log(`   - Low Priority: ${filteredLow.length} task`);
 
-      // Crea l'array unificato SOLO con task dai containers (non assegnate)
-      // Le task assegnate vengono aggiunte SOLO se sono effettivamente in timeline.json
+      // Crea l'array unificato usando dedupe per id (non per logisticCode!)
       const tasksWithAssignments: Task[] = [];
 
       // Aggiungi task NON assegnate dai containers
@@ -310,9 +358,9 @@ export default function GenerateAssignments() {
 
       // Aggiungi SOLO task che sono effettivamente in timeline.json con i loro dati completi
       for (const [taskId, timelineAssignment] of timelineAssignmentsMap.entries()) {
-        // Trova la task originale dai containers per prendere i dati base
+        // Trova la task originale dai containers usando l'id univoco
         const originalTask = [...initialEarlyOut, ...initialHigh, ...initialLow].find(
-          t => String(t.id) === taskId
+          t => String(t.id) === String(taskId)
         );
 
         if (timelineAssignment.cleanerId) {
@@ -372,15 +420,20 @@ export default function GenerateAssignments() {
         }
       }
 
+      // DEDUPE finale per id prima di salvare lo stato
+      const dedupedTasks = dedupeById(tasksWithAssignments);
+
       console.log(`📊 SINCRONIZZAZIONE TIMELINE:`);
-      console.log(`   - Task totali: ${tasksWithAssignments.length}`);
-      console.log(`   - Task assegnate: ${tasksWithAssignments.filter(t => (t as any).assignedCleaner).length}`);
-      console.log(`   - Task nei containers: ${tasksWithAssignments.filter(t => !(t as any).assignedCleaner).length}`);
+      console.log(`   - Task totali (prima dedupe): ${tasksWithAssignments.length}`);
+      console.log(`   - Task totali (dopo dedupe): ${dedupedTasks.length}`);
+      console.log(`   - Task assegnate: ${dedupedTasks.filter(t => (t as any).assignedCleaner).length}`);
+      console.log(`   - Task nei containers: ${dedupedTasks.filter(t => !(t as any).assignedCleaner).length}`);
 
       // Debug: mostra alcune task assegnate
-      const assignedTasks = tasksWithAssignments.filter(t => (t as any).assignedCleaner);
+      const assignedTasks = dedupedTasks.filter(t => (t as any).assignedCleaner);
       if (assignedTasks.length > 0) {
         console.log(`📌 Esempio task assegnate (prime 3):`, assignedTasks.slice(0, 3).map(t => ({
+          id: t.id,
           name: t.name,
           assignedCleaner: (t as any).assignedCleaner,
           sequence: (t as any).sequence,
@@ -388,7 +441,7 @@ export default function GenerateAssignments() {
         })));
       }
 
-      setAllTasksWithAssignments(tasksWithAssignments);
+      setAllTasksWithAssignments(dedupedTasks);
 
       setIsLoadingTasks(false);
       setExtractionStep("Task caricati con successo!");
@@ -575,14 +628,14 @@ export default function GenerateAssignments() {
     try {
       const dateStr = format(selectedDate, "yyyy-MM-dd");
 
-      // Trova il task completo dai containers
-      const task = allTasksWithAssignments.find(t => t.id === taskId);
+      // Trova il task completo usando l'id univoco
+      const task = allTasksWithAssignments.find(t => String(t.id) === String(taskId));
 
-      // Determina la priorità originale della task
+      // Determina la priorità originale della task usando l'id
       let priority = 'low_priority'; // default
-      if (earlyOutTasks.find(t => t.id === taskId)) {
+      if (earlyOutTasks.find(t => String(t.id) === String(taskId))) {
         priority = 'early_out';
-      } else if (highPriorityTasks.find(t => t.id === taskId)) {
+      } else if (highPriorityTasks.find(t => String(t.id) === String(taskId))) {
         priority = 'high_priority';
       }
 
@@ -590,19 +643,19 @@ export default function GenerateAssignments() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          taskId,
+          taskId, // Chiave univoca
           cleanerId,
-          logisticCode,
+          logisticCode, // Attributo non univoco
           date: dateStr,
           dropIndex,
-          priority, // Passa la priorità originale
-          taskData: task // Passa tutti i dati del task
+          priority,
+          taskData: task
         }),
       });
       if (!response.ok) {
         console.error('Errore nel salvataggio dell\'assegnazione nella timeline');
       } else {
-        console.log('Assegnazione salvata nella timeline con successo');
+        console.log(`Assegnazione salvata: taskId=${taskId}, logisticCode=${logisticCode}`);
       }
     } catch (error) {
       console.error('Errore nella chiamata API di salvataggio timeline:', error);
@@ -694,9 +747,10 @@ export default function GenerateAssignments() {
       return;
     }
 
+    // draggableId è sempre l'id univoco della task
     const taskId = draggableId;
-    const task = allTasksWithAssignments.find(t => t.id === taskId);
-    const logisticCode = task?.name;
+    const task = allTasksWithAssignments.find(t => String(t.id) === String(taskId));
+    const logisticCode = task?.name; // name contiene il logistic_code
 
     try {
       // 🔹 Ramo TIMELINE (drag tra cleaners o riordino nello stesso cleaner)
