@@ -349,11 +349,19 @@ export default function TimelineView({
       // Trova i cleaner per la data selezionata
       const dateCleaners = data.dates[workDate]?.cleaners || [];
 
-      // Filtra i cleaner che NON sono già VISIBILI nella timeline
-      // (solo i cleaner con task vengono mostrati, quindi escludiamo quelli)
-      const currentCleanerIds = cleaners.map(c => c.id);
+      // Filtra i cleaner che NON sono già nella timeline (selected_cleaners + timeline nascosti)
+      // IMPORTANTE: Includi il cleaner da sostituire se presente
+      const currentCleanerIds = new Set(cleaners.map(c => c.id));
+      const timelineCleanerIds = new Set(
+        timelineCleaners
+          .filter(tc => tc.cleaner?.id && tc.cleaner.id !== cleanerToReplace)
+          .map(tc => tc.cleaner.id)
+      );
+      
       const available = dateCleaners.filter((c: Cleaner) => 
-        !currentCleanerIds.includes(c.id) && c.active
+        !currentCleanerIds.has(c.id) && 
+        !timelineCleanerIds.has(c.id) && 
+        c.active
       );
 
       // Ordina per role (Premium prima) e poi per nome
@@ -366,6 +374,9 @@ export default function TimelineView({
       setAvailableCleaners(available);
       
       console.log(`📋 Cleaner disponibili da aggiungere: ${available.length}/${dateCleaners.length}`);
+      console.log(`   - Cleaners in selected: ${currentCleanerIds.size}`);
+      console.log(`   - Cleaners nascosti in timeline: ${timelineCleanerIds.size}`);
+      console.log(`   - Cleaner da sostituire: ${cleanerToReplace || 'nessuno'}`);
     } catch (error) {
       console.error('Errore nel caricamento dei cleaner disponibili:', error);
       toast({
