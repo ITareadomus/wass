@@ -1,6 +1,6 @@
 {
   "metadata": {
-    "last_updated": "2025-11-04T10:31:52.281Z",
+    "last_updated": "2025-11-04T11:29:21.458616",
     "date": "2025-11-04"
   },
   "cleaners_assignments": [
@@ -73,11 +73,11 @@
             "automatic_assignment_eo"
           ],
           "priority": "early_out",
-          "start_time": "17:01",
-          "end_time": "20:01",
+          "start_time": "11:39",
+          "end_time": "14:39",
           "followup": true,
-          "sequence": 3,
-          "travel_time": 30
+          "sequence": 2,
+          "travel_time": 9
         },
         {
           "task_id": 218403,
@@ -107,10 +107,10 @@
             "not_hp",
             "automatic_assignment_lp"
           ],
-          "start_time": "20:24",
-          "end_time": "21:54",
-          "followup": true,
-          "sequence": 4,
+          "start_time": "15:01",
+          "end_time": "16:31",
+          "followup": false,
+          "sequence": 3,
           "travel_time": 23
         }
       ]
@@ -227,9 +227,9 @@
     },
     {
       "cleaner": {
-        "id": 785,
-        "name": "RACHEL",
-        "lastname": "OTSHINGA",
+        "id": 445,
+        "name": "IBRAHIM",
+        "lastname": "SANYANG",
         "role": "Premium",
         "premium": true
       },
@@ -294,11 +294,11 @@
             "automatic_assignment_eo"
           ],
           "priority": "early_out",
-          "start_time": "10:40",
-          "end_time": "11:20",
+          "start_time": "10:43",
+          "end_time": "11:23",
           "followup": true,
           "sequence": 2,
-          "travel_time": 0
+          "travel_time": 3
         },
         {
           "task_id": 218429,
@@ -328,9 +328,9 @@
             "not_hp",
             "automatic_assignment_lp"
           ],
-          "start_time": "12:00",
-          "end_time": "14:00",
-          "followup": true,
+          "start_time": "11:50",
+          "end_time": "13:50",
+          "followup": false,
           "sequence": 3,
           "travel_time": 28
         }
@@ -338,9 +338,9 @@
     },
     {
       "cleaner": {
-        "id": 445,
-        "name": "IBRAHIM",
-        "lastname": "SANYANG",
+        "id": 495,
+        "name": "EL HADJI",
+        "lastname": "BA",
         "role": "Premium",
         "premium": true
       },
@@ -515,9 +515,9 @@
     },
     {
       "cleaner": {
-        "id": 495,
-        "name": "EL HADJI",
-        "lastname": "BA",
+        "id": 596,
+        "name": "TRACY",
+        "lastname": "OKE",
         "role": "Premium",
         "premium": true
       },
@@ -593,9 +593,9 @@
     },
     {
       "cleaner": {
-        "id": 596,
-        "name": "TRACY",
-        "lastname": "OKE",
+        "id": 644,
+        "name": "HENRY",
+        "lastname": "CHIDUBEM",
         "role": "Premium",
         "premium": true
       },
@@ -671,9 +671,9 @@
     },
     {
       "cleaner": {
-        "id": 644,
-        "name": "HENRY",
-        "lastname": "CHIDUBEM",
+        "id": 249,
+        "name": "Ogbodo Chidi",
+        "lastname": "Igwe",
         "role": "Premium",
         "premium": true
       },
@@ -778,84 +778,6 @@
           "followup": true,
           "sequence": 3,
           "travel_time": 45
-        }
-      ]
-    },
-    {
-      "cleaner": {
-        "id": 249,
-        "name": "Ogbodo Chidi",
-        "lastname": "Igwe",
-        "role": "Premium",
-        "premium": true
-      },
-      "tasks": [
-        {
-          "task_id": 217262,
-          "logistic_code": 1530,
-          "client_id": 101,
-          "premium": true,
-          "address": "via Lanzone 39",
-          "lat": "45.461049",
-          "lng": "9.175446",
-          "cleaning_time": 60,
-          "checkin_date": "2025-11-04",
-          "checkout_date": "2025-11-04",
-          "checkin_time": "13:45",
-          "checkout_time": "11:15",
-          "pax_in": 4,
-          "pax_out": 4,
-          "small_equipment": true,
-          "operation_id": 2,
-          "confirmed_operation": true,
-          "straordinaria": false,
-          "type_apt": "A",
-          "alias": "CO99",
-          "customer_name": "CO99",
-          "reasons": [
-            "same_day_checkin_between_eo_hp",
-            "premium",
-            "automatic_assignment_hp"
-          ],
-          "priority": "high_priority",
-          "start_time": "11:15",
-          "end_time": "12:15",
-          "followup": false,
-          "sequence": 1,
-          "travel_time": 0
-        },
-        {
-          "task_id": 218328,
-          "logistic_code": 1541,
-          "client_id": 118,
-          "premium": false,
-          "address": "VIA GONIN, 58",
-          "lat": "45.4423379",
-          "lng": "9.1195717",
-          "cleaning_time": 90,
-          "checkin_date": "2025-11-04",
-          "checkout_date": "2025-11-04",
-          "checkin_time": "15:00",
-          "checkout_time": "11:00",
-          "pax_in": 4,
-          "pax_out": 4,
-          "small_equipment": false,
-          "operation_id": 2,
-          "confirmed_operation": true,
-          "straordinaria": false,
-          "type_apt": "B",
-          "alias": "CLLTR",
-          "customer_name": "CALLATRONI ELENA",
-          "reasons": [
-            "same_day_checkin_between_eo_hp",
-            "automatic_assignment_hp"
-          ],
-          "priority": "high_priority",
-          "start_time": "12:56",
-          "end_time": "14:26",
-          "followup": true,
-          "sequence": 2,
-          "travel_time": 41
         }
       ]
     },
@@ -1049,13 +971,57 @@
           "travel_time": 24
         }
       ]
+    },
+    {
+      "cleaner": {
+        "id": 785,
+        "name": "RACHEL",
+        "lastname": "OTSHINGA",
+        "role": "Premium",
+        "premium": true
+      },
+      "tasks": [
+        {
+          "task_id": 218402,
+          "logistic_code": 1577,
+          "client_id": 3,
+          "premium": true,
+          "address": "VIA CROCEFISSO, 25",
+          "lat": "45.4570059",
+          "lng": "9.1848347",
+          "cleaning_time": 270,
+          "checkin_date": "2025-11-04",
+          "checkout_date": "2025-11-04",
+          "checkin_time": "15:00",
+          "checkout_time": null,
+          "pax_in": 4,
+          "pax_out": 6,
+          "small_equipment": false,
+          "operation_id": 2,
+          "confirmed_operation": true,
+          "straordinaria": false,
+          "type_apt": "E",
+          "alias": "TBR",
+          "customer_name": "THE BEST RENT S.r.l.",
+          "reasons": [
+            "same_day_checkin_between_eo_hp",
+            "premium",
+            "automatic_assignment_hp"
+          ],
+          "priority": "high_priority",
+          "start_time": "10:00",
+          "end_time": "14:30",
+          "followup": false,
+          "sequence": 1,
+          "travel_time": 0
+        }
+      ]
     }
   ],
   "meta": {
-    "total_cleaners": 10,
-    "total_tasks": 28,
+    "total_cleaners": 9,
+    "total_tasks": 0,
     "used_cleaners": 10,
-    "assigned_tasks": 28,
-    "last_updated": "2025-11-04T10:31:20.752Z"
+    "assigned_tasks": 27
   }
 }
