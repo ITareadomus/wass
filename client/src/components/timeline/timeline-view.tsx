@@ -349,13 +349,23 @@ export default function TimelineView({
       // Trova i cleaner per la data selezionata
       const dateCleaners = data.dates[workDate]?.cleaners || [];
 
-      // Filtra i cleaner che NON sono già nella timeline
+      // Filtra i cleaner che NON sono già VISIBILI nella timeline
+      // (solo i cleaner con task vengono mostrati, quindi escludiamo quelli)
       const currentCleanerIds = cleaners.map(c => c.id);
       const available = dateCleaners.filter((c: Cleaner) => 
-        !currentCleanerIds.includes(c.id) && c.available
+        !currentCleanerIds.includes(c.id) && c.active
       );
 
+      // Ordina per role (Premium prima) e poi per nome
+      available.sort((a, b) => {
+        if (a.role === "Premium" && b.role !== "Premium") return -1;
+        if (a.role !== "Premium" && b.role === "Premium") return 1;
+        return a.name.localeCompare(b.name);
+      });
+
       setAvailableCleaners(available);
+      
+      console.log(`📋 Cleaner disponibili da aggiungere: ${available.length}/${dateCleaners.length}`);
     } catch (error) {
       console.error('Errore nel caricamento dei cleaner disponibili:', error);
       toast({
