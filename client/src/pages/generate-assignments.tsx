@@ -177,7 +177,7 @@ export default function GenerateAssignments() {
     extractData(selectedDate);
   }, [selectedDate]); // Aggiungi selectedDate come dipendenza
 
-  
+
 
   // Funzione per convertire cleaning_time (minuti) in formato ore.minuti
   const formatDuration = (minutes: number): string => {
@@ -291,8 +291,8 @@ export default function GenerateAssignments() {
           console.log(`   Cleaner ${cleanerEntry.cleaner.id} (${cleanerEntry.cleaner.name}) ha ${cleanerEntry.tasks?.length || 0} task`);
           for (const task of cleanerEntry.tasks || []) {
             const taskId = String(task.task_id);
-            const logisticCode = String(task.logistic_code);
-            console.log(`      → Task ${logisticCode} (ID: ${taskId}) assegnata a cleaner ${cleanerEntry.cleaner.id}`);
+            const taskLC = String(task.logistic_code);
+            console.log(`      → Task ${taskLC} (ID: ${taskId}) assegnata a cleaner ${cleanerEntry.cleaner.id}`);
             timelineAssignmentsMap.set(taskId, {
               ...task,
               cleanerId: cleanerEntry.cleaner.id,
@@ -385,7 +385,8 @@ export default function GenerateAssignments() {
             updatedAt: new Date().toISOString()
           };
 
-          console.log(`➕ Aggiungendo task ${logisticCode} dalla timeline a cleaner ${timelineAssignment.cleanerId} con sequence ${timelineAssignment.sequence}`);
+          const taskLogCode = getLogisticCode(baseTask);
+          console.log(`➕ Aggiungendo task ${taskLogCode} dalla timeline a cleaner ${timelineAssignment.cleanerId} con sequence ${timelineAssignment.sequence}`);
 
           // IMPORTANTE: Assicurati che assignedCleaner sia propagato correttamente
           const taskWithAssignment = {
@@ -459,7 +460,7 @@ export default function GenerateAssignments() {
     await loadTasks(true); // Skip extraction, just reload from files
   };
 
-  
+
 
 
 
@@ -756,7 +757,7 @@ export default function GenerateAssignments() {
       // 🔹 Ramo TIMELINE (drag tra cleaners o riordino nello stesso cleaner)
       const fromCleanerId = parseCleanerId(source.droppableId);
       const toCleanerId = parseCleanerId(destination.droppableId);
-      
+
       // ✅ NUOVO CASO: da container (early/high/low) → timeline di un cleaner
       const fromContainer = parseContainerKey(source.droppableId);
       const toContainer = parseContainerKey(destination.droppableId);
@@ -768,7 +769,7 @@ export default function GenerateAssignments() {
           // Salva in timeline.json (rimuove automaticamente da containers.json)
           await saveTimelineAssignment(taskId, toCleanerId, logisticCode, destination.index);
           await loadTasks(true);
-          
+
           toast({
             title: "Task assegnata",
             description: `Task ${logisticCode} assegnata al cleaner`,
