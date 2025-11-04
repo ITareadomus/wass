@@ -1,4 +1,3 @@
-
 # -*- coding: utf-8 -*-
 import json
 import mysql.connector
@@ -83,7 +82,7 @@ def get_tasks_from_db(selected_date):
     print(f"Aggiorno la lista delle operazioni attive dal DB...")
     ops = get_active_operations()
     save_operations_to_file(ops)
-    
+
     valid_operation_ids = ops + [0, None]
     non_null_operation_ids = [op for op in valid_operation_ids if op is not None]
     operation_placeholders = ','.join(['%s'] * len(non_null_operation_ids)) if non_null_operation_ids else 'NULL'
@@ -282,86 +281,43 @@ def classify_tasks(tasks, selected_date):
 
 # ---------- Main ----------
 def main():
+    import sys
+
+    # Leggi la data da argomento CLI se fornita
     if len(sys.argv) > 1:
-        selected_date = sys.argv[1]
-        print(f"Usando data specifica: {selected_date}")
+        work_date = sys.argv[1]
+        print(f"Usando data specifica: {work_date}")
     else:
-        selected_date = (datetime.now() + timedelta(days=1)).strftime("%Y-%m-%d")
-        print(f"Usando data di default (domani): {selected_date}")
+        work_date = None  # Se non specificata, usa la data corrente
 
-    # Estrai task dal DB
-    print(f"📋 Estrazione task dal database per {selected_date}...")
-    all_tasks = get_tasks_from_db(selected_date)
-    print(f"✅ Estratte {len(all_tasks)} task dal database")
-
-    # Filtra task già presenti in timeline.json E aggiorna i loro dati
+    # Leggi task già assegnate dalla timeline
+    assigned_task_ids = set()
     timeline_path = OUTPUT_DIR / "timeline.json"
-    timeline_task_ids = set()
-    timeline_updated = False
-    
     if timeline_path.exists():
         try:
             timeline_data = json.loads(timeline_path.read_text(encoding="utf-8"))
-            
-            # Crea una mappa task_id -> dati aggiornati dal DB
-            db_tasks_map = {task["task_id"]: task for task in all_tasks}
-            
-            # Aggiorna i dati delle task in timeline con quelli freschi dal DB
             for cleaner_entry in timeline_data.get("cleaners_assignments", []):
                 for task in cleaner_entry.get("tasks", []):
                     task_id = task.get("task_id")
-                    timeline_task_ids.add(task_id)
-                    
-                    # Se questa task esiste nel DB, aggiorna i suoi dati
-                    if task_id in db_tasks_map:
-                        db_task = db_tasks_map[task_id]
-                        
-                        # Aggiorna SOLO i campi che possono cambiare nel DB
-                        # Manteniamo i campi specifici della timeline (sequence, start_time, end_time, etc.)
-                        fields_to_update = [
-                            "logistic_code", "client_id", "premium", "address", "lat", "lng",
-                            "cleaning_time", "checkin_date", "checkout_date", "checkin_time", 
-                            "checkout_time", "pax_in", "pax_out", "small_equipment", 
-                            "operation_id", "confirmed_operation", "straordinaria", 
-                            "type_apt", "alias", "customer_name"
-                        ]
-                        
-                        updated_fields = []
-                        for field in fields_to_update:
-                            if field in db_task and task.get(field) != db_task[field]:
-                                old_value = task.get(field)
-                                task[field] = db_task[field]
-                                updated_fields.append(f"{field}: {old_value} → {db_task[field]}")
-                                timeline_updated = True
-                        
-                        if updated_fields:
-                            print(f"  ✏️ Aggiornata task {task_id} (logistic: {task.get('logistic_code')})")
-                            for upd in updated_fields[:3]:  # Mostra max 3 campi aggiornati
-                                print(f"     - {upd}")
-            
-            # Salva timeline aggiornata se ci sono stati cambiamenti
-            if timeline_updated:
-                timeline_path.write_text(json.dumps(timeline_data, ensure_ascii=False, indent=2), encoding="utf-8")
-                print(f"💾 Timeline aggiornata con i dati freschi dal DB")
-            
-            if timeline_task_ids:
-                print(f"🔍 Trovate {len(timeline_task_ids)} task già in timeline")
+                    if task_id:
+                        assigned_task_ids.add(int(task_id))
+            if assigned_task_ids:
+                print(f"✅ Task già assegnate nella timeline: {len(assigned_task_ids)}")
         except Exception as e:
-            print(f"⚠️ Errore nel caricamento/aggiornamento timeline: {e}")
-    
-    # Filtra le task che sono già in timeline
-    all_tasks = [task for task in all_tasks if task.get("task_id") not in timeline_task_ids]
-    print(f"✅ Task disponibili per containers (dopo filtro timeline): {len(all_tasks)}")
+            print(f"⚠️ Errore lettura timeline: {e}")
+
+    # Estrai task dal database
+    all_tasks = get_tasks_from_db(work_date, assigned_task_ids)
 
     # Classifica task
     print(f"🔄 Classificazione task in containers...")
-    early_out, high_priority, low_priority = classify_tasks(all_tasks, selected_date)
+    early_out, high_priority, low_priority = classify_tasks(all_tasks, work_date)
 
     # Crea output
     output = {
         "metadata": {
             "last_updated": datetime.now().isoformat(),
-            "date": selected_date
+            "date": work_date
         },
         "containers": {
             "early_out": {
@@ -390,12 +346,161 @@ def main():
         json.dump(output, f, indent=2, ensure_ascii=False)
 
     print(f"\n✅ File containers.json creato con successo!")
-    print(f"   📅 Data: {selected_date}")
+    print(f"   📅 Data: {work_date}")
     print(f"   📦 Task totali: {len(all_tasks)}")
     print(f"   🔴 Early-Out: {len(early_out)}")
     print(f"   🟡 High-Priority: {len(high_priority)}")
     print(f"   🟢 Low-Priority: {len(low_priority)}")
     print(f"   💾 Salvato in: {OUTPUT_CONTAINERS}")
+
+# ---------- Funzione per estrazione task con filtro già assegnate ----------
+def extract_tasks_from_db(work_date=None, assigned_task_ids=None):
+    """
+    Estrae task dal database per la data specificata (o oggi se non specificata)
+    Ritorna una lista di task con tutti i campi necessari
+    Esclude le task già assegnate nella timeline
+    """
+    import os
+    from dotenv import load_dotenv
+    import psycopg2
+    from datetime import datetime
+
+    if assigned_task_ids is None:
+        assigned_task_ids = set()
+
+    # Carica variabili d'ambiente
+    load_dotenv()
+
+    # Connessione al database
+    conn = psycopg2.connect(
+        host=os.getenv("DB_HOST"),
+        database=os.getenv("DB_NAME"),
+        user=os.getenv("DB_USER"),
+        password=os.getenv("DB_PASSWORD"),
+        port=os.getenv("DB_PORT")
+    )
+
+    cursor = conn.cursor()
+
+    # Se non specificata, usa la data corrente
+    if work_date is None:
+        work_date = datetime.now().strftime("%Y-%m-%d")
+
+    print(f"📋 Estrazione task dal database per {work_date}...")
+
+    # Ottieni le operation_ids attive
+    ops = get_active_operations()
+    save_operations_to_file(ops)
+
+    valid_operation_ids = ops + [0, None]
+    non_null_operation_ids = [op for op in valid_operation_ids if op is not None]
+    operation_placeholders = ','.join(['%s'] * len(non_null_operation_ids)) if non_null_operation_ids else 'NULL'
+
+    base_query = f"""
+        SELECT 
+            h.id AS task_id,
+            s.logistic_code AS logistic_code,
+            s.customer_id AS client_id,
+            s.premium AS premium,
+            s.address1 AS address,
+            s.lat,
+            s.lng,
+            (
+                SELECT duration_minutes 
+                FROM app_structure_timings ast
+                WHERE ast.structure_type_id = s.structure_type_id
+                    AND ast.customer_id = s.customer_id
+                    AND ast.structure_operation_id = (
+                        CASE WHEN h.operation_id = 0 THEN 2 ELSE h.operation_id END
+                    )
+                    AND ast.data_contratto <= CURDATE()
+                    AND ast.deleted_at IS NULL
+                ORDER BY ABS(DATEDIFF(ast.data_contratto, CURDATE()))
+                LIMIT 1
+            ) AS cleaning_time,
+            h.checkin,
+            h.checkout,
+            h.checkin_time,
+            h.checkout_time,
+            h.checkin_pax AS pax_in,
+            h.checkout_pax AS pax_out,
+            s.structure_type_id,
+            h.operation_id,
+            c.alias AS alias,
+            c.name AS customer_name
+        FROM app_housekeeping h
+        JOIN app_structures s ON h.structure_id = s.id
+        LEFT JOIN app_customers c ON s.customer_id = c.id
+        WHERE h.checkout = %s
+          AND h.deleted_at IS NULL
+          AND h.deleted_at_client IS NULL
+          AND s.lat IS NOT NULL AND s.lng IS NOT NULL
+          AND s.lat != '' AND s.lng != ''
+          AND s.lat != '0' AND s.lng != '0'
+    """
+
+    params = [work_date]
+    if non_null_operation_ids:
+        base_query += f" AND (h.operation_id IN ({operation_placeholders}) OR h.operation_id IS NULL OR h.operation_id = 0)"
+        params += non_null_operation_ids
+
+    cursor.execute(base_query, params)
+    rows = cursor.fetchall()
+
+    tasks = []
+    for r in rows:
+        structure_type_id = r.get("structure_type_id")
+        op_id = r.get("operation_id")
+
+        if op_id == 0:
+            confirmed_operation = False
+            output_operation_id = 2
+        else:
+            confirmed_operation = True
+            output_operation_id = op_id
+
+        premium_bool = True if r.get("premium") in (1, True, "1") else False
+        straordinaria_bool = True if output_operation_id == 3 else False
+        small_equipment_bool = True if structure_type_id == 1 else False
+
+        item = {
+            "task_id": r.get("task_id"),
+            "logistic_code": r.get("logistic_code"),
+            "client_id": r.get("client_id"),
+            "premium": premium_bool,
+            "address": r.get("address"),
+            "lat": normalize_coord(r.get("lat")),
+            "lng": normalize_coord(r.get("lng")),
+            "cleaning_time": r.get("cleaning_time"),
+            "checkin_date": date_to_str(r.get("checkin")) if r.get("checkin") else None,
+            "checkout_date": date_to_str(r.get("checkout")) if r.get("checkout") else None,
+            "checkin_time": varchar_to_str(r.get("checkin_time")) if r.get("checkin_time") else None,
+            "checkout_time": varchar_to_str(r.get("checkout_time")) if r.get("checkout_time") else None,
+            "pax_in": r.get("pax_in"),
+            "pax_out": r.get("pax_out"),
+            "small_equipment": small_equipment_bool,
+            "operation_id": output_operation_id,
+            "confirmed_operation": confirmed_operation,
+            "straordinaria": straordinaria_bool,
+            "type_apt": map_structure_type_to_letter(structure_type_id),
+            "alias": varchar_to_str(r.get("alias")) if r.get("alias") is not None else None,
+            "customer_name": varchar_to_str(r.get("customer_name")) if r.get("customer_name") is not None else None,
+        }
+        tasks.append(item)
+
+    cursor.close()
+    conn.close()
+
+    # Filtra task già assegnate
+    if assigned_task_ids:
+        original_count = len(tasks)
+        tasks = [t for t in tasks if t["task_id"] not in assigned_task_ids]
+        filtered_count = original_count - len(tasks)
+        if filtered_count > 0:
+            print(f"✅ Filtrate {filtered_count} task già assegnate (rimangono {len(tasks)})")
+
+    print(f"✅ Estratte {len(tasks)} task dal database")
+    return tasks
 
 if __name__ == "__main__":
     main()

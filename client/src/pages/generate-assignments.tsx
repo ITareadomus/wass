@@ -315,18 +315,11 @@ export default function GenerateAssignments() {
       tasksWithAssignments.push(...filteredEarlyOut, ...filteredHigh, ...filteredLow);
 
       // Aggiungi SOLO task che sono effettivamente in timeline.json con i loro dati completi
-      console.log(`🔄 Elaborazione ${timelineAssignmentsMap.size} task dalla timeline...`);
       for (const [taskId, timelineAssignment] of timelineAssignmentsMap.entries()) {
         // Trova la task originale dai containers per prendere i dati base
         const originalTask = [...initialEarlyOut, ...initialHigh, ...initialLow].find(
           t => String(t.id) === taskId
         );
-
-        console.log(`   → Task ${timelineAssignment.logistic_code} (ID: ${taskId}):`, {
-          hasOriginalTask: !!originalTask,
-          cleanerId: timelineAssignment.cleanerId,
-          priority: timelineAssignment.priority
-        });
 
         if (timelineAssignment.cleanerId) {
           // Se la task esiste nei containers, usa quei dati come base
