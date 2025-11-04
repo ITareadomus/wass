@@ -217,60 +217,9 @@ export default function Convocazioni() {
       console.log("Cleaners salvati con successo:", result);
       toast({
         variant: "success",
-        title: `${selectedCleanersData.length} cleaner selezionati correttamente!`,
-        description: "Torna alle assegnazioni per visualizzarli nella timeline"
+        title: `${selectedCleanersData.length} cleaner salvati con successo!`,
+        description: "I cleaners sono stati aggiunti alla selezione"
       });
-    } catch (error) {
-      console.error("Errore nel salvataggio:", error);
-      toast({
-        variant: "destructive",
-        title: "❌ Errore nel salvataggio",
-        description: "Si è verificato un errore nel salvataggio dei cleaners selezionati"
-      });
-    }
-  };
-
-  const handleSaveAndNavigate = async () => {
-    if (selectedCleaners.size === 0) {
-      toast({
-        variant: "destructive",
-        title: "⚠️ Nessun cleaner selezionato",
-        description: "Seleziona almeno un cleaner prima di continuare"
-      });
-      return;
-    }
-
-    try {
-      const selectedCleanersData = cleaners.filter(c => selectedCleaners.has(c.id));
-
-      const dataToSave = {
-        cleaners: selectedCleanersData,
-        total_selected: selectedCleanersData.length
-      };
-
-      const response = await fetch('/api/save-selected-cleaners', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(dataToSave),
-      });
-
-      if (!response.ok) {
-        throw new Error('Errore nel salvataggio dei cleaners');
-      }
-
-      toast({
-        variant: "success",
-        title: `${selectedCleanersData.length} cleaner salvati!`,
-        description: "Caricamento timeline in corso..."
-      });
-
-      // Imposta flag per preservare le assegnazioni
-      sessionStorage.setItem('preserveAssignments', 'true');
-      
-      // Naviga alla pagina principale
-      setLocation('/');
     } catch (error) {
       console.error("Errore nel salvataggio:", error);
       toast({
@@ -490,27 +439,15 @@ export default function Convocazioni() {
             </DialogContent>
           </Dialog>
           <div className="flex justify-between mt-4 pt-4 border-t">
-            <div className="flex gap-2">
-              <Button
-                onClick={handleSaveSelection}
-                size="lg"
-                variant="outline"
-                disabled={selectedCleaners.size === 0}
-                className="flex items-center gap-2"
-              >
-                <Save className="w-4 h-4" />
-                Salva
-              </Button>
-              <Button
-                onClick={handleSaveAndNavigate}
-                size="lg"
-                disabled={selectedCleaners.size === 0}
-                className="flex items-center gap-2"
-              >
-                <Save className="w-4 h-4" />
-                Salva e Vai alla Timeline
-              </Button>
-            </div>
+            <Button
+              onClick={handleSaveSelection}
+              size="lg"
+              disabled={selectedCleaners.size === 0}
+              className="flex items-center gap-2"
+            >
+              <Save className="w-4 h-4" />
+              Salva
+            </Button>
             <Button
               variant="outline"
               onClick={() => setLocation('/')}
