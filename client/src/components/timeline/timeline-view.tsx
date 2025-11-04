@@ -1,6 +1,7 @@
 import { Personnel, TaskType as Task } from "@shared/schema";
 import { Calendar, RotateCcw, Users, RefreshCw, UserPlus } from "lucide-react";
 import { useState, useEffect } from "react";
+import * as React from "react";
 import { Droppable, Draggable } from "react-beautiful-dnd";
 import { useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -462,8 +463,49 @@ export default function TimelineView({
   };
 
 
+  // Carica anche i cleaner dalla timeline.json per mostrare quelli nascosti
+  const [timelineCleaners, setTimelineCleaners] = useState<any[]>([]);
+
+  const loadTimelineCleaners = async () => {
+    try {
+      const response = await fetch(`/data/output/timeline.json?t=${Date.now()}`);
+      if (!response.ok) return;
+      
+      const timelineData = await response.json();
+      const timelineCleanersList = timelineData.cleaners_assignments || [];
+      setTimelineCleaners(timelineCleanersList);
+    } catch (error) {
+      console.error("Errore nel caricamento timeline cleaners:", error);
+    }
+  };
+
+  useEffect(() => {
+    loadCleaners();
+    loadAliases();
+    loadTimelineCleaners();
+  }, []);
+
+  // Combina cleaners selezionati con quelli dalla timeline (per mostrare anche quelli nascosti)
+  const allCleanersToShow = React.useMemo(() => {
+    const selectedIds = new Set(cleaners.map(c => c.id));
+    const result = [...cleaners];
+    
+    // Aggiungi cleaners dalla timeline che NON sono in selected_cleaners
+    for (const timelineEntry of timelineCleaners) {
+      const cleanerId = timelineEntry.cleaner?.id;
+      if (cleanerId && !selectedIds.has(cleanerId) && timelineEntry.tasks?.length > 0) {
+        result.push({
+          ...timelineEntry.cleaner,
+          _isHidden: true // Flag per indicare che è nascosto
+        });
+      }
+    }
+    
+    return result;
+  }, [cleaners, timelineCleaners]);
+
   // Non mostrare nulla se non ci sono cleaners
-  if (cleaners.length === 0) {
+  if (allCleanersToShow.length === 0) {
     return null;
   }
 
@@ -533,9 +575,10 @@ export default function TimelineView({
           </div>
 
           {/* Righe dei cleaners */}
-          {cleaners.map((cleaner, index) => {
+          {allCleanersToShow.map((cleaner, index) => {
             const color = getCleanerColor(index);
             const droppableId = `cleaner-${cleaner.id}`;
+            const isHidden = (cleaner as any)._isHidden;
 
             // Trova tutte le task assegnate a questo cleaner
             const cleanerTasks = tasks.filter(task => 
@@ -544,34 +587,43 @@ export default function TimelineView({
 
             return (
               <div key={cleaner.id} className="flex mb-0.5">
-                {/* Info cleaner */}
+                {/* Info cleaner - con stile tratteggiato se nascosto */}
                 <div
-                  className="flex-shrink-0 p-1 flex items-center border border-border cursor-pointer hover:opacity-90 transition-opacity"
+                  className="flex-shrink-0 p-1 flex items-center border cursor-pointer hover:opacity-90 transition-opacity"
                   style={{ 
                     width: `${cleanerColumnWidth}px`,
-                    backgroundColor: filteredCleanerId === cleaner.id ? `${color.bg}` : color.bg,
-                    color: color.text,
+                    backgroundColor: isHidden ? '#f0f0f0' : (filteredCleanerId === cleaner.id ? `${color.bg}` : color.bg),
+                    color: isHidden ? '#999' : color.text,
                     boxShadow: filteredCleanerId === cleaner.id ? '0 0 0 3px rgba(59, 130, 246, 0.5)' : 'none',
-                    userSelect: 'none'
+                    userSelect: 'none',
+                    borderStyle: isHidden ? 'dashed' : 'solid',
+                    borderWidth: isHidden ? '2px' : '1px',
+                    borderColor: isHidden ? '#ccc' : 'inherit'
                   }}
-                  onClick={(e) => handleCleanerClick(cleaner, e)}
-                  title="Click: dettagli | Doppio click: filtra mappa"
+                  onClick={isHidden ? handleOpenAddCleanerDialog : ((e) => handleCleanerClick(cleaner, e))}
+                  title={isHidden ? "Cleaner rimosso - Click per aggiungere nuovo cleaner" : "Click: dettagli | Doppio click: filtra mappa"}
                 >
-                  <div className="w-full flex items-center gap-1">
-                    <div className="break-words font-bold text-[13px] flex-1">
-                      {cleanersAliases[cleaner.id]?.alias || `${cleaner.name.toUpperCase()} ${cleaner.lastname.toUpperCase()}`}
+                  {isHidden ? (
+                    <div className="w-full flex items-center justify-center">
+                      <UserPlus className="w-6 h-6 text-gray-400" />
                     </div>
-                    {cleaner.role === "Premium" && (
-                      <div className="bg-yellow-500 text-black font-bold text-[10px] px-1 py-0.5 rounded flex-shrink-0">
-                        P
+                  ) : (
+                    <div className="w-full flex items-center gap-1">
+                      <div className="break-words font-bold text-[13px] flex-1">
+                        {cleanersAliases[cleaner.id]?.alias || `${cleaner.name.toUpperCase()} ${cleaner.lastname.toUpperCase()}`}
                       </div>
-                    )}
-                    {cleaner.role === "Formatore" && (
-                      <div className="bg-orange-500 text-black font-bold text-[10px] px-1 py-0.5 rounded flex-shrink-0">
-                        F
-                      </div>
-                    )}
-                  </div>
+                      {cleaner.role === "Premium" && (
+                        <div className="bg-yellow-500 text-black font-bold text-[10px] px-1 py-0.5 rounded flex-shrink-0">
+                          P
+                        </div>
+                      )}
+                      {cleaner.role === "Formatore" && (
+                        <div className="bg-orange-500 text-black font-bold text-[10px] px-1 py-0.5 rounded flex-shrink-0">
+                          F
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
                 {/* Timeline per questo cleaner - area unica droppable */}
                 <Droppable droppableId={`timeline-${cleaner.id}`} direction="horizontal">

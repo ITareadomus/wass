@@ -897,10 +897,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       await fs.rename(tmpPath, selectedCleanersPath);
 
       console.log(`✅ Cleaner ${cleanerId} rimosso da selected_cleaners.json (${cleanersBefore} -> ${selectedData.cleaners.length})`);
+      console.log(`   Il cleaner rimane in timeline.json con le sue task fino a sostituzione`);
 
       res.json({ 
         success: true, 
-        message: "Cleaner rimosso da selected_cleaners.json",
+        message: "Cleaner rimosso da selected_cleaners.json (rimane in timeline fino a sostituzione)",
         remaining: selectedData.cleaners.length
       });
     } catch (error: any) {
