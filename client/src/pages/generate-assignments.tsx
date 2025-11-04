@@ -671,6 +671,15 @@ export default function GenerateAssignments() {
     return null;
   };
 
+  // Helper per estrarre container key
+  const parseContainerKey = (droppableId: string | undefined | null): "early_out" | "high_priority" | "low_priority" | null => {
+    if (!droppableId) return null;
+    if (droppableId === "early-out") return "early_out";
+    if (droppableId === "high") return "high_priority";
+    if (droppableId === "low") return "low_priority";
+    return null;
+  };
+
   const onDragEnd = async (result: any) => {
     const { destination, source, draggableId } = result;
 
@@ -693,6 +702,33 @@ export default function GenerateAssignments() {
       // 🔹 Ramo TIMELINE (drag tra cleaners o riordino nello stesso cleaner)
       const fromCleanerId = parseCleanerId(source.droppableId);
       const toCleanerId = parseCleanerId(destination.droppableId);
+      
+      // ✅ NUOVO CASO: da container (early/high/low) → timeline di un cleaner
+      const fromContainer = parseContainerKey(source.droppableId);
+      const toContainer = parseContainerKey(destination.droppableId);
+
+      if (!fromCleanerId && fromContainer && toCleanerId !== null && !toContainer) {
+        console.log(`🔄 Spostamento da container ${fromContainer} a cleaner ${toCleanerId}`);
+
+        try {
+          // Salva in timeline.json (rimuove automaticamente da containers.json)
+          await saveTimelineAssignment(taskId, toCleanerId, logisticCode, destination.index);
+          await loadTasks(true);
+          
+          toast({
+            title: "Task assegnata",
+            description: `Task ${logisticCode} assegnata al cleaner`,
+          });
+        } catch (err) {
+          console.error("Errore nel salvataggio in timeline:", err);
+          toast({
+            title: "Errore",
+            description: "Impossibile assegnare la task alla timeline.",
+            variant: "destructive",
+          });
+        }
+        return;
+      }
 
       if (fromCleanerId !== null && toCleanerId !== null) {
         console.log(`🔄 Timeline move: task ${logisticCode} da cleaner ${fromCleanerId} (idx ${source.index}) a cleaner ${toCleanerId} (idx ${destination.index})`);
