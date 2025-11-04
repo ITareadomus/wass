@@ -462,7 +462,7 @@ export default function GenerateAssignments() {
     }
   };
 
-  
+
 
   // Funzione per assegnare le task Early Out alla timeline
   const assignEarlyOutToTimeline = async () => {
@@ -903,7 +903,11 @@ export default function GenerateAssignments() {
     }
   };
 
+  // Combina task dalla timeline con task dai containers (senza filtri su logistic_code)
   const allTasks = [...earlyOutTasks, ...highPriorityTasks, ...lowPriorityTasks, ...lopezTasks, ...garciaTasks, ...rossiTasks];
+  // The following line was replaced by the comment above.
+  // const allTasks = [...timelineTasksWithoutDuplicates, ...containerTasks];
+
 
   // Mostra loader durante l'estrazione
   if (isExtracting || isLoadingTasks) {
