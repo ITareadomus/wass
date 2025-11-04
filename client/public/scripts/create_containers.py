@@ -290,6 +290,28 @@ def classify_tasks(tasks, selected_date):
         if tid not in classified_eo and tid not in classified_hp:
             low_priority_tasks.append({**task, "priority": "low_priority", "reasons": ["not_eo", "not_hp"]})
 
+    # GESTIONE DUPLICATI: Marca task duplicate con badge "is_duplicate_secondary"
+    from collections import defaultdict
+    
+    for container in [early_out_tasks, high_priority_tasks, low_priority_tasks]:
+        by_lc = defaultdict(list)
+        for t in container:
+            by_lc[t.get("logistic_code")].append(t)
+        
+        for lc, group in by_lc.items():
+            if len(group) > 1:
+                # Ordina per checkin vincolante
+                group.sort(key=lambda x: (
+                    x.get("checkin_time") is None,
+                    x.get("checkin_time") if x.get("checkin_time") else "23:59"
+                ))
+                # Marca le successive come duplicate
+                for i in range(1, len(group)):
+                    group[i]["is_duplicate_secondary"] = True
+                    if "reasons" not in group[i]:
+                        group[i]["reasons"] = []
+                    group[i]["reasons"].append("duplicate_task_secondary")
+
     return early_out_tasks, high_priority_tasks, low_priority_tasks
 
 # ---------- Main ----------
