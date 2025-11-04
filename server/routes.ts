@@ -925,14 +925,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
+      // Carica cleaners.json per ottenere can_do_straordinaria
+      const cleanersPath = path.join(process.cwd(), 'client/public/data/cleaners/cleaners.json');
+      const cleanersContent = await fs.readFile(cleanersPath, 'utf8');
+      const cleanersData = JSON.parse(cleanersContent);
+      
+      // Estrai la data più recente
+      const dates = Object.keys(cleanersData.dates);
+      const latestDate = dates.sort().reverse()[0];
+      const allCleaners = cleanersData.dates[latestDate]?.cleaners || [];
+      
+      // Crea mappa can_do_straordinaria per ID
+      const straordinariaMap = new Map();
+      allCleaners.forEach((c: any) => {
+        straordinariaMap.set(c.id, c.can_do_straordinaria || false);
+      });
+
+      // Aggiungi can_do_straordinaria ai cleaner selezionati
+      const enrichedCleaners = selectedCleaners.map((c: any) => ({
+        ...c,
+        can_do_straordinaria: straordinariaMap.get(c.id) || false
+      }));
+
       const selectedCleanersPath = path.join(
         process.cwd(), 
         'client/public/data/cleaners/selected_cleaners.json'
       );
 
       const dataToSave = {
-        cleaners: selectedCleaners,
-        total_selected: total_selected || selectedCleaners.length
+        cleaners: enrichedCleaners,
+        total_selected: total_selected || enrichedCleaners.length
       };
 
       // Scrittura atomica
@@ -940,7 +962,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       await fs.writeFile(tmpPath, JSON.stringify(dataToSave, null, 2));
       await fs.rename(tmpPath, selectedCleanersPath);
 
-      console.log(`✅ Salvati ${selectedCleaners.length} cleaners in selected_cleaners.json`);
+      console.log(`✅ Salvati ${enrichedCleaners.length} cleaners in selected_cleaners.json (con can_do_straordinaria)`);
 
       res.json({ 
         success: true, 
