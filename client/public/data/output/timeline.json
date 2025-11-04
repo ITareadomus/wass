@@ -1,25 +1,12 @@
 {
   "metadata": {
-    "last_updated": "2025-11-04T09:02:38.931Z",
+    "last_updated": "2025-11-04T09:09:06.075Z",
     "date": "2025-11-04"
   },
-  "cleaners_assignments": [
-    {
-      "cleaner": {
-        "id": 326,
-        "name": "FESTUS OSARO",
-        "lastname": "AIHIVBERE",
-        "role": "Standard",
-        "premium": false
-      },
-      "tasks": []
-    }
-  ],
+  "cleaners_assignments": [],
   "meta": {
-    "total_cleaners": 1,
+    "total_cleaners": 0,
     "used_cleaners": 0,
-    "assigned_tasks": 0,
-    "total_tasks": 0,
-    "last_updated": "2025-11-04T09:02:38.932Z"
+    "assigned_tasks": 0
   }
 }
