@@ -811,6 +811,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Endpoint per confermare le assegnazioni e salvare una copia immutabile
+  app.post("/api/confirm-assignments", async (req, res) => {
+    try {
+      const { date } = req.body;
+      const workDate = date || format(new Date(), 'yyyy-MM-dd');
+      
+      // Leggi timeline.json corrente
+      const timelinePath = path.join(process.cwd(), 'client/public/data/output/timeline.json');
+      const timelineData = JSON.parse(await fs.readFile(timelinePath, 'utf8'));
+      
+      // Crea nome file con formato ddmmyy
+      const dateObj = new Date(workDate);
+      const day = String(dateObj.getDate()).padStart(2, '0');
+      const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+      const year = String(dateObj.getFullYear()).slice(-2);
+      const filename = `assignments_${day}${month}${year}.json`;
+      
+      // Salva la copia in data/assigned/
+      const assignedPath = path.join(process.cwd(), 'client/public/data/assigned', filename);
+      await fs.writeFile(assignedPath, JSON.stringify(timelineData, null, 2));
+      
+      console.log(`✅ Assegnazioni confermate e salvate in ${filename}`);
+      
+      res.json({ 
+        success: true, 
+        filename,
+        message: `Assegnazioni salvate in ${filename}`
+      });
+    } catch (error: any) {
+      console.error("Errore nella conferma delle assegnazioni:", error);
+      res.status(500).json({ 
+        success: false, 
+        error: error.message 
+      });
+    }
+  });
+
   // Endpoint per aggiungere un cleaner alla timeline
   app.post("/api/add-cleaner-to-timeline", async (req, res) => {
     try {
