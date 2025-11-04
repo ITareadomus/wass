@@ -828,16 +828,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const year = String(dateObj.getFullYear()).slice(-2);
       const filename = `assignments_${day}${month}${year}.json`;
       
-      // Salva la copia in data/assigned/
-      const assignedPath = path.join(process.cwd(), 'client/public/data/assigned', filename);
-      await fs.writeFile(assignedPath, JSON.stringify(timelineData, null, 2));
+      // Salva nel bucket wass_assignments usando Replit Object Storage
+      const { Client } = await import('@replit/object-storage');
+      const client = new Client();
       
-      console.log(`✅ Assegnazioni confermate e salvate in ${filename}`);
+      // Converti i dati in stringa JSON
+      const jsonContent = JSON.stringify(timelineData, null, 2);
+      
+      // Upload nel bucket wass_assignments
+      await client.uploadFromText(filename, jsonContent, {
+        bucket: 'wass_assignments'
+      });
+      
+      console.log(`✅ Assegnazioni confermate e salvate in Object Storage: ${filename}`);
       
       res.json({ 
         success: true, 
         filename,
-        message: `Assegnazioni salvate in ${filename}`
+        message: `Assegnazioni salvate in Object Storage: ${filename}`
       });
     } catch (error: any) {
       console.error("Errore nella conferma delle assegnazioni:", error);
