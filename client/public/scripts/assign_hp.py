@@ -557,16 +557,25 @@ def load_tasks() -> Tuple[List[Task], str]:
 
 
 # -------- Planner --------
-def plan_day(tasks: List[Task], cleaners: List[Cleaner]) -> Tuple[List[Cleaner], List[Task]]:
+def plan_day(tasks: List[Task], cleaners: List[Cleaner], assigned_logistic_codes: set = None) -> Tuple[List[Cleaner], List[Task]]:
     """
     Assegna le task ai cleaner con regole semplificate:
     - Favorisce percorsi < 15'
     - Se non ci sono percorsi < 15', sceglie il minore dei > 15'
     - Max 2 task per cleaner (3ª solo se entro 10')
+    - DEDUPLICA: Solo una task per logistic_code viene assegnata
     """
+    if assigned_logistic_codes is None:
+        assigned_logistic_codes = set()
+    
     unassigned = []
 
     for task in tasks:
+        # DEDUPLICA: Skippa task con logistic_code già assegnato
+        if task.logistic_code in assigned_logistic_codes:
+            print(f"   ⏭️  Skippata task {task.task_id} (logistic_code {task.logistic_code} già assegnato)")
+            unassigned.append(task)
+            continue
         # Trova tutti i cleaner che possono prendere questa task
         candidates = []
 
@@ -633,6 +642,8 @@ def plan_day(tasks: List[Task], cleaners: List[Cleaner]) -> Tuple[List[Cleaner],
 
         cleaner, pos, travel = chosen
         cleaner.route.insert(pos, task)
+        # Traccia il logistic_code come assegnato
+        assigned_logistic_codes.add(task.logistic_code)
 
     return cleaners, unassigned
 
@@ -734,19 +745,20 @@ def build_output(cleaners: List[Cleaner], unassigned: List[Task], original_tasks
             "tasks": tasks_list
         })
 
-    # Trova le task assegnate
-    assigned_codes = set()
+    # Trova le task assegnate usando task_id (NON logistic_code per permettere duplicati)
+    assigned_task_ids = set()
     for entry in cleaners_with_tasks:
         for t in entry.get("tasks", []):
-            assigned_codes.add(int(t["logistic_code"]))
+            assigned_task_ids.add(int(t["task_id"]))
 
     # Unassigned list
     unassigned_list: List[Dict[str, Any]] = []
     for ot in original_tasks:
+        tid = int(ot.task_id)
         lc = int(ot.logistic_code)
-        if lc not in assigned_codes:
+        if tid not in assigned_task_ids:
             unassigned_list.append({
-                "task_id": int(ot.task_id),
+                "task_id": tid,
                 "logistic_code": lc,
                 "reason": "no_eligible_cleaner_or_time_window"
             })
@@ -813,10 +825,27 @@ def main():
     print(f"📋 Caricamento dati...")
     print(f"👥 Cleaner disponibili: {len(cleaners)}")
     print(f"📦 Task High-Priority da assegnare: {len(tasks)}")
+    
+    # Leggi i logistic_code già assegnati dalla timeline
+    assigned_logistic_codes = set()
+    timeline_path = OUTPUT_ASSIGN.parent / "timeline.json"
+    if timeline_path.exists():
+        try:
+            timeline_data = json.loads(timeline_path.read_text(encoding="utf-8"))
+            for cleaner_entry in timeline_data.get("cleaners_assignments", []):
+                for task in cleaner_entry.get("tasks", []):
+                    logistic_code = str(task.get("logistic_code"))
+                    if logistic_code:
+                        assigned_logistic_codes.add(logistic_code)
+            if assigned_logistic_codes:
+                print(f"📌 Logistic codes già assegnati in timeline: {len(assigned_logistic_codes)}")
+        except Exception as e:
+            print(f"⚠️ Errore lettura timeline per deduplica: {e}")
+    
     print()
     print(f"🔄 Assegnazione in corso...")
 
-    planners, leftovers = plan_day(tasks, cleaners)
+    planners, leftovers = plan_day(tasks, cleaners, assigned_logistic_codes)
     output = build_output(planners, leftovers, tasks)
 
     print()
@@ -905,18 +934,18 @@ def main():
     if containers_path.exists():
         containers_data = json.loads(containers_path.read_text(encoding="utf-8"))
 
-        # Trova tutti i logistic_code assegnati
-        assigned_codes = set()
+        # Trova tutti i task_id assegnati (NON logistic_code per permettere duplicati)
+        assigned_task_ids = set()
         for cleaner_entry in output["high_priority_tasks_assigned"]:
             for task in cleaner_entry.get("tasks", []):
-                assigned_codes.add(int(task["logistic_code"]))
+                assigned_task_ids.add(int(task["task_id"]))
 
-        # Rimuovi le task assegnate dal container high_priority
+        # Rimuovi le task assegnate dal container high_priority usando task_id
         if "containers" in containers_data and "high_priority" in containers_data["containers"]:
             original_count = len(containers_data["containers"]["high_priority"]["tasks"])
             containers_data["containers"]["high_priority"]["tasks"] = [
                 t for t in containers_data["containers"]["high_priority"]["tasks"]
-                if int(t.get("logistic_code", 0)) not in assigned_codes
+                if int(t.get("task_id", 0)) not in assigned_task_ids
             ]
             new_count = len(containers_data["containers"]["high_priority"]["tasks"])
             containers_data["containers"]["high_priority"]["count"] = new_count
@@ -929,8 +958,9 @@ def main():
 
             # Scrivi containers.json aggiornato
             containers_path.write_text(json.dumps(containers_data, ensure_ascii=False, indent=2), encoding="utf-8")
-            print(f"✅ Rimosse {original_count - new_count} task da containers.json (high_priority)")
+            print(f"✅ Rimosse {original_count - new_count} task da containers.json (high_priority) usando task_id")
             print(f"   - Task rimaste in high_priority: {new_count}")
+            print(f"   💡 Task con logistic_code duplicati rimangono disponibili nei container")
 
 
 if __name__ == "__main__":
