@@ -78,7 +78,10 @@ def save_operations_to_file(operation_ids):
     print(f"Salvati {len(operation_ids)} operation_id validi in {ops_file}")
 
 # ---------- Estrazione task dal DB ----------
-def get_tasks_from_db(selected_date):
+def get_tasks_from_db(selected_date, assigned_task_ids=None):
+    if assigned_task_ids is None:
+        assigned_task_ids = set()
+    
     print(f"Aggiorno la lista delle operazioni attive dal DB...")
     ops = get_active_operations()
     save_operations_to_file(ops)
@@ -144,7 +147,14 @@ def get_tasks_from_db(selected_date):
     connection.close()
 
     results = []
+    filtered_count = 0
     for r in rows:
+        task_id = r.get("task_id")
+        
+        # Filtra task già assegnate
+        if task_id and task_id in assigned_task_ids:
+            filtered_count += 1
+            continue
         structure_type_id = r.get("structure_type_id")
         op_id = r.get("operation_id")
 
@@ -184,6 +194,9 @@ def get_tasks_from_db(selected_date):
         }
         results.append(item)
 
+    if filtered_count > 0:
+        print(f"✅ Filtrate {filtered_count} task già assegnate (rimangono {len(results)})")
+    
     return results
 
 # ---------- Classificazione task ----------
