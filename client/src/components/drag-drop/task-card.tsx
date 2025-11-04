@@ -94,7 +94,7 @@ export default function TaskCard({
 
   // Task corrente da visualizzare - trova sempre per ID
   const displayTask = allTasks.find(t => t.id === currentTaskId) || task;
-
+  
   // DEBUG: verifica se displayTask è corretto
   useEffect(() => {
     if (displayTask.id !== currentTaskId) {
@@ -224,7 +224,7 @@ export default function TaskCard({
                     {...provided.draggableProps}
                     {...provided.dragHandleProps}
                     className={`
-                      ${cardColorClass}
+                      ${cardColorClass} 
                       rounded-sm px-2 py-1 shadow-sm border transition-all duration-200
                       ${snapshot.isDragging ? "shadow-lg scale-105" : ""}
                       ${isOverdue ? "animate-blink" : ""}
@@ -251,7 +251,7 @@ export default function TaskCard({
                         />
                       </div>
                     )}
-                    <div
+                    <div 
                       className="flex flex-col items-center justify-center h-full gap-0"
                     >
                       <div className="flex items-center gap-1">
@@ -325,10 +325,10 @@ export default function TaskCard({
                           : "bg-gray-500 text-white border-gray-700"
                     )}
                   >
-                    {(displayTask as any).priority === "early_out"
-                      ? "EO"
-                      : (displayTask as any).priority === "high_priority"
-                        ? "HP"
+                    {(displayTask as any).priority === "early_out" 
+                      ? "EO" 
+                      : (displayTask as any).priority === "high_priority" 
+                        ? "HP" 
                         : "LP"}
                   </Badge>
                 )}
@@ -428,8 +428,8 @@ export default function TaskCard({
                   Travel Time
                 </p>
                 <p className="text-sm">
-                  {assignmentTimes.travel_time !== undefined
-                    ? `${assignmentTimes.travel_time} minuti`
+                  {assignmentTimes.travel_time !== undefined 
+                    ? `${assignmentTimes.travel_time} minuti` 
                     : "non assegnato"}
                 </p>
               </div>
@@ -481,35 +481,6 @@ export default function TaskCard({
                 </p>
                 <p className="text-sm">{(displayTask as any).pax_out ?? "non migrato"}</p>
               </div>
-            </div>
-
-            {/* Badge Premium, Straordinaria e Duplicate */}
-            <div className="flex gap-2">
-              {(displayTask as any).premium && (
-                <Badge
-                  variant="default"
-                  className="bg-yellow-500 hover:bg-yellow-600 text-white"
-                >
-                  P
-                </Badge>
-              )}
-              {(displayTask as any).straordinaria && (
-                <Badge
-                  variant="default"
-                  className="bg-red-500 hover:bg-red-600 text-white"
-                >
-                  Straordinaria
-                </Badge>
-              )}
-              {(displayTask as any).is_duplicate_secondary && (
-                <Badge
-                  variant="outline"
-                  className="bg-orange-100 border-orange-500 text-orange-700"
-                  title="Task duplicata - Seconda istanza (non assegnabile automaticamente)"
-                >
-                  S
-                </Badge>
-              )}
             </div>
 
           </div>

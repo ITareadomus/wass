@@ -542,27 +542,6 @@ def load_tasks() -> Tuple[List[Task], str]:
                 is_hp_soft=is_hp_soft,
             ))
 
-    # GESTIONE DUPLICATI: Ordina task duplicate per checkin vincolante
-    from collections import defaultdict
-    by_lc = defaultdict(list)
-    for t in tasks:
-        by_lc[t.logistic_code].append(t)
-    
-    filtered_tasks = []
-    for lc, group in by_lc.items():
-        if len(group) == 1:
-            filtered_tasks.append(group[0])
-        else:
-            # Ordina: checkin definito prima, poi per orario checkin
-            group.sort(key=lambda x: (
-                x.checkin_dt is None,
-                x.checkin_dt if x.checkin_dt else datetime.max
-            ))
-            filtered_tasks.append(group[0])
-            print(f"⚠️  Logistic code {lc} duplicato: assegnata task {group[0].task_id} (checkin: {group[0].checkin_dt}), ignorata task {group[1].task_id}")
-    
-    tasks = filtered_tasks
-
     # Determina ref_date dal primo task
     ref_date = None
     for t in tasks: # Iterate over the loaded tasks
