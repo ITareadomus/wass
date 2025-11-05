@@ -61,11 +61,16 @@ export default function TimelineView({
   const [cleanerToReplace, setCleanerToReplace] = useState<number | null>(null);
   const { toast } = useToast();
 
+  // Recupera la data selezionata da localStorage o usa la data odierna
+  const savedDate = localStorage.getItem('selected_work_date');
+  const workDate = savedDate || new Date().toISOString().split('T')[0];
+
   // Mutation per rimuovere un cleaner da selected_cleaners.json
   const removeCleanerMutation = useMutation({
     mutationFn: async (cleanerId: number) => {
       const response = await apiRequest("POST", "/api/remove-cleaner-from-selected", {
-        cleanerId
+        cleanerId,
+        date: workDate // Passa la data selezionata
       });
       return await response.json();
     },
@@ -94,9 +99,6 @@ export default function TimelineView({
   // Mutation per aggiungere un cleaner alla timeline
   const addCleanerMutation = useMutation({
     mutationFn: async (cleanerId: number) => {
-      const savedDate = localStorage.getItem('selected_work_date');
-      const workDate = savedDate || new Date().toISOString().split('T')[0];
-
       const response = await apiRequest("POST", "/api/add-cleaner-to-timeline", {
         cleanerId,
         date: workDate
@@ -133,10 +135,6 @@ export default function TimelineView({
   // Mutation per scambiare task tra cleaners
   const swapCleanersMutation = useMutation({
     mutationFn: async ({ sourceCleanerId, destCleanerId }: { sourceCleanerId: number; destCleanerId: number }) => {
-      // Leggi la data selezionata da localStorage, fallback a oggi se non presente
-      const savedDate = localStorage.getItem('selected_work_date');
-      const workDate = savedDate || new Date().toISOString().split('T')[0];
-
       const response = await apiRequest("POST", "/api/swap-cleaners-tasks", {
         sourceCleanerId,
         destCleanerId,
@@ -340,9 +338,6 @@ export default function TimelineView({
   // Carica cleaner disponibili per aggiungerli alla timeline
   const loadAvailableCleaners = async () => {
     try {
-      const savedDate = localStorage.getItem('selected_work_date');
-      const workDate = savedDate || new Date().toISOString().split('T')[0];
-
       const response = await fetch(`/data/cleaners/cleaners.json`);
       const data = await response.json();
 
@@ -364,7 +359,7 @@ export default function TimelineView({
       });
 
       setAvailableCleaners(available);
-      
+
       console.log(`📋 Cleaner disponibili da aggiungere: ${available.length}/${dateCleaners.length}`);
     } catch (error) {
       console.error('Errore nel caricamento dei cleaner disponibili:', error);
@@ -708,7 +703,9 @@ export default function TimelineView({
                         {(() => {
                           // Calcola l'array delle task per questo cleaner una sola volta
                           const cleanerTasks = tasks
-                            .filter((task) => (task as any).assignedCleaner === cleaner.id)
+                            .filter((task) => 
+                              (task as any).assignedCleaner === cleaner.id
+                            )
                             .map(normalizeTask)
                             .sort((a, b) => {
                               const taskA = a as any;
