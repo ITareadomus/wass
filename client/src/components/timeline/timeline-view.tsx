@@ -148,15 +148,22 @@ export default function TimelineView({
       });
       return await response.json();
     },
-    onSuccess: async () => {
+    onSuccess: async (data, variables) => {
       // Ricarica i task per mostrare immediatamente lo swap
       if ((window as any).reloadAllTasks) {
         await (window as any).reloadAllTasks();
       }
 
+      // Trova i nomi dei cleaner coinvolti
+      const sourceCleaner = cleaners.find(c => c.id === variables.sourceCleanerId);
+      const destCleaner = cleaners.find(c => c.id === variables.destCleanerId);
+      
+      const sourceCleanerName = sourceCleaner ? `${sourceCleaner.name} ${sourceCleaner.lastname}` : `ID ${variables.sourceCleanerId}`;
+      const destCleanerName = destCleaner ? `${destCleaner.name} ${destCleaner.lastname}` : `ID ${variables.destCleanerId}`;
+
       toast({
         title: "Successo",
-        description: "Task scambiate con successo tra i cleaners",
+        description: `Task di ${sourceCleanerName} scambiate con successo con le task di ${destCleanerName}`,
       });
       setSelectedSwapCleaner("");
       setIsModalOpen(false);
