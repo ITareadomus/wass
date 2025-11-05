@@ -1,40 +1,12 @@
 {
   "metadata": {
-    "last_updated": "2025-11-05T13:16:28.642748",
+    "last_updated": "2025-11-05T13:25:42.372538",
     "date": "2025-11-05"
   },
   "containers": {
     "early_out": {
-      "tasks": [
-        {
-          "task_id": 218319,
-          "logistic_code": 840,
-          "client_id": 61,
-          "premium": false,
-          "address": "VIA TULIPANI, 19",
-          "lat": "45.4498056",
-          "lng": "9.1372543",
-          "cleaning_time": 60,
-          "checkin_date": "2025-11-05",
-          "checkout_date": "2025-11-05",
-          "checkin_time": "11:00",
-          "checkout_time": null,
-          "pax_in": 1,
-          "pax_out": 1,
-          "small_equipment": true,
-          "operation_id": 2,
-          "confirmed_operation": true,
-          "straordinaria": false,
-          "type_apt": "A",
-          "alias": "NTM",
-          "customer_name": "NOTA-MI",
-          "reasons": [
-            "client_forced_eo"
-          ],
-          "priority": "early_out"
-        }
-      ],
-      "count": 1
+      "tasks": [],
+      "count": 0
     },
     "high_priority": {
       "tasks": [
@@ -127,202 +99,6 @@
           ]
         },
         {
-          "task_id": 218315,
-          "logistic_code": 1501,
-          "client_id": 94,
-          "premium": false,
-          "address": "VIA VALASSINA 45",
-          "lat": "45.5022144",
-          "lng": "9.1883947",
-          "cleaning_time": 150,
-          "checkin_date": "2025-11-05",
-          "checkout_date": "2025-11-05",
-          "checkin_time": null,
-          "checkout_time": null,
-          "pax_in": 4,
-          "pax_out": 5,
-          "small_equipment": false,
-          "operation_id": 2,
-          "confirmed_operation": true,
-          "straordinaria": false,
-          "type_apt": "C",
-          "alias": "IHST",
-          "customer_name": "IHOST",
-          "priority": "low_priority",
-          "reasons": [
-            "not_eo",
-            "not_hp"
-          ]
-        },
-        {
-          "task_id": 218423,
-          "logistic_code": 1496,
-          "client_id": 113,
-          "premium": false,
-          "address": "VIA TORINO 44",
-          "lat": "45.4613523",
-          "lng": "9.1849551",
-          "cleaning_time": 60,
-          "checkin_date": "2025-11-05",
-          "checkout_date": "2025-11-05",
-          "checkin_time": null,
-          "checkout_time": null,
-          "pax_in": 2,
-          "pax_out": 3,
-          "small_equipment": true,
-          "operation_id": 2,
-          "confirmed_operation": true,
-          "straordinaria": false,
-          "type_apt": "A",
-          "alias": "ELITE",
-          "customer_name": "ELITE APARTMENTS",
-          "priority": "low_priority",
-          "reasons": [
-            "not_eo",
-            "not_hp"
-          ]
-        },
-        {
-          "task_id": 218442,
-          "logistic_code": 1048,
-          "client_id": 3,
-          "premium": false,
-          "address": "Via Vigevano 9",
-          "lat": "45.4527254",
-          "lng": "9.1748049",
-          "cleaning_time": 210,
-          "checkin_date": "2025-11-07",
-          "checkout_date": "2025-11-05",
-          "checkin_time": "02:00",
-          "checkout_time": null,
-          "pax_in": 3,
-          "pax_out": 2,
-          "small_equipment": false,
-          "operation_id": 2,
-          "confirmed_operation": true,
-          "straordinaria": false,
-          "type_apt": "D",
-          "alias": "TBR",
-          "customer_name": "THE BEST RENT S.r.l.",
-          "priority": "low_priority",
-          "reasons": [
-            "not_eo",
-            "not_hp"
-          ]
-        },
-        {
-          "task_id": 218444,
-          "logistic_code": 1072,
-          "client_id": 3,
-          "premium": false,
-          "address": "VIA AUSONIO, 6",
-          "lat": "45.4599303",
-          "lng": "9.1743487",
-          "cleaning_time": 90,
-          "checkin_date": "2025-11-05",
-          "checkout_date": "2025-11-05",
-          "checkin_time": "18:00",
-          "checkout_time": null,
-          "pax_in": 1,
-          "pax_out": 2,
-          "small_equipment": true,
-          "operation_id": 2,
-          "confirmed_operation": true,
-          "straordinaria": false,
-          "type_apt": "A",
-          "alias": "TBR",
-          "customer_name": "THE BEST RENT S.r.l.",
-          "priority": "low_priority",
-          "reasons": [
-            "not_eo",
-            "not_hp"
-          ]
-        },
-        {
-          "task_id": 218446,
-          "logistic_code": 1470,
-          "client_id": 3,
-          "premium": false,
-          "address": "Via Pergolesi, 29",
-          "lat": "45.4858682",
-          "lng": "9.2081009",
-          "cleaning_time": 150,
-          "checkin_date": null,
-          "checkout_date": "2025-11-05",
-          "checkin_time": null,
-          "checkout_time": null,
-          "pax_in": 0,
-          "pax_out": 4,
-          "small_equipment": false,
-          "operation_id": 2,
-          "confirmed_operation": true,
-          "straordinaria": false,
-          "type_apt": "C",
-          "alias": "TBR",
-          "customer_name": "THE BEST RENT S.r.l.",
-          "priority": "low_priority",
-          "reasons": [
-            "not_eo",
-            "not_hp"
-          ]
-        },
-        {
-          "task_id": 218468,
-          "logistic_code": 844,
-          "client_id": 3,
-          "premium": false,
-          "address": "VIA SEBENICO 28",
-          "lat": "45.4875142",
-          "lng": "9.1897492",
-          "cleaning_time": 30,
-          "checkin_date": "2025-11-05",
-          "checkout_date": "2025-11-05",
-          "checkin_time": null,
-          "checkout_time": null,
-          "pax_in": 0,
-          "pax_out": 0,
-          "small_equipment": false,
-          "operation_id": 4,
-          "confirmed_operation": true,
-          "straordinaria": false,
-          "type_apt": "C",
-          "alias": "TBR",
-          "customer_name": "THE BEST RENT S.r.l.",
-          "priority": "low_priority",
-          "reasons": [
-            "not_eo",
-            "not_hp"
-          ]
-        },
-        {
-          "task_id": 218480,
-          "logistic_code": 410,
-          "client_id": 2,
-          "premium": false,
-          "address": "VIA GIAN GALEAZZO 7",
-          "lat": "45.4529136",
-          "lng": "9.1823451",
-          "cleaning_time": 30,
-          "checkin_date": "2025-11-08",
-          "checkout_date": "2025-11-05",
-          "checkin_time": null,
-          "checkout_time": null,
-          "pax_in": 4,
-          "pax_out": 0,
-          "small_equipment": false,
-          "operation_id": 4,
-          "confirmed_operation": true,
-          "straordinaria": false,
-          "type_apt": "B",
-          "alias": "ITW",
-          "customer_name": "ITALIANWAY SRL",
-          "priority": "low_priority",
-          "reasons": [
-            "not_eo",
-            "not_hp"
-          ]
-        },
-        {
           "task_id": 218501,
           "logistic_code": 1048,
           "client_id": 3,
@@ -351,13 +127,13 @@
           ]
         }
       ],
-      "count": 9
+      "count": 2
     }
   },
   "summary": {
-    "total_tasks": 12,
-    "early_out": 1,
+    "total_tasks": 4,
+    "early_out": 0,
     "high_priority": 2,
-    "low_priority": 9
+    "low_priority": 2
   }
 }
