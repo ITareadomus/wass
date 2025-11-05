@@ -61,9 +61,8 @@ export default function TimelineView({
   const [cleanerToReplace, setCleanerToReplace] = useState<number | null>(null);
   const { toast } = useToast();
 
-  // Recupera la data selezionata da localStorage o usa la data odierna
-  const savedDate = localStorage.getItem('selected_work_date');
-  const workDate = savedDate || new Date().toISOString().split('T')[0];
+  // Usa sempre la data odierna all'apertura dell'app
+  const workDate = new Date().toISOString().split('T')[0];
 
   // Mutation per rimuovere un cleaner da selected_cleaners.json
   const removeCleanerMutation = useMutation({

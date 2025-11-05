@@ -87,22 +87,8 @@ function indexById(list: Task[]): Map<string, Task> {
 }
 
 export default function GenerateAssignments() {
-  // Leggi la data da localStorage se disponibile, altrimenti usa oggi
-  const [selectedDate, setSelectedDate] = useState<Date>(() => {
-    const savedDate = localStorage.getItem('selected_work_date');
-    if (savedDate) {
-      const saved = new Date(savedDate);
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-
-      // Se la data salvata è nel passato, usa oggi
-      if (saved < today) {
-        return new Date();
-      }
-      return saved;
-    }
-    return new Date();
-  });
+  // Usa sempre la data odierna all'apertura dell'app
+  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
 
   // Salva la data in localStorage ogni volta che cambia (formato locale senza timezone)
   useEffect(() => {
@@ -152,7 +138,7 @@ export default function GenerateAssignments() {
       }
 
       const result = await response.json();
-      
+
       if (result.found) {
         console.log("✅ Assegnazioni salvate caricate:", result.filename);
         // Salva la data e ora formattate in localStorage per mostrarlo nella timeline
