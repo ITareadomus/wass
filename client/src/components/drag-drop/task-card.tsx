@@ -505,7 +505,7 @@ export default function TaskCard({
               </div>
               <div>
                 <p className="text-sm font-semibold text-muted-foreground mb-1">
-                  Durata di pulizia
+                  Durata pulizia
                 </p>
                 {editingField === 'duration' ? (
                   <div className="flex items-center gap-2">
