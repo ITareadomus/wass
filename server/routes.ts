@@ -918,6 +918,64 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Endpoint per caricare assegnazioni salvate da Object Storage
+  app.post("/api/load-saved-assignments", async (req, res) => {
+    try {
+      const { date } = req.body;
+      const workDate = date || format(new Date(), 'yyyy-MM-dd');
+
+      // Crea nome file con formato ddmmyy
+      const dateObj = new Date(workDate);
+      const day = String(dateObj.getDate()).padStart(2, '0');
+      const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+      const year = String(dateObj.getFullYear()).slice(-2);
+      const filename = `assignments_${day}${month}${year}.json`;
+
+      // Carica dal bucket wass_assignments usando Replit Object Storage
+      const { Client } = await import('@replit/object-storage');
+      const client = new Client();
+
+      // Prova a scaricare il file
+      const result = await client.downloadAsText(filename, {
+        bucket: 'wass_assignments'
+      });
+
+      if (!result.ok) {
+        // File non trovato, non è un errore - significa solo che non ci sono assegnazioni salvate
+        console.log(`Nessuna assegnazione salvata trovata per ${workDate} (${filename})`);
+        return res.json({ 
+          success: true, 
+          found: false,
+          message: `Nessuna assegnazione salvata per questa data`
+        });
+      }
+
+      const savedData = JSON.parse(result.value);
+
+      // Salva i dati caricati in timeline.json
+      const timelinePath = path.join(process.cwd(), 'client/public/data/output/timeline.json');
+      const tmpPath = `${timelinePath}.tmp`;
+      await fs.writeFile(tmpPath, JSON.stringify(savedData, null, 2));
+      await fs.rename(tmpPath, timelinePath);
+
+      console.log(`✅ Assegnazioni caricate da Object Storage: ${filename}`);
+
+      res.json({ 
+        success: true, 
+        found: true,
+        filename,
+        data: savedData,
+        message: `Assegnazioni caricate da: ${filename}`
+      });
+    } catch (error: any) {
+      console.error("Errore nel caricamento delle assegnazioni:", error);
+      res.status(500).json({ 
+        success: false, 
+        error: error.message 
+      });
+    }
+  });
+
   // Endpoint per rimuovere un cleaner da selected_cleaners.json
   app.post("/api/remove-cleaner-from-selected", async (req, res) => {
     try {
