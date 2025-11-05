@@ -908,9 +908,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       console.log(`✅ Assegnazioni confermate e salvate in Object Storage: ${filename}`);
 
+      // Formatta la data per mostrare nel formato "DD/MM/YY"
+      const formattedDate = `${day}/${month}/${year}`;
+
       res.json({
         success: true,
         filename,
+        formattedDate,
         message: `Assegnazioni salvate in Object Storage: ${filename}`
       });
     } catch (error: any) {
@@ -985,11 +989,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const dateMatch = filename.match(/assignments_(\d{6})\.json/);
       const lastSavedTimestamp = dateMatch ? dateMatch[1] : null;
 
+      // Formatta la data per mostrare nel formato "DD/MM/YY"
+      const formattedDate = lastSavedTimestamp 
+        ? `${lastSavedTimestamp.slice(0, 2)}/${lastSavedTimestamp.slice(2, 4)}/${lastSavedTimestamp.slice(4, 6)}`
+        : null;
+
       res.json({
         success: true,
         found: true,
         filename,
         lastSavedTimestamp,
+        formattedDate,
         data: savedData,
         message: `Assegnazioni caricate da: ${filename}`
       });
