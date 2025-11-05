@@ -480,12 +480,12 @@ export default function TimelineView({
 
       const result = await response.json();
 
-      setLastSavedFilename(result.formattedDate || result.filename);
-      localStorage.setItem('last_saved_assignment', result.formattedDate || result.filename);
+      setLastSavedFilename(result.formattedDateTime || result.filename);
+      localStorage.setItem('last_saved_assignment', result.formattedDateTime || result.filename);
 
       toast({
         title: "✅ Assegnazioni confermate!",
-        description: `Salvate il ${result.formattedDate}`,
+        description: `Salvate il ${result.formattedDateTime}`,
         variant: "success",
       });
     } catch (error) {
