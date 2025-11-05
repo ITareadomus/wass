@@ -114,7 +114,8 @@ export default function PriorityColumn({
 
       toast({
         variant: "success",
-        title: successMessage,
+        title: "Successo",
+        description: successMessage,
       });
 
       // Ricarica i task per riflettere le nuove assegnazioni
@@ -126,7 +127,8 @@ export default function PriorityColumn({
     } catch (error: any) {
       console.error(`Errore nell'assegnazione ${priority}:`, error);
       toast({
-        title: `❌ ${title} non assegnati, errore!`,
+        title: "Errore",
+        description: `${title} non assegnati, errore!`,
         variant: "destructive",
       });
     } finally {
