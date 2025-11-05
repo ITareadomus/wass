@@ -135,7 +135,7 @@ export default function Convocazioni() {
       }
 
       const statsData = await statsResponse.json();
-      
+
       // Usa le statistiche direttamente
       const stats = statsData.task_stats || {
         total: 0,
@@ -365,6 +365,7 @@ export default function Convocazioni() {
               const isPremium = cleaner.role === "Premium";
               const isAvailable = cleaner.available !== false;
               const isFormatore = cleaner.role === "Formatore";
+              const canDoStraordinaria = (cleaner as any).can_do_straordinaria === true;
 
               const borderColor = !isAvailable
                 ? "border-gray-400"
@@ -395,9 +396,16 @@ export default function Convocazioni() {
                         <span className="font-semibold text-foreground text-lg">
                           {cleaner.name.toUpperCase()} {cleaner.lastname.toUpperCase()}
                         </span>
-                        <span className={`px-2 py-0.5 rounded border font-medium text-sm ${badgeColor}`}>
-                          {cleaner.role}
-                        </span>
+                        <div className="flex items-center gap-1.5">
+                          <span className={`px-2 py-0.5 rounded border font-medium text-sm ${badgeColor}`}>
+                            {cleaner.role}
+                          </span>
+                          {canDoStraordinaria && (
+                            <span className="px-2 py-0.5 rounded border font-medium text-sm bg-red-500/20 text-red-700 dark:text-red-300 border-red-500">
+                              S
+                            </span>
+                          )}
+                        </div>
                       </div>
                       <div className="text-xs text-foreground/80">
                         <span className="font-semibold">Ore questa settimana:</span> {cleaner.counter_hours}h
@@ -462,7 +470,7 @@ export default function Convocazioni() {
         {/* Pannello Statistiche - 1/3 dello spazio - FISSO */}
         <Card className="p-6 border-2 flex flex-col h-full overflow-hidden">
           <h3 className="text-lg font-semibold text-foreground mb-4">Statistiche</h3>
-          
+
           {/* Statistiche Task */}
           <div className="mb-4 pb-3 border-b border-border">
             <h4 className="text-xs font-semibold text-muted-foreground mb-2">Task Giornata</h4>
