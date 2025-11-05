@@ -49,7 +49,7 @@ export default function TaskCard({
   const { toast } = useToast();
 
   // Stati per editing
-  const [isEditing, setIsEditing] = useState(false);
+  const [editingField, setEditingField] = useState<'duration' | 'checkout' | 'checkin' | null>(null);
   const [editedCheckoutDate, setEditedCheckoutDate] = useState("");
   const [editedCheckoutTime, setEditedCheckoutTime] = useState("");
   const [editedCheckinDate, setEditedCheckinDate] = useState("");
@@ -104,7 +104,7 @@ export default function TaskCard({
   useEffect(() => {
     if (isModalOpen) {
       setCurrentTaskId(task.id);
-      setIsEditing(false);
+      setEditingField(null);
       
       // Inizializza campi editabili con i valori attuali
       setEditedCheckoutDate((displayTask as any).checkout_date || "");
@@ -217,7 +217,7 @@ export default function TaskCard({
           description: "I dettagli della task sono stati aggiornati con successo.",
         });
         
-        setIsEditing(false);
+        setEditingField(null);
         setIsModalOpen(false);
         
         // Ricarica i task per mostrare le modifiche
@@ -453,7 +453,7 @@ export default function TaskCard({
                 <p className="text-sm font-semibold text-muted-foreground mb-1">
                   Durata di pulizia
                 </p>
-                {isEditing ? (
+                {editingField === 'duration' ? (
                   <div className="flex items-center gap-2">
                     <Input
                       type="text"
@@ -466,13 +466,14 @@ export default function TaskCard({
                       }}
                       className="text-sm w-20 [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                       min="0"
+                      autoFocus
                     />
                     <span className="text-sm text-muted-foreground">minuti</span>
                   </div>
                 ) : (
                   <p 
                     className="text-sm cursor-pointer hover:bg-muted/50 p-1 rounded"
-                    onClick={() => setIsEditing(true)}
+                    onClick={() => setEditingField('duration')}
                   >
                     {displayTask.duration.replace(".", ":")} ore
                   </p>
@@ -486,13 +487,14 @@ export default function TaskCard({
                 <p className="text-sm font-semibold text-muted-foreground mb-1">
                   Checkout
                 </p>
-                {isEditing ? (
+                {editingField === 'checkout' ? (
                   <div className="space-y-2">
                     <Input
                       type="date"
                       value={editedCheckoutDate}
                       onChange={(e) => setEditedCheckoutDate(e.target.value)}
                       className="text-sm"
+                      autoFocus
                     />
                     <Input
                       type="time"
@@ -504,7 +506,7 @@ export default function TaskCard({
                 ) : (
                   <p 
                     className="text-sm cursor-pointer hover:bg-muted/50 p-1 rounded"
-                    onClick={() => setIsEditing(true)}
+                    onClick={() => setEditingField('checkout')}
                   >
                     {(displayTask as any).checkout_date
                       ? new Date((displayTask as any).checkout_date).toLocaleDateString(
@@ -524,13 +526,14 @@ export default function TaskCard({
                 <p className="text-sm font-semibold text-muted-foreground mb-1">
                   Checkin
                 </p>
-                {isEditing ? (
+                {editingField === 'checkin' ? (
                   <div className="space-y-2">
                     <Input
                       type="date"
                       value={editedCheckinDate}
                       onChange={(e) => setEditedCheckinDate(e.target.value)}
                       className="text-sm"
+                      autoFocus
                     />
                     <Input
                       type="time"
@@ -542,7 +545,7 @@ export default function TaskCard({
                 ) : (
                   <p 
                     className="text-sm cursor-pointer hover:bg-muted/50 p-1 rounded"
-                    onClick={() => setIsEditing(true)}
+                    onClick={() => setEditingField('checkin')}
                   >
                     {(displayTask as any).checkin_date
                       ? new Date((displayTask as any).checkin_date).toLocaleDateString(
@@ -623,7 +626,7 @@ export default function TaskCard({
             </div>
 
             {/* Pulsante Salva Modifiche */}
-            {isEditing && (
+            {editingField && (
               <div className="pt-4 border-t mt-4 flex gap-2">
                 <Button
                   onClick={handleSaveChanges}
@@ -635,7 +638,7 @@ export default function TaskCard({
                 </Button>
                 <Button
                   onClick={() => {
-                    setIsEditing(false);
+                    setEditingField(null);
                     // Ripristina i valori originali
                     setEditedCheckoutDate((displayTask as any).checkout_date || "");
                     setEditedCheckoutTime((displayTask as any).checkout_time || "");
