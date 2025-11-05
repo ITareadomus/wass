@@ -60,49 +60,59 @@ export default function TaskCard({
   // Determina le task navigabili in base al contesto
   const getNavigableTasks = () => {
     if (!allTasks || allTasks.length === 0) return [task];
-
-    if (isInTimeline) {
-      // In timeline: le task sono già filtrate per cleaner tramite allTasks
-      return allTasks;
-    } else {
-      // Nei container: ritorna solo le task dello stesso container
-      // allTasks contiene TUTTE le task, dobbiamo filtrare per priority
-      const taskPriority = (task as any).priority;
-      if (!taskPriority) return [task];
-      
-      return allTasks.filter(t => (t as any).priority === taskPriority);
-    }
+    
+    // Usa direttamente allTasks - sia per timeline che per container
+    // perché vengono già passate le task corrette dal componente padre
+    return allTasks;
   };
 
   const navigableTasks = getNavigableTasks();
   const currentTaskInNavigable = navigableTasks.findIndex(t => String(t.id) === String(currentTaskId));
 
   const canGoPrev = navigableTasks.length > 1 && currentTaskInNavigable > 0;
-  const canGoNext = navigableTasks.length > 1 && currentTaskInNavigable < navigableTasks.length - 1 && currentTaskInNavigable !== -1;
+  const canGoNext = navigableTasks.length > 1 && currentTaskInNavigable >= 0 && currentTaskInNavigable < navigableTasks.length - 1;
 
   const handlePrevTask = () => {
-    if (!canGoPrev || navigableTasks.length === 0) return;
-    const currentIndex = navigableTasks.findIndex(t => String(t.id) === String(currentTaskId));
-    if (currentIndex <= 0) return;
-    const prevTask = navigableTasks[currentIndex - 1];
-    console.log('🔄 Navigazione PREV:', {
+    console.log('🔍 handlePrevTask chiamato:', {
+      canGoPrev,
+      navigableTasksLength: navigableTasks.length,
+      currentTaskInNavigable,
+      currentTaskId
+    });
+    
+    if (!canGoPrev || navigableTasks.length === 0) {
+      console.log('❌ Non posso andare indietro');
+      return;
+    }
+    
+    const prevTask = navigableTasks[currentTaskInNavigable - 1];
+    console.log('✅ Navigazione PREV:', {
       from: currentTaskId,
       to: prevTask.id,
-      currentIndex,
+      currentIndex: currentTaskInNavigable,
       totalTasks: navigableTasks.length
     });
     setCurrentTaskId(prevTask.id);
   };
 
   const handleNextTask = () => {
-    if (!canGoNext || navigableTasks.length === 0) return;
-    const currentIndex = navigableTasks.findIndex(t => String(t.id) === String(currentTaskId));
-    if (currentIndex === -1 || currentIndex >= navigableTasks.length - 1) return;
-    const nextTask = navigableTasks[currentIndex + 1];
-    console.log('🔄 Navigazione NEXT:', {
+    console.log('🔍 handleNextTask chiamato:', {
+      canGoNext,
+      navigableTasksLength: navigableTasks.length,
+      currentTaskInNavigable,
+      currentTaskId
+    });
+    
+    if (!canGoNext || navigableTasks.length === 0) {
+      console.log('❌ Non posso andare avanti');
+      return;
+    }
+    
+    const nextTask = navigableTasks[currentTaskInNavigable + 1];
+    console.log('✅ Navigazione NEXT:', {
       from: currentTaskId,
       to: nextTask.id,
-      currentIndex,
+      currentIndex: currentTaskInNavigable,
       totalTasks: navigableTasks.length,
       nextTaskData: {
         name: (nextTask as any).logistic_code || nextTask.name,
