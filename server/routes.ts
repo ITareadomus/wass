@@ -1656,7 +1656,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.error("Errore durante l'estrazione delle statistiche task per convocazioni:", error);
       res.status(500).json({
         success: false,
-        message: 'Errore durante l\\'estrazione delle statistiche task per convocazioni',
+        message: "Errore durante l'estrazione delle statistiche task per convocazioni",
         error: error.message,
         stderr: error.stderr
       });
@@ -1693,7 +1693,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.error("Errore durante l'estrazione dei cleaners (ottimizzato):", error);
       res.status(500).json({
         success: false,
-        message: 'Errore durante l\\'estrazione dei cleaners (ottimizzato)',
+        message: "Errore durante l'estrazione dei cleaners (ottimizzato)",
         error: error.message,
         stderr: error.stderr
       });
