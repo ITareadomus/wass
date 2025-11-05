@@ -105,7 +105,7 @@ export default function TimelineView({
       });
       return await response.json();
     },
-    onSuccess: async () => {
+    onSuccess: async (data, cleanerId) => {
       // Ricarica ENTRAMBI i file per sincronizzare la vista
       await Promise.all([
         loadCleaners(),
@@ -117,9 +117,15 @@ export default function TimelineView({
         await (window as any).reloadAllTasks(true);
       }
 
+      // Trova il cleaner appena aggiunto per mostrare nome e cognome
+      const cleanersResponse = await fetch('/data/cleaners/selected_cleaners.json');
+      const cleanersData = await cleanersResponse.json();
+      const addedCleaner = cleanersData.cleaners.find((c: any) => c.id === cleanerId);
+      const cleanerName = addedCleaner ? `${addedCleaner.name} ${addedCleaner.lastname}` : `ID ${cleanerId}`;
+
       toast({
-        title: "Cleaner aggiunto!",
-        description: "Il cleaner è stato aggiunto alla timeline con successo.",
+        title: "Cleaner aggiunto",
+        description: `${cleanerName} è stato aggiunto alla selezione`,
       });
       setIsAddCleanerDialogOpen(false);
     },
