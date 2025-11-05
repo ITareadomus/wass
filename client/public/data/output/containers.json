@@ -1,6 +1,6 @@
 {
   "metadata": {
-    "last_updated": "2025-11-05T11:13:24.899751",
+    "last_updated": "2025-11-05T11:16:43.430890",
     "date": "2025-11-05"
   },
   "containers": {
@@ -32,9 +32,36 @@
             "client_forced_eo"
           ],
           "priority": "early_out"
+        },
+        {
+          "task_id": 217483,
+          "logistic_code": 1198,
+          "client_id": 2,
+          "premium": false,
+          "address": "Via Bergognone 31",
+          "lat": "45.453707852983",
+          "lng": "9.1641459982137",
+          "cleaning_time": 180,
+          "checkin_date": "2025-11-05",
+          "checkout_date": "2025-11-05",
+          "checkin_time": null,
+          "checkout_time": "09:00",
+          "pax_in": 3,
+          "pax_out": 4,
+          "small_equipment": false,
+          "operation_id": 2,
+          "confirmed_operation": true,
+          "straordinaria": false,
+          "type_apt": "D",
+          "alias": "ITW",
+          "customer_name": "ITALIANWAY SRL",
+          "reasons": [
+            "checkout_time<=eo_time"
+          ],
+          "priority": "early_out"
         }
       ],
-      "count": 1
+      "count": 2
     },
     "high_priority": {
       "tasks": [
@@ -656,8 +683,8 @@
     }
   },
   "summary": {
-    "total_tasks": 23,
-    "early_out": 1,
+    "total_tasks": 24,
+    "early_out": 2,
     "high_priority": 15,
     "low_priority": 7
   }
