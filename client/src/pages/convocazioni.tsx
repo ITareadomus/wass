@@ -662,7 +662,7 @@ export default function Convocazioni() {
             </div>
 
             {/* Formatori */}
-            <div className="bg-orange-50 dark:bg-orange-950/20 rounded-lg p-2 flex flex-col items-center justify-center border border-orange-200 dark:border-orange-800 col-span-2">
+            <div className="bg-orange-50 dark:bg-orange-950/20 rounded-lg p-2 flex flex-col items-center justify-center border border-orange-200 dark:border-orange-800">
               <svg className="w-16 h-16 mb-1" viewBox="0 0 100 100">
                 <circle
                   cx="50"
@@ -699,6 +699,47 @@ export default function Convocazioni() {
               <span className="text-[10px] font-semibold text-orange-700 dark:text-orange-300 text-center">Formatori</span>
               <span className="text-[9px] text-orange-600 dark:text-orange-400">
                 {cleaners.filter(c => c.role === "Formatore").length}/{cleaners.length}
+              </span>
+            </div>
+
+            {/* Straordinari */}
+            <div className="bg-red-50 dark:bg-red-950/20 rounded-lg p-2 flex flex-col items-center justify-center border border-red-200 dark:border-red-800">
+              <svg className="w-16 h-16 mb-1" viewBox="0 0 100 100">
+                <circle
+                  cx="50"
+                  cy="50"
+                  r="40"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="8"
+                  className="text-red-200 dark:text-red-900"
+                />
+                <circle
+                  cx="50"
+                  cy="50"
+                  r="40"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="8"
+                  strokeDasharray={`${cleaners.length > 0 ? (cleaners.filter(c => (c as any).can_do_straordinaria === true).length / cleaners.length) * 251.2 : 0} 251.2`}
+                  strokeDashoffset="0"
+                  transform="rotate(-90 50 50)"
+                  className="text-red-500 dark:text-red-600 transition-all duration-500"
+                  strokeLinecap="round"
+                />
+                <text
+                  x="50"
+                  y="50"
+                  textAnchor="middle"
+                  dominantBaseline="middle"
+                  className="text-lg font-bold fill-red-600 dark:fill-red-400"
+                >
+                  {cleaners.length > 0 ? Math.round((cleaners.filter(c => (c as any).can_do_straordinaria === true).length / cleaners.length) * 100) : 0}%
+                </text>
+              </svg>
+              <span className="text-[10px] font-semibold text-red-700 dark:text-red-300 text-center">Straordinari</span>
+              <span className="text-[9px] text-red-600 dark:text-red-400">
+                {cleaners.filter(c => (c as any).can_do_straordinaria === true).length}/{cleaners.length}
               </span>
             </div>
           </div>
