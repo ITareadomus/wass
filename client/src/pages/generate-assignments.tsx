@@ -792,13 +792,19 @@ export default function GenerateAssignments() {
         console.log(`🔄 Spostamento da container ${fromContainer} a cleaner ${toCleanerId}`);
 
         try {
+          // Carica i dati del cleaner per mostrare nome e cognome
+          const cleanersResponse = await fetch('/data/cleaners/selected_cleaners.json');
+          const cleanersData = await cleanersResponse.json();
+          const cleaner = cleanersData.cleaners.find((c: any) => c.id === toCleanerId);
+          const cleanerName = cleaner ? `${cleaner.name} ${cleaner.lastname}` : `ID ${toCleanerId}`;
+
           // Salva in timeline.json (rimuove automaticamente da containers.json)
           await saveTimelineAssignment(taskId, toCleanerId, logisticCode, destination.index);
           await loadTasks(true);
 
           toast({
             title: "Task assegnata",
-            description: `Task ${logisticCode} assegnata al cleaner`,
+            description: `Task ${logisticCode} assegnata al cleaner ${cleanerName}`,
           });
         } catch (err) {
           console.error("Errore nel salvataggio in timeline:", err);
@@ -922,9 +928,24 @@ export default function GenerateAssignments() {
       if (fromContainerJson && toCleanerId !== null) {
         console.log(`🔄 Spostamento da container ${fromContainerJson} a cleaner ${toCleanerId}`);
 
-        // Salva in timeline.json (rimuove automaticamente da containers.json)
-        await saveTimelineAssignment(taskId, toCleanerId, logisticCode, destination.index);
-        await loadTasks(true);
+        try {
+          // Carica i dati del cleaner per mostrare nome e cognome
+          const cleanersResponse = await fetch('/data/cleaners/selected_cleaners.json');
+          const cleanersData = await cleanersResponse.json();
+          const cleaner = cleanersData.cleaners.find((c: any) => c.id === toCleanerId);
+          const cleanerName = cleaner ? `${cleaner.name} ${cleaner.lastname}` : `ID ${toCleanerId}`;
+
+          // Salva in timeline.json (rimuove automaticamente da containers.json)
+          await saveTimelineAssignment(taskId, toCleanerId, logisticCode, destination.index);
+          await loadTasks(true);
+
+          toast({
+            title: "Task assegnata",
+            description: `Task ${logisticCode} assegnata al cleaner ${cleanerName}`,
+          });
+        } catch (err) {
+          console.error("Errore nell'assegnazione:", err);
+        }
         return;
       }
 
