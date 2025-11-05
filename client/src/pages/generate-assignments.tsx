@@ -229,7 +229,7 @@ export default function GenerateAssignments() {
       // Aggiungi timestamp UNIVOCO per evitare QUALSIASI cache
       const timestamp = Date.now() + Math.random();
 
-      console.log(`🔄 Caricamento task dai file JSON (timestamp: ${timestamp})...`);
+      console.log("🔄 Caricamento task dai file JSON (timestamp: ${timestamp})...");
 
       const [containersResponse, timelineResponse] = await Promise.all([
         fetch(`/data/output/containers.json?t=${timestamp}`, {
@@ -353,7 +353,7 @@ export default function GenerateAssignments() {
 
       // Crea l'array unificato usando dedupe per id (non per logisticCode!)
       const tasksWithAssignments: Task[] = [];
-      
+
       // CRITICAL: usa Set per tracciare id già inseriti
       const addedIds = new Set<string>();
 
@@ -478,7 +478,42 @@ export default function GenerateAssignments() {
   };
 
 
+  // Calcola conteggi per le statistiche
+  const unassignedTasksCount = earlyOutTasks.length + highPriorityTasks.length + lowPriorityTasks.length;
+  const violatedChecksCount = allTasksWithAssignments.filter(t => {
+    const task = t as any;
+    if (!task.assignedCleaner || !task.start_time || !task.end_time) return false;
 
+    const checkoutTime = task.checkout_time;
+    const checkinTime = task.checkin_time;
+    const endTime = task.end_time;
+    const startTime = task.start_time;
+
+    let violated = false;
+
+    if (checkoutTime && checkoutTime !== null && endTime) {
+      const [endHour, endMin] = endTime.split(':').map(Number);
+      const [checkoutHour, checkoutMin] = checkoutTime.split(':').map(Number);
+      const endMinutes = endHour * 60 + endMin;
+      const checkoutMinutes = checkoutHour * 60 + checkoutMin;
+
+      if (endMinutes > checkoutMinutes) {
+        violated = true;
+      }
+    }
+
+    if (checkinTime && checkinTime !== null && startTime) {
+      const [startHour, startMin] = startTime.split(':').map(Number);
+      const [checkinHour, checkinMin] = checkinTime.split(':').map(Number);
+      const startMinutes = startHour * 60 + startMin;
+      const checkinMinutes = checkinHour * 60 + checkinMin;
+
+      if (startMinutes < checkinMinutes) {
+        violated = true;
+      }
+    }
+    return violated;
+  }).length;
 
 
   // Funzione per assegnare le task Early Out alla timeline
@@ -1083,13 +1118,13 @@ export default function GenerateAssignments() {
 
             <div className="space-y-6">
               <MapSection tasks={allTasksWithAssignments} />
-              
+
               {/* Pannello Statistiche Task */}
               <div className="bg-card rounded-lg border shadow-sm">
-                <div className="p-4 border-b border-border">
-                  <h3 className="font-semibold text-foreground flex items-center">
+                <div className="p-2 border-b border-border">
+                  <h3 className="text-sm font-semibold text-foreground flex items-center">
                     <svg 
-                      className="w-5 h-5 mr-2 text-primary" 
+                      className="w-4 h-4 mr-1.5 text-primary" 
                       fill="none" 
                       stroke="currentColor" 
                       viewBox="0 0 24 24"
@@ -1104,89 +1139,52 @@ export default function GenerateAssignments() {
                     Statistiche Task
                   </h3>
                 </div>
-                <div className="p-4 grid grid-cols-2 gap-3">
+                <div className="p-2 grid grid-cols-3 gap-2">
                   {/* Totale Task */}
-                  <div className="bg-blue-50 dark:bg-blue-950/20 rounded-lg p-3 border border-blue-200 dark:border-blue-800">
-                    <div className="text-xs text-blue-600 dark:text-blue-400 font-medium mb-1">Totale</div>
-                    <div className="text-2xl font-bold text-blue-700 dark:text-blue-300">
+                  <div className="bg-blue-50 dark:bg-blue-950/20 rounded p-2 border border-blue-200 dark:border-blue-800">
+                    <div className="text-[10px] text-blue-600 dark:text-blue-400 font-medium">Totale</div>
+                    <div className="text-lg font-bold text-blue-700 dark:text-blue-300 leading-tight">
                       {allTasksWithAssignments.length}
                     </div>
                   </div>
 
                   {/* Premium */}
-                  <div className="bg-yellow-50 dark:bg-yellow-950/20 rounded-lg p-3 border border-yellow-200 dark:border-yellow-800">
-                    <div className="text-xs text-yellow-600 dark:text-yellow-400 font-medium mb-1">Premium</div>
-                    <div className="text-2xl font-bold text-yellow-700 dark:text-yellow-300">
+                  <div className="bg-yellow-50 dark:bg-yellow-950/20 rounded p-2 border border-yellow-200 dark:border-yellow-800">
+                    <div className="text-[10px] text-yellow-600 dark:text-yellow-400 font-medium">Premium</div>
+                    <div className="text-lg font-bold text-yellow-700 dark:text-yellow-300 leading-tight">
                       {allTasksWithAssignments.filter(t => t.premium).length}
                     </div>
                   </div>
 
                   {/* Standard */}
-                  <div className="bg-green-50 dark:bg-green-950/20 rounded-lg p-3 border border-green-200 dark:border-green-800">
-                    <div className="text-xs text-green-600 dark:text-green-400 font-medium mb-1">Standard</div>
-                    <div className="text-2xl font-bold text-green-700 dark:text-green-300">
+                  <div className="bg-green-50 dark:bg-green-950/20 rounded p-2 border border-green-200 dark:border-green-800">
+                    <div className="text-[10px] text-green-600 dark:text-green-400 font-medium">Standard</div>
+                    <div className="text-lg font-bold text-green-700 dark:text-green-300 leading-tight">
                       {allTasksWithAssignments.filter(t => !t.premium && !t.straordinaria).length}
                     </div>
                   </div>
 
                   {/* Straordinarie */}
-                  <div className="bg-red-50 dark:bg-red-950/20 rounded-lg p-3 border border-red-200 dark:border-red-800">
-                    <div className="text-xs text-red-600 dark:text-red-400 font-medium mb-1">Straordinarie</div>
-                    <div className="text-2xl font-bold text-red-700 dark:text-red-300">
+                  <div className="bg-red-50 dark:bg-red-950/20 rounded p-2 border border-red-200 dark:border-red-800">
+                    <div className="text-[10px] text-red-600 dark:text-red-400 font-medium">Straordinarie</div>
+                    <div className="text-lg font-bold text-red-700 dark:text-red-300 leading-tight">
                       {allTasksWithAssignments.filter(t => t.straordinaria).length}
                     </div>
                   </div>
 
                   {/* Non Assegnate */}
-                  <div className="bg-gray-50 dark:bg-gray-950/20 rounded-lg p-3 border border-gray-200 dark:border-gray-800">
-                    <div className="text-xs text-gray-600 dark:text-gray-400 font-medium mb-1">Non Assegnate</div>
-                    <div className="text-2xl font-bold text-gray-700 dark:text-gray-300">
-                      {earlyOutTasks.length + highPriorityTasks.length + lowPriorityTasks.length}
+                  <div className="bg-gray-50 dark:bg-gray-950/20 rounded p-2 border border-gray-200 dark:border-gray-800">
+                    <div className="text-[10px] text-gray-600 dark:text-gray-400 font-medium">Non Assegnate</div>
+                    <div className="text-lg font-bold text-gray-700 dark:text-gray-300 leading-tight">
+                      {unassignedTasksCount}
                     </div>
                   </div>
 
-                  {/* Check-out/Check-in Infranto */}
-                  <div className="bg-orange-50 dark:bg-orange-950/20 rounded-lg p-3 border border-orange-200 dark:border-orange-800">
-                    <div className="text-xs text-orange-600 dark:text-orange-400 font-medium mb-1">CI/CO Infranto</div>
-                    <div className="text-2xl font-bold text-orange-700 dark:text-orange-300">
-                      {allTasksWithAssignments.filter(t => {
-                        const task = t as any;
-                        // Solo task assegnate con orari di lavoro
-                        if (!task.assignedCleaner || !task.start_time || !task.end_time) return false;
-                        
-                        const checkoutTime = task.checkout_time;
-                        const checkinTime = task.checkin_time;
-                        const endTime = task.end_time;
-                        const startTime = task.start_time;
-
-                        let violated = false;
-
-                        // Violazione checkout: SOLO se checkout_time esiste ed è definito
-                        if (checkoutTime && checkoutTime !== null && endTime) {
-                          const [endHour, endMin] = endTime.split(':').map(Number);
-                          const [checkoutHour, checkoutMin] = checkoutTime.split(':').map(Number);
-                          const endMinutes = endHour * 60 + endMin;
-                          const checkoutMinutes = checkoutHour * 60 + checkoutMin;
-                          
-                          if (endMinutes > checkoutMinutes) {
-                            violated = true;
-                          }
-                        }
-
-                        // Violazione checkin: SOLO se checkin_time esiste ed è definito
-                        if (checkinTime && checkinTime !== null && startTime) {
-                          const [startHour, startMin] = startTime.split(':').map(Number);
-                          const [checkinHour, checkinMin] = checkinTime.split(':').map(Number);
-                          const startMinutes = startHour * 60 + startMin;
-                          const checkinMinutes = checkinHour * 60 + checkinMin;
-                          
-                          if (startMinutes < checkinMinutes) {
-                            violated = true;
-                          }
-                        }
-
-                        return violated;
-                      }).length}
+                  {/* Check-out/Check-in infranto */}
+                  <div className="bg-orange-50 dark:bg-orange-950/20 rounded p-2 border border-orange-200 dark:border-orange-800">
+                    <div className="text-[10px] text-orange-600 dark:text-orange-400 font-medium">Check Infranti</div>
+                    <div className="text-lg font-bold text-orange-700 dark:text-orange-300 leading-tight">
+                      {violatedChecksCount}
                     </div>
                   </div>
                 </div>
