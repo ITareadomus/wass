@@ -1,6 +1,6 @@
 {
     "metadata": {
-        "last_updated": "2025-11-05T09:29:52.793988",
+        "last_updated": "2025-11-05T10:19:36.290885",
         "db_config": {
             "host": "139.59.132.41",
             "user": "admin",
@@ -11,7 +11,7 @@
     },
     "dates": {
         "2025-11-05": {
-            "timestamp": "2025-11-05T09:29:52.794003",
+            "timestamp": "2025-11-05T10:19:36.290895",
             "cleaners": [
                 {
                     "id": 24,
@@ -20,7 +20,7 @@
                     "role": "Standard",
                     "active": true,
                     "ranking": 0,
-                    "counter_hours": 12.0,
+                    "counter_hours": 13.0,
                     "counter_days": 4,
                     "available": true,
                     "contract_type": "B",
@@ -507,7 +507,7 @@
                     "role": "Premium",
                     "active": true,
                     "ranking": 0,
-                    "counter_hours": 4.0,
+                    "counter_hours": 5.0,
                     "counter_days": 0,
                     "available": true,
                     "contract_type": "B",
@@ -674,7 +674,7 @@
                     "ranking": 0,
                     "counter_hours": 3.5,
                     "counter_days": 0,
-                    "available": true,
+                    "available": false,
                     "contract_type": "a chiamata",
                     "preferred_customers": [],
                     "telegram_id": null,
