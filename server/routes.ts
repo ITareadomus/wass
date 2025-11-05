@@ -303,22 +303,59 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Carica timeline.json
       let timelineData: any = JSON.parse(await fs.readFile(timelinePath, 'utf8'));
 
-      // Trova entrambi i cleaners
-      const sourceEntry = timelineData.cleaners_assignments.find((c: any) => c.cleaner.id === sourceCleanerId);
-      const destEntry = timelineData.cleaners_assignments.find((c: any) => c.cleaner.id === destCleanerId);
+      // Trova entrambi i cleaners (creali se non esistono)
+      let sourceEntry = timelineData.cleaners_assignments.find((c: any) => c.cleaner.id === sourceCleanerId);
+      let destEntry = timelineData.cleaners_assignments.find((c: any) => c.cleaner.id === destCleanerId);
 
+      // Se non esistono, creali con array vuoto
       if (!sourceEntry) {
-        return res.status(404).json({ 
-          success: false, 
-          message: `Cleaner sorgente ${sourceCleanerId} non trovato nella timeline` 
-        });
+        const selectedCleanersPath = path.join(process.cwd(), 'client/public/data/cleaners/selected_cleaners.json');
+        const selectedData = JSON.parse(await fs.readFile(selectedCleanersPath, 'utf8'));
+        const cleanerData = selectedData.cleaners.find((c: any) => c.id === sourceCleanerId);
+        
+        if (!cleanerData) {
+          return res.status(404).json({ 
+            success: false, 
+            message: `Cleaner sorgente ${sourceCleanerId} non trovato` 
+          });
+        }
+
+        sourceEntry = {
+          cleaner: {
+            id: cleanerData.id,
+            name: cleanerData.name,
+            lastname: cleanerData.lastname,
+            role: cleanerData.role,
+            premium: cleanerData.role === "Premium"
+          },
+          tasks: []
+        };
+        timelineData.cleaners_assignments.push(sourceEntry);
       }
 
       if (!destEntry) {
-        return res.status(404).json({ 
-          success: false, 
-          message: `Cleaner destinazione ${destCleanerId} non trovato nella timeline` 
-        });
+        const selectedCleanersPath = path.join(process.cwd(), 'client/public/data/cleaners/selected_cleaners.json');
+        const selectedData = JSON.parse(await fs.readFile(selectedCleanersPath, 'utf8'));
+        const cleanerData = selectedData.cleaners.find((c: any) => c.id === destCleanerId);
+        
+        if (!cleanerData) {
+          return res.status(404).json({ 
+            success: false, 
+            message: `Cleaner destinazione ${destCleanerId} non trovato` 
+          });
+        }
+
+        destEntry = {
+          cleaner: {
+            id: cleanerData.id,
+            name: cleanerData.name,
+            lastname: cleanerData.lastname,
+            role: cleanerData.role,
+            premium: cleanerData.role === "Premium"
+          },
+          tasks: []
+        };
+        timelineData.cleaners_assignments.push(destEntry);
       }
 
       // Scambia le task array
