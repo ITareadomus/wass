@@ -1925,6 +1925,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log(`📅 EO Assignment - Ricevuta data dal frontend: ${workDate}`);
       console.log(`▶ Eseguendo assign_eo.py per data: ${workDate}`);
 
+      // CRITICO: Prima di eseguire lo script, assicurati che timeline.json abbia la data corretta
+      const timelinePath = path.join(process.cwd(), 'client/public/data/output/timeline.json');
+      try {
+        const timelineData = JSON.parse(await fs.readFile(timelinePath, 'utf8'));
+        if (timelineData.metadata?.date !== workDate) {
+          console.log(`⚠️ ATTENZIONE: timeline.json ha data ${timelineData.metadata?.date}, dovrebbe essere ${workDate}`);
+          console.log(`🔄 Aggiornamento data in timeline.json...`);
+          timelineData.metadata = timelineData.metadata || {};
+          timelineData.metadata.date = workDate;
+          await fs.writeFile(timelinePath, JSON.stringify(timelineData, null, 2));
+        }
+      } catch (err) {
+        console.warn("Impossibile verificare/aggiornare timeline.json:", err);
+      }
+
       const { spawn } = await import('child_process');
       const scriptPath = path.join(process.cwd(), 'client/public/scripts/assign_eo.py');
 
@@ -1987,6 +2002,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log(`📅 HP Assignment - Ricevuta data dal frontend: ${workDate}`);
       console.log(`▶ Eseguendo assign_hp.py per data: ${workDate}`);
 
+      // Verifica che timeline.json abbia la data corretta
+      const timelinePath = path.join(process.cwd(), 'client/public/data/output/timeline.json');
+      try {
+        const timelineData = JSON.parse(await fs.readFile(timelinePath, 'utf8'));
+        if (timelineData.metadata?.date !== workDate) {
+          console.log(`⚠️ ATTENZIONE: timeline.json ha data ${timelineData.metadata?.date}, dovrebbe essere ${workDate}`);
+          timelineData.metadata = timelineData.metadata || {};
+          timelineData.metadata.date = workDate;
+          await fs.writeFile(timelinePath, JSON.stringify(timelineData, null, 2));
+        }
+      } catch (err) {
+        console.warn("Impossibile verificare timeline.json:", err);
+      }
+
       const { spawn } = await import('child_process');
       const scriptPath = path.join(process.cwd(), 'client/public/scripts/assign_hp.py');
 
@@ -2048,6 +2077,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       console.log(`📅 LP Assignment - Ricevuta data dal frontend: ${workDate}`);
       console.log(`▶ Eseguendo assign_lp.py per data: ${workDate}`);
+
+      // Verifica che timeline.json abbia la data corretta
+      const timelinePath = path.join(process.cwd(), 'client/public/data/output/timeline.json');
+      try {
+        const timelineData = JSON.parse(await fs.readFile(timelinePath, 'utf8'));
+        if (timelineData.metadata?.date !== workDate) {
+          console.log(`⚠️ ATTENZIONE: timeline.json ha data ${timelineData.metadata?.date}, dovrebbe essere ${workDate}`);
+          timelineData.metadata = timelineData.metadata || {};
+          timelineData.metadata.date = workDate;
+          await fs.writeFile(timelinePath, JSON.stringify(timelineData, null, 2));
+        }
+      } catch (err) {
+        console.warn("Impossibile verificare timeline.json:", err);
+      }
 
       const { spawn } = await import('child_process');
       const scriptPath = path.join(process.cwd(), 'client/public/scripts/assign_lp.py');
