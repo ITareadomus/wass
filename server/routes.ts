@@ -960,10 +960,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       console.log(`✅ Assegnazioni caricate da Object Storage: ${filename}`);
 
+      // Estrai il timestamp dal filename (formato: assignments_DDMMYY.json)
+      const dateMatch = filename.match(/assignments_(\d{6})\.json/);
+      const lastSavedTimestamp = dateMatch ? dateMatch[1] : null;
+
       res.json({ 
         success: true, 
         found: true,
         filename,
+        lastSavedTimestamp,
         data: savedData,
         message: `Assegnazioni caricate da: ${filename}`
       });

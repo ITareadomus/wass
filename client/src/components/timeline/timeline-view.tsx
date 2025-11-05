@@ -447,7 +447,10 @@ export default function TimelineView({
     }
   };
 
-  const [lastSavedFilename, setLastSavedFilename] = useState<string | null>(null);
+  const [lastSavedFilename, setLastSavedFilename] = useState<string | null>(() => {
+    // Carica l'ultimo salvataggio da localStorage se disponibile
+    return localStorage.getItem('last_saved_assignment');
+  });
 
   const handleConfirmAssignments = async () => {
     try {
@@ -478,6 +481,7 @@ export default function TimelineView({
       const result = await response.json();
 
       setLastSavedFilename(result.filename);
+      localStorage.setItem('last_saved_assignment', result.filename);
 
       toast({
         title: "✅ Assegnazioni confermate!",
