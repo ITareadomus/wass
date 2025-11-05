@@ -229,7 +229,7 @@ export default function GenerateAssignments() {
       // Aggiungi timestamp UNIVOCO per evitare QUALSIASI cache
       const timestamp = Date.now() + Math.random();
 
-      console.log(`🔄 Caricamento task dai file JSON (timestamp: ${timestamp})...`);
+      console.log("🔄 Caricamento task dai file JSON (timestamp: ${timestamp})...");
 
       const [containersResponse, timelineResponse] = await Promise.all([
         fetch(`/data/output/containers.json?t=${timestamp}`, {
@@ -353,7 +353,7 @@ export default function GenerateAssignments() {
 
       // Crea l'array unificato usando dedupe per id (non per logisticCode!)
       const tasksWithAssignments: Task[] = [];
-      
+
       // CRITICAL: usa Set per tracciare id già inseriti
       const addedIds = new Set<string>();
 
@@ -994,6 +994,14 @@ export default function GenerateAssignments() {
     );
   }
 
+  // Definisci la funzione handleDateSelect qui, se non è già definita
+  const handleDateSelect = (date: Date | undefined) => {
+    if (date) {
+      setSelectedDate(date);
+    }
+  };
+
+
   return (
     <div className="bg-background text-foreground min-h-screen">
       <div className="w-full px-4 py-6">
@@ -1019,7 +1027,7 @@ export default function GenerateAssignments() {
                 <Button
                   variant="outline"
                   className={cn(
-                    "w-[240px] justify-start text-left font-normal",
+                    "justify-start text-left font-normal",
                     !selectedDate && "text-muted-foreground"
                   )}
                 >
@@ -1027,21 +1035,16 @@ export default function GenerateAssignments() {
                   {selectedDate ? format(selectedDate, "PPP", { locale: it }) : <span>Seleziona data</span>}
                 </Button>
               </PopoverTrigger>
-              <PopoverContent className="w-auto p-0" align="end">
+              <PopoverContent className="w-auto p-0" align="start">
                 <Calendar
                   mode="single"
                   selected={selectedDate}
-                  onSelect={(date) => date && setSelectedDate(date)}
+                  onSelect={handleDateSelect}
                   initialFocus
                   locale={it}
                 />
               </PopoverContent>
             </Popover>
-
-            <div className="bg-card rounded-lg border shadow-sm px-4 py-2 text-center">
-              <div className="text-sm text-muted-foreground">Task Totali</div>
-              <div className="text-2xl font-bold text-primary">{allTasksWithAssignments.length}</div>
-            </div>
           </div>
         </div>
 
@@ -1083,7 +1086,7 @@ export default function GenerateAssignments() {
 
             <div className="space-y-6">
               <MapSection tasks={allTasksWithAssignments} />
-              
+
               {/* Pannello Statistiche Task */}
               <div className="bg-card rounded-lg border shadow-sm">
                 <div className="p-4 border-b border-border">
