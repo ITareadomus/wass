@@ -908,13 +908,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       console.log(`✅ Assegnazioni confermate e salvate in Object Storage: ${filename}`);
 
-      // Formatta la data per mostrare nel formato "DD/MM/YY"
-      const formattedDate = `${day}/${month}/${year}`;
+      // Formatta la data e l'ora per mostrare nel formato "DD/MM/YY HH:MM"
+      const now = new Date();
+      const hours = String(now.getHours()).padStart(2, '0');
+      const minutes = String(now.getMinutes()).padStart(2, '0');
+      const formattedDateTime = `${day}/${month}/${year} ${hours}:${minutes}`;
 
       res.json({
         success: true,
         filename,
-        formattedDate,
+        formattedDateTime,
         message: `Assegnazioni salvate in Object Storage: ${filename}`
       });
     } catch (error: any) {
@@ -989,17 +992,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const dateMatch = filename.match(/assignments_(\d{6})\.json/);
       const lastSavedTimestamp = dateMatch ? dateMatch[1] : null;
 
-      // Formatta la data per mostrare nel formato "DD/MM/YY"
-      const formattedDate = lastSavedTimestamp 
-        ? `${lastSavedTimestamp.slice(0, 2)}/${lastSavedTimestamp.slice(2, 4)}/${lastSavedTimestamp.slice(4, 6)}`
-        : null;
+      // Recupera i metadati dell'Object Storage per ottenere la data di creazione
+      const metadata = await client.stat(filename, { bucket: 'wass_assignments' });
+      
+      let formattedDateTime = null;
+      if (metadata.ok && metadata.value.timeCreated) {
+        const createdDate = new Date(metadata.value.timeCreated);
+        const day = String(createdDate.getDate()).padStart(2, '0');
+        const month = String(createdDate.getMonth() + 1).padStart(2, '0');
+        const year = String(createdDate.getFullYear()).slice(-2);
+        const hours = String(createdDate.getHours()).padStart(2, '0');
+        const minutes = String(createdDate.getMinutes()).padStart(2, '0');
+        formattedDateTime = `${day}/${month}/${year} ${hours}:${minutes}`;
+      } else if (lastSavedTimestamp) {
+        // Fallback: usa solo la data dal filename se i metadata non sono disponibili
+        formattedDateTime = `${lastSavedTimestamp.slice(0, 2)}/${lastSavedTimestamp.slice(2, 4)}/${lastSavedTimestamp.slice(4, 6)}`;
+      }
 
       res.json({
         success: true,
         found: true,
         filename,
         lastSavedTimestamp,
-        formattedDate,
+        formattedDateTime,
         data: savedData,
         message: `Assegnazioni caricate da: ${filename}`
       });
