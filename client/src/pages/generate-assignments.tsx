@@ -821,6 +821,14 @@ export default function GenerateAssignments() {
         console.log(`🔄 Timeline move: task ${logisticCode} da cleaner ${fromCleanerId} (idx ${source.index}) a cleaner ${toCleanerId} (idx ${destination.index})`);
 
         try {
+          // Carica i dati dei cleaner per mostrare nome e cognome
+          const cleanersResponse = await fetch('/data/cleaners/selected_cleaners.json');
+          const cleanersData = await cleanersResponse.json();
+          const fromCleaner = cleanersData.cleaners.find((c: any) => c.id === fromCleanerId);
+          const toCleaner = cleanersData.cleaners.find((c: any) => c.id === toCleanerId);
+          const fromCleanerName = fromCleaner ? `${fromCleaner.name} ${fromCleaner.lastname}` : `ID ${fromCleanerId}`;
+          const toCleanerName = toCleaner ? `${toCleaner.name} ${toCleaner.lastname}` : `ID ${toCleanerId}`;
+
           const payload = {
             taskId: draggableId,
             logisticCode,
@@ -854,6 +862,14 @@ export default function GenerateAssignments() {
             // Ricarica i dati dopo lo spostamento
             await loadTasks(true);
             console.log('Timeline aggiornata con successo');
+            
+            // Mostra toast solo se i cleaner sono diversi
+            if (fromCleanerId !== toCleanerId) {
+              toast({
+                title: "Task spostata",
+                description: `Task ${logisticCode} spostata dal cleaner ${fromCleanerName} al cleaner ${toCleanerName}`,
+              });
+            }
           }
         } catch (error) {
           console.error('Errore nella chiamata API:', error);
