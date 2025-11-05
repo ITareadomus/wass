@@ -84,6 +84,7 @@ export default function TimelineView({
       toast({
         title: "Cleaner rimosso",
         description: `${selectedCleaner?.name} ${selectedCleaner?.lastname} è stato rimosso dalla selezione.`,
+        variant: "success",
       });
       setIsModalOpen(false);
     },
@@ -126,6 +127,7 @@ export default function TimelineView({
       toast({
         title: "Cleaner aggiunto",
         description: `${cleanerName} è stato aggiunto alla selezione`,
+        variant: "success",
       });
       setIsAddCleanerDialogOpen(false);
     },
@@ -164,6 +166,7 @@ export default function TimelineView({
       toast({
         title: "Successo",
         description: `Task di ${sourceCleanerName} scambiate con successo con le task di ${destCleanerName}`,
+        variant: "success",
       });
       setSelectedSwapCleaner("");
       setIsModalOpen(false);
@@ -488,6 +491,7 @@ export default function TimelineView({
       toast({
         title: "✅ Assegnazioni confermate!",
         description: `Salvate in ${result.filename}`,
+        variant: "success",
       });
     } catch (error) {
       console.error('Errore nella conferma:', error);
