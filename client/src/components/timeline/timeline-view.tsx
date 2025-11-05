@@ -535,22 +535,16 @@ export default function TimelineView({
 
   // Combina cleaners selezionati con quelli dalla timeline (per mostrare anche quelli nascosti)
   const allCleanersToShow = React.useMemo(() => {
-    const selectedIds = new Set(cleaners.map(c => c.id));
-    const result = [...cleaners];
-
-    // Aggiungi cleaners dalla timeline che NON sono in selected_cleaners
-    // Li mostriamo SEMPRE (anche senza task) per permettere l'aggiunta di un nuovo cleaner tramite +
-    for (const timelineEntry of timelineCleaners) {
-      const cleanerId = timelineEntry.cleaner?.id;
-      if (cleanerId && !selectedIds.has(cleanerId)) {
-        result.push({
-          ...timelineEntry.cleaner,
-          _isHidden: true // Flag per indicare che è nascosto
-        });
-      }
+    // Se ci sono cleaner nella timeline, mostra SOLO quelli
+    // Questo accade quando si caricano assegnazioni salvate dall'Object Storage
+    if (timelineCleaners.length > 0) {
+      return timelineCleaners
+        .filter(entry => entry.cleaner && entry.cleaner.id)
+        .map(entry => entry.cleaner);
     }
 
-    return result;
+    // Altrimenti mostra i cleaner da selected_cleaners.json
+    return cleaners;
   }, [cleaners, timelineCleaners]);
 
   // Non mostrare nulla se non ci sono cleaners
@@ -627,7 +621,6 @@ export default function TimelineView({
           {allCleanersToShow.map((cleaner, index) => {
             const color = getCleanerColor(index);
             const droppableId = `cleaner-${cleaner.id}`;
-            const isHidden = (cleaner as any)._isHidden;
 
             // Trova tutte le task assegnate a questo cleaner
             const cleanerTasks = tasks.filter(task => 
@@ -636,55 +629,39 @@ export default function TimelineView({
 
             return (
               <div key={cleaner.id} className="flex mb-0.5">
-                {/* Info cleaner - con stile tratteggiato se nascosto */}
+                {/* Info cleaner */}
                 <div
                   className="flex-shrink-0 p-1 flex items-center border cursor-pointer hover:opacity-90 transition-opacity"
                   style={{ 
                     width: `${cleanerColumnWidth}px`,
-                    backgroundColor: isHidden ? '#f0f0f0' : (filteredCleanerId === cleaner.id ? `${color.bg}` : color.bg),
-                    color: isHidden ? '#999' : color.text,
+                    backgroundColor: filteredCleanerId === cleaner.id ? `${color.bg}` : color.bg,
+                    color: color.text,
                     boxShadow: filteredCleanerId === cleaner.id ? '0 0 0 3px rgba(59, 130, 246, 0.5)' : 'none',
-                    userSelect: 'none',
-                    borderStyle: isHidden ? 'dashed' : 'solid',
-                    borderWidth: isHidden ? '2px' : '1px',
-                    borderColor: isHidden ? '#ccc' : 'inherit'
+                    userSelect: 'none'
                   }}
-                  onClick={isHidden ? (() => {
-                    setCleanerToReplace(cleaner.id);
-                    handleOpenAddCleanerDialog();
-                  }) : ((e) => handleCleanerClick(cleaner, e))}
-                  title={isHidden ? "Cleaner rimosso - Click per sostituire" : "Click: dettagli | Doppio click: filtra mappa"}
+                  onClick={(e) => handleCleanerClick(cleaner, e)}
+                  title="Click: dettagli | Doppio click: filtra mappa"
                 >
-                  {isHidden ? (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="w-full h-full bg-transparent hover:bg-transparent"
-                    >
-                      <UserPlus className="w-5 h-5" />
-                    </Button>
-                  ) : (
-                    <div className="w-full flex items-center gap-1">
-                      <div className="break-words font-bold text-[13px] flex-1">
-                        {cleanersAliases[cleaner.id]?.alias || `${cleaner.name.toUpperCase()} ${cleaner.lastname.toUpperCase()}`}
-                      </div>
-                      {cleaner.role === "Premium" && (
-                        <div className="bg-yellow-500 text-black font-bold text-[10px] px-1 py-0.5 rounded flex-shrink-0">
-                          P
-                        </div>
-                      )}
-                      {cleaner.role === "Formatore" && (
-                        <div className="bg-orange-500 text-black font-bold text-[10px] px-1 py-0.5 rounded flex-shrink-0">
-                          F
-                        </div>
-                      )}
-                      {cleaner.can_do_straordinaria && (
-                        <div className="bg-red-500 text-white font-bold text-[10px] px-1 py-0.5 rounded flex-shrink-0">
-                          S
-                        </div>
-                      )}
+                  <div className="w-full flex items-center gap-1">
+                    <div className="break-words font-bold text-[13px] flex-1">
+                      {cleanersAliases[cleaner.id]?.alias || `${cleaner.name.toUpperCase()} ${cleaner.lastname.toUpperCase()}`}
                     </div>
-                  )}
+                    {cleaner.role === "Premium" && (
+                      <div className="bg-yellow-500 text-black font-bold text-[10px] px-1 py-0.5 rounded flex-shrink-0">
+                        P
+                      </div>
+                    )}
+                    {cleaner.role === "Formatore" && (
+                      <div className="bg-orange-500 text-black font-bold text-[10px] px-1 py-0.5 rounded flex-shrink-0">
+                        F
+                      </div>
+                    )}
+                    {cleaner.can_do_straordinaria && (
+                      <div className="bg-red-500 text-white font-bold text-[10px] px-1 py-0.5 rounded flex-shrink-0">
+                        S
+                      </div>
+                    )}
+                  </div>
                 </div>
                 {/* Timeline per questo cleaner - area unica droppable */}
                 <Droppable droppableId={`timeline-${cleaner.id}`} direction="horizontal">
