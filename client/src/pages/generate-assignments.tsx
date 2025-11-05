@@ -805,6 +805,7 @@ export default function GenerateAssignments() {
           toast({
             title: "Task assegnata",
             description: `Task ${logisticCode} assegnata a ${cleanerName}`,
+            variant: "success",
           });
         } catch (err) {
           console.error("Errore nel salvataggio in timeline:", err);
@@ -868,6 +869,7 @@ export default function GenerateAssignments() {
               toast({
                 title: "Task spostata",
                 description: `Task ${logisticCode} spostata da ${fromCleanerName} a ${toCleanerName}`,
+                variant: "success",
               });
             }
           }
@@ -958,6 +960,7 @@ export default function GenerateAssignments() {
           toast({
             title: "Task assegnata",
             description: `Task ${logisticCode} assegnata a ${cleanerName}`,
+            variant: "success",
           });
         } catch (err) {
           console.error("Errore nell'assegnazione:", err);
