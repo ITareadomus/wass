@@ -447,10 +447,7 @@ export default function TimelineView({
     }
   };
 
-  const [lastSavedFilename, setLastSavedFilename] = useState<string | null>(() => {
-    // Carica l'ultimo salvataggio da localStorage se disponibile
-    return localStorage.getItem('last_saved_assignment');
-  });
+  const [lastSavedFilename, setLastSavedFilename] = useState<string | null>(null);
 
   const handleConfirmAssignments = async () => {
     try {
@@ -531,7 +528,29 @@ export default function TimelineView({
     loadCleaners();
     loadAliases();
     loadTimelineCleaners();
+    // Carica la data formattata se esiste un salvataggio
+    loadSavedAssignmentDate();
   }, []);
+
+  const loadSavedAssignmentDate = async () => {
+    try {
+      const response = await fetch('/api/load-saved-assignments', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ date: workDate })
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        if (result.found && result.formattedDateTime) {
+          setLastSavedFilename(result.formattedDateTime);
+          localStorage.setItem('last_saved_assignment', result.formattedDateTime);
+        }
+      }
+    } catch (error) {
+      console.error("Errore nel caricamento della data di salvataggio:", error);
+    }
+  };
 
   // Combina cleaners selezionati con quelli dalla timeline (per mostrare anche quelli nascosti)
   const allCleanersToShow = React.useMemo(() => {
