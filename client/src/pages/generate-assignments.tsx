@@ -1138,7 +1138,7 @@ export default function GenerateAssignments() {
                   </div>
 
                   {/* Non Assegnate */}
-                  <div className="bg-gray-50 dark:bg-gray-950/20 rounded-lg p-3 border border-gray-200 dark:border-gray-800 col-span-2">
+                  <div className="bg-gray-50 dark:bg-gray-950/20 rounded-lg p-3 border border-gray-200 dark:border-gray-800 col-span-2 text-center">
                     <div className="text-xs text-gray-600 dark:text-gray-400 font-medium mb-1">Non Assegnate</div>
                     <div className="text-2xl font-bold text-gray-700 dark:text-gray-300">
                       {earlyOutTasks.length + highPriorityTasks.length + lowPriorityTasks.length}
