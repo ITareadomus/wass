@@ -724,8 +724,17 @@ export default function GenerateAssignments() {
       });
       if (!response.ok) {
         console.error('Errore nella rimozione dell\'assegnazione dalla timeline');
+        toast({
+          title: "Errore",
+          description: "Impossibile spostare la task dalla timeline",
+          variant: "destructive",
+        });
       } else {
         console.log('Assegnazione rimossa dalla timeline con successo');
+        toast({
+          title: "Task spostata",
+          description: `Task ${logisticCode || taskId} rimossa dalla timeline e riportata nel container`,
+        });
       }
     } catch (error) {
       console.error('Errore nella chiamata API di rimozione timeline:', error);
