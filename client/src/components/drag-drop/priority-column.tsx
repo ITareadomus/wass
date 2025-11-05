@@ -180,13 +180,13 @@ export default function PriorityColumn({
           >
             {tasks.map((task, index) => (
               <TaskCard
-                    key={task.id}
-                    task={task}
-                    index={index}
-                    isInTimeline={false}
-                    allTasks={tasks}
-                    currentContainer={droppableId}
-                  />
+                key={task.id}
+                task={task}
+                index={index}
+                isInTimeline={false}
+                allTasks={tasks}
+                currentContainer={droppableId}
+              />
             ))}
             {provided.placeholder}
           </div>

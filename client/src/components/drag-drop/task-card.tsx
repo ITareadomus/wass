@@ -59,15 +59,31 @@ export default function TaskCard({
 
   // Determina le task navigabili in base al contesto
   const getNavigableTasks = () => {
-    if (!allTasks || allTasks.length === 0) return [task];
+    if (!allTasks || allTasks.length === 0) {
+      console.log('⚠️ allTasks vuoto, usando solo task corrente');
+      return [task];
+    }
     
-    // Usa direttamente allTasks - sia per timeline che per container
-    // perché vengono già passate le task corrette dal componente padre
+    console.log('📋 Navigazione - allTasks ricevuto:', {
+      length: allTasks.length,
+      taskIds: allTasks.map(t => t.id),
+      isInTimeline,
+      currentContainer
+    });
+    
     return allTasks;
   };
 
   const navigableTasks = getNavigableTasks();
   const currentTaskInNavigable = navigableTasks.findIndex(t => String(t.id) === String(currentTaskId));
+
+  console.log('🔍 Stato navigazione:', {
+    currentTaskId,
+    navigableTasksCount: navigableTasks.length,
+    currentIndex: currentTaskInNavigable,
+    canGoPrev: navigableTasks.length > 1 && currentTaskInNavigable > 0,
+    canGoNext: navigableTasks.length > 1 && currentTaskInNavigable >= 0 && currentTaskInNavigable < navigableTasks.length - 1
+  });
 
   const canGoPrev = navigableTasks.length > 1 && currentTaskInNavigable > 0;
   const canGoNext = navigableTasks.length > 1 && currentTaskInNavigable >= 0 && currentTaskInNavigable < navigableTasks.length - 1;
@@ -129,6 +145,14 @@ export default function TaskCard({
   // Reset currentTaskId quando il modale si apre
   useEffect(() => {
     if (isModalOpen) {
+      console.log('🔓 Modale aperto per task:', {
+        taskId: task.id,
+        allTasksCount: allTasks?.length || 0,
+        allTasksIds: allTasks?.map(t => t.id) || [],
+        isInTimeline,
+        currentContainer
+      });
+      
       setCurrentTaskId(task.id);
       setEditingField(null);
       
@@ -144,7 +168,7 @@ export default function TaskCard({
       const totalMinutes = (hours || 0) * 60 + (mins || 0);
       setEditedDuration(totalMinutes.toString());
     }
-  }, [isModalOpen, task.id, displayTask]);
+  }, [isModalOpen, task.id, displayTask, allTasks, isInTimeline, currentContainer]);
   
   // DEBUG: verifica se displayTask è corretto
   useEffect(() => {
