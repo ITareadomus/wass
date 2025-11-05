@@ -456,10 +456,15 @@ export default function TaskCard({
                 {isEditing ? (
                   <div className="flex items-center gap-2">
                     <Input
-                      type="number"
+                      type="text"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
                       value={editedDuration}
-                      onChange={(e) => setEditedDuration(e.target.value)}
-                      className="text-sm w-20"
+                      onChange={(e) => {
+                        const value = e.target.value.replace(/\D/g, '');
+                        setEditedDuration(value);
+                      }}
+                      className="text-sm w-20 [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                       min="0"
                     />
                     <span className="text-sm text-muted-foreground">minuti</span>
