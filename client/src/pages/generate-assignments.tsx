@@ -1151,6 +1151,7 @@ export default function GenerateAssignments() {
                     <div className="text-2xl font-bold text-orange-700 dark:text-orange-300">
                       {allTasksWithAssignments.filter(t => {
                         const task = t as any;
+                        // Solo task assegnate con orari di lavoro
                         if (!task.assignedCleaner || !task.start_time || !task.end_time) return false;
                         
                         const checkoutTime = task.checkout_time;
@@ -1160,8 +1161,8 @@ export default function GenerateAssignments() {
 
                         let violated = false;
 
-                        // Violazione checkout
-                        if (checkoutTime && endTime) {
+                        // Violazione checkout: SOLO se checkout_time esiste ed è definito
+                        if (checkoutTime && checkoutTime !== null && endTime) {
                           const [endHour, endMin] = endTime.split(':').map(Number);
                           const [checkoutHour, checkoutMin] = checkoutTime.split(':').map(Number);
                           const endMinutes = endHour * 60 + endMin;
@@ -1172,14 +1173,14 @@ export default function GenerateAssignments() {
                           }
                         }
 
-                        // Violazione checkin
-                        if (checkinTime && startTime) {
+                        // Violazione checkin: SOLO se checkin_time esiste ed è definito
+                        if (checkinTime && checkinTime !== null && startTime) {
                           const [startHour, startMin] = startTime.split(':').map(Number);
                           const [checkinHour, checkinMin] = checkinTime.split(':').map(Number);
                           const startMinutes = startHour * 60 + startMin;
                           const checkinMinutes = checkinHour * 60 + checkinMin;
                           
-                          if (startMinutes > checkinMinutes) {
+                          if (startMinutes < checkinMinutes) {
                             violated = true;
                           }
                         }
