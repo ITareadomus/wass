@@ -63,22 +63,39 @@ export default function TaskCard({
       console.log('⚠️ allTasks vuoto, usando solo task corrente');
       return [task];
     }
-    
+
     console.log('📋 Navigazione - allTasks ricevuto:', {
       length: allTasks.length,
       taskIds: allTasks.map(t => t.id),
       isInTimeline,
       currentContainer
     });
-    
-    return allTasks;
+
+    if (isInTimeline) {
+      // Timeline: naviga tra task dello stesso cleaner
+      const taskAssignedCleaner = (task as any).assignedCleaner;
+      return allTasks.filter(t => (t as any).assignedCleaner === taskAssignedCleaner);
+    } else {
+      // Container: naviga tra task dello stesso container
+      return allTasks.filter(t => t.priority === task.priority);
+    }
   };
 
   const navigableTasks = getNavigableTasks();
-  const currentTaskInNavigable = navigableTasks.findIndex(t => String(t.id) === String(currentTaskId));
+
+  // Se currentTaskId non è impostato o non è valido, usa l'id della task corrente
+  const effectiveCurrentId = currentTaskId && navigableTasks.some(t => String(t.id) === String(currentTaskId)) 
+    ? currentTaskId 
+    : task.id;
+
+  const currentTaskInNavigable = navigableTasks.findIndex(t => String(t.id) === String(effectiveCurrentId));
+
+  // Task corrente da visualizzare
+  const displayTask = navigableTasks.find(t => String(t.id) === String(effectiveCurrentId)) || task;
 
   console.log('🔍 Stato navigazione:', {
     currentTaskId,
+    effectiveCurrentId,
     navigableTasksCount: navigableTasks.length,
     currentIndex: currentTaskInNavigable,
     canGoPrev: navigableTasks.length > 1 && currentTaskInNavigable > 0,
@@ -88,19 +105,13 @@ export default function TaskCard({
   const canGoPrev = navigableTasks.length > 1 && currentTaskInNavigable > 0;
   const canGoNext = navigableTasks.length > 1 && currentTaskInNavigable >= 0 && currentTaskInNavigable < navigableTasks.length - 1;
 
-  const handlePrevTask = () => {
-    console.log('🔍 handlePrevTask chiamato:', {
-      canGoPrev,
-      navigableTasksLength: navigableTasks.length,
-      currentTaskInNavigable,
-      currentTaskId
-    });
-    
-    if (!canGoPrev || navigableTasks.length === 0) {
-      console.log('❌ Non posso andare indietro');
+  const handlePrevTask = (e: React.MouseEvent) => {
+    e.stopPropagation();
+
+    if (navigableTasks.length === 0 || currentTaskInNavigable <= 0) {
       return;
     }
-    
+
     const prevTask = navigableTasks[currentTaskInNavigable - 1];
     console.log('✅ Navigazione PREV:', {
       from: currentTaskId,
@@ -111,19 +122,13 @@ export default function TaskCard({
     setCurrentTaskId(prevTask.id);
   };
 
-  const handleNextTask = () => {
-    console.log('🔍 handleNextTask chiamato:', {
-      canGoNext,
-      navigableTasksLength: navigableTasks.length,
-      currentTaskInNavigable,
-      currentTaskId
-    });
-    
-    if (!canGoNext || navigableTasks.length === 0) {
-      console.log('❌ Non posso andare avanti');
+  const handleNextTask = (e: React.MouseEvent) => {
+    e.stopPropagation();
+
+    if (navigableTasks.length === 0 || currentTaskInNavigable < 0 || currentTaskInNavigable >= navigableTasks.length - 1) {
       return;
     }
-    
+
     const nextTask = navigableTasks[currentTaskInNavigable + 1];
     console.log('✅ Navigazione NEXT:', {
       from: currentTaskId,
@@ -139,9 +144,6 @@ export default function TaskCard({
     setCurrentTaskId(nextTask.id);
   };
 
-  // Task corrente da visualizzare - trova sempre per ID
-  const displayTask = allTasks.find(t => t.id === currentTaskId) || task;
-
   // Reset currentTaskId quando il modale si apre
   useEffect(() => {
     if (isModalOpen) {
@@ -152,16 +154,16 @@ export default function TaskCard({
         isInTimeline,
         currentContainer
       });
-      
-      setCurrentTaskId(task.id);
+
+      setCurrentTaskId(task.id); // Assicura che currentTaskId sia all'inizio quando si apre il modale
       setEditingField(null);
-      
-      // Inizializza campi editabili con i valori attuali
+
+      // Inizializza campi editabili con i valori attuali della task visualizzata
       setEditedCheckoutDate((displayTask as any).checkout_date || "");
       setEditedCheckoutTime((displayTask as any).checkout_time || "");
       setEditedCheckinDate((displayTask as any).checkin_date || "");
       setEditedCheckinTime((displayTask as any).checkin_time || "");
-      
+
       // Converti duration da "1.30" a "90" minuti
       const duration = displayTask.duration || "0.0";
       const [hours, mins] = duration.split('.').map(Number);
@@ -169,18 +171,18 @@ export default function TaskCard({
       setEditedDuration(totalMinutes.toString());
     }
   }, [isModalOpen, task.id, displayTask, allTasks, isInTimeline, currentContainer]);
-  
+
   // DEBUG: verifica se displayTask è corretto
   useEffect(() => {
-    if (displayTask.id !== currentTaskId) {
-      console.warn('⚠️ MISMATCH: displayTask.id !== currentTaskId', {
+    if (displayTask.id !== effectiveCurrentId) {
+      console.warn('⚠️ MISMATCH: displayTask.id !== effectiveCurrentId', {
         displayTaskId: displayTask.id,
-        currentTaskId: currentTaskId,
+        effectiveCurrentId: effectiveCurrentId,
         displayTaskName: (displayTask as any).logistic_code || displayTask.name,
         allTasksIds: allTasks.map(t => t.id)
       });
     }
-  }, [displayTask, currentTaskId, allTasks]);
+  }, [displayTask, effectiveCurrentId, allTasks]);
 
   // DEBUG: Log per verificare i flag della task durante navigazione
   useEffect(() => {
@@ -188,10 +190,10 @@ export default function TaskCard({
       console.log(`Task ${(displayTask as any).logistic_code || displayTask.name}:`, {
         premium: displayTask.premium,
         straordinaria: displayTask.straordinaria,
-        currentTaskId: currentTaskId
+        currentTaskId: effectiveCurrentId
       });
     }
-  }, [currentTaskId, isModalOpen, displayTask]);
+  }, [effectiveCurrentId, isModalOpen, displayTask]);
 
   // Normalizza confirmed_operation da boolean/number/string a boolean sicuro
   // USA displayTask invece di task
@@ -234,7 +236,7 @@ export default function TaskCard({
         travel_time: taskObj.travel_time || taskObj.travelTime
       });
     }
-  }, [displayTask, currentTaskId]);
+  }, [displayTask, effectiveCurrentId]);
 
   const handleCardClick = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -244,7 +246,7 @@ export default function TaskCard({
   const handleSaveChanges = async () => {
     try {
       setIsSaving(true);
-      
+
       const response = await fetch('/api/update-task-details', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -266,10 +268,10 @@ export default function TaskCard({
           title: "Modifiche salvate!",
           description: "I dettagli della task sono stati aggiornati con successo.",
         });
-        
+
         setEditingField(null);
         setIsModalOpen(false);
-        
+
         // Ricarica i task per mostrare le modifiche
         if ((window as any).reloadAllTasks) {
           await (window as any).reloadAllTasks();
@@ -420,6 +422,7 @@ export default function TaskCard({
                   "h-8 w-8",
                   !canGoPrev && "opacity-30 cursor-not-allowed"
                 )}
+                type="button"
               >
                 <ChevronLeft className="h-5 w-5" />
               </Button>
@@ -469,6 +472,7 @@ export default function TaskCard({
                   "h-8 w-8",
                   !canGoNext && "opacity-30 cursor-not-allowed"
                 )}
+                type="button"
               >
                 <ChevronRight className="h-5 w-5" />
               </Button>
