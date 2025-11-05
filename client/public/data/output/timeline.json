@@ -1,6 +1,6 @@
 {
   "metadata": {
-    "last_updated": "2025-11-05T10:43:42.474Z",
+    "last_updated": "2025-11-05T10:47:41.988Z",
     "date": "2025-11-05"
   },
   "cleaners_assignments": [
@@ -45,39 +45,6 @@
           "followup": false,
           "sequence": 1,
           "travel_time": 0
-        },
-        {
-          "task_id": 217483,
-          "logistic_code": 1198,
-          "client_id": 2,
-          "premium": false,
-          "address": "Via Bergognone 31",
-          "lat": "45.453707852983",
-          "lng": "9.1641459982137",
-          "cleaning_time": 180,
-          "checkin_date": "2025-11-05",
-          "checkout_date": "2025-11-05",
-          "checkin_time": null,
-          "checkout_time": "09:00",
-          "pax_in": 3,
-          "pax_out": 4,
-          "small_equipment": false,
-          "operation_id": 2,
-          "confirmed_operation": true,
-          "straordinaria": false,
-          "type_apt": "D",
-          "alias": "ITW",
-          "customer_name": "ITALIANWAY SRL",
-          "reasons": [
-            "checkout_time<=eo_time",
-            "automatic_assignment_eo"
-          ],
-          "priority": "early_out",
-          "start_time": "12:07",
-          "end_time": "15:07",
-          "followup": true,
-          "sequence": 2,
-          "travel_time": 7
         }
       ]
     },
@@ -122,6 +89,70 @@
           "followup": false,
           "sequence": 1,
           "travel_time": 0
+        },
+        {
+          "task_id": 217483,
+          "logistic_code": 1198,
+          "client_id": null,
+          "premium": false,
+          "address": "Via Bergognone 31",
+          "lat": "45.453707852983",
+          "lng": "9.1641459982137",
+          "cleaning_time": 180,
+          "checkin_date": "2025-11-05",
+          "checkout_date": "2025-11-05",
+          "checkin_time": null,
+          "checkout_time": "09:00",
+          "pax_in": 3,
+          "pax_out": 4,
+          "small_equipment": false,
+          "operation_id": 2,
+          "confirmed_operation": true,
+          "straordinaria": false,
+          "type_apt": "D",
+          "alias": "ITW",
+          "customer_name": "ITALIANWAY SRL",
+          "reasons": [
+            "manually_moved_to_timeline"
+          ],
+          "priority": "early_out",
+          "start_time": "11:41",
+          "end_time": "14:41",
+          "followup": true,
+          "sequence": 2,
+          "travel_time": 41
+        },
+        {
+          "task_id": 218319,
+          "logistic_code": 840,
+          "client_id": null,
+          "premium": false,
+          "address": "VIA TULIPANI, 19",
+          "lat": "45.4498056",
+          "lng": "9.1372543",
+          "cleaning_time": 60,
+          "checkin_date": "2025-11-05",
+          "checkout_date": "2025-11-05",
+          "checkin_time": "11:00",
+          "checkout_time": null,
+          "pax_in": 1,
+          "pax_out": 1,
+          "small_equipment": false,
+          "operation_id": 2,
+          "confirmed_operation": true,
+          "straordinaria": false,
+          "type_apt": "A",
+          "alias": "NTM",
+          "customer_name": "NOTA-MI",
+          "reasons": [
+            "manually_moved_to_timeline"
+          ],
+          "priority": "early_out",
+          "start_time": "15:02",
+          "end_time": "16:02",
+          "followup": true,
+          "sequence": 3,
+          "travel_time": 21
         }
       ]
     },
@@ -427,6 +458,6 @@
     "total_cleaners": 8,
     "used_cleaners": 8,
     "assigned_tasks": 10,
-    "total_tasks": 10
+    "total_tasks": 11
   }
 }
