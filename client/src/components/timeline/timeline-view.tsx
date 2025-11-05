@@ -1,5 +1,5 @@
 import { Personnel, TaskType as Task } from "@shared/schema";
-import { Calendar, RotateCcw, Users, RefreshCw, UserPlus } from "lucide-react";
+import { Calendar, RotateCcw, Users, RefreshCw, UserPlus, Plus } from "lucide-react";
 import { useState, useEffect } from "react";
 import * as React from "react";
 import { Droppable, Draggable } from "react-beautiful-dnd";
@@ -159,7 +159,7 @@ export default function TimelineView({
       // Trova i nomi dei cleaner coinvolti
       const sourceCleaner = cleaners.find(c => c.id === variables.sourceCleanerId);
       const destCleaner = cleaners.find(c => c.id === variables.destCleanerId);
-      
+
       const sourceCleanerName = sourceCleaner ? `${sourceCleaner.name} ${sourceCleaner.lastname}` : `ID ${variables.sourceCleanerId}`;
       const destCleanerName = destCleaner ? `${destCleaner.name} ${destCleaner.lastname}` : `ID ${variables.destCleanerId}`;
 
@@ -443,7 +443,7 @@ export default function TimelineView({
       window.location.reload();
     } catch (error) {
       console.error('Errore nel reset:', error);
-      alert('Errore durante il reset delle assegnazioni');
+      alert('Errore durante le assegnazioni');
     }
   };
 
@@ -815,9 +815,11 @@ export default function TimelineView({
                 }}
                 variant="ghost"
                 size="sm"
-                className="w-full h-full"
+                className="w-full h-full flex items-center justify-center gap-2 border-dashed p-1"
+                style={{ minHeight: '100%' }}
               >
-                <UserPlus className="w-5 h-5" />
+                <Plus className="w-4 h-4" />
+                Aggiungi Cleaner
               </Button>
             </div>
             {/* Pulsante Conferma Assegnazioni che prende tutto lo spazio della timeline */}
