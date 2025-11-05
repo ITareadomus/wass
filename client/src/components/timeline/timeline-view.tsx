@@ -682,7 +682,7 @@ export default function TimelineView({
                       {...provided.droppableProps}
                       data-testid={`timeline-cleaner-${cleaner.id}`}
                       data-cleaner-id={cleaner.id}
-                      className={`relative border-t border-border transition-colors min-h-[32px] flex-1 ${
+                      className={`relative border-t border-border transition-colors min-h-[45px] flex-1 ${
                         snapshot.isDraggingOver ? 'bg-primary/20 ring-2 ring-primary' : ''
                       }`}
                       style={{ 
@@ -779,13 +779,13 @@ export default function TimelineView({
                                 {idx > 0 && (
                                   <div 
                                     key={`marker-${uniqueKey}`} 
-                                    className="flex items-center justify-center flex-shrink-0 py-1 px-1"
-                                    style={{ width: `${totalWidth}%`, minHeight: '32px' }}
+                                    className="flex items-center justify-center flex-shrink-0 py-3 px-2"
+                                    style={{ width: `${totalWidth}%`, minHeight: '50px' }}
                                     title={`${travelTime} min`}
                                   >
                                     <svg
-                                      width="14"
-                                      height="14"
+                                      width="20"
+                                      height="20"
                                       viewBox="0 0 24 24"
                                       fill="currentColor"
                                       className="text-gray-600 flex-shrink-0"
