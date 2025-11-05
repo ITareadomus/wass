@@ -185,19 +185,6 @@ export default function TimelineView({
 
     const destCleanerId = parseInt(selectedSwapCleaner, 10);
 
-    // Defensive guard: verifica che entrambi i cleaners abbiano task assegnate
-    const sourceHasTasks = tasks.some((t: any) => t.assignedCleaner === selectedCleaner.id);
-    const destHasTasks = tasks.some((t: any) => t.assignedCleaner === destCleanerId);
-
-    if (!sourceHasTasks || !destHasTasks) {
-      toast({
-        title: "Errore",
-        description: "Entrambi i cleaners devono avere task assegnate per poter scambiare",
-        variant: "destructive",
-      });
-      return;
-    }
-
     swapCleanersMutation.mutate({
       sourceCleanerId: selectedCleaner.id,
       destCleanerId: destCleanerId,
@@ -1007,13 +994,6 @@ export default function TimelineView({
                       <SelectContent>
                         {cleaners
                           .filter(c => c.id !== selectedCleaner.id) // Escludi cleaner corrente
-                          .filter(c => {
-                            // Mostra solo cleaners con task effettivamente assegnate nella timeline
-                            const hasTasks = tasks.some((t: any) => 
-                              t.assignedCleaner === c.id && t.assignedCleaner !== undefined && t.assignedCleaner !== null
-                            );
-                            return hasTasks;
-                          })
                           .map(cleaner => (
                             <SelectItem 
                               key={cleaner.id} 
