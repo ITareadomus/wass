@@ -129,14 +129,51 @@ export default function GenerateAssignments() {
   const [extractionStep, setExtractionStep] = useState<string>("Inizializzazione...");
   const [isLoadingTasks, setIsLoadingTasks] = useState(false);
   const [isConfirming, setIsConfirming] = useState(false);
+  const [lastSavedAssignment, setLastSavedAssignment] = useState<string | null>(null);
   const { toast } = useToast();
   const [, setLocation] = useLocation();
+
+  // Funzione per caricare assegnazioni salvate da Object Storage
+  const loadSavedAssignments = async (date: Date) => {
+    try {
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      const dateStr = `${year}-${month}-${day}`;
+
+      const response = await fetch('/api/load-saved-assignments', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ date: dateStr })
+      });
+
+      if (!response.ok) {
+        throw new Error('Errore durante il caricamento delle assegnazioni');
+      }
+
+      const result = await response.json();
+      
+      if (result.found) {
+        console.log("✅ Assegnazioni salvate caricate:", result.filename);
+        setLastSavedAssignment(result.filename);
+        return true;
+      } else {
+        console.log("ℹ️ Nessuna assegnazione salvata per questa data");
+        setLastSavedAssignment(null);
+        return false;
+      }
+    } catch (error) {
+      console.error("Errore nel caricamento delle assegnazioni salvate:", error);
+      setLastSavedAssignment(null);
+      return false;
+    }
+  };
 
   // Funzione per estrarre i dati dal backend
   const extractData = async (date: Date) => {
     try {
       setIsExtracting(true);
-      setExtractionStep("Estrazione dati dal database...");
+      setExtractionStep("Verifica assegnazioni salvate...");
 
       // Format date in local timezone to avoid UTC shift
       const year = date.getFullYear();
@@ -144,6 +181,19 @@ export default function GenerateAssignments() {
       const day = String(date.getDate()).padStart(2, '0');
       const dateStr = `${year}-${month}-${day}`;
 
+      // Prima prova a caricare assegnazioni salvate
+      const hasSavedAssignments = await loadSavedAssignments(date);
+
+      if (hasSavedAssignments) {
+        setExtractionStep("Assegnazioni salvate caricate!");
+        setIsExtracting(false);
+        // Carica i task dalle assegnazioni salvate
+        loadTasks();
+        return;
+      }
+
+      // Se non ci sono assegnazioni salvate, procedi con l'estrazione normale
+      setExtractionStep("Estrazione dati dal database...");
       console.log("Estraendo task per la data:", dateStr);
 
       const response = await fetch('/api/extract-data', {
