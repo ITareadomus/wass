@@ -191,22 +191,25 @@ export default function TaskCard({
     }
   };
 
-  // Verifica se end_time sfora checkin_time
+  // Verifica se end_time sfora checkin_time (considerando le date!)
   const isOverdue = (() => {
     const taskObj = displayTask as any;
     const endTime = assignmentTimes.end_time || taskObj.end_time || taskObj.endTime;
     const checkinTime = taskObj.checkin_time;
+    const checkoutDate = taskObj.checkout_date;
+    const checkinDate = taskObj.checkin_date;
 
     if (!endTime || !checkinTime || !isInTimeline) return false;
 
-    // Converti in minuti per confronto
-    const [endH, endM] = endTime.split(':').map(Number);
-    const [checkinH, checkinM] = checkinTime.split(':').map(Number);
+    // Se non abbiamo le date, non possiamo determinare con certezza
+    if (!checkoutDate || !checkinDate) return false;
 
-    const endMinutes = endH * 60 + endM;
-    const checkinMinutes = checkinH * 60 + checkinM;
+    // Converti date in oggetti Date per confronto corretto
+    const checkoutDateTime = new Date(checkoutDate + 'T' + endTime + ':00');
+    const checkinDateTime = new Date(checkinDate + 'T' + checkinTime + ':00');
 
-    return endMinutes > checkinMinutes;
+    // Overdue solo se end_time è DOPO checkin_time (considerando data + ora)
+    return checkoutDateTime > checkinDateTime;
   })();
 
   return (
