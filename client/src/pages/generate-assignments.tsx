@@ -804,7 +804,7 @@ export default function GenerateAssignments() {
 
           toast({
             title: "Task assegnata",
-            description: `Task ${logisticCode} assegnata al cleaner ${cleanerName}`,
+            description: `Task ${logisticCode} assegnata a ${cleanerName}`,
           });
         } catch (err) {
           console.error("Errore nel salvataggio in timeline:", err);
@@ -862,12 +862,12 @@ export default function GenerateAssignments() {
             // Ricarica i dati dopo lo spostamento
             await loadTasks(true);
             console.log('Timeline aggiornata con successo');
-            
+
             // Mostra toast solo se i cleaner sono diversi
             if (fromCleanerId !== toCleanerId) {
               toast({
                 title: "Task spostata",
-                description: `Task ${logisticCode} spostata dal cleaner ${fromCleanerName} al cleaner ${toCleanerName}`,
+                description: `Task ${logisticCode} spostata da ${fromCleanerName} a ${toCleanerName}`,
               });
             }
           }
@@ -957,7 +957,7 @@ export default function GenerateAssignments() {
 
           toast({
             title: "Task assegnata",
-            description: `Task ${logisticCode} assegnata al cleaner ${cleanerName}`,
+            description: `Task ${logisticCode} assegnata a ${cleanerName}`,
           });
         } catch (err) {
           console.error("Errore nell'assegnazione:", err);
