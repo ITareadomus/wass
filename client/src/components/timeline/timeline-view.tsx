@@ -815,11 +815,10 @@ export default function TimelineView({
                 }}
                 variant="ghost"
                 size="sm"
-                className="w-full h-full flex items-center justify-center gap-2 border-dashed p-1"
+                className="w-full h-full flex items-center justify-center border-dashed p-1"
                 style={{ minHeight: '100%' }}
               >
-                <Plus className="w-4 h-4" />
-                Aggiungi Cleaner
+                <Plus className="w-5 h-5" />
               </Button>
             </div>
             {/* Pulsante Conferma Assegnazioni che prende tutto lo spazio della timeline */}
