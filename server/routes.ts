@@ -964,6 +964,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       console.log(`✅ Assegnazioni caricate da Object Storage: ${filename}`);
 
+      // RIGENERA containers.json per la data corretta
+      console.log(`🔄 Rigenerazione containers.json per data ${workDate}...`);
+      const containersResult = await new Promise<string>((resolve, reject) => {
+        exec(
+          `python3 client/public/scripts/create_containers.py ${workDate}`,
+          (error, stdout, stderr) => {
+            if (error) {
+              console.error("Errore create_containers:", stderr);
+              reject(new Error(stderr || error.message));
+            } else {
+              resolve(stdout);
+            }
+          }
+        );
+      });
+      console.log("create_containers output:", containersResult);
+
       // Estrai il timestamp dal filename (formato: assignments_DDMMYY.json)
       const dateMatch = filename.match(/assignments_(\d{6})\.json/);
       const lastSavedTimestamp = dateMatch ? dateMatch[1] : null;
