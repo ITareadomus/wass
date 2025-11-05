@@ -212,6 +212,34 @@
       "can_do_straordinaria": true
     },
     {
+      "id": 937,
+      "name": "LOVETH",
+      "lastname": "IGUDIA",
+      "role": "Premium",
+      "active": true,
+      "ranking": 0,
+      "counter_hours": 5.5,
+      "counter_days": 2,
+      "available": true,
+      "contract_type": "a chiamata",
+      "preferred_customers": [
+        3,
+        61,
+        72,
+        75,
+        80,
+        84,
+        91,
+        94,
+        113,
+        115,
+        121
+      ],
+      "telegram_id": 7573041558,
+      "start_time": "10:00",
+      "can_do_straordinaria": false
+    },
+    {
       "id": 469,
       "name": "LAMIN",
       "lastname": "SOLY",
@@ -248,51 +276,7 @@
       "telegram_id": null,
       "start_time": "10:00",
       "can_do_straordinaria": false
-    },
-    {
-      "id": 937,
-      "name": "LOVETH",
-      "lastname": "IGUDIA",
-      "role": "Premium",
-      "active": true,
-      "ranking": 0,
-      "counter_hours": 5.5,
-      "counter_days": 2,
-      "available": true,
-      "contract_type": "a chiamata",
-      "preferred_customers": [
-        3,
-        61,
-        72,
-        75,
-        80,
-        84,
-        91,
-        94,
-        113,
-        115,
-        121
-      ],
-      "telegram_id": 7573041558,
-      "start_time": "10:00",
-      "can_do_straordinaria": false
-    },
-    {
-      "id": 1046,
-      "name": "JOY",
-      "lastname": "EDIAGBANYA",
-      "role": "Standard",
-      "active": true,
-      "ranking": 0,
-      "counter_hours": 5,
-      "counter_days": 1,
-      "available": true,
-      "contract_type": "a chiamata",
-      "preferred_customers": [],
-      "telegram_id": null,
-      "start_time": null,
-      "can_do_straordinaria": false
     }
   ],
-  "total_selected": 11
+  "total_selected": 10
 }
