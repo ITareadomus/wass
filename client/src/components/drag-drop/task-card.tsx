@@ -97,6 +97,9 @@ export default function TaskCard({
     setCurrentTaskId(nextTask.id);
   };
 
+  // Task corrente da visualizzare - trova sempre per ID
+  const displayTask = allTasks.find(t => t.id === currentTaskId) || task;
+
   // Reset currentTaskId quando il modale si apre
   useEffect(() => {
     if (isModalOpen) {
@@ -116,9 +119,6 @@ export default function TaskCard({
       setEditedDuration(totalMinutes.toString());
     }
   }, [isModalOpen, task.id, displayTask]);
-
-  // Task corrente da visualizzare - trova sempre per ID
-  const displayTask = allTasks.find(t => t.id === currentTaskId) || task;
   
   // DEBUG: verifica se displayTask è corretto
   useEffect(() => {
