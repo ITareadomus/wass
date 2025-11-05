@@ -25,7 +25,7 @@ interface TaskCardProps {
   index: number;
   isInTimeline?: boolean;
   allTasks?: Task[];
-  currentContainer?: string;
+  currentContainer?: 'early-out' | 'high' | 'low' | string;
 }
 
 interface AssignedTask {
@@ -62,11 +62,15 @@ export default function TaskCard({
     if (!allTasks || allTasks.length === 0) return [task];
 
     if (isInTimeline) {
-      // In timeline: le task sono già filtrate per cleaner, usa direttamente allTasks
+      // In timeline: le task sono già filtrate per cleaner tramite allTasks
       return allTasks;
     } else {
-      // Nei container: ritorna tutte le task del container
-      return allTasks;
+      // Nei container: ritorna solo le task dello stesso container
+      // allTasks contiene TUTTE le task, dobbiamo filtrare per priority
+      const taskPriority = (task as any).priority;
+      if (!taskPriority) return [task];
+      
+      return allTasks.filter(t => (t as any).priority === taskPriority);
     }
   };
 
