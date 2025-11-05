@@ -59,7 +59,7 @@ export default function TaskCard({
 
   // Determina le task navigabili in base al contesto
   const getNavigableTasks = () => {
-    if (!allTasks || allTasks.length === 0) return [];
+    if (!allTasks || allTasks.length === 0) return [task];
 
     if (isInTimeline) {
       // In timeline: le task sono già filtrate per cleaner, usa direttamente allTasks
@@ -71,23 +71,35 @@ export default function TaskCard({
   };
 
   const navigableTasks = getNavigableTasks();
-  const currentTaskInNavigable = navigableTasks.findIndex(t => t.id === currentTaskId);
+  const currentTaskInNavigable = navigableTasks.findIndex(t => String(t.id) === String(currentTaskId));
 
-  const canGoPrev = currentTaskInNavigable > 0;
-  const canGoNext = currentTaskInNavigable < navigableTasks.length - 1;
+  const canGoPrev = navigableTasks.length > 1 && currentTaskInNavigable > 0;
+  const canGoNext = navigableTasks.length > 1 && currentTaskInNavigable < navigableTasks.length - 1 && currentTaskInNavigable !== -1;
 
   const handlePrevTask = () => {
-    if (!canGoPrev) return;
-    const prevTask = navigableTasks[currentTaskInNavigable - 1];
+    if (!canGoPrev || navigableTasks.length === 0) return;
+    const currentIndex = navigableTasks.findIndex(t => String(t.id) === String(currentTaskId));
+    if (currentIndex <= 0) return;
+    const prevTask = navigableTasks[currentIndex - 1];
+    console.log('🔄 Navigazione PREV:', {
+      from: currentTaskId,
+      to: prevTask.id,
+      currentIndex,
+      totalTasks: navigableTasks.length
+    });
     setCurrentTaskId(prevTask.id);
   };
 
   const handleNextTask = () => {
-    if (!canGoNext) return;
-    const nextTask = navigableTasks[currentTaskInNavigable + 1];
+    if (!canGoNext || navigableTasks.length === 0) return;
+    const currentIndex = navigableTasks.findIndex(t => String(t.id) === String(currentTaskId));
+    if (currentIndex === -1 || currentIndex >= navigableTasks.length - 1) return;
+    const nextTask = navigableTasks[currentIndex + 1];
     console.log('🔄 Navigazione NEXT:', {
       from: currentTaskId,
       to: nextTask.id,
+      currentIndex,
+      totalTasks: navigableTasks.length,
       nextTaskData: {
         name: (nextTask as any).logistic_code || nextTask.name,
         premium: nextTask.premium,
