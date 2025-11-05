@@ -908,11 +908,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       console.log(`✅ Assegnazioni confermate e salvate in Object Storage: ${filename}`);
 
-      // Formatta la data e l'ora per mostrare nel formato "DD/MM/YY HH:MM"
+      // Formatta data e ora nel formato "HH:MM, DD/MM/YY"
       const now = new Date();
       const hours = String(now.getHours()).padStart(2, '0');
       const minutes = String(now.getMinutes()).padStart(2, '0');
-      const formattedDateTime = `${day}/${month}/${year} ${hours}:${minutes}`;
+      const formattedDateTime = `${hours}:${minutes}, ${day}/${month}/${year}`;
 
       res.json({
         success: true,
@@ -994,7 +994,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Recupera i metadati dell'Object Storage per ottenere la data di creazione
       const metadata = await client.stat(filename, { bucket: 'wass_assignments' });
-      
+
       let formattedDateTime = null;
       if (metadata.ok && metadata.value.timeCreated) {
         const createdDate = new Date(metadata.value.timeCreated);
@@ -1003,7 +1003,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const year = String(createdDate.getFullYear()).slice(-2);
         const hours = String(createdDate.getHours()).padStart(2, '0');
         const minutes = String(createdDate.getMinutes()).padStart(2, '0');
-        formattedDateTime = `${day}/${month}/${year} ${hours}:${minutes}`;
+        formattedDateTime = `${hours}:${minutes}, ${day}/${month}/${year}`;
       } else if (lastSavedTimestamp) {
         // Fallback: usa solo la data dal filename se i metadata non sono disponibili
         formattedDateTime = `${lastSavedTimestamp.slice(0, 2)}/${lastSavedTimestamp.slice(2, 4)}/${lastSavedTimestamp.slice(4, 6)}`;

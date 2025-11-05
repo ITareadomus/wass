@@ -852,7 +852,7 @@ export default function TimelineView({
                 </Button>
                 {lastSavedFilename && (
                   <div className="text-xs text-red-500 text-center">
-                    ultimo salvataggio: {lastSavedFilename.toLowerCase()}
+                    ultimo salvataggio: {lastSavedFilename}
                   </div>
                 )}
               </div>
