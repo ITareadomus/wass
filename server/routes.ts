@@ -837,36 +837,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { date } = req.body;
       const workDate = date || format(new Date(), 'yyyy-MM-dd');
-      
+
       // Leggi timeline.json corrente
       const timelinePath = path.join(process.cwd(), 'client/public/data/output/timeline.json');
       const timelineData = JSON.parse(await fs.readFile(timelinePath, 'utf8'));
-      
+
       // Crea nome file con formato ddmmyy
       const dateObj = new Date(workDate);
       const day = String(dateObj.getDate()).padStart(2, '0');
       const month = String(dateObj.getMonth() + 1).padStart(2, '0');
       const year = String(dateObj.getFullYear()).slice(-2);
       const filename = `assignments_${day}${month}${year}.json`;
-      
+
       // Salva nel bucket wass_assignments usando Replit Object Storage
       const { Client } = await import('@replit/object-storage');
       const client = new Client();
-      
+
       // Converti i dati in stringa JSON
       const jsonContent = JSON.stringify(timelineData, null, 2);
-      
+
       // Upload nel bucket wass_assignments usando uploadFromText
       const result = await client.uploadFromText(filename, jsonContent, {
         bucket: 'wass_assignments'
       });
-      
+
       if (!result.ok) {
         throw new Error(result.error || 'Errore sconosciuto nel salvataggio');
       }
-      
+
       console.log(`✅ Assegnazioni confermate e salvate in Object Storage: ${filename}`);
-      
+
       res.json({ 
         success: true, 
         filename,
@@ -884,8 +884,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Endpoint per rimuovere un cleaner da selected_cleaners.json
   app.post("/api/remove-cleaner-from-selected", async (req, res) => {
     try {
-      const { cleanerId } = req.body;
-      
+      const { cleanerId, date } = req.body;
+
       if (!cleanerId) {
         return res.status(400).json({ 
           success: false, 
@@ -893,9 +893,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
+      const workDate = date || format(new Date(), 'yyyy-MM-dd');
       const selectedCleanersPath = path.join(
         process.cwd(), 
         'client/public/data/cleaners/selected_cleaners.json'
+      );
+      const timelinePath = path.join(
+        process.cwd(), 
+        'client/public/data/output/timeline.json'
       );
 
       // Carica i cleaners selezionati
@@ -907,30 +912,73 @@ export async function registerRoutes(app: Express): Promise<Server> {
         selectedData = { cleaners: [], total_selected: 0 };
       }
 
-      // Rimuovi il cleaner dall'array
+      // Carica timeline per verificare se il cleaner ha task
+      let timelineData: any;
+      let hasTasks = false;
+      try {
+        const timelineContent = await fs.readFile(timelinePath, 'utf8');
+        timelineData = JSON.parse(timelineContent);
+
+        const cleanerEntry = timelineData.cleaners_assignments?.find(
+          (c: any) => c.cleaner?.id === cleanerId
+        );
+        hasTasks = cleanerEntry && cleanerEntry.tasks && cleanerEntry.tasks.length > 0;
+      } catch (error) {
+        // Timeline non esiste, nessuna task
+        hasTasks = false;
+      }
+
+      // Rimuovi il cleaner da selected_cleaners.json
       const cleanersBefore = selectedData.cleaners.length;
       selectedData.cleaners = selectedData.cleaners.filter((c: any) => c.id !== cleanerId);
       selectedData.total_selected = selectedData.cleaners.length;
 
-      // Salva il file aggiornato
+      // Salva selected_cleaners.json
       const tmpPath = `${selectedCleanersPath}.tmp`;
       await fs.writeFile(tmpPath, JSON.stringify(selectedData, null, 2));
       await fs.rename(tmpPath, selectedCleanersPath);
 
-      console.log(`✅ Cleaner ${cleanerId} rimosso da selected_cleaners.json (${cleanersBefore} -> ${selectedData.cleaners.length})`);
-      console.log(`   Il cleaner rimane in timeline.json con le sue task fino a sostituzione`);
+      let message = "";
+
+      // Se il cleaner NON ha task, rimuovilo anche da timeline.json
+      if (!hasTasks && timelineData) {
+        timelineData.cleaners_assignments = timelineData.cleaners_assignments.filter(
+          (c: any) => c.cleaner?.id !== cleanerId
+        );
+
+        // Aggiorna metadata
+        timelineData.metadata = timelineData.metadata || {};
+        timelineData.metadata.last_updated = new Date().toISOString();
+        timelineData.metadata.date = workDate;
+        timelineData.meta = timelineData.meta || {};
+        timelineData.meta.total_cleaners = timelineData.cleaners_assignments.length;
+        timelineData.meta.total_tasks = timelineData.cleaners_assignments.reduce(
+          (sum: number, c: any) => sum + (c.tasks?.length || 0), 0
+        );
+
+        // Salva timeline.json
+        const tmpTimelinePath = `${timelinePath}.tmp`;
+        await fs.writeFile(tmpTimelinePath, JSON.stringify(timelineData, null, 2));
+        await fs.rename(tmpTimelinePath, timelinePath);
+
+        console.log(`✅ Cleaner ${cleanerId} rimosso completamente (nessuna task)`);
+        console.log(`   - Rimosso da selected_cleaners.json (${cleanersBefore} -> ${selectedData.cleaners.length})`);
+        console.log(`   - Rimosso da timeline.json`);
+        message = "Cleaner rimosso completamente (nessuna task)";
+      } else {
+        console.log(`✅ Cleaner ${cleanerId} rimosso da selected_cleaners.json (${cleanersBefore} -> ${selectedData.cleaners.length})`);
+        console.log(`   Il cleaner rimane in timeline.json con le sue task fino a sostituzione`);
+        message = "Cleaner rimosso dalla selezione (task mantenute)";
+      }
 
       res.json({ 
         success: true, 
-        message: "Cleaner rimosso da selected_cleaners.json (rimane in timeline fino a sostituzione)",
-        remaining: selectedData.cleaners.length
+        message,
+        removedFromTimeline: !hasTasks
       });
     } catch (error: any) {
-      console.error("Errore nella rimozione del cleaner da selected_cleaners.json:", error);
-      res.status(500).json({ 
-        success: false, 
-        error: error.message 
-      });
+      console.error("Errore nella rimozione del cleaner:", error);
+      res.status(500).json({ success: false, error: error.message });
     }
   });
 
@@ -938,7 +986,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/save-selected-cleaners", async (req, res) => {
     try {
       const { cleaners: selectedCleaners, total_selected } = req.body;
-      
+
       if (!selectedCleaners || !Array.isArray(selectedCleaners)) {
         return res.status(400).json({ 
           success: false, 
@@ -950,12 +998,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const cleanersPath = path.join(process.cwd(), 'client/public/data/cleaners/cleaners.json');
       const cleanersContent = await fs.readFile(cleanersPath, 'utf8');
       const cleanersData = JSON.parse(cleanersContent);
-      
+
       // Estrai la data più recente
       const dates = Object.keys(cleanersData.dates);
       const latestDate = dates.sort().reverse()[0];
       const allCleaners = cleanersData.dates[latestDate]?.cleaners || [];
-      
+
       // Crea mappa can_do_straordinaria per ID
       const straordinariaMap = new Map();
       allCleaners.forEach((c: any) => {
@@ -2055,7 +2103,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  
+
 
 
   // Endpoint per spostare/riordinare task nella timeline con indici precisi
@@ -2113,20 +2161,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const taskKey = String(typeof taskId !== 'undefined' ? taskId : logisticCode);
 
       let dstEntry = getCleanerEntry(toCleanerId);
-      
+
       // Se il cleaner di destinazione non esiste, crealo (caso cleaner nascosto)
       if (!dstEntry) {
         // Carica i dati del cleaner da cleaners.json
         const cleanersPath = path.join(process.cwd(), 'client/public/data/cleaners/cleaners.json');
         const selectedCleanersPath = path.join(process.cwd(), 'client/public/data/cleaners/selected_cleaners.json');
-        
+
         try {
           const cleanersData = JSON.parse(await fs.readFile(cleanersPath, 'utf8'));
           const selectedData = JSON.parse(await fs.readFile(selectedCleanersPath, 'utf8'));
-          
+
           // Cerca prima nei selected_cleaners
           let cleanerInfo = selectedData.cleaners.find((c: any) => c.id === toCleanerId);
-          
+
           // Se non trovato, cerca in cleaners.json per la data
           if (!cleanerInfo) {
             for (const date of Object.keys(cleanersData.dates || {})) {
@@ -2135,11 +2183,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
               if (cleanerInfo) break;
             }
           }
-          
+
           if (!cleanerInfo) {
             return res.status(400).json({ success: false, message: 'Cleaner di destinazione non trovato' });
           }
-          
+
           // Crea la nuova entry per il cleaner
           dstEntry = {
             cleaner: {
@@ -2158,7 +2206,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return res.status(400).json({ success: false, message: 'Errore nel caricamento dati cleaner' });
         }
       }
-      
+
       if (!Array.isArray(dstEntry.tasks)) {
         dstEntry.tasks = [];
       }
@@ -2185,12 +2233,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (takeIdx === null) {
           return res.status(404).json({ success: false, message: 'Task non trovata nel cleaner sorgente' });
         }
-        
+
         // Se stesso cleaner, traccia l'indice di rimozione
         if (fromCleanerId === toCleanerId) {
           removedFromIndex = takeIdx;
         }
-        
+
         [moved] = srcEntry.tasks.splice(takeIdx, 1);
 
         // Aggiorna sequence nel cleaner sorgente
@@ -2221,14 +2269,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Inserimento nella posizione richiesta
       let insertAt = typeof destIndex === 'number' ? destIndex : dstEntry.tasks.length;
-      
+
       // CRITICAL FIX: Quando spostiamo nello stesso cleaner, dopo aver rimosso la task
       // l'array è più corto di 1, quindi dobbiamo aggiustare l'indice di destinazione
       if (removedFromIndex !== null && removedFromIndex < insertAt) {
         insertAt = insertAt - 1;
         console.log(`🔧 Aggiustato destIndex da ${destIndex} a ${insertAt} (rimozione da ${removedFromIndex})`);
       }
-      
+
       if (insertAt < 0) insertAt = 0;
       if (insertAt > dstEntry.tasks.length) insertAt = dstEntry.tasks.length;
       dstEntry.tasks.splice(insertAt, 0, moved);
@@ -2241,7 +2289,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const updatedDst = await recalculateCleanerTimes(dstEntry);
         dstEntry.tasks = updatedDst.tasks;
         console.log(`✅ Tempi ricalcolati per cleaner ${toCleanerId} dopo inserimento`);
-        
+
         // Se c'è un cleaner sorgente diverso, ricalcola anche quello
         if (typeof fromCleanerId === 'number' && fromCleanerId !== toCleanerId) {
           const srcEntry = getCleanerEntry(fromCleanerId);
