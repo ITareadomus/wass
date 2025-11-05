@@ -133,33 +133,6 @@
       "can_do_straordinaria": false
     },
     {
-      "id": 829,
-      "name": "MUSTAPHA",
-      "lastname": "BAH",
-      "role": "Premium",
-      "active": true,
-      "ranking": 0,
-      "counter_hours": 4,
-      "counter_days": 9,
-      "available": true,
-      "contract_type": "B",
-      "preferred_customers": [
-        3,
-        61,
-        64,
-        72,
-        75,
-        84,
-        91,
-        94,
-        113,
-        115
-      ],
-      "telegram_id": 7108751314,
-      "start_time": "10:00",
-      "can_do_straordinaria": false
-    },
-    {
       "id": 789,
       "name": "LAFORTUNE",
       "lastname": "DJOUKOUO NGUEMTHE",
@@ -321,5 +294,5 @@
       "can_do_straordinaria": false
     }
   ],
-  "total_selected": 12
+  "total_selected": 11
 }
