@@ -1138,55 +1138,10 @@ export default function GenerateAssignments() {
                   </div>
 
                   {/* Non Assegnate */}
-                  <div className="bg-gray-50 dark:bg-gray-950/20 rounded-lg p-3 border border-gray-200 dark:border-gray-800">
+                  <div className="bg-gray-50 dark:bg-gray-950/20 rounded-lg p-3 border border-gray-200 dark:border-gray-800 col-span-2">
                     <div className="text-xs text-gray-600 dark:text-gray-400 font-medium mb-1">Non Assegnate</div>
                     <div className="text-2xl font-bold text-gray-700 dark:text-gray-300">
                       {earlyOutTasks.length + highPriorityTasks.length + lowPriorityTasks.length}
-                    </div>
-                  </div>
-
-                  {/* Check-out/Check-in Infranto */}
-                  <div className="bg-orange-50 dark:bg-orange-950/20 rounded-lg p-3 border border-orange-200 dark:border-orange-800">
-                    <div className="text-xs text-orange-600 dark:text-orange-400 font-medium mb-1">CI/CO Infranto</div>
-                    <div className="text-2xl font-bold text-orange-700 dark:text-orange-300">
-                      {allTasksWithAssignments.filter(t => {
-                        const task = t as any;
-                        // Solo task assegnate con orari di lavoro
-                        if (!task.assignedCleaner || !task.start_time || !task.end_time) return false;
-                        
-                        const checkoutTime = task.checkout_time;
-                        const checkinTime = task.checkin_time;
-                        const endTime = task.end_time;
-                        const startTime = task.start_time;
-
-                        let violated = false;
-
-                        // Violazione checkout: SOLO se checkout_time esiste ed è definito
-                        if (checkoutTime && checkoutTime !== null && endTime) {
-                          const [endHour, endMin] = endTime.split(':').map(Number);
-                          const [checkoutHour, checkoutMin] = checkoutTime.split(':').map(Number);
-                          const endMinutes = endHour * 60 + endMin;
-                          const checkoutMinutes = checkoutHour * 60 + checkoutMin;
-                          
-                          if (endMinutes > checkoutMinutes) {
-                            violated = true;
-                          }
-                        }
-
-                        // Violazione checkin: SOLO se checkin_time esiste ed è definito
-                        if (checkinTime && checkinTime !== null && startTime) {
-                          const [startHour, startMin] = startTime.split(':').map(Number);
-                          const [checkinHour, checkinMin] = checkinTime.split(':').map(Number);
-                          const startMinutes = startHour * 60 + startMin;
-                          const checkinMinutes = checkinHour * 60 + checkinMin;
-                          
-                          if (startMinutes < checkinMinutes) {
-                            violated = true;
-                          }
-                        }
-
-                        return violated;
-                      }).length}
                     </div>
                   </div>
                 </div>
