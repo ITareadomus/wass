@@ -1,6 +1,6 @@
 {
   "metadata": {
-    "last_updated": "2025-11-05T10:49:50.445121",
+    "last_updated": "2025-11-05T10:53:59.629766",
     "date": "2025-11-05"
   },
   "containers": {
@@ -223,6 +223,33 @@
           "priority": "early_out"
         },
         {
+          "task_id": 218323,
+          "logistic_code": 1487,
+          "client_id": 61,
+          "premium": false,
+          "address": "viale monteceneri 58",
+          "lat": "45.4920654",
+          "lng": "9.1541396",
+          "cleaning_time": 60,
+          "checkin_date": null,
+          "checkout_date": "2025-11-05",
+          "checkin_time": null,
+          "checkout_time": null,
+          "pax_in": 3,
+          "pax_out": 1,
+          "small_equipment": true,
+          "operation_id": 2,
+          "confirmed_operation": true,
+          "straordinaria": false,
+          "type_apt": "A",
+          "alias": "NTM",
+          "customer_name": "NOTA-MI",
+          "reasons": [
+            "client_forced_eo"
+          ],
+          "priority": "early_out"
+        },
+        {
           "task_id": 218324,
           "logistic_code": 1623,
           "client_id": 61,
@@ -252,7 +279,7 @@
         {
           "task_id": 218325,
           "logistic_code": 1625,
-          "client_id": null,
+          "client_id": 61,
           "premium": false,
           "address": "via Goffredo Mameli 9",
           "lat": "45.466406",
@@ -264,39 +291,16 @@
           "checkout_time": null,
           "pax_in": 1,
           "pax_out": 1,
-          "small_equipment": false,
+          "small_equipment": true,
           "operation_id": 2,
           "confirmed_operation": true,
           "straordinaria": false,
           "type_apt": "A",
           "alias": "NTM",
           "customer_name": "NOTA-MI",
-          "reasons": [],
-          "priority": "early_out"
-        },
-        {
-          "task_id": 218323,
-          "logistic_code": 1487,
-          "client_id": null,
-          "premium": false,
-          "address": "viale monteceneri 58",
-          "lat": "45.4920654",
-          "lng": "9.1541396",
-          "cleaning_time": 60,
-          "checkin_date": null,
-          "checkout_date": "2025-11-05",
-          "checkin_time": null,
-          "checkout_time": null,
-          "pax_in": 3,
-          "pax_out": 1,
-          "small_equipment": false,
-          "operation_id": 2,
-          "confirmed_operation": true,
-          "straordinaria": false,
-          "type_apt": "A",
-          "alias": "NTM",
-          "customer_name": "NOTA-MI",
-          "reasons": [],
+          "reasons": [
+            "client_forced_eo"
+          ],
           "priority": "early_out"
         }
       ],

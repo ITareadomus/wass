@@ -1,6 +1,6 @@
 {
   "metadata": {
-    "last_updated": "2025-11-05T10:51:47.655Z",
+    "last_updated": "2025-11-05T10:54:21.067Z",
     "date": "2025-11-05"
   },
   "cleaners_assignments": [
@@ -13,39 +13,17 @@
         "premium": false
       },
       "assignment_type": "manual_drag",
+      "tasks": []
+    },
+    {
+      "cleaner": {
+        "id": 24,
+        "name": "HUSSAIN",
+        "lastname": "SYED SHUJIAHAT",
+        "role": "Standard",
+        "premium": false
+      },
       "tasks": [
-        {
-          "task_id": 218325,
-          "logistic_code": 1625,
-          "client_id": null,
-          "premium": false,
-          "address": "via Goffredo Mameli 9",
-          "lat": "45.466406",
-          "lng": "9.2134926",
-          "cleaning_time": 60,
-          "checkin_date": "2025-11-06",
-          "checkout_date": "2025-11-05",
-          "checkin_time": null,
-          "checkout_time": null,
-          "pax_in": 1,
-          "pax_out": 1,
-          "small_equipment": false,
-          "operation_id": 2,
-          "confirmed_operation": true,
-          "straordinaria": false,
-          "type_apt": "A",
-          "alias": "NTM",
-          "customer_name": "NOTA-MI",
-          "reasons": [
-            "manually_moved_to_timeline"
-          ],
-          "priority": "early_out",
-          "start_time": "10:00",
-          "end_time": "11:00",
-          "followup": false,
-          "sequence": 1,
-          "travel_time": 0
-        },
         {
           "task_id": 218324,
           "logistic_code": 1623,
@@ -72,50 +50,6 @@
             "manually_moved_to_timeline"
           ],
           "priority": "early_out",
-          "start_time": "11:40",
-          "end_time": "12:40",
-          "followup": true,
-          "sequence": 2,
-          "travel_time": 40
-        }
-      ]
-    },
-    {
-      "cleaner": {
-        "id": 24,
-        "name": "HUSSAIN",
-        "lastname": "SYED SHUJIAHAT",
-        "role": "Standard",
-        "premium": false
-      },
-      "assignment_type": "manual_drag",
-      "tasks": [
-        {
-          "task_id": 218323,
-          "logistic_code": 1487,
-          "client_id": null,
-          "premium": false,
-          "address": "viale monteceneri 58",
-          "lat": "45.4920654",
-          "lng": "9.1541396",
-          "cleaning_time": 60,
-          "checkin_date": null,
-          "checkout_date": "2025-11-05",
-          "checkin_time": null,
-          "checkout_time": null,
-          "pax_in": 3,
-          "pax_out": 1,
-          "small_equipment": false,
-          "operation_id": 2,
-          "confirmed_operation": true,
-          "straordinaria": false,
-          "type_apt": "A",
-          "alias": "NTM",
-          "customer_name": "NOTA-MI",
-          "reasons": [
-            "manually_moved_to_timeline"
-          ],
-          "priority": "early_out",
           "start_time": "10:00",
           "end_time": "11:00",
           "followup": false,
@@ -126,9 +60,9 @@
     }
   ],
   "meta": {
-    "total_cleaners": 2,
+    "total_cleaners": 1,
     "used_cleaners": 0,
     "assigned_tasks": 0,
-    "total_tasks": 3
+    "total_tasks": 1
   }
 }
