@@ -237,7 +237,7 @@ export default function TaskCard({
                     style={{
                       ...provided.draggableProps.style,
                       width: cardWidth,
-                      minHeight: "40px",
+                      minHeight: "28px",
                     }}
                     data-testid={`task-card-${task.id}`}
                     onClick={(e) => {
@@ -247,29 +247,29 @@ export default function TaskCard({
                     }}
                   >
                     {!isConfirmedOperation && (
-                      <div className="absolute top-0.5 right-0.5 z-50">
+                      <div className="absolute top-0 right-0 z-50">
                         <HelpCircle
-                          className="w-3 h-3 text-gray-900"
+                          className="w-2.5 h-2.5 text-gray-900"
                           strokeWidth={2.5}
                         />
                       </div>
                     )}
                     <div 
-                      className="flex flex-col items-center justify-center h-full gap-0"
+                      className="flex flex-col items-center justify-center h-full"
                     >
-                      <div className="flex items-center gap-1">
+                      <div className="flex items-center gap-0.5">
                         <span
-                          className="text-[13px] text-[#ff0000] font-extrabold"
+                          className="text-[11px] text-[#ff0000] font-extrabold leading-none"
                           data-testid={`task-name-${task.id}`}
                         >
                           {task.name}
                         </span>
-                        <span className="text-[11px] opacity-60 leading-none font-bold text-[#000000]">
+                        <span className="text-[9px] opacity-60 leading-none font-bold text-[#000000]">
                           ({task.duration.replace(".", ":")}h)
                         </span>
                       </div>
                       {task.alias && (
-                        <span className="text-[11px] opacity-70 leading-none mt-0.5 text-[#000000] font-bold">
+                        <span className="text-[9px] opacity-70 leading-none mt-0 text-[#000000] font-bold">
                           {task.alias}{(task as any).type_apt ? ` (${(task as any).type_apt})` : ''}
                         </span>
                       )}
