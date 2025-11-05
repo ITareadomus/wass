@@ -532,6 +532,7 @@ export default function GenerateAssignments() {
 
       console.log(`📅 Assegnazione EO per data: ${dateStr}`);
       console.log(`📅 selectedDate oggetto:`, selectedDate);
+      console.log(`📅 Invio data al backend:`, dateStr);
 
       const response = await fetch('/api/assign-early-out-to-timeline', {
         method: 'POST',
@@ -575,6 +576,7 @@ export default function GenerateAssignments() {
 
       console.log(`📅 Assegnazione HP per data: ${dateStr}`);
       console.log(`📅 selectedDate oggetto:`, selectedDate);
+      console.log(`📅 Invio data al backend:`, dateStr);
 
       const response = await fetch('/api/assign-high-priority-to-timeline', {
         method: 'POST',
@@ -622,6 +624,7 @@ export default function GenerateAssignments() {
 
       console.log(`📅 Assegnazione LP per data: ${dateStr}`);
       console.log(`📅 selectedDate oggetto:`, selectedDate);
+      console.log(`📅 Invio data al backend:`, dateStr);
 
       const response = await fetch('/api/assign-low-priority-to-timeline', {
         method: 'POST',
