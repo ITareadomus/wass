@@ -438,8 +438,10 @@ export default function TimelineView({
         throw new Error('Errore nel reset della timeline');
       }
 
-      // 2. Ricarica la pagina per rieseguire extract_all
-      window.location.reload();
+      // 2. Ricarica i task senza ricaricare la pagina (mantiene la data)
+      if ((window as any).reloadAllTasks) {
+        await (window as any).reloadAllTasks();
+      }
     } catch (error) {
       console.error('Errore nel reset:', error);
       alert('Errore durante il reset delle assegnazioni');
