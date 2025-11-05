@@ -14,9 +14,11 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { Input } from "@/components/ui/input";
 import { useState, useEffect } from "react";
-import { HelpCircle, ChevronLeft, ChevronRight } from "lucide-react";
+import { HelpCircle, ChevronLeft, ChevronRight, Save } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useToast } from "@/hooks/use-toast";
 
 interface TaskCardProps {
   task: Task;
@@ -44,6 +46,16 @@ export default function TaskCard({
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [currentTaskId, setCurrentTaskId] = useState(task.id);
   const [assignmentTimes, setAssignmentTimes] = useState<{ start_time?: string; end_time?: string; travel_time?: number }>({});
+  const { toast } = useToast();
+
+  // Stati per editing
+  const [isEditing, setIsEditing] = useState(false);
+  const [editedCheckoutDate, setEditedCheckoutDate] = useState("");
+  const [editedCheckoutTime, setEditedCheckoutTime] = useState("");
+  const [editedCheckinDate, setEditedCheckinDate] = useState("");
+  const [editedCheckinTime, setEditedCheckinTime] = useState("");
+  const [editedDuration, setEditedDuration] = useState("");
+  const [isSaving, setIsSaving] = useState(false);
 
   // Determina le task navigabili in base al contesto
   const getNavigableTasks = () => {
@@ -89,8 +101,21 @@ export default function TaskCard({
   useEffect(() => {
     if (isModalOpen) {
       setCurrentTaskId(task.id);
+      setIsEditing(false);
+      
+      // Inizializza campi editabili con i valori attuali
+      setEditedCheckoutDate((displayTask as any).checkout_date || "");
+      setEditedCheckoutTime((displayTask as any).checkout_time || "");
+      setEditedCheckinDate((displayTask as any).checkin_date || "");
+      setEditedCheckinTime((displayTask as any).checkin_time || "");
+      
+      // Converti duration da "1.30" a "90" minuti
+      const duration = displayTask.duration || "0.0";
+      const [hours, mins] = duration.split('.').map(Number);
+      const totalMinutes = (hours || 0) * 60 + (mins || 0);
+      setEditedDuration(totalMinutes.toString());
     }
-  }, [isModalOpen, task.id]);
+  }, [isModalOpen, task.id, displayTask]);
 
   // Task corrente da visualizzare - trova sempre per ID
   const displayTask = allTasks.find(t => t.id === currentTaskId) || task;
@@ -164,6 +189,54 @@ export default function TaskCard({
   const handleCardClick = (e: React.MouseEvent) => {
     e.stopPropagation();
     setIsModalOpen(true);
+  };
+
+  const handleSaveChanges = async () => {
+    try {
+      setIsSaving(true);
+      
+      const response = await fetch('/api/update-task-details', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          taskId: displayTask.id,
+          logisticCode: displayTask.name,
+          checkoutDate: editedCheckoutDate,
+          checkoutTime: editedCheckoutTime,
+          checkinDate: editedCheckinDate,
+          checkinTime: editedCheckinTime,
+          cleaningTime: parseInt(editedDuration),
+        }),
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        toast({
+          title: "Modifiche salvate!",
+          description: "I dettagli della task sono stati aggiornati con successo.",
+        });
+        
+        setIsEditing(false);
+        setIsModalOpen(false);
+        
+        // Ricarica i task per mostrare le modifiche
+        if ((window as any).reloadAllTasks) {
+          await (window as any).reloadAllTasks();
+        }
+      } else {
+        throw new Error(result.error || 'Errore nel salvataggio');
+      }
+    } catch (error: any) {
+      console.error("Errore nel salvataggio:", error);
+      toast({
+        title: "Errore",
+        description: error.message || "Impossibile salvare le modifiche",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   // Calcola la larghezza in base alla durata
@@ -377,50 +450,108 @@ export default function TaskCard({
                 <p className="text-sm">{displayTask.address?.toLowerCase() || "non migrato"}</p>
               </div>
               <div>
-                <p className="text-sm font-semibold text-muted-foreground">
+                <p className="text-sm font-semibold text-muted-foreground mb-1">
                   Durata di pulizia
                 </p>
-                <p className="text-sm">{displayTask.duration.replace(".", ":")} ore</p>
+                {isEditing ? (
+                  <div className="flex items-center gap-2">
+                    <Input
+                      type="number"
+                      value={editedDuration}
+                      onChange={(e) => setEditedDuration(e.target.value)}
+                      className="text-sm w-20"
+                      min="0"
+                    />
+                    <span className="text-sm text-muted-foreground">minuti</span>
+                  </div>
+                ) : (
+                  <p 
+                    className="text-sm cursor-pointer hover:bg-muted/50 p-1 rounded"
+                    onClick={() => setIsEditing(true)}
+                  >
+                    {displayTask.duration.replace(".", ":")} ore
+                  </p>
+                )}
               </div>
             </div>
 
             {/* Terza riga: Checkout - Checkin */}
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <p className="text-sm font-semibold text-muted-foreground">
+                <p className="text-sm font-semibold text-muted-foreground mb-1">
                   Checkout
                 </p>
-                <p className="text-sm">
-                  {(displayTask as any).checkout_date
-                    ? new Date((displayTask as any).checkout_date).toLocaleDateString(
-                        "it-IT",
-                        { day: "2-digit", month: "2-digit", year: "numeric" },
-                      )
-                    : "non migrato"}
-                  {(displayTask as any).checkout_date
-                    ? ((displayTask as any).checkout_time
-                        ? ` - ${(displayTask as any).checkout_time}`
-                        : " - orario non migrato")
-                    : ""}
-                </p>
+                {isEditing ? (
+                  <div className="space-y-2">
+                    <Input
+                      type="date"
+                      value={editedCheckoutDate}
+                      onChange={(e) => setEditedCheckoutDate(e.target.value)}
+                      className="text-sm"
+                    />
+                    <Input
+                      type="time"
+                      value={editedCheckoutTime}
+                      onChange={(e) => setEditedCheckoutTime(e.target.value)}
+                      className="text-sm"
+                    />
+                  </div>
+                ) : (
+                  <p 
+                    className="text-sm cursor-pointer hover:bg-muted/50 p-1 rounded"
+                    onClick={() => setIsEditing(true)}
+                  >
+                    {(displayTask as any).checkout_date
+                      ? new Date((displayTask as any).checkout_date).toLocaleDateString(
+                          "it-IT",
+                          { day: "2-digit", month: "2-digit", year: "numeric" },
+                        )
+                      : "non migrato"}
+                    {(displayTask as any).checkout_date
+                      ? ((displayTask as any).checkout_time
+                          ? ` - ${(displayTask as any).checkout_time}`
+                          : " - orario non migrato")
+                      : ""}
+                  </p>
+                )}
               </div>
               <div>
-                <p className="text-sm font-semibold text-muted-foreground">
+                <p className="text-sm font-semibold text-muted-foreground mb-1">
                   Checkin
                 </p>
-                <p className="text-sm">
-                  {(displayTask as any).checkin_date
-                    ? new Date((displayTask as any).checkin_date).toLocaleDateString(
-                        "it-IT",
-                        { day: "2-digit", month: "2-digit", year: "numeric" },
-                      )
-                    : "non migrato"}
-                  {(displayTask as any).checkin_date
-                    ? ((displayTask as any).checkin_time
-                        ? ` - ${(displayTask as any).checkin_time}`
-                        : " - orario non migrato")
-                    : ""}
-                </p>
+                {isEditing ? (
+                  <div className="space-y-2">
+                    <Input
+                      type="date"
+                      value={editedCheckinDate}
+                      onChange={(e) => setEditedCheckinDate(e.target.value)}
+                      className="text-sm"
+                    />
+                    <Input
+                      type="time"
+                      value={editedCheckinTime}
+                      onChange={(e) => setEditedCheckinTime(e.target.value)}
+                      className="text-sm"
+                    />
+                  </div>
+                ) : (
+                  <p 
+                    className="text-sm cursor-pointer hover:bg-muted/50 p-1 rounded"
+                    onClick={() => setIsEditing(true)}
+                  >
+                    {(displayTask as any).checkin_date
+                      ? new Date((displayTask as any).checkin_date).toLocaleDateString(
+                          "it-IT",
+                          { day: "2-digit", month: "2-digit", year: "numeric" },
+                        )
+                      : "non migrato"}
+                    {(displayTask as any).checkin_date
+                      ? ((displayTask as any).checkin_time
+                          ? ` - ${(displayTask as any).checkin_time}`
+                          : " - orario non migrato")
+                      : ""}
+                  </p>
+                )}
               </div>
             </div>
 
@@ -485,6 +616,37 @@ export default function TaskCard({
                 <p className="text-sm">{(displayTask as any).pax_out ?? "non migrato"}</p>
               </div>
             </div>
+
+            {/* Pulsante Salva Modifiche */}
+            {isEditing && (
+              <div className="pt-4 border-t mt-4 flex gap-2">
+                <Button
+                  onClick={handleSaveChanges}
+                  disabled={isSaving}
+                  className="flex-1"
+                >
+                  <Save className="w-4 h-4 mr-2" />
+                  {isSaving ? "Salvataggio..." : "Salva Modifiche"}
+                </Button>
+                <Button
+                  onClick={() => {
+                    setIsEditing(false);
+                    // Ripristina i valori originali
+                    setEditedCheckoutDate((displayTask as any).checkout_date || "");
+                    setEditedCheckoutTime((displayTask as any).checkout_time || "");
+                    setEditedCheckinDate((displayTask as any).checkin_date || "");
+                    setEditedCheckinTime((displayTask as any).checkin_time || "");
+                    const duration = displayTask.duration || "0.0";
+                    const [hours, mins] = duration.split('.').map(Number);
+                    const totalMinutes = (hours || 0) * 60 + (mins || 0);
+                    setEditedDuration(totalMinutes.toString());
+                  }}
+                  variant="outline"
+                >
+                  Annulla
+                </Button>
+              </div>
+            )}
 
           </div>
         </DialogContent>

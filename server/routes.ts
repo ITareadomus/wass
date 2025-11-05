@@ -1446,6 +1446,80 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Endpoint per aggiornare i dettagli di una task (checkout, checkin, durata)
+  app.post("/api/update-task-details", async (req, res) => {
+    try {
+      const { taskId, logisticCode, checkoutDate, checkoutTime, checkinDate, checkinTime, cleaningTime } = req.body;
+
+      if (!taskId && !logisticCode) {
+        return res.status(400).json({ success: false, error: "taskId o logisticCode richiesto" });
+      }
+
+      const containersPath = path.join(process.cwd(), 'client/public/data/output/containers.json');
+      const timelinePath = path.join(process.cwd(), 'client/public/data/output/timeline.json');
+
+      // Carica entrambi i file
+      const [containersData, timelineData] = await Promise.all([
+        fs.readFile(containersPath, 'utf8').then(JSON.parse).catch(() => ({ containers: {} })),
+        fs.readFile(timelinePath, 'utf8').then(JSON.parse).catch(() => ({ cleaners_assignments: [] }))
+      ]);
+
+      let taskUpdated = false;
+
+      // Funzione helper per aggiornare una task
+      const updateTask = (task: any) => {
+        if (String(task.task_id) === String(taskId) || String(task.logistic_code) === String(logisticCode)) {
+          task.checkout_date = checkoutDate;
+          task.checkout_time = checkoutTime;
+          task.checkin_date = checkinDate;
+          task.checkin_time = checkinTime;
+          task.cleaning_time = cleaningTime;
+          taskUpdated = true;
+          return true;
+        }
+        return false;
+      };
+
+      // Aggiorna nei containers
+      if (containersData.containers) {
+        for (const containerType of ['early_out', 'high_priority', 'low_priority']) {
+          const container = containersData.containers[containerType];
+          if (container?.tasks) {
+            container.tasks.forEach(updateTask);
+          }
+        }
+      }
+
+      // Aggiorna in timeline
+      if (timelineData.cleaners_assignments) {
+        for (const cleanerEntry of timelineData.cleaners_assignments) {
+          if (cleanerEntry.tasks) {
+            cleanerEntry.tasks.forEach(updateTask);
+          }
+        }
+      }
+
+      if (!taskUpdated) {
+        return res.status(404).json({ success: false, error: "Task non trovata" });
+      }
+
+      // Salva entrambi i file in modo atomico
+      const tmpContainersPath = `${containersPath}.tmp`;
+      await fs.writeFile(tmpContainersPath, JSON.stringify(containersData, null, 2));
+      await fs.rename(tmpContainersPath, containersPath);
+
+      const tmpTimelinePath = `${timelinePath}.tmp`;
+      await fs.writeFile(tmpTimelinePath, JSON.stringify(timelineData, null, 2));
+      await fs.rename(tmpTimelinePath, timelinePath);
+
+      console.log(`✅ Task ${logisticCode} aggiornata con successo`);
+      res.json({ success: true, message: "Task aggiornata con successo" });
+    } catch (error: any) {
+      console.error("Errore nell'aggiornamento della task:", error);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
   // Endpoint per estrarre statistiche task per convocazioni
   app.post("/api/extract-convocazioni-tasks", async (req, res) => {
     try {
