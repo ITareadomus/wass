@@ -402,7 +402,7 @@ export default function Convocazioni() {
                           </span>
                           {canDoStraordinaria && (
                             <span className="px-2 py-0.5 rounded border font-medium text-sm bg-red-500/20 text-red-700 dark:text-red-300 border-red-500">
-                              S
+                              Straordinario
                             </span>
                           )}
                         </div>
