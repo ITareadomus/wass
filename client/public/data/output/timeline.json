@@ -1,141 +1,18 @@
 {
   "metadata": {
-    "last_updated": "2025-11-05T11:10:47.023Z",
+    "last_updated": "2025-11-05T11:13:41.830Z",
     "date": "2025-11-05"
   },
   "cleaners_assignments": [
     {
       "cleaner": {
-        "id": 626,
-        "name": "DORA PATRICIA",
-        "lastname": "JIMENEZ",
-        "role": "Formatore",
+        "id": 24,
+        "name": "HUSSAIN",
+        "lastname": "SYED SHUJIAHAT",
+        "role": "Standard",
         "premium": false
       },
-      "assignment_type": "manual_drag",
       "tasks": []
-    },
-    {
-      "cleaner": {
-        "id": 24,
-        "name": "HUSSAIN",
-        "lastname": "SYED SHUJIAHAT",
-        "role": "Standard",
-        "premium": false
-      },
-      "tasks": [
-        {
-          "task_id": 218317,
-          "logistic_code": 1626,
-          "client_id": 61,
-          "premium": false,
-          "address": "Via Giancarlo Sismondi, 74",
-          "lat": "45.465553",
-          "lng": "9.2346878",
-          "cleaning_time": 120,
-          "checkin_date": "2025-11-08",
-          "checkout_date": "2025-11-05",
-          "checkin_time": "18:00",
-          "checkout_time": null,
-          "pax_in": 4,
-          "pax_out": 1,
-          "small_equipment": false,
-          "operation_id": 2,
-          "confirmed_operation": true,
-          "straordinaria": false,
-          "type_apt": "C",
-          "alias": "NTM",
-          "customer_name": "NOTA-MI",
-          "reasons": [
-            "client_forced_eo",
-            "automatic_assignment_eo",
-            "manual_assignment"
-          ],
-          "priority": "early_out",
-          "start_time": "10:00",
-          "end_time": "12:00",
-          "followup": false,
-          "sequence": 1,
-          "travel_time": 0
-        }
-      ]
-    },
-    {
-      "cleaner": {
-        "id": 24,
-        "name": "HUSSAIN",
-        "lastname": "SYED SHUJIAHAT",
-        "role": "Standard",
-        "premium": false
-      },
-      "tasks": [
-        {
-          "task_id": 218322,
-          "logistic_code": 1472,
-          "client_id": 61,
-          "premium": false,
-          "address": "via Voghera 9/A",
-          "lat": "45.4540455",
-          "lng": "9.1676391",
-          "cleaning_time": 120,
-          "checkin_date": "2025-11-05",
-          "checkout_date": "2025-11-05",
-          "checkin_time": null,
-          "checkout_time": null,
-          "pax_in": 3,
-          "pax_out": 1,
-          "small_equipment": false,
-          "operation_id": 2,
-          "confirmed_operation": true,
-          "straordinaria": false,
-          "type_apt": "C",
-          "alias": "NTM",
-          "customer_name": "NOTA-MI",
-          "reasons": [
-            "client_forced_eo",
-            "automatic_assignment_eo"
-          ],
-          "priority": "early_out",
-          "start_time": "10:00",
-          "end_time": "12:00",
-          "followup": false,
-          "sequence": 1,
-          "travel_time": 0
-        },
-        {
-          "task_id": 217483,
-          "logistic_code": 1198,
-          "client_id": 2,
-          "premium": false,
-          "address": "Via Bergognone 31",
-          "lat": "45.453707852983",
-          "lng": "9.1641459982137",
-          "cleaning_time": 180,
-          "checkin_date": "2025-11-05",
-          "checkout_date": "2025-11-05",
-          "checkin_time": null,
-          "checkout_time": "09:00",
-          "pax_in": 3,
-          "pax_out": 4,
-          "small_equipment": false,
-          "operation_id": 2,
-          "confirmed_operation": true,
-          "straordinaria": false,
-          "type_apt": "D",
-          "alias": "ITW",
-          "customer_name": "ITALIANWAY SRL",
-          "reasons": [
-            "checkout_time<=eo_time",
-            "automatic_assignment_eo"
-          ],
-          "priority": "early_out",
-          "start_time": "12:07",
-          "end_time": "15:07",
-          "followup": true,
-          "sequence": 2,
-          "travel_time": 7
-        }
-      ]
     },
     {
       "cleaner": {
@@ -191,34 +68,34 @@
       },
       "tasks": [
         {
-          "task_id": 218324,
-          "logistic_code": 1623,
-          "client_id": null,
+          "task_id": 218317,
+          "logistic_code": 1626,
+          "client_id": 61,
           "premium": false,
-          "address": "via Principe Eugenio 15",
-          "lat": "45.48931",
-          "lng": "9.1635183",
-          "cleaning_time": 60,
-          "checkin_date": "2025-11-05",
+          "address": "Via Giancarlo Sismondi, 74",
+          "lat": "45.465553",
+          "lng": "9.2346878",
+          "cleaning_time": 120,
+          "checkin_date": "2025-11-08",
           "checkout_date": "2025-11-05",
-          "checkin_time": null,
+          "checkin_time": "18:00",
           "checkout_time": null,
-          "pax_in": 1,
+          "pax_in": 4,
           "pax_out": 1,
           "small_equipment": false,
           "operation_id": 2,
           "confirmed_operation": true,
           "straordinaria": false,
-          "type_apt": "A",
+          "type_apt": "C",
           "alias": "NTM",
           "customer_name": "NOTA-MI",
           "reasons": [
-            "manually_moved_to_timeline",
-            "manual_assignment"
+            "client_forced_eo",
+            "automatic_assignment_eo"
           ],
           "priority": "early_out",
           "start_time": "10:00",
-          "end_time": "11:00",
+          "end_time": "12:00",
           "followup": false,
           "sequence": 1,
           "travel_time": 0
@@ -367,6 +244,39 @@
       },
       "tasks": [
         {
+          "task_id": 218324,
+          "logistic_code": 1623,
+          "client_id": 61,
+          "premium": false,
+          "address": "via Principe Eugenio 15",
+          "lat": "45.48931",
+          "lng": "9.1635183",
+          "cleaning_time": 60,
+          "checkin_date": "2025-11-05",
+          "checkout_date": "2025-11-05",
+          "checkin_time": null,
+          "checkout_time": null,
+          "pax_in": 1,
+          "pax_out": 1,
+          "small_equipment": true,
+          "operation_id": 2,
+          "confirmed_operation": true,
+          "straordinaria": false,
+          "type_apt": "A",
+          "alias": "NTM",
+          "customer_name": "NOTA-MI",
+          "reasons": [
+            "client_forced_eo",
+            "automatic_assignment_eo"
+          ],
+          "priority": "early_out",
+          "start_time": "10:00",
+          "end_time": "11:00",
+          "followup": false,
+          "sequence": 1,
+          "travel_time": 0
+        },
+        {
           "task_id": 218323,
           "logistic_code": 1487,
           "client_id": 61,
@@ -393,6 +303,50 @@
             "automatic_assignment_eo"
           ],
           "priority": "early_out",
+          "start_time": "11:17",
+          "end_time": "12:17",
+          "followup": true,
+          "sequence": 2,
+          "travel_time": 17
+        }
+      ]
+    },
+    {
+      "cleaner": {
+        "id": 469,
+        "name": "LAMIN",
+        "lastname": "SOLY",
+        "role": "Standard",
+        "premium": false
+      },
+      "tasks": [
+        {
+          "task_id": 218325,
+          "logistic_code": 1625,
+          "client_id": 61,
+          "premium": false,
+          "address": "via Goffredo Mameli 9",
+          "lat": "45.466406",
+          "lng": "9.2134926",
+          "cleaning_time": 60,
+          "checkin_date": "2025-11-06",
+          "checkout_date": "2025-11-05",
+          "checkin_time": null,
+          "checkout_time": null,
+          "pax_in": 1,
+          "pax_out": 1,
+          "small_equipment": true,
+          "operation_id": 2,
+          "confirmed_operation": true,
+          "straordinaria": false,
+          "type_apt": "A",
+          "alias": "NTM",
+          "customer_name": "NOTA-MI",
+          "reasons": [
+            "client_forced_eo",
+            "automatic_assignment_eo"
+          ],
+          "priority": "early_out",
           "start_time": "10:00",
           "end_time": "11:00",
           "followup": false,
@@ -400,12 +354,124 @@
           "travel_time": 0
         }
       ]
+    },
+    {
+      "cleaner": {
+        "id": 249,
+        "name": "Ogbodo Chidi",
+        "lastname": "Igwe",
+        "role": "Premium",
+        "premium": true
+      },
+      "tasks": [
+        {
+          "task_id": 218322,
+          "logistic_code": 1472,
+          "client_id": 61,
+          "premium": false,
+          "address": "via Voghera 9/A",
+          "lat": "45.4540455",
+          "lng": "9.1676391",
+          "cleaning_time": 120,
+          "checkin_date": "2025-11-05",
+          "checkout_date": "2025-11-05",
+          "checkin_time": null,
+          "checkout_time": null,
+          "pax_in": 3,
+          "pax_out": 1,
+          "small_equipment": false,
+          "operation_id": 2,
+          "confirmed_operation": true,
+          "straordinaria": false,
+          "type_apt": "C",
+          "alias": "NTM",
+          "customer_name": "NOTA-MI",
+          "reasons": [
+            "client_forced_eo",
+            "automatic_assignment_eo",
+            "manual_assignment"
+          ],
+          "priority": "early_out",
+          "start_time": "10:00",
+          "end_time": "12:00",
+          "followup": false,
+          "sequence": 1,
+          "travel_time": 0
+        },
+        {
+          "task_id": 217483,
+          "logistic_code": 1198,
+          "client_id": 2,
+          "premium": false,
+          "address": "Via Bergognone 31",
+          "lat": "45.453707852983",
+          "lng": "9.1641459982137",
+          "cleaning_time": 180,
+          "checkin_date": "2025-11-05",
+          "checkout_date": "2025-11-05",
+          "checkin_time": null,
+          "checkout_time": "09:00",
+          "pax_in": 3,
+          "pax_out": 4,
+          "small_equipment": false,
+          "operation_id": 2,
+          "confirmed_operation": true,
+          "straordinaria": false,
+          "type_apt": "D",
+          "alias": "ITW",
+          "customer_name": "ITALIANWAY SRL",
+          "reasons": [
+            "checkout_time<=eo_time",
+            "automatic_assignment_eo",
+            "manual_assignment"
+          ],
+          "priority": "early_out",
+          "start_time": "12:07",
+          "end_time": "15:07",
+          "followup": true,
+          "sequence": 2,
+          "travel_time": 7
+        },
+        {
+          "task_id": 218319,
+          "logistic_code": 840,
+          "client_id": null,
+          "premium": false,
+          "address": "VIA TULIPANI, 19",
+          "lat": "45.4498056",
+          "lng": "9.1372543",
+          "cleaning_time": 60,
+          "checkin_date": "2025-11-05",
+          "checkout_date": "2025-11-05",
+          "checkin_time": "11:00",
+          "checkout_time": null,
+          "pax_in": 1,
+          "pax_out": 1,
+          "small_equipment": false,
+          "operation_id": 2,
+          "confirmed_operation": true,
+          "straordinaria": false,
+          "type_apt": "A",
+          "alias": "NTM",
+          "customer_name": "NOTA-MI",
+          "reasons": [
+            "manually_moved_to_timeline",
+            "manual_assignment"
+          ],
+          "priority": "early_out",
+          "start_time": "15:28",
+          "end_time": "16:28",
+          "followup": true,
+          "sequence": 3,
+          "travel_time": 21
+        }
+      ]
     }
   ],
   "meta": {
     "total_cleaners": 9,
     "used_cleaners": 8,
-    "assigned_tasks": 9,
-    "total_tasks": 9
+    "assigned_tasks": 10,
+    "total_tasks": 11
   }
 }
