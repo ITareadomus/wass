@@ -992,21 +992,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const dateMatch = filename.match(/assignments_(\d{6})\.json/);
       const lastSavedTimestamp = dateMatch ? dateMatch[1] : null;
 
-      // Recupera i metadati dell'Object Storage per ottenere la data di creazione
-      const metadata = await client.stat(filename, { bucket: 'wass_assignments' });
-
+      // Usa la data corrente con la data dal filename
       let formattedDateTime = null;
-      if (metadata.ok && metadata.value.timeCreated) {
-        const createdDate = new Date(metadata.value.timeCreated);
-        const day = String(createdDate.getDate()).padStart(2, '0');
-        const month = String(createdDate.getMonth() + 1).padStart(2, '0');
-        const year = String(createdDate.getFullYear()).slice(-2);
-        const hours = String(createdDate.getHours()).padStart(2, '0');
-        const minutes = String(createdDate.getMinutes()).padStart(2, '0');
+      if (lastSavedTimestamp) {
+        // Usa l'ora corrente con la data dal filename (non abbiamo accesso ai metadata)
+        const now = new Date();
+        const hours = String(now.getHours()).padStart(2, '0');
+        const minutes = String(now.getMinutes()).padStart(2, '0');
+        const day = lastSavedTimestamp.slice(0, 2);
+        const month = lastSavedTimestamp.slice(2, 4);
+        const year = lastSavedTimestamp.slice(4, 6);
         formattedDateTime = `${hours}:${minutes}, ${day}/${month}/${year}`;
-      } else if (lastSavedTimestamp) {
-        // Fallback: usa solo la data dal filename se i metadata non sono disponibili
-        formattedDateTime = `${lastSavedTimestamp.slice(0, 2)}/${lastSavedTimestamp.slice(2, 4)}/${lastSavedTimestamp.slice(4, 6)}`;
       }
 
       res.json({
