@@ -112,12 +112,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const timelinePath = path.join(process.cwd(), 'client/public/data/output/timeline.json');
 
       // Svuota il file timeline.json con struttura corretta
-      const emptyTimeline = { 
+      const emptyTimeline = {
         metadata: {
           last_updated: new Date().toISOString(),
           date: workDate
         },
-        cleaners_assignments: [], 
+        cleaners_assignments: [],
         meta: {
           total_cleaners: 0,
           used_cleaners: 0,
@@ -148,9 +148,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
       console.log("create_containers output:", containersResult);
 
-      res.json({ 
-        success: true, 
-        message: `Assegnazioni resettate e containers ripristinati per ${workDate}` 
+      res.json({
+        success: true,
+        message: `Assegnazioni resettate e containers ripristinati per ${workDate}`
       });
     } catch (error: any) {
       console.error("Errore nel reset delle assegnazioni della timeline:", error);
@@ -173,7 +173,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // 1. Trova e rimuovi la task dal cleaner di origine
       const sourceEntry = timelineData.cleaners_assignments.find((c: any) => c.cleaner.id === sourceCleanerId);
       if (sourceEntry) {
-        const taskIndex = sourceEntry.tasks.findIndex((t: any) => 
+        const taskIndex = sourceEntry.tasks.findIndex((t: any) =>
           String(t.task_id) === String(taskId) || String(t.logistic_code) === String(logisticCode)
         );
         if (taskIndex !== -1) {
@@ -212,7 +212,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // 3. Inserisci la task nella posizione specificata e aggiorna reason
-      const targetIndex = destIndex !== undefined 
+      const targetIndex = destIndex !== undefined
         ? Math.max(0, Math.min(destIndex, destEntry.tasks.length))
         : destEntry.tasks.length;
 
@@ -222,7 +222,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         taskToMove.reasons.push('manual_assignment');
       }
       // Rimuovi eventuali reason automatiche
-      taskToMove.reasons = taskToMove.reasons.filter((r: string) => 
+      taskToMove.reasons = taskToMove.reasons.filter((r: string) =>
         !['auto_assignment', 'early_out_assignment', 'high_priority_assignment', 'low_priority_assignment'].includes(r)
       );
 
@@ -262,7 +262,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       timelineData.metadata.date = workDate;
       timelineData.meta.total_cleaners = timelineData.cleaners_assignments.length;
       timelineData.meta.total_tasks = timelineData.cleaners_assignments.reduce(
-        (sum: number, c: any) => sum + c.tasks.length, 0
+        (sum: number, c: any) => sum + c.tasks.length,
+        0
       );
 
       // Scrittura atomica
@@ -284,16 +285,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { sourceCleanerId, destCleanerId, date } = req.body;
 
       if (!sourceCleanerId || !destCleanerId) {
-        return res.status(400).json({ 
-          success: false, 
-          message: "sourceCleanerId e destCleanerId sono obbligatori" 
+        return res.status(400).json({
+          success: false,
+          message: "sourceCleanerId e destCleanerId sono obbligatori"
         });
       }
 
       if (sourceCleanerId === destCleanerId) {
-        return res.status(400).json({ 
-          success: false, 
-          message: "Non puoi scambiare le task con lo stesso cleaner" 
+        return res.status(400).json({
+          success: false,
+          message: "Non puoi scambiare le task con lo stesso cleaner"
         });
       }
 
@@ -314,9 +315,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const cleanerData = selectedData.cleaners.find((c: any) => c.id === sourceCleanerId);
 
         if (!cleanerData) {
-          return res.status(404).json({ 
-            success: false, 
-            message: `Cleaner sorgente ${sourceCleanerId} non trovato` 
+          return res.status(404).json({
+            success: false,
+            message: `Cleaner sorgente ${sourceCleanerId} non trovato`
           });
         }
 
@@ -339,9 +340,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const cleanerData = selectedData.cleaners.find((c: any) => c.id === destCleanerId);
 
         if (!cleanerData) {
-          return res.status(404).json({ 
-            success: false, 
-            message: `Cleaner destinazione ${destCleanerId} non trovato` 
+          return res.status(404).json({
+            success: false,
+            message: `Cleaner destinazione ${destCleanerId} non trovato`
           });
         }
 
@@ -373,7 +374,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             task.reasons.push('manual_assignment');
           }
           // Rimuovi eventuali reason automatiche
-          task.reasons = task.reasons.filter((r: string) => 
+          task.reasons = task.reasons.filter((r: string) =>
             !['auto_assignment', 'early_out_assignment', 'high_priority_assignment', 'low_priority_assignment'].includes(r)
           );
         });
@@ -414,7 +415,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       timelineData.metadata.date = workDate;
       timelineData.meta.total_cleaners = timelineData.cleaners_assignments.length;
       timelineData.meta.total_tasks = timelineData.cleaners_assignments.reduce(
-        (sum: number, c: any) => sum + c.tasks.length, 0
+        (sum: number, c: any) => sum + c.tasks.length,
+        0
       );
 
       // Scrittura atomica
@@ -423,8 +425,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       await fs.rename(tmpPath, timelinePath);
 
       console.log(`✅ Task scambiate tra cleaner ${sourceCleanerId} e cleaner ${destCleanerId}`);
-      res.json({ 
-        success: true, 
+      res.json({
+        success: true,
         message: "Task scambiate con successo tra cleaners",
         swapped: {
           source: { cleanerId: sourceCleanerId, tasksCount: sourceEntry.tasks.length },
@@ -465,7 +467,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         for (const containerType of ['early_out', 'high_priority', 'low_priority']) {
           const container = containersData.containers?.[containerType];
           if (container && container.tasks) {
-            const foundTask = container.tasks.find((t: any) => 
+            const foundTask = container.tasks.find((t: any) =>
               String(t.task_id) === String(taskId) || String(t.logistic_code) === String(logisticCode)
             );
             if (foundTask) {
@@ -493,9 +495,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Se ancora non abbiamo dati, errore
       if (!fullTaskData) {
         console.error(`❌ Task ${logisticCode} non trovata`);
-        return res.status(404).json({ 
-          success: false, 
-          error: `Task ${logisticCode} non trovata` 
+        return res.status(404).json({
+          success: false,
+          error: `Task ${logisticCode} non trovata`
         });
       }
 
@@ -523,8 +525,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
 
       // Carica o crea il file timeline con nuova struttura
-      let timelineData: any = { 
-        cleaners_assignments: [], 
+      let timelineData: any = {
+        cleaners_assignments: [],
         current_date: workDate,
         meta: {
           total_cleaners: 0,
@@ -589,7 +591,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Rimuovi il task se già presente (evita duplicazioni)
-      cleanerEntry.tasks = cleanerEntry.tasks.filter((t: any) => 
+      cleanerEntry.tasks = cleanerEntry.tasks.filter((t: any) =>
         String(t.logistic_code) !== normalizedLogisticCode && String(t.task_id) !== normalizedTaskId
       );
 
@@ -657,7 +659,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       // Inserisci in posizione dropIndex
-      const targetIndex = dropIndex !== undefined 
+      const targetIndex = dropIndex !== undefined
         ? Math.max(0, Math.min(dropIndex, cleanerEntry.tasks.length))
         : cleanerEntry.tasks.length;
 
@@ -683,7 +685,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       timelineData.metadata.date = workDate;
       timelineData.meta.total_cleaners = timelineData.cleaners_assignments.length;
       timelineData.meta.total_tasks = timelineData.cleaners_assignments.reduce(
-        (sum: number, c: any) => sum + c.tasks.length, 0
+        (sum: number, c: any) => sum + c.tasks.length,
+        0
       );
 
       // Scrittura atomica
@@ -703,7 +706,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
             const originalCount = containerObj.tasks.length;
             // Usa solo task_id come chiave univoca per rimuovere duplicati
-            containerObj.tasks = containerObj.tasks.filter((t: any) => 
+            containerObj.tasks = containerObj.tasks.filter((t: any) =>
               String(t.task_id) !== normalizedTaskId
             );
             const newCount = containerObj.tasks.length;
@@ -722,9 +725,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
               containersData.summary.early_out = containersData.containers.early_out?.count || 0;
               containersData.summary.high_priority = containersData.containers.high_priority?.count || 0;
               containersData.summary.low_priority = containersData.containers.low_priority?.count || 0;
-              containersData.summary.total_tasks = 
-                containersData.summary.early_out + 
-                containersData.summary.high_priority + 
+              containersData.summary.total_tasks =
+                containersData.summary.early_out +
+                containersData.summary.high_priority +
                 containersData.summary.low_priority;
             }
 
@@ -797,7 +800,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       assignmentsData.metadata.date = workDate;
       assignmentsData.meta.total_cleaners = assignmentsData.cleaners_assignments.length;
       assignmentsData.meta.total_tasks = assignmentsData.cleaners_assignments.reduce(
-        (sum: number, c: any) => sum + c.tasks.length, 0
+        (sum: number, c: any) => sum + c.tasks.length,
+        0
       );
 
       // Salva timeline
@@ -810,8 +814,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
           // Determina il container corretto in base alla priority della task
           const priority = removedTask.priority || 'low_priority';
-          const containerType = priority === 'early_out' ? 'early_out' 
-            : priority === 'high_priority' ? 'high_priority' 
+          const containerType = priority === 'early_out' ? 'early_out'
+            : priority === 'high_priority' ? 'high_priority'
             : 'low_priority';
 
           // Rimuovi campi specifici della timeline
@@ -823,7 +827,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
           // Filtra reasons automatiche
           if (removedTask.reasons) {
-            removedTask.reasons = removedTask.reasons.filter((r: string) => 
+            removedTask.reasons = removedTask.reasons.filter((r: string) =>
               !['automatic_assignment_eo', 'automatic_assignment_hp', 'automatic_assignment_lp', 'manual_assignment', 'manually_moved_to_timeline'].includes(r)
             );
           }
@@ -848,9 +852,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
             containersData.summary.early_out = containersData.containers.early_out?.count || 0;
             containersData.summary.high_priority = containersData.containers.high_priority?.count || 0;
             containersData.summary.low_priority = containersData.containers.low_priority?.count || 0;
-            containersData.summary.total_tasks = 
-              containersData.summary.early_out + 
-              containersData.summary.high_priority + 
+            containersData.summary.total_tasks =
+              containersData.summary.early_out +
+              containersData.summary.high_priority +
               containersData.summary.low_priority;
           }
 
@@ -904,16 +908,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       console.log(`✅ Assegnazioni confermate e salvate in Object Storage: ${filename}`);
 
-      res.json({ 
-        success: true, 
+      res.json({
+        success: true,
         filename,
         message: `Assegnazioni salvate in Object Storage: ${filename}`
       });
     } catch (error: any) {
       console.error("Errore nella conferma delle assegnazioni:", error);
-      res.status(500).json({ 
-        success: false, 
-        error: error.message 
+      res.status(500).json({
+        success: false,
+        error: error.message
       });
     }
   });
@@ -943,8 +947,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!result.ok) {
         // File non trovato, non è un errore - significa solo che non ci sono assegnazioni salvate
         console.log(`Nessuna assegnazione salvata trovata per ${workDate} (${filename})`);
-        return res.json({ 
-          success: true, 
+        return res.json({
+          success: true,
           found: false,
           message: `Nessuna assegnazione salvata per questa data`
         });
@@ -964,8 +968,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const dateMatch = filename.match(/assignments_(\d{6})\.json/);
       const lastSavedTimestamp = dateMatch ? dateMatch[1] : null;
 
-      res.json({ 
-        success: true, 
+      res.json({
+        success: true,
         found: true,
         filename,
         lastSavedTimestamp,
@@ -974,9 +978,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     } catch (error: any) {
       console.error("Errore nel caricamento delle assegnazioni:", error);
-      res.status(500).json({ 
-        success: false, 
-        error: error.message 
+      res.status(500).json({
+        success: false,
+        error: error.message
       });
     }
   });
@@ -987,19 +991,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { cleanerId, date } = req.body;
 
       if (!cleanerId) {
-        return res.status(400).json({ 
-          success: false, 
-          message: "cleanerId mancante" 
+        return res.status(400).json({
+          success: false,
+          message: "cleanerId mancante"
         });
       }
 
       const workDate = date || format(new Date(), 'yyyy-MM-dd');
       const selectedCleanersPath = path.join(
-        process.cwd(), 
+        process.cwd(),
         'client/public/data/cleaners/selected_cleaners.json'
       );
       const timelinePath = path.join(
-        process.cwd(), 
+        process.cwd(),
         'client/public/data/output/timeline.json'
       );
 
@@ -1053,7 +1057,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         timelineData.meta = timelineData.meta || {};
         timelineData.meta.total_cleaners = timelineData.cleaners_assignments.length;
         timelineData.meta.total_tasks = timelineData.cleaners_assignments.reduce(
-          (sum: number, c: any) => sum + (c.tasks?.length || 0), 0
+          (sum: number, c: any) => sum + (c.tasks?.length || 0),
+          0
         );
 
         // Salva timeline.json
@@ -1071,8 +1076,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         message = "Cleaner rimosso dalla selezione (task mantenute)";
       }
 
-      res.json({ 
-        success: true, 
+      res.json({
+        success: true,
         message,
         removedFromTimeline: !hasTasks
       });
@@ -1088,9 +1093,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { cleaners: selectedCleaners, total_selected } = req.body;
 
       if (!selectedCleaners || !Array.isArray(selectedCleaners)) {
-        return res.status(400).json({ 
-          success: false, 
-          message: "Dati cleaners non validi" 
+        return res.status(400).json({
+          success: false,
+          message: "Dati cleaners non validi"
         });
       }
 
@@ -1117,7 +1122,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }));
 
       const selectedCleanersPath = path.join(
-        process.cwd(), 
+        process.cwd(),
         'client/public/data/cleaners/selected_cleaners.json'
       );
 
@@ -1133,16 +1138,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       console.log(`✅ Salvati ${enrichedCleaners.length} cleaners in selected_cleaners.json (con can_do_straordinaria)`);
 
-      res.json({ 
-        success: true, 
+      res.json({
+        success: true,
         message: `${selectedCleaners.length} cleaners salvati con successo`,
         count: selectedCleaners.length
       });
     } catch (error: any) {
       console.error("Errore nel salvataggio di selected_cleaners.json:", error);
-      res.status(500).json({ 
-        success: false, 
-        error: error.message 
+      res.status(500).json({
+        success: false,
+        error: error.message
       });
     }
   });
@@ -1200,9 +1205,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const selectedCleanerIds = new Set(selectedCleanersData.cleaners.map((c: any) => c.id));
 
       // Carica timeline
-      let timelineData: any = { 
-        cleaners_assignments: [], 
-        current_date: workDate, 
+      let timelineData: any = {
+        cleaners_assignments: [],
+        current_date: workDate,
         meta: { total_cleaners: 0, total_tasks: 0, last_updated: new Date().toISOString() },
         metadata: { last_updated: new Date().toISOString(), date: workDate }
       };
@@ -1254,7 +1259,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       timelineData.metadata.date = workDate;
       timelineData.meta.total_cleaners = timelineData.cleaners_assignments.length;
       timelineData.meta.total_tasks = timelineData.cleaners_assignments.reduce(
-        (sum: number, c: any) => sum + c.tasks.length, 0
+        (sum: number, c: any) => sum + c.tasks.length,
+        0
       );
       timelineData.meta.last_updated = new Date().toISOString();
 
@@ -1278,11 +1284,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       console.log(`✅ Cleaner ${cleanerId} ${replacedCleanerId ? 'sostituito' : 'aggiunto'} alla timeline con successo`);
-      res.json({ 
-        success: true, 
+      res.json({
+        success: true,
         replaced: replacedCleanerId,
-        message: replacedCleanerId 
-          ? `Cleaner ${replacedCleanerId} sostituito con ${cleanerId}` 
+        message: replacedCleanerId
+          ? `Cleaner ${replacedCleanerId} sostituito con ${cleanerId}`
           : `Cleaner ${cleanerId} aggiunto`
       });
     } catch (error: any) {
@@ -1650,7 +1656,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.error("Errore durante l'estrazione delle statistiche task per convocazioni:", error);
       res.status(500).json({
         success: false,
-        message: 'Errore durante l\'estrazione delle statistiche task per convocazioni',
+        message: 'Errore durante l\\'estrazione delle statistiche task per convocazioni',
         error: error.message,
         stderr: error.stderr
       });
@@ -1687,7 +1693,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.error("Errore durante l'estrazione dei cleaners (ottimizzato):", error);
       res.status(500).json({
         success: false,
-        message: 'Errore durante l\'estrazione dei cleaners (ottimizzato)',
+        message: 'Errore durante l\\'estrazione dei cleaners (ottimizzato)',
         error: error.message,
         stderr: error.stderr
       });
@@ -2090,7 +2096,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const assignedDir = path.join(process.cwd(), 'client/public/data/assigned');
 
       // Carica timeline per questa data specifica
-      let timelineData: any = { 
+      let timelineData: any = {
         metadata: { last_updated: new Date().toISOString(), date },
         cleaners_assignments: [],
         meta: { total_cleaners: 0, used_cleaners: 0, assigned_tasks: 0 }
@@ -2103,7 +2109,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         timelineData = JSON.parse(existingData);
 
         // Se il file esiste ma è vuoto o per un'altra data, crea nuovo file vuoto
-        if (!timelineData.cleaners_assignments || timelineData.cleaners_assignments.length === 0 || 
+        if (!timelineData.cleaners_assignments || timelineData.cleaners_assignments.length === 0 ||
             (timelineData.metadata && timelineData.metadata.date !== date)) {
           console.log(`Timeline per ${date} è vuota o per altra data, creando timeline vuota`);
           throw new Error('No assignments in timeline file');
@@ -2115,7 +2121,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Nessun file trovato, crea nuovo file vuoto
         console.log(`Nessuna assegnazione trovata per ${date}, creando timeline vuota`);
         loadedFrom = 'new';
-        timelineData = { 
+        timelineData = {
           metadata: { last_updated: new Date().toISOString(), date },
           cleaners_assignments: [],
           meta: { total_cleaners: 0, used_cleaners: 0, assigned_tasks: 0 }
@@ -2129,7 +2135,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.log(`📅 Cambio data rilevato: ${timelineDate} → ${date}`);
         console.log(`🔄 Resettando timeline per la nuova data...`);
 
-        const emptyTimelineForNewDate = { 
+        const emptyTimelineForNewDate = {
           metadata: { last_updated: new Date().toISOString(), date },
           cleaners_assignments: [],
           meta: { total_cleaners: 0, used_cleaners: 0, assigned_tasks: 0 }
@@ -2543,15 +2549,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Verifica che la task a fromIndex corrisponda al taskId/logisticCode fornito
       const taskAtFromIndex = cleanerEntry.tasks[fromIndex];
-      const taskMatches = 
-        String(taskAtFromIndex.task_id) === String(taskId) || 
+      const taskMatches =
+        String(taskAtFromIndex.task_id) === String(taskId) ||
         String(taskAtFromIndex.logistic_code) === String(logisticCode);
 
       if (!taskMatches) {
         console.error(`Task mismatch: expected task ${taskId}/${logisticCode} at index ${fromIndex}, found ${taskAtFromIndex.task_id}/${taskAtFromIndex.logistic_code}`);
-        return res.status(400).json({ 
-          success: false, 
-          message: "La task all'indice specificato non corrisponde all'ID fornito. Ricarica la pagina." 
+        return res.status(400).json({
+          success: false,
+          message: "La task all'indice specificato non corrisponde all'ID fornito. Ricarica la pagina."
         });
       }
 
@@ -2583,7 +2589,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       timelineData.meta = timelineData.meta || {};
       timelineData.meta.total_tasks = timelineData.cleaners_assignments.reduce(
-        (sum: number, c: any) => sum + (c.tasks?.length || 0), 0
+        (sum: number, c: any) => sum + (c.tasks?.length || 0),
+        0
       );
       timelineData.meta.total_cleaners = timelineData.cleaners_assignments.length;
 
