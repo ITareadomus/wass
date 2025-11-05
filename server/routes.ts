@@ -312,7 +312,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const selectedCleanersPath = path.join(process.cwd(), 'client/public/data/cleaners/selected_cleaners.json');
         const selectedData = JSON.parse(await fs.readFile(selectedCleanersPath, 'utf8'));
         const cleanerData = selectedData.cleaners.find((c: any) => c.id === sourceCleanerId);
-        
+
         if (!cleanerData) {
           return res.status(404).json({ 
             success: false, 
@@ -337,7 +337,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const selectedCleanersPath = path.join(process.cwd(), 'client/public/data/cleaners/selected_cleaners.json');
         const selectedData = JSON.parse(await fs.readFile(selectedCleanersPath, 'utf8'));
         const cleanerData = selectedData.cleaners.find((c: any) => c.id === destCleanerId);
-        
+
         if (!cleanerData) {
           return res.status(404).json({ 
             success: false, 
@@ -2060,14 +2060,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
         await fs.writeFile(timelinePath, JSON.stringify(timelineData, null, 2));
       }
 
-      // Forza sempre timeline.json vuoto all'extract-data, indipendentemente dalla fonte
-      const emptyTimelineForExtract = { 
-        metadata: { last_updated: new Date().toISOString(), date },
-        cleaners_assignments: [],
-        meta: { total_cleaners: 0, used_cleaners: 0, assigned_tasks: 0 }
-      };
-      await fs.writeFile(timelinePath, JSON.stringify(emptyTimelineForExtract, null, 2));
-      console.log(`✅ Timeline.json resettato vuoto all'avvio (fonte dati: ${loadedFrom})`);
+      // Se la data nel file timeline.json è DIVERSA dalla data richiesta, resetta
+      const timelineDate = timelineData.metadata?.date;
+      if (timelineDate !== date) {
+        console.log(`📅 Cambio data rilevato: ${timelineDate} → ${date}`);
+        console.log(`🔄 Resettando timeline per la nuova data...`);
+
+        const emptyTimelineForNewDate = { 
+          metadata: { last_updated: new Date().toISOString(), date },
+          cleaners_assignments: [],
+          meta: { total_cleaners: 0, used_cleaners: 0, assigned_tasks: 0 }
+        };
+        await fs.writeFile(timelinePath, JSON.stringify(emptyTimelineForNewDate, null, 2));
+        console.log(`✅ Timeline svuotata per la nuova data ${date}`);
+      } else {
+        console.log(`✅ Timeline mantenuta per la stessa data ${date} con ${timelineData.cleaners_assignments?.length || 0} assegnazioni`);
+      }
 
       // Esegui SEMPRE create_containers.py per avere dati freschi dal database
       console.log(`Eseguendo create_containers.py per data ${date}...`);
