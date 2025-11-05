@@ -155,9 +155,10 @@ export default function GenerateAssignments() {
       
       if (result.found) {
         console.log("✅ Assegnazioni salvate caricate:", result.filename);
-        // Salva il filename in localStorage per mostrarlo nella timeline
-        localStorage.setItem('last_saved_assignment', result.filename);
-        setLastSavedAssignment(result.filename);
+        // Salva la data formattata in localStorage per mostrarlo nella timeline
+        const displayDate = result.formattedDate || result.filename;
+        localStorage.setItem('last_saved_assignment', displayDate);
+        setLastSavedAssignment(displayDate);
         return true;
       } else {
         console.log("ℹ️ Nessuna assegnazione salvata per questa data");
