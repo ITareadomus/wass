@@ -158,7 +158,7 @@ export default function TimelineView({
       // Trova i nomi dei cleaner coinvolti
       const sourceCleaner = cleaners.find(c => c.id === variables.sourceCleanerId);
       const destCleaner = cleaners.find(c => c.id === variables.destCleanerId);
-      
+
       const sourceCleanerName = sourceCleaner ? `${sourceCleaner.name} ${sourceCleaner.lastname}` : `ID ${variables.sourceCleanerId}`;
       const destCleanerName = destCleaner ? `${destCleaner.name} ${destCleaner.lastname}` : `ID ${variables.destCleanerId}`;
 
@@ -840,21 +840,19 @@ export default function TimelineView({
             </div>
             {/* Pulsante Conferma Assegnazioni che prende tutto lo spazio della timeline */}
             <div className="flex-1 p-1 border-t border-border">
-              <div className="space-y-1">
-                <Button
-                  onClick={handleConfirmAssignments}
-                  className="w-full h-full bg-green-500 hover:bg-green-600"
-                  data-testid="button-confirm-assignments"
-                >
-                  <Users className="w-4 h-4 mr-2" />
-                  Conferma Assegnazioni
-                </Button>
+              <Button
+                onClick={handleConfirmAssignments}
+                className="w-full h-full bg-green-500 hover:bg-green-600 flex items-center justify-center gap-2"
+                data-testid="button-confirm-assignments"
+              >
+                <Users className="w-4 h-4" />
+                <span>Conferma Assegnazioni</span>
                 {lastSavedFilename && (
-                  <div className="text-xs text-red-500 text-center">
-                    ultimo salvataggio: {lastSavedFilename}
-                  </div>
+                  <span className="text-xs text-red-300 font-normal ml-1">
+                    - ultimo salvataggio: {lastSavedFilename}
+                  </span>
                 )}
-              </div>
+              </Button>
             </div>
           </div>
         </div>
