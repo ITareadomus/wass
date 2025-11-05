@@ -1081,7 +1081,116 @@ export default function GenerateAssignments() {
               />
             </div>
 
-            <MapSection tasks={allTasksWithAssignments} />
+            <div className="space-y-6">
+              <MapSection tasks={allTasksWithAssignments} />
+              
+              {/* Pannello Statistiche Task */}
+              <div className="bg-card rounded-lg border shadow-sm">
+                <div className="p-4 border-b border-border">
+                  <h3 className="font-semibold text-foreground flex items-center">
+                    <svg 
+                      className="w-5 h-5 mr-2 text-primary" 
+                      fill="none" 
+                      stroke="currentColor" 
+                      viewBox="0 0 24 24"
+                    >
+                      <path 
+                        strokeLinecap="round" 
+                        strokeLinejoin="round" 
+                        strokeWidth={2} 
+                        d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" 
+                      />
+                    </svg>
+                    Statistiche Task
+                  </h3>
+                </div>
+                <div className="p-4 grid grid-cols-2 gap-3">
+                  {/* Totale Task */}
+                  <div className="bg-blue-50 dark:bg-blue-950/20 rounded-lg p-3 border border-blue-200 dark:border-blue-800">
+                    <div className="text-xs text-blue-600 dark:text-blue-400 font-medium mb-1">Totale</div>
+                    <div className="text-2xl font-bold text-blue-700 dark:text-blue-300">
+                      {allTasksWithAssignments.length}
+                    </div>
+                  </div>
+
+                  {/* Premium */}
+                  <div className="bg-yellow-50 dark:bg-yellow-950/20 rounded-lg p-3 border border-yellow-200 dark:border-yellow-800">
+                    <div className="text-xs text-yellow-600 dark:text-yellow-400 font-medium mb-1">Premium</div>
+                    <div className="text-2xl font-bold text-yellow-700 dark:text-yellow-300">
+                      {allTasksWithAssignments.filter(t => t.premium).length}
+                    </div>
+                  </div>
+
+                  {/* Standard */}
+                  <div className="bg-green-50 dark:bg-green-950/20 rounded-lg p-3 border border-green-200 dark:border-green-800">
+                    <div className="text-xs text-green-600 dark:text-green-400 font-medium mb-1">Standard</div>
+                    <div className="text-2xl font-bold text-green-700 dark:text-green-300">
+                      {allTasksWithAssignments.filter(t => !t.premium && !t.straordinaria).length}
+                    </div>
+                  </div>
+
+                  {/* Straordinarie */}
+                  <div className="bg-red-50 dark:bg-red-950/20 rounded-lg p-3 border border-red-200 dark:border-red-800">
+                    <div className="text-xs text-red-600 dark:text-red-400 font-medium mb-1">Straordinarie</div>
+                    <div className="text-2xl font-bold text-red-700 dark:text-red-300">
+                      {allTasksWithAssignments.filter(t => t.straordinaria).length}
+                    </div>
+                  </div>
+
+                  {/* Non Assegnate */}
+                  <div className="bg-gray-50 dark:bg-gray-950/20 rounded-lg p-3 border border-gray-200 dark:border-gray-800">
+                    <div className="text-xs text-gray-600 dark:text-gray-400 font-medium mb-1">Non Assegnate</div>
+                    <div className="text-2xl font-bold text-gray-700 dark:text-gray-300">
+                      {earlyOutTasks.length + highPriorityTasks.length + lowPriorityTasks.length}
+                    </div>
+                  </div>
+
+                  {/* Check-out/Check-in Infranto */}
+                  <div className="bg-orange-50 dark:bg-orange-950/20 rounded-lg p-3 border border-orange-200 dark:border-orange-800">
+                    <div className="text-xs text-orange-600 dark:text-orange-400 font-medium mb-1">CI/CO Infranto</div>
+                    <div className="text-2xl font-bold text-orange-700 dark:text-orange-300">
+                      {allTasksWithAssignments.filter(t => {
+                        const task = t as any;
+                        if (!task.assignedCleaner || !task.start_time || !task.end_time) return false;
+                        
+                        const checkoutTime = task.checkout_time;
+                        const checkinTime = task.checkin_time;
+                        const endTime = task.end_time;
+                        const startTime = task.start_time;
+
+                        let violated = false;
+
+                        // Violazione checkout
+                        if (checkoutTime && endTime) {
+                          const [endHour, endMin] = endTime.split(':').map(Number);
+                          const [checkoutHour, checkoutMin] = checkoutTime.split(':').map(Number);
+                          const endMinutes = endHour * 60 + endMin;
+                          const checkoutMinutes = checkoutHour * 60 + checkoutMin;
+                          
+                          if (endMinutes > checkoutMinutes) {
+                            violated = true;
+                          }
+                        }
+
+                        // Violazione checkin
+                        if (checkinTime && startTime) {
+                          const [startHour, startMin] = startTime.split(':').map(Number);
+                          const [checkinHour, checkinMin] = checkinTime.split(':').map(Number);
+                          const startMinutes = startHour * 60 + startMin;
+                          const checkinMinutes = checkinHour * 60 + checkinMin;
+                          
+                          if (startMinutes > checkinMinutes) {
+                            violated = true;
+                          }
+                        }
+
+                        return violated;
+                      }).length}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         </DragDropContext>
       </div>
