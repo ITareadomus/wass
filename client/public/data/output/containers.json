@@ -1,6 +1,6 @@
 {
   "metadata": {
-    "last_updated": "2025-11-05T10:36:48.513754",
+    "last_updated": "2025-11-05T10:38:39.927573",
     "date": "2025-11-05"
   },
   "containers": {
@@ -612,6 +612,33 @@
           "priority": "high_priority"
         },
         {
+          "task_id": 218457,
+          "logistic_code": 1617,
+          "client_id": 123,
+          "premium": true,
+          "address": "VIA DELL'ANNUNCIATA 7",
+          "lat": "45.4724431",
+          "lng": "9.1933797",
+          "cleaning_time": 180,
+          "checkin_date": "2026-02-05",
+          "checkout_date": "2025-11-05",
+          "checkin_time": null,
+          "checkout_time": null,
+          "pax_in": 6,
+          "pax_out": 4,
+          "small_equipment": false,
+          "operation_id": 2,
+          "confirmed_operation": true,
+          "straordinaria": false,
+          "type_apt": "E",
+          "alias": "YOUHO",
+          "customer_name": "YOUHOSTY",
+          "reasons": [
+            "premium"
+          ],
+          "priority": "high_priority"
+        },
+        {
           "task_id": 218445,
           "logistic_code": 1393,
           "client_id": 3,
@@ -688,33 +715,6 @@
           "type_apt": "B",
           "alias": "TBR",
           "customer_name": "THE BEST RENT S.r.l.",
-          "reasons": [
-            "premium"
-          ],
-          "priority": "high_priority"
-        },
-        {
-          "task_id": 218457,
-          "logistic_code": 1617,
-          "client_id": 123,
-          "premium": true,
-          "address": "VIA DELL'ANNUNCIATA 7",
-          "lat": "45.4724431",
-          "lng": "9.1933797",
-          "cleaning_time": 180,
-          "checkin_date": "2026-02-05",
-          "checkout_date": "2025-11-05",
-          "checkin_time": null,
-          "checkout_time": null,
-          "pax_in": 6,
-          "pax_out": 4,
-          "small_equipment": false,
-          "operation_id": 2,
-          "confirmed_operation": true,
-          "straordinaria": false,
-          "type_apt": "E",
-          "alias": "YOUHO",
-          "customer_name": "YOUHOSTY",
           "reasons": [
             "premium"
           ],
@@ -896,7 +896,7 @@
         {
           "task_id": 218468,
           "logistic_code": 844,
-          "client_id": 3,
+          "client_id": null,
           "premium": false,
           "address": "VIA SEBENICO 28",
           "lat": "45.4875142",
@@ -915,11 +915,8 @@
           "type_apt": "C",
           "alias": "TBR",
           "customer_name": "THE BEST RENT S.r.l.",
-          "priority": "low_priority",
-          "reasons": [
-            "not_eo",
-            "not_hp"
-          ]
+          "reasons": [],
+          "priority": "low_priority"
         }
       ],
       "count": 7
