@@ -83,7 +83,7 @@ export default function TimelineView({
 
       toast({
         title: "Cleaner rimosso",
-        description: "Il cleaner è stato rimosso dalla selezione.",
+        description: `${selectedCleaner?.name} ${selectedCleaner?.lastname} è stato rimosso dalla selezione.`,
       });
       setIsModalOpen(false);
     },
