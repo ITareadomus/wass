@@ -489,19 +489,25 @@ export default function TaskCard({
                 </p>
                 {editingField === 'checkout' ? (
                   <div className="space-y-2">
-                    <Input
-                      type="date"
-                      value={editedCheckoutDate}
-                      onChange={(e) => setEditedCheckoutDate(e.target.value)}
-                      className="text-sm"
-                      autoFocus
-                    />
-                    <Input
-                      type="time"
-                      value={editedCheckoutTime}
-                      onChange={(e) => setEditedCheckoutTime(e.target.value)}
-                      className="text-sm"
-                    />
+                    <div className="relative cursor-pointer" onClick={() => document.getElementById('checkout-date-input')?.showPicker()}>
+                      <Input
+                        id="checkout-date-input"
+                        type="date"
+                        value={editedCheckoutDate}
+                        onChange={(e) => setEditedCheckoutDate(e.target.value)}
+                        className="text-sm cursor-pointer"
+                        autoFocus
+                      />
+                    </div>
+                    <div className="relative cursor-pointer" onClick={() => document.getElementById('checkout-time-input')?.showPicker()}>
+                      <Input
+                        id="checkout-time-input"
+                        type="time"
+                        value={editedCheckoutTime}
+                        onChange={(e) => setEditedCheckoutTime(e.target.value)}
+                        className="text-sm cursor-pointer"
+                      />
+                    </div>
                   </div>
                 ) : (
                   <p 
@@ -528,19 +534,25 @@ export default function TaskCard({
                 </p>
                 {editingField === 'checkin' ? (
                   <div className="space-y-2">
-                    <Input
-                      type="date"
-                      value={editedCheckinDate}
-                      onChange={(e) => setEditedCheckinDate(e.target.value)}
-                      className="text-sm"
-                      autoFocus
-                    />
-                    <Input
-                      type="time"
-                      value={editedCheckinTime}
-                      onChange={(e) => setEditedCheckinTime(e.target.value)}
-                      className="text-sm"
-                    />
+                    <div className="relative cursor-pointer" onClick={() => document.getElementById('checkin-date-input')?.showPicker()}>
+                      <Input
+                        id="checkin-date-input"
+                        type="date"
+                        value={editedCheckinDate}
+                        onChange={(e) => setEditedCheckinDate(e.target.value)}
+                        className="text-sm cursor-pointer"
+                        autoFocus
+                      />
+                    </div>
+                    <div className="relative cursor-pointer" onClick={() => document.getElementById('checkin-time-input')?.showPicker()}>
+                      <Input
+                        id="checkin-time-input"
+                        type="time"
+                        value={editedCheckinTime}
+                        onChange={(e) => setEditedCheckinTime(e.target.value)}
+                        className="text-sm cursor-pointer"
+                      />
+                    </div>
                   </div>
                 ) : (
                   <p 
