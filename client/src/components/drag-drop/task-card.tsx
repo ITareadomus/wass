@@ -16,7 +16,7 @@ import {
 } from "@/components/ui/tooltip";
 import { Input } from "@/components/ui/input";
 import { useState, useEffect } from "react";
-import { HelpCircle, ChevronLeft, ChevronRight, Save } from "lucide-react";
+import { HelpCircle, ChevronLeft, ChevronRight, Save, Pencil } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 
@@ -509,8 +509,9 @@ export default function TaskCard({
                 <p className="text-sm">{displayTask.address?.toLowerCase() || "non migrato"}</p>
               </div>
               <div>
-                <p className="text-sm font-semibold text-muted-foreground mb-1">
+                <p className="text-sm font-semibold text-muted-foreground mb-1 flex items-center gap-1">
                   Durata pulizia
+                  <Pencil className="w-3 h-3 text-muted-foreground/60" />
                 </p>
                 {editingField === 'duration' ? (
                   <div className="flex items-center gap-2">
@@ -543,8 +544,9 @@ export default function TaskCard({
             {/* Terza riga: Checkout - Checkin */}
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <p className="text-sm font-semibold text-muted-foreground mb-1">
+                <p className="text-sm font-semibold text-muted-foreground mb-1 flex items-center gap-1">
                   Checkout
+                  <Pencil className="w-3 h-3 text-muted-foreground/60" />
                 </p>
                 {editingField === 'checkout' ? (
                   <div className="space-y-2">
@@ -590,8 +592,9 @@ export default function TaskCard({
                 )}
               </div>
               <div>
-                <p className="text-sm font-semibold text-muted-foreground mb-1">
+                <p className="text-sm font-semibold text-muted-foreground mb-1 flex items-center gap-1">
                   Checkin
+                  <Pencil className="w-3 h-3 text-muted-foreground/60" />
                 </p>
                 {editingField === 'checkin' ? (
                   <div className="space-y-2">
@@ -687,8 +690,9 @@ export default function TaskCard({
             {/* Quinta riga: Pax-In - Pax-Out */}
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <p className="text-sm font-semibold text-muted-foreground mb-1">
+                <p className="text-sm font-semibold text-muted-foreground mb-1 flex items-center gap-1">
                   Pax-In
+                  <Pencil className="w-3 h-3 text-muted-foreground/60" />
                 </p>
                 {editingField === 'paxin' ? (
                   <div className="flex items-center gap-2">
