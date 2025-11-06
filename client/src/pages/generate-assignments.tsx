@@ -190,9 +190,12 @@ export default function GenerateAssignments() {
       const hasSavedAssignments = await loadSavedAssignments(date);
 
       if (hasSavedAssignments) {
-        setExtractionStep("Assegnazioni salvate caricate!");
+        setExtractionStep("Caricamento assegnazioni salvate...");
         // CRITICAL: Aspetta che i task siano caricati prima di nascondere il loader
         await loadTasks();
+        setExtractionStep("Assegnazioni salvate caricate!");
+        // Delay per assicurarsi che lo stato sia aggiornato prima di nascondere il loader
+        await new Promise(resolve => setTimeout(resolve, 100));
         setIsExtracting(false);
         return;
       }
@@ -221,6 +224,10 @@ export default function GenerateAssignments() {
       
       // Carica i task dopo l'estrazione e aspetta che finisca
       await loadTasks();
+      
+      setExtractionStep("Task caricati!");
+      // Delay per assicurarsi che lo stato sia aggiornato prima di nascondere il loader
+      await new Promise(resolve => setTimeout(resolve, 100));
       setIsExtracting(false);
     } catch (error) {
       console.error("Errore nell'estrazione:", error);
