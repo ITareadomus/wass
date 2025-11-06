@@ -932,8 +932,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const month = String(dateObj.getMonth() + 1).padStart(2, '0');
       const fullYear = String(dateObj.getFullYear());
       const year = fullYear.slice(-2);
-      // Crea il percorso della cartella: DD/MM/YYYY/
-      const folderPath = `${day}/${month}/${fullYear}`;
+      // Crea il percorso della cartella: DD-MM-YYYY/
+      const folderPath = `${day}-${month}-${fullYear}`;
       const filename = `${folderPath}/assignments_${day}${month}${year}.json`;
 
       const jsonContent = JSON.stringify(timelineData, null, 2);
@@ -971,7 +971,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       selectedCleanersData.metadata.date = workDate;
       selectedCleanersData.metadata.saved_at = new Date().toISOString();
 
-      // nome file: DD/MM/YYYY/selected_cleaners_DDMMYY.json
+      // nome file: DD-MM-YYYY/selected_cleaners_DDMMYY.json
       const scFilename = `${folderPath}/selected_cleaners_${day}${month}${year}.json`;
 
       const scJson = JSON.stringify(selectedCleanersData, null, 2);
@@ -1017,8 +1017,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const month = String(dateObj.getMonth() + 1).padStart(2, '0');
       const fullYear = String(dateObj.getFullYear());
       const year = fullYear.slice(-2);
-      // Crea il percorso della cartella: DD/MM/YYYY/
-      const folderPath = `${day}/${month}/${fullYear}`;
+      // Crea il percorso della cartella: DD-MM-YYYY/
+      const folderPath = `${day}-${month}-${fullYear}`;
       const filename = `${folderPath}/assignments_${day}${month}${year}.json`;
 
       console.log(`Tentativo di caricamento file: ${filename}`);
@@ -2360,7 +2360,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const month = String(dateObj.getMonth() + 1).padStart(2, '0');
         const fullYear = String(dateObj.getFullYear());
         const year = fullYear.slice(-2);
-        const folderPath = `${day}/${month}/${fullYear}`;
+        const folderPath = `${day}-${month}-${fullYear}`;
         const scFilename = `${folderPath}/selected_cleaners_${day}${month}${year}.json`;
 
         const scResult = await client.downloadAsText(scFilename, { bucket: 'wass_assignments' });
