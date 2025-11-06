@@ -160,6 +160,11 @@ export default function GenerateAssignments() {
           await (window as any).loadTimelineCleaners();
         }
 
+        // Aggiorna anche lo stato della timeline view
+        if ((window as any).updateLastSavedFilename) {
+          (window as any).updateLastSavedFilename(displayDateTime);
+        }
+
         return true;
       } else {
         console.log("ℹ️ Nessuna assegnazione salvata per questa data");
