@@ -153,6 +153,13 @@ export default function GenerateAssignments() {
         const displayDateTime = result.formattedDateTime || result.filename;
         localStorage.setItem('last_saved_assignment', displayDateTime);
         setLastSavedAssignment(displayDateTime);
+        
+        // CRITICAL: Forza il refresh della timeline per mostrare i cleaners con task
+        if ((window as any).loadTimelineCleaners) {
+          console.log("🔄 Ricaricamento timeline cleaners dopo caricamento assegnazioni salvate...");
+          await (window as any).loadTimelineCleaners();
+        }
+        
         return true;
       } else {
         console.log("ℹ️ Nessuna assegnazione salvata per questa data");
