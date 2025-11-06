@@ -43,24 +43,8 @@ export default function Convocazioni() {
   const [isLoading, setIsLoading] = useState(true);
   const [loadingMessage, setLoadingMessage] = useState("Inizializzazione...");
   const [selectedDate, setSelectedDate] = useState<Date>(() => {
-    // Leggi la data dal parametro URL se presente
-    const urlParams = new URLSearchParams(window.location.search);
-    const dateParam = urlParams.get('date');
-    
-    if (dateParam) {
-      // Converte yyyy-MM-dd in Date senza problemi di timezone
-      const [year, month, day] = dateParam.split('-').map(Number);
-      return new Date(year, month - 1, day);
-    }
-    
-    // Altrimenti usa la data salvata in localStorage
-    const savedDate = localStorage.getItem('selected_work_date');
-    if (savedDate) {
-      const [year, month, day] = savedDate.split('-').map(Number);
-      return new Date(year, month - 1, day);
-    }
-    
-    return new Date();
+    const today = new Date();
+    return today;
   });
   const [confirmDialog, setConfirmDialog] = useState<{ open: boolean; cleanerId: number | null }>({ open: false, cleanerId: null });
   const { toast } = useToast();
