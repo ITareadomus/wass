@@ -109,7 +109,7 @@ export default function MapSection({ tasks }: MapSectionProps) {
 
   // Aggiorna i marker quando cambiano le task, cleaners o filtro
   useEffect(() => {
-    if (!googleMapRef.current || !isMapLoaded || cleaners.length === 0) return;
+    if (!googleMapRef.current || !isMapLoaded) return;
 
     // Rimuovi marker esistenti
     markersRef.current.forEach(marker => marker.setMap(null));
@@ -132,6 +132,7 @@ export default function MapSection({ tasks }: MapSectionProps) {
 
     console.log('Task totali:', tasks.length);
     console.log('Task con coordinate:', tasksWithCoordinates.length);
+    console.log('Cleaners caricati:', cleaners.length);
     console.log('Prime 3 task con coordinate:', tasksWithCoordinates.slice(0, 3).map(t => ({
       name: t.name,
       address: t.address,
