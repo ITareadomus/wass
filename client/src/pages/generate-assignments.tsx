@@ -191,9 +191,9 @@ export default function GenerateAssignments() {
 
       if (hasSavedAssignments) {
         setExtractionStep("Assegnazioni salvate caricate!");
+        // CRITICAL: Aspetta che i task siano caricati prima di nascondere il loader
+        await loadTasks();
         setIsExtracting(false);
-        // Carica i task dalle assegnazioni salvate
-        loadTasks();
         return;
       }
 
@@ -215,16 +215,16 @@ export default function GenerateAssignments() {
       console.log("Estrazione completata:", result);
 
       setExtractionStep("Elaborazione task completata!");
+      
+      // Carica i task dopo l'estrazione e aspetta che finisca
+      await loadTasks();
       setIsExtracting(false);
-
-      // Carica i task dopo l'estrazione
-      loadTasks();
     } catch (error) {
       console.error("Errore nell'estrazione:", error);
       setExtractionStep("Errore durante l'estrazione. Caricamento task esistenti...");
-      setIsExtracting(false);
       // Prova comunque a caricare i task esistenti
-      loadTasks();
+      await loadTasks();
+      setIsExtracting(false);
     }
   };
 
