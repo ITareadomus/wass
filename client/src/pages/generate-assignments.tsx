@@ -214,7 +214,10 @@ export default function GenerateAssignments() {
       const result = await response.json();
       console.log("Estrazione completata:", result);
 
-      setExtractionStep("Elaborazione task completata!");
+      setExtractionStep("Caricamento task...");
+      
+      // CRITICAL: Aspetta che il backend finisca di creare i file prima di caricarli
+      await new Promise(resolve => setTimeout(resolve, 500));
       
       // Carica i task dopo l'estrazione e aspetta che finisca
       await loadTasks();
