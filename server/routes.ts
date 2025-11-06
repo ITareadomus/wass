@@ -148,44 +148,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
       console.log("create_containers output:", containersResult);
 
-      // === Resetta anche selected_cleaners.json per la nuova data ===
-      // Verifica se esiste un file salvato in Object Storage per questa data
+      // === Mantieni i cleaner selezionati, aggiorna solo la data ===
       try {
-        const { Client } = await import('@replit/object-storage');
-        const client = new Client();
-
-        const dateObj = new Date(workDate);
-        const day = String(dateObj.getDate()).padStart(2, '0');
-        const month = String(dateObj.getMonth() + 1).padStart(2, '0');
-        const fullYear = String(dateObj.getFullYear());
-        const year = fullYear.slice(-2);
-        const folderPath = `${day}/${month}/${fullYear}`;
-        const scFilename = `${folderPath}/selected_cleaners_${day}${month}${year}.json`;
-
-        const scResult = await client.downloadAsText(scFilename, { bucket: 'wass_assignments' });
-
         const selectedCleanersPath = path.join(
           process.cwd(),
           'client/public/data/cleaners/selected_cleaners.json'
         );
 
+        // Leggi i cleaner attualmente selezionati
         let selectedCleanersData;
-        if (scResult.ok) {
-          // File salvato trovato - ripristinalo
-          selectedCleanersData = JSON.parse(scResult.value);
+        try {
+          const existingContent = await fs.readFile(selectedCleanersPath, 'utf8');
+          selectedCleanersData = JSON.parse(existingContent);
+          
+          // Mantieni i cleaner, aggiorna solo metadata
           selectedCleanersData.metadata = selectedCleanersData.metadata || {};
           selectedCleanersData.metadata.date = workDate;
-          console.log(`✅ selected_cleaners.json ripristinato da Object Storage per ${workDate}`);
-        } else {
-          // Nessun file salvato - crea vuoto
+          selectedCleanersData.metadata.reset_at = new Date().toISOString();
+          
+          console.log(`✅ Mantenuti ${selectedCleanersData.cleaners?.length || 0} cleaner selezionati dopo reset timeline`);
+        } catch (err) {
+          // Se il file non esiste o è corrotto, crea vuoto
           selectedCleanersData = {
             cleaners: [],
             total_selected: 0,
             metadata: { date: workDate, reset_at: new Date().toISOString() }
           };
-          console.log(`ℹ️ Nessun selected_cleaners salvato per ${workDate} - creato vuoto`);
+          console.log(`ℹ️ Creato selected_cleaners.json vuoto per ${workDate}`);
         }
 
+        // Salva con scrittura atomica
         const tmpScPath = `${selectedCleanersPath}.tmp`;
         await fs.writeFile(tmpScPath, JSON.stringify(selectedCleanersData, null, 2));
         await fs.rename(tmpScPath, selectedCleanersPath);
