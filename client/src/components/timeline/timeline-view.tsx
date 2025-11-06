@@ -651,15 +651,6 @@ export default function TimelineView({
             </h3>
             <div className="flex gap-2">
               <Button
-                onClick={toggleFullscreen}
-                variant="outline"
-                size="sm"
-                className="flex items-center gap-2 print:hidden"
-                title={isFullscreen ? "Esci da schermo intero" : "Schermo intero"}
-              >
-                {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
-              </Button>
-              <Button
                 onClick={() => {
                   // Passa la data corrente come parametro URL
                   const dateStr = localStorage.getItem('selected_work_date') || format(new Date(), 'yyyy-MM-dd');
