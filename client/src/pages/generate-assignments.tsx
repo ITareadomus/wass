@@ -394,15 +394,18 @@ export default function GenerateAssignments() {
 
       console.log("✅ Task assegnate nella timeline (task_id):", Array.from(timelineAssignmentsMap.keys()));
 
-      // CRITICAL: Filtra i duplicati SOLO se ci sono task sia nei containers che nella timeline
+      // CRITICAL: Filtra i duplicati SOLO se timeline e containers hanno la STESSA data
       let filteredEarlyOut = initialEarlyOut;
       let filteredHigh = initialHigh;
       let filteredLow = initialLow;
 
       const totalContainerTasks = initialEarlyOut.length + initialHigh.length + initialLow.length;
       
-      if (isCorrectDate && timelineAssignmentsMap.size > 0 && totalContainerTasks > 0) {
-        console.log(`🔄 Filtro duplicati: ${totalContainerTasks} task nei containers, ${timelineAssignmentsMap.size} in timeline`);
+      // Verifica che timeline e containers abbiano la stessa data
+      const timelineMatchesSelectedDate = isCorrectDate && timelineDate === dateStr;
+      
+      if (timelineMatchesSelectedDate && timelineAssignmentsMap.size > 0 && totalContainerTasks > 0) {
+        console.log(`🔄 Filtro duplicati: ${totalContainerTasks} task nei containers, ${timelineAssignmentsMap.size} in timeline (stessa data: ${dateStr})`);
         
         filteredEarlyOut = initialEarlyOut.filter(task => {
           const tid = String(task.id);
@@ -432,8 +435,10 @@ export default function GenerateAssignments() {
         });
         
         console.log(`📊 Dopo filtro: Early=${filteredEarlyOut.length}, High=${filteredHigh.length}, Low=${filteredLow.length}`);
-      } else if (totalContainerTasks === 0 && timelineAssignmentsMap.size > 0) {
-        console.log(`✅ Containers vuoti - tutte le ${timelineAssignmapsMap.size} task sono solo in timeline (scenario 5/11)`);
+      } else if (totalContainerTasks === 0 && timelineAssignmentsMap.size > 0 && timelineMatchesSelectedDate) {
+        console.log(`✅ Containers vuoti - tutte le ${timelineAssignmentsMap.size} task sono solo in timeline (scenario 5/11)`);
+      } else if (!timelineMatchesSelectedDate && totalContainerTasks > 0) {
+        console.log(`⚠️ Timeline ha data diversa (${timelineDate} vs ${dateStr}) - NON filtro containers, mostro tutte le ${totalContainerTasks} task`);
       }
 
       console.log("Task dopo filtro - Early:", filteredEarlyOut.length, "High:", filteredHigh.length, "Low:", filteredLow.length);
