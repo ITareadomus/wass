@@ -319,6 +319,13 @@ export default function GenerateAssignments() {
       if (timelineResponse.ok) {
         timelineAssignmentsData = await timelineResponse.json();
         console.log("Caricato da timeline.json");
+        
+        // CRITICAL: Verifica che la timeline sia della data corretta
+        const timelineDate = timelineAssignmentsData.metadata?.date || timelineAssignmentsData.current_date;
+        if (timelineDate !== dateStr) {
+          console.warn(`⚠️ Timeline con data errata: ${timelineDate} invece di ${dateStr} - ignorata`);
+          timelineAssignmentsData = { assignments: [], current_date: dateStr, cleaners_assignments: [] };
+        }
       }
 
       console.log("Containers data:", containersData);
@@ -343,7 +350,11 @@ export default function GenerateAssignments() {
       // Nuova struttura: cleaners_assignments è un array di {cleaner, tasks}
       const timelineAssignmentsMap = new Map<string, any>();
 
-      if (timelineAssignmentsData.cleaners_assignments) {
+      // CRITICAL: Controlla che la timeline sia della data corretta prima di usarla
+      const timelineDate = timelineAssignmentsData.metadata?.date || timelineAssignmentsData.current_date;
+      const isCorrectDate = timelineDate === dateStr;
+
+      if (isCorrectDate && timelineAssignmentsData.cleaners_assignments) {
         // Nuova struttura organizzata per cleaner
         console.log('📋 Caricamento da cleaners_assignments:', timelineAssignmentsData.cleaners_assignments.length, 'cleaners');
         for (const cleanerEntry of timelineAssignmentsData.cleaners_assignments) {
@@ -365,12 +376,14 @@ export default function GenerateAssignments() {
             });
           }
         }
-      } else if (timelineAssignmentsData.assignments) {
+      } else if (isCorrectDate && timelineAssignmentsData.assignments) {
         // Vecchia struttura piatta (fallback)
         console.log('📋 Caricamento da assignments (vecchia struttura):', timelineAssignmentsData.assignments.length);
         for (const a of timelineAssignmentsData.assignments) {
           timelineAssignmentsMap.set(String(a.task_id), a);
         }
+      } else if (!isCorrectDate) {
+        console.log('⚠️ Timeline ignorata perché appartiene alla data:', timelineDate, 'invece di:', dateStr);
       }
 
       console.log("✅ Task assegnate nella timeline (task_id):", Array.from(timelineAssignmentsMap.keys()));
