@@ -218,13 +218,13 @@ export default function GenerateAssignments() {
       console.log("Estrazione completata:", result);
 
       setExtractionStep("Caricamento task...");
-      
+
       // CRITICAL: Aspetta che il backend finisca di creare i file prima di caricarli
       await new Promise(resolve => setTimeout(resolve, 500));
-      
+
       // Carica i task dopo l'estrazione e aspetta che finisca
       await loadTasks();
-      
+
       setExtractionStep("Task caricati!");
       // Delay per assicurarsi che lo stato sia aggiornato prima di nascondere il loader
       await new Promise(resolve => setTimeout(resolve, 100));
@@ -1190,10 +1190,10 @@ export default function GenerateAssignments() {
 
           <div className="mt-6 grid grid-cols-1 xl:grid-cols-3 gap-6">
             <div className="xl:col-span-2">
-              <TimelineView
-                personnel={[]}
-                tasks={allTasksWithAssignments}
-              />
+              {/* Timeline View */}
+              <div data-print-timeline>
+                <TimelineView personnel={[]} tasks={allTasksWithAssignments} />
+              </div>
             </div>
 
             <div className="space-y-6">

@@ -222,6 +222,16 @@
     -webkit-print-color-adjust: exact;
   }
 
+  /* Nascondi TUTTO tranne la timeline */
+  body > * {
+    display: none !important;
+  }
+
+  /* Mostra solo il contenitore della timeline */
+  body > div[data-print-timeline] {
+    display: block !important;
+  }
+
   /* Nascondi elementi non necessari */
   .print\\:hidden {
     display: none !important;
@@ -253,5 +263,15 @@
   /* Assicurati che la griglia sia leggibile */
   .border-border {
     border-color: #000 !important;
+  }
+
+  /* Nascondi navbar, sidebar e altri elementi della pagina */
+  nav,
+  aside,
+  header,
+  footer,
+  [role="navigation"],
+  [role="complementary"] {
+    display: none !important;
   }
 }
