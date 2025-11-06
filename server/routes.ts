@@ -160,12 +160,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         try {
           const existingContent = await fs.readFile(selectedCleanersPath, 'utf8');
           selectedCleanersData = JSON.parse(existingContent);
-          
+
           // Mantieni i cleaner, aggiorna solo metadata
           selectedCleanersData.metadata = selectedCleanersData.metadata || {};
           selectedCleanersData.metadata.date = workDate;
           selectedCleanersData.metadata.reset_at = new Date().toISOString();
-          
+
           console.log(`✅ Mantenuti ${selectedCleanersData.cleaners?.length || 0} cleaner selezionati dopo reset timeline`);
         } catch (err) {
           // Se il file non esiste o è corrotto, crea vuoto
@@ -2328,16 +2328,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Se la data nel file timeline.json è DIVERSA dalla data richiesta, resetta
       const timelineDate = timelineData.metadata?.date;
       if (timelineDate !== date) {
-        console.log(`📅 Cambio data rilevato: ${timelineDate} → ${date}`);
-        console.log(`🔄 Resettando timeline per la nuova data...`);
-
-        const emptyTimelineForNewDate = {
+        console.log(`⚠️ ATTENZIONE: Data in timeline.json (${timelineDate}) diversa dalla data richiesta (${date})`);
+        console.log(`🔄 Resetto timeline.json per la nuova data ${date}`);
+        timelineData = {
           metadata: { last_updated: new Date().toISOString(), date },
           cleaners_assignments: [],
           meta: { total_cleaners: 0, used_cleaners: 0, assigned_tasks: 0 }
         };
-        await fs.writeFile(timelinePath, JSON.stringify(emptyTimelineForNewDate, null, 2));
-        console.log(`✅ Timeline svuotata per la nuova data ${date}`);
+        await fs.writeFile(timelinePath, JSON.stringify(timelineData, null, 2));
+      } else if (loadedFrom === 'new') {
+        // Se non ci sono assegnazioni salvate, resetta timeline anche se la data coincide
+        console.log(`🔄 Nessuna assegnazione salvata per ${date}, resetto timeline.json`);
+        timelineData = {
+          metadata: { last_updated: new Date().toISOString(), date },
+          cleaners_assignments: [],
+          meta: { total_cleaners: 0, used_cleaners: 0, assigned_tasks: 0 }
+        };
+        await fs.writeFile(timelinePath, JSON.stringify(timelineData, null, 2));
       } else {
         console.log(`✅ Timeline mantenuta per la stessa data ${date} con ${timelineData.cleaners_assignments?.length || 0} assegnazioni`);
       }
