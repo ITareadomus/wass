@@ -222,13 +222,8 @@
     -webkit-print-color-adjust: exact;
   }
 
-  /* Nascondi TUTTO tranne la timeline */
-  body > * {
-    display: none !important;
-  }
-
-  /* Mostra solo il contenitore della timeline */
-  body > div[data-print-timeline] {
+  /* Mostra SOLO la timeline e nascondi tutto il resto */
+  [data-print-timeline] {
     display: block !important;
   }
 
@@ -271,7 +266,28 @@
   header,
   footer,
   [role="navigation"],
-  [role="complementary"] {
+  [role="complementary"],
+  .priority-column-early,
+  .priority-column-high,
+  .priority-column-low,
+  button,
+  .map-container {
     display: none !important;
+  }
+
+  /* Forza visibilità della timeline */
+  [data-print-timeline],
+  [data-print-timeline] * {
+    visibility: visible !important;
+    display: block !important;
+  }
+
+  /* Mantieni layout flex per la timeline */
+  [data-print-timeline] .flex {
+    display: flex !important;
+  }
+
+  [data-print-timeline] .grid {
+    display: grid !important;
   }
 }
