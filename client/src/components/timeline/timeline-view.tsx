@@ -1,5 +1,5 @@
 import { Personnel, TaskType as Task } from "@shared/schema";
-import { Calendar, RotateCcw, Users, RefreshCw, UserPlus, Save } from "lucide-react";
+import { Calendar, RotateCcw, Users, RefreshCw, UserPlus } from "lucide-react";
 import { useState, useEffect } from "react";
 import * as React from "react";
 import { Droppable, Draggable } from "react-beautiful-dnd";
@@ -160,7 +160,7 @@ export default function TimelineView({
       // Trova i nomi dei cleaner coinvolti
       const sourceCleaner = cleaners.find(c => c.id === variables.sourceCleanerId);
       const destCleaner = cleaners.find(c => c.id === variables.destCleanerId);
-
+      
       const sourceCleanerName = sourceCleaner ? `${sourceCleaner.name} ${sourceCleaner.lastname}` : `ID ${variables.sourceCleanerId}`;
       const destCleanerName = destCleaner ? `${destCleaner.name} ${destCleaner.lastname}` : `ID ${variables.destCleanerId}`;
 
@@ -533,7 +533,7 @@ export default function TimelineView({
     loadTimelineCleaners();
     // Carica la data formattata se esiste un salvataggio
     loadSavedAssignmentDate();
-
+    
     // Esponi la funzione per ricaricare i cleaners della timeline
     (window as any).loadTimelineCleaners = loadTimelineCleaners;
   }, []);
@@ -856,16 +856,16 @@ export default function TimelineView({
               <div className="space-y-1">
                 <Button
                   onClick={handleConfirmAssignments}
-                  className="w-full h-full bg-green-600 hover:bg-green-700 text-white"
-                  disabled={cleaners.length === 0}
+                  className="w-full h-full bg-green-500 hover:bg-green-600"
+                  data-testid="button-confirm-assignments"
                 >
-                  <Save className="w-4 h-4 mr-2" />
+                  <Users className="w-4 h-4 mr-2" />
                   Conferma Assegnazioni
                 </Button>
                 {lastSavedFilename && (
-                  <p className="text-xs text-red-600 dark:text-red-500 mt-2 text-center lowercase">
+                  <div className="text-xs text-red-500 text-center">
                     ultimo salvataggio: {lastSavedFilename}
-                  </p>
+                  </div>
                 )}
               </div>
             </div>
