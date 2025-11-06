@@ -6,11 +6,31 @@ import path from "path";
 import { fileURLToPath } from "url";
 import { dirname } from "path";
 import * as fs from 'fs/promises';
-import { format } from "date-fns";
+import { format, parseISO } from "date-fns";
+import dayjs from "dayjs";
+import timezone from "dayjs/plugin/timezone";
+import utc from "dayjs/plugin/utc";
+
+dayjs.extend(utc);
+dayjs.extend(timezone);
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const execAsync = promisify(exec);
+const ZONE = "Europe/Rome";
+
+// Funzioni di utilità per filtrare per data checkout
+const isConfirmed = (s: any) => {
+  if (typeof s === "boolean") return s;
+  if (typeof s === "string") return /confirm|confermat|ok|true/i.test(s);
+  return false;
+};
+
+const toISO = (v: any) => {
+  if (!v) return null;
+  const d = dayjs(v).tz(ZONE);
+  return d.isValid() ? d.format("YYYY-MM-DD") : null;
+};
 
 /**
  * Helper function to recalculate travel_time, start_time, end_time for a cleaner's tasks
@@ -111,17 +131,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const workDate = date || format(new Date(), 'yyyy-MM-dd');
       const timelinePath = path.join(process.cwd(), 'client/public/data/output/timeline.json');
 
-      // Svuota il file timeline.json con struttura corretta
+      // CRITICAL: Normalizza la data selezionata
+      const selectedDateISO = dayjs(workDate).tz(ZONE).format("YYYY-MM-DD");
+
+      console.log(`🔄 Reset delle assegnazioni timeline per data: ${selectedDateISO}`);
+
+      // Resetta il file timeline.json con la data normalizzata
       const emptyTimeline = {
         metadata: {
           last_updated: new Date().toISOString(),
-          date: workDate
+          date: selectedDateISO
         },
         cleaners_assignments: [],
         meta: {
           total_cleaners: 0,
           used_cleaners: 0,
-          assigned_tasks: 0
+          total_tasks: 0,
+          total_duration: 0
         }
       };
 
@@ -163,7 +189,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
           // Mantieni i cleaner, aggiorna solo metadata
           selectedCleanersData.metadata = selectedCleanersData.metadata || {};
-          selectedCleanersData.metadata.date = workDate;
+          selectedCleanersData.metadata.date = selectedDateISO;
           selectedCleanersData.metadata.reset_at = new Date().toISOString();
 
           console.log(`✅ Mantenuti ${selectedCleanersData.cleaners?.length || 0} cleaner selezionati dopo reset timeline`);
@@ -172,9 +198,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           selectedCleanersData = {
             cleaners: [],
             total_selected: 0,
-            metadata: { date: workDate }
+            metadata: { date: selectedDateISO }
           };
-          console.log(`ℹ️ Creato selected_cleaners.json vuoto per ${workDate}`);
+          console.log(`ℹ️ Creato selected_cleaners.json vuoto per ${selectedDateISO}`);
         }
 
         // Salva con scrittura atomica
@@ -2300,7 +2326,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let loadedFrom = 'new';
 
       try {
-        // Carica da timeline.json
         const existingData = await fs.readFile(timelinePath, 'utf8');
         timelineData = JSON.parse(existingData);
 
@@ -2610,7 +2635,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const idMatches = (t: any, key: string) =>
         String(t?.task_id) === key || String(t?.logistic_code) === key || String(t?.id) === key;
 
-      const findTaskIndex = (arr: any[], key: string) => arr.findIndex(t => idMatches(t, key));
+      const findTaskIndex = (arr: any[]) => {
+        if (typeof taskId !== 'undefined') {
+          const idStr = String(taskId);
+          const idx = arr.findIndex(t => idMatches(t, idStr));
+          if (idx !== -1) return idx;
+        }
+        if (typeof logisticCode !== 'undefined') {
+          const codeStr = String(logisticCode);
+          const idx = arr.findIndex(t => idMatches(t, codeStr));
+          if (idx !== -1) return idx;
+        }
+        return -1;
+      };
 
       const taskKey = String(typeof taskId !== 'undefined' ? taskId : logisticCode);
 
@@ -2681,7 +2718,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (typeof sourceIndex === 'number' && sourceIndex >= 0 && sourceIndex < srcEntry.tasks.length) {
           takeIdx = sourceIndex;
         } else {
-          const idx = findTaskIndex(srcEntry.tasks, taskKey);
+          const idx = findTaskIndex(srcEntry.tasks);
           takeIdx = idx >= 0 ? idx : null;
         }
         if (takeIdx === null) {
@@ -2702,7 +2739,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Caso B: provengo da CONTAINER
       if (!moved && fromContainer && containersData?.containers?.[fromContainer]?.tasks) {
         const srcArr = containersData.containers[fromContainer].tasks as any[];
-        let idx = findTaskIndex(srcArr, taskKey);
+        let idx = findTaskIndex(srcArr);
         if (idx === -1 && typeof sourceIndex === 'number' && srcArr[sourceIndex]) idx = sourceIndex;
         if (idx === -1) {
           return res.status(404).json({ success: false, message: 'Task non trovata nel container sorgente' });
@@ -2713,7 +2750,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Caso C: riordino interno
       if (!moved) {
-        const idx = findTaskIndex(dstEntry.tasks, taskKey);
+        const idx = findTaskIndex(dstEntry.tasks);
         if (idx === -1) {
           return res.status(404).json({ success: false, message: 'Task non trovata' });
         }
