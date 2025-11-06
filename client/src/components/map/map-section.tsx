@@ -121,8 +121,10 @@ export default function MapSection({ tasks }: MapSectionProps) {
       return hasCoordinates;
     });
 
-    // Se c'è un filtro attivo, mostra solo gli appartamenti del cleaner selezionato
-    if (filteredCleanerId !== null && filteredCleanerId !== undefined) {
+    // Se c'è un filtro attivo (un cleaner specifico selezionato nella timeline),
+    // mostra solo gli appartamenti del cleaner selezionato
+    // Altrimenti mostra tutte le task con coordinate
+    if (filteredCleanerId !== null && filteredCleanerId !== undefined && filteredCleanerId !== 0) {
       tasksWithCoordinates = tasksWithCoordinates.filter(task => 
         (task as any).assignedCleaner === filteredCleanerId
       );
