@@ -309,7 +309,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Scrittura atomica
       const tmpPath = `${timelinePath}.tmp`;
-      await fs.writeFile(tmpPath, JSON.stringify(timelineData, null, 2));
+      await fs.writeFile(tmpPath, JSON.JSON.stringify(timelineData, null, 2));
       await fs.rename(tmpPath, timelinePath);
 
       console.log(`✅ Task ${logisticCode} spostata da cleaner ${sourceCleanerId} a cleaner ${destCleanerId}`);
@@ -949,9 +949,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       console.log(`✅ Assegnazioni salvate in Object Storage: ${filename}`);
 
-      // Salva timestamp effettivo del salvataggio
-      const saveTimestamp = new Date().toISOString();
-
       // === NEW: salva anche i selected_cleaners per la stessa data ===
       const selectedCleanersPath = path.join(
         process.cwd(),
@@ -970,7 +967,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // inject metadata.date per robustezza
       selectedCleanersData.metadata = selectedCleanersData.metadata || {};
       selectedCleanersData.metadata.date = workDate;
-      selectedCleanersData.metadata.saved_at = saveTimestamp;
+      selectedCleanersData.metadata.saved_at = new Date().toISOString();
 
       // nome file: selected_cleaners_DDMMYY.json
       const scFilename = `selected_cleaners_${day}${month}${year}.json`;
@@ -985,10 +982,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log(`✅ Selected cleaners salvati in Object Storage: ${scFilename}`);
       // === END NEW ===
 
-      // Formatta data e ora usando il timestamp effettivo del salvataggio
-      const saveDate = new Date(saveTimestamp);
-      const hours = String(saveDate.getHours()).padStart(2, '0');
-      const minutes = String(saveDate.getMinutes()).padStart(2, '0');
+      // Formatta data e ora nel formato "HH:MM, DD/MM/YY"
+      const now = new Date();
+      const hours = String(now.getHours()).padStart(2, '0');
+      const minutes = String(now.getMinutes()).padStart(2, '0');
       const formattedDateTime = `${day}/${month}/${year} alle ${hours}:${minutes}`;
 
       res.json({
@@ -1104,16 +1101,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
       console.log("create_containers output:", containersResult);
 
-      // Estrai la data e ora dai metadata del file salvato
+      // Estrai il timestamp dal filename (formato: assignments_DDMMYY.json)
+      const dateMatch = filename.match(/assignments_(\d{6})\.json/);
+      const lastSavedTimestamp = dateMatch ? dateMatch[1] : null;
+
+      // Usa la data corrente con la data dal filename
       let formattedDateTime = null;
-      if (savedData.metadata?.saved_at) {
-        // Usa il timestamp salvato nei metadata
-        const savedDate = new Date(savedData.metadata.saved_at);
-        const day = String(savedDate.getDate()).padStart(2, '0');
-        const month = String(savedDate.getMonth() + 1).padStart(2, '0');
-        const year = String(savedDate.getFullYear()).slice(-2);
-        const hours = String(savedDate.getHours()).padStart(2, '0');
-        const minutes = String(savedDate.getMinutes()).padStart(2, '0');
+      if (lastSavedTimestamp) {
+        // Usa l'ora corrente con la data dal filename (non abbiamo accesso ai metadata)
+        const now = new Date();
+        const hours = String(now.getHours()).padStart(2, '0');
+        const minutes = String(now.getMinutes()).padStart(2, '0');
+        const day = lastSavedTimestamp.slice(0, 2);
+        const month = lastSavedTimestamp.slice(2, 4);
+        const year = lastSavedTimestamp.slice(4, 6);
         formattedDateTime = `${day}/${month}/${year} alle ${hours}:${minutes}`;
       }
 
@@ -1121,6 +1122,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         success: true,
         found: true,
         filename,
+        lastSavedTimestamp,
         formattedDateTime,
         data: savedData,
         message: `Assegnazioni caricate da: ${filename}`
