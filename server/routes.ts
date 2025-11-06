@@ -2354,9 +2354,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const existingData = await fs.readFile(timelinePath, 'utf8');
         timelineData = JSON.parse(existingData);
 
+        // CRITICAL: Verifica le date delle task effettive, non solo il metadata
+        let hasWrongDateTasks = false;
+        if (timelineData.cleaners_assignments && timelineData.cleaners_assignments.length > 0) {
+          for (const cleanerEntry of timelineData.cleaners_assignments) {
+            const tasks = cleanerEntry.tasks || [];
+            for (const task of tasks) {
+              const taskCheckout = task.checkout_date || task.checkoutDate;
+              if (taskCheckout && taskCheckout !== date) {
+                hasWrongDateTasks = true;
+                console.log(`⚠️ Trovata task con checkout ${taskCheckout} invece di ${date} - resetterò la timeline`);
+                break;
+              }
+            }
+            if (hasWrongDateTasks) break;
+          }
+        }
+
         // Se il file esiste ma è vuoto o per un'altra data, crea nuovo file vuoto
         if (!timelineData.cleaners_assignments || timelineData.cleaners_assignments.length === 0 ||
-            (timelineData.metadata && timelineData.metadata.date !== date)) {
+            (timelineData.metadata && timelineData.metadata.date !== date) || hasWrongDateTasks) {
           console.log(`Timeline per ${date} è vuota o per altra data, creando timeline vuota`);
           throw new Error('No assignments in timeline file');
         }
