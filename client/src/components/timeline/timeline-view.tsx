@@ -651,6 +651,24 @@ export default function TimelineView({
             </h3>
             <div className="flex gap-2">
               <Button
+                onClick={handlePrint}
+                variant="outline"
+                size="sm"
+                className="flex items-center gap-2 print:hidden"
+                title="Stampa timeline"
+              >
+                <Printer className="w-4 h-4" />
+              </Button>
+              <Button
+                onClick={toggleFullscreen}
+                variant="outline"
+                size="sm"
+                className="flex items-center gap-2 print:hidden"
+                title={isFullscreen ? "Esci da schermo intero" : "Schermo intero"}
+              >
+                {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
+              </Button>
+              <Button
                 onClick={() => {
                   // Passa la data corrente come parametro URL
                   const dateStr = localStorage.getItem('selected_work_date') || format(new Date(), 'yyyy-MM-dd');
@@ -904,23 +922,15 @@ export default function TimelineView({
                 <UserPlus className="w-5 h-5" />
               </Button>
             </div>
-            {/* Pulsanti Conferma Assegnazioni e Stampa affiancati */}
-            <div className="flex-1 p-1 border-t border-border flex gap-2">
+            {/* Pulsante Conferma Assegnazioni che prende tutto lo spazio della timeline */}
+            <div className="flex-1 p-1 border-t border-border">
               <Button
                 onClick={handleConfirmAssignments}
-                className="flex-1 h-full bg-green-500 hover:bg-green-600"
+                className="w-full h-full bg-green-500 hover:bg-green-600"
                 data-testid="button-confirm-assignments"
               >
                 <Users className="w-4 h-4 mr-2" />
                 Conferma Assegnazioni
-              </Button>
-              <Button
-                onClick={handlePrint}
-                variant="outline"
-                className="h-full px-6"
-              >
-                <Printer className="w-4 h-4 mr-2" />
-                Stampa
               </Button>
             </div>
           </div>
