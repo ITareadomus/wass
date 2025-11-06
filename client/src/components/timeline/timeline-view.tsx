@@ -1,5 +1,5 @@
 import { Personnel, TaskType as Task } from "@shared/schema";
-import { Calendar, RotateCcw, Users, RefreshCw, UserPlus, Maximize2, Minimize2 } from "lucide-react";
+import { Calendar, RotateCcw, Users, RefreshCw, UserPlus, Maximize2, Minimize2, Printer } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import * as React from "react";
 import { Droppable, Draggable } from "react-beautiful-dnd";
@@ -459,6 +459,11 @@ export default function TimelineView({
     };
   }, []);
 
+  // Funzione per stampare la timeline
+  const handlePrint = () => {
+    window.print();
+  };
+
   const handleResetAssignments = async () => {
     try {
       // La data è già nel formato corretto yyyy-MM-dd nel localStorage
@@ -646,10 +651,19 @@ export default function TimelineView({
             </h3>
             <div className="flex gap-2">
               <Button
+                onClick={handlePrint}
+                variant="outline"
+                size="sm"
+                className="flex items-center gap-2 print:hidden"
+                title="Stampa timeline"
+              >
+                <Printer className="w-4 h-4" />
+              </Button>
+              <Button
                 onClick={toggleFullscreen}
                 variant="outline"
                 size="sm"
-                className="flex items-center gap-2"
+                className="flex items-center gap-2 print:hidden"
                 title={isFullscreen ? "Esci da schermo intero" : "Schermo intero"}
               >
                 {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
@@ -662,7 +676,7 @@ export default function TimelineView({
                 }}
                 variant="outline"
                 size="sm"
-                className="flex items-center gap-2"
+                className="flex items-center gap-2 print:hidden"
               >
                 <Users className="w-4 h-4" />
                 Convocazioni
@@ -671,7 +685,7 @@ export default function TimelineView({
                 onClick={handleResetAssignments}
                 variant="outline"
                 size="sm"
-                className="flex items-center gap-2"
+                className="flex items-center gap-2 print:hidden"
               >
                 <RotateCcw className="w-4 h-4" />
                 Reset Assegnazioni

@@ -209,3 +209,49 @@
     background-color: rgba(0, 0, 0, 0.95);
   }
 }
+
+/* Print styles */
+@media print {
+  @page {
+    size: landscape;
+    margin: 0.5cm;
+  }
+
+  body {
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+
+  /* Nascondi elementi non necessari */
+  .print\\:hidden {
+    display: none !important;
+  }
+
+  /* Ottimizza la timeline per la stampa */
+  .bg-card {
+    border: 1px solid #000 !important;
+  }
+
+  /* Assicurati che i colori dei cleaners siano visibili */
+  .timeline-cell {
+    page-break-inside: avoid;
+  }
+
+  /* Rimuovi ombre e effetti non necessari */
+  .shadow-sm {
+    box-shadow: none !important;
+  }
+
+  /* Mantieni i colori delle task */
+  .task-straordinaria,
+  .task-premium,
+  .task-standard {
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+
+  /* Assicurati che la griglia sia leggibile */
+  .border-border {
+    border-color: #000 !important;
+  }
+}
