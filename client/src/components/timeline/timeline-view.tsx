@@ -23,6 +23,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useLocation } from 'wouter';
+import { format } from 'date-fns';
 
 interface TimelineViewProps {
   personnel: Personnel[];
@@ -160,7 +161,7 @@ export default function TimelineView({
       // Trova i nomi dei cleaner coinvolti
       const sourceCleaner = cleaners.find(c => c.id === variables.sourceCleanerId);
       const destCleaner = cleaners.find(c => c.id === variables.destCleanerId);
-      
+
       const sourceCleanerName = sourceCleaner ? `${sourceCleaner.name} ${sourceCleaner.lastname}` : `ID ${variables.sourceCleanerId}`;
       const destCleanerName = destCleaner ? `${destCleaner.name} ${destCleaner.lastname}` : `ID ${variables.destCleanerId}`;
 
@@ -533,7 +534,7 @@ export default function TimelineView({
     loadTimelineCleaners();
     // Carica la data formattata se esiste un salvataggio
     loadSavedAssignmentDate();
-    
+
     // Esponi la funzione per ricaricare i cleaners della timeline
     (window as any).loadTimelineCleaners = loadTimelineCleaners;
   }, []);
@@ -602,7 +603,11 @@ export default function TimelineView({
             </h3>
             <div className="flex gap-2">
               <Button
-                onClick={() => setLocation('/convocazioni')}
+                onClick={() => {
+                  // Passa la data corrente come parametro URL
+                  const dateStr = localStorage.getItem('selected_work_date') || format(new Date(), 'yyyy-MM-dd');
+                  setLocation(`/convocazioni?date=${dateStr}`);
+                }}
                 variant="outline"
                 size="sm"
                 className="flex items-center gap-2"
