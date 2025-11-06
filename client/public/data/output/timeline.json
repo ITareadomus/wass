@@ -1,14 +1,14 @@
 {
   "metadata": {
-    "last_updated": "2025-11-06T11:29:26.220Z",
+    "last_updated": "2025-11-06T11:36:12.248Z",
     "date": "2025-11-06"
   },
   "cleaners_assignments": [
     {
       "cleaner": {
-        "id": 24,
-        "name": "HUSSAIN",
-        "lastname": "SYED SHUJIAHAT",
+        "id": 1063,
+        "name": "ALEXANDER DENNYS",
+        "lastname": "CARDENAS OLAYA",
         "role": "Standard",
         "premium": false
       },
@@ -115,11 +115,11 @@
     },
     {
       "cleaner": {
-        "id": 785,
-        "name": "RACHEL",
-        "lastname": "OTSHINGA",
-        "role": "Premium",
-        "premium": true
+        "id": 24,
+        "name": "HUSSAIN",
+        "lastname": "SYED SHUJIAHAT",
+        "role": "Standard",
+        "premium": false
       },
       "tasks": [
         {
@@ -190,45 +190,46 @@
           "travel_time": 26
         },
         {
-          "task_id": 218445,
-          "logistic_code": 1393,
-          "client_id": 3,
-          "premium": true,
-          "address": "Via San Carpoforo, 7",
-          "lat": "45.4715316",
-          "lng": "9.184796",
-          "cleaning_time": 120,
+          "task_id": 218315,
+          "logistic_code": 1501,
+          "client_id": 94,
+          "premium": false,
+          "address": "VIA VALASSINA 45",
+          "lat": "45.5022144",
+          "lng": "9.1883947",
+          "cleaning_time": 150,
           "checkin_date": "2025-11-05",
           "checkout_date": "2025-11-05",
           "checkin_time": null,
           "checkout_time": null,
-          "pax_in": 1,
-          "pax_out": 2,
+          "pax_in": 4,
+          "pax_out": 5,
           "small_equipment": false,
           "operation_id": 2,
           "confirmed_operation": true,
           "straordinaria": false,
-          "type_apt": "B",
-          "alias": "TBR",
-          "customer_name": "THE BEST RENT S.r.l.",
+          "type_apt": "C",
+          "alias": "IHST",
+          "customer_name": "IHOST",
+          "priority": "low_priority",
           "reasons": [
-            "premium",
-            "automatic_assignment_hp"
+            "not_eo",
+            "not_hp",
+            "automatic_assignment_lp"
           ],
-          "priority": "high_priority",
-          "start_time": "13:14",
-          "end_time": "15:14",
-          "followup": true,
+          "start_time": "13:26",
+          "end_time": "15:56",
+          "followup": false,
           "sequence": 3,
-          "travel_time": 19
+          "travel_time": 32
         }
       ]
     },
     {
       "cleaner": {
-        "id": 596,
-        "name": "TRACY",
-        "lastname": "OKE",
+        "id": 785,
+        "name": "RACHEL",
+        "lastname": "OTSHINGA",
         "role": "Premium",
         "premium": true
       },
@@ -300,17 +301,17 @@
           "travel_time": 18
         },
         {
-          "task_id": 218440,
-          "logistic_code": 716,
+          "task_id": 218445,
+          "logistic_code": 1393,
           "client_id": 3,
           "premium": true,
-          "address": "PIAZZA MENTANA, 8",
-          "lat": "45.4623463",
-          "lng": "9.1819616",
+          "address": "Via San Carpoforo, 7",
+          "lat": "45.4715316",
+          "lng": "9.184796",
           "cleaning_time": 120,
           "checkin_date": "2025-11-05",
           "checkout_date": "2025-11-05",
-          "checkin_time": "18:00",
+          "checkin_time": null,
           "checkout_time": null,
           "pax_in": 1,
           "pax_out": 2,
@@ -326,19 +327,19 @@
             "automatic_assignment_hp"
           ],
           "priority": "high_priority",
-          "start_time": "14:38",
-          "end_time": "16:38",
+          "start_time": "14:42",
+          "end_time": "16:42",
           "followup": true,
           "sequence": 3,
-          "travel_time": 21
+          "travel_time": 25
         }
       ]
     },
     {
       "cleaner": {
-        "id": 495,
-        "name": "EL HADJI",
-        "lastname": "BA",
+        "id": 132,
+        "name": "JOHOISER ERNESTO",
+        "lastname": "LOPEZ GIRON",
         "role": "Premium",
         "premium": true
       },
@@ -446,9 +447,9 @@
     },
     {
       "cleaner": {
-        "id": 937,
-        "name": "LOVETH",
-        "lastname": "IGUDIA",
+        "id": 596,
+        "name": "TRACY",
+        "lastname": "OKE",
         "role": "Premium",
         "premium": true
       },
@@ -516,7 +517,7 @@
           "priority": "high_priority",
           "start_time": "11:31",
           "end_time": "14:01",
-          "followup": false,
+          "followup": true,
           "sequence": 2,
           "travel_time": 31
         },
@@ -548,9 +549,9 @@
             "not_hp",
             "automatic_assignment_lp"
           ],
-          "start_time": "14:19",
-          "end_time": "14:49",
-          "followup": false,
+          "start_time": "14:20",
+          "end_time": "14:50",
+          "followup": true,
           "sequence": 3,
           "travel_time": 19
         },
@@ -582,8 +583,8 @@
             "not_hp",
             "automatic_assignment_lp"
           ],
-          "start_time": "15:03",
-          "end_time": "18:33",
+          "start_time": "15:04",
+          "end_time": "18:34",
           "followup": true,
           "sequence": 4,
           "travel_time": 14
@@ -592,11 +593,11 @@
     },
     {
       "cleaner": {
-        "id": 1031,
-        "name": "YAH PRISCA LEA",
-        "lastname": "ADOU",
-        "role": "Standard",
-        "premium": false
+        "id": 722,
+        "name": "LACINE",
+        "lastname": "KONE",
+        "role": "Premium",
+        "premium": true
       },
       "tasks": [
         {
@@ -662,49 +663,50 @@
           "priority": "high_priority",
           "start_time": "12:19",
           "end_time": "13:19",
-          "followup": true,
+          "followup": false,
           "sequence": 2,
           "travel_time": 19
         },
         {
-          "task_id": 218501,
-          "logistic_code": 1048,
-          "client_id": null,
-          "premium": false,
-          "address": "Via Vigevano 9",
-          "lat": "45.4527254",
-          "lng": "9.1748049",
-          "cleaning_time": 210,
+          "task_id": 218440,
+          "logistic_code": 716,
+          "client_id": 3,
+          "premium": true,
+          "address": "PIAZZA MENTANA, 8",
+          "lat": "45.4623463",
+          "lng": "9.1819616",
+          "cleaning_time": 120,
           "checkin_date": "2025-11-05",
           "checkout_date": "2025-11-05",
-          "checkin_time": null,
+          "checkin_time": "18:00",
           "checkout_time": null,
-          "pax_in": 0,
-          "pax_out": 0,
+          "pax_in": 1,
+          "pax_out": 2,
           "small_equipment": false,
           "operation_id": 2,
           "confirmed_operation": true,
           "straordinaria": false,
-          "type_apt": "D",
+          "type_apt": "B",
           "alias": "TBR",
           "customer_name": "THE BEST RENT S.r.l.",
           "reasons": [
-            "manually_moved_to_timeline"
+            "premium",
+            "automatic_assignment_hp"
           ],
-          "priority": "low_priority",
-          "start_time": "13:45",
-          "end_time": "17:15",
+          "priority": "high_priority",
+          "start_time": "13:37",
+          "end_time": "15:37",
           "followup": true,
           "sequence": 3,
-          "travel_time": 26
+          "travel_time": 19
         }
       ]
     },
     {
       "cleaner": {
-        "id": 789,
-        "name": "LAFORTUNE",
-        "lastname": "DJOUKOUO NGUEMTHE",
+        "id": 495,
+        "name": "EL HADJI",
+        "lastname": "BA",
         "role": "Premium",
         "premium": true
       },
@@ -847,11 +849,11 @@
     },
     {
       "cleaner": {
-        "id": 1045,
-        "name": "ARACELY ROCIO",
-        "lastname": "MORLA ZAMBRANO",
-        "role": "Standard",
-        "premium": false
+        "id": 937,
+        "name": "LOVETH",
+        "lastname": "IGUDIA",
+        "role": "Premium",
+        "premium": true
       },
       "tasks": [
         {
@@ -993,11 +995,11 @@
     },
     {
       "cleaner": {
-        "id": 249,
-        "name": "Ogbodo Chidi",
-        "lastname": "Igwe",
-        "role": "Premium",
-        "premium": true
+        "id": 1031,
+        "name": "YAH PRISCA LEA",
+        "lastname": "ADOU",
+        "role": "Standard",
+        "premium": false
       },
       "tasks": [
         {
@@ -1070,11 +1072,11 @@
     },
     {
       "cleaner": {
-        "id": 469,
-        "name": "LAMIN",
-        "lastname": "SOLY",
-        "role": "Standard",
-        "premium": false
+        "id": 789,
+        "name": "LAFORTUNE",
+        "lastname": "DJOUKOUO NGUEMTHE",
+        "role": "Premium",
+        "premium": true
       },
       "tasks": [
         {
@@ -1138,45 +1140,43 @@
             "automatic_assignment_hp"
           ],
           "priority": "high_priority",
-          "start_time": "12:18",
-          "end_time": "13:18",
+          "start_time": "12:19",
+          "end_time": "13:19",
           "followup": true,
           "sequence": 2,
           "travel_time": 19
         },
         {
-          "task_id": 218315,
-          "logistic_code": 1501,
-          "client_id": 94,
+          "task_id": 218501,
+          "logistic_code": 1048,
+          "client_id": null,
           "premium": false,
-          "address": "VIA VALASSINA 45",
-          "lat": "45.5022144",
-          "lng": "9.1883947",
-          "cleaning_time": 150,
+          "address": "Via Vigevano 9",
+          "lat": "45.4527254",
+          "lng": "9.1748049",
+          "cleaning_time": 210,
           "checkin_date": "2025-11-05",
           "checkout_date": "2025-11-05",
           "checkin_time": null,
           "checkout_time": null,
-          "pax_in": 4,
-          "pax_out": 5,
+          "pax_in": 0,
+          "pax_out": 0,
           "small_equipment": false,
           "operation_id": 2,
           "confirmed_operation": true,
           "straordinaria": false,
-          "type_apt": "C",
-          "alias": "IHST",
-          "customer_name": "IHOST",
-          "priority": "low_priority",
+          "type_apt": "D",
+          "alias": "TBR",
+          "customer_name": "THE BEST RENT S.r.l.",
           "reasons": [
-            "not_eo",
-            "not_hp",
-            "automatic_assignment_lp"
+            "manually_moved_to_timeline"
           ],
-          "start_time": "13:53",
-          "end_time": "16:23",
-          "followup": false,
+          "priority": "low_priority",
+          "start_time": "13:49",
+          "end_time": "17:19",
+          "followup": true,
           "sequence": 3,
-          "travel_time": 36
+          "travel_time": 30
         }
       ]
     },
