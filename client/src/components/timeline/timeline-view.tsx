@@ -22,6 +22,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { useLocation } from 'wouter';
 
 interface TimelineViewProps {
   personnel: Personnel[];
@@ -60,6 +61,7 @@ export default function TimelineView({
   const [availableCleaners, setAvailableCleaners] = useState<Cleaner[]>([]);
   const [cleanerToReplace, setCleanerToReplace] = useState<number | null>(null);
   const { toast } = useToast();
+  const [, setLocation] = useLocation();
 
   // Usa sempre la data odierna all'apertura dell'app
   const workDate = new Date().toISOString().split('T')[0];
@@ -158,7 +160,7 @@ export default function TimelineView({
       // Trova i nomi dei cleaner coinvolti
       const sourceCleaner = cleaners.find(c => c.id === variables.sourceCleanerId);
       const destCleaner = cleaners.find(c => c.id === variables.destCleanerId);
-      
+
       const sourceCleanerName = sourceCleaner ? `${sourceCleaner.name} ${sourceCleaner.lastname}` : `ID ${variables.sourceCleanerId}`;
       const destCleanerName = destCleaner ? `${destCleaner.name} ${destCleaner.lastname}` : `ID ${variables.destCleanerId}`;
 
@@ -531,7 +533,7 @@ export default function TimelineView({
     loadTimelineCleaners();
     // Carica la data formattata se esiste un salvataggio
     loadSavedAssignmentDate();
-    
+
     // Esponi la funzione per ricaricare i cleaners della timeline
     (window as any).loadTimelineCleaners = loadTimelineCleaners;
   }, []);
@@ -629,13 +631,22 @@ export default function TimelineView({
 
           {/* Righe dei cleaners - mostra solo se ci sono cleaners selezionati */}
           {allCleanersToShow.length === 0 ? (
-            <div className="flex mb-2">
-              <div
-                className="flex-1 p-4 flex items-center justify-center border bg-yellow-50 dark:bg-yellow-950/20 border-yellow-300 dark:border-yellow-700"
-              >
-                <p className="text-yellow-800 dark:text-yellow-200 font-semibold text-center">
-                  Nessun cleaner selezionato, fare le convocazioni
-                </p>
+            <div className="bg-gradient-to-r from-primary/10 via-primary/20 to-primary/10 rounded-xl border-2 border-primary/30 shadow-lg p-6">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <div className="text-lg font-semibold text-muted-foreground">CLEANERS SELEZIONATI</div>
+                  <div className="text-lg font-bold">
+                    <span className="text-primary">{cleaners.length}</span>
+                  </div>
+                </div>
+                <Button
+                  onClick={() => setLocation('/convocazioni')}
+                  variant="outline"
+                  className="flex items-center gap-2"
+                >
+                  <Users className="w-4 h-4" />
+                  Convocazioni
+                </Button>
               </div>
             </div>
           ) : allCleanersToShow.map((cleaner, index) => {
