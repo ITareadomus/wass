@@ -1,6 +1,6 @@
 {
   "metadata": {
-    "last_updated": "2025-11-06T10:38:07.795479",
+    "last_updated": "2025-11-06T10:48:50.684094",
     "date": "2025-11-06"
   },
   "containers": {
@@ -17,8 +17,8 @@
           "cleaning_time": 90,
           "checkin_date": "2025-11-06",
           "checkout_date": "2025-11-06",
-          "checkin_time": null,
-          "checkout_time": null,
+          "checkin_time": "",
+          "checkout_time": "",
           "pax_in": 1,
           "pax_out": 1,
           "small_equipment": false,
@@ -312,10 +312,10 @@
           "lat": "45.4438637",
           "lng": "9.1281044",
           "cleaning_time": 90,
-          "checkin_date": "2025-11-23",
+          "checkin_date": "2025-11-06",
           "checkout_date": "2025-11-06",
-          "checkin_time": null,
-          "checkout_time": null,
+          "checkin_time": "",
+          "checkout_time": "",
           "pax_in": 2,
           "pax_out": 1,
           "small_equipment": false,
