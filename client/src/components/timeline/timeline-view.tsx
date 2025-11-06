@@ -531,6 +531,9 @@ export default function TimelineView({
     loadTimelineCleaners();
     // Carica la data formattata se esiste un salvataggio
     loadSavedAssignmentDate();
+    
+    // Esponi la funzione per ricaricare i cleaners della timeline
+    (window as any).loadTimelineCleaners = loadTimelineCleaners;
   }, []);
 
   const loadSavedAssignmentDate = async () => {
