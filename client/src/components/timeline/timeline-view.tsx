@@ -628,7 +628,17 @@ export default function TimelineView({
           </div>
 
           {/* Righe dei cleaners - mostra solo se ci sono cleaners selezionati */}
-          {allCleanersToShow.length > 0 && allCleanersToShow.map((cleaner, index) => {
+          {allCleanersToShow.length === 0 ? (
+            <div className="flex mb-2">
+              <div
+                className="flex-1 p-4 flex items-center justify-center border bg-yellow-50 dark:bg-yellow-950/20 border-yellow-300 dark:border-yellow-700"
+              >
+                <p className="text-yellow-800 dark:text-yellow-200 font-semibold text-center">
+                  Nessun cleaner selezionato, fare le convocazioni
+                </p>
+              </div>
+            </div>
+          ) : allCleanersToShow.map((cleaner, index) => {
             const color = getCleanerColor(index);
             const droppableId = `cleaner-${cleaner.id}`;
 
