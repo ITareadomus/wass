@@ -148,28 +148,49 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
       console.log("create_containers output:", containersResult);
 
-      // === NEW: resetta anche selected_cleaners.json per la nuova data ===
+      // === Resetta anche selected_cleaners.json per la nuova data ===
+      // Verifica se esiste un file salvato in Object Storage per questa data
       try {
+        const { Client } = await import('@replit/object-storage');
+        const client = new Client();
+        
+        const dateObj = new Date(workDate);
+        const day = String(dateObj.getDate()).padStart(2, '0');
+        const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+        const year = String(dateObj.getFullYear()).slice(-2);
+        const scFilename = `selected_cleaners_${day}${month}${year}.json`;
+        
+        const scResult = await client.downloadAsText(scFilename, { bucket: 'wass_assignments' });
+        
         const selectedCleanersPath = path.join(
           process.cwd(),
           'client/public/data/cleaners/selected_cleaners.json'
         );
-
-        const emptySelected = {
-          cleaners: [],
-          total_selected: 0,
-          metadata: { date: workDate, reset_at: new Date().toISOString() }
-        };
+        
+        let selectedCleanersData;
+        if (scResult.ok) {
+          // File salvato trovato - ripristinalo
+          selectedCleanersData = JSON.parse(scResult.value);
+          selectedCleanersData.metadata = selectedCleanersData.metadata || {};
+          selectedCleanersData.metadata.date = workDate;
+          console.log(`✅ selected_cleaners.json ripristinato da Object Storage per ${workDate}`);
+        } else {
+          // Nessun file salvato - crea vuoto
+          selectedCleanersData = {
+            cleaners: [],
+            total_selected: 0,
+            metadata: { date: workDate, reset_at: new Date().toISOString() }
+          };
+          console.log(`ℹ️ Nessun selected_cleaners salvato per ${workDate} - creato vuoto`);
+        }
 
         const tmpScPath = `${selectedCleanersPath}.tmp`;
-        await fs.writeFile(tmpScPath, JSON.stringify(emptySelected, null, 2));
+        await fs.writeFile(tmpScPath, JSON.stringify(selectedCleanersData, null, 2));
         await fs.rename(tmpScPath, selectedCleanersPath);
-
-        console.log(`✅ selected_cleaners.json resettato per ${workDate}`);
       } catch (e) {
-        console.warn('⚠️ Impossibile resettare selected_cleaners.json:', e);
+        console.warn('⚠️ Errore gestione selected_cleaners.json:', e);
       }
-      // === END NEW ===
+      // === END ===
 
       res.json({ success: true, message: "Timeline resettata con successo" });
     } catch (error: any) {
@@ -1022,16 +1043,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       await fs.writeFile(tmpPath, JSON.stringify(savedData, null, 2));
       await fs.rename(tmpPath, timelinePath);
 
-      // === NEW: scarica e ripristina selected_cleaners per la stessa data ===
+      // === Scarica e ripristina selected_cleaners per la stessa data ===
       const scFilename = `selected_cleaners_${day}${month}${year}.json`;
       try {
         const scResult = await client.downloadAsText(scFilename, { bucket: 'wass_assignments' });
+        const selectedCleanersPath = path.join(
+          process.cwd(),
+          'client/public/data/cleaners/selected_cleaners.json'
+        );
+
         if (scResult.ok) {
           const scData = JSON.parse(scResult.value);
-          const selectedCleanersPath = path.join(
-            process.cwd(),
-            'client/public/data/cleaners/selected_cleaners.json'
-          );
 
           // update metadata coerente
           scData.metadata = scData.metadata || {};
@@ -1044,12 +1066,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
           console.log(`✅ Selected cleaners ripristinati da Object Storage: ${scFilename}`);
         } else {
-          console.log(`ℹ️ Nessun selected_cleaners salvato per ${workDate} (${scFilename})`);
+          // Nessun file salvato - crea vuoto
+          const emptySelected = {
+            cleaners: [],
+            total_selected: 0,
+            metadata: { date: workDate, reset_at: new Date().toISOString() }
+          };
+
+          const tmpScPath = `${selectedCleanersPath}.tmp`;
+          await fs.writeFile(tmpScPath, JSON.stringify(emptySelected, null, 2));
+          await fs.rename(tmpScPath, selectedCleanersPath);
+
+          console.log(`ℹ️ Nessun selected_cleaners salvato per ${workDate} - creato vuoto`);
         }
       } catch (e) {
         console.warn(`⚠️ Impossibile caricare ${scFilename}:`, e);
       }
-      // === END NEW ===
+      // === END ===
 
       // Rigenera containers.json per la data caricata
       console.log(`🔄 Rigenerazione containers.json per data ${workDate}...`);
@@ -2309,6 +2342,52 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.log(`✅ Timeline svuotata per la nuova data ${date}`);
       } else {
         console.log(`✅ Timeline mantenuta per la stessa data ${date} con ${timelineData.cleaners_assignments?.length || 0} assegnazioni`);
+      }
+
+      // Carica selected_cleaners.json salvato per la data specificata
+      try {
+        const { Client } = await import('@replit/object-storage');
+        const client = new Client();
+        
+        const dateObj = new Date(date);
+        const day = String(dateObj.getDate()).padStart(2, '0');
+        const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+        const year = String(dateObj.getFullYear()).slice(-2);
+        const scFilename = `selected_cleaners_${day}${month}${year}.json`;
+        
+        const scResult = await client.downloadAsText(scFilename, { bucket: 'wass_assignments' });
+        const selectedCleanersPath = path.join(
+          process.cwd(),
+          'client/public/data/cleaners/selected_cleaners.json'
+        );
+        
+        if (scResult.ok) {
+          const scData = JSON.parse(scResult.value);
+          scData.metadata = scData.metadata || {};
+          scData.metadata.date = date;
+          scData.metadata.loaded_at = new Date().toISOString();
+
+          const tmpScPath = `${selectedCleanersPath}.tmp`;
+          await fs.writeFile(tmpScPath, JSON.stringify(scData, null, 2));
+          await fs.rename(tmpScPath, selectedCleanersPath);
+
+          console.log(`✅ Selected cleaners ripristinati per ${date}`);
+        } else {
+          // Nessun file salvato - crea vuoto
+          const emptySelected = {
+            cleaners: [],
+            total_selected: 0,
+            metadata: { date, reset_at: new Date().toISOString() }
+          };
+
+          const tmpScPath = `${selectedCleanersPath}.tmp`;
+          await fs.writeFile(tmpScPath, JSON.stringify(emptySelected, null, 2));
+          await fs.rename(tmpScPath, selectedCleanersPath);
+
+          console.log(`ℹ️ Nessun selected_cleaners per ${date} - creato vuoto`);
+        }
+      } catch (e) {
+        console.warn('⚠️ Errore caricamento selected_cleaners:', e);
       }
 
       // Esegui SEMPRE create_containers.py per avere dati freschi dal database
