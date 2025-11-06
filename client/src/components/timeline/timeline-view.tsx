@@ -922,15 +922,23 @@ export default function TimelineView({
                 <UserPlus className="w-5 h-5" />
               </Button>
             </div>
-            {/* Pulsante Conferma Assegnazioni che prende tutto lo spazio della timeline */}
-            <div className="flex-1 p-1 border-t border-border">
+            {/* Pulsanti Conferma Assegnazioni e Stampa affiancati */}
+            <div className="flex-1 p-1 border-t border-border flex gap-2">
               <Button
                 onClick={handleConfirmAssignments}
-                className="w-full h-full bg-green-500 hover:bg-green-600"
+                className="flex-1 h-full bg-green-500 hover:bg-green-600"
                 data-testid="button-confirm-assignments"
               >
                 <Users className="w-4 h-4 mr-2" />
                 Conferma Assegnazioni
+              </Button>
+              <Button
+                onClick={handlePrint}
+                variant="outline"
+                className="h-full px-6"
+              >
+                <Printer className="w-4 h-4 mr-2" />
+                Stampa
               </Button>
             </div>
           </div>
