@@ -153,20 +153,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       try {
         const { Client } = await import('@replit/object-storage');
         const client = new Client();
-        
+
         const dateObj = new Date(workDate);
         const day = String(dateObj.getDate()).padStart(2, '0');
         const month = String(dateObj.getMonth() + 1).padStart(2, '0');
         const year = String(dateObj.getFullYear()).slice(-2);
         const scFilename = `selected_cleaners_${day}${month}${year}.json`;
-        
+
         const scResult = await client.downloadAsText(scFilename, { bucket: 'wass_assignments' });
-        
+
         const selectedCleanersPath = path.join(
           process.cwd(),
           'client/public/data/cleaners/selected_cleaners.json'
         );
-        
+
         let selectedCleanersData;
         if (scResult.ok) {
           // File salvato trovato - ripristinalo
@@ -309,7 +309,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Scrittura atomica
       const tmpPath = `${timelinePath}.tmp`;
-      await fs.writeFile(tmpPath, JSON.stringify(timelineData, null, 2));
+      await fs.writeFile(tmpPath, JSON.JSON.stringify(timelineData, null, 2));
       await fs.rename(tmpPath, timelinePath);
 
       console.log(`✅ Task ${logisticCode} spostata da cleaner ${sourceCleanerId} a cleaner ${destCleanerId}`);
@@ -2348,19 +2348,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       try {
         const { Client } = await import('@replit/object-storage');
         const client = new Client();
-        
+
         const dateObj = new Date(date);
         const day = String(dateObj.getDate()).padStart(2, '0');
         const month = String(dateObj.getMonth() + 1).padStart(2, '0');
         const year = String(dateObj.getFullYear()).slice(-2);
         const scFilename = `selected_cleaners_${day}${month}${year}.json`;
-        
+
         const scResult = await client.downloadAsText(scFilename, { bucket: 'wass_assignments' });
         const selectedCleanersPath = path.join(
           process.cwd(),
           'client/public/data/cleaners/selected_cleaners.json'
         );
-        
+
         if (scResult.ok) {
           const scData = JSON.parse(scResult.value);
           scData.metadata = scData.metadata || {};
