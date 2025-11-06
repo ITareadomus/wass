@@ -160,7 +160,7 @@ export default function TimelineView({
       // Trova i nomi dei cleaner coinvolti
       const sourceCleaner = cleaners.find(c => c.id === variables.sourceCleanerId);
       const destCleaner = cleaners.find(c => c.id === variables.destCleanerId);
-
+      
       const sourceCleanerName = sourceCleaner ? `${sourceCleaner.name} ${sourceCleaner.lastname}` : `ID ${variables.sourceCleanerId}`;
       const destCleanerName = destCleaner ? `${destCleaner.name} ${destCleaner.lastname}` : `ID ${variables.destCleanerId}`;
 
@@ -297,65 +297,9 @@ export default function TimelineView({
     }
   };
 
-  // Carica anche i cleaner dalla timeline.json per mostrare quelli nascosti
-  const [timelineCleaners, setTimelineCleaners] = useState<any[]>([]);
-
-  const loadTimelineCleaners = async () => {
-    try {
-      const response = await fetch(`/data/output/timeline.json?t=${Date.now()}`);
-      if (!response.ok) {
-        console.warn(`Timeline file not found (${response.status}), using empty timeline`);
-        setTimelineCleaners([]);
-        return;
-      }
-
-      const contentType = response.headers.get('content-type');
-      if (!contentType || !contentType.includes('application/json')) {
-        console.warn('Timeline file is not JSON, using empty timeline');
-        setTimelineCleaners([]);
-        return;
-      }
-
-      const timelineData = await response.json();
-      const timelineCleanersList = timelineData.cleaners_assignments || [];
-      setTimelineCleaners(timelineCleanersList);
-    } catch (error) {
-      console.error("Errore nel caricamento timeline cleaners:", error);
-      setTimelineCleaners([]);
-    }
-  };
-
-  const loadSavedAssignmentDate = async () => {
-    try {
-      const response = await fetch('/api/load-saved-assignments', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ date: workDate })
-      });
-
-      if (response.ok) {
-        const result = await response.json();
-        if (result.found && result.formattedDateTime) {
-          setLastSavedFilename(result.formattedDateTime);
-          localStorage.setItem('last_saved_assignment', result.formattedDateTime);
-        }
-      }
-    } catch (error) {
-      console.error("Errore nel caricamento della data di salvataggio:", error);
-    }
-  };
-
-
   useEffect(() => {
     loadCleaners();
     loadAliases();
-    loadTimelineCleaners();
-    loadSavedAssignmentDate();
-
-    // Esponi funzione per aggiornare lastSavedFilename
-    (window as any).updateLastSavedFilename = (filename: string) => {
-      setLastSavedFilename(filename);
-    };
   }, []);
 
   const handleCleanerClick = (cleaner: Cleaner, e: React.MouseEvent) => {
@@ -506,6 +450,8 @@ export default function TimelineView({
     }
   };
 
+  const [lastSavedFilename, setLastSavedFilename] = useState<string | null>(null);
+
   const handleConfirmAssignments = async () => {
     try {
       const dateStr = localStorage.getItem('selected_work_date') || (() => {
@@ -537,11 +483,6 @@ export default function TimelineView({
       setLastSavedFilename(result.formattedDateTime || result.filename);
       localStorage.setItem('last_saved_assignment', result.formattedDateTime || result.filename);
 
-      // Chiama la funzione esposta globalmente per aggiornare lastSavedFilename nel componente
-      if ((window as any).updateLastSavedFilename) {
-        (window as any).updateLastSavedFilename(result.formattedDateTime || result.filename);
-      }
-
       toast({
         title: "✅ Assegnazioni confermate!",
         description: `Salvate il ${result.formattedDateTime}`,
@@ -557,6 +498,65 @@ export default function TimelineView({
     }
   };
 
+
+  // Carica anche i cleaner dalla timeline.json per mostrare quelli nascosti
+  const [timelineCleaners, setTimelineCleaners] = useState<any[]>([]);
+
+  const loadTimelineCleaners = async () => {
+    try {
+      const response = await fetch(`/data/output/timeline.json?t=${Date.now()}`);
+      if (!response.ok) {
+        console.warn(`Timeline file not found (${response.status}), using empty timeline`);
+        setTimelineCleaners([]);
+        return;
+      }
+
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        console.warn('Timeline file is not JSON, using empty timeline');
+        setTimelineCleaners([]);
+        return;
+      }
+
+      const timelineData = await response.json();
+      const timelineCleanersList = timelineData.cleaners_assignments || [];
+      setTimelineCleaners(timelineCleanersList);
+    } catch (error) {
+      console.error("Errore nel caricamento timeline cleaners:", error);
+      setTimelineCleaners([]);
+    }
+  };
+
+  useEffect(() => {
+    loadCleaners();
+    loadAliases();
+    loadTimelineCleaners();
+    // Carica la data formattata se esiste un salvataggio
+    loadSavedAssignmentDate();
+    
+    // Esponi la funzione per ricaricare i cleaners della timeline
+    (window as any).loadTimelineCleaners = loadTimelineCleaners;
+  }, []);
+
+  const loadSavedAssignmentDate = async () => {
+    try {
+      const response = await fetch('/api/load-saved-assignments', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ date: workDate })
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        if (result.found && result.formattedDateTime) {
+          setLastSavedFilename(result.formattedDateTime);
+          localStorage.setItem('last_saved_assignment', result.formattedDateTime);
+        }
+      }
+    } catch (error) {
+      console.error("Errore nel caricamento della data di salvataggio:", error);
+    }
+  };
 
   // Mostra SEMPRE tutti i cleaners da selected_cleaners.json
   // Questo permette di vedere tutti i cleaners disponibili anche prima di assegnare le task
