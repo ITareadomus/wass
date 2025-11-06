@@ -172,7 +172,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           selectedCleanersData = {
             cleaners: [],
             total_selected: 0,
-            metadata: { date: workDate, reset_at: new Date().toISOString() }
+            metadata: { date: workDate }
           };
           console.log(`ℹ️ Creato selected_cleaners.json vuoto per ${workDate}`);
         }
@@ -2391,7 +2391,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             const emptySelected = {
               cleaners: [],
               total_selected: 0,
-              metadata: { date, reset_at: new Date().toISOString() }
+              metadata: { date }
             };
 
             const tmpScPath = `${selectedCleanersPath}.tmp`;
