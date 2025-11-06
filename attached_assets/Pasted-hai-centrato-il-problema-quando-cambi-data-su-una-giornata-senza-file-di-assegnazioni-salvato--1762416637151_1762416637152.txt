@@ -1,0 +1,109 @@
+hai centrato il problema: quando cambi data su una giornata **senza file di assegnazioni salvato**, il frontend continua a leggere il vecchio `client/public/data/output/timeline.json` (rimasto della giornata precedente, es. 05/11). Poi, quando premi **Assegna**, quella timeline vecchia viene riusata e ti “ripropaga” le assegnazioni del 05/11.
+
+Di fatto, quando `/api/load-saved-assignments` risponde `found: false`, **la timeline non viene azzerata**: resta il file del giorno precedente. Serve quindi:
+
+1. **Resettare esplicitamente `timeline.json` alla nuova data** quando non c’è un salvataggio per quel giorno.
+2. **Ignorare qualsiasi `timeline.json` che non sia della data selezionata** come ulteriore protezione.
+
+Di seguito le correzioni pronte da incollare su Replit.
+
+---
+
+# 1) Frontend – `client/src/pages/generate-assignments.tsx`
+
+### A) Resetta la timeline se non trovi assegnazioni salvate
+
+Dentro la funzione `extractData(date: Date)`, **subito dopo**:
+
+```ts
+// Prima prova a caricare assegnazioni salvate
+const hasSavedAssignments = await loadSavedAssignments(date);
+
+if (hasSavedAssignments) {
+  setExtractionStep("Assegnazioni salvate caricate!");
+  setIsExtracting(false);
+  // Carica i task dalle assegnazioni salvate
+  loadTasks();
+  return;
+}
+```
+
+**AGGIUNGI** questo blocco (prima di chiamare `/api/extract-data`):
+
+```ts
+// Non ci sono assegnazioni salvate: AZZERA la timeline del giorno selezionato
+try {
+  const year = String(date.getFullYear());
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  const dateStr = `${year}-${month}-${day}`;
+
+  await fetch('/api/reset-timeline-assignments', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ date: dateStr }),
+  });
+  console.log(`Timeline resettata per ${dateStr}`);
+} catch (e) {
+  console.warn('Impossibile resettare la timeline; continuo comunque con estrazione.', e);
+}
+```
+
+### B) Ignora timeline “di un’altra data” durante il caricamento
+
+Nella funzione che carica i file (dove fai i due `fetch` a `containers.json` e `timeline.json`), **subito dopo**:
+
+```ts
+let timelineAssignmentsData = { assignments: [], current_date: dateStr };
+
+if (timelineResponse.ok) {
+  timelineAssignmentsData = await timelineResponse.json();
+  console.log("Caricato da timeline.json");
+}
+```
+
+**SOSTITUISCI** con questo, che valida la data:
+
+```ts
+let timelineAssignmentsData: any = { assignments: [], current_date: dateStr };
+
+// forza sempre no-cache con query param già presente
+if (timelineResponse.ok) {
+  const raw = await timelineResponse.json();
+  // Se il file contiene metadata con la data, usala per validare
+  const fileDate =
+    raw?.metadata?.date ||
+    raw?.current_date ||     // fallback per versioni precedenti
+    null;
+
+  if (fileDate && fileDate !== dateStr) {
+    console.warn(`timeline.json è di un'altra data (${fileDate}), lo ignoro per ${dateStr}`);
+  } else {
+    timelineAssignmentsData = raw;
+    console.log("Caricato da timeline.json (data coerente)");
+  }
+}
+```
+
+> Effetto: anche se per errore rimanesse un `timeline.json` vecchio, viene ignorato se la data non combacia con quella selezionata.
+
+---
+
+# 2) (Opzionale ma consigliato) Server – `server/routes.ts`
+
+L’endpoint `/api/load-saved-assignments` è già corretto: quando non trova il file risponde `found: false` **senza** creare timeline.
+Hai già un endpoint pronto per resettare: `/api/reset-timeline-assignments`. Con la patch sopra lo chiamiamo dal client in modo atomico e sicuro.
+
+Se vuoi essere ultra-robusto anche lato server, puoi **aggiungere** (non sostituire) un reset automatico quando non trovi il file, ma non è strettamente necessario dopo la fix frontend.
+
+---
+
+## Perché così funziona
+
+* Quando cambi data:
+
+  * Se **esiste** un salvataggio → lo carichi e aggiorni `timeline.json` correttamente a quella data.
+  * Se **non esiste** → **azzeri** `timeline.json` per la data selezionata prima di estrarre i task. Non rimane più in giro il `timeline.json` del 05/11.
+* Durante `loadTasks`, se per qualunque motivo il file non è della data selezionata, viene **ignorato**.
+
+Queste due modifiche eliminano definitivamente l’effetto “mi ripopola la timeline del 05/11”.
