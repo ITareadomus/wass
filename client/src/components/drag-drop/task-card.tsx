@@ -650,8 +650,9 @@ export default function TaskCard({
                 <p className="text-sm">{(displayTask as any).type_apt ?? "non migrato"}</p>
               </div>
               <div>
-                <p className="text-sm font-semibold text-muted-foreground">
+                <p className="text-sm font-semibold text-muted-foreground flex items-center gap-1">
                   Tipologia intervento
+                  <Pencil className="w-3 h-3 text-muted-foreground/60" />
                 </p>
                 <p className="text-sm">
                   {!isConfirmedOperation ? "non migrato" : (displayTask as any).operation_id ?? "-"}
