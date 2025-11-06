@@ -1051,8 +1051,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       if (!result.ok) {
-        // File non trovato, non è un errore - significa solo che non ci sono assegnazioni salvate
+        // File non trovato - resetta timeline.json per evitare di mostrare task di date precedenti
         console.log(`Nessuna assegnazione salvata trovata per ${workDate} (${filename})`);
+        
+        // CRITICAL: Resetta timeline.json per la nuova data
+        const timelinePath = path.join(process.cwd(), 'client/public/data/output/timeline.json');
+        const emptyTimeline = {
+          metadata: { last_updated: new Date().toISOString(), date: workDate },
+          cleaners_assignments: [],
+          current_date: workDate,
+          meta: { total_cleaners: 0, used_cleaners: 0, assigned_tasks: 0 }
+        };
+        const tmpPath = `${timelinePath}.tmp`;
+        await fs.writeFile(tmpPath, JSON.stringify(emptyTimeline, null, 2));
+        await fs.rename(tmpPath, timelinePath);
+        console.log(`✅ Timeline resettata per la nuova data ${workDate}`);
+        
+        // Resetta anche selected_cleaners.json
+        const selectedCleanersPath = path.join(process.cwd(), 'client/public/data/cleaners/selected_cleaners.json');
+        const emptySelected = {
+          cleaners: [],
+          total_selected: 0,
+          metadata: { date: workDate, reset_at: new Date().toISOString() }
+        };
+        const tmpScPath = `${selectedCleanersPath}.tmp`;
+        await fs.writeFile(tmpScPath, JSON.stringify(emptySelected, null, 2));
+        await fs.rename(tmpScPath, selectedCleanersPath);
+        
         return res.json({
           success: true,
           found: false,
