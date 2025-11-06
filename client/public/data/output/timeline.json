@@ -1,12 +1,25 @@
 {
   "metadata": {
-    "last_updated": "2025-11-06T10:31:37.883Z",
+    "last_updated": "2025-11-06T10:33:45.474Z",
     "date": "2025-11-06"
   },
-  "cleaners_assignments": [],
+  "cleaners_assignments": [
+    {
+      "cleaner": {
+        "id": 495,
+        "name": "EL HADJI",
+        "lastname": "BA",
+        "role": "Premium",
+        "premium": true
+      },
+      "tasks": []
+    }
+  ],
   "meta": {
-    "total_cleaners": 0,
+    "total_cleaners": 1,
     "used_cleaners": 0,
-    "assigned_tasks": 0
+    "assigned_tasks": 0,
+    "total_tasks": 0,
+    "last_updated": "2025-11-06T10:33:45.474Z"
   }
 }
