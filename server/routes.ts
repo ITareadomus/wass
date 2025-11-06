@@ -148,12 +148,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
       console.log("create_containers output:", containersResult);
 
-      res.json({
-        success: true,
-        message: `Assegnazioni resettate e containers ripristinati per ${workDate}`
-      });
+      // === NEW: resetta anche selected_cleaners.json per la nuova data ===
+      try {
+        const selectedCleanersPath = path.join(
+          process.cwd(),
+          'client/public/data/cleaners/selected_cleaners.json'
+        );
+
+        const emptySelected = {
+          cleaners: [],
+          total_selected: 0,
+          metadata: { date: workDate, reset_at: new Date().toISOString() }
+        };
+
+        const tmpScPath = `${selectedCleanersPath}.tmp`;
+        await fs.writeFile(tmpScPath, JSON.stringify(emptySelected, null, 2));
+        await fs.rename(tmpScPath, selectedCleanersPath);
+
+        console.log(`✅ selected_cleaners.json resettato per ${workDate}`);
+      } catch (e) {
+        console.warn('⚠️ Impossibile resettare selected_cleaners.json:', e);
+      }
+      // === END NEW ===
+
+      res.json({ success: true, message: "Timeline resettata con successo" });
     } catch (error: any) {
-      console.error("Errore nel reset delle assegnazioni della timeline:", error);
+      console.error("Errore nel reset della timeline:", error);
       res.status(500).json({ success: false, error: error.message });
     }
   });
@@ -906,13 +926,46 @@ export async function registerRoutes(app: Express): Promise<Server> {
         throw new Error(result.error || 'Errore sconosciuto nel salvataggio');
       }
 
-      console.log(`✅ Assegnazioni confermate e salvate in Object Storage: ${filename}`);
+      console.log(`✅ Assegnazioni salvate in Object Storage: ${filename}`);
+
+      // === NEW: salva anche i selected_cleaners per la stessa data ===
+      const selectedCleanersPath = path.join(
+        process.cwd(),
+        'client/public/data/cleaners/selected_cleaners.json'
+      );
+
+      // leggi i cleaners selezionati correnti (se non esiste, crea vuoto)
+      let selectedCleanersData: any;
+      try {
+        const scRaw = await fs.readFile(selectedCleanersPath, 'utf8');
+        selectedCleanersData = JSON.parse(scRaw);
+      } catch {
+        selectedCleanersData = { cleaners: [], total_selected: 0 };
+      }
+
+      // inject metadata.date per robustezza
+      selectedCleanersData.metadata = selectedCleanersData.metadata || {};
+      selectedCleanersData.metadata.date = workDate;
+      selectedCleanersData.metadata.saved_at = new Date().toISOString();
+
+      // nome file: selected_cleaners_DDMMYY.json
+      const scFilename = `selected_cleaners_${day}${month}${year}.json`;
+
+      const scJson = JSON.stringify(selectedCleanersData, null, 2);
+      const scResult = await client.uploadFromText(scFilename, scJson, {
+        bucket: 'wass_assignments'
+      });
+      if (!scResult.ok) {
+        throw new Error(scResult.error || 'Errore nel salvataggio dei selected_cleaners');
+      }
+      console.log(`✅ Selected cleaners salvati in Object Storage: ${scFilename}`);
+      // === END NEW ===
 
       // Formatta data e ora nel formato "HH:MM, DD/MM/YY"
       const now = new Date();
       const hours = String(now.getHours()).padStart(2, '0');
       const minutes = String(now.getMinutes()).padStart(2, '0');
-      const formattedDateTime = `${hours}:${minutes}, ${day}/${month}/${year}`;
+      const formattedDateTime = `${day}/${month}/${year} alle ${hours}:${minutes}`;
 
       res.json({
         success: true,
@@ -921,7 +974,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         message: `Assegnazioni salvate in Object Storage: ${filename}`
       });
     } catch (error: any) {
-      console.error("Errore nella conferma delle assegnazioni:", error);
+      console.error("Errore nel salvataggio delle assegnazioni:", error);
       res.status(500).json({
         success: false,
         error: error.message
@@ -969,9 +1022,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
       await fs.writeFile(tmpPath, JSON.stringify(savedData, null, 2));
       await fs.rename(tmpPath, timelinePath);
 
-      console.log(`✅ Assegnazioni caricate da Object Storage: ${filename}`);
+      // === NEW: scarica e ripristina selected_cleaners per la stessa data ===
+      const scFilename = `selected_cleaners_${day}${month}${year}.json`;
+      try {
+        const scResult = await client.downloadAsText(scFilename, { bucket: 'wass_assignments' });
+        if (scResult.ok) {
+          const scData = JSON.parse(scResult.value);
+          const selectedCleanersPath = path.join(
+            process.cwd(),
+            'client/public/data/cleaners/selected_cleaners.json'
+          );
 
-      // RIGENERA containers.json per la data corretta
+          // update metadata coerente
+          scData.metadata = scData.metadata || {};
+          scData.metadata.date = workDate;
+          scData.metadata.loaded_at = new Date().toISOString();
+
+          const tmpScPath = `${selectedCleanersPath}.tmp`;
+          await fs.writeFile(tmpScPath, JSON.stringify(scData, null, 2));
+          await fs.rename(tmpScPath, selectedCleanersPath);
+
+          console.log(`✅ Selected cleaners ripristinati da Object Storage: ${scFilename}`);
+        } else {
+          console.log(`ℹ️ Nessun selected_cleaners salvato per ${workDate} (${scFilename})`);
+        }
+      } catch (e) {
+        console.warn(`⚠️ Impossibile caricare ${scFilename}:`, e);
+      }
+      // === END NEW ===
+
+      // Rigenera containers.json per la data caricata
       console.log(`🔄 Rigenerazione containers.json per data ${workDate}...`);
       const containersResult = await new Promise<string>((resolve, reject) => {
         exec(
@@ -1002,7 +1082,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const day = lastSavedTimestamp.slice(0, 2);
         const month = lastSavedTimestamp.slice(2, 4);
         const year = lastSavedTimestamp.slice(4, 6);
-        formattedDateTime = `${hours}:${minutes}, ${day}/${month}/${year}`;
+        formattedDateTime = `${day}/${month}/${year} alle ${hours}:${minutes}`;
       }
 
       res.json({
@@ -1016,10 +1096,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     } catch (error: any) {
       console.error("Errore nel caricamento delle assegnazioni:", error);
-      res.status(500).json({
-        success: false,
-        error: error.message
-      });
+      res.status(500).json({ success: false, error: error.message });
     }
   });
 
