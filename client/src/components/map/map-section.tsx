@@ -232,6 +232,19 @@ export default function MapSection({ tasks }: MapSectionProps) {
     }
   }, [tasks, isMapLoaded, cleaners, filteredCleanerId]);
 
+  // Conta i marker visibili in base al filtro
+  const visibleTasksCount = (() => {
+    const tasksWithCoordinates = tasks.filter(task => task.address && task.lat && task.lng);
+    
+    if (filteredCleanerId !== null && filteredCleanerId !== undefined && filteredCleanerId !== 0) {
+      return tasksWithCoordinates.filter(task => 
+        (task as any).assignedCleaner === filteredCleanerId
+      ).length;
+    }
+    
+    return tasksWithCoordinates.length;
+  })();
+
   return (
     <div className="bg-card rounded-lg border shadow-sm">
       <div className="p-4 border-b border-border">
@@ -256,6 +269,9 @@ export default function MapSection({ tasks }: MapSectionProps) {
             />
           </svg>
           Mappa Appartamenti
+          <span className="ml-2 px-2 py-0.5 text-xs font-semibold rounded-full bg-primary/10 text-primary">
+            {visibleTasksCount}
+          </span>
         </h3>
       </div>
       <div className="p-4 relative">
