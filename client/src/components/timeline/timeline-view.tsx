@@ -531,32 +531,18 @@ export default function TimelineView({
     loadCleaners();
     loadAliases();
     loadTimelineCleaners();
+    
     // Carica la data formattata se esiste un salvataggio
-    loadSavedAssignmentDate();
+    const savedDate = localStorage.getItem('last_saved_assignment');
+    if (savedDate) {
+      setLastSavedFilename(savedDate);
+    }
     
     // Esponi la funzione per ricaricare i cleaners della timeline
     (window as any).loadTimelineCleaners = loadTimelineCleaners;
   }, []);
 
-  const loadSavedAssignmentDate = async () => {
-    try {
-      const response = await fetch('/api/load-saved-assignments', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ date: workDate })
-      });
-
-      if (response.ok) {
-        const result = await response.json();
-        if (result.found && result.formattedDateTime) {
-          setLastSavedFilename(result.formattedDateTime);
-          localStorage.setItem('last_saved_assignment', result.formattedDateTime);
-        }
-      }
-    } catch (error) {
-      console.error("Errore nel caricamento della data di salvataggio:", error);
-    }
-  };
+  
 
   // Mostra SEMPRE tutti i cleaners da selected_cleaners.json
   // Questo permette di vedere tutti i cleaners disponibili anche prima di assegnare le task
@@ -863,8 +849,8 @@ export default function TimelineView({
                   Conferma Assegnazioni
                 </Button>
                 {lastSavedFilename && (
-                  <div className="text-xs text-red-500 text-center">
-                    ultimo salvataggio: {lastSavedFilename}
+                  <div className="text-xs text-red-500 text-center lowercase">
+                    ultimo salvataggio: {lastSavedFilename.toLowerCase()}
                   </div>
                 )}
               </div>
