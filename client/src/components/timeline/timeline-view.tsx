@@ -853,21 +853,14 @@ export default function TimelineView({
             </div>
             {/* Pulsante Conferma Assegnazioni che prende tutto lo spazio della timeline */}
             <div className="flex-1 p-1 border-t border-border">
-              <div className="space-y-1">
-                <Button
-                  onClick={handleConfirmAssignments}
-                  className="w-full h-full bg-green-500 hover:bg-green-600"
-                  data-testid="button-confirm-assignments"
-                >
-                  <Users className="w-4 h-4 mr-2" />
-                  Conferma Assegnazioni
-                </Button>
-                {lastSavedFilename && (
-                  <div className="text-xs text-red-500 text-center">
-                    ultimo salvataggio: {lastSavedFilename}
-                  </div>
-                )}
-              </div>
+              <Button
+                onClick={handleConfirmAssignments}
+                className="w-full h-full bg-green-500 hover:bg-green-600"
+                data-testid="button-confirm-assignments"
+              >
+                <Users className="w-4 h-4 mr-2" />
+                Conferma Assegnazioni
+              </Button>
             </div>
           </div>
         </div>
