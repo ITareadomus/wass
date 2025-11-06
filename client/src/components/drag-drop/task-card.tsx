@@ -49,12 +49,13 @@ export default function TaskCard({
   const { toast } = useToast();
 
   // Stati per editing
-  const [editingField, setEditingField] = useState<'duration' | 'checkout' | 'checkin' | null>(null);
+  const [editingField, setEditingField] = useState<'duration' | 'checkout' | 'checkin' | 'paxin' | null>(null);
   const [editedCheckoutDate, setEditedCheckoutDate] = useState("");
   const [editedCheckoutTime, setEditedCheckoutTime] = useState("");
   const [editedCheckinDate, setEditedCheckinDate] = useState("");
   const [editedCheckinTime, setEditedCheckinTime] = useState("");
   const [editedDuration, setEditedDuration] = useState("");
+  const [editedPaxIn, setEditedPaxIn] = useState("");
   const [isSaving, setIsSaving] = useState(false);
 
   // Determina le task navigabili in base al contesto
@@ -169,6 +170,9 @@ export default function TaskCard({
       const [hours, mins] = duration.split('.').map(Number);
       const totalMinutes = (hours || 0) * 60 + (mins || 0);
       setEditedDuration(totalMinutes.toString());
+
+      // Inizializza pax-in
+      setEditedPaxIn(String((displayTask as any).pax_in || 0));
     }
   }, [isModalOpen, task.id, displayTask, allTasks, isInTimeline, currentContainer]);
 
@@ -258,6 +262,7 @@ export default function TaskCard({
           checkinDate: editedCheckinDate,
           checkinTime: editedCheckinTime,
           cleaningTime: parseInt(editedDuration),
+          paxIn: parseInt(editedPaxIn),
         }),
       });
 
@@ -682,10 +687,34 @@ export default function TaskCard({
             {/* Quinta riga: Pax-In - Pax-Out */}
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <p className="text-sm font-semibold text-muted-foreground">
+                <p className="text-sm font-semibold text-muted-foreground mb-1">
                   Pax-In
                 </p>
-                <p className="text-sm">{(displayTask as any).pax_in ?? "non migrato"}</p>
+                {editingField === 'paxin' ? (
+                  <div className="flex items-center gap-2">
+                    <Input
+                      type="text"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
+                      value={editedPaxIn}
+                      onChange={(e) => {
+                        const value = e.target.value.replace(/\D/g, '');
+                        setEditedPaxIn(value);
+                      }}
+                      className="text-sm w-20 [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                      min="0"
+                      autoFocus
+                    />
+                    <span className="text-sm text-muted-foreground">persone</span>
+                  </div>
+                ) : (
+                  <p 
+                    className="text-sm cursor-pointer hover:bg-muted/50 p-1 rounded"
+                    onClick={() => setEditingField('paxin')}
+                  >
+                    {(displayTask as any).pax_in ?? "non migrato"}
+                  </p>
+                )}
               </div>
               <div>
                 <p className="text-sm font-semibold text-muted-foreground">
@@ -718,6 +747,7 @@ export default function TaskCard({
                     const [hours, mins] = duration.split('.').map(Number);
                     const totalMinutes = (hours || 0) * 60 + (mins || 0);
                     setEditedDuration(totalMinutes.toString());
+                    setEditedPaxIn(String((displayTask as any).pax_in || 0));
                   }}
                   variant="outline"
                 >
