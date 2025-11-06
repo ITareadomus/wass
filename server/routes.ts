@@ -309,7 +309,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Scrittura atomica
       const tmpPath = `${timelinePath}.tmp`;
-      await fs.writeFile(tmpPath, JSON.JSON.stringify(timelineData, null, 2));
+      await fs.writeFile(tmpPath, JSON.stringify(timelineData, null, 2));
       await fs.rename(tmpPath, timelinePath);
 
       console.log(`✅ Task ${logisticCode} spostata da cleaner ${sourceCleanerId} a cleaner ${destCleanerId}`);
@@ -1104,20 +1104,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
       console.log("create_containers output:", containersResult);
 
-      // Estrai il timestamp dal filename (formato: assignments_DDMMYY.json)
-      const dateMatch = filename.match(/assignments_(\d{6})\.json/);
-      const lastSavedTimestamp = dateMatch ? dateMatch[1] : null;
-
-      // Usa la data corrente con la data dal filename
+      // Estrai la data e ora dai metadata del file salvato
       let formattedDateTime = null;
-      if (lastSavedTimestamp) {
-        // Usa l'ora corrente con la data dal filename (non abbiamo accesso ai metadata)
-        const now = new Date();
-        const hours = String(now.getHours()).padStart(2, '0');
-        const minutes = String(now.getMinutes()).padStart(2, '0');
-        const day = lastSavedTimestamp.slice(0, 2);
-        const month = lastSavedTimestamp.slice(2, 4);
-        const year = lastSavedTimestamp.slice(4, 6);
+      if (savedData.metadata?.saved_at) {
+        // Usa il timestamp salvato nei metadata
+        const savedDate = new Date(savedData.metadata.saved_at);
+        const day = String(savedDate.getDate()).padStart(2, '0');
+        const month = String(savedDate.getMonth() + 1).padStart(2, '0');
+        const year = String(savedDate.getFullYear()).slice(-2);
+        const hours = String(savedDate.getHours()).padStart(2, '0');
+        const minutes = String(savedDate.getMinutes()).padStart(2, '0');
         formattedDateTime = `${day}/${month}/${year} alle ${hours}:${minutes}`;
       }
 
@@ -1125,7 +1121,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         success: true,
         found: true,
         filename,
-        lastSavedTimestamp,
         formattedDateTime,
         data: savedData,
         message: `Assegnazioni caricate da: ${filename}`
