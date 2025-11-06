@@ -2362,6 +2362,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         );
 
         if (scResult.ok) {
+          // File salvato trovato - ripristinalo
           const scData = JSON.parse(scResult.value);
           scData.metadata = scData.metadata || {};
           scData.metadata.date = date;
@@ -2371,20 +2372,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
           await fs.writeFile(tmpScPath, JSON.stringify(scData, null, 2));
           await fs.rename(tmpScPath, selectedCleanersPath);
 
-          console.log(`✅ Selected cleaners ripristinati per ${date}`);
+          console.log(`✅ Selected cleaners ripristinati da Object Storage per ${date}`);
         } else {
-          // Nessun file salvato - crea vuoto
-          const emptySelected = {
-            cleaners: [],
-            total_selected: 0,
-            metadata: { date, reset_at: new Date().toISOString() }
-          };
+          // Nessun file in Object Storage - verifica se esiste file locale
+          let existingLocalData: any = null;
+          try {
+            const localContent = await fs.readFile(selectedCleanersPath, 'utf8');
+            existingLocalData = JSON.parse(localContent);
+          } catch {
+            // File locale non esiste o non valido
+          }
 
-          const tmpScPath = `${selectedCleanersPath}.tmp`;
-          await fs.writeFile(tmpScPath, JSON.stringify(emptySelected, null, 2));
-          await fs.rename(tmpScPath, selectedCleanersPath);
+          // Se il file locale esiste E ha la data corretta E ha cleaners, mantienilo
+          if (existingLocalData?.metadata?.date === date && existingLocalData?.cleaners?.length > 0) {
+            console.log(`✅ Mantenuto selected_cleaners.json locale esistente per ${date} (${existingLocalData.cleaners.length} cleaners)`);
+          } else {
+            // Solo se non c'è file locale valido, creane uno vuoto
+            const emptySelected = {
+              cleaners: [],
+              total_selected: 0,
+              metadata: { date, reset_at: new Date().toISOString() }
+            };
 
-          console.log(`ℹ️ Nessun selected_cleaners per ${date} - creato vuoto`);
+            const tmpScPath = `${selectedCleanersPath}.tmp`;
+            await fs.writeFile(tmpScPath, JSON.stringify(emptySelected, null, 2));
+            await fs.rename(tmpScPath, selectedCleanersPath);
+
+            console.log(`ℹ️ Creato selected_cleaners.json vuoto per ${date}`);
+          }
         }
       } catch (e) {
         console.warn('⚠️ Errore caricamento selected_cleaners:', e);
