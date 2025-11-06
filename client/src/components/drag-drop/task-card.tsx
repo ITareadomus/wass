@@ -541,11 +541,11 @@ export default function TaskCard({
               </div>
             </div>
 
-            {/* Terza riga: Checkout - Checkin */}
+            {/* Terza riga: Check-out - Check-in */}
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <p className="text-sm font-semibold text-muted-foreground mb-1 flex items-center gap-1">
-                  Checkout
+                  Check-out
                   <Pencil className="w-3 h-3 text-muted-foreground/60" />
                 </p>
                 {editingField === 'checkout' ? (
@@ -593,7 +593,7 @@ export default function TaskCard({
               </div>
               <div>
                 <p className="text-sm font-semibold text-muted-foreground mb-1 flex items-center gap-1">
-                  Checkin
+                  Check-in
                   <Pencil className="w-3 h-3 text-muted-foreground/60" />
                 </p>
                 {editingField === 'checkin' ? (
