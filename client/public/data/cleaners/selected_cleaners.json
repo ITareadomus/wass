@@ -311,5 +311,10 @@
       "can_do_straordinaria": false
     }
   ],
-  "total_selected": 11
+  "total_selected": 11,
+  "metadata": {
+    "date": "2025-11-05",
+    "saved_at": "2025-11-06T09:11:29.086Z",
+    "loaded_at": "2025-11-06T09:18:34.263Z"
+  }
 }
