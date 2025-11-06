@@ -1,6 +1,6 @@
 import { Personnel, TaskType as Task } from "@shared/schema";
-import { Calendar, RotateCcw, Users, RefreshCw, UserPlus } from "lucide-react";
-import { useState, useEffect } from "react";
+import { Calendar, RotateCcw, Users, RefreshCw, UserPlus, Maximize2, Minimize2, Printer } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
 import * as React from "react";
 import { Droppable, Draggable } from "react-beautiful-dnd";
 import { useMutation } from "@tanstack/react-query";
@@ -23,6 +23,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useLocation } from 'wouter';
+import { format } from 'date-fns';
 
 interface TimelineViewProps {
   personnel: Personnel[];
@@ -60,6 +61,8 @@ export default function TimelineView({
   const [isAddCleanerDialogOpen, setIsAddCleanerDialogOpen] = useState(false);
   const [availableCleaners, setAvailableCleaners] = useState<Cleaner[]>([]);
   const [cleanerToReplace, setCleanerToReplace] = useState<number | null>(null);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const timelineRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
   const [, setLocation] = useLocation();
 
@@ -160,7 +163,7 @@ export default function TimelineView({
       // Trova i nomi dei cleaner coinvolti
       const sourceCleaner = cleaners.find(c => c.id === variables.sourceCleanerId);
       const destCleaner = cleaners.find(c => c.id === variables.destCleanerId);
-      
+
       const sourceCleanerName = sourceCleaner ? `${sourceCleaner.name} ${sourceCleaner.lastname}` : `ID ${variables.sourceCleanerId}`;
       const destCleanerName = destCleaner ? `${destCleaner.name} ${destCleaner.lastname}` : `ID ${variables.destCleanerId}`;
 
@@ -418,6 +421,49 @@ export default function TimelineView({
 
   const cleanerColumnWidth = calculateCleanerColumnWidth();
 
+  // Gestione fullscreen
+  const toggleFullscreen = async () => {
+    if (!timelineRef.current) return;
+
+    try {
+      if (!isFullscreen) {
+        // Entra in fullscreen
+        if (timelineRef.current.requestFullscreen) {
+          await timelineRef.current.requestFullscreen();
+        }
+      } else {
+        // Esci da fullscreen
+        if (document.exitFullscreen) {
+          await document.exitFullscreen();
+        }
+      }
+    } catch (error) {
+      console.error('Errore fullscreen:', error);
+      toast({
+        title: "Errore",
+        description: "Impossibile attivare/disattivare la modalità a schermo intero",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Listener per cambiamenti fullscreen
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(!!document.fullscreenElement);
+    };
+
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    return () => {
+      document.removeEventListener('fullscreenchange', handleFullscreenChange);
+    };
+  }, []);
+
+  // Funzione per stampare la timeline
+  const handlePrint = () => {
+    window.print();
+  };
+
   const handleResetAssignments = async () => {
     try {
       // La data è già nel formato corretto yyyy-MM-dd nel localStorage
@@ -533,7 +579,7 @@ export default function TimelineView({
     loadTimelineCleaners();
     // Carica la data formattata se esiste un salvataggio
     loadSavedAssignmentDate();
-    
+
     // Esponi la funzione per ricaricare i cleaners della timeline
     (window as any).loadTimelineCleaners = loadTimelineCleaners;
   }, []);
@@ -593,7 +639,10 @@ export default function TimelineView({
 
   return (
     <>
-      <div className="bg-card rounded-lg border shadow-sm">
+      <div 
+        ref={timelineRef}
+        className={`bg-card rounded-lg border shadow-sm ${isFullscreen ? 'fixed inset-0 z-50 overflow-auto' : ''}`}
+      >
         <div className="p-4 border-b border-border">
           <div className="flex items-center justify-between">
             <h3 className="font-semibold text-foreground flex items-center">
@@ -602,10 +651,32 @@ export default function TimelineView({
             </h3>
             <div className="flex gap-2">
               <Button
-                onClick={() => setLocation('/convocazioni')}
+                onClick={handlePrint}
                 variant="outline"
                 size="sm"
-                className="flex items-center gap-2"
+                className="flex items-center gap-2 print:hidden"
+                title="Stampa timeline"
+              >
+                <Printer className="w-4 h-4" />
+              </Button>
+              <Button
+                onClick={toggleFullscreen}
+                variant="outline"
+                size="sm"
+                className="flex items-center gap-2 print:hidden"
+                title={isFullscreen ? "Esci da schermo intero" : "Schermo intero"}
+              >
+                {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
+              </Button>
+              <Button
+                onClick={() => {
+                  // Passa la data corrente come parametro URL
+                  const dateStr = localStorage.getItem('selected_work_date') || format(new Date(), 'yyyy-MM-dd');
+                  setLocation(`/convocazioni?date=${dateStr}`);
+                }}
+                variant="outline"
+                size="sm"
+                className="flex items-center gap-2 print:hidden"
               >
                 <Users className="w-4 h-4" />
                 Convocazioni
@@ -614,7 +685,7 @@ export default function TimelineView({
                 onClick={handleResetAssignments}
                 variant="outline"
                 size="sm"
-                className="flex items-center gap-2"
+                className="flex items-center gap-2 print:hidden"
               >
                 <RotateCcw className="w-4 h-4" />
                 Reset Assegnazioni
@@ -851,15 +922,23 @@ export default function TimelineView({
                 <UserPlus className="w-5 h-5" />
               </Button>
             </div>
-            {/* Pulsante Conferma Assegnazioni che prende tutto lo spazio della timeline */}
-            <div className="flex-1 p-1 border-t border-border">
+            {/* Pulsanti Conferma Assegnazioni e Stampa affiancati */}
+            <div className="flex-1 p-1 border-t border-border flex gap-2">
               <Button
                 onClick={handleConfirmAssignments}
-                className="w-full h-full bg-green-500 hover:bg-green-600"
+                className="flex-1 h-full bg-green-500 hover:bg-green-600"
                 data-testid="button-confirm-assignments"
               >
                 <Users className="w-4 h-4 mr-2" />
                 Conferma Assegnazioni
+              </Button>
+              <Button
+                onClick={handlePrint}
+                variant="outline"
+                className="h-full px-6"
+              >
+                <Printer className="w-4 h-4 mr-2" />
+                Stampa
               </Button>
             </div>
           </div>
