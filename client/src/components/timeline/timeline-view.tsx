@@ -651,15 +651,6 @@ export default function TimelineView({
             </h3>
             <div className="flex gap-2">
               <Button
-                onClick={handlePrint}
-                variant="outline"
-                size="sm"
-                className="flex items-center gap-2 print:hidden"
-                title="Stampa timeline"
-              >
-                <Printer className="w-4 h-4" />
-              </Button>
-              <Button
                 onClick={toggleFullscreen}
                 variant="outline"
                 size="sm"
