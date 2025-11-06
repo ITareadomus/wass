@@ -195,10 +195,12 @@ export default function Convocazioni() {
 
     try {
       const selectedCleanersData = cleaners.filter(c => selectedCleaners.has(c.id));
+      const dateStr = format(selectedDate, "yyyy-MM-dd");
 
       const dataToSave = {
         cleaners: selectedCleanersData,
-        total_selected: selectedCleanersData.length
+        total_selected: selectedCleanersData.length,
+        date: dateStr
       };
 
       const response = await fetch('/api/save-selected-cleaners', {
@@ -218,7 +220,7 @@ export default function Convocazioni() {
       toast({
         variant: "success",
         title: `${selectedCleanersData.length} cleaner salvati con successo!`,
-        description: "I cleaners sono stati aggiunti alla selezione"
+        description: `I cleaners sono stati salvati per il ${format(selectedDate, "dd/MM/yyyy", { locale: it })}`
       });
     } catch (error) {
       console.error("Errore nel salvataggio:", error);
@@ -241,6 +243,8 @@ export default function Convocazioni() {
     }
 
     try {
+      const dateStr = format(selectedDate, "yyyy-MM-dd");
+
       // Carica la selezione attuale
       const currentResponse = await fetch('/data/cleaners/selected_cleaners.json');
       const currentData = await currentResponse.json();
@@ -254,7 +258,8 @@ export default function Convocazioni() {
 
       const dataToSave = {
         cleaners: mergedCleaners,
-        total_selected: mergedCleaners.length
+        total_selected: mergedCleaners.length,
+        date: dateStr
       };
 
       const response = await fetch('/api/save-selected-cleaners', {
@@ -270,7 +275,7 @@ export default function Convocazioni() {
       toast({
         variant: "success",
         title: `${newCleaners.length} cleaner selezionati correttamente!`,
-        description: `Totale cleaners: ${mergedCleaners.length}`
+        description: `Totale cleaners: ${mergedCleaners.length} per il ${format(selectedDate, "dd/MM/yyyy", { locale: it })}`
       });
 
       // Torna alla pagina principale SENZA resettare la timeline

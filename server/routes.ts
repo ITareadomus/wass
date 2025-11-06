@@ -1205,7 +1205,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Endpoint per salvare i cleaners selezionati
   app.post("/api/save-selected-cleaners", async (req, res) => {
     try {
-      const { cleaners: selectedCleaners, total_selected } = req.body;
+      const { cleaners: selectedCleaners, total_selected, date } = req.body;
 
       if (!selectedCleaners || !Array.isArray(selectedCleaners)) {
         return res.status(400).json({
@@ -1214,15 +1214,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
+      // Usa la data fornita o la data corrente
+      const workDate = date || format(new Date(), 'yyyy-MM-dd');
+
       // Carica cleaners.json per ottenere can_do_straordinaria
       const cleanersPath = path.join(process.cwd(), 'client/public/data/cleaners/cleaners.json');
       const cleanersContent = await fs.readFile(cleanersPath, 'utf8');
       const cleanersData = JSON.parse(cleanersContent);
 
-      // Estrai la data più recente
+      // Usa la data specifica o la più recente
       const dates = Object.keys(cleanersData.dates);
-      const latestDate = dates.sort().reverse()[0];
-      const allCleaners = cleanersData.dates[latestDate]?.cleaners || [];
+      const targetDate = dates.includes(workDate) ? workDate : dates.sort().reverse()[0];
+      const allCleaners = cleanersData.dates[targetDate]?.cleaners || [];
 
       // Crea mappa can_do_straordinaria per ID
       const straordinariaMap = new Map();
@@ -1243,7 +1246,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const dataToSave = {
         cleaners: enrichedCleaners,
-        total_selected: total_selected || enrichedCleaners.length
+        total_selected: total_selected || enrichedCleaners.length,
+        metadata: {
+          date: workDate,
+          saved_at: new Date().toISOString()
+        }
       };
 
       // Scrittura atomica
@@ -1251,7 +1258,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       await fs.writeFile(tmpPath, JSON.stringify(dataToSave, null, 2));
       await fs.rename(tmpPath, selectedCleanersPath);
 
-      console.log(`✅ Salvati ${enrichedCleaners.length} cleaners in selected_cleaners.json (con can_do_straordinaria)`);
+      console.log(`✅ Salvati ${enrichedCleaners.length} cleaners in selected_cleaners.json per ${workDate} (con can_do_straordinaria e metadata)`);
 
       res.json({
         success: true,
