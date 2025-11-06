@@ -553,19 +553,11 @@ export default function TimelineView({
     }
   };
 
-  // Combina cleaners selezionati con quelli dalla timeline (per mostrare anche quelli nascosti)
+  // Mostra SEMPRE tutti i cleaners da selected_cleaners.json
+  // Questo permette di vedere tutti i cleaners disponibili anche prima di assegnare le task
   const allCleanersToShow = React.useMemo(() => {
-    // Se ci sono cleaner nella timeline, mostra SOLO quelli
-    // Questo accade quando si caricano assegnazioni salvate dall'Object Storage
-    if (timelineCleaners.length > 0) {
-      return timelineCleaners
-        .filter(entry => entry.cleaner && entry.cleaner.id)
-        .map(entry => entry.cleaner);
-    }
-
-    // Altrimenti mostra i cleaner da selected_cleaners.json
     return cleaners;
-  }, [cleaners, timelineCleaners]);
+  }, [cleaners]);
 
   // Non mostrare nulla se non ci sono cleaners
   if (allCleanersToShow.length === 0) {
