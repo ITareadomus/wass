@@ -641,34 +641,6 @@ export default function TaskCard({
               </div>
             </div>
 
-            {/* Nuova riga: Travel Time - Start Time/End Time */}
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <p className="text-sm font-semibold text-muted-foreground">
-                  Travel Time
-                </p>
-                <p className="text-sm">
-                  {assignmentTimes.travel_time !== undefined 
-                    ? `${assignmentTimes.travel_time} minuti` 
-                    : "non assegnato"}
-                </p>
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <p className="text-sm font-semibold text-muted-foreground">
-                    Start Time
-                  </p>
-                  <p className="text-sm">{assignmentTimes.start_time ?? "non assegnato"}</p>
-                </div>
-                <div>
-                  <p className="text-sm font-semibold text-muted-foreground">
-                    End Time
-                  </p>
-                  <p className="text-sm">{assignmentTimes.end_time ?? "non assegnato"}</p>
-                </div>
-              </div>
-            </div>
-
             {/* Quarta riga: Tipologia appartamento - Tipologia intervento */}
             <div className="grid grid-cols-2 gap-4">
               <div>
@@ -725,6 +697,34 @@ export default function TaskCard({
                   Pax-Out
                 </p>
                 <p className="text-sm">{(displayTask as any).pax_out ?? "non migrato"}</p>
+              </div>
+            </div>
+
+            {/* Sesta riga: Travel Time - Start Time/End Time */}
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <p className="text-sm font-semibold text-muted-foreground">
+                  Travel Time
+                </p>
+                <p className="text-sm">
+                  {assignmentTimes.travel_time !== undefined 
+                    ? `${assignmentTimes.travel_time} minuti` 
+                    : "non assegnato"}
+                </p>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <p className="text-sm font-semibold text-muted-foreground">
+                    Start Time
+                  </p>
+                  <p className="text-sm">{assignmentTimes.start_time ?? "non assegnato"}</p>
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-muted-foreground">
+                    End Time
+                  </p>
+                  <p className="text-sm">{assignmentTimes.end_time ?? "non assegnato"}</p>
+                </div>
               </div>
             </div>
 
