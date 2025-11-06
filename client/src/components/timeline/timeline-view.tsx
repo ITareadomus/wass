@@ -22,6 +22,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { useLocation } from 'wouter';
 
 interface TimelineViewProps {
   personnel: Personnel[];
@@ -60,6 +61,7 @@ export default function TimelineView({
   const [availableCleaners, setAvailableCleaners] = useState<Cleaner[]>([]);
   const [cleanerToReplace, setCleanerToReplace] = useState<number | null>(null);
   const { toast } = useToast();
+  const [, setLocation] = useLocation();
 
   // Usa sempre la data odierna all'apertura dell'app
   const workDate = new Date().toISOString().split('T')[0];
@@ -594,10 +596,21 @@ export default function TimelineView({
       <div className="bg-card rounded-lg border shadow-sm">
         <div className="p-4 border-b border-border">
           <div className="flex items-center justify-between">
-            <h3 className="font-semibold text-foreground flex items-center">
-              <Calendar className="w-5 h-5 mr-2 text-primary" />
-              Timeline Assegnazioni - {cleaners.length} Cleaners
-            </h3>
+            <div className="flex items-center gap-2">
+              <h3 className="font-semibold text-foreground flex items-center">
+                <Calendar className="w-5 h-5 mr-2 text-primary" />
+                Timeline Assegnazioni - {cleaners.length} Cleaners
+              </h3>
+              <Button
+                onClick={() => setLocation('/convocazioni')}
+                variant="outline"
+                size="sm"
+                className="flex items-center gap-2"
+              >
+                <Users className="w-4 h-4" />
+                Convocazioni
+              </Button>
+            </div>
             <div className="flex gap-2">
               <Button
                 onClick={handleResetAssignments}
