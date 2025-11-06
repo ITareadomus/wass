@@ -160,13 +160,6 @@ export default function GenerateAssignments() {
           await (window as any).loadTimelineCleaners();
         }
 
-        // Quando c'è un salvataggio, imposta i containers come vuoti
-        // (tutte le task sono già nella timeline)
-        setEarlyOutTasks([]);
-        setHighPriorityTasks([]);
-        setLowPriorityTasks([]);
-        console.log("✅ Containers impostati come vuoti (task già in timeline)");
-
         return true;
       } else {
         console.log("ℹ️ Nessuna assegnazione salvata per questa data");
@@ -197,10 +190,11 @@ export default function GenerateAssignments() {
       const hasSavedAssignments = await loadSavedAssignments(date);
 
       if (hasSavedAssignments) {
+        setExtractionStep("Caricamento assegnazioni salvate...");
+        // CRITICAL: Aspetta che i task siano caricati prima di nascondere il loader
+        await loadTasks();
         setExtractionStep("Assegnazioni salvate caricate!");
-        // NON chiamiamo loadTasks() perché i containers sono già vuoti
-        // e le task sono tutte nella timeline
-        console.log("⏭️ Salto loadTasks() - assegnazioni già presenti in timeline");
+        // Delay per assicurarsi che lo stato sia aggiornato prima di nascondere il loader
         await new Promise(resolve => setTimeout(resolve, 100));
         setIsExtracting(false);
         return;
@@ -325,13 +319,6 @@ export default function GenerateAssignments() {
       if (timelineResponse.ok) {
         timelineAssignmentsData = await timelineResponse.json();
         console.log("Caricato da timeline.json");
-        
-        // CRITICAL: Verifica che la timeline sia della data corretta
-        const timelineDate = timelineAssignmentsData.metadata?.date || timelineAssignmentsData.current_date;
-        if (timelineDate !== dateStr) {
-          console.warn(`⚠️ Timeline con data errata: ${timelineDate} invece di ${dateStr} - ignorata`);
-          timelineAssignmentsData = { assignments: [], current_date: dateStr, cleaners_assignments: [] };
-        }
       }
 
       console.log("Containers data:", containersData);
@@ -356,11 +343,7 @@ export default function GenerateAssignments() {
       // Nuova struttura: cleaners_assignments è un array di {cleaner, tasks}
       const timelineAssignmentsMap = new Map<string, any>();
 
-      // CRITICAL: Controlla che la timeline sia della data corretta prima di usarla
-      const timelineDate = timelineAssignmentsData.metadata?.date || timelineAssignmentsData.current_date;
-      const isCorrectDate = timelineDate === dateStr;
-
-      if (isCorrectDate && timelineAssignmentsData.cleaners_assignments) {
+      if (timelineAssignmentsData.cleaners_assignments) {
         // Nuova struttura organizzata per cleaner
         console.log('📋 Caricamento da cleaners_assignments:', timelineAssignmentsData.cleaners_assignments.length, 'cleaners');
         for (const cleanerEntry of timelineAssignmentsData.cleaners_assignments) {
@@ -382,64 +365,43 @@ export default function GenerateAssignments() {
             });
           }
         }
-      } else if (isCorrectDate && timelineAssignmentsData.assignments) {
+      } else if (timelineAssignmentsData.assignments) {
         // Vecchia struttura piatta (fallback)
         console.log('📋 Caricamento da assignments (vecchia struttura):', timelineAssignmentsData.assignments.length);
         for (const a of timelineAssignmentsData.assignments) {
           timelineAssignmentsMap.set(String(a.task_id), a);
         }
-      } else if (!isCorrectDate) {
-        console.log('⚠️ Timeline ignorata perché appartiene alla data:', timelineDate, 'invece di:', dateStr);
       }
 
       console.log("✅ Task assegnate nella timeline (task_id):", Array.from(timelineAssignmentsMap.keys()));
 
-      // CRITICAL: Filtra i duplicati SOLO se timeline e containers hanno la STESSA data
-      let filteredEarlyOut = initialEarlyOut;
-      let filteredHigh = initialHigh;
-      let filteredLow = initialLow;
+      // Filtra le task già presenti nella timeline dai container usando l'id univoco
+      const filteredEarlyOut = initialEarlyOut.filter(task => {
+        const tid = String(task.id);
+        const isAssigned = timelineAssignmentsMap.has(tid);
+        if (isAssigned) {
+          console.log(`Task ${task.name} (ID: ${tid}) filtrata da Early Out (è nella timeline)`);
+        }
+        return !isAssigned;
+      });
 
-      const totalContainerTasks = initialEarlyOut.length + initialHigh.length + initialLow.length;
-      
-      // Verifica che timeline e containers abbiano la stessa data
-      const timelineMatchesSelectedDate = isCorrectDate && timelineDate === dateStr;
-      
-      if (timelineMatchesSelectedDate && timelineAssignmentsMap.size > 0 && totalContainerTasks > 0) {
-        console.log(`🔄 Filtro duplicati: ${totalContainerTasks} task nei containers, ${timelineAssignmentsMap.size} in timeline (stessa data: ${dateStr})`);
-        
-        filteredEarlyOut = initialEarlyOut.filter(task => {
-          const tid = String(task.id);
-          const isAssigned = timelineAssignmentsMap.has(tid);
-          if (isAssigned) {
-            console.log(`Task ${task.name} (ID: ${tid}) filtrata da Early Out (è nella timeline)`);
-          }
-          return !isAssigned;
-        });
+      const filteredHigh = initialHigh.filter(task => {
+        const tid = String(task.id);
+        const isAssigned = timelineAssignmentsMap.has(tid);
+        if (isAssigned) {
+          console.log(`Task ${task.name} (ID: ${tid}) filtrata da High Priority (è nella timeline)`);
+        }
+        return !isAssigned;
+      });
 
-        filteredHigh = initialHigh.filter(task => {
-          const tid = String(task.id);
-          const isAssigned = timelineAssignmentsMap.has(tid);
-          if (isAssigned) {
-            console.log(`Task ${task.name} (ID: ${tid}) filtrata da High Priority (è nella timeline)`);
-          }
-          return !isAssigned;
-        });
-
-        filteredLow = initialLow.filter(task => {
-          const tid = String(task.id);
-          const isAssigned = timelineAssignmentsMap.has(tid);
-          if (isAssigned) {
-            console.log(`Task ${task.name} (ID: ${tid}) filtrata da Low Priority (è nella timeline)`);
-          }
-          return !isAssigned;
-        });
-        
-        console.log(`📊 Dopo filtro: Early=${filteredEarlyOut.length}, High=${filteredHigh.length}, Low=${filteredLow.length}`);
-      } else if (totalContainerTasks === 0 && timelineAssignmentsMap.size > 0 && timelineMatchesSelectedDate) {
-        console.log(`✅ Containers vuoti - tutte le ${timelineAssignmentsMap.size} task sono solo in timeline (scenario 5/11)`);
-      } else if (!timelineMatchesSelectedDate && totalContainerTasks > 0) {
-        console.log(`⚠️ Timeline ha data diversa (${timelineDate} vs ${dateStr}) - NON filtro containers, mostro tutte le ${totalContainerTasks} task`);
-      }
+      const filteredLow = initialLow.filter(task => {
+        const tid = String(task.id);
+        const isAssigned = timelineAssignmentsMap.has(tid);
+        if (isAssigned) {
+          console.log(`Task ${task.name} (ID: ${tid}) filtrata da Low Priority (è nella timeline)`);
+        }
+        return !isAssigned;
+      });
 
       console.log("Task dopo filtro - Early:", filteredEarlyOut.length, "High:", filteredHigh.length, "Low:", filteredLow.length);
 
@@ -460,25 +422,18 @@ export default function GenerateAssignments() {
       // CRITICAL: usa Set per tracciare id già inseriti
       const addedIds = new Set<string>();
 
-      // Aggiungi task NON assegnate dai containers (FILTRATE - senza duplicati dalla timeline)
+      // Aggiungi task NON assegnate dai containers
       for (const task of [...filteredEarlyOut, ...filteredHigh, ...filteredLow]) {
         const tid = String(task.id);
         if (!addedIds.has(tid)) {
           tasksWithAssignments.push(task);
           addedIds.add(tid);
-          console.log(`➕ Container task aggiunta: ${task.name} (ID: ${tid})`);
         }
       }
 
       // Aggiungi SOLO task che sono effettivamente in timeline.json con i loro dati completi
       console.log(`🔄 Elaborazione ${timelineAssignmentsMap.size} task dalla timeline...`);
       for (const [taskId, timelineAssignment] of timelineAssignmentsMap.entries()) {
-        // CRITICAL: Salta task già aggiunte dai containers
-        if (addedIds.has(String(taskId))) {
-          console.log(`⚠️ SKIPPED duplicato dalla timeline: task ${taskId} già nei containers`);
-          continue;
-        }
-
         // Trova la task originale dai containers usando l'id univoco
         const originalTask = [...initialEarlyOut, ...initialHigh, ...initialLow].find(
           t => String(t.id) === String(taskId)
@@ -544,10 +499,7 @@ export default function GenerateAssignments() {
             alias: timelineAssignment.alias,
           } as any;
 
-          // CRITICAL: Marca come aggiunta per evitare duplicati
-          addedIds.add(String(taskId));
           tasksWithAssignments.push(taskWithAssignment);
-          console.log(`➕ Timeline task aggiunta: ${timelineAssignment.logistic_code} (ID: ${taskId})`);
         }
       }
 

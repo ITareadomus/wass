@@ -6,31 +6,11 @@ import path from "path";
 import { fileURLToPath } from "url";
 import { dirname } from "path";
 import * as fs from 'fs/promises';
-import { format, parseISO } from "date-fns";
-import dayjs from "dayjs";
-import timezone from "dayjs/plugin/timezone";
-import utc from "dayjs/plugin/utc";
-
-dayjs.extend(utc);
-dayjs.extend(timezone);
+import { format } from "date-fns";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const execAsync = promisify(exec);
-const ZONE = "Europe/Rome";
-
-// Funzioni di utilità per filtrare per data checkout
-const isConfirmed = (s: any) => {
-  if (typeof s === "boolean") return s;
-  if (typeof s === "string") return /confirm|confermat|ok|true/i.test(s);
-  return false;
-};
-
-const toISO = (v: any) => {
-  if (!v) return null;
-  const d = dayjs(v).tz(ZONE);
-  return d.isValid() ? d.format("YYYY-MM-DD") : null;
-};
 
 /**
  * Helper function to recalculate travel_time, start_time, end_time for a cleaner's tasks
@@ -131,23 +111,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const workDate = date || format(new Date(), 'yyyy-MM-dd');
       const timelinePath = path.join(process.cwd(), 'client/public/data/output/timeline.json');
 
-      // CRITICAL: Normalizza la data selezionata
-      const selectedDateISO = dayjs(workDate).tz(ZONE).format("YYYY-MM-DD");
-
-      console.log(`🔄 Reset delle assegnazioni timeline per data: ${selectedDateISO}`);
-
-      // Resetta il file timeline.json con la data normalizzata
+      // Svuota il file timeline.json con struttura corretta
       const emptyTimeline = {
         metadata: {
           last_updated: new Date().toISOString(),
-          date: selectedDateISO
+          date: workDate
         },
         cleaners_assignments: [],
         meta: {
           total_cleaners: 0,
           used_cleaners: 0,
-          total_tasks: 0,
-          total_duration: 0
+          assigned_tasks: 0
         }
       };
 
@@ -186,21 +160,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
         try {
           const existingContent = await fs.readFile(selectedCleanersPath, 'utf8');
           selectedCleanersData = JSON.parse(existingContent);
-
+          
           // Mantieni i cleaner, aggiorna solo metadata
           selectedCleanersData.metadata = selectedCleanersData.metadata || {};
-          selectedCleanersData.metadata.date = selectedDateISO;
+          selectedCleanersData.metadata.date = workDate;
           selectedCleanersData.metadata.reset_at = new Date().toISOString();
-
+          
           console.log(`✅ Mantenuti ${selectedCleanersData.cleaners?.length || 0} cleaner selezionati dopo reset timeline`);
         } catch (err) {
           // Se il file non esiste o è corrotto, crea vuoto
           selectedCleanersData = {
             cleaners: [],
             total_selected: 0,
-            metadata: { date: selectedDateISO }
+            metadata: { date: workDate }
           };
-          console.log(`ℹ️ Creato selected_cleaners.json vuoto per ${selectedDateISO}`);
+          console.log(`ℹ️ Creato selected_cleaners.json vuoto per ${workDate}`);
         }
 
         // Salva con scrittura atomica
@@ -1023,18 +997,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Lock per evitare chiamate simultanee
-  let loadAssignmentsLock = Promise.resolve();
-
   // Endpoint per caricare assegnazioni salvate da Object Storage
   app.post("/api/load-saved-assignments", async (req, res) => {
-    // Aspetta il completamento della chiamata precedente (sequenzializza le richieste)
-    await loadAssignmentsLock;
-    
-    // Crea un nuovo lock per questa chiamata
-    let releaseLock: () => void;
-    loadAssignmentsLock = new Promise(resolve => { releaseLock = resolve; });
-    
     try {
       const { date } = req.body;
       const workDate = date || format(new Date(), 'yyyy-MM-dd');
@@ -1061,55 +1025,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       if (!result.ok) {
-        // File non trovato - resetta timeline.json SOLO se contiene task di un'altra data
+        // File non trovato, non è un errore - significa solo che non ci sono assegnazioni salvate
         console.log(`Nessuna assegnazione salvata trovata per ${workDate} (${filename})`);
-        
-        // CRITICAL: Verifica se la timeline ha già la data corretta prima di resettare
-        const timelinePath = path.join(process.cwd(), 'client/public/data/output/timeline.json');
-        let shouldReset = false;
-        let currentTimelineDate = null;
-        
-        try {
-          const existingTimeline = await fs.readFile(timelinePath, 'utf8');
-          const timelineData = JSON.parse(existingTimeline);
-          currentTimelineDate = timelineData.metadata?.date;
-          
-          // Resetta SOLO se la data è diversa (evita di resettare quando ricarichi la stessa data)
-          if (currentTimelineDate !== workDate) {
-            shouldReset = true;
-            console.log(`⚠️ Timeline ha data ${currentTimelineDate} invece di ${workDate} - resetterò`);
-          } else {
-            console.log(`✅ Timeline ha già la data corretta ${workDate} - mantengo lo stato attuale`);
-          }
-        } catch (error) {
-          // File non esiste o corrotto - crea nuovo
-          shouldReset = true;
-        }
-        
-        if (shouldReset) {
-          const emptyTimeline = {
-            metadata: { last_updated: new Date().toISOString(), date: workDate },
-            cleaners_assignments: [],
-            current_date: workDate,
-            meta: { total_cleaners: 0, used_cleaners: 0, assigned_tasks: 0 }
-          };
-          const tmpPath = `${timelinePath}.tmp`;
-          await fs.writeFile(tmpPath, JSON.stringify(emptyTimeline, null, 2));
-          await fs.rename(tmpPath, timelinePath);
-          console.log(`✅ Timeline resettata per la nuova data ${workDate}`);
-          
-          // Resetta anche selected_cleaners.json
-          const selectedCleanersPath = path.join(process.cwd(), 'client/public/data/cleaners/selected_cleaners.json');
-          const emptySelected = {
-            cleaners: [],
-            total_selected: 0,
-            metadata: { date: workDate, reset_at: new Date().toISOString() }
-          };
-          const tmpScPath = `${selectedCleanersPath}.tmp`;
-          await fs.writeFile(tmpScPath, JSON.stringify(emptySelected, null, 2));
-          await fs.rename(tmpScPath, selectedCleanersPath);
-        }
-        
         return res.json({
           success: true,
           found: false,
@@ -1212,9 +1129,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       console.error("Errore nel caricamento delle assegnazioni:", error);
       res.status(500).json({ success: false, error: error.message });
-    } finally {
-      // Rilascia il lock per permettere altre richieste
-      releaseLock!();
     }
   });
 
@@ -2386,29 +2300,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let loadedFrom = 'new';
 
       try {
+        // Carica da timeline.json
         const existingData = await fs.readFile(timelinePath, 'utf8');
         timelineData = JSON.parse(existingData);
 
-        // CRITICAL: Verifica le date delle task effettive, non solo il metadata
-        let hasWrongDateTasks = false;
-        if (timelineData.cleaners_assignments && timelineData.cleaners_assignments.length > 0) {
-          for (const cleanerEntry of timelineData.cleaners_assignments) {
-            const tasks = cleanerEntry.tasks || [];
-            for (const task of tasks) {
-              const taskCheckout = task.checkout_date || task.checkoutDate;
-              if (taskCheckout && taskCheckout !== date) {
-                hasWrongDateTasks = true;
-                console.log(`⚠️ Trovata task con checkout ${taskCheckout} invece di ${date} - resetterò la timeline`);
-                break;
-              }
-            }
-            if (hasWrongDateTasks) break;
-          }
-        }
-
         // Se il file esiste ma è vuoto o per un'altra data, crea nuovo file vuoto
         if (!timelineData.cleaners_assignments || timelineData.cleaners_assignments.length === 0 ||
-            (timelineData.metadata && timelineData.metadata.date !== date) || hasWrongDateTasks) {
+            (timelineData.metadata && timelineData.metadata.date !== date)) {
           console.log(`Timeline per ${date} è vuota o per altra data, creando timeline vuota`);
           throw new Error('No assignments in timeline file');
         }
@@ -2430,23 +2328,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Se la data nel file timeline.json è DIVERSA dalla data richiesta, resetta
       const timelineDate = timelineData.metadata?.date;
       if (timelineDate !== date) {
-        console.log(`⚠️ ATTENZIONE: Data in timeline.json (${timelineDate}) diversa dalla data richiesta (${date})`);
-        console.log(`🔄 Resetto timeline.json per la nuova data ${date}`);
-        timelineData = {
+        console.log(`📅 Cambio data rilevato: ${timelineDate} → ${date}`);
+        console.log(`🔄 Resettando timeline per la nuova data...`);
+
+        const emptyTimelineForNewDate = {
           metadata: { last_updated: new Date().toISOString(), date },
           cleaners_assignments: [],
           meta: { total_cleaners: 0, used_cleaners: 0, assigned_tasks: 0 }
         };
-        await fs.writeFile(timelinePath, JSON.stringify(timelineData, null, 2));
-      } else if (loadedFrom === 'new') {
-        // Se non ci sono assegnazioni salvate, resetta timeline anche se la data coincide
-        console.log(`🔄 Nessuna assegnazione salvata per ${date}, resetto timeline.json`);
-        timelineData = {
-          metadata: { last_updated: new Date().toISOString(), date },
-          cleaners_assignments: [],
-          meta: { total_cleaners: 0, used_cleaners: 0, assigned_tasks: 0 }
-        };
-        await fs.writeFile(timelinePath, JSON.stringify(timelineData, null, 2));
+        await fs.writeFile(timelinePath, JSON.stringify(emptyTimelineForNewDate, null, 2));
+        console.log(`✅ Timeline svuotata per la nuova data ${date}`);
       } else {
         console.log(`✅ Timeline mantenuta per la stessa data ${date} con ${timelineData.cleaners_assignments?.length || 0} assegnazioni`);
       }
@@ -2712,19 +2603,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const idMatches = (t: any, key: string) =>
         String(t?.task_id) === key || String(t?.logistic_code) === key || String(t?.id) === key;
 
-      const findTaskIndex = (arr: any[]) => {
-        if (typeof taskId !== 'undefined') {
-          const idStr = String(taskId);
-          const idx = arr.findIndex(t => idMatches(t, idStr));
-          if (idx !== -1) return idx;
-        }
-        if (typeof logisticCode !== 'undefined') {
-          const codeStr = String(logisticCode);
-          const idx = arr.findIndex(t => idMatches(t, codeStr));
-          if (idx !== -1) return idx;
-        }
-        return -1;
-      };
+      const findTaskIndex = (arr: any[], key: string) => arr.findIndex(t => idMatches(t, key));
 
       const taskKey = String(typeof taskId !== 'undefined' ? taskId : logisticCode);
 
@@ -2795,7 +2674,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (typeof sourceIndex === 'number' && sourceIndex >= 0 && sourceIndex < srcEntry.tasks.length) {
           takeIdx = sourceIndex;
         } else {
-          const idx = findTaskIndex(srcEntry.tasks);
+          const idx = findTaskIndex(srcEntry.tasks, taskKey);
           takeIdx = idx >= 0 ? idx : null;
         }
         if (takeIdx === null) {
@@ -2816,7 +2695,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Caso B: provengo da CONTAINER
       if (!moved && fromContainer && containersData?.containers?.[fromContainer]?.tasks) {
         const srcArr = containersData.containers[fromContainer].tasks as any[];
-        let idx = findTaskIndex(srcArr);
+        let idx = findTaskIndex(srcArr, taskKey);
         if (idx === -1 && typeof sourceIndex === 'number' && srcArr[sourceIndex]) idx = sourceIndex;
         if (idx === -1) {
           return res.status(404).json({ success: false, message: 'Task non trovata nel container sorgente' });
@@ -2827,7 +2706,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Caso C: riordino interno
       if (!moved) {
-        const idx = findTaskIndex(dstEntry.tasks);
+        const idx = findTaskIndex(dstEntry.tasks, taskKey);
         if (idx === -1) {
           return res.status(404).json({ success: false, message: 'Task non trovata' });
         }
