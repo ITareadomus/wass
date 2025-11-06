@@ -222,14 +222,23 @@
     -webkit-print-color-adjust: exact;
   }
 
-  /* Mostra SOLO la timeline e nascondi tutto il resto */
-  [data-print-timeline] {
-    display: block !important;
+  /* NASCONDI TUTTO IL BODY */
+  body * {
+    visibility: hidden !important;
   }
 
-  /* Nascondi elementi non necessari */
-  .print\\:hidden {
-    display: none !important;
+  /* MOSTRA SOLO LA TIMELINE E I SUOI FIGLI */
+  [data-print-timeline],
+  [data-print-timeline] * {
+    visibility: visible !important;
+  }
+
+  /* Posiziona la timeline in cima alla pagina */
+  [data-print-timeline] {
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 100% !important;
   }
 
   /* Ottimizza la timeline per la stampa */
@@ -258,28 +267,6 @@
   /* Assicurati che la griglia sia leggibile */
   .border-border {
     border-color: #000 !important;
-  }
-
-  /* Nascondi navbar, sidebar e altri elementi della pagina */
-  nav,
-  aside,
-  header,
-  footer,
-  [role="navigation"],
-  [role="complementary"],
-  .priority-column-early,
-  .priority-column-high,
-  .priority-column-low,
-  button,
-  .map-container {
-    display: none !important;
-  }
-
-  /* Forza visibilità della timeline */
-  [data-print-timeline],
-  [data-print-timeline] * {
-    visibility: visible !important;
-    display: block !important;
   }
 
   /* Mantieni layout flex per la timeline */
