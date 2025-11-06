@@ -153,13 +153,13 @@ export default function GenerateAssignments() {
         const displayDateTime = result.formattedDateTime || result.filename;
         localStorage.setItem('last_saved_assignment', displayDateTime);
         setLastSavedAssignment(displayDateTime);
-        
+
         // CRITICAL: Forza il refresh della timeline per mostrare i cleaners con task
         if ((window as any).loadTimelineCleaners) {
           console.log("🔄 Ricaricamento timeline cleaners dopo caricamento assegnazioni salvate...");
           await (window as any).loadTimelineCleaners();
         }
-        
+
         return true;
       } else {
         console.log("ℹ️ Nessuna assegnazione salvata per questa data");
@@ -1120,14 +1120,6 @@ export default function GenerateAssignments() {
             </span>
           </h1>
           <div className="flex items-center gap-3">
-            <Button
-              onClick={() => setLocation('/convocazioni')}
-              variant="outline"
-              className="flex items-center gap-2"
-            >
-              <Users className="w-4 h-4" />
-              Convocazioni
-            </Button>
             {/* Date Selector + Dark Mode Toggle */}
             <div className="flex items-center gap-3">
               <Popover>
