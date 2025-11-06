@@ -214,7 +214,7 @@
 @media print {
   @page {
     size: landscape;
-    margin: 0.5cm;
+    margin: 0.3cm;
   }
 
   body {
@@ -239,6 +239,78 @@
     left: 0 !important;
     top: 0 !important;
     width: 100% !important;
+    transform: scale(0.85);
+    transform-origin: top left;
+  }
+
+  /* Riduci padding e margini */
+  [data-print-timeline] .p-4 {
+    padding: 0.25rem !important;
+  }
+
+  [data-print-timeline] .mb-2 {
+    margin-bottom: 0.1rem !important;
+  }
+
+  [data-print-timeline] .mb-0\.5 {
+    margin-bottom: 0 !important;
+  }
+
+  /* Riduci dimensioni font */
+  [data-print-timeline] {
+    font-size: 10px !important;
+  }
+
+  [data-print-timeline] h3 {
+    font-size: 11px !important;
+    margin: 0 !important;
+  }
+
+  /* Riduci altezza righe timeline */
+  [data-print-timeline] .min-h-\[45px\] {
+    min-height: 30px !important;
+  }
+
+  /* Riduci dimensioni task cards */
+  [data-print-timeline] .text-xs {
+    font-size: 7px !important;
+  }
+
+  [data-print-timeline] .text-sm {
+    font-size: 8px !important;
+  }
+
+  [data-print-timeline] .text-\[10px\] {
+    font-size: 6px !important;
+  }
+
+  [data-print-timeline] .text-\[13px\] {
+    font-size: 9px !important;
+  }
+
+  /* Riduci padding task cards */
+  [data-print-timeline] .p-1 {
+    padding: 0.1rem !important;
+  }
+
+  [data-print-timeline] .px-1 {
+    padding-left: 0.1rem !important;
+    padding-right: 0.1rem !important;
+  }
+
+  [data-print-timeline] .py-1 {
+    padding-top: 0.1rem !important;
+    padding-bottom: 0.1rem !important;
+  }
+
+  [data-print-timeline] .px-2 {
+    padding-left: 0.15rem !important;
+    padding-right: 0.15rem !important;
+  }
+
+  [data-print-timeline] .py-3 {
+    padding-top: 0.2rem !important;
+    padding-bottom: 0.2rem !important;
   }
 
   /* Ottimizza la timeline per la stampa */
@@ -276,5 +348,20 @@
 
   [data-print-timeline] .grid {
     display: grid !important;
+  }
+
+  /* Nascondi icone non essenziali */
+  [data-print-timeline] svg {
+    width: 8px !important;
+    height: 8px !important;
+  }
+
+  /* Riduci gap tra elementi */
+  [data-print-timeline] .gap-1 {
+    gap: 0.1rem !important;
+  }
+
+  [data-print-timeline] .gap-2 {
+    gap: 0.15rem !important;
   }
 }
