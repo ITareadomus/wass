@@ -157,8 +157,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const dateObj = new Date(workDate);
         const day = String(dateObj.getDate()).padStart(2, '0');
         const month = String(dateObj.getMonth() + 1).padStart(2, '0');
-        const year = String(dateObj.getFullYear()).slice(-2);
-        const scFilename = `selected_cleaners_${day}${month}${year}.json`;
+        const fullYear = String(dateObj.getFullYear());
+        const year = fullYear.slice(-2);
+        const folderPath = `${day}/${month}/${fullYear}`;
+        const scFilename = `${folderPath}/selected_cleaners_${day}${month}${year}.json`;
 
         const scResult = await client.downloadAsText(scFilename, { bucket: 'wass_assignments' });
 
@@ -309,7 +311,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Scrittura atomica
       const tmpPath = `${timelinePath}.tmp`;
-      await fs.writeFile(tmpPath, JSON.JSON.stringify(timelineData, null, 2));
+      await fs.writeFile(tmpPath, JSON.stringify(timelineData, null, 2));
       await fs.rename(tmpPath, timelinePath);
 
       console.log(`✅ Task ${logisticCode} spostata da cleaner ${sourceCleanerId} a cleaner ${destCleanerId}`);
@@ -928,17 +930,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const dateObj = new Date(workDate);
       const day = String(dateObj.getDate()).padStart(2, '0');
       const month = String(dateObj.getMonth() + 1).padStart(2, '0');
-      const year = String(dateObj.getFullYear()).slice(-2);
-      const filename = `assignments_${day}${month}${year}.json`;
+      const fullYear = String(dateObj.getFullYear());
+      const year = fullYear.slice(-2);
+      // Crea il percorso della cartella: DD/MM/YYYY/
+      const folderPath = `${day}/${month}/${fullYear}`;
+      const filename = `${folderPath}/assignments_${day}${month}${year}.json`;
 
-      // Salva nel bucket wass_assignments usando Replit Object Storage
-      const { Client } = await import('@replit/object-storage');
-      const client = new Client();
-
-      // Converti i dati in stringa JSON
       const jsonContent = JSON.stringify(timelineData, null, 2);
 
       // Upload nel bucket wass_assignments usando uploadFromText
+      const { Client } = await import('@replit/object-storage');
+      const client = new Client();
       const result = await client.uploadFromText(filename, jsonContent, {
         bucket: 'wass_assignments'
       });
@@ -969,8 +971,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       selectedCleanersData.metadata.date = workDate;
       selectedCleanersData.metadata.saved_at = new Date().toISOString();
 
-      // nome file: selected_cleaners_DDMMYY.json
-      const scFilename = `selected_cleaners_${day}${month}${year}.json`;
+      // nome file: DD/MM/YYYY/selected_cleaners_DDMMYY.json
+      const scFilename = `${folderPath}/selected_cleaners_${day}${month}${year}.json`;
 
       const scJson = JSON.stringify(selectedCleanersData, null, 2);
       const scResult = await client.uploadFromText(scFilename, scJson, {
@@ -986,7 +988,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const now = new Date();
       const hours = String(now.getHours()).padStart(2, '0');
       const minutes = String(now.getMinutes()).padStart(2, '0');
-      const formattedDateTime = `${day}/${month}/${year} alle ${hours}:${minutes}`;
+      const formattedDateTime = `${day}/${month}/${fullYear} alle ${hours}:${minutes}`;
 
       res.json({
         success: true,
@@ -1013,8 +1015,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const dateObj = new Date(workDate);
       const day = String(dateObj.getDate()).padStart(2, '0');
       const month = String(dateObj.getMonth() + 1).padStart(2, '0');
-      const year = String(dateObj.getFullYear()).slice(-2);
-      const filename = `assignments_${day}${month}${year}.json`;
+      const fullYear = String(dateObj.getFullYear());
+      const year = fullYear.slice(-2);
+      // Crea il percorso della cartella: DD/MM/YYYY/
+      const folderPath = `${day}/${month}/${fullYear}`;
+      const filename = `${folderPath}/assignments_${day}${month}${year}.json`;
+
+      console.log(`Tentativo di caricamento file: ${filename}`);
 
       // Carica dal bucket wass_assignments usando Replit Object Storage
       const { Client } = await import('@replit/object-storage');
@@ -1044,7 +1051,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       await fs.rename(tmpPath, timelinePath);
 
       // === Scarica e ripristina selected_cleaners per la stessa data ===
-      const scFilename = `selected_cleaners_${day}${month}${year}.json`;
+      const scFilename = `${folderPath}/selected_cleaners_${day}${month}${year}.json`;
       try {
         const scResult = await client.downloadAsText(scFilename, { bucket: 'wass_assignments' });
         const selectedCleanersPath = path.join(
@@ -1105,7 +1112,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const dateMatch = filename.match(/assignments_(\d{6})\.json/);
       const lastSavedTimestamp = dateMatch ? dateMatch[1] : null;
 
-      // Usa la data corrente con la data dal filename
+      // Usa la data corrente con la data dal filename (non abbiamo accesso ai metadata)
       let formattedDateTime = null;
       if (lastSavedTimestamp) {
         // Usa l'ora corrente con la data dal filename (non abbiamo accesso ai metadata)
@@ -1590,7 +1597,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(500).json({ success: false, message: 'Struttura containers mancante in containers.json' });
       }
 
-      // Utility: ricalcolo summary
       const recalc = () => {
         const eo = containers.early_out?.tasks?.length ?? 0;
         const hp = containers.high_priority?.tasks?.length ?? 0;
@@ -2352,8 +2358,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const dateObj = new Date(date);
         const day = String(dateObj.getDate()).padStart(2, '0');
         const month = String(dateObj.getMonth() + 1).padStart(2, '0');
-        const year = String(dateObj.getFullYear()).slice(-2);
-        const scFilename = `selected_cleaners_${day}${month}${year}.json`;
+        const fullYear = String(dateObj.getFullYear());
+        const year = fullYear.slice(-2);
+        const folderPath = `${day}/${month}/${fullYear}`;
+        const scFilename = `${folderPath}/selected_cleaners_${day}${month}${year}.json`;
 
         const scResult = await client.downloadAsText(scFilename, { bucket: 'wass_assignments' });
         const selectedCleanersPath = path.join(
