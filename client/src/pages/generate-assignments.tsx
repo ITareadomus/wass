@@ -388,50 +388,46 @@ export default function GenerateAssignments() {
 
       console.log("✅ Task assegnate nella timeline (task_id):", Array.from(timelineAssignmentsMap.keys()));
 
-      // CRITICAL: Se timeline ha la data corretta e ci sono assegnazioni, non filtrare
-      // perché i containers potrebbero essere vuoti (tutte le task già assegnate)
+      // CRITICAL: Filtra i duplicati SOLO se ci sono task sia nei containers che nella timeline
       let filteredEarlyOut = initialEarlyOut;
       let filteredHigh = initialHigh;
       let filteredLow = initialLow;
 
-      if (isCorrectDate && timelineAssignmentsMap.size > 0) {
-        console.log(`✅ Timeline ha ${timelineAssignmentsMap.size} task assegnate per la data corretta ${dateStr}`);
+      const totalContainerTasks = initialEarlyOut.length + initialHigh.length + initialLow.length;
+      
+      if (isCorrectDate && timelineAssignmentsMap.size > 0 && totalContainerTasks > 0) {
+        console.log(`🔄 Filtro duplicati: ${totalContainerTasks} task nei containers, ${timelineAssignmentsMap.size} in timeline`);
         
-        // Filtra SOLO se ci sono effettivamente task nei containers
-        const totalContainerTasks = initialEarlyOut.length + initialHigh.length + initialLow.length;
+        filteredEarlyOut = initialEarlyOut.filter(task => {
+          const tid = String(task.id);
+          const isAssigned = timelineAssignmentsMap.has(tid);
+          if (isAssigned) {
+            console.log(`Task ${task.name} (ID: ${tid}) filtrata da Early Out (è nella timeline)`);
+          }
+          return !isAssigned;
+        });
+
+        filteredHigh = initialHigh.filter(task => {
+          const tid = String(task.id);
+          const isAssigned = timelineAssignmentsMap.has(tid);
+          if (isAssigned) {
+            console.log(`Task ${task.name} (ID: ${tid}) filtrata da High Priority (è nella timeline)`);
+          }
+          return !isAssigned;
+        });
+
+        filteredLow = initialLow.filter(task => {
+          const tid = String(task.id);
+          const isAssigned = timelineAssignmentsMap.has(tid);
+          if (isAssigned) {
+            console.log(`Task ${task.name} (ID: ${tid}) filtrata da Low Priority (è nella timeline)`);
+          }
+          return !isAssigned;
+        });
         
-        if (totalContainerTasks > 0) {
-          console.log(`📦 Containers hanno ${totalContainerTasks} task - applico filtro duplicati`);
-          
-          filteredEarlyOut = initialEarlyOut.filter(task => {
-            const tid = String(task.id);
-            const isAssigned = timelineAssignmentsMap.has(tid);
-            if (isAssigned) {
-              console.log(`Task ${task.name} (ID: ${tid}) filtrata da Early Out (è nella timeline)`);
-            }
-            return !isAssigned;
-          });
-
-          filteredHigh = initialHigh.filter(task => {
-            const tid = String(task.id);
-            const isAssigned = timelineAssignmentsMap.has(tid);
-            if (isAssigned) {
-              console.log(`Task ${task.name} (ID: ${tid}) filtrata da High Priority (è nella timeline)`);
-            }
-            return !isAssigned;
-          });
-
-          filteredLow = initialLow.filter(task => {
-            const tid = String(task.id);
-            const isAssigned = timelineAssignmentsMap.has(tid);
-            if (isAssigned) {
-              console.log(`Task ${task.name} (ID: ${tid}) filtrata da Low Priority (è nella timeline)`);
-            }
-            return !isAssigned;
-          });
-        } else {
-          console.log(`ℹ️ Containers vuoti - tutte le ${timelineAssignmentsMap.size} task sono nella timeline`);
-        }
+        console.log(`📊 Dopo filtro: Early=${filteredEarlyOut.length}, High=${filteredHigh.length}, Low=${filteredLow.length}`);
+      } else if (totalContainerTasks === 0 && timelineAssignmentsMap.size > 0) {
+        console.log(`✅ Containers vuoti - tutte le ${timelineAssignmapsMap.size} task sono solo in timeline (scenario 5/11)`);
       }
 
       console.log("Task dopo filtro - Early:", filteredEarlyOut.length, "High:", filteredHigh.length, "Low:", filteredLow.length);
