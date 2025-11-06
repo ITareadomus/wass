@@ -2398,7 +2398,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             await fs.writeFile(tmpScPath, JSON.stringify(emptySelected, null, 2));
             await fs.rename(tmpScPath, selectedCleanersPath);
 
-            console.log(`ℹ️ Creato selected_cleaners.json vuoto per ${date}`);
+            console.log(`⚠️ ATTENZIONE: selected_cleaners.json resettato per ${date} - fare le convocazioni!`);
           }
         }
       } catch (e) {
