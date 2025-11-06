@@ -1023,8 +1023,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Lock per evitare chiamate simultanee
+  let loadAssignmentsLock = Promise.resolve();
+
   // Endpoint per caricare assegnazioni salvate da Object Storage
   app.post("/api/load-saved-assignments", async (req, res) => {
+    // Aspetta il completamento della chiamata precedente (sequenzializza le richieste)
+    await loadAssignmentsLock;
+    
+    // Crea un nuovo lock per questa chiamata
+    let releaseLock: () => void;
+    loadAssignmentsLock = new Promise(resolve => { releaseLock = resolve; });
+    
     try {
       const { date } = req.body;
       const workDate = date || format(new Date(), 'yyyy-MM-dd');
@@ -1202,6 +1212,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       console.error("Errore nel caricamento delle assegnazioni:", error);
       res.status(500).json({ success: false, error: error.message });
+    } finally {
+      // Rilascia il lock per permettere altre richieste
+      releaseLock!();
     }
   });
 
