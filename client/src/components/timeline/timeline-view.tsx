@@ -562,11 +562,6 @@ export default function TimelineView({
     return cleaners;
   }, [cleaners]);
 
-  // Non mostrare nulla se non ci sono cleaners
-  if (allCleanersToShow.length === 0) {
-    return null;
-  }
-
   // --- NORMALIZZAZIONI TIMELINE ---
   // NON normalizzare task.type - lo determiniamo dai flag
   const normalizeTask = (task: any) => {
@@ -632,8 +627,8 @@ export default function TimelineView({
             </div>
           </div>
 
-          {/* Righe dei cleaners */}
-          {allCleanersToShow.map((cleaner, index) => {
+          {/* Righe dei cleaners - mostra solo se ci sono cleaners selezionati */}
+          {allCleanersToShow.length > 0 && allCleanersToShow.map((cleaner, index) => {
             const color = getCleanerColor(index);
             const droppableId = `cleaner-${cleaner.id}`;
 
