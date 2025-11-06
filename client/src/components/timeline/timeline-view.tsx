@@ -345,18 +345,32 @@ export default function TimelineView({
   // Carica cleaner disponibili per aggiungerli alla timeline
   const loadAvailableCleaners = async () => {
     try {
-      const response = await fetch(`/data/cleaners/cleaners.json`);
-      const data = await response.json();
+      const [cleanersResponse, selectedResponse] = await Promise.all([
+        fetch(`/data/cleaners/cleaners.json`),
+        fetch(`/data/cleaners/selected_cleaners.json?t=${Date.now()}`)
+      ]);
+
+      const data = await cleanersResponse.json();
+      const selectedData = await selectedResponse.json();
 
       // Trova i cleaner per la data selezionata
       const dateCleaners = data.dates[workDate]?.cleaners || [];
 
-      // Filtra i cleaner che NON sono già VISIBILI nella timeline
-      // (solo i cleaner con task vengono mostrati, quindi escludiamo quelli)
-      const currentCleanerIds = cleaners.map(c => c.id);
-      const available = dateCleaners.filter((c: Cleaner) => 
-        !currentCleanerIds.includes(c.id) && c.active
-      );
+      // Se selected_cleaners.json è vuoto, mostra TUTTI i cleaners disponibili
+      // Altrimenti filtra quelli già selezionati
+      const selectedCleanersList = selectedData.cleaners || [];
+      let available: Cleaner[];
+
+      if (selectedCleanersList.length === 0) {
+        // Nessun cleaner selezionato → mostra tutti i cleaners attivi
+        available = dateCleaners.filter((c: Cleaner) => c.active);
+      } else {
+        // Ci sono cleaners selezionati → filtra quelli già presenti
+        const selectedCleanerIds = new Set(selectedCleanersList.map((c: any) => c.id));
+        available = dateCleaners.filter((c: Cleaner) => 
+          !selectedCleanerIds.has(c.id) && c.active
+        );
+      }
 
       // Ordina per role (Premium prima) e poi per nome
       available.sort((a, b) => {
@@ -367,7 +381,13 @@ export default function TimelineView({
 
       setAvailableCleaners(available);
 
+      const selectedCount = selectedCleanersList.length;
       console.log(`📋 Cleaner disponibili da aggiungere: ${available.length}/${dateCleaners.length}`);
+      console.log(`   - Cleaner già selezionati: ${selectedCount}`);
+      console.log(`   - Cleaner totali per ${workDate}: ${dateCleaners.length}`);
+      if (selectedCount === 0) {
+        console.log(`   ℹ️ selected_cleaners.json vuoto → mostrando TUTTI i cleaners attivi`);
+      }
     } catch (error) {
       console.error('Errore nel caricamento dei cleaner disponibili:', error);
       toast({
