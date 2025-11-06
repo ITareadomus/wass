@@ -949,6 +949,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       console.log(`✅ Assegnazioni salvate in Object Storage: ${filename}`);
 
+      // Salva timestamp effettivo del salvataggio
+      const saveTimestamp = new Date().toISOString();
+
       // === NEW: salva anche i selected_cleaners per la stessa data ===
       const selectedCleanersPath = path.join(
         process.cwd(),
@@ -967,7 +970,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // inject metadata.date per robustezza
       selectedCleanersData.metadata = selectedCleanersData.metadata || {};
       selectedCleanersData.metadata.date = workDate;
-      selectedCleanersData.metadata.saved_at = new Date().toISOString();
+      selectedCleanersData.metadata.saved_at = saveTimestamp;
 
       // nome file: selected_cleaners_DDMMYY.json
       const scFilename = `selected_cleaners_${day}${month}${year}.json`;
@@ -982,10 +985,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log(`✅ Selected cleaners salvati in Object Storage: ${scFilename}`);
       // === END NEW ===
 
-      // Formatta data e ora nel formato "HH:MM, DD/MM/YY"
-      const now = new Date();
-      const hours = String(now.getHours()).padStart(2, '0');
-      const minutes = String(now.getMinutes()).padStart(2, '0');
+      // Formatta data e ora usando il timestamp effettivo del salvataggio
+      const saveDate = new Date(saveTimestamp);
+      const hours = String(saveDate.getHours()).padStart(2, '0');
+      const minutes = String(saveDate.getMinutes()).padStart(2, '0');
       const formattedDateTime = `${day}/${month}/${year} alle ${hours}:${minutes}`;
 
       res.json({
