@@ -160,6 +160,13 @@ export default function GenerateAssignments() {
           await (window as any).loadTimelineCleaners();
         }
 
+        // Quando c'è un salvataggio, imposta i containers come vuoti
+        // (tutte le task sono già nella timeline)
+        setEarlyOutTasks([]);
+        setHighPriorityTasks([]);
+        setLowPriorityTasks([]);
+        console.log("✅ Containers impostati come vuoti (task già in timeline)");
+
         return true;
       } else {
         console.log("ℹ️ Nessuna assegnazione salvata per questa data");
@@ -190,11 +197,10 @@ export default function GenerateAssignments() {
       const hasSavedAssignments = await loadSavedAssignments(date);
 
       if (hasSavedAssignments) {
-        setExtractionStep("Caricamento assegnazioni salvate...");
-        // CRITICAL: Aspetta che i task siano caricati prima di nascondere il loader
-        await loadTasks();
         setExtractionStep("Assegnazioni salvate caricate!");
-        // Delay per assicurarsi che lo stato sia aggiornato prima di nascondere il loader
+        // NON chiamiamo loadTasks() perché i containers sono già vuoti
+        // e le task sono tutte nella timeline
+        console.log("⏭️ Salto loadTasks() - assegnazioni già presenti in timeline");
         await new Promise(resolve => setTimeout(resolve, 100));
         setIsExtracting(false);
         return;
