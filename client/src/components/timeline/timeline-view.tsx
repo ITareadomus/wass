@@ -28,6 +28,7 @@ import { format } from 'date-fns';
 interface TimelineViewProps {
   personnel: Personnel[];
   tasks: Task[];
+  onTaskMoved?: () => void; // Callback quando una task viene spostata
 }
 
 interface Cleaner {
@@ -50,6 +51,7 @@ interface Cleaner {
 export default function TimelineView({
   personnel,
   tasks,
+  onTaskMoved,
 }: TimelineViewProps) {
   const [cleaners, setCleaners] = useState<Cleaner[]>([]);
   const [selectedCleaner, setSelectedCleaner] = useState<Cleaner | null>(null);
@@ -690,7 +692,23 @@ export default function TimelineView({
 
     // Esponi la funzione per ricaricare i cleaners della timeline
     (window as any).loadTimelineCleaners = loadTimelineCleaners;
+    
+    // Esponi funzione per marcare modifiche non salvate
+    (window as any).markTimelineAsUnsaved = () => {
+      setHasUnsavedChanges(true);
+    };
   }, []);
+
+  // Monitora cambiamenti nelle task per marcare modifiche non salvate
+  useEffect(() => {
+    // Skip al primo render
+    if (tasks.length === 0) return;
+    
+    // Quando le task cambiano (drag-and-drop), notifica il parent
+    if (onTaskMoved && !hasUnsavedChanges) {
+      onTaskMoved();
+    }
+  }, [tasks]);
 
   const loadSavedAssignmentDate = async () => {
     try {
