@@ -208,6 +208,14 @@ export default function GenerateAssignments() {
 
       console.log("Estrazione task per la data:", dateStr);
 
+      // CRITICAL: Svuota la timeline prima di estrarre i nuovi dati
+      setExtractionStep("Svuotamento timeline...");
+      await fetch('/api/reset-timeline', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ date: dateStr })
+      });
+
       const response = await fetch('/api/extract-data', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
