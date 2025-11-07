@@ -88,19 +88,24 @@ export default function TimelineView({
       });
       return await response.json();
     },
-    onSuccess: async () => {
+    onSuccess: async (data) => {
       if ((window as any).setHasUnsavedChanges) {
         (window as any).setHasUnsavedChanges(true);
       }
-      // Ricarica ENTRAMBI i file per sincronizzare la vista
-      await Promise.all([
-        loadCleaners(),
-        loadTimelineCleaners()
-      ]);
+      
+      // CRITICAL: Ricarica PRIMA la timeline per vedere i cleaners con task
+      await loadTimelineCleaners();
+      
+      // POI ricarica selected_cleaners
+      await loadCleaners();
+
+      const message = data.removedFromTimeline 
+        ? `${selectedCleaner?.name} ${selectedCleaner?.lastname} è stato rimosso completamente (nessuna task).`
+        : `${selectedCleaner?.name} ${selectedCleaner?.lastname} è stato rimosso dalla selezione. Le sue task rimangono in timeline.`;
 
       toast({
         title: "Cleaner rimosso",
-        description: `${selectedCleaner?.name} ${selectedCleaner?.lastname} è stato rimosso dalla selezione.`,
+        description: message,
         variant: "success",
       });
       setIsModalOpen(false);
