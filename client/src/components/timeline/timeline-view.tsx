@@ -92,10 +92,10 @@ export default function TimelineView({
       if ((window as any).setHasUnsavedChanges) {
         (window as any).setHasUnsavedChanges(true);
       }
-      
+
       // CRITICAL: Ricarica PRIMA la timeline per vedere i cleaners con task
       await loadTimelineCleaners();
-      
+
       // POI ricarica selected_cleaners
       await loadCleaners();
 
@@ -703,7 +703,7 @@ export default function TimelineView({
   useEffect(() => {
     // Skip al primo render
     if (tasks.length === 0) return;
-    
+
     // Quando le task cambiano (drag-and-drop), notifica il parent
     if (onTaskMoved) {
       onTaskMoved();
@@ -867,7 +867,7 @@ export default function TimelineView({
             ).map(normalizeTask); // Applica la normalizzazione qui
 
             const isRemoved = removedCleanerIds.has(cleaner.id);
-            
+
             return (
               <div key={cleaner.id} className="flex mb-0.5">
                 {/* Info cleaner */}
@@ -1168,6 +1168,11 @@ export default function TimelineView({
                     {cleaner.role === "Standard" && (
                       <span className="px-2 py-1 rounded bg-green-500 text-white text-xs font-bold">
                         Standard
+                      </span>
+                    )}
+                    {cleaner.can_do_straordinaria && (
+                      <span className="px-2 py-1 rounded bg-red-500 text-black text-xs font-bold">
+                        Straordinario
                       </span>
                     )}
                   </div>
