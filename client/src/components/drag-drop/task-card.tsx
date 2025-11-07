@@ -61,25 +61,14 @@ export default function TaskCard({
   const [isSaving, setIsSaving] = useState(false);
 
   // Determina le task navigabili in base al contesto
-  const getNavigableTasks = () => {
-    if (!allTasks || allTasks.length === 0) {
-      console.log('⚠️ allTasks vuoto, usando solo task corrente');
-      return [task];
-    }
-
-    console.log('📋 Navigazione - allTasks ricevuto:', {
-      length: allTasks.length,
-      taskIds: allTasks.map(t => t.id),
-      isInTimeline,
-      currentContainer
-    });
-
+  const getNavigableTasks = (): Task[] => {
     if (isInTimeline) {
-      // Timeline: naviga tra task dello stesso cleaner
       const taskAssignedCleaner = (task as any).assignedCleaner;
-      return allTasks.filter(t => (t as any).assignedCleaner === taskAssignedCleaner);
+      const allHaveAssigned = allTasks.every(t => (t as any).assignedCleaner != null);
+      return allHaveAssigned
+        ? allTasks.filter(t => (t as any).assignedCleaner === taskAssignedCleaner)
+        : allTasks; // fallback, le tasks che arrivano da TimelineView sono già del cleaner corrente
     } else {
-      // Container: naviga tra task dello stesso container
       return allTasks.filter(t => t.priority === task.priority);
     }
   };
@@ -87,8 +76,8 @@ export default function TaskCard({
   const navigableTasks = getNavigableTasks();
 
   // Se currentTaskId non è impostato o non è valido, usa l'id della task corrente
-  const effectiveCurrentId = currentTaskId && navigableTasks.some(t => String(t.id) === String(currentTaskId)) 
-    ? currentTaskId 
+  const effectiveCurrentId = currentTaskId && navigableTasks.some(t => String(t.id) === String(currentTaskId))
+    ? currentTaskId
     : task.id;
 
   const currentTaskInNavigable = navigableTasks.findIndex(t => String(t.id) === String(effectiveCurrentId));
@@ -102,11 +91,15 @@ export default function TaskCard({
     navigableTasksCount: navigableTasks.length,
     currentIndex: currentTaskInNavigable,
     canGoPrev: navigableTasks.length > 1 && currentTaskInNavigable > 0,
-    canGoNext: navigableTasks.length > 1 && currentTaskInNavigable >= 0 && currentTaskInNavigable < navigableTasks.length - 1
+    canGoNext: navigableTasks.length > 1
+      && currentTaskInNavigable >= 0
+      && currentTaskInNavigable < navigableTasks.length - 1
   });
 
   const canGoPrev = navigableTasks.length > 1 && currentTaskInNavigable > 0;
-  const canGoNext = navigableTasks.length > 1 && currentTaskInNavigable >= 0 && currentTaskInNavigable < navigableTasks.length - 1;
+  const canGoNext = navigableTasks.length > 1
+    && currentTaskInNavigable >= 0
+    && currentTaskInNavigable < navigableTasks.length - 1;
 
   const handlePrevTask = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -233,16 +226,39 @@ export default function TaskCard({
     getTaskTypeStyle(cardIsStraordinaria, cardIsPremium);
 
   useEffect(() => {
-    // I dati sono già presenti nell'oggetto task (dalla timeline o dai containers)
-    const taskObj = displayTask as any;
-    if (taskObj.startTime || taskObj.start_time) {
-      setAssignmentTimes({
-        start_time: taskObj.start_time || taskObj.startTime,
-        end_time: taskObj.end_time || taskObj.endTime,
-        travel_time: taskObj.travel_time || taskObj.travelTime
-      });
+    const calculateAssignmentTimes = () => {
+      const taskObj = displayTask as any;
+      if (taskObj.startTime || taskObj.start_time) {
+        setAssignmentTimes({
+          start_time: taskObj.start_time || taskObj.startTime,
+          end_time: taskObj.end_time || taskObj.endTime,
+          travel_time: taskObj.travel_time || taskObj.travelTime
+        });
+      }
+    };
+
+    if (isModalOpen) {
+      calculateAssignmentTimes();
     }
-  }, [displayTask, effectiveCurrentId]);
+  }, [isModalOpen, displayTask]);
+
+  // Supporto navigazione con frecce da tastiera
+  useEffect(() => {
+    if (!isModalOpen) return;
+
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "ArrowLeft" && canGoPrev) {
+        handlePrevTask(new MouseEvent('click') as any);
+      }
+      if (e.key === "ArrowRight" && canGoNext) {
+        handleNextTask(new MouseEvent('click') as any);
+      }
+    };
+
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [isModalOpen, canGoPrev, canGoNext, currentTaskInNavigable, navigableTasks]);
+
 
   const handleCardClick = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -359,7 +375,7 @@ export default function TaskCard({
                     {...provided.draggableProps}
                     {...provided.dragHandleProps}
                     className={`
-                      ${cardColorClass} 
+                      ${cardColorClass}
                       rounded-sm px-2 py-1 shadow-sm border transition-all duration-200
                       ${snapshot.isDragging ? "shadow-lg scale-105" : ""}
                       ${isOverdue ? "animate-blink" : ""}
@@ -387,7 +403,7 @@ export default function TaskCard({
                         />
                       </div>
                     )}
-                    <div 
+                    <div
                       className="flex flex-col items-center justify-center h-full gap-0"
                     >
                       <div className="flex items-center gap-1">
@@ -462,10 +478,10 @@ export default function TaskCard({
                           : "bg-gray-500 text-white border-gray-700"
                     )}
                   >
-                    {(displayTask as any).priority === "early_out" 
-                      ? "EO" 
-                      : (displayTask as any).priority === "high_priority" 
-                        ? "HP" 
+                    {(displayTask as any).priority === "early_out"
+                      ? "EO"
+                      : (displayTask as any).priority === "high_priority"
+                        ? "HP"
                         : "LP"}
                   </Badge>
                 )}
@@ -534,7 +550,7 @@ export default function TaskCard({
                     <span className="text-sm text-muted-foreground">minuti</span>
                   </div>
                 ) : (
-                  <p 
+                  <p
                     className="text-sm cursor-pointer hover:bg-muted/50 p-1 rounded"
                     onClick={() => setEditingField('duration')}
                   >
@@ -576,7 +592,7 @@ export default function TaskCard({
                     </div>
                   </div>
                 ) : (
-                  <p 
+                  <p
                     className="text-sm cursor-pointer hover:bg-muted/50 p-1 rounded"
                     onClick={() => setEditingField('checkout')}
                   >
@@ -624,7 +640,7 @@ export default function TaskCard({
                     </div>
                   </div>
                 ) : (
-                  <p 
+                  <p
                     className="text-sm cursor-pointer hover:bg-muted/50 p-1 rounded"
                     onClick={() => setEditingField('checkin')}
                   >
@@ -688,7 +704,7 @@ export default function TaskCard({
                     <span className="text-sm text-muted-foreground">persone</span>
                   </div>
                 ) : (
-                  <p 
+                  <p
                     className="text-sm cursor-pointer hover:bg-muted/50 p-1 rounded"
                     onClick={() => setEditingField('paxin')}
                   >
@@ -711,8 +727,8 @@ export default function TaskCard({
                   Travel Time
                 </p>
                 <p className="text-sm">
-                  {assignmentTimes.travel_time !== undefined 
-                    ? `${assignmentTimes.travel_time} minuti` 
+                  {assignmentTimes.travel_time !== undefined
+                    ? `${assignmentTimes.travel_time} minuti`
                     : "non assegnato"}
                 </p>
               </div>
