@@ -630,16 +630,30 @@ export default function TimelineView({
         throw new Error('Errore nel reset della timeline');
       }
 
-      // 2. Ricarica i task senza ricaricare la pagina (mantiene la data)
+      // 2. CRITICAL: Resetta il lastSavedFilename per indicare che non ci sono salvataggi
+      setLastSavedFilename(null);
+      localStorage.removeItem('last_saved_assignment');
+
+      // 3. Ricarica i task senza ricaricare la pagina (mantiene la data)
       if ((window as any).reloadAllTasks) {
         await (window as any).reloadAllTasks();
       }
       if ((window as any).setHasUnsavedChanges) {
         (window as any).setHasUnsavedChanges(true);
       }
+
+      toast({
+        title: "Reset completato",
+        description: "Timeline svuotata con successo",
+        variant: "success",
+      });
     } catch (error) {
       console.error('Errore nel reset:', error);
-      alert('Errore durante il reset delle assegnazioni');
+      toast({
+        title: "Errore",
+        description: "Errore durante il reset delle assegnazioni",
+        variant: "destructive",
+      });
     }
   };
 
@@ -747,6 +761,23 @@ export default function TimelineView({
 
   const loadSavedAssignmentDate = async () => {
     try {
+      // CRITICAL: Verifica se la timeline è vuota (dopo un reset)
+      // Se è vuota, non caricare automaticamente le assegnazioni salvate
+      const timelineResponse = await fetch(`/data/output/timeline.json?t=${Date.now()}`);
+      if (timelineResponse.ok) {
+        const timelineData = await timelineResponse.json();
+        const isEmpty = !timelineData.cleaners_assignments || 
+                       timelineData.cleaners_assignments.length === 0 ||
+                       timelineData.cleaners_assignments.every((c: any) => !c.tasks || c.tasks.length === 0);
+        
+        if (isEmpty) {
+          console.log('⚠️ Timeline vuota dopo reset - skip caricamento automatico');
+          setLastSavedFilename(null);
+          localStorage.removeItem('last_saved_assignment');
+          return;
+        }
+      }
+
       const response = await fetch('/api/load-saved-assignments', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
