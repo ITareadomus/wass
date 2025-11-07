@@ -1385,7 +1385,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // SOSTITUZIONE: Questo cleaner è stato rimosso da selected_cleaners ma ha task
         replacedCleanerId = cleanerToReplace.cleaner?.id || cleanerToReplace.cleaner_id;
         const taskCount = cleanerToReplace.tasks?.length || 0;
-        
+
         console.log(`🔄 SOSTITUZIONE cleaner rimosso ${replacedCleanerId} (con ${taskCount} task) con cleaner ${cleanerId}`);
 
         // Sostituisci SOLO i dati del cleaner, mantieni le task
@@ -1455,7 +1455,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       console.log(`✅ Operazione completata: cleaner ${cleanerId} ${replacedCleanerId ? `ha sostituito ${replacedCleanerId}` : 'aggiunto'}`);
-      
+
       res.json({
         success: true,
         replaced: replacedCleanerId,
