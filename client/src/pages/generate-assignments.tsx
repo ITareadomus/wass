@@ -100,7 +100,6 @@ export default function GenerateAssignments() {
 
   // Traccia il primo caricamento per evitare reload automatici
   const [isInitialMount, setIsInitialMount] = useState(true);
-  const [hasLoadedInitialData, setHasLoadedInitialData] = useState(false);
 
   // Salva la data in localStorage ogni volta che cambia (formato locale senza timezone)
   useEffect(() => {
@@ -243,23 +242,22 @@ export default function GenerateAssignments() {
   useEffect(() => {
     const currentDateStr = format(selectedDate, 'yyyy-MM-dd');
     
-    // Al primo caricamento, carica SOLO i dati esistenti senza rieseguire extract-data
-    if (isInitialMount && !hasLoadedInitialData) {
-      setIsInitialMount(false);
-      setHasLoadedInitialData(true);
-      prevDateRef.current = currentDateStr;
-      
-      // Carica solo i file JSON esistenti senza toccare timeline.json
-      loadTasks(true); // skipExtraction = true
-      return;
-    }
+    // CRITICAL: Carica automaticamente SOLO se:
+    // 1. È il primo montaggio (isInitialMount = true)
+    // 2. OPPURE la data è cambiata rispetto alla precedente
+    const shouldLoad = isInitialMount || (prevDateRef.current !== null && prevDateRef.current !== currentDateStr);
     
-    // Per cambi data successivi, esegui extract-data completo
-    if (prevDateRef.current !== null && prevDateRef.current !== currentDateStr) {
+    if (shouldLoad) {
       extractData(selectedDate);
       prevDateRef.current = currentDateStr;
     }
-  }, [selectedDate, isInitialMount, hasLoadedInitialData]);
+    
+    // Reset isInitialMount dopo la prima chiamata
+    if (isInitialMount) {
+      setIsInitialMount(false);
+      prevDateRef.current = currentDateStr;
+    }
+  }, [selectedDate, isInitialMount]);
 
   // Funzione per caricare MANUALMENTE le assegnazioni salvate
   const handleLoadSavedAssignments = async () => {
