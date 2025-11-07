@@ -709,7 +709,7 @@ export default function TimelineView({
   useEffect(() => {
     // Skip al primo render
     if (tasks.length === 0) return;
-
+    
     // Quando le task cambiano (drag-and-drop), notifica il parent
     if (onTaskMoved) {
       onTaskMoved();
@@ -778,8 +778,6 @@ export default function TimelineView({
       confirmed_operation: isConfirmedOperation,
     };
   };
-
-  const hasSavedAssignments = !hasUnsavedChanges;
 
   return (
     <>
@@ -1061,12 +1059,11 @@ export default function TimelineView({
             <div className="flex-1 p-1 border-t border-border flex gap-2">
               <Button
                 onClick={handleConfirmAssignments}
-                variant="default"
-                size="lg"
-                className="w-full text-lg font-bold h-14"
+                className={`flex-1 h-full ${hasUnsavedChanges ? 'bg-orange-500 hover:bg-orange-600 animate-pulse' : 'bg-green-500 hover:bg-green-600'}`}
+                data-testid="button-confirm-assignments"
               >
-                <span className="mr-2">💾</span>
-                {hasSavedAssignments ? 'Salva Modifiche' : 'Conferma Assegnazioni'}
+                <Users className="w-4 h-4 mr-2" />
+                {hasUnsavedChanges ? 'Salva Modifiche ⚠️' : 'Conferma Assegnazioni'}
               </Button>
               <Button
                 onClick={handlePrint}
@@ -1122,7 +1119,7 @@ export default function TimelineView({
                   </div>
                   <div className="flex items-center gap-2">
                     {cleaner.role === "Premium" && (
-                      <span className="px-2 py-1 rounded bg-yellow-500 text-black text-xs font-bold">
+                      <span className="px-2 py-1 rounded bg-yellow-400 text-black text-xs font-bold">
                         Premium
                       </span>
                     )}
