@@ -1,6 +1,6 @@
 {
   "metadata": {
-    "last_updated": "2025-11-07T10:38:25.511Z",
+    "last_updated": "2025-11-07T15:00:29.488Z",
     "date": "2025-11-07"
   },
   "cleaners_assignments": [
@@ -346,73 +346,7 @@
         "role": "Premium",
         "premium": true
       },
-      "tasks": [
-        {
-          "task_id": 218495,
-          "logistic_code": 1363,
-          "client_id": null,
-          "premium": true,
-          "address": "VIA AMEDEI, 2",
-          "lat": "45.4597298",
-          "lng": "9.186577",
-          "cleaning_time": 270,
-          "checkin_date": "2025-11-06",
-          "checkout_date": "2025-11-06",
-          "checkin_time": "15:00",
-          "checkout_time": null,
-          "pax_in": 1,
-          "pax_out": 2,
-          "small_equipment": false,
-          "operation_id": 2,
-          "confirmed_operation": true,
-          "straordinaria": false,
-          "type_apt": "E",
-          "alias": "TBR",
-          "customer_name": "THE BEST RENT S.r.l.",
-          "reasons": [
-            "manually_moved_to_timeline"
-          ],
-          "priority": "high_priority",
-          "start_time": "10:00",
-          "end_time": "14:30",
-          "followup": false,
-          "sequence": 1,
-          "travel_time": 0
-        },
-        {
-          "task_id": 218379,
-          "logistic_code": 494,
-          "client_id": 61,
-          "premium": false,
-          "address": "P.ZZA S. MARCO, 1",
-          "lat": "45.4730972",
-          "lng": "9.1883431",
-          "cleaning_time": 60,
-          "checkin_date": "2025-11-07",
-          "checkout_date": "2025-11-06",
-          "checkin_time": null,
-          "checkout_time": null,
-          "pax_in": 2,
-          "pax_out": 1,
-          "small_equipment": true,
-          "operation_id": 2,
-          "confirmed_operation": true,
-          "straordinaria": false,
-          "type_apt": "A",
-          "alias": "NTM",
-          "customer_name": "NOTA-MI",
-          "reasons": [
-            "client_forced_eo",
-            "automatic_assignment_eo"
-          ],
-          "priority": "early_out",
-          "start_time": "14:57",
-          "end_time": "15:57",
-          "followup": true,
-          "sequence": 2,
-          "travel_time": 27
-        }
-      ]
+      "tasks": []
     },
     {
       "cleaner": {
@@ -534,6 +468,39 @@
       },
       "tasks": [
         {
+          "task_id": 218379,
+          "logistic_code": 494,
+          "client_id": 61,
+          "premium": false,
+          "address": "P.ZZA S. MARCO, 1",
+          "lat": "45.4730972",
+          "lng": "9.1883431",
+          "cleaning_time": 60,
+          "checkin_date": "2025-11-07",
+          "checkout_date": "2025-11-06",
+          "checkin_time": null,
+          "checkout_time": null,
+          "pax_in": 2,
+          "pax_out": 1,
+          "small_equipment": true,
+          "operation_id": 2,
+          "confirmed_operation": true,
+          "straordinaria": false,
+          "type_apt": "A",
+          "alias": "NTM",
+          "customer_name": "NOTA-MI",
+          "reasons": [
+            "client_forced_eo",
+            "automatic_assignment_eo"
+          ],
+          "priority": "early_out",
+          "start_time": "10:00",
+          "end_time": "11:00",
+          "followup": false,
+          "sequence": 1,
+          "travel_time": 0
+        },
+        {
           "task_id": 218230,
           "logistic_code": 1210,
           "client_id": 75,
@@ -560,11 +527,43 @@
             "automatic_assignment_hp"
           ],
           "priority": "high_priority",
-          "start_time": "11:00",
-          "end_time": "12:30",
-          "followup": false,
-          "sequence": 1,
-          "travel_time": 0
+          "start_time": "11:21",
+          "end_time": "12:51",
+          "followup": true,
+          "sequence": 2,
+          "travel_time": 21
+        },
+        {
+          "task_id": 218495,
+          "logistic_code": 1363,
+          "client_id": null,
+          "premium": true,
+          "address": "VIA AMEDEI, 2",
+          "lat": "45.4597298",
+          "lng": "9.186577",
+          "cleaning_time": 270,
+          "checkin_date": "2025-11-06",
+          "checkout_date": "2025-11-06",
+          "checkin_time": "15:00",
+          "checkout_time": null,
+          "pax_in": 1,
+          "pax_out": 2,
+          "small_equipment": false,
+          "operation_id": 2,
+          "confirmed_operation": true,
+          "straordinaria": false,
+          "type_apt": "E",
+          "alias": "TBR",
+          "customer_name": "THE BEST RENT S.r.l.",
+          "reasons": [
+            "manually_moved_to_timeline"
+          ],
+          "priority": "high_priority",
+          "start_time": "13:22",
+          "end_time": "17:52",
+          "followup": true,
+          "sequence": 3,
+          "travel_time": 31
         },
         {
           "task_id": 218355,
@@ -593,11 +592,11 @@
             "automatic_assignment_eo"
           ],
           "priority": "early_out",
-          "start_time": "12:36",
-          "end_time": "13:36",
+          "start_time": "18:23",
+          "end_time": "19:23",
           "followup": true,
-          "sequence": 2,
-          "travel_time": 6
+          "sequence": 4,
+          "travel_time": 31
         },
         {
           "task_id": 218517,
@@ -627,10 +626,10 @@
             "not_hp",
             "automatic_assignment_lp"
           ],
-          "start_time": "14:06",
-          "end_time": "14:36",
+          "start_time": "19:53",
+          "end_time": "20:23",
           "followup": true,
-          "sequence": 3,
+          "sequence": 5,
           "travel_time": 30
         }
       ]
@@ -707,7 +706,7 @@
           ],
           "start_time": "11:25",
           "end_time": "14:55",
-          "followup": false,
+          "followup": true,
           "sequence": 2,
           "travel_time": 25
         },
@@ -744,6 +743,40 @@
           "followup": true,
           "sequence": 3,
           "travel_time": 20
+        },
+        {
+          "task_id": 218562,
+          "logistic_code": 1072,
+          "client_id": 3,
+          "premium": false,
+          "address": "VIA AUSONIO, 6",
+          "lat": "45.4599303",
+          "lng": "9.1743487",
+          "cleaning_time": 30,
+          "checkin_date": "2025-11-06",
+          "checkout_date": "2025-11-06",
+          "checkin_time": null,
+          "checkout_time": null,
+          "pax_in": 0,
+          "pax_out": 0,
+          "small_equipment": true,
+          "operation_id": 4,
+          "confirmed_operation": true,
+          "straordinaria": false,
+          "type_apt": "A",
+          "alias": "TBR",
+          "customer_name": "THE BEST RENT S.r.l.",
+          "priority": "low_priority",
+          "reasons": [
+            "not_eo",
+            "not_hp",
+            "automatic_assignment_lp"
+          ],
+          "start_time": "18:04",
+          "end_time": "18:34",
+          "followup": true,
+          "sequence": 4,
+          "travel_time": 19
         }
       ]
     },
@@ -1159,40 +1192,6 @@
           "followup": true,
           "sequence": 2,
           "travel_time": 34
-        },
-        {
-          "task_id": 218562,
-          "logistic_code": 1072,
-          "client_id": 3,
-          "premium": false,
-          "address": "VIA AUSONIO, 6",
-          "lat": "45.4599303",
-          "lng": "9.1743487",
-          "cleaning_time": 30,
-          "checkin_date": "2025-11-06",
-          "checkout_date": "2025-11-06",
-          "checkin_time": null,
-          "checkout_time": null,
-          "pax_in": 0,
-          "pax_out": 0,
-          "small_equipment": true,
-          "operation_id": 4,
-          "confirmed_operation": true,
-          "straordinaria": false,
-          "type_apt": "A",
-          "alias": "TBR",
-          "customer_name": "THE BEST RENT S.r.l.",
-          "priority": "low_priority",
-          "reasons": [
-            "not_eo",
-            "not_hp",
-            "automatic_assignment_lp"
-          ],
-          "start_time": "13:22",
-          "end_time": "13:52",
-          "followup": true,
-          "sequence": 3,
-          "travel_time": 18
         }
       ]
     }
