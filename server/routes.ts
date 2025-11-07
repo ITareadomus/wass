@@ -1243,12 +1243,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Carica timeline per verificare se il cleaner ha task
       let timelineData: any;
+      let cleanerEntry: any = null;
       let hasTasks = false;
       try {
         const timelineContent = await fs.readFile(timelinePath, 'utf8');
         timelineData = JSON.parse(timelineContent);
 
-        const cleanerEntry = timelineData.cleaners_assignments?.find(
+        cleanerEntry = timelineData.cleaners_assignments?.find(
           (c: any) => c.cleaner?.id === cleanerId
         );
         hasTasks = cleanerEntry && cleanerEntry.tasks && cleanerEntry.tasks.length > 0;
@@ -1269,8 +1270,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       let message = "";
 
-      // Se il cleaner NON ha task, rimuovilo anche da timeline.json
-      if (!hasTasks && timelineData) {
+      // Se il cleaner HA task, sostituisci i suoi dati con cleaner fittizio "NON ASSEGNATO"
+      if (hasTasks && timelineData && cleanerEntry) {
+        // Trova il prossimo numero sequenziale per cleaners fittizi
+        const fictionalCleaners = timelineData.cleaners_assignments.filter(
+          (c: any) => c.cleaner?.id < 0
+        );
+        const nextFictionalId = fictionalCleaners.length > 0 
+          ? Math.min(...fictionalCleaners.map((c: any) => c.cleaner.id)) - 1
+          : -1;
+
+        // Sostituisci i dati del cleaner con il cleaner fittizio
+        cleanerEntry.cleaner = {
+          id: nextFictionalId,
+          name: "CLEANER NON",
+          lastname: `ASSEGNATO`,
+          role: "Standard",
+          premium: false
+        };
+
+        // Aggiorna metadata
+        timelineData.metadata = timelineData.metadata || {};
+        timelineData.metadata.last_updated = new Date().toISOString();
+        timelineData.metadata.date = workDate;
+
+        // Salva timeline.json
+        const tmpTimelinePath = `${timelinePath}.tmp`;
+        await fs.writeFile(tmpTimelinePath, JSON.stringify(timelineData, null, 2));
+        await fs.rename(tmpTimelinePath, timelinePath);
+
+        console.log(`✅ Cleaner ${cleanerId} sostituito con cleaner fittizio ${nextFictionalId}`);
+        console.log(`   - Rimosso da selected_cleaners.json (${cleanersBefore} -> ${selectedData.cleaners.length})`);
+        console.log(`   - Sostituito in timeline.json con "NON ASSEGNATO"`);
+        message = "Cleaner sostituito con 'NON ASSEGNATO' in timeline";
+      } else if (!hasTasks && timelineData) {
+        // Se non ha task, rimuovilo completamente da timeline
         timelineData.cleaners_assignments = timelineData.cleaners_assignments.filter(
           (c: any) => c.cleaner?.id !== cleanerId
         );
@@ -1296,9 +1330,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.log(`   - Rimosso da timeline.json`);
         message = "Cleaner rimosso completamente (nessuna task)";
       } else {
-        console.log(`✅ Cleaner ${cleanerId} rimosso da selected_cleaners.json (${cleanersBefore} -> ${selectedData.cleaners.length})`);
-        console.log(`   Il cleaner rimane in timeline.json con le sue task fino a sostituzione`);
-        message = "Cleaner rimosso dalla selezione (task mantenute)";
+        message = "Cleaner rimosso dalla selezione";
       }
 
       res.json({
