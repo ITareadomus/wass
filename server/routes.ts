@@ -406,7 +406,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         timelineData.cleaners_assignments.push(destEntry);
       }
 
-      // Scambia le task array
+      // Scambia SOLO le task array tra i due cleaner specificati
       const sourceTasks = sourceEntry.tasks;
       const destTasks = destEntry.tasks;
 
@@ -429,6 +429,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       markTasksAsManual(sourceEntry.tasks);
       markTasksAsManual(destEntry.tasks);
+
+      // CRITICAL: Non modificare timelineData.cleaners_assignments
+      // Gli entry sourceEntry e destEntry sono riferimenti diretti agli oggetti nell'array
+      // quindi lo scambio è già applicato senza dover riassegnare l'array
 
       // Ricalcola tempi per entrambi i cleaners
       try {
