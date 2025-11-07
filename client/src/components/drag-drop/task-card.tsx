@@ -75,15 +75,24 @@ export default function TaskCard({
 
   const navigableTasks = getNavigableTasks();
 
-  // Se currentTaskId non è impostato o non è valido, usa l'id della task corrente
-  const effectiveCurrentId = currentTaskId && navigableTasks.some(t => String(t.id) === String(currentTaskId))
-    ? currentTaskId
-    : task.id;
+  // IMPORTANTE: Ricalcola displayTask ogni volta che currentTaskId cambia
+  const { effectiveCurrentId, currentTaskInNavigable, displayTask } = (() => {
+    // Se currentTaskId non è impostato o non è valido, usa l'id della task corrente
+    const effId = currentTaskId && navigableTasks.some(t => String(t.id) === String(currentTaskId))
+      ? currentTaskId
+      : task.id;
 
-  const currentTaskInNavigable = navigableTasks.findIndex(t => String(t.id) === String(effectiveCurrentId));
+    const currIdx = navigableTasks.findIndex(t => String(t.id) === String(effId));
 
-  // Task corrente da visualizzare
-  const displayTask = navigableTasks.find(t => String(t.id) === String(effectiveCurrentId)) || task;
+    // Task corrente da visualizzare
+    const dispTask = navigableTasks.find(t => String(t.id) === String(effId)) || task;
+
+    return {
+      effectiveCurrentId: effId,
+      currentTaskInNavigable: currIdx,
+      displayTask: dispTask
+    };
+  })();
 
   console.log('🔍 Stato navigazione:', {
     currentTaskId,
