@@ -781,12 +781,33 @@ export default function TimelineView({
     }
   };
 
-  // CRITICAL: Mostra SOLO cleaners da selected_cleaners.json
-  // Non mostrare cleaners rimossi dopo un reload - devono essere sostituiti manualmente
+  // CRITICAL: Mostra cleaners attivi + una riga speciale per task orfane
   const allCleanersToShow = React.useMemo(() => {
-    // Ritorna solo i cleaners attualmente selezionati
     return cleaners;
   }, [cleaners]);
+
+  // Trova task "orfane": task in timeline.json che non appartengono a nessun cleaner in selected_cleaners.json
+  const orphanTasks = React.useMemo(() => {
+    const selectedCleanerIds = new Set(cleaners.map(c => c.id));
+    
+    // Trova tutte le task in timeline che hanno un cleaner NON più in selected_cleaners
+    const orphans: any[] = [];
+    for (const cleanerEntry of timelineCleaners) {
+      const cleanerId = cleanerEntry.cleaner?.id;
+      if (cleanerId && !selectedCleanerIds.has(cleanerId)) {
+        // Questo cleaner è stato rimosso, le sue task sono orfane
+        for (const task of cleanerEntry.tasks || []) {
+          orphans.push({
+            ...task,
+            originalCleanerId: cleanerId,
+            originalCleanerName: `${cleanerEntry.cleaner?.name} ${cleanerEntry.cleaner?.lastname}`
+          });
+        }
+      }
+    }
+    
+    return orphans;
+  }, [cleaners, timelineCleaners]);
 
   // Set vuoto - non mostriamo più cleaners rimossi dopo reload
   const removedCleanerIds = React.useMemo(() => {
@@ -1100,6 +1121,63 @@ export default function TimelineView({
               </div>
             );
           })}
+
+          {/* Riga per task orfane (senza cleaner assegnato) */}
+          {orphanTasks.length > 0 && (
+            <div className="flex mb-2">
+              <div
+                className="flex-shrink-0 p-1 flex items-center border border-red-500 bg-red-50 dark:bg-red-950/20"
+                style={{ width: `${cleanerColumnWidth}px` }}
+              >
+                <div className="w-full flex items-center gap-1">
+                  <div className="break-words font-bold text-[13px] flex-1 text-red-700 dark:text-red-300">
+                    TASK SENZA CLEANER
+                  </div>
+                  <div className="bg-red-600 text-white font-bold text-[10px] px-1 py-0.5 rounded flex-shrink-0">
+                    {orphanTasks.length}
+                  </div>
+                </div>
+              </div>
+              <Droppable droppableId="timeline-orphan" direction="horizontal">
+                {(provided, snapshot) => (
+                  <div
+                    ref={provided.innerRef}
+                    {...provided.droppableProps}
+                    data-testid="timeline-orphan"
+                    className={`relative border-t border-border transition-colors min-h-[45px] flex-1 ${
+                      snapshot.isDraggingOver ? 'bg-red-500/20 ring-2 ring-red-500' : 'bg-red-100/50 dark:bg-red-950/10'
+                    }`}
+                  >
+                    <div className="absolute inset-0 grid grid-cols-10 pointer-events-none opacity-10">
+                      {timeSlots.map((slot, idx) => (
+                        <div key={idx} className="border-r border-border"></div>
+                      ))}
+                    </div>
+                    <div className="relative z-10 flex items-center h-full">
+                      {orphanTasks.map((task, idx) => (
+                        <TaskCard 
+                          key={task.task_id || task.id}
+                          task={{
+                            ...task,
+                            id: String(task.task_id || task.id),
+                            name: String(task.logistic_code),
+                            type: task.customer_name || 'Unknown',
+                            duration: `${task.cleaning_time || 0}min`,
+                            priority: task.priority || 'unknown',
+                            assignedCleaner: null, // Nessun cleaner assegnato
+                          }} 
+                          index={idx}
+                          isInTimeline={true}
+                          allTasks={orphanTasks}
+                        />
+                      ))}
+                      {provided.placeholder}
+                    </div>
+                  </div>
+                )}
+              </Droppable>
+            </div>
+          )}
 
           {/* Riga finale con pulsanti */}
           <div className="flex mb-2">
