@@ -390,12 +390,8 @@ def main():
 
     # Estrai task dal database
     all_tasks = get_tasks_from_db(work_date, assigned_task_ids)
-    
-    # Deduplica task prima della classificazione
-    print(f"🔄 Deduplica task duplicate...")
-    all_tasks = deduplicate_tasks(all_tasks)
 
-    # Classifica task
+    # Classifica task (senza deduplica - le task duplicate rimangono visibili)
     print(f"🔄 Classificazione task in containers...")
     early_out, high_priority, low_priority = classify_tasks(all_tasks, work_date)
 
