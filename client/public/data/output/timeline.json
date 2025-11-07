@@ -1,35 +1,12 @@
 {
   "metadata": {
-    "last_updated": "2025-11-07T08:56:18.127Z",
-    "date": "2025-11-07"
+    "last_updated": "2025-11-07T09:03:41.900Z",
+    "date": "2025-11-06"
   },
-  "cleaners_assignments": [
-    {
-      "cleaner": {
-        "id": 495,
-        "name": "EL HADJI",
-        "lastname": "BA",
-        "role": "Premium",
-        "premium": true
-      },
-      "tasks": []
-    },
-    {
-      "cleaner": {
-        "id": 644,
-        "name": "HENRY",
-        "lastname": "CHIDUBEM",
-        "role": "Premium",
-        "premium": true
-      },
-      "tasks": []
-    }
-  ],
+  "cleaners_assignments": [],
   "meta": {
-    "total_cleaners": 2,
+    "total_cleaners": 0,
     "used_cleaners": 0,
-    "assigned_tasks": 0,
-    "total_tasks": 0,
-    "last_updated": "2025-11-07T08:56:18.127Z"
+    "assigned_tasks": 0
   }
 }
