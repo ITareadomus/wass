@@ -781,82 +781,37 @@ export default function TimelineView({
     }
   };
 
-  // Crea cleaners fittizi per task orfane (task senza cleaner in selected_cleaners)
+  // Mostra cleaners da timeline.json (include sia selected che fittizi "NON ASSEGNATO")
   const allCleanersToShow = React.useMemo(() => {
-    const selectedCleanerIds = new Set(cleaners.map(c => c.id));
-    const fictionalCleaners: Cleaner[] = [];
+    return timelineCleaners.map((tc: any) => ({
+      id: tc.cleaner?.id,
+      name: tc.cleaner?.name,
+      lastname: tc.cleaner?.lastname,
+      role: tc.cleaner?.role || "Standard",
+      active: tc.cleaner?.id > 0,
+      ranking: 0,
+      counter_hours: 0,
+      counter_days: 0,
+      available: tc.cleaner?.id > 0,
+      contract_type: tc.cleaner?.id > 0 ? "B" : "temporaneo",
+      preferred_customers: [],
+      telegram_id: null,
+      start_time: null,
+      can_do_straordinaria: false,
+      premium: tc.cleaner?.premium || false
+    } as Cleaner));
+  }, [timelineCleaners]);
 
-    // Trova task orfane raggruppate per cleaner originale
-    const orphanGroups = new Map<number, any[]>();
-
-    for (const cleanerEntry of timelineCleaners) {
-      const cleanerId = cleanerEntry.cleaner?.id;
-      if (cleanerId && !selectedCleanerIds.has(cleanerId)) {
-        // Questo cleaner è stato rimosso, le sue task sono orfane
-        const tasks = cleanerEntry.tasks || [];
-        if (tasks.length > 0) {
-          orphanGroups.set(cleanerId, tasks);
-        }
-      }
-    }
-
-    // Crea cleaners fittizi per ogni gruppo di task orfane
-    let fictionalIndex = 1;
-    for (const [originalCleanerId, tasks] of orphanGroups.entries()) {
-      fictionalCleaners.push({
-        id: -fictionalIndex, // ID negativo per distinguerli
-        name: "CLEANER NON",
-        lastname: `ASSEGNATO N${fictionalIndex}`,
-        role: "Standard",
-        active: false,
-        ranking: 0,
-        counter_hours: 0,
-        counter_days: 0,
-        available: false,
-        contract_type: "temporaneo",
-        preferred_customers: [],
-        telegram_id: null,
-        start_time: null,
-        can_do_straordinaria: false,
-      } as Cleaner);
-      fictionalIndex++;
-    }
-
-    // Ritorna cleaners reali + cleaners fittizi
-    return [...cleaners, ...fictionalCleaners];
-  }, [cleaners, timelineCleaners]);
-
-  // Set di ID cleaners fittizi (non assegnati)
+  // Set di ID cleaners fittizi (non assegnati) - ID negativi
   const removedCleanerIds = React.useMemo(() => {
     return new Set<number>(
       allCleanersToShow
-        .filter(c => c.id < 0) // ID negativi sono fittizi
+        .filter(c => c.id < 0)
         .map(c => c.id)
     );
   }, [allCleanersToShow]);
 
-  // Trova task "orfane": task in timeline.json che non appartengono a nessun cleaner in selected_cleaners.json
-  const orphanTasks = React.useMemo(() => {
-    const selectedCleanerIds = new Set(cleaners.map(c => c.id));
-
-    // Trova tutte le task in timeline che hanno un cleaner NON più in selected_cleaners
-    const orphans: any[] = [];
-    for (const cleanerEntry of timelineCleaners) {
-      const cleanerId = cleanerEntry.cleaner?.id;
-      if (cleanerId && !selectedCleanerIds.has(cleanerId)) {
-        // Questo cleaner è stato rimosso, le sue task sono orfane
-        for (const task of cleanerEntry.tasks || []) {
-          orphans.push({
-            ...task,
-            originalCleanerId: cleanerId,
-            originalCleanerName: `${cleanerEntry.cleaner?.name} ${cleanerEntry.cleaner?.lastname}`
-          });
-        }
-      }
-    }
-
-    return orphans;
-  }, [cleaners, timelineCleaners]);
+  // Non servono più orphanTasks - le task sono già nei cleaners fittizi in timeline.json
 
   // --- NORMALIZZAZIONI TIMELINE ---
   // NON normalizzare task.type - lo determiniamo dai flag
@@ -963,12 +918,9 @@ export default function TimelineView({
             const color = getCleanerColor(index);
             const droppableId = `cleaner-${cleaner.id}`;
 
-            // Trova tutte le task assegnate a questo cleaner
-            // Se il cleaner è fittizio (id < 0), prendi le task da orphanTasks
-            const cleanerTasks = cleaner.id < 0 
-              ? orphanTasks.filter(task => task.originalCleanerId === -cleaner.id) // Usa l'ID originale per filtrare
-              : tasks.filter(task => (task as any).assignedCleaner === cleaner.id)
-            .map(normalizeTask); // Applica la normalizzazione qui
+            // Trova tutte le task assegnate a questo cleaner da timelineCleaners
+            const cleanerEntry = timelineCleaners.find((tc: any) => tc.cleaner?.id === cleaner.id);
+            const cleanerTasks = (cleanerEntry?.tasks || []).map(normalizeTask);
 
             const isRemoved = removedCleanerIds.has(cleaner.id);
             const isFictional = cleaner.id < 0;
