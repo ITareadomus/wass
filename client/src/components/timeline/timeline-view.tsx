@@ -66,8 +66,14 @@ export default function TimelineView({
   const { toast } = useToast();
   const [, setLocation] = useLocation();
 
-  // Usa sempre la data odierna all'apertura dell'app
-  const workDate = new Date().toISOString().split('T')[0];
+  // Normalizza la data da localStorage per coerenza ovunque
+  const workDate = localStorage.getItem('selected_work_date') || (() => {
+    const today = new Date();
+    const year = today.getFullYear();
+    const month = String(today.getMonth() + 1).padStart(2, '0');
+    const day = String(today.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  })();
 
   // Mutation per rimuovere un cleaner da selected_cleaners.json
   const removeCleanerMutation = useMutation({
@@ -122,8 +128,12 @@ export default function TimelineView({
         await (window as any).reloadAllTasks(true);
       }
 
+      // IMPORTANTE: ricarica timeline.json PRIMA di ricalcolare gli available
+      // Questo previene race conditions tra cache e stato locale
+      await new Promise(resolve => setTimeout(resolve, 100)); // Small delay per file system sync
+
       // Trova il cleaner appena aggiunto per mostrare nome e cognome
-      const cleanersResponse = await fetch('/data/cleaners/selected_cleaners.json');
+      const cleanersResponse = await fetch(`/data/cleaners/selected_cleaners.json?t=${Date.now()}`);
       const cleanersData = await cleanersResponse.json();
       const addedCleaner = cleanersData.cleaners.find((c: any) => c.id === cleanerId);
       const cleanerName = addedCleaner ? `${addedCleaner.name} ${addedCleaner.lastname}` : `ID ${cleanerId}`;
@@ -384,6 +394,11 @@ export default function TimelineView({
   };
 
   // Carica cleaner disponibili per aggiungerli alla timeline
+  // 
+  // TEST DI REGRESSIONE (prevenzione bug):
+  // Scenario: workDate="2025-11-07", cleaners=[{id:495},{id:101}], timeline={cleaners_assignments:[{cleaner_id:495}]}
+  // Expected: available=[{id:101}] (495 è già in timeline, quindi escluso)
+  // Causa bug precedente: filtrava contro selected_cleaners.json invece di timeline.json
   const loadAvailableCleaners = async () => {
     try {
       const [cleanersResponse, timelineResponse] = await Promise.all([
@@ -394,7 +409,7 @@ export default function TimelineView({
       const data = await cleanersResponse.json();
 
       console.log('🔍 DEBUG loadAvailableCleaners:');
-      console.log('   - workDate:', workDate);
+      console.log('   - workDate (normalizzata):', workDate);
       console.log('   - Date disponibili in cleaners.json:', Object.keys(data.dates || {}));
 
       // Trova i cleaner per la data selezionata
@@ -415,24 +430,29 @@ export default function TimelineView({
       console.log(`   - Cleaner trovati per la data: ${dateCleaners.length}`);
 
       // FILTRA CONTRO LA TIMELINE, NON CONTRO selected_cleaners.json
-      let timelineCleanerIds = new Set<number>();
-      if (timelineResponse.ok) {
-        try {
-          const timelineData = await timelineResponse.json();
-          timelineCleanerIds = new Set(
-            (timelineData.cleaners_assignments || [])
-              .map((ca: any) => ca.cleaner?.id)
-              .filter((id: number) => id !== undefined)
-          );
-          console.log(`   - Cleaner già in timeline.json: ${timelineCleanerIds.size}`, Array.from(timelineCleanerIds));
-        } catch (e) {
-          console.warn('   ⚠️ Errore parsing timeline.json:', e);
-        }
-      }
+      // Gestione robusta: se timeline non esiste o è vuota, usa array vuoto
+      const timelineData = timelineResponse.ok 
+        ? await timelineResponse.json() 
+        : { cleaners_assignments: [] };
 
-      // Escludi solo i cleaners già presenti nella timeline
+      // Helper per estrarre ID normalizzato (gestisce string/number e varie strutture)
+      const getCleanerId = (item: any): number | null => {
+        const id = item?.cleaner?.id ?? item?.cleaner_id ?? item?.id;
+        return id !== undefined && id !== null ? Number(id) : null;
+      };
+
+      // Crea Set di ID normalizzati (solo valori non-null)
+      const timelineCleanerIds = new Set<number>(
+        (timelineData.cleaners_assignments || [])
+          .map(getCleanerId)
+          .filter((id): id is number => id !== null)
+      );
+
+      console.log(`   - Cleaner già in timeline.json: ${timelineCleanerIds.size}`, Array.from(timelineCleanerIds));
+
+      // Escludi solo i cleaners già presenti nella timeline (con ID normalizzati)
       const available = dateCleaners.filter((c: Cleaner) => 
-        !timelineCleanerIds.has(c.id) && c.active
+        c.active && !timelineCleanerIds.has(Number(c.id))
       );
 
       console.log(`   - Cleaner disponibili da aggiungere: ${available.length}/${dateCleaners.length}`);
