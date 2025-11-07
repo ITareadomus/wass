@@ -1036,6 +1036,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const savedData = JSON.parse(result.value);
 
+      // CRITICAL: Aggiorna la data nei metadata per riflettere la data selezionata
+      savedData.metadata = savedData.metadata || {};
+      savedData.metadata.date = workDate;
+      savedData.metadata.last_updated = new Date().toISOString();
+
       // Salva i dati caricati in timeline.json
       const timelinePath = path.join(process.cwd(), 'client/public/data/output/timeline.json');
       const tmpPath = `${timelinePath}.tmp`;
