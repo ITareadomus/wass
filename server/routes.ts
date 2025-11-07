@@ -1306,7 +1306,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Endpoint per aggiungere un cleaner alla timeline (sostituisce cleaner esistenti in timeline.json)
+  // Endpoint per aggiungere un cleaner alla timeline (sostituisce cleaner rimossi da selected_cleaners)
   app.post("/api/add-cleaner-to-timeline", async (req, res) => {
     try {
       const { cleanerId, date } = req.body;
@@ -1317,7 +1317,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       console.log(`Aggiunta cleaner ${cleanerId} alla timeline per data ${workDate}`);
 
-      // Carica cleaners.json per ottenere i dati del cleaner
+      // Carica cleaners.json per ottenere i dati del cleaner da aggiungere
       let cleanersData: any;
       try {
         const cleanersContent = await fs.readFile(cleanersPath, 'utf8');
@@ -1347,13 +1347,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ success: false, error: "Cleaner non trovato in cleaners.json" });
       }
 
-      // Carica selected_cleaners.json per trovare cleaners che non sono più nella selezione
+      // Carica selected_cleaners.json
       let selectedCleanersData: any;
       try {
         const selectedContent = await fs.readFile(selectedCleanersPath, 'utf8');
         selectedCleanersData = JSON.parse(selectedContent);
       } catch (error) {
-        selectedCleanersData = { cleaners: [], total_selected: 0 };
+        selectedCleanersData = { cleaners: [], total_selected: 0, metadata: { date: workDate } };
       }
 
       const selectedCleanerIds = new Set(selectedCleanersData.cleaners.map((c: any) => c.id));
@@ -1373,17 +1373,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.log("Timeline file non trovato, creazione nuovo file");
       }
 
-      // Trova il primo cleaner in timeline.json che NON è in selected_cleaners.json
-      let replacedCleanerId: number | null = null;
+      // CRITICAL: Cerca un cleaner in timeline CHE NON sia in selected_cleaners
+      // Questi sono i cleaners rimossi che hanno ancora task
       const cleanerToReplace = timelineData.cleaners_assignments.find(
         (c: any) => !selectedCleanerIds.has(c.cleaner?.id || c.cleaner_id)
       );
 
-      if (cleanerToReplace) {
-        replacedCleanerId = cleanerToReplace.cleaner?.id || cleanerToReplace.cleaner_id;
-        console.log(`🔄 Sostituzione cleaner ${replacedCleanerId} con cleaner ${cleanerId} in timeline.json`);
+      let replacedCleanerId: number | null = null;
 
-        // Sostituisci il cleaner mantenendo le task
+      if (cleanerToReplace) {
+        // SOSTITUZIONE: Questo cleaner è stato rimosso da selected_cleaners ma ha task
+        replacedCleanerId = cleanerToReplace.cleaner?.id || cleanerToReplace.cleaner_id;
+        const taskCount = cleanerToReplace.tasks?.length || 0;
+        
+        console.log(`🔄 SOSTITUZIONE cleaner rimosso ${replacedCleanerId} (con ${taskCount} task) con cleaner ${cleanerId}`);
+
+        // Sostituisci SOLO i dati del cleaner, mantieni le task
         cleanerToReplace.cleaner = {
           id: cleanerData.id,
           name: cleanerData.name,
@@ -1391,9 +1396,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
           role: cleanerData.role,
           premium: cleanerData.role === "Premium"
         };
+
+        // Ricalcola i tempi per le task con il nuovo cleaner
+        if (taskCount > 0) {
+          try {
+            const updatedData = await recalculateCleanerTimes(cleanerToReplace);
+            cleanerToReplace.tasks = updatedData.tasks;
+            console.log(`✅ Tempi ricalcolati per ${taskCount} task del nuovo cleaner ${cleanerId}`);
+          } catch (err) {
+            console.warn(`⚠️ Errore ricalcolo tempi, continuo senza ricalcolare`);
+          }
+        }
       } else {
-        // Nessun cleaner da sostituire, aggiungi nuovo cleaner
-        console.log(`➕ Nessun cleaner da sostituire, aggiunta nuovo cleaner ${cleanerId}`);
+        // AGGIUNTA: Nessun cleaner rimosso da sostituire, aggiungi nuovo entry
+        console.log(`➕ Nessun cleaner da sostituire, aggiunta nuovo cleaner ${cleanerId} (senza task)`);
         const newCleanerEntry = {
           cleaner: {
             id: cleanerData.id,
@@ -1407,28 +1423,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
         timelineData.cleaners_assignments.push(newCleanerEntry);
       }
 
-      // Aggiorna metadata
+      // Aggiorna metadata timeline
       timelineData.metadata = timelineData.metadata || {};
       timelineData.metadata.last_updated = new Date().toISOString();
       timelineData.metadata.date = workDate;
       timelineData.meta.total_cleaners = timelineData.cleaners_assignments.length;
       timelineData.meta.total_tasks = timelineData.cleaners_assignments.reduce(
-        (sum: number, c: any) => sum + c.tasks.length,
+        (sum: number, c: any) => sum + (c.tasks?.length || 0),
         0
       );
-      timelineData.meta.last_updated = new Date().toISOString();
 
       // Scrittura atomica timeline
       const tmpPath = `${timelinePath}.tmp`;
       await fs.writeFile(tmpPath, JSON.stringify(timelineData, null, 2));
       await fs.rename(tmpPath, timelinePath);
 
-      // Aggiungi il cleaner a selected_cleaners.json
+      // Aggiungi il cleaner a selected_cleaners.json (se non già presente)
       const isAlreadySelected = selectedCleanersData.cleaners.some((c: any) => c.id === cleanerId);
 
       if (!isAlreadySelected) {
         selectedCleanersData.cleaners.push(cleanerData);
         selectedCleanersData.total_selected = selectedCleanersData.cleaners.length;
+        selectedCleanersData.metadata = selectedCleanersData.metadata || {};
+        selectedCleanersData.metadata.date = workDate;
 
         // Salva selected_cleaners.json
         const tmpSelectedPath = `${selectedCleanersPath}.tmp`;
@@ -1437,7 +1454,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.log(`✅ Cleaner ${cleanerId} aggiunto a selected_cleaners.json`);
       }
 
-      console.log(`✅ Cleaner ${cleanerId} ${replacedCleanerId ? 'sostituito' : 'aggiunto'} alla timeline con successo`);
+      console.log(`✅ Operazione completata: cleaner ${cleanerId} ${replacedCleanerId ? `ha sostituito ${replacedCleanerId}` : 'aggiunto'}`);
+      
       res.json({
         success: true,
         replaced: replacedCleanerId,
