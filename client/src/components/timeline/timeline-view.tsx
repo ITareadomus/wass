@@ -83,14 +83,6 @@ export default function TimelineView({
   // Mutation per rimuovere un cleaner da selected_cleaners.json
   const removeCleanerMutation = useMutation({
     mutationFn: async (cleanerId: number) => {
-      // CRITICAL: Notifica SUBITO all'inizio della mutation
-      if (onTaskMoved) {
-        onTaskMoved();
-      }
-      if ((window as any).setHasUnsavedChanges) {
-        (window as any).setHasUnsavedChanges(true);
-      }
-
       const response = await apiRequest("POST", "/api/remove-cleaner-from-selected", {
         cleanerId,
         date: workDate // Passa la data selezionata
@@ -98,6 +90,14 @@ export default function TimelineView({
       return await response.json();
     },
     onSuccess: async (data) => {
+      // CRITICAL: Notifica PRIMA del reload per mantenere lo stato
+      if (onTaskMoved) {
+        onTaskMoved();
+      }
+      if ((window as any).setHasUnsavedChanges) {
+        (window as any).setHasUnsavedChanges(true);
+      }
+
       // CRITICAL: Ricarica PRIMA la timeline per vedere i cleaners con task
       await loadTimelineCleaners();
 
@@ -127,14 +127,6 @@ export default function TimelineView({
   // Mutation per aggiungere un cleaner alla timeline
   const addCleanerMutation = useMutation({
     mutationFn: async (cleanerId: number) => {
-      // CRITICAL: Notifica SUBITO all'inizio della mutation
-      if (onTaskMoved) {
-        onTaskMoved();
-      }
-      if ((window as any).setHasUnsavedChanges) {
-        (window as any).setHasUnsavedChanges(true);
-      }
-
       const response = await apiRequest("POST", "/api/add-cleaner-to-timeline", {
         cleanerId,
         date: workDate
@@ -142,6 +134,14 @@ export default function TimelineView({
       return await response.json();
     },
     onSuccess: async (data, cleanerId) => {
+      // CRITICAL: Notifica PRIMA del reload per mantenere lo stato
+      if (onTaskMoved) {
+        onTaskMoved();
+      }
+      if ((window as any).setHasUnsavedChanges) {
+        (window as any).setHasUnsavedChanges(true);
+      }
+      
       // Ricarica ENTRAMBI i file per sincronizzare la vista
       await Promise.all([
         loadCleaners(),
@@ -182,14 +182,6 @@ export default function TimelineView({
   // Mutation per scambiare task tra cleaners
   const swapCleanersMutation = useMutation({
     mutationFn: async ({ sourceCleanerId, destCleanerId }: { sourceCleanerId: number; destCleanerId: number }) => {
-      // CRITICAL: Notifica SUBITO all'inizio della mutation
-      if (onTaskMoved) {
-        onTaskMoved();
-      }
-      if ((window as any).setHasUnsavedChanges) {
-        (window as any).setHasUnsavedChanges(true);
-      }
-
       const response = await apiRequest("POST", "/api/swap-cleaners-tasks", {
         sourceCleanerId,
         destCleanerId,
@@ -198,6 +190,14 @@ export default function TimelineView({
       return await response.json();
     },
     onSuccess: async (data, variables) => {
+      // CRITICAL: Notifica PRIMA del reload per mantenere lo stato
+      if (onTaskMoved) {
+        onTaskMoved();
+      }
+      if ((window as any).setHasUnsavedChanges) {
+        (window as any).setHasUnsavedChanges(true);
+      }
+      
       // Ricarica i task per mostrare immediatamente lo swap
       if ((window as any).reloadAllTasks) {
         await (window as any).reloadAllTasks();
