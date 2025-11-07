@@ -2833,14 +2833,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Fallback: mantieni sequence manualmente (già fatto sopra)
       }
 
-      // Aggiorna metadata
-      timelineData.metadata = timelineData.metadata || {};
-      timelineData.metadata.last_updated = new Date().toISOString();
-      timelineData.metadata.date = workDate;
+      // CRITICAL FIX: Ricarica timeline.json PRIMA di salvare per preservare tutti i cleaner
+      const freshTimelineData = JSON.parse(await fs.readFile(timelinePath, 'utf8'));
+      
+      // Trova e aggiorna SOLO i cleaner modificati
+      if (fromCleanerId !== null && toCleanerId !== null) {
+        // Aggiorna il cleaner destinazione
+        const dstIdx = freshTimelineData.cleaners_assignments.findIndex((c: any) => c.cleaner.id === toCleanerId);
+        if (dstIdx !== -1) {
+          freshTimelineData.cleaners_assignments[dstIdx] = timelineData.cleaners_assignments.find((c: any) => c.cleaner.id === toCleanerId);
+        }
+        
+        // Se c'è un cleaner sorgente diverso, aggiorna anche quello
+        if (fromCleanerId !== toCleanerId) {
+          const srcIdx = freshTimelineData.cleaners_assignments.findIndex((c: any) => c.cleaner.id === fromCleanerId);
+          if (srcIdx !== -1) {
+            const srcEntry = timelineData.cleaners_assignments.find((c: any) => c.cleaner.id === fromCleanerId);
+            if (srcEntry) {
+              freshTimelineData.cleaners_assignments[srcIdx] = srcEntry;
+            }
+          }
+        }
+      }
 
-      // Salvataggi atomici
+      // Aggiorna metadata
+      freshTimelineData.metadata = freshTimelineData.metadata || {};
+      freshTimelineData.metadata.last_updated = new Date().toISOString();
+      freshTimelineData.metadata.date = workDate;
+
+      // Salvataggi atomici con i dati completi
       const tmp1 = `${timelinePath}.tmp`;
-      await fs.writeFile(tmp1, JSON.stringify(timelineData, null, 2));
+      await fs.writeFile(tmp1, JSON.stringify(freshTimelineData, null, 2));
       await fs.rename(tmp1, timelinePath);
 
       if (containersData) {
