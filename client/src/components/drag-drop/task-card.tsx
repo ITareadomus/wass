@@ -104,11 +104,17 @@ export default function TaskCard({
   const handlePrevTask = (e: React.MouseEvent) => {
     e.stopPropagation();
 
-    if (navigableTasks.length === 0 || currentTaskInNavigable <= 0) {
+    if (!canGoPrev) {
+      console.warn('⚠️ PREV bloccato:', { canGoPrev, currentTaskInNavigable, navigableTasksCount: navigableTasks.length });
       return;
     }
 
     const prevTask = navigableTasks[currentTaskInNavigable - 1];
+    if (!prevTask) {
+      console.error('❌ prevTask non trovato!');
+      return;
+    }
+
     console.log('✅ Navigazione PREV:', {
       from: currentTaskId,
       to: prevTask.id,
@@ -121,11 +127,17 @@ export default function TaskCard({
   const handleNextTask = (e: React.MouseEvent) => {
     e.stopPropagation();
 
-    if (navigableTasks.length === 0 || currentTaskInNavigable < 0 || currentTaskInNavigable >= navigableTasks.length - 1) {
+    if (!canGoNext) {
+      console.warn('⚠️ NEXT bloccato:', { canGoNext, currentTaskInNavigable, navigableTasksCount: navigableTasks.length });
       return;
     }
 
     const nextTask = navigableTasks[currentTaskInNavigable + 1];
+    if (!nextTask) {
+      console.error('❌ nextTask non trovato!');
+      return;
+    }
+
     console.log('✅ Navigazione NEXT:', {
       from: currentTaskId,
       to: nextTask.id,
