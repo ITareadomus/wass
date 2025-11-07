@@ -160,12 +160,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         try {
           const existingContent = await fs.readFile(selectedCleanersPath, 'utf8');
           selectedCleanersData = JSON.parse(existingContent);
-          
+
           // Mantieni i cleaner, aggiorna solo metadata
           selectedCleanersData.metadata = selectedCleanersData.metadata || {};
           selectedCleanersData.metadata.date = workDate;
           selectedCleanersData.metadata.reset_at = new Date().toISOString();
-          
+
           console.log(`✅ Mantenuti ${selectedCleanersData.cleaners?.length || 0} cleaner selezionati dopo reset timeline`);
         } catch (err) {
           // Se il file non esiste o è corrotto, crea vuoto
@@ -2294,13 +2294,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // SEMPRE resetta timeline.json quando viene chiamato extract-data
       // Questo endpoint viene chiamato quando l'utente cambia data nel frontend
       console.log(`🔄 Reset timeline.json per la nuova data ${date}`);
-      
+
       const emptyTimelineForNewDate = {
         metadata: { last_updated: new Date().toISOString(), date },
         cleaners_assignments: [],
         meta: { total_cleaners: 0, used_cleaners: 0, assigned_tasks: 0 }
       };
-      
+
       await fs.writeFile(timelinePath, JSON.stringify(emptyTimelineForNewDate, null, 2));
       console.log(`✅ Timeline resettata per ${date}`);
 

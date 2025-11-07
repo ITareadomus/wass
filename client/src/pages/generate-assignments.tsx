@@ -929,12 +929,14 @@ export default function GenerateAssignments() {
               description: data.message || "Impossibile spostare la task",
               variant: "destructive"
             });
-            // Ricarica per sincronizzare
+            // Ricarica per sincronizzare solo in caso di errore
             await loadTasks(true);
           } else {
-            // Ricarica i dati dopo lo spostamento
+            console.log('✅ Movimento salvato automaticamente in timeline.json');
+            
+            // IMPORTANTE: Ricarica sempre per sincronizzare con il file appena scritto
+            // Questo previene discrepanze tra stato locale e file su disco
             await loadTasks(true);
-            console.log('Timeline aggiornata con successo');
 
             // Mostra toast solo se i cleaner sono diversi
             if (fromCleanerId !== toCleanerId) {
@@ -1027,6 +1029,9 @@ export default function GenerateAssignments() {
 
           // Salva in timeline.json (rimuove automaticamente da containers.json)
           await saveTimelineAssignment(taskId, toCleanerId, logisticCode, destination.index);
+          
+          // Attendi che il backend finisca di scrivere prima di ricaricare
+          await new Promise(resolve => setTimeout(resolve, 100));
           await loadTasks(true);
 
           toast({
