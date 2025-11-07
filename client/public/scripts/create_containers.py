@@ -372,9 +372,11 @@ def main():
     else:
         work_date = None  # Se non specificata, usa la data corrente
 
-    # Leggi task già assegnate dalla timeline
+    # Leggi timeline.json per aggiornare i dati delle task assegnate
     assigned_task_ids = set()
     timeline_path = OUTPUT_DIR / "timeline.json"
+    timeline_data = None
+    
     if timeline_path.exists():
         try:
             timeline_data = json.loads(timeline_path.read_text(encoding="utf-8"))
@@ -388,8 +390,42 @@ def main():
         except Exception as e:
             print(f"⚠️ Errore lettura timeline: {e}")
 
-    # Estrai task dal database
-    all_tasks = get_tasks_from_db(work_date, assigned_task_ids)
+    # Estrai TUTTE le task dal database (anche quelle assegnate per aggiornarle)
+    all_tasks_from_db = get_tasks_from_db(work_date, assigned_task_ids=set())  # Non filtrare
+    
+    # Aggiorna i dati delle task in timeline.json con i dati freschi dal DB
+    if timeline_data and assigned_task_ids:
+        db_tasks_map = {task["task_id"]: task for task in all_tasks_from_db}
+        updated_count = 0
+        
+        for cleaner_entry in timeline_data.get("cleaners_assignments", []):
+            for task in cleaner_entry.get("tasks", []):
+                task_id = task.get("task_id")
+                if task_id and task_id in db_tasks_map:
+                    fresh_data = db_tasks_map[task_id]
+                    
+                    # Campi da aggiornare dal DB (non sovrascrivere campi timeline)
+                    fields_to_update = [
+                        "logistic_code", "client_id", "premium", "address", "lat", "lng",
+                        "cleaning_time", "checkin_date", "checkout_date", "checkin_time",
+                        "checkout_time", "pax_in", "pax_out", "small_equipment",
+                        "operation_id", "confirmed_operation", "straordinaria",
+                        "type_apt", "alias", "customer_name"
+                    ]
+                    
+                    for field in fields_to_update:
+                        if field in fresh_data:
+                            task[field] = fresh_data[field]
+                    
+                    updated_count += 1
+        
+        if updated_count > 0:
+            # Salva timeline.json aggiornata
+            timeline_path.write_text(json.dumps(timeline_data, ensure_ascii=False, indent=2), encoding="utf-8")
+            print(f"✅ Aggiornate {updated_count} task in timeline.json con dati freschi dal DB")
+    
+    # Filtra le task già assegnate per containers.json
+    all_tasks = [t for t in all_tasks_from_db if t["task_id"] not in assigned_task_ids]
 
     # Classifica task (senza deduplica - le task duplicate rimangono visibili)
     print(f"🔄 Classificazione task in containers...")
