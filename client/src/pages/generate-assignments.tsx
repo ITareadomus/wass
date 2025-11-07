@@ -1203,7 +1203,16 @@ export default function GenerateAssignments() {
             <div className="xl:col-span-2">
               {/* Timeline View */}
               <div data-print-timeline>
-                <TimelineView personnel={[]} tasks={allTasksWithAssignments} />
+                <TimelineView 
+                  personnel={[]} 
+                  tasks={allTasksWithAssignments}
+                  onTaskMoved={() => {
+                    // Marca che ci sono modifiche non salvate quando una task viene spostata
+                    if ((window as any).markTimelineAsUnsaved) {
+                      (window as any).markTimelineAsUnsaved();
+                    }
+                  }}
+                />
               </div>
             </div>
 
