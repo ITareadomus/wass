@@ -1154,23 +1154,31 @@ export default function TimelineView({
                       ))}
                     </div>
                     <div className="relative z-10 flex items-center h-full">
-                      {orphanTasks.map((task, idx) => (
-                        <TaskCard 
-                          key={task.task_id || task.id}
-                          task={{
-                            ...task,
-                            id: String(task.task_id || task.id),
-                            name: String(task.logistic_code),
-                            type: task.customer_name || 'Unknown',
-                            duration: `${task.cleaning_time || 0}min`,
-                            priority: task.priority || 'unknown',
-                            assignedCleaner: null, // Nessun cleaner assegnato
-                          }} 
-                          index={idx}
-                          isInTimeline={true}
-                          allTasks={orphanTasks}
-                        />
-                      ))}
+                      {orphanTasks.map((task, idx) => {
+                        // Converti cleaning_time da minuti a formato "ore.minuti"
+                        const cleaningMinutes = task.cleaning_time || 0;
+                        const hours = Math.floor(cleaningMinutes / 60);
+                        const mins = cleaningMinutes % 60;
+                        const duration = `${hours}.${String(mins).padStart(2, '0')}`;
+
+                        return (
+                          <TaskCard 
+                            key={task.task_id || task.id}
+                            task={{
+                              ...task,
+                              id: String(task.task_id || task.id),
+                              name: String(task.logistic_code),
+                              type: task.customer_name || 'Unknown',
+                              duration: duration,
+                              priority: task.priority || 'unknown',
+                              assignedCleaner: null, // Nessun cleaner assegnato
+                            }} 
+                            index={idx}
+                            isInTimeline={true}
+                            allTasks={orphanTasks}
+                          />
+                        );
+                      })}
                       {provided.placeholder}
                     </div>
                   </div>
