@@ -259,29 +259,70 @@ export default function TimelineView({
   // Funzione per caricare i cleaner da selected_cleaners.json
   const loadCleaners = async () => {
     try {
-      // Aggiungi timestamp per evitare caching
-      const response = await fetch(`/data/cleaners/selected_cleaners.json?t=${Date.now()}`);
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+      // Carica sia selected_cleaners.json che timeline.json per verificare la sincronizzazione
+      const [selectedResponse, timelineResponse] = await Promise.all([
+        fetch(`/data/cleaners/selected_cleaners.json?t=${Date.now()}`),
+        fetch(`/data/output/timeline.json?t=${Date.now()}`)
+      ]);
+
+      // Verifica selected_cleaners.json
+      if (!selectedResponse.ok) {
+        throw new Error(`HTTP error! status: ${selectedResponse.status}`);
       }
 
-      // Verifica che la risposta sia JSON
-      const contentType = response.headers.get('content-type');
+      const contentType = selectedResponse.headers.get('content-type');
       if (!contentType || !contentType.includes('application/json')) {
         console.error('Risposta non JSON:', contentType);
         setCleaners([]);
         return;
       }
 
-      const selectedData = await response.json();
+      const selectedData = await selectedResponse.json();
       console.log("Cleaners caricati da selected_cleaners.json:", selectedData);
 
-      // I cleaners sono già nel formato corretto
-      const cleanersList = selectedData.cleaners || [];
+      // Verifica se timeline.json esiste e ha cleaners
+      let timelineCleaners: any[] = [];
+      if (timelineResponse.ok) {
+        try {
+          const timelineData = await timelineResponse.json();
+          timelineCleaners = timelineData.cleaners_assignments?.map((c: any) => ({
+            id: c.cleaner?.id,
+            name: c.cleaner?.name,
+            lastname: c.cleaner?.lastname,
+            role: c.cleaner?.role,
+          })).filter((c: any) => c.id) || [];
+        } catch (e) {
+          console.warn('Errore parsing timeline.json:', e);
+        }
+      }
+
+      // Se selected_cleaners.json è vuoto MA timeline.json ha cleaners,
+      // usa quelli dalla timeline (caso di ritorno a data precedente)
+      let cleanersList = selectedData.cleaners || [];
+      if (cleanersList.length === 0 && timelineCleaners.length > 0) {
+        console.log(`⚠️ selected_cleaners.json vuoto ma timeline.json ha ${timelineCleaners.length} cleaners`);
+        console.log('🔄 Caricamento cleaners dalla timeline per visualizzazione');
+        
+        // Carica i dati completi dei cleaners da cleaners.json
+        const cleanersResponse = await fetch(`/data/cleaners/cleaners.json?t=${Date.now()}`);
+        if (cleanersResponse.ok) {
+          const cleanersData = await cleanersResponse.json();
+          const allCleaners = Object.values(cleanersData.dates || {})
+            .flatMap((d: any) => d.cleaners || []);
+          
+          cleanersList = timelineCleaners.map((tc: any) => {
+            const fullData = allCleaners.find((c: any) => c.id === tc.id);
+            return fullData || tc;
+          });
+          
+          console.log(`✅ Caricati ${cleanersList.length} cleaners dalla timeline`);
+        }
+      }
+
       setCleaners(cleanersList);
     } catch (error) {
       console.error("Errore nel caricamento dei cleaners selezionati:", error);
-      setCleaners([]); // Imposta array vuoto invece di lasciare undefined
+      setCleaners([]);
     }
   };
 
