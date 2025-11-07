@@ -1063,7 +1063,7 @@ export default function TimelineView({
                 data-testid="button-confirm-assignments"
               >
                 <Users className="w-4 h-4 mr-2" />
-                {hasUnsavedChanges ? 'Salva Modifiche ⚠️' : 'Conferma Assegnazioni'}
+                {hasUnsavedChanges ? 'Salva Modifiche ⚠️' : 'Assegnazioni confermate'}
               </Button>
               <Button
                 onClick={handlePrint}
