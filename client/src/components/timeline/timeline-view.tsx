@@ -757,26 +757,10 @@ export default function TimelineView({
     }
   }, [tasks]);
 
-  const loadSavedAssignmentDate = async () => {
+  // Funzione per verificare SE esistono assegnazioni salvate (senza caricarle)
+  const checkSavedAssignmentExists = async () => {
     try {
-      // CRITICAL: Verifica se la timeline è vuota (dopo un reset)
-      // Se è vuota, non caricare automaticamente le assegnazioni salvate
-      const timelineResponse = await fetch(`/data/output/timeline.json?t=${Date.now()}`);
-      if (timelineResponse.ok) {
-        const timelineData = await timelineResponse.json();
-        const isEmpty = !timelineData.cleaners_assignments || 
-                       timelineData.cleaners_assignments.length === 0 ||
-                       timelineData.cleaners_assignments.every((c: any) => !c.tasks || c.tasks.length === 0);
-        
-        if (isEmpty) {
-          console.log('⚠️ Timeline vuota dopo reset - skip caricamento automatico');
-          setLastSavedFilename(null);
-          localStorage.removeItem('last_saved_assignment');
-          return;
-        }
-      }
-
-      const response = await fetch('/api/load-saved-assignments', {
+      const response = await fetch('/api/check-saved-assignments', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ date: workDate })
@@ -787,13 +771,13 @@ export default function TimelineView({
         if (result.found && result.formattedDateTime) {
           setLastSavedFilename(result.formattedDateTime);
           localStorage.setItem('last_saved_assignment', result.formattedDateTime);
-          if ((window as any).setHasUnsavedChanges) {
-            (window as any).setHasUnsavedChanges(false);
-          }
+        } else {
+          setLastSavedFilename(null);
+          localStorage.removeItem('last_saved_assignment');
         }
       }
     } catch (error) {
-      console.error("Errore nel caricamento della data di salvataggio:", error);
+      console.error("Errore nel controllo delle assegnazioni salvate:", error);
     }
   };
 

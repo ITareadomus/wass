@@ -194,11 +194,11 @@ export default function GenerateAssignments() {
     }
   };
 
-  // Funzione per estrarre i dati dal backend
+  // Funzione per estrarre i dati dal backend (SENZA caricare da Object Storage)
   const extractData = async (date: Date) => {
     try {
       setIsExtracting(true);
-      setExtractionStep("Verifica assegnazioni salvate...");
+      setExtractionStep("Estrazione dati dal database...");
 
       // Format date in local timezone to avoid UTC shift
       const year = date.getFullYear();
@@ -206,23 +206,7 @@ export default function GenerateAssignments() {
       const day = String(date.getDate()).padStart(2, '0');
       const dateStr = `${year}-${month}-${day}`;
 
-      // CRITICAL: Al cambio data, prova SEMPRE a caricare da Object Storage
-      // Se esiste un salvataggio, lo carica; altrimenti resetta timeline.json
-      const hasSavedAssignments = await loadSavedAssignments(date);
-
-      if (hasSavedAssignments) {
-        // Esiste un salvataggio in Object Storage → caricato da loadSavedAssignments
-        setExtractionStep("Caricamento assegnazioni salvate...");
-        await loadTasks();
-        setExtractionStep("Assegnazioni salvate caricate!");
-        await new Promise(resolve => setTimeout(resolve, 100));
-        setIsExtracting(false);
-        return;
-      }
-
-      // Non esiste un salvataggio → resetta timeline e crea containers freschi
-      setExtractionStep("Estrazione dati dal database...");
-      console.log("Nessun salvataggio trovato, estrazione task per la data:", dateStr);
+      console.log("Estrazione task per la data:", dateStr);
 
       const response = await fetch('/api/extract-data', {
         method: 'POST',
@@ -274,6 +258,46 @@ export default function GenerateAssignments() {
       prevDateRef.current = currentDateStr;
     }
   }, [selectedDate, isInitialMount]);
+
+  // Funzione per caricare MANUALMENTE le assegnazioni salvate
+  const handleLoadSavedAssignments = async () => {
+    try {
+      setIsExtracting(true);
+      setExtractionStep("Caricamento assegnazioni salvate...");
+
+      const hasSavedAssignments = await loadSavedAssignments(selectedDate);
+
+      if (hasSavedAssignments) {
+        await loadTasks();
+        setExtractionStep("Assegnazioni salvate caricate!");
+        await new Promise(resolve => setTimeout(resolve, 100));
+        
+        toast({
+          title: "Assegnazioni caricate",
+          description: "Le assegnazioni salvate sono state caricate con successo",
+          variant: "success",
+        });
+      } else {
+        toast({
+          title: "Nessuna assegnazione",
+          description: "Non ci sono assegnazioni salvate per questa data",
+          variant: "default",
+        });
+      }
+
+      setIsExtracting(false);
+    } catch (error) {
+      console.error("Errore nel caricamento delle assegnazioni:", error);
+      setExtractionStep("Errore durante il caricamento");
+      setIsExtracting(false);
+      
+      toast({
+        title: "Errore",
+        description: "Impossibile caricare le assegnazioni salvate",
+        variant: "destructive",
+      });
+    }
+  };
 
 
 
@@ -1306,7 +1330,7 @@ export default function GenerateAssignments() {
             </Button>
           </div>
           <div className="flex items-center gap-3">
-            {/* Date Selector + Dark Mode Toggle */}
+            {/* Date Selector + Load Button + Dark Mode Toggle */}
             <div className="flex items-center gap-3">
               <Popover>
                 <PopoverTrigger asChild>
@@ -1331,6 +1355,14 @@ export default function GenerateAssignments() {
                   />
                 </PopoverContent>
               </Popover>
+              <Button
+                onClick={handleLoadSavedAssignments}
+                variant="default"
+                className="bg-blue-600 hover:bg-blue-700"
+                disabled={isExtracting}
+              >
+                Carica Assegnazioni
+              </Button>
               <ThemeToggle />
             </div>
           </div>
