@@ -5,7 +5,7 @@ import TimelineView from "@/components/timeline/timeline-view";
 import MapSection from "@/components/map/map-section";
 import { useState, useEffect } from "react";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { CalendarIcon, Users } from "lucide-react";
+import { CalendarIcon, Users, RefreshCw } from "lucide-react";
 import { useLocation } from 'wouter';
 import { format } from "date-fns";
 import { it } from "date-fns/locale";
@@ -1131,30 +1131,42 @@ export default function GenerateAssignments() {
           </h1>
           <div className="flex items-center gap-3">
             {/* Date Selector + Dark Mode Toggle */}
-            <div className="flex items-center gap-3">
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    className={cn(
-                      "w-[240px] justify-start text-left font-normal",
-                      !selectedDate && "text-muted-foreground"
-                    )}
-                  >
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {selectedDate ? format(selectedDate, "PPP", { locale: it }) : <span>Seleziona data</span>}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                  <Calendar
-                    mode="single"
-                    selected={selectedDate}
-                    onSelect={handleDateSelect}
-                    initialFocus
-                    locale={it}
-                  />
-                </PopoverContent>
-              </Popover>
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2">
+                <Calendar className="h-5 w-5" />
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className={cn(
+                        "w-[240px] justify-start text-left font-normal",
+                        !selectedDate && "text-muted-foreground"
+                      )}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {selectedDate ? format(selectedDate, "PPP", { locale: it }) : <span>Seleziona data</span>}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={selectedDate}
+                      onSelect={handleDateSelect}
+                      initialFocus
+                      locale={it}
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
+              <Button
+                onClick={() => loadTasks(true)}
+                variant="outline"
+                size="icon"
+                className="rounded-full h-10 w-10"
+                title="Ricarica dati"
+              >
+                <RefreshCw className="h-4 w-4" />
+              </Button>
               <ThemeToggle />
             </div>
           </div>
