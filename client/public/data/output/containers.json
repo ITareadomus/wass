@@ -1,6 +1,6 @@
 {
   "metadata": {
-    "last_updated": "2025-11-07T09:46:06.848001",
+    "last_updated": "2025-11-07T09:57:42.984750",
     "date": "2025-11-07"
   },
   "containers": {
@@ -554,34 +554,6 @@
           "priority": "high_priority"
         },
         {
-          "task_id": 218412,
-          "logistic_code": 782,
-          "client_id": 64,
-          "premium": false,
-          "address": "Via Melchiorre Gioia 1",
-          "lat": "45.4813881",
-          "lng": "9.1910586",
-          "cleaning_time": 60,
-          "checkin_date": "2025-11-07",
-          "checkout_date": "2025-11-07",
-          "checkin_time": "14:00",
-          "checkout_time": "11:00",
-          "pax_in": 4,
-          "pax_out": 4,
-          "small_equipment": true,
-          "operation_id": 2,
-          "confirmed_operation": true,
-          "straordinaria": false,
-          "type_apt": "A",
-          "alias": "RELSTAY",
-          "customer_name": "RELSTAY - FERRARA GIULIA",
-          "reasons": [
-            "same_day_checkin_between_eo_hp",
-            "client_forced_hp"
-          ],
-          "priority": "high_priority"
-        },
-        {
           "task_id": 218413,
           "logistic_code": 1032,
           "client_id": 64,
@@ -690,6 +662,34 @@
           "reasons": [
             "same_day_checkin_between_eo_hp",
             "premium"
+          ],
+          "priority": "high_priority"
+        },
+        {
+          "task_id": 218412,
+          "logistic_code": 782,
+          "client_id": 64,
+          "premium": false,
+          "address": "Via Melchiorre Gioia 1",
+          "lat": "45.4813881",
+          "lng": "9.1910586",
+          "cleaning_time": 60,
+          "checkin_date": "2025-11-07",
+          "checkout_date": "2025-11-07",
+          "checkin_time": "14:00",
+          "checkout_time": "11:00",
+          "pax_in": 4,
+          "pax_out": 4,
+          "small_equipment": true,
+          "operation_id": 2,
+          "confirmed_operation": true,
+          "straordinaria": false,
+          "type_apt": "A",
+          "alias": "RELSTAY",
+          "customer_name": "RELSTAY - FERRARA GIULIA",
+          "reasons": [
+            "same_day_checkin_between_eo_hp",
+            "client_forced_hp"
           ],
           "priority": "high_priority"
         },
@@ -1030,34 +1030,6 @@
           ]
         },
         {
-          "task_id": 218546,
-          "logistic_code": 846,
-          "client_id": 3,
-          "premium": false,
-          "address": "VIA SANTA CROCE 2",
-          "lat": "45.4566225",
-          "lng": "9.1834182",
-          "cleaning_time": 150,
-          "checkin_date": "2025-11-08",
-          "checkout_date": "2025-11-07",
-          "checkin_time": null,
-          "checkout_time": null,
-          "pax_in": 4,
-          "pax_out": 3,
-          "small_equipment": false,
-          "operation_id": 2,
-          "confirmed_operation": true,
-          "straordinaria": false,
-          "type_apt": "C",
-          "alias": "TBR",
-          "customer_name": "THE BEST RENT S.r.l.",
-          "priority": "low_priority",
-          "reasons": [
-            "not_eo",
-            "not_hp"
-          ]
-        },
-        {
           "task_id": 218550,
           "logistic_code": 1683,
           "client_id": 3,
@@ -1077,6 +1049,34 @@
           "confirmed_operation": true,
           "straordinaria": false,
           "type_apt": "A",
+          "alias": "TBR",
+          "customer_name": "THE BEST RENT S.r.l.",
+          "priority": "low_priority",
+          "reasons": [
+            "not_eo",
+            "not_hp"
+          ]
+        },
+        {
+          "task_id": 218546,
+          "logistic_code": 846,
+          "client_id": 3,
+          "premium": false,
+          "address": "VIA SANTA CROCE 2",
+          "lat": "45.4566225",
+          "lng": "9.1834182",
+          "cleaning_time": 150,
+          "checkin_date": "2025-11-08",
+          "checkout_date": "2025-11-07",
+          "checkin_time": null,
+          "checkout_time": null,
+          "pax_in": 4,
+          "pax_out": 3,
+          "small_equipment": false,
+          "operation_id": 2,
+          "confirmed_operation": true,
+          "straordinaria": false,
+          "type_apt": "C",
           "alias": "TBR",
           "customer_name": "THE BEST RENT S.r.l.",
           "priority": "low_priority",
