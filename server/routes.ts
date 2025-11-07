@@ -1089,6 +1089,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // === END ===
 
       // Rigenera containers.json per la data caricata
+      // CRITICAL: Aggiorna timeline.json con la data corretta DOPO create_containers
       console.log(`🔄 Rigenerazione containers.json per data ${workDate}...`);
       const containersResult = await new Promise<string>((resolve, reject) => {
         exec(
@@ -1104,6 +1105,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
         );
       });
       console.log("create_containers output:", containersResult);
+
+      // CRITICAL FIX: Ri-scrivi timeline.json con la data corretta dopo create_containers
+      // perché lo script potrebbe aver modificato il file
+      const finalTimelinePath = path.join(process.cwd(), 'client/public/data/output/timeline.json');
+      const finalTimelineData = JSON.parse(await fs.readFile(finalTimelinePath, 'utf8'));
+      
+      // Forza la data corretta anche se lo script l'ha cambiata
+      finalTimelineData.metadata = finalTimelineData.metadata || {};
+      finalTimelineData.metadata.date = workDate;
+      finalTimelineData.metadata.loaded_from_object_storage = true;
+      finalTimelineData.metadata.last_updated = new Date().toISOString();
+      
+      const tmpFinalPath = `${finalTimelinePath}.tmp`;
+      await fs.writeFile(tmpFinalPath, JSON.stringify(finalTimelineData, null, 2));
+      await fs.rename(tmpFinalPath, finalTimelinePath);
+      
+      console.log(`✅ Timeline.json ri-sincronizzata con data ${workDate} dopo create_containers`);
 
       // Estrai il timestamp dal filename (formato: assignments_DDMMYY.json)
       const dateMatch = filename.match(/assignments_(\d{6})\.json/);
