@@ -2432,68 +2432,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
         timelineExists = false;
       }
 
-      // Carica selected_cleaners.json salvato per la data specificata
-      try {
-        const { Client } = await import('@replit/object-storage');
-        const client = new Client();
+      // CRITICAL: NON caricare automaticamente selected_cleaners.json quando cambi data
+      // I cleaner verranno caricati SOLO quando l'utente preme "Carica Assegnazioni"
+      // Per ora, resetta sempre il file a vuoto quando cambi data
+      const selectedCleanersPath = path.join(
+        process.cwd(),
+        'client/public/data/cleaners/selected_cleaners.json'
+      );
 
-        const dateObj = new Date(date);
-        const day = String(dateObj.getDate()).padStart(2, '0');
-        const month = String(dateObj.getMonth() + 1).padStart(2, '0');
-        const fullYear = String(dateObj.getFullYear());
-        const year = fullYear.slice(-2);
-        const folderPath = `${day}-${month}-${fullYear}`;
-        const scFilename = `${folderPath}/selected_cleaners_${day}${month}${year}.json`;
+      const emptySelected = {
+        cleaners: [],
+        total_selected: 0,
+        metadata: { date }
+      };
 
-        const scResult = await client.downloadAsText(scFilename, { bucket: 'wass_assignments' });
-        const selectedCleanersPath = path.join(
-          process.cwd(),
-          'client/public/data/cleaners/selected_cleaners.json'
-        );
+      const tmpScPath = `${selectedCleanersPath}.tmp`;
+      await fs.writeFile(tmpScPath, JSON.stringify(emptySelected, null, 2));
+      await fs.rename(tmpScPath, selectedCleanersPath);
 
-        if (scResult.ok) {
-          // File salvato trovato - ripristinalo
-          const scData = JSON.parse(scResult.value);
-          scData.metadata = scData.metadata || {};
-          scData.metadata.date = date;
-          scData.metadata.loaded_at = new Date().toISOString();
-
-          const tmpScPath = `${selectedCleanersPath}.tmp`;
-          await fs.writeFile(tmpScPath, JSON.stringify(scData, null, 2));
-          await fs.rename(tmpScPath, selectedCleanersPath);
-
-          console.log(`✅ Selected cleaners ripristinati da Object Storage per ${date}`);
-        } else {
-          // Nessun file in Object Storage - verifica se esiste file locale
-          let existingLocalData: any = null;
-          try {
-            const localContent = await fs.readFile(selectedCleanersPath, 'utf8');
-            existingLocalData = JSON.parse(localContent);
-          } catch {
-            // File locale non esiste o non valido
-          }
-
-          // Se il file locale esiste E ha la data corretta E ha cleaners, mantienilo
-          if (existingLocalData?.metadata?.date === date && existingLocalData?.cleaners?.length > 0) {
-            console.log(`✅ Mantenuto selected_cleaners.json locale esistente per ${date} (${existingLocalData.cleaners.length} cleaners)`);
-          } else {
-            // Solo se non c'è file locale valido, creane uno vuoto
-            const emptySelected = {
-              cleaners: [],
-              total_selected: 0,
-              metadata: { date }
-            };
-
-            const tmpScPath = `${selectedCleanersPath}.tmp`;
-            await fs.writeFile(tmpScPath, JSON.stringify(emptySelected, null, 2));
-            await fs.rename(tmpScPath, selectedCleanersPath);
-
-            console.log(`⚠️ ATTENZIONE: selected_cleaners.json resettato per ${date} - fare le convocazioni!`);
-          }
-        }
-      } catch (e) {
-        console.warn('⚠️ Errore caricamento selected_cleaners:', e);
-      }
+      console.log(`ℹ️ selected_cleaners.json resettato per ${date} - cleaner verranno caricati solo con "Carica Assegnazioni"`);
 
       // Esegui SEMPRE create_containers.py per avere dati freschi dal database
       console.log(`Eseguendo create_containers.py per data ${date}...`);
