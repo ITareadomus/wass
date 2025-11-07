@@ -445,7 +445,7 @@ export default function TaskCard({
                           {task.name}
                         </span>
                         <span className="text-[11px] opacity-60 leading-none font-bold text-[#000000]">
-                          ({task.duration.replace(".", ":")}h)
+                          ({task.duration ? task.duration.replace(".", ":") : "0:00"}h)
                         </span>
                       </div>
                       {task.alias && (
