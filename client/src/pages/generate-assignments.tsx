@@ -194,11 +194,11 @@ export default function GenerateAssignments() {
     }
   };
 
-  // Funzione per estrarre i dati dal backend (SENZA caricare da Object Storage)
+  // Funzione per estrarre i dati dal backend
   const extractData = async (date: Date) => {
     try {
       setIsExtracting(true);
-      setExtractionStep("Estrazione dati dal database...");
+      setExtractionStep("Verifica assegnazioni salvate...");
 
       // Format date in local timezone to avoid UTC shift
       const year = date.getFullYear();
@@ -206,35 +206,60 @@ export default function GenerateAssignments() {
       const day = String(date.getDate()).padStart(2, '0');
       const dateStr = `${year}-${month}-${day}`;
 
-      console.log("Estrazione task per la data:", dateStr);
+      console.log("Cambio data a:", dateStr);
 
-      // CRITICAL: Svuota la timeline prima di estrarre i nuovi dati
-      setExtractionStep("Svuotamento timeline...");
-      await fetch('/api/reset-timeline', {
+      // CRITICAL: Prima verifica se esistono assegnazioni salvate per questa data
+      const checkResponse = await fetch('/api/check-saved-assignments', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ date: dateStr })
       });
 
-      const response = await fetch('/api/extract-data', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ date: dateStr })
-      });
+      const checkResult = await checkResponse.json();
 
-      if (!response.ok) {
-        throw new Error('Errore durante l\'estrazione dei dati');
+      if (checkResult.found) {
+        // Esistono assegnazioni salvate - caricale
+        console.log("✅ Trovate assegnazioni salvate per", dateStr);
+        setExtractionStep("Caricamento assegnazioni salvate...");
+        
+        await loadSavedAssignments(date);
+        await loadTasks();
+        
+        setExtractionStep("Assegnazioni caricate!");
+        await new Promise(resolve => setTimeout(resolve, 100));
+      } else {
+        // NON esistono assegnazioni salvate - crea timeline vuota
+        console.log("ℹ️ Nessuna assegnazione salvata per", dateStr);
+        setExtractionStep("Estrazione dati dal database...");
+
+        // SOLO ORA resetta la timeline
+        await fetch('/api/reset-timeline-assignments', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ date: dateStr })
+        });
+
+        const response = await fetch('/api/extract-data', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ date: dateStr })
+        });
+
+        if (!response.ok) {
+          throw new Error('Errore durante l\'estrazione dei dati');
+        }
+
+        const result = await response.json();
+        console.log("Estrazione completata:", result);
+
+        setExtractionStep("Caricamento task...");
+        await new Promise(resolve => setTimeout(resolve, 500));
+        await loadTasks();
+
+        setExtractionStep("Task caricati!");
+        await new Promise(resolve => setTimeout(resolve, 100));
       }
 
-      const result = await response.json();
-      console.log("Estrazione completata:", result);
-
-      setExtractionStep("Caricamento task...");
-      await new Promise(resolve => setTimeout(resolve, 500));
-      await loadTasks();
-
-      setExtractionStep("Task caricati!");
-      await new Promise(resolve => setTimeout(resolve, 100));
       setIsExtracting(false);
     } catch (error) {
       console.error("Errore nell'estrazione:", error);
