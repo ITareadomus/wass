@@ -1,111 +1,26 @@
 {
   "metadata": {
-    "last_updated": "2025-11-07T10:35:30.224096",
-    "date": "2025-11-06"
+    "last_updated": "2025-11-07T10:42:29.857080",
+    "date": "2025-11-05"
   },
   "containers": {
     "early_out": {
-      "tasks": [
-        {
-          "task_id": 218512,
-          "logistic_code": 1091,
-          "client_id": 61,
-          "premium": false,
-          "address": "VIA GONIN, 5",
-          "lat": "45.4438637",
-          "lng": "9.1281044",
-          "cleaning_time": 90,
-          "checkin_date": "2025-11-23",
-          "checkout_date": "2025-11-06",
-          "checkin_time": null,
-          "checkout_time": null,
-          "pax_in": 2,
-          "pax_out": 1,
-          "small_equipment": false,
-          "operation_id": 2,
-          "confirmed_operation": false,
-          "straordinaria": false,
-          "type_apt": "B",
-          "alias": "NTM",
-          "customer_name": "NOTA-MI",
-          "reasons": [
-            "client_forced_eo"
-          ],
-          "priority": "early_out"
-        }
-      ],
-      "count": 1
+      "tasks": [],
+      "count": 0
     },
     "high_priority": {
       "tasks": [],
       "count": 0
     },
     "low_priority": {
-      "tasks": [
-        {
-          "task_id": 218563,
-          "logistic_code": 1535,
-          "client_id": 2,
-          "premium": false,
-          "address": "Via Gallura 9",
-          "lat": "45.4373695",
-          "lng": "9.1993307",
-          "cleaning_time": 60,
-          "checkin_date": null,
-          "checkout_date": "2025-11-06",
-          "checkin_time": null,
-          "checkout_time": null,
-          "pax_in": 0,
-          "pax_out": 0,
-          "small_equipment": false,
-          "operation_id": 4,
-          "confirmed_operation": true,
-          "straordinaria": false,
-          "type_apt": "C",
-          "alias": "ITW",
-          "customer_name": "ITALIANWAY SRL",
-          "priority": "low_priority",
-          "reasons": [
-            "not_eo",
-            "not_hp"
-          ]
-        },
-        {
-          "task_id": 218566,
-          "logistic_code": 111,
-          "client_id": 3,
-          "premium": false,
-          "address": "VIA WHASHINGTON 102",
-          "lat": "45.4553247",
-          "lng": "9.1543019",
-          "cleaning_time": 30,
-          "checkin_date": "2025-11-06",
-          "checkout_date": "2025-11-06",
-          "checkin_time": null,
-          "checkout_time": null,
-          "pax_in": 0,
-          "pax_out": 0,
-          "small_equipment": true,
-          "operation_id": 4,
-          "confirmed_operation": true,
-          "straordinaria": false,
-          "type_apt": "A",
-          "alias": "TBR",
-          "customer_name": "THE BEST RENT S.r.l.",
-          "priority": "low_priority",
-          "reasons": [
-            "not_eo",
-            "not_hp"
-          ]
-        }
-      ],
-      "count": 2
+      "tasks": [],
+      "count": 0
     }
   },
   "summary": {
-    "total_tasks": 3,
-    "early_out": 1,
+    "total_tasks": 0,
+    "early_out": 0,
     "high_priority": 0,
-    "low_priority": 2
+    "low_priority": 0
   }
 }
