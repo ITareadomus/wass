@@ -338,7 +338,15 @@ export default function TaskCard({
   };
 
   // Calcola la larghezza in base alla durata
-  const calculateWidth = (duration: string, forTimeline: boolean) => {
+  const calculateWidth = (duration: string | undefined, forTimeline: boolean) => {
+    // Se duration è undefined, usa cleaning_time dalla task
+    if (!duration) {
+      const cleaningMinutes = (task as any).cleaning_time || 0;
+      const hours = Math.floor(cleaningMinutes / 60);
+      const mins = cleaningMinutes % 60;
+      duration = `${hours}.${String(mins).padStart(2, '0')}`;
+    }
+
     const parts = duration.split(".");
     const hours = parseInt(parts[0] || "0");
     const minutes = parts[1] ? parseInt(parts[1]) : 0;
