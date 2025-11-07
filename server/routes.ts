@@ -1388,7 +1388,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         console.log(`🔄 SOSTITUZIONE cleaner rimosso ${replacedCleanerId} (con ${taskCount} task) con cleaner ${cleanerId}`);
 
-        // Sostituisci SOLO i dati del cleaner, mantieni le task
+        // Sostituisci SOLO i dati del cleaner, mantieni le task e la posizione
         cleanerToReplace.cleaner = {
           id: cleanerData.id,
           name: cleanerData.name,
@@ -1408,8 +1408,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
         }
       } else {
-        // AGGIUNTA: Nessun cleaner rimosso da sostituire, aggiungi nuovo entry
+        // AGGIUNTA: Nessun cleaner rimosso da sostituire, aggiungi alla fine
         console.log(`➕ Nessun cleaner da sostituire, aggiunta nuovo cleaner ${cleanerId} (senza task)`);
+        
+        // Cerca la posizione corretta basandoti su selected_cleaners.json
+        // per mantenere l'ordine visivo
+        const insertIndex = selectedCleanersData.cleaners.findIndex((c: any) => c.id === cleanerId);
+        
         const newCleanerEntry = {
           cleaner: {
             id: cleanerData.id,
@@ -1420,7 +1425,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
           },
           tasks: []
         };
-        timelineData.cleaners_assignments.push(newCleanerEntry);
+        
+        // Inserisci alla posizione corretta invece di append
+        if (insertIndex >= 0 && insertIndex < timelineData.cleaners_assignments.length) {
+          timelineData.cleaners_assignments.splice(insertIndex, 0, newCleanerEntry);
+        } else {
+          timelineData.cleaners_assignments.push(newCleanerEntry);
+        }
       }
 
       // Aggiorna metadata timeline
