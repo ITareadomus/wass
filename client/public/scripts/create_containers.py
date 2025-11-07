@@ -393,7 +393,7 @@ def main():
     # Estrai TUTTE le task dal database (anche quelle assegnate per aggiornarle)
     all_tasks_from_db = get_tasks_from_db(work_date, assigned_task_ids=set())  # Non filtrare
     
-    # Aggiorna i dati delle task in timeline.json con i dati freschi dal DB
+    # CRITICAL: Preserva timeline.json aggiornando SOLO i dati modificati dal DB
     if timeline_data and assigned_task_ids:
         db_tasks_map = {task["task_id"]: task for task in all_tasks_from_db}
         updated_count = 0
@@ -404,7 +404,8 @@ def main():
                 if task_id and task_id in db_tasks_map:
                     fresh_data = db_tasks_map[task_id]
                     
-                    # Campi da aggiornare dal DB (non sovrascrivere campi timeline)
+                    # CRITICAL: Campi da aggiornare dal DB (NON toccare campi timeline)
+                    # Preserva: start_time, end_time, travel_time, sequence, followup, priority, reasons
                     fields_to_update = [
                         "logistic_code", "client_id", "premium", "address", "lat", "lng",
                         "cleaning_time", "checkin_date", "checkout_date", "checkin_time",
@@ -420,9 +421,11 @@ def main():
                     updated_count += 1
         
         if updated_count > 0:
-            # Salva timeline.json aggiornata
+            # Salva timeline.json preservando metadata e struttura
+            timeline_data["metadata"]["last_updated"] = datetime.now().isoformat()
+            # NON cambiare la data - mantieni quella della timeline
             timeline_path.write_text(json.dumps(timeline_data, ensure_ascii=False, indent=2), encoding="utf-8")
-            print(f"✅ Aggiornate {updated_count} task in timeline.json con dati freschi dal DB")
+            print(f"✅ Aggiornate {updated_count} task in timeline.json (preservati campi timeline: start_time, end_time, travel_time, sequence)")
     
     # Filtra le task già assegnate per containers.json
     all_tasks = [t for t in all_tasks_from_db if t["task_id"] not in assigned_task_ids]
