@@ -337,8 +337,9 @@ export default function TaskCard({
 
   // Calcola la larghezza in base alla durata
   const calculateWidth = (duration: string, forTimeline: boolean) => {
-    if (!duration) return forTimeline ? 80 : 250;
-    const parts = duration.split(".");
+    // Normalizza duration: se è falsy o vuoto, usa "0.0" come default
+    const safeDuration = duration && duration.trim() ? duration : "0.0";
+    const parts = safeDuration.split(".");
     const hours = parseInt(parts[0] || "0");
     const minutes = parts[1] ? parseInt(parts[1]) : 0;
     const totalMinutes = hours * 60 + minutes;
