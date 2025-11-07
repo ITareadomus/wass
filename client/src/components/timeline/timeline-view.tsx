@@ -386,18 +386,16 @@ export default function TimelineView({
   // Carica cleaner disponibili per aggiungerli alla timeline
   const loadAvailableCleaners = async () => {
     try {
-      const [cleanersResponse, selectedResponse] = await Promise.all([
+      const [cleanersResponse, timelineResponse] = await Promise.all([
         fetch(`/data/cleaners/cleaners.json?t=${Date.now()}`),
-        fetch(`/data/cleaners/selected_cleaners.json?t=${Date.now()}`)
+        fetch(`/data/output/timeline.json?t=${Date.now()}`)
       ]);
 
       const data = await cleanersResponse.json();
-      const selectedData = await selectedResponse.json();
 
       console.log('🔍 DEBUG loadAvailableCleaners:');
       console.log('   - workDate:', workDate);
       console.log('   - Date disponibili in cleaners.json:', Object.keys(data.dates || {}));
-      console.log('   - selected_cleaners.json:', selectedData);
 
       // Trova i cleaner per la data selezionata
       let dateCleaners = data.dates?.[workDate]?.cleaners || [];
@@ -416,24 +414,28 @@ export default function TimelineView({
 
       console.log(`   - Cleaner trovati per la data: ${dateCleaners.length}`);
 
-      // Se selected_cleaners.json è vuoto, mostra TUTTI i cleaners disponibili
-      // Altrimenti filtra quelli già selezionati
-      const selectedCleanersList = selectedData.cleaners || [];
-      let available: Cleaner[];
-
-      if (selectedCleanersList.length === 0) {
-        // Nessun cleaner selezionato → mostra tutti i cleaners attivi
-        available = dateCleaners.filter((c: Cleaner) => c.active);
-        console.log(`   ℹ️ selected_cleaners.json vuoto → mostrando TUTTI i ${available.length} cleaners attivi`);
-      } else {
-        // Ci sono cleaners selezionati → filtra quelli già presenti
-        const selectedCleanerIds = new Set(selectedCleanersList.map((c: any) => c.id));
-        available = dateCleaners.filter((c: Cleaner) => 
-          !selectedCleanerIds.has(c.id) && c.active
-        );
-        console.log(`   - Cleaner già selezionati: ${selectedCount}`);
-        console.log(`   - Cleaner disponibili da aggiungere: ${available.length}`);
+      // FILTRA CONTRO LA TIMELINE, NON CONTRO selected_cleaners.json
+      let timelineCleanerIds = new Set<number>();
+      if (timelineResponse.ok) {
+        try {
+          const timelineData = await timelineResponse.json();
+          timelineCleanerIds = new Set(
+            (timelineData.cleaners_assignments || [])
+              .map((ca: any) => ca.cleaner?.id)
+              .filter((id: number) => id !== undefined)
+          );
+          console.log(`   - Cleaner già in timeline.json: ${timelineCleanerIds.size}`, Array.from(timelineCleanerIds));
+        } catch (e) {
+          console.warn('   ⚠️ Errore parsing timeline.json:', e);
+        }
       }
+
+      // Escludi solo i cleaners già presenti nella timeline
+      const available = dateCleaners.filter((c: Cleaner) => 
+        !timelineCleanerIds.has(c.id) && c.active
+      );
+
+      console.log(`   - Cleaner disponibili da aggiungere: ${available.length}/${dateCleaners.length}`);
 
       // Ordina per role (Premium prima) e poi per nome
       available.sort((a, b) => {
@@ -444,7 +446,6 @@ export default function TimelineView({
 
       setAvailableCleaners(available);
 
-      const selectedCount = selectedCleanersList.length;
       console.log(`✅ Cleaner disponibili da aggiungere: ${available.length}/${dateCleaners.length}`);
     } catch (error) {
       console.error('Errore nel caricamento dei cleaner disponibili:', error);
