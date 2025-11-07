@@ -241,17 +241,17 @@ export default function GenerateAssignments() {
 
   useEffect(() => {
     const currentDateStr = format(selectedDate, 'yyyy-MM-dd');
-    
+
     // CRITICAL: Carica automaticamente SOLO se:
     // 1. È il primo montaggio (isInitialMount = true)
     // 2. OPPURE la data è cambiata rispetto alla precedente
     const shouldLoad = isInitialMount || (prevDateRef.current !== null && prevDateRef.current !== currentDateStr);
-    
+
     if (shouldLoad) {
       extractData(selectedDate);
       prevDateRef.current = currentDateStr;
     }
-    
+
     // Reset isInitialMount dopo la prima chiamata
     if (isInitialMount) {
       setIsInitialMount(false);
@@ -271,7 +271,7 @@ export default function GenerateAssignments() {
         await loadTasks();
         setExtractionStep("Assegnazioni salvate caricate!");
         await new Promise(resolve => setTimeout(resolve, 100));
-        
+
         toast({
           title: "Assegnazioni caricate",
           description: "Le assegnazioni salvate sono state caricate con successo",
@@ -290,7 +290,7 @@ export default function GenerateAssignments() {
       console.error("Errore nel caricamento delle assegnazioni:", error);
       setExtractionStep("Errore durante il caricamento");
       setIsExtracting(false);
-      
+
       toast({
         title: "Errore",
         description: "Impossibile caricare le assegnazioni salvate",
@@ -1236,9 +1236,13 @@ export default function GenerateAssignments() {
       }
 
     } catch (error) {
-      console.error('❌ Errore durante lo spostamento:', error);
-      // In caso di errore, ricarica comunque per ripristinare lo stato corretto
-      await loadTasks(true);
+      console.error('Errore nello spostamento:', error);
+      // NON ricaricare - mostra solo errore
+      toast({
+        title: "Errore",
+        description: "Errore nello spostamento della task",
+        variant: "destructive",
+      });
     }
   };
 
@@ -1400,8 +1404,8 @@ export default function GenerateAssignments() {
             <div className="xl:col-span-2">
               {/* Timeline View */}
               <div data-print-timeline>
-                <TimelineView 
-                  personnel={[]} 
+                <TimelineView
+                  personnel={[]}
                   tasks={allTasksWithAssignments}
                   hasUnsavedChanges={hasUnsavedChanges}
                   onTaskMoved={() => setHasUnsavedChanges(true)}

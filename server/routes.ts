@@ -2398,30 +2398,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const timelinePath = path.join(process.cwd(), 'client/public/data/output/timeline.json');
       const assignedDir = path.join(process.cwd(), 'client/public/data/assigned');
 
-      // CRITICAL: Resetta timeline.json SOLO se la data è cambiata
-      // Al reload della pagina con la stessa data, mantieni le assegnazioni esistenti
-      let shouldResetTimeline = true;
+      // CRITICAL: NON resettare timeline.json - preservalo sempre
+      // Anche se la data cambia, mantieni le assegnazioni esistenti
+      // create_containers.py aggiornerà i dati delle task esistenti
+      let timelineExists = false;
       try {
+        await fs.access(timelinePath);
         const existingTimeline = JSON.parse(await fs.readFile(timelinePath, 'utf8'));
-        if (existingTimeline.metadata?.date === date) {
+        timelineExists = true;
+        
+        // Aggiorna SOLO la metadata.date se è cambiata
+        if (existingTimeline.metadata?.date !== date) {
+          console.log(`🔄 Timeline esiste per data ${existingTimeline.metadata?.date}, aggiorno metadata.date a ${date}`);
+          existingTimeline.metadata.date = date;
+          existingTimeline.metadata.last_updated = new Date().toISOString();
+          await fs.writeFile(timelinePath, JSON.stringify(existingTimeline, null, 2));
+        } else {
           console.log(`✅ Timeline.json già presente per ${date}, mantieni assegnazioni esistenti`);
-          shouldResetTimeline = false;
         }
       } catch (err) {
-        // File non esiste o non valido, crea nuovo
-        shouldResetTimeline = true;
-      }
-
-      if (shouldResetTimeline) {
-        console.log(`🔄 Reset timeline.json per la nuova data ${date}`);
-        const emptyTimelineForNewDate = {
+        // File non esiste - crealo vuoto
+        console.log(`📝 Timeline.json non esiste, creazione nuova per ${date}`);
+        const emptyTimeline = {
           metadata: { last_updated: new Date().toISOString(), date },
           cleaners_assignments: [],
           meta: { total_cleaners: 0, used_cleaners: 0, assigned_tasks: 0 }
         };
-
-        await fs.writeFile(timelinePath, JSON.stringify(emptyTimelineForNewDate, null, 2));
-        console.log(`✅ Timeline resettata per ${date}`);
+        await fs.writeFile(timelinePath, JSON.stringify(emptyTimeline, null, 2));
+        timelineExists = false;
       }
 
       // Carica selected_cleaners.json salvato per la data specificata
