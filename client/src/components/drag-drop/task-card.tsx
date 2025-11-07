@@ -575,7 +575,7 @@ export default function TaskCard({
                     className="text-sm cursor-pointer hover:bg-muted/50 p-1 rounded"
                     onClick={() => setEditingField('duration')}
                   >
-                    {displayTask.duration.replace(".", ":")} ore
+                    {displayTask.duration ? displayTask.duration.replace(".", ":") : "0:00"} ore
                   </p>
                 )}
               </div>
