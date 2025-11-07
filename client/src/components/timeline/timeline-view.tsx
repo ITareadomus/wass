@@ -740,10 +740,20 @@ export default function TimelineView({
     const timelineCleanersWithTasks = timelineCleaners
       .filter(tc => tc.tasks && tc.tasks.length > 0) // Solo cleaners con task
       .filter(tc => !selectedCleanerIds.has(tc.cleaner?.id)) // Non già in selected_cleaners
-      .map(tc => tc.cleaner); // Estrai solo i dati del cleaner
+      .map(tc => ({ ...tc.cleaner, isRemoved: true })); // Marca come rimosso
 
-    // Combina selected_cleaners + timeline cleaners con task
+    // Combina selected_cleaners + timeline cleaners con task (quelli rimossi andranno in fondo)
     return [...cleaners, ...timelineCleanersWithTasks];
+  }, [cleaners, timelineCleaners]);
+
+  // Crea Set di ID cleaner rimossi per facile lookup
+  const removedCleanerIds = React.useMemo(() => {
+    const selectedIds = new Set(cleaners.map(c => c.id));
+    return new Set(
+      timelineCleaners
+        .filter(tc => tc.tasks && tc.tasks.length > 0 && !selectedIds.has(tc.cleaner?.id))
+        .map(tc => tc.cleaner?.id)
+    );
   }, [cleaners, timelineCleaners]);
 
   // --- NORMALIZZAZIONI TIMELINE ---
@@ -856,6 +866,8 @@ export default function TimelineView({
               (task as any).assignedCleaner === cleaner.id
             ).map(normalizeTask); // Applica la normalizzazione qui
 
+            const isRemoved = removedCleanerIds.has(cleaner.id);
+            
             return (
               <div key={cleaner.id} className="flex mb-0.5">
                 {/* Info cleaner */}
@@ -863,29 +875,48 @@ export default function TimelineView({
                   className="flex-shrink-0 p-1 flex items-center border cursor-pointer hover:opacity-90 transition-opacity"
                   style={{ 
                     width: `${cleanerColumnWidth}px`,
-                    backgroundColor: filteredCleanerId === cleaner.id ? `${color.bg}` : color.bg,
-                    color: color.text,
+                    backgroundColor: isRemoved 
+                      ? '#9CA3AF' // Grigio per cleaners rimossi
+                      : filteredCleanerId === cleaner.id ? `${color.bg}` : color.bg,
+                    color: isRemoved ? '#1F2937' : color.text,
                     boxShadow: filteredCleanerId === cleaner.id ? '0 0 0 3px rgba(59, 130, 246, 0.5)' : 'none',
-                    userSelect: 'none'
+                    userSelect: 'none',
+                    opacity: isRemoved ? 0.7 : 1
                   }}
-                  onClick={(e) => handleCleanerClick(cleaner, e)}
-                  title="Click: dettagli | Doppio click: filtra mappa"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    if (isRemoved) {
+                      // Cleaner rimosso: apri dialog sostituzione
+                      setCleanerToReplace(cleaner.id);
+                      loadAvailableCleaners();
+                      setIsAddCleanerDialogOpen(true);
+                    } else {
+                      // Cleaner attivo: gestione normale (singolo/doppio click)
+                      handleCleanerClick(cleaner, e);
+                    }
+                  }}
+                  title={isRemoved ? "Cleaner rimosso - Click per sostituire" : "Click: dettagli | Doppio click: filtra mappa"}
                 >
                   <div className="w-full flex items-center gap-1">
                     <div className="break-words font-bold text-[13px] flex-1">
                       {cleanersAliases[cleaner.id]?.alias || `${cleaner.name.toUpperCase()} ${cleaner.lastname.toUpperCase()}`}
                     </div>
-                    {cleaner.role === "Premium" && (
+                    {isRemoved && (
+                      <div className="bg-red-600 text-white font-bold text-[10px] px-1 py-0.5 rounded flex-shrink-0 animate-pulse">
+                        RIMOSSO
+                      </div>
+                    )}
+                    {!isRemoved && cleaner.role === "Premium" && (
                       <div className="bg-yellow-500 text-black font-bold text-[10px] px-1 py-0.5 rounded flex-shrink-0">
                         P
                       </div>
                     )}
-                    {cleaner.role === "Formatore" && (
+                    {!isRemoved && cleaner.role === "Formatore" && (
                       <div className="bg-orange-500 text-black font-bold text-[10px] px-1 py-0.5 rounded flex-shrink-0">
                         F
                       </div>
                     )}
-                    {cleaner.can_do_straordinaria && (
+                    {!isRemoved && cleaner.can_do_straordinaria && (
                       <div className="bg-red-500 text-white font-bold text-[10px] px-1 py-0.5 rounded flex-shrink-0">
                         S
                       </div>
@@ -1081,12 +1112,23 @@ export default function TimelineView({
         <DialogContent className="sm:max-w-2xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
-              {cleanerToReplace ? "Sostituisci Cleaner" : "Aggiungi Cleaner alla Timeline"}
+              {cleanerToReplace ? "Sostituisci Cleaner Rimosso" : "Aggiungi Cleaner alla Timeline"}
             </DialogTitle>
             <DialogDescription>
-              {cleanerToReplace 
-                ? "Seleziona un cleaner disponibile per sostituire quello rimosso"
-                : "Seleziona un cleaner disponibile da aggiungere alla timeline"}
+              {cleanerToReplace ? (
+                <>
+                  Sostituendo <strong>
+                    {(() => {
+                      const removedCleaner = allCleanersToShow.find(c => c.id === cleanerToReplace);
+                      return removedCleaner 
+                        ? `${removedCleaner.name} ${removedCleaner.lastname}` 
+                        : `ID ${cleanerToReplace}`;
+                    })()}
+                  </strong> - Le sue task verranno assegnate al nuovo cleaner
+                </>
+              ) : (
+                "Seleziona un cleaner disponibile da aggiungere alla timeline"
+              )}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-2 mt-4">
