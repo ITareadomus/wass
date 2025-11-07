@@ -1,6 +1,6 @@
 {
   "metadata": {
-    "last_updated": "2025-11-07T08:50:02.892Z",
+    "last_updated": "2025-11-07T08:56:18.127Z",
     "date": "2025-11-07"
   },
   "cleaners_assignments": [
@@ -13,13 +13,23 @@
         "premium": true
       },
       "tasks": []
+    },
+    {
+      "cleaner": {
+        "id": 644,
+        "name": "HENRY",
+        "lastname": "CHIDUBEM",
+        "role": "Premium",
+        "premium": true
+      },
+      "tasks": []
     }
   ],
   "meta": {
-    "total_cleaners": 1,
+    "total_cleaners": 2,
     "used_cleaners": 0,
     "assigned_tasks": 0,
     "total_tasks": 0,
-    "last_updated": "2025-11-07T08:50:02.892Z"
+    "last_updated": "2025-11-07T08:56:18.127Z"
   }
 }
