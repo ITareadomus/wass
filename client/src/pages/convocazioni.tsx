@@ -46,25 +46,28 @@ export default function Convocazioni() {
     // Leggi la data dal parametro URL se presente
     const urlParams = new URLSearchParams(window.location.search);
     const dateParam = urlParams.get('date');
-    
+
     if (dateParam) {
       // Converte yyyy-MM-dd in Date senza problemi di timezone
       const [year, month, day] = dateParam.split('-').map(Number);
       return new Date(year, month - 1, day);
     }
-    
+
     // Altrimenti usa la data salvata in localStorage
     const savedDate = localStorage.getItem('selected_work_date');
     if (savedDate) {
       const [year, month, day] = savedDate.split('-').map(Number);
       return new Date(year, month - 1, day);
     }
-    
+
     return new Date();
   });
   const [confirmDialog, setConfirmDialog] = useState<{ open: boolean; cleanerId: number | null }>({ open: false, cleanerId: null });
   const { toast } = useToast();
   const [, setLocation] = useLocation();
+
+  // Aggiunto uno stato per i cleaners filtrati per evitare che vengano sovrascritti quando cambia la data
+  const [filteredCleaners, setFilteredCleaners] = useState<Cleaner[]>([]);
 
   useEffect(() => {
     const loadCleaners = async () => {
@@ -92,26 +95,65 @@ export default function Convocazioni() {
 
         setLoadingMessage("Caricamento cleaners...");
 
-        const response = await fetch('/data/cleaners/cleaners.json');
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
+        // Carica cleaners.json per la data
+        const cleanersResponse = await fetch(`/data/cleaners/cleaners.json?t=${Date.now()}`);
+        if (!cleanersResponse.ok) {
+          throw new Error('Impossibile caricare i cleaners');
         }
-        const cleanersData = await response.json();
-        console.log("Cleaners caricati da cleaners.json:", cleanersData);
 
-        // Estrai i cleaners dalla struttura del file
-        let cleanersList: Cleaner[] = [];
-        if (cleanersData.dates) {
-          const latestDate = Object.keys(cleanersData.dates).sort().reverse()[0];
-          cleanersList = cleanersData.dates[latestDate]?.cleaners || [];
-        } else if (cleanersData.cleaners) {
-          cleanersList = cleanersData.cleaners;
+        const cleanersData = await cleanersResponse.json();
+
+        // Trova i cleaners per la data specifica
+        let dateCleaners = cleanersData.dates?.[dateStr]?.cleaners || [];
+
+        // Se non ci sono cleaners per questa data, usa la data più recente disponibile
+        if (dateCleaners.length === 0) {
+          const availableDates = Object.keys(cleanersData.dates || {}).sort().reverse();
+          if (availableDates.length > 0) {
+            const latestDate = availableDates[0];
+            dateCleaners = cleanersData.dates[latestDate]?.cleaners || [];
+            console.log(`⚠️ Nessun cleaner per ${dateStr}, usando data ${latestDate}`);
+          }
         }
+
+        console.log(`📅 Cleaners totali per ${dateStr}:`, dateCleaners.length);
+
+        // Carica selected_cleaners.json per escludere quelli già selezionati
+        const selectedResponse = await fetch(`/data/cleaners/selected_cleaners.json?t=${Date.now()}`);
+        let alreadySelectedIds = new Set<number>();
+
+        if (selectedResponse.ok) {
+          const selectedData = await selectedResponse.json();
+          // Verifica che la data in selected_cleaners corrisponda
+          const selectedDateFromFile = selectedData.metadata?.date;
+          console.log(`🔍 Data in selected_cleaners.json: ${selectedDateFromFile}, data richiesta: ${dateStr}`);
+
+          // Filtra solo se la data corrisponde
+          if (selectedDateFromFile === dateStr) {
+            alreadySelectedIds = new Set(selectedData.cleaners?.map((c: any) => c.id) || []);
+            console.log(`✅ Cleaners già selezionati per ${dateStr}:`, Array.from(alreadySelectedIds));
+          } else {
+            console.log(`⚠️ Data non corrispondente, ignoro selected_cleaners.json`);
+          }
+        }
+
+        // Filtra cleaners: escludi quelli già selezionati E mostra solo attivi
+        const availableCleaners = dateCleaners.filter((c: any) => 
+          !alreadySelectedIds.has(c.id) && c.active === true
+        );
+
+        setCleaners(availableCleaners);
+        setFilteredCleaners(availableCleaners); // Aggiorna anche i cleaners filtrati
+        console.log(`📊 Cleaners disponibili (dopo filtro):`, availableCleaners.length);
+        console.log(`   - Totali: ${dateCleaners.length}`);
+        console.log(`   - Già selezionati: ${alreadySelectedIds.size}`);
+        console.log(`   - Disponibili: ${availableCleaners.length}`);
+
 
         // Ordina per counter_hours (decrescente - più ore prima)
-        cleanersList.sort((a, b) => b.counter_hours - a.counter_hours);
+        availableCleaners.sort((a, b) => b.counter_hours - a.counter_hours);
 
-        setCleaners(cleanersList);
+        setCleaners(availableCleaners);
         setSelectedCleaners(new Set()); // Reset selezioni quando cambia la data
 
         // Carica statistiche task
@@ -371,7 +413,7 @@ export default function Convocazioni() {
               <div className="text-lg font-bold">
                 <span className="text-primary">{selectedCleaners.size}</span>
                 <span className="text-muted-foreground mx-1">/</span>
-                <span className="text-foreground">{cleaners.length}</span>
+                <span className="text-foreground">{filteredCleaners.length}</span> {/* Utilizza filteredCleaners per il conteggio totale */}
               </div>
             </div>
           </div>
@@ -382,7 +424,7 @@ export default function Convocazioni() {
           {/* Lista Cleaners - 2/3 dello spazio */}
           <Card className="p-6 lg:col-span-2 flex flex-col overflow-hidden">
           <div className="space-y-3 flex-1 overflow-y-auto pr-2">
-            {cleaners.map((cleaner) => {
+            {filteredCleaners.map((cleaner) => { // Itera su filteredCleaners
               const isPremium = cleaner.role === "Premium";
               const isAvailable = cleaner.available !== false;
               const isFormatore = cleaner.role === "Formatore";
@@ -537,7 +579,7 @@ export default function Convocazioni() {
                   fill="none"
                   stroke="currentColor"
                   strokeWidth="8"
-                  strokeDasharray={`${cleaners.length > 0 ? (cleaners.filter(c => c.available !== false).length / cleaners.length) * 251.2 : 0} 251.2`}
+                  strokeDasharray={`${filteredCleaners.length > 0 ? (filteredCleaners.filter(c => c.available !== false).length / filteredCleaners.length) * 251.2 : 0} 251.2`}
                   strokeDashoffset="0"
                   transform="rotate(-90 50 50)"
                   className="text-blue-500 dark:text-blue-600 transition-all duration-500"
@@ -550,12 +592,12 @@ export default function Convocazioni() {
                   dominantBaseline="middle"
                   className="text-lg font-bold fill-blue-600 dark:fill-blue-400"
                 >
-                  {cleaners.length > 0 ? Math.round((cleaners.filter(c => c.available !== false).length / cleaners.length) * 100) : 0}%
+                  {filteredCleaners.length > 0 ? Math.round((filteredCleaners.filter(c => c.available !== false).length / filteredCleaners.length) * 100) : 0}%
                 </text>
               </svg>
               <span className="text-[10px] font-semibold text-blue-700 dark:text-blue-300 text-center">Disponibili</span>
               <span className="text-[9px] text-blue-600 dark:text-blue-400">
-                {cleaners.filter(c => c.available !== false).length}/{cleaners.length}
+                {filteredCleaners.filter(c => c.available !== false).length}/{filteredCleaners.length}
               </span>
             </div>
 
@@ -578,7 +620,7 @@ export default function Convocazioni() {
                   fill="none"
                   stroke="currentColor"
                   strokeWidth="8"
-                  strokeDasharray={`${cleaners.length > 0 ? (cleaners.filter(c => c.available === false).length / cleaners.length) * 251.2 : 0} 251.2`}
+                  strokeDasharray={`${filteredCleaners.length > 0 ? (filteredCleaners.filter(c => c.available === false).length / filteredCleaners.length) * 251.2 : 0} 251.2`}
                   strokeDashoffset="0"
                   transform="rotate(-90 50 50)"
                   className="text-gray-500 dark:text-gray-600 transition-all duration-500"
@@ -591,12 +633,12 @@ export default function Convocazioni() {
                   dominantBaseline="middle"
                   className="text-lg font-bold fill-gray-600 dark:fill-gray-400"
                 >
-                  {cleaners.length > 0 ? Math.round((cleaners.filter(c => c.available === false).length / cleaners.length) * 100) : 0}%
+                  {filteredCleaners.length > 0 ? Math.round((filteredCleaners.filter(c => c.available === false).length / filteredCleaners.length) * 100) : 0}%
                 </text>
               </svg>
               <span className="text-[10px] font-semibold text-gray-700 dark:text-gray-300 text-center">Non Disponibili</span>
               <span className="text-[9px] text-gray-600 dark:text-gray-400">
-                {cleaners.filter(c => c.available === false).length}/{cleaners.length}
+                {filteredCleaners.filter(c => c.available === false).length}/{filteredCleaners.length}
               </span>
             </div>
 
@@ -619,7 +661,7 @@ export default function Convocazioni() {
                   fill="none"
                   stroke="currentColor"
                   strokeWidth="8"
-                  strokeDasharray={`${cleaners.length > 0 ? (cleaners.filter(c => c.role === "Premium").length / cleaners.length) * 251.2 : 0} 251.2`}
+                  strokeDasharray={`${filteredCleaners.length > 0 ? (filteredCleaners.filter(c => c.role === "Premium").length / filteredCleaners.length) * 251.2 : 0} 251.2`}
                   strokeDashoffset="0"
                   transform="rotate(-90 50 50)"
                   className="text-yellow-500 dark:text-yellow-600 transition-all duration-500"
@@ -632,12 +674,12 @@ export default function Convocazioni() {
                   dominantBaseline="middle"
                   className="text-lg font-bold fill-yellow-600 dark:fill-yellow-400"
                 >
-                  {cleaners.length > 0 ? Math.round((cleaners.filter(c => c.role === "Premium").length / cleaners.length) * 100) : 0}%
+                  {filteredCleaners.length > 0 ? Math.round((filteredCleaners.filter(c => c.role === "Premium").length / filteredCleaners.length) * 100) : 0}%
                 </text>
               </svg>
               <span className="text-[10px] font-semibold text-yellow-700 dark:text-yellow-300 text-center">Premium</span>
               <span className="text-[9px] text-yellow-600 dark:text-yellow-400">
-                {cleaners.filter(c => c.role === "Premium").length}/{cleaners.length}
+                {filteredCleaners.filter(c => c.role === "Premium").length}/{filteredCleaners.length}
               </span>
             </div>
 
@@ -660,7 +702,7 @@ export default function Convocazioni() {
                   fill="none"
                   stroke="currentColor"
                   strokeWidth="8"
-                  strokeDasharray={`${cleaners.length > 0 ? (cleaners.filter(c => c.role === "Standard").length / cleaners.length) * 251.2 : 0} 251.2`}
+                  strokeDasharray={`${filteredCleaners.length > 0 ? (filteredCleaners.filter(c => c.role === "Standard").length / filteredCleaners.length) * 251.2 : 0} 251.2`}
                   strokeDashoffset="0"
                   transform="rotate(-90 50 50)"
                   className="text-green-500 dark:text-green-600 transition-all duration-500"
@@ -673,12 +715,12 @@ export default function Convocazioni() {
                   dominantBaseline="middle"
                   className="text-lg font-bold fill-green-600 dark:fill-green-400"
                 >
-                  {cleaners.length > 0 ? Math.round((cleaners.filter(c => c.role === "Standard").length / cleaners.length) * 100) : 0}%
+                  {filteredCleaners.length > 0 ? Math.round((filteredCleaners.filter(c => c.role === "Standard").length / filteredCleaners.length) * 100) : 0}%
                 </text>
               </svg>
               <span className="text-[10px] font-semibold text-green-700 dark:text-green-300 text-center">Standard</span>
               <span className="text-[9px] text-green-600 dark:text-green-400">
-                {cleaners.filter(c => c.role === "Standard").length}/{cleaners.length}
+                {filteredCleaners.filter(c => c.role === "Standard").length}/{filteredCleaners.length}
               </span>
             </div>
 
@@ -701,7 +743,7 @@ export default function Convocazioni() {
                   fill="none"
                   stroke="currentColor"
                   strokeWidth="8"
-                  strokeDasharray={`${cleaners.length > 0 ? (cleaners.filter(c => c.role === "Formatore").length / cleaners.length) * 251.2 : 0} 251.2`}
+                  strokeDasharray={`${filteredCleaners.length > 0 ? (filteredCleaners.filter(c => c.role === "Formatore").length / filteredCleaners.length) * 251.2 : 0} 251.2`}
                   strokeDashoffset="0"
                   transform="rotate(-90 50 50)"
                   className="text-orange-500 dark:text-orange-600 transition-all duration-500"
@@ -714,12 +756,12 @@ export default function Convocazioni() {
                   dominantBaseline="middle"
                   className="text-lg font-bold fill-orange-600 dark:fill-orange-400"
                 >
-                  {cleaners.length > 0 ? Math.round((cleaners.filter(c => c.role === "Formatore").length / cleaners.length) * 100) : 0}%
+                  {filteredCleaners.length > 0 ? Math.round((filteredCleaners.filter(c => c.role === "Formatore").length / filteredCleaners.length) * 100) : 0}%
                 </text>
               </svg>
               <span className="text-[10px] font-semibold text-orange-700 dark:text-orange-300 text-center">Formatori</span>
               <span className="text-[9px] text-orange-600 dark:text-orange-400">
-                {cleaners.filter(c => c.role === "Formatore").length}/{cleaners.length}
+                {filteredCleaners.filter(c => c.role === "Formatore").length}/{filteredCleaners.length}
               </span>
             </div>
 
@@ -742,7 +784,7 @@ export default function Convocazioni() {
                   fill="none"
                   stroke="currentColor"
                   strokeWidth="8"
-                  strokeDasharray={`${cleaners.length > 0 ? (cleaners.filter(c => (c as any).can_do_straordinaria === true).length / cleaners.length) * 251.2 : 0} 251.2`}
+                  strokeDasharray={`${filteredCleaners.length > 0 ? (filteredCleaners.filter(c => (c as any).can_do_straordinaria === true).length / filteredCleaners.length) * 251.2 : 0} 251.2`}
                   strokeDashoffset="0"
                   transform="rotate(-90 50 50)"
                   className="text-red-500 dark:text-red-600 transition-all duration-500"
@@ -755,12 +797,12 @@ export default function Convocazioni() {
                   dominantBaseline="middle"
                   className="text-lg font-bold fill-red-600 dark:fill-red-400"
                 >
-                  {cleaners.length > 0 ? Math.round((cleaners.filter(c => (c as any).can_do_straordinaria === true).length / cleaners.length) * 100) : 0}%
+                  {filteredCleaners.length > 0 ? Math.round((filteredCleaners.filter(c => (c as any).can_do_straordinaria === true).length / filteredCleaners.length) * 100) : 0}%
                 </text>
               </svg>
               <span className="text-[10px] font-semibold text-red-700 dark:text-red-300 text-center">Straordinari</span>
               <span className="text-[9px] text-red-600 dark:text-red-400">
-                {cleaners.filter(c => (c as any).can_do_straordinaria === true).length}/{cleaners.length}
+                {filteredCleaners.filter(c => (c as any).can_do_straordinaria === true).length}/{filteredCleaners.length}
               </span>
             </div>
           </div>
