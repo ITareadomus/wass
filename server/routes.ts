@@ -156,6 +156,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       await fs.rename(tmpPath2, timelinePath);
       console.log(`✅ Timeline resettata nuovamente dopo create_containers`);
 
+      // CRITICAL: Elimina il flag di ultimo salvataggio per evitare ricaricamenti automatici
+      console.log(`🗑️ Reset flag ultimo salvataggio per data ${workDate}`);
+      // Il frontend gestirà la rimozione del localStorage
+
       // === Mantieni i cleaner selezionati, aggiorna solo la data ===
       try {
         const selectedCleanersPath = path.join(
