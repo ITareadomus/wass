@@ -2398,18 +2398,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const timelinePath = path.join(process.cwd(), 'client/public/data/output/timeline.json');
       const assignedDir = path.join(process.cwd(), 'client/public/data/assigned');
 
-      // SEMPRE resetta timeline.json quando viene chiamato extract-data
-      // Questo endpoint viene chiamato quando l'utente cambia data nel frontend
-      console.log(`🔄 Reset timeline.json per la nuova data ${date}`);
+      // CRITICAL: Resetta timeline.json SOLO se la data è cambiata
+      // Al reload della pagina con la stessa data, mantieni le assegnazioni esistenti
+      let shouldResetTimeline = true;
+      try {
+        const existingTimeline = JSON.parse(await fs.readFile(timelinePath, 'utf8'));
+        if (existingTimeline.metadata?.date === date) {
+          console.log(`✅ Timeline.json già presente per ${date}, mantieni assegnazioni esistenti`);
+          shouldResetTimeline = false;
+        }
+      } catch (err) {
+        // File non esiste o non valido, crea nuovo
+        shouldResetTimeline = true;
+      }
 
-      const emptyTimelineForNewDate = {
-        metadata: { last_updated: new Date().toISOString(), date },
-        cleaners_assignments: [],
-        meta: { total_cleaners: 0, used_cleaners: 0, assigned_tasks: 0 }
-      };
+      if (shouldResetTimeline) {
+        console.log(`🔄 Reset timeline.json per la nuova data ${date}`);
+        const emptyTimelineForNewDate = {
+          metadata: { last_updated: new Date().toISOString(), date },
+          cleaners_assignments: [],
+          meta: { total_cleaners: 0, used_cleaners: 0, assigned_tasks: 0 }
+        };
 
-      await fs.writeFile(timelinePath, JSON.stringify(emptyTimelineForNewDate, null, 2));
-      console.log(`✅ Timeline resettata per ${date}`);
+        await fs.writeFile(timelinePath, JSON.stringify(emptyTimelineForNewDate, null, 2));
+        console.log(`✅ Timeline resettata per ${date}`);
+      }
 
       // Carica selected_cleaners.json salvato per la data specificata
       try {
