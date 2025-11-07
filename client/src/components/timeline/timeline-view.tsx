@@ -781,28 +781,17 @@ export default function TimelineView({
     }
   };
 
-  // Mostra cleaners da selected_cleaners.json + cleaners che hanno task in timeline.json
-  // Questo permette di vedere cleaners rimossi che hanno ancora task assegnate
+  // CRITICAL: Mostra SOLO cleaners da selected_cleaners.json
+  // Non mostrare cleaners rimossi dopo un reload - devono essere sostituiti manualmente
   const allCleanersToShow = React.useMemo(() => {
-    const selectedCleanerIds = new Set(cleaners.map(c => c.id));
-    const timelineCleanersWithTasks = timelineCleaners
-      .filter(tc => tc.tasks && tc.tasks.length > 0) // Solo cleaners con task
-      .filter(tc => !selectedCleanerIds.has(tc.cleaner?.id)) // Non già in selected_cleaners
-      .map(tc => ({ ...tc.cleaner, isRemoved: true })); // Marca come rimosso
+    // Ritorna solo i cleaners attualmente selezionati
+    return cleaners;
+  }, [cleaners]);
 
-    // Combina selected_cleaners + timeline cleaners con task (quelli rimossi andranno in fondo)
-    return [...cleaners, ...timelineCleanersWithTasks];
-  }, [cleaners, timelineCleaners]);
-
-  // Crea Set di ID cleaner rimossi per facile lookup
+  // Set vuoto - non mostriamo più cleaners rimossi dopo reload
   const removedCleanerIds = React.useMemo(() => {
-    const selectedIds = new Set(cleaners.map(c => c.id));
-    return new Set(
-      timelineCleaners
-        .filter(tc => tc.tasks && tc.tasks.length > 0 && !selectedIds.has(tc.cleaner?.id))
-        .map(tc => tc.cleaner?.id)
-    );
-  }, [cleaners, timelineCleaners]);
+    return new Set<number>();
+  }, []);
 
   // --- NORMALIZZAZIONI TIMELINE ---
   // NON normalizzare task.type - lo determiniamo dai flag
