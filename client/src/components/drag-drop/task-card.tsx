@@ -442,7 +442,7 @@ export default function TaskCard({
                           className="text-[13px] text-[#ff0000] font-extrabold"
                           data-testid={`task-name-${task.id}`}
                         >
-                          {task.name}
+                          {(task as any).logistic_code || task.name}
                         </span>
                         <span className="text-[11px] opacity-60 leading-none font-bold text-[#000000]">
                           ({task.duration ? task.duration.replace(".", ":") : "0:00"}h)
@@ -540,7 +540,7 @@ export default function TaskCard({
                 <p className="text-sm font-semibold text-muted-foreground">
                   Codice ADAM
                 </p>
-                <p className="text-sm">{displayTask.name}</p>
+                <p className="text-sm">{(displayTask as any).logistic_code || displayTask.name}</p>
               </div>
               <div>
                 <p className="text-sm font-semibold text-muted-foreground">
@@ -758,8 +758,8 @@ export default function TaskCard({
                   Travel Time
                 </p>
                 <p className="text-sm">
-                  {assignmentTimes.travel_time !== undefined
-                    ? `${assignmentTimes.travel_time} minuti`
+                  {(displayTask as any).travel_time !== undefined
+                    ? `${(displayTask as any).travel_time} minuti`
                     : "non assegnato"}
                 </p>
               </div>
@@ -768,13 +768,13 @@ export default function TaskCard({
                   <p className="text-sm font-semibold text-muted-foreground">
                     Start Time
                   </p>
-                  <p className="text-sm">{assignmentTimes.start_time ?? "non assegnato"}</p>
+                  <p className="text-sm">{(displayTask as any).start_time || (displayTask as any).startTime || "non assegnato"}</p>
                 </div>
                 <div>
                   <p className="text-sm font-semibold text-muted-foreground">
                     End Time
                   </p>
-                  <p className="text-sm">{assignmentTimes.end_time ?? "non assegnato"}</p>
+                  <p className="text-sm">{(displayTask as any).end_time || (displayTask as any).endTime || "non assegnato"}</p>
                 </div>
               </div>
             </div>
