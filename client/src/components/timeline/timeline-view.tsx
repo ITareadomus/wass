@@ -90,7 +90,14 @@ export default function TimelineView({
       return await response.json();
     },
     onSuccess: async (data) => {
-      // CRITICAL: Notifica PRIMA del reload per mantenere lo stato
+      // CRITICAL: Aggiorna IMMEDIATAMENTE la vista locale
+      // Ricarica la timeline per vedere il cleaner fittizio
+      await loadTimelineCleaners();
+      
+      // Ricarica selected_cleaners (ora senza questo cleaner)
+      await loadCleaners();
+
+      // Notifica modifiche non salvate
       if (onTaskMoved) {
         onTaskMoved();
       }
@@ -98,15 +105,9 @@ export default function TimelineView({
         (window as any).setHasUnsavedChanges(true);
       }
 
-      // CRITICAL: Ricarica PRIMA la timeline per vedere i cleaners con task
-      await loadTimelineCleaners();
-
-      // POI ricarica selected_cleaners
-      await loadCleaners();
-
       const message = data.removedFromTimeline 
         ? `${selectedCleaner?.name} ${selectedCleaner?.lastname} è stato rimosso completamente (nessuna task).`
-        : `${selectedCleaner?.name} ${selectedCleaner?.lastname} è stato rimosso dalla selezione. Le sue task rimangono in timeline.`;
+        : `${selectedCleaner?.name} ${selectedCleaner?.lastname} rimosso. Le task sono assegnate a "NON ASSEGNATO".`;
 
       toast({
         title: "Cleaner rimosso",
@@ -134,28 +135,25 @@ export default function TimelineView({
       return await response.json();
     },
     onSuccess: async (data, cleanerId) => {
-      // CRITICAL: Notifica PRIMA del reload per mantenere lo stato
+      // CRITICAL: Aggiorna IMMEDIATAMENTE la vista locale
+      // Ricarica la timeline per vedere il nuovo cleaner con le task
+      await loadTimelineCleaners();
+      
+      // Ricarica selected_cleaners (ora con questo cleaner)
+      await loadCleaners();
+
+      // Ricarica le task per aggiornare assignedCleaner
+      if ((window as any).reloadAllTasks) {
+        await (window as any).reloadAllTasks(true);
+      }
+
+      // Notifica modifiche non salvate
       if (onTaskMoved) {
         onTaskMoved();
       }
       if ((window as any).setHasUnsavedChanges) {
         (window as any).setHasUnsavedChanges(true);
       }
-
-      // Ricarica ENTRAMBI i file per sincronizzare la vista
-      await Promise.all([
-        loadCleaners(),
-        loadTimelineCleaners()
-      ]);
-
-      // Ricarica anche le task se necessario
-      if ((window as any).reloadAllTasks) {
-        await (window as any).reloadAllTasks(true);
-      }
-
-      // IMPORTANTE: ricarica timeline.json PRIMA di ricalcolare gli available
-      // Questo previene race conditions tra cache e stato locale
-      await new Promise(resolve => setTimeout(resolve, 100)); // Small delay per file system sync
 
       // Trova il cleaner appena aggiunto per mostrare nome e cognome
       const cleanersResponse = await fetch(`/data/cleaners/selected_cleaners.json?t=${Date.now()}`);
@@ -164,8 +162,8 @@ export default function TimelineView({
       const cleanerName = addedCleaner ? `${addedCleaner.name} ${addedCleaner.lastname}` : `ID ${cleanerId}`;
 
       toast({
-        title: "Cleaner aggiunto",
-        description: `${cleanerName} è stato aggiunto alla selezione`,
+        title: "Task riassegnate",
+        description: `Le task sono ora assegnate a ${cleanerName}`,
         variant: "success",
       });
       setIsAddCleanerDialogOpen(false);
@@ -801,12 +799,12 @@ export default function TimelineView({
     }
 
     // Crea cleaners fittizi per ogni gruppo di task orfane
-    let fictionalIndex = 1;
+    // USA L'ID ORIGINALE del cleaner rimosso per mappare correttamente le task
     for (const [originalCleanerId, tasks] of orphanGroups.entries()) {
       fictionalCleaners.push({
-        id: -fictionalIndex, // ID negativo per distinguerli
-        name: "CLEANER NON",
-        lastname: `ASSEGNATO N${fictionalIndex}`,
+        id: originalCleanerId, // USA L'ID ORIGINALE (non negativo)
+        name: "NON",
+        lastname: "ASSEGNATO",
         role: "Standard",
         active: false,
         ranking: 0,
@@ -819,7 +817,6 @@ export default function TimelineView({
         start_time: null,
         can_do_straordinaria: false,
       } as Cleaner);
-      fictionalIndex++;
     }
 
     // Ritorna cleaners reali + cleaners fittizi
@@ -828,12 +825,13 @@ export default function TimelineView({
 
   // Set di ID cleaners fittizi (non assegnati)
   const removedCleanerIds = React.useMemo(() => {
+    const selectedIds = new Set(cleaners.map(c => c.id));
     return new Set<number>(
       allCleanersToShow
-        .filter(c => c.id < 0) // ID negativi sono fittizi
+        .filter(c => !selectedIds.has(c.id)) // Non in selected_cleaners = fittizi
         .map(c => c.id)
     );
-  }, [allCleanersToShow]);
+  }, [allCleanersToShow, cleaners]);
 
   // Trova task "orfane": task in timeline.json che non appartengono a nessun cleaner in selected_cleaners.json
   const orphanTasks = React.useMemo(() => {
@@ -848,6 +846,7 @@ export default function TimelineView({
         for (const task of cleanerEntry.tasks || []) {
           orphans.push({
             ...task,
+            assignedCleaner: cleanerId, // CRITICAL: usa l'ID del cleaner dalla timeline
             originalCleanerId: cleanerId,
             originalCleanerName: `${cleanerEntry.cleaner?.name} ${cleanerEntry.cleaner?.lastname}`
           });
@@ -964,14 +963,14 @@ export default function TimelineView({
             const droppableId = `cleaner-${cleaner.id}`;
 
             // Trova tutte le task assegnate a questo cleaner
-            // Se il cleaner è fittizio (id < 0), prendi le task da orphanTasks
-            const cleanerTasks = cleaner.id < 0 
-              ? orphanTasks.filter(task => task.originalCleanerId === -cleaner.id) // Usa l'ID originale per filtrare
+            // Se il cleaner è fittizio (non in selected_cleaners), prendi le task da orphanTasks
+            const isFictional = removedCleanerIds.has(cleaner.id);
+            const cleanerTasks = isFictional
+              ? orphanTasks.filter(task => task.assignedCleaner === cleaner.id)
               : tasks.filter(task => (task as any).assignedCleaner === cleaner.id)
-            .map(normalizeTask); // Applica la normalizzazione qui
+                .map(normalizeTask); // Applica la normalizzazione qui
 
             const isRemoved = removedCleanerIds.has(cleaner.id);
-            const isFictional = cleaner.id < 0;
 
             return (
               <div key={cleaner.id} className="flex mb-0.5">
@@ -993,14 +992,8 @@ export default function TimelineView({
                   onClick={(e) => {
                     e.preventDefault();
                     if (isFictional) {
-                      // Cleaner fittizio: apri dialog per sostituire il gruppo di task
-                      // Trova l'ID originale del cleaner rimosso associato a questo fittizio
-                      const originalCleanerId = -cleaner.id; 
-                      setCleanerToReplace(originalCleanerId);
-                      loadAvailableCleaners();
-                      setIsAddCleanerDialogOpen(true);
-                    } else if (isRemoved) {
-                      // Cleaner rimosso: apri dialog sostituzione
+                      // Cleaner fittizio: apri dialog per sostituire
+                      // USA L'ID ORIGINALE del cleaner (già memorizzato in cleaner.id)
                       setCleanerToReplace(cleaner.id);
                       loadAvailableCleaners();
                       setIsAddCleanerDialogOpen(true);
@@ -1014,23 +1007,11 @@ export default function TimelineView({
                   <div className="w-full flex items-center gap-1">
                     <div className="break-words font-bold text-[13px] flex-1">
                       {isFictional ? (
-                        <>
-                          <span className="text-red-600">{cleaner.name}</span> {cleaner.lastname}
-                        </>
+                        <span className="text-red-600">NON ASSEGNATO</span>
                       ) : (
                         cleanersAliases[cleaner.id]?.alias || `${cleaner.name.toUpperCase()} ${cleaner.lastname.toUpperCase()}`
                       )}
                     </div>
-                    {isFictional && (
-                      <div className="bg-red-600 text-white font-bold text-[10px] px-1 py-0.5 rounded flex-shrink-0 animate-pulse">
-                        ORFANEE
-                      </div>
-                    )}
-                    {!isFictional && isRemoved && (
-                      <div className="bg-red-600 text-white font-bold text-[10px] px-1 py-0.5 rounded flex-shrink-0 animate-pulse">
-                        RIMOSSO
-                      </div>
-                    )}
                     {!isFictional && !isRemoved && cleaner.role === "Premium" && (
                       <div className="bg-yellow-500 text-black font-bold text-[10px] px-1 py-0.5 rounded flex-shrink-0">
                         P
