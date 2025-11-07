@@ -148,6 +148,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
       console.log("create_containers output:", containersResult);
 
+      // CRITICAL: Forza nuovamente il reset di timeline.json dopo create_containers
+      // perché lo script Python potrebbe aver sovrascritto il file
+      console.log(`🔄 Forzatura reset timeline.json dopo create_containers...`);
+      const tmpPath2 = `${timelinePath}.tmp`;
+      await fs.writeFile(tmpPath2, JSON.stringify(emptyTimeline, null, 2));
+      await fs.rename(tmpPath2, timelinePath);
+      console.log(`✅ Timeline resettata nuovamente dopo create_containers`);
+
       // === Mantieni i cleaner selezionati, aggiorna solo la data ===
       try {
         const selectedCleanersPath = path.join(
