@@ -830,7 +830,7 @@ export default function TimelineView({
     const selectedIds = new Set(cleaners.map(c => c.id));
     return new Set<number>(
       allCleanersToShow
-        .filter(c => !selectedCleanerIds.has(c.id)) // Non in selected_cleaners = fittizi
+        .filter(c => !selectedIds.has(c.id)) // Non in selected_cleaners = fittizi
         .map(c => c.id)
     );
   }, [allCleanersToShow, cleaners]);
