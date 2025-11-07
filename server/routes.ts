@@ -920,6 +920,49 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Endpoint per verificare SE esistono assegnazioni salvate (senza caricarle)
+  app.post("/api/check-saved-assignments", async (req, res) => {
+    try {
+      const { date } = req.body;
+      const workDate = date || format(new Date(), 'yyyy-MM-dd');
+
+      const [day, month, year] = workDate.split('-').reverse();
+      const folderPath = `${day}-${month}-20${year}`;
+      const filename = `${folderPath}/assignments_${day}${month}${year}.json`;
+
+      const bucketName = process.env.REPLIT_OBJECT_STORAGE_BUCKET_ID;
+      if (!bucketName) {
+        return res.json({ success: false, found: false, message: "Bucket non configurato" });
+      }
+
+      const storage = new Storage();
+      const bucket = storage.bucket(bucketName);
+      const file = bucket.file(filename);
+
+      const [exists] = await file.exists();
+
+      if (exists) {
+        const dateObj = new Date(workDate);
+        const formattedDateTime = format(dateObj, "dd/MM/yyyy", { locale: it });
+
+        res.json({
+          success: true,
+          found: true,
+          filename,
+          formattedDateTime
+        });
+      } else {
+        res.json({
+          success: true,
+          found: false
+        });
+      }
+    } catch (error: any) {
+      console.error("Errore nel controllo delle assegnazioni salvate:", error);
+      res.json({ success: false, found: false, error: error.message });
+    }
+  });
+
   // Endpoint per confermare le assegnazioni e salvare una copia immutabile
   app.post("/api/confirm-assignments", async (req, res) => {
     try {
