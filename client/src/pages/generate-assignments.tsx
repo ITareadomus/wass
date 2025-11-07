@@ -3,7 +3,7 @@ import { TaskType as Task } from "@shared/schema";
 import PriorityColumn from "@/components/drag-drop/priority-column";
 import TimelineView from "@/components/timeline/timeline-view";
 import MapSection from "@/components/map/map-section";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { CalendarIcon, Users, RefreshCw } from "lucide-react";
 import { useLocation } from 'wouter';
@@ -252,16 +252,28 @@ export default function GenerateAssignments() {
     }
   };
 
+  // Traccia se è un reload o un cambio data effettivo
+  const prevDateRef = useRef<string | null>(null);
+
   useEffect(() => {
-    // Chiamata condizionata solo al primo montaggio o al cambio data
-    if (isInitialMount || !isLoadingTasks) { // Aggiunto controllo isLoadingTasks per evitare chiamate multiple durante il caricamento
+    const currentDateStr = format(selectedDate, 'yyyy-MM-dd');
+    
+    // CRITICAL: Carica automaticamente SOLO se:
+    // 1. È il primo montaggio (isInitialMount = true)
+    // 2. OPPURE la data è cambiata rispetto alla precedente
+    const shouldLoad = isInitialMount || (prevDateRef.current !== null && prevDateRef.current !== currentDateStr);
+    
+    if (shouldLoad) {
       extractData(selectedDate);
+      prevDateRef.current = currentDateStr;
     }
+    
     // Reset isInitialMount dopo la prima chiamata
     if (isInitialMount) {
       setIsInitialMount(false);
+      prevDateRef.current = currentDateStr;
     }
-  }, [selectedDate, isInitialMount]); // Aggiungi isInitialMount alle dipendenze
+  }, [selectedDate, isInitialMount]);
 
 
 
