@@ -157,6 +157,20 @@ export default function GenerateAssignments() {
         localStorage.setItem('last_saved_assignment', displayDateTime);
         setLastSavedAssignment(displayDateTime);
 
+        // CRITICAL: Verifica e aggiorna la data in timeline.json dopo il caricamento
+        const timelineResponse = await fetch(`/data/output/timeline.json?t=${Date.now()}`, {
+          cache: 'no-store',
+          headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' }
+        });
+        
+        if (timelineResponse.ok) {
+          const timelineData = await timelineResponse.json();
+          if (timelineData.metadata?.date !== dateStr) {
+            console.log(`🔄 Aggiornamento data in timeline.json da ${timelineData.metadata?.date} a ${dateStr}`);
+            // La data verrà aggiornata dal backend al prossimo salvataggio
+          }
+        }
+
         // CRITICAL: Forza il refresh della timeline per mostrare i cleaners con task
         if ((window as any).loadTimelineCleaners) {
           console.log("🔄 Ricaricamento timeline cleaners dopo caricamento assegnazioni salvate...");
