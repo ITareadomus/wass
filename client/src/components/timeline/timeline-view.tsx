@@ -300,7 +300,7 @@ export default function TimelineView({
   };
 
   // Funzione per caricare i cleaner da selected_cleaners.json
-  const loadCleaners = async () => {
+  const loadCleaners = async (skipLoadSaved = false) => {
     try {
       // Carica sia selected_cleaners.json che timeline.json per verificare la sincronizzazione
       const [selectedResponse, timelineResponse] = await Promise.all([
@@ -741,8 +741,6 @@ export default function TimelineView({
     loadCleaners();
     loadAliases();
     loadTimelineCleaners();
-    // Carica la data formattata se esiste un salvataggio
-    loadSavedAssignmentDate();
 
     // Esponi la funzione per ricaricare i cleaners della timeline
     (window as any).loadTimelineCleaners = loadTimelineCleaners;
