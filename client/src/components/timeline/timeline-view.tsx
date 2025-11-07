@@ -28,6 +28,7 @@ import { format } from 'date-fns';
 interface TimelineViewProps {
   personnel: Personnel[];
   tasks: Task[];
+  hasUnsavedChanges?: boolean; // Stato delle modifiche non salvate dal parent
   onTaskMoved?: () => void; // Callback quando una task viene spostata
 }
 
@@ -51,6 +52,7 @@ interface Cleaner {
 export default function TimelineView({
   personnel,
   tasks,
+  hasUnsavedChanges = false,
   onTaskMoved,
 }: TimelineViewProps) {
   const [cleaners, setCleaners] = useState<Cleaner[]>([]);
@@ -67,9 +69,6 @@ export default function TimelineView({
   const timelineRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
   const [, setLocation] = useLocation();
-
-  // Stato per tracciare le modifiche non salvate
-  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
   // Normalizza la data da localStorage per coerenza ovunque
   const workDate = localStorage.getItem('selected_work_date') || (() => {
@@ -90,7 +89,9 @@ export default function TimelineView({
       return await response.json();
     },
     onSuccess: async () => {
-      setHasUnsavedChanges(true); // Marca come modifiche non salvate
+      if ((window as any).setHasUnsavedChanges) {
+        (window as any).setHasUnsavedChanges(true);
+      }
       // Ricarica ENTRAMBI i file per sincronizzare la vista
       await Promise.all([
         loadCleaners(),
@@ -123,7 +124,9 @@ export default function TimelineView({
       return await response.json();
     },
     onSuccess: async (data, cleanerId) => {
-      setHasUnsavedChanges(true); // Marca come modifiche non salvate
+      if ((window as any).setHasUnsavedChanges) {
+        (window as any).setHasUnsavedChanges(true);
+      }
       // Ricarica ENTRAMBI i file per sincronizzare la vista
       await Promise.all([
         loadCleaners(),
@@ -172,7 +175,9 @@ export default function TimelineView({
       return await response.json();
     },
     onSuccess: async (data, variables) => {
-      setHasUnsavedChanges(true); // Marca come modifiche non salvate
+      if ((window as any).setHasUnsavedChanges) {
+        (window as any).setHasUnsavedChanges(true);
+      }
       // Ricarica i task per mostrare immediatamente lo swap
       if ((window as any).reloadAllTasks) {
         await (window as any).reloadAllTasks();
@@ -493,7 +498,9 @@ export default function TimelineView({
 
   // Handler per aggiungere/sostituire un cleaner
   const handleAddCleaner = (cleanerId: number) => {
-    setHasUnsavedChanges(true); // Marca come modifiche non salvate
+    if ((window as any).setHasUnsavedChanges) {
+      (window as any).setHasUnsavedChanges(true);
+    }
     if (cleanerToReplace) {
       // Sostituzione: prima rimuovi il vecchio, poi aggiungi il nuovo
       removeCleanerMutation.mutate(cleanerToReplace, {
@@ -598,7 +605,9 @@ export default function TimelineView({
       if ((window as any).reloadAllTasks) {
         await (window as any).reloadAllTasks();
       }
-      setHasUnsavedChanges(true); // Marca come modifiche non salvate dopo il reset
+      if ((window as any).setHasUnsavedChanges) {
+        (window as any).setHasUnsavedChanges(true);
+      }
     } catch (error) {
       console.error('Errore nel reset:', error);
       alert('Errore durante il reset delle assegnazioni');
@@ -636,7 +645,9 @@ export default function TimelineView({
 
       setLastSavedFilename(result.formattedDateTime || result.filename);
       localStorage.setItem('last_saved_assignment', result.formattedDateTime || result.filename);
-      setHasUnsavedChanges(false); // Resetta l'indicatore dopo il salvataggio
+      if ((window as any).setHasUnsavedChanges) {
+        (window as any).setHasUnsavedChanges(false);
+      }
 
       toast({
         title: "✅ Assegnazioni confermate!",
@@ -692,11 +703,6 @@ export default function TimelineView({
 
     // Esponi la funzione per ricaricare i cleaners della timeline
     (window as any).loadTimelineCleaners = loadTimelineCleaners;
-    
-    // Esponi funzione per marcare modifiche non salvate
-    (window as any).markTimelineAsUnsaved = () => {
-      setHasUnsavedChanges(true);
-    };
   }, []);
 
   // Monitora cambiamenti nelle task per marcare modifiche non salvate
@@ -705,7 +711,7 @@ export default function TimelineView({
     if (tasks.length === 0) return;
     
     // Quando le task cambiano (drag-and-drop), notifica il parent
-    if (onTaskMoved && !hasUnsavedChanges) {
+    if (onTaskMoved) {
       onTaskMoved();
     }
   }, [tasks]);
@@ -723,7 +729,9 @@ export default function TimelineView({
         if (result.found && result.formattedDateTime) {
           setLastSavedFilename(result.formattedDateTime);
           localStorage.setItem('last_saved_assignment', result.formattedDateTime);
-          setHasUnsavedChanges(false); // Assicurati che venga resettato se viene caricato un file salvato
+          if ((window as any).setHasUnsavedChanges) {
+            (window as any).setHasUnsavedChanges(false);
+          }
         }
       }
     } catch (error) {

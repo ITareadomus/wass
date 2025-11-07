@@ -118,6 +118,9 @@ export default function GenerateAssignments() {
   // Stato per tracciare tutte le task con le loro assegnazioni
   const [allTasksWithAssignments, setAllTasksWithAssignments] = useState<Task[]>([]);
 
+  // Stato per tracciare modifiche non salvate
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+
   // Stati di caricamento
   const [isExtracting, setIsExtracting] = useState(true);
   const [extractionStep, setExtractionStep] = useState<string>("Inizializzazione...");
@@ -691,6 +694,7 @@ export default function GenerateAssignments() {
   (window as any).assignEarlyOutToTimeline = assignEarlyOutToTimeline;
   (window as any).assignHighPriorityToTimeline = assignHighPriorityToTimeline;
   (window as any).assignLowPriorityToTimeline = assignLowPriorityToTimeline;
+  (window as any).setHasUnsavedChanges = setHasUnsavedChanges;
 
 
   const saveTaskAssignments = async (tasks: Task[]) => {
@@ -1206,12 +1210,8 @@ export default function GenerateAssignments() {
                 <TimelineView 
                   personnel={[]} 
                   tasks={allTasksWithAssignments}
-                  onTaskMoved={() => {
-                    // Marca che ci sono modifiche non salvate quando una task viene spostata
-                    if ((window as any).markTimelineAsUnsaved) {
-                      (window as any).markTimelineAsUnsaved();
-                    }
-                  }}
+                  hasUnsavedChanges={hasUnsavedChanges}
+                  onTaskMoved={() => setHasUnsavedChanges(true)}
                 />
               </div>
             </div>
