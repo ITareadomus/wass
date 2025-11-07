@@ -41,6 +41,7 @@ interface Cleaner {
   ranking: number;
   counter_hours: number;
   counter_days: number;
+  weekly_hours?: number;
   available: boolean;
   contract_type: string;
   preferred_customers: number[];
@@ -1271,8 +1272,12 @@ export default function TimelineView({
                   <p className="text-sm">{selectedCleaner.counter_days}</p>
                 </div>
                 <div>
-                  <p className="text-sm font-semibold text-muted-foreground">Ore lavorate</p>
+                  <p className="text-sm font-semibold text-muted-foreground">Ore lavorate (totali)</p>
                   <p className="text-sm">{selectedCleaner.counter_hours}</p>
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-muted-foreground">Ore questa settimana</p>
+                  <p className="text-sm">{selectedCleaner.weekly_hours?.toFixed(2) || '0.00'}</p>
                 </div>
                 <div>
                   <p className="text-sm font-semibold text-muted-foreground">Tipo contratto</p>
