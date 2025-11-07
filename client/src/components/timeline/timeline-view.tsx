@@ -703,11 +703,18 @@ export default function TimelineView({
     }
   };
 
-  // Mostra SEMPRE tutti i cleaners da selected_cleaners.json
-  // Questo permette di vedere tutti i cleaners disponibili anche prima di assegnare le task
+  // Mostra cleaners da selected_cleaners.json + cleaners che hanno task in timeline.json
+  // Questo permette di vedere cleaners rimossi che hanno ancora task assegnate
   const allCleanersToShow = React.useMemo(() => {
-    return cleaners;
-  }, [cleaners]);
+    const selectedCleanerIds = new Set(cleaners.map(c => c.id));
+    const timelineCleanersWithTasks = timelineCleaners
+      .filter(tc => tc.tasks && tc.tasks.length > 0) // Solo cleaners con task
+      .filter(tc => !selectedCleanerIds.has(tc.cleaner?.id)) // Non già in selected_cleaners
+      .map(tc => tc.cleaner); // Estrai solo i dati del cleaner
+
+    // Combina selected_cleaners + timeline cleaners con task
+    return [...cleaners, ...timelineCleanersWithTasks];
+  }, [cleaners, timelineCleaners]);
 
   // --- NORMALIZZAZIONI TIMELINE ---
   // NON normalizzare task.type - lo determiniamo dai flag
