@@ -181,8 +181,10 @@ export default function TaskCard({
       setEditedCheckinDate((displayTask as any).checkin_date || "");
       setEditedCheckinTime((displayTask as any).checkin_time || "");
 
-      // Converti duration da "1.30" a "90" minuti
-      const duration = displayTask.duration || "0.0";
+      // Converti duration da "1.30" a "90" minuti, gestendo undefined
+      const duration = displayTask.duration || (displayTask as any).cleaning_time 
+        ? `${Math.floor(((displayTask as any).cleaning_time || 0) / 60)}.${((displayTask as any).cleaning_time || 0) % 60}` 
+        : "0.0";
       const [hours, mins] = duration.split('.').map(Number);
       const totalMinutes = (hours || 0) * 60 + (mins || 0);
       setEditedDuration(totalMinutes.toString());
@@ -575,7 +577,7 @@ export default function TaskCard({
                     className="text-sm cursor-pointer hover:bg-muted/50 p-1 rounded"
                     onClick={() => setEditingField('duration')}
                   >
-                    {displayTask.duration.replace(".", ":")} ore
+                    {displayTask.duration ? displayTask.duration.replace(".", ":") : "0:00"} ore
                   </p>
                 )}
               </div>
