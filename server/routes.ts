@@ -1344,6 +1344,132 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Endpoint per riassegnare task da un cleaner fittizio a un cleaner reale
+  app.post("/api/reassign-cleaner", async (req, res) => {
+    try {
+      const { fictionalCleanerId, newCleanerId, date } = req.body;
+
+      if (!fictionalCleanerId || !newCleanerId) {
+        return res.status(400).json({
+          success: false,
+          message: "fictionalCleanerId e newCleanerId sono obbligatori"
+        });
+      }
+
+      const workDate = date || format(new Date(), 'yyyy-MM-dd');
+      const timelinePath = path.join(process.cwd(), 'client/public/data/output/timeline.json');
+      const selectedCleanersPath = path.join(
+        process.cwd(),
+        'client/public/data/cleaners/selected_cleaners.json'
+      );
+      const allCleanersPath = path.join(
+        process.cwd(),
+        'client/public/data/cleaners/cleaners.json'
+      );
+
+      // Carica timeline
+      let timelineData: any;
+      try {
+        const timelineContent = await fs.readFile(timelinePath, 'utf8');
+        timelineData = JSON.parse(timelineContent);
+      } catch (error) {
+        return res.status(404).json({
+          success: false,
+          message: "Timeline non trovata"
+        });
+      }
+
+      // Trova il cleaner fittizio
+      const cleanerEntry = timelineData.cleaners_assignments?.find(
+        (c: any) => c.cleaner?.id === fictionalCleanerId
+      );
+
+      if (!cleanerEntry) {
+        return res.status(404).json({
+          success: false,
+          message: "Cleaner fittizio non trovato in timeline"
+        });
+      }
+
+      // Carica i dati del nuovo cleaner da cleaners.json
+      let allCleanersData: any;
+      try {
+        const allCleanersContent = await fs.readFile(allCleanersPath, 'utf8');
+        allCleanersData = JSON.parse(allCleanersContent);
+      } catch (error) {
+        return res.status(404).json({
+          success: false,
+          message: "Lista cleaners non trovata"
+        });
+      }
+
+      const newCleaner = allCleanersData.cleaners.find((c: any) => c.id === newCleanerId);
+      if (!newCleaner) {
+        return res.status(404).json({
+          success: false,
+          message: "Nuovo cleaner non trovato"
+        });
+      }
+
+      // Sostituisci i dati del cleaner fittizio con quelli del nuovo cleaner
+      cleanerEntry.cleaner = {
+        id: newCleaner.id,
+        name: newCleaner.name,
+        lastname: newCleaner.lastname,
+        role: newCleaner.role,
+        premium: newCleaner.premium || false
+      };
+
+      // Aggiorna metadata
+      timelineData.metadata = timelineData.metadata || {};
+      timelineData.metadata.last_updated = new Date().toISOString();
+      timelineData.metadata.date = workDate;
+
+      // Salva timeline.json
+      const tmpTimelinePath = `${timelinePath}.tmp`;
+      await fs.writeFile(tmpTimelinePath, JSON.stringify(timelineData, null, 2));
+      await fs.rename(tmpTimelinePath, timelinePath);
+
+      // Aggiungi il nuovo cleaner a selected_cleaners.json
+      let selectedData: any;
+      try {
+        const selectedContent = await fs.readFile(selectedCleanersPath, 'utf8');
+        selectedData = JSON.parse(selectedContent);
+      } catch (error) {
+        selectedData = { cleaners: [], total_selected: 0 };
+      }
+
+      // Verifica se il cleaner è già presente
+      const isAlreadySelected = selectedData.cleaners.some((c: any) => c.id === newCleanerId);
+      if (!isAlreadySelected) {
+        selectedData.cleaners.push(newCleaner);
+        selectedData.total_selected = selectedData.cleaners.length;
+        selectedData.metadata = selectedData.metadata || {};
+        selectedData.metadata.date = workDate;
+        selectedData.metadata.last_updated = new Date().toISOString();
+
+        // Salva selected_cleaners.json
+        const tmpScPath = `${selectedCleanersPath}.tmp`;
+        await fs.writeFile(tmpScPath, JSON.stringify(selectedData, null, 2));
+        await fs.rename(tmpScPath, selectedCleanersPath);
+      }
+
+      console.log(`✅ Cleaner fittizio ${fictionalCleanerId} sostituito con ${newCleaner.name} ${newCleaner.lastname} (ID: ${newCleanerId})`);
+
+      res.json({
+        success: true,
+        message: `Task riassegnate a ${newCleaner.name} ${newCleaner.lastname}`,
+        cleaner: newCleaner
+      });
+    } catch (error: any) {
+      console.error("Errore nella riassegnazione del cleaner:", error);
+      res.status(500).json({
+        success: false,
+        message: error.message
+      });
+    }
+  });
+
   // Endpoint per salvare i cleaners selezionati
   app.post("/api/save-selected-cleaners", async (req, res) => {
     try {
