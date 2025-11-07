@@ -1165,17 +1165,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // perché lo script potrebbe aver modificato il file
       const finalTimelinePath = path.join(process.cwd(), 'client/public/data/output/timeline.json');
       const finalTimelineData = JSON.parse(await fs.readFile(finalTimelinePath, 'utf8'));
-      
+
       // Forza la data corretta anche se lo script l'ha cambiata
       finalTimelineData.metadata = finalTimelineData.metadata || {};
       finalTimelineData.metadata.date = workDate;
       finalTimelineData.metadata.loaded_from_object_storage = true;
       finalTimelineData.metadata.last_updated = new Date().toISOString();
-      
+
       const tmpFinalPath = `${finalTimelinePath}.tmp`;
       await fs.writeFile(tmpFinalPath, JSON.stringify(finalTimelineData, null, 2));
       await fs.rename(tmpFinalPath, finalTimelinePath);
-      
+
       console.log(`✅ Timeline.json ri-sincronizzata con data ${workDate} dopo create_containers`);
 
       // Estrai il timestamp dal filename (formato: assignments_DDMMYY.json)
@@ -1452,10 +1452,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // CRITICAL: Cerca un cleaner in timeline CHE NON sia in selected_cleaners
-      // Questi sono i cleaners rimossi che hanno ancora task
+      // Questi sono i cleaners rimossi che hanno ancora task (cleaners fittizi)
       const cleanerToReplace = timelineData.cleaners_assignments.find(
-        (c: any) => !selectedCleanerIds.has(c.cleaner?.id || c.cleaner_id)
+        (c: any) => !selectedCleanerIds.has(c.cleaner?.id) && c.cleaner?.id > 0
       );
+
 
       let replacedCleanerId: number | null = null;
 
@@ -1488,11 +1489,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       } else {
         // AGGIUNTA: Nessun cleaner rimosso da sostituire, aggiungi alla fine
         console.log(`➕ Nessun cleaner da sostituire, aggiunta nuovo cleaner ${cleanerId} (senza task)`);
-        
+
         // Cerca la posizione corretta basandoti su selected_cleaners.json
         // per mantenere l'ordine visivo
         const insertIndex = selectedCleanersData.cleaners.findIndex((c: any) => c.id === cleanerId);
-        
+
         const newCleanerEntry = {
           cleaner: {
             id: cleanerData.id,
@@ -1503,7 +1504,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           },
           tasks: []
         };
-        
+
         // Inserisci alla posizione corretta invece di append
         if (insertIndex >= 0 && insertIndex < timelineData.cleaners_assignments.length) {
           timelineData.cleaners_assignments.splice(insertIndex, 0, newCleanerEntry);
@@ -2406,7 +2407,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         await fs.access(timelinePath);
         const existingTimeline = JSON.parse(await fs.readFile(timelinePath, 'utf8'));
         timelineExists = true;
-        
+
         // Aggiorna SOLO la metadata.date se è cambiata
         if (existingTimeline.metadata?.date !== date) {
           console.log(`🔄 Timeline esiste per data ${existingTimeline.metadata?.date}, aggiorno metadata.date a ${date}`);
@@ -2839,7 +2840,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // CRITICAL FIX: Usa timelineData direttamente (già contiene tutti i cleaner)
       // NON ricaricare da file perché timelineData è già completo
-      
+
       // Aggiorna solo metadata
       timelineData.metadata = timelineData.metadata || {};
       timelineData.metadata.last_updated = new Date().toISOString();
