@@ -336,20 +336,11 @@ export default function TaskCard({
   };
 
   // Calcola la larghezza in base alla durata
-  const calculateWidth = (duration: string | undefined, forTimeline: boolean) => {
-    // Se duration non è presente, usa cleaning_time dalla task
-    let totalMinutes = 0;
-    
-    if (!duration) {
-      // Fallback: usa cleaning_time se disponibile
-      const cleaningTime = (displayTask as any).cleaning_time;
-      totalMinutes = cleaningTime || 0;
-    } else {
-      const parts = duration.split(".");
-      const hours = parseInt(parts[0] || "0");
-      const minutes = parts[1] ? parseInt(parts[1]) : 0;
-      totalMinutes = hours * 60 + minutes;
-    }
+  const calculateWidth = (duration: string, forTimeline: boolean) => {
+    const parts = duration.split(".");
+    const hours = parseInt(parts[0] || "0");
+    const minutes = parts[1] ? parseInt(parts[1]) : 0;
+    const totalMinutes = hours * 60 + minutes;
 
     // Se 0 minuti, usa almeno 30 minuti
     const effectiveMinutes = totalMinutes === 0 ? 30 : totalMinutes;
@@ -394,6 +385,8 @@ export default function TaskCard({
     <>
       <Draggable draggableId={task.id} index={index}>
         {(provided, snapshot) => {
+          // Usa sempre task.duration (la prop originale) per la larghezza della card
+          // Non displayTask.duration che potrebbe essere undefined durante la navigazione
           const cardWidth = calculateWidth(task.duration, isInTimeline);
 
           return (
