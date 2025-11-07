@@ -292,6 +292,75 @@ def classify_tasks(tasks, selected_date):
 
     return early_out_tasks, high_priority_tasks, low_priority_tasks
 
+# ---------- Deduplica intelligente task ----------
+def deduplicate_tasks(tasks):
+    """
+    Rimuove task duplicate (stesso logistic_code) mantenendo quella migliore secondo:
+    1. Checkin più recente (data più vicina)
+    2. Operation_id confermato
+    3. Task_id più alto (fallback)
+    """
+    from datetime import datetime
+    
+    # Raggruppa per logistic_code
+    by_logistic_code = {}
+    for task in tasks:
+        code = task.get("logistic_code")
+        if code not in by_logistic_code:
+            by_logistic_code[code] = []
+        by_logistic_code[code].append(task)
+    
+    # Per ogni gruppo, scegli la migliore
+    deduplicated = []
+    duplicates_removed = 0
+    
+    for code, task_group in by_logistic_code.items():
+        if len(task_group) == 1:
+            # Nessun duplicato
+            deduplicated.append(task_group[0])
+        else:
+            # Duplicati trovati - scegli la migliore
+            duplicates_removed += len(task_group) - 1
+            
+            # Ordina per:
+            # 1. checkin_date più recente (None = meno prioritario)
+            # 2. confirmed_operation = True
+            # 3. task_id più alto
+            def task_priority(t):
+                # Parse checkin_date
+                checkin_str = t.get("checkin_date")
+                if checkin_str:
+                    try:
+                        checkin_dt = datetime.strptime(checkin_str, "%Y-%m-%d")
+                        # Inverti per ordinare dal più recente
+                        checkin_score = -checkin_dt.timestamp()
+                    except:
+                        checkin_score = float('inf')  # Data invalida = meno prioritario
+                else:
+                    checkin_score = float('inf')  # Nessuna data = meno prioritario
+                
+                # confirmed_operation (True = 0, False = 1 per ordinamento)
+                confirmed = t.get("confirmed_operation", False)
+                confirmed_score = 0 if confirmed else 1
+                
+                # task_id più alto
+                task_id = t.get("task_id", 0)
+                task_id_score = -task_id  # Inverti per ordinare dal più alto
+                
+                return (checkin_score, confirmed_score, task_id_score)
+            
+            best_task = min(task_group, key=task_priority)
+            deduplicated.append(best_task)
+            
+            print(f"   🔍 Duplicato {code}: mantenuta task_id={best_task.get('task_id')} "
+                  f"(checkin={best_task.get('checkin_date') or 'N/A'}, "
+                  f"confirmed={best_task.get('confirmed_operation')})")
+    
+    if duplicates_removed > 0:
+        print(f"✅ Rimosse {duplicates_removed} task duplicate dai containers")
+    
+    return deduplicated
+
 # ---------- Main ----------
 def main():
     import sys
@@ -321,6 +390,10 @@ def main():
 
     # Estrai task dal database
     all_tasks = get_tasks_from_db(work_date, assigned_task_ids)
+    
+    # Deduplica task prima della classificazione
+    print(f"🔄 Deduplica task duplicate...")
+    all_tasks = deduplicate_tasks(all_tasks)
 
     # Classifica task
     print(f"🔄 Classificazione task in containers...")
