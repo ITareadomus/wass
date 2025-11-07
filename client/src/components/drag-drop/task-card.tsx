@@ -181,10 +181,8 @@ export default function TaskCard({
       setEditedCheckinDate((displayTask as any).checkin_date || "");
       setEditedCheckinTime((displayTask as any).checkin_time || "");
 
-      // Converti duration da "1.30" a "90" minuti, gestendo undefined
-      const duration = displayTask.duration || (displayTask as any).cleaning_time 
-        ? `${Math.floor(((displayTask as any).cleaning_time || 0) / 60)}.${((displayTask as any).cleaning_time || 0) % 60}` 
-        : "0.0";
+      // Converti duration da "1.30" a "90" minuti
+      const duration = displayTask.duration || "0.0";
       const [hours, mins] = duration.split('.').map(Number);
       const totalMinutes = (hours || 0) * 60 + (mins || 0);
       setEditedDuration(totalMinutes.toString());
@@ -338,15 +336,7 @@ export default function TaskCard({
   };
 
   // Calcola la larghezza in base alla durata
-  const calculateWidth = (duration: string | undefined, forTimeline: boolean) => {
-    // Se duration è undefined, usa cleaning_time dalla task
-    if (!duration) {
-      const cleaningMinutes = (task as any).cleaning_time || 0;
-      const hours = Math.floor(cleaningMinutes / 60);
-      const mins = cleaningMinutes % 60;
-      duration = `${hours}.${String(mins).padStart(2, '0')}`;
-    }
-
+  const calculateWidth = (duration: string, forTimeline: boolean) => {
     const parts = duration.split(".");
     const hours = parseInt(parts[0] || "0");
     const minutes = parts[1] ? parseInt(parts[1]) : 0;
@@ -442,10 +432,10 @@ export default function TaskCard({
                           className="text-[13px] text-[#ff0000] font-extrabold"
                           data-testid={`task-name-${task.id}`}
                         >
-                          {(task as any).logistic_code || task.name}
+                          {task.name}
                         </span>
                         <span className="text-[11px] opacity-60 leading-none font-bold text-[#000000]">
-                          ({task.duration ? task.duration.replace(".", ":") : "0:00"}h)
+                          ({task.duration.replace(".", ":")}h)
                         </span>
                       </div>
                       {task.alias && (
@@ -540,7 +530,7 @@ export default function TaskCard({
                 <p className="text-sm font-semibold text-muted-foreground">
                   Codice ADAM
                 </p>
-                <p className="text-sm">{(displayTask as any).logistic_code || displayTask.name}</p>
+                <p className="text-sm">{displayTask.name}</p>
               </div>
               <div>
                 <p className="text-sm font-semibold text-muted-foreground">
@@ -585,7 +575,7 @@ export default function TaskCard({
                     className="text-sm cursor-pointer hover:bg-muted/50 p-1 rounded"
                     onClick={() => setEditingField('duration')}
                   >
-                    {displayTask.duration ? displayTask.duration.replace(".", ":") : "0:00"} ore
+                    {displayTask.duration.replace(".", ":")} ore
                   </p>
                 )}
               </div>
@@ -758,8 +748,8 @@ export default function TaskCard({
                   Travel Time
                 </p>
                 <p className="text-sm">
-                  {(displayTask as any).travel_time !== undefined
-                    ? `${(displayTask as any).travel_time} minuti`
+                  {assignmentTimes.travel_time !== undefined
+                    ? `${assignmentTimes.travel_time} minuti`
                     : "non assegnato"}
                 </p>
               </div>
@@ -768,13 +758,13 @@ export default function TaskCard({
                   <p className="text-sm font-semibold text-muted-foreground">
                     Start Time
                   </p>
-                  <p className="text-sm">{(displayTask as any).start_time || (displayTask as any).startTime || "non assegnato"}</p>
+                  <p className="text-sm">{assignmentTimes.start_time ?? "non assegnato"}</p>
                 </div>
                 <div>
                   <p className="text-sm font-semibold text-muted-foreground">
                     End Time
                   </p>
-                  <p className="text-sm">{(displayTask as any).end_time || (displayTask as any).endTime || "non assegnato"}</p>
+                  <p className="text-sm">{assignmentTimes.end_time ?? "non assegnato"}</p>
                 </div>
               </div>
             </div>

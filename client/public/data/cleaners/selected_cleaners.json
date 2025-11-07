@@ -288,41 +288,13 @@
       "telegram_id": 8035270407,
       "start_time": "10:00",
       "can_do_straordinaria": true
-    },
-    {
-      "id": 644,
-      "name": "HENRY",
-      "lastname": "CHIDUBEM",
-      "role": "Premium",
-      "active": true,
-      "ranking": 0,
-      "counter_hours": 0,
-      "counter_days": 0,
-      "available": true,
-      "contract_type": "B",
-      "preferred_customers": [
-        3,
-        61,
-        64,
-        72,
-        75,
-        84,
-        91,
-        94,
-        101,
-        113,
-        115
-      ],
-      "telegram_id": 6658049814,
-      "start_time": "10:00",
-      "can_do_straordinaria": true
     }
   ],
-  "total_selected": 11,
+  "total_selected": 10,
   "metadata": {
     "date": "2025-11-06",
     "saved_at": "2025-11-07T15:34:23.158Z",
     "reset_at": "2025-11-07T15:19:32.429Z",
-    "loaded_at": "2025-11-07T16:30:33.427Z"
+    "loaded_at": "2025-11-07T16:16:27.529Z"
   }
 }
