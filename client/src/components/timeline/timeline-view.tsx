@@ -1185,10 +1185,7 @@ export default function TimelineView({
                         {cleaner.name} {cleaner.lastname}
                       </p>
                       <p className="text-sm text-muted-foreground">
-                        {cleaner.role} • Contratto: {cleaner.contract_type}
-                      </p>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        Ore questa settimana: {cleaner.counter_hours?.toFixed(2) || '0.00'}h
+                        {cleaner.role} • Contratto: {cleaner.contract_type} • {cleaner.counter_hours?.toFixed(2) || '0.00'}h
                       </p>
                     </div>
                   </div>
