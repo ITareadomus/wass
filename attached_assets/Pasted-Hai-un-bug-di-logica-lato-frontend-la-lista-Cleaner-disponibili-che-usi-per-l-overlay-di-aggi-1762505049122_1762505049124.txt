@@ -1,0 +1,94 @@
+Hai un bug di **logica lato frontend**: la lista “Cleaner disponibili” che usi per l’overlay di aggiunta **viene filtrata contro `selected_cleaners.json`** invece che contro i **cleaner già presenti in `timeline.json`**.
+
+Risultato:
+
+* Timeline vuota → `selected_cleaners.json` spesso è vuoto ⇒ vedi tutti i cleaner ⇒ aggiungi ok.
+* Timeline già con alcuni cleaner → `selected_cleaners.json` li contiene (magari contiene perfino TUTTI i disponibili) ⇒ il filtro li esclude ⇒ la lista “disponibili” diventa vuota ⇒ **non puoi aggiungerne altri** anche se in timeline non ci sono ancora.
+
+# Dove succede
+
+Nel componente `client/src/components/timeline/timeline-view.tsx`, funzione `loadAvailableCleaners()`.
+Qui carichi solo:
+
+* `/data/cleaners/cleaners.json`
+* `/data/cleaners/selected_cleaners.json`
+  …e poi fai:
+
+```ts
+const selectedCleanerIds = new Set(selectedCleanersList.map((c: any) => c.id));
+available = dateCleaners.filter((c: Cleaner) => 
+  !selectedCleanerIds.has(c.id) && c.active
+);
+```
+
+Questo è il filtro sbagliato per la tua UX.
+
+# Fix rapido (consigliato)
+
+Filtra rispetto ai cleaner **già in timeline**, non rispetto ai “selected”.
+
+### Patch (diff minimale)
+
+Nel file `client/src/components/timeline/timeline-view.tsx`, modifica `loadAvailableCleaners()` per caricare anche `timeline.json` e creare il set degli ID già in timeline:
+
+```diff
+-  const [cleanersResponse, selectedResponse] = await Promise.all([
+-    fetch(`/data/cleaners/cleaners.json?t=${Date.now()}`),
+-    fetch(`/data/cleaners/selected_cleaners.json?t=${Date.now()}`)
+-  ]);
++  const [cleanersResponse, selectedResponse, timelineResponse] = await Promise.all([
++    fetch(`/data/cleaners/cleaners.json?t=${Date.now()}`),
++    fetch(`/data/cleaners/selected_cleaners.json?t=${Date.now()}`),
++    fetch(`/data/output/timeline.json?t=${Date.now()}`)
++  ]);
+
+   const data = await cleanersResponse.json();
+   const selectedData = await selectedResponse.json();
++  const timelineData = timelineResponse.ok ? await timelineResponse.json() : { cleaners_assignments: [] };
++  const timelineCleanerIds = new Set(
++    (timelineData.cleaners_assignments || [])
++      .map((c: any) => c?.cleaner?.id ?? c?.cleaner_id)
++      .filter(Boolean)
++  );
+```
+
+Ora, quando calcoli gli “available”:
+
+```diff
+-  if (selectedCleanersList.length === 0) {
+-    available = dateCleaners.filter((c: Cleaner) => c.active);
+-  } else {
+-    const selectedCleanerIds = new Set(selectedCleanersList.map((c: any) => c.id));
+-    available = dateCleaners.filter((c: Cleaner) => 
+-      !selectedCleanerIds.has(c.id) && c.active
+-    );
+-  }
++  // Mostra tutti i cleaners ATTIVI che NON sono già in timeline
++  available = dateCleaners.filter((c: Cleaner) => c.active && !timelineCleanerIds.has(c.id));
+```
+
+> Opzionale: se vuoi limitare la scelta ai soli cleaner già “selezionati”, usa:
+>
+> ```ts
+> const selectedIds = new Set((selectedData.cleaners || []).map((x:any)=>x.id));
+> available = dateCleaners.filter(c => c.active && selectedIds.has(c.id) && !timelineCleanerIds.has(c.id));
+> ```
+
+### Perché funziona
+
+* La sorgente di verità per “posso aggiungerlo?” è se **è già in timeline**.
+* `selected_cleaners.json` serve per un’altra logica (pool selezionato), ma non dovrebbe bloccare l’aggiunta se quel cleaner non è ancora in timeline.
+
+# Nota sul backend
+
+L’endpoint `POST /api/add-cleaner-to-timeline` è già robusto:
+
+* se trova un cleaner in `timeline.json` che **non è** in `selected_cleaners.json`, lo **sostituisce** (mantiene le task)
+* altrimenti **pusha** un nuovo cleaner in `cleaners_assignments`
+* aggiorna anche `selected_cleaners.json` se necessario
+
+Quindi la parte server è ok; il blocco era solo il filtro frontend degli “available”.
+
+---
+
+Se vuoi, posso anche applicarti la patch completa ai punti esatti del file e farti un piccolo PR diff con i cambi minimi.
