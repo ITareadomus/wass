@@ -336,11 +336,10 @@ export default function TaskCard({
   };
 
   // Calcola la larghezza in base alla durata
-  const calculateWidth = (duration: string, forTimeline: boolean) => {
-    const parts = duration.split(".");
-    const hours = parseInt(parts[0] || "0");
-    const minutes = parts[1] ? parseInt(parts[1]) : 0;
-    const totalMinutes = hours * 60 + minutes;
+  const calculateWidth = (taskData: Task, forTimeline: boolean) => {
+    // Usa cleaning_time (sempre presente) invece di duration (può essere undefined)
+    const cleaningTime = (taskData as any).cleaning_time || 0;
+    const totalMinutes = cleaningTime;
 
     // Se 0 minuti, usa almeno 30 minuti
     const effectiveMinutes = totalMinutes === 0 ? 30 : totalMinutes;
@@ -385,9 +384,8 @@ export default function TaskCard({
     <>
       <Draggable draggableId={task.id} index={index}>
         {(provided, snapshot) => {
-          // Usa sempre task.duration (la prop originale) per la larghezza della card
-          // Non displayTask.duration che potrebbe essere undefined durante la navigazione
-          const cardWidth = calculateWidth(task.duration, isInTimeline);
+          // Usa task (con cleaning_time) invece di duration
+          const cardWidth = calculateWidth(task, isInTimeline);
 
           return (
             <TooltipProvider delayDuration={300}>
