@@ -1175,7 +1175,7 @@ export default function TimelineView({
                       </span>
                     )}
                     {cleaner.role === "Formatore" && (
-                      <span className="px-2 py-1 rounded bg-orange-500 text-white text-xs font-bold">
+                      <span className="px-2 py-1 rounded bg-orange-500 text-black text-xs font-bold">
                         Formatore
                       </span>
                     )}
