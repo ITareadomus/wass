@@ -336,10 +336,11 @@ export default function TaskCard({
   };
 
   // Calcola la larghezza in base alla durata
-  const calculateWidth = (taskData: Task, forTimeline: boolean) => {
-    // Usa cleaning_time (sempre presente) invece di duration (può essere undefined)
-    const cleaningTime = (taskData as any).cleaning_time || 0;
-    const totalMinutes = cleaningTime;
+  const calculateWidth = (duration: string, forTimeline: boolean) => {
+    const parts = duration.split(".");
+    const hours = parseInt(parts[0] || "0");
+    const minutes = parts[1] ? parseInt(parts[1]) : 0;
+    const totalMinutes = hours * 60 + minutes;
 
     // Se 0 minuti, usa almeno 30 minuti
     const effectiveMinutes = totalMinutes === 0 ? 30 : totalMinutes;
@@ -384,8 +385,7 @@ export default function TaskCard({
     <>
       <Draggable draggableId={task.id} index={index}>
         {(provided, snapshot) => {
-          // Usa task (con cleaning_time) invece di duration
-          const cardWidth = calculateWidth(task, isInTimeline);
+          const cardWidth = calculateWidth(task.duration, isInTimeline);
 
           return (
             <TooltipProvider delayDuration={300}>
@@ -575,7 +575,7 @@ export default function TaskCard({
                     className="text-sm cursor-pointer hover:bg-muted/50 p-1 rounded"
                     onClick={() => setEditingField('duration')}
                   >
-                    {displayTask.duration ? displayTask.duration.replace(".", ":") : "0:00"} ore
+                    {displayTask.duration.replace(".", ":")} ore
                   </p>
                 )}
               </div>

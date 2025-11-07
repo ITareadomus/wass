@@ -1,6 +1,6 @@
 {
   "metadata": {
-    "last_updated": "2025-11-07T16:50:53.212124",
+    "last_updated": "2025-11-07T16:22:11.369174",
     "date": "2025-11-06"
   },
   "cleaners_assignments": [
@@ -941,9 +941,9 @@
     },
     {
       "cleaner": {
-        "id": 644,
-        "name": "HENRY",
-        "lastname": "CHIDUBEM",
+        "id": 249,
+        "name": "Ogbodo Chidi",
+        "lastname": "Igwe",
         "role": "Premium",
         "premium": true
       },
@@ -1009,8 +1009,8 @@
             "automatic_assignment_hp"
           ],
           "priority": "high_priority",
-          "start_time": "12:41",
-          "end_time": "17:11",
+          "start_time": "12:42",
+          "end_time": "17:12",
           "followup": true,
           "sequence": 2,
           "travel_time": 42
@@ -1043,9 +1043,9 @@
             "not_hp",
             "automatic_assignment_lp"
           ],
-          "start_time": "17:27",
-          "end_time": "17:57",
-          "followup": false,
+          "start_time": "17:29",
+          "end_time": "17:59",
+          "followup": true,
           "sequence": 3,
           "travel_time": 17
         },
@@ -1077,8 +1077,8 @@
             "not_hp",
             "automatic_assignment_lp"
           ],
-          "start_time": "18:15",
-          "end_time": "18:45",
+          "start_time": "18:17",
+          "end_time": "18:47",
           "followup": true,
           "sequence": 4,
           "travel_time": 18
@@ -1167,7 +1167,7 @@
   ],
   "meta": {
     "total_cleaners": 11,
-    "total_tasks": 0,
+    "total_tasks": 31,
     "used_cleaners": 11,
     "assigned_tasks": 31
   }
