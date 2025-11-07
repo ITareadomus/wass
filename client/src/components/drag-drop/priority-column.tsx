@@ -13,6 +13,7 @@ interface PriorityColumnProps {
   tasks: Task[];
   droppableId: string;
   icon: "clock" | "alert-circle" | "arrow-down";
+  assignAction?: () => Promise<void>;
 }
 
 export default function PriorityColumn({
@@ -21,9 +22,38 @@ export default function PriorityColumn({
   tasks,
   droppableId,
   icon,
+  assignAction,
 }: PriorityColumnProps) {
   const { toast } = useToast();
   const [isAssigning, setIsAssigning] = useState(false);
+
+  const iconMap: Record<string, React.ReactNode> = {
+    clock: <Clock className="w-5 h-5 mr-2 text-muted-foreground" />,
+    "alert-circle": <AlertCircle className="w-5 h-5 mr-2 text-muted-foreground" />,
+    "arrow-down": <ArrowDown className="w-5 h-5 mr-2 text-muted-foreground" />,
+  };
+
+  // Identifica task duplicate basandosi sul logistic_code
+  const logisticCodeCounts = tasks.reduce((acc, task) => {
+    const code = task.name; // name contiene il logistic_code
+    acc[code] = (acc[code] || 0) + 1;
+    return acc;
+  }, {} as Record<string, number>);
+
+  const isDuplicateTask = (task: Task) => {
+    return logisticCodeCounts[task.name] > 1;
+  };
+
+  const handleAssignClick = async () => {
+    if (!assignAction) return;
+
+    try {
+      await assignAction();
+    } catch (error) {
+      console.error("Errore durante l'assegnazione:", error);
+    }
+  };
+
 
   const getColumnClass = (priority: string, tasks: Task[]) => {
     switch (priority) {
@@ -188,6 +218,7 @@ export default function PriorityColumn({
                 isInTimeline={false}
                 allTasks={tasks}
                 currentContainer={droppableId}
+                isDuplicate={isDuplicateTask(task)} // Passa il flag isDuplicate
               />
             ))}
             {provided.placeholder}

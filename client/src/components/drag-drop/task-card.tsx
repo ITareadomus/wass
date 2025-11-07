@@ -26,6 +26,7 @@ interface TaskCardProps {
   isInTimeline?: boolean;
   allTasks?: Task[];
   currentContainer?: 'early-out' | 'high' | 'low' | string;
+  isDuplicate?: boolean;
 }
 
 interface AssignedTask {
@@ -42,6 +43,7 @@ export default function TaskCard({
   isInTimeline = false,
   allTasks = [],
   currentContainer = '',
+  isDuplicate = false,
 }: TaskCardProps) {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [currentTaskId, setCurrentTaskId] = useState(task.id);
@@ -361,6 +363,7 @@ export default function TaskCard({
                       rounded-sm px-2 py-1 shadow-sm border transition-all duration-200
                       ${snapshot.isDragging ? "shadow-lg scale-105" : ""}
                       ${isOverdue ? "animate-blink" : ""}
+                      ${isDuplicate && !isInTimeline ? "animate-blink-yellow" : ""}
                       hover:shadow-md cursor-pointer
                       flex-shrink-0 relative
                     `}
