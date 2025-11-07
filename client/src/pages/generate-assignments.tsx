@@ -189,23 +189,23 @@ export default function GenerateAssignments() {
       const day = String(date.getDate()).padStart(2, '0');
       const dateStr = `${year}-${month}-${day}`;
 
-      // Prima prova a caricare assegnazioni salvate
+      // CRITICAL: Al cambio data, prova SEMPRE a caricare da Object Storage
+      // Se esiste un salvataggio, lo carica; altrimenti resetta timeline.json
       const hasSavedAssignments = await loadSavedAssignments(date);
 
       if (hasSavedAssignments) {
+        // Esiste un salvataggio in Object Storage → caricato da loadSavedAssignments
         setExtractionStep("Caricamento assegnazioni salvate...");
-        // CRITICAL: Aspetta che i task siano caricati prima di nascondere il loader
         await loadTasks();
         setExtractionStep("Assegnazioni salvate caricate!");
-        // Delay per assicurarsi che lo stato sia aggiornato prima di nascondere il loader
         await new Promise(resolve => setTimeout(resolve, 100));
         setIsExtracting(false);
         return;
       }
 
-      // Se non ci sono assegnazioni salvate, procedi con l'estrazione normale
+      // Non esiste un salvataggio → resetta timeline e crea containers freschi
       setExtractionStep("Estrazione dati dal database...");
-      console.log("Estraendo task per la data:", dateStr);
+      console.log("Nessun salvataggio trovato, estrazione task per la data:", dateStr);
 
       const response = await fetch('/api/extract-data', {
         method: 'POST',
@@ -221,21 +221,15 @@ export default function GenerateAssignments() {
       console.log("Estrazione completata:", result);
 
       setExtractionStep("Caricamento task...");
-
-      // CRITICAL: Aspetta che il backend finisca di creare i file prima di caricarli
       await new Promise(resolve => setTimeout(resolve, 500));
-
-      // Carica i task dopo l'estrazione e aspetta che finisca
       await loadTasks();
 
       setExtractionStep("Task caricati!");
-      // Delay per assicurarsi che lo stato sia aggiornato prima di nascondere il loader
       await new Promise(resolve => setTimeout(resolve, 100));
       setIsExtracting(false);
     } catch (error) {
       console.error("Errore nell'estrazione:", error);
       setExtractionStep("Errore durante l'estrazione. Caricamento task esistenti...");
-      // Prova comunque a caricare i task esistenti
       await loadTasks();
       setIsExtracting(false);
     }
