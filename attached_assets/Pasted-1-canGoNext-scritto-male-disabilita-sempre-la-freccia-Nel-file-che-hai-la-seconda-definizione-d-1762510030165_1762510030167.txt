@@ -1,0 +1,100 @@
+1) canGoNext scritto male (disabilita sempre la freccia)
+
+Nel file che hai, la seconda definizione di canGoNext è corrotta/typo (si vede il nome della variabile “tronco”). Deve essere identica a quella usata nel log:
+
+// giusto
+const canGoPrev = navigableTasks.length > 1 && currentTaskInNavigable > 0;
+const canGoNext = navigableTasks.length > 1 
+  && currentTaskInNavigable >= 0 
+  && currentTaskInNavigable < navigableTasks.length - 1;
+
+
+Se lì c’è anche solo un carattere sbagliato, React disabilita il bottone (disabled={!canGoNext}) → la freccia non risponde.
+
+2) Indice corrente non trovato (IDs come string vs number)
+
+currentTaskInNavigable si calcola così:
+
+const currentTaskInNavigable = navigableTasks
+  .findIndex(t => String(t.id) === String(effectiveCurrentId));
+
+
+Qui sei protetto (con String(...)), ma se in allTasks l’id cambia forma (es. id vs task_id) la ricerca fallisce e l’indice va a -1 ⇒ frecce disabilitate.
+Se nei tuoi dati capita, normalizza:
+
+const taskIdOf = (t: any) => Number(t?.id ?? t?.task_id);
+const currentTaskInNavigable = navigableTasks
+  .findIndex(t => taskIdOf(t) === taskIdOf({ id: effectiveCurrentId }));
+
+3) Navigazione calcolata su un gruppo sbagliato
+
+La funzione:
+
+if (isInTimeline) {
+  const taskAssignedCleaner = (task as any).assignedCleaner;
+  return allTasks.filter(t => (t as any).assignedCleaner === taskAssignedCleaner);
+} else {
+  return allTasks.filter(t => t.priority === task.priority);
+}
+
+
+Funziona se:
+
+in timeline passi allTasks={cleanerTasks} (ok, lo fai) e ogni task ha assignedCleaner consistente.
+
+in container passi allTasks={tasks} con priority coerente.
+
+Se qualche task in allTasks ha assignedCleaner diverso/undefined, il gruppo si riduce a 1 elemento ⇒ frecce disattivate. In timeline puoi rendere più robusto:
+
+if (isInTimeline) {
+  // fallback: se assignedCleaner manca, naviga comunque su allTasks (stesso cleaner perché già filtrate a monte)
+  const hasAssigned = allTasks.every(t => (t as any).assignedCleaner != null);
+  return hasAssigned 
+    ? allTasks.filter(t => (t as any).assignedCleaner === (task as any).assignedCleaner)
+    : allTasks;
+}
+
+Patch consigliata (minima e risolutiva)
+
+Nel file client/src/components/drag-drop/task-card.tsx:
+
+Correggi canGoNext (e verifica canGoPrev):
+
+- const canGoNext = navigableTasks.length > 1 && currentTaskInNa...able >= 0 && currentTaskInNavigable < navigableTasks.length - 1;
++ const canGoNext = navigableTasks.length > 1 
++   && currentTaskInNavigable >= 0 
++   && currentTaskInNavigable < navigableTasks.length - 1;
+
+
+Rendi robusta la costruzione del gruppo navigabile:
+
+- if (isInTimeline) {
+-   const taskAssignedCleaner = (task as any).assignedCleaner;
+-   return allTasks.filter(t => (t as any).assignedCleaner === taskAssignedCleaner);
+- } else {
++ if (isInTimeline) {
++   const taskAssignedCleaner = (task as any).assignedCleaner;
++   const allHaveAssigned = allTasks.every(t => (t as any).assignedCleaner != null);
++   return allHaveAssigned
++     ? allTasks.filter(t => (t as any).assignedCleaner === taskAssignedCleaner)
++     : allTasks; // fallback, le tasks che arrivano da TimelineView sono già del cleaner corrente
++ } else {
+    return allTasks.filter(t => t.priority === task.priority);
+  }
+
+
+(Qualità di vita) Aggiungi le frecce da tastiera per navigare anche con ←/→:
+
+useEffect(() => {
+  if (!isModalOpen) return;
+  const onKey = (e: KeyboardEvent) => {
+    if (e.key === "ArrowLeft" && canGoPrev) handlePrevTask(new MouseEvent('click') as any);
+    if (e.key === "ArrowRight" && canGoNext) handleNextTask(new MouseEvent('click') as any);
+  };
+  window.addEventListener("keydown", onKey);
+  return () => window.removeEventListener("keydown", onKey);
+}, [isModalOpen, canGoPrev, canGoNext, currentTaskInNavigable, navigableTasks]);
+
+
+Assicurati che i campi visualizzati seguano displayTask
+Hai già un effect che ricalcola assignmentTimes su displayTask; tienilo dipendente da displayTask (non solo all’apertura del modale), così vedi cambiare i dati quando navighi.
