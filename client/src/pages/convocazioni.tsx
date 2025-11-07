@@ -133,14 +133,21 @@ export default function Convocazioni() {
             alreadySelectedIds = new Set(selectedData.cleaners?.map((c: any) => c.id) || []);
             console.log(`✅ Cleaners già selezionati per ${dateStr}:`, Array.from(alreadySelectedIds));
           } else {
-            console.log(`⚠️ Data non corrispondente, ignoro selected_cleaners.json`);
+            console.log(`⚠️ Data non corrispondente (file: ${selectedDateFromFile}, richiesta: ${dateStr}), mostro TUTTI i cleaners`);
           }
+        } else {
+          console.log(`ℹ️ selected_cleaners.json non trovato, mostro TUTTI i cleaners`);
         }
 
         // Filtra cleaners: escludi quelli già selezionati E mostra solo attivi
         const availableCleaners = dateCleaners.filter((c: any) => 
           !alreadySelectedIds.has(c.id) && c.active === true
         );
+
+        console.log(`📊 Risultato filtro cleaners:`);
+        console.log(`   - Totali per ${dateStr}: ${dateCleaners.length}`);
+        console.log(`   - Già selezionati: ${alreadySelectedIds.size}`);
+        console.log(`   - Disponibili: ${availableCleaners.length}`);
 
         setCleaners(availableCleaners);
         setFilteredCleaners(availableCleaners); // Aggiorna anche i cleaners filtrati
