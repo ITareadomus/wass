@@ -66,6 +66,9 @@ export default function TimelineView({
   const { toast } = useToast();
   const [, setLocation] = useLocation();
 
+  // Stato per tracciare le modifiche non salvate
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+
   // Normalizza la data da localStorage per coerenza ovunque
   const workDate = localStorage.getItem('selected_work_date') || (() => {
     const today = new Date();
@@ -85,6 +88,7 @@ export default function TimelineView({
       return await response.json();
     },
     onSuccess: async () => {
+      setHasUnsavedChanges(true); // Marca come modifiche non salvate
       // Ricarica ENTRAMBI i file per sincronizzare la vista
       await Promise.all([
         loadCleaners(),
@@ -117,6 +121,7 @@ export default function TimelineView({
       return await response.json();
     },
     onSuccess: async (data, cleanerId) => {
+      setHasUnsavedChanges(true); // Marca come modifiche non salvate
       // Ricarica ENTRAMBI i file per sincronizzare la vista
       await Promise.all([
         loadCleaners(),
@@ -165,6 +170,7 @@ export default function TimelineView({
       return await response.json();
     },
     onSuccess: async (data, variables) => {
+      setHasUnsavedChanges(true); // Marca come modifiche non salvate
       // Ricarica i task per mostrare immediatamente lo swap
       if ((window as any).reloadAllTasks) {
         await (window as any).reloadAllTasks();
@@ -312,19 +318,19 @@ export default function TimelineView({
       if (cleanersList.length === 0 && timelineCleaners.length > 0) {
         console.log(`⚠️ selected_cleaners.json vuoto ma timeline.json ha ${timelineCleaners.length} cleaners`);
         console.log('🔄 Caricamento cleaners dalla timeline per visualizzazione');
-        
+
         // Carica i dati completi dei cleaners da cleaners.json
         const cleanersResponse = await fetch(`/data/cleaners/cleaners.json?t=${Date.now()}`);
         if (cleanersResponse.ok) {
           const cleanersData = await cleanersResponse.json();
           const allCleaners = Object.values(cleanersData.dates || {})
             .flatMap((d: any) => d.cleaners || []);
-          
+
           cleanersList = timelineCleaners.map((tc: any) => {
             const fullData = allCleaners.find((c: any) => c.id === tc.id);
             return fullData || tc;
           });
-          
+
           console.log(`✅ Caricati ${cleanersList.length} cleaners dalla timeline`);
         }
       }
@@ -485,6 +491,7 @@ export default function TimelineView({
 
   // Handler per aggiungere/sostituire un cleaner
   const handleAddCleaner = (cleanerId: number) => {
+    setHasUnsavedChanges(true); // Marca come modifiche non salvate
     if (cleanerToReplace) {
       // Sostituzione: prima rimuovi il vecchio, poi aggiungi il nuovo
       removeCleanerMutation.mutate(cleanerToReplace, {
@@ -589,13 +596,13 @@ export default function TimelineView({
       if ((window as any).reloadAllTasks) {
         await (window as any).reloadAllTasks();
       }
+      setHasUnsavedChanges(true); // Marca come modifiche non salvate dopo il reset
     } catch (error) {
       console.error('Errore nel reset:', error);
       alert('Errore durante il reset delle assegnazioni');
     }
   };
 
-  const [lastSavedFilename, setLastSavedFilename] = useState<string | null>(null);
 
   const handleConfirmAssignments = async () => {
     try {
@@ -627,6 +634,7 @@ export default function TimelineView({
 
       setLastSavedFilename(result.formattedDateTime || result.filename);
       localStorage.setItem('last_saved_assignment', result.formattedDateTime || result.filename);
+      setHasUnsavedChanges(false); // Resetta l'indicatore dopo il salvataggio
 
       toast({
         title: "✅ Assegnazioni confermate!",
@@ -643,6 +651,7 @@ export default function TimelineView({
     }
   };
 
+  const [lastSavedFilename, setLastSavedFilename] = useState<string | null>(null);
 
   // Carica anche i cleaner dalla timeline.json per mostrare quelli nascosti
   const [timelineCleaners, setTimelineCleaners] = useState<any[]>([]);
@@ -696,6 +705,7 @@ export default function TimelineView({
         if (result.found && result.formattedDateTime) {
           setLastSavedFilename(result.formattedDateTime);
           localStorage.setItem('last_saved_assignment', result.formattedDateTime);
+          setHasUnsavedChanges(false); // Assicurati che venga resettato se viene caricato un file salvato
         }
       }
     } catch (error) {
@@ -1023,11 +1033,11 @@ export default function TimelineView({
             <div className="flex-1 p-1 border-t border-border flex gap-2">
               <Button
                 onClick={handleConfirmAssignments}
-                className="flex-1 h-full bg-green-500 hover:bg-green-600"
+                className={`flex-1 h-full ${hasUnsavedChanges ? 'bg-orange-500 hover:bg-orange-600 animate-pulse' : 'bg-green-500 hover:bg-green-600'}`}
                 data-testid="button-confirm-assignments"
               >
                 <Users className="w-4 h-4 mr-2" />
-                Conferma Assegnazioni
+                {hasUnsavedChanges ? 'Salva Modifiche ⚠️' : 'Conferma Assegnazioni'}
               </Button>
               <Button
                 onClick={handlePrint}
