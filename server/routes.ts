@@ -2432,27 +2432,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
         timelineExists = false;
       }
 
-      // CRITICAL: Quando cambi data, svuota SEMPRE il file locale selected_cleaners.json
-      // I cleaners verranno caricati SOLO quando l'utente preme "Carica Assegnazioni"
+      // CRITICAL: Svuota selected_cleaners.json SOLO se la data è cambiata
       const selectedCleanersPath = path.join(
         process.cwd(),
         'client/public/data/cleaners/selected_cleaners.json'
       );
 
-      const emptySelected = {
-        cleaners: [],
-        total_selected: 0,
-        metadata: { 
-          date,
-          reset_at: new Date().toISOString()
+      let shouldResetSelectedCleaners = false;
+      try {
+        const existingSelectedData = JSON.parse(await fs.readFile(selectedCleanersPath, 'utf8'));
+        const existingDate = existingSelectedData.metadata?.date;
+        
+        if (existingDate !== date) {
+          shouldResetSelectedCleaners = true;
+          console.log(`📅 Data cambiata da ${existingDate} a ${date} - reset selected_cleaners.json`);
+        } else {
+          console.log(`✅ Stessa data (${date}) - mantieni selected_cleaners.json`);
         }
-      };
+      } catch (err) {
+        // File non esiste o è corrotto - crealo vuoto
+        shouldResetSelectedCleaners = true;
+        console.log(`📝 selected_cleaners.json non esiste - creazione nuovo`);
+      }
 
-      const tmpScPath = `${selectedCleanersPath}.tmp`;
-      await fs.writeFile(tmpScPath, JSON.stringify(emptySelected, null, 2));
-      await fs.rename(tmpScPath, selectedCleanersPath);
+      if (shouldResetSelectedCleaners) {
+        const emptySelected = {
+          cleaners: [],
+          total_selected: 0,
+          metadata: { 
+            date,
+            reset_at: new Date().toISOString()
+          }
+        };
 
-      console.log(`ℹ️ selected_cleaners.json resettato per ${date} - cleaner verranno caricati solo con "Carica Assegnazioni"`);
+        const tmpScPath = `${selectedCleanersPath}.tmp`;
+        await fs.writeFile(tmpScPath, JSON.stringify(emptySelected, null, 2));
+        await fs.rename(tmpScPath, selectedCleanersPath);
+
+        console.log(`ℹ️ selected_cleaners.json resettato per ${date}`);
+      }
 
       // Esegui SEMPRE create_containers.py per avere dati freschi dal database
       console.log(`Eseguendo create_containers.py per data ${date}...`);
