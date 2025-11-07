@@ -526,18 +526,65 @@ export default function TimelineView({
   };
 
   // Handler per aggiungere/sostituire un cleaner
-  const handleAddCleaner = (cleanerId: number) => {
+  const handleAddCleaner = async (cleanerId: number) => {
     if ((window as any).setHasUnsavedChanges) {
       (window as any).setHasUnsavedChanges(true);
     }
     if (cleanerToReplace) {
-      // Sostituzione: prima rimuovi il vecchio, poi aggiungi il nuovo
-      removeCleanerMutation.mutate(cleanerToReplace, {
-        onSuccess: () => {
-          addCleanerMutation.mutate(cleanerId);
-          setCleanerToReplace(null);
+      // Distingui tra cleaner fittizio (ID < 0) e cleaner rimosso (ID > 0)
+      if (cleanerToReplace < 0) {
+        // Cleaner fittizio: riassegnazione diretta tramite nuovo endpoint
+        try {
+          const year = selectedDate.getFullYear();
+          const month = String(selectedDate.getMonth() + 1).padStart(2, '0');
+          const day = String(selectedDate.getDate()).padStart(2, '0');
+          const dateStr = `${year}-${month}-${day}`;
+
+          const response = await fetch('/api/reassign-cleaner', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              fictionalCleanerId: cleanerToReplace,
+              newCleanerId: cleanerId,
+              date: dateStr
+            })
+          });
+
+          const result = await response.json();
+
+          if (result.success) {
+            toast({
+              title: "Riassegnazione completata",
+              description: result.message,
+            });
+            
+            // Ricarica i cleaner dalla timeline
+            if ((window as any).loadTimelineCleaners) {
+              await (window as any).loadTimelineCleaners();
+            }
+            
+            setCleanerToReplace(null);
+            setIsAddCleanerDialogOpen(false);
+          } else {
+            throw new Error(result.message);
+          }
+        } catch (error: any) {
+          console.error('Errore nella riassegnazione:', error);
+          toast({
+            title: "Errore",
+            description: error.message || "Impossibile riassegnare le task",
+            variant: "destructive",
+          });
         }
-      });
+      } else {
+        // Cleaner rimosso normale: usa la logica originale (rimuovi + aggiungi)
+        removeCleanerMutation.mutate(cleanerToReplace, {
+          onSuccess: () => {
+            addCleanerMutation.mutate(cleanerId);
+            setCleanerToReplace(null);
+          }
+        });
+      }
     } else {
       // Aggiunta normale
       addCleanerMutation.mutate(cleanerId);
@@ -945,10 +992,9 @@ export default function TimelineView({
                   onClick={(e) => {
                     e.preventDefault();
                     if (isFictional) {
-                      // Cleaner fittizio: apri dialog per sostituire il gruppo di task
-                      // Trova l'ID originale del cleaner rimosso associato a questo fittizio
-                      const originalCleanerId = -cleaner.id; 
-                      setCleanerToReplace(originalCleanerId);
+                      // Cleaner fittizio: apri dialog per riassegnare le task
+                      // L'ID è già negativo, usalo direttamente
+                      setCleanerToReplace(cleaner.id);
                       loadAvailableCleaners();
                       setIsAddCleanerDialogOpen(true);
                     } else if (isRemoved) {
@@ -966,16 +1012,14 @@ export default function TimelineView({
                   <div className="w-full flex items-center gap-1">
                     <div className="break-words font-bold text-[13px] flex-1">
                       {isFictional ? (
-                        <>
-                          <span className="text-red-600">{cleaner.name}</span> {cleaner.lastname}
-                        </>
+                        <span className="text-gray-700 font-semibold">NON ASSEGNATO</span>
                       ) : (
                         cleanersAliases[cleaner.id]?.alias || `${cleaner.name.toUpperCase()} ${cleaner.lastname.toUpperCase()}`
                       )}
                     </div>
                     {isFictional && (
-                      <div className="bg-red-600 text-white font-bold text-[10px] px-1 py-0.5 rounded flex-shrink-0 animate-pulse">
-                        ORFANEE
+                      <div className="bg-gray-600 text-white font-bold text-[10px] px-1 py-0.5 rounded flex-shrink-0">
+                        CLICK QUI
                       </div>
                     )}
                     {!isFictional && isRemoved && (
