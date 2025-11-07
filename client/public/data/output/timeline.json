@@ -1,6 +1,6 @@
 {
   "metadata": {
-    "last_updated": "2025-11-07T16:36:50.006607",
+    "last_updated": "2025-11-07T16:16:29.839889",
     "date": "2025-11-06"
   },
   "cleaners_assignments": [
@@ -941,11 +941,11 @@
     },
     {
       "cleaner": {
-        "id": -1,
-        "name": "CLEANER NON",
-        "lastname": "ASSEGNATO",
-        "role": "Standard",
-        "premium": false
+        "id": 644,
+        "name": "HENRY",
+        "lastname": "CHIDUBEM",
+        "role": "Premium",
+        "premium": true
       },
       "tasks": [
         {
@@ -1163,21 +1163,11 @@
           "travel_time": 45
         }
       ]
-    },
-    {
-      "cleaner": {
-        "id": 937,
-        "name": "LOVETH",
-        "lastname": "IGUDIA",
-        "role": "Premium",
-        "premium": true
-      },
-      "tasks": []
     }
   ],
   "meta": {
-    "total_cleaners": 12,
-    "total_tasks": 31,
+    "total_cleaners": 11,
+    "total_tasks": 0,
     "used_cleaners": 11,
     "assigned_tasks": 31
   }
