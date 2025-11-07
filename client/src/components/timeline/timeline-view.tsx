@@ -24,6 +24,8 @@ import {
 } from "@/components/ui/select";
 import { useLocation } from 'wouter';
 import { format } from 'date-fns';
+import { cn } from "@/lib/utils";
+
 
 interface TimelineViewProps {
   personnel: Personnel[];
@@ -93,7 +95,7 @@ export default function TimelineView({
       // CRITICAL: Aggiorna IMMEDIATAMENTE la vista locale
       // Ricarica la timeline per vedere il cleaner fittizio
       await loadTimelineCleaners();
-      
+
       // Ricarica selected_cleaners (ora senza questo cleaner)
       await loadCleaners();
 
@@ -138,7 +140,7 @@ export default function TimelineView({
       // CRITICAL: Aggiorna IMMEDIATAMENTE la vista locale
       // Ricarica la timeline per vedere il nuovo cleaner con le task
       await loadTimelineCleaners();
-      
+
       // Ricarica selected_cleaners (ora con questo cleaner)
       await loadCleaners();
 
@@ -828,7 +830,7 @@ export default function TimelineView({
     const selectedIds = new Set(cleaners.map(c => c.id));
     return new Set<number>(
       allCleanersToShow
-        .filter(c => !selectedIds.has(c.id)) // Non in selected_cleaners = fittizi
+        .filter(c => !selectedCleanerIds.has(c.id)) // Non in selected_cleaners = fittizi
         .map(c => c.id)
     );
   }, [allCleanersToShow, cleaners]);
@@ -1165,9 +1167,6 @@ export default function TimelineView({
             );
           })}
 
-          {/* Riga per task orfane (senza cleaner assegnato) - ora gestita dai cleaners fittizi */}
-          {/* Questa sezione non è più necessaria grazie ai cleaners fittizi */}
-
           {/* Riga finale con pulsanti */}
           <div className="flex mb-2">
             {/* Pulsante + sotto il nome dell'ultimo cleaner */}
@@ -1261,12 +1260,12 @@ export default function TimelineView({
                   <div className="flex items-center gap-2">
                     {cleaner.role === "Premium" && (
                       <span className="px-2 py-1 rounded bg-yellow-400 text-black text-xs font-bold">
-                        Premium
+                        P
                       </span>
                     )}
                     {cleaner.role === "Formatore" && (
                       <span className="px-2 py-1 rounded bg-orange-500 text-black text-xs font-bold">
-                        Formatore
+                        F
                       </span>
                     )}
                     {cleaner.role === "Standard" && (
