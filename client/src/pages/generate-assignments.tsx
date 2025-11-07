@@ -98,6 +98,9 @@ export default function GenerateAssignments() {
     return new Date();
   });
 
+  // Traccia il primo caricamento per evitare reload automatici
+  const [isInitialMount, setIsInitialMount] = useState(true);
+
   // Salva la data in localStorage ogni volta che cambia (formato locale senza timezone)
   useEffect(() => {
     const year = selectedDate.getFullYear();
@@ -162,7 +165,7 @@ export default function GenerateAssignments() {
           cache: 'no-store',
           headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' }
         });
-        
+
         if (timelineResponse.ok) {
           const timelineData = await timelineResponse.json();
           if (timelineData.metadata?.date !== dateStr) {
@@ -250,8 +253,15 @@ export default function GenerateAssignments() {
   };
 
   useEffect(() => {
-    extractData(selectedDate);
-  }, [selectedDate]); // Aggiungi selectedDate come dipendenza
+    // Chiamata condizionata solo al primo montaggio o al cambio data
+    if (isInitialMount || !isLoadingTasks) { // Aggiunto controllo isLoadingTasks per evitare chiamate multiple durante il caricamento
+      extractData(selectedDate);
+    }
+    // Reset isInitialMount dopo la prima chiamata
+    if (isInitialMount) {
+      setIsInitialMount(false);
+    }
+  }, [selectedDate, isInitialMount]); // Aggiungi isInitialMount alle dipendenze
 
 
 
@@ -325,11 +335,13 @@ export default function GenerateAssignments() {
       const containersData = await containersResponse.json();
 
       // Carica da timeline.json
-      let timelineAssignmentsData = { assignments: [], current_date: dateStr };
+      let timelineAssignmentsData = { assignments: [], metadata: { date: dateStr }, cleaners_assignments: [] };
 
       if (timelineResponse.ok) {
         timelineAssignmentsData = await timelineResponse.json();
         console.log("Caricato da timeline.json");
+      } else {
+        console.warn("⚠️ timeline.json non trovato o non leggibile.");
       }
 
       console.log("Containers data:", containersData);
@@ -941,7 +953,7 @@ export default function GenerateAssignments() {
             await loadTasks(true);
           } else {
             console.log('✅ Movimento salvato automaticamente in timeline.json');
-            
+
             // CRITICAL FIX: NON ricaricare da Object Storage dopo ogni movimento
             // Il file locale timeline.json è già aggiornato dal backend
             // Ricarichiamo SOLO dal file locale, senza sovrascrivere con il file salvato
@@ -950,14 +962,14 @@ export default function GenerateAssignments() {
               cache: 'no-store',
               headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' }
             });
-            
+
             if (timelineResponse.ok) {
               const timelineData = await timelineResponse.json();
-              
+
               // Ricostruisci allTasksWithAssignments dalla timeline aggiornata
               const tasksWithAssignments: Task[] = [];
               const addedIds = new Set<string>();
-              
+
               // Task non assegnate dai containers (già in stato)
               for (const task of [...earlyOutTasks, ...highPriorityTasks, ...lowPriorityTasks]) {
                 const tid = String(task.id);
@@ -966,7 +978,7 @@ export default function GenerateAssignments() {
                   addedIds.add(tid);
                 }
               }
-              
+
               // Task assegnate dalla timeline
               for (const cleanerEntry of timelineData.cleaners_assignments || []) {
                 for (const task of cleanerEntry.tasks || []) {
@@ -990,7 +1002,7 @@ export default function GenerateAssignments() {
                     createdAt: new Date().toISOString(),
                     updatedAt: new Date().toISOString()
                   };
-                  
+
                   const tid = String(task.task_id);
                   if (!addedIds.has(tid)) {
                     tasksWithAssignments.push(taskWithAssignment as any);
@@ -998,7 +1010,7 @@ export default function GenerateAssignments() {
                   }
                 }
               }
-              
+
               setAllTasksWithAssignments(tasksWithAssignments);
             }
 
@@ -1093,10 +1105,10 @@ export default function GenerateAssignments() {
 
           // Salva in timeline.json (rimuove automaticamente da containers.json)
           await saveTimelineAssignment(taskId, toCleanerId, logisticCode, destination.index);
-          
+
           // CRITICAL FIX: Ricarica SOLO i file locali, non da Object Storage
           await new Promise(resolve => setTimeout(resolve, 100));
-          
+
           const timestamp = Date.now() + Math.random();
           const [containersResponse, timelineResponse] = await Promise.all([
             fetch(`/data/output/containers.json?t=${timestamp}`, {
@@ -1108,22 +1120,22 @@ export default function GenerateAssignments() {
               headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' }
             })
           ]);
-          
+
           if (containersResponse.ok && timelineResponse.ok) {
             const [containersData, timelineData] = await Promise.all([
               containersResponse.json(),
               timelineResponse.json()
             ]);
-            
+
             // Aggiorna containers
             setEarlyOutTasks((containersData.containers?.early_out?.tasks || []).map((t: any) => convertRawTask(t, "early_out")));
             setHighPriorityTasks((containersData.containers?.high_priority?.tasks || []).map((t: any) => convertRawTask(t, "high_priority")));
             setLowPriorityTasks((containersData.containers?.low_priority?.tasks || []).map((t: any) => convertRawTask(t, "low_priority")));
-            
+
             // Ricostruisci allTasksWithAssignments
             const tasksWithAssignments: Task[] = [];
             const addedIds = new Set<string>();
-            
+
             for (const task of [...earlyOutTasks, ...highPriorityTasks, ...lowPriorityTasks]) {
               const tid = String(task.id);
               if (!addedIds.has(tid)) {
@@ -1131,7 +1143,7 @@ export default function GenerateAssignments() {
                 addedIds.add(tid);
               }
             }
-            
+
             for (const cleanerEntry of timelineData.cleaners_assignments || []) {
               for (const task of cleanerEntry.tasks || []) {
                 const taskWithAssignment = {
@@ -1154,7 +1166,7 @@ export default function GenerateAssignments() {
                   createdAt: new Date().toISOString(),
                   updatedAt: new Date().toISOString()
                 };
-                
+
                 const tid = String(task.task_id);
                 if (!addedIds.has(tid)) {
                   tasksWithAssignments.push(taskWithAssignment as any);
@@ -1162,7 +1174,7 @@ export default function GenerateAssignments() {
                 }
               }
             }
-            
+
             setAllTasksWithAssignments(tasksWithAssignments);
           }
 
