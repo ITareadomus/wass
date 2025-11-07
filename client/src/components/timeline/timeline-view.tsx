@@ -478,11 +478,31 @@ export default function TimelineView({
 
       console.log(`   - Cleaner disponibili da aggiungere: ${available.length}/${dateCleaners.length}`);
 
-      // Ordina per role (Premium prima) e poi per nome
+      // Ordina in 4 sezioni con priorità:
+      // 1. Formatore
+      // 2. Premium/Straordinario (Premium che possono fare straordinaria)
+      // 3. Premium (senza straordinaria)
+      // 4. Standard
+      // All'interno di ogni sezione, ordina per counter_hours decrescente
       available.sort((a, b) => {
-        if (a.role === "Premium" && b.role !== "Premium") return -1;
-        if (a.role !== "Premium" && b.role === "Premium") return 1;
-        return a.name.localeCompare(b.name);
+        // Determina la sezione di appartenenza
+        const getSectionPriority = (c: Cleaner) => {
+          if (c.role === "Formatore") return 1;
+          if (c.role === "Premium" && c.can_do_straordinaria) return 2;
+          if (c.role === "Premium") return 3;
+          return 4; // Standard
+        };
+
+        const sectionA = getSectionPriority(a);
+        const sectionB = getSectionPriority(b);
+
+        // Prima ordina per sezione
+        if (sectionA !== sectionB) {
+          return sectionA - sectionB;
+        }
+
+        // All'interno della stessa sezione, ordina per counter_hours decrescente
+        return b.counter_hours - a.counter_hours;
       });
 
       setAvailableCleaners(available);
