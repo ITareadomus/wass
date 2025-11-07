@@ -535,18 +535,13 @@ export default function TimelineView({
       if (cleanerToReplace < 0) {
         // Cleaner fittizio: riassegnazione diretta tramite nuovo endpoint
         try {
-          const year = selectedDate.getFullYear();
-          const month = String(selectedDate.getMonth() + 1).padStart(2, '0');
-          const day = String(selectedDate.getDate()).padStart(2, '0');
-          const dateStr = `${year}-${month}-${day}`;
-
           const response = await fetch('/api/reassign-cleaner', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               fictionalCleanerId: cleanerToReplace,
               newCleanerId: cleanerId,
-              date: dateStr
+              date: workDate
             })
           });
 
