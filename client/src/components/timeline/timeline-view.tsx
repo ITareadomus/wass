@@ -1059,11 +1059,12 @@ export default function TimelineView({
             <div className="flex-1 p-1 border-t border-border flex gap-2">
               <Button
                 onClick={handleConfirmAssignments}
-                className={`flex-1 h-full ${hasUnsavedChanges ? 'bg-orange-500 hover:bg-orange-600 animate-pulse' : 'bg-green-500 hover:bg-green-600'}`}
+                disabled={!hasUnsavedChanges}
+                className={`flex-1 h-full ${hasUnsavedChanges ? 'bg-orange-500 hover:bg-orange-600 animate-pulse' : 'bg-green-500 hover:bg-green-600 opacity-50 cursor-not-allowed'}`}
                 data-testid="button-confirm-assignments"
               >
                 <Users className="w-4 h-4 mr-2" />
-                {hasUnsavedChanges ? 'Salva Modifiche ⚠️' : 'Assegnazioni confermate'}
+                {hasUnsavedChanges ? 'Salva Modifiche ⚠️' : 'Assegnazioni Confermate'}
               </Button>
               <Button
                 onClick={handlePrint}
