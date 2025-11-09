@@ -11,6 +11,11 @@ export default function StatisticsPanel({ tasks }: StatisticsPanelProps) {
   const lowPriorityCount = tasks.filter(task => task.priority === "low").length;
   const unassignedCount = tasks.filter(task => !task.priority).length;
   
+  // Conteggio corretto: straordinarie separate da premium
+  const straordinarieCount = tasks.filter(task => (task as any).straordinaria === true).length;
+  const premiumCount = tasks.filter(task => (task as any).premium === true && (task as any).straordinaria !== true).length;
+  const standardCount = tasks.filter(task => (task as any).premium !== true && (task as any).straordinaria !== true).length;
+  
   const totalTasks = tasks.length;
   const assignedTasks = totalTasks - unassignedCount;
   const completionPercentage = totalTasks > 0 ? Math.round((assignedTasks / totalTasks) * 100) : 0;
@@ -72,17 +77,24 @@ export default function StatisticsPanel({ tasks }: StatisticsPanelProps) {
 
         <div className="space-y-2">
           <div className="flex items-center text-sm">
-            <div className="w-3 h-3 bg-orange-400 rounded mr-2"></div>
-            <span className="text-muted-foreground">Mattina:</span>
-            <span className="ml-auto font-medium" data-testid="stats-morning">
-              {earlyOutCount + Math.floor(highPriorityCount / 2)} task
+            <div className="w-3 h-3 bg-yellow-400 rounded mr-2"></div>
+            <span className="text-muted-foreground">Premium:</span>
+            <span className="ml-auto font-medium" data-testid="stats-premium">
+              {premiumCount} task
             </span>
           </div>
           <div className="flex items-center text-sm">
             <div className="w-3 h-3 bg-green-500 rounded mr-2"></div>
-            <span className="text-muted-foreground">Pomeriggio:</span>
-            <span className="ml-auto font-medium" data-testid="stats-afternoon">
-              {lowPriorityCount + Math.ceil(highPriorityCount / 2)} task
+            <span className="text-muted-foreground">Standard:</span>
+            <span className="ml-auto font-medium" data-testid="stats-standard">
+              {standardCount} task
+            </span>
+          </div>
+          <div className="flex items-center text-sm">
+            <div className="w-3 h-3 bg-red-500 rounded mr-2"></div>
+            <span className="text-muted-foreground">Straordinarie:</span>
+            <span className="ml-auto font-medium" data-testid="stats-straordinarie">
+              {straordinarieCount} task
             </span>
           </div>
         </div>
