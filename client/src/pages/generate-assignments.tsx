@@ -757,6 +757,20 @@ export default function GenerateAssignments() {
       const day = String(selectedDate.getDate()).padStart(2, '0');
       const dateStr = `${year}-${month}-${day}`;
 
+      // VALIDAZIONE: Verifica che ci siano cleaner convocati
+      const selectedCleanersResponse = await fetch(`/data/cleaners/selected_cleaners.json?t=${Date.now()}`);
+      const selectedCleanersData = await selectedCleanersResponse.json();
+      
+      if (!selectedCleanersData.cleaners || selectedCleanersData.cleaners.length === 0) {
+        toast({
+          title: "Errore: Nessun cleaner convocato",
+          description: "Devi prima convocare almeno un cleaner nella sezione Convocazioni",
+          variant: "destructive",
+          duration: 5000,
+        });
+        return;
+      }
+
       console.log(`📅 Assegnazione EO per data: ${dateStr}`);
       console.log(`📅 selectedDate oggetto:`, selectedDate);
       console.log(`📅 Invio data al backend:`, dateStr);
@@ -800,6 +814,20 @@ export default function GenerateAssignments() {
       const month = String(selectedDate.getMonth() + 1).padStart(2, '0');
       const day = String(selectedDate.getDate()).padStart(2, '0');
       const dateStr = `${year}-${month}-${day}`;
+
+      // VALIDAZIONE: Verifica che ci siano cleaner convocati
+      const selectedCleanersResponse = await fetch(`/data/cleaners/selected_cleaners.json?t=${Date.now()}`);
+      const selectedCleanersData = await selectedCleanersResponse.json();
+      
+      if (!selectedCleanersData.cleaners || selectedCleanersData.cleaners.length === 0) {
+        toast({
+          title: "Errore: Nessun cleaner convocato",
+          description: "Devi prima convocare almeno un cleaner nella sezione Convocazioni",
+          variant: "destructive",
+          duration: 5000,
+        });
+        return;
+      }
 
       console.log(`📅 Assegnazione HP per data: ${dateStr}`);
       console.log(`📅 selectedDate oggetto:`, selectedDate);
@@ -848,6 +876,20 @@ export default function GenerateAssignments() {
       const month = String(selectedDate.getMonth() + 1).padStart(2, '0');
       const day = String(selectedDate.getDate()).padStart(2, '0');
       const dateStr = `${year}-${month}-${day}`;
+
+      // VALIDAZIONE: Verifica che ci siano cleaner convocati
+      const selectedCleanersResponse = await fetch(`/data/cleaners/selected_cleaners.json?t=${Date.now()}`);
+      const selectedCleanersData = await selectedCleanersResponse.json();
+      
+      if (!selectedCleanersData.cleaners || selectedCleanersData.cleaners.length === 0) {
+        toast({
+          title: "Errore: Nessun cleaner convocato",
+          description: "Devi prima convocare almeno un cleaner nella sezione Convocazioni",
+          variant: "destructive",
+          duration: 5000,
+        });
+        return;
+      }
 
       console.log(`📅 Assegnazione LP per data: ${dateStr}`);
       console.log(`📅 selectedDate oggetto:`, selectedDate);
