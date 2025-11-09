@@ -223,13 +223,6 @@ export default function GenerateAssignments() {
         const loaded = await loadSavedAssignments(date);
         
         if (loaded) {
-          // CRITICAL: Attendi che i file siano scritti sul filesystem
-          console.log("⏳ Attesa sincronizzazione file...");
-          await new Promise(resolve => setTimeout(resolve, 500));
-          
-          // Ricarica con skip extraction per leggere i file aggiornati
-          await loadTasks(true);
-          
           setExtractionStep("Assegnazioni caricate!");
           await new Promise(resolve => setTimeout(resolve, 100));
           setIsExtracting(false);
@@ -239,6 +232,16 @@ export default function GenerateAssignments() {
             console.log("🔄 Ricaricamento timeline cleaners dopo auto-load...");
             await (window as any).loadTimelineCleaners();
           }
+          
+          // CRITICAL: Ricarica tasks DOPO che timeline.json è stato scritto
+          // Usa un piccolo delay per assicurarsi che il file sia disponibile
+          setTimeout(async () => {
+            try {
+              await loadTasks(true);
+            } catch (err) {
+              console.warn("Errore nel caricamento tasks dopo auto-load:", err);
+            }
+          }, 200);
         } else {
           // Caricamento fallito, procedi con estrazione normale
           console.log("⚠️ Caricamento assegnazioni salvate fallito, procedo con estrazione normale");
