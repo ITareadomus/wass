@@ -234,6 +234,7 @@ export default function PriorityColumn({
             className={`
               flex flex-wrap gap-2 min-h-[120px] transition-colors duration-200 content-start p-2
               ${snapshot.isDraggingOver ? "drop-zone-active" : ""}
+              ${tasks.some(isDuplicateTask) ? "bg-yellow-200" : ""}
             `}
             data-testid={`priority-column-${droppableId}`}
           >
