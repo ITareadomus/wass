@@ -257,6 +257,28 @@ export default function GenerateAssignments() {
           console.log(`✅ Assegnazioni salvate caricate automaticamente per ${dateStr}`);
           setLastSavedTimestamp(checkResult.formattedDateTime || null);
 
+          // CRITICAL: Verifica che timeline.json sia valido prima di caricare
+          const timestamp = Date.now() + Math.random();
+          const timelineCheckResponse = await fetch(`/data/output/timeline.json?t=${timestamp}`, {
+            cache: 'no-store',
+            headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' }
+          });
+
+          if (timelineCheckResponse.ok) {
+            const timelineText = await timelineCheckResponse.text();
+            if (!timelineText.trim().startsWith('{')) {
+              console.error("❌ timeline.json corrotto dopo caricamento da Object Storage");
+              toast({
+                title: "Errore",
+                description: "File timeline corrotto, riprova tra qualche secondo",
+                variant: "destructive",
+                duration: 5000
+              });
+              setIsExtracting(false);
+              return;
+            }
+          }
+
           // Ricarica i task per mostrare i dati aggiornati
           await loadTasks(true);
 
