@@ -853,6 +853,7 @@ export default function TimelineView({
                 variant="outline"
                 size="sm"
                 className="flex items-center gap-2 print:hidden"
+                disabled={isReadOnly}
               >
                 <Users className="w-4 h-4" />
                 Convocazioni
