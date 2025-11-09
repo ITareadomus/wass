@@ -439,21 +439,26 @@ export default function GenerateAssignments() {
           
           // CRITICAL: Verifica che sia JSON valido
           if (!timelineText.trim().startsWith('{') && !timelineText.trim().startsWith('[')) {
-            console.error("❌ timeline.json contiene HTML/testo non valido - file non pronto");
-            console.log("📄 Contenuto ricevuto:", timelineText.substring(0, 100));
-            console.log("🔄 Tentativo di ricreare timeline.json vuota...");
+            console.error("❌ timeline.json contiene HTML/testo non valido - file corrotto");
+            console.log("📄 Contenuto ricevuto:", timelineText.substring(0, 200));
+            console.log("🔄 Ricreazione forzata di timeline.json...");
             
-            // Tenta di ricreare timeline vuota tramite backend
+            // Forza ricreazione timeline vuota tramite endpoint dedicato
             try {
-              await fetch('/api/reset-timeline-assignments', {
+              const recreateResponse = await fetch('/api/force-recreate-timeline', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ date: dateStr })
               });
               
-              // Attendi creazione file e riprova
-              await new Promise(resolve => setTimeout(resolve, 1000));
+              if (!recreateResponse.ok) {
+                throw new Error('Errore nella ricreazione timeline');
+              }
               
+              // Attendi che il file sia scritto
+              await new Promise(resolve => setTimeout(resolve, 1500));
+              
+              // Riprova a caricare
               const retryResponse = await fetch(`/data/output/timeline.json?t=${Date.now() + Math.random()}`, {
                 cache: 'no-store',
                 headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' }
@@ -463,16 +468,29 @@ export default function GenerateAssignments() {
                 const retryText = await retryResponse.text();
                 if (retryText.trim().startsWith('{')) {
                   timelineAssignmentsData = JSON.parse(retryText);
-                  console.log("✅ Timeline ricreata e caricata:", {
+                  console.log("✅ Timeline ricreata con successo:", {
                     cleaners: timelineAssignmentsData.cleaners_assignments?.length || 0,
                     date: timelineAssignmentsData.metadata?.date
                   });
+                  
+                  toast({
+                    title: "Timeline ripristinata",
+                    description: "Il file timeline.json è stato ricreato con successo",
+                    duration: 3000,
+                  });
                 } else {
                   console.warn("⚠️ Retry fallito, usa timeline vuota");
+                  throw new Error('Timeline ancora corrotta dopo ricreazione');
                 }
               }
             } catch (resetError) {
-              console.error("❌ Errore nella ricreare timeline:", resetError);
+              console.error("❌ Errore nella ricreazione timeline:", resetError);
+              toast({
+                title: "Errore critico",
+                description: "Impossibile ricreare timeline.json. Prova a ricaricare la pagina.",
+                variant: "destructive",
+                duration: 5000,
+              });
             }
           } else {
             timelineAssignmentsData = JSON.parse(timelineText);
