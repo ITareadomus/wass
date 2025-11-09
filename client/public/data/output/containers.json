@@ -1,6 +1,6 @@
 {
   "metadata": {
-    "last_updated": "2025-11-09T21:18:40.754934",
+    "last_updated": "2025-11-09T21:28:36.698512",
     "date": "2025-11-09"
   },
   "containers": {
@@ -640,7 +640,7 @@
         {
           "task_id": 218643,
           "logistic_code": 1600,
-          "client_id": null,
+          "client_id": 3,
           "premium": true,
           "address": "VIA VIVAIO, 15",
           "lat": "45.46967",
@@ -659,7 +659,9 @@
           "type_apt": "B",
           "alias": "TBR",
           "customer_name": "THE BEST RENT S.r.l.",
-          "reasons": [],
+          "reasons": [
+            "premium"
+          ],
           "priority": "high_priority"
         }
       ],
