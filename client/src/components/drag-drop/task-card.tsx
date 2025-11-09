@@ -16,7 +16,7 @@ import {
 } from "@/components/ui/tooltip";
 import { Input } from "@/components/ui/input";
 import { useState, useEffect } from "react";
-import { HelpCircle, ChevronLeft, ChevronRight, Save, Pencil, Copy } from "lucide-react";
+import { HelpCircle, ChevronLeft, ChevronRight, Save, Pencil } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 
@@ -44,7 +44,7 @@ export default function TaskCard({
   isInTimeline = false,
   allTasks = [],
   currentContainer = '',
-  isDuplicate = false, // Aggiunta questa prop con valore di default
+  isDuplicate = false,
   isDragDisabled = false, // Aggiunta questa prop con valore di default
 }: TaskCardProps) {
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -513,12 +513,6 @@ export default function TaskCard({
                       : (displayTask as any).priority === "high_priority"
                         ? "HP"
                         : "LP"}
-                  </Badge>
-                )}
-                {isDuplicate && (
-                  <Badge variant="secondary" className="bg-yellow-100 text-yellow-800 border-yellow-400">
-                    <Copy className="h-3 w-3 mr-1" />
-                    Duplicato
                   </Badge>
                 )}
               </DialogTitle>

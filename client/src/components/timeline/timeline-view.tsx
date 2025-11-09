@@ -1,5 +1,5 @@
 import { Personnel, TaskType as Task } from "@shared/schema";
-import { Calendar, RotateCcw, Users, RefreshCw, UserPlus, Maximize2, Minimize2, Printer, Copy } from "lucide-react";
+import { Calendar, RotateCcw, Users, RefreshCw, UserPlus, Maximize2, Minimize2, Printer } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import * as React from "react";
 import { Droppable, Draggable } from "react-beautiful-dnd";
@@ -24,8 +24,6 @@ import {
 } from "@/components/ui/select";
 import { useLocation } from 'wouter';
 import { format } from 'date-fns';
-import { Badge } from "@/components/ui/badge";
-import { Crown } from "lucide-react"; // Import Crown for Premium badge
 
 interface TimelineViewProps {
   personnel: Personnel[];
@@ -53,160 +51,6 @@ interface Cleaner {
   can_do_straordinaria?: boolean;
 }
 
-// Definizione dell'interfaccia per le task nella timeline, includendo isDuplicate
-interface TimelineTask extends Task {
-  task_id: string; // Assumendo che task_id sia una stringa univoca
-  logistic_code: string;
-  premium?: boolean;
-  straordinaria?: boolean;
-  confirmed_operation?: boolean | number | string;
-  assignedCleaner?: number;
-  start_time?: string;
-  sequence?: number;
-  travel_time?: number | string;
-  travelTime?: number | string;
-}
-
-// Definizione dell'interfaccia per SortableTask, aggiungendo isDuplicate
-interface SortableTaskProps {
-  task: TimelineTask;
-  cleanerId: number;
-  taskIndex: number;
-  isPastDate: boolean;
-  isDuplicate?: boolean;
-}
-
-// Componente SortableTask che riceve la prop isDuplicate
-function SortableTask({ task, cleanerId, taskIndex, isPastDate, isDuplicate = false }: SortableTaskProps) {
-  const { toast } = useToast();
-  const { cleaners } = React.useContext(TimelineViewContext); // Assumendo che cleaners sia disponibile nel contesto
-
-  const handleTaskClick = (e: React.MouseEvent) => {
-    e.stopPropagation(); // Evita che click sulla task attivi click sul cleaner
-    // Implementa la logica per aprire la modale di dettaglio task se necessario
-    // toast({ title: `Task ${task.task_id} cliccata`, description: `Logistic code: ${task.logistic_code}` });
-  };
-
-  const handleTaskDoubleClick = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    // Implementa la logica per la doppia clic su task, es. modifica
-    // toast({ title: `Task ${task.task_id} doppiopiccata` });
-  };
-
-  // Calcola la larghezza della task basandosi sul tempo di inizio e travel_time
-  const calculateTaskWidth = () => {
-    // La timeline copre 600 minuti (10:00-19:00)
-    const totalTimelineMinutes = 600; 
-    let currentOffsetMinutes = 0;
-
-    // Calcola l'offset iniziale se non è la prima task o se ha un start_time specifico
-    if (task.start_time) {
-      const [hours, minutes] = task.start_time.split(':').map(Number);
-      const taskStartMinutes = (hours * 60 + minutes) - (10 * 60); // minuti dall'inizio timeline (10:00)
-      if (taskStartMinutes > 0) {
-        currentOffsetMinutes = taskStartMinutes;
-      }
-    }
-    
-    // Estrae e normalizza travel_time
-    let travelTime = 0;
-    if (task.travel_time !== undefined && task.travel_time !== null) {
-      travelTime = typeof task.travel_time === 'number' ? task.travel_time : parseInt(String(task.travel_time), 10);
-    } else if (task.travelTime !== undefined && task.travelTime !== null) {
-      travelTime = typeof task.travelTime === 'number' ? task.travelTime : parseInt(String(task.travelTime), 10);
-    }
-    if (isNaN(travelTime)) {
-      travelTime = 0;
-    }
-
-    // Larghezza minima per garantire visibilità anche senza travel_time definito
-    const minWidthPercentage = 1; // 1% della timeline
-
-    // Calcola larghezza effettiva, considerando offset e travel_time
-    const effectiveWidth = currentOffsetMinutes + travelTime;
-    
-    // Limita la larghezza per non eccedere la timeline
-    const finalWidthPercentage = Math.min(100, (effectiveWidth / totalTimelineMinutes) * 100);
-
-    return {
-      widthPercentage: Math.max(minWidthPercentage, finalWidthPercentage),
-      offsetPercentage: (currentOffsetMinutes / totalTimelineMinutes) * 100,
-    };
-  };
-
-  const { widthPercentage, offsetPercentage } = calculateTaskWidth();
-
-  // Trova il colore del cleaner associato
-  const cleanerIndex = cleaners.findIndex(c => c.id === cleanerId);
-  const cleanerColor = cleanerIndex !== -1 ? getCleanerColor(cleanerIndex) : { bg: '#e5e7eb', text: '#1f2937' }; // Grigio di default
-
-  // Assicurati che task.task_id esista o usa un fallback
-  const uniqueKey = task.task_id || `task-${taskIndex}-${cleanerId}`;
-
-  return (
-    <Draggable draggableId={uniqueKey} index={taskIndex} isDragDisabled={isPastDate}>
-      {(provided, snapshot) => (
-        <div
-          ref={provided.innerRef}
-          {...provided.draggableProps}
-          {...provided.dragHandleProps}
-          className={`absolute top-1/2 -translate-y-1/2 h-[calc(100%-16px)] rounded-md shadow-sm cursor-grab touch-manipulation z-10 ${
-            snapshot.isDragging ? 'opacity-50 shadow-lg' : ''
-          } ${isPastDate ? 'cursor-not-allowed opacity-70' : ''}`}
-          style={{
-            left: `${offsetPercentage}%`,
-            width: `${widthPercentage}%`,
-            backgroundColor: cleanerColor.bg,
-            color: cleanerColor.text,
-            boxShadow: snapshot.isDragging ? '0 0 0 3px rgba(59, 130, 246, 0.5)' : 'none',
-          }}
-          onClick={handleTaskClick}
-          onDoubleClick={handleTaskDoubleClick}
-          data-testid={`task-card-${task.task_id}`}
-        >
-          <div className="p-2 h-full flex flex-col justify-between">
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="font-semibold text-xs truncate w-full block">{task.logistic_code}</span>
-              {task.premium && (
-                <Badge variant="secondary" className="bg-amber-100 text-amber-800 border-amber-300">
-                  <Crown className="h-3 w-3 mr-1" />
-                  Premium
-                </Badge>
-              )}
-              {isDuplicate && (
-                <Badge variant="secondary" className="bg-yellow-100 text-yellow-800 border-yellow-400">
-                  <Copy className="h-3 w-3 mr-1" />
-                  Duplicato
-                </Badge>
-              )}
-            </div>
-            <div className="flex items-center justify-between text-xs opacity-70">
-              <div className="flex items-center gap-1">
-                <Clock className="h-3 w-3" />
-                <span>{task.start_time || "00:00"}</span>
-              </div>
-              {task.travel_time !== undefined && task.travel_time !== null && (
-                <div className="flex items-center gap-1" title={`${task.travel_time} min`}>
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" className="text-gray-600">
-                    <path d="M13.5 5.5c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zM9.8 8.9L7 23h2.1l1.8-8 2.1 2v6h2v-7.5l-2.1-2 .6-3C14.8 12 16.8 13 19 13v-2c-1.9 0-3.5-1-4.3-2.4l-1-1.6c-.4-.6-1-1-1.7-1-.3 0-.5.1-.8.1L6 8.3V13h2V9.6l1.8-.7"/>
-                  </svg>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-    </Draggable>
-  );
-}
-
-// Contesto per rendere disponibili cleaners e altre funzioni globali
-const TimelineViewContext = React.createContext<{
-  cleaners: Cleaner[];
-  // Aggiungi qui altre funzioni o stati globali se necessario
-}>({ cleaners: [] });
-
-
 export default function TimelineView({
   personnel,
   tasks,
@@ -228,8 +72,6 @@ export default function TimelineView({
   const timelineRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
   const [, setLocation] = useLocation();
-  const [lastSavedFilename, setLastSavedFilename] = useState<string | null>(null);
-  const [timelineCleaners, setTimelineCleaners] = useState<any[]>([]);
 
   // Normalizza la data da localStorage per coerenza ovunque
   const workDate = localStorage.getItem('selected_work_date') || (() => {
@@ -405,7 +247,7 @@ export default function TimelineView({
     "15:00", "16:00", "17:00", "18:00", "19:00"
   ];
 
-  // Palette di colori azzurri per i cleaners (non usata attualmente, ma mantenuta)
+  // Palette di colori azzurri per i cleaners
   const cleanerColors = [
     { bg: '#0EA5E9', text: '#FFFFFF' }, // Azzurro
     { bg: '#38BDF8', text: '#FFFFFF' }, // Azzurro chiaro
@@ -419,8 +261,8 @@ export default function TimelineView({
     { bg: '#164E63', text: '#FFFFFF' }, // Ciano molto scuro
   ];
 
-  // Funzione per ottenere un colore dal cleaner basato sull'indice
   const getCleanerColor = (index: number) => {
+    // Colori distribuiti per massimo contrasto visivo tra consecutivi
     const colors = [
       { bg: "#EF4444", text: "#FFFFFF" }, // rosso
       { bg: "#3B82F6", text: "#FFFFFF" }, // blu
@@ -462,13 +304,15 @@ export default function TimelineView({
   };
 
   // Funzione per caricare i cleaner da selected_cleaners.json
-  const loadCleaners = async () => {
+  const loadCleaners = async (skipLoadSaved = false) => {
     try {
+      // Carica sia selected_cleaners.json che timeline.json per verificare la sincronizzazione
       const [selectedResponse, timelineResponse] = await Promise.all([
         fetch(`/data/cleaners/selected_cleaners.json?t=${Date.now()}`),
         fetch(`/data/output/timeline.json?t=${Date.now()}`)
       ]);
 
+      // Verifica selected_cleaners.json
       if (!selectedResponse.ok) {
         throw new Error(`HTTP error! status: ${selectedResponse.status}`);
       }
@@ -481,36 +325,44 @@ export default function TimelineView({
       }
 
       const selectedData = await selectedResponse.json();
-      let cleanersList = selectedData.cleaners || [];
+      console.log("Cleaners caricati da selected_cleaners.json:", selectedData);
 
-      // Se selected_cleaners.json è vuoto ma timeline.json ha cleaners, usali
-      if (cleanersList.length === 0 && timelineResponse.ok) {
+      // Verifica se timeline.json esiste e ha cleaners
+      let timelineCleaners: any[] = [];
+      if (timelineResponse.ok) {
         try {
           const timelineData = await timelineResponse.json();
-          const timelineCleanersWithTasks = timelineData.cleaners_assignments?.map((c: any) => ({
+          timelineCleaners = timelineData.cleaners_assignments?.map((c: any) => ({
             id: c.cleaner?.id,
             name: c.cleaner?.name,
             lastname: c.cleaner?.lastname,
             role: c.cleaner?.role,
           })).filter((c: any) => c.id) || [];
-
-          if (timelineCleanersWithTasks.length > 0) {
-            console.log(`⚠️ selected_cleaners.json vuoto ma timeline.json ha ${timelineCleanersWithTasks.length} cleaners`);
-            const cleanersResponse = await fetch(`/data/cleaners/cleaners.json?t=${Date.now()}`);
-            if (cleanersResponse.ok) {
-              const allCleanersData = await cleanersResponse.json();
-              const allCleaners = Object.values(allCleanersData.dates || {})
-                .flatMap((d: any) => d.cleaners || []);
-
-              cleanersList = timelineCleanersWithTasks.map((tc: any) => {
-                const fullData = allCleaners.find((c: any) => c.id === tc.id);
-                return fullData || tc;
-              });
-              console.log(`✅ Caricati ${cleanersList.length} cleaners dalla timeline`);
-            }
-          }
         } catch (e) {
           console.warn('Errore parsing timeline.json:', e);
+        }
+      }
+
+      // Se selected_cleaners.json è vuoto MA timeline.json ha cleaners,
+      // usa quelli dalla timeline (caso di ritorno a data precedente)
+      let cleanersList = selectedData.cleaners || [];
+      if (cleanersList.length === 0 && timelineCleaners.length > 0) {
+        console.log(`⚠️ selected_cleaners.json vuoto ma timeline.json ha ${timelineCleaners.length} cleaners`);
+        console.log('🔄 Caricamento cleaners dalla timeline per visualizzazione');
+
+        // Carica i dati completi dei cleaners da cleaners.json
+        const cleanersResponse = await fetch(`/data/cleaners/cleaners.json?t=${Date.now()}`);
+        if (cleanersResponse.ok) {
+          const cleanersData = await cleanersResponse.json();
+          const allCleaners = Object.values(cleanersData.dates || {})
+            .flatMap((d: any) => d.cleaners || []);
+
+          cleanersList = timelineCleaners.map((tc: any) => {
+            const fullData = allCleaners.find((c: any) => c.id === tc.id);
+            return fullData || tc;
+          });
+
+          console.log(`✅ Caricati ${cleanersList.length} cleaners dalla timeline`);
         }
       }
 
@@ -521,7 +373,6 @@ export default function TimelineView({
     }
   };
 
-  // Carica gli alias dei cleaner
   const loadAliases = async () => {
     try {
       const response = await fetch(`/data/cleaners/cleaners_aliases.json?t=${Date.now()}`);
@@ -531,71 +382,57 @@ export default function TimelineView({
       }
       const aliasesData = await response.json();
       setCleanersAliases(aliasesData.aliases || {});
+      console.log("Alias cleaners caricati:", aliasesData.aliases);
     } catch (error) {
       console.error("Errore nel caricamento degli alias:", error);
     }
   };
 
-  // Carica i cleaner dalla timeline (anche quelli rimossi che hanno task)
-  const loadTimelineCleaners = async () => {
-    try {
-      const response = await fetch(`/data/output/timeline.json?t=${Date.now()}`);
-      if (!response.ok) {
-        console.warn(`Timeline file not found (${response.status}), using empty timeline`);
-        setTimelineCleaners([]);
-        return;
-      }
-      const contentType = response.headers.get('content-type');
-      if (!contentType || !contentType.includes('application/json')) {
-        console.warn('Timeline file is not JSON, using empty timeline');
-        setTimelineCleaners([]);
-        return;
-      }
-      const timelineData = await response.json();
-      setTimelineCleaners(timelineData.cleaners_assignments || []);
-    } catch (error) {
-      console.error("Errore nel caricamento timeline cleaners:", error);
-      setTimelineCleaners([]);
-    }
-  };
-
-  // Effettua i caricamenti iniziali al mount del componente
   useEffect(() => {
     loadCleaners();
     loadAliases();
-    loadTimelineCleaners();
-    // Esponi la funzione per ricaricare i cleaners della timeline globalmente
-    (window as any).loadTimelineCleaners = loadTimelineCleaners;
   }, []);
 
-  // Gestione click singolo/doppio sul cleaner per filtro mappa o dettaglio
   const handleCleanerClick = (cleaner: Cleaner, e: React.MouseEvent) => {
     e.preventDefault();
+
+    // Se c'è già un timer attivo, è un doppio click
     if (clickTimer) {
       clearTimeout(clickTimer);
       setClickTimer(null);
-      // Doppio click: filtra mappa
+
+      // Gestione doppio click: filtro mappa
       if (filteredCleanerId === cleaner.id) {
         setFilteredCleanerId(null);
         (window as any).mapFilteredCleanerId = null;
-        toast({ title: "Filtro mappa rimosso" });
+        toast({
+          title: "Filtro rimosso",
+          description: "Ora visualizzi tutti gli appartamenti sulla mappa",
+        });
       } else {
         setFilteredCleanerId(cleaner.id);
         (window as any).mapFilteredCleanerId = cleaner.id;
-        toast({ title: "Filtro mappa attivato" });
+        toast({
+          title: "Filtro attivato",
+          description: `Visualizzi solo gli appartamenti di ${cleaner.name} ${cleaner.lastname}`,
+        });
       }
     } else {
-      // Singolo click: avvia timer per distinguere da doppio click
+      // Primo click: avvia timer
       const timer = setTimeout(() => {
+        // Singolo click: apri modal
         setSelectedCleaner(cleaner);
         setIsModalOpen(true);
         setClickTimer(null);
-      }, 250);
+      }, 250); // 250ms per distinguere singolo da doppio click
+
       setClickTimer(timer);
     }
   };
 
   // Carica cleaner disponibili per aggiungerli alla timeline
+  // FILTRA CONTRO selected_cleaners.json (cleaners già selezionati)
+  // NON contro timeline.json (che contiene anche cleaners rimossi con task)
   const loadAvailableCleaners = async () => {
     try {
       const [cleanersResponse, selectedCleanersResponse] = await Promise.all([
@@ -604,45 +441,95 @@ export default function TimelineView({
       ]);
 
       const data = await cleanersResponse.json();
+
+      console.log('🔍 DEBUG loadAvailableCleaners:');
+      console.log('   - workDate (normalizzata):', workDate);
+      console.log('   - Date disponibili in cleaners.json:', Object.keys(data.dates || {}));
+
+      // Trova i cleaner per la data selezionata
       let dateCleaners = data.dates?.[workDate]?.cleaners || [];
 
-      // Se non ci sono cleaner per la data, cerca nella data più recente disponibile
+      // Se non ci sono cleaners per la data, prova a cercare in tutte le date disponibili
       if (dateCleaners.length === 0) {
-        const allDates = Object.keys(data.dates || {}).sort().reverse();
+        console.log(`⚠️ Nessun cleaner trovato per ${workDate}, cerco in tutte le date...`);
+        const allDates = Object.keys(data.dates || {});
         if (allDates.length > 0) {
-          dateCleaners = data.dates[allDates[0]]?.cleaners || [];
+          // Usa la data più recente disponibile
+          const latestDate = allDates.sort().reverse()[0];
+          console.log(`   - Uso la data più recente disponibile: ${latestDate}`);
+          dateCleaners = data.dates[latestDate]?.cleaners || [];
         }
       }
 
-      const selectedCleanersData = selectedCleanersResponse.ok ? await selectedCleanersResponse.json() : { cleaners: [] };
-      const selectedCleanerIds = new Set<number>((selectedCleanersData.cleaners || []).map((c: any) => Number(c.id)));
+      console.log(`   - Cleaner trovati per la data: ${dateCleaners.length}`);
 
+      // FILTRA CONTRO selected_cleaners.json (NON timeline.json)
+      // Questo permette di sostituire cleaners rimossi dalla selezione ma ancora con task
+      const selectedCleanersData = selectedCleanersResponse.ok 
+        ? await selectedCleanersResponse.json() 
+        : { cleaners: [] };
+
+      // Crea Set di ID già selezionati
+      const selectedCleanerIds = new Set<number>(
+        (selectedCleanersData.cleaners || []).map((c: any) => Number(c.id))
+      );
+
+      console.log(`   - Cleaner già in selected_cleaners.json: ${selectedCleanerIds.size}`, Array.from(selectedCleanerIds));
+
+      // Escludi solo i cleaners già in selected_cleaners.json
       const available = dateCleaners.filter((c: Cleaner) => 
         c.active && !selectedCleanerIds.has(Number(c.id))
       );
 
-      // Ordina i cleaner disponibili per priorità di ruolo e poi ore lavorate
+      console.log(`   - Cleaner disponibili da aggiungere: ${available.length}/${dateCleaners.length}`);
+
+      // Ordina in 4 sezioni con priorità:
+      // 1. Formatore
+      // 2. Premium/Straordinario (Premium che possono fare straordinaria)
+      // 3. Premium (senza straordinaria)
+      // 4. Standard
+      // All'interno di ogni sezione, ordina per counter_hours decrescente
       available.sort((a, b) => {
+        // Determina la sezione di appartenenza
         const getSectionPriority = (c: Cleaner) => {
           if (c.role === "Formatore") return 1;
           if (c.role === "Premium" && c.can_do_straordinaria) return 2;
           if (c.role === "Premium") return 3;
-          return 4;
+          return 4; // Standard
         };
+
         const sectionA = getSectionPriority(a);
         const sectionB = getSectionPriority(b);
-        if (sectionA !== sectionB) return sectionA - sectionB;
-        return b.counter_hours - a.counter_hours; // Decrescente
+
+        // Prima ordina per sezione
+        if (sectionA !== sectionB) {
+          return sectionA - sectionB;
+        }
+
+        // All'interno della stessa sezione, ordina per counter_hours decrescente
+        return b.counter_hours - a.counter_hours;
       });
 
       setAvailableCleaners(available);
+
+      console.log(`✅ Cleaner disponibili da aggiungere: ${available.length}/${dateCleaners.length}`);
     } catch (error) {
       console.error('Errore nel caricamento dei cleaner disponibili:', error);
-      toast({ title: "Errore", description: "Impossibile caricare i cleaner disponibili", variant: "destructive" });
+      toast({
+        title: "Errore",
+        description: "Impossibile caricare i cleaner disponibili",
+        variant: "destructive",
+      });
     }
   };
 
-  // Gestisce l'aggiunta o sostituzione di un cleaner
+  // Handler per aprire il dialog di aggiunta cleaner
+  const handleOpenAddCleanerDialog = () => {
+    loadAvailableCleaners();
+    setIsAddCleanerDialogOpen(true);
+  };
+
+  // Handler per aggiungere/sostituire un cleaner
   const handleAddCleaner = (cleanerId: number) => {
     if ((window as any).setHasUnsavedChanges) {
       (window as any).setHasUnsavedChanges(true);
@@ -656,107 +543,225 @@ export default function TimelineView({
         }
       });
     } else {
+      // Aggiunta normale
       addCleanerMutation.mutate(cleanerId);
     }
   };
 
-  // Calcola la larghezza dinamica della colonna cleaner
+  // Calcola la larghezza dinamica della colonna cleaners in base all'alias più lungo
   const calculateCleanerColumnWidth = () => {
-    if (cleaners.length === 0) return 96; 
+    if (cleaners.length === 0) return 96; // default 24 (w-24 = 96px)
+
     const maxLength = cleaners.reduce((max, cleaner) => {
-      const alias = cleanersAliases[cleaner.id]?.alias || `${cleaner.name} ${cleaner.lastname}`;
+      const alias = cleanersAliases[cleaner.id]?.alias || 
+                    `${cleaner.name} ${cleaner.lastname}`;
       return Math.max(max, alias.length);
     }, 0);
-    const baseWidth = 60; 
-    const charWidth = 7.5; 
-    const badgeSpace = 30; 
+
+    // Formula: larghezza base + (caratteri * pixel per carattere)
+    // Aggiungi spazio extra per il badge
+    const baseWidth = 60; // padding e margini
+    const charWidth = 7.5; // circa 7.5px per carattere con font bold 13px
+    const badgeSpace = 30; // spazio per il badge P/F
+
     return Math.max(96, baseWidth + (maxLength * charWidth) + badgeSpace);
   };
 
   const cleanerColumnWidth = calculateCleanerColumnWidth();
 
-  // Gestione modalità schermo intero
+  // Gestione fullscreen
   const toggleFullscreen = async () => {
     if (!timelineRef.current) return;
+
     try {
       if (!isFullscreen) {
-        if (timelineRef.current.requestFullscreen) await timelineRef.current.requestFullscreen();
+        // Entra in fullscreen
+        if (timelineRef.current.requestFullscreen) {
+          await timelineRef.current.requestFullscreen();
+        }
       } else {
-        if (document.exitFullscreen) await document.exitFullscreen();
+        // Esci da fullscreen
+        if (document.exitFullscreen) {
+          await document.exitFullscreen();
+        }
       }
     } catch (error) {
       console.error('Errore fullscreen:', error);
-      toast({ title: "Errore", description: "Impossibile attivare/disattivare la modalità a schermo intero", variant: "destructive" });
+      toast({
+        title: "Errore",
+        description: "Impossibile attivare/disattivare la modalità a schermo intero",
+        variant: "destructive",
+      });
     }
   };
 
-  // Listener per cambiamenti stato fullscreen
+  // Listener per cambiamenti fullscreen
   useEffect(() => {
-    const handleFullscreenChange = () => setIsFullscreen(!!document.fullscreenElement);
+    const handleFullscreenChange = () => {
+      setIsFullscreen(!!document.fullscreenElement);
+    };
+
     document.addEventListener('fullscreenchange', handleFullscreenChange);
-    return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
+    return () => {
+      document.removeEventListener('fullscreenchange', handleFullscreenChange);
+    };
   }, []);
 
-  // Stampa la timeline
-  const handlePrint = () => window.print();
+  // Funzione per stampare la timeline
+  const handlePrint = () => {
+    window.print();
+  };
 
-  // Reset tutte le assegnazioni per la data corrente
   const handleResetAssignments = async () => {
-    const dateStr = localStorage.getItem('selected_work_date') || format(new Date(), 'yyyy-MM-dd');
     try {
+      // La data è già nel formato corretto yyyy-MM-dd nel localStorage
+      const dateStr = localStorage.getItem('selected_work_date') || (() => {
+        const today = new Date();
+        const year = today.getFullYear();
+        const month = String(today.getMonth() + 1).padStart(2, '0');
+        const day = String(today.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+      })();
+
+      // 1. Reset timeline_assignments.json (file principale)
       const resetResponse = await fetch('/api/reset-timeline-assignments', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ date: dateStr })
       });
-      if (!resetResponse.ok) throw new Error('Errore nel reset della timeline');
-      
+
+      if (!resetResponse.ok) {
+        throw new Error('Errore nel reset della timeline');
+      }
+
+      // 2. CRITICAL: Resetta il lastSavedFilename per indicare che non ci sono salvataggi
       setLastSavedFilename(null);
       localStorage.removeItem('last_saved_assignment');
-      if ((window as any).reloadAllTasks) await (window as any).reloadAllTasks();
-      if ((window as any).setHasUnsavedChanges) (window as any).setHasUnsavedChanges(true);
 
-      toast({ title: "Reset completato", description: "Timeline svuotata con successo", variant: "success" });
+      // 3. Ricarica i task senza ricaricare la pagina (mantiene la data)
+      if ((window as any).reloadAllTasks) {
+        await (window as any).reloadAllTasks();
+      }
+      if ((window as any).setHasUnsavedChanges) {
+        (window as any).setHasUnsavedChanges(true);
+      }
+
+      toast({
+        title: "Reset completato",
+        description: "Timeline svuotata con successo",
+        variant: "success",
+      });
     } catch (error) {
       console.error('Errore nel reset:', error);
-      toast({ title: "Errore", description: "Errore durante il reset delle assegnazioni", variant: "destructive" });
+      toast({
+        title: "Errore",
+        description: "Errore durante il reset delle assegnazioni",
+        variant: "destructive",
+      });
     }
   };
 
-  // Conferma e salva le assegnazioni correnti come immutabili
+
   const handleConfirmAssignments = async () => {
-    const dateStr = localStorage.getItem('selected_work_date') || format(new Date(), 'yyyy-MM-dd');
     try {
-      toast({ title: "Conferma in corso...", description: "Salvataggio delle assegnazioni in corso" });
+      const dateStr = localStorage.getItem('selected_work_date') || (() => {
+        const today = new Date();
+        const year = today.getFullYear();
+        const month = String(today.getMonth() + 1).padStart(2, '0');
+        const day = String(today.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+      })();
+
+      toast({
+        title: "Conferma in corso...",
+        description: "Salvataggio delle assegnazioni in corso",
+      });
+
+      // Chiama l'API per salvare la copia immutabile
       const response = await fetch('/api/confirm-assignments', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ date: dateStr }),
       });
-      if (!response.ok) throw new Error('Errore nel salvataggio delle assegnazioni');
-      
+
+      if (!response.ok) {
+        throw new Error('Errore nel salvataggio delle assegnazioni');
+      }
+
       const result = await response.json();
+
       setLastSavedFilename(result.formattedDateTime || result.filename);
       localStorage.setItem('last_saved_assignment', result.formattedDateTime || result.filename);
-      if ((window as any).setHasUnsavedChanges) (window as any).setHasUnsavedChanges(false);
+      if ((window as any).setHasUnsavedChanges) {
+        (window as any).setHasUnsavedChanges(false);
+      }
 
-      toast({ title: "✅ Assegnazioni confermate!", description: `Salvate il ${result.formattedDateTime}`, variant: "success" });
+      toast({
+        title: "✅ Assegnazioni confermate!",
+        description: `Salvate il ${result.formattedDateTime}`,
+        variant: "success",
+      });
     } catch (error) {
       console.error('Errore nella conferma:', error);
-      toast({ title: "Errore", description: "Errore durante la conferma delle assegnazioni", variant: "destructive" });
+      toast({
+        title: "Errore",
+        description: "Errore durante la conferma delle assegnazioni",
+        variant: "destructive",
+      });
     }
   };
 
-  // Effettua il mount per caricare lo stato del filename salvato
-  useEffect(() => {
-    const savedFilename = localStorage.getItem('last_saved_assignment');
-    if (savedFilename) {
-      setLastSavedFilename(savedFilename);
-    }
-    checkSavedAssignmentExists(); // Verifica se esiste un salvataggio per la data corrente
-  }, [workDate]); // Ricarica se la data cambia
+  const [lastSavedFilename, setLastSavedFilename] = useState<string | null>(null);
 
-  // Funzione per verificare SE esistono assegnazioni salvate per la data corrente
+  // Carica anche i cleaner dalla timeline.json per mostrare quelli nascosti
+  const [timelineCleaners, setTimelineCleaners] = useState<any[]>([]);
+
+  const loadTimelineCleaners = async () => {
+    try {
+      const response = await fetch(`/data/output/timeline.json?t=${Date.now()}`);
+      if (!response.ok) {
+        console.warn(`Timeline file not found (${response.status}), using empty timeline`);
+        setTimelineCleaners([]);
+        return;
+      }
+
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        console.warn('Timeline file is not JSON, using empty timeline');
+        setTimelineCleaners([]);
+        return;
+      }
+
+      const timelineData = await response.json();
+      const timelineCleanersList = timelineData.cleaners_assignments || [];
+      setTimelineCleaners(timelineCleanersList);
+    } catch (error) {
+      console.error("Errore nel caricamento timeline cleaners:", error);
+      setTimelineCleaners([]);
+    }
+  };
+
+  useEffect(() => {
+    loadCleaners();
+    loadAliases();
+    loadTimelineCleaners();
+
+    // Esponi la funzione per ricaricare i cleaners della timeline
+    (window as any).loadTimelineCleaners = loadTimelineCleaners;
+  }, []);
+
+  // Monitora cambiamenti nelle task per marcare modifiche non salvate
+  useEffect(() => {
+    // Skip al primo render
+    if (tasks.length === 0) return;
+
+    // Quando le task cambiano (drag-and-drop), notifica il parent
+    if (onTaskMoved) {
+      onTaskMoved();
+    }
+  }, [tasks]);
+
+  // Funzione per verificare SE esistono assegnazioni salvate (senza caricarle)
   const checkSavedAssignmentExists = async () => {
     try {
       const response = await fetch('/api/check-saved-assignments', {
@@ -764,6 +769,7 @@ export default function TimelineView({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ date: workDate })
       });
+
       if (response.ok) {
         const result = await response.json();
         if (result.found && result.formattedDateTime) {
@@ -779,17 +785,20 @@ export default function TimelineView({
     }
   };
 
-  // Combina cleaners da selected_cleaners.json e timeline.json (per quelli rimossi)
+  // Mostra cleaners da selected_cleaners.json + cleaners che hanno task in timeline.json
+  // Questo permette di vedere cleaners rimossi che hanno ancora task assegnate
   const allCleanersToShow = React.useMemo(() => {
     const selectedCleanerIds = new Set(cleaners.map(c => c.id));
     const timelineCleanersWithTasks = timelineCleaners
       .filter(tc => tc.tasks && tc.tasks.length > 0) // Solo cleaners con task
-      .filter(tc => !selectedCleanerIds.has(tc.cleaner?.id)) // Esclude quelli già in selected_cleaners
+      .filter(tc => !selectedCleanerIds.has(tc.cleaner?.id)) // Non già in selected_cleaners
       .map(tc => ({ ...tc.cleaner, isRemoved: true })); // Marca come rimosso
+
+    // Combina selected_cleaners + timeline cleaners con task (quelli rimossi andranno in fondo)
     return [...cleaners, ...timelineCleanersWithTasks];
   }, [cleaners, timelineCleaners]);
 
-  // Set di ID cleaner rimossi per lookup rapido
+  // Crea Set di ID cleaner rimossi per facile lookup
   const removedCleanerIds = React.useMemo(() => {
     const selectedIds = new Set(cleaners.map(c => c.id));
     return new Set(
@@ -799,10 +808,14 @@ export default function TimelineView({
     );
   }, [cleaners, timelineCleaners]);
 
-  // Normalizza i dati delle task per coerenza (es. flag premium/straordinaria)
-  const normalizeTask = (task: any): TimelineTask => {
+  // --- NORMALIZZAZIONI TIMELINE ---
+  // NON normalizzare task.type - lo determiniamo dai flag
+  const normalizeTask = (task: any) => {
+    // Normalizza SOLO i flag straordinaria/premium, NON il type
     const isPremium = Boolean(task.premium);
     const isStraordinaria = Boolean(task.straordinaria);
+
+    // Normalizza confirmed_operation
     const rawConfirmed = task.confirmed_operation;
     const isConfirmedOperation =
       typeof rawConfirmed === "boolean"
@@ -815,62 +828,15 @@ export default function TimelineView({
 
     return {
       ...task,
-      task_id: task.id || task.task_id, // Assicurati che task_id sia presente
-      logistic_code: task.logistic_code || 'N/A', // Fallback per logistic_code
+      // NON sovrascrivere task.type - lascialo undefined se non esiste
       premium: isPremium,
       straordinaria: isStraordinaria,
       confirmed_operation: isConfirmedOperation,
-      assignedCleaner: task.assignedCleaner,
-      start_time: task.start_time,
-      sequence: task.sequence,
-      travel_time: task.travel_time,
-      travelTime: task.travelTime,
     };
   };
 
-  // Monitora cambiamenti nelle task per marcare modifiche non salvate
-  useEffect(() => {
-    if (tasks.length === 0) return;
-    if (onTaskMoved) onTaskMoved();
-  }, [tasks]);
-
-  // Costruisci la struttura dati necessaria per il rendering della timeline
-  // groups tasks by cleaner and includes logistic code for duplicate checking
-  const timelineDataForRendering = React.useMemo(() => {
-    const dataByCleaner: Record<number, { cleaner: Cleaner; tasks: TimelineTask[] }> = {};
-
-    // Inizializza la struttura con tutti i cleaner (selezionati e rimossi con task)
-    allCleanersToShow.forEach(cleaner => {
-      dataByCleaner[cleaner.id] = { cleaner: cleaner as Cleaner, tasks: [] };
-    });
-
-    // Mappa le task ai rispettivi cleaner
-    tasks.forEach(task => {
-      const taskWithCleaner = task as any; // Assumi che task abbia assignedCleaner
-      const cleanerId = taskWithCleaner.assignedCleaner;
-      if (cleanerId && dataByCleaner[cleanerId]) {
-        dataByCleaner[cleanerId].tasks.push(normalizeTask(task));
-      }
-    });
-
-    // Ordina le task per ogni cleaner in base a sequence o start_time
-    Object.values(dataByCleaner).forEach(group => {
-      group.tasks.sort((a, b) => {
-        if (a.sequence !== undefined && b.sequence !== undefined) {
-          return a.sequence - b.sequence;
-        }
-        const timeA = a.start_time || a.fw_start_time || a.startTime || "00:00";
-        const timeB = b.start_time || b.fw_start_time || b.startTime || "00:00";
-        return timeA.localeCompare(timeB);
-      });
-    });
-
-    return Object.values(dataByCleaner);
-  }, [allCleanersToShow, tasks]);
-
-
   return (
-    <TimelineViewContext.Provider value={{ cleaners }}>
+    <>
       <div 
         ref={timelineRef}
         className={`bg-card rounded-lg border shadow-sm ${isFullscreen ? 'fixed inset-0 z-50 overflow-auto' : ''}`}
@@ -893,6 +859,7 @@ export default function TimelineView({
               </Button>
               <Button
                 onClick={() => {
+                  // Passa la data corrente come parametro URL
                   const dateStr = localStorage.getItem('selected_work_date') || format(new Date(), 'yyyy-MM-dd');
                   setLocation(`/convocazioni?date=${dateStr}`);
                 }}
@@ -918,6 +885,7 @@ export default function TimelineView({
           </div>
         </div>
         <div className="p-4 overflow-x-auto">
+          {/* Header con orari */}
           <div className="flex mb-2">
             <div className="flex-shrink-0" style={{ width: `${cleanerColumnWidth}px` }}></div>
             <div className="flex-1 flex">
@@ -932,8 +900,9 @@ export default function TimelineView({
             </div>
           </div>
 
+          {/* Righe dei cleaners - mostra solo se ci sono cleaners selezionati */}
           <div className="flex-1 overflow-auto px-4 pb-4">
-            {timelineDataForRendering.length === 0 && !isReadOnly ? (
+            {allCleanersToShow.length === 0 && !isReadOnly ? (
               <div className="flex items-center justify-center h-64 bg-yellow-50 dark:bg-yellow-950/20 border-2 border-yellow-300 dark:border-yellow-700 rounded-lg">
                 <div className="text-center p-6">
                   <Users className="mx-auto h-12 w-12 text-yellow-600 dark:text-yellow-400 mb-3" />
@@ -945,7 +914,7 @@ export default function TimelineView({
                   </p>
                 </div>
               </div>
-            ) : timelineDataForRendering.length === 0 && isReadOnly ? (
+            ) : allCleanersToShow.length === 0 && isReadOnly ? (
               <div className="flex items-center justify-center h-64 bg-red-50 dark:bg-red-950/20 border-2 border-red-300 dark:border-red-700 rounded-lg">
                 <div className="text-center p-6">
                   <Calendar className="mx-auto h-12 w-12 text-red-600 dark:text-red-400 mb-3" />
@@ -958,27 +927,27 @@ export default function TimelineView({
                 </div>
               </div>
             ) : (
-              timelineDataForRendering.map(({ cleaner, tasks: cleanerTasks }) => {
-                const index = cleaners.findIndex(c => c.id === cleaner.id); // Trova indice per colore
+              allCleanersToShow.map((cleaner, index) => {
                 const color = getCleanerColor(index);
+                const droppableId = `cleaner-${cleaner.id}`;
+
+                // Trova tutte le task assegnate a questo cleaner
+                const cleanerTasks = tasks.filter(task => 
+                  (task as any).assignedCleaner === cleaner.id
+                ).map(normalizeTask); // Applica la normalizzazione qui
+
                 const isRemoved = removedCleanerIds.has(cleaner.id);
-
-                // Verifica se questa task è duplicata (stesso logistic_code in altre task della timeline)
-                const allTasksForDuplicateCheck = timelineDataForRendering.flatMap(item => item.tasks);
-                const duplicateLogisticCodes = new Map<string, number>();
-                allTasksForDuplicateCheck.forEach(t => {
-                  duplicateLogisticCodes.set(t.logistic_code, (duplicateLogisticCodes.get(t.logistic_code) || 0) + 1);
-                });
-                const isDuplicateTask = (task: TimelineTask) => (duplicateLogisticCodes.get(task.logistic_code) || 0) > 1;
-
 
                 return (
                   <div key={cleaner.id} className="flex mb-0.5">
+                    {/* Info cleaner */}
                     <div
                       className="flex-shrink-0 p-1 flex items-center border cursor-pointer hover:opacity-90 transition-opacity"
                       style={{ 
                         width: `${cleanerColumnWidth}px`,
-                        backgroundColor: isRemoved ? '#9CA3AF' : filteredCleanerId === cleaner.id ? `${color.bg}` : color.bg,
+                        backgroundColor: isRemoved 
+                          ? '#9CA3AF' // Grigio per cleaners rimossi
+                          : filteredCleanerId === cleaner.id ? `${color.bg}` : color.bg,
                         color: isRemoved ? '#1F2937' : color.text,
                         boxShadow: filteredCleanerId === cleaner.id ? '0 0 0 3px rgba(59, 130, 246, 0.5)' : 'none',
                         userSelect: 'none',
@@ -987,10 +956,12 @@ export default function TimelineView({
                       onClick={(e) => {
                         e.preventDefault();
                         if (isRemoved) {
+                          // Cleaner rimosso: apri dialog sostituzione
                           setCleanerToReplace(cleaner.id);
                           loadAvailableCleaners();
                           setIsAddCleanerDialogOpen(true);
                         } else {
+                          // Cleaner attivo: gestione normale (singolo/doppio click)
                           handleCleanerClick(cleaner, e);
                         }
                       }}
@@ -1006,44 +977,160 @@ export default function TimelineView({
                           </div>
                         )}
                         {!isRemoved && cleaner.role === "Premium" && (
-                          <div className="bg-yellow-500 text-black font-bold text-[10px] px-1 py-0.5 rounded flex-shrink-0">P</div>
+                          <div className="bg-yellow-500 text-black font-bold text-[10px] px-1 py-0.5 rounded flex-shrink-0">
+                            P
+                          </div>
                         )}
                         {!isRemoved && cleaner.role === "Formatore" && (
-                          <div className="bg-orange-500 text-black font-bold text-[10px] px-1 py-0.5 rounded flex-shrink-0">F</div>
+                          <div className="bg-orange-500 text-black font-bold text-[10px] px-1 py-0.5 rounded flex-shrink-0">
+                            F
+                          </div>
                         )}
                         {!isRemoved && cleaner.can_do_straordinaria && (
-                          <div className="bg-red-500 text-white font-bold text-[10px] px-1 py-0.5 rounded flex-shrink-0">S</div>
+                          <div className="bg-red-500 text-white font-bold text-[10px] px-1 py-0.5 rounded flex-shrink-0">
+                            S
+                          </div>
                         )}
                       </div>
                     </div>
-                    <Droppable droppableId={`cleaner-timeline-${cleaner.id}`} direction="horizontal" isDropDisabled={isReadOnly}>
+                    {/* Timeline per questo cleaner - area unica droppable */}
+                    <Droppable droppableId={`timeline-${cleaner.id}`} direction="horizontal" isDropDisabled={isReadOnly}>
                       {(provided, snapshot) => (
                         <div
                           ref={provided.innerRef}
                           {...provided.droppableProps}
                           data-testid={`timeline-cleaner-${cleaner.id}`}
                           data-cleaner-id={cleaner.id}
-                          className={`relative min-h-[45px] flex-1 ${snapshot.isDraggingOver && !isReadOnly ? 'bg-primary/20 ring-2 ring-primary' : ''}`}
-                          style={{ backgroundColor: snapshot.isDraggingOver && !isReadOnly ? `${color.bg}40` : `${color.bg}10` }}
+                          className={`relative min-h-[45px] flex-1 ${
+                            snapshot.isDraggingOver && !isReadOnly ? 'bg-primary/20 ring-2 ring-primary' : ''
+                          }`}
+                          style={{ 
+                            backgroundColor: snapshot.isDraggingOver && !isReadOnly
+                              ? `${color.bg}40`
+                              : `${color.bg}10`
+                          }}
                         >
+                          {/* Griglia oraria di sfondo (solo visiva) */}
                           <div className="absolute inset-0 grid grid-cols-10 pointer-events-none opacity-10">
-                            {timeSlots.map((slot, idx) => ( <div key={idx} className="border-r border-border"></div> ))}
+                            {timeSlots.map((slot, idx) => (
+                              <div key={idx} className="border-r border-border"></div>
+                            ))}
                           </div>
 
+                          {/* Task posizionate in sequenza con indicatori di travel time */}
                           <div className="relative z-10 flex items-center h-full">
-                            {cleanerTasks.map((task, taskIndex) => {
-                              const isDuplicate = isDuplicateTask(task);
-                              return (
-                                <SortableTask 
-                                  key={task.task_id || task.id} // Usa task.task_id se disponibile
-                                  task={task}
-                                  cleanerId={cleaner.id}
-                                  taskIndex={taskIndex}
-                                  isPastDate={false} // Implementa logica se necessario
-                                  isDuplicate={isDuplicate}
-                                />
-                              );
-                            })}
+                            {(() => {
+                              // Calcola l'array delle task per questo cleaner una sola volta
+                              const cleanerTasks = tasks
+                                .filter((task) => 
+                                  (task as any).assignedCleaner === cleaner.id
+                                )
+                                .map(normalizeTask)
+                                .sort((a, b) => {
+                                  const taskA = a as any;
+                                  const taskB = b as any;
+
+                                  if (taskA.sequence !== undefined && taskB.sequence !== undefined) {
+                                    return taskA.sequence - taskB.sequence;
+                                  }
+
+                                  const timeA = taskA.start_time || taskA.fw_start_time || taskA.startTime || "00:00";
+                                  const timeB = taskB.start_time || taskB.fw_start_time || taskB.startTime || "00:00";
+                                  return timeA.localeCompare(timeB);
+                                });
+
+                              return cleanerTasks.map((task, idx) => {
+                                const taskObj = task as any;
+
+                                // Per il drag and drop, usa l'indice locale (idx) non globalIndex
+                                // React-beautiful-dnd richiede indici sequenziali 0,1,2,3... per ogni Droppable
+
+                                // Leggi travel_time dalla task normalizzata (che viene da timeline_assignments.json)
+                                // Prova sia travel_time che travelTime per compatibilità
+                                let travelTime = 0;
+                                if (taskObj.travel_time !== undefined && taskObj.travel_time !== null) {
+                                  travelTime = typeof taskObj.travel_time === 'number' 
+                                    ? taskObj.travel_time 
+                                    : parseInt(String(taskObj.travel_time), 10);
+                                } else if (taskObj.travelTime !== undefined && taskObj.travelTime !== null) {
+                                  travelTime = typeof taskObj.travelTime === 'number' 
+                                    ? taskObj.travelTime 
+                                    : parseInt(String(taskObj.travelTime), 10);
+                                }
+
+                                // Se il parsing fallisce, usa 0
+                                if (isNaN(travelTime)) {
+                                  travelTime = 0;
+                                }
+
+                                // Calcola offset dinamico basato su start_time della task
+                                let timeOffset = 0;
+                                if (taskObj.sequence === 1 && taskObj.start_time) {
+                                  // La timeline inizia alle 10:00 (= 0 minuti dall'inizio)
+                                  const [hours, minutes] = taskObj.start_time.split(':').map(Number);
+                                  const taskStartMinutes = (hours * 60 + minutes) - (10 * 60); // minuti dall'inizio timeline
+                                  if (taskStartMinutes > 0) {
+                                    timeOffset = taskStartMinutes; // offset in minuti
+                                  }
+                                }
+
+                                // DEBUG: log per capire cosa sta succedendo
+                                if (idx > 0) {
+                                  console.log(`Task ${taskObj.task_id || taskObj.id}: travel_time=${travelTime} min`);
+                                }
+
+                                // Calcola larghezza EFFETTIVA in base ai minuti reali di travel_time
+                                // La timeline copre 600 minuti (10:00-19:00)
+                                // Se travelTime è 0, usa almeno 1 minuto per visibilità
+                                const effectiveTravelMinutes = travelTime === 0 ? 1 : travelTime;
+                                const totalWidth = (effectiveTravelMinutes / 600) * 100;
+
+                                // Usa task.id o task.task_id come chiave univoca (non logistic_code che può essere duplicato)
+                                const uniqueKey = taskObj.task_id || taskObj.id;
+
+                                return (
+                                  <>
+                                    {/* Spazio vuoto per task con sequence=1 e start_time=11:00 */}
+                                    {timeOffset > 0 && (
+                                      <div 
+                                        key={`offset-${uniqueKey}`}
+                                        className="flex-shrink-0"
+                                        style={{ width: `${(timeOffset / 600) * 100}%` }}
+                                      />
+                                    )}
+
+                                    {/* Indicatore di travel time: solo omino */}
+                                    {idx > 0 && (
+                                      <div 
+                                        key={`marker-${uniqueKey}`} 
+                                        className="flex items-center justify-center flex-shrink-0 py-3 px-2"
+                                        style={{ width: `${totalWidth}%`, minHeight: '50px' }}
+                                        title={`${travelTime} min`}
+                                      >
+                                        <svg
+                                          width="20"
+                                          height="20"
+                                          viewBox="0 0 24 24"
+                                          fill="currentColor"
+                                          className="text-gray-600 flex-shrink-0"
+                                        >
+                                          <path d="M13.5 5.5c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zM9.8 8.9L7 23h2.1l1.8-8 2.1 2v6h2v-7.5l-2.1-2 .6-3C14.8 12 16.8 13 19 13v-2c-1.9 0-3.5-1-4.3-2.4l-1-1.6c-.4-.6-1-1-1.7-1-.3 0-.5.1-.8.1L6 8.3V13h2V9.6l1.8-.7"/>
+                                        </svg>
+                                      </div>
+                                    )}
+
+                                    <TaskCard 
+                                      key={uniqueKey}
+                                      task={task} 
+                                      index={idx}
+                                      isInTimeline={true}
+                                      allTasks={cleanerTasks}
+                                      isDragDisabled={isReadOnly}
+                                    />
+                                  </>
+                                );
+                              });
+                            })()}
                             {provided.placeholder}
                           </div>
                         </div>
@@ -1056,12 +1143,12 @@ export default function TimelineView({
 
             {/* Riga finale con pulsanti */}
             <div className="flex mb-2">
+              {/* Pulsante + sotto il nome dell'ultimo cleaner */}
               <div className="flex-shrink-0 p-1 flex items-center justify-center border border-border" style={{ width: `${cleanerColumnWidth}px` }}>
                 <Button
                   onClick={() => {
                     setCleanerToReplace(null);
-                    loadAvailableCleaners();
-                    setIsAddCleanerDialogOpen(true);
+                    handleOpenAddCleanerDialog();
                   }}
                   variant="ghost"
                   size="sm"
@@ -1071,6 +1158,7 @@ export default function TimelineView({
                   <UserPlus className="w-5 h-5" />
                 </Button>
               </div>
+              {/* Pulsanti Conferma Assegnazioni e Stampa affiancati */}
               <div className="flex-1 p-1 border-t border-border flex gap-2">
                 {!isReadOnly && (
                   <Button
@@ -1260,7 +1348,7 @@ export default function TimelineView({
                       </SelectTrigger>
                       <SelectContent>
                         {cleaners
-                          .filter(c => c.id !== selectedCleaner.id) 
+                          .filter(c => c.id !== selectedCleaner.id) // Escludi cleaner corrente
                           .map(cleaner => (
                             <SelectItem 
                               key={cleaner.id} 
@@ -1317,6 +1405,6 @@ export default function TimelineView({
           )}
         </DialogContent>
       </Dialog>
-    </TimelineViewContext.Provider>
+    </>
   );
 }
