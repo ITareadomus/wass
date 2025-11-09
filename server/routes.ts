@@ -1115,6 +1115,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const folderPath = `${day}-${month}-${fullYear}`;
       const scKey = `${folderPath}/selected_cleaners_${day}${month}${year}.json`;
       
+      let selectedCleanersBackup: any = null;
       try {
         const scResult = await client.downloadAsText(scKey, { bucket: BUCKET });
         const selectedCleanersPath = path.join(
@@ -1128,6 +1129,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           scData.metadata = scData.metadata || {};
           scData.metadata.date = workDate;
           scData.metadata.loaded_at = new Date().toISOString();
+
+          // Salva backup in memoria per ripristino post-create_containers
+          selectedCleanersBackup = scData;
 
           const tmpScPath = `${selectedCleanersPath}.tmp`;
           await fs.writeFile(tmpScPath, JSON.stringify(scData, null, 2));
@@ -1169,6 +1173,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
         );
       });
       console.log("create_containers output:", containersResult);
+
+      // CRITICAL: Ripristina selected_cleaners.json DOPO create_containers
+      // perché lo script Python potrebbe averlo sovrascritto
+      if (selectedCleanersBackup) {
+        try {
+          const selectedCleanersPath = path.join(
+            process.cwd(),
+            'client/public/data/cleaners/selected_cleaners.json'
+          );
+          
+          const tmpScPath = `${selectedCleanersPath}.tmp`;
+          await fs.writeFile(tmpScPath, JSON.stringify(selectedCleanersBackup, null, 2));
+          await fs.rename(tmpScPath, selectedCleanersPath);
+
+          console.log(`✅ Selected cleaners ri-ripristinati dopo create_containers (${selectedCleanersBackup.cleaners?.length || 0} cleaners)`);
+        } catch (e) {
+          console.warn(`⚠️ Errore nel ri-ripristino selected_cleaners:`, e);
+        }
+      }
 
       // CRITICAL: NON rieseguire create_containers dopo aver caricato da Object Storage
       // Invece, rimuovi dai containers.json le task già assegnate in timeline.json
