@@ -265,72 +265,37 @@ export default function GenerateAssignments() {
               description: `Ultime assegnazioni salvate il ${checkResult.formattedDateTime || dateStr}`,
               duration: 3000
             });
-          } else {
-            console.log("⚠️ Caricamento assegnazioni salvate fallito, procedo con estrazione normale");
-            await extractData(date); // Fallback if loading fails
-            return;
-          }
 
-          // Imposta timeline in modalità read-only (assegnazioni salvate)
-          setIsTimelineReadOnly(true);
-          console.log("🔒 Timeline impostata in modalità READ-ONLY (assegnazioni salvate)");
+            // Imposta timeline in modalità read-only (assegnazioni salvate)
+            setIsTimelineReadOnly(true);
+            console.log("🔒 Timeline impostata in modalità READ-ONLY (assegnazioni salvate)");
 
-          // CRITICAL: Verifica che la data nel file caricato corrisponda alla data selezionata
-          const timestamp = Date.now() + Math.random();
-          const timelineResponse = await fetch(`/data/output/timeline.json?t=${timestamp}`, {
-            cache: 'no-store',
-            headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' }
-          });
-
-          if (timelineResponse.ok) {
-            const timelineData = await timelineResponse.json();
-            const loadedDate = timelineData.metadata?.date;
-
-            if (loadedDate !== dateStr) {
-              console.warn(`⚠️ La data nel file (${loadedDate}) non corrisponde alla data selezionata (${dateStr})`);
-              console.log("📭 Mostro timeline vuota per data passata senza salvataggi");
-
-              // Data passata senza salvataggi corrispondenti: mostra timeline vuota
-              setIsTimelineReadOnly(true);
-              setExtractionStep("Data passata - nessuna assegnazione disponibile");
-
-              // Svuota i containers e la timeline
-              setEarlyOutTasks([]);
-              setHighPriorityTasks([]);
-              setLowPriorityTasks([]);
-              setAllTasksWithAssignments([]);
-
-              await new Promise(resolve => setTimeout(resolve, 500));
-              setIsExtracting(false);
-              return;
+            // Ricarica la timeline UI
+            if ((window as any).loadTimelineCleaners) {
+              console.log("🔄 Ricaricamento timeline cleaners dopo auto-load...");
+              await (window as any).loadTimelineCleaners();
             }
-          }
 
-          // La data corrisponde - procedi con il caricamento normale
-          console.log("⏳ Attesa sincronizzazione file dopo caricamento da Object Storage...");
-          await new Promise(resolve => setTimeout(resolve, 1000));
+            setExtractionStep("Assegnazioni caricate!");
+            await new Promise(resolve => setTimeout(resolve, 100));
+            setIsExtracting(false);
+          } else {
+            // Caricamento fallito per data passata = nessun salvataggio disponibile
+            console.log("📭 Data passata senza salvataggi disponibili - mostro messaggio vuoto");
+            setIsTimelineReadOnly(true);
+            setExtractionStep("Data passata - nessuna assegnazione disponibile");
 
-          // Ricarica la timeline UI
-          if ((window as any).loadTimelineCleaners) {
-            console.log("🔄 Ricaricamento timeline cleaners dopo auto-load...");
-            await (window as any).loadTimelineCleaners();
-          }
+            // Svuota tutto
+            setEarlyOutTasks([]);
+            setHighPriorityTasks([]);
+            setLowPriorityTasks([]);
+            setAllTasksWithAssignments([]);
+            setLastSavedTimestamp(null);
 
-          // Ricarica i tasks con i dati aggiornati
-          try {
-            console.log("📊 Caricamento tasks da file aggiornati...");
-            await loadTasks(true);
-            console.log("✅ Tasks caricati con successo da assegnazioni salvate");
-          } catch (err) {
-            console.warn("⚠️ Errore nel caricamento tasks dopo auto-load:", err);
-            // Se fallisce, prova con estrazione nuova
-            await extractData(date);
+            await new Promise(resolve => setTimeout(resolve, 500));
+            setIsExtracting(false);
             return;
           }
-
-          setExtractionStep("Assegnazioni caricate!");
-          await new Promise(resolve => setTimeout(resolve, 100));
-          setIsExtracting(false);
 
         } else {
           // Per data corrente e future: mostra solo che esistono salvataggi ma NON caricarli
