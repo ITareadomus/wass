@@ -1,25 +1,25 @@
 {
   "cleaners": [
     {
-      "id": 626,
-      "name": "DORA PATRICIA",
-      "lastname": "JIMENEZ",
-      "role": "Formatore",
+      "id": 1063,
+      "name": "ALEXANDER DENNYS",
+      "lastname": "CARDENAS OLAYA",
+      "role": "Standard",
       "active": true,
       "ranking": 0,
-      "counter_hours": 34.75,
-      "counter_days": 0,
+      "counter_hours": 35.5,
+      "counter_days": 6,
       "available": true,
-      "contract_type": "B",
+      "contract_type": "a chiamata",
       "preferred_customers": [],
       "telegram_id": null,
-      "start_time": "10:00",
+      "start_time": null,
       "can_do_straordinaria": false
     }
   ],
   "total_selected": 1,
   "metadata": {
     "date": "2025-11-09",
-    "reset_at": "2025-11-09T21:56:58.044Z"
+    "saved_at": "2025-11-09T22:01:02.348Z"
   }
 }
