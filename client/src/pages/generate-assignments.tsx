@@ -219,12 +219,27 @@ export default function GenerateAssignments() {
         console.log("✅ Trovate assegnazioni salvate per", dateStr, "- caricamento automatico...");
         setExtractionStep("Caricamento assegnazioni salvate...");
         
-        await loadSavedAssignments(date);
-        await loadTasks();
+        // CRITICAL: Prima resetta la timeline per evitare conflitti
+        await fetch('/api/reset-timeline-assignments', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ date: dateStr })
+        });
         
-        setExtractionStep("Assegnazioni caricate!");
-        await new Promise(resolve => setTimeout(resolve, 100));
-        setIsExtracting(false);
+        await new Promise(resolve => setTimeout(resolve, 200));
+        
+        const loaded = await loadSavedAssignments(date);
+        
+        if (loaded) {
+          await loadTasks();
+          setExtractionStep("Assegnazioni caricate!");
+          await new Promise(resolve => setTimeout(resolve, 100));
+          setIsExtracting(false);
+        } else {
+          // Caricamento fallito, procedi con estrazione normale
+          console.log("⚠️ Caricamento assegnazioni salvate fallito, procedo con estrazione normale");
+          await extractData(date);
+        }
       } else {
         // NON esistono assegnazioni salvate - estrai dati dal database
         console.log("ℹ️ Nessuna assegnazione salvata per", dateStr, "- estrazione dal database...");
@@ -447,6 +462,9 @@ export default function GenerateAssignments() {
               body: JSON.stringify({ date: dateStr })
             });
             
+            // Attendi che il file sia scritto
+            await new Promise(resolve => setTimeout(resolve, 500));
+            
             // Ricarica dopo reset
             const retryResponse = await fetch(`/data/output/timeline.json?t=${Date.now()}`, {
               cache: 'no-store',
@@ -469,7 +487,17 @@ export default function GenerateAssignments() {
           }
         } catch (parseError) {
           console.error("❌ Errore parsing timeline.json:", parseError);
-          console.log("⚠️ Uso timeline vuota - i container potrebbero non essere filtrati correttamente");
+          console.log("🔄 Tento ricreazione timeline.json dopo errore di parsing...");
+          
+          // Forza ricreazione anche in caso di errore di parsing
+          await fetch('/api/reset-timeline-assignments', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ date: dateStr })
+          });
+          
+          await new Promise(resolve => setTimeout(resolve, 500));
+          console.log("⚠️ Timeline ricreata, usa timeline vuota per questo caricamento");
         }
       } else {
         console.warn("⚠️ timeline.json non trovato (HTTP", timelineResponse.status, ")");
@@ -482,6 +510,7 @@ export default function GenerateAssignments() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ date: dateStr })
           });
+          await new Promise(resolve => setTimeout(resolve, 500));
           console.log("✅ Timeline.json creata");
         } catch (err) {
           console.error("❌ Impossibile creare timeline.json:", err);
