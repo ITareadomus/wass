@@ -413,7 +413,7 @@ export default function TaskCard({
                       ${cardColorClass}
                       rounded-sm px-2 py-1 shadow-sm border transition-all duration-200
                       ${snapshot.isDragging ? "shadow-lg scale-105" : ""}
-                      ${isOverdue ? "animate-blink" : ""}
+                      ${isOverdue && isInTimeline ? "animate-blink" : ""}
                       ${isDuplicate && !isInTimeline ? "animate-blink-yellow" : ""}
                       hover:shadow-md cursor-pointer
                       flex-shrink-0 relative

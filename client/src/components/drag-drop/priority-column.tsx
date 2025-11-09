@@ -27,6 +27,7 @@ export default function PriorityColumn({
   const [isAssigning, setIsAssigning] = useState(false);
   const [isDateInPast, setIsDateInPast] = useState(false);
   const { toast } = useToast();
+  const [hasAssigned, setHasAssigned] = useState(false); // Stato per tracciare se è stato fatto un assegnamento
 
   // Verifica se la data selezionata è nel passato
   useEffect(() => {
@@ -70,13 +71,11 @@ export default function PriorityColumn({
     return logisticCodeCounts[task.name] > 1;
   };
 
-  const handleAssignClick = async () => {
-    if (!assignAction) return;
-
-    try {
+  // Funzione modificata per usare hasAssigned
+  const handleAssign = async () => {
+    if (assignAction) {
       await assignAction();
-    } catch (error) {
-      console.error("Errore durante l'assegnazione:", error);
+      setHasAssigned(true); // Imposta hasAssigned a true dopo l'assegnazione
     }
   };
 
@@ -207,7 +206,7 @@ export default function PriorityColumn({
         <Button
           variant="outline"
           size="sm"
-          onClick={handleAssignContainer}
+          onClick={handleAssign} // Utilizza handleAssign
           disabled={isAssigning || tasks.length === 0 || isDateInPast}
           className="text-xs px-2 py-1 h-7"
           title={isDateInPast ? "Non puoi assegnare task per date passate" : ""}
@@ -237,17 +236,24 @@ export default function PriorityColumn({
             `}
             data-testid={`priority-column-${droppableId}`}
           >
-            {tasks.map((task, index) => (
-              <TaskCard
-                key={task.id}
-                task={task}
-                index={index}
-                isInTimeline={false}
-                allTasks={tasks}
-                currentContainer={droppableId}
-                isDuplicate={isDuplicateTask(task)} // Passa il flag isDuplicate
-              />
-            ))}
+            {tasks.map((task, index) => {
+              // Verifica se è duplicata (stesso logistic_code ma id diverso)
+              // La task è considerata duplicata se hasAssigned è true E ci sono altre task con lo stesso logistic_code
+              const isDuplicate = hasAssigned && tasks.some(
+                t => t.name === task.name && t.id !== task.id
+              );
+              return (
+                <TaskCard
+                  key={task.id}
+                  task={task}
+                  index={index}
+                  isInTimeline={false}
+                  allTasks={tasks}
+                  currentContainer={droppableId}
+                  isDuplicate={isDuplicate} // Passa il flag isDuplicate
+                />
+              );
+            })}
             {provided.placeholder}
           </div>
         )}
