@@ -142,6 +142,31 @@ export default function Convocazioni() {
           console.log(`ℹ️ selected_cleaners.json non trovato, mostro TUTTI i cleaners`);
         }
 
+        // NUOVO: Carica anche cleaners dalla timeline.json per pre-selezionarli
+        const timelineResponse = await fetch(`/data/output/timeline.json?t=${Date.now()}`);
+        if (timelineResponse.ok) {
+          try {
+            const timelineData = await timelineResponse.json();
+            const timelineDateFromFile = timelineData.metadata?.date;
+            
+            // Solo se la data corrisponde
+            if (timelineDateFromFile === dateStr && timelineData.cleaners_assignments) {
+              for (const cleanerEntry of timelineData.cleaners_assignments) {
+                if (cleanerEntry.cleaner?.id) {
+                  const cleanerId = cleanerEntry.cleaner.id;
+                  // Aggiungi alla lista di cleaners già selezionati
+                  alreadySelectedIds.add(cleanerId);
+                  // Pre-seleziona visivamente
+                  preselectedIds.add(cleanerId);
+                  console.log(`✅ Cleaner ${cleanerId} trovato nella timeline - pre-selezionato`);
+                }
+              }
+            }
+          } catch (e) {
+            console.warn('⚠️ Errore parsing timeline.json:', e);
+          }
+        }
+
         // Filtra cleaners: escludi quelli già selezionati E mostra solo attivi
         const availableCleaners = dateCleaners.filter((c: any) => 
           !alreadySelectedIds.has(c.id) && c.active === true
