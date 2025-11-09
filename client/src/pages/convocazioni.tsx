@@ -118,9 +118,10 @@ export default function Convocazioni() {
 
         console.log(`📅 Cleaners totali per ${dateStr}:`, dateCleaners.length);
 
-        // Carica selected_cleaners.json per escludere quelli già selezionati
+        // Carica selected_cleaners.json per gestire la persistenza delle selezioni
         const selectedResponse = await fetch(`/data/cleaners/selected_cleaners.json?t=${Date.now()}`);
         let alreadySelectedIds = new Set<number>();
+        let preselectedIds = new Set<number>(); // IDs da mantenere selezionati nell'UI
 
         if (selectedResponse.ok) {
           const selectedData = await selectedResponse.json();
@@ -130,7 +131,9 @@ export default function Convocazioni() {
 
           // Filtra solo se la data corrisponde
           if (selectedDateFromFile === dateStr) {
-            alreadySelectedIds = new Set(selectedData.cleaners?.map((c: any) => c.id) || []);
+            const selectedCleanerIds = selectedData.cleaners?.map((c: any) => c.id) || [];
+            alreadySelectedIds = new Set(selectedCleanerIds);
+            preselectedIds = new Set(selectedCleanerIds); // Mantieni la selezione visiva
             console.log(`✅ Cleaners già selezionati per ${dateStr}:`, Array.from(alreadySelectedIds));
           } else {
             console.log(`⚠️ Data non corrispondente (file: ${selectedDateFromFile}, richiesta: ${dateStr}), mostro TUTTI i cleaners`);
@@ -161,7 +164,8 @@ export default function Convocazioni() {
         availableCleaners.sort((a, b) => b.counter_hours - a.counter_hours);
 
         setCleaners(availableCleaners);
-        setSelectedCleaners(new Set()); // Reset selezioni quando cambia la data
+        // Mantieni la selezione dei cleaner appena salvati (visivamente)
+        setSelectedCleaners(preselectedIds);
 
         // Carica statistiche task
         setLoadingMessage("Caricamento statistiche task...");
