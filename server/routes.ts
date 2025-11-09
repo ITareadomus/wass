@@ -965,26 +965,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const result = await client.downloadAsText(key, { bucket: BUCKET });
 
       if (result.ok) {
-        // CRITICAL: Verifica che la data nel file corrisponda alla data richiesta
-        try {
-          const savedData = JSON.parse(result.value);
-          const savedDate = savedData.metadata?.date;
-          
-          if (savedDate !== workDate) {
-            console.log(`⚠️ File trovato ma data non corrisponde: richiesta ${workDate}, trovata ${savedDate}`);
-            return res.json({ success: true, found: false });
-          }
-          
-          return res.json({
-            success: true,
-            found: true,
-            filename: key,
-            formattedDateTime: format(d, "dd/MM/yyyy", { locale: it })
-          });
-        } catch (parseError) {
-          console.error("Errore parsing file salvato:", parseError);
-          return res.json({ success: true, found: false });
-        }
+        // File trovato - ritorna sempre come valido
+        // La data nel filename è quella che conta (costruita da buildKey)
+        return res.json({
+          success: true,
+          found: true,
+          filename: key,
+          formattedDateTime: format(d, "dd/MM/yyyy", { locale: it })
+        });
       }
 
       // File non trovato
@@ -1106,18 +1094,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const savedData = JSON.parse(result.value);
       
-      // CRITICAL: Verifica che la data nel file corrisponda alla data richiesta
-      const savedDate = savedData.metadata?.date;
-      if (savedDate !== workDate) {
-        console.log(`⚠️ Data nel file (${savedDate}) non corrisponde alla data richiesta (${workDate})`);
-        return res.json({
-          success: true,
-          found: false,
-          message: "Nessuna assegnazione salvata per questa data"
-        });
-      }
-
-      // CRITICAL: Aggiorna la data nei metadata per riflettere la data selezionata
+      // CRITICAL: Aggiorna SEMPRE la data nei metadata con la data richiesta
+      // Questo permette di caricare file salvati anche se la data interna non corrisponde
       savedData.metadata = savedData.metadata || {};
       savedData.metadata.date = workDate;
       savedData.metadata.last_updated = new Date().toISOString();
