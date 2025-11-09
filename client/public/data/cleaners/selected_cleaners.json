@@ -1,25 +1,8 @@
 {
-  "cleaners": [
-    {
-      "id": 1063,
-      "name": "ALEXANDER DENNYS",
-      "lastname": "CARDENAS OLAYA",
-      "role": "Standard",
-      "active": true,
-      "ranking": 0,
-      "counter_hours": 35.5,
-      "counter_days": 6,
-      "available": true,
-      "contract_type": "a chiamata",
-      "preferred_customers": [],
-      "telegram_id": null,
-      "start_time": null,
-      "can_do_straordinaria": false
-    }
-  ],
-  "total_selected": 1,
+  "cleaners": [],
+  "total_selected": 0,
   "metadata": {
     "date": "2025-11-09",
-    "saved_at": "2025-11-09T22:01:02.348Z"
+    "reset_at": "2025-11-09T22:31:07.073Z"
   }
 }
