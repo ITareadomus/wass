@@ -305,6 +305,14 @@ export default function GenerateAssignments() {
         if (isPastDate) {
           console.log("🔒 Data passata senza assegnazioni salvate - modalità READ-ONLY con container");
           setIsTimelineReadOnly(true);
+          
+          // CRITICAL: Svuota selected_cleaners.json per date passate senza salvataggi
+          // Questo forza la visualizzazione dei container vuoti invece del messaggio giallo
+          await fetch('/api/reset-selected-cleaners', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ date: dateStr })
+          });
         } else {
           console.log("✏️ Data presente/futura - modalità EDITABILE");
           setIsTimelineReadOnly(false);
