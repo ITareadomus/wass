@@ -560,9 +560,9 @@ export default function TaskCard({
               <div>
                 <p className="text-sm font-semibold text-muted-foreground mb-1 flex items-center gap-1">
                   Durata pulizia
-                  <Pencil className="w-3 h-3 text-muted-foreground/60" />
+                  {!isDragDisabled && <Pencil className="w-3 h-3 text-muted-foreground/60" />}
                 </p>
-                {editingField === 'duration' ? (
+                {editingField === 'duration' && !isDragDisabled ? (
                   <div className="flex items-center gap-2">
                     <Input
                       type="text"
@@ -581,8 +581,8 @@ export default function TaskCard({
                   </div>
                 ) : (
                   <p
-                    className="text-sm cursor-pointer hover:bg-muted/50 p-1 rounded"
-                    onClick={() => setEditingField('duration')}
+                    className={`text-sm p-1 rounded ${!isDragDisabled ? 'cursor-pointer hover:bg-muted/50' : ''}`}
+                    onClick={() => !isDragDisabled && setEditingField('duration')}
                   >
                     {displayTask.duration.replace(".", ":")} ore
                   </p>
@@ -595,9 +595,9 @@ export default function TaskCard({
               <div>
                 <p className="text-sm font-semibold text-muted-foreground mb-1 flex items-center gap-1">
                   Check-out
-                  <Pencil className="w-3 h-3 text-muted-foreground/60" />
+                  {!isDragDisabled && <Pencil className="w-3 h-3 text-muted-foreground/60" />}
                 </p>
-                {editingField === 'checkout' ? (
+                {editingField === 'checkout' && !isDragDisabled ? (
                   <div className="space-y-2">
                     <div className="relative">
                       <Input
@@ -623,8 +623,8 @@ export default function TaskCard({
                   </div>
                 ) : (
                   <p
-                    className="text-sm cursor-pointer hover:bg-muted/50 p-1 rounded"
-                    onClick={() => setEditingField('checkout')}
+                    className={`text-sm p-1 rounded ${!isDragDisabled ? 'cursor-pointer hover:bg-muted/50' : ''}`}
+                    onClick={() => !isDragDisabled && setEditingField('checkout')}
                   >
                     {(displayTask as any).checkout_date
                       ? new Date((displayTask as any).checkout_date).toLocaleDateString(
@@ -643,9 +643,9 @@ export default function TaskCard({
               <div>
                 <p className="text-sm font-semibold text-muted-foreground mb-1 flex items-center gap-1">
                   Check-in
-                  <Pencil className="w-3 h-3 text-muted-foreground/60" />
+                  {!isDragDisabled && <Pencil className="w-3 h-3 text-muted-foreground/60" />}
                 </p>
-                {editingField === 'checkin' ? (
+                {editingField === 'checkin' && !isDragDisabled ? (
                   <div className="space-y-2">
                     <div className="relative">
                       <Input
@@ -671,8 +671,8 @@ export default function TaskCard({
                   </div>
                 ) : (
                   <p
-                    className="text-sm cursor-pointer hover:bg-muted/50 p-1 rounded"
-                    onClick={() => setEditingField('checkin')}
+                    className={`text-sm p-1 rounded ${!isDragDisabled ? 'cursor-pointer hover:bg-muted/50' : ''}`}
+                    onClick={() => !isDragDisabled && setEditingField('checkin')}
                   >
                     {(displayTask as any).checkin_date
                       ? new Date((displayTask as any).checkin_date).toLocaleDateString(
@@ -714,9 +714,9 @@ export default function TaskCard({
               <div>
                 <p className="text-sm font-semibold text-muted-foreground mb-1 flex items-center gap-1">
                   Pax-In
-                  <Pencil className="w-3 h-3 text-muted-foreground/60" />
+                  {!isDragDisabled && <Pencil className="w-3 h-3 text-muted-foreground/60" />}
                 </p>
-                {editingField === 'paxin' ? (
+                {editingField === 'paxin' && !isDragDisabled ? (
                   <div className="flex items-center gap-2">
                     <Input
                       type="text"
@@ -735,8 +735,8 @@ export default function TaskCard({
                   </div>
                 ) : (
                   <p
-                    className="text-sm cursor-pointer hover:bg-muted/50 p-1 rounded"
-                    onClick={() => setEditingField('paxin')}
+                    className={`text-sm p-1 rounded ${!isDragDisabled ? 'cursor-pointer hover:bg-muted/50' : ''}`}
+                    onClick={() => !isDragDisabled && setEditingField('paxin')}
                   >
                     {(displayTask as any).pax_in ?? "non migrato"}
                   </p>
@@ -779,7 +779,7 @@ export default function TaskCard({
             </div>
 
             {/* Pulsante Salva Modifiche */}
-            {editingField && (
+            {editingField && !isDragDisabled && (
               <div className="pt-4 border-t mt-4 flex gap-2">
                 <Button
                   onClick={handleSaveChanges}
