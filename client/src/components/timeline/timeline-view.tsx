@@ -1041,10 +1041,15 @@ export default function TimelineView({
                               travelTime = 0;
                             }
 
-                            // Se la task ha sequence=1 e start_time=11:00, aggiungi 1 ora di offset (60 minuti)
+                            // Calcola offset dinamico basato su start_time della task
                             let timeOffset = 0;
-                            if (taskObj.sequence === 1 && taskObj.start_time === "11:00") {
-                              timeOffset = 60; // 60 minuti di spazio vuoto
+                            if (taskObj.sequence === 1 && taskObj.start_time) {
+                              // La timeline inizia alle 10:00 (= 0 minuti dall'inizio)
+                              const [hours, minutes] = taskObj.start_time.split(':').map(Number);
+                              const taskStartMinutes = (hours * 60 + minutes) - (10 * 60); // minuti dall'inizio timeline
+                              if (taskStartMinutes > 0) {
+                                timeOffset = taskStartMinutes; // offset in minuti
+                              }
                             }
 
                             // DEBUG: log per capire cosa sta succedendo
