@@ -82,45 +82,7 @@ export default function TimelineView({
     return `${year}-${month}-${day}`;
   })();
 
-  // --- STATO PER LA NUOVA FEATURE: Controlla se la data è passata e SENZA salvataggi ---
-  const [isPastDateWithoutSavedAssignments, setIsPastDateWithoutSavedAssignments] = useState(false);
-
-  useEffect(() => {
-    const checkDateAndAssignments = async () => {
-      const today = new Date();
-      const selectedDate = new Date(workDate);
-
-      // Controlla se la data selezionata è nel passato
-      if (selectedDate < today) {
-        try {
-          const response = await fetch('/api/check-saved-assignments', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ date: workDate })
-          });
-
-          if (response.ok) {
-            const result = await response.json();
-            // Imposta lo stato se è una data passata E non ci sono assegnazioni trovate
-            setIsPastDateWithoutSavedAssignments(!result.found);
-          } else {
-            console.error("Errore nel controllo delle assegnazioni salvate:", response.status);
-            // In caso di errore, assumiamo che non ci siano assegnazioni per precauzione
-            setIsPastDateWithoutSavedAssignments(true);
-          }
-        } catch (error) {
-          console.error("Errore nella chiamata API check-saved-assignments:", error);
-          // In caso di errore di rete, assumiamo che non ci siano assegnazioni
-          setIsPastDateWithoutSavedAssignments(true);
-        }
-      } else {
-        // La data non è passata, quindi non mostrare il messaggio speciale
-        setIsPastDateWithoutSavedAssignments(false);
-      }
-    };
-
-    checkDateAndAssignments();
-  }, [workDate]); // Riesegui quando workDate cambia
+  
 
   // Mutation per rimuovere un cleaner da selected_cleaners.json
   const removeCleanerMutation = useMutation({
@@ -940,21 +902,7 @@ export default function TimelineView({
 
           {/* Righe dei cleaners - mostra solo se ci sono cleaners selezionati */}
           <div className="flex-1 overflow-auto px-4 pb-4">
-            {isPastDateWithoutSavedAssignments ? (
-              <div className="flex items-center justify-center h-64 bg-red-50 dark:bg-red-950/20 border-2 border-red-300 dark:border-red-700 rounded-lg">
-                <div className="text-center p-6">
-                  <svg className="mx-auto h-12 w-12 text-red-600 dark:text-red-400 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                  <h3 className="text-lg font-semibold text-red-800 dark:text-red-200 mb-2">
-                    Nessuna assegnazione presente per questa data
-                  </h3>
-                  <p className="text-red-700 dark:text-red-300">
-                    Non sono disponibili dati salvati per questa data passata
-                  </p>
-                </div>
-              </div>
-            ) : allCleanersToShow.length === 0 ? (
+            {allCleanersToShow.length === 0 ? (
               <div className="flex items-center justify-center h-64 bg-yellow-50 dark:bg-yellow-950/20 border-2 border-yellow-300 dark:border-yellow-700 rounded-lg">
                 <div className="text-center p-6">
                   <Users className="mx-auto h-12 w-12 text-yellow-600 dark:text-yellow-400 mb-3" />

@@ -281,20 +281,10 @@ export default function GenerateAssignments() {
             setIsExtracting(false);
           } else {
             // Caricamento fallito per data passata = nessun salvataggio disponibile
-            console.log("📭 Data passata senza salvataggi disponibili - mostro messaggio vuoto");
+            // Ma mostra comunque i container come per date future
+            console.log("📭 Data passata senza salvataggi disponibili - mostro container in sola lettura");
             setIsTimelineReadOnly(true);
-            setExtractionStep("Data passata - nessuna assegnazione disponibile");
-
-            // Svuota tutto
-            setEarlyOutTasks([]);
-            setHighPriorityTasks([]);
-            setLowPriorityTasks([]);
-            setAllTasksWithAssignments([]);
-            setLastSavedTimestamp(null);
-
-            await new Promise(resolve => setTimeout(resolve, 500));
-            setIsExtracting(false);
-            return;
+            await extractData(date);
           }
 
         } else {
@@ -310,20 +300,16 @@ export default function GenerateAssignments() {
         // NON esistono assegnazioni salvate
         console.log("ℹ️ Nessuna assegnazione salvata per", dateStr);
 
-        // Verifica se la data è nel passato
+        // Data passata o futura senza salvataggi: estrai normalmente
+        // La modalità read-only è già impostata se è data passata
         if (isPastDate) {
-          // Data passata senza salvataggi: read-only con timeline vuota
-          console.log("🔒 Data passata senza assegnazioni salvate - modalità READ-ONLY");
+          console.log("🔒 Data passata senza assegnazioni salvate - modalità READ-ONLY con container");
           setIsTimelineReadOnly(true);
-          setExtractionStep("Data passata - nessuna assegnazione disponibile");
-          await new Promise(resolve => setTimeout(resolve, 500));
-          setIsExtracting(false);
         } else {
-          // Data presente/futura senza salvataggi: modalità editabile
           console.log("✏️ Data presente/futura - modalità EDITABILE");
           setIsTimelineReadOnly(false);
-          await extractData(date);
         }
+        await extractData(date);
       }
     } catch (error) {
       console.error("Errore nella verifica assegnazioni salvate:", error);
