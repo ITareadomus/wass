@@ -871,7 +871,16 @@ export default function TimelineView({
                 <RotateCcw className="w-4 h-4" />
                 Reset Assegnazioni
               </Button>
-              {!isReadOnly && (
+              {isReadOnly ? (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="flex items-center gap-2 bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-200 border-yellow-300 dark:border-yellow-700 cursor-default hover:bg-yellow-100 dark:hover:bg-yellow-900/30"
+                  disabled
+                >
+                  📜 Sei in modalità storico
+                </Button>
+              ) : (
                 <Button
                   onClick={handleConfirmAssignments}
                   variant="default"
@@ -1160,32 +1169,12 @@ export default function TimelineView({
                   <UserPlus className="w-5 h-5" />
                 </Button>
               </div>
-              {/* Pulsanti Conferma Assegnazioni, Storico e Stampa affiancati */}
+              {/* Pulsante Stampa */}
               <div className="flex-1 p-1 border-t border-border flex gap-2">
-                {!isReadOnly && hasAssignedTasks && (
-                  <Button
-                    onClick={handleConfirmAssignments}
-                    disabled={!hasUnsavedChanges}
-                    className={`flex-1 h-full ${hasUnsavedChanges ? 'bg-green-500 hover:bg-green-600 animate-pulse' : 'bg-green-500 hover:bg-green-600 opacity-50 cursor-not-allowed'}`}
-                    data-testid="button-confirm-assignments"
-                  >
-                    <Users className="w-4 h-4 mr-2" />
-                    {hasUnsavedChanges ? 'Conferma Assegnazioni ⚠️' : 'Assegnazioni Confermate'}
-                  </Button>
-                )}
-                {isReadOnly && (
-                  <Button
-                    disabled
-                    variant="outline"
-                    className="flex-1 h-full bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-200 border-yellow-300 dark:border-yellow-700 cursor-default"
-                  >
-                    📜 Sei in modalità storico
-                  </Button>
-                )}
                 <Button
                   onClick={handlePrint}
                   variant="outline"
-                  className="h-full px-6"
+                  className="flex-1 h-full"
                 >
                   <Printer className="w-4 h-4 mr-2" />
                   Stampa
