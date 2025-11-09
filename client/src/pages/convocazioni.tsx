@@ -143,7 +143,6 @@ export default function Convocazioni() {
         }
 
         // NUOVO: Carica anche cleaners dalla timeline.json per pre-selezionarli
-        let timelineCleanerIds = new Set<number>();
         const timelineResponse = await fetch(`/data/output/timeline.json?t=${Date.now()}`);
         if (timelineResponse.ok) {
           try {
@@ -155,9 +154,7 @@ export default function Convocazioni() {
               for (const cleanerEntry of timelineData.cleaners_assignments) {
                 if (cleanerEntry.cleaner?.id) {
                   const cleanerId = cleanerEntry.cleaner.id;
-                  // Aggiungi alla lista di cleaners dalla timeline
-                  timelineCleanerIds.add(cleanerId);
-                  // Pre-seleziona visivamente (NON aggiungere ad alreadySelectedIds per non filtrarli)
+                  // Pre-seleziona visivamente (NON aggiungere ad alreadySelectedIds per renderlo visibile)
                   preselectedIds.add(cleanerId);
                   console.log(`✅ Cleaner ${cleanerId} trovato nella timeline - pre-selezionato visivamente`);
                 }
