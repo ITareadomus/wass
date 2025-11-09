@@ -335,45 +335,7 @@ export default function GenerateAssignments() {
     }
   }, [selectedDate, isInitialMount]);
 
-  // Funzione per caricare MANUALMENTE le assegnazioni salvate
-  const handleLoadSavedAssignments = async () => {
-    try {
-      setIsExtracting(true);
-      setExtractionStep("Caricamento assegnazioni salvate...");
-
-      const hasSavedAssignments = await loadSavedAssignments(selectedDate);
-
-      if (hasSavedAssignments) {
-        await loadTasks();
-        setExtractionStep("Assegnazioni salvate caricate!");
-        await new Promise(resolve => setTimeout(resolve, 100));
-
-        toast({
-          title: "Assegnazioni caricate",
-          description: "Le assegnazioni salvate sono state caricate con successo",
-          variant: "success",
-        });
-      } else {
-        toast({
-          title: "Nessuna assegnazione",
-          description: "Non ci sono assegnazioni salvate per questa data",
-          variant: "default",
-        });
-      }
-
-      setIsExtracting(false);
-    } catch (error) {
-      console.error("Errore nel caricamento delle assegnazioni:", error);
-      setExtractionStep("Errore durante il caricamento");
-      setIsExtracting(false);
-
-      toast({
-        title: "Errore",
-        description: "Impossibile caricare le assegnazioni salvate",
-        variant: "destructive",
-      });
-    }
-  };
+  
 
 
 
@@ -1451,7 +1413,7 @@ export default function GenerateAssignments() {
             </Button>
           </div>
           <div className="flex items-center gap-3">
-            {/* Date Selector + Load Button + Dark Mode Toggle */}
+            {/* Date Selector + Dark Mode Toggle */}
             <div className="flex items-center gap-3">
               <Popover>
                 <PopoverTrigger asChild>
@@ -1476,14 +1438,6 @@ export default function GenerateAssignments() {
                   />
                 </PopoverContent>
               </Popover>
-              <Button
-                onClick={handleLoadSavedAssignments}
-                variant="default"
-                className="bg-blue-600 hover:bg-blue-700"
-                disabled={isExtracting}
-              >
-                Carica Assegnazioni
-              </Button>
               <ThemeToggle />
             </div>
           </div>
