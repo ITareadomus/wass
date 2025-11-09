@@ -942,12 +942,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const result = await client.downloadAsText(key, { bucket: BUCKET });
 
       if (result.ok) {
-        return res.json({
-          success: true,
-          found: true,
-          filename: key,
-          formattedDateTime: format(d, "dd/MM/yyyy", { locale: it })
-        });
+        // CRITICAL: Verifica che la data nel file corrisponda alla data richiesta
+        try {
+          const savedData = JSON.parse(result.value);
+          const savedDate = savedData.metadata?.date;
+          
+          if (savedDate !== workDate) {
+            console.log(`⚠️ File trovato ma data non corrisponde: richiesta ${workDate}, trovata ${savedDate}`);
+            return res.json({ success: true, found: false });
+          }
+          
+          return res.json({
+            success: true,
+            found: true,
+            filename: key,
+            formattedDateTime: format(d, "dd/MM/yyyy", { locale: it })
+          });
+        } catch (parseError) {
+          console.error("Errore parsing file salvato:", parseError);
+          return res.json({ success: true, found: false });
+        }
       }
 
       // File non trovato
@@ -1068,6 +1082,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const savedData = JSON.parse(result.value);
+      
+      // CRITICAL: Verifica che la data nel file corrisponda alla data richiesta
+      const savedDate = savedData.metadata?.date;
+      if (savedDate !== workDate) {
+        console.log(`⚠️ Data nel file (${savedDate}) non corrisponde alla data richiesta (${workDate})`);
+        return res.json({
+          success: true,
+          found: false,
+          message: "Nessuna assegnazione salvata per questa data"
+        });
+      }
 
       // CRITICAL: Aggiorna la data nei metadata per riflettere la data selezionata
       savedData.metadata = savedData.metadata || {};
