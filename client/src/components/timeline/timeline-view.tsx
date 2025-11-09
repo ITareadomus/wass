@@ -864,6 +864,7 @@ export default function TimelineView({
                 variant="outline"
                 size="sm"
                 className="flex items-center gap-2 print:hidden"
+                disabled={isReadOnly}
               >
                 <Users className="w-4 h-4" />
                 Convocazioni
@@ -873,6 +874,7 @@ export default function TimelineView({
                 variant="outline"
                 size="sm"
                 className="flex items-center gap-2 print:hidden"
+                disabled={isReadOnly}
               >
                 <RotateCcw className="w-4 h-4" />
                 Reset Assegnazioni
@@ -1319,7 +1321,7 @@ export default function TimelineView({
                     <Select 
                       value={selectedSwapCleaner} 
                       onValueChange={setSelectedSwapCleaner}
-                      disabled={swapCleanersMutation.isPending}
+                      disabled={swapCleanersMutation.isPending || isReadOnly}
                     >
                       <SelectTrigger data-testid="select-swap-cleaner">
                         <SelectValue placeholder="Seleziona cleaner..." />
@@ -1341,7 +1343,7 @@ export default function TimelineView({
                   </div>
                   <Button
                     onClick={handleSwapCleaners}
-                    disabled={!selectedSwapCleaner || swapCleanersMutation.isPending}
+                    disabled={!selectedSwapCleaner || swapCleanersMutation.isPending || isReadOnly}
                     variant="default"
                     className="flex gap-2"
                     data-testid="button-swap-cleaner"
@@ -1371,7 +1373,7 @@ export default function TimelineView({
                 </p>
                 <Button
                   onClick={() => removeCleanerMutation.mutate(selectedCleaner.id)}
-                  disabled={removeCleanerMutation.isPending}
+                  disabled={removeCleanerMutation.isPending || isReadOnly}
                   variant="destructive"
                   className="w-full"
                   data-testid="button-remove-cleaner"
