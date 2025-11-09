@@ -176,29 +176,52 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log(`🗑️ Reset flag ultimo salvataggio per data ${workDate}`);
       // Il frontend gestirà la rimozione del localStorage
 
-      // === Svuota selected_cleaners.json quando cambia data (stesso comportamento di timeline.json) ===
+      // === MODIFICATO: Non svuotare più selected_cleaners.json automaticamente ===
+      // I cleaners selezionati rimangono persistenti tra le pagine
+      // Verranno svuotati SOLO quando l'utente cambia effettivamente data
       try {
         const selectedCleanersPath = path.join(
           process.cwd(),
           'client/public/data/cleaners/selected_cleaners.json'
         );
 
-        // Crea sempre un file vuoto quando cambia la data
-        const emptySelectedCleaners = {
-          cleaners: [],
-          total_selected: 0,
-          metadata: { 
-            date: workDate,
-            reset_at: new Date().toISOString()
-          }
-        };
+        // Leggi il file attuale
+        let currentData;
+        try {
+          const content = await fs.readFile(selectedCleanersPath, 'utf8');
+          currentData = JSON.parse(content);
+        } catch (e) {
+          // Se il file non esiste, crea uno vuoto
+          currentData = {
+            cleaners: [],
+            total_selected: 0,
+            metadata: { 
+              date: workDate,
+              reset_at: new Date().toISOString()
+            }
+          };
+        }
 
-        // Salva con scrittura atomica
-        const tmpScPath = `${selectedCleanersPath}.tmp`;
-        await fs.writeFile(tmpScPath, JSON.stringify(emptySelectedCleaners, null, 2));
-        await fs.rename(tmpScPath, selectedCleanersPath);
+        // Svuota SOLO se la data è diversa da quella salvata
+        const savedDate = currentData.metadata?.date;
+        if (savedDate !== workDate) {
+          console.log(`🔄 Cambio data da ${savedDate} a ${workDate} - reset selected_cleaners.json`);
+          const emptySelectedCleaners = {
+            cleaners: [],
+            total_selected: 0,
+            metadata: { 
+              date: workDate,
+              reset_at: new Date().toISOString()
+            }
+          };
 
-        console.log(`🗑️ selected_cleaners.json svuotato per nuova data ${workDate}`);
+          const tmpScPath = `${selectedCleanersPath}.tmp`;
+          await fs.writeFile(tmpScPath, JSON.stringify(emptySelectedCleaners, null, 2));
+          await fs.rename(tmpScPath, selectedCleanersPath);
+          console.log(`🗑️ selected_cleaners.json svuotato per nuova data ${workDate}`);
+        } else {
+          console.log(`✅ Stessa data (${workDate}) - selected_cleaners.json NON modificato`);
+        }
       } catch (e) {
         console.warn('⚠️ Errore gestione selected_cleaners.json:', e);
       }
