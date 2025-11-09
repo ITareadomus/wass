@@ -38,7 +38,7 @@
   --input: hsl(214.3 31.8% 91.4%);
   --ring: hsl(221.2 83.2% 53.3%);
   --radius: 0.5rem;
-
+  
   /* Task-specific colors */
   --task-early-out-bg: hsl(199 89% 48%);
   --task-early-out-fg: hsl(0 0% 100%);
@@ -48,17 +48,17 @@
   --task-low-priority-fg: hsl(0 0% 100%);
   --task-unassigned-bg: hsl(220 13% 91%);
   --task-unassigned-fg: hsl(220 9% 46%);
-
+  
   /* Priority column colors */
   --priority-column-early-bg: hsl(199 89% 88%);
   --priority-column-high-bg: hsl(199 89% 88%);
   --priority-column-low-bg: hsl(199 89% 88%);
-
+  
   /* Timeline colors */
   --timeline-early-bg: hsl(199 89% 84%);
   --timeline-high-bg: hsl(199 89% 84%);
   --timeline-low-bg: hsl(199 89% 84%);
-
+  
   --font-sans: Open Sans, sans-serif;
   --font-serif: Georgia, serif;
   --font-mono: Menlo, monospace;
@@ -93,8 +93,8 @@
 
   body {
     @apply font-sans antialiased bg-background text-foreground;
-  }
 
+  
   /* Animazione lampeggiante gialla per task duplicate */
   @keyframes blink-yellow {
     0%, 100% {
@@ -105,25 +105,11 @@
       border-color: #eab308;
     }
   }
-
+  
   .animate-blink-yellow {
     animation: blink-yellow 1.5s ease-in-out infinite;
   }
 
-  /* NUOVA ANIMAZIONE: Pulse giallo per task duplicate non assegnate */
-  @keyframes pulse-yellow {
-    0%, 100% {
-      background-color: rgb(254 249 195);
-      box-shadow: 0 0 0 0 rgba(234 179 8 / 0.7);
-    }
-    50% {
-      background-color: rgb(254 240 138);
-      box-shadow: 0 0 0 8px rgba(234 179 8 / 0);
-    }
-  }
-
-  .animate-pulse-yellow {
-    animation: pulse-yellow 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
   }
 }
 
@@ -134,19 +120,19 @@
     color: #7f1d1d;
     border-color: #ef4444;
   }
-
+  
   .task-premium {
     background-color: #fcd34d;
     color: #78350f;
     border-color: #f59e0b;
   }
-
+  
   .task-standard {
     background-color: #86efac;
     color: #14532d;
     border-color: #22c55e;
   }
-
+  
   /* Responsive width utilities per task cards */
   @media (max-width: 639px) {
     /* Mobile: larghezze ridotte */
@@ -154,36 +140,36 @@
       min-width: 60px;
     }
   }
-
+  
   @media (min-width: 640px) and (max-width: 767px) {
     /* Tablet: larghezze medie */
     .task-card-width {
       min-width: 70px;
     }
   }
-
+  
   @media (min-width: 768px) {
     /* Desktop: larghezze standard */
     .task-card-width {
       min-width: 80px;
     }
   }
-
+  
   .task-early-out {
     background-color: var(--task-early-out-bg);
     color: var(--task-early-out-fg);
   }
-
+  
   .task-high-priority {
     background-color: var(--task-high-priority-bg);
     color: var(--task-high-priority-fg);
   }
-
+  
   .task-low-priority {
     background-color: var(--task-low-priority-bg);
     color: var(--task-low-priority-fg);
   }
-
+  
   .task-unassigned {
     background-color: var(--task-unassigned-bg);
     color: var(--task-unassigned-fg);
@@ -193,11 +179,11 @@
   .priority-column-early {
     background-color: var(--priority-column-early-bg);
   }
-
+  
   .priority-column-high {
     background-color: var(--priority-column-high-bg);
   }
-
+  
   .priority-column-low {
     background-color: var(--priority-column-low-bg);
   }
@@ -213,7 +199,7 @@
     min-height: 40px;
     position: relative;
   }
-
+  
   .assignment-bar {
     border-radius: 4px;
     margin: 2px 0;
@@ -222,7 +208,7 @@
     display: flex;
     align-items: center;
   }
-
+  
   /* Map container */
   .map-container {
     background-color: hsl(210 40% 98%);
