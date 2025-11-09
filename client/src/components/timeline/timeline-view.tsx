@@ -1,5 +1,5 @@
 import { Personnel, TaskType as Task } from "@shared/schema";
-import { Calendar, User, Clock, Save, RotateCcw, Users, Eye, AlertCircle, Printer, Maximize2, Minimize2 } from "lucide-react";
+import { Calendar, RotateCcw, Users, RefreshCw, UserPlus, Maximize2, Minimize2, Printer, Check, CheckCircle } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import * as React from "react";
 import { Droppable, Draggable } from "react-beautiful-dnd";
@@ -24,7 +24,6 @@ import {
 } from "@/components/ui/select";
 import { useLocation } from 'wouter';
 import { format } from 'date-fns';
-import { cn } from "@/lib/utils"; // Assicurati che cn sia importato correttamente
 
 interface TimelineViewProps {
   personnel: Personnel[];
@@ -73,9 +72,6 @@ export default function TimelineView({
   const timelineRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
   const [, setLocation] = useLocation();
-  const [isConfirming, setIsConfirming] = useState(false); // Stato per il pulsante di conferma
-  const [selectedTask, setSelectedTask] = useState<any>(null); // Stato per task selezionata per dettagli
-  const [isDialogOpen, setIsDialogOpen] = useState(false); // Stato per visibilità dialog dettagli task
 
   // Normalizza la data da localStorage per coerenza ovunque
   const workDate = localStorage.getItem('selected_work_date') || (() => {
@@ -85,6 +81,8 @@ export default function TimelineView({
     const day = String(today.getDate()).padStart(2, '0');
     return `${year}-${month}-${day}`;
   })();
+
+
 
   // Mutation per rimuovere un cleaner da selected_cleaners.json
   const removeCleanerMutation = useMutation({
@@ -420,7 +418,7 @@ export default function TimelineView({
         });
       }
     } else {
-      // Singolo click: avvia timer
+      // Primo click: avvia timer
       const timer = setTimeout(() => {
         // Singolo click: apri modal
         setSelectedCleaner(cleaner);
@@ -665,7 +663,6 @@ export default function TimelineView({
 
 
   const handleConfirmAssignments = async () => {
-    setIsConfirming(true); // Inizia la conferma
     try {
       const dateStr = localStorage.getItem('selected_work_date') || (() => {
         const today = new Date();
@@ -711,8 +708,6 @@ export default function TimelineView({
         description: "Errore durante la conferma delle assegnazioni",
         variant: "destructive",
       });
-    } finally {
-      setIsConfirming(false); // Termina la conferma
     }
   };
 
@@ -840,25 +835,6 @@ export default function TimelineView({
     };
   };
 
-  // Handler per aggiornare task
-  const handleTaskUpdate = async (updatedTask: any) => {
-    // Implementazione logica per aggiornare la task (es. chiamata API)
-    console.log("Task aggiornata:", updatedTask);
-    // Ricarica le task o aggiorna lo stato locale
-    if ((window as any).reloadAllTasks) {
-      await (window as any).reloadAllTasks();
-    }
-    if ((window as any).setHasUnsavedChanges) {
-      (window as any).setHasUnsavedChanges(true);
-    }
-    setIsDialogOpen(false); // Chiudi dialog dopo salvataggio
-  };
-
-  // Effettua il controllo all'avvio
-  useEffect(() => {
-    checkSavedAssignmentExists();
-  }, [workDate]);
-
   return (
     <>
       <div
@@ -892,246 +868,550 @@ export default function TimelineView({
                 <RotateCcw className="w-4 h-4" />
                 Reset Assegnazioni
               </Button>
-              <Button
-                onClick={handlePrint}
-                variant="outline"
-                size="sm"
-                className="flex items-center gap-2 print:hidden"
-              >
-                <Printer className="w-4 h-4" />
-                Stampa Timeline
-              </Button>
-              <Button
-                onClick={toggleFullscreen}
-                variant="outline"
-                size="sm"
-                className="flex items-center gap-2 print:hidden"
-              >
-                {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
-                {isFullscreen ? 'Esci Fullscreen' : 'Fullscreen'}
-              </Button>
               {isReadOnly ? (
                 <Button
+                  variant="outline"
+                  size="sm"
+                  className="flex items-center gap-2 bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-200 border-yellow-300 dark:border-yellow-700 cursor-default hover:bg-yellow-100 dark:hover:bg-yellow-900/30"
                   disabled
-                  className="bg-yellow-500 hover:bg-yellow-600 text-white font-semibold print:hidden"
                 >
-                  📖 Sei in modalità storico
+                  📜 Sei in modalità storico
                 </Button>
               ) : (
                 <Button
                   onClick={handleConfirmAssignments}
-                  className="bg-green-600 hover:bg-green-700 text-white font-semibold print:hidden"
-                  disabled={isConfirming}
+                  variant="default"
+                  size="sm"
+                  className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white print:hidden"
                 >
-                  {isConfirming ? (
-                    <>
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                      Salvataggio...
-                    </>
-                  ) : (
-                    <>
-                      <Save className="w-4 h-4 mr-2" />
-                      Conferma Assegnazioni
-                    </>
-                  )}
+                  <CheckCircle className="w-4 h-4" />
+                  Conferma Assegnazioni
                 </Button>
               )}
             </div>
           </div>
         </div>
-
-        {lastSavedFilename && (
-          <div className="px-4 py-2 bg-muted/50 border-b border-border flex items-center justify-between print:hidden">
-            <span className="text-sm text-muted-foreground flex items-center gap-2">
-              <Clock className="w-4 h-4" />
-              Ultime assegnazioni salvate: <strong className="text-foreground">{lastSavedFilename}</strong>
-            </span>
-          </div>
-        )}
-
-        <div className="p-4 overflow-x-auto" style={{ maxHeight: isFullscreen ? 'calc(100vh - 120px)' : 'auto' }}>
-          {timelineCleaners.length === 0 ? (
-            <div className="text-center py-12 text-muted-foreground">
-              <Users className="w-12 h-12 mx-auto mb-4 opacity-50" />
-              <p className="text-lg font-medium">Nessun cleaner convocato</p>
-              <p className="text-sm mt-2">Vai alla sezione Convocazioni per selezionare i cleaners</p>
+        <div className="p-4 overflow-x-auto">
+          {/* Header con orari */}
+          <div className="flex mb-2">
+            <div className="flex-shrink-0" style={{ width: `${cleanerColumnWidth}px` }}></div>
+            <div className="flex-1 flex">
+              {timeSlots.map((slot) => (
+                <div
+                  key={slot}
+                  className="flex-1 text-center text-sm font-medium text-muted-foreground border-l border-border first:border-l-0 py-1"
+                >
+                  {slot}
+                </div>
+              ))}
             </div>
-          ) : (
-            <div className="space-y-4 min-w-[800px]">
-              {/* Cleaners attivi */}
-              {timelineCleaners
-                .filter(tc => !removedCleanerIds.has(tc.cleaner?.id))
-                .map((tc) => {
-                  const cleanerId = tc.cleaner?.id;
-                  if (!cleanerId) return null;
-
-                  const cleanerTasks = (tc.tasks || [])
-                    .map(normalizeTask)
-                    .sort((a, b) => {
-                      const seqA = a.sequence ?? 0;
-                      const seqB = b.sequence ?? 0;
-                      return seqA - seqB;
-                    });
-
-                  const totalDuration = cleanerTasks.reduce((sum, task) => {
-                    const durationParts = task.duration?.toString().split('.') || ['0', '0'];
-                    const hours = parseInt(durationParts[0], 10) || 0;
-                    const minutes = parseInt(durationParts[1], 10) || 0;
-                    return sum + hours * 60 + minutes;
-                  }, 0);
-
-                  const totalTravelTime = cleanerTasks.reduce((sum, task) => {
-                    return sum + (task.travelTime || 0);
-                  }, 0);
-
-                  const totalMinutes = totalDuration + totalTravelTime;
-                  const hours = Math.floor(totalMinutes / 60);
-                  const minutes = totalMinutes % 60;
-
-                  return (
-                    <CleanerTimeline
-                      key={`cleaner-${cleanerId}`}
-                      cleaner={tc.cleaner}
-                      tasks={cleanerTasks}
-                      totalDuration={`${hours}h ${minutes}m`}
-                      isDragDisabled={isReadOnly}
-                    />
-                  );
-                })}
-
-              {/* Cleaners rimossi con task */}
-              {Array.from(removedCleanerIds).map((cleanerId) => {
-                const tc = timelineCleaners.find(tc => tc.cleaner?.id === cleanerId);
-                if (!tc) return null;
-
-                const cleanerTasks = (tc.tasks || [])
-                  .map(normalizeTask)
-                  .sort((a, b) => {
-                    const seqA = a.sequence ?? 0;
-                    const seqB = b.sequence ?? 0;
-                    return seqA - seqB;
-                  });
-
-                const totalDuration = cleanerTasks.reduce((sum, task) => {
-                  const durationParts = task.duration?.toString().split('.') || ['0', '0'];
-                  const hours = parseInt(durationParts[0], 10) || 0;
-                  const minutes = parseInt(durationParts[1], 10) || 0;
-                  return sum + hours * 60 + minutes;
-                }, 0);
-
-                const totalTravelTime = cleanerTasks.reduce((sum, task) => {
-                  return sum + (task.travelTime || 0);
-                }, 0);
-
-                const totalMinutes = totalDuration + totalTravelTime;
-                const hours = Math.floor(totalMinutes / 60);
-                const minutes = totalMinutes % 60;
-
-                return (
-                  <CleanerTimeline
-                    key={`removed-cleaner-${cleanerId}`}
-                    cleaner={tc.cleaner}
-                    tasks={cleanerTasks}
-                    totalDuration={`${hours}h ${minutes}m`}
-                    isDragDisabled={isReadOnly}
-                    isRemoved={true}
-                  />
-                );
-              })}
-            </div>
-          )}
-        </div>
-      </div>
-
-      <TaskDetailsDialog
-        task={selectedTask}
-        open={isDialogOpen}
-        onOpenChange={setIsDialogOpen}
-        onSave={handleTaskUpdate}
-        isReadOnly={isReadOnly}
-      />
-    </>
-  );
-}
-
-// Componente per timeline di un singolo cleaner
-interface CleanerTimelineProps {
-  cleaner: any;
-  tasks: any[];
-  totalDuration: string;
-  isDragDisabled?: boolean;
-  isRemoved?: boolean;
-}
-
-function CleanerTimeline({ cleaner, tasks, totalDuration, isDragDisabled = false, isRemoved = false }: CleanerTimelineProps) {
-  const droppableId = `timeline-${cleaner.id}`;
-
-  return (
-    <div className={cn(
-      "bg-muted/30 rounded-lg p-4 border-2 border-dashed",
-      isRemoved ? "border-red-500/50 bg-red-50/50 dark:bg-red-950/20" : "border-muted"
-    )}>
-      <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-            <User className="w-5 h-5 text-primary" />
           </div>
-          <div>
-            <h4 className="font-semibold text-foreground flex items-center gap-2">
-              {cleaner.name} {cleaner.lastname}
-              {isRemoved && (
-                <span className="text-xs bg-red-500 text-white px-2 py-0.5 rounded">
-                  NON CONVOCATO
-                </span>
-              )}
-            </h4>
-            <p className="text-sm text-muted-foreground">
-              {tasks.length} task • {totalDuration}
-            </p>
-          </div>
-        </div>
-        <div className="text-right">
-          <p className="text-xs text-muted-foreground">Inizio: {cleaner.start_time || '10:00'}</p>
-        </div>
-      </div>
 
-      <Droppable droppableId={droppableId} direction="horizontal">
-        {(provided, snapshot) => (
-          <div
-            ref={provided.innerRef}
-            {...provided.droppableProps}
-            className={cn(
-              "flex gap-2 min-h-[100px] p-2 rounded-lg transition-colors overflow-x-auto",
-              snapshot.isDraggingOver ? "bg-primary/10" : "bg-background/50"
-            )}
-          >
-            {tasks.length === 0 ? (
-              <div className="flex-1 flex items-center justify-center text-muted-foreground text-sm">
-                Nessuna task assegnata
+          {/* Righe dei cleaners - mostra solo se ci sono cleaners selezionati */}
+          <div className="flex-1 overflow-auto px-4 pb-4">
+            {allCleanersToShow.length === 0 && !isReadOnly ? (
+              <div className="flex items-center justify-center h-64 bg-yellow-50 dark:bg-yellow-950/20 border-2 border-yellow-300 dark:border-yellow-700 rounded-lg">
+                <div className="text-center p-6">
+                  <Users className="mx-auto h-12 w-12 text-yellow-600 dark:text-yellow-400 mb-3" />
+                  <h3 className="text-lg font-semibold text-yellow-800 dark:text-yellow-200 mb-2">
+                    Nessun cleaner selezionato
+                  </h3>
+                  <p className="text-yellow-700 dark:text-yellow-300">
+                    Vai alla pagina Convocazioni per selezionare i cleaner da convocare
+                  </p>
+                </div>
+              </div>
+            ) : allCleanersToShow.length === 0 && isReadOnly ? (
+              <div className="flex items-center justify-center h-64 bg-red-50 dark:bg-red-950/20 border-2 border-red-300 dark:border-red-700 rounded-lg">
+                <div className="text-center p-6">
+                  <Calendar className="mx-auto h-12 w-12 text-red-600 dark:text-red-400 mb-3" />
+                  <h3 className="text-lg font-semibold text-red-800 dark:text-red-200 mb-2">
+                    Nessuna assegnazione presente per questa data
+                  </h3>
+                  <p className="text-red-700 dark:text-red-300">
+                    Non sono disponibili dati salvati per questa data passata
+                  </p>
+                </div>
               </div>
             ) : (
-              tasks.map((task, index) => (
-                <TaskCard
-                  key={`${task.id}-${index}`}
-                  task={task}
-                  index={index}
-                  isDragDisabled={isDragDisabled}
-                  allTasks={tasks}
-                  currentContainer={droppableId}
-                />
+              allCleanersToShow.map((cleaner, index) => {
+                const color = getCleanerColor(index);
+                const droppableId = `cleaner-${cleaner.id}`;
+
+                // Trova tutte le task assegnate a questo cleaner
+                const cleanerTasks = tasks.filter(task =>
+                  (task as any).assignedCleaner === cleaner.id
+                ).map(normalizeTask); // Applica la normalizzazione qui
+
+                const isRemoved = removedCleanerIds.has(cleaner.id);
+
+                return (
+                  <div key={cleaner.id} className="flex mb-0.5">
+                    {/* Info cleaner */}
+                    <div
+                      className="flex-shrink-0 p-1 flex items-center border cursor-pointer hover:opacity-90 transition-opacity"
+                      style={{
+                        width: `${cleanerColumnWidth}px`,
+                        backgroundColor: isRemoved
+                          ? '#9CA3AF' // Grigio per cleaners rimossi
+                          : filteredCleanerId === cleaner.id ? `${color.bg}` : color.bg,
+                        color: isRemoved ? '#1F2937' : color.text,
+                        boxShadow: filteredCleanerId === cleaner.id ? '0 0 0 3px rgba(59, 130, 246, 0.5)' : 'none',
+                        userSelect: 'none',
+                        opacity: isRemoved ? 0.7 : 1
+                      }}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        if (isRemoved) {
+                          // Cleaner rimosso: apri dialog sostituzione
+                          setCleanerToReplace(cleaner.id);
+                          loadAvailableCleaners();
+                          setIsAddCleanerDialogOpen(true);
+                        } else {
+                          // Cleaner attivo: gestione normale (singolo/doppio click)
+                          handleCleanerClick(cleaner, e);
+                        }
+                      }}
+                      title={isRemoved ? "Cleaner rimosso - Click per sostituire" : "Click: dettagli | Doppio click: filtra mappa"}
+                    >
+                      <div className="w-full flex items-center gap-1">
+                        <div className="break-words font-bold text-[13px] flex-1">
+                          {cleanersAliases[cleaner.id]?.alias || `${cleaner.name.toUpperCase()} ${cleaner.lastname.toUpperCase()}`}
+                        </div>
+                        {isRemoved && (
+                          <div className="bg-red-600 text-white font-bold text-[10px] px-1 py-0.5 rounded flex-shrink-0 animate-pulse">
+                            RIMOSSO
+                          </div>
+                        )}
+                        {!isRemoved && cleaner.role === "Premium" && (
+                          <div className="bg-yellow-500 text-black font-bold text-[10px] px-1 py-0.5 rounded flex-shrink-0">
+                            P
+                          </div>
+                        )}
+                        {!isRemoved && cleaner.role === "Formatore" && (
+                          <div className="bg-orange-500 text-black font-bold text-[10px] px-1 py-0.5 rounded flex-shrink-0">
+                            F
+                          </div>
+                        )}
+                        {!isRemoved && cleaner.can_do_straordinaria && (
+                          <div className="bg-red-500 text-white font-bold text-[10px] px-1 py-0.5 rounded flex-shrink-0">
+                            S
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    {/* Timeline per questo cleaner - area unica droppable */}
+                    <Droppable droppableId={`timeline-${cleaner.id}`} direction="horizontal" isDropDisabled={isReadOnly}>
+                      {(provided, snapshot) => (
+                        <div
+                          ref={provided.innerRef}
+                          {...provided.droppableProps}
+                          data-testid={`timeline-cleaner-${cleaner.id}`}
+                          data-cleaner-id={cleaner.id}
+                          className={`relative min-h-[45px] flex-1 ${
+                            snapshot.isDraggingOver && !isReadOnly ? 'bg-primary/20 ring-2 ring-primary' : ''
+                          }`}
+                          style={{
+                            backgroundColor: snapshot.isDraggingOver && !isReadOnly
+                              ? `${color.bg}40`
+                              : `${color.bg}10`
+                          }}
+                        >
+                          {/* Griglia oraria di sfondo (solo visiva) */}
+                          <div className="absolute inset-0 grid grid-cols-10 pointer-events-none opacity-10">
+                            {timeSlots.map((slot, idx) => (
+                              <div key={idx} className="border-r border-border"></div>
+                            ))}
+                          </div>
+
+                          {/* Task posizionate in sequenza con indicatori di travel time */}
+                          <div className="relative z-10 flex items-center h-full">
+                            {(() => {
+                              // Calcola l'array delle task per questo cleaner una sola volta
+                              const cleanerTasks = tasks
+                                .filter((task) =>
+                                  (task as any).assignedCleaner === cleaner.id
+                                )
+                                .map(normalizeTask)
+                                .sort((a, b) => {
+                                  const taskA = a as any;
+                                  const taskB = b as any;
+
+                                  if (taskA.sequence !== undefined && taskB.sequence !== undefined) {
+                                    return taskA.sequence - taskB.sequence;
+                                  }
+
+                                  const timeA = taskA.start_time || taskA.fw_start_time || taskA.startTime || "00:00";
+                                  const timeB = taskB.start_time || taskB.fw_start_time || taskB.startTime || "00:00";
+                                  return timeA.localeCompare(timeB);
+                                });
+
+                              return cleanerTasks.map((task, idx) => {
+                                const taskObj = task as any;
+
+                                // Per il drag and drop, usa l'indice locale (idx) non globalIndex
+                                // React-beautiful-dnd richiede indici sequenziali 0,1,2,3... per ogni Droppable
+
+                                // Leggi travel_time dalla task normalizzata (che viene da timeline_assignments.json)
+                                // Prova sia travel_time che travelTime per compatibilità
+                                let travelTime = 0;
+                                if (taskObj.travel_time !== undefined && taskObj.travel_time !== null) {
+                                  travelTime = typeof taskObj.travel_time === 'number'
+                                    ? taskObj.travel_time
+                                    : parseInt(String(taskObj.travel_time), 10);
+                                } else if (taskObj.travelTime !== undefined && taskObj.travelTime !== null) {
+                                  travelTime = typeof taskObj.travelTime === 'number'
+                                    ? taskObj.travelTime
+                                    : parseInt(String(taskObj.travelTime), 10);
+                                }
+
+                                // Se il parsing fallisce, usa 0
+                                if (isNaN(travelTime)) {
+                                  travelTime = 0;
+                                }
+
+                                // Calcola offset dinamico basato su start_time della task
+                                let timeOffset = 0;
+                                if (taskObj.sequence === 1 && taskObj.start_time) {
+                                  // La timeline inizia alle 10:00 (= 0 minuti dall'inizio)
+                                  const [hours, minutes] = taskObj.start_time.split(':').map(Number);
+                                  const taskStartMinutes = (hours * 60 + minutes) - (10 * 60); // minuti dall'inizio timeline
+                                  if (taskStartMinutes > 0) {
+                                    timeOffset = taskStartMinutes; // offset in minuti
+                                  }
+                                }
+
+                                // DEBUG: log per capire cosa sta succedendo
+                                if (idx > 0) {
+                                  console.log(`Task ${taskObj.task_id || taskObj.id}: travel_time=${travelTime} min`);
+                                }
+
+                                // Calcola larghezza EFFETTIVA in base ai minuti reali di travel_time
+                                // La timeline copre 600 minuti (10:00-19:00)
+                                // Se travelTime è 0, usa almeno 1 minuto per visibilità
+                                const effectiveTravelMinutes = travelTime === 0 ? 1 : travelTime;
+                                const totalWidth = (effectiveTravelMinutes / 600) * 100;
+
+                                // Usa task.id o task.task_id come chiave univoca (non logistic_code che può essere duplicato)
+                                const uniqueKey = taskObj.task_id || taskObj.id;
+
+                                return (
+                                  <>
+                                    {/* Spazio vuoto per task con sequence=1 e start_time=11:00 */}
+                                    {timeOffset > 0 && (
+                                      <div
+                                        key={`offset-${uniqueKey}`}
+                                        className="flex-shrink-0"
+                                        style={{ width: `${(timeOffset / 600) * 100}%` }}
+                                      />
+                                    )}
+
+                                    {/* Indicatore di travel time: solo omino */}
+                                    {idx > 0 && (
+                                      <div
+                                        key={`marker-${uniqueKey}`}
+                                        className="flex items-center justify-center flex-shrink-0 py-3 px-2"
+                                        style={{ width: `${totalWidth}%`, minHeight: '50px' }}
+                                        title={`${travelTime} min`}
+                                      >
+                                        <svg
+                                          width="20"
+                                          height="20"
+                                          viewBox="0 0 24 24"
+                                          fill="currentColor"
+                                          className="text-gray-600 flex-shrink-0"
+                                        >
+                                          <path d="M13.5 5.5c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zM9.8 8.9L7 23h2.1l1.8-8 2.1 2v6h2v-7.5l-2.1-2 .6-3C14.8 12 16.8 13 19 13v-2c-1.9 0-3.5-1-4.3-2.4l-1-1.6c-.4-.6-1-1-1.7-1-.3 0-.5.1-.8.1L6 8.3V13h2V9.6l1.8-.7"/>
+                                        </svg>
+                                      </div>
+                                    )}
+
+                                    <TaskCard
+                                      key={uniqueKey}
+                                      task={task}
+                                      index={idx}
+                                      isInTimeline={true}
+                                      allTasks={cleanerTasks}
+                                      isDragDisabled={isReadOnly}
+                                    />
+                                  </>
+                                );
+                              });
+                            })()}
+                            {provided.placeholder}
+                          </div>
+                        </div>
+                      )}
+                    </Droppable>
+                  </div>
+                );
+              })
+            )}
+
+            {/* Riga finale con pulsanti */}
+            <div className="flex mb-2">
+              {/* Pulsante + sotto il nome dell'ultimo cleaner */}
+              <div className="flex-shrink-0 p-1 flex items-center justify-center border border-border" style={{ width: `${cleanerColumnWidth}px` }}>
+                <Button
+                  onClick={() => {
+                    setCleanerToReplace(null);
+                    handleOpenAddCleanerDialog();
+                  }}
+                  variant="ghost"
+                  size="sm"
+                  className="w-full h-full"
+                  disabled={isReadOnly}
+                >
+                  <UserPlus className="w-5 h-5" />
+                </Button>
+              </div>
+              {/* Pulsanti Conferma Assegnazioni e Stampa affiancati */}
+              <div className="flex-1 p-1 border-t border-border flex gap-2">
+                {!isReadOnly && (
+                  <Button
+                    onClick={handleConfirmAssignments}
+                    disabled={!hasUnsavedChanges}
+                    className={`flex-1 h-full ${hasUnsavedChanges ? 'bg-green-500 hover:bg-green-600 animate-pulse' : 'bg-green-500 hover:bg-green-600 opacity-50 cursor-not-allowed'}`}
+                    data-testid="button-confirm-assignments"
+                  >
+                    <Users className="w-4 h-4 mr-2" />
+                    {hasUnsavedChanges ? 'Conferma Assegnazioni ⚠️' : 'Assegnazioni Confermate'}
+                  </Button>
+                )}
+                <Button
+                  onClick={handlePrint}
+                  variant="outline"
+                  className={isReadOnly ? "flex-1 h-full" : "h-full px-6"}
+                >
+                  <Printer className="w-4 h-4 mr-2" />
+                  Stampa
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Add Cleaner Dialog */}
+      <Dialog open={isAddCleanerDialogOpen} onOpenChange={(open) => {
+        setIsAddCleanerDialogOpen(open);
+        if (!open) setCleanerToReplace(null);
+      }}>
+        <DialogContent className="sm:max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>
+              {cleanerToReplace ? "Sostituisci Cleaner Rimosso" : "Aggiungi Cleaner alla Timeline"}
+            </DialogTitle>
+            <DialogDescription>
+              {cleanerToReplace ? (
+                <>
+                  Sostituendo <strong>
+                    {(() => {
+                      const removedCleaner = allCleanersToShow.find(c => c.id === cleanerToReplace);
+                      return removedCleaner
+                        ? `${removedCleaner.name} ${removedCleaner.lastname}`
+                        : `ID ${cleanerToReplace}`;
+                    })()}
+                  </strong> - Le sue task verranno assegnate al nuovo cleaner
+                </>
+              ) : (
+                "Seleziona un cleaner disponibile da aggiungere alla timeline"
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2 mt-4">
+            {availableCleaners.length === 0 ? (
+              <p className="text-center text-muted-foreground py-8">
+                Nessun cleaner disponibile da aggiungere
+              </p>
+            ) : (
+              availableCleaners.map((cleaner) => (
+                <div
+                  key={cleaner.id}
+                  className="flex items-center justify-between p-3 border rounded-lg hover:bg-accent cursor-pointer"
+                  onClick={() => handleAddCleaner(cleaner.id)}
+                  data-testid={`cleaner-option-${cleaner.id}`}
+                >
+                  <div className="flex items-center gap-3">
+                    <div>
+                      <p className="font-semibold">
+                        {cleaner.name} {cleaner.lastname}
+                      </p>
+                      <p className="text-sm text-muted-foreground">
+                        {cleaner.role} • Contratto: {cleaner.contract_type} • {cleaner.counter_hours?.toFixed(2) || '0.00'}h
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {cleaner.role === "Premium" && (
+                      <span className="px-2 py-1 rounded bg-yellow-400 text-black text-xs font-bold">
+                        Premium
+                      </span>
+                    )}
+                    {cleaner.role === "Formatore" && (
+                      <span className="px-2 py-1 rounded bg-orange-500 text-black text-xs font-bold">
+                        Formatore
+                      </span>
+                    )}
+                    {cleaner.role === "Standard" && (
+                      <span className="px-2 py-1 rounded bg-green-500 text-white text-xs font-bold">
+                        Standard
+                      </span>
+                    )}
+                    {cleaner.can_do_straordinaria && (
+                      <span className="px-2 py-1 rounded bg-red-500 text-black text-xs font-bold">
+                        Straordinario
+                      </span>
+                    )}
+                  </div>
+                </div>
               ))
             )}
-            {provided.placeholder}
           </div>
-        )}
-      </Droppable>
-    </div>
-  );
-}
+        </DialogContent>
+      </Dialog>
 
-// Placeholder per TaskDetailsDialog se non definito altrove
-// Assicurati che questo componente sia definito nel tuo progetto
-function TaskDetailsDialog({ task, open, onOpenChange, onSave, isReadOnly }: any) {
-  // Implementazione fittizia o reale del dialog
-  return null;
+      {/* Cleaner Details Dialog */}
+      <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
+        <DialogContent className={`sm:max-w-2xl max-h-[80vh] overflow-y-auto ${
+          selectedCleaner?.role === "Formatore"
+            ? "border-4 border-orange-500 bg-orange-500/30"
+            : selectedCleaner?.role === "Premium"
+            ? "border-4 border-yellow-500 bg-yellow-500/30"
+            : selectedCleaner?.role === "Standard"
+            ? "border-4 border-green-500 bg-green-500/30"
+            : ""
+        }`}>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              Dettagli Cleaner #{selectedCleaner?.id}
+              {selectedCleaner && (
+                <>
+                  {selectedCleaner.role === "Formatore" ? (
+                    <span className="px-3 py-1 rounded-md bg-orange-500 text-black border-2 border-black font-semibold text-sm">
+                      Formatore
+                    </span>
+                  ) : selectedCleaner.role === "Premium" ? (
+                    <span className="px-3 py-1 rounded-md bg-yellow-400 text-black border-2 border-black font-semibold text-sm">
+                      Premium
+                    </span>
+                  ) : (
+                    <span className="px-3 py-1 rounded-md bg-green-500 text-white border-2 border-black font-semibold text-sm">
+                      Standard
+                    </span>
+                  )}
+                  {selectedCleaner.can_do_straordinaria && (
+                    <span className="px-3 py-1 rounded-md bg-red-500 text-black border-2 border-black font-semibold text-sm">
+                      Straordinario
+                    </span>
+                  )}
+                </>
+              )}
+            </DialogTitle>
+          </DialogHeader>
+          {selectedCleaner && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-sm font-semibold text-muted-foreground">Nome</p>
+                  <p className="text-sm">{selectedCleaner.name.toUpperCase()}</p>
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-muted-foreground">Cognome</p>
+                  <p className="text-sm">{selectedCleaner.lastname.toUpperCase()}</p>
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-muted-foreground">Giorni lavorati</p>
+                  <p className="text-sm">{selectedCleaner.counter_days}</p>
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-muted-foreground">Ore lavorate (totali)</p>
+                  <p className="text-sm">{selectedCleaner.counter_hours}</p>
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-muted-foreground">Ore questa settimana</p>
+                  <p className="text-sm">{selectedCleaner.weekly_hours?.toFixed(2) || '0.00'}</p>
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-muted-foreground">Tipo contratto</p>
+                  <p className="text-sm">{selectedCleaner.contract_type}</p>
+                </div>
+              </div>
+
+              {/* Sezione Scambia Cleaner */}
+              <div className="border-t pt-4 mt-4">
+                <p className="text-sm font-semibold text-muted-foreground mb-3">
+                  Scambia Cleaner
+                </p>
+                <div className="flex gap-3 items-end">
+                  <div className="flex-1">
+                    <Select
+                      value={selectedSwapCleaner}
+                      onValueChange={setSelectedSwapCleaner}
+                      disabled={swapCleanersMutation.isPending || isReadOnly}
+                    >
+                      <SelectTrigger data-testid="select-swap-cleaner">
+                        <SelectValue placeholder="Seleziona cleaner..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {cleaners
+                          .filter(c => c.id !== selectedCleaner.id) // Escludi cleaner corrente
+                          .map(cleaner => (
+                            <SelectItem
+                              key={cleaner.id}
+                              value={String(cleaner.id)}
+                              data-testid={`option-cleaner-${cleaner.id}`}
+                            >
+                              {cleaner.name} {cleaner.lastname}
+                            </SelectItem>
+                          ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <Button
+                    onClick={handleSwapCleaners}
+                    disabled={!selectedSwapCleaner || swapCleanersMutation.isPending || isReadOnly}
+                    variant="default"
+                    className="flex gap-2"
+                    data-testid="button-swap-cleaner"
+                  >
+                    {swapCleanersMutation.isPending ? (
+                      <>
+                        <RefreshCw className="h-4 w-4 animate-spin" />
+                        Scambio...
+                      </>
+                    ) : (
+                      <>
+                        <RefreshCw className="h-4 w-4" />
+                        Scambia
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </div>
+
+              {/* Sezione Rimuovi Cleaner */}
+              <div className="border-t pt-4 mt-4">
+                <p className="text-sm font-semibold text-muted-foreground mb-3">
+                  Rimuovi Cleaner
+                </p>
+                <p className="text-xs text-muted-foreground mb-3">
+                  Il cleaner sarà rimosso dalla timeline ma le sue task rimarranno finché non verrà sostituito.
+                </p>
+                <Button
+                  onClick={() => removeCleanerMutation.mutate(selectedCleaner.id)}
+                  disabled={removeCleanerMutation.isPending || isReadOnly}
+                  variant="destructive"
+                  className="w-full"
+                  data-testid="button-remove-cleaner"
+                >
+                  {removeCleanerMutation.isPending ? "Rimozione..." : "Rimuovi dalla selezione"}
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+    </>
+  );
 }
