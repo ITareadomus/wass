@@ -235,80 +235,73 @@ export default function GenerateAssignments() {
       const checkResult = await checkResponse.json();
 
       if (checkResult.found) {
-        // Per date passate O data corrente con salvataggio: carica automaticamente
-        if (isPastDate || isCurrentDate) {
-          // CRITICAL: Salva il timestamp PRIMA di caricare per evitare loop infiniti
-          const savedKey = `last_saved_${dateStr}`;
-          localStorage.setItem(savedKey, checkResult.lastSavedTimestamp || dateStr);
+        // Per TUTTE le date con salvataggio esistente: carica automaticamente
+        // CRITICAL: Salva il timestamp PRIMA di caricare per evitare loop infiniti
+        const savedKey = `last_saved_${dateStr}`;
+        localStorage.setItem(savedKey, checkResult.lastSavedTimestamp || dateStr);
 
-          console.log(`📥 Auto-caricamento assegnazioni salvate per ${dateStr} (data passata)`);
-          setExtractionStep("Caricamento assegnazioni salvate...");
+        const dateType = isPastDate ? "data passata" : (isCurrentDate ? "data corrente" : "data futura");
+        console.log(`📥 Auto-caricamento assegnazioni salvate per ${dateStr} (${dateType})`);
+        setExtractionStep("Caricamento assegnazioni salvate...");
 
-          // Carica automaticamente i dati salvati
-          const loadResponse = await fetch('/api/load-saved-assignments', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ date: dateStr })
+        // Carica automaticamente i dati salvati
+        const loadResponse = await fetch('/api/load-saved-assignments', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ date: dateStr })
+        });
+
+        const loadResult = await loadResponse.json();
+
+        if (loadResult.success && loadResult.found) {
+          console.log(`✅ Assegnazioni salvate caricate automaticamente per ${dateStr}`);
+          setLastSavedTimestamp(checkResult.formattedDateTime || null);
+
+          // Ricarica i task per mostrare i dati aggiornati
+          await loadTasks(true);
+
+          // CRITICAL: SOLO date passate sono READ-ONLY, tutte le altre (corrente e future) sono EDITABILI
+          const toastMessage = isPastDate 
+            ? "📥 Assegnazioni caricate (sola lettura)"
+            : "📥 Assegnazioni caricate (modificabili)";
+          
+          const toastDescription = isPastDate
+            ? `Ultime assegnazioni salvate il ${checkResult.formattedDateTime || dateStr}`
+            : `Ultime assegnazioni salvate il ${checkResult.formattedDateTime || dateStr}`;
+
+          toast({
+            variant: "success",
+            title: toastMessage,
+            description: toastDescription,
+            duration: 3000
           });
 
-          const loadResult = await loadResponse.json();
-
-          if (loadResult.success && loadResult.found) {
-            console.log(`✅ Assegnazioni salvate caricate automaticamente per ${dateStr}`);
-            setLastSavedTimestamp(checkResult.formattedDateTime || null);
-
-            // Ricarica i task per mostrare i dati aggiornati
-            await loadTasks(true);
-
-            // CRITICAL: Data corrente rimane EDITABILE, date passate sono READ-ONLY
-            const toastMessage = isPastDate 
-              ? "📥 Assegnazioni caricate (sola lettura)"
-              : "📥 Assegnazioni caricate";
-            
-            const toastDescription = isPastDate
-              ? `Ultime assegnazioni salvate il ${checkResult.formattedDateTime || dateStr}`
-              : `Ultime assegnazioni salvate il ${checkResult.formattedDateTime || dateStr} (modificabili)`;
-
-            toast({
-              variant: "success",
-              title: toastMessage,
-              description: toastDescription,
-              duration: 3000
-            });
-
-            // Imposta timeline in modalità read-only SOLO per date passate
-            setIsTimelineReadOnly(isPastDate);
-            if (isPastDate) {
-              console.log("🔒 Timeline impostata in modalità READ-ONLY (data passata con assegnazioni salvate)");
-            } else {
-              console.log("✏️ Timeline impostata in modalità EDITABILE (data corrente con assegnazioni salvate)");
-            }
-
-            // Ricarica la timeline UI
-            if ((window as any).loadTimelineCleaners) {
-              console.log("🔄 Ricaricamento timeline cleaners dopo auto-load...");
-              await (window as any).loadTimelineCleaners();
-            }
-
-            setExtractionStep("Assegnazioni caricate!");
-            await new Promise(resolve => setTimeout(resolve, 100));
-            setIsExtracting(false);
+          // Imposta timeline in modalità read-only SOLO per date passate
+          setIsTimelineReadOnly(isPastDate);
+          if (isPastDate) {
+            console.log("🔒 Timeline impostata in modalità READ-ONLY (data passata)");
           } else {
-            // Caricamento fallito per data passata = nessun salvataggio disponibile
-            // Ma mostra comunque i container come per date future
-            console.log("📭 Data passata senza salvataggi disponibili - mostro container in sola lettura");
-            setIsTimelineReadOnly(true);
-            await extractData(date);
+            console.log("✏️ Timeline impostata in modalità EDITABILE (data corrente/futura con salvataggio)");
           }
 
-        } else {
-          // Per date FUTURE: permetti sempre modifiche
-          console.log(`✏️ Data ${dateStr} (futura) - modalità EDITABILE`);
-          setLastSavedTimestamp(null);
-          localStorage.removeItem(`last_saved_${dateStr}`);
-          setIsTimelineReadOnly(false);
+          // Ricarica la timeline UI
+          if ((window as any).loadTimelineCleaners) {
+            console.log("🔄 Ricaricamento timeline cleaners dopo auto-load...");
+            await (window as any).loadTimelineCleaners();
+          }
 
-          // Procedi con estrazione normale per data futura
+          setExtractionStep("Assegnazioni caricate!");
+          await new Promise(resolve => setTimeout(resolve, 100));
+          setIsExtracting(false);
+        } else {
+          // Caricamento fallito = nessun salvataggio disponibile
+          if (isPastDate) {
+            console.log("📭 Data passata senza salvataggi disponibili - mostro container in sola lettura");
+            setIsTimelineReadOnly(true);
+          } else {
+            console.log("📭 Data corrente/futura senza salvataggi disponibili - modalità EDITABILE");
+            setIsTimelineReadOnly(false);
+          }
           await extractData(date);
         }
       } else {
