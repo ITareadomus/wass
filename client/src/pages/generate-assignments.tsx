@@ -219,15 +219,7 @@ export default function GenerateAssignments() {
         console.log("✅ Trovate assegnazioni salvate per", dateStr, "- caricamento automatico...");
         setExtractionStep("Caricamento assegnazioni salvate...");
         
-        // CRITICAL: Prima resetta la timeline per evitare conflitti
-        await fetch('/api/reset-timeline-assignments', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ date: dateStr })
-        });
-        
-        await new Promise(resolve => setTimeout(resolve, 200));
-        
+        // Carica direttamente le assegnazioni salvate senza resettare timeline
         const loaded = await loadSavedAssignments(date);
         
         if (loaded) {
