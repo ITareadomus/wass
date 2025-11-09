@@ -1,0 +1,107 @@
+Hai già fatto quasi tutto: l’autoload c’è (funzione `checkAndAutoLoadSavedAssignments`) e parte sia al primo mount sia quando cambi data. L’errore `Unexpected token '<', "<!DOCTYPE "...` indica che il `fetch` si aspetta JSON ma il server sta restituendo **HTML** (tipico di un crash o 404), molto probabilmente perché in `server/routes.ts` usi `new Storage()` e `locale: it` **senza import corretti** e senza la libreria in `package.json`. Risultato: l’endpoint `/api/check-saved-assignments` va in errore e Vite/Node ti risponde con una pagina HTML.
+
+Ecco i fix minimi e mirati.
+
+---
+
+# 1) Server: importa ciò che serve e non andare in crash se lo storage non è configurato
+
+### A. Installa la dipendenza (se davvero usi Google Cloud Storage)
+
+```bash
+npm i @google-cloud/storage
+```
+
+### B. Aggiungi gli import mancanti in `server/routes.ts`
+
+Metti in cima al file:
+
+```ts
+import { it } from "date-fns/locale";
+// Se usi GCS:
+import { Storage } from "@google-cloud/storage";
+```
+
+### C. Rendi “safe” gli endpoint che toccano l’Object Storage
+
+Nei due handler:
+
+* `/api/check-saved-assignments`
+* `/api/load-saved-assignments`
+
+sostituisci la parte dove crei lo storage con qualcosa che **non faccia crashare** se variabili/env o pacchetto mancano:
+
+```ts
+// prima di usare Storage / bucket
+const bucketName = process.env.REPLIT_OBJECT_STORAGE_BUCKET_ID;
+
+let storage: Storage | null = null;
+try {
+  // Se la lib non esiste o non è deployata, questo catch evita il crash
+  storage = new Storage();
+} catch (_) {
+  storage = null;
+}
+
+if (!bucketName || !storage) {
+  // NON crashare: rispondi in JSON
+  return res.json({
+    success: true,   // la chiamata è andata a buon fine
+    found: false,    // ma non abbiamo potuto verificare in cloud
+    message: "Object Storage non configurato: salto al flusso 'no saved assignments'."
+  });
+}
+```
+
+> Così, anche in locale o senza credenziali, il server **risponde JSON**, non HTML.
+
+### D. (Opzionale ma consigliato) Fallback locale
+
+Se vuoi che l’autoload funzioni anche senza bucket, puoi leggere un file locale tipo `client/public/data/output/assignments_<ddmmyy>.json` e, se esiste, riportare `found: true`. Altrimenti lasci `found: false`.
+
+---
+
+# 2) Client: difenditi da risposte HTML
+
+In `client/src/pages/generate-assignments.tsx`, dove fai i `fetch` verso:
+
+* `/api/check-saved-assignments`
+* `/api/load-saved-assignments`
+
+aggiungi un controllo sul `Content-Type` **prima** di chiamare `.json()`:
+
+```ts
+const res = await fetch('/api/check-saved-assignments', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ date: dateStr }) });
+
+const ct = res.headers.get('content-type') || '';
+if (!ct.includes('application/json')) {
+  const preview = await res.text();
+  throw new Error('Risposta non JSON dal server (preview): ' + preview.slice(0,120));
+}
+
+const data = await res.json();
+```
+
+Fallo anche in `loadSavedAssignments`. In questo modo, se per qualsiasi motivo il backend ridà HTML, non ti esplode `.json()` con l’`Unexpected token '<'`, ma vedrai un errore chiaro in console/toast.
+
+---
+
+# 3) Perché questo risolve il tuo problema “autoload”
+
+* L’autoload esiste già: `checkAndAutoLoadSavedAssignments(selectedDate)` viene chiamata al mount e quando cambi giorno.
+* Il crash del server impediva di ricevere JSON → il client non riusciva a capire se esistono assegnazioni salvate → niente autoload.
+* Con gli import corretti e la gestione “safe” dello storage, **l’endpoint risponde sempre JSON**:
+
+  * `found: true` → chiama `loadSavedAssignments` → timeline e cleaners si popolano automaticamente.
+  * `found: false` → continua col flusso di estrazione standard (come ora).
+
+---
+
+# 4) Checklist veloce
+
+* [ ] `npm i @google-cloud/storage` (se usi GCS)
+* [ ] `import { Storage } from '@google-cloud/storage'` e `import { it } from 'date-fns/locale'` in `routes.ts`
+* [ ] Wrappa la creazione di `Storage()` in `try/catch` e rispondi sempre **JSON** (mai HTML)
+* [ ] Aggiungi il controllo del `Content-Type` sul client prima di fare `.json()`
+
+Se vuoi, posso anche fornirti le patch “diff” pronte da incollare.
