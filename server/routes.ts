@@ -1106,6 +1106,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       await fs.writeFile(tmpPath, JSON.stringify(savedData, null, 2));
       await fs.rename(tmpPath, timelinePath);
 
+      // CRITICAL: Attendi che il file sia effettivamente scritto
+      await new Promise(resolve => setTimeout(resolve, 200));
+
       // === Scarica e ripristina selected_cleaners per la stessa data ===
       const dateObj = new Date(workDate);
       const day = String(dateObj.getDate()).padStart(2, '0');
