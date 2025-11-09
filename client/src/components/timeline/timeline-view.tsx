@@ -1,5 +1,5 @@
 import { Personnel, TaskType as Task } from "@shared/schema";
-import { Calendar, RotateCcw, Users, RefreshCw, UserPlus, Maximize2, Minimize2, Printer } from "lucide-react";
+import { Calendar, RotateCcw, Users, RefreshCw, UserPlus, Maximize2, Minimize2, Printer, Check } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import * as React from "react";
 import { Droppable, Draggable } from "react-beautiful-dnd";
@@ -1161,15 +1161,25 @@ export default function TimelineView({
               {/* Pulsanti Conferma Assegnazioni e Stampa affiancati */}
               <div className="flex-1 p-1 border-t border-border flex gap-2">
                 {!isReadOnly && (
-                  <Button
-                    onClick={handleConfirmAssignments}
-                    disabled={!hasUnsavedChanges}
-                    className={`flex-1 h-full ${hasUnsavedChanges ? 'bg-green-500 hover:bg-green-600 animate-pulse' : 'bg-green-500 hover:bg-green-600 opacity-50 cursor-not-allowed'}`}
-                    data-testid="button-confirm-assignments"
-                  >
-                    <Users className="w-4 h-4 mr-2" />
-                    {hasUnsavedChanges ? 'Conferma Assegnazioni ⚠️' : 'Assegnazioni Confermate'}
-                  </Button>
+                  hasUnsavedChanges ? (
+                    <Button
+                      onClick={handleConfirmAssignments}
+                      className="bg-green-600 hover:bg-green-700 text-white flex items-center gap-2 print:hidden"
+                      disabled={isReadOnly}
+                    >
+                      <Check className="w-4 h-4" />
+                      Conferma Assegnazioni ⚠️
+                    </Button>
+                  ) : (
+                    <Button
+                      variant="outline"
+                      className="flex items-center gap-2 print:hidden border-green-600 text-green-600 cursor-default"
+                      disabled
+                    >
+                      <Check className="w-4 h-4" />
+                      Assegnazioni Confermate
+                    </Button>
+                  )
                 )}
                 <Button
                   onClick={handlePrint}
