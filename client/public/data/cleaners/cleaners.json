@@ -1,6 +1,6 @@
 {
     "metadata": {
-        "last_updated": "2025-11-09T18:24:24.294024",
+        "last_updated": "2025-11-09T20:49:43.791595",
         "db_config": {
             "host": "139.59.132.41",
             "user": "admin",
@@ -10,8 +10,8 @@
         "schema_version": "1.0"
     },
     "dates": {
-        "2025-11-08": {
-            "timestamp": "2025-11-09T18:24:24.294039",
+        "2025-11-09": {
+            "timestamp": "2025-11-09T20:49:43.791606",
             "cleaners": [
                 {
                     "id": 24,
@@ -509,7 +509,7 @@
                     "ranking": 0,
                     "counter_hours": 18.0,
                     "counter_days": 0,
-                    "available": false,
+                    "available": true,
                     "contract_type": "B",
                     "preferred_customers": [
                         3,
@@ -920,7 +920,7 @@
                 }
             ],
             "total_cleaners": 40,
-            "date": "2025-11-08",
+            "date": "2025-11-09",
             "data_source": "database_query"
         }
     }
