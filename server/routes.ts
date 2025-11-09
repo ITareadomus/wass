@@ -195,7 +195,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           currentData = {
             cleaners: [],
             total_selected: 0,
-            metadata: { 
+            metadata: {
               date: workDate,
               reset_at: new Date().toISOString()
             }
@@ -209,7 +209,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const emptySelectedCleaners = {
             cleaners: [],
             total_selected: 0,
-            metadata: { 
+            metadata: {
               date: workDate,
               reset_at: new Date().toISOString()
             }
@@ -979,10 +979,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.json({ success: true, found: false });
     } catch (error: any) {
       console.error("check-saved-assignments error:", error);
-      return res.status(200).json({ 
-        success: false, 
-        found: false, 
-        error: String(error?.message || error) 
+      return res.status(200).json({
+        success: false,
+        found: false,
+        error: String(error?.message || error)
       });
     }
   });
@@ -1053,7 +1053,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const now = new Date();
       const hours = String(now.getHours()).padStart(2, '0');
       const minutes = String(now.getMinutes()).padStart(2, '0');
-      const formattedDateTime = `${day}/${month}/${fullYear} alle ${hours}:${minutes}`;
+      const formattedDateTime = `${day}/${month}/${year} alle ${hours}:${minutes}`;
 
       res.json({
         success: true,
@@ -1078,6 +1078,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const workDate = req.body?.date || format(new Date(), "yyyy-MM-dd");
       const { key } = buildKey(workDate);
+      const dateStr = workDate; // Alias for clarity
 
       console.log(`Tentativo di caricamento file: ${key}`);
 
@@ -1092,19 +1093,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      const savedData = JSON.parse(result.value);
-      
-      // CRITICAL: Aggiorna SEMPRE la data nei metadata con la data richiesta
-      // Questo permette di caricare file salvati anche se la data interna non corrisponde
-      savedData.metadata = savedData.metadata || {};
-      savedData.metadata.date = workDate;
-      savedData.metadata.last_updated = new Date().toISOString();
+      const timelineData = result.value; // Contiene il contenuto del file come stringa
 
-      // Salva i dati caricati in timeline.json
+      // 3. Ripristina timeline.json con validazione
       const timelinePath = path.join(process.cwd(), 'client/public/data/output/timeline.json');
-      const tmpPath = `${timelinePath}.tmp`;
-      await fs.writeFile(tmpPath, JSON.stringify(savedData, null, 2));
-      await fs.rename(tmpPath, timelinePath);
+      console.log('✅ Ripristinando timeline.json da Object Storage...');
+
+      // Valida che timelineData sia JSON valido
+      try {
+        JSON.parse(timelineData);
+        await fs.writeFile(timelinePath, timelineData, 'utf-8');
+        console.log('✅ Timeline ripristinata con successo');
+      } catch (parseError) {
+        console.error('❌ Timeline.json da Object Storage non è JSON valido:', parseError);
+        // Crea una timeline vuota valida
+        const emptyTimeline = {
+          metadata: {
+            date: dateStr,
+            last_updated: new Date().toISOString()
+          },
+          cleaners_assignments: [],
+          meta: { total_cleaners: 0, used_cleaners: 0, assigned_tasks: 0 }
+        };
+        await fs.writeFile(timelinePath, JSON.stringify(emptyTimeline, null, 2), 'utf-8');
+        console.log('⚠️ Creata timeline vuota (file corrotto in Object Storage)');
+      }
 
       // === Scarica e ripristina selected_cleaners per la stessa data ===
       const dateObj = new Date(workDate);
@@ -1114,41 +1127,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const year = fullYear.slice(-2);
       const folderPath = `${day}-${month}-${fullYear}`;
       const scKey = `${folderPath}/selected_cleaners_${day}${month}${year}.json`;
-      
-      try {
-        const scResult = await client.downloadAsText(scKey, { bucket: BUCKET });
-        const selectedCleanersPath = path.join(
-          process.cwd(),
-          'client/public/data/cleaners/selected_cleaners.json'
-        );
 
-        if (scResult.ok) {
-          const scData = JSON.parse(scResult.value);
+      // 2. Ripristina selected_cleaners.json se esiste con validazione
+      const selectedCleanersPath = path.join(process.cwd(), 'client/public/data/cleaners/selected_cleaners.json');
+      if (scKey && await client.exists(scKey)) {
+        const selectedCleanersData = await client.read(scKey);
 
-          scData.metadata = scData.metadata || {};
-          scData.metadata.date = workDate;
-          scData.metadata.loaded_at = new Date().toISOString();
-
-          const tmpScPath = `${selectedCleanersPath}.tmp`;
-          await fs.writeFile(tmpScPath, JSON.stringify(scData, null, 2));
-          await fs.rename(tmpScPath, selectedCleanersPath);
-
+        // Valida che sia JSON valido
+        try {
+          JSON.parse(selectedCleanersData);
+          await fs.writeFile(selectedCleanersPath, selectedCleanersData, 'utf-8');
           console.log(`✅ Selected cleaners ripristinati da Object Storage: ${scKey}`);
-        } else {
-          const emptySelected = {
+        } catch (parseError) {
+          console.error('❌ selected_cleaners.json da Object Storage non è JSON valido:', parseError);
+          // Crea un file vuoto valido
+          const emptySelectedCleaners = {
             cleaners: [],
             total_selected: 0,
-            metadata: { date: workDate, reset_at: new Date().toISOString() }
+            metadata: {
+              date: dateStr,
+              saved_at: new Date().toISOString()
+            }
           };
-
-          const tmpScPath = `${selectedCleanersPath}.tmp`;
-          await fs.writeFile(tmpScPath, JSON.stringify(emptySelected, null, 2));
-          await fs.rename(tmpScPath, selectedCleanersPath);
-
-          console.log(`ℹ️ Nessun selected_cleaners salvato per ${workDate} - creato vuoto`);
+          await fs.writeFile(selectedCleanersPath, JSON.stringify(emptySelectedCleaners, null, 2), 'utf-8');
+          console.log('⚠️ Creato selected_cleaners vuoto (file corrotto in Object Storage)');
         }
-      } catch (e) {
-        console.warn(`⚠️ Impossibile caricare ${scKey}:`, e);
+      } else {
+        console.log('⚠️ selected_cleaners.json non trovato in Object Storage, mantengo quello corrente');
       }
       // === END ===
 
@@ -1173,23 +1178,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // CRITICAL: NON rieseguire create_containers dopo aver caricato da Object Storage
       // Invece, rimuovi dai containers.json le task già assegnate in timeline.json
       const containersPath = path.join(process.cwd(), 'client/public/data/output/containers.json');
-      
+
       try {
         // Carica containers esistenti (generati da extract-data precedente)
         const containersData = JSON.parse(await fs.readFile(containersPath, 'utf8'));
-        
+
         // Estrai tutti i task_id assegnati dalla timeline
         const assignedTaskIds = new Set<number>();
-        if (savedData.cleaners_assignments) {
-          for (const cleanerEntry of savedData.cleaners_assignments) {
+        if (JSON.parse(timelineData).cleaners_assignments) { // Ensure timelineData is parsed here too
+          for (const cleanerEntry of JSON.parse(timelineData).cleaners_assignments) {
             for (const task of cleanerEntry.tasks || []) {
               assignedTaskIds.add(task.task_id);
             }
           }
         }
-        
+
         console.log(`🔍 Task assegnate trovate in timeline: ${assignedTaskIds.size}`);
-        
+
         // Rimuovi dai containers le task già assegnate
         let removedCount = 0;
         for (const containerType of ['early_out', 'high_priority', 'low_priority']) {
@@ -1201,7 +1206,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             removedCount += (originalCount - container.tasks.length);
           }
         }
-        
+
         // Aggiorna summary
         if (containersData.summary) {
           containersData.summary.early_out = containersData.containers.early_out?.count || 0;
@@ -1212,12 +1217,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
             containersData.summary.high_priority +
             containersData.summary.low_priority;
         }
-        
+
         // Salva containers.json sincronizzato
         const tmpContainersPath = `${containersPath}.tmp`;
         await fs.writeFile(tmpContainersPath, JSON.stringify(containersData, null, 2));
         await fs.rename(tmpContainersPath, containersPath);
-        
+
         console.log(`✅ Containers sincronizzati: rimosse ${removedCount} task già assegnate`);
       } catch (err) {
         console.warn('⚠️ Impossibile sincronizzare containers:', err);
@@ -1245,7 +1250,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         filename: key,
         lastSavedTimestamp,
         formattedDateTime,
-        data: savedData,
+        data: JSON.parse(timelineData), // Return parsed data
         message: `Assegnazioni caricate da: ${key}`
       });
     } catch (error: any) {
@@ -1532,11 +1537,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       } else {
         // AGGIUNTA: Nessun cleaner rimosso da sostituire, aggiungi alla fine
         console.log(`➕ Nessun cleaner da sostituire, aggiunta nuovo cleaner ${cleanerId} (senza task)`);
-        
+
         // Cerca la posizione corretta basandoti su selected_cleaners.json
         // per mantenere l'ordine visivo
         const insertIndex = selectedCleanersData.cleaners.findIndex((c: any) => c.id === cleanerId);
-        
+
         const newCleanerEntry = {
           cleaner: {
             id: cleanerData.id,
@@ -1547,7 +1552,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           },
           tasks: []
         };
-        
+
         // Inserisci alla posizione corretta invece di append
         if (insertIndex >= 0 && insertIndex < timelineData.cleaners_assignments.length) {
           timelineData.cleaners_assignments.splice(insertIndex, 0, newCleanerEntry);
@@ -2449,15 +2454,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       try {
         await fs.access(timelinePath);
         const fileContent = await fs.readFile(timelinePath, 'utf8');
-        
+
         // Verifica che il contenuto sia JSON valido
         if (!fileContent.trim().startsWith('{')) {
           throw new Error('timeline.json non contiene JSON valido');
         }
-        
+
         const existingTimeline = JSON.parse(fileContent);
         timelineExists = true;
-        
+
         // Aggiorna SOLO la metadata.date se è cambiata
         if (existingTimeline.metadata?.date !== date) {
           console.log(`🔄 Timeline esiste per data ${existingTimeline.metadata?.date}, aggiorno metadata.date a ${date}`);
@@ -2493,7 +2498,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       try {
         const existingSelectedData = JSON.parse(await fs.readFile(selectedCleanersPath, 'utf8'));
         const existingDate = existingSelectedData.metadata?.date;
-        
+
         if (existingDate !== date) {
           shouldResetSelectedCleaners = true;
           console.log(`📅 Data cambiata da ${existingDate} a ${date} - reset selected_cleaners.json`);
@@ -2510,7 +2515,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const emptySelected = {
           cleaners: [],
           total_selected: 0,
-          metadata: { 
+          metadata: {
             date,
             reset_at: new Date().toISOString()
           }
@@ -2871,7 +2876,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // CRITICAL FIX: Usa timelineData direttamente (già contiene tutti i cleaner)
       // NON ricaricare da file perché timelineData è già completo
-      
+
       // Aggiorna solo metadata
       timelineData.metadata = timelineData.metadata || {};
       timelineData.metadata.last_updated = new Date().toISOString();
