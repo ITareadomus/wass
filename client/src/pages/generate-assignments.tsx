@@ -283,10 +283,10 @@ export default function GenerateAssignments() {
           await loadTasks(true);
 
           // CRITICAL: SOLO date passate sono READ-ONLY, tutte le altre (corrente e future) sono EDITABILI
-          const toastMessage = isPastDate 
+          const toastMessage = isPastDate
             ? "📥 Assegnazioni caricate (sola lettura)"
             : "📥 Assegnazioni caricate (modificabili)";
-          
+
           const toastDescription = isPastDate
             ? `Ultime assegnazioni salvate il ${checkResult.formattedDateTime || dateStr}`
             : `Ultime assegnazioni salvate il ${checkResult.formattedDateTime || dateStr}`;
@@ -338,7 +338,7 @@ export default function GenerateAssignments() {
           console.log("✏️ Data presente/futura - modalità EDITABILE");
           setIsTimelineReadOnly(false);
         }
-        
+
         await extractData(date);
       }
     } catch (error) {
