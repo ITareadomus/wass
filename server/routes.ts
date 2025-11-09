@@ -1155,22 +1155,58 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
       console.log("create_containers output:", containersResult);
 
-      // CRITICAL FIX: Ri-scrivi timeline.json con la data corretta dopo create_containers
-      // perché lo script potrebbe aver modificato il file
-      const finalTimelinePath = path.join(process.cwd(), 'client/public/data/output/timeline.json');
-      const finalTimelineData = JSON.parse(await fs.readFile(finalTimelinePath, 'utf8'));
+      // CRITICAL: NON rieseguire create_containers dopo aver caricato da Object Storage
+      // Invece, rimuovi dai containers.json le task già assegnate in timeline.json
+      const containersPath = path.join(process.cwd(), 'client/public/data/output/containers.json');
       
-      // Forza la data corretta anche se lo script l'ha cambiata
-      finalTimelineData.metadata = finalTimelineData.metadata || {};
-      finalTimelineData.metadata.date = workDate;
-      finalTimelineData.metadata.loaded_from_object_storage = true;
-      finalTimelineData.metadata.last_updated = new Date().toISOString();
-      
-      const tmpFinalPath = `${finalTimelinePath}.tmp`;
-      await fs.writeFile(tmpFinalPath, JSON.stringify(finalTimelineData, null, 2));
-      await fs.rename(tmpFinalPath, finalTimelinePath);
-      
-      console.log(`✅ Timeline.json ri-sincronizzata con data ${workDate} dopo create_containers`);
+      try {
+        // Carica containers esistenti (generati da extract-data precedente)
+        const containersData = JSON.parse(await fs.readFile(containersPath, 'utf8'));
+        
+        // Estrai tutti i task_id assegnati dalla timeline
+        const assignedTaskIds = new Set<number>();
+        if (savedData.cleaners_assignments) {
+          for (const cleanerEntry of savedData.cleaners_assignments) {
+            for (const task of cleanerEntry.tasks || []) {
+              assignedTaskIds.add(task.task_id);
+            }
+          }
+        }
+        
+        console.log(`🔍 Task assegnate trovate in timeline: ${assignedTaskIds.size}`);
+        
+        // Rimuovi dai containers le task già assegnate
+        let removedCount = 0;
+        for (const containerType of ['early_out', 'high_priority', 'low_priority']) {
+          const container = containersData.containers?.[containerType];
+          if (container?.tasks) {
+            const originalCount = container.tasks.length;
+            container.tasks = container.tasks.filter((t: any) => !assignedTaskIds.has(t.task_id));
+            container.count = container.tasks.length;
+            removedCount += (originalCount - container.tasks.length);
+          }
+        }
+        
+        // Aggiorna summary
+        if (containersData.summary) {
+          containersData.summary.early_out = containersData.containers.early_out?.count || 0;
+          containersData.summary.high_priority = containersData.containers.high_priority?.count || 0;
+          containersData.summary.low_priority = containersData.containers.low_priority?.count || 0;
+          containersData.summary.total_tasks =
+            containersData.summary.early_out +
+            containersData.summary.high_priority +
+            containersData.summary.low_priority;
+        }
+        
+        // Salva containers.json sincronizzato
+        const tmpContainersPath = `${containersPath}.tmp`;
+        await fs.writeFile(tmpContainersPath, JSON.stringify(containersData, null, 2));
+        await fs.rename(tmpContainersPath, containersPath);
+        
+        console.log(`✅ Containers sincronizzati: rimosse ${removedCount} task già assegnate`);
+      } catch (err) {
+        console.warn('⚠️ Impossibile sincronizzare containers:', err);
+      }
 
       // Estrai il timestamp dal filename (formato: assignments_DDMMYY.json)
       const dateMatch = filename.match(/assignments_(\d{6})\.json/);
