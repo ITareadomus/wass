@@ -1,5 +1,5 @@
 import { Personnel, TaskType as Task } from "@shared/schema";
-import { Calendar, RotateCcw, Users, RefreshCw, UserPlus, Maximize2, Minimize2, Printer, Check } from "lucide-react";
+import { Calendar, RotateCcw, Users, RefreshCw, UserPlus, Maximize2, Minimize2, Printer, Check, CheckCircle } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import * as React from "react";
 import { Droppable, Draggable } from "react-beautiful-dnd";
@@ -108,7 +108,7 @@ export default function TimelineView({
       // POI ricarica selected_cleaners
       await loadCleaners();
 
-      const message = data.removedFromTimeline 
+      const message = data.removedFromTimeline
         ? `${selectedCleaner?.name} ${selectedCleaner?.lastname} è stato rimosso completamente (nessuna task).`
         : `${selectedCleaner?.name} ${selectedCleaner?.lastname} è stato rimosso dalla selezione. Le sue task rimangono in timeline.`;
 
@@ -465,8 +465,8 @@ export default function TimelineView({
 
       // FILTRA CONTRO selected_cleaners.json (NON timeline.json)
       // Questo permette di sostituire cleaners rimossi dalla selezione ma ancora con task
-      const selectedCleanersData = selectedCleanersResponse.ok 
-        ? await selectedCleanersResponse.json() 
+      const selectedCleanersData = selectedCleanersResponse.ok
+        ? await selectedCleanersResponse.json()
         : { cleaners: [] };
 
       // Crea Set di ID già selezionati
@@ -477,7 +477,7 @@ export default function TimelineView({
       console.log(`   - Cleaner già in selected_cleaners.json: ${selectedCleanerIds.size}`, Array.from(selectedCleanerIds));
 
       // Escludi solo i cleaners già in selected_cleaners.json
-      const available = dateCleaners.filter((c: Cleaner) => 
+      const available = dateCleaners.filter((c: Cleaner) =>
         c.active && !selectedCleanerIds.has(Number(c.id))
       );
 
@@ -553,7 +553,7 @@ export default function TimelineView({
     if (cleaners.length === 0) return 96; // default 24 (w-24 = 96px)
 
     const maxLength = cleaners.reduce((max, cleaner) => {
-      const alias = cleanersAliases[cleaner.id]?.alias || 
+      const alias = cleanersAliases[cleaner.id]?.alias ||
                     `${cleaner.name} ${cleaner.lastname}`;
       return Math.max(max, alias.length);
     }, 0);
@@ -837,7 +837,7 @@ export default function TimelineView({
 
   return (
     <>
-      <div 
+      <div
         ref={timelineRef}
         className={`bg-card rounded-lg border shadow-sm ${isFullscreen ? 'fixed inset-0 z-50 overflow-auto' : ''}`}
       >
@@ -847,26 +847,12 @@ export default function TimelineView({
               <Calendar className="w-5 h-5 mr-2 text-primary" />
               Timeline Assegnazioni - {cleaners.length} Cleaners
             </h3>
-            <div className="flex gap-2">
+            <div className="flex gap-3 print:hidden">
               <Button
-                onClick={toggleFullscreen}
+                onClick={() => setLocation('/convocazioni')}
                 variant="outline"
                 size="sm"
                 className="flex items-center gap-2 print:hidden"
-                title={isFullscreen ? "Esci da schermo intero" : "Schermo intero"}
-              >
-                {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
-              </Button>
-              <Button
-                onClick={() => {
-                  // Passa la data corrente come parametro URL
-                  const dateStr = localStorage.getItem('selected_work_date') || format(new Date(), 'yyyy-MM-dd');
-                  setLocation(`/convocazioni?date=${dateStr}`);
-                }}
-                variant="outline"
-                size="sm"
-                className="flex items-center gap-2 print:hidden"
-                disabled={isReadOnly}
               >
                 <Users className="w-4 h-4" />
                 Convocazioni
@@ -881,6 +867,26 @@ export default function TimelineView({
                 <RotateCcw className="w-4 h-4" />
                 Reset Assegnazioni
               </Button>
+              {isReadOnly ? (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="flex items-center gap-2 bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-200 border-yellow-300 dark:border-yellow-700 cursor-default hover:bg-yellow-100 dark:hover:bg-yellow-900/30"
+                  disabled
+                >
+                  📜 Sei in modalità storico
+                </Button>
+              ) : (
+                <Button
+                  onClick={handleConfirmAssignments}
+                  variant="default"
+                  size="sm"
+                  className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white print:hidden"
+                >
+                  <CheckCircle className="w-4 h-4" />
+                  Conferma Assegnazioni
+                </Button>
+              )}
             </div>
           </div>
         </div>
@@ -932,7 +938,7 @@ export default function TimelineView({
                 const droppableId = `cleaner-${cleaner.id}`;
 
                 // Trova tutte le task assegnate a questo cleaner
-                const cleanerTasks = tasks.filter(task => 
+                const cleanerTasks = tasks.filter(task =>
                   (task as any).assignedCleaner === cleaner.id
                 ).map(normalizeTask); // Applica la normalizzazione qui
 
@@ -943,9 +949,9 @@ export default function TimelineView({
                     {/* Info cleaner */}
                     <div
                       className="flex-shrink-0 p-1 flex items-center border cursor-pointer hover:opacity-90 transition-opacity"
-                      style={{ 
+                      style={{
                         width: `${cleanerColumnWidth}px`,
-                        backgroundColor: isRemoved 
+                        backgroundColor: isRemoved
                           ? '#9CA3AF' // Grigio per cleaners rimossi
                           : filteredCleanerId === cleaner.id ? `${color.bg}` : color.bg,
                         color: isRemoved ? '#1F2937' : color.text,
@@ -1004,7 +1010,7 @@ export default function TimelineView({
                           className={`relative min-h-[45px] flex-1 ${
                             snapshot.isDraggingOver && !isReadOnly ? 'bg-primary/20 ring-2 ring-primary' : ''
                           }`}
-                          style={{ 
+                          style={{
                             backgroundColor: snapshot.isDraggingOver && !isReadOnly
                               ? `${color.bg}40`
                               : `${color.bg}10`
@@ -1022,7 +1028,7 @@ export default function TimelineView({
                             {(() => {
                               // Calcola l'array delle task per questo cleaner una sola volta
                               const cleanerTasks = tasks
-                                .filter((task) => 
+                                .filter((task) =>
                                   (task as any).assignedCleaner === cleaner.id
                                 )
                                 .map(normalizeTask)
@@ -1049,12 +1055,12 @@ export default function TimelineView({
                                 // Prova sia travel_time che travelTime per compatibilità
                                 let travelTime = 0;
                                 if (taskObj.travel_time !== undefined && taskObj.travel_time !== null) {
-                                  travelTime = typeof taskObj.travel_time === 'number' 
-                                    ? taskObj.travel_time 
+                                  travelTime = typeof taskObj.travel_time === 'number'
+                                    ? taskObj.travel_time
                                     : parseInt(String(taskObj.travel_time), 10);
                                 } else if (taskObj.travelTime !== undefined && taskObj.travelTime !== null) {
-                                  travelTime = typeof taskObj.travelTime === 'number' 
-                                    ? taskObj.travelTime 
+                                  travelTime = typeof taskObj.travelTime === 'number'
+                                    ? taskObj.travelTime
                                     : parseInt(String(taskObj.travelTime), 10);
                                 }
 
@@ -1092,7 +1098,7 @@ export default function TimelineView({
                                   <>
                                     {/* Spazio vuoto per task con sequence=1 e start_time=11:00 */}
                                     {timeOffset > 0 && (
-                                      <div 
+                                      <div
                                         key={`offset-${uniqueKey}`}
                                         className="flex-shrink-0"
                                         style={{ width: `${(timeOffset / 600) * 100}%` }}
@@ -1101,8 +1107,8 @@ export default function TimelineView({
 
                                     {/* Indicatore di travel time: solo omino */}
                                     {idx > 0 && (
-                                      <div 
-                                        key={`marker-${uniqueKey}`} 
+                                      <div
+                                        key={`marker-${uniqueKey}`}
                                         className="flex items-center justify-center flex-shrink-0 py-3 px-2"
                                         style={{ width: `${totalWidth}%`, minHeight: '50px' }}
                                         title={`${travelTime} min`}
@@ -1119,9 +1125,9 @@ export default function TimelineView({
                                       </div>
                                     )}
 
-                                    <TaskCard 
+                                    <TaskCard
                                       key={uniqueKey}
-                                      task={task} 
+                                      task={task}
                                       index={idx}
                                       isInTimeline={true}
                                       allTasks={cleanerTasks}
@@ -1201,8 +1207,8 @@ export default function TimelineView({
                   Sostituendo <strong>
                     {(() => {
                       const removedCleaner = allCleanersToShow.find(c => c.id === cleanerToReplace);
-                      return removedCleaner 
-                        ? `${removedCleaner.name} ${removedCleaner.lastname}` 
+                      return removedCleaner
+                        ? `${removedCleaner.name} ${removedCleaner.lastname}`
                         : `ID ${cleanerToReplace}`;
                     })()}
                   </strong> - Le sue task verranno assegnate al nuovo cleaner
@@ -1267,8 +1273,8 @@ export default function TimelineView({
       {/* Cleaner Details Dialog */}
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
         <DialogContent className={`sm:max-w-2xl max-h-[80vh] overflow-y-auto ${
-          selectedCleaner?.role === "Formatore" 
-            ? "border-4 border-orange-500 bg-orange-500/30" 
+          selectedCleaner?.role === "Formatore"
+            ? "border-4 border-orange-500 bg-orange-500/30"
             : selectedCleaner?.role === "Premium"
             ? "border-4 border-yellow-500 bg-yellow-500/30"
             : selectedCleaner?.role === "Standard"
@@ -1338,8 +1344,8 @@ export default function TimelineView({
                 </p>
                 <div className="flex gap-3 items-end">
                   <div className="flex-1">
-                    <Select 
-                      value={selectedSwapCleaner} 
+                    <Select
+                      value={selectedSwapCleaner}
                       onValueChange={setSelectedSwapCleaner}
                       disabled={swapCleanersMutation.isPending || isReadOnly}
                     >
@@ -1350,8 +1356,8 @@ export default function TimelineView({
                         {cleaners
                           .filter(c => c.id !== selectedCleaner.id) // Escludi cleaner corrente
                           .map(cleaner => (
-                            <SelectItem 
-                              key={cleaner.id} 
+                            <SelectItem
+                              key={cleaner.id}
                               value={String(cleaner.id)}
                               data-testid={`option-cleaner-${cleaner.id}`}
                             >
