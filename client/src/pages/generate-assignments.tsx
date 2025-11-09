@@ -234,7 +234,7 @@ export default function GenerateAssignments() {
       const checkResult = await checkResponse.json();
 
       if (checkResult.found) {
-        // SOLO per date passate: carica automaticamente e blocca modifiche
+        // SOLO per date STRETTAMENTE passate: carica automaticamente e blocca modifiche
         if (isPastDate) {
           // CRITICAL: Salva il timestamp PRIMA di caricare per evitare loop infiniti
           const savedKey = `last_saved_${dateStr}`;
@@ -288,10 +288,11 @@ export default function GenerateAssignments() {
           }
 
         } else {
-          // Per data corrente e future: mostra solo che esistono salvataggi ma NON caricarli
-          console.log(`ℹ️ Assegnazioni salvate esistono per ${dateStr} (data corrente/futura) ma NON auto-caricate - permetti modifiche`);
-          setLastSavedTimestamp(null); // Ensure this is null for editable dates
+          // Per data corrente e future: permetti sempre modifiche
+          console.log(`✏️ Data ${dateStr} (presente/futura) - modalità EDITABILE`);
+          setLastSavedTimestamp(null);
           localStorage.removeItem(`last_saved_${dateStr}`);
+          setIsTimelineReadOnly(false);
 
           // Procedi con estrazione normale per data corrente/futura
           await extractData(date);
@@ -300,23 +301,15 @@ export default function GenerateAssignments() {
         // NON esistono assegnazioni salvate
         console.log("ℹ️ Nessuna assegnazione salvata per", dateStr);
 
-        // Data passata o futura senza salvataggi: estrai normalmente
-        // La modalità read-only è già impostata se è data passata
+        // SOLO date STRETTAMENTE passate sono read-only
         if (isPastDate) {
           console.log("🔒 Data passata senza assegnazioni salvate - modalità READ-ONLY con container");
           setIsTimelineReadOnly(true);
-          
-          // CRITICAL: Svuota selected_cleaners.json per date passate senza salvataggi
-          // Questo forza la visualizzazione dei container vuoti invece del messaggio giallo
-          await fetch('/api/reset-selected-cleaners', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ date: dateStr })
-          });
         } else {
           console.log("✏️ Data presente/futura - modalità EDITABILE");
           setIsTimelineReadOnly(false);
         }
+        
         await extractData(date);
       }
     } catch (error) {
