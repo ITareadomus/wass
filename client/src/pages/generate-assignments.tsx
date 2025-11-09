@@ -86,6 +86,15 @@ function indexById(list: Task[]): Map<string, Task> {
   return m;
 }
 
+// Helper per verificare se una data è nel passato
+const isDateInPast = (date: Date): boolean => {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0); // Normalizza a inizio giornata per confronto
+  const targetDate = new Date(date);
+  targetDate.setHours(0, 0, 0, 0);
+  return targetDate < today;
+};
+
 export default function GenerateAssignments() {
   // Usa la data salvata in localStorage, oppure la data odierna se non presente
   const [selectedDate, setSelectedDate] = useState<Date>(() => {
@@ -100,6 +109,9 @@ export default function GenerateAssignments() {
 
   // Traccia il primo caricamento per evitare reload automatici
   const [isInitialMount, setIsInitialMount] = useState(true);
+
+  // Stato per tracciare se la timeline è in modalità di sola visualizzazione
+  const [isTimelineReadOnly, setIsTimelineReadOnly] = useState<boolean>(false);
 
   // Salva la data in localStorage ogni volta che cambia (formato locale senza timezone)
   useEffect(() => {
@@ -218,21 +230,25 @@ export default function GenerateAssignments() {
         // Esistono assegnazioni salvate - CARICA AUTOMATICAMENTE
         console.log("✅ Trovate assegnazioni salvate per", dateStr, "- caricamento automatico...");
         setExtractionStep("Caricamento assegnazioni salvate...");
-        
+
+        // Imposta timeline in modalità read-only (assegnazioni salvate)
+        setIsTimelineReadOnly(true);
+        console.log("🔒 Timeline impostata in modalità READ-ONLY (assegnazioni salvate)");
+
         // Carica direttamente le assegnazioni salvate
         const loaded = await loadSavedAssignments(date);
-        
+
         if (loaded) {
           // CRITICAL: Dopo il caricamento, aspetta che i file siano sincronizzati
           console.log("⏳ Attesa sincronizzazione file dopo caricamento da Object Storage...");
-          await new Promise(resolve => setTimeout(resolve, 800));
-          
+          await new Promise(resolve => setTimeout(resolve, 1000));
+
           // Ricarica la timeline UI
           if ((window as any).loadTimelineCleaners) {
             console.log("🔄 Ricaricamento timeline cleaners dopo auto-load...");
             await (window as any).loadTimelineCleaners();
           }
-          
+
           // Ricarica i tasks con i dati aggiornati
           try {
             console.log("📊 Caricamento tasks da file aggiornati...");
@@ -240,8 +256,11 @@ export default function GenerateAssignments() {
             console.log("✅ Tasks caricati con successo da assegnazioni salvate");
           } catch (err) {
             console.warn("⚠️ Errore nel caricamento tasks dopo auto-load:", err);
+            // Se fallisce, prova con estrazione nuova
+            await extractData(date);
+            return;
           }
-          
+
           setExtractionStep("Assegnazioni caricate!");
           await new Promise(resolve => setTimeout(resolve, 100));
           setIsExtracting(false);
@@ -251,9 +270,23 @@ export default function GenerateAssignments() {
           await extractData(date);
         }
       } else {
-        // NON esistono assegnazioni salvate - estrai dati dal database
-        console.log("ℹ️ Nessuna assegnazione salvata per", dateStr, "- estrazione dal database...");
-        await extractData(date);
+        // NON esistono assegnazioni salvate
+        console.log("ℹ️ Nessuna assegnazione salvata per", dateStr);
+
+        // Verifica se la data è nel passato
+        if (isDateInPast(date)) {
+          // Data passata senza salvataggi: read-only con timeline vuota
+          console.log("🔒 Data passata senza assegnazioni salvate - modalità READ-ONLY");
+          setIsTimelineReadOnly(true);
+          setExtractionStep("Data passata - nessuna assegnazione disponibile");
+          await new Promise(resolve => setTimeout(resolve, 500));
+          setIsExtracting(false);
+        } else {
+          // Data presente/futura senza salvataggi: modalità editabile
+          console.log("✏️ Data presente/futura - modalità EDITABILE");
+          setIsTimelineReadOnly(false);
+          await extractData(date);
+        }
       }
     } catch (error) {
       console.error("Errore nella verifica assegnazioni salvate:", error);
@@ -335,7 +368,7 @@ export default function GenerateAssignments() {
     }
   }, [selectedDate, isInitialMount]);
 
-  
+
 
 
 
@@ -409,29 +442,29 @@ export default function GenerateAssignments() {
       const containersData = await containersResponse.json();
 
       // Carica da timeline.json con gestione errori robusta
-      let timelineAssignmentsData = { 
-        assignments: [], 
-        metadata: { date: dateStr }, 
-        cleaners_assignments: [] 
+      let timelineAssignmentsData = {
+        assignments: [],
+        metadata: { date: dateStr },
+        cleaners_assignments: []
       };
 
       if (timelineResponse.ok) {
         try {
           const timelineText = await timelineResponse.text();
-          
+
           // CRITICAL: Verifica che sia JSON valido
           if (!timelineText.trim().startsWith('{') && !timelineText.trim().startsWith('[')) {
             console.error("❌ timeline.json contiene HTML/testo non valido - file non pronto");
             console.log("🔄 Attesa aggiuntiva per sincronizzazione file...");
-            
+
             // Attendi un po' di più e riprova
             await new Promise(resolve => setTimeout(resolve, 500));
-            
+
             const retryResponse = await fetch(`/data/output/timeline.json?t=${Date.now() + Math.random()}`, {
               cache: 'no-store',
               headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' }
             });
-            
+
             if (retryResponse.ok) {
               const retryText = await retryResponse.text();
               if (retryText.trim().startsWith('{')) {
@@ -554,6 +587,18 @@ export default function GenerateAssignments() {
       console.log(`   - Low Priority: ${filteredLow.length} task (filtrate ${initialLow.length - filteredLow.length})`);
       console.log(`   - Timeline ha ${timelineAssignmentsMap.size} task assegnate`);
 
+      // Debug: mostra alcune task assegnate
+      const assignedTasks = Array.from(timelineAssignmentsMap.values());
+      if (assignedTasks.length > 0) {
+        console.log(`📌 Esempio task assegnate (prime 3):`, assignedTasks.slice(0, 3).map(t => ({
+          id: t.task_id,
+          logistic_code: t.logistic_code,
+          cleanerId: t.cleanerId,
+          sequence: t.sequence,
+          start_time: t.start_time
+        })));
+      }
+
       // Crea l'array unificato usando dedupe per id (non per logisticCode!)
       const tasksWithAssignments: Task[] = [];
 
@@ -649,18 +694,6 @@ export default function GenerateAssignments() {
       console.log(`   - Task totali (dopo dedupe): ${dedupedTasks.length}`);
       console.log(`   - Task assegnate: ${dedupedTasks.filter(t => (t as any).assignedCleaner).length}`);
       console.log(`   - Task nei containers: ${dedupedTasks.filter(t => !(t as any).assignedCleaner).length}`);
-
-      // Debug: mostra alcune task assegnate
-      const assignedTasks = dedupedTasks.filter(t => (t as any).assignedCleaner);
-      if (assignedTasks.length > 0) {
-        console.log(`📌 Esempio task assegnate (prime 3):`, assignedTasks.slice(0, 3).map(t => ({
-          id: t.id,
-          name: t.name,
-          assignedCleaner: (t as any).assignedCleaner,
-          sequence: (t as any).sequence,
-          start_time: (t as any).start_time
-        })));
-      }
 
       setAllTasksWithAssignments(dedupedTasks);
 
@@ -985,6 +1018,18 @@ export default function GenerateAssignments() {
     const taskId = draggableId;
     const task = allTasksWithAssignments.find(t => String(t.id) === String(taskId));
     const logisticCode = task?.name; // name contiene il logistic_code
+
+    // Se la timeline è read-only, non permettere modifiche
+    if (isTimelineReadOnly) {
+      console.log("Timeline è READ-ONLY, spostamento annullato.");
+      toast({
+        title: "Operazione non permessa",
+        description: "La timeline è in sola visualizzazione per questa data.",
+        variant: "warning",
+      });
+      // Opzionale: annulla visivamente il drag (anche se react-beautiful-dnd potrebbe gestirlo)
+      return;
+    }
 
     try {
       // 🔹 Ramo TIMELINE (drag tra cleaners o riordino nello stesso cleaner)
@@ -1480,6 +1525,7 @@ export default function GenerateAssignments() {
                   tasks={allTasksWithAssignments}
                   hasUnsavedChanges={hasUnsavedChanges}
                   onTaskMoved={() => setHasUnsavedChanges(true)}
+                  isReadOnly={isTimelineReadOnly} // Passa lo stato read-only
                 />
               </div>
             </div>

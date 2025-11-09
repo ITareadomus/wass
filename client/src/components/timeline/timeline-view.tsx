@@ -30,6 +30,7 @@ interface TimelineViewProps {
   tasks: Task[];
   hasUnsavedChanges?: boolean; // Stato delle modifiche non salvate dal parent
   onTaskMoved?: () => void; // Callback quando una task viene spostata
+  isReadOnly?: boolean; // Modalità read-only: disabilita tutte le modifiche
 }
 
 interface Cleaner {
@@ -55,6 +56,7 @@ export default function TimelineView({
   tasks,
   hasUnsavedChanges = false,
   onTaskMoved,
+  isReadOnly = false,
 }: TimelineViewProps) {
   const [cleaners, setCleaners] = useState<Cleaner[]>([]);
   const [selectedCleaner, setSelectedCleaner] = useState<Cleaner | null>(null);
@@ -972,7 +974,7 @@ export default function TimelineView({
                   </div>
                 </div>
                 {/* Timeline per questo cleaner - area unica droppable */}
-                <Droppable droppableId={`timeline-${cleaner.id}`} direction="horizontal">
+                <Droppable droppableId={`timeline-${cleaner.id}`} direction="horizontal" isDropDisabled={isReadOnly}>
                   {(provided, snapshot) => (
                     <div
                       ref={provided.innerRef}
@@ -980,10 +982,10 @@ export default function TimelineView({
                       data-testid={`timeline-cleaner-${cleaner.id}`}
                       data-cleaner-id={cleaner.id}
                       className={`relative border-t border-border transition-colors min-h-[45px] flex-1 ${
-                        snapshot.isDraggingOver ? 'bg-primary/20 ring-2 ring-primary' : ''
+                        snapshot.isDraggingOver && !isReadOnly ? 'bg-primary/20 ring-2 ring-primary' : ''
                       }`}
                       style={{ 
-                        backgroundColor: snapshot.isDraggingOver 
+                        backgroundColor: snapshot.isDraggingOver && !isReadOnly
                           ? `${color.bg}40`
                           : `${color.bg}10`
                       }}
@@ -1103,6 +1105,7 @@ export default function TimelineView({
                                   index={idx}
                                   isInTimeline={true}
                                   allTasks={cleanerTasks}
+                                  isDragDisabled={isReadOnly}
                                 />
                               </>
                             );
@@ -1129,25 +1132,28 @@ export default function TimelineView({
                 variant="ghost"
                 size="sm"
                 className="w-full h-full"
+                disabled={isReadOnly}
               >
                 <UserPlus className="w-5 h-5" />
               </Button>
             </div>
             {/* Pulsanti Conferma Assegnazioni e Stampa affiancati */}
             <div className="flex-1 p-1 border-t border-border flex gap-2">
-              <Button
-                onClick={handleConfirmAssignments}
-                disabled={!hasUnsavedChanges}
-                className={`flex-1 h-full ${hasUnsavedChanges ? 'bg-green-500 hover:bg-green-600 animate-pulse' : 'bg-green-500 hover:bg-green-600 opacity-50 cursor-not-allowed'}`}
-                data-testid="button-confirm-assignments"
-              >
-                <Users className="w-4 h-4 mr-2" />
-                {hasUnsavedChanges ? 'Conferma Assegnazioni ⚠️' : 'Assegnazioni Confermate'}
-              </Button>
+              {!isReadOnly && (
+                <Button
+                  onClick={handleConfirmAssignments}
+                  disabled={!hasUnsavedChanges}
+                  className={`flex-1 h-full ${hasUnsavedChanges ? 'bg-green-500 hover:bg-green-600 animate-pulse' : 'bg-green-500 hover:bg-green-600 opacity-50 cursor-not-allowed'}`}
+                  data-testid="button-confirm-assignments"
+                >
+                  <Users className="w-4 h-4 mr-2" />
+                  {hasUnsavedChanges ? 'Conferma Assegnazioni ⚠️' : 'Assegnazioni Confermate'}
+                </Button>
+              )}
               <Button
                 onClick={handlePrint}
                 variant="outline"
-                className="h-full px-6"
+                className={isReadOnly ? "flex-1 h-full" : "h-full px-6"}
               >
                 <Printer className="w-4 h-4 mr-2" />
                 Stampa

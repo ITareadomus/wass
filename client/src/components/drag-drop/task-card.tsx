@@ -27,6 +27,7 @@ interface TaskCardProps {
   allTasks?: Task[];
   currentContainer?: 'early-out' | 'high' | 'low' | string;
   isDuplicate?: boolean;
+  isDragDisabled?: boolean; // Aggiunta questa prop
 }
 
 interface AssignedTask {
@@ -44,6 +45,7 @@ export default function TaskCard({
   allTasks = [],
   currentContainer = '',
   isDuplicate = false,
+  isDragDisabled = false, // Aggiunta questa prop con valore di default
 }: TaskCardProps) {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [currentTaskId, setCurrentTaskId] = useState(task.id);
@@ -381,9 +383,16 @@ export default function TaskCard({
     return checkoutDateTime > checkinDateTime;
   })();
 
+  // Determina se il drag è disabilitato in base alla data e se la task è già salvata
+  const shouldDisableDrag = isDragDisabled || (displayTask as any).checkin_date;
+
   return (
     <>
-      <Draggable draggableId={task.id} index={index}>
+      <Draggable
+        draggableId={task.id}
+        index={index}
+        isDragDisabled={shouldDisableDrag} // Usa la prop per disabilitare il drag
+      >
         {(provided, snapshot) => {
           const cardWidth = calculateWidth(task.duration, isInTimeline);
 
