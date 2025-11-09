@@ -212,12 +212,6 @@ export default function GenerateAssignments() {
         body: JSON.stringify({ date: dateStr })
       });
 
-      if (!checkResponse.ok) {
-        console.warn("⚠️ Errore nella verifica assegnazioni salvate, procedo con estrazione");
-        await extractData(date);
-        return;
-      }
-
       const checkResult = await checkResponse.json();
 
       if (checkResult.found) {
@@ -231,7 +225,7 @@ export default function GenerateAssignments() {
         if (loaded) {
           // CRITICAL: Dopo il caricamento, aspetta che i file siano sincronizzati
           console.log("⏳ Attesa sincronizzazione file dopo caricamento da Object Storage...");
-          await new Promise(resolve => setTimeout(resolve, 1000));
+          await new Promise(resolve => setTimeout(resolve, 800));
           
           // Ricarica la timeline UI
           if ((window as any).loadTimelineCleaners) {
@@ -246,9 +240,6 @@ export default function GenerateAssignments() {
             console.log("✅ Tasks caricati con successo da assegnazioni salvate");
           } catch (err) {
             console.warn("⚠️ Errore nel caricamento tasks dopo auto-load:", err);
-            // Se fallisce, prova con estrazione nuova
-            await extractData(date);
-            return;
           }
           
           setExtractionStep("Assegnazioni caricate!");
@@ -321,15 +312,6 @@ export default function GenerateAssignments() {
 
   // Traccia se è un reload o un cambio data effettivo
   const prevDateRef = useRef<string | null>(null);
-
-  // Verifica se la data selezionata è nel passato
-  const isPastDate = () => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const selected = new Date(selectedDate);
-    selected.setHours(0, 0, 0, 0);
-    return selected < today;
-  };
 
   useEffect(() => {
     const currentDateStr = format(selectedDate, 'yyyy-MM-dd');
@@ -439,58 +421,28 @@ export default function GenerateAssignments() {
           
           // CRITICAL: Verifica che sia JSON valido
           if (!timelineText.trim().startsWith('{') && !timelineText.trim().startsWith('[')) {
-            console.error("❌ timeline.json contiene HTML/testo non valido - file corrotto");
-            console.log("📄 Contenuto ricevuto:", timelineText.substring(0, 200));
-            console.log("🔄 Ricreazione forzata di timeline.json...");
+            console.error("❌ timeline.json contiene HTML/testo non valido - file non pronto");
+            console.log("🔄 Attesa aggiuntiva per sincronizzazione file...");
             
-            // Forza ricreazione timeline vuota tramite endpoint dedicato
-            try {
-              const recreateResponse = await fetch('/api/force-recreate-timeline', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ date: dateStr })
-              });
-              
-              if (!recreateResponse.ok) {
-                throw new Error('Errore nella ricreazione timeline');
+            // Attendi un po' di più e riprova
+            await new Promise(resolve => setTimeout(resolve, 500));
+            
+            const retryResponse = await fetch(`/data/output/timeline.json?t=${Date.now() + Math.random()}`, {
+              cache: 'no-store',
+              headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' }
+            });
+            
+            if (retryResponse.ok) {
+              const retryText = await retryResponse.text();
+              if (retryText.trim().startsWith('{')) {
+                timelineAssignmentsData = JSON.parse(retryText);
+                console.log("✅ Timeline caricata dopo retry:", {
+                  cleaners: timelineAssignmentsData.cleaners_assignments?.length || 0,
+                  date: timelineAssignmentsData.metadata?.date
+                });
+              } else {
+                console.warn("⚠️ Retry fallito, usa timeline vuota");
               }
-              
-              // Attendi che il file sia scritto
-              await new Promise(resolve => setTimeout(resolve, 1500));
-              
-              // Riprova a caricare
-              const retryResponse = await fetch(`/data/output/timeline.json?t=${Date.now() + Math.random()}`, {
-                cache: 'no-store',
-                headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' }
-              });
-              
-              if (retryResponse.ok) {
-                const retryText = await retryResponse.text();
-                if (retryText.trim().startsWith('{')) {
-                  timelineAssignmentsData = JSON.parse(retryText);
-                  console.log("✅ Timeline ricreata con successo:", {
-                    cleaners: timelineAssignmentsData.cleaners_assignments?.length || 0,
-                    date: timelineAssignmentsData.metadata?.date
-                  });
-                  
-                  toast({
-                    title: "Timeline ripristinata",
-                    description: "Il file timeline.json è stato ricreato con successo",
-                    duration: 3000,
-                  });
-                } else {
-                  console.warn("⚠️ Retry fallito, usa timeline vuota");
-                  throw new Error('Timeline ancora corrotta dopo ricreazione');
-                }
-              }
-            } catch (resetError) {
-              console.error("❌ Errore nella ricreazione timeline:", resetError);
-              toast({
-                title: "Errore critico",
-                description: "Impossibile ricreare timeline.json. Prova a ricaricare la pagina.",
-                variant: "destructive",
-                duration: 5000,
-              });
             }
           } else {
             timelineAssignmentsData = JSON.parse(timelineText);
@@ -1442,20 +1394,10 @@ export default function GenerateAssignments() {
   return (
     <div className="bg-background text-foreground min-h-screen">
       <div className="w-full px-4 py-6">
-        {isPastDate() && (
-          <div className="mb-4 p-4 bg-yellow-50 dark:bg-yellow-950/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
-            <p className="text-sm text-yellow-800 dark:text-yellow-200 flex items-center gap-2">
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-              </svg>
-              <strong>Modalità di sola lettura:</strong> Stai visualizzando assegnazioni di una data passata. Non è possibile effettuare modifiche.
-            </p>
-          </div>
-        )}
         <div className="mb-6 flex justify-between items-center flex-wrap gap-4">
           <div className="flex items-center gap-3">
             <h1 className="text-3xl font-bold text-foreground flex items-center gap-2">
-              {isPastDate() ? 'VISUALIZZA ASSEGNAZIONI' : 'GENERA ASSEGNAZIONI'}
+              GENERA ASSEGNAZIONI
               <span className="text-2xl font-normal text-muted-foreground ml-4">
                 del {format(selectedDate, "dd/MM/yyyy", { locale: it })}
               </span>
@@ -1501,7 +1443,7 @@ export default function GenerateAssignments() {
           </div>
         </div>
 
-        <DragDropContext onDragEnd={isPastDate() ? () => {} : onDragEnd}>
+        <DragDropContext onDragEnd={onDragEnd}>
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6 w-full">
             <PriorityColumn
               title="EARLY OUT"
@@ -1510,7 +1452,6 @@ export default function GenerateAssignments() {
               droppableId="early-out"
               icon="clock"
               assignAction={assignEarlyOutToTimeline}
-              disabled={isPastDate()}
             />
             <PriorityColumn
               title="HIGH PRIORITY"
@@ -1519,7 +1460,6 @@ export default function GenerateAssignments() {
               droppableId="high"
               icon="alert-circle"
               assignAction={assignHighPriorityToTimeline}
-              disabled={isPastDate()}
             />
             <PriorityColumn
               title="LOW PRIORITY"
@@ -1528,7 +1468,6 @@ export default function GenerateAssignments() {
               droppableId="low"
               icon="arrow-down"
               assignAction={assignLowPriorityToTimeline}
-              disabled={isPastDate()}
             />
           </div>
 
@@ -1541,7 +1480,6 @@ export default function GenerateAssignments() {
                   tasks={allTasksWithAssignments}
                   hasUnsavedChanges={hasUnsavedChanges}
                   onTaskMoved={() => setHasUnsavedChanges(true)}
-                  readOnly={isPastDate()}
                 />
               </div>
             </div>

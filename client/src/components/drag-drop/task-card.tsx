@@ -27,7 +27,6 @@ interface TaskCardProps {
   allTasks?: Task[];
   currentContainer?: 'early-out' | 'high' | 'low' | string;
   isDuplicate?: boolean;
-  readOnly?: boolean;
 }
 
 interface AssignedTask {
@@ -45,7 +44,6 @@ export default function TaskCard({
   allTasks = [],
   currentContainer = '',
   isDuplicate = false,
-  readOnly = false,
 }: TaskCardProps) {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [currentTaskId, setCurrentTaskId] = useState(task.id);
@@ -61,24 +59,6 @@ export default function TaskCard({
   const [editedDuration, setEditedDuration] = useState("");
   const [editedPaxIn, setEditedPaxIn] = useState("");
   const [isSaving, setIsSaving] = useState(false);
-
-  // Determina se la task è in una data passata
-  const isPastDate = (() => {
-    const taskDate = (displayTask as any).checkout_date || (displayTask as any).checkin_date || task.checkin_date || task.checkout_date;
-    if (!taskDate) return false; // Non possiamo determinare se non c'è una data
-
-    const today = new Date();
-    today.setHours(0, 0, 0, 0); // Resetta l'ora per confrontare solo la data
-
-    const taskDateTime = new Date(taskDate);
-    taskDateTime.setHours(0, 0, 0, 0); // Resetta l'ora per confronto
-
-    return taskDateTime < today;
-  })();
-
-  // Determina se l'intera card deve essere in modalità read-only
-  const isCardReadOnly = readOnly || isPastDate;
-
 
   // Determina le task navigabili in base al contesto
   const getNavigableTasks = (): Task[] => {
@@ -403,7 +383,7 @@ export default function TaskCard({
 
   return (
     <>
-      <Draggable draggableId={task.id} index={index} isDragDisabled={isCardReadOnly}>
+      <Draggable draggableId={task.id} index={index}>
         {(provided, snapshot) => {
           const cardWidth = calculateWidth(task.duration, isInTimeline);
 
@@ -423,7 +403,6 @@ export default function TaskCard({
                       ${isDuplicate && !isInTimeline ? "animate-blink-yellow" : ""}
                       hover:shadow-md cursor-pointer
                       flex-shrink-0 relative
-                      ${isCardReadOnly ? "opacity-70 cursor-not-allowed" : ""}
                     `}
                     style={{
                       ...provided.draggableProps.style,
@@ -433,11 +412,11 @@ export default function TaskCard({
                     data-testid={`task-card-${task.id}`}
                     onClick={(e) => {
                       if (!snapshot.isDragging) {
-                        setIsModalOpen(true);
+                        handleCardClick(e);
                       }
                     }}
                   >
-                    {!isConfirmedOperation && !isCardReadOnly && (
+                    {!isConfirmedOperation && (
                       <div className="absolute top-0.5 right-0.5 z-50">
                         <HelpCircle
                           className="w-3 h-3 text-gray-900"
@@ -475,7 +454,7 @@ export default function TaskCard({
           );
           }}
       </Draggable>
-      <Dialog open={isModalOpen} onOpenChange={(open) => !isCardReadOnly && setIsModalOpen(open)}>
+      <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
         <DialogContent className="sm:max-w-2xl max-h-[80vh] overflow-y-auto [&>button]:hidden">
           <DialogHeader>
             <div className="flex items-center justify-between w-full">
@@ -483,10 +462,10 @@ export default function TaskCard({
                 variant="ghost"
                 size="icon"
                 onClick={handlePrevTask}
-                disabled={!canGoPrev || isCardReadOnly}
+                disabled={!canGoPrev}
                 className={cn(
                   "h-8 w-8",
-                  (!canGoPrev || isCardReadOnly) && "opacity-30 cursor-not-allowed"
+                  !canGoPrev && "opacity-30 cursor-not-allowed"
                 )}
                 type="button"
               >
@@ -533,10 +512,10 @@ export default function TaskCard({
                 variant="ghost"
                 size="icon"
                 onClick={handleNextTask}
-                disabled={!canGoNext || isCardReadOnly}
+                disabled={!canGoNext}
                 className={cn(
                   "h-8 w-8",
-                  (!canGoNext || isCardReadOnly) && "opacity-30 cursor-not-allowed"
+                  !canGoNext && "opacity-30 cursor-not-allowed"
                 )}
                 type="button"
               >
@@ -572,9 +551,9 @@ export default function TaskCard({
               <div>
                 <p className="text-sm font-semibold text-muted-foreground mb-1 flex items-center gap-1">
                   Durata pulizia
-                  {!isCardReadOnly && <Pencil className="w-3 h-3 text-muted-foreground/60" />}
+                  <Pencil className="w-3 h-3 text-muted-foreground/60" />
                 </p>
-                {editingField === 'duration' && !isCardReadOnly ? (
+                {editingField === 'duration' ? (
                   <div className="flex items-center gap-2">
                     <Input
                       type="text"
@@ -593,11 +572,8 @@ export default function TaskCard({
                   </div>
                 ) : (
                   <p
-                    className={cn(
-                      "text-sm",
-                      !isCardReadOnly && "cursor-pointer hover:bg-muted/50 p-1 rounded"
-                    )}
-                    onClick={() => !isCardReadOnly && setEditingField('duration')}
+                    className="text-sm cursor-pointer hover:bg-muted/50 p-1 rounded"
+                    onClick={() => setEditingField('duration')}
                   >
                     {displayTask.duration.replace(".", ":")} ore
                   </p>
@@ -610,9 +586,9 @@ export default function TaskCard({
               <div>
                 <p className="text-sm font-semibold text-muted-foreground mb-1 flex items-center gap-1">
                   Check-out
-                  {!isCardReadOnly && <Pencil className="w-3 h-3 text-muted-foreground/60" />}
+                  <Pencil className="w-3 h-3 text-muted-foreground/60" />
                 </p>
-                {editingField === 'checkout' && !isCardReadOnly ? (
+                {editingField === 'checkout' ? (
                   <div className="space-y-2">
                     <div className="relative">
                       <Input
@@ -638,11 +614,8 @@ export default function TaskCard({
                   </div>
                 ) : (
                   <p
-                    className={cn(
-                      "text-sm",
-                      !isCardReadOnly && "cursor-pointer hover:bg-muted/50 p-1 rounded"
-                    )}
-                    onClick={() => !isCardReadOnly && setEditingField('checkout')}
+                    className="text-sm cursor-pointer hover:bg-muted/50 p-1 rounded"
+                    onClick={() => setEditingField('checkout')}
                   >
                     {(displayTask as any).checkout_date
                       ? new Date((displayTask as any).checkout_date).toLocaleDateString(
@@ -661,9 +634,9 @@ export default function TaskCard({
               <div>
                 <p className="text-sm font-semibold text-muted-foreground mb-1 flex items-center gap-1">
                   Check-in
-                  {!isCardReadOnly && <Pencil className="w-3 h-3 text-muted-foreground/60" />}
+                  <Pencil className="w-3 h-3 text-muted-foreground/60" />
                 </p>
-                {editingField === 'checkin' && !isCardReadOnly ? (
+                {editingField === 'checkin' ? (
                   <div className="space-y-2">
                     <div className="relative">
                       <Input
@@ -689,11 +662,8 @@ export default function TaskCard({
                   </div>
                 ) : (
                   <p
-                    className={cn(
-                      "text-sm",
-                      !isCardReadOnly && "cursor-pointer hover:bg-muted/50 p-1 rounded"
-                    )}
-                    onClick={() => !isCardReadOnly && setEditingField('checkin')}
+                    className="text-sm cursor-pointer hover:bg-muted/50 p-1 rounded"
+                    onClick={() => setEditingField('checkin')}
                   >
                     {(displayTask as any).checkin_date
                       ? new Date((displayTask as any).checkin_date).toLocaleDateString(
@@ -722,7 +692,7 @@ export default function TaskCard({
               <div>
                 <p className="text-sm font-semibold text-muted-foreground flex items-center gap-1">
                   Tipologia intervento
-                  {!isCardReadOnly && <Pencil className="w-3 h-3 text-muted-foreground/60" />}
+                  <Pencil className="w-3 h-3 text-muted-foreground/60" />
                 </p>
                 <p className="text-sm">
                   {!isConfirmedOperation ? "non migrato" : (displayTask as any).operation_id ?? "-"}
@@ -735,9 +705,9 @@ export default function TaskCard({
               <div>
                 <p className="text-sm font-semibold text-muted-foreground mb-1 flex items-center gap-1">
                   Pax-In
-                  {!isCardReadOnly && <Pencil className="w-3 h-3 text-muted-foreground/60" />}
+                  <Pencil className="w-3 h-3 text-muted-foreground/60" />
                 </p>
-                {editingField === 'paxin' && !isCardReadOnly ? (
+                {editingField === 'paxin' ? (
                   <div className="flex items-center gap-2">
                     <Input
                       type="text"
@@ -756,11 +726,8 @@ export default function TaskCard({
                   </div>
                 ) : (
                   <p
-                    className={cn(
-                      "text-sm",
-                      !isCardReadOnly && "cursor-pointer hover:bg-muted/50 p-1 rounded"
-                    )}
-                    onClick={() => !isCardReadOnly && setEditingField('paxin')}
+                    className="text-sm cursor-pointer hover:bg-muted/50 p-1 rounded"
+                    onClick={() => setEditingField('paxin')}
                   >
                     {(displayTask as any).pax_in ?? "non migrato"}
                   </p>
@@ -803,7 +770,7 @@ export default function TaskCard({
             </div>
 
             {/* Pulsante Salva Modifiche */}
-            {editingField && !isCardReadOnly && (
+            {editingField && (
               <div className="pt-4 border-t mt-4 flex gap-2">
                 <Button
                   onClick={handleSaveChanges}
