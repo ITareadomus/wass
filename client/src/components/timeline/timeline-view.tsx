@@ -915,8 +915,16 @@ export default function TimelineView({
                 </div>
               </div>
             ) : allCleanersToShow.length === 0 && isReadOnly ? (
-              <div className="flex items-center justify-center h-64">
-                <p className="text-muted-foreground">Nessuna assegnazione disponibile per questa data</p>
+              <div className="flex items-center justify-center h-64 bg-red-50 dark:bg-red-950/20 border-2 border-red-300 dark:border-red-700 rounded-lg">
+                <div className="text-center p-6">
+                  <Calendar className="mx-auto h-12 w-12 text-red-600 dark:text-red-400 mb-3" />
+                  <h3 className="text-lg font-semibold text-red-800 dark:text-red-200 mb-2">
+                    Nessuna assegnazione presente per questa data
+                  </h3>
+                  <p className="text-red-700 dark:text-red-300">
+                    Non sono disponibili dati salvati per questa data passata
+                  </p>
+                </div>
               </div>
             ) : (
               allCleanersToShow.map((cleaner, index) => {
