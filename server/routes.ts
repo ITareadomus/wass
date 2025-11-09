@@ -2408,7 +2408,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let timelineExists = false;
       try {
         await fs.access(timelinePath);
-        const existingTimeline = JSON.parse(await fs.readFile(timelinePath, 'utf8'));
+        const fileContent = await fs.readFile(timelinePath, 'utf8');
+        
+        // Verifica che il contenuto sia JSON valido
+        if (!fileContent.trim().startsWith('{')) {
+          throw new Error('timeline.json non contiene JSON valido');
+        }
+        
+        const existingTimeline = JSON.parse(fileContent);
         timelineExists = true;
         
         // Aggiorna SOLO la metadata.date se è cambiata
@@ -2416,19 +2423,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
           console.log(`🔄 Timeline esiste per data ${existingTimeline.metadata?.date}, aggiorno metadata.date a ${date}`);
           existingTimeline.metadata.date = date;
           existingTimeline.metadata.last_updated = new Date().toISOString();
-          await fs.writeFile(timelinePath, JSON.stringify(existingTimeline, null, 2));
+          const tmpPath = `${timelinePath}.tmp`;
+          await fs.writeFile(tmpPath, JSON.stringify(existingTimeline, null, 2));
+          await fs.rename(tmpPath, timelinePath);
         } else {
           console.log(`✅ Timeline.json già presente per ${date}, mantieni assegnazioni esistenti`);
         }
       } catch (err) {
-        // File non esiste - crealo vuoto
-        console.log(`📝 Timeline.json non esiste, creazione nuova per ${date}`);
+        // File non esiste o è corrotto - crealo vuoto
+        console.log(`📝 Timeline.json non esiste o corrotto, creazione nuova per ${date}`);
         const emptyTimeline = {
           metadata: { last_updated: new Date().toISOString(), date },
           cleaners_assignments: [],
           meta: { total_cleaners: 0, used_cleaners: 0, assigned_tasks: 0 }
         };
-        await fs.writeFile(timelinePath, JSON.stringify(emptyTimeline, null, 2));
+        const tmpPath = `${timelinePath}.tmp`;
+        await fs.writeFile(tmpPath, JSON.stringify(emptyTimeline, null, 2));
+        await fs.rename(tmpPath, timelinePath);
         timelineExists = false;
       }
 
