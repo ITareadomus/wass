@@ -219,14 +219,26 @@ export default function GenerateAssignments() {
         console.log("✅ Trovate assegnazioni salvate per", dateStr, "- caricamento automatico...");
         setExtractionStep("Caricamento assegnazioni salvate...");
         
-        // Carica direttamente le assegnazioni salvate senza resettare timeline
+        // Carica direttamente le assegnazioni salvate
         const loaded = await loadSavedAssignments(date);
         
         if (loaded) {
-          await loadTasks();
+          // CRITICAL: Attendi che i file siano scritti sul filesystem
+          console.log("⏳ Attesa sincronizzazione file...");
+          await new Promise(resolve => setTimeout(resolve, 500));
+          
+          // Ricarica con skip extraction per leggere i file aggiornati
+          await loadTasks(true);
+          
           setExtractionStep("Assegnazioni caricate!");
           await new Promise(resolve => setTimeout(resolve, 100));
           setIsExtracting(false);
+          
+          // Force reload della timeline UI
+          if ((window as any).loadTimelineCleaners) {
+            console.log("🔄 Ricaricamento timeline cleaners dopo auto-load...");
+            await (window as any).loadTimelineCleaners();
+          }
         } else {
           // Caricamento fallito, procedi con estrazione normale
           console.log("⚠️ Caricamento assegnazioni salvate fallito, procedo con estrazione normale");
