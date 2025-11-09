@@ -11,10 +11,10 @@ export default function StatisticsPanel({ tasks }: StatisticsPanelProps) {
   const lowPriorityCount = tasks.filter(task => task.priority === "low").length;
   const unassignedCount = tasks.filter(task => !task.priority).length;
   
-  // Conteggio corretto: straordinarie separate da premium
+  // Conteggio corretto: straordinarie hanno priorità assoluta
   const straordinarieCount = tasks.filter(task => (task as any).straordinaria === true).length;
-  const premiumCount = tasks.filter(task => (task as any).premium === true && (task as any).straordinaria !== true).length;
-  const standardCount = tasks.filter(task => (task as any).premium !== true && (task as any).straordinaria !== true).length;
+  const premiumCount = tasks.filter(task => (task as any).straordinaria !== true && (task as any).premium === true).length;
+  const standardCount = tasks.filter(task => (task as any).straordinaria !== true && (task as any).premium !== true).length;
   
   const totalTasks = tasks.length;
   const assignedTasks = totalTasks - unassignedCount;
