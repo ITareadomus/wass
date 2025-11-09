@@ -239,7 +239,38 @@ export default function GenerateAssignments() {
         const loaded = await loadSavedAssignments(date);
 
         if (loaded) {
-          // CRITICAL: Dopo il caricamento, aspetta che i file siano sincronizzati
+          // CRITICAL: Verifica che la data nel file caricato corrisponda alla data selezionata
+          const timestamp = Date.now() + Math.random();
+          const timelineResponse = await fetch(`/data/output/timeline.json?t=${timestamp}`, {
+            cache: 'no-store',
+            headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' }
+          });
+
+          if (timelineResponse.ok) {
+            const timelineData = await timelineResponse.json();
+            const loadedDate = timelineData.metadata?.date;
+
+            if (loadedDate !== dateStr) {
+              console.warn(`⚠️ La data nel file (${loadedDate}) non corrisponde alla data selezionata (${dateStr})`);
+              console.log("📭 Mostro timeline vuota per data passata senza salvataggi");
+              
+              // Data passata senza salvataggi corrispondenti: mostra timeline vuota
+              setIsTimelineReadOnly(true);
+              setExtractionStep("Data passata - nessuna assegnazione disponibile");
+              
+              // Svuota i containers e la timeline
+              setEarlyOutTasks([]);
+              setHighPriorityTasks([]);
+              setLowPriorityTasks([]);
+              setAllTasksWithAssignments([]);
+              
+              await new Promise(resolve => setTimeout(resolve, 500));
+              setIsExtracting(false);
+              return;
+            }
+          }
+
+          // La data corrisponde - procedi con il caricamento normale
           console.log("⏳ Attesa sincronizzazione file dopo caricamento da Object Storage...");
           await new Promise(resolve => setTimeout(resolve, 1000));
 
