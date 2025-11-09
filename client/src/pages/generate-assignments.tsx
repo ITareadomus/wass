@@ -403,14 +403,26 @@ export default function GenerateAssignments() {
 
       const containersData = await containersResponse.json();
 
-      // Carica da timeline.json
+      // Carica da timeline.json con gestione errori robusta
       let timelineAssignmentsData = { assignments: [], metadata: { date: dateStr }, cleaners_assignments: [] };
 
       if (timelineResponse.ok) {
-        timelineAssignmentsData = await timelineResponse.json();
-        console.log("Caricato da timeline.json");
+        try {
+          const timelineText = await timelineResponse.text();
+          // Verifica che sia JSON valido prima di parsarlo
+          if (timelineText.trim().startsWith('{') || timelineText.trim().startsWith('[')) {
+            timelineAssignmentsData = JSON.parse(timelineText);
+            console.log("✅ Caricato da timeline.json");
+          } else {
+            console.error("❌ timeline.json contiene HTML/testo non valido, uso timeline vuota");
+            console.log("Contenuto ricevuto:", timelineText.substring(0, 200));
+          }
+        } catch (parseError) {
+          console.error("❌ Errore parsing timeline.json:", parseError);
+          console.log("Uso timeline vuota per evitare filtraggio errato dei container");
+        }
       } else {
-        console.warn("⚠️ timeline.json non trovato o non leggibile.");
+        console.warn("⚠️ timeline.json non trovato (status:", timelineResponse.status, ")");
       }
 
       console.log("Containers data:", containersData);
