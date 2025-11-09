@@ -160,39 +160,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log(`🗑️ Reset flag ultimo salvataggio per data ${workDate}`);
       // Il frontend gestirà la rimozione del localStorage
 
-      // === Mantieni i cleaner selezionati, aggiorna solo la data ===
+      // === Svuota selected_cleaners.json quando cambia data (stesso comportamento di timeline.json) ===
       try {
         const selectedCleanersPath = path.join(
           process.cwd(),
           'client/public/data/cleaners/selected_cleaners.json'
         );
 
-        // Leggi i cleaner attualmente selezionati
-        let selectedCleanersData;
-        try {
-          const existingContent = await fs.readFile(selectedCleanersPath, 'utf8');
-          selectedCleanersData = JSON.parse(existingContent);
-
-          // Mantieni i cleaner, aggiorna solo metadata
-          selectedCleanersData.metadata = selectedCleanersData.metadata || {};
-          selectedCleanersData.metadata.date = workDate;
-          selectedCleanersData.metadata.reset_at = new Date().toISOString();
-
-          console.log(`✅ Mantenuti ${selectedCleanersData.cleaners?.length || 0} cleaner selezionati dopo reset timeline`);
-        } catch (err) {
-          // Se il file non esiste o è corrotto, crea vuoto
-          selectedCleanersData = {
-            cleaners: [],
-            total_selected: 0,
-            metadata: { date: workDate }
-          };
-          console.log(`ℹ️ Creato selected_cleaners.json vuoto per ${workDate}`);
-        }
+        // Crea sempre un file vuoto quando cambia la data
+        const emptySelectedCleaners = {
+          cleaners: [],
+          total_selected: 0,
+          metadata: { 
+            date: workDate,
+            reset_at: new Date().toISOString()
+          }
+        };
 
         // Salva con scrittura atomica
         const tmpScPath = `${selectedCleanersPath}.tmp`;
-        await fs.writeFile(tmpScPath, JSON.stringify(selectedCleanersData, null, 2));
+        await fs.writeFile(tmpScPath, JSON.stringify(emptySelectedCleaners, null, 2));
         await fs.rename(tmpScPath, selectedCleanersPath);
+
+        console.log(`🗑️ selected_cleaners.json svuotato per nuova data ${workDate}`);
       } catch (e) {
         console.warn('⚠️ Errore gestione selected_cleaners.json:', e);
       }
