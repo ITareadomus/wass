@@ -7,6 +7,7 @@ import { fileURLToPath } from "url";
 import { dirname } from "path";
 import * as fs from 'fs/promises';
 import { format } from "date-fns";
+import { it } from "date-fns/locale";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -924,18 +925,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const folderPath = `${day}-${month}-20${year}`;
       const filename = `${folderPath}/assignments_${day}${month}${year}.json`;
 
-      const bucketName = process.env.REPLIT_OBJECT_STORAGE_BUCKET_ID;
-      if (!bucketName) {
-        return res.json({ success: false, found: false, message: "Bucket non configurato" });
-      }
+      // Usa Replit Object Storage Client
+      const { Client } = await import('@replit/object-storage');
+      const client = new Client();
 
-      const storage = new Storage();
-      const bucket = storage.bucket(bucketName);
-      const file = bucket.file(filename);
+      // Prova a scaricare il file per verificare se esiste
+      const result = await client.downloadAsText(filename, {
+        bucket: 'wass_assignments'
+      });
 
-      const [exists] = await file.exists();
-
-      if (exists) {
+      if (result.ok) {
         const dateObj = new Date(workDate);
         const formattedDateTime = format(dateObj, "dd/MM/yyyy", { locale: it });
 
