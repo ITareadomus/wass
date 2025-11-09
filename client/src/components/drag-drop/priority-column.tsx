@@ -5,7 +5,7 @@ import { Clock, AlertCircle, ArrowDown, Calendar } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 interface PriorityColumnProps {
   title: string;
@@ -24,8 +24,34 @@ export default function PriorityColumn({
   icon,
   assignAction,
 }: PriorityColumnProps) {
-  const { toast } = useToast();
   const [isAssigning, setIsAssigning] = useState(false);
+  const [isDateInPast, setIsDateInPast] = useState(false);
+  const { toast } = useToast();
+
+  // Verifica se la data selezionata è nel passato
+  useEffect(() => {
+    const checkIfDateInPast = () => {
+      const savedDate = localStorage.getItem('selected_work_date');
+      if (!savedDate) {
+        setIsDateInPast(false);
+        return;
+      }
+
+      const [year, month, day] = savedDate.split('-').map(Number);
+      const selectedDate = new Date(year, month - 1, day);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      selectedDate.setHours(0, 0, 0, 0);
+
+      setIsDateInPast(selectedDate < today);
+    };
+
+    checkIfDateInPast();
+
+    // Ricontrolla quando cambia la data
+    const interval = setInterval(checkIfDateInPast, 1000);
+    return () => clearInterval(interval);
+  }, []);
 
   const iconMap: Record<string, React.ReactNode> = {
     clock: <Clock className="w-5 h-5 mr-2 text-muted-foreground" />,
@@ -182,8 +208,9 @@ export default function PriorityColumn({
           variant="outline"
           size="sm"
           onClick={handleAssignContainer}
-          disabled={isAssigning || tasks.length === 0}
+          disabled={isAssigning || tasks.length === 0 || isDateInPast}
           className="text-xs px-2 py-1 h-7"
+          title={isDateInPast ? "Non puoi assegnare task per date passate" : ""}
         >
           {isAssigning ? (
             <>
