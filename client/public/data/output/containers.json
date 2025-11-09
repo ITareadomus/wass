@@ -1,6 +1,6 @@
 {
   "metadata": {
-    "last_updated": "2025-11-09T21:14:35.330768",
+    "last_updated": "2025-11-09T21:18:40.754934",
     "date": "2025-11-09"
   },
   "containers": {
@@ -636,9 +636,34 @@
             "premium"
           ],
           "priority": "high_priority"
+        },
+        {
+          "task_id": 218643,
+          "logistic_code": 1600,
+          "client_id": null,
+          "premium": true,
+          "address": "VIA VIVAIO, 15",
+          "lat": "45.46967",
+          "lng": "9.2034764",
+          "cleaning_time": 90,
+          "checkin_date": "2025-11-17",
+          "checkout_date": "2025-11-09",
+          "checkin_time": null,
+          "checkout_time": null,
+          "pax_in": 3,
+          "pax_out": 2,
+          "small_equipment": false,
+          "operation_id": 1,
+          "confirmed_operation": true,
+          "straordinaria": false,
+          "type_apt": "B",
+          "alias": "TBR",
+          "customer_name": "THE BEST RENT S.r.l.",
+          "reasons": [],
+          "priority": "high_priority"
         }
       ],
-      "count": 12
+      "count": 13
     },
     "low_priority": {
       "tasks": [
@@ -1011,9 +1036,9 @@
     }
   },
   "summary": {
-    "total_tasks": 36,
+    "total_tasks": 37,
     "early_out": 11,
-    "high_priority": 12,
+    "high_priority": 13,
     "low_priority": 13
   }
 }
