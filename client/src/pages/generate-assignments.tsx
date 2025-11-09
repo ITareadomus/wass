@@ -404,25 +404,70 @@ export default function GenerateAssignments() {
       const containersData = await containersResponse.json();
 
       // Carica da timeline.json con gestione errori robusta
-      let timelineAssignmentsData = { assignments: [], metadata: { date: dateStr }, cleaners_assignments: [] };
+      let timelineAssignmentsData = { 
+        assignments: [], 
+        metadata: { date: dateStr }, 
+        cleaners_assignments: [] 
+      };
 
       if (timelineResponse.ok) {
         try {
           const timelineText = await timelineResponse.text();
-          // Verifica che sia JSON valido prima di parsarlo
-          if (timelineText.trim().startsWith('{') || timelineText.trim().startsWith('[')) {
-            timelineAssignmentsData = JSON.parse(timelineText);
-            console.log("✅ Caricato da timeline.json");
+          
+          // CRITICAL: Verifica che sia JSON valido
+          if (!timelineText.trim().startsWith('{') && !timelineText.trim().startsWith('[')) {
+            console.error("❌ timeline.json contiene HTML/testo non valido");
+            console.log("Status:", timelineResponse.status);
+            console.log("Content-Type:", timelineResponse.headers.get('Content-Type'));
+            console.log("Primi 500 caratteri:", timelineText.substring(0, 500));
+            
+            // Forza ricreazione del file
+            console.log("🔄 Tento ricreazione timeline.json...");
+            await fetch('/api/reset-timeline-assignments', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ date: dateStr })
+            });
+            
+            // Ricarica dopo reset
+            const retryResponse = await fetch(`/data/output/timeline.json?t=${Date.now()}`, {
+              cache: 'no-store',
+              headers: { 'Cache-Control': 'no-cache' }
+            });
+            
+            if (retryResponse.ok) {
+              const retryText = await retryResponse.text();
+              if (retryText.trim().startsWith('{')) {
+                timelineAssignmentsData = JSON.parse(retryText);
+                console.log("✅ Timeline ricreata e caricata con successo");
+              }
+            }
           } else {
-            console.error("❌ timeline.json contiene HTML/testo non valido, uso timeline vuota");
-            console.log("Contenuto ricevuto:", timelineText.substring(0, 200));
+            timelineAssignmentsData = JSON.parse(timelineText);
+            console.log("✅ Caricato da timeline.json:", {
+              cleaners: timelineAssignmentsData.cleaners_assignments?.length || 0,
+              date: timelineAssignmentsData.metadata?.date
+            });
           }
         } catch (parseError) {
           console.error("❌ Errore parsing timeline.json:", parseError);
-          console.log("Uso timeline vuota per evitare filtraggio errato dei container");
+          console.log("⚠️ Uso timeline vuota - i container potrebbero non essere filtrati correttamente");
         }
       } else {
-        console.warn("⚠️ timeline.json non trovato (status:", timelineResponse.status, ")");
+        console.warn("⚠️ timeline.json non trovato (HTTP", timelineResponse.status, ")");
+        console.log("🔄 Tento creazione timeline.json...");
+        
+        // Crea timeline vuota
+        try {
+          await fetch('/api/reset-timeline-assignments', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ date: dateStr })
+          });
+          console.log("✅ Timeline.json creata");
+        } catch (err) {
+          console.error("❌ Impossibile creare timeline.json:", err);
+        }
       }
 
       console.log("Containers data:", containersData);
