@@ -212,6 +212,12 @@ export default function GenerateAssignments() {
         body: JSON.stringify({ date: dateStr })
       });
 
+      if (!checkResponse.ok) {
+        console.warn("⚠️ Errore nella verifica assegnazioni salvate, procedo con estrazione");
+        await extractData(date);
+        return;
+      }
+
       const checkResult = await checkResponse.json();
 
       if (checkResult.found) {
@@ -225,7 +231,7 @@ export default function GenerateAssignments() {
         if (loaded) {
           // CRITICAL: Dopo il caricamento, aspetta che i file siano sincronizzati
           console.log("⏳ Attesa sincronizzazione file dopo caricamento da Object Storage...");
-          await new Promise(resolve => setTimeout(resolve, 800));
+          await new Promise(resolve => setTimeout(resolve, 1000));
           
           // Ricarica la timeline UI
           if ((window as any).loadTimelineCleaners) {
@@ -240,6 +246,9 @@ export default function GenerateAssignments() {
             console.log("✅ Tasks caricati con successo da assegnazioni salvate");
           } catch (err) {
             console.warn("⚠️ Errore nel caricamento tasks dopo auto-load:", err);
+            // Se fallisce, prova con estrazione nuova
+            await extractData(date);
+            return;
           }
           
           setExtractionStep("Assegnazioni caricate!");
@@ -431,27 +440,39 @@ export default function GenerateAssignments() {
           // CRITICAL: Verifica che sia JSON valido
           if (!timelineText.trim().startsWith('{') && !timelineText.trim().startsWith('[')) {
             console.error("❌ timeline.json contiene HTML/testo non valido - file non pronto");
-            console.log("🔄 Attesa aggiuntiva per sincronizzazione file...");
+            console.log("📄 Contenuto ricevuto:", timelineText.substring(0, 100));
+            console.log("🔄 Tentativo di ricreare timeline.json vuota...");
             
-            // Attendi un po' di più e riprova
-            await new Promise(resolve => setTimeout(resolve, 500));
-            
-            const retryResponse = await fetch(`/data/output/timeline.json?t=${Date.now() + Math.random()}`, {
-              cache: 'no-store',
-              headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' }
-            });
-            
-            if (retryResponse.ok) {
-              const retryText = await retryResponse.text();
-              if (retryText.trim().startsWith('{')) {
-                timelineAssignmentsData = JSON.parse(retryText);
-                console.log("✅ Timeline caricata dopo retry:", {
-                  cleaners: timelineAssignmentsData.cleaners_assignments?.length || 0,
-                  date: timelineAssignmentsData.metadata?.date
-                });
-              } else {
-                console.warn("⚠️ Retry fallito, usa timeline vuota");
+            // Tenta di ricreare timeline vuota tramite backend
+            try {
+              await fetch('/api/reset-timeline-assignments', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ date: dateStr })
+              });
+              
+              // Attendi creazione file e riprova
+              await new Promise(resolve => setTimeout(resolve, 1000));
+              
+              const retryResponse = await fetch(`/data/output/timeline.json?t=${Date.now() + Math.random()}`, {
+                cache: 'no-store',
+                headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' }
+              });
+              
+              if (retryResponse.ok) {
+                const retryText = await retryResponse.text();
+                if (retryText.trim().startsWith('{')) {
+                  timelineAssignmentsData = JSON.parse(retryText);
+                  console.log("✅ Timeline ricreata e caricata:", {
+                    cleaners: timelineAssignmentsData.cleaners_assignments?.length || 0,
+                    date: timelineAssignmentsData.metadata?.date
+                  });
+                } else {
+                  console.warn("⚠️ Retry fallito, usa timeline vuota");
+                }
               }
+            } catch (resetError) {
+              console.error("❌ Errore nella ricreare timeline:", resetError);
             }
           } else {
             timelineAssignmentsData = JSON.parse(timelineText);
