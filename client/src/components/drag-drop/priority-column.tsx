@@ -14,6 +14,7 @@ interface PriorityColumnProps {
   droppableId: string;
   icon: "clock" | "alert-circle" | "arrow-down";
   assignAction?: () => Promise<void>;
+  isDragDisabled?: boolean; // Aggiunta la prop isDragDisabled
 }
 
 export default function PriorityColumn({
@@ -23,6 +24,7 @@ export default function PriorityColumn({
   droppableId,
   icon,
   assignAction,
+  isDragDisabled = false, // Inizializza isDragDisabled a false
 }: PriorityColumnProps) {
   const [isAssigning, setIsAssigning] = useState(false);
   const [isDateInPast, setIsDateInPast] = useState(false);
@@ -251,6 +253,7 @@ export default function PriorityColumn({
                   allTasks={tasks}
                   currentContainer={droppableId}
                   isDuplicate={isDuplicate} // Passa il flag isDuplicate
+                  isDragDisabled={isDragDisabled} // Passa la prop isDragDisabled
                 />
               );
             })}
