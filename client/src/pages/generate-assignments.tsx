@@ -141,7 +141,7 @@ export default function GenerateAssignments() {
   const [extractionStep, setExtractionStep] = useState<string>("Inizializzazione...");
   const [isLoadingTasks, setIsLoadingTasks] = useState(false);
   const [isConfirming, setIsConfirming] = useState(false);
-  const [lastSavedAssignment, setLastSavedAssignment] = useState<string | null>(null);
+  const [lastSavedTimestamp, setLastSavedTimestamp] = useState<string | null>(null); // Renamed from lastSavedAssignment
   const { toast } = useToast();
   const [, setLocation] = useLocation();
 
@@ -170,7 +170,7 @@ export default function GenerateAssignments() {
         // Salva la data e ora formattate in localStorage per mostrarlo nella timeline
         const displayDateTime = result.formattedDateTime || result.filename;
         localStorage.setItem('last_saved_assignment', displayDateTime);
-        setLastSavedAssignment(displayDateTime);
+        setLastSavedTimestamp(displayDateTime); // Use setLastSavedTimestamp
 
         // CRITICAL: Verifica e aggiorna la data in timeline.json dopo il caricamento
         const timelineResponse = await fetch(`/data/output/timeline.json?t=${Date.now()}`, {
@@ -196,17 +196,17 @@ export default function GenerateAssignments() {
       } else {
         console.log("ℹ️ Nessuna assegnazione salvata per questa data");
         localStorage.removeItem('last_saved_assignment');
-        setLastSavedAssignment(null);
+        setLastSavedTimestamp(null); // Use setLastSavedTimestamp
         return false;
       }
     } catch (error) {
       console.error("Errore nel caricamento delle assegnazioni salvate:", error);
-      setLastSavedAssignment(null);
+      setLastSavedTimestamp(null); // Use setLastSavedTimestamp
       return false;
     }
   };
 
-  // Funzione per verificare ed eventualmente caricare automaticamente le assegnazioni salvate
+  // Funzione per controllare e caricare automaticamente assegnazioni salvate
   const checkAndAutoLoadSavedAssignments = async (date: Date) => {
     try {
       setIsExtracting(true);
@@ -217,7 +217,14 @@ export default function GenerateAssignments() {
       const day = String(date.getDate()).padStart(2, '0');
       const dateStr = `${year}-${month}-${day}`;
 
-      // Verifica se esistono assegnazioni salvate
+      // CRITICAL: Calcola se la data è passata, presente o futura
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const targetDate = new Date(date);
+      targetDate.setHours(0, 0, 0, 0);
+      const isPastDate = targetDate < today;
+
+      // CRITICAL: Verifica SE esistono assegnazioni salvate per questa data
       const checkResponse = await fetch('/api/check-saved-assignments', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -227,18 +234,47 @@ export default function GenerateAssignments() {
       const checkResult = await checkResponse.json();
 
       if (checkResult.found) {
-        // Esistono assegnazioni salvate - CARICA AUTOMATICAMENTE
-        console.log("✅ Trovate assegnazioni salvate per", dateStr, "- caricamento automatico...");
-        setExtractionStep("Caricamento assegnazioni salvate...");
+        // SOLO per date passate: carica automaticamente e blocca modifiche
+        if (isPastDate) {
+          // CRITICAL: Salva il timestamp PRIMA di caricare per evitare loop infiniti
+          const savedKey = `last_saved_${dateStr}`;
+          localStorage.setItem(savedKey, checkResult.lastSavedTimestamp || dateStr);
 
-        // Imposta timeline in modalità read-only (assegnazioni salvate)
-        setIsTimelineReadOnly(true);
-        console.log("🔒 Timeline impostata in modalità READ-ONLY (assegnazioni salvate)");
+          console.log(`📥 Auto-caricamento assegnazioni salvate per ${dateStr} (data passata)`);
+          setExtractionStep("Caricamento assegnazioni salvate...");
 
-        // Carica direttamente le assegnazioni salvate
-        const loaded = await loadSavedAssignments(date);
+          // Carica automaticamente i dati salvati
+          const loadResponse = await fetch('/api/load-saved-assignments', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ date: dateStr })
+          });
 
-        if (loaded) {
+          const loadResult = await loadResponse.json();
+
+          if (loadResult.success && loadResult.found) {
+            console.log(`✅ Assegnazioni salvate caricate automaticamente per ${dateStr}`);
+            setLastSavedTimestamp(checkResult.formattedDateTime || null);
+
+            // Ricarica i task per mostrare i dati aggiornati
+            await loadTasks(true);
+
+            toast({
+              variant: "success",
+              title: "📥 Assegnazioni caricate (sola lettura)",
+              description: `Ultime assegnazioni salvate il ${checkResult.formattedDateTime || dateStr}`,
+              duration: 3000
+            });
+          } else {
+            console.log("⚠️ Caricamento assegnazioni salvate fallito, procedo con estrazione normale");
+            await extractData(date); // Fallback if loading fails
+            return;
+          }
+
+          // Imposta timeline in modalità read-only (assegnazioni salvate)
+          setIsTimelineReadOnly(true);
+          console.log("🔒 Timeline impostata in modalità READ-ONLY (assegnazioni salvate)");
+
           // CRITICAL: Verifica che la data nel file caricato corrisponda alla data selezionata
           const timestamp = Date.now() + Math.random();
           const timelineResponse = await fetch(`/data/output/timeline.json?t=${timestamp}`, {
@@ -253,17 +289,17 @@ export default function GenerateAssignments() {
             if (loadedDate !== dateStr) {
               console.warn(`⚠️ La data nel file (${loadedDate}) non corrisponde alla data selezionata (${dateStr})`);
               console.log("📭 Mostro timeline vuota per data passata senza salvataggi");
-              
+
               // Data passata senza salvataggi corrispondenti: mostra timeline vuota
               setIsTimelineReadOnly(true);
               setExtractionStep("Data passata - nessuna assegnazione disponibile");
-              
+
               // Svuota i containers e la timeline
               setEarlyOutTasks([]);
               setHighPriorityTasks([]);
               setLowPriorityTasks([]);
               setAllTasksWithAssignments([]);
-              
+
               await new Promise(resolve => setTimeout(resolve, 500));
               setIsExtracting(false);
               return;
@@ -295,9 +331,14 @@ export default function GenerateAssignments() {
           setExtractionStep("Assegnazioni caricate!");
           await new Promise(resolve => setTimeout(resolve, 100));
           setIsExtracting(false);
+
         } else {
-          // Caricamento fallito, procedi con estrazione normale
-          console.log("⚠️ Caricamento assegnazioni salvate fallito, procedo con estrazione normale");
+          // Per data corrente e future: mostra solo che esistono salvataggi ma NON caricarli
+          console.log(`ℹ️ Assegnazioni salvate esistono per ${dateStr} (data corrente/futura) ma NON auto-caricate - permetti modifiche`);
+          setLastSavedTimestamp(null); // Ensure this is null for editable dates
+          localStorage.removeItem(`last_saved_${dateStr}`);
+
+          // Procedi con estrazione normale per data corrente/futura
           await extractData(date);
         }
       } else {
@@ -305,7 +346,7 @@ export default function GenerateAssignments() {
         console.log("ℹ️ Nessuna assegnazione salvata per", dateStr);
 
         // Verifica se la data è nel passato
-        if (isDateInPast(date)) {
+        if (isPastDate) {
           // Data passata senza salvataggi: read-only con timeline vuota
           console.log("🔒 Data passata senza assegnazioni salvate - modalità READ-ONLY");
           setIsTimelineReadOnly(true);
@@ -325,6 +366,7 @@ export default function GenerateAssignments() {
       await extractData(date);
     }
   };
+
 
   // Funzione per estrarre i dati dal database (quando NON esistono assegnazioni salvate)
   const extractData = async (date: Date) => {
@@ -760,7 +802,7 @@ export default function GenerateAssignments() {
       // VALIDAZIONE: Verifica che ci siano cleaner convocati
       const selectedCleanersResponse = await fetch(`/data/cleaners/selected_cleaners.json?t=${Date.now()}`);
       const selectedCleanersData = await selectedCleanersResponse.json();
-      
+
       if (!selectedCleanersData.cleaners || selectedCleanersData.cleaners.length === 0) {
         toast({
           title: "Errore: Nessun cleaner convocato",
@@ -818,7 +860,7 @@ export default function GenerateAssignments() {
       // VALIDAZIONE: Verifica che ci siano cleaner convocati
       const selectedCleanersResponse = await fetch(`/data/cleaners/selected_cleaners.json?t=${Date.now()}`);
       const selectedCleanersData = await selectedCleanersResponse.json();
-      
+
       if (!selectedCleanersData.cleaners || selectedCleanersData.cleaners.length === 0) {
         toast({
           title: "Errore: Nessun cleaner convocato",
@@ -880,7 +922,7 @@ export default function GenerateAssignments() {
       // VALIDAZIONE: Verifica che ci siano cleaner convocati
       const selectedCleanersResponse = await fetch(`/data/cleaners/selected_cleaners.json?t=${Date.now()}`);
       const selectedCleanersData = await selectedCleanersResponse.json();
-      
+
       if (!selectedCleanersData.cleaners || selectedCleanersData.cleaners.length === 0) {
         toast({
           title: "Errore: Nessun cleaner convocato",
