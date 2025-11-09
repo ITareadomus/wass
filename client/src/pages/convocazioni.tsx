@@ -165,30 +165,28 @@ export default function Convocazioni() {
           }
         }
 
-        // Filtra cleaners: escludi SOLO quelli in selected_cleaners.json (non quelli dalla timeline) E mostra solo attivi
+        // Filtra cleaners: escludi SOLO quelli in selected_cleaners.json E mostra solo attivi
+        // NON escludere quelli dalla timeline - li mostreremo come già selezionati
         const availableCleaners = dateCleaners.filter((c: any) => 
           !alreadySelectedIds.has(c.id) && c.active === true
         );
 
         console.log(`📊 Risultato filtro cleaners:`);
         console.log(`   - Totali per ${dateStr}: ${dateCleaners.length}`);
-        console.log(`   - Già selezionati: ${alreadySelectedIds.size}`);
-        console.log(`   - Disponibili: ${availableCleaners.length}`);
-
-        setCleaners(availableCleaners);
-        setFilteredCleaners(availableCleaners); // Aggiorna anche i cleaners filtrati
-        console.log(`📊 Cleaners disponibili (dopo filtro):`, availableCleaners.length);
-        console.log(`   - Totali: ${dateCleaners.length}`);
-        console.log(`   - Già selezionati: ${alreadySelectedIds.size}`);
-        console.log(`   - Disponibili: ${availableCleaners.length}`);
-
+        console.log(`   - Già in selected_cleaners.json: ${alreadySelectedIds.size}`);
+        console.log(`   - Pre-selezionati dalla timeline: ${preselectedIds.size}`);
+        console.log(`   - Disponibili da mostrare: ${availableCleaners.length}`);
 
         // Ordina per counter_hours (decrescente - più ore prima)
         availableCleaners.sort((a, b) => b.counter_hours - a.counter_hours);
 
         setCleaners(availableCleaners);
-        // Mantieni la selezione dei cleaner appena salvati (visivamente)
+        setFilteredCleaners(availableCleaners);
+        
+        // Mantieni la selezione visiva dei cleaner dalla timeline
         setSelectedCleaners(preselectedIds);
+        
+        console.log(`✅ Cleaners mostrati: ${availableCleaners.length}, pre-selezionati: ${preselectedIds.size}`);
 
         // Carica statistiche task
         setLoadingMessage("Caricamento statistiche task...");
