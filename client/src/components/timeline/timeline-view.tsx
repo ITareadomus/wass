@@ -627,7 +627,7 @@ export default function TimelineView({
       const resetResponse = await fetch('/api/reset-timeline-assignments', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ date: dateStr })
+        body: JSON.JSONstringify({ date: dateStr })
       });
 
       if (!resetResponse.ok) {
@@ -835,6 +835,9 @@ export default function TimelineView({
     };
   };
 
+  // Variabile per determinare se ci sono task assegnate (per mostrare/nascondere pulsante conferma)
+  const hasAssignedTasks = tasks.some(task => (task as any).assignedCleaner !== undefined);
+
   return (
     <>
       <div
@@ -868,21 +871,13 @@ export default function TimelineView({
                 <RotateCcw className="w-4 h-4" />
                 Reset Assegnazioni
               </Button>
-              {isReadOnly ? (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="flex items-center gap-2 bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-200 border-yellow-300 dark:border-yellow-700 cursor-default hover:bg-yellow-100 dark:hover:bg-yellow-900/30"
-                  disabled
-                >
-                  📜 Sei in modalità storico
-                </Button>
-              ) : (
+              {!isReadOnly && (
                 <Button
                   onClick={handleConfirmAssignments}
                   variant="default"
                   size="sm"
                   className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white print:hidden"
+                  disabled={!hasUnsavedChanges}
                 >
                   <CheckCircle className="w-4 h-4" />
                   Conferma Assegnazioni
@@ -1165,9 +1160,9 @@ export default function TimelineView({
                   <UserPlus className="w-5 h-5" />
                 </Button>
               </div>
-              {/* Pulsanti Conferma Assegnazioni e Stampa affiancati */}
+              {/* Pulsanti Conferma Assegnazioni, Storico e Stampa affiancati */}
               <div className="flex-1 p-1 border-t border-border flex gap-2">
-                {!isReadOnly && (
+                {!isReadOnly && hasAssignedTasks && (
                   <Button
                     onClick={handleConfirmAssignments}
                     disabled={!hasUnsavedChanges}
@@ -1178,10 +1173,19 @@ export default function TimelineView({
                     {hasUnsavedChanges ? 'Conferma Assegnazioni ⚠️' : 'Assegnazioni Confermate'}
                   </Button>
                 )}
+                {isReadOnly && (
+                  <Button
+                    disabled
+                    variant="outline"
+                    className="flex-1 h-full bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-200 border-yellow-300 dark:border-yellow-700 cursor-default"
+                  >
+                    📜 Sei in modalità storico
+                  </Button>
+                )}
                 <Button
                   onClick={handlePrint}
                   variant="outline"
-                  className={isReadOnly ? "flex-1 h-full" : "h-full px-6"}
+                  className="h-full px-6"
                 >
                   <Printer className="w-4 h-4 mr-2" />
                   Stampa
