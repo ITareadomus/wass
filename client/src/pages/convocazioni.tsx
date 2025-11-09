@@ -165,11 +165,8 @@ export default function Convocazioni() {
           }
         }
 
-        // Filtra cleaners: escludi SOLO quelli in selected_cleaners.json E mostra solo attivi
-        // NON escludere quelli dalla timeline - li mostreremo come già selezionati
-        const availableCleaners = dateCleaners.filter((c: any) => 
-          !alreadySelectedIds.has(c.id) && c.active === true
-        );
+        // Mostra TUTTI i cleaners attivi (NON filtrare quelli già selezionati)
+        const availableCleaners = dateCleaners.filter((c: any) => c.active === true);
 
         console.log(`📊 Risultato filtro cleaners:`);
         console.log(`   - Totali per ${dateStr}: ${dateCleaners.length}`);
@@ -183,8 +180,11 @@ export default function Convocazioni() {
         setCleaners(availableCleaners);
         setFilteredCleaners(availableCleaners);
         
-        // Mantieni la selezione visiva dei cleaner dalla timeline
-        setSelectedCleaners(preselectedIds);
+        // Unisci TUTTI i cleaners pre-selezionati (da selected_cleaners.json E dalla timeline)
+        const allPreselectedIds = new Set([...alreadySelectedIds, ...preselectedIds]);
+        setSelectedCleaners(allPreselectedIds);
+        
+        console.log(`✅ Cleaners mostrati: ${availableCleaners.length}, pre-selezionati totali: ${allPreselectedIds.size}`);
         
         console.log(`✅ Cleaners mostrati: ${availableCleaners.length}, pre-selezionati: ${preselectedIds.size}`);
 
