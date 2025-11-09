@@ -13,6 +13,21 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const execAsync = promisify(exec);
 
+// Costante bucket per Object Storage
+const BUCKET = "wass_assignments";
+
+// Utility: costruzione chiave file consistente
+function buildKey(isoDate: string) {
+  const d = new Date(isoDate);
+  const day = String(d.getDate()).padStart(2, "0");
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const fullYear = String(d.getFullYear());
+  const year = fullYear.slice(-2);
+  const folder = `${day}-${month}-${fullYear}`;
+  const filename = `assignments_${day}${month}${year}.json`;
+  return { key: `${folder}/${filename}`, d };
+}
+
 /**
  * Helper function to recalculate travel_time, start_time, end_time for a cleaner's tasks
  */
@@ -918,86 +933,67 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Endpoint per verificare SE esistono assegnazioni salvate (senza caricarle)
   app.post("/api/check-saved-assignments", async (req, res) => {
     try {
-      const { date } = req.body;
-      const workDate = date || format(new Date(), 'yyyy-MM-dd');
-
-      const [day, month, year] = workDate.split('-').reverse();
-      const folderPath = `${day}-${month}-20${year}`;
-      const filename = `${folderPath}/assignments_${day}${month}${year}.json`;
-
-      // Usa Replit Object Storage Client
-      const { Client } = await import('@replit/object-storage');
+      const { Client } = await import("@replit/object-storage");
       const client = new Client();
 
-      // Prova a scaricare il file per verificare se esiste
-      const result = await client.downloadAsText(filename, {
-        bucket: 'wass_assignments'
-      });
+      const workDate = req.body?.date || format(new Date(), "yyyy-MM-dd");
+      const { key, d } = buildKey(workDate);
+
+      const result = await client.downloadAsText(key, { bucket: BUCKET });
 
       if (result.ok) {
-        const dateObj = new Date(workDate);
-        const formattedDateTime = format(dateObj, "dd/MM/yyyy", { locale: it });
-
-        res.json({
+        return res.json({
           success: true,
           found: true,
-          filename,
-          formattedDateTime
-        });
-      } else {
-        res.json({
-          success: true,
-          found: false
+          filename: key,
+          formattedDateTime: format(d, "dd/MM/yyyy", { locale: it })
         });
       }
+
+      // File non trovato
+      return res.json({ success: true, found: false });
     } catch (error: any) {
-      console.error("Errore nel controllo delle assegnazioni salvate:", error);
-      res.json({ success: false, found: false, error: error.message });
+      console.error("check-saved-assignments error:", error);
+      return res.status(200).json({ 
+        success: false, 
+        found: false, 
+        error: String(error?.message || error) 
+      });
     }
   });
 
   // Endpoint per confermare le assegnazioni e salvare una copia immutabile
   app.post("/api/confirm-assignments", async (req, res) => {
     try {
-      const { date } = req.body;
-      const workDate = date || format(new Date(), 'yyyy-MM-dd');
+      const { Client } = await import("@replit/object-storage");
+      const client = new Client();
+
+      const workDate = req.body?.date || format(new Date(), "yyyy-MM-dd");
 
       // Leggi timeline.json corrente
       const timelinePath = path.join(process.cwd(), 'client/public/data/output/timeline.json');
       const timelineData = JSON.parse(await fs.readFile(timelinePath, 'utf8'));
 
-      // Crea nome file con formato ddmmyy
-      const dateObj = new Date(workDate);
-      const day = String(dateObj.getDate()).padStart(2, '0');
-      const month = String(dateObj.getMonth() + 1).padStart(2, '0');
-      const fullYear = String(dateObj.getFullYear());
-      const year = fullYear.slice(-2);
-      // Crea il percorso della cartella: DD-MM-YYYY/
-      const folderPath = `${day}-${month}-${fullYear}`;
-      const filename = `${folderPath}/assignments_${day}${month}${year}.json`;
-
+      const { key, d } = buildKey(workDate);
       const jsonContent = JSON.stringify(timelineData, null, 2);
 
-      // Upload nel bucket wass_assignments usando uploadFromText
-      const { Client } = await import('@replit/object-storage');
-      const client = new Client();
-      const result = await client.uploadFromText(filename, jsonContent, {
-        bucket: 'wass_assignments'
+      // Upload con uploadFromText
+      const result = await client.uploadFromText(key, jsonContent, {
+        bucket: BUCKET
       });
 
       if (!result.ok) {
         throw new Error(result.error || 'Errore sconosciuto nel salvataggio');
       }
 
-      console.log(`✅ Assegnazioni salvate in Object Storage: ${filename}`);
+      console.log(`✅ Assegnazioni salvate in Object Storage: ${key}`);
 
-      // === NEW: salva anche i selected_cleaners per la stessa data ===
+      // === Salva anche i selected_cleaners per la stessa data ===
       const selectedCleanersPath = path.join(
         process.cwd(),
         'client/public/data/cleaners/selected_cleaners.json'
       );
 
-      // leggi i cleaners selezionati correnti (se non esiste, crea vuoto)
       let selectedCleanersData: any;
       try {
         const scRaw = await fs.readFile(selectedCleanersPath, 'utf8');
@@ -1006,25 +1002,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
         selectedCleanersData = { cleaners: [], total_selected: 0 };
       }
 
-      // inject metadata.date per robustezza
       selectedCleanersData.metadata = selectedCleanersData.metadata || {};
       selectedCleanersData.metadata.date = workDate;
       selectedCleanersData.metadata.saved_at = new Date().toISOString();
 
-      // nome file: DD-MM-YYYY/selected_cleaners_DDMMYY.json
-      const scFilename = `${folderPath}/selected_cleaners_${day}${month}${year}.json`;
+      // Costruisci chiave per selected_cleaners
+      const dateObj = new Date(workDate);
+      const day = String(dateObj.getDate()).padStart(2, '0');
+      const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+      const fullYear = String(dateObj.getFullYear());
+      const year = fullYear.slice(-2);
+      const folderPath = `${day}-${month}-${fullYear}`;
+      const scKey = `${folderPath}/selected_cleaners_${day}${month}${year}.json`;
 
       const scJson = JSON.stringify(selectedCleanersData, null, 2);
-      const scResult = await client.uploadFromText(scFilename, scJson, {
-        bucket: 'wass_assignments'
+      const scResult = await client.uploadFromText(scKey, scJson, {
+        bucket: BUCKET
       });
       if (!scResult.ok) {
         throw new Error(scResult.error || 'Errore nel salvataggio dei selected_cleaners');
       }
-      console.log(`✅ Selected cleaners salvati in Object Storage: ${scFilename}`);
-      // === END NEW ===
+      console.log(`✅ Selected cleaners salvati in Object Storage: ${scKey}`);
 
-      // Formatta data e ora nel formato "HH:MM, DD/MM/YY"
+      // Formatta data e ora
       const now = new Date();
       const hours = String(now.getHours()).padStart(2, '0');
       const minutes = String(now.getMinutes()).padStart(2, '0');
@@ -1032,9 +1032,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       res.json({
         success: true,
-        filename,
+        filename: key,
         formattedDateTime,
-        message: `Assegnazioni salvate in Object Storage: ${filename}`
+        message: `Assegnazioni salvate in Object Storage: ${key}`
       });
     } catch (error: any) {
       console.error("Errore nel salvataggio delle assegnazioni:", error);
@@ -1048,37 +1048,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Endpoint per caricare assegnazioni salvate da Object Storage
   app.post("/api/load-saved-assignments", async (req, res) => {
     try {
-      const { date } = req.body;
-      const workDate = date || format(new Date(), 'yyyy-MM-dd');
-
-      // Crea nome file con formato ddmmyy
-      const dateObj = new Date(workDate);
-      const day = String(dateObj.getDate()).padStart(2, '0');
-      const month = String(dateObj.getMonth() + 1).padStart(2, '0');
-      const fullYear = String(dateObj.getFullYear());
-      const year = fullYear.slice(-2);
-      // Crea il percorso della cartella: DD-MM-YYYY/
-      const folderPath = `${day}-${month}-${fullYear}`;
-      const filename = `${folderPath}/assignments_${day}${month}${year}.json`;
-
-      console.log(`Tentativo di caricamento file: ${filename}`);
-
-      // Carica dal bucket wass_assignments usando Replit Object Storage
-      const { Client } = await import('@replit/object-storage');
+      const { Client } = await import("@replit/object-storage");
       const client = new Client();
 
-      // Prova a scaricare il file
-      const result = await client.downloadAsText(filename, {
-        bucket: 'wass_assignments'
-      });
+      const workDate = req.body?.date || format(new Date(), "yyyy-MM-dd");
+      const { key } = buildKey(workDate);
+
+      console.log(`Tentativo di caricamento file: ${key}`);
+
+      const result = await client.downloadAsText(key, { bucket: BUCKET });
 
       if (!result.ok) {
-        // File non trovato, non è un errore - significa solo che non ci sono assegnazioni salvate
-        console.log(`Nessuna assegnazione salvata trovata per ${workDate} (${filename})`);
+        console.log(`Nessuna assegnazione salvata trovata per ${workDate} (${key})`);
         return res.json({
           success: true,
           found: false,
-          message: `Nessuna assegnazione salvata per questa data`
+          message: "Nessuna assegnazione salvata per questa data"
         });
       }
 
@@ -1096,9 +1081,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       await fs.rename(tmpPath, timelinePath);
 
       // === Scarica e ripristina selected_cleaners per la stessa data ===
-      const scFilename = `${folderPath}/selected_cleaners_${day}${month}${year}.json`;
+      const dateObj = new Date(workDate);
+      const day = String(dateObj.getDate()).padStart(2, '0');
+      const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+      const fullYear = String(dateObj.getFullYear());
+      const year = fullYear.slice(-2);
+      const folderPath = `${day}-${month}-${fullYear}`;
+      const scKey = `${folderPath}/selected_cleaners_${day}${month}${year}.json`;
+      
       try {
-        const scResult = await client.downloadAsText(scFilename, { bucket: 'wass_assignments' });
+        const scResult = await client.downloadAsText(scKey, { bucket: BUCKET });
         const selectedCleanersPath = path.join(
           process.cwd(),
           'client/public/data/cleaners/selected_cleaners.json'
@@ -1107,7 +1099,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (scResult.ok) {
           const scData = JSON.parse(scResult.value);
 
-          // update metadata coerente
           scData.metadata = scData.metadata || {};
           scData.metadata.date = workDate;
           scData.metadata.loaded_at = new Date().toISOString();
@@ -1116,9 +1107,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           await fs.writeFile(tmpScPath, JSON.stringify(scData, null, 2));
           await fs.rename(tmpScPath, selectedCleanersPath);
 
-          console.log(`✅ Selected cleaners ripristinati da Object Storage: ${scFilename}`);
+          console.log(`✅ Selected cleaners ripristinati da Object Storage: ${scKey}`);
         } else {
-          // Nessun file salvato - crea vuoto
           const emptySelected = {
             cleaners: [],
             total_selected: 0,
@@ -1132,7 +1122,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           console.log(`ℹ️ Nessun selected_cleaners salvato per ${workDate} - creato vuoto`);
         }
       } catch (e) {
-        console.warn(`⚠️ Impossibile caricare ${scFilename}:`, e);
+        console.warn(`⚠️ Impossibile caricare ${scKey}:`, e);
       }
       // === END ===
 
@@ -1208,13 +1198,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Estrai il timestamp dal filename (formato: assignments_DDMMYY.json)
-      const dateMatch = filename.match(/assignments_(\d{6})\.json/);
+      const dateMatch = key.match(/assignments_(\d{6})\.json/);
       const lastSavedTimestamp = dateMatch ? dateMatch[1] : null;
 
-      // Usa la data corrente con la data dal filename (non abbiamo accesso ai metadata)
+      // Usa la data corrente con la data dal filename
       let formattedDateTime = null;
       if (lastSavedTimestamp) {
-        // Usa l'ora corrente con la data dal filename (non abbiamo accesso ai metadata)
         const now = new Date();
         const hours = String(now.getHours()).padStart(2, '0');
         const minutes = String(now.getMinutes()).padStart(2, '0');
@@ -1227,11 +1216,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({
         success: true,
         found: true,
-        filename,
+        filename: key,
         lastSavedTimestamp,
         formattedDateTime,
         data: savedData,
-        message: `Assegnazioni caricate da: ${filename}`
+        message: `Assegnazioni caricate da: ${key}`
       });
     } catch (error: any) {
       console.error("Errore nel caricamento delle assegnazioni:", error);
