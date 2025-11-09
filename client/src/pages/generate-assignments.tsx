@@ -223,6 +223,7 @@ export default function GenerateAssignments() {
       const targetDate = new Date(date);
       targetDate.setHours(0, 0, 0, 0);
       const isPastDate = targetDate < today;
+      const isCurrentDate = targetDate.getTime() === today.getTime();
 
       // CRITICAL: Verifica SE esistono assegnazioni salvate per questa data
       const checkResponse = await fetch('/api/check-saved-assignments', {
@@ -234,8 +235,8 @@ export default function GenerateAssignments() {
       const checkResult = await checkResponse.json();
 
       if (checkResult.found) {
-        // SOLO per date STRETTAMENTE passate: carica automaticamente e blocca modifiche
-        if (isPastDate) {
+        // Per date passate O data corrente con salvataggio: carica automaticamente
+        if (isPastDate || isCurrentDate) {
           // CRITICAL: Salva il timestamp PRIMA di caricare per evitare loop infiniti
           const savedKey = `last_saved_${dateStr}`;
           localStorage.setItem(savedKey, checkResult.lastSavedTimestamp || dateStr);
@@ -259,16 +260,29 @@ export default function GenerateAssignments() {
             // Ricarica i task per mostrare i dati aggiornati
             await loadTasks(true);
 
+            // CRITICAL: Data corrente rimane EDITABILE, date passate sono READ-ONLY
+            const toastMessage = isPastDate 
+              ? "📥 Assegnazioni caricate (sola lettura)"
+              : "📥 Assegnazioni caricate";
+            
+            const toastDescription = isPastDate
+              ? `Ultime assegnazioni salvate il ${checkResult.formattedDateTime || dateStr}`
+              : `Ultime assegnazioni salvate il ${checkResult.formattedDateTime || dateStr} (modificabili)`;
+
             toast({
               variant: "success",
-              title: "📥 Assegnazioni caricate (sola lettura)",
-              description: `Ultime assegnazioni salvate il ${checkResult.formattedDateTime || dateStr}`,
+              title: toastMessage,
+              description: toastDescription,
               duration: 3000
             });
 
-            // Imposta timeline in modalità read-only (assegnazioni salvate)
-            setIsTimelineReadOnly(true);
-            console.log("🔒 Timeline impostata in modalità READ-ONLY (assegnazioni salvate)");
+            // Imposta timeline in modalità read-only SOLO per date passate
+            setIsTimelineReadOnly(isPastDate);
+            if (isPastDate) {
+              console.log("🔒 Timeline impostata in modalità READ-ONLY (data passata con assegnazioni salvate)");
+            } else {
+              console.log("✏️ Timeline impostata in modalità EDITABILE (data corrente con assegnazioni salvate)");
+            }
 
             // Ricarica la timeline UI
             if ((window as any).loadTimelineCleaners) {
@@ -288,13 +302,13 @@ export default function GenerateAssignments() {
           }
 
         } else {
-          // Per data corrente e future: permetti sempre modifiche
-          console.log(`✏️ Data ${dateStr} (presente/futura) - modalità EDITABILE`);
+          // Per date FUTURE: permetti sempre modifiche
+          console.log(`✏️ Data ${dateStr} (futura) - modalità EDITABILE`);
           setLastSavedTimestamp(null);
           localStorage.removeItem(`last_saved_${dateStr}`);
           setIsTimelineReadOnly(false);
 
-          // Procedi con estrazione normale per data corrente/futura
+          // Procedi con estrazione normale per data futura
           await extractData(date);
         }
       } else {
