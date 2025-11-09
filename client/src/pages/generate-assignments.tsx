@@ -313,6 +313,15 @@ export default function GenerateAssignments() {
   // Traccia se è un reload o un cambio data effettivo
   const prevDateRef = useRef<string | null>(null);
 
+  // Verifica se la data selezionata è nel passato
+  const isPastDate = () => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const selected = new Date(selectedDate);
+    selected.setHours(0, 0, 0, 0);
+    return selected < today;
+  };
+
   useEffect(() => {
     const currentDateStr = format(selectedDate, 'yyyy-MM-dd');
 
@@ -1394,10 +1403,20 @@ export default function GenerateAssignments() {
   return (
     <div className="bg-background text-foreground min-h-screen">
       <div className="w-full px-4 py-6">
+        {isPastDate() && (
+          <div className="mb-4 p-4 bg-yellow-50 dark:bg-yellow-950/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
+            <p className="text-sm text-yellow-800 dark:text-yellow-200 flex items-center gap-2">
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              </svg>
+              <strong>Modalità di sola lettura:</strong> Stai visualizzando assegnazioni di una data passata. Non è possibile effettuare modifiche.
+            </p>
+          </div>
+        )}
         <div className="mb-6 flex justify-between items-center flex-wrap gap-4">
           <div className="flex items-center gap-3">
             <h1 className="text-3xl font-bold text-foreground flex items-center gap-2">
-              GENERA ASSEGNAZIONI
+              {isPastDate() ? 'VISUALIZZA ASSEGNAZIONI' : 'GENERA ASSEGNAZIONI'}
               <span className="text-2xl font-normal text-muted-foreground ml-4">
                 del {format(selectedDate, "dd/MM/yyyy", { locale: it })}
               </span>
@@ -1443,7 +1462,7 @@ export default function GenerateAssignments() {
           </div>
         </div>
 
-        <DragDropContext onDragEnd={onDragEnd}>
+        <DragDropContext onDragEnd={isPastDate() ? () => {} : onDragEnd}>
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6 w-full">
             <PriorityColumn
               title="EARLY OUT"
@@ -1452,6 +1471,7 @@ export default function GenerateAssignments() {
               droppableId="early-out"
               icon="clock"
               assignAction={assignEarlyOutToTimeline}
+              disabled={isPastDate()}
             />
             <PriorityColumn
               title="HIGH PRIORITY"
@@ -1460,6 +1480,7 @@ export default function GenerateAssignments() {
               droppableId="high"
               icon="alert-circle"
               assignAction={assignHighPriorityToTimeline}
+              disabled={isPastDate()}
             />
             <PriorityColumn
               title="LOW PRIORITY"
@@ -1468,6 +1489,7 @@ export default function GenerateAssignments() {
               droppableId="low"
               icon="arrow-down"
               assignAction={assignLowPriorityToTimeline}
+              disabled={isPastDate()}
             />
           </div>
 
@@ -1480,6 +1502,7 @@ export default function GenerateAssignments() {
                   tasks={allTasksWithAssignments}
                   hasUnsavedChanges={hasUnsavedChanges}
                   onTaskMoved={() => setHasUnsavedChanges(true)}
+                  readOnly={isPastDate()}
                 />
               </div>
             </div>

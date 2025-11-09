@@ -27,6 +27,16 @@ export default function PriorityColumn({
   const { toast } = useToast();
   const [isAssigning, setIsAssigning] = useState(false);
 
+  const today = new Date();
+  today.setHours(0, 0, 0, 0); // Normalizza a inizio giornata
+
+  const savedDateString = localStorage.getItem('selected_work_date');
+  const selectedDate = savedDateString ? new Date(savedDateString) : null;
+  selectedDate?.setHours(0, 0, 0, 0); // Normalizza a inizio giornata
+
+  const disabled = selectedDate ? selectedDate < today : false;
+
+
   const iconMap: Record<string, React.ReactNode> = {
     clock: <Clock className="w-5 h-5 mr-2 text-muted-foreground" />,
     "alert-circle": <AlertCircle className="w-5 h-5 mr-2 text-muted-foreground" />,
@@ -105,7 +115,6 @@ export default function PriorityColumn({
         setIsAssigning(false);
         return;
       }
-      // La data è già nel formato corretto yyyy-MM-dd, non serve più lo split
       const dateStr = savedDate;
 
       let endpoint = '';
@@ -148,7 +157,6 @@ export default function PriorityColumn({
         description: successMessage,
       });
 
-      // Ricarica i task per riflettere le nuove assegnazioni
       if ((window as any).reloadAllTasks) {
         console.log('🔄 Ricaricamento task dopo assegnazione...');
         await (window as any).reloadAllTasks();
@@ -178,28 +186,30 @@ export default function PriorityColumn({
             {tasks.length} task
           </div>
         </div>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={handleAssignContainer}
-          disabled={isAssigning || tasks.length === 0}
-          className="text-xs px-2 py-1 h-7"
-        >
-          {isAssigning ? (
-            <>
-              <span className="animate-spin mr-2">⏳</span>
-              Assegnando...
-            </>
-          ) : (
-            <>
-              <Calendar className="w-3 h-3 mr-1" />
-              Assegna
-            </>
-          )}
-        </Button>
+        {assignAction && !disabled && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleAssignContainer}
+            disabled={isAssigning || tasks.length === 0}
+            className="text-xs px-2 py-1 h-7"
+          >
+            {isAssigning ? (
+              <>
+                <span className="animate-spin mr-2">⏳</span>
+                Assegnando...
+              </>
+            ) : (
+              <>
+                <Calendar className="w-3 h-3 mr-1" />
+                Assegna
+              </>
+            )}
+          </Button>
+        )}
       </div>
 
-      <Droppable droppableId={droppableId}>
+      <Droppable droppableId={droppableId} isDropDisabled={disabled}>
         {(provided, snapshot) => (
           <div
             ref={provided.innerRef}
@@ -207,6 +217,7 @@ export default function PriorityColumn({
             className={`
               flex flex-wrap gap-2 min-h-[120px] transition-colors duration-200 content-start p-2
               ${snapshot.isDraggingOver ? "drop-zone-active" : ""}
+              ${disabled ? "cursor-not-allowed" : ""}
             `}
             data-testid={`priority-column-${droppableId}`}
           >
@@ -218,10 +229,16 @@ export default function PriorityColumn({
                 isInTimeline={false}
                 allTasks={tasks}
                 currentContainer={droppableId}
-                isDuplicate={isDuplicateTask(task)} // Passa il flag isDuplicate
+                isDuplicate={isDuplicateTask(task)}
+                readOnly={disabled}
               />
             ))}
             {provided.placeholder}
+            {disabled && tasks.length === 0 && (
+              <div className="absolute inset-0 flex items-center justify-center text-muted-foreground text-sm">
+                Nessuna assegnazione per questo giorno.
+              </div>
+            )}
           </div>
         )}
       </Droppable>
