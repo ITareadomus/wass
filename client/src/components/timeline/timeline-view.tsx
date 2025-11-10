@@ -1167,14 +1167,6 @@ export default function TimelineView({
                     📜 Sei in modalità storico
                   </Button>
                 )}
-                <Button
-                  onClick={handlePrint}
-                  variant="outline"
-                  className="h-full px-6"
-                >
-                  <Printer className="w-4 h-4 mr-2" />
-                  Stampa
-                </Button>
               </div>
             </div>
           </div>
