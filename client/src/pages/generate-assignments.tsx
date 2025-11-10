@@ -113,6 +113,9 @@ export default function GenerateAssignments() {
   // Stato per tracciare se la timeline è in modalità di sola visualizzazione
   const [isTimelineReadOnly, setIsTimelineReadOnly] = useState<boolean>(false);
 
+  // Stato per tracciare se è in corso un'operazione di drag-and-drop
+  const [isDragging, setIsDragging] = useState<boolean>(false);
+
   // Salva la data in localStorage ogni volta che cambia (formato locale senza timezone)
   useEffect(() => {
     const year = selectedDate.getFullYear();
@@ -171,7 +174,7 @@ export default function GenerateAssignments() {
         const displayDateTime = result.formattedDateTime || result.filename;
         localStorage.setItem('last_saved_assignment', displayDateTime);
         setLastSavedTimestamp(displayDateTime);
-        
+
         // CRITICAL: Quando carichiamo assegnazioni salvate, NON ci sono modifiche
         setHasUnsavedChanges(false);
 
@@ -394,10 +397,10 @@ export default function GenerateAssignments() {
 
       setExtractionStep("Task caricati!");
       await new Promise(resolve => setTimeout(resolve, 100));
-      
+
       // CRITICAL: Dopo estrazione nuovi dati, NON ci sono modifiche da salvare
       setHasUnsavedChanges(false);
-      
+
       setIsExtracting(false);
     } catch (error) {
       console.error("Errore nell'estrazione:", error);
@@ -1120,6 +1123,18 @@ export default function GenerateAssignments() {
       return;
     }
 
+    // CRITICAL: Blocca drag simultanei
+    if (isDragging) {
+      console.log("⚠️ Drag già in corso, operazione annullata per prevenire conflitti");
+      toast({
+        title: "Operazione in corso",
+        description: "Attendi il completamento del movimento precedente",
+        variant: "warning",
+        duration: 2000,
+      });
+      return;
+    }
+
     // draggableId è sempre l'id univoco della task
     const taskId = draggableId;
     const task = allTasksWithAssignments.find(t => String(t.id) === String(taskId));
@@ -1136,6 +1151,9 @@ export default function GenerateAssignments() {
       // Opzionale: annulla visivamente il drag (anche se react-beautiful-dnd potrebbe gestirlo)
       return;
     }
+
+    // Imposta lock
+    setIsDragging(true);
 
     try {
       // 🔹 Ramo TIMELINE (drag tra cleaners o riordino nello stesso cleaner)
@@ -1172,6 +1190,9 @@ export default function GenerateAssignments() {
             description: "Impossibile assegnare la task alla timeline.",
             variant: "destructive",
           });
+        } finally {
+          // Rilascia lock indipendentemente dall'esito
+          setIsDragging(false);
         }
         return;
       }
@@ -1219,7 +1240,7 @@ export default function GenerateAssignments() {
             await loadTasks(true);
           } else {
             console.log('✅ Movimento salvato automaticamente in timeline.json');
-            
+
             // CRITICAL: Marca modifiche dopo drag and drop riuscito
             setHasUnsavedChanges(true);
             if (onTaskMoved) {
@@ -1229,20 +1250,20 @@ export default function GenerateAssignments() {
             // CRITICAL FIX: Attendi esplicitamente il ricaricamento COMPLETO
             // Prima di permettere altri movimenti
             setIsLoadingTasks(true);
-            
+
             // Attendi che il backend abbia scritto il file su disco
             await new Promise(resolve => setTimeout(resolve, 500));
-            
+
             // Forza ricaricamento completo con cache bust aggressivo
             const timestamp = Date.now() + Math.random();
-            await fetch(`/data/output/timeline.json?bust=${timestamp}`, { 
+            await fetch(`/data/output/timeline.json?bust=${timestamp}`, {
               cache: 'no-store',
               headers: { 'Cache-Control': 'no-cache' }
             });
-            
+
             // Ricarica tutto lo stato
             await loadTasks(true);
-            
+
             setIsLoadingTasks(false);
 
             // Mostra toast solo se i cleaner sono diversi
@@ -1261,6 +1282,9 @@ export default function GenerateAssignments() {
             description: "Impossibile spostare la task. Verifica la connessione.",
             variant: "destructive"
           });
+        } finally {
+          // Rilascia lock indipendentemente dall'esito
+          setIsDragging(false);
         }
         return;
       }
@@ -1325,6 +1349,9 @@ export default function GenerateAssignments() {
             description: "Errore di rete nello spostamento",
             variant: "destructive"
           });
+        } finally {
+          // Rilascia lock indipendentemente dall'esito
+          setIsDragging(false);
         }
         return;
       }
@@ -1428,6 +1455,9 @@ export default function GenerateAssignments() {
           });
         } catch (err) {
           console.error("Errore nell'assegnazione:", err);
+        } finally {
+          // Rilascia lock indipendentemente dall'esito
+          setIsDragging(false);
         }
         return;
       }
@@ -1439,12 +1469,14 @@ export default function GenerateAssignments() {
         // Rimuovi da timeline.json
         await removeTimelineAssignment(taskId, logisticCode);
         await loadTasks(true);
-        
+
         // CRITICAL: Marca modifiche dopo rimozione da timeline
         setHasUnsavedChanges(true);
         if (onTaskMoved) {
           onTaskMoved();
         }
+        // Rilascia lock indipendentemente dall'esito
+        setIsDragging(false);
         return;
       }
 
@@ -1456,6 +1488,11 @@ export default function GenerateAssignments() {
         description: "Errore nello spostamento della task",
         variant: "destructive",
       });
+    } finally {
+      // Assicurati che il lock venga rilasciato anche in caso di errori inaspettati
+      if (isDragging) { // Controlla se il lock è ancora attivo
+        setIsDragging(false);
+      }
     }
   };
 
