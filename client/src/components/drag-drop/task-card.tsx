@@ -20,6 +20,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { HelpCircle, ChevronLeft, ChevronRight, Save, Pencil } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
+import { useMultiSelect } from "@/pages/generate-assignments";
 
 // Normalizza la chiave di una task indipendentemente dal campo usato
 const getTaskKey = (t: any) => String(t?.id ?? t?.task_id ?? t?.logistic_code ?? "");
@@ -32,11 +33,7 @@ interface TaskCardProps {
   currentContainer?: 'early-out' | 'high' | 'low' | string;
   isDuplicate?: boolean;
   isDragDisabled?: boolean;
-  isReadOnly?: boolean; // Modalità read-only per disabilitare editing
-  isMultiSelectMode?: boolean;
-  isSelected?: boolean;
-  selectionOrder?: number;
-  onSelect?: (taskId: string) => void;
+  isReadOnly?: boolean;
 }
 
 interface AssignedTask {
@@ -55,13 +52,28 @@ export default function TaskCard({
   currentContainer = '',
   isDuplicate = false,
   isDragDisabled = false,
-  isReadOnly = false, // Modalità read-only
-  isMultiSelectMode = false,
-  isSelected = false,
-  selectionOrder,
-  onSelect,
+  isReadOnly = false,
 }: TaskCardProps) {
   const [isModalOpen, setIsModalOpen] = useState(false);
+  
+  // Usa il context per multi-select (solo per container, non timeline)
+  const multiSelectContext = !isInTimeline ? useMultiSelect() : null;
+  const isMultiSelectMode = multiSelectContext?.isMultiSelectMode ?? false;
+  const isSelected = multiSelectContext?.isTaskSelected(task.id) ?? false;
+  const selectionOrder = multiSelectContext?.getTaskOrder(task.id);
+  
+  // Gestisce il click sulla card: se multi-select toggle selezione, altrimenti apri modale
+  const handleCardClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    
+    // In multi-select mode nei container: toggle selezione invece di aprire modale
+    if (isMultiSelectMode && !isInTimeline && multiSelectContext) {
+      multiSelectContext.toggleTask(task.id);
+    } else {
+      // Default: apri modale
+      setIsModalOpen(true);
+    }
+  };
 
   const [currentTaskId, setCurrentTaskId] = useState(getTaskKey(task));
   const [assignmentTimes, setAssignmentTimes] = useState<{ start_time?: string; end_time?: string; travel_time?: number }>({});
@@ -273,12 +285,6 @@ export default function TaskCard({
     return () => window.removeEventListener("keydown", onKey);
   }, [isModalOpen, canGoPrev, canGoNext, currentTaskInNavigable, navigableTasks]);
 
-
-  const handleCardClick = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    setIsModalOpen(true);
-  };
-
   const handleSaveChanges = async () => {
     try {
       setIsSaving(true);
@@ -418,7 +424,28 @@ export default function TaskCard({
                       }
                     }}
                   >
-                    {!isConfirmedOperation && (
+                    {/* Checkbox overlay per multi-select (solo container) */}
+                    {isMultiSelectMode && !isInTimeline && (
+                      <div className="absolute top-0.5 left-0.5 z-50">
+                        <Checkbox
+                          checked={isSelected}
+                          onCheckedChange={() => multiSelectContext?.toggleTask(task.id)}
+                          className="w-4 h-4 bg-white border-2 border-sky-600"
+                          data-testid={`checkbox-task-${task.id}`}
+                        />
+                      </div>
+                    )}
+                    
+                    {/* Badge ordine selezione (solo se selezionata) */}
+                    {isSelected && selectionOrder && !isInTimeline && (
+                      <div className="absolute top-0.5 right-0.5 z-50">
+                        <div className="bg-sky-600 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs font-bold">
+                          {selectionOrder}
+                        </div>
+                      </div>
+                    )}
+                    
+                    {!isConfirmedOperation && !isSelected && (
                       <div className="absolute top-0.5 right-0.5 z-50">
                         <HelpCircle
                           className="w-3 h-3 text-gray-900"

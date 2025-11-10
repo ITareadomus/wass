@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { useState, useEffect } from "react";
+import { useMultiSelect } from "@/pages/generate-assignments";
 
 interface PriorityColumnProps {
   title: string;
@@ -14,11 +15,7 @@ interface PriorityColumnProps {
   droppableId: string;
   icon: "clock" | "alert-circle" | "arrow-down";
   assignAction?: () => Promise<void>;
-  isDragDisabled?: boolean; // Aggiunta la prop isDragDisabled
-  isMultiSelectMode?: boolean;
-  selectedTasks?: Array<{taskId: string; order: number}>;
-  onToggleMultiSelect?: () => void;
-  onSelectTask?: (taskId: string) => void;
+  isDragDisabled?: boolean;
 }
 
 export default function PriorityColumn({
@@ -28,16 +25,15 @@ export default function PriorityColumn({
   droppableId,
   icon,
   assignAction,
-  isDragDisabled = false, // Inizializza isDragDisabled a false
-  isMultiSelectMode = false,
-  selectedTasks = [],
-  onToggleMultiSelect,
-  onSelectTask,
+  isDragDisabled = false,
 }: PriorityColumnProps) {
   const [isAssigning, setIsAssigning] = useState(false);
   const [isDateInPast, setIsDateInPast] = useState(false);
   const { toast } = useToast();
-  const [hasAssigned, setHasAssigned] = useState(false); // Stato per tracciare se è stato fatto un assegnamento
+  const [hasAssigned, setHasAssigned] = useState(false);
+  
+  // Usa il context per multi-select
+  const { isMultiSelectMode, selectedTasks, toggleMode, toggleTask, isTaskSelected, getTaskOrder } = useMultiSelect();
 
   // Verifica se la data selezionata è nel passato
   useEffect(() => {
@@ -222,7 +218,7 @@ export default function PriorityColumn({
           <Button
             variant={isMultiSelectMode ? "default" : "outline"}
             size="sm"
-            onClick={onToggleMultiSelect}
+            onClick={toggleMode}
             disabled={tasks.length === 0 || isDateInPast}
             className="text-xs px-2 py-1 h-7"
             title={isMultiSelectMode ? "Disattiva selezione multipla" : "Attiva selezione multipla"}
@@ -268,12 +264,9 @@ export default function PriorityColumn({
           >
             {tasks.map((task, index) => {
               // Verifica se è duplicata (stesso logistic_code ma id diverso)
-              // La task è considerata duplicata se hasAssigned è true E ci sono altre task con lo stesso logistic_code
               const isDuplicate = hasAssigned && tasks.some(
                 t => t.name === task.name && t.id !== task.id
               );
-              const isSelected = selectedTasks.some(st => st.taskId === task.id);
-              const selectionOrder = selectedTasks.find(st => st.taskId === task.id)?.order;
               
               return (
                 <TaskCard
@@ -283,13 +276,9 @@ export default function PriorityColumn({
                   isInTimeline={false}
                   allTasks={tasks}
                   currentContainer={droppableId}
-                  isDuplicate={isDuplicate} // Passa il flag isDuplicate
-                  isDragDisabled={isDragDisabled || isDateInPast} // Disabilita drag per date passate
-                  isReadOnly={isDateInPast} // Disabilita editing per date passate
-                  isMultiSelectMode={isMultiSelectMode}
-                  isSelected={isSelected}
-                  selectionOrder={selectionOrder}
-                  onSelect={onSelectTask}
+                  isDuplicate={isDuplicate}
+                  isDragDisabled={isDragDisabled || isDateInPast}
+                  isReadOnly={isDateInPast}
                 />
               );
             })}
