@@ -37,8 +37,25 @@ export async function loadTimeline(workDate: string): Promise<any | null> {
     const data = await fs.readFile(PATHS.timeline, 'utf-8');
     const parsed = JSON.parse(data);
     
-    // Verify the date matches (or is close enough)
-    if (parsed.metadata?.date === workDate) {
+    // Accept file from filesystem if:
+    // 1. It has matching metadata.date, OR
+    // 2. It has NO metadata (legacy format), OR
+    // 3. It has cleaners_assignments (valid timeline structure)
+    const hasMatchingDate = parsed.metadata?.date === workDate;
+    const hasNoMetadata = !parsed.metadata;
+    const hasValidStructure = parsed.cleaners_assignments || parsed.assignments;
+    
+    if (hasMatchingDate || hasNoMetadata || hasValidStructure) {
+      // Ensure metadata exists (migration for legacy files)
+      if (!parsed.metadata) {
+        parsed.metadata = {
+          date: workDate,
+          last_updated: new Date().toISOString()
+        };
+      } else if (!parsed.metadata.date) {
+        parsed.metadata.date = workDate;
+      }
+      
       console.log(`✅ Timeline loaded from filesystem for ${workDate}`);
       return parsed;
     }

@@ -9,6 +9,7 @@ import * as fs from 'fs/promises';
 import { format } from "date-fns";
 import { it } from "date-fns/locale";
 import { storageService } from "./services/storage-service";
+import * as workspaceFiles from "./services/workspace-files";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -605,32 +606,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
       fullTaskData.cleaning_time = fullTaskData.cleaning_time || 0;
 
 
-      // Carica o crea il file timeline con nuova struttura
-      let timelineData: any = {
-        cleaners_assignments: [],
-        current_date: workDate,
-        meta: {
-          total_cleaners: 0,
-          total_tasks: 0,
-          last_updated: new Date().toISOString()
-        }
-      };
-
-      try {
-        const existingData = await fs.readFile(timelinePath, 'utf8');
-        timelineData = JSON.parse(existingData);
-
-        // Migrazione da vecchia struttura a nuova se necessario
-        if (timelineData.assignments && !timelineData.cleaners_assignments) {
-          timelineData.cleaners_assignments = [];
-          timelineData.meta = {
+      // Carica timeline esistente o crea nuova struttura usando workspace helper
+      let timelineData = await workspaceFiles.loadTimeline(workDate);
+      
+      if (!timelineData) {
+        // Crea nuova struttura se non esiste
+        timelineData = {
+          cleaners_assignments: [],
+          current_date: workDate,
+          meta: {
             total_cleaners: 0,
             total_tasks: 0,
             last_updated: new Date().toISOString()
-          };
-        }
-      } catch (error) {
+          },
+          metadata: {
+            date: workDate,
+            last_updated: new Date().toISOString()
+          }
+        };
         console.log(`Creazione nuovo file timeline per ${workDate}`);
+      }
+
+      // Migrazione da vecchia struttura a nuova se necessario
+      if (timelineData.assignments && !timelineData.cleaners_assignments) {
+        timelineData.cleaners_assignments = [];
+        timelineData.meta = {
+          total_cleaners: 0,
+          total_tasks: 0,
+          last_updated: new Date().toISOString()
+        };
       }
 
       const normalizedLogisticCode = String(logisticCode);
@@ -769,10 +773,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         0
       );
 
-      // Scrittura atomica
-      const tmpPath = `${timelinePath}.tmp`;
-      await fs.writeFile(tmpPath, JSON.stringify(timelineData, null, 2));
-      await fs.rename(tmpPath, timelinePath);
+      // Salva timeline usando workspace helper (scrive su filesystem + Object Storage)
+      await workspaceFiles.saveTimeline(workDate, timelineData);
 
       // RIMUOVI SEMPRE la task da containers.json quando salvata in timeline
       if (containersData && containersData.containers) {
@@ -811,10 +813,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 containersData.summary.low_priority;
             }
 
-            // Salva containers.json aggiornato in modo atomico
-            const tmpContainersPath = `${containersPath}.tmp`;
-            await fs.writeFile(tmpContainersPath, JSON.stringify(containersData, null, 2));
-            await fs.rename(tmpContainersPath, containersPath);
+            // Salva containers.json aggiornato usando workspace helper (filesystem + Object Storage)
+            await workspaceFiles.saveContainers(workDate, containersData);
             console.log(`✅ Containers.json aggiornato e sincronizzato con timeline`);
           }
         } catch (containerError) {
@@ -843,13 +843,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       console.log(`Rimozione assegnazione timeline - taskId: ${taskId}, logisticCode: ${logisticCode}, date: ${workDate}`);
 
-      // Carica timeline
-      let assignmentsData: any = { cleaners_assignments: [], current_date: workDate, meta: { total_cleaners: 0, total_tasks: 0, last_updated: new Date().toISOString() } };
-      try {
-        const existingData = await fs.readFile(timelinePath, 'utf8');
-        assignmentsData = JSON.parse(existingData);
-      } catch (error) {
-        // File non esiste, usa struttura vuota
+      // Carica timeline usando workspace helper
+      let assignmentsData = await workspaceFiles.loadTimeline(workDate);
+      if (!assignmentsData) {
+        // Crea struttura vuota se non esiste
+        assignmentsData = {
+          cleaners_assignments: [],
+          current_date: workDate,
+          meta: { total_cleaners: 0, total_tasks: 0, last_updated: new Date().toISOString() },
+          metadata: { date: workDate, last_updated: new Date().toISOString() }
+        };
       }
 
       let removedCount = 0;
@@ -884,8 +887,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         0
       );
 
-      // Salva timeline
-      await fs.writeFile(timelinePath, JSON.stringify(assignmentsData, null, 2));
+      // Salva timeline usando workspace helper (filesystem + Object Storage)
+      await workspaceFiles.saveTimeline(workDate, assignmentsData);
 
       // RIPORTA la task nel container corretto
       if (removedTask) {
@@ -938,8 +941,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
               containersData.summary.low_priority;
           }
 
-          // Salva containers.json
-          await fs.writeFile(containersPath, JSON.stringify(containersData, null, 2));
+          // Salva containers.json usando workspace helper (filesystem + Object Storage)
+          await workspaceFiles.saveContainers(workDate, containersData);
           console.log(`✅ Task ${logisticCode} riportata nel container ${containerType}`);
         } catch (containerError) {
           console.warn('Errore nel ripristino del container:', containerError);
