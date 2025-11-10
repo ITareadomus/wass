@@ -1226,65 +1226,9 @@ export default function GenerateAssignments() {
               onTaskMoved();
             }
 
-            // CRITICAL FIX: NON ricaricare da Object Storage dopo ogni movimento
-            // Il file locale timeline.json è già aggiornato dal backend
-            // Ricarichiamo SOLO dal file locale, senza sovrascrivere con il file salvato
-            const timestamp = Date.now() + Math.random();
-            const timelineResponse = await fetch(`/data/output/timeline.json?t=${timestamp}`, {
-              cache: 'no-store',
-              headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' }
-            });
-
-            if (timelineResponse.ok) {
-              const timelineData = await timelineResponse.json();
-
-              // Ricostruisci allTasksWithAssignments dalla timeline aggiornata
-              const tasksWithAssignments: Task[] = [];
-              const addedIds = new Set<string>();
-
-              // Task non assegnate dai containers (già in stato)
-              for (const task of [...earlyOutTasks, ...highPriorityTasks, ...lowPriorityTasks]) {
-                const tid = String(task.id);
-                if (!addedIds.has(tid)) {
-                  tasksWithAssignments.push(task);
-                  addedIds.add(tid);
-                }
-              }
-
-              // Task assegnate dalla timeline
-              for (const cleanerEntry of timelineData.cleaners_assignments || []) {
-                for (const task of cleanerEntry.tasks || []) {
-                  const taskWithAssignment = {
-                    ...task,
-                    id: String(task.task_id),
-                    name: String(task.logistic_code),
-                    type: task.customer_name || 'Unknown',
-                    duration: formatDuration(task.cleaning_time || 0),
-                    priority: task.priority || 'unknown',
-                    assignedCleaner: cleanerEntry.cleaner.id,
-                    sequence: task.sequence,
-                    start_time: task.start_time,
-                    end_time: task.end_time,
-                    startTime: task.start_time,
-                    endTime: task.end_time,
-                    travelTime: task.travel_time || 0,
-                    assignedTo: null,
-                    status: "pending",
-                    scheduledTime: null,
-                    createdAt: new Date().toISOString(),
-                    updatedAt: new Date().toISOString()
-                  };
-
-                  const tid = String(task.task_id);
-                  if (!addedIds.has(tid)) {
-                    tasksWithAssignments.push(taskWithAssignment as any);
-                    addedIds.add(tid);
-                  }
-                }
-              }
-
-              setAllTasksWithAssignments(tasksWithAssignments);
-            }
+            // CRITICAL FIX: Ricarica COMPLETA per sincronizzare tutto lo stato
+            // Questo previene errori 404 su movimenti successivi
+            await loadTasks(true);
 
             // Mostra toast solo se i cleaner sono diversi
             if (fromCleanerId !== toCleanerId) {
