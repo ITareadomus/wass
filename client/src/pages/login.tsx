@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,6 +13,13 @@ export default function Login() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+
+  useEffect(() => {
+    const user = localStorage.getItem("user");
+    if (user) {
+      setLocation("/");
+    }
+  }, [setLocation]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -94,11 +101,6 @@ export default function Login() {
               {isLoading ? "Accesso in corso..." : "Accedi"}
             </Button>
           </form>
-          <div className="mt-4 text-sm text-muted-foreground text-center">
-            <p>Utenti di test:</p>
-            <p className="font-mono text-xs mt-1">admin / admin123</p>
-            <p className="font-mono text-xs">user / user123</p>
-          </div>
         </CardContent>
       </Card>
     </div>
