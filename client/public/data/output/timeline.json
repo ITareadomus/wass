@@ -1,12 +1,57 @@
 {
   "metadata": {
-    "last_updated": "2025-11-10T15:36:26.121Z",
+    "last_updated": "2025-11-10T15:43:06.986Z",
     "date": "2025-11-11"
   },
-  "cleaners_assignments": [],
+  "cleaners_assignments": [
+    {
+      "cleaner": {
+        "id": 626,
+        "name": "DORA PATRICIA",
+        "lastname": "JIMENEZ",
+        "role": "Formatore",
+        "premium": false
+      },
+      "tasks": [
+        {
+          "task_id": 218624,
+          "logistic_code": 504,
+          "client_id": null,
+          "premium": false,
+          "address": "VIA TOFANE, 5",
+          "lat": "45.5034283",
+          "lng": "9.221111",
+          "cleaning_time": 60,
+          "checkin_date": "2025-11-13",
+          "checkout_date": "2025-11-11",
+          "checkin_time": "15:30",
+          "checkout_time": null,
+          "pax_in": 1,
+          "pax_out": 1,
+          "small_equipment": false,
+          "operation_id": 2,
+          "confirmed_operation": false,
+          "straordinaria": false,
+          "type_apt": "A",
+          "alias": "NTM",
+          "customer_name": "NOTA-MI",
+          "reasons": [
+            "manually_moved_to_timeline"
+          ],
+          "priority": "early_out",
+          "start_time": "10:00",
+          "end_time": "11:00",
+          "followup": false,
+          "sequence": 1,
+          "travel_time": 0
+        }
+      ]
+    }
+  ],
   "meta": {
-    "total_cleaners": 0,
+    "total_cleaners": 1,
     "used_cleaners": 0,
-    "assigned_tasks": 0
+    "assigned_tasks": 0,
+    "total_tasks": 1
   }
 }
