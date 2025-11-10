@@ -619,7 +619,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
             role: cleanerInfo?.role || 'Standard',
             premium: cleanerInfo?.premium || false
           },
-          assignment_type: 'manual_drag',
           tasks: []
         };
         timelineData.cleaners_assignments.push(cleanerEntry);
