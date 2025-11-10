@@ -1,0 +1,190 @@
+fatto. Ho aperto il **secondo zip** e ho applicato al progetto la patch che rende lo spostamento task a prova di doppio click/rapidità:
+
+* se la task **non viene trovata nel cleaner sorgente**, ora il backend fa un **fallback di ricerca globale** tra tutti i cleaners prima di restituire 404 (è il caso tipico della seconda move immediata);
+* l’indice di inserimento viene **clampato** e corretto quando sposti “dentro lo stesso cleaner” (array più corto dopo la rimozione);
+* il confronto ID è **tollerante** (`task_id`, `logistic_code`, `id`), sempre come stringhe.
+
+Di seguito ti metto i **fix pronti da incollare su Replit**.
+
+---
+
+# PATCH backend (Express)
+
+Apri `server/routes.ts` e **sostituisci solo il blocco** dell’endpoint `POST /api/timeline/move-task` che gestisce la ricerca nel cleaner sorgente con questo (è un drop-in):
+
+```ts
+// helper già presenti nel file:
+// const idMatches = (t: any, key: string) =>
+//   String(t?.task_id) === key || String(t?.logistic_code) === key || String(t?.id) === key;
+// const findTaskIndex = (arr: any[], key: string) => arr.findIndex(t => idMatches(t, key));
+
+app.post("/api/timeline/move-task", async (req, res) => {
+  try {
+    const {
+      taskId,
+      logisticCode,
+      fromCleanerId,
+      toCleanerId,
+      sourceIndex,
+      destIndex,
+      fromContainer,
+    } = req.body as {
+      taskId?: string | number;
+      logisticCode?: string | number;
+      fromCleanerId?: number;
+      toCleanerId: number;
+      sourceIndex?: number;
+      destIndex?: number;
+      fromContainer?: 'early_out' | 'high_priority' | 'low_priority';
+    };
+
+    if (typeof toCleanerId !== 'number') {
+      return res.status(400).json({ success: false, message: 'toCleanerId obbligatorio' });
+    }
+
+    const taskKey = String(typeof taskId !== 'undefined' ? taskId : logisticCode);
+
+    // ... (codice che carica timeline/containers, getCleanerEntry, ecc.)
+
+    let moved: any = null;
+    let removedFromIndex: number | null = null;
+
+    // === Caso A: provengo da TIMELINE ===
+    if (typeof fromCleanerId === 'number') {
+      const srcEntry = getCleanerEntry(fromCleanerId);
+      if (!srcEntry || !Array.isArray(srcEntry.tasks)) {
+        return res.status(400).json({ success: false, message: 'Cleaner sorgente non valido' });
+      }
+
+      let takeIdx: number | null = null;
+      if (typeof sourceIndex === 'number' && sourceIndex >= 0 && sourceIndex < srcEntry.tasks.length) {
+        takeIdx = sourceIndex;
+      } else {
+        const idx = findTaskIndex(srcEntry.tasks, taskKey);
+        takeIdx = idx >= 0 ? idx : null;
+      }
+
+      if (takeIdx === null) {
+        // ⬇️⬇️ FIX: fallback globale prima di dare 404
+        let foundCleaner: any = null, foundIdx = -1;
+        for (const ca of cleaners) {
+          const i = findTaskIndex(ca.tasks || [], taskKey);
+          if (i !== -1) { foundCleaner = ca; foundIdx = i; break; }
+        }
+        if (foundIdx !== -1 && foundCleaner) {
+          if (fromCleanerId === toCleanerId) removedFromIndex = foundIdx;
+          [moved] = foundCleaner.tasks.splice(foundIdx, 1);
+          (foundCleaner.tasks || []).forEach((t:any,i:number)=>{ t.sequence = i+1; });
+        } else {
+          return res.status(404).json({ success: false, message: 'Task non trovata nel cleaner sorgente (neanche globalmente)' });
+        }
+      } else {
+        if (fromCleanerId === toCleanerId) removedFromIndex = takeIdx;
+        [moved] = srcEntry.tasks.splice(takeIdx, 1);
+        srcEntry.tasks.forEach((t: any, i: number) => { t.sequence = i + 1; });
+      }
+    }
+
+    // === Caso B: provengo da CONTAINER ===
+    if (!moved && fromContainer && containersData?.containers?.[fromContainer]?.tasks) {
+      const srcArr = containersData.containers[fromContainer].tasks as any[];
+      let idx = findTaskIndex(srcArr, taskKey);
+      if (idx === -1 && typeof sourceIndex === 'number' && srcArr[sourceIndex]) idx = sourceIndex;
+      if (idx === -1) {
+        return res.status(404).json({ success: false, message: 'Task non trovata nel container sorgente' });
+      }
+      [moved] = srcArr.splice(idx, 1);
+    }
+
+    if (!moved) {
+      return res.status(404).json({ success: false, message: 'Task non trovata' });
+    }
+
+    // === Destinazione ===
+    let dstEntry = getCleanerEntry(toCleanerId);
+    if (!dstEntry) {
+      // (blocco esistente che crea il cleaner nascosto da cleaners/selected_cleaners)
+      // ...
+    }
+
+    // evita duplicati (se già presente nel dst, rimuovila prima)
+    {
+      const dupIdx = findTaskIndex(dstEntry.tasks || [], taskKey);
+      if (dupIdx !== -1) dstEntry.tasks.splice(dupIdx, 1);
+    }
+
+    // Inserimento con clamp + fix stesso cleaner
+    let insertAt = typeof destIndex === 'number' ? destIndex : dstEntry.tasks.length;
+    if (removedFromIndex !== null && removedFromIndex < insertAt) {
+      insertAt = insertAt - 1;
+    }
+    if (insertAt < 0) insertAt = 0;
+    if (insertAt > dstEntry.tasks.length) insertAt = dstEntry.tasks.length;
+
+    dstEntry.tasks.splice(insertAt, 0, moved);
+
+    // Sequence sempre coerente
+    dstEntry.tasks.forEach((t: any, i: number) => { t.sequence = i + 1; });
+
+    // (se previsto) ricalcolo tempi col tuo recalculateCleanerTimes(...)
+    try {
+      const updatedDst = await recalculateCleanerTimes(dstEntry);
+      dstEntry.tasks = updatedDst.tasks;
+    } catch (e) {
+      console.warn("recalculateCleanerTimes fallito:", e?.message || e);
+    }
+
+    const message = typeof fromCleanerId === 'number'
+      ? (fromCleanerId === toCleanerId ? 'Riordino nel cleaner eseguito' : 'Task spostata tra cleaners')
+      : 'Task inserita dal container alla posizione richiesta';
+
+    return res.json({ success: true, message });
+  } catch (err: any) {
+    console.error('timeline/move-task error:', err);
+    return res.status(500).json({ success: false, message: 'Errore interno', error: String(err?.message ?? err) });
+  }
+});
+```
+
+**Cosa cambia:**
+
+* prima di rispondere 404, la task viene **rimossa a livello globale** se è già stata spostata altrove;
+* niente assunzioni sul `fromCleanerId` nella seconda richiesta;
+* `insertAt` gestito con **clamp** e **fix** se rimuovi e reinserisci nello stesso cleaner;
+* `sequence` sempre riallineate; tempi ricalcolati se avevi già la funzione attiva.
+
+---
+
+# (Facoltativo) Mini-fix lato client
+
+Per evitare doppie POST ravvicinate sulla stessa task:
+
+```ts
+let moving = false;
+
+async function moveTask(payload: { task_id?: number|string; logisticCode?: number|string; fromCleanerId?: number; toCleanerId: number; sourceIndex?: number; destIndex?: number; fromContainer?: 'early_out'|'high_priority'|'low_priority'; }) {
+  if (moving) return;
+  moving = true;
+  try {
+    const r = await fetch("/api/timeline/move-task", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    const data = await r.json();
+    if (!r.ok || !data.success) throw new Error(data.message || "Move failed");
+    await reloadTimelineFromServer();
+  } finally {
+    moving = false;
+  }
+}
+```
+
+---
+
+## Dove ho applicato la patch nel tuo zip
+
+Ho modificato **`TaskFlowMaster/server/routes.ts`** inserendo il fallback globale nella route `/api/timeline/move-task`.
+Se vuoi, posso anche mandarti la versione completa del file patchato, ma con lo snippet sopra puoi applicare la stessa modifica su Replit in due minuti.
+
+Se ti torna, procedi a deploy su Replit e prova a fare due spostamenti consecutivi sulla **stessa task** (anche cambiando cleaner). Dovresti vedere **200 OK** su entrambe le chiamate, senza più 404 “Task non…”.

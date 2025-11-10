@@ -1,29 +1,6 @@
 {
   "cleaners": [
     {
-      "id": 24,
-      "name": "HUSSAIN",
-      "lastname": "SYED SHUJIAHAT",
-      "role": "Standard",
-      "active": true,
-      "ranking": 0,
-      "counter_hours": 1,
-      "counter_days": 1,
-      "available": true,
-      "contract_type": "B",
-      "preferred_customers": [
-        2,
-        67,
-        72,
-        84,
-        94,
-        115
-      ],
-      "telegram_id": null,
-      "start_time": "10:00",
-      "can_do_straordinaria": false
-    },
-    {
       "id": 132,
       "name": "JOHOISER ERNESTO",
       "lastname": "LOPEZ GIRON",
@@ -284,12 +261,28 @@
       "telegram_id": null,
       "start_time": "10:00",
       "can_do_straordinaria": false
+    },
+    {
+      "id": 626,
+      "name": "DORA PATRICIA",
+      "lastname": "JIMENEZ",
+      "role": "Formatore",
+      "active": true,
+      "ranking": 0,
+      "counter_hours": 0,
+      "counter_days": 0,
+      "available": true,
+      "contract_type": "B",
+      "preferred_customers": [],
+      "telegram_id": null,
+      "start_time": "10:00",
+      "can_do_straordinaria": false
     }
   ],
   "total_selected": 9,
   "metadata": {
     "date": "2025-11-11",
-    "saved_at": "2025-11-10T11:17:31.396Z",
-    "loaded_at": "2025-11-10T11:27:55.269Z"
+    "saved_at": "2025-11-10T11:29:59.914Z",
+    "loaded_at": "2025-11-10T11:36:36.116Z"
   }
 }
