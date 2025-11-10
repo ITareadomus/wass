@@ -127,41 +127,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const workDate = date || format(new Date(), 'yyyy-MM-dd');
       const timelinePath = path.join(process.cwd(), 'client/public/data/output/timeline.json');
 
-      // Carica timeline esistente per preservare i cleaners
-      let timelineData: any;
-      try {
-        const existingData = await fs.readFile(timelinePath, 'utf8');
-        timelineData = JSON.parse(existingData);
-      } catch (err) {
-        // Se non esiste, crea struttura vuota
-        timelineData = {
-          metadata: { last_updated: new Date().toISOString(), date: workDate },
-          cleaners_assignments: [],
-          meta: { total_cleaners: 0, used_cleaners: 0, assigned_tasks: 0 }
-        };
-      }
-
-      // CRITICAL: Mantieni i cleaners ma svuota le loro task
-      if (timelineData.cleaners_assignments && Array.isArray(timelineData.cleaners_assignments)) {
-        timelineData.cleaners_assignments = timelineData.cleaners_assignments.map((cleanerEntry: any) => ({
-          cleaner: cleanerEntry.cleaner,
-          tasks: [] // Svuota solo le task
-        }));
-        console.log(`✅ Mantenuti ${timelineData.cleaners_assignments.length} cleaners, svuotate le loro task`);
-      } else {
-        timelineData.cleaners_assignments = [];
-      }
-
-      // Aggiorna metadata
-      timelineData.metadata = {
-        last_updated: new Date().toISOString(),
-        date: workDate
+      // CRITICAL: Svuota completamente timeline.json (sia cleaners che task)
+      const timelineData: any = {
+        metadata: { last_updated: new Date().toISOString(), date: workDate },
+        cleaners_assignments: [],
+        meta: { total_cleaners: 0, used_cleaners: 0, assigned_tasks: 0 }
       };
-      timelineData.meta = {
-        total_cleaners: timelineData.cleaners_assignments.length,
-        used_cleaners: 0,
-        assigned_tasks: 0
-      };
+      
+      console.log(`✅ Timeline.json completamente resettato per ${workDate}`);
 
       // Scrittura atomica
       const tmpPath = `${timelinePath}.tmp`;
@@ -190,38 +163,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // perché lo script Python potrebbe aver sovrascritto il file
       console.log(`🔄 Forzatura reset timeline.json dopo create_containers...`);
       
-      // Ricarica timeline per preservare i cleaners ma svuotare le task
-      let finalTimelineData: any;
-      try {
-        const reloadedData = await fs.readFile(timelinePath, 'utf8');
-        finalTimelineData = JSON.parse(reloadedData);
-        
-        // Mantieni cleaners ma svuota task
-        if (finalTimelineData.cleaners_assignments && Array.isArray(finalTimelineData.cleaners_assignments)) {
-          finalTimelineData.cleaners_assignments = finalTimelineData.cleaners_assignments.map((cleanerEntry: any) => ({
-            cleaner: cleanerEntry.cleaner,
-            tasks: []
-          }));
-        }
-        
-        finalTimelineData.metadata = {
-          last_updated: new Date().toISOString(),
-          date: workDate
-        };
-        finalTimelineData.meta = {
-          total_cleaners: finalTimelineData.cleaners_assignments.length,
-          used_cleaners: 0,
-          assigned_tasks: 0
-        };
-      } catch (err) {
-        // Se il file è corrotto, usa timelineData già definito sopra
-        finalTimelineData = timelineData;
-      }
+      const finalTimelineData: any = {
+        metadata: { last_updated: new Date().toISOString(), date: workDate },
+        cleaners_assignments: [],
+        meta: { total_cleaners: 0, used_cleaners: 0, assigned_tasks: 0 }
+      };
       
       const tmpPath2 = `${timelinePath}.tmp`;
       await fs.writeFile(tmpPath2, JSON.stringify(finalTimelineData, null, 2));
       await fs.rename(tmpPath2, timelinePath);
-      console.log(`✅ Timeline resettata nuovamente dopo create_containers`);
+      console.log(`✅ Timeline completamente resettata dopo create_containers`);
 
       // CRITICAL: Elimina il flag di ultimo salvataggio per evitare ricaricamenti automatici
       console.log(`🗑️ Reset flag ultimo salvataggio per data ${workDate}`);
@@ -2519,46 +2470,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const timelinePath = path.join(process.cwd(), 'client/public/data/output/timeline.json');
       const assignedDir = path.join(process.cwd(), 'client/public/data/assigned');
 
-      // CRITICAL: NON resettare timeline.json - preservalo sempre
-      // Anche se la data cambia, mantieni le assegnazioni esistenti
-      // create_containers.py aggiornerà i dati delle task esistenti
-      let timelineExists = false;
-      try {
-        await fs.access(timelinePath);
-        const fileContent = await fs.readFile(timelinePath, 'utf8');
-        
-        // Verifica che il contenuto sia JSON valido
-        if (!fileContent.trim().startsWith('{')) {
-          throw new Error('timeline.json non contiene JSON valido');
-        }
-        
-        const existingTimeline = JSON.parse(fileContent);
-        timelineExists = true;
-        
-        // Aggiorna SOLO la metadata.date se è cambiata
-        if (existingTimeline.metadata?.date !== date) {
-          console.log(`🔄 Timeline esiste per data ${existingTimeline.metadata?.date}, aggiorno metadata.date a ${date}`);
-          existingTimeline.metadata.date = date;
-          existingTimeline.metadata.last_updated = new Date().toISOString();
-          const tmpPath = `${timelinePath}.tmp`;
-          await fs.writeFile(tmpPath, JSON.stringify(existingTimeline, null, 2));
-          await fs.rename(tmpPath, timelinePath);
-        } else {
-          console.log(`✅ Timeline.json già presente per ${date}, mantieni assegnazioni esistenti`);
-        }
-      } catch (err) {
-        // File non esiste o è corrotto - crealo vuoto
-        console.log(`📝 Timeline.json non esiste o corrotto, creazione nuova per ${date}`);
-        const emptyTimeline = {
-          metadata: { last_updated: new Date().toISOString(), date },
-          cleaners_assignments: [],
-          meta: { total_cleaners: 0, used_cleaners: 0, assigned_tasks: 0 }
-        };
-        const tmpPath = `${timelinePath}.tmp`;
-        await fs.writeFile(tmpPath, JSON.stringify(emptyTimeline, null, 2));
-        await fs.rename(tmpPath, timelinePath);
-        timelineExists = false;
-      }
+      // CRITICAL: Svuota sempre timeline.json al cambio data
+      const emptyTimeline = {
+        metadata: { last_updated: new Date().toISOString(), date },
+        cleaners_assignments: [],
+        meta: { total_cleaners: 0, used_cleaners: 0, assigned_tasks: 0 }
+      };
+      const tmpPath = `${timelinePath}.tmp`;
+      await fs.writeFile(tmpPath, JSON.stringify(emptyTimeline, null, 2));
+      await fs.rename(tmpPath, timelinePath);
+      console.log(`✅ Timeline.json completamente resettato per ${date}`);
 
       // CRITICAL: Svuota selected_cleaners.json SOLO se la data è cambiata
       const selectedCleanersPath = path.join(
