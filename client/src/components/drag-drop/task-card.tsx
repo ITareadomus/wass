@@ -16,6 +16,7 @@ import {
   TooltipContent,
 } from "@/components/ui/tooltip";
 import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
 import { HelpCircle, ChevronLeft, ChevronRight, Save, Pencil } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
@@ -32,6 +33,10 @@ interface TaskCardProps {
   isDuplicate?: boolean;
   isDragDisabled?: boolean;
   isReadOnly?: boolean; // Modalità read-only per disabilitare editing
+  isMultiSelectMode?: boolean;
+  isSelected?: boolean;
+  selectionOrder?: number;
+  onSelect?: (taskId: string) => void;
 }
 
 interface AssignedTask {
@@ -51,6 +56,10 @@ export default function TaskCard({
   isDuplicate = false,
   isDragDisabled = false,
   isReadOnly = false, // Modalità read-only
+  isMultiSelectMode = false,
+  isSelected = false,
+  selectionOrder,
+  onSelect,
 }: TaskCardProps) {
   const [isModalOpen, setIsModalOpen] = useState(false);
 
