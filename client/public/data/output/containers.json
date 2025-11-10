@@ -1,6 +1,6 @@
 {
   "metadata": {
-    "last_updated": "2025-11-10T13:55:40.597454",
+    "last_updated": "2025-11-10T14:05:54.700139",
     "date": "2025-11-11"
   },
   "containers": {
@@ -500,36 +500,9 @@
             "premium"
           ],
           "priority": "high_priority"
-        },
-        {
-          "task_id": 218731,
-          "logistic_code": 1537,
-          "client_id": 3,
-          "premium": true,
-          "address": "Via dei Piatti, 4 20123 (MI)",
-          "lat": "45.460795",
-          "lng": "9.1850985",
-          "cleaning_time": 150,
-          "checkin_date": "2025-11-11",
-          "checkout_date": "2025-11-11",
-          "checkin_time": null,
-          "checkout_time": null,
-          "pax_in": 2,
-          "pax_out": 2,
-          "small_equipment": false,
-          "operation_id": 2,
-          "confirmed_operation": false,
-          "straordinaria": false,
-          "type_apt": "C",
-          "alias": "TBR",
-          "customer_name": "THE BEST RENT S.r.l.",
-          "reasons": [
-            "premium"
-          ],
-          "priority": "high_priority"
         }
       ],
-      "count": 7
+      "count": 6
     },
     "low_priority": {
       "tasks": [
@@ -790,9 +763,9 @@
     }
   },
   "summary": {
-    "total_tasks": 28,
+    "total_tasks": 27,
     "early_out": 12,
-    "high_priority": 7,
+    "high_priority": 6,
     "low_priority": 9
   }
 }
