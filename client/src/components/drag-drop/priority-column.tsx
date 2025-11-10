@@ -253,7 +253,8 @@ export default function PriorityColumn({
                   allTasks={tasks}
                   currentContainer={droppableId}
                   isDuplicate={isDuplicate} // Passa il flag isDuplicate
-                  isDragDisabled={isDragDisabled} // Passa la prop isDragDisabled
+                  isDragDisabled={isDragDisabled || isDateInPast} // Disabilita drag per date passate
+                  isReadOnly={isDateInPast} // Disabilita editing per date passate
                 />
               );
             })}
