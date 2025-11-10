@@ -188,10 +188,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       };
 
-      // Scrittura atomica
-      const tmpPath = `${timelinePath}.tmp`;
-      await fs.writeFile(tmpPath, JSON.stringify(emptyTimeline, null, 2));
-      await fs.rename(tmpPath, timelinePath);
+      // Salva timeline (dual-write: filesystem + Object Storage)
+      await saveTimeline(emptyTimeline, workDate);
       console.log(`Timeline resettata: timeline.json (struttura corretta)`);
 
       // FORZA la ricreazione di containers.json rieseguendo create_containers.py
@@ -214,9 +212,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // CRITICAL: Forza nuovamente il reset di timeline.json dopo create_containers
       // perché lo script Python potrebbe aver sovrascritto il file
       console.log(`🔄 Forzatura reset timeline.json dopo create_containers...`);
-      const tmpPath2 = `${timelinePath}.tmp`;
-      await fs.writeFile(tmpPath2, JSON.stringify(emptyTimeline, null, 2));
-      await fs.rename(tmpPath2, timelinePath);
+      await saveTimeline(emptyTimeline, workDate);
       console.log(`✅ Timeline resettata nuovamente dopo create_containers`);
 
       // CRITICAL: Elimina il flag di ultimo salvataggio per evitare ricaricamenti automatici
@@ -344,10 +340,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         0
       );
 
-      // Scrittura atomica
-      const tmpPath = `${timelinePath}.tmp`;
-      await fs.writeFile(tmpPath, JSON.stringify(timelineData, null, 2));
-      await fs.rename(tmpPath, timelinePath);
+      // Salva timeline (dual-write: filesystem + Object Storage)
+      await saveTimeline(timelineData, workDate);
 
       console.log(`✅ Task ${logisticCode} spostata da cleaner ${sourceCleanerId} a cleaner ${destCleanerId}`);
       res.json({ success: true, message: "Task spostata con successo tra cleaners" });
@@ -501,10 +495,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         0
       );
 
-      // Scrittura atomica
-      const tmpPath = `${timelinePath}.tmp`;
-      await fs.writeFile(tmpPath, JSON.stringify(timelineData, null, 2));
-      await fs.rename(tmpPath, timelinePath);
+      // Salva timeline (dual-write: filesystem + Object Storage)
+      await saveTimeline(timelineData, workDate);
 
       console.log(`✅ Task scambiate tra cleaner ${sourceCleanerId} e cleaner ${destCleanerId}`);
       res.json({
