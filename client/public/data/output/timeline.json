@@ -1,7 +1,7 @@
 {
   "metadata": {
-    "last_updated": "2025-11-10T14:05:54.695930",
-    "date": "2025-11-11"
+    "last_updated": "2025-11-10T15:26:46.680237",
+    "date": "2025-11-10"
   },
   "cleaners_assignments": [
     {
@@ -12,25 +12,35 @@
         "role": "Formatore",
         "premium": false
       },
+      "tasks": []
+    },
+    {
+      "cleaner": {
+        "id": 495,
+        "name": "EL HADJI",
+        "lastname": "BA",
+        "role": "Premium",
+        "premium": true
+      },
       "tasks": [
         {
-          "task_id": 218624,
-          "logistic_code": 504,
+          "task_id": 218559,
+          "logistic_code": 1623,
           "client_id": 61,
           "premium": false,
-          "address": "VIA TOFANE, 5",
-          "lat": "45.5034283",
-          "lng": "9.221111",
+          "address": "via Principe Eugenio 15",
+          "lat": "45.48931",
+          "lng": "9.1635183",
           "cleaning_time": 60,
-          "checkin_date": "2025-11-13",
-          "checkout_date": "2025-11-11",
-          "checkin_time": "15:30",
+          "checkin_date": "2025-11-10",
+          "checkout_date": "2025-11-10",
+          "checkin_time": "15:00",
           "checkout_time": null,
           "pax_in": 1,
           "pax_out": 1,
           "small_equipment": true,
           "operation_id": 2,
-          "confirmed_operation": false,
+          "confirmed_operation": true,
           "straordinaria": false,
           "type_apt": "A",
           "alias": "NTM",
@@ -45,38 +55,27 @@
           "followup": false,
           "sequence": 1,
           "travel_time": 0
-        }
-      ]
-    },
-    {
-      "cleaner": {
-        "id": 132,
-        "name": "JOHOISER ERNESTO",
-        "lastname": "LOPEZ GIRON",
-        "role": "Premium",
-        "premium": true
-      },
-      "tasks": [
+        },
         {
-          "task_id": 218602,
-          "logistic_code": 1153,
+          "task_id": 218560,
+          "logistic_code": 1625,
           "client_id": 61,
           "premium": false,
-          "address": "VIA CELESTINO IV, 9",
-          "lat": "45.4596054",
-          "lng": "9.1821442",
-          "cleaning_time": 120,
-          "checkin_date": "2025-11-13",
-          "checkout_date": "2025-11-11",
-          "checkin_time": "14:00",
+          "address": "via Goffredo Mameli 9",
+          "lat": "45.466406",
+          "lng": "9.2134926",
+          "cleaning_time": 60,
+          "checkin_date": "2025-11-22",
+          "checkout_date": "2025-11-10",
+          "checkin_time": null,
           "checkout_time": null,
           "pax_in": 2,
           "pax_out": 1,
-          "small_equipment": false,
+          "small_equipment": true,
           "operation_id": 2,
-          "confirmed_operation": false,
+          "confirmed_operation": true,
           "straordinaria": false,
-          "type_apt": "C",
+          "type_apt": "A",
           "alias": "NTM",
           "customer_name": "NOTA-MI",
           "reasons": [
@@ -84,62 +83,19 @@
             "manual_assignment"
           ],
           "priority": "early_out",
-          "start_time": "10:00",
-          "end_time": "12:00",
-          "followup": false,
-          "sequence": 1,
-          "travel_time": 0
-        },
-        {
-          "task_id": 218731,
-          "logistic_code": 1537,
-          "client_id": 3,
-          "premium": true,
-          "address": "Via dei Piatti, 4 20123 (MI)",
-          "lat": "45.460795",
-          "lng": "9.1850985",
-          "cleaning_time": 150,
-          "checkin_date": "2025-11-11",
-          "checkout_date": "2025-11-11",
-          "checkin_time": null,
-          "checkout_time": null,
-          "pax_in": 2,
-          "pax_out": 2,
-          "small_equipment": false,
-          "operation_id": 2,
-          "confirmed_operation": false,
-          "straordinaria": false,
-          "type_apt": "C",
-          "alias": "TBR",
-          "customer_name": "THE BEST RENT S.r.l.",
-          "reasons": [
-            "manually_moved_to_timeline",
-            "manual_assignment"
-          ],
-          "priority": "high_priority",
-          "start_time": "12:07",
-          "end_time": "14:37",
+          "start_time": "11:40",
+          "end_time": "12:40",
           "followup": true,
           "sequence": 2,
-          "travel_time": 7
+          "travel_time": 40
         }
       ]
-    },
-    {
-      "cleaner": {
-        "id": 495,
-        "name": "EL HADJI",
-        "lastname": "BA",
-        "role": "Premium",
-        "premium": true
-      },
-      "tasks": []
     }
   ],
   "meta": {
-    "total_cleaners": 3,
+    "total_cleaners": 2,
     "used_cleaners": 0,
     "assigned_tasks": 0,
-    "total_tasks": 3
+    "total_tasks": 2
   }
 }
