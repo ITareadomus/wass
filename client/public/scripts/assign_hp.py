@@ -489,10 +489,41 @@ def seed_cleaners_from_eo(cleaners: List[Cleaner], ref_date: str):
         if not tasks:
             continue
 
-        # Filtra solo task EO (con priority="early_out" o reasons che include "automatic_assignment_eo")
+        # Filtra task EO e HP
         eo_tasks = [t for t in tasks if
                     t.get("priority") == "early_out" or
                     ("automatic_assignment_eo" in t.get("reasons", []))]
+        
+        hp_tasks = [t for t in tasks if
+                    t.get("priority") == "high_priority" or
+                    ("automatic_assignment_hp" in t.get("reasons", []))]
+
+        # Carica task HP già assegnate nella route del cleaner
+        for cl in cleaners:
+            if cl.id == cid:
+                for hp_task in hp_tasks:
+                    checkout_dt = parse_dt(hp_task.get("checkout_date"), hp_task.get("checkout_time"))
+                    checkin_dt = parse_dt(hp_task.get("checkin_date"), hp_task.get("checkin_time"))
+                    is_hp_soft = (checkin_dt is None and checkout_dt is None)
+                    
+                    task_obj = Task(
+                        task_id=str(hp_task.get("task_id")),
+                        logistic_code=str(hp_task.get("logistic_code")),
+                        lat=float(hp_task.get("lat")),
+                        lng=float(hp_task.get("lng")),
+                        cleaning_time=int(hp_task.get("cleaning_time") or 60),
+                        checkout_dt=checkout_dt,
+                        checkin_dt=checkin_dt,
+                        is_premium=bool(hp_task.get("premium", False)),
+                        apt_type=hp_task.get("type_apt"),
+                        address=hp_task.get("address"),
+                        alias=hp_task.get("alias"),
+                        small_equipment=bool(hp_task.get("small_equipment", False)),
+                        straordinaria=bool(hp_task.get("straordinaria", False)),
+                        is_hp_soft=is_hp_soft,
+                    )
+                    cl.route.append(task_obj)
+                break
 
         if not eo_tasks:
             continue
