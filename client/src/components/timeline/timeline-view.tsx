@@ -70,7 +70,6 @@ export default function TimelineView({
   const [cleanerToReplace, setCleanerToReplace] = useState<number | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const timelineRef = useRef<HTMLDivElement>(null);
-  const [lastSavedFilename, setLastSavedFilename] = useState<string | null>(null);
   const { toast } = useToast();
   const [, setLocation] = useLocation();
 
@@ -625,7 +624,7 @@ export default function TimelineView({
       const resetResponse = await fetch('/api/reset-timeline-assignments', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ date: dateStr })
+        body: JSON.JSONstringify({ date: dateStr })
       });
 
       if (!resetResponse.ok) {
@@ -633,31 +632,20 @@ export default function TimelineView({
       }
 
       // 2. CRITICAL: Resetta il lastSavedFilename per indicare che non ci sono salvataggi
-      // 3. Ricarica i dati dal backend senza reload completo
-      console.log('🔄 Reset completato, ricarico dati...');
-      
-      // Attendi che il backend abbia completato tutte le operazioni
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      // Ricarica cleaners e timeline
-      await Promise.all([
-        loadCleaners(),
-        loadTimelineCleaners()
-      ]);
-      
-      // Notifica il parent per ricaricare le task dai containers
+      setLastSavedFilename(null);
+      localStorage.removeItem('last_saved_assignment');
+
+      // 3. Ricarica i task senza ricaricare la pagina (mantiene la data)
       if ((window as any).reloadAllTasks) {
-        await (window as any).reloadAllTasks(true);
+        await (window as any).reloadAllTasks();
       }
-      
-      // Marca come modifiche non salvate e resetta il filename
       if ((window as any).setHasUnsavedChanges) {
-        (window as any).setHasUnsavedChanges(false);
+        (window as any).setHasUnsavedChanges(true);
       }
-      
+
       toast({
         title: "Reset completato",
-        description: "Timeline svuotata, task riportate nei container",
+        description: "Timeline svuotata con successo",
         variant: "success",
       });
     } catch (error) {
@@ -719,6 +707,8 @@ export default function TimelineView({
       });
     }
   };
+
+  const [lastSavedFilename, setLastSavedFilename] = useState<string | null>(null);
 
   // Carica anche i cleaner dalla timeline.json per mostrare quelli nascosti
   const [timelineCleaners, setTimelineCleaners] = useState<any[]>([]);
@@ -795,25 +785,8 @@ export default function TimelineView({
   // Mostra cleaners da selected_cleaners.json + cleaners che hanno task in timeline.json
   // Questo permette di vedere cleaners rimossi che hanno ancora task assegnate
   const allCleanersToShow = React.useMemo(() => {
-    // Se selected_cleaners.json è vuoto, non mostrare nessun cleaner
-    if (cleaners.length === 0) {
-      return [];
-    }
-
     const selectedCleanerIds = new Set(cleaners.map(c => c.id));
-    
-    // Crea un Set per evitare duplicati dalla timeline
-    const seenIds = new Set<number>();
-    const uniqueTimelineCleaners = timelineCleaners.filter(tc => {
-      const cleanerId = tc.cleaner?.id;
-      if (!cleanerId || seenIds.has(cleanerId)) {
-        return false;
-      }
-      seenIds.add(cleanerId);
-      return true;
-    });
-    
-    const timelineCleanersWithTasks = uniqueTimelineCleaners
+    const timelineCleanersWithTasks = timelineCleaners
       .filter(tc => tc.tasks && tc.tasks.length > 0) // Solo cleaners con task
       .filter(tc => !selectedCleanerIds.has(tc.cleaner?.id)) // Non già in selected_cleaners
       .map(tc => ({ ...tc.cleaner, isRemoved: true })); // Marca come rimosso
@@ -1181,8 +1154,8 @@ export default function TimelineView({
                     disabled={!hasUnsavedChanges}
                     variant="outline"
                     className={`flex-1 h-full ${
-                      hasUnsavedChanges
-                        ? 'bg-green-600 hover:bg-green-700 text-white border-green-700 animate-pulse'
+                      hasUnsavedChanges 
+                        ? 'bg-green-600 hover:bg-green-700 text-white border-green-700 animate-pulse' 
                         : 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200 border-green-300 dark:border-green-700 cursor-default'
                     }`}
                     data-testid="button-confirm-assignments"

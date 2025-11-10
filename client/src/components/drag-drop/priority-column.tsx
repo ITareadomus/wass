@@ -170,9 +170,9 @@ export default function PriorityColumn({
       console.log(`Assegnazione ${priority} completata:`, result);
 
       toast({
+        variant: "success",
         title: "Successo",
         description: successMessage,
-        variant: "success",
       });
 
       // Ricarica i task per riflettere le nuove assegnazioni
