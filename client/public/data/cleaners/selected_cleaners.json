@@ -1,62 +1,8 @@
 {
-  "cleaners": [
-    {
-      "id": 626,
-      "name": "DORA PATRICIA",
-      "lastname": "JIMENEZ",
-      "role": "Formatore",
-      "active": true,
-      "ranking": 0,
-      "counter_hours": 0,
-      "counter_days": 0,
-      "available": true,
-      "contract_type": "B",
-      "preferred_customers": [],
-      "telegram_id": null,
-      "start_time": "10:00",
-      "can_do_straordinaria": false
-    },
-    {
-      "id": 495,
-      "name": "EL HADJI",
-      "lastname": "BA",
-      "role": "Premium",
-      "active": true,
-      "ranking": 0,
-      "counter_hours": 1.5,
-      "counter_days": 4,
-      "available": true,
-      "contract_type": "B",
-      "preferred_customers": [
-        2,
-        3,
-        9,
-        61,
-        64,
-        75,
-        84,
-        85,
-        87,
-        91,
-        94,
-        101,
-        113,
-        115,
-        118,
-        120,
-        121,
-        123
-      ],
-      "telegram_id": 8035270407,
-      "start_time": "10:00",
-      "can_do_straordinaria": true
-    }
-  ],
-  "total_selected": 2,
+  "cleaners": [],
+  "total_selected": 0,
   "metadata": {
-    "date": "2025-11-10",
-    "reset_at": "2025-11-10T14:53:53.274Z",
-    "saved_at": "2025-11-10T15:01:22.582Z",
-    "loaded_at": "2025-11-10T15:26:44.168Z"
+    "date": "2025-11-11",
+    "reset_at": "2025-11-10T15:27:45.351Z"
   }
 }
