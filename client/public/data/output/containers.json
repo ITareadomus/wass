@@ -1,6 +1,6 @@
 {
   "metadata": {
-    "last_updated": "2025-11-10T13:50:53.150583",
+    "last_updated": "2025-11-10T13:53:40.635581",
     "date": "2025-11-11"
   },
   "containers": {
@@ -277,33 +277,6 @@
           "priority": "early_out"
         },
         {
-          "task_id": 218602,
-          "logistic_code": 1153,
-          "client_id": 61,
-          "premium": false,
-          "address": "VIA CELESTINO IV, 9",
-          "lat": "45.4596054",
-          "lng": "9.1821442",
-          "cleaning_time": 120,
-          "checkin_date": "2025-11-13",
-          "checkout_date": "2025-11-11",
-          "checkin_time": "14:00",
-          "checkout_time": null,
-          "pax_in": 2,
-          "pax_out": 1,
-          "small_equipment": false,
-          "operation_id": 2,
-          "confirmed_operation": false,
-          "straordinaria": false,
-          "type_apt": "C",
-          "alias": "NTM",
-          "customer_name": "NOTA-MI",
-          "reasons": [
-            "client_forced_eo"
-          ],
-          "priority": "early_out"
-        },
-        {
           "task_id": 218603,
           "logistic_code": 1240,
           "client_id": 61,
@@ -356,36 +329,9 @@
             "client_forced_eo"
           ],
           "priority": "early_out"
-        },
-        {
-          "task_id": 218624,
-          "logistic_code": 504,
-          "client_id": 61,
-          "premium": false,
-          "address": "VIA TOFANE, 5",
-          "lat": "45.5034283",
-          "lng": "9.221111",
-          "cleaning_time": 60,
-          "checkin_date": "2025-11-13",
-          "checkout_date": "2025-11-11",
-          "checkin_time": "15:30",
-          "checkout_time": null,
-          "pax_in": 1,
-          "pax_out": 1,
-          "small_equipment": true,
-          "operation_id": 2,
-          "confirmed_operation": false,
-          "straordinaria": false,
-          "type_apt": "A",
-          "alias": "NTM",
-          "customer_name": "NOTA-MI",
-          "reasons": [
-            "client_forced_eo"
-          ],
-          "priority": "early_out"
         }
       ],
-      "count": 14
+      "count": 12
     },
     "high_priority": {
       "tasks": [
@@ -844,8 +790,8 @@
     }
   },
   "summary": {
-    "total_tasks": 30,
-    "early_out": 14,
+    "total_tasks": 28,
+    "early_out": 12,
     "high_priority": 7,
     "low_priority": 9
   }
