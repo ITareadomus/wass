@@ -769,7 +769,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             const tmpContainersPath = `${containersPath}.tmp`;
             await fs.writeFile(tmpContainersPath, JSON.stringify(containersData, null, 2));
             await fs.rename(tmpContainersPath, containersPath);
-            console.log(`✅ Containers.json aggiornato e sincronizzato con timeline`);
+            console.log(`✅ Containers.json aggiornato e sincronizzato con timeline (NO create_containers.py)`);
           }
         } catch (containerError) {
           console.warn('Errore nella rimozione da containers.json:', containerError);
