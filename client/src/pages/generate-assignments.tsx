@@ -600,30 +600,45 @@ export default function GenerateAssignments() {
 
       console.log("✅ Task assegnate nella timeline (task_id):", Array.from(timelineAssignmentsMap.keys()));
 
-      // Filtra le task già presenti nella timeline dai container usando l'id univoco
+      // CRITICAL: Filtra le task già presenti nella timeline dai container usando l'id univoco
+      // Crea un Set di tutti i task_id presenti nella timeline (include EO, HP, LP)
+      const assignedTaskIds = new Set<string>();
+      if (timelineAssignmentsData.cleaners_assignments) {
+        for (const cleanerEntry of timelineAssignmentsData.cleaners_assignments) {
+          for (const task of cleanerEntry.tasks || []) {
+            assignedTaskIds.add(String(task.task_id));
+          }
+        }
+      }
+
+      console.log(`📋 Task assegnate nella timeline (by task_id): ${assignedTaskIds.size}`);
+      if (assignedTaskIds.size > 0) {
+        console.log(`   Primi 5 task_id assegnati:`, Array.from(assignedTaskIds).slice(0, 5));
+      }
+
       const filteredEarlyOut = initialEarlyOut.filter(task => {
         const tid = String(task.id);
-        const isAssigned = timelineAssignmentsMap.has(tid);
+        const isAssigned = assignedTaskIds.has(tid);
         if (isAssigned) {
-          console.log(`Task ${task.name} (ID: ${tid}) filtrata da Early Out (è nella timeline)`);
+          console.log(`   ❌ Task ${task.name} (ID: ${tid}) filtrata da Early Out (è nella timeline)`);
         }
         return !isAssigned;
       });
 
       const filteredHigh = initialHigh.filter(task => {
         const tid = String(task.id);
-        const isAssigned = timelineAssignmentsMap.has(tid);
+        const isAssigned = assignedTaskIds.has(tid);
         if (isAssigned) {
-          console.log(`Task ${task.name} (ID: ${tid}) filtrata da High Priority (è nella timeline)`);
+          console.log(`   ❌ Task ${task.name} (ID: ${tid}) filtrata da High Priority (è nella timeline)`);
         }
         return !isAssigned;
       });
 
       const filteredLow = initialLow.filter(task => {
         const tid = String(task.id);
-        const isAssigned = timelineAssignmentsMap.has(tid);
+        const isAssigned = assignedTaskIds.has(tid);
         if (isAssigned) {
-          console.log(`Task ${task.name} (ID: ${tid}) filtrata da Low Priority (è nella timeline)`);
+          console.log(`   ❌ Task ${task.name} (ID: ${tid}) filtrata da Low Priority (è nella timeline)`);
         }
         return !isAssigned;
       });
