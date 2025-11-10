@@ -1226,11 +1226,13 @@ export default function GenerateAssignments() {
             body: JSON.stringify(payload),
           });
 
+          console.log('✅ Response ricevuta, status:', response.status, 'ok:', response.ok);
+          
           const data = await response.json();
-          console.log('Risposta server:', data);
+          console.log('✅ JSON parseato con successo:', data);
 
           if (!response.ok || !data?.success) {
-            console.error('Errore timeline/move-task:', data);
+            console.error('❌ Errore timeline/move-task - response.ok:', response.ok, 'data.success:', data?.success);
             toast({
               title: "Errore",
               description: data.message || "Impossibile spostare la task",
@@ -1239,6 +1241,7 @@ export default function GenerateAssignments() {
             // Ricarica per sincronizzare solo in caso di errore
             await loadTasks(true);
           } else {
+            console.log('✅ Movimento completato - response.ok:', response.ok, 'data.success:', data.success);
             console.log('✅ Movimento salvato automaticamente in timeline.json');
 
             // CRITICAL: Marca modifiche dopo drag and drop riuscito
