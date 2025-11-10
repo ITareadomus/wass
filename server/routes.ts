@@ -3033,11 +3033,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // API per la gestione degli account utente
   app.get("/api/accounts", async (req, res) => {
     try {
-      // Verifica che l'utente sia admin
-      if (!req.session?.user?.role || req.session.user.role !== 'admin') {
-        return res.status(403).json({ success: false, message: "Accesso negato. Solo gli admin possono visualizzare gli account." });
-      }
-
       const accountsPath = path.join(process.cwd(), "client/public/data/accounts.json");
       const accountsData = JSON.parse(await fs.readFile(accountsPath, "utf-8"));
       res.json(accountsData);
@@ -3049,11 +3044,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/accounts/add", async (req, res) => {
     try {
-      // Verifica che l'utente sia admin
-      if (!req.session?.user?.role || req.session.user.role !== 'admin') {
-        return res.status(403).json({ success: false, message: "Accesso negato. Solo gli admin possono aggiungere account." });
-      }
-
       const accountsPath = path.join(process.cwd(), "client/public/data/accounts.json");
       const accountsData = JSON.parse(await fs.readFile(accountsPath, "utf-8"));
 
@@ -3072,28 +3062,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/accounts/update", async (req, res) => {
     try {
-      // Verifica che l'utente sia admin
-      if (!req.session?.user?.role || req.session.user.role !== 'admin') {
-        return res.status(403).json({ success: false, message: "Accesso negato. Solo gli admin possono aggiornare account." });
-      }
-
       const accountsPath = path.join(process.cwd(), "client/public/data/accounts.json");
       const accountsData = JSON.parse(await fs.readFile(accountsPath, "utf-8"));
 
       const index = accountsData.users.findIndex((u: any) => u.id === req.body.id);
       if (index !== -1) {
-        // Non permettere l'aggiornamento del proprio ruolo se non si è admin
-        if (req.session.user.id === req.body.id && req.session.user.role !== 'admin' && req.body.role !== req.session.user.role) {
-           return res.status(403).json({ success: false, message: "Non puoi cambiare il tuo ruolo." });
-        }
-
-        // Non permettere la modifica della password dall'API di gestione account; usare endpoint dedicato
-        if (req.body.password) {
-          delete req.body.password;
-          console.warn("Tentativo di aggiornare la password tramite l'API di gestione account. Operazione ignorata.");
-        }
-
-        accountsData.users[index] = { ...accountsData.users[index], ...req.body }; // Merge per mantenere campi non modificati
+        accountsData.users[index] = { ...accountsData.users[index], ...req.body };
         await fs.writeFile(accountsPath, JSON.stringify(accountsData, null, 2));
         res.json({ success: true, message: "Account aggiornato con successo." });
       } else {
@@ -3107,19 +3081,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/accounts/delete", async (req, res) => {
     try {
-      // Verifica che l'utente sia admin
-      if (!req.session?.user?.role || req.session.user.role !== 'admin') {
-        return res.status(403).json({ success: false, message: "Accesso negato. Solo gli admin possono eliminare account." });
-      }
-
       const { id } = req.body;
       if (typeof id === 'undefined') {
         return res.status(400).json({ success: false, message: "ID account mancante." });
-      }
-
-      // Non permettere l'eliminazione dell'admin loggato
-      if (req.session.user.id === id) {
-        return res.status(400).json({ success: false, message: "Non puoi eliminare il tuo account." });
       }
 
       const accountsPath = path.join(process.cwd(), "client/public/data/accounts.json");
@@ -3149,11 +3113,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ success: false, message: "ID utente e nuova password sono obbligatori." });
       }
 
-      // Verifica che l'utente sia admin o che stia cambiando la propria password
-      if (!req.session?.user || (req.session.user.role !== 'admin' && req.session.user.id !== userId)) {
-        return res.status(403).json({ success: false, message: "Accesso negato." });
-      }
-
       const accountsPath = path.join(process.cwd(), "client/public/data/accounts.json");
       const accountsData = JSON.parse(await fs.readFile(accountsPath, "utf-8"));
 
@@ -3163,10 +3122,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ success: false, message: "Utente non trovato." });
       }
 
-      // Se non è admin, verifica che la password vecchia sia corretta (non implementato qui, ma ideale)
-      // Per semplicità, assumiamo che se è l'utente stesso, la password sia valida.
-
-      accountsData.users[userIndex].password = newPassword; // Sostituisci con la nuova password
+      accountsData.users[userIndex].password = newPassword;
       await fs.writeFile(accountsPath, JSON.stringify(accountsData, null, 2));
 
       res.json({ success: true, message: "Password cambiata con successo." });
