@@ -1261,6 +1261,66 @@ export default function GenerateAssignments() {
       const fromContainer = parseContainerKey(source.droppableId);
       const toContainer = parseContainerKey(destination.droppableId);
 
+      // 🔸 BATCH MOVE: Se multi-select è attivo, ci sono task selezionate, E la task trascinata è tra quelle selezionate
+      const isDraggedTaskSelected = selectedTasks.some(st => st.taskId === taskId);
+      
+      if (isMultiSelectMode && selectedTasks.length > 0 && isDraggedTaskSelected && fromContainer && toCleanerId !== null && !toContainer) {
+        // Filtra solo le task selezionate che sono nello stesso container della task trascinata
+        const tasksInSameContainer = selectedTasks.filter(st => {
+          const task = allTasksWithAssignments.find(t => String(t.id) === st.taskId);
+          return task && task.priority === allTasksWithAssignments.find(t => String(t.id) === taskId)?.priority;
+        });
+        
+        console.log(`🔄 BATCH MOVE: Spostamento di ${tasksInSameContainer.length} task selezionate da ${fromContainer} a cleaner ${toCleanerId}`);
+        
+        try {
+          // Carica i dati del cleaner
+          const cleanersResponse = await fetch('/data/cleaners/selected_cleaners.json');
+          const cleanersData = await cleanersResponse.json();
+          const cleaner = cleanersData.cleaners.find((c: any) => c.id === toCleanerId);
+          const cleanerName = cleaner ? `${cleaner.name} ${cleaner.lastname}` : `ID ${toCleanerId}`;
+
+          // Ordina le task selezionate (dello stesso container) per ordine di selezione
+          const sortedTasks = [...tasksInSameContainer].sort((a, b) => a.order - b.order);
+          
+          // Sposta ciascuna task in sequenza alla destinazione
+          let currentIndex = destination.index;
+          for (const selectedTask of sortedTasks) {
+            const task = allTasksWithAssignments.find(t => String(t.id) === selectedTask.taskId);
+            if (task) {
+              await saveTimelineAssignment(selectedTask.taskId, toCleanerId, task.name, currentIndex);
+              currentIndex++; // Incrementa l'indice per la prossima task
+            }
+          }
+
+          // Pulisci selezione e ricarica
+          clearSelection();
+          await refreshAssignments("manual");
+
+          // Marca modifiche
+          setHasUnsavedChanges(true);
+          if (handleTaskMoved) {
+            handleTaskMoved();
+          }
+
+          toast({
+            title: "Task assegnate",
+            description: `${tasksInSameContainer.length} task assegnate a ${cleanerName}`,
+            variant: "success",
+          });
+        } catch (err) {
+          console.error("Errore nel batch move:", err);
+          toast({
+            title: "Errore",
+            description: "Impossibile assegnare le task selezionate.",
+            variant: "destructive",
+          });
+        } finally {
+          setIsDragging(false);
+        }
+        return;
+      }
+
       if (!fromCleanerId && fromContainer && toCleanerId !== null && !toContainer) {
         console.log(`🔄 Spostamento da container ${fromContainer} a cleaner ${toCleanerId}`);
 
