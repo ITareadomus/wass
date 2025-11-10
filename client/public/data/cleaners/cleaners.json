@@ -1,6 +1,6 @@
 {
     "metadata": {
-        "last_updated": "2025-11-10T15:06:33.720840",
+        "last_updated": "2025-11-10T14:01:14.630357",
         "db_config": {
             "host": "139.59.132.41",
             "user": "admin",
@@ -11,7 +11,7 @@
     },
     "dates": {
         "2025-11-11": {
-            "timestamp": "2025-11-10T15:06:33.720850",
+            "timestamp": "2025-11-10T14:01:14.630371",
             "cleaners": [
                 {
                     "id": 24,
@@ -187,7 +187,7 @@
                     "role": "Premium",
                     "active": true,
                     "ranking": 0,
-                    "counter_hours": 2.5,
+                    "counter_hours": 1.5,
                     "counter_days": 0,
                     "available": true,
                     "contract_type": "B",
@@ -221,7 +221,7 @@
                     "role": "Standard",
                     "active": true,
                     "ranking": 0,
-                    "counter_hours": 4.0,
+                    "counter_hours": 1.5,
                     "counter_days": 0,
                     "available": true,
                     "contract_type": "B",
@@ -259,7 +259,7 @@
                     "role": "Premium",
                     "active": true,
                     "ranking": 0,
-                    "counter_hours": 4.5,
+                    "counter_hours": 1.5,
                     "counter_days": 4,
                     "available": true,
                     "contract_type": "B",
@@ -438,7 +438,7 @@
                     "role": "Premium",
                     "active": true,
                     "ranking": 0,
-                    "counter_hours": 3.5,
+                    "counter_hours": 2.5,
                     "counter_days": 1,
                     "available": true,
                     "contract_type": "B",
@@ -603,7 +603,7 @@
                     "role": "Standard",
                     "active": true,
                     "ranking": 0,
-                    "counter_hours": 3.5,
+                    "counter_hours": 0.0,
                     "counter_days": 7,
                     "available": true,
                     "contract_type": "a chiamata",
@@ -653,7 +653,7 @@
                     "role": "Standard",
                     "active": true,
                     "ranking": 0,
-                    "counter_hours": 4.0,
+                    "counter_hours": 1.5,
                     "counter_days": 0,
                     "available": true,
                     "contract_type": "a chiamata",
@@ -893,7 +893,7 @@
                     "role": "Standard",
                     "active": true,
                     "ranking": 0,
-                    "counter_hours": 2.5,
+                    "counter_hours": 1.0,
                     "counter_days": 1,
                     "available": true,
                     "contract_type": "a chiamata",
