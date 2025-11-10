@@ -1,6 +1,8 @@
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
+import { fileURLToPath } from "url";
+import path from "path";
 
 const app = express();
 app.use(express.json());
@@ -63,6 +65,14 @@ app.use((req, res, next) => {
   if (app.get("env") === "development") {
     await setupVite(app, server);
   } else {
+    // In production, serve static reference data files from source
+    // This ensures cleaners.json, aliases, etc. are accessible after deployment
+    const __filename = fileURLToPath(import.meta.url);
+    const __dirname = path.dirname(__filename);
+    const staticDataPath = path.resolve(__dirname, "..", "client", "public", "data");
+    app.use("/data", express.static(staticDataPath));
+    log("serving static data from /data");
+    
     serveStatic(app);
   }
 

@@ -1,0 +1,68 @@
+🔹 1. Modifica da fare nei file Python (tutti quelli che scrivono o leggono JSON)
+
+File coinvolti (in base al tuo progetto):
+assign_eo.py, assign_mg.py, extract_cleaners_optimized.py, extract_tasks_for_convocazioni.py, recalculate_times.py, ecc.
+
+In cima a ciascuno, subito dopo gli import, incolla questo blocco (sostituendo eventuali vecchie righe tipo BASE = Path(__file__).parent.parent / "data"):
+
+import os
+from pathlib import Path
+
+# Directory di lavoro dinamica (funziona anche su Replit Deployments)
+DATA_DIR = Path(os.environ.get("DATA_DIR", "/tmp/taskflow-data"))
+OUTPUT_DIR = DATA_DIR / "output"
+OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+
+# Esempi di utilizzo:
+# timeline_path = OUTPUT_DIR / "timeline.json"
+# containers_path = OUTPUT_DIR / "containers.json"
+# timeline_path.write_text(json.dumps(timeline, ensure_ascii=False, indent=2), encoding="utf-8")
+
+✅ Cosa fa
+
+Usa /tmp/taskflow-data/output come cartella runtime scrivibile anche su Replit Deployments.
+
+Evita di toccare client/public/data/..., che lì è read-only.
+
+Puoi passare una directory personalizzata via variabile d’ambiente DATA_DIR, ma /tmp funziona sempre.
+
+🔹 2. Modifica nel server (Node / TypeScript) per servire i JSON
+
+Nel file server/routes.ts o dove servi i dati JSON, incolla questo schema:
+
+import * as fs from "fs/promises";
+import path from "path";
+import express from "express";
+
+const app = express();
+
+// Leggi il path runtime
+const DATA_DIR = process.env.DATA_DIR || "/tmp/taskflow-data";
+
+// Endpoint per containers.json
+app.get("/api/containers", async (_req, res, next) => {
+  try {
+    const containersPath = path.join(DATA_DIR, "output", "containers.json");
+    const raw = await fs.readFile(containersPath, "utf-8");
+    res.json(JSON.parse(raw));
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Endpoint per timeline.json
+app.get("/api/timeline", async (_req, res, next) => {
+  try {
+    const timelinePath = path.join(DATA_DIR, "output", "timeline.json");
+    const raw = await fs.readFile(timelinePath, "utf-8");
+    res.json(JSON.parse(raw));
+  } catch (err) {
+    next(err);
+  }
+});
+
+🔹 3. Imposta la variabile su Replit
+
+Apri “Secrets” e aggiungi questa chiave:
+
+DATA_DIR=/tmp/taskflow-data
