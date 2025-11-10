@@ -795,8 +795,25 @@ export default function TimelineView({
   // Mostra cleaners da selected_cleaners.json + cleaners che hanno task in timeline.json
   // Questo permette di vedere cleaners rimossi che hanno ancora task assegnate
   const allCleanersToShow = React.useMemo(() => {
+    // Se selected_cleaners.json è vuoto, non mostrare nessun cleaner
+    if (cleaners.length === 0) {
+      return [];
+    }
+
     const selectedCleanerIds = new Set(cleaners.map(c => c.id));
-    const timelineCleanersWithTasks = timelineCleaners
+    
+    // Crea un Set per evitare duplicati dalla timeline
+    const seenIds = new Set<number>();
+    const uniqueTimelineCleaners = timelineCleaners.filter(tc => {
+      const cleanerId = tc.cleaner?.id;
+      if (!cleanerId || seenIds.has(cleanerId)) {
+        return false;
+      }
+      seenIds.add(cleanerId);
+      return true;
+    });
+    
+    const timelineCleanersWithTasks = uniqueTimelineCleaners
       .filter(tc => tc.tasks && tc.tasks.length > 0) // Solo cleaners con task
       .filter(tc => !selectedCleanerIds.has(tc.cleaner?.id)) // Non già in selected_cleaners
       .map(tc => ({ ...tc.cleaner, isRemoved: true })); // Marca come rimosso
