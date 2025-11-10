@@ -940,8 +940,8 @@ def main():
             for task in cleaner_entry.get("tasks", []):
                 assigned_task_ids.add(int(task["task_id"]))
 
-        # Rimuovi le task assegnate dal container high_priority usando task_id
-        if "containers" in containers_data and "high_priority" in containers_data["containers"]:
+        # CRITICAL FIX: Rimuovi task SOLO se effettivamente assegnate in questo run
+        if assigned_task_ids and "containers" in containers_data and "high_priority" in containers_data["containers"]:
             original_count = len(containers_data["containers"]["high_priority"]["tasks"])
             containers_data["containers"]["high_priority"]["tasks"] = [
                 t for t in containers_data["containers"]["high_priority"]["tasks"]
@@ -961,6 +961,9 @@ def main():
             print(f"✅ Rimosse {original_count - new_count} task da containers.json (high_priority) usando task_id")
             print(f"   - Task rimaste in high_priority: {new_count}")
             print(f"   💡 Task con logistic_code duplicati rimangono disponibili nei container")
+        elif not assigned_task_ids:
+            print(f"ℹ️ Nessuna task assegnata in questo run - containers.json NON modificato")
+            print(f"   - Task rimaste in high_priority: {len(containers_data['containers']['high_priority']['tasks'])}")
 
 
 if __name__ == "__main__":
