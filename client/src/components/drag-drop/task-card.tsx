@@ -1,3 +1,4 @@
+import React, { useState, useEffect } from "react";
 import { Draggable } from "react-beautiful-dnd";
 import { TaskType as Task } from "@shared/schema";
 import {
@@ -10,12 +11,11 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Tooltip,
-  TooltipContent,
   TooltipProvider,
   TooltipTrigger,
+  TooltipContent,
 } from "@/components/ui/tooltip";
 import { Input } from "@/components/ui/input";
-import { useState, useEffect } from "react";
 import { HelpCircle, ChevronLeft, ChevronRight, Save, Pencil } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
@@ -78,23 +78,40 @@ export default function TaskCard({
     }
   };
 
-  const navigableTasks = getNavigableTasks();
+  // CRITICAL: Memoizza navigableTasks per evitare ricalcoli che causano mismatch
+  const navigableTasks = React.useMemo(() => {
+    const tasks = allTasks.filter(t => {
+      const matchCleaner = (t as any).assignedCleaner === task.assignedCleaner;
+      const notCurrentTask = String(t.id) !== String(task.id);
+      return matchCleaner && notCurrentTask && t.assignedCleaner;
+    });
+    // Normalizza gli ID per confronto consistente
+    return tasks.map(t => ({ ...t, id: String(t.id) }));
+  }, [allTasks, task.assignedCleaner, task.id]);
 
-  // IMPORTANTE: Ricalcola displayTask ogni volta che currentTaskId cambia
+  // Trova l'indice effettivo della task nel cleaner
   const { effectiveCurrentId, currentTaskInNavigable, displayTask } = (() => {
-    // Se currentTaskId non è impostato o non è valido, usa l'id della task corrente
-    const effId = currentTaskId && navigableTasks.some(t => String(t.id) === String(currentTaskId))
-      ? currentTaskId
-      : task.id;
+    // Normalizza currentTaskId per confronto
+    const normalizedCurrentId = currentTaskId ? String(currentTaskId) : null;
+    const normalizedTaskId = String(task.id);
 
-    const currIdx = navigableTasks.findIndex(t => String(t.id) === String(effId));
+    // Usa currentTaskId se esiste in navigableTasks, altrimenti usa task.id
+    const effId = normalizedCurrentId && navigableTasks.some(t => t.id === normalizedCurrentId)
+      ? normalizedCurrentId
+      : normalizedTaskId;
 
-    // Task corrente da visualizzare
-    const dispTask = navigableTasks.find(t => String(t.id) === String(effId)) || task;
+    // Trova l'indice con confronto normalizzato
+    const currIdx = navigableTasks.findIndex(t => t.id === effId);
+
+    // Se non trovato, probabilmente è la task corrente (non in navigableTasks)
+    // In questo caso usa indice 0 come fallback invece di -1
+    const safeIdx = currIdx >= 0 ? currIdx : 0;
+
+    const dispTask = navigableTasks.find(t => t.id === effId) || task;
 
     return {
       effectiveCurrentId: effId,
-      currentTaskInNavigable: currIdx,
+      currentTaskInNavigable: safeIdx,
       displayTask: dispTask
     };
   })();
