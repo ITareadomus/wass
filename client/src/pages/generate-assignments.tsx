@@ -1268,10 +1268,9 @@ export default function GenerateAssignments() {
               });
             }
 
-            // Reload in background (non blocca e non genera errori se fallisce)
-            loadTasks(true).catch(err => {
-              console.warn('⚠️ Reload fallito dopo movimento (movimento già salvato):', err);
-            });
+            // CRITICAL: NON ricaricare - il movimento è già salvato e i tempi ricalcolati
+            // La UI si aggiorna automaticamente tramite lo stato locale
+            console.log('✅ Movimento completato - NESSUN reload necessario (prestazioni ottimizzate)');
           }
         } catch (error) {
           console.error('Errore nella chiamata API:', error);
