@@ -1160,7 +1160,7 @@ export default function TimelineView({
                   <UserPlus className="w-5 h-5" />
                 </Button>
               </div>
-              {/* Pulsanti Conferma Assegnazioni, Storico e Stampa affiancati */}
+              {/* Pulsanti Conferma Assegnazioni e Stampa affiancati */}
               <div className="flex-1 p-1 border-t border-border flex gap-2">
                 {!isReadOnly && hasAssignedTasks && (
                   <Button
