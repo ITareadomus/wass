@@ -624,7 +624,7 @@ export default function TimelineView({
       const resetResponse = await fetch('/api/reset-timeline-assignments', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.JSONstringify({ date: dateStr })
+        body: JSON.stringify({ date: dateStr })
       });
 
       if (!resetResponse.ok) {
