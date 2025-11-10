@@ -1,7 +1,7 @@
 import { Droppable } from "react-beautiful-dnd";
 import { TaskType as Task } from "@shared/schema";
 import TaskCard from "./task-card";
-import { Clock, AlertCircle, ArrowDown, Calendar } from "lucide-react";
+import { Clock, AlertCircle, ArrowDown, Calendar, CheckSquare } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
@@ -15,6 +15,10 @@ interface PriorityColumnProps {
   icon: "clock" | "alert-circle" | "arrow-down";
   assignAction?: () => Promise<void>;
   isDragDisabled?: boolean; // Aggiunta la prop isDragDisabled
+  isMultiSelectMode?: boolean;
+  selectedTasks?: Array<{taskId: string; order: number}>;
+  onToggleMultiSelect?: () => void;
+  onSelectTask?: (taskId: string) => void;
 }
 
 export default function PriorityColumn({
@@ -25,6 +29,10 @@ export default function PriorityColumn({
   icon,
   assignAction,
   isDragDisabled = false, // Inizializza isDragDisabled a false
+  isMultiSelectMode = false,
+  selectedTasks = [],
+  onToggleMultiSelect,
+  onSelectTask,
 }: PriorityColumnProps) {
   const [isAssigning, setIsAssigning] = useState(false);
   const [isDateInPast, setIsDateInPast] = useState(false);
@@ -203,28 +211,48 @@ export default function PriorityColumn({
           </h3>
           <div className="text-xs text-muted-foreground mt-1">
             {tasks.length} task
+            {isMultiSelectMode && selectedTasks.length > 0 && (
+              <span className="ml-2 text-sky-600 font-semibold">
+                ({selectedTasks.filter(st => tasks.some(t => t.id === st.taskId)).length} selezionate)
+              </span>
+            )}
           </div>
         </div>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={handleAssign} // Utilizza handleAssign
-          disabled={isAssigning || tasks.length === 0 || isDateInPast}
-          className="text-xs px-2 py-1 h-7"
-          title={isDateInPast ? "Non puoi assegnare task per date passate" : ""}
-        >
-          {isAssigning ? (
-            <>
-              <span className="animate-spin mr-2">⏳</span>
-              Assegnando...
-            </>
-          ) : (
-            <>
-              <Calendar className="w-3 h-3 mr-1" />
-              Assegna
-            </>
-          )}
-        </Button>
+        <div className="flex gap-2">
+          <Button
+            variant={isMultiSelectMode ? "default" : "outline"}
+            size="sm"
+            onClick={onToggleMultiSelect}
+            disabled={tasks.length === 0 || isDateInPast}
+            className="text-xs px-2 py-1 h-7"
+            title={isMultiSelectMode ? "Disattiva selezione multipla" : "Attiva selezione multipla"}
+            data-testid="button-toggle-multiselect"
+          >
+            <CheckSquare className={`w-3 h-3 ${isMultiSelectMode ? 'mr-1' : ''}`} />
+            {isMultiSelectMode && <span className="ml-1">On</span>}
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleAssign} // Utilizza handleAssign
+            disabled={isAssigning || tasks.length === 0 || isDateInPast}
+            className="text-xs px-2 py-1 h-7"
+            title={isDateInPast ? "Non puoi assegnare task per date passate" : ""}
+            data-testid="button-assign"
+          >
+            {isAssigning ? (
+              <>
+                <span className="animate-spin mr-2">⏳</span>
+                Assegnando...
+              </>
+            ) : (
+              <>
+                <Calendar className="w-3 h-3 mr-1" />
+                Assegna
+              </>
+            )}
+          </Button>
+        </div>
       </div>
 
       <Droppable droppableId={droppableId}>
@@ -244,6 +272,9 @@ export default function PriorityColumn({
               const isDuplicate = hasAssigned && tasks.some(
                 t => t.name === task.name && t.id !== task.id
               );
+              const isSelected = selectedTasks.some(st => st.taskId === task.id);
+              const selectionOrder = selectedTasks.find(st => st.taskId === task.id)?.order;
+              
               return (
                 <TaskCard
                   key={task.id}
@@ -255,6 +286,10 @@ export default function PriorityColumn({
                   isDuplicate={isDuplicate} // Passa il flag isDuplicate
                   isDragDisabled={isDragDisabled || isDateInPast} // Disabilita drag per date passate
                   isReadOnly={isDateInPast} // Disabilita editing per date passate
+                  isMultiSelectMode={isMultiSelectMode}
+                  isSelected={isSelected}
+                  selectionOrder={selectionOrder}
+                  onSelect={onSelectTask}
                 />
               );
             })}
