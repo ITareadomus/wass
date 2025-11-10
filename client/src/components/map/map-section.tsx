@@ -27,7 +27,10 @@ export default function MapSection({ tasks }: MapSectionProps) {
   useEffect(() => {
     const loadCleaners = async () => {
       try {
-        const response = await fetch(`/data/cleaners/selected_cleaners.json?t=${Date.now()}`);
+        const response = await fetch(`/data/cleaners/selected_cleaners.json?t=${Date.now()}`, {
+          cache: 'no-store',
+          headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' }
+        });
         if (!response.ok) return;
         const data = await response.json();
         setCleaners(data.cleaners || []);

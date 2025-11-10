@@ -119,7 +119,10 @@ export default function Convocazioni() {
         console.log(`📅 Cleaners totali per ${dateStr}:`, dateCleaners.length);
 
         // Carica selected_cleaners.json per gestire la persistenza delle selezioni
-        const selectedResponse = await fetch(`/data/cleaners/selected_cleaners.json?t=${Date.now()}`);
+        const selectedResponse = await fetch(`/data/cleaners/selected_cleaners.json?t=${Date.now()}`, {
+          cache: 'no-store',
+          headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' }
+        });
         let alreadySelectedIds = new Set<number>();
         let preselectedIds = new Set<number>(); // IDs da mantenere selezionati nell'UI
 
@@ -336,7 +339,10 @@ export default function Convocazioni() {
       const dateStr = format(selectedDate, "yyyy-MM-dd");
 
       // Carica la selezione attuale
-      const currentResponse = await fetch('/data/cleaners/selected_cleaners.json');
+      const currentResponse = await fetch(`/data/cleaners/selected_cleaners.json?t=${Date.now()}`, {
+        cache: 'no-store',
+        headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' }
+      });
       const currentData = await currentResponse.json();
       const currentCleaners = currentData.cleaners || [];
 
