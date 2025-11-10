@@ -248,24 +248,40 @@
       "can_do_straordinaria": false
     },
     {
-      "id": 326,
-      "name": "FESTUS OSARO",
-      "lastname": "AIHIVBERE",
+      "id": 469,
+      "name": "LAMIN",
+      "lastname": "SOLY",
       "role": "Standard",
       "active": true,
       "ranking": 0,
       "counter_hours": 0,
-      "counter_days": 1,
+      "counter_days": 0,
       "available": true,
       "contract_type": "B",
       "preferred_customers": [
         2,
         3,
+        61,
+        64,
+        72,
         75,
+        80,
+        84,
+        87,
+        91,
         94,
-        115
+        101,
+        102,
+        113,
+        115,
+        118,
+        119,
+        120,
+        121,
+        123,
+        124
       ],
-      "telegram_id": 7895288780,
+      "telegram_id": null,
       "start_time": "10:00",
       "can_do_straordinaria": false
     }
@@ -274,6 +290,6 @@
   "metadata": {
     "date": "2025-11-11",
     "saved_at": "2025-11-10T11:08:20.326Z",
-    "loaded_at": "2025-11-10T11:08:23.945Z"
+    "loaded_at": "2025-11-10T11:10:54.450Z"
   }
 }
