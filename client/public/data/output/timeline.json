@@ -1,6 +1,6 @@
 {
   "metadata": {
-    "last_updated": "2025-11-10T13:51:31.229Z",
+    "last_updated": "2025-11-10T13:54:28.007Z",
     "date": "2025-11-11"
   },
   "cleaners_assignments": [
@@ -12,13 +12,110 @@
         "role": "Formatore",
         "premium": false
       },
-      "tasks": []
+      "tasks": [
+        {
+          "task_id": 218602,
+          "logistic_code": 1153,
+          "client_id": 61,
+          "premium": false,
+          "address": "VIA CELESTINO IV, 9",
+          "lat": "45.4596054",
+          "lng": "9.1821442",
+          "cleaning_time": 120,
+          "checkin_date": "2025-11-13",
+          "checkout_date": "2025-11-11",
+          "checkin_time": "14:00",
+          "checkout_time": null,
+          "pax_in": 2,
+          "pax_out": 1,
+          "small_equipment": false,
+          "operation_id": 2,
+          "confirmed_operation": false,
+          "straordinaria": false,
+          "type_apt": "C",
+          "alias": "NTM",
+          "customer_name": "NOTA-MI",
+          "reasons": [
+            "manually_moved_to_timeline"
+          ],
+          "priority": "early_out",
+          "start_time": "10:00",
+          "end_time": "12:00",
+          "followup": false,
+          "sequence": 1,
+          "travel_time": 0
+        },
+        {
+          "task_id": 218624,
+          "logistic_code": 504,
+          "client_id": 61,
+          "premium": false,
+          "address": "VIA TOFANE, 5",
+          "lat": "45.5034283",
+          "lng": "9.221111",
+          "cleaning_time": 60,
+          "checkin_date": "2025-11-13",
+          "checkout_date": "2025-11-11",
+          "checkin_time": "15:30",
+          "checkout_time": null,
+          "pax_in": 1,
+          "pax_out": 1,
+          "small_equipment": true,
+          "operation_id": 2,
+          "confirmed_operation": false,
+          "straordinaria": false,
+          "type_apt": "A",
+          "alias": "NTM",
+          "customer_name": "NOTA-MI",
+          "reasons": [
+            "manually_moved_to_timeline"
+          ],
+          "priority": "early_out",
+          "start_time": "12:48",
+          "end_time": "13:48",
+          "followup": true,
+          "sequence": 2,
+          "travel_time": 48
+        },
+        {
+          "task_id": 218731,
+          "logistic_code": 1537,
+          "client_id": null,
+          "premium": true,
+          "address": "Via dei Piatti, 4 20123 (MI)",
+          "lat": "45.460795",
+          "lng": "9.1850985",
+          "cleaning_time": 150,
+          "checkin_date": "2025-11-11",
+          "checkout_date": "2025-11-11",
+          "checkin_time": null,
+          "checkout_time": null,
+          "pax_in": 2,
+          "pax_out": 2,
+          "small_equipment": false,
+          "operation_id": 2,
+          "confirmed_operation": false,
+          "straordinaria": false,
+          "type_apt": "C",
+          "alias": "TBR",
+          "customer_name": "THE BEST RENT S.r.l.",
+          "reasons": [
+            "manually_moved_to_timeline"
+          ],
+          "priority": "high_priority",
+          "start_time": "14:34",
+          "end_time": "17:04",
+          "followup": true,
+          "sequence": 3,
+          "travel_time": 46
+        }
+      ]
     }
   ],
   "meta": {
     "total_cleaners": 1,
     "used_cleaners": 0,
     "assigned_tasks": 0,
-    "total_tasks": 0
+    "total_tasks": 3
   }
 }
