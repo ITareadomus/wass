@@ -127,25 +127,47 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const workDate = date || format(new Date(), 'yyyy-MM-dd');
       const timelinePath = path.join(process.cwd(), 'client/public/data/output/timeline.json');
 
-      // Svuota il file timeline.json con struttura corretta
-      const emptyTimeline = {
-        metadata: {
-          last_updated: new Date().toISOString(),
-          date: workDate
-        },
-        cleaners_assignments: [],
-        meta: {
-          total_cleaners: 0,
-          used_cleaners: 0,
-          assigned_tasks: 0
-        }
+      // Carica timeline esistente per preservare i cleaners
+      let timelineData: any;
+      try {
+        const existingData = await fs.readFile(timelinePath, 'utf8');
+        timelineData = JSON.parse(existingData);
+      } catch (err) {
+        // Se non esiste, crea struttura vuota
+        timelineData = {
+          metadata: { last_updated: new Date().toISOString(), date: workDate },
+          cleaners_assignments: [],
+          meta: { total_cleaners: 0, used_cleaners: 0, assigned_tasks: 0 }
+        };
+      }
+
+      // CRITICAL: Mantieni i cleaners ma svuota le loro task
+      if (timelineData.cleaners_assignments && Array.isArray(timelineData.cleaners_assignments)) {
+        timelineData.cleaners_assignments = timelineData.cleaners_assignments.map((cleanerEntry: any) => ({
+          cleaner: cleanerEntry.cleaner,
+          tasks: [] // Svuota solo le task
+        }));
+        console.log(`✅ Mantenuti ${timelineData.cleaners_assignments.length} cleaners, svuotate le loro task`);
+      } else {
+        timelineData.cleaners_assignments = [];
+      }
+
+      // Aggiorna metadata
+      timelineData.metadata = {
+        last_updated: new Date().toISOString(),
+        date: workDate
+      };
+      timelineData.meta = {
+        total_cleaners: timelineData.cleaners_assignments.length,
+        used_cleaners: 0,
+        assigned_tasks: 0
       };
 
       // Scrittura atomica
       const tmpPath = `${timelinePath}.tmp`;
-      await fs.writeFile(tmpPath, JSON.stringify(emptyTimeline, null, 2));
+      await fs.writeFile(tmpPath, JSON.stringify(timelineData, null, 2));
       await fs.rename(tmpPath, timelinePath);
-      console.log(`Timeline resettata: timeline.json (struttura corretta)`);
+      console.log(`Timeline resettata: cleaners mantenuti, task svuotate`);
 
       // FORZA la ricreazione di containers.json rieseguendo create_containers.py
       console.log(`Rieseguendo create_containers.py per ripristinare i containers...`);
