@@ -116,6 +116,10 @@ export default function GenerateAssignments() {
   // Stato per tracciare se è in corso un'operazione di drag-and-drop
   const [isDragging, setIsDragging] = useState<boolean>(false);
 
+  // Stati per selezione multipla
+  const [isMultiSelectMode, setIsMultiSelectMode] = useState<boolean>(false);
+  const [selectedTasks, setSelectedTasks] = useState<Array<{taskId: string; order: number}>>([]);
+
   // Salva la data in localStorage ogni volta che cambia (formato locale senza timezone)
   useEffect(() => {
     const year = selectedDate.getFullYear();
