@@ -1226,9 +1226,12 @@ export default function GenerateAssignments() {
               onTaskMoved();
             }
 
-            // CRITICAL FIX: Ricarica COMPLETA per sincronizzare tutto lo stato
-            // Questo previene errori 404 su movimenti successivi
+            // CRITICAL FIX: Attendi esplicitamente il ricaricamento COMPLETO
+            // Prima di permettere altri movimenti
+            setIsLoadingTasks(true);
+            await new Promise(resolve => setTimeout(resolve, 200)); // Attendi salvataggio file
             await loadTasks(true);
+            setIsLoadingTasks(false);
 
             // Mostra toast solo se i cleaner sono diversi
             if (fromCleanerId !== toCleanerId) {
