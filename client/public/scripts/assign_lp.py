@@ -157,12 +157,12 @@ def travel_minutes(a_lat: float, a_lng: float, b_lat: float, b_lng: float,
     # Stesso edificio
     if a_addr and b_addr and same_building(a_addr, b_addr):
         return max(MIN_TRAVEL, min(MAX_TRAVEL, SHORT_BASE_MIN))
-    
+
     km = haversine_km(a_lat, a_lng, b_lat, b_lng)
-    
+
     # Fattore correzione percorsi non rettilinei
     dist_reale = km * 1.5
-    
+
     # Modello progressivo
     if dist_reale < 0.8:
         travel_time = dist_reale * 6.0  # ~10 km/h a piedi
@@ -170,15 +170,15 @@ def travel_minutes(a_lat: float, a_lng: float, b_lat: float, b_lng: float,
         travel_time = dist_reale * 10.0  # ~6 km/h misto
     else:
         travel_time = dist_reale * 5.0  # ~12 km/h mezzi
-    
+
     # Tempo base
     base_time = 5.0
     total_time = base_time + travel_time
-    
+
     # Bonus stesso strada (riduce tempo base)
     if a_addr and b_addr and same_street(a_addr, b_addr) and km < 0.10:
         total_time = max(total_time - 2.0, MIN_TRAVEL)
-    
+
     return max(MIN_TRAVEL, min(MAX_TRAVEL, total_time))
 
 
@@ -209,7 +209,8 @@ def evaluate_route(cleaner: Cleaner, route: List[Task]) -> Tuple[bool, List[Tupl
     first = route[0]
 
     # Calcola l'arrivo al primo task
-    base = cleaner.available_from if cleaner.available_from else 10 * 60  # default 10:00
+    # WORK_START_TIME è 10:00 (600 minuti) come default
+    work_start_min = hhmm_to_min(cleaner.available_from) if cleaner.available_from else 10 * 60
 
     # Viaggio da ultima posizione a LP
     if cleaner.last_lat is not None and cleaner.last_lng is not None:
@@ -219,7 +220,7 @@ def evaluate_route(cleaner: Cleaner, route: List[Task]) -> Tuple[bool, List[Tupl
     else:
         tt = 3.0 if same_street(cleaner.last_address, first.address) else 12.0
 
-    arrival = base + tt
+    arrival = work_start_min + tt
     start = arrival
     finish = start + first.cleaning_time
 
@@ -280,7 +281,7 @@ def can_add_task(cleaner: Cleaner, task: Task) -> bool:
         # Formatore max 2 task LP al giorno (totale)
         if len(cleaner.route) >= 2:
             return False
-    
+
     if not can_handle_premium(cleaner, task):
         return False
 
@@ -295,11 +296,11 @@ def can_add_task(cleaner: Cleaner, task: Task) -> bool:
     max_lp_allowed = MAX_DAILY_TASKS - cleaner.total_daily_tasks
     # Il limite è il MINORE tra BASE (2) e lo spazio rimanente
     dynamic_max_lp = min(BASE_MAX_TASKS_PER_PRIORITY, max_lp_allowed)
-    
+
     # Se lo spazio rimanente è maggiore di 2, usa quello spazio
     if max_lp_allowed > BASE_MAX_TASKS_PER_PRIORITY:
         dynamic_max_lp = max_lp_allowed
-    
+
     if len(cleaner.route) >= dynamic_max_lp:
         return False
 
@@ -483,8 +484,8 @@ def seed_cleaners_from_assignments(cleaners: List[Cleaner]):
             continue
 
         # Filtra solo task NON-LP (EO e HP)
-        non_lp_tasks = [t for t in tasks if 
-                        t.get("priority") in ["early_out", "high_priority"] or 
+        non_lp_tasks = [t for t in tasks if
+                        t.get("priority") in ["early_out", "high_priority"] or
                         ("automatic_assignment_lp" not in t.get("reasons", []))]
 
         if not non_lp_tasks:
@@ -519,7 +520,7 @@ def load_tasks() -> List[Task]:
         # Parse checkin e checkout datetime
         checkin_dt = None
         checkout_dt = None
-        
+
         checkin_date = t.get("checkin_date")
         checkin_time = t.get("checkin_time")
         if checkin_date and checkin_time:
@@ -527,7 +528,7 @@ def load_tasks() -> List[Task]:
                 checkin_dt = datetime.strptime(f"{checkin_date} {checkin_time}", "%Y-%m-%d %H:%M")
             except:
                 pass
-        
+
         checkout_date = t.get("checkout_date")
         checkout_time = t.get("checkout_time")
         if checkout_date and checkout_time:
@@ -535,7 +536,7 @@ def load_tasks() -> List[Task]:
                 checkout_dt = datetime.strptime(f"{checkout_date} {checkout_time}", "%Y-%m-%d %H:%M")
             except:
                 pass
-        
+
         tasks.append(
             Task(
                 task_id=str(t.get("task_id")),
@@ -569,7 +570,7 @@ def plan_day(tasks: List[Task], cleaners: List[Cleaner], assigned_logistic_codes
     """
     if assigned_logistic_codes is None:
         assigned_logistic_codes = set()
-    
+
     unassigned = []
 
     for task in tasks:
@@ -596,7 +597,7 @@ def plan_day(tasks: List[Task], cleaners: List[Cleaner], assigned_logistic_codes
         for c, p, t in candidates:
             # Controlla se il cleaner ha già task nello stesso indirizzo
             has_same_address = any(
-                existing_task.address == task.address 
+                existing_task.address == task.address
                 for existing_task in c.route
             )
             if has_same_address:
@@ -712,7 +713,6 @@ def build_output(cleaners: List[Cleaner], unassigned: List[Task], original_tasks
             start_time_str = min_to_hhmm(start)
             end_time_str = min_to_hhmm(fin)
             current_seq = overall_seq
-
 
             # Carica i dati originali completi della task da containers.json
             containers_data = json.loads(INPUT_CONTAINERS.read_text(encoding="utf-8"))
@@ -866,7 +866,7 @@ def main():
     print(f"📋 Caricamento dati...")
     print(f"   - Cleaner disponibili: {len(cleaners)}")
     print(f"   - Task Low-Priority da assegnare: {len(tasks)}")
-    
+
     # Leggi i logistic_code già assegnati dalla timeline
     assigned_logistic_codes = set()
     timeline_path = OUTPUT_ASSIGN.parent / "timeline.json"
@@ -882,7 +882,7 @@ def main():
                 print(f"📌 Logistic codes già assegnati in timeline: {len(assigned_logistic_codes)}")
         except Exception as e:
             print(f"⚠️ Errore lettura timeline per deduplica: {e}")
-    
+
     print()
     print(f"🔄 Assegnazione in corso...")
 
@@ -969,7 +969,6 @@ def main():
 
     # Scrivi il file timeline.json
     timeline_path.write_text(json.dumps(timeline_data, ensure_ascii=False, indent=2), encoding="utf-8")
-
     lp_count = sum(1 for c in timeline_data["cleaners_assignments"]
                    if any(t.get("reasons") and "automatic_assignment_lp" in t.get("reasons", []) for t in c.get("tasks", [])))
     print(f"✅ Aggiornato {timeline_path}")
