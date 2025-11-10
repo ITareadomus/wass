@@ -1739,15 +1739,6 @@ export default function GenerateAssignments() {
                 del {format(selectedDate, "dd/MM/yyyy", { locale: it })}
               </span>
             </h1>
-            <Button
-              onClick={() => refreshAssignments("manual-refresh")}
-              variant="outline"
-              size="icon"
-              className="rounded-full h-10 w-10"
-              title="Ricarica dati"
-            >
-              <RefreshCw className="h-4 w-4" />
-            </Button>
           </div>
           <div className="flex items-center gap-3">
             {/* Settings button for admin */}
@@ -1760,9 +1751,11 @@ export default function GenerateAssignments() {
                     <Button
                       onClick={() => setLocation("/settings")}
                       variant="outline"
+                      size="icon"
+                      className="rounded-full"
+                      title="Impostazioni"
                     >
-                      <Settings className="w-4 h-4 mr-2" />
-                      Impostazioni
+                      <Settings className="h-5 w-5" />
                     </Button>
                   );
                 }
