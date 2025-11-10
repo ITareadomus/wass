@@ -1,6 +1,6 @@
 {
   "metadata": {
-    "last_updated": "2025-11-10T13:55:40.593341",
+    "last_updated": "2025-11-10T14:05:54.695930",
     "date": "2025-11-11"
   },
   "cleaners_assignments": [
@@ -11,6 +11,50 @@
         "lastname": "JIMENEZ",
         "role": "Formatore",
         "premium": false
+      },
+      "tasks": [
+        {
+          "task_id": 218624,
+          "logistic_code": 504,
+          "client_id": 61,
+          "premium": false,
+          "address": "VIA TOFANE, 5",
+          "lat": "45.5034283",
+          "lng": "9.221111",
+          "cleaning_time": 60,
+          "checkin_date": "2025-11-13",
+          "checkout_date": "2025-11-11",
+          "checkin_time": "15:30",
+          "checkout_time": null,
+          "pax_in": 1,
+          "pax_out": 1,
+          "small_equipment": true,
+          "operation_id": 2,
+          "confirmed_operation": false,
+          "straordinaria": false,
+          "type_apt": "A",
+          "alias": "NTM",
+          "customer_name": "NOTA-MI",
+          "reasons": [
+            "manually_moved_to_timeline",
+            "manual_assignment"
+          ],
+          "priority": "early_out",
+          "start_time": "10:00",
+          "end_time": "11:00",
+          "followup": false,
+          "sequence": 1,
+          "travel_time": 0
+        }
+      ]
+    },
+    {
+      "cleaner": {
+        "id": 132,
+        "name": "JOHOISER ERNESTO",
+        "lastname": "LOPEZ GIRON",
+        "role": "Premium",
+        "premium": true
       },
       "tasks": [
         {
@@ -36,7 +80,8 @@
           "alias": "NTM",
           "customer_name": "NOTA-MI",
           "reasons": [
-            "manually_moved_to_timeline"
+            "manually_moved_to_timeline",
+            "manual_assignment"
           ],
           "priority": "early_out",
           "start_time": "10:00",
@@ -46,44 +91,55 @@
           "travel_time": 0
         },
         {
-          "task_id": 218624,
-          "logistic_code": 504,
-          "client_id": 61,
-          "premium": false,
-          "address": "VIA TOFANE, 5",
-          "lat": "45.5034283",
-          "lng": "9.221111",
-          "cleaning_time": 60,
-          "checkin_date": "2025-11-13",
+          "task_id": 218731,
+          "logistic_code": 1537,
+          "client_id": 3,
+          "premium": true,
+          "address": "Via dei Piatti, 4 20123 (MI)",
+          "lat": "45.460795",
+          "lng": "9.1850985",
+          "cleaning_time": 150,
+          "checkin_date": "2025-11-11",
           "checkout_date": "2025-11-11",
-          "checkin_time": "15:30",
+          "checkin_time": null,
           "checkout_time": null,
-          "pax_in": 1,
-          "pax_out": 1,
-          "small_equipment": true,
+          "pax_in": 2,
+          "pax_out": 2,
+          "small_equipment": false,
           "operation_id": 2,
           "confirmed_operation": false,
           "straordinaria": false,
-          "type_apt": "A",
-          "alias": "NTM",
-          "customer_name": "NOTA-MI",
+          "type_apt": "C",
+          "alias": "TBR",
+          "customer_name": "THE BEST RENT S.r.l.",
           "reasons": [
-            "manually_moved_to_timeline"
+            "manually_moved_to_timeline",
+            "manual_assignment"
           ],
-          "priority": "early_out",
-          "start_time": "12:48",
-          "end_time": "13:48",
+          "priority": "high_priority",
+          "start_time": "12:07",
+          "end_time": "14:37",
           "followup": true,
           "sequence": 2,
-          "travel_time": 48
+          "travel_time": 7
         }
       ]
+    },
+    {
+      "cleaner": {
+        "id": 495,
+        "name": "EL HADJI",
+        "lastname": "BA",
+        "role": "Premium",
+        "premium": true
+      },
+      "tasks": []
     }
   ],
   "meta": {
-    "total_cleaners": 1,
+    "total_cleaners": 3,
     "used_cleaners": 0,
     "assigned_tasks": 0,
-    "total_tasks": 2
+    "total_tasks": 3
   }
 }
