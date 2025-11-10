@@ -327,6 +327,7 @@ export default function Settings() {
                             onValueChange={(value: "admin" | "user" | "viewer") =>
                               setEditingAccount({ ...editingAccount, role: value })
                             }
+                            disabled={editingAccount.id === 1 && editingAccount.role === 'admin'}
                           >
                             <SelectTrigger>
                               <SelectValue />
@@ -394,6 +395,7 @@ export default function Settings() {
                             onClick={() => setEditingAccount(account)}
                             variant="outline"
                             size="sm"
+                            disabled={account.id === 1 && account.role === 'admin'}
                           >
                             Modifica
                           </Button>
@@ -404,6 +406,7 @@ export default function Settings() {
                             }}
                             variant="destructive"
                             size="sm"
+                            disabled={account.id === 1}
                           >
                             <Trash2 className="w-4 h-4" />
                           </Button>
