@@ -50,7 +50,10 @@ export default function TaskCard({
   isReadOnly = false, // Modalità read-only
 }: TaskCardProps) {
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [currentTaskId, setCurrentTaskId] = useState(task.id);
+  // Helper per normalizzare l'id (supporta sia id che task_id)
+  const getTaskKey = (t: any) => String(t?.id ?? t?.task_id);
+
+  const [currentTaskId, setCurrentTaskId] = useState(getTaskKey(task));
   const [assignmentTimes, setAssignmentTimes] = useState<{ start_time?: string; end_time?: string; travel_time?: number }>({});
   const { toast } = useToast();
 
@@ -82,32 +85,28 @@ export default function TaskCard({
   const navigableTasks = React.useMemo(() => {
     const tasks = allTasks.filter(t => {
       const matchCleaner = (t as any).assignedCleaner === task.assignedCleaner;
-      const notCurrentTask = String(t.id) !== String(task.id);
+      const notCurrentTask = getTaskKey(t) !== getTaskKey(task);
       return matchCleaner && notCurrentTask && t.assignedCleaner;
     });
     // Normalizza gli ID per confronto consistente
-    return tasks.map(t => ({ ...t, id: String(t.id) }));
-  }, [allTasks, task.assignedCleaner, task.id]);
+    return tasks.map(t => ({ ...t, id: getTaskKey(t) }));
+  }, [allTasks, task.assignedCleaner, task.id, getTaskKey]);
 
   // Trova l'indice effettivo della task nel cleaner
   const { effectiveCurrentId, currentTaskInNavigable, displayTask } = (() => {
-    // Normalizza currentTaskId per confronto
-    const normalizedCurrentId = currentTaskId ? String(currentTaskId) : null;
-    const normalizedTaskId = String(task.id);
-
     // Usa currentTaskId se esiste in navigableTasks, altrimenti usa task.id
-    const effId = normalizedCurrentId && navigableTasks.some(t => t.id === normalizedCurrentId)
-      ? normalizedCurrentId
-      : normalizedTaskId;
+    const effId = currentTaskId && navigableTasks.some(t => getTaskKey(t) === String(currentTaskId))
+      ? currentTaskId
+      : getTaskKey(task);
 
     // Trova l'indice con confronto normalizzato
-    const currIdx = navigableTasks.findIndex(t => t.id === effId);
+    const currIdx = navigableTasks.findIndex(t => getTaskKey(t) === String(effId));
 
     // Se non trovato, probabilmente è la task corrente (non in navigableTasks)
     // In questo caso usa indice 0 come fallback invece di -1
     const safeIdx = currIdx >= 0 ? currIdx : 0;
 
-    const dispTask = navigableTasks.find(t => t.id === effId) || task;
+    const dispTask = navigableTasks.find(t => getTaskKey(t) === effId) || task;
 
     return {
       effectiveCurrentId: effId,
@@ -148,11 +147,11 @@ export default function TaskCard({
 
     console.log('✅ Navigazione PREV:', {
       from: currentTaskId,
-      to: prevTask.id,
+      to: getTaskKey(prevTask),
       currentIndex: currentTaskInNavigable,
       totalTasks: navigableTasks.length
     });
-    setCurrentTaskId(prevTask.id);
+    setCurrentTaskId(getTaskKey(prevTask));
   };
 
   const handleNextTask = (e: React.MouseEvent) => {
@@ -171,7 +170,7 @@ export default function TaskCard({
 
     console.log('✅ Navigazione NEXT:', {
       from: currentTaskId,
-      to: nextTask.id,
+      to: getTaskKey(nextTask),
       currentIndex: currentTaskInNavigable,
       totalTasks: navigableTasks.length,
       nextTaskData: {
@@ -180,7 +179,7 @@ export default function TaskCard({
         straordinaria: nextTask.straordinaria
       }
     });
-    setCurrentTaskId(nextTask.id);
+    setCurrentTaskId(getTaskKey(nextTask));
   };
 
   // Reset currentTaskId quando il modale si apre
@@ -189,12 +188,12 @@ export default function TaskCard({
       console.log('🔓 Modale aperto per task:', {
         taskId: task.id,
         allTasksCount: allTasks?.length || 0,
-        allTasksIds: allTasks?.map(t => t.id) || [],
+        allTasksIds: allTasks?.map(t => getTaskKey(t)) || [],
         isInTimeline,
         currentContainer
       });
 
-      setCurrentTaskId(task.id); // Assicura che currentTaskId sia all'inizio quando si apre il modale
+      setCurrentTaskId(getTaskKey(task)); // Assicura che currentTaskId sia all'inizio quando si apre il modale
       setEditingField(null);
 
       // Inizializza campi editabili con i valori attuali della task visualizzata
@@ -219,12 +218,12 @@ export default function TaskCard({
 
   // DEBUG: verifica se displayTask è corretto
   useEffect(() => {
-    if (displayTask.id !== effectiveCurrentId) {
+    if (getTaskKey(displayTask) !== effectiveCurrentId) {
       console.warn('⚠️ MISMATCH: displayTask.id !== effectiveCurrentId', {
-        displayTaskId: displayTask.id,
+        displayTaskId: getTaskKey(displayTask),
         effectiveCurrentId: effectiveCurrentId,
         displayTaskName: (displayTask as any).logistic_code || displayTask.name,
-        allTasksIds: allTasks.map(t => t.id)
+        allTasksIds: allTasks.map(t => getTaskKey(t))
       });
     }
   }, [displayTask, effectiveCurrentId, allTasks]);
@@ -319,7 +318,7 @@ export default function TaskCard({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          taskId: displayTask.id,
+          taskId: getTaskKey(displayTask),
           logisticCode: displayTask.name,
           checkoutDate: editedCheckoutDate,
           checkoutTime: editedCheckoutTime,
@@ -414,7 +413,7 @@ export default function TaskCard({
   return (
     <>
       <Draggable
-        draggableId={task.id}
+        draggableId={getTaskKey(task)}
         index={index}
         isDragDisabled={shouldDisableDrag} // Usa la prop per disabilitare il drag
       >
@@ -443,7 +442,7 @@ export default function TaskCard({
                       width: cardWidth,
                       minHeight: "40px",
                     }}
-                    data-testid={`task-card-${task.id}`}
+                    data-testid={`task-card-${getTaskKey(task)}`}
                     onClick={(e) => {
                       if (!snapshot.isDragging) {
                         handleCardClick(e);
@@ -464,7 +463,7 @@ export default function TaskCard({
                       <div className="flex items-center gap-1">
                         <span
                           className="text-[13px] text-[#ff0000] font-extrabold"
-                          data-testid={`task-name-${task.id}`}
+                          data-testid={`task-name-${getTaskKey(task)}`}
                         >
                           {task.name}
                         </span>
@@ -507,7 +506,7 @@ export default function TaskCard({
               </Button>
 
               <DialogTitle className="flex items-center gap-2 flex-1 justify-center">
-                Dettagli Task #{(displayTask as any).task_id ?? displayTask.id}
+                Dettagli Task #{getTaskKey(displayTask)}
                 <Badge
                   variant="outline"
                   className={cn(
