@@ -143,33 +143,43 @@ export default function GenerateAssignments() {
 
   // Helper functions per multi-select context
   const toggleMode = useCallback(() => {
-    setIsMultiSelectMode(prev => !prev);
-  }, []);
+    console.log('[DEBUG] toggleMode called');
+    setIsMultiSelectMode(prev => {
+      console.log('[DEBUG] Toggling mode from', prev, 'to', !prev);
+      return !prev;
+    });
+  }, []); // Empty deps - setIsMultiSelectMode is stable
 
   const toggleTask = useCallback((taskId: string) => {
+    console.log('[DEBUG] toggleTask called for:', taskId);
     setSelectedTasks(prev => {
       const existing = prev.find(t => t.taskId === taskId);
       if (existing) {
         // Deseleziona
-        return prev.filter(t => t.taskId !== taskId).map((t, idx) => ({ ...t, order: idx + 1 }));
+        const newSelection = prev.filter(t => t.taskId !== taskId).map((t, idx) => ({ ...t, order: idx + 1 }));
+        console.log('[DEBUG] Deselected task', taskId, ', new selection:', newSelection);
+        return newSelection;
       } else {
         // Seleziona con nuovo ordine
-        return [...prev, { taskId, order: prev.length + 1 }];
+        const newSelection = [...prev, { taskId, order: prev.length + 1 }];
+        console.log('[DEBUG] Selected task', taskId, ', new selection:', newSelection);
+        return newSelection;
       }
     });
-  }, []);
+  }, []); // Empty deps - setSelectedTasks is stable
 
   const clearSelection = useCallback(() => {
+    console.log('[DEBUG] Clearing all selections');
     setSelectedTasks([]);
-  }, []);
+  }, []); // Empty deps - setSelectedTasks is stable
 
   const isTaskSelected = useCallback((taskId: string) => {
     return selectedTasks.some(t => t.taskId === taskId);
-  }, [selectedTasks]);
+  }, [selectedTasks]); // Depends on selectedTasks
 
   const getTaskOrder = useCallback((taskId: string) => {
     return selectedTasks.find(t => t.taskId === taskId)?.order;
-  }, [selectedTasks]);
+  }, [selectedTasks]); // Depends on selectedTasks
 
   // Memoizza il context value per evitare re-render non necessari
   const multiSelectContextValue: MultiSelectContextType = useMemo(() => ({

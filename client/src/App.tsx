@@ -11,6 +11,7 @@ function Router() {
   return (
     <Switch>
       <Route path="/" component={GenerateAssignments} />
+      <Route path="/generate-assignments" component={GenerateAssignments} />
       <Route path="/convocazioni" component={Convocazioni} />
       <Route component={NotFound} />
     </Switch>
