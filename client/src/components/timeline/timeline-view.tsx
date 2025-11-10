@@ -1147,15 +1147,20 @@ export default function TimelineView({
               </div>
               {/* Pulsanti nella riga finale */}
               <div className="flex-1 p-1 border-t border-border flex gap-2">
-                {!isReadOnly && hasAssignedTasks && (
+                {!isReadOnly && (
                   <Button
                     onClick={handleConfirmAssignments}
                     disabled={!hasUnsavedChanges}
-                    className={`flex-1 h-full ${hasUnsavedChanges ? 'bg-green-500 hover:bg-green-600 animate-pulse' : 'bg-green-500 hover:bg-green-600 opacity-50 cursor-not-allowed'}`}
+                    variant="outline"
+                    className={`flex-1 h-full ${
+                      hasUnsavedChanges 
+                        ? 'bg-green-600 hover:bg-green-700 text-white border-green-700 animate-pulse' 
+                        : 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200 border-green-300 dark:border-green-700 cursor-default'
+                    }`}
                     data-testid="button-confirm-assignments"
                   >
                     <CheckCircle className="w-4 h-4 mr-2" />
-                    {hasUnsavedChanges ? 'Conferma Assegnazioni ⚠️' : 'Assegnazioni Confermate'}
+                    {hasUnsavedChanges ? 'Conferma Assegnazioni ⚠️' : '✅ Assegnazioni Confermate'}
                   </Button>
                 )}
                 {isReadOnly && (
