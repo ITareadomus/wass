@@ -209,8 +209,9 @@ def evaluate_route(cleaner: Cleaner, route: List[Task]) -> Tuple[bool, List[Tupl
     first = route[0]
 
     # Calcola l'arrivo al primo task
-    # WORK_START_TIME è 10:00 (600 minuti) come default
-    work_start_min = hhmm_to_min(cleaner.available_from) if cleaner.available_from else 10 * 60
+    # available_from è già in minuti da mezzanotte (non serve hhmm_to_min)
+    # Se None, usa 10:00 (600 minuti) come default
+    work_start_min = cleaner.available_from if cleaner.available_from is not None else 10 * 60
 
     # Viaggio da ultima posizione a LP
     if cleaner.last_lat is not None and cleaner.last_lng is not None:
