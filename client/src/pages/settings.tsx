@@ -196,9 +196,14 @@ export default function Settings() {
         <div className="flex justify-between items-center mb-8">
           <h1 className="text-3xl font-bold">Impostazioni Account</h1>
           <div className="flex gap-2">
-            <Button onClick={() => setLocation("/")} variant="outline" className="flex items-center gap-2">
-              <Home className="w-4 h-4" />
-              <span>Torna alla Home</span>
+            <Button 
+              onClick={() => setLocation("/")} 
+              variant="outline" 
+              size="icon"
+              className="rounded-full"
+              title="Torna alla Home"
+            >
+              <Home className="h-5 w-5" />
             </Button>
             <ThemeToggle />
           </div>
