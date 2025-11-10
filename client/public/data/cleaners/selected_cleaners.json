@@ -154,41 +154,6 @@
       "can_do_straordinaria": false
     },
     {
-      "id": 495,
-      "name": "EL HADJI",
-      "lastname": "BA",
-      "role": "Premium",
-      "active": true,
-      "ranking": 0,
-      "counter_hours": 0,
-      "counter_days": 4,
-      "available": true,
-      "contract_type": "B",
-      "preferred_customers": [
-        2,
-        3,
-        9,
-        61,
-        64,
-        75,
-        84,
-        85,
-        87,
-        91,
-        94,
-        101,
-        113,
-        115,
-        118,
-        120,
-        121,
-        123
-      ],
-      "telegram_id": 8035270407,
-      "start_time": "10:00",
-      "can_do_straordinaria": true
-    },
-    {
       "id": 626,
       "name": "DORA PATRICIA",
       "lastname": "JIMENEZ",
@@ -205,7 +170,7 @@
       "can_do_straordinaria": false
     }
   ],
-  "total_selected": 7,
+  "total_selected": 6,
   "metadata": {
     "date": "2025-11-11",
     "saved_at": "2025-11-10T10:06:30.014Z"
