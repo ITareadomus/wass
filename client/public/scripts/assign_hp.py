@@ -557,20 +557,29 @@ def load_tasks() -> Tuple[List[Task], str]:
 
 
 # -------- Planner --------
-def plan_day(tasks: List[Task], cleaners: List[Cleaner], assigned_logistic_codes: set = None) -> Tuple[List[Cleaner], List[Task]]:
+def plan_day(tasks: List[Task], cleaners: List[Cleaner], assigned_logistic_codes: set = None, assigned_task_ids: set = None) -> Tuple[List[Cleaner], List[Task]]:
     """
     Assegna le task ai cleaner con regole semplificate:
     - Favorisce percorsi < 15'
     - Se non ci sono percorsi < 15', sceglie il minore dei > 15'
     - Max 2 task per cleaner (3ª solo se entro 10')
     - DEDUPLICA: Solo una task per logistic_code viene assegnata
+    - SKIP: Task già assegnate (per task_id) vengono saltate
     """
     if assigned_logistic_codes is None:
         assigned_logistic_codes = set()
+    if assigned_task_ids is None:
+        assigned_task_ids = set()
     
     unassigned = []
 
     for task in tasks:
+        # SKIP: Task già assegnata (per task_id)
+        if task.task_id in assigned_task_ids:
+            print(f"   ⏭️  Skippata task {task.task_id} (task_id già assegnato)")
+            unassigned.append(task)
+            continue
+        
         # DEDUPLICA: Skippa task con logistic_code già assegnato
         if task.logistic_code in assigned_logistic_codes:
             print(f"   ⏭️  Skippata task {task.task_id} (logistic_code {task.logistic_code} già assegnato)")
@@ -642,8 +651,9 @@ def plan_day(tasks: List[Task], cleaners: List[Cleaner], assigned_logistic_codes
 
         cleaner, pos, travel = chosen
         cleaner.route.insert(pos, task)
-        # Traccia il logistic_code come assegnato
+        # Traccia il logistic_code e task_id come assegnati
         assigned_logistic_codes.add(task.logistic_code)
+        assigned_task_ids.add(task.task_id)
 
     return cleaners, unassigned
 
@@ -826,8 +836,9 @@ def main():
     print(f"👥 Cleaner disponibili: {len(cleaners)}")
     print(f"📦 Task High-Priority da assegnare: {len(tasks)}")
     
-    # Leggi i logistic_code già assegnati dalla timeline
+    # Leggi i logistic_code E task_id già assegnati dalla timeline
     assigned_logistic_codes = set()
+    assigned_task_ids = set()
     timeline_path = OUTPUT_ASSIGN.parent / "timeline.json"
     if timeline_path.exists():
         try:
@@ -835,17 +846,22 @@ def main():
             for cleaner_entry in timeline_data.get("cleaners_assignments", []):
                 for task in cleaner_entry.get("tasks", []):
                     logistic_code = str(task.get("logistic_code"))
+                    task_id = str(task.get("task_id"))
                     if logistic_code:
                         assigned_logistic_codes.add(logistic_code)
+                    if task_id:
+                        assigned_task_ids.add(task_id)
             if assigned_logistic_codes:
                 print(f"📌 Logistic codes già assegnati in timeline: {len(assigned_logistic_codes)}")
+            if assigned_task_ids:
+                print(f"📌 Task IDs già assegnati in timeline: {len(assigned_task_ids)}")
         except Exception as e:
             print(f"⚠️ Errore lettura timeline per deduplica: {e}")
     
     print()
     print(f"🔄 Assegnazione in corso...")
 
-    planners, leftovers = plan_day(tasks, cleaners, assigned_logistic_codes)
+    planners, leftovers = plan_day(tasks, cleaners, assigned_logistic_codes, assigned_task_ids)
     output = build_output(planners, leftovers, tasks)
 
     print()
