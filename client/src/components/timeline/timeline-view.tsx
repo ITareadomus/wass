@@ -1,5 +1,5 @@
 import { Personnel, TaskType as Task } from "@shared/schema";
-import { Calendar, RotateCcw, Users, RefreshCw, UserPlus, Maximize2, Minimize2, Printer, Check, CheckCircle } from "lucide-react";
+import { Calendar, RotateCcw, Users, RefreshCw, UserPlus, Maximize2, Minimize2, Check, CheckCircle } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import * as React from "react";
 import { Droppable, Draggable } from "react-beautiful-dnd";
@@ -607,10 +607,7 @@ export default function TimelineView({
     };
   }, []);
 
-  // Funzione per stampare la timeline
-  const handlePrint = () => {
-    window.print();
-  };
+  
 
   const handleResetAssignments = async () => {
     try {
@@ -881,21 +878,13 @@ export default function TimelineView({
                   📜 Sei in modalità storico
                 </Button>
               )}
-              <Button
-                onClick={handlePrint}
-                variant="outline"
-                size="sm"
-                className="flex items-center gap-2 print:hidden"
-              >
-                <Printer className="w-4 h-4" />
-                Stampa
-              </Button>
+              
               {!isReadOnly && (
                 <Button
                   onClick={handleConfirmAssignments}
                   variant="default"
                   size="sm"
-                  className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white print:hidden"
+                  className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white"
                   disabled={!hasUnsavedChanges}
                 >
                   <CheckCircle className="w-4 h-4" />
@@ -1201,14 +1190,7 @@ export default function TimelineView({
                     📜 Sei in modalità storico
                   </Button>
                 )}
-                <Button
-                  onClick={handlePrint}
-                  variant="outline"
-                  className="h-full px-6"
-                >
-                  <Printer className="w-4 h-4 mr-2" />
-                  Stampa
-                </Button>
+                
               </div>
             </div>
           </div>
