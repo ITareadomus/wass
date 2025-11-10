@@ -1,6 +1,6 @@
 {
   "metadata": {
-    "last_updated": "2025-11-10T13:35:37.840Z",
+    "last_updated": "2025-11-10T13:36:43.263Z",
     "date": "2025-11-10"
   },
   "cleaners_assignments": [
@@ -13,18 +13,39 @@
         "premium": false
       },
       "assignment_type": "manual_drag",
-      "tasks": []
-    },
-    {
-      "cleaner": {
-        "id": 1058,
-        "name": "MONDAY",
-        "lastname": "SIMEON",
-        "role": "Standard",
-        "premium": false
-      },
-      "assignment_type": "manual_drag",
       "tasks": [
+        {
+          "task_id": 218629,
+          "logistic_code": 1643,
+          "client_id": null,
+          "premium": true,
+          "address": "Viale Majno 23",
+          "lat": "45.47048",
+          "lng": "9.2052883",
+          "cleaning_time": 180,
+          "checkin_date": "2025-11-17",
+          "checkout_date": "2025-11-12",
+          "checkin_time": null,
+          "checkout_time": null,
+          "pax_in": 5,
+          "pax_out": 5,
+          "small_equipment": false,
+          "operation_id": 2,
+          "confirmed_operation": false,
+          "straordinaria": false,
+          "type_apt": "E",
+          "alias": "HACCA",
+          "customer_name": "HACCA SRL",
+          "reasons": [
+            "manually_moved_to_timeline"
+          ],
+          "priority": "early_out",
+          "start_time": "10:00",
+          "end_time": "13:00",
+          "followup": false,
+          "sequence": 1,
+          "travel_time": 0
+        },
         {
           "task_id": 218646,
           "logistic_code": 1084,
@@ -51,11 +72,11 @@
             "manually_moved_to_timeline"
           ],
           "priority": "early_out",
-          "start_time": "10:00",
-          "end_time": "11:00",
-          "followup": false,
-          "sequence": 1,
-          "travel_time": 0
+          "start_time": "13:32",
+          "end_time": "14:32",
+          "followup": true,
+          "sequence": 2,
+          "travel_time": 32
         },
         {
           "task_id": 218640,
@@ -83,45 +104,24 @@
             "manually_moved_to_timeline"
           ],
           "priority": "early_out",
-          "start_time": "11:26",
-          "end_time": "12:26",
-          "followup": true,
-          "sequence": 2,
-          "travel_time": 26
-        },
-        {
-          "task_id": 218629,
-          "logistic_code": 1643,
-          "client_id": null,
-          "premium": true,
-          "address": "Viale Majno 23",
-          "lat": "45.47048",
-          "lng": "9.2052883",
-          "cleaning_time": 180,
-          "checkin_date": "2025-11-17",
-          "checkout_date": "2025-11-12",
-          "checkin_time": null,
-          "checkout_time": null,
-          "pax_in": 5,
-          "pax_out": 5,
-          "small_equipment": false,
-          "operation_id": 2,
-          "confirmed_operation": false,
-          "straordinaria": false,
-          "type_apt": "E",
-          "alias": "HACCA",
-          "customer_name": "HACCA SRL",
-          "reasons": [
-            "manually_moved_to_timeline"
-          ],
-          "priority": "early_out",
-          "start_time": "12:51",
-          "end_time": "15:51",
+          "start_time": "14:58",
+          "end_time": "15:58",
           "followup": true,
           "sequence": 3,
-          "travel_time": 25
+          "travel_time": 26
         }
       ]
+    },
+    {
+      "cleaner": {
+        "id": 1058,
+        "name": "MONDAY",
+        "lastname": "SIMEON",
+        "role": "Standard",
+        "premium": false
+      },
+      "assignment_type": "manual_drag",
+      "tasks": []
     }
   ],
   "meta": {
