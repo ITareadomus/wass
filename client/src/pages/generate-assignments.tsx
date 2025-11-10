@@ -217,6 +217,24 @@ export default function GenerateAssignments() {
     }
   };
 
+  // Orchestratore centralizzato per refresh assegnazioni
+  const refreshAssignments = async (
+    trigger: "initial" | "date-change" | "manual" | "manual-refresh",
+    date: Date = selectedDate
+  ) => {
+    console.log(`🔄 refreshAssignments chiamato con trigger: "${trigger}"`);
+
+    if (trigger === "manual") {
+      // Refresh manuale dopo drag-and-drop: solo reload file, NO auto-load, NO extractData
+      console.log('📂 Refresh manuale - solo reload file JSON');
+      await loadTasks(true);
+      return;
+    }
+
+    // Per tutti gli altri trigger, esegui auto-load completo
+    await checkAndAutoLoadSavedAssignments(date);
+  };
+
   // Funzione per controllare e caricare automaticamente assegnazioni salvate
   const checkAndAutoLoadSavedAssignments = async (date: Date) => {
     try {
@@ -427,9 +445,10 @@ export default function GenerateAssignments() {
     const shouldLoad = isInitialMount || (prevDateRef.current !== null && prevDateRef.current !== currentDateStr);
 
     if (shouldLoad) {
-      // NUOVO: Prima verifica se esistono assegnazioni salvate
-      // Se esistono, carica direttamente quelle invece di creare container vuoti
-      checkAndAutoLoadSavedAssignments(selectedDate);
+      // Determina il trigger corretto
+      const trigger = isInitialMount ? "initial" : "date-change";
+      console.log(`📅 Data changed o initial mount - trigger: "${trigger}"`);
+      refreshAssignments(trigger, selectedDate);
       prevDateRef.current = currentDateStr;
     }
 
@@ -782,7 +801,7 @@ export default function GenerateAssignments() {
 
   // Funzione esposta per ricaricare i task e le assegnazioni
   const reloadAllTasks = async () => {
-    await loadTasks(true); // Skip extraction, just reload from files
+    await refreshAssignments("manual");
   };
 
 
@@ -832,7 +851,7 @@ export default function GenerateAssignments() {
         });
 
         // Ricarica i task per mostrare le assegnazioni nella timeline
-        await loadTasks(true);
+        await refreshAssignments("manual");
       } else {
         throw new Error(result.message || 'Errore sconosciuto');
       }
@@ -1053,7 +1072,7 @@ export default function GenerateAssignments() {
             variant: "destructive"
           });
           // Ricarica i dati per sincronizzare lo stato
-          await loadTasks(true);
+          await refreshAssignments("manual");
         }
       } else {
         console.log('Timeline riordinata con successo');
@@ -1181,7 +1200,7 @@ export default function GenerateAssignments() {
 
           // Salva in timeline.json (rimuove automaticamente da containers.json)
           await saveTimelineAssignment(taskId, toCleanerId, logisticCode, destination.index);
-          await loadTasks(true);
+          await refreshAssignments("manual");
 
           // CRITICAL: Marca modifiche dopo drag-and-drop da container
           setHasUnsavedChanges(true);
@@ -1250,7 +1269,7 @@ export default function GenerateAssignments() {
               variant: "destructive"
             });
             // Ricarica per sincronizzare solo in caso di errore
-            await loadTasks(true);
+            await refreshAssignments("manual");
           } else {
             console.log('✅ Movimento completato - response.ok:', response.ok, 'data.success:', data.success);
             console.log('✅ Movimento salvato automaticamente in timeline.json');
@@ -1269,7 +1288,7 @@ export default function GenerateAssignments() {
             }
 
             // Reload in background (non blocca e non genera errori se fallisce)
-            loadTasks(true).catch(err => {
+            refreshAssignments("manual").catch(err => {
               console.warn('⚠️ Reload fallito dopo movimento (movimento già salvato):', err);
             });
           }
@@ -1328,7 +1347,7 @@ export default function GenerateAssignments() {
           }
 
           // Ricarica i task dai containers aggiornati
-          await loadTasks(true);
+          await refreshAssignments("manual");
 
           // CRITICAL: Marca modifiche dopo spostamento tra containers
           setHasUnsavedChanges(true);
@@ -1466,7 +1485,7 @@ export default function GenerateAssignments() {
 
         // Rimuovi da timeline.json
         await removeTimelineAssignment(taskId, logisticCode);
-        await loadTasks(true);
+        await refreshAssignments("manual");
 
         // CRITICAL: Marca modifiche dopo rimozione da timeline
         setHasUnsavedChanges(true);
@@ -1578,7 +1597,7 @@ export default function GenerateAssignments() {
               </span>
             </h1>
             <Button
-              onClick={() => loadTasks(true)}
+              onClick={() => refreshAssignments("manual-refresh")}
               variant="outline"
               size="icon"
               className="rounded-full h-10 w-10"
