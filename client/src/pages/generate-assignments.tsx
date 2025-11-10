@@ -170,7 +170,10 @@ export default function GenerateAssignments() {
         // Salva la data e ora formattate in localStorage per mostrarlo nella timeline
         const displayDateTime = result.formattedDateTime || result.filename;
         localStorage.setItem('last_saved_assignment', displayDateTime);
-        setLastSavedTimestamp(displayDateTime); // Use setLastSavedTimestamp
+        setLastSavedTimestamp(displayDateTime);
+        
+        // CRITICAL: Quando carichiamo assegnazioni salvate, NON ci sono modifiche
+        setHasUnsavedChanges(false);
 
         // CRITICAL: Verifica e aggiorna la data in timeline.json dopo il caricamento
         const timelineResponse = await fetch(`/data/output/timeline.json?t=${Date.now()}`, {
@@ -196,12 +199,12 @@ export default function GenerateAssignments() {
       } else {
         console.log("ℹ️ Nessuna assegnazione salvata per questa data");
         localStorage.removeItem('last_saved_assignment');
-        setLastSavedTimestamp(null); // Use setLastSavedTimestamp
+        setLastSavedTimestamp(null);
         return false;
       }
     } catch (error) {
       console.error("Errore nel caricamento delle assegnazioni salvate:", error);
-      setLastSavedTimestamp(null); // Use setLastSavedTimestamp
+      setLastSavedTimestamp(null);
       return false;
     }
   };
@@ -312,6 +315,9 @@ export default function GenerateAssignments() {
             await (window as any).loadTimelineCleaners();
           }
 
+          // CRITICAL: Dopo aver caricato assegnazioni salvate, NON ci sono modifiche
+          setHasUnsavedChanges(false);
+
           setExtractionStep("Assegnazioni caricate!");
           await new Promise(resolve => setTimeout(resolve, 100));
           setIsExtracting(false);
@@ -388,6 +394,10 @@ export default function GenerateAssignments() {
 
       setExtractionStep("Task caricati!");
       await new Promise(resolve => setTimeout(resolve, 100));
+      
+      // CRITICAL: Dopo estrazione nuovi dati, NON ci sono modifiche da salvare
+      setHasUnsavedChanges(false);
+      
       setIsExtracting(false);
     } catch (error) {
       console.error("Errore nell'estrazione:", error);
