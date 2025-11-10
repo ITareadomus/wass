@@ -94,12 +94,12 @@ export default function TimelineView({
       return await response.json();
     },
     onSuccess: async (data) => {
-      // CRITICAL: Notifica PRIMA del reload per mantenere lo stato
-      if (onTaskMoved) {
-        onTaskMoved();
-      }
+      // CRITICAL: Marca modifiche SOLO dopo azioni utente
       if ((window as any).setHasUnsavedChanges) {
         (window as any).setHasUnsavedChanges(true);
+      }
+      if (onTaskMoved) {
+        onTaskMoved();
       }
 
       // CRITICAL: Ricarica PRIMA la timeline per vedere i cleaners con task
@@ -138,12 +138,12 @@ export default function TimelineView({
       return await response.json();
     },
     onSuccess: async (data, cleanerId) => {
-      // CRITICAL: Notifica PRIMA del reload per mantenere lo stato
-      if (onTaskMoved) {
-        onTaskMoved();
-      }
+      // CRITICAL: Marca modifiche SOLO dopo azioni utente
       if ((window as any).setHasUnsavedChanges) {
         (window as any).setHasUnsavedChanges(true);
+      }
+      if (onTaskMoved) {
+        onTaskMoved();
       }
 
       // Ricarica ENTRAMBI i file per sincronizzare la vista
@@ -194,12 +194,12 @@ export default function TimelineView({
       return await response.json();
     },
     onSuccess: async (data, variables) => {
-      // CRITICAL: Notifica PRIMA del reload per mantenere lo stato
-      if (onTaskMoved) {
-        onTaskMoved();
-      }
+      // CRITICAL: Marca modifiche SOLO dopo azioni utente
       if ((window as any).setHasUnsavedChanges) {
         (window as any).setHasUnsavedChanges(true);
+      }
+      if (onTaskMoved) {
+        onTaskMoved();
       }
 
       // Ricarica i task per mostrare immediatamente lo swap
@@ -769,16 +769,8 @@ export default function TimelineView({
     (window as any).loadTimelineCleaners = loadTimelineCleaners;
   }, []);
 
-  // Monitora cambiamenti nelle task per marcare modifiche non salvate
-  useEffect(() => {
-    // Skip al primo render
-    if (tasks.length === 0) return;
-
-    // Quando le task cambiano (drag-and-drop), notifica il parent
-    if (onTaskMoved) {
-      onTaskMoved();
-    }
-  }, [tasks]);
+  // Nota: il tracking delle modifiche avviene SOLO tramite onTaskMoved
+  // chiamato esplicitamente durante drag-and-drop e altre azioni utente
 
   // Funzione per verificare SE esistono assegnazioni salvate (senza caricarle)
   const checkSavedAssignmentExists = async () => {
