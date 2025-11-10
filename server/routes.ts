@@ -102,6 +102,51 @@ async function recalculateCleanerTimes(cleanerData: any): Promise<any> {
 }
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Endpoint per il login
+  app.post("/api/login", async (req, res) => {
+    try {
+      const { username, password } = req.body;
+
+      if (!username || !password) {
+        return res.status(400).json({
+          success: false,
+          message: "Username e password sono obbligatori"
+        });
+      }
+
+      // Carica accounts.json
+      const accountsPath = path.join(process.cwd(), 'client/public/data/accounts.json');
+      const accountsData = JSON.parse(await fs.readFile(accountsPath, 'utf8'));
+
+      // Trova l'utente
+      const user = accountsData.users.find(
+        (u: any) => u.username === username && u.password === password
+      );
+
+      if (!user) {
+        return res.status(401).json({
+          success: false,
+          message: "Username o password non validi"
+        });
+      }
+
+      // Rimuovi la password dalla risposta
+      const { password: _, ...userWithoutPassword } = user;
+
+      res.json({
+        success: true,
+        user: userWithoutPassword,
+        message: "Login effettuato con successo"
+      });
+    } catch (error: any) {
+      console.error("Errore nel login:", error);
+      res.status(500).json({
+        success: false,
+        message: "Errore interno del server"
+      });
+    }
+  });
+
   // Endpoint per svuotare early_out.json dopo l'assegnazione
   app.post("/api/clear-early-out-json", async (req, res) => {
     try {
