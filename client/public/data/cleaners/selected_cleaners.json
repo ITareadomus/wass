@@ -1,29 +1,6 @@
 {
   "cleaners": [
     {
-      "id": 24,
-      "name": "HUSSAIN",
-      "lastname": "SYED SHUJIAHAT",
-      "role": "Standard",
-      "active": true,
-      "ranking": 0,
-      "counter_hours": 0,
-      "counter_days": 1,
-      "available": true,
-      "contract_type": "B",
-      "preferred_customers": [
-        2,
-        67,
-        72,
-        84,
-        94,
-        115
-      ],
-      "telegram_id": null,
-      "start_time": "10:00",
-      "can_do_straordinaria": false
-    },
-    {
       "id": 132,
       "name": "JOHOISER ERNESTO",
       "lastname": "LOPEZ GIRON",
@@ -228,9 +205,9 @@
       "can_do_straordinaria": false
     }
   ],
-  "total_selected": 8,
+  "total_selected": 7,
   "metadata": {
     "date": "2025-11-11",
-    "saved_at": "2025-11-10T10:00:47.441Z"
+    "saved_at": "2025-11-10T10:06:30.014Z"
   }
 }
