@@ -624,7 +624,7 @@ export default function TimelineView({
       const resetResponse = await fetch('/api/reset-timeline-assignments', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.JSONstringify({ date: dateStr })
+        body: JSON.stringify({ date: dateStr })
       });
 
       if (!resetResponse.ok) {
@@ -635,19 +635,9 @@ export default function TimelineView({
       setLastSavedFilename(null);
       localStorage.removeItem('last_saved_assignment');
 
-      // 3. Ricarica i task senza ricaricare la pagina (mantiene la data)
-      if ((window as any).reloadAllTasks) {
-        await (window as any).reloadAllTasks();
-      }
-      if ((window as any).setHasUnsavedChanges) {
-        (window as any).setHasUnsavedChanges(true);
-      }
-
-      toast({
-        title: "Reset completato",
-        description: "Timeline svuotata con successo",
-        variant: "success",
-      });
+      // 3. CRITICAL: Ricarica forzata della pagina per sincronizzare tutti gli stati
+      // Questo garantisce che frontend e backend siano perfettamente allineati
+      window.location.reload();
     } catch (error) {
       console.error('Errore nel reset:', error);
       toast({
@@ -708,7 +698,7 @@ export default function TimelineView({
     }
   };
 
-  const [lastSavedFilename, setLastSavedFilename] = useState<string | null>(null);
+  // const [lastSavedFilename, setLastSavedFilename] = useState<string | null>(null);
 
   // Carica anche i cleaner dalla timeline.json per mostrare quelli nascosti
   const [timelineCleaners, setTimelineCleaners] = useState<any[]>([]);
@@ -1154,8 +1144,8 @@ export default function TimelineView({
                     disabled={!hasUnsavedChanges}
                     variant="outline"
                     className={`flex-1 h-full ${
-                      hasUnsavedChanges 
-                        ? 'bg-green-600 hover:bg-green-700 text-white border-green-700 animate-pulse' 
+                      hasUnsavedChanges
+                        ? 'bg-green-600 hover:bg-green-700 text-white border-green-700 animate-pulse'
                         : 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200 border-green-300 dark:border-green-700 cursor-default'
                     }`}
                     data-testid="button-confirm-assignments"
