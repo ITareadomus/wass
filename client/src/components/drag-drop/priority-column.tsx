@@ -33,7 +33,10 @@ export default function PriorityColumn({
   const [hasAssigned, setHasAssigned] = useState(false);
   
   // Usa il context per multi-select
-  const { isMultiSelectMode, selectedTasks, toggleMode, toggleTask, isTaskSelected, getTaskOrder } = useMultiSelect();
+  const multiSelectCtx = useMultiSelect();
+  const { isMultiSelectMode, selectedTasks, toggleMode, toggleTask, isTaskSelected, getTaskOrder } = multiSelectCtx;
+  
+  console.log('[DEBUG PriorityColumn]', priority, 'isMultiSelectMode:', isMultiSelectMode, 'selectedTasks:', selectedTasks.length);
 
   // Verifica se la data selezionata è nel passato
   useEffect(() => {
