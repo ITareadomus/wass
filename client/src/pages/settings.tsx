@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
@@ -7,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { Trash2, Plus, Eye, EyeOff, Save, X } from "lucide-react";
+import { Trash2, Plus, Eye, EyeOff, Save, X, Home } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -197,8 +196,9 @@ export default function Settings() {
         <div className="flex justify-between items-center mb-8">
           <h1 className="text-3xl font-bold">Impostazioni Account</h1>
           <div className="flex gap-2">
-            <Button onClick={() => setLocation("/")} variant="outline">
-              Torna alla Home
+            <Button onClick={() => setLocation("/")} variant="outline" className="flex items-center gap-2">
+              <Home className="w-4 h-4" />
+              <span>Torna alla Home</span>
             </Button>
             <ThemeToggle />
           </div>
