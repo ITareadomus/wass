@@ -1,7 +1,7 @@
 {
   "metadata": {
-    "last_updated": "2025-11-10T11:22:03.880694",
-    "date": "2025-11-11"
+    "last_updated": "2025-11-10T11:26:24.609Z",
+    "date": "2025-11-10"
   },
   "cleaners_assignments": [
     {
@@ -779,41 +779,6 @@
           "followup": true,
           "sequence": 3,
           "travel_time": 25
-        },
-        {
-          "task_id": 216333,
-          "logistic_code": 1198,
-          "client_id": 2,
-          "premium": false,
-          "address": "Via Bergognone 31",
-          "lat": "45.453707852983",
-          "lng": "9.1641459982137",
-          "cleaning_time": 180,
-          "checkin_date": "2025-11-11",
-          "checkout_date": "2025-11-11",
-          "checkin_time": null,
-          "checkout_time": null,
-          "pax_in": 7,
-          "pax_out": 9,
-          "small_equipment": false,
-          "operation_id": 2,
-          "confirmed_operation": true,
-          "straordinaria": false,
-          "type_apt": "D",
-          "alias": "ITW",
-          "customer_name": "ITALIANWAY SRL",
-          "priority": "low_priority",
-          "reasons": [
-            "not_eo",
-            "not_hp",
-            "automatic_assignment_lp",
-            "manual_assignment"
-          ],
-          "start_time": "14:46",
-          "end_time": "17:46",
-          "followup": true,
-          "sequence": 4,
-          "travel_time": 26
         }
       ]
     },
@@ -1009,6 +974,41 @@
           "followup": true,
           "sequence": 2,
           "travel_time": 26
+        },
+        {
+          "task_id": 216333,
+          "logistic_code": 1198,
+          "client_id": 2,
+          "premium": false,
+          "address": "Via Bergognone 31",
+          "lat": "45.453707852983",
+          "lng": "9.1641459982137",
+          "cleaning_time": 180,
+          "checkin_date": "2025-11-11",
+          "checkout_date": "2025-11-11",
+          "checkin_time": null,
+          "checkout_time": null,
+          "pax_in": 7,
+          "pax_out": 9,
+          "small_equipment": false,
+          "operation_id": 2,
+          "confirmed_operation": true,
+          "straordinaria": false,
+          "type_apt": "D",
+          "alias": "ITW",
+          "customer_name": "ITALIANWAY SRL",
+          "priority": "low_priority",
+          "reasons": [
+            "not_eo",
+            "not_hp",
+            "automatic_assignment_lp",
+            "manual_assignment"
+          ],
+          "start_time": "13:45",
+          "end_time": "16:45",
+          "followup": true,
+          "sequence": 3,
+          "travel_time": 49
         }
       ]
     }
