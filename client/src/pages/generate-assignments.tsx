@@ -5,7 +5,7 @@ import TimelineView from "@/components/timeline/timeline-view";
 import MapSection from "@/components/map/map-section";
 import { useState, useEffect, useRef, useCallback, createContext, useContext, useMemo } from "react";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { CalendarIcon, Users, RefreshCw } from "lucide-react";
+import { CalendarIcon, Users, RefreshCw, Settings } from "lucide-react";
 import { useLocation } from 'wouter';
 import { format } from "date-fns";
 import { it } from "date-fns/locale";
@@ -1273,16 +1273,16 @@ export default function GenerateAssignments() {
 
       // 🔸 BATCH MOVE: Se multi-select è attivo, ci sono task selezionate, E la task trascinata è tra quelle selezionate
       const isDraggedTaskSelected = selectedTasks.some(st => st.taskId === taskId);
-      
+
       if (isMultiSelectMode && selectedTasks.length > 0 && isDraggedTaskSelected && fromContainer && toCleanerId !== null && !toContainer) {
         // Filtra solo le task selezionate che sono nello stesso container della task trascinata
         const tasksInSameContainer = selectedTasks.filter(st => {
           const task = allTasksWithAssignments.find(t => String(t.id) === st.taskId);
           return task && task.priority === allTasksWithAssignments.find(t => String(t.id) === taskId)?.priority;
         });
-        
+
         console.log(`🔄 BATCH MOVE: Spostamento di ${tasksInSameContainer.length} task selezionate da ${fromContainer} a cleaner ${toCleanerId}`);
-        
+
         try {
           // Carica i dati del cleaner
           const cleanersResponse = await fetch('/data/cleaners/selected_cleaners.json');
@@ -1292,7 +1292,7 @@ export default function GenerateAssignments() {
 
           // Ordina le task selezionate (dello stesso container) per ordine di selezione
           const sortedTasks = [...tasksInSameContainer].sort((a, b) => a.order - b.order);
-          
+
           // Sposta ciascuna task in sequenza alla destinazione
           let currentIndex = destination.index;
           for (const selectedTask of sortedTasks) {
@@ -1400,7 +1400,7 @@ export default function GenerateAssignments() {
           });
 
           console.log('✅ Response ricevuta, status:', response.status, 'ok:', response.ok);
-          
+
           const data = await response.json();
           console.log('✅ JSON parseato con successo:', data);
 
@@ -1758,9 +1758,10 @@ export default function GenerateAssignments() {
                 if (userData.role === "admin") {
                   return (
                     <Button
-                      onClick={() => window.location.href = "/settings"}
+                      onClick={() => setLocation("/settings")}
                       variant="outline"
                     >
+                      <Settings className="w-4 h-4 mr-2" />
                       Impostazioni
                     </Button>
                   );
