@@ -176,55 +176,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log(`🗑️ Reset flag ultimo salvataggio per data ${workDate}`);
       // Il frontend gestirà la rimozione del localStorage
 
-      // === MODIFICATO: Non svuotare più selected_cleaners.json automaticamente ===
-      // I cleaners selezionati rimangono persistenti tra le pagine
-      // Verranno svuotati SOLO quando l'utente cambia effettivamente data
-      try {
-        const selectedCleanersPath = path.join(
-          process.cwd(),
-          'client/public/data/cleaners/selected_cleaners.json'
-        );
-
-        // Leggi il file attuale
-        let currentData;
-        try {
-          const content = await fs.readFile(selectedCleanersPath, 'utf8');
-          currentData = JSON.parse(content);
-        } catch (e) {
-          // Se il file non esiste, crea uno vuoto
-          currentData = {
-            cleaners: [],
-            total_selected: 0,
-            metadata: { 
-              date: workDate,
-              reset_at: new Date().toISOString()
-            }
-          };
-        }
-
-        // Svuota SOLO se la data è diversa da quella salvata
-        const savedDate = currentData.metadata?.date;
-        if (savedDate !== workDate) {
-          console.log(`🔄 Cambio data da ${savedDate} a ${workDate} - reset selected_cleaners.json`);
-          const emptySelectedCleaners = {
-            cleaners: [],
-            total_selected: 0,
-            metadata: { 
-              date: workDate,
-              reset_at: new Date().toISOString()
-            }
-          };
-
-          const tmpScPath = `${selectedCleanersPath}.tmp`;
-          await fs.writeFile(tmpScPath, JSON.stringify(emptySelectedCleaners, null, 2));
-          await fs.rename(tmpScPath, selectedCleanersPath);
-          console.log(`🗑️ selected_cleaners.json svuotato per nuova data ${workDate}`);
-        } else {
-          console.log(`✅ Stessa data (${workDate}) - selected_cleaners.json NON modificato`);
-        }
-      } catch (e) {
-        console.warn('⚠️ Errore gestione selected_cleaners.json:', e);
-      }
+      // === RESET: NON modificare selected_cleaners.json ===
+      // Durante il reset, selected_cleaners.json rimane INVARIATO
+      // Viene svuotato SOLO quando si cambia data (in /api/extract-data)
+      console.log(`✅ Reset completato - selected_cleaners.json NON modificato (rimane invariato)`);
       // === END ===
 
       res.json({ success: true, message: "Timeline resettata con successo" });
@@ -979,10 +934,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.json({ success: true, found: false });
     } catch (error: any) {
       console.error("check-saved-assignments error:", error);
-      return res.status(200).json({ 
-        success: false, 
-        found: false, 
-        error: String(error?.message || error) 
+      return res.status(200).json({
+        success: false,
+        found: false,
+        error: String(error?.message || error)
       });
     }
   });
@@ -1053,7 +1008,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const now = new Date();
       const hours = String(now.getHours()).padStart(2, '0');
       const minutes = String(now.getMinutes()).padStart(2, '0');
-      const formattedDateTime = `${day}/${month}/${fullYear} alle ${hours}:${minutes}`;
+      const formattedDateTime = `${day}/${month}/${year} alle ${hours}:${minutes}`;
 
       res.json({
         success: true,
@@ -1093,7 +1048,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const savedData = JSON.parse(result.value);
-      
+
       // CRITICAL: Aggiorna SEMPRE la data nei metadata con la data richiesta
       // Questo permette di caricare file salvati anche se la data interna non corrisponde
       savedData.metadata = savedData.metadata || {};
@@ -1117,7 +1072,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const year = fullYear.slice(-2);
       const folderPath = `${day}-${month}-${fullYear}`;
       const scKey = `${folderPath}/selected_cleaners_${day}${month}${year}.json`;
-      
+
       let selectedCleanersBackup: any = null;
       try {
         const scResult = await client.downloadAsText(scKey, { bucket: BUCKET });
@@ -1185,7 +1140,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             process.cwd(),
             'client/public/data/cleaners/selected_cleaners.json'
           );
-          
+
           const tmpScPath = `${selectedCleanersPath}.tmp`;
           await fs.writeFile(tmpScPath, JSON.stringify(selectedCleanersBackup, null, 2));
           await fs.rename(tmpScPath, selectedCleanersPath);
@@ -1199,11 +1154,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // CRITICAL: NON rieseguire create_containers dopo aver caricato da Object Storage
       // Invece, rimuovi dai containers.json le task già assegnate in timeline.json
       const containersPath = path.join(process.cwd(), 'client/public/data/output/containers.json');
-      
+
       try {
         // Carica containers esistenti (generati da extract-data precedente)
         const containersData = JSON.parse(await fs.readFile(containersPath, 'utf8'));
-        
+
         // Estrai tutti i task_id assegnati dalla timeline
         const assignedTaskIds = new Set<number>();
         if (savedData.cleaners_assignments) {
@@ -1213,9 +1168,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
             }
           }
         }
-        
+
         console.log(`🔍 Task assegnate trovate in timeline: ${assignedTaskIds.size}`);
-        
+
         // Rimuovi dai containers le task già assegnate
         let removedCount = 0;
         for (const containerType of ['early_out', 'high_priority', 'low_priority']) {
@@ -1227,7 +1182,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             removedCount += (originalCount - container.tasks.length);
           }
         }
-        
+
         // Aggiorna summary
         if (containersData.summary) {
           containersData.summary.early_out = containersData.containers.early_out?.count || 0;
@@ -1238,12 +1193,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
             containersData.summary.high_priority +
             containersData.summary.low_priority;
         }
-        
+
         // Salva containers.json sincronizzato
         const tmpContainersPath = `${containersPath}.tmp`;
         await fs.writeFile(tmpContainersPath, JSON.stringify(containersData, null, 2));
         await fs.rename(tmpContainersPath, containersPath);
-        
+
         console.log(`✅ Containers sincronizzati: rimosse ${removedCount} task già assegnate`);
       } catch (err) {
         console.warn('⚠️ Impossibile sincronizzare containers:', err);
@@ -1558,11 +1513,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       } else {
         // AGGIUNTA: Nessun cleaner rimosso da sostituire, aggiungi alla fine
         console.log(`➕ Nessun cleaner da sostituire, aggiunta nuovo cleaner ${cleanerId} (senza task)`);
-        
+
         // Cerca la posizione corretta basandoti su selected_cleaners.json
         // per mantenere l'ordine visivo
         const insertIndex = selectedCleanersData.cleaners.findIndex((c: any) => c.id === cleanerId);
-        
+
         const newCleanerEntry = {
           cleaner: {
             id: cleanerData.id,
@@ -1573,7 +1528,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           },
           tasks: []
         };
-        
+
         // Inserisci alla posizione corretta invece di append
         if (insertIndex >= 0 && insertIndex < timelineData.cleaners_assignments.length) {
           timelineData.cleaners_assignments.splice(insertIndex, 0, newCleanerEntry);
@@ -2475,15 +2430,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       try {
         await fs.access(timelinePath);
         const fileContent = await fs.readFile(timelinePath, 'utf8');
-        
+
         // Verifica che il contenuto sia JSON valido
         if (!fileContent.trim().startsWith('{')) {
           throw new Error('timeline.json non contiene JSON valido');
         }
-        
+
         const existingTimeline = JSON.parse(fileContent);
         timelineExists = true;
-        
+
         // Aggiorna SOLO la metadata.date se è cambiata
         if (existingTimeline.metadata?.date !== date) {
           console.log(`🔄 Timeline esiste per data ${existingTimeline.metadata?.date}, aggiorno metadata.date a ${date}`);
@@ -2519,7 +2474,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       try {
         const existingSelectedData = JSON.parse(await fs.readFile(selectedCleanersPath, 'utf8'));
         const existingDate = existingSelectedData.metadata?.date;
-        
+
         if (existingDate !== date) {
           shouldResetSelectedCleaners = true;
           console.log(`📅 Data cambiata da ${existingDate} a ${date} - reset selected_cleaners.json`);
@@ -2536,7 +2491,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const emptySelected = {
           cleaners: [],
           total_selected: 0,
-          metadata: { 
+          metadata: {
             date,
             reset_at: new Date().toISOString()
           }
@@ -2897,7 +2852,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // CRITICAL FIX: Usa timelineData direttamente (già contiene tutti i cleaner)
       // NON ricaricare da file perché timelineData è già completo
-      
+
       // Aggiorna solo metadata
       timelineData.metadata = timelineData.metadata || {};
       timelineData.metadata.last_updated = new Date().toISOString();
