@@ -1735,10 +1735,30 @@ export default function GenerateAssignments() {
           <div className="flex items-center gap-3">
             <h1 className="text-3xl font-bold text-foreground flex items-center gap-2">
               GENERA ASSEGNAZIONI
-              <span className="text-2xl font-normal text-muted-foreground ml-4">
-                del {format(selectedDate, "dd/MM/yyyy", { locale: it })}
-              </span>
             </h1>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  className={cn(
+                    "justify-start text-left font-normal",
+                    !selectedDate && "text-muted-foreground"
+                  )}
+                >
+                  <CalendarIcon className="mr-2 h-4 w-4" />
+                  {selectedDate ? format(selectedDate, "dd/MM/yyyy", { locale: it }) : <span>Seleziona data</span>}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar
+                  mode="single"
+                  selected={selectedDate}
+                  onSelect={handleDateSelect}
+                  initialFocus
+                  locale={it}
+                />
+              </PopoverContent>
+            </Popover>
           </div>
           <div className="flex items-center gap-3">
             {/* Settings button for admin */}
@@ -1762,33 +1782,7 @@ export default function GenerateAssignments() {
               }
               return null;
             })()}
-            {/* Date Selector + Dark Mode Toggle */}
-            <div className="flex items-center gap-3">
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    className={cn(
-                      "w-[240px] justify-start text-left font-normal",
-                      !selectedDate && "text-muted-foreground"
-                    )}
-                  >
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {selectedDate ? format(selectedDate, "PPP", { locale: it }) : <span>Seleziona data</span>}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                  <Calendar
-                    mode="single"
-                    selected={selectedDate}
-                    onSelect={handleDateSelect}
-                    initialFocus
-                    locale={it}
-                  />
-                </PopoverContent>
-              </Popover>
-              <ThemeToggle />
-            </div>
+            <ThemeToggle />
           </div>
         </div>
 
