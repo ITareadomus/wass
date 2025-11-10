@@ -1,6 +1,6 @@
 {
   "metadata": {
-    "last_updated": "2025-11-10T10:14:24.275Z",
+    "last_updated": "2025-11-10T10:17:20.814Z",
     "date": "2025-11-11"
   },
   "cleaners_assignments": [
@@ -253,10 +253,60 @@
         "premium": true
       },
       "tasks": []
+    },
+    {
+      "cleaner": {
+        "id": 132,
+        "name": "JOHOISER ERNESTO",
+        "lastname": "LOPEZ GIRON",
+        "role": "Premium",
+        "premium": true
+      },
+      "tasks": []
+    },
+    {
+      "cleaner": {
+        "id": 249,
+        "name": "Ogbodo Chidi",
+        "lastname": "Igwe",
+        "role": "Premium",
+        "premium": true
+      },
+      "tasks": []
+    },
+    {
+      "cleaner": {
+        "id": 326,
+        "name": "FESTUS OSARO",
+        "lastname": "AIHIVBERE",
+        "role": "Standard",
+        "premium": false
+      },
+      "tasks": []
+    },
+    {
+      "cleaner": {
+        "id": 404,
+        "name": "RASEL",
+        "lastname": "MOLLA",
+        "role": "Standard",
+        "premium": false
+      },
+      "tasks": []
+    },
+    {
+      "cleaner": {
+        "id": 445,
+        "name": "IBRAHIM",
+        "lastname": "SANYANG",
+        "role": "Premium",
+        "premium": true
+      },
+      "tasks": []
     }
   ],
   "meta": {
-    "total_cleaners": 25,
+    "total_cleaners": 30,
     "used_cleaners": 0,
     "assigned_tasks": 0
   }
