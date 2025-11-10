@@ -489,41 +489,10 @@ def seed_cleaners_from_eo(cleaners: List[Cleaner], ref_date: str):
         if not tasks:
             continue
 
-        # Filtra task EO e HP
+        # Filtra solo task EO (con priority="early_out" o reasons che include "automatic_assignment_eo")
         eo_tasks = [t for t in tasks if
                     t.get("priority") == "early_out" or
                     ("automatic_assignment_eo" in t.get("reasons", []))]
-        
-        hp_tasks = [t for t in tasks if
-                    t.get("priority") == "high_priority" or
-                    ("automatic_assignment_hp" in t.get("reasons", []))]
-
-        # Carica task HP già assegnate nella route del cleaner
-        for cl in cleaners:
-            if cl.id == cid:
-                for hp_task in hp_tasks:
-                    checkout_dt = parse_dt(hp_task.get("checkout_date"), hp_task.get("checkout_time"))
-                    checkin_dt = parse_dt(hp_task.get("checkin_date"), hp_task.get("checkin_time"))
-                    is_hp_soft = (checkin_dt is None and checkout_dt is None)
-                    
-                    task_obj = Task(
-                        task_id=str(hp_task.get("task_id")),
-                        logistic_code=str(hp_task.get("logistic_code")),
-                        lat=float(hp_task.get("lat")),
-                        lng=float(hp_task.get("lng")),
-                        cleaning_time=int(hp_task.get("cleaning_time") or 60),
-                        checkout_dt=checkout_dt,
-                        checkin_dt=checkin_dt,
-                        is_premium=bool(hp_task.get("premium", False)),
-                        apt_type=hp_task.get("type_apt"),
-                        address=hp_task.get("address"),
-                        alias=hp_task.get("alias"),
-                        small_equipment=bool(hp_task.get("small_equipment", False)),
-                        straordinaria=bool(hp_task.get("straordinaria", False)),
-                        is_hp_soft=is_hp_soft,
-                    )
-                    cl.route.append(task_obj)
-                break
 
         if not eo_tasks:
             continue
@@ -588,29 +557,20 @@ def load_tasks() -> Tuple[List[Task], str]:
 
 
 # -------- Planner --------
-def plan_day(tasks: List[Task], cleaners: List[Cleaner], assigned_logistic_codes: set = None, assigned_task_ids: set = None) -> Tuple[List[Cleaner], List[Task]]:
+def plan_day(tasks: List[Task], cleaners: List[Cleaner], assigned_logistic_codes: set = None) -> Tuple[List[Cleaner], List[Task]]:
     """
     Assegna le task ai cleaner con regole semplificate:
     - Favorisce percorsi < 15'
     - Se non ci sono percorsi < 15', sceglie il minore dei > 15'
     - Max 2 task per cleaner (3ª solo se entro 10')
     - DEDUPLICA: Solo una task per logistic_code viene assegnata
-    - SKIP: Task già assegnate (per task_id) vengono saltate
     """
     if assigned_logistic_codes is None:
         assigned_logistic_codes = set()
-    if assigned_task_ids is None:
-        assigned_task_ids = set()
     
     unassigned = []
 
     for task in tasks:
-        # SKIP: Task già assegnata (per task_id)
-        if task.task_id in assigned_task_ids:
-            print(f"   ⏭️  Skippata task {task.task_id} (task_id già assegnato)")
-            unassigned.append(task)
-            continue
-        
         # DEDUPLICA: Skippa task con logistic_code già assegnato
         if task.logistic_code in assigned_logistic_codes:
             print(f"   ⏭️  Skippata task {task.task_id} (logistic_code {task.logistic_code} già assegnato)")
@@ -682,9 +642,8 @@ def plan_day(tasks: List[Task], cleaners: List[Cleaner], assigned_logistic_codes
 
         cleaner, pos, travel = chosen
         cleaner.route.insert(pos, task)
-        # Traccia il logistic_code e task_id come assegnati
+        # Traccia il logistic_code come assegnato
         assigned_logistic_codes.add(task.logistic_code)
-        assigned_task_ids.add(task.task_id)
 
     return cleaners, unassigned
 
@@ -867,9 +826,8 @@ def main():
     print(f"👥 Cleaner disponibili: {len(cleaners)}")
     print(f"📦 Task High-Priority da assegnare: {len(tasks)}")
     
-    # Leggi i logistic_code E task_id già assegnati dalla timeline
+    # Leggi i logistic_code già assegnati dalla timeline
     assigned_logistic_codes = set()
-    assigned_task_ids = set()
     timeline_path = OUTPUT_ASSIGN.parent / "timeline.json"
     if timeline_path.exists():
         try:
@@ -877,22 +835,17 @@ def main():
             for cleaner_entry in timeline_data.get("cleaners_assignments", []):
                 for task in cleaner_entry.get("tasks", []):
                     logistic_code = str(task.get("logistic_code"))
-                    task_id = str(task.get("task_id"))
                     if logistic_code:
                         assigned_logistic_codes.add(logistic_code)
-                    if task_id:
-                        assigned_task_ids.add(task_id)
             if assigned_logistic_codes:
                 print(f"📌 Logistic codes già assegnati in timeline: {len(assigned_logistic_codes)}")
-            if assigned_task_ids:
-                print(f"📌 Task IDs già assegnati in timeline: {len(assigned_task_ids)}")
         except Exception as e:
             print(f"⚠️ Errore lettura timeline per deduplica: {e}")
     
     print()
     print(f"🔄 Assegnazione in corso...")
 
-    planners, leftovers = plan_day(tasks, cleaners, assigned_logistic_codes, assigned_task_ids)
+    planners, leftovers = plan_day(tasks, cleaners, assigned_logistic_codes)
     output = build_output(planners, leftovers, tasks)
 
     print()
@@ -987,8 +940,8 @@ def main():
             for task in cleaner_entry.get("tasks", []):
                 assigned_task_ids.add(int(task["task_id"]))
 
-        # CRITICAL FIX: Rimuovi task SOLO se effettivamente assegnate in questo run
-        if assigned_task_ids and "containers" in containers_data and "high_priority" in containers_data["containers"]:
+        # Rimuovi le task assegnate dal container high_priority usando task_id
+        if "containers" in containers_data and "high_priority" in containers_data["containers"]:
             original_count = len(containers_data["containers"]["high_priority"]["tasks"])
             containers_data["containers"]["high_priority"]["tasks"] = [
                 t for t in containers_data["containers"]["high_priority"]["tasks"]
@@ -1008,9 +961,6 @@ def main():
             print(f"✅ Rimosse {original_count - new_count} task da containers.json (high_priority) usando task_id")
             print(f"   - Task rimaste in high_priority: {new_count}")
             print(f"   💡 Task con logistic_code duplicati rimangono disponibili nei container")
-        elif not assigned_task_ids:
-            print(f"ℹ️ Nessuna task assegnata in questo run - containers.json NON modificato")
-            print(f"   - Task rimaste in high_priority: {len(containers_data['containers']['high_priority']['tasks'])}")
 
 
 if __name__ == "__main__":
