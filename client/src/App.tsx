@@ -5,11 +5,13 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import GenerateAssignments from "@/pages/generate-assignments";
 import Convocazioni from "@/pages/convocazioni";
+import Login from "@/pages/login";
 import NotFound from "@/pages/not-found";
 
 function Router() {
   return (
     <Switch>
+      <Route path="/login" component={Login} />
       <Route path="/" component={GenerateAssignments} />
       <Route path="/generate-assignments" component={GenerateAssignments} />
       <Route path="/convocazioni" component={Convocazioni} />
