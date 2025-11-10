@@ -3,7 +3,7 @@ import { TaskType as Task } from "@shared/schema";
 import PriorityColumn from "@/components/drag-drop/priority-column";
 import TimelineView from "@/components/timeline/timeline-view";
 import MapSection from "@/components/map/map-section";
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, createContext, useContext, useMemo } from "react";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { CalendarIcon, Users, RefreshCw } from "lucide-react";
 import { useLocation } from 'wouter';
@@ -95,6 +95,27 @@ const isDateInPast = (date: Date): boolean => {
   return targetDate < today;
 };
 
+// MultiSelect Context per gestire selezione multipla task
+interface MultiSelectContextType {
+  isMultiSelectMode: boolean;
+  selectedTasks: Array<{taskId: string; order: number}>;
+  toggleMode: () => void;
+  toggleTask: (taskId: string) => void;
+  clearSelection: () => void;
+  isTaskSelected: (taskId: string) => boolean;
+  getTaskOrder: (taskId: string) => number | undefined;
+}
+
+const MultiSelectContext = createContext<MultiSelectContextType | null>(null);
+
+export const useMultiSelect = () => {
+  const context = useContext(MultiSelectContext);
+  if (!context) {
+    throw new Error('useMultiSelect must be used within MultiSelectProvider');
+  }
+  return context;
+};
+
 export default function GenerateAssignments() {
   // Usa la data salvata in localStorage, oppure la data odierna se non presente
   const [selectedDate, setSelectedDate] = useState<Date>(() => {
@@ -116,9 +137,57 @@ export default function GenerateAssignments() {
   // Stato per tracciare se è in corso un'operazione di drag-and-drop
   const [isDragging, setIsDragging] = useState<boolean>(false);
 
-  // Stati per selezione multipla
+  // Stati per selezione multipla (gestiti dal context)
   const [isMultiSelectMode, setIsMultiSelectMode] = useState<boolean>(false);
   const [selectedTasks, setSelectedTasks] = useState<Array<{taskId: string; order: number}>>([]);
+
+  // Helper functions per multi-select context
+  const toggleMode = useCallback(() => {
+    setIsMultiSelectMode(prev => !prev);
+  }, []);
+
+  const toggleTask = useCallback((taskId: string) => {
+    setSelectedTasks(prev => {
+      const existing = prev.find(t => t.taskId === taskId);
+      if (existing) {
+        // Deseleziona
+        return prev.filter(t => t.taskId !== taskId).map((t, idx) => ({ ...t, order: idx + 1 }));
+      } else {
+        // Seleziona con nuovo ordine
+        return [...prev, { taskId, order: prev.length + 1 }];
+      }
+    });
+  }, []);
+
+  const clearSelection = useCallback(() => {
+    setSelectedTasks([]);
+  }, []);
+
+  const isTaskSelected = useCallback((taskId: string) => {
+    return selectedTasks.some(t => t.taskId === taskId);
+  }, [selectedTasks]);
+
+  const getTaskOrder = useCallback((taskId: string) => {
+    return selectedTasks.find(t => t.taskId === taskId)?.order;
+  }, [selectedTasks]);
+
+  // Memoizza il context value per evitare re-render non necessari
+  const multiSelectContextValue: MultiSelectContextType = useMemo(() => ({
+    isMultiSelectMode,
+    selectedTasks,
+    toggleMode,
+    toggleTask,
+    clearSelection,
+    isTaskSelected,
+    getTaskOrder,
+  }), [isMultiSelectMode, selectedTasks, toggleMode, toggleTask, clearSelection, isTaskSelected, getTaskOrder]);
+
+  // Effect per pulire la selezione quando si disattiva la modalità multi-select
+  useEffect(() => {
+    if (!isMultiSelectMode && selectedTasks.length > 0) {
+      setSelectedTasks([]);
+    }
+  }, [isMultiSelectMode, selectedTasks.length]);
 
   // Salva la data in localStorage ogni volta che cambia (formato locale senza timezone)
   useEffect(() => {
@@ -1641,24 +1710,25 @@ export default function GenerateAssignments() {
           </div>
         </div>
 
-        <DragDropContext onDragEnd={onDragEnd}>
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6 w-full">
-            <PriorityColumn
-              title="EARLY OUT"
-              priority="early-out"
-              tasks={earlyOutTasks}
-              droppableId="early-out"
-              icon="clock"
-              assignAction={assignEarlyOutToTimeline}
-            />
-            <PriorityColumn
-              title="HIGH PRIORITY"
-              priority="high"
-              tasks={highPriorityTasks}
-              droppableId="high"
-              icon="alert-circle"
-              assignAction={assignHighPriorityToTimeline}
-            />
+        <MultiSelectContext.Provider value={multiSelectContextValue}>
+          <DragDropContext onDragEnd={onDragEnd}>
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6 w-full">
+              <PriorityColumn
+                title="EARLY OUT"
+                priority="early-out"
+                tasks={earlyOutTasks}
+                droppableId="early-out"
+                icon="clock"
+                assignAction={assignEarlyOutToTimeline}
+              />
+              <PriorityColumn
+                title="HIGH PRIORITY"
+                priority="high"
+                tasks={highPriorityTasks}
+                droppableId="high"
+                icon="alert-circle"
+                assignAction={assignHighPriorityToTimeline}
+              />
             <PriorityColumn
               title="LOW PRIORITY"
               priority="low"
@@ -1751,6 +1821,7 @@ export default function GenerateAssignments() {
             </div>
           </div>
         </DragDropContext>
+        </MultiSelectContext.Provider>
       </div>
     </div>
   );
