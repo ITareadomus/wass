@@ -1183,6 +1183,12 @@ export default function GenerateAssignments() {
           await saveTimelineAssignment(taskId, toCleanerId, logisticCode, destination.index);
           await loadTasks(true);
 
+          // CRITICAL: Marca modifiche dopo drag-and-drop da container
+          setHasUnsavedChanges(true);
+          if (handleTaskMoved) {
+            handleTaskMoved();
+          }
+
           toast({
             title: "Task assegnata",
             description: `Task ${logisticCode} assegnata a ${cleanerName}`,
