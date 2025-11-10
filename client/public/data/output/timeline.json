@@ -1,6 +1,6 @@
 {
   "metadata": {
-    "last_updated": "2025-11-10T13:17:21.046Z",
+    "last_updated": "2025-11-10T13:23:04.041826",
     "date": "2025-11-11"
   },
   "cleaners_assignments": [
@@ -111,41 +111,6 @@
           "followup": true,
           "sequence": 3,
           "travel_time": 19
-        },
-        {
-          "task_id": 216333,
-          "logistic_code": 1198,
-          "client_id": 2,
-          "premium": false,
-          "address": "Via Bergognone 31",
-          "lat": "45.453707852983",
-          "lng": "9.1641459982137",
-          "cleaning_time": 180,
-          "checkin_date": "2025-11-11",
-          "checkout_date": "2025-11-11",
-          "checkin_time": null,
-          "checkout_time": null,
-          "pax_in": 7,
-          "pax_out": 9,
-          "small_equipment": false,
-          "operation_id": 2,
-          "confirmed_operation": true,
-          "straordinaria": false,
-          "type_apt": "D",
-          "alias": "ITW",
-          "customer_name": "ITALIANWAY SRL",
-          "priority": "low_priority",
-          "reasons": [
-            "not_eo",
-            "not_hp",
-            "automatic_assignment_lp",
-            "manual_assignment"
-          ],
-          "start_time": "13:33",
-          "end_time": "16:33",
-          "followup": true,
-          "sequence": 4,
-          "travel_time": 24
         }
       ]
     },
@@ -894,6 +859,41 @@
           "followup": true,
           "sequence": 2,
           "travel_time": 18
+        },
+        {
+          "task_id": 218592,
+          "logistic_code": 1674,
+          "client_id": 123,
+          "premium": false,
+          "address": "Via Disciplini, 4",
+          "lat": "45.45829",
+          "lng": "9.1866989",
+          "cleaning_time": 60,
+          "checkin_date": "2025-11-12",
+          "checkout_date": "2025-11-11",
+          "checkin_time": null,
+          "checkout_time": null,
+          "pax_in": 1,
+          "pax_out": 2,
+          "small_equipment": true,
+          "operation_id": 2,
+          "confirmed_operation": false,
+          "straordinaria": false,
+          "type_apt": "A",
+          "alias": "YOUHO",
+          "customer_name": "YOUHOSTY",
+          "priority": "low_priority",
+          "reasons": [
+            "not_eo",
+            "not_hp",
+            "automatic_assignment_lp",
+            "manual_assignment"
+          ],
+          "start_time": "12:26",
+          "end_time": "13:26",
+          "followup": true,
+          "sequence": 3,
+          "travel_time": 8
         }
       ]
     },
@@ -976,27 +976,27 @@
           "travel_time": 26
         },
         {
-          "task_id": 218592,
-          "logistic_code": 1674,
-          "client_id": 123,
+          "task_id": 216333,
+          "logistic_code": 1198,
+          "client_id": 2,
           "premium": false,
-          "address": "Via Disciplini, 4",
-          "lat": "45.45829",
-          "lng": "9.1866989",
-          "cleaning_time": 60,
-          "checkin_date": "2025-11-12",
+          "address": "Via Bergognone 31",
+          "lat": "45.453707852983",
+          "lng": "9.1641459982137",
+          "cleaning_time": 180,
+          "checkin_date": "2025-11-11",
           "checkout_date": "2025-11-11",
           "checkin_time": null,
           "checkout_time": null,
-          "pax_in": 1,
-          "pax_out": 2,
-          "small_equipment": true,
+          "pax_in": 7,
+          "pax_out": 9,
+          "small_equipment": false,
           "operation_id": 2,
-          "confirmed_operation": false,
+          "confirmed_operation": true,
           "straordinaria": false,
-          "type_apt": "A",
-          "alias": "YOUHO",
-          "customer_name": "YOUHOSTY",
+          "type_apt": "D",
+          "alias": "ITW",
+          "customer_name": "ITALIANWAY SRL",
           "priority": "low_priority",
           "reasons": [
             "not_eo",
@@ -1004,11 +1004,11 @@
             "automatic_assignment_lp",
             "manual_assignment"
           ],
-          "start_time": "13:34",
-          "end_time": "14:34",
+          "start_time": "13:45",
+          "end_time": "16:45",
           "followup": true,
           "sequence": 3,
-          "travel_time": 38
+          "travel_time": 49
         }
       ]
     }

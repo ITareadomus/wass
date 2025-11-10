@@ -362,8 +362,9 @@ export default function TaskCard({
   };
 
   // Calcola la larghezza in base alla durata
-  const calculateWidth = (duration: string, forTimeline: boolean) => {
-    const parts = duration.split(".");
+  const calculateWidth = (duration: string | undefined, forTimeline: boolean) => {
+    const safeDuration = duration || "0.0";
+    const parts = safeDuration.split(".");
     const hours = parseInt(parts[0] || "0");
     const minutes = parts[1] ? parseInt(parts[1]) : 0;
     const totalMinutes = hours * 60 + minutes;
@@ -468,7 +469,7 @@ export default function TaskCard({
                           {task.name}
                         </span>
                         <span className="text-[11px] opacity-60 leading-none font-bold text-[#000000]">
-                          ({task.duration.replace(".", ":")}h)
+                          ({(task.duration || "0.0").replace(".", ":")}h)
                         </span>
                       </div>
                       {task.alias && (
@@ -608,7 +609,7 @@ export default function TaskCard({
                     className={`text-sm p-1 rounded ${!isReadOnly ? 'cursor-pointer hover:bg-muted/50' : ''}`}
                     onClick={() => !isReadOnly && setEditingField('duration')}
                   >
-                    {displayTask.duration.replace(".", ":")} ore
+                    {(displayTask.duration || "0.0").replace(".", ":")} ore
                   </p>
                 )}
               </div>
