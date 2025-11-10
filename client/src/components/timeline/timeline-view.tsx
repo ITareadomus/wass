@@ -868,18 +868,6 @@ export default function TimelineView({
                 <RotateCcw className="w-4 h-4" />
                 Reset Assegnazioni
               </Button>
-              {!isReadOnly && (
-                <Button
-                  onClick={handleConfirmAssignments}
-                  variant="default"
-                  size="sm"
-                  className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white"
-                  disabled={!hasUnsavedChanges}
-                >
-                  <CheckCircle className="w-4 h-4" />
-                  Conferma Assegnazioni
-                </Button>
-              )}
             </div>
           </div>
         </div>
@@ -1166,7 +1154,7 @@ export default function TimelineView({
                     className={`flex-1 h-full ${hasUnsavedChanges ? 'bg-green-500 hover:bg-green-600 animate-pulse' : 'bg-green-500 hover:bg-green-600 opacity-50 cursor-not-allowed'}`}
                     data-testid="button-confirm-assignments"
                   >
-                    <Users className="w-4 h-4 mr-2" />
+                    <CheckCircle className="w-4 h-4 mr-2" />
                     {hasUnsavedChanges ? 'Conferma Assegnazioni ⚠️' : 'Assegnazioni Confermate'}
                   </Button>
                 )}
@@ -1179,7 +1167,14 @@ export default function TimelineView({
                     📜 Sei in modalità storico
                   </Button>
                 )}
-                
+                <Button
+                  onClick={handlePrint}
+                  variant="outline"
+                  className="h-full px-6"
+                >
+                  <Printer className="w-4 h-4 mr-2" />
+                  Stampa
+                </Button>
               </div>
             </div>
           </div>
