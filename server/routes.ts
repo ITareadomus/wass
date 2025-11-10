@@ -189,7 +189,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       };
 
       // Salva timeline (dual-write: filesystem + Object Storage)
-      await saveTimeline(emptyTimeline, workDate);
+      await workspaceFiles.saveTimeline(workDate, emptyTimeline);
       console.log(`Timeline resettata: timeline.json (struttura corretta)`);
 
       // FORZA la ricreazione di containers.json rieseguendo create_containers.py
@@ -212,7 +212,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // CRITICAL: Forza nuovamente il reset di timeline.json dopo create_containers
       // perché lo script Python potrebbe aver sovrascritto il file
       console.log(`🔄 Forzatura reset timeline.json dopo create_containers...`);
-      await saveTimeline(emptyTimeline, workDate);
+      await workspaceFiles.saveTimeline(workDate, emptyTimeline);
       console.log(`✅ Timeline resettata nuovamente dopo create_containers`);
 
       // CRITICAL: Elimina il flag di ultimo salvataggio per evitare ricaricamenti automatici
@@ -341,7 +341,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       );
 
       // Salva timeline (dual-write: filesystem + Object Storage)
-      await saveTimeline(timelineData, workDate);
+      await workspaceFiles.saveTimeline(workDate, timelineData);
 
       console.log(`✅ Task ${logisticCode} spostata da cleaner ${sourceCleanerId} a cleaner ${destCleanerId}`);
       res.json({ success: true, message: "Task spostata con successo tra cleaners" });
@@ -496,7 +496,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       );
 
       // Salva timeline (dual-write: filesystem + Object Storage)
-      await saveTimeline(timelineData, workDate);
+      await workspaceFiles.saveTimeline(workDate, timelineData);
 
       console.log(`✅ Task scambiate tra cleaner ${sourceCleanerId} e cleaner ${destCleanerId}`);
       res.json({
@@ -1095,11 +1095,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       savedData.metadata.date = workDate;
       savedData.metadata.last_updated = new Date().toISOString();
 
-      // Salva i dati caricati in timeline.json
-      const timelinePath = path.join(process.cwd(), 'client/public/data/output/timeline.json');
-      const tmpPath = `${timelinePath}.tmp`;
-      await fs.writeFile(tmpPath, JSON.stringify(savedData, null, 2));
-      await fs.rename(tmpPath, timelinePath);
+      // Salva i dati caricati in timeline.json (dual-write: filesystem + Object Storage)
+      await workspaceFiles.saveTimeline(workDate, savedData);
 
       // CRITICAL: Attendi che il file sia effettivamente scritto
       await new Promise(resolve => setTimeout(resolve, 200));
@@ -1234,10 +1231,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
             containersData.summary.low_priority;
         }
 
-        // Salva containers.json sincronizzato
-        const tmpContainersPath = `${containersPath}.tmp`;
-        await fs.writeFile(tmpContainersPath, JSON.stringify(containersData, null, 2));
-        await fs.rename(tmpContainersPath, containersPath);
+        // Salva containers.json sincronizzato (dual-write: filesystem + Object Storage)
+        const workDate = req.body.date || format(new Date(), 'yyyy-MM-dd');
+        await workspaceFiles.saveContainers(workDate, containersData);
 
         console.log(`✅ Containers sincronizzati: rimosse ${removedCount} task già assegnate`);
       } catch (err) {
@@ -1351,10 +1347,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           0
         );
 
-        // Salva timeline.json
-        const tmpTimelinePath = `${timelinePath}.tmp`;
-        await fs.writeFile(tmpTimelinePath, JSON.stringify(timelineData, null, 2));
-        await fs.rename(tmpTimelinePath, timelinePath);
+        // Salva timeline.json (dual-write: filesystem + Object Storage)
+        await workspaceFiles.saveTimeline(workDate, timelineData);
 
         console.log(`✅ Cleaner ${cleanerId} rimosso completamente (nessuna task)`);
         console.log(`   - Rimosso da selected_cleaners.json (${cleanersBefore} -> ${selectedData.cleaners.length})`);
@@ -1588,7 +1582,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       );
 
       // Salva timeline (dual-write: filesystem + Object Storage)
-      await saveTimeline(timelineData, workDate);
+      await workspaceFiles.saveTimeline(workDate, timelineData);
 
       // Aggiungi il cleaner a selected_cleaners.json (se non già presente)
       const isAlreadySelected = selectedCleanersData.cleaners.some((c: any) => c.id === cleanerId);
@@ -1815,7 +1809,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
           recalc();
           // Salva containers (dual-write: filesystem + Object Storage)
-          await saveContainers(containersData, workDate);
+          await workspaceFiles.saveContainers(workDate, containersData);
 
           return res.json({ success: true, message: 'Riordino nello stesso container eseguito' });
         }
@@ -1830,7 +1824,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         recalc();
         // Salva containers (dual-write: filesystem + Object Storage)
-        await saveContainers(containersData, workDate);
+        await workspaceFiles.saveContainers(workDate, containersData);
 
         return res.json({ success: true, message: 'Riordino fallback (append) eseguito' });
       }
@@ -1864,7 +1858,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       recalc();
 
       // Salva containers (dual-write: filesystem + Object Storage)
-      await saveContainers(containersData, workDate);
+      await workspaceFiles.saveContainers(workDate, containersData);
 
       return res.json({ success: true, message: 'Task spostata tra containers' });
     } catch (err: any) {
@@ -1934,8 +1928,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Salva entrambi i file (dual-write: filesystem + Object Storage)
       await Promise.all([
-        saveContainers(containersData, workDate),
-        saveTimeline(timelineData, workDate)
+        workspaceFiles.saveContainers(workDate, containersData),
+        workspaceFiles.saveTimeline(workDate, timelineData)
       ]);
 
       console.log(`✅ Task ${logisticCode} aggiornata con successo`);
@@ -2216,7 +2210,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           console.log(`🔄 Aggiornamento data in timeline.json...`);
           timelineData.metadata = timelineData.metadata || {};
           timelineData.metadata.date = workDate;
-          await fs.writeFile(timelinePath, JSON.stringify(timelineData, null, 2));
+          await workspaceFiles.saveTimeline(workDate, timelineData);
         }
       } catch (err) {
         console.warn("Impossibile verificare/aggiornare timeline.json:", err);
@@ -2292,7 +2286,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           console.log(`⚠️ ATTENZIONE: timeline.json ha data ${timelineData.metadata?.date}, dovrebbe essere ${workDate}`);
           timelineData.metadata = timelineData.metadata || {};
           timelineData.metadata.date = workDate;
-          await fs.writeFile(timelinePath, JSON.stringify(timelineData, null, 2));
+          await workspaceFiles.saveTimeline(workDate, timelineData);
         }
       } catch (err) {
         console.warn("Impossibile verificare timeline.json:", err);
@@ -2368,7 +2362,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           console.log(`⚠️ ATTENZIONE: timeline.json ha data ${timelineData.metadata?.date}, dovrebbe essere ${workDate}`);
           timelineData.metadata = timelineData.metadata || {};
           timelineData.metadata.date = workDate;
-          await fs.writeFile(timelinePath, JSON.stringify(timelineData, null, 2));
+          await workspaceFiles.saveTimeline(workDate, timelineData);
         }
       } catch (err) {
         console.warn("Impossibile verificare timeline.json:", err);
@@ -2479,7 +2473,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           console.log(`🔄 Timeline esiste per data ${existingTimeline.metadata?.date}, aggiorno metadata.date a ${date}`);
           existingTimeline.metadata.date = date;
           existingTimeline.metadata.last_updated = new Date().toISOString();
-          await saveTimeline(existingTimeline, date);
+          await workspaceFiles.saveTimeline(date, existingTimeline);
         } else {
           console.log(`✅ Timeline.json già presente per ${date}, mantieni assegnazioni esistenti`);
         }
@@ -2491,7 +2485,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           cleaners_assignments: [],
           meta: { total_cleaners: 0, used_cleaners: 0, assigned_tasks: 0 }
         };
-        await saveTimeline(emptyTimeline, date);
+        await workspaceFiles.saveTimeline(date, emptyTimeline);
         timelineExists = false;
       }
 
@@ -2907,10 +2901,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       timelineData.metadata.date = workDate;
 
       // Salva file (dual-write: filesystem + Object Storage)
-      await saveTimeline(timelineData, workDate);
+      await workspaceFiles.saveTimeline(workDate, timelineData);
 
       if (containersData) {
-        await saveContainers(containersData, workDate);
+        await workspaceFiles.saveContainers(workDate, containersData);
       }
 
       const message = typeof fromCleanerId === 'number'
@@ -3000,7 +2994,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       timelineData.meta.total_cleaners = timelineData.cleaners_assignments.length;
 
       // Salva timeline (dual-write: filesystem + Object Storage)
-      await saveTimeline(timelineData, workDate);
+      await workspaceFiles.saveTimeline(workDate, timelineData);
 
       console.log(`✅ Task ${logisticCode} riordinata da posizione ${fromIndex} a ${toIndex} per cleaner ${cleanerId}`);
       console.log(`   Nuova sequenza delle task: ${cleanerEntry.tasks.map((t: any) => `${t.logistic_code}(${t.sequence})`).join(', ')}`);
