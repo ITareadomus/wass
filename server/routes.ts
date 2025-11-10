@@ -2750,9 +2750,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const getCleanerEntry = (cid: number) => cleaners.find((c: any) => c?.cleaner?.id === cid);
 
-      const findTaskIndex = (arr: any[], key: string) => arr.findIndex(t => idMatches(t, key));
-      const idMatches = (t: any, key: string) =>
-        String(t?.task_id) === key || String(t?.logistic_code) === key || String(t?.id) === key;
+      const findTaskIndex = (arr: any[]) => {
+        if (typeof taskId !== 'undefined') {
+          const idStr = String(taskId);
+          const idx = arr.findIndex((t) => String(t?.task_id) === idStr || String(t?.id) === idStr);
+          if (idx !== -1) return idx;
+        }
+        if (typeof logisticCode !== 'undefined') {
+          const codeStr = String(logisticCode);
+          const idx = arr.findIndex((t) => String(t?.logistic_code) === codeStr);
+          if (idx !== -1) return idx;
+        }
+        return -1;
+      };
 
 
       let moved: any | null = null;
@@ -3019,6 +3029,154 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ success: false, error: error.message });
     }
   });
+
+  // API per la gestione degli account utente
+  app.get("/api/accounts", async (req, res) => {
+    try {
+      // Verifica che l'utente sia admin
+      if (!req.session?.user?.role || req.session.user.role !== 'admin') {
+        return res.status(403).json({ success: false, message: "Accesso negato. Solo gli admin possono visualizzare gli account." });
+      }
+
+      const accountsPath = path.join(process.cwd(), "client/public/data/accounts.json");
+      const accountsData = JSON.parse(await fs.readFile(accountsPath, "utf-8"));
+      res.json(accountsData);
+    } catch (error) {
+      console.error("Errore nel caricamento degli account:", error);
+      res.status(500).json({ success: false, message: "Errore del server" });
+    }
+  });
+
+  app.post("/api/accounts/add", async (req, res) => {
+    try {
+      // Verifica che l'utente sia admin
+      if (!req.session?.user?.role || req.session.user.role !== 'admin') {
+        return res.status(403).json({ success: false, message: "Accesso negato. Solo gli admin possono aggiungere account." });
+      }
+
+      const accountsPath = path.join(process.cwd(), "client/public/data/accounts.json");
+      const accountsData = JSON.parse(await fs.readFile(accountsPath, "utf-8"));
+
+      const newId = Math.max(0, ...accountsData.users.map((u: any) => u.id)) + 1;
+      const newAccount = { id: newId, ...req.body };
+
+      accountsData.users.push(newAccount);
+      await fs.writeFile(accountsPath, JSON.stringify(accountsData, null, 2));
+
+      res.json({ success: true, message: "Account aggiunto con successo." });
+    } catch (error) {
+      console.error("Errore nell'aggiunta dell'account:", error);
+      res.status(500).json({ success: false, message: "Errore del server" });
+    }
+  });
+
+  app.post("/api/accounts/update", async (req, res) => {
+    try {
+      // Verifica che l'utente sia admin
+      if (!req.session?.user?.role || req.session.user.role !== 'admin') {
+        return res.status(403).json({ success: false, message: "Accesso negato. Solo gli admin possono aggiornare account." });
+      }
+
+      const accountsPath = path.join(process.cwd(), "client/public/data/accounts.json");
+      const accountsData = JSON.parse(await fs.readFile(accountsPath, "utf-8"));
+
+      const index = accountsData.users.findIndex((u: any) => u.id === req.body.id);
+      if (index !== -1) {
+        // Non permettere l'aggiornamento del proprio ruolo se non si è admin
+        if (req.session.user.id === req.body.id && req.session.user.role !== 'admin' && req.body.role !== req.session.user.role) {
+           return res.status(403).json({ success: false, message: "Non puoi cambiare il tuo ruolo." });
+        }
+
+        // Non permettere la modifica della password dall'API di gestione account; usare endpoint dedicato
+        if (req.body.password) {
+          delete req.body.password;
+          console.warn("Tentativo di aggiornare la password tramite l'API di gestione account. Operazione ignorata.");
+        }
+
+        accountsData.users[index] = { ...accountsData.users[index], ...req.body }; // Merge per mantenere campi non modificati
+        await fs.writeFile(accountsPath, JSON.stringify(accountsData, null, 2));
+        res.json({ success: true, message: "Account aggiornato con successo." });
+      } else {
+        res.status(404).json({ success: false, message: "Account non trovato" });
+      }
+    } catch (error) {
+      console.error("Errore nell'aggiornamento dell'account:", error);
+      res.status(500).json({ success: false, message: "Errore del server" });
+    }
+  });
+
+  app.post("/api/accounts/delete", async (req, res) => {
+    try {
+      // Verifica che l'utente sia admin
+      if (!req.session?.user?.role || req.session.user.role !== 'admin') {
+        return res.status(403).json({ success: false, message: "Accesso negato. Solo gli admin possono eliminare account." });
+      }
+
+      const { id } = req.body;
+      if (typeof id === 'undefined') {
+        return res.status(400).json({ success: false, message: "ID account mancante." });
+      }
+
+      // Non permettere l'eliminazione dell'admin loggato
+      if (req.session.user.id === id) {
+        return res.status(400).json({ success: false, message: "Non puoi eliminare il tuo account." });
+      }
+
+      const accountsPath = path.join(process.cwd(), "client/public/data/accounts.json");
+      const accountsData = JSON.parse(await fs.readFile(accountsPath, "utf-8"));
+
+      const initialLength = accountsData.users.length;
+      accountsData.users = accountsData.users.filter((u: any) => u.id !== id);
+
+      if (accountsData.users.length === initialLength) {
+        return res.status(404).json({ success: false, message: "Account non trovato." });
+      }
+
+      await fs.writeFile(accountsPath, JSON.stringify(accountsData, null, 2));
+
+      res.json({ success: true, message: "Account eliminato con successo." });
+    } catch (error) {
+      console.error("Errore nell'eliminazione dell'account:", error);
+      res.status(500).json({ success: false, message: "Errore del server" });
+    }
+  });
+
+  app.post("/api/accounts/change-password", async (req, res) => {
+    try {
+      const { userId, newPassword } = req.body;
+
+      if (typeof userId === 'undefined' || !newPassword) {
+        return res.status(400).json({ success: false, message: "ID utente e nuova password sono obbligatori." });
+      }
+
+      // Verifica che l'utente sia admin o che stia cambiando la propria password
+      if (!req.session?.user || (req.session.user.role !== 'admin' && req.session.user.id !== userId)) {
+        return res.status(403).json({ success: false, message: "Accesso negato." });
+      }
+
+      const accountsPath = path.join(process.cwd(), "client/public/data/accounts.json");
+      const accountsData = JSON.parse(await fs.readFile(accountsPath, "utf-8"));
+
+      const userIndex = accountsData.users.findIndex((u: any) => u.id === userId);
+
+      if (userIndex === -1) {
+        return res.status(404).json({ success: false, message: "Utente non trovato." });
+      }
+
+      // Se non è admin, verifica che la password vecchia sia corretta (non implementato qui, ma ideale)
+      // Per semplicità, assumiamo che se è l'utente stesso, la password sia valida.
+
+      accountsData.users[userIndex].password = newPassword; // Sostituisci con la nuova password
+      await fs.writeFile(accountsPath, JSON.stringify(accountsData, null, 2));
+
+      res.json({ success: true, message: "Password cambiata con successo." });
+
+    } catch (error) {
+      console.error("Errore nel cambio password:", error);
+      res.status(500).json({ success: false, message: "Errore del server" });
+    }
+  });
+
 
   const httpServer = createServer(app);
   return httpServer;

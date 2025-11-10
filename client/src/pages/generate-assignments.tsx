@@ -1750,6 +1750,24 @@ export default function GenerateAssignments() {
             </Button>
           </div>
           <div className="flex items-center gap-3">
+            {/* Settings button for admin */}
+            {(() => {
+              const user = localStorage.getItem("user");
+              if (user) {
+                const userData = JSON.parse(user);
+                if (userData.role === "admin") {
+                  return (
+                    <Button
+                      onClick={() => window.location.href = "/settings"}
+                      variant="outline"
+                    >
+                      Impostazioni
+                    </Button>
+                  );
+                }
+              }
+              return null;
+            })()}
             {/* Date Selector + Dark Mode Toggle */}
             <div className="flex items-center gap-3">
               <Popover>
