@@ -1229,8 +1229,20 @@ export default function GenerateAssignments() {
             // CRITICAL FIX: Attendi esplicitamente il ricaricamento COMPLETO
             // Prima di permettere altri movimenti
             setIsLoadingTasks(true);
-            await new Promise(resolve => setTimeout(resolve, 200)); // Attendi salvataggio file
+            
+            // Attendi che il backend abbia scritto il file su disco
+            await new Promise(resolve => setTimeout(resolve, 500));
+            
+            // Forza ricaricamento completo con cache bust aggressivo
+            const timestamp = Date.now() + Math.random();
+            await fetch(`/data/output/timeline.json?bust=${timestamp}`, { 
+              cache: 'no-store',
+              headers: { 'Cache-Control': 'no-cache' }
+            });
+            
+            // Ricarica tutto lo stato
             await loadTasks(true);
+            
             setIsLoadingTasks(false);
 
             // Mostra toast solo se i cleaner sono diversi
