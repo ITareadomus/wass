@@ -2680,35 +2680,104 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ success: false, message: 'taskId o logisticCode obbligatorio' });
       }
 
-      const workDate = req.body.date || format(new Date(), 'yyyy-MM-dd');
+      const taskKey = String(typeof taskId !== 'undefined' ? taskId : logisticCode);
+
       const timelinePath = path.join(process.cwd(), 'client/public/data/output/timeline.json');
       const containersPath = path.join(process.cwd(), 'client/public/data/output/containers.json');
 
-      const [timelineRaw, containersRaw] = await Promise.all([
-        fs.readFile(timelinePath, 'utf8'),
-        fs.readFile(containersPath, 'utf8').catch(() => 'null'),
-      ]);
+      let timelineData: any = { metadata: {}, cleaners_assignments: [] };
+      let containersData: any = null;
 
-      const timelineData: any = JSON.parse(timelineRaw);
-      const containersData: any = containersRaw !== 'null' ? JSON.parse(containersRaw) : null;
-
-      const cleaners = timelineData?.cleaners_assignments;
-      if (!cleaners || !Array.isArray(cleaners)) {
-        return res.status(500).json({ success: false, message: 'Struttura timeline non valida' });
+      try {
+        const timelineText = await fs.readFile(timelinePath, 'utf8');
+        timelineData = JSON.parse(timelineText);
+      } catch (err) {
+        console.error('Errore caricamento timeline.json:', err);
       }
 
-      const getCleanerEntry = (id: number) => cleaners.find((c: any) => c.cleaner?.id === id);
+      try {
+        const containersText = await fs.readFile(containersPath, 'utf8');
+        containersData = JSON.parse(containersText);
+      } catch (err) {
+        console.error('Errore caricamento containers.json:', err);
+      }
 
+      const cleaners = timelineData.cleaners_assignments || [];
+
+      const getCleanerEntry = (cid: number) => cleaners.find((c: any) => c?.cleaner?.id === cid);
+
+      const findTaskIndex = (arr: any[], key: string) => arr.findIndex(t => idMatches(t, key));
       const idMatches = (t: any, key: string) =>
         String(t?.task_id) === key || String(t?.logistic_code) === key || String(t?.id) === key;
 
-      const findTaskIndex = (arr: any[], key: string) => arr.findIndex(t => idMatches(t, key));
 
-      const taskKey = String(typeof taskId !== 'undefined' ? taskId : logisticCode);
+      let moved: any | null = null;
+      let removedFromIndex: number | null = null;
 
+      // === Caso A: provengo da TIMELINE ===
+      if (typeof fromCleanerId === 'number') {
+        const srcEntry = getCleanerEntry(fromCleanerId);
+        if (!srcEntry || !Array.isArray(srcEntry.tasks)) {
+          return res.status(400).json({ success: false, message: 'Cleaner sorgente non valido' });
+        }
+
+        let takeIdx: number | null = null;
+        if (typeof sourceIndex === 'number' && sourceIndex >= 0 && sourceIndex < srcEntry.tasks.length) {
+          takeIdx = sourceIndex;
+        } else {
+          const idx = findTaskIndex(srcEntry.tasks, taskKey);
+          takeIdx = idx >= 0 ? idx : null;
+        }
+
+        if (takeIdx === null) {
+          // FIX: fallback globale prima di dare 404
+          let foundCleaner: any = null, foundIdx = -1;
+          for (const ca of cleaners) {
+            const i = findTaskIndex(ca.tasks || [], taskKey);
+            if (i !== -1) { foundCleaner = ca; foundIdx = i; break; }
+          }
+          if (foundIdx !== -1 && foundCleaner) {
+            if (fromCleanerId === toCleanerId) removedFromIndex = foundIdx;
+            [moved] = foundCleaner.tasks.splice(foundIdx, 1);
+            (foundCleaner.tasks || []).forEach((t: any, i: number) => { t.sequence = i + 1; });
+          } else {
+            return res.status(404).json({ success: false, message: 'Task non trovata nel cleaner sorgente (neanche globalmente)' });
+          }
+        } else {
+          if (fromCleanerId === toCleanerId) removedFromIndex = takeIdx;
+          [moved] = srcEntry.tasks.splice(takeIdx, 1);
+          srcEntry.tasks.forEach((t: any, i: number) => { t.sequence = i + 1; });
+        }
+      }
+
+      // === Caso B: provengo da CONTAINER ===
+      if (!moved && fromContainer && containersData?.containers?.[fromContainer]?.tasks) {
+        const srcArr = containersData.containers[fromContainer].tasks as any[];
+        let idx = findTaskIndex(srcArr, taskKey);
+        if (idx === -1 && typeof sourceIndex === 'number' && srcArr[sourceIndex]) idx = sourceIndex;
+        if (idx === -1) {
+          return res.status(404).json({ success: false, message: 'Task non trovata nel container sorgente' });
+        }
+        [moved] = srcArr.splice(idx, 1);
+        containersData.containers[fromContainer].count = srcArr.length; // Update count
+      }
+
+      // === Caso C: Riordino interno (se non spostato da altro) ===
+      if (!moved) {
+        const idx = findTaskIndex(cleaners.find((c: any) => c?.cleaner?.id === toCleanerId)?.tasks || [], taskKey);
+        if (idx === -1) {
+          return res.status(404).json({ success: false, message: 'Task non trovata' });
+        }
+        removedFromIndex = idx; // Traccia l'indice di rimozione
+        [moved] = cleaners.find((c: any) => c?.cleaner?.id === toCleanerId).tasks.splice(idx, 1);
+      }
+
+      if (!moved) {
+        return res.status(404).json({ success: false, message: 'Task non trovata in nessuna fonte' });
+      }
+
+      // Trova o crea l'entry del cleaner di destinazione
       let dstEntry = getCleanerEntry(toCleanerId);
-
-      // Se il cleaner di destinazione non esiste, crealo (caso cleaner nascosto)
       if (!dstEntry) {
         // Carica i dati del cleaner da cleaners.json
         const cleanersPath = path.join(process.cwd(), 'client/public/data/cleaners/cleaners.json');
@@ -2757,74 +2826,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         dstEntry.tasks = [];
       }
 
-      let moved: any | null = null;
-
-      // Traccia la posizione di rimozione per aggiustare destIndex se necessario
-      let removedFromIndex: number | null = null;
-
-      // Caso A: provengo da TIMELINE
-      if (typeof fromCleanerId === 'number') {
-        const srcEntry = getCleanerEntry(fromCleanerId);
-        if (!srcEntry || !Array.isArray(srcEntry.tasks)) {
-          return res.status(400).json({ success: false, message: 'Cleaner sorgente non valido' });
-        }
-
-        let takeIdx: number | null = null;
-        if (typeof sourceIndex === 'number' && sourceIndex >= 0 && sourceIndex < srcEntry.tasks.length) {
-          takeIdx = sourceIndex;
-        } else {
-          const idx = findTaskIndex(srcEntry.tasks, taskKey);
-          takeIdx = idx >= 0 ? idx : null;
-        }
-        if (takeIdx === null) {
-          return res.status(404).json({ success: false, message: 'Task non trovata nel cleaner sorgente' });
-        }
-
-        // Se stesso cleaner, traccia l'indice di rimozione
-        if (fromCleanerId === toCleanerId) {
-          removedFromIndex = takeIdx;
-        }
-
-        [moved] = srcEntry.tasks.splice(takeIdx, 1);
-
-        // Aggiorna sequence nel cleaner sorgente
-        srcEntry.tasks.forEach((t: any, i: number) => { t.sequence = i + 1; });
-      }
-
-      // Caso B: provengo da CONTAINER
-      if (!moved && fromContainer && containersData?.containers?.[fromContainer]?.tasks) {
-        const srcArr = containersData.containers[fromContainer].tasks as any[];
-        let idx = findTaskIndex(srcArr, taskKey);
-        if (idx === -1 && typeof sourceIndex === 'number' && srcArr[sourceIndex]) idx = sourceIndex;
-        if (idx === -1) {
-          return res.status(404).json({ success: false, message: 'Task non trovata nel container sorgente' });
-        }
-        [moved] = srcArr.splice(idx, 1);
-        containersData.containers[fromContainer].summary.total = srcArr.length;
-      }
-
-      // Caso C: riordino interno
-      if (!moved) {
-        const idx = findTaskIndex(dstEntry.tasks, taskKey);
-        if (idx === -1) {
-          return res.status(404).json({ success: false, message: 'Task non trovata' });
-        }
-        removedFromIndex = idx;
-        [moved] = dstEntry.tasks.splice(idx, 1);
-      }
-
-      // Inserimento nella posizione richiesta
+      // Inserimento con clamp + fix stesso cleaner
       let insertAt = typeof destIndex === 'number' ? destIndex : dstEntry.tasks.length;
-
-      // CRITICAL FIX: Quando spostiamo nello stesso cleaner, dopo aver rimosso la task
-      // l'array è più corto di 1, quindi dobbiamo aggiustare l'indice di destinazione
       if (removedFromIndex !== null && removedFromIndex < insertAt) {
         insertAt = insertAt - 1;
-        console.log(`🔧 Aggiustato destIndex da ${destIndex} a ${insertAt} (rimozione da ${removedFromIndex})`);
       }
-
       if (insertAt < 0) insertAt = 0;
       if (insertAt > dstEntry.tasks.length) insertAt = dstEntry.tasks.length;
+
       dstEntry.tasks.splice(insertAt, 0, moved);
 
       // Aggiorna sequence nel cleaner destinazione
@@ -2850,13 +2859,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Fallback: mantieni sequence manualmente (già fatto sopra)
       }
 
-      // CRITICAL FIX: Usa timelineData direttamente (già contiene tutti i cleaner)
-      // NON ricaricare da file perché timelineData è già completo
-
-      // Aggiorna solo metadata
+      // Aggiorna metadata
       timelineData.metadata = timelineData.metadata || {};
       timelineData.metadata.last_updated = new Date().toISOString();
-      timelineData.metadata.date = workDate;
+      timelineData.metadata.date = req.body.date || format(new Date(), 'yyyy-MM-dd'); // Usa la data della richiesta
 
       // Salvataggi atomici
       const tmp1 = `${timelinePath}.tmp`;
@@ -2870,7 +2876,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const message = typeof fromCleanerId === 'number'
-        ? (fromCleanerId === toCleanerId ? 'Riordino nel cleaner eseguito' : 'Task spostata tra cleaners')
+        ? (fromCleanerId === toCleanerId ? 'Riordino nel cleaner eseguito' : `Task spostata da cleaner ${fromCleanerId} a cleaner ${toCleanerId}`)
         : 'Task inserita dal container alla posizione richiesta';
 
       console.log(`✅ ${message} - Task ${taskKey} inserita in posizione ${insertAt} per cleaner ${toCleanerId}`);
