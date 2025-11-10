@@ -1219,6 +1219,12 @@ export default function GenerateAssignments() {
             await loadTasks(true);
           } else {
             console.log('✅ Movimento salvato automaticamente in timeline.json');
+            
+            // CRITICAL: Marca modifiche dopo drag and drop riuscito
+            setHasUnsavedChanges(true);
+            if (onTaskMoved) {
+              onTaskMoved();
+            }
 
             // CRITICAL FIX: NON ricaricare da Object Storage dopo ogni movimento
             // Il file locale timeline.json è già aggiornato dal backend
@@ -1343,6 +1349,12 @@ export default function GenerateAssignments() {
           // Ricarica i task dai containers aggiornati
           await loadTasks(true);
 
+          // CRITICAL: Marca modifiche dopo spostamento tra containers
+          setHasUnsavedChanges(true);
+          if (onTaskMoved) {
+            onTaskMoved();
+          }
+
           toast({
             title: "Task spostata",
             description: `Task spostata tra containers`,
@@ -1444,6 +1456,12 @@ export default function GenerateAssignments() {
             setAllTasksWithAssignments(tasksWithAssignments);
           }
 
+          // CRITICAL: Marca modifiche dopo assegnazione
+          setHasUnsavedChanges(true);
+          if (onTaskMoved) {
+            onTaskMoved();
+          }
+
           toast({
             title: "Task assegnata",
             description: `Task ${logisticCode} assegnata a ${cleanerName}`,
@@ -1462,6 +1480,12 @@ export default function GenerateAssignments() {
         // Rimuovi da timeline.json
         await removeTimelineAssignment(taskId, logisticCode);
         await loadTasks(true);
+        
+        // CRITICAL: Marca modifiche dopo rimozione da timeline
+        setHasUnsavedChanges(true);
+        if (onTaskMoved) {
+          onTaskMoved();
+        }
         return;
       }
 
