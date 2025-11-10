@@ -20,6 +20,9 @@ import { HelpCircle, ChevronLeft, ChevronRight, Save, Pencil } from "lucide-reac
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 
+// Normalizza la chiave di una task indipendentemente dal campo usato
+const getTaskKey = (t: any) => String(t?.id ?? t?.task_id ?? t?.logistic_code ?? "");
+
 interface TaskCardProps {
   task: Task;
   index: number;
@@ -50,8 +53,6 @@ export default function TaskCard({
   isReadOnly = false, // Modalità read-only
 }: TaskCardProps) {
   const [isModalOpen, setIsModalOpen] = useState(false);
-  // Helper per normalizzare l'id (supporta sia id che task_id)
-  const getTaskKey = (t: any) => String(t?.id ?? t?.task_id);
 
   const [currentTaskId, setCurrentTaskId] = useState(getTaskKey(task));
   const [assignmentTimes, setAssignmentTimes] = useState<{ start_time?: string; end_time?: string; travel_time?: number }>({});
@@ -84,34 +85,33 @@ export default function TaskCard({
   // CRITICAL: Memoizza navigableTasks per evitare ricalcoli che causano mismatch
   const navigableTasks = React.useMemo(() => {
     const tasks = allTasks.filter(t => {
-      const matchCleaner = (t as any).assignedCleaner === task.assignedCleaner;
-      const notCurrentTask = getTaskKey(t) !== getTaskKey(task);
-      return matchCleaner && notCurrentTask && t.assignedCleaner;
+      const sameCleaner = (t as any).assignedCleaner === (task as any).assignedCleaner;
+      const notCurrent  = getTaskKey(t) !== getTaskKey(task);
+      // NON escludere task senza assignedCleaner: basta che sia lo stesso cleaner della corrente
+      return sameCleaner && notCurrent;
     });
-    // Normalizza gli ID per confronto consistente
-    return tasks.map(t => ({ ...t, id: getTaskKey(t) }));
-  }, [allTasks, task.assignedCleaner, task.id, getTaskKey]);
+    // Mappa con una chiave consistente
+    return tasks.map(t => ({ ...t, __key: getTaskKey(t) }));
+  }, [allTasks, task]);
 
   // Trova l'indice effettivo della task nel cleaner
-  const { effectiveCurrentId, currentTaskInNavigable, displayTask } = (() => {
-    // Usa currentTaskId se esiste in navigableTasks, altrimenti usa task.id
-    const effId = currentTaskId && navigableTasks.some(t => getTaskKey(t) === String(currentTaskId))
-      ? currentTaskId
-      : getTaskKey(task);
+  const { effectiveCurrentId, currentTaskInNavigable, displayTask, canGoPrev, canGoNext } = (() => {
+    const normalizedCurrentId = currentTaskId ? String(currentTaskId) : null;
+    const normalizedTaskId    = getTaskKey(task);
 
-    // Trova l'indice con confronto normalizzato
-    const currIdx = navigableTasks.findIndex(t => getTaskKey(t) === String(effId));
+    const effId = normalizedCurrentId && navigableTasks.some(t => (t as any).__key === normalizedCurrentId)
+      ? normalizedCurrentId
+      : normalizedTaskId;
 
-    // Se non trovato, probabilmente è la task corrente (non in navigableTasks)
-    // In questo caso usa indice 0 come fallback invece di -1
+    const currIdx = navigableTasks.findIndex(t => (t as any).__key === effId);
     const safeIdx = currIdx >= 0 ? currIdx : 0;
-
-    const dispTask = navigableTasks.find(t => getTaskKey(t) === effId) || task;
 
     return {
       effectiveCurrentId: effId,
-      currentTaskInNavigable: safeIdx,
-      displayTask: dispTask
+      currentTaskInNavigable: currIdx,
+      displayTask: currIdx >= 0 ? navigableTasks[currIdx] : { ...task, __key: normalizedTaskId },
+      canGoPrev: navigableTasks.length > 0 && safeIdx > 0,
+      canGoNext: navigableTasks.length > 0 && safeIdx < navigableTasks.length - 1
     };
   })();
 
@@ -120,66 +120,26 @@ export default function TaskCard({
     effectiveCurrentId,
     navigableTasksCount: navigableTasks.length,
     currentIndex: currentTaskInNavigable,
-    canGoPrev: navigableTasks.length > 1 && currentTaskInNavigable > 0,
-    canGoNext: navigableTasks.length > 1
-      && currentTaskInNavigable >= 0
-      && currentTaskInNavigable < navigableTasks.length - 1
+    canGoPrev: canGoPrev,
+    canGoNext: canGoNext
   });
-
-  const canGoPrev = navigableTasks.length > 1 && currentTaskInNavigable > 0;
-  const canGoNext = navigableTasks.length > 1
-    && currentTaskInNavigable >= 0
-    && currentTaskInNavigable < navigableTasks.length - 1;
 
   const handlePrevTask = (e: React.MouseEvent) => {
     e.stopPropagation();
-
-    if (!canGoPrev) {
-      console.warn('⚠️ PREV bloccato:', { canGoPrev, currentTaskInNavigable, navigableTasksCount: navigableTasks.length });
-      return;
+    if (canGoPrev && currentTaskInNavigable > 0) {
+      const prevTask = navigableTasks[currentTaskInNavigable - 1];
+      setCurrentTaskId(getTaskKey(prevTask));
+      console.log(`⬅️ Navigazione verso task precedente: ${prevTask.name}`);
     }
-
-    const prevTask = navigableTasks[currentTaskInNavigable - 1];
-    if (!prevTask) {
-      console.error('❌ prevTask non trovato!');
-      return;
-    }
-
-    console.log('✅ Navigazione PREV:', {
-      from: currentTaskId,
-      to: getTaskKey(prevTask),
-      currentIndex: currentTaskInNavigable,
-      totalTasks: navigableTasks.length
-    });
-    setCurrentTaskId(getTaskKey(prevTask));
   };
 
   const handleNextTask = (e: React.MouseEvent) => {
     e.stopPropagation();
-
-    if (!canGoNext) {
-      console.warn('⚠️ NEXT bloccato:', { canGoNext, currentTaskInNavigable, navigableTasksCount: navigableTasks.length });
-      return;
+    if (canGoNext && currentTaskInNavigable < navigableTasks.length - 1) {
+      const nextTask = navigableTasks[currentTaskInNavigable + 1];
+      setCurrentTaskId(getTaskKey(nextTask));
+      console.log(`➡️ Navigazione verso task successiva: ${nextTask.name}`);
     }
-
-    const nextTask = navigableTasks[currentTaskInNavigable + 1];
-    if (!nextTask) {
-      console.error('❌ nextTask non trovato!');
-      return;
-    }
-
-    console.log('✅ Navigazione NEXT:', {
-      from: currentTaskId,
-      to: getTaskKey(nextTask),
-      currentIndex: currentTaskInNavigable,
-      totalTasks: navigableTasks.length,
-      nextTaskData: {
-        name: (nextTask as any).logistic_code || nextTask.name,
-        premium: nextTask.premium,
-        straordinaria: nextTask.straordinaria
-      }
-    });
-    setCurrentTaskId(getTaskKey(nextTask));
   };
 
   // Reset currentTaskId quando il modale si apre
