@@ -901,7 +901,10 @@ export default function GenerateAssignments() {
       const dateStr = `${year}-${month}-${day}`;
 
       // VALIDAZIONE: Verifica che ci siano cleaner convocati
-      const selectedCleanersResponse = await fetch(`/data/cleaners/selected_cleaners.json?t=${Date.now()}`);
+      const selectedCleanersResponse = await fetch(`/data/cleaners/selected_cleaners.json?t=${Date.now()}`, {
+        cache: 'no-store',
+        headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' }
+      });
       const selectedCleanersData = await selectedCleanersResponse.json();
 
       if (!selectedCleanersData.cleaners || selectedCleanersData.cleaners.length === 0) {
@@ -959,7 +962,10 @@ export default function GenerateAssignments() {
       const dateStr = `${year}-${month}-${day}`;
 
       // VALIDAZIONE: Verifica che ci siano cleaner convocati
-      const selectedCleanersResponse = await fetch(`/data/cleaners/selected_cleaners.json?t=${Date.now()}`);
+      const selectedCleanersResponse = await fetch(`/data/cleaners/selected_cleaners.json?t=${Date.now()}`, {
+        cache: 'no-store',
+        headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' }
+      });
       const selectedCleanersData = await selectedCleanersResponse.json();
 
       if (!selectedCleanersData.cleaners || selectedCleanersData.cleaners.length === 0) {
@@ -1021,7 +1027,10 @@ export default function GenerateAssignments() {
       const dateStr = `${year}-${month}-${day}`;
 
       // VALIDAZIONE: Verifica che ci siano cleaner convocati
-      const selectedCleanersResponse = await fetch(`/data/cleaners/selected_cleaners.json?t=${Date.now()}`);
+      const selectedCleanersResponse = await fetch(`/data/cleaners/selected_cleaners.json?t=${Date.now()}`, {
+        cache: 'no-store',
+        headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' }
+      });
       const selectedCleanersData = await selectedCleanersResponse.json();
 
       if (!selectedCleanersData.cleaners || selectedCleanersData.cleaners.length === 0) {
@@ -1285,7 +1294,10 @@ export default function GenerateAssignments() {
 
         try {
           // Carica i dati del cleaner
-          const cleanersResponse = await fetch('/data/cleaners/selected_cleaners.json');
+          const cleanersResponse = await fetch(`/data/cleaners/selected_cleaners.json?t=${Date.now()}`, {
+            cache: 'no-store',
+            headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' }
+          });
           const cleanersData = await cleanersResponse.json();
           const cleaner = cleanersData.cleaners.find((c: any) => c.id === toCleanerId);
           const cleanerName = cleaner ? `${cleaner.name} ${cleaner.lastname}` : `ID ${toCleanerId}`;
@@ -1336,7 +1348,10 @@ export default function GenerateAssignments() {
 
         try {
           // Carica i dati del cleaner per mostrare nome e cognome
-          const cleanersResponse = await fetch('/data/cleaners/selected_cleaners.json');
+          const cleanersResponse = await fetch(`/data/cleaners/selected_cleaners.json?t=${Date.now()}`, {
+            cache: 'no-store',
+            headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' }
+          });
           const cleanersData = await cleanersResponse.json();
           const cleaner = cleanersData.cleaners.find((c: any) => c.id === toCleanerId);
           const cleanerName = cleaner ? `${cleaner.name} ${cleaner.lastname}` : `ID ${toCleanerId}`;
@@ -1375,7 +1390,10 @@ export default function GenerateAssignments() {
 
         try {
           // Carica i dati dei cleaner per mostrare nome e cognome
-          const cleanersResponse = await fetch('/data/cleaners/selected_cleaners.json');
+          const cleanersResponse = await fetch(`/data/cleaners/selected_cleaners.json?t=${Date.now()}`, {
+            cache: 'no-store',
+            headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' }
+          });
           const cleanersData = await cleanersResponse.json();
           const fromCleaner = cleanersData.cleaners.find((c: any) => c.id === fromCleanerId);
           const toCleaner = cleanersData.cleaners.find((c: any) => c.id === toCleanerId);
@@ -1522,7 +1540,10 @@ export default function GenerateAssignments() {
 
         try {
           // Carica i dati del cleaner per mostrare nome e cognome
-          const cleanersResponse = await fetch('/data/cleaners/selected_cleaners.json');
+          const cleanersResponse = await fetch(`/data/cleaners/selected_cleaners.json?t=${Date.now()}`, {
+            cache: 'no-store',
+            headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' }
+          });
           const cleanersData = await cleanersResponse.json();
           const cleaner = cleanersData.cleaners.find((c: any) => c.id === toCleanerId);
           const cleanerName = cleaner ? `${cleaner.name} ${cleaner.lastname}` : `ID ${toCleanerId}`;

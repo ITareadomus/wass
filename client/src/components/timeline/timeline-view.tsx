@@ -162,7 +162,10 @@ export default function TimelineView({
       await new Promise(resolve => setTimeout(resolve, 100)); // Small delay per file system sync
 
       // Trova il cleaner appena aggiunto per mostrare nome e cognome
-      const cleanersResponse = await fetch(`/data/cleaners/selected_cleaners.json?t=${Date.now()}`);
+      const cleanersResponse = await fetch(`/data/cleaners/selected_cleaners.json?t=${Date.now()}`, {
+        cache: 'no-store',
+        headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' }
+      });
       const cleanersData = await cleanersResponse.json();
       const addedCleaner = cleanersData.cleaners.find((c: any) => c.id === cleanerId);
       const cleanerName = addedCleaner ? `${addedCleaner.name} ${addedCleaner.lastname}` : `ID ${cleanerId}`;
@@ -308,8 +311,14 @@ export default function TimelineView({
     try {
       // Carica sia selected_cleaners.json che timeline.json per verificare la sincronizzazione
       const [selectedResponse, timelineResponse] = await Promise.all([
-        fetch(`/data/cleaners/selected_cleaners.json?t=${Date.now()}`),
-        fetch(`/data/output/timeline.json?t=${Date.now()}`)
+        fetch(`/data/cleaners/selected_cleaners.json?t=${Date.now()}`, {
+          cache: 'no-store',
+          headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' }
+        }),
+        fetch(`/data/output/timeline.json?t=${Date.now()}`, {
+          cache: 'no-store',
+          headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' }
+        })
       ]);
 
       // Verifica selected_cleaners.json
@@ -436,8 +445,14 @@ export default function TimelineView({
   const loadAvailableCleaners = async () => {
     try {
       const [cleanersResponse, selectedCleanersResponse] = await Promise.all([
-        fetch(`/data/cleaners/cleaners.json?t=${Date.now()}`),
-        fetch(`/data/cleaners/selected_cleaners.json?t=${Date.now()}`)
+        fetch(`/data/cleaners/cleaners.json?t=${Date.now()}`, {
+          cache: 'no-store',
+          headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' }
+        }),
+        fetch(`/data/cleaners/selected_cleaners.json?t=${Date.now()}`, {
+          cache: 'no-store',
+          headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' }
+        })
       ]);
 
       const data = await cleanersResponse.json();
