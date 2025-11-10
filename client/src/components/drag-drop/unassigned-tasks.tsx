@@ -7,9 +7,10 @@ interface UnassignedTasksProps {
   tasks: Task[];
   hasAssigned?: boolean;
   isDragDisabled?: boolean;
+  isReadOnly?: boolean;
 }
 
-export default function UnassignedTasks({ tasks, hasAssigned = false, isDragDisabled = false }: UnassignedTasksProps) {
+export default function UnassignedTasks({ tasks, hasAssigned = false, isDragDisabled = false, isReadOnly = false }: UnassignedTasksProps) {
   return (
     <div className="bg-muted rounded-lg p-4">
       <h3 className="font-semibold mb-4 text-foreground flex items-center">
@@ -35,7 +36,7 @@ export default function UnassignedTasks({ tasks, hasAssigned = false, isDragDisa
             data-testid="unassigned-tasks-container"
           >
             {tasks.map((task, index) => (
-              <TaskCard key={task.id} task={task} index={index} isDragDisabled={isDragDisabled} />
+              <TaskCard key={task.id} task={task} index={index} isDragDisabled={isDragDisabled} isReadOnly={isReadOnly} />
             ))}
             {provided.placeholder}
           </div>

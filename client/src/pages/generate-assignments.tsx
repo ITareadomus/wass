@@ -1492,6 +1492,12 @@ export default function GenerateAssignments() {
   // The following line was replaced by the comment above.
   // const allTasks = [...timelineTasksWithoutDuplicates, ...containerTasks];
 
+  // Determina se la modalità storica è attiva (data passata)
+  const isHistoricalMode = isDateInPast(selectedDate);
+
+  // Filtra le task non assegnate
+  const unassignedTasks = allTasksWithAssignments.filter(task => !task.assignedCleaner);
+  const hasAssignedTasks = allTasksWithAssignments.some(task => task.assignedCleaner);
 
   // Mostra loader durante l'estrazione
   if (isExtracting || isLoadingTasks) {
@@ -1686,7 +1692,7 @@ export default function GenerateAssignments() {
                   <div className="bg-gray-50 dark:bg-gray-950/20 rounded-lg p-3 border border-gray-200 dark:border-gray-800 col-span-2 text-center">
                     <div className="text-xs text-gray-600 dark:text-gray-400 font-medium mb-1">Non Assegnate</div>
                     <div className="text-2xl font-bold text-gray-700 dark:text-gray-300">
-                      {earlyOutTasks.length + highPriorityTasks.length + lowPriorityTasks.length}
+                      {unassignedTasks.length}
                     </div>
                   </div>
                 </div>
