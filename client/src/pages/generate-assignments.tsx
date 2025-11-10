@@ -1761,6 +1761,7 @@ export default function GenerateAssignments() {
             </Popover>
           </div>
           <div className="flex items-center gap-3">
+            <ThemeToggle />
             {/* Settings button for admin */}
             {(() => {
               const user = localStorage.getItem("user");
@@ -1782,7 +1783,6 @@ export default function GenerateAssignments() {
               }
               return null;
             })()}
-            <ThemeToggle />
           </div>
         </div>
 
