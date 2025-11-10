@@ -607,7 +607,7 @@ export default function TimelineView({
     };
   }, []);
 
-  
+
 
   const handleResetAssignments = async () => {
     try {
