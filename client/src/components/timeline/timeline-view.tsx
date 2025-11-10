@@ -624,7 +624,7 @@ export default function TimelineView({
       const resetResponse = await fetch('/api/reset-timeline-assignments', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.JSONstringify({ date: dateStr })
+        body: JSON.stringify({ date: dateStr })
       });
 
       if (!resetResponse.ok) {
@@ -635,19 +635,41 @@ export default function TimelineView({
       setLastSavedFilename(null);
       localStorage.removeItem('last_saved_assignment');
 
-      // 3. Ricarica i task senza ricaricare la pagina (mantiene la data)
-      if ((window as any).reloadAllTasks) {
-        await (window as any).reloadAllTasks();
-      }
-      if ((window as any).setHasUnsavedChanges) {
-        (window as any).setHasUnsavedChanges(true);
-      }
-
-      toast({
-        title: "Reset completato",
-        description: "Timeline svuotata con successo",
-        variant: "success",
+      // 3. CRITICAL: Ricarica SOLO i file JSON locali senza chiamare extract-data
+      // Il backend ha già resettato timeline.json e ricreato containers.json
+      // Dobbiamo solo ricaricare il frontend con i nuovi dati
+      const timestamp = Date.now();
+      
+      // Ricarica containers.json (che ora contiene tutte le task)
+      const containersResponse = await fetch(`/data/output/containers.json?t=${timestamp}`, {
+        cache: 'no-store',
+        headers: { 'Cache-Control': 'no-cache' }
       });
+      
+      // Ricarica timeline.json (che ora è vuota)
+      const timelineResponse = await fetch(`/data/output/timeline.json?t=${timestamp}`, {
+        cache: 'no-store',
+        headers: { 'Cache-Control': 'no-cache' }
+      });
+
+      if (containersResponse.ok && timelineResponse.ok) {
+        // Triggera il reload dei containers nella pagina principale
+        if ((window as any).reloadAllTasks) {
+          await (window as any).reloadAllTasks();
+        }
+        
+        if ((window as any).setHasUnsavedChanges) {
+          (window as any).setHasUnsavedChanges(true);
+        }
+
+        toast({
+          title: "Reset completato",
+          description: "Timeline svuotata, task tornate nei containers",
+          variant: "success",
+        });
+      } else {
+        throw new Error('Errore nel ricaricamento dei file JSON');
+      }
     } catch (error) {
       console.error('Errore nel reset:', error);
       toast({
