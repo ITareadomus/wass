@@ -10,7 +10,6 @@ packages = ["libxcrypt", "pkg-config", "xsimd"]
 deploymentTarget = "autoscale"
 build = ["npm", "run", "build"]
 run = ["npm", "run", "start"]
-publicDir = "dist"
 
 [[ports]]
 localPort = 5000
