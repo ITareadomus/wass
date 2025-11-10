@@ -3,7 +3,7 @@ import { TaskType as Task } from "@shared/schema";
 import PriorityColumn from "@/components/drag-drop/priority-column";
 import TimelineView from "@/components/timeline/timeline-view";
 import MapSection from "@/components/map/map-section";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { CalendarIcon, Users, RefreshCw } from "lucide-react";
 import { useLocation } from 'wouter';
@@ -147,6 +147,11 @@ export default function GenerateAssignments() {
   const [lastSavedTimestamp, setLastSavedTimestamp] = useState<string | null>(null); // Renamed from lastSavedAssignment
   const { toast } = useToast();
   const [, setLocation] = useLocation();
+
+  // Callback per notificare modifiche dopo movimenti task
+  const handleTaskMoved = useCallback(() => {
+    setHasUnsavedChanges(true);
+  }, []);
 
   // Funzione per caricare assegnazioni salvate da Object Storage
   const loadSavedAssignments = async (date: Date) => {
@@ -1246,30 +1251,9 @@ export default function GenerateAssignments() {
 
             // CRITICAL: Marca modifiche dopo drag and drop riuscito
             setHasUnsavedChanges(true);
-            if (onTaskMoved) {
-              onTaskMoved();
-            }
+            handleTaskMoved();
 
-            // CRITICAL FIX: Attendi esplicitamente il ricaricamento COMPLETO
-            // Prima di permettere altri movimenti
-            setIsLoadingTasks(true);
-
-            // Attendi che il backend abbia scritto il file su disco
-            await new Promise(resolve => setTimeout(resolve, 500));
-
-            // Forza ricaricamento completo con cache bust aggressivo
-            const timestamp = Date.now() + Math.random();
-            await fetch(`/data/output/timeline.json?bust=${timestamp}`, {
-              cache: 'no-store',
-              headers: { 'Cache-Control': 'no-cache' }
-            });
-
-            // Ricarica tutto lo stato
-            await loadTasks(true);
-
-            setIsLoadingTasks(false);
-
-            // Mostra toast solo se i cleaner sono diversi
+            // Mostra toast SUBITO (non aspettare il reload)
             if (fromCleanerId !== toCleanerId) {
               toast({
                 title: "Task spostata",
@@ -1277,6 +1261,11 @@ export default function GenerateAssignments() {
                 variant: "success",
               });
             }
+
+            // Reload in background (non blocca e non genera errori se fallisce)
+            loadTasks(true).catch(err => {
+              console.warn('⚠️ Reload fallito dopo movimento (movimento già salvato):', err);
+            });
           }
         } catch (error) {
           console.error('Errore nella chiamata API:', error);
@@ -1337,8 +1326,8 @@ export default function GenerateAssignments() {
 
           // CRITICAL: Marca modifiche dopo spostamento tra containers
           setHasUnsavedChanges(true);
-          if (onTaskMoved) {
-            onTaskMoved();
+          if (handleTaskMoved) {
+            handleTaskMoved();
           }
 
           toast({
@@ -1447,8 +1436,8 @@ export default function GenerateAssignments() {
 
           // CRITICAL: Marca modifiche dopo assegnazione
           setHasUnsavedChanges(true);
-          if (onTaskMoved) {
-            onTaskMoved();
+          if (handleTaskMoved) {
+            handleTaskMoved();
           }
 
           toast({
@@ -1475,8 +1464,8 @@ export default function GenerateAssignments() {
 
         // CRITICAL: Marca modifiche dopo rimozione da timeline
         setHasUnsavedChanges(true);
-        if (onTaskMoved) {
-          onTaskMoved();
+        if (handleTaskMoved) {
+          handleTaskMoved();
         }
         // Rilascia lock indipendentemente dall'esito
         setIsDragging(false);
@@ -1659,7 +1648,7 @@ export default function GenerateAssignments() {
                   personnel={[]}
                   tasks={allTasksWithAssignments}
                   hasUnsavedChanges={hasUnsavedChanges}
-                  onTaskMoved={() => setHasUnsavedChanges(true)}
+                  onTaskMoved={handleTaskMoved}
                   isReadOnly={isTimelineReadOnly} // Passa lo stato read-only
                 />
               </div>
