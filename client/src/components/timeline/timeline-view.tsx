@@ -70,6 +70,7 @@ export default function TimelineView({
   const [cleanerToReplace, setCleanerToReplace] = useState<number | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const timelineRef = useRef<HTMLDivElement>(null);
+  const [lastSavedFilename, setLastSavedFilename] = useState<string | null>(null);
   const { toast } = useToast();
   const [, setLocation] = useLocation();
 
@@ -632,12 +633,33 @@ export default function TimelineView({
       }
 
       // 2. CRITICAL: Resetta il lastSavedFilename per indicare che non ci sono salvataggi
-      setLastSavedFilename(null);
-      localStorage.removeItem('last_saved_assignment');
-
-      // 3. CRITICAL: Ricarica forzata della pagina per sincronizzare tutti gli stati
-      // Questo garantisce che frontend e backend siano perfettamente allineati
-      window.location.reload();
+      // 3. Ricarica i dati dal backend senza reload completo
+      console.log('🔄 Reset completato, ricarico dati...');
+      
+      // Attendi che il backend abbia completato tutte le operazioni
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      // Ricarica cleaners e timeline
+      await Promise.all([
+        loadCleaners(),
+        loadTimelineCleaners()
+      ]);
+      
+      // Notifica il parent per ricaricare le task dai containers
+      if ((window as any).reloadAllTasks) {
+        await (window as any).reloadAllTasks(true);
+      }
+      
+      // Marca come modifiche non salvate e resetta il filename
+      if ((window as any).setHasUnsavedChanges) {
+        (window as any).setHasUnsavedChanges(false);
+      }
+      
+      toast({
+        title: "Reset completato",
+        description: "Timeline svuotata, task riportate nei container",
+        variant: "success",
+      });
     } catch (error) {
       console.error('Errore nel reset:', error);
       toast({
@@ -697,8 +719,6 @@ export default function TimelineView({
       });
     }
   };
-
-  // const [lastSavedFilename, setLastSavedFilename] = useState<string | null>(null);
 
   // Carica anche i cleaner dalla timeline.json per mostrare quelli nascosti
   const [timelineCleaners, setTimelineCleaners] = useState<any[]>([]);
