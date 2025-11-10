@@ -189,8 +189,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // CRITICAL: Forza nuovamente il reset di timeline.json dopo create_containers
       // perché lo script Python potrebbe aver sovrascritto il file
       console.log(`🔄 Forzatura reset timeline.json dopo create_containers...`);
+      
+      // Ricarica timeline per preservare i cleaners ma svuotare le task
+      let finalTimelineData: any;
+      try {
+        const reloadedData = await fs.readFile(timelinePath, 'utf8');
+        finalTimelineData = JSON.parse(reloadedData);
+        
+        // Mantieni cleaners ma svuota task
+        if (finalTimelineData.cleaners_assignments && Array.isArray(finalTimelineData.cleaners_assignments)) {
+          finalTimelineData.cleaners_assignments = finalTimelineData.cleaners_assignments.map((cleanerEntry: any) => ({
+            cleaner: cleanerEntry.cleaner,
+            tasks: []
+          }));
+        }
+        
+        finalTimelineData.metadata = {
+          last_updated: new Date().toISOString(),
+          date: workDate
+        };
+        finalTimelineData.meta = {
+          total_cleaners: finalTimelineData.cleaners_assignments.length,
+          used_cleaners: 0,
+          assigned_tasks: 0
+        };
+      } catch (err) {
+        // Se il file è corrotto, usa timelineData già definito sopra
+        finalTimelineData = timelineData;
+      }
+      
       const tmpPath2 = `${timelinePath}.tmp`;
-      await fs.writeFile(tmpPath2, JSON.stringify(emptyTimeline, null, 2));
+      await fs.writeFile(tmpPath2, JSON.stringify(finalTimelineData, null, 2));
       await fs.rename(tmpPath2, timelinePath);
       console.log(`✅ Timeline resettata nuovamente dopo create_containers`);
 
