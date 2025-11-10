@@ -871,6 +871,25 @@ export default function TimelineView({
                 <RotateCcw className="w-4 h-4" />
                 Reset Assegnazioni
               </Button>
+              {isReadOnly && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="flex items-center gap-2 bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-200 border-yellow-300 dark:border-yellow-700 cursor-default hover:bg-yellow-100 dark:hover:bg-yellow-900/30"
+                  disabled
+                >
+                  📜 Sei in modalità storico
+                </Button>
+              )}
+              <Button
+                onClick={handlePrint}
+                variant="outline"
+                size="sm"
+                className="flex items-center gap-2 print:hidden"
+              >
+                <Printer className="w-4 h-4" />
+                Stampa
+              </Button>
               {!isReadOnly && (
                 <Button
                   onClick={handleConfirmAssignments}
