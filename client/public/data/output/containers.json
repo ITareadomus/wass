@@ -1,6 +1,6 @@
 {
   "metadata": {
-    "last_updated": "2025-11-12T19:28:12.334820",
+    "last_updated": "2025-11-12T19:33:05.336167",
     "date": "2025-11-12"
   },
   "containers": {
@@ -358,33 +358,6 @@
           "priority": "early_out"
         },
         {
-          "task_id": 218768,
-          "logistic_code": 714,
-          "client_id": 61,
-          "premium": false,
-          "address": "VIA CHINOTTO 26",
-          "lat": "45.4668897",
-          "lng": "9.1272539",
-          "cleaning_time": 30,
-          "checkin_date": "2025-11-12",
-          "checkout_date": "2025-11-12",
-          "checkin_time": null,
-          "checkout_time": null,
-          "pax_in": 0,
-          "pax_out": 0,
-          "small_equipment": true,
-          "operation_id": 4,
-          "confirmed_operation": true,
-          "straordinaria": false,
-          "type_apt": "A",
-          "alias": "NTM",
-          "customer_name": "NOTA-MI",
-          "reasons": [
-            "client_forced_eo"
-          ],
-          "priority": "early_out"
-        },
-        {
           "task_id": 218718,
           "logistic_code": 619,
           "client_id": 67,
@@ -408,6 +381,33 @@
           "customer_name": "EXPERIENCE DESIGN BED & SHOW",
           "reasons": [
             "checkout_time<=eo_time"
+          ],
+          "priority": "early_out"
+        },
+        {
+          "task_id": 218768,
+          "logistic_code": 714,
+          "client_id": 61,
+          "premium": false,
+          "address": "VIA CHINOTTO 26",
+          "lat": "45.4668897",
+          "lng": "9.1272539",
+          "cleaning_time": 30,
+          "checkin_date": "2025-11-12",
+          "checkout_date": "2025-11-12",
+          "checkin_time": null,
+          "checkout_time": null,
+          "pax_in": 0,
+          "pax_out": 0,
+          "small_equipment": true,
+          "operation_id": 4,
+          "confirmed_operation": true,
+          "straordinaria": false,
+          "type_apt": "A",
+          "alias": "NTM",
+          "customer_name": "NOTA-MI",
+          "reasons": [
+            "client_forced_eo"
           ],
           "priority": "early_out"
         }
