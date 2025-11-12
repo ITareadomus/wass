@@ -1,6 +1,6 @@
 {
   "metadata": {
-    "last_updated": "2025-11-12T13:35:06.873Z",
+    "last_updated": "2025-11-12T13:41:56.614034",
     "date": "2025-11-12",
     "created_by": "unknown"
   },
@@ -17,7 +17,7 @@
         {
           "task_id": 218768,
           "logistic_code": 714,
-          "client_id": null,
+          "client_id": 61,
           "premium": false,
           "address": "VIA CHINOTTO 26",
           "lat": "45.4668897",
@@ -29,7 +29,7 @@
           "checkout_time": null,
           "pax_in": 0,
           "pax_out": 0,
-          "small_equipment": false,
+          "small_equipment": true,
           "operation_id": 4,
           "confirmed_operation": true,
           "straordinaria": false,
