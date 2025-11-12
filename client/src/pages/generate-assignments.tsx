@@ -5,7 +5,7 @@ import TimelineView from "@/components/timeline/timeline-view";
 import MapSection from "@/components/map/map-section";
 import { useState, useEffect, useRef, useCallback, createContext, useContext, useMemo } from "react";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { CalendarIcon, Users, RefreshCw, Settings, Trash2 } from "lucide-react";
+import { CalendarIcon, Users, RefreshCw, Settings } from "lucide-react";
 import { useLocation } from 'wouter';
 import { format } from "date-fns";
 import { it } from "date-fns/locale";
@@ -14,16 +14,6 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 
 interface RawTask {
   task_id: number;
@@ -249,10 +239,6 @@ export default function GenerateAssignments() {
   const [lastSavedTimestamp, setLastSavedTimestamp] = useState<string | null>(null); // Renamed from lastSavedAssignment
   const { toast } = useToast();
   const [, setLocation] = useLocation();
-
-  // Stati per dialog cancellazione workspace
-  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
-  const [isDeletingWorkspace, setIsDeletingWorkspace] = useState(false);
 
   // Callback per notificare modifiche dopo movimenti task
   const handleTaskMoved = useCallback(() => {
@@ -1774,48 +1760,6 @@ export default function GenerateAssignments() {
     }
   };
 
-  // Funzione per cancellare workspace
-  const handleDeleteWorkspace = async () => {
-    setIsDeletingWorkspace(true);
-    try {
-      const year = selectedDate.getFullYear();
-      const month = String(selectedDate.getMonth() + 1).padStart(2, '0');
-      const day = String(selectedDate.getDate()).padStart(2, '0');
-      const dateStr = `${year}-${month}-${day}`;
-
-      const response = await fetch(`/api/workspace/${dateStr}`, {
-        method: 'DELETE'
-      });
-
-      const result = await response.json();
-
-      if (result.success) {
-        toast({
-          title: "Workspace cancellato",
-          description: `File workspace rimossi per ${format(selectedDate, "dd/MM/yyyy", { locale: it })}`,
-          variant: "default",
-        });
-        setShowDeleteDialog(false);
-      } else {
-        toast({
-          title: "Errore",
-          description: result.message || "Impossibile cancellare il workspace",
-          variant: "destructive",
-        });
-      }
-    } catch (error: any) {
-      console.error("Errore cancellazione workspace:", error);
-      toast({
-        title: "Errore",
-        description: error.message || "Errore durante la cancellazione del workspace",
-        variant: "destructive",
-      });
-    } finally {
-      setIsDeletingWorkspace(false);
-    }
-  };
-
-
   return (
     <div className="bg-background text-foreground min-h-screen">
       <div className="w-full px-4 py-6">
@@ -1849,44 +1793,9 @@ export default function GenerateAssignments() {
             </Popover>
           </div>
           <div className="flex items-center gap-3">
-            <Button
-              onClick={() => setShowDeleteDialog(true)}
-              variant="outline"
-              size="icon"
-              className="rounded-full"
-              title="Cancella Workspace"
-              data-testid="button-delete-workspace"
-            >
-              <Trash2 className="h-5 w-5" />
-            </Button>
             <ThemeToggle />
           </div>
         </div>
-
-        {/* Dialog conferma cancellazione workspace */}
-        <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>Cancellare workspace?</AlertDialogTitle>
-              <AlertDialogDescription>
-                Questa azione cancellerà i file workspace non salvati per la data{" "}
-                <strong>{format(selectedDate, "dd/MM/yyyy", { locale: it })}</strong>.
-                <br /><br />
-                I file salvati (confermati) non saranno toccati. Questa operazione non può essere annullata.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel disabled={isDeletingWorkspace}>Annulla</AlertDialogCancel>
-              <AlertDialogAction
-                onClick={handleDeleteWorkspace}
-                disabled={isDeletingWorkspace}
-                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              >
-                {isDeletingWorkspace ? "Cancellazione..." : "Cancella"}
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
 
         <MultiSelectContext.Provider value={multiSelectContextValue}>
           <DragDropContext onDragEnd={onDragEnd}>
