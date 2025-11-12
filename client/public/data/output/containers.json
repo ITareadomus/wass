@@ -1,65 +1,11 @@
 {
   "metadata": {
-    "last_updated": "2025-11-12T17:05:11.890790",
+    "last_updated": "2025-11-12T17:02:39.418880",
     "date": "2025-11-12"
   },
   "containers": {
     "early_out": {
       "tasks": [
-        {
-          "task_id": 218629,
-          "logistic_code": 1643,
-          "client_id": 87,
-          "premium": true,
-          "address": "Viale Majno 23",
-          "lat": "45.47048",
-          "lng": "9.2052883",
-          "cleaning_time": 180,
-          "checkin_date": "2025-11-17",
-          "checkout_date": "2025-11-12",
-          "checkin_time": null,
-          "checkout_time": null,
-          "pax_in": 5,
-          "pax_out": 5,
-          "small_equipment": false,
-          "operation_id": 2,
-          "confirmed_operation": true,
-          "straordinaria": false,
-          "type_apt": "E",
-          "alias": "HACCA",
-          "customer_name": "HACCA SRL",
-          "reasons": [
-            "client_forced_eo"
-          ],
-          "priority": "early_out"
-        },
-        {
-          "task_id": 218630,
-          "logistic_code": 1646,
-          "client_id": 87,
-          "premium": false,
-          "address": "Via Matteo Bandello 4/1",
-          "lat": "45.465877",
-          "lng": "9.1667974",
-          "cleaning_time": 60,
-          "checkin_date": "2025-11-15",
-          "checkout_date": "2025-11-12",
-          "checkin_time": "19:00",
-          "checkout_time": null,
-          "pax_in": 2,
-          "pax_out": 2,
-          "small_equipment": true,
-          "operation_id": 2,
-          "confirmed_operation": true,
-          "straordinaria": false,
-          "type_apt": "A",
-          "alias": "HACCA",
-          "customer_name": "HACCA SRL",
-          "reasons": [
-            "client_forced_eo"
-          ],
-          "priority": "early_out"
-        },
         {
           "task_id": 218631,
           "logistic_code": 609,
@@ -412,7 +358,7 @@
           "priority": "early_out"
         }
       ],
-      "count": 15
+      "count": 13
     },
     "high_priority": {
       "tasks": [
@@ -921,8 +867,8 @@
     }
   },
   "summary": {
-    "total_tasks": 33,
-    "early_out": 15,
+    "total_tasks": 31,
+    "early_out": 13,
     "high_priority": 11,
     "low_priority": 7
   }
