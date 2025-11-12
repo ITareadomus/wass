@@ -394,14 +394,19 @@ export default function TaskCard({
     }
   };
 
-  // Verifica se la durata è >= 1 ora (60 minuti)
+  // Verifica se la durata è >= 1 ora (60 minuti) E almeno un orario è migrato
   const shouldShowCheckInOutArrows = () => {
     const duration = task.duration || "0.0";
     const parts = duration.split(".");
     const hours = parseInt(parts[0] || "0");
     const minutes = parts[1] ? parseInt(parts[1]) : 0;
     const totalMinutes = hours * 60 + minutes;
-    return totalMinutes >= 60;
+    
+    // Mostra le frecce solo se durata >= 60 min E almeno un orario è migrato
+    const hasCheckout = !!(task as any).checkout_time;
+    const hasCheckin = !!(task as any).checkin_time;
+    
+    return totalMinutes >= 60 && (hasCheckout || hasCheckin);
   };
 
   // Verifica se end_time sfora checkin_time (considerando le date!)
@@ -502,15 +507,13 @@ export default function TaskCard({
                       </div>
                     )}
                     <div className="flex items-center justify-between h-full w-full gap-1">
-                      {/* Freccia check-out (verde, verso l'alto) */}
-                      {shouldShowCheckInOutArrows() && (
+                      {/* Freccia check-out (verde, verso l'alto) - solo se checkout_time è migrato */}
+                      {shouldShowCheckInOutArrows() && (task as any).checkout_time && (
                         <div className="flex flex-col items-center justify-center flex-shrink-0">
                           <ArrowUp className="w-3 h-3 text-green-600" strokeWidth={3} />
-                          {(task as any).checkout_time && (
-                            <span className="text-[7px] font-bold text-green-600 leading-none">
-                              {(task as any).checkout_time}
-                            </span>
-                          )}
+                          <span className="text-[7px] font-bold text-green-600 leading-none">
+                            {(task as any).checkout_time}
+                          </span>
                         </div>
                       )}
                       
@@ -533,15 +536,13 @@ export default function TaskCard({
                         )}
                       </div>
                       
-                      {/* Freccia check-in (rossa, verso il basso) */}
-                      {shouldShowCheckInOutArrows() && (
+                      {/* Freccia check-in (rossa, verso il basso) - solo se checkin_time è migrato */}
+                      {shouldShowCheckInOutArrows() && (task as any).checkin_time && (
                         <div className="flex flex-col items-center justify-center flex-shrink-0">
                           <ArrowDown className="w-3 h-3 text-red-600" strokeWidth={3} />
-                          {(task as any).checkin_time && (
-                            <span className="text-[7px] font-bold text-red-600 leading-none">
-                              {(task as any).checkin_time}
-                            </span>
-                          )}
+                          <span className="text-[7px] font-bold text-red-600 leading-none">
+                            {(task as any).checkin_time}
+                          </span>
                         </div>
                       )}
                     </div>
