@@ -835,8 +835,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-
-
   // Endpoint per rimuovere un'assegnazione dalla timeline
   app.post("/api/remove-timeline-assignment", async (req, res) => {
     try {
@@ -1001,23 +999,57 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const client = new Client();
 
       const workDate = req.body?.date || format(new Date(), "yyyy-MM-dd");
-      const createdBy = req.body?.created_by || "unknown";
+      const username = getCurrentUsername(req); // Usa username da req.body
+      const cleanersAssignments = req.body?.cleanersAssignments; // Assicurati che venga passato se necessario
 
-      // Leggi timeline.json corrente
-      const timelinePath = path.join(process.cwd(), 'client/public/data/output/timeline.json');
-      const timelineData = JSON.parse(await fs.readFile(timelinePath, 'utf8'));
-
-      // Aggiungi il campo created_by ai metadata
-      if (!timelineData.metadata) {
-        timelineData.metadata = {};
+      if (!cleanersAssignments) {
+        // Se cleanersAssignments non è passato, prova a caricarlo dal file
+        try {
+          const timelinePath = path.join(process.cwd(), 'client/public/data/output/timeline.json');
+          const timelineData = JSON.parse(await fs.readFile(timelinePath, 'utf8'));
+          cleanersAssignments = timelineData.cleaners_assignments || [];
+        } catch (err) {
+          console.error("Errore nel caricamento di timeline.json per confirm-assignments:", err);
+          return res.status(500).json({ success: false, message: "Errore nel caricamento delle assegnazioni correnti." });
+        }
       }
-      timelineData.metadata.created_by = createdBy;
 
-      // Salva timeline.json aggiornato con created_by (dual-write)
-      await workspaceFiles.saveTimeline(workDate, timelineData);
+      // Carica timeline esistente per preservare created_by e modified_by
+      let existingTimeline: any = null;
+      try {
+        existingTimeline = await workspaceFiles.loadTimeline(workDate);
+      } catch (err) {
+        console.log("Timeline non esistente, sarà creata");
+      }
+
+      // Prepara modified_by array
+      const modifiedBy = existingTimeline?.metadata?.modified_by || [];
+      if (username && !modifiedBy.includes(username)) { // Assicurati che username non sia 'system' o vuoto
+        modifiedBy.push(username);
+      }
+
+      // Prepara i dati per il salvataggio
+      const dataToSave = {
+        metadata: {
+          last_updated: new Date().toISOString(),
+          date: workDate,
+          created_by: existingTimeline?.metadata?.created_by || username,
+          modified_by: modifiedBy
+        },
+        cleaners_assignments: cleanersAssignments,
+        meta: {
+          total_cleaners: cleanersAssignments.length,
+          used_cleaners: cleanersAssignments.filter((c: any) => c.tasks && c.tasks.length > 0).length,
+          assigned_tasks: cleanersAssignments.reduce((sum: number, c: any) => sum + (c.tasks?.length || 0), 0),
+          total_tasks: cleanersAssignments.reduce((sum: number, c: any) => sum + (c.tasks?.length || 0), 0)
+        }
+      };
+
+      // Salva timeline.json aggiornato con created_by e modified_by (dual-write)
+      await workspaceFiles.saveTimeline(workDate, dataToSave);
 
       const { key, d } = buildKey(workDate);
-      const jsonContent = JSON.stringify(timelineData, null, 2);
+      const jsonContent = JSON.stringify(dataToSave, null, 2);
 
       // Upload con uploadFromText
       const result = await client.uploadFromText(key, jsonContent, {
