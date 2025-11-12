@@ -26,6 +26,13 @@ def haversine_km(lat1: float, lng1: float, lat2: float, lng2: float) -> float:
     return 6371 * c
 
 
+def same_building(addr1: Optional[str], addr2: Optional[str]) -> bool:
+    """Verifica se due indirizzi sono esattamente lo stesso edificio."""
+    if not addr1 or not addr2:
+        return False
+    return addr1.strip().upper() == addr2.strip().upper()
+
+
 def same_street(addr1: Optional[str], addr2: Optional[str]) -> bool:
     """Verifica se due indirizzi condividono la stessa via."""
     if not addr1 or not addr2:
@@ -47,13 +54,13 @@ def same_street(addr1: Optional[str], addr2: Optional[str]) -> bool:
 def travel_minutes(lat1: float, lng1: float, lat2: float, lng2: float,
                    addr1: Optional[str], addr2: Optional[str]) -> float:
     """
-    Calcola il tempo di viaggio in minuti tra due punti usando un modello 
-    realistico per Milano urbano che tiene conto di:
-    - Percorsi non rettilinei (fattore 1.5x sulla distanza haversine)
-    - Velocità medie variabili per distanza
-    - Tempo base per preparazione/attesa (5 min)
+    Modello realistico Milano urbano:
+    - Percorsi non rettilinei (1.5x haversine)
+    - Velocità variabile per distanza
+    - Tempo base preparazione
     """
-    if same_street(addr1, addr2):
+    # Stesso edificio
+    if same_building(addr1, addr2):
         return 0.0
     
     dist_km = haversine_km(lat1, lng1, lat2, lng2)
@@ -61,26 +68,26 @@ def travel_minutes(lat1: float, lng1: float, lat2: float, lng2: float,
     if dist_km > MAX_DISTANCE_KM:
         return 9999.0
     
-    # Fattore correzione percorsi non rettilinei (Milano centro storico)
+    # Fattore correzione percorsi non rettilinei
     dist_reale = dist_km * 1.5
     
-    # Modello progressivo basato su distanza effettiva:
-    # - Brevi (<0.8km): a piedi rapido, ~10 km/h → 6 min/km
-    # - Medie (0.8-2.5km): misto piedi/mezzi, ~6 km/h → 10 min/km  
-    # - Lunghe (>2.5km): mezzi pubblici/taxi, ~12 km/h → 5 min/km
-    
+    # Modello progressivo
     if dist_reale < 0.8:
-        travel_time = dist_reale * 6.0  # ~10 km/h
+        travel_time = dist_reale * 6.0  # ~10 km/h a piedi
     elif dist_reale < 2.5:
-        travel_time = dist_reale * 10.0  # ~6 km/h
+        travel_time = dist_reale * 10.0  # ~6 km/h misto
     else:
-        travel_time = dist_reale * 5.0  # ~12 km/h
+        travel_time = dist_reale * 5.0  # ~12 km/h mezzi
     
-    # Aggiungi tempo base (preparazione, attesa semafori, ecc.)
+    # Tempo base
     base_time = 5.0
     total_time = base_time + travel_time
     
-    # Limiti ragionevoli: min 3 min, max 50 min
+    # Bonus stesso strada (riduce tempo base solo se molto vicini)
+    if same_street(addr1, addr2) and dist_km < 0.10:
+        total_time = max(total_time - 2.0, 3.0)
+    
+    # Limiti: min 3 min, max 50 min
     return max(3.0, min(50.0, total_time))
 
 
