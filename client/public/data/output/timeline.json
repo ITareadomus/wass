@@ -1,95 +1,13 @@
 {
   "metadata": {
-    "last_updated": "2025-11-12T16:33:09.444Z",
+    "last_updated": "2025-11-12T16:38:43.374Z",
     "date": "2025-11-12",
-    "created_by": "Admin",
-    "modified_by": [
-      "Admin"
-    ]
+    "created_by": "Admin"
   },
-  "cleaners_assignments": [
-    {
-      "cleaner": {
-        "id": 626,
-        "name": "DORA PATRICIA",
-        "lastname": "JIMENEZ",
-        "role": "Formatore",
-        "premium": false
-      },
-      "tasks": [
-        {
-          "task_id": 218763,
-          "logistic_code": 1600,
-          "client_id": null,
-          "premium": true,
-          "address": "VIA VIVAIO, 15",
-          "lat": "45.46967",
-          "lng": "9.2034764",
-          "cleaning_time": 120,
-          "checkin_date": "2025-11-17",
-          "checkout_date": "2025-11-12",
-          "checkin_time": null,
-          "checkout_time": null,
-          "pax_in": 3,
-          "pax_out": 2,
-          "small_equipment": false,
-          "operation_id": 2,
-          "confirmed_operation": true,
-          "straordinaria": false,
-          "type_apt": "B",
-          "alias": "TBR",
-          "customer_name": "THE BEST RENT S.r.l.",
-          "reasons": [
-            "manually_moved_to_timeline"
-          ],
-          "priority": "high_priority",
-          "start_time": "10:00",
-          "end_time": "12:00",
-          "followup": false,
-          "sequence": 1,
-          "travel_time": 0,
-          "modified_by": "Admin"
-        },
-        {
-          "task_id": 218520,
-          "logistic_code": 1540,
-          "client_id": null,
-          "premium": false,
-          "address": "VIA GONIN, 58",
-          "lat": "45.4423379",
-          "lng": "9.1195717",
-          "cleaning_time": 60,
-          "checkin_date": "2025-11-12",
-          "checkout_date": "2025-11-12",
-          "checkin_time": "15:00",
-          "checkout_time": "10:15",
-          "pax_in": 2,
-          "pax_out": 2,
-          "small_equipment": false,
-          "operation_id": 2,
-          "confirmed_operation": true,
-          "straordinaria": false,
-          "type_apt": "A",
-          "alias": "CLLTR",
-          "customer_name": "CALLATRONI ELENA",
-          "reasons": [
-            "manually_moved_to_timeline"
-          ],
-          "priority": "high_priority",
-          "start_time": "12:50",
-          "end_time": "13:50",
-          "followup": true,
-          "sequence": 2,
-          "travel_time": 50,
-          "modified_by": "Admin"
-        }
-      ]
-    }
-  ],
+  "cleaners_assignments": [],
   "meta": {
-    "total_cleaners": 1,
+    "total_cleaners": 0,
     "used_cleaners": 0,
-    "assigned_tasks": 0,
-    "total_tasks": 2
+    "assigned_tasks": 0
   }
 }
