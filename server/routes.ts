@@ -1116,7 +1116,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       savedData.metadata = savedData.metadata || {};
       savedData.metadata.date = workDate;
       savedData.metadata.last_updated = new Date().toISOString();
-      
+
       // Preserva created_by se esiste, altrimenti usa 'loaded_from_storage'
       if (!savedData.metadata.created_by) {
         savedData.metadata.created_by = 'loaded_from_storage';
@@ -2562,43 +2562,62 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // CRITICAL: Svuota selected_cleaners.json SOLO se la data è cambiata
-      const selectedCleanersPath = path.join(
-        process.cwd(),
-        'client/public/data/cleaners/selected_cleaners.json'
-      );
+      // Questo permette di mantenere la selezione cleaners per la stessa data
+      // ma resettarla quando si cambia giorno
+      const selectedCleanersPath = path.join(process.cwd(), 'client/public/data/cleaners/selected_cleaners.json');
+      let currentSelectedDate: string | null = null;
 
-      let shouldResetSelectedCleaners = false;
       try {
-        const existingSelectedData = JSON.parse(await fs.readFile(selectedCleanersPath, 'utf8'));
-        const existingDate = existingSelectedData.metadata?.date;
-
-        if (existingDate !== date) {
-          shouldResetSelectedCleaners = true;
-          console.log(`📅 Data cambiata da ${existingDate} a ${date} - reset selected_cleaners.json`);
-        } else {
-          console.log(`✅ Stessa data (${date}) - mantieni selected_cleaners.json`);
-        }
+        const selectedContent = await fs.readFile(selectedCleanersPath, 'utf8');
+        const selectedData = JSON.parse(selectedContent);
+        currentSelectedDate = selectedData.metadata?.date || null;
       } catch (err) {
-        // File non esiste o è corrotto - crealo vuoto
-        shouldResetSelectedCleaners = true;
-        console.log(`📝 selected_cleaners.json non esiste - creazione nuovo`);
+        currentSelectedDate = null;
       }
 
-      if (shouldResetSelectedCleaners) {
-        const emptySelected = {
+      // Verifica se esistono dati salvati per la data target
+      const timelinePath = path.join(process.cwd(), 'client/public/data/output/timeline.json');
+      let hasExistingTimeline = false;
+      let timelineDataForCheck: any = null; // Store timelineData if loaded
+      try {
+        const timelineContent = await fs.readFile(timelinePath, 'utf8');
+        timelineDataForCheck = JSON.parse(timelineContent); // Parse it here
+        hasExistingTimeline = timelineDataForCheck.metadata?.date === date &&
+                             timelineDataForCheck.cleaners_assignments?.length > 0;
+      } catch (err) {
+        hasExistingTimeline = false;
+      }
+
+      // Resetta SOLO se:
+      // 1. La data è diversa E
+      // 2. NON esistono già assegnazioni salvate per la nuova data
+      if (currentSelectedDate !== date && !hasExistingTimeline) {
+        console.log(`📅 Data cambiata da ${currentSelectedDate} a ${date} - reset selected_cleaners.json (nessuna timeline esistente)`);
+        const emptySelection = {
           cleaners: [],
           total_selected: 0,
-          metadata: {
-            date,
-            reset_at: new Date().toISOString()
-          }
+          metadata: { date }
         };
-
-        const tmpScPath = `${selectedCleanersPath}.tmp`;
-        await fs.writeFile(tmpScPath, JSON.stringify(emptySelected, null, 2));
-        await fs.rename(tmpScPath, selectedCleanersPath);
-
+        const tmpSelectedPath = `${selectedCleanersPath}.tmp`;
+        await fs.writeFile(tmpSelectedPath, JSON.stringify(emptySelection, null, 2));
+        await fs.rename(tmpSelectedPath, selectedCleanersPath);
         console.log(`ℹ️ selected_cleaners.json resettato per ${date}`);
+      } else if (currentSelectedDate !== date && hasExistingTimeline) {
+        console.log(`✅ Data cambiata da ${currentSelectedDate} a ${date} - mantieni dati esistenti (timeline con ${timelineDataForCheck.cleaners_assignments.length} cleaners)`);
+        // Ricostruisci selected_cleaners.json dalla timeline esistente
+        const cleanersInTimeline = timelineDataForCheck.cleaners_assignments.map((ca: any) => ca.cleaner).filter(Boolean);
+
+        const selectionFromTimeline = {
+          cleaners: cleanersInTimeline,
+          total_selected: cleanersInTimeline.length,
+          metadata: { date }
+        };
+        const tmpSelectedPath = `${selectedCleanersPath}.tmp`;
+        await fs.writeFile(tmpSelectedPath, JSON.stringify(selectionFromTimeline, null, 2));
+        await fs.rename(tmpSelectedPath, selectedCleanersPath);
+        console.log(`✅ selected_cleaners.json ricostruito da timeline per ${date}`);
+      } else {
+        console.log(`✅ Stessa data (${date}) - mantieni selected_cleaners.json`);
       }
 
       // Esegui SEMPRE create_containers.py per avere dati freschi dal database
@@ -3213,22 +3232,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.delete("/api/workspace/:workDate", async (req, res) => {
     try {
       const { workDate } = req.params;
-      
+
       if (!workDate || !/^\d{4}-\d{2}-\d{2}$/.test(workDate)) {
-        return res.status(400).json({ 
-          success: false, 
-          error: "Data non valida. Formato richiesto: YYYY-MM-DD" 
+        return res.status(400).json({
+          success: false,
+          error: "Data non valida. Formato richiesto: YYYY-MM-DD"
         });
       }
 
       const result = await storageService.deleteWorkspaceFiles(workDate);
-      
-      res.json({ 
-        success: result.success, 
+
+      res.json({
+        success: result.success,
         deletedFiles: result.deletedFiles,
         errors: result.errors,
-        message: result.success 
-          ? `File workspace cancellati per ${workDate}` 
+        message: result.success
+          ? `File workspace cancellati per ${workDate}`
           : `Errori durante la cancellazione: ${result.errors.join(', ')}`
       });
     } catch (error: any) {
