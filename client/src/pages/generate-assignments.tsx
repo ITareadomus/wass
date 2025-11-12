@@ -132,8 +132,19 @@ const getCurrentUsername = (): string => {
 };
 
 export default function GenerateAssignments() {
-  // Usa sempre la data odierna al mount iniziale
+  // Ripristina l'ultima data selezionata da localStorage, altrimenti usa oggi
   const [selectedDate, setSelectedDate] = useState<Date>(() => {
+    const savedDate = localStorage.getItem('selected_work_date');
+    if (savedDate) {
+      try {
+        // Parse formato YYYY-MM-DD
+        const [year, month, day] = savedDate.split('-').map(Number);
+        return new Date(year, month - 1, day); // month è 0-indexed in JS
+      } catch (e) {
+        console.error('Errore parsing data salvata:', e);
+        return new Date();
+      }
+    }
     return new Date();
   });
 
