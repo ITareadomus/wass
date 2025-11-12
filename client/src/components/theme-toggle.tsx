@@ -1,6 +1,7 @@
 
 import { Moon, Sun, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
 import { useToast } from "@/hooks/use-toast";
@@ -47,17 +48,35 @@ export function ThemeToggle() {
 
   const user = localStorage.getItem("user");
 
+  const getUserInitial = () => {
+    if (!user) return "";
+    try {
+      const userData = JSON.parse(user);
+      const username = userData.username || "";
+      return username.charAt(0).toUpperCase();
+    } catch {
+      return "";
+    }
+  };
+
   return (
     <div className="flex items-center gap-2">
       {user && (
-        <Button
-          variant="outline"
-          size="icon"
-          onClick={handleLogout}
-          className="rounded-full bg-red-500 hover:bg-red-600 text-white border-red-600"
-        >
-          <LogOut className="h-5 w-5" />
-        </Button>
+        <>
+          <Avatar className="h-9 w-9">
+            <AvatarFallback className="bg-primary text-primary-foreground font-semibold">
+              {getUserInitial()}
+            </AvatarFallback>
+          </Avatar>
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={handleLogout}
+            className="rounded-full bg-red-500 hover:bg-red-600 text-white border-red-600"
+          >
+            <LogOut className="h-5 w-5" />
+          </Button>
+        </>
       )}
       <Button
         variant="outline"
