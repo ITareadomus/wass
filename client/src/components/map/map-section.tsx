@@ -329,7 +329,7 @@ export default function MapSection({ tasks }: MapSectionProps) {
       <div className="p-4 border-b border-border">
         <h3 className="font-semibold text-foreground flex items-center">
           <svg 
-            className="w-5 h-5 mr-2 text-primary" 
+            className="w-5 h-5 mr-2 text-[hsl(217,91%,22%)]" 
             fill="none" 
             stroke="currentColor" 
             viewBox="0 0 24 24"
