@@ -36,7 +36,7 @@ export async function loadTimeline(workDate: string): Promise<any | null> {
     // Try filesystem first
     const data = await fs.readFile(PATHS.timeline, 'utf-8');
     const parsed = JSON.parse(data);
-
+    
     // Accept file from filesystem if:
     // 1. It has matching metadata.date, OR
     // 2. It has NO metadata (legacy format), OR
@@ -44,7 +44,7 @@ export async function loadTimeline(workDate: string): Promise<any | null> {
     const hasMatchingDate = parsed.metadata?.date === workDate;
     const hasNoMetadata = !parsed.metadata;
     const hasValidStructure = parsed.cleaners_assignments || parsed.assignments;
-
+    
     if (hasMatchingDate || hasNoMetadata || hasValidStructure) {
       // Ensure metadata exists (migration for legacy files)
       if (!parsed.metadata) {
@@ -55,7 +55,7 @@ export async function loadTimeline(workDate: string): Promise<any | null> {
       } else if (!parsed.metadata.date) {
         parsed.metadata.date = workDate;
       }
-
+      
       console.log(`✅ Timeline loaded from filesystem for ${workDate}`);
       return parsed;
     }
@@ -124,7 +124,7 @@ export async function loadContainers(workDate: string): Promise<any | null> {
     // Try filesystem first
     const data = await fs.readFile(PATHS.containers, 'utf-8');
     const parsed = JSON.parse(data);
-
+    
     // Containers might not have metadata date, so just return if valid
     if (parsed.containers) {
       console.log(`✅ Containers loaded from filesystem for ${workDate}`);
@@ -190,7 +190,7 @@ export async function loadSelectedCleaners(workDate: string): Promise<any | null
     // Try filesystem first
     const data = await fs.readFile(PATHS.selectedCleaners, 'utf-8');
     const parsed = JSON.parse(data);
-
+    
     // Verify the date matches if metadata exists
     if (!parsed.metadata?.date || parsed.metadata.date === workDate) {
       console.log(`✅ Selected cleaners loaded from filesystem for ${workDate}`);

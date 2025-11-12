@@ -204,7 +204,7 @@ export default function PriorityColumn({
     <div className={`${getColumnClass(priority, tasks)} rounded-lg p-4 border-2`}>
       <div className="flex items-center justify-between mb-4">
         <div>
-          <h3 className="font-semibold flex items-center dark:text-[#3c83f6] text-[#00008b]">
+          <h3 className="font-semibold flex items-center text-sky-400 dark:text-[#3c83f6]">
             {renderIcon()}
             {title}
           </h3>
