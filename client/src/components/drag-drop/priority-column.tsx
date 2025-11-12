@@ -105,11 +105,11 @@ export default function PriorityColumn({
   const getHeaderClass = (priority: string) => {
     switch (priority) {
       case "early-out":
-        return "text-[hsl(217,91%,22%)]";
+        return "text-custom-blue";
       case "high":
-        return "text-[hsl(217,91%,22%)]";
+        return "text-custom-blue";
       case "low":
-        return "text-[hsl(217,91%,22%)]";
+        return "text-custom-blue";
       default:
         return "text-foreground";
     }
@@ -204,7 +204,7 @@ export default function PriorityColumn({
     <div className={`${getColumnClass(priority, tasks)} rounded-lg p-4 border-2`}>
       <div className="flex items-center justify-between mb-4">
         <div>
-          <h3 className="font-semibold flex items-center text-[hsl(217,91%,22%)]">
+          <h3 className="font-semibold flex items-center text-custom-blue">
             {renderIcon()}
             {title}
           </h3>

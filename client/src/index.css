@@ -63,8 +63,8 @@
   --priority-column-high-bg: hsl(199 89% 88%);
   --priority-column-low-bg: hsl(199 89% 88%);
   
-  /* Priority border colors - Light mode */
-  --priority-border-color: hsl(217 91% 22%);
+  /* Priority border colors - Light mode (azzurro) */
+  --priority-border-color: hsl(199 89% 48%);
 
   /* Timeline colors */
   --timeline-early-bg: hsl(199 89% 84%);
@@ -97,7 +97,7 @@
   --input: hsl(217.2 32.6% 17.5%);
   --ring: hsl(224.3 76.3% 94.1%);
   
-  /* Priority border colors - Dark mode (blu) */
+  /* Priority border colors - Dark mode (blu scuro) */
   --priority-border-color: hsl(217 91% 22%);
   
   /* Container background colors - Dark mode */
@@ -144,6 +144,15 @@
   
   .dark .bg-custom-blue-light {
     background: var(--container-bg-light);
+  }
+  
+  /* Text color personalizzato per icone e titoli */
+  .text-custom-blue {
+    color: hsl(199, 89%, 48%);
+  }
+  
+  .dark .text-custom-blue {
+    color: hsl(217, 91%, 22%);
   }
 
   /* Task styling basato su premium e straordinaria */
