@@ -195,7 +195,7 @@ export default function MapSection({ tasks }: MapSectionProps) {
       
       // Verifica se questa task è evidenziata
       const isHighlighted = highlightedTaskIds.has(task.name);
-      const markerScale = isHighlighted ? 18 : 12; // Più grande se evidenziata
+      const markerScale = 12; // Dimensione costante per tutti i marker
       const strokeWeight = isHighlighted ? 4 : 2; // Bordo più spesso se evidenziata
       const strokeColor = isHighlighted ? '#FFD700' : '#ffffff'; // Bordo dorato se evidenziata
 
