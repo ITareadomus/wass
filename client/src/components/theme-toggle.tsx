@@ -102,6 +102,22 @@ export function ThemeToggle() {
     }
   };
 
+  const getAvatarColor = (userId: number) => {
+    const colors = [
+      "bg-blue-500",
+      "bg-green-500",
+      "bg-purple-500",
+      "bg-orange-500",
+      "bg-pink-500",
+      "bg-teal-500",
+      "bg-red-500",
+      "bg-indigo-500",
+      "bg-yellow-500",
+      "bg-cyan-500",
+    ];
+    return colors[(userId - 1) % colors.length];
+  };
+
   const currentUser = getCurrentUser();
 
   return (
@@ -123,7 +139,7 @@ export function ThemeToggle() {
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" size="icon" className="rounded-full h-9 w-9 p-0">
               <Avatar className="h-9 w-9 cursor-pointer">
-                <AvatarFallback className="bg-primary text-primary-foreground font-semibold">
+                <AvatarFallback className={`${currentUser ? getAvatarColor(currentUser.id) : 'bg-primary'} text-white font-semibold`}>
                   {getUserInitial()}
                 </AvatarFallback>
               </Avatar>
@@ -149,7 +165,11 @@ export function ThemeToggle() {
                   >
                     <div className="flex items-center justify-between w-full">
                       <div className="flex items-center gap-2">
-                        <User className="h-4 w-4" />
+                        <Avatar className="h-6 w-6">
+                          <AvatarFallback className={`${getAvatarColor(account.id)} text-white text-xs font-semibold`}>
+                            {account.username.charAt(0).toUpperCase()}
+                          </AvatarFallback>
+                        </Avatar>
                         <span>{account.username}</span>
                       </div>
                       {currentUser?.id === account.id && (
