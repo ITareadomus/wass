@@ -42,7 +42,7 @@ export default function Login() {
         localStorage.setItem("user", JSON.stringify(data.user));
         toast({
           title: "Login effettuato",
-          description: `Benvenuto ${data.user.username}!`,
+          description: `Benvenuto/a ${data.user.username}!`,
           variant: "success",
         });
         setLocation("/");
