@@ -56,6 +56,7 @@ export default function TaskCard({
 }: TaskCardProps) {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [clickTimer, setClickTimer] = useState<NodeJS.Timeout | null>(null);
+  const [clickCount, setClickCount] = useState(0);
   
   // Usa il context per multi-select (solo per container, non timeline)
   const multiSelectContext = !isInTimeline ? useMultiSelect() : null;
@@ -73,39 +74,46 @@ export default function TaskCard({
       return;
     }
     
-    // Gestione doppio click per mostrare task sulla mappa
+    // Incrementa il contatore di click
+    const newClickCount = clickCount + 1;
+    setClickCount(newClickCount);
+    
+    // Cancella il timer precedente se esiste
     if (clickTimer) {
-      // Doppio click rilevato
       clearTimeout(clickTimer);
-      setClickTimer(null);
-      
-      // Toggle filtro mappa per questa task
-      const currentFilteredTaskId = (window as any).mapFilteredTaskId;
-      if (currentFilteredTaskId === task.name) {
-        // Rimuovi filtro
-        (window as any).mapFilteredTaskId = null;
-        toast({
-          title: "Filtro rimosso",
-          description: "Ora visualizzi tutti gli appartamenti sulla mappa",
-        });
-      } else {
-        // Applica filtro
-        (window as any).mapFilteredTaskId = task.name;
-        toast({
-          title: "Task evidenziata",
-          description: `Visualizzi solo ${task.name} sulla mappa`,
-        });
-      }
-    } else {
-      // Primo click: avvia timer
-      const timer = setTimeout(() => {
+    }
+    
+    // Imposta un nuovo timer
+    const timer = setTimeout(() => {
+      if (newClickCount === 1) {
         // Singolo click: apri modale
         setIsModalOpen(true);
-        setClickTimer(null);
-      }, 250);
+      } else if (newClickCount >= 2) {
+        // Doppio click: toggle filtro mappa
+        const currentFilteredTaskId = (window as any).mapFilteredTaskId;
+        if (currentFilteredTaskId === task.name) {
+          // Rimuovi filtro
+          (window as any).mapFilteredTaskId = null;
+          toast({
+            title: "Filtro rimosso",
+            description: "Ora visualizzi tutti gli appartamenti sulla mappa",
+          });
+        } else {
+          // Applica filtro
+          (window as any).mapFilteredTaskId = task.name;
+          toast({
+            title: "Task evidenziata",
+            description: `Visualizzi solo ${task.name} sulla mappa`,
+          });
+        }
+      }
       
-      setClickTimer(timer);
-    }
+      // Reset
+      setClickCount(0);
+      setClickTimer(null);
+    }, 300);
+    
+    setClickTimer(timer);
   };
 
   const [currentTaskId, setCurrentTaskId] = useState(getTaskKey(task));
