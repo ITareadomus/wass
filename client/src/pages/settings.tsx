@@ -220,7 +220,10 @@ export default function Settings() {
             <div className="space-y-4">
               {/* Pulsante Aggiungi Nuovo */}
               {!isAddingNew && (
-                <Button onClick={() => setIsAddingNew(true)} className="w-full">
+                <Button 
+                  onClick={() => setIsAddingNew(true)} 
+                  className="w-full bg-custom-blue-light border-2 border-custom-blue text-black dark:text-white hover:opacity-80"
+                >
                   <Plus className="w-4 h-4 mr-2" />
                   Aggiungi Nuovo Account
                 </Button>
@@ -273,7 +276,10 @@ export default function Settings() {
                         </Select>
                       </div>
                       <div className="flex gap-2">
-                        <Button onClick={handleAddAccount} className="flex-1">
+                        <Button 
+                          onClick={handleAddAccount} 
+                          className="flex-1 bg-custom-blue-light border-2 border-custom-blue text-black dark:text-white hover:opacity-80"
+                        >
                           <Save className="w-4 h-4 mr-2" />
                           Salva
                         </Button>
@@ -347,7 +353,7 @@ export default function Settings() {
                         <div className="flex gap-2">
                           <Button
                             onClick={() => handleSaveAccount(editingAccount)}
-                            className="flex-1"
+                            className="flex-1 bg-custom-blue-light border-2 border-custom-blue text-black dark:text-white hover:opacity-80"
                           >
                             <Save className="w-4 h-4 mr-2" />
                             Salva
