@@ -196,7 +196,6 @@ export default function Settings() {
         <div className="flex justify-between items-center mb-8">
           <h1 className="text-3xl font-bold">Impostazioni Account</h1>
           <div className="flex gap-2">
-            <ThemeToggle />
             <Button 
               onClick={() => setLocation("/")} 
               variant="outline" 
@@ -206,6 +205,7 @@ export default function Settings() {
             >
               <Home className="h-5 w-5" />
             </Button>
+            <ThemeToggle />
           </div>
         </div>
 
