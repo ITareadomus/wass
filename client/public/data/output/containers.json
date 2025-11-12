@@ -1,6 +1,6 @@
 {
   "metadata": {
-    "last_updated": "2025-11-12T14:28:22.048445",
+    "last_updated": "2025-11-12T14:31:39.475022",
     "date": "2025-11-12"
   },
   "containers": {
@@ -329,36 +329,9 @@
             "checkout_time<=eo_time"
           ],
           "priority": "early_out"
-        },
-        {
-          "task_id": 218717,
-          "logistic_code": 618,
-          "client_id": 67,
-          "premium": false,
-          "address": "VIA VOGHERA, 4",
-          "lat": "45.454632",
-          "lng": "9.168536",
-          "cleaning_time": 30,
-          "checkin_date": "2025-11-12",
-          "checkout_date": "2025-11-12",
-          "checkin_time": null,
-          "checkout_time": "09:30",
-          "pax_in": 2,
-          "pax_out": 0,
-          "small_equipment": true,
-          "operation_id": 2,
-          "confirmed_operation": true,
-          "straordinaria": false,
-          "type_apt": "A",
-          "alias": "EXPRDS",
-          "customer_name": "EXPERIENCE DESIGN BED & SHOW",
-          "reasons": [
-            "checkout_time<=eo_time"
-          ],
-          "priority": "early_out"
         }
       ],
-      "count": 13
+      "count": 12
     },
     "high_priority": {
       "tasks": [
@@ -867,8 +840,8 @@
     }
   },
   "summary": {
-    "total_tasks": 31,
-    "early_out": 13,
+    "total_tasks": 30,
+    "early_out": 12,
     "high_priority": 11,
     "low_priority": 7
   }
