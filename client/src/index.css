@@ -86,6 +86,10 @@
   --ring: hsl(224.3 76.3% 94.1%);
 }
 
+.dark .border-sky-400 {
+  border-color: hsl(217 32% 25%) !important;
+}
+
 @layer base {
   * {
     @apply border-border;
