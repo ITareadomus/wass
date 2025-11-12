@@ -22,6 +22,7 @@ export default function MapSection({ tasks }: MapSectionProps) {
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [cleaners, setCleaners] = useState<any[]>([]);
   const [filteredCleanerId, setFilteredCleanerId] = useState<number | null>(null);
+  const [filteredTaskId, setFilteredTaskId] = useState<string | null>(null);
 
   // Carica i cleaners
   useEffect(() => {
@@ -42,11 +43,19 @@ export default function MapSection({ tasks }: MapSectionProps) {
 
     // Listener per aggiornamenti del filtro dalla timeline
     const checkFilterUpdates = setInterval(() => {
-      const newFilterId = (window as any).mapFilteredCleanerId;
+      const newFilterCleanerId = (window as any).mapFilteredCleanerId;
+      const newFilterTaskId = (window as any).mapFilteredTaskId;
+      
       setFilteredCleanerId(prev => {
-        // Aggiorna solo se cambia davvero
-        if (prev !== newFilterId) {
-          return newFilterId;
+        if (prev !== newFilterCleanerId) {
+          return newFilterCleanerId;
+        }
+        return prev;
+      });
+      
+      setFilteredTaskId(prev => {
+        if (prev !== newFilterTaskId) {
+          return newFilterTaskId;
         }
         return prev;
       });
@@ -124,10 +133,14 @@ export default function MapSection({ tasks }: MapSectionProps) {
       return hasCoordinates;
     });
 
-    // Se c'è un filtro attivo (un cleaner specifico selezionato nella timeline),
-    // mostra solo gli appartamenti del cleaner selezionato
-    // Altrimenti mostra tutte le task con coordinate
-    if (filteredCleanerId !== null && filteredCleanerId !== undefined && filteredCleanerId !== 0) {
+    // Se c'è un filtro per task ID (doppio click su task card)
+    if (filteredTaskId !== null && filteredTaskId !== undefined) {
+      tasksWithCoordinates = tasksWithCoordinates.filter(task => 
+        task.name === filteredTaskId
+      );
+    }
+    // Altrimenti, se c'è un filtro per cleaner (doppio click su cleaner nella timeline)
+    else if (filteredCleanerId !== null && filteredCleanerId !== undefined && filteredCleanerId !== 0) {
       tasksWithCoordinates = tasksWithCoordinates.filter(task => 
         (task as any).assignedCleaner === filteredCleanerId
       );
@@ -233,7 +246,7 @@ export default function MapSection({ tasks }: MapSectionProps) {
     if (tasksWithCoordinates.length > 0) {
       googleMapRef.current.fitBounds(bounds);
     }
-  }, [tasks, isMapLoaded, cleaners, filteredCleanerId]);
+  }, [tasks, isMapLoaded, cleaners, filteredCleanerId, filteredTaskId]);
 
   return (
     <div className="bg-card rounded-lg border shadow-sm">
