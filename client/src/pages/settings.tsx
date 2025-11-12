@@ -209,7 +209,7 @@ export default function Settings() {
           <ThemeToggle />
         </div>
 
-        <Card className="mb-6 bg-custom-blue-light">
+        <Card className="mb-6 bg-custom-blue-light border-2 border-custom-blue">
           <CardHeader className="bg-custom-blue-light">
             <CardTitle>Gestione Account</CardTitle>
             <CardDescription>
@@ -302,7 +302,7 @@ export default function Settings() {
 
               {/* Lista Account */}
               {accounts.map((account) => (
-                <Card key={account.id} className="bg-custom-blue-light">
+                <Card key={account.id} className="bg-custom-blue-light border-2 border-custom-blue">
                   <CardContent className="pt-6 bg-custom-blue-light">
                     {editingAccount?.id === account.id ? (
                       <div className="space-y-4">
