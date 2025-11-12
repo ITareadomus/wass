@@ -109,12 +109,7 @@ export default function MapSection({ tasks }: MapSectionProps) {
       zoom: 12,
       gestureHandling: 'greedy',
       disableDefaultUI: true,
-      zoomControl: false,
-      mapTypeControl: false,
-      scaleControl: false,
-      streetViewControl: false,
-      rotateControl: false,
-      fullscreenControl: false,
+      fullscreenControl: true,
       styles: [
         {
           featureType: 'poi',
