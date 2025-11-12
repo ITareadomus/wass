@@ -17,7 +17,7 @@ import {
 } from "@/components/ui/tooltip";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
-import { HelpCircle, ChevronLeft, ChevronRight, Save, Pencil, ArrowUp, ArrowDown } from "lucide-react";
+import { HelpCircle, ChevronLeft, ChevronRight, Save, Pencil } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { useMultiSelect } from "@/pages/generate-assignments";
@@ -394,21 +394,6 @@ export default function TaskCard({
     }
   };
 
-  // Verifica se la durata è >= 1 ora (60 minuti) E almeno un orario è migrato
-  const shouldShowCheckInOutArrows = () => {
-    const duration = task.duration || "0.0";
-    const parts = duration.split(".");
-    const hours = parseInt(parts[0] || "0");
-    const minutes = parts[1] ? parseInt(parts[1]) : 0;
-    const totalMinutes = hours * 60 + minutes;
-    
-    // Mostra le frecce solo se durata >= 60 min E almeno un orario è migrato
-    const hasCheckout = !!(task as any).checkout_time;
-    const hasCheckin = !!(task as any).checkin_time;
-    
-    return totalMinutes >= 60 && (hasCheckout || hasCheckin);
-  };
-
   // Verifica se end_time sfora checkin_time (considerando le date!)
   const isOverdue = (() => {
     const taskObj = displayTask as any;
@@ -453,7 +438,7 @@ export default function TaskCard({
                     {...provided.dragHandleProps}
                     className={`
                       ${cardColorClass}
-                      rounded-sm px-0 py-1 shadow-sm border transition-all duration-200
+                      rounded-sm px-2 py-1 shadow-sm border transition-all duration-200
                       ${snapshot.isDragging ? "shadow-lg scale-105" : ""}
                       ${isOverdue && isInTimeline ? "animate-blink" : ""}
                       ${isDuplicate && !isInTimeline ? "animate-blink-yellow" : ""}
@@ -506,44 +491,24 @@ export default function TaskCard({
                         />
                       </div>
                     )}
-                    <div className="flex items-center justify-between h-full w-full gap-1">
-                      {/* Freccia check-out (verde, verso l'alto) - solo se checkout_time è migrato */}
-                      {shouldShowCheckInOutArrows() && (task as any).checkout_time && (
-                        <div className="flex flex-col items-center justify-center flex-shrink-0">
-                          <ArrowUp className="w-3 h-3 text-green-600" strokeWidth={3} />
-                          <span className="text-[7px] font-bold text-green-600 leading-none">
-                            {(task as any).checkout_time}
-                          </span>
-                        </div>
-                      )}
-                      
-                      <div className="flex flex-col items-center justify-center h-full gap-0 flex-1">
-                        <div className="flex items-center gap-1">
-                          <span
-                            className="text-[13px] text-[#ff0000] font-extrabold"
-                            data-testid={`task-name-${getTaskKey(task)}`}
-                          >
-                            {task.name}
-                          </span>
-                          <span className="text-[9px] opacity-60 leading-none font-bold text-[#000000]">
-                            ({(task.duration || "0.0").replace(".", ":")}h)
-                          </span>
-                        </div>
-                        {task.alias && (
-                          <span className="text-[9px] opacity-70 leading-none mt-0.5 text-[#000000] font-bold">
-                            {task.alias}{(task as any).type_apt ? ` (${(task as any).type_apt})` : ''}
-                          </span>
-                        )}
+                    <div
+                      className="flex flex-col items-center justify-center h-full gap-0"
+                    >
+                      <div className="flex items-center gap-1">
+                        <span
+                          className="text-[13px] text-[#ff0000] font-extrabold"
+                          data-testid={`task-name-${getTaskKey(task)}`}
+                        >
+                          {task.name}
+                        </span>
+                        <span className="text-[11px] opacity-60 leading-none font-bold text-[#000000]">
+                          ({(task.duration || "0.0").replace(".", ":")}h)
+                        </span>
                       </div>
-                      
-                      {/* Freccia check-in (rossa, verso il basso) - solo se checkin_time è migrato */}
-                      {shouldShowCheckInOutArrows() && (task as any).checkin_time && (
-                        <div className="flex flex-col items-center justify-center flex-shrink-0">
-                          <ArrowDown className="w-3 h-3 text-red-600" strokeWidth={3} />
-                          <span className="text-[7px] font-bold text-red-600 leading-none">
-                            {(task as any).checkin_time}
-                          </span>
-                        </div>
+                      {task.alias && (
+                        <span className="text-[11px] opacity-70 leading-none mt-0.5 text-[#000000] font-bold">
+                          {task.alias}{(task as any).type_apt ? ` (${(task as any).type_apt})` : ''}
+                        </span>
                       )}
                     </div>
                   </div>
