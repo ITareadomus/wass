@@ -1,5 +1,5 @@
 
-import { Moon, Sun, LogOut, History, User, Check } from "lucide-react";
+import { Moon, Sun, LogOut, History, User, Check, Settings } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
@@ -153,6 +153,13 @@ export function ThemeToggle() {
               <History className="mr-2 h-4 w-4" />
               <span>History</span>
             </DropdownMenuItem>
+
+            {currentUser?.role === "admin" && (
+              <DropdownMenuItem onClick={() => setLocation("/settings")} className="cursor-pointer">
+                <Settings className="mr-2 h-4 w-4" />
+                <span>Settings</span>
+              </DropdownMenuItem>
+            )}
             
             <DropdownMenuSeparator />
             
