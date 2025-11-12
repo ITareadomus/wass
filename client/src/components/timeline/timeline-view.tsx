@@ -73,6 +73,9 @@ export default function TimelineView({
   const { toast } = useToast();
   const [, setLocation] = useLocation();
 
+  // Stato per memorizzare i dati della timeline (inclusi i metadata)
+  const [timelineData, setTimelineData] = useState<any>(null);
+
   // Normalizza la data da localStorage per coerenza ovunque
   const workDate = localStorage.getItem('selected_work_date') || (() => {
     const today = new Date();
@@ -104,6 +107,8 @@ export default function TimelineView({
 
       // CRITICAL: Ricarica PRIMA la timeline per vedere i cleaners con task
       await loadTimelineCleaners();
+      // Aggiorna i dati della timeline per mostrare i metadata aggiornati
+      await loadTimelineData();
 
       // POI ricarica selected_cleaners
       await loadCleaners();
@@ -151,6 +156,8 @@ export default function TimelineView({
         loadCleaners(),
         loadTimelineCleaners()
       ]);
+      // Aggiorna i dati della timeline per mostrare i metadata aggiornati
+      await loadTimelineData();
 
       // Ricarica anche le task se necessario
       if ((window as any).reloadAllTasks) {
@@ -209,6 +216,8 @@ export default function TimelineView({
       if ((window as any).reloadAllTasks) {
         await (window as any).reloadAllTasks();
       }
+      // Aggiorna i dati della timeline per mostrare i metadata aggiornati
+      await loadTimelineData();
 
       // Trova i nomi dei cleaner coinvolti
       const sourceCleaner = cleaners.find(c => c.id === variables.sourceCleanerId);
@@ -397,9 +406,40 @@ export default function TimelineView({
     }
   };
 
+  // Funzione per caricare i dati della timeline (inclusi i metadata)
+  const loadTimelineData = async () => {
+    try {
+      const response = await fetch(`/data/output/timeline.json?t=${Date.now()}`, {
+        cache: 'no-store',
+        headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' }
+      });
+      if (!response.ok) {
+        console.warn(`Timeline file not found (${response.status}), using empty data`);
+        setTimelineData(null); // Resetta i dati se il file non esiste o c'è un errore
+        return;
+      }
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        console.warn('Timeline file is not JSON, using empty data');
+        setTimelineData(null);
+        return;
+      }
+      const data = await response.json();
+      setTimelineData(data);
+    } catch (error) {
+      console.error("Errore nel caricamento dei dati della timeline:", error);
+      setTimelineData(null);
+    }
+  };
+
   useEffect(() => {
     loadCleaners();
     loadAliases();
+    loadTimelineCleaners();
+    loadTimelineData(); // Carica i dati della timeline anche qui
+
+    // Esponi la funzione per ricaricare i cleaners della timeline
+    (window as any).loadTimelineCleaners = loadTimelineCleaners;
   }, []);
 
   const handleCleanerClick = (cleaner: Cleaner, e: React.MouseEvent) => {
@@ -654,13 +694,13 @@ export default function TimelineView({
       // Il backend ha già resettato timeline.json e ricreato containers.json
       // Dobbiamo solo ricaricare il frontend con i nuovi dati
       const timestamp = Date.now();
-      
+
       // Ricarica containers.json (che ora contiene tutte le task)
       const containersResponse = await fetch(`/data/output/containers.json?t=${timestamp}`, {
         cache: 'no-store',
         headers: { 'Cache-Control': 'no-cache' }
       });
-      
+
       // Ricarica timeline.json (che ora è vuota)
       const timelineResponse = await fetch(`/data/output/timeline.json?t=${timestamp}`, {
         cache: 'no-store',
@@ -672,10 +712,12 @@ export default function TimelineView({
         if ((window as any).reloadAllTasks) {
           await (window as any).reloadAllTasks();
         }
-        
+
         if ((window as any).setHasUnsavedChanges) {
           (window as any).setHasUnsavedChanges(true);
         }
+        // Aggiorna i dati della timeline per mostrare i metadata aggiornati
+        await loadTimelineData();
 
         toast({
           title: "Reset completato",
@@ -730,6 +772,9 @@ export default function TimelineView({
         (window as any).setHasUnsavedChanges(false);
       }
 
+      // Aggiorna i dati della timeline per mostrare i metadata aggiornati
+      await loadTimelineData();
+
       toast({
         title: "✅ Assegnazioni confermate!",
         description: `Salvate il ${result.formattedDateTime}`,
@@ -774,15 +819,6 @@ export default function TimelineView({
       setTimelineCleaners([]);
     }
   };
-
-  useEffect(() => {
-    loadCleaners();
-    loadAliases();
-    loadTimelineCleaners();
-
-    // Esponi la funzione per ricaricare i cleaners della timeline
-    (window as any).loadTimelineCleaners = loadTimelineCleaners;
-  }, []);
 
   // Nota: il tracking delle modifiche avviene SOLO tramite onTaskMoved
   // chiamato esplicitamente durante drag-and-drop e altre azioni utente
@@ -871,33 +907,43 @@ export default function TimelineView({
         className={`bg-card rounded-lg border shadow-sm ${isFullscreen ? 'fixed inset-0 z-50 overflow-auto' : ''}`}
       >
         <div className="p-4 border-b border-border">
-          <div className="flex items-center justify-between">
-            <h3 className="font-semibold text-foreground flex items-center">
-              <Calendar className="w-5 h-5 mr-2 text-primary" />
-              Timeline Assegnazioni - {cleaners.length} Cleaners
-            </h3>
-            <div className="flex gap-3 print:hidden">
-              <Button
-                onClick={() => setLocation('/convocazioni')}
-                variant="outline"
-                size="sm"
-                className="flex items-center gap-2 print:hidden"
-                disabled={isReadOnly}
-              >
-                <Users className="w-4 h-4" />
-                Convocazioni
-              </Button>
-              <Button
-                onClick={handleResetAssignments}
-                variant="outline"
-                size="sm"
-                className="flex items-center gap-2 print:hidden"
-                disabled={isReadOnly}
-              >
-                <RotateCcw className="w-4 h-4" />
-                Reset Assegnazioni
-              </Button>
+          <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+            <div>
+              <h2 className="text-xl font-bold text-foreground flex items-center">
+                <Calendar className="w-5 h-5 mr-2 text-primary" />
+                Timeline Assegnazioni - {cleaners.length} Cleaners
+              </h2>
+              {timelineData?.metadata?.last_modified_by && (
+                <p className="text-xs text-muted-foreground">
+                  Ultima modifica: {timelineData.metadata.last_modified_by} 
+                  {timelineData.metadata.last_updated && 
+                    ` - ${new Date(timelineData.metadata.last_updated).toLocaleString('it-IT')}`
+                  }
+                </p>
+              )}
             </div>
+          </div>
+          <div className="flex gap-3 print:hidden">
+            <Button
+              onClick={() => setLocation('/convocazioni')}
+              variant="outline"
+              size="sm"
+              className="flex items-center gap-2 print:hidden"
+              disabled={isReadOnly}
+            >
+              <Users className="w-4 h-4" />
+              Convocazioni
+            </Button>
+            <Button
+              onClick={handleResetAssignments}
+              variant="outline"
+              size="sm"
+              className="flex items-center gap-2 print:hidden"
+              disabled={isReadOnly}
+            >
+              <RotateCcw className="w-4 h-4" />
+              Reset Assegnazioni
+            </Button>
           </div>
         </div>
         <div className="p-4 overflow-x-auto">
