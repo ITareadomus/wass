@@ -501,12 +501,12 @@ export default function TaskCard({
                         >
                           {task.name}
                         </span>
-                        <span className="text-[11px] opacity-60 leading-none font-bold text-[#000000]">
+                        <span className="text-[9px] opacity-60 leading-none font-bold text-[#000000]">
                           ({(task.duration || "0.0").replace(".", ":")}h)
                         </span>
                       </div>
                       {task.alias && (
-                        <span className="text-[11px] opacity-70 leading-none mt-0.5 text-[#000000] font-bold">
+                        <span className="text-[9px] opacity-70 leading-none mt-0.5 text-[#000000] font-bold">
                           {task.alias}{(task as any).type_apt ? ` (${(task as any).type_apt})` : ''}
                         </span>
                       )}
