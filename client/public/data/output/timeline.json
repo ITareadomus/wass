@@ -1,6 +1,6 @@
 {
   "metadata": {
-    "last_updated": "2025-11-12T16:11:17.443Z",
+    "last_updated": "2025-11-12T16:14:21.878Z",
     "date": "2025-11-12",
     "created_by": "Admin",
     "modified_by": [
@@ -15,6 +15,16 @@
         "name": "JOHOISER ERNESTO",
         "lastname": "LOPEZ GIRON",
         "role": "Premium",
+        "premium": false
+      },
+      "tasks": []
+    },
+    {
+      "cleaner": {
+        "id": 626,
+        "name": "DORA PATRICIA",
+        "lastname": "JIMENEZ",
+        "role": "Formatore",
         "premium": false
       },
       "tasks": [
