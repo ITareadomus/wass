@@ -209,14 +209,14 @@ export default function Settings() {
           <ThemeToggle />
         </div>
 
-        <Card className="mb-6">
-          <CardHeader>
+        <Card className="mb-6 bg-custom-blue-light">
+          <CardHeader className="bg-custom-blue-light">
             <CardTitle>Gestione Account</CardTitle>
             <CardDescription>
               Aggiungi, modifica o elimina gli account
             </CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="bg-custom-blue-light">
             <div className="space-y-4">
               {/* Pulsante Aggiungi Nuovo */}
               {!isAddingNew && (
@@ -231,8 +231,8 @@ export default function Settings() {
 
               {/* Form Nuovo Account */}
               {isAddingNew && (
-                <Card className="border-2 border-custom-blue">
-                  <CardContent className="pt-6">
+                <Card className="border-2 border-custom-blue bg-custom-blue-light">
+                  <CardContent className="pt-6 bg-custom-blue-light">
                     <div className="space-y-4">
                       <div>
                         <Label htmlFor="new-username">Username</Label>
@@ -302,8 +302,8 @@ export default function Settings() {
 
               {/* Lista Account */}
               {accounts.map((account) => (
-                <Card key={account.id}>
-                  <CardContent className="pt-6">
+                <Card key={account.id} className="bg-custom-blue-light">
+                  <CardContent className="pt-6 bg-custom-blue-light">
                     {editingAccount?.id === account.id ? (
                       <div className="space-y-4">
                         <div>
