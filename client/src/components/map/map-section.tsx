@@ -199,37 +199,72 @@ export default function MapSection({ tasks }: MapSectionProps) {
       const strokeWeight = isHighlighted ? 4 : 2; // Bordo più spesso se evidenziata
       const strokeColor = isHighlighted ? '#FFD700' : '#ffffff'; // Bordo dorato se evidenziata
 
-      // Se c'è una sequenza, usa un marker con testo
+      // Se c'è una sequenza, usa un custom HTML marker
       if (sequence !== undefined && sequence !== null) {
-        const marker = new window.google.maps.Marker({
-          position,
-          map: googleMapRef.current,
-          title: `${task.name} - ${task.type} (Seq: ${sequence})`,
-          label: {
-            text: String(sequence),
-            color: '#ffffff',
-            fontSize: isHighlighted ? '14px' : '12px',
-            fontWeight: 'bold'
-          },
-          icon: {
-            path: window.google.maps.SymbolPath.CIRCLE,
-            fillColor: markerColor,
-            fillOpacity: 1,
-            strokeColor: strokeColor,
-            strokeWeight: strokeWeight,
-            scale: markerScale,
-            anchor: new window.google.maps.Point(0, 0)
-          },
-          zIndex: isHighlighted ? 1000 : index,
-          animation: isHighlighted ? window.google.maps.Animation.BOUNCE : null,
-          optimized: true
-        });
-
-        marker.addListener('click', () => {
-          setSelectedTask(task);
-        });
-
-        markersRef.current.push(marker);
+        // Crea un custom overlay
+        class CustomMarker extends window.google.maps.OverlayView {
+          position: any;
+          div: HTMLDivElement | null = null;
+          
+          constructor(position: any) {
+            super();
+            this.position = position;
+          }
+          
+          onAdd() {
+            const div = document.createElement('div');
+            div.style.position = 'absolute';
+            div.style.cursor = 'pointer';
+            div.style.width = `${markerScale * 2}px`;
+            div.style.height = `${markerScale * 2}px`;
+            div.style.borderRadius = '50%';
+            div.style.backgroundColor = markerColor;
+            div.style.border = `${strokeWeight}px solid ${strokeColor}`;
+            div.style.display = 'flex';
+            div.style.alignItems = 'center';
+            div.style.justifyContent = 'center';
+            div.style.color = '#ffffff';
+            div.style.fontSize = isHighlighted ? '14px' : '12px';
+            div.style.fontWeight = 'bold';
+            div.style.zIndex = isHighlighted ? '1000' : String(index);
+            div.textContent = String(sequence);
+            div.title = `${task.name} - ${task.type} (Seq: ${sequence})`;
+            
+            // Aggiungi animazione bounce se evidenziato
+            if (isHighlighted) {
+              div.style.animation = 'bounce 0.5s ease infinite alternate';
+            }
+            
+            div.addEventListener('click', () => {
+              setSelectedTask(task);
+            });
+            
+            this.div = div;
+            const panes = this.getPanes();
+            panes.overlayMouseTarget.appendChild(div);
+          }
+          
+          draw() {
+            if (!this.div) return;
+            const overlayProjection = this.getProjection();
+            const pos = overlayProjection.fromLatLngToDivPixel(this.position);
+            if (pos) {
+              this.div.style.left = `${pos.x - markerScale}px`;
+              this.div.style.top = `${pos.y - markerScale}px`;
+            }
+          }
+          
+          onRemove() {
+            if (this.div && this.div.parentNode) {
+              this.div.parentNode.removeChild(this.div);
+              this.div = null;
+            }
+          }
+        }
+        
+        const customMarker = new CustomMarker(position);
+        customMarker.setMap(googleMapRef.current);
+        markersRef.current.push(customMarker);
       } else {
         // Marker senza sequenza (non assegnato)
         const marker = new window.google.maps.Marker({
