@@ -34,6 +34,7 @@ interface TaskCardProps {
   isDuplicate?: boolean;
   isDragDisabled?: boolean;
   isReadOnly?: boolean;
+  useRealWidth?: boolean;
 }
 
 interface AssignedTask {
@@ -53,6 +54,7 @@ export default function TaskCard({
   isDuplicate = false,
   isDragDisabled = false,
   isReadOnly = false,
+  useRealWidth = false,
 }: TaskCardProps) {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [clickTimer, setClickTimer] = useState<NodeJS.Timeout | null>(null);
@@ -369,7 +371,7 @@ export default function TaskCard({
   };
 
   // Calcola la larghezza in base alla durata
-  const calculateWidth = (duration: string | undefined, forTimeline: boolean) => {
+  const calculateWidth = (duration: string | undefined, forTimeline: boolean, useRealWidthProp: boolean) => {
     const safeDuration = duration || "0.0";
     const parts = safeDuration.split(".");
     const hours = parseInt(parts[0] || "0");
@@ -386,8 +388,9 @@ export default function TaskCard({
       return `${widthPercentage}%`;
     } else {
       // Per le colonne di priorità:
-      // Se la task è < 60 minuti, usa sempre 60 minuti (larghezza di 1 ora)
-      const displayMinutes = effectiveMinutes < 60 ? 60 : effectiveMinutes;
+      // Se useRealWidth è true, usa la durata effettiva
+      // Altrimenti usa sempre almeno 60 minuti per task < 1 ora
+      const displayMinutes = (useRealWidthProp || effectiveMinutes >= 60) ? effectiveMinutes : 60;
       const halfHours = Math.ceil(displayMinutes / 30);
       const baseWidth = halfHours * 50;
       return `${baseWidth}px`;
@@ -395,13 +398,14 @@ export default function TaskCard({
   };
 
   // Determina se la task è < 1 ora per ridurre le dimensioni del testo
+  // Nei container applica la riduzione solo se useRealWidth è true
   const isSmallTask = (() => {
     const safeDuration = task.duration || "0.0";
     const parts = safeDuration.split(".");
     const hours = parseInt(parts[0] || "0");
     const minutes = parts[1] ? parseInt(parts[1]) : 0;
     const totalMinutes = hours * 60 + minutes;
-    return totalMinutes < 60;
+    return totalMinutes < 60 && (isInTimeline || useRealWidth);
   })();
 
   // Verifica se end_time sfora checkin_time (considerando le date!)
@@ -436,7 +440,7 @@ export default function TaskCard({
         isDragDisabled={shouldDisableDrag} // Usa la prop per disabilitare il drag
       >
         {(provided, snapshot) => {
-          const cardWidth = calculateWidth(task.duration, isInTimeline);
+          const cardWidth = calculateWidth(task.duration, isInTimeline, useRealWidth);
 
           return (
             <TooltipProvider delayDuration={300}>
