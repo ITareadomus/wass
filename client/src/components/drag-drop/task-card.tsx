@@ -533,7 +533,7 @@ export default function TaskCard({
                   </div>
                 </TooltipTrigger>
                 <TooltipContent side="top" className="max-w-xs text-base px-3 py-2">
-                  <p className="font-semibold">{displayTask.address?.toLowerCase() || "indirizzo non disponibile"}</p>
+                  <p className="font-semibold">{displayTask.address?.toUpperCase() || "INDIRIZZO NON DISPONIBILE"}</p>
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>
@@ -632,7 +632,7 @@ export default function TaskCard({
                 <p className="text-sm font-semibold text-muted-foreground">
                   Indirizzo
                 </p>
-                <p className="text-sm">{displayTask.address?.toLowerCase() || "non migrato"}</p>
+                <p className="text-sm">{displayTask.address?.toUpperCase() || "NON MIGRATO"}</p>
               </div>
               <div>
                 <p className="text-sm font-semibold text-muted-foreground mb-1 flex items-center gap-1">
