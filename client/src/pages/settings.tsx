@@ -213,7 +213,7 @@ export default function Settings() {
           <CardHeader>
             <CardTitle>Gestione Account</CardTitle>
             <CardDescription>
-              Aggiungi, modifica o elimina gli account utente
+              Aggiungi, modifica o elimina gli account
             </CardDescription>
           </CardHeader>
           <CardContent>
