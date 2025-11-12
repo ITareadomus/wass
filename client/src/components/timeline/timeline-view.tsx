@@ -904,7 +904,7 @@ export default function TimelineView({
     <>
       <div
         ref={timelineRef}
-        className={`bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800 rounded-lg border-2 shadow-sm ${isFullscreen ? 'fixed inset-0 z-50 overflow-auto' : ''}`}
+        className={`bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800 rounded-lg border-2 border-sky-400 shadow-sm ${isFullscreen ? 'fixed inset-0 z-50 overflow-auto' : ''}`}
       >
         <div className="p-4 border-b border-border">
           <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
