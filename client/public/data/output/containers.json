@@ -1,6 +1,6 @@
 {
   "metadata": {
-    "last_updated": "2025-11-12T18:23:43.877801",
+    "last_updated": "2025-11-12T18:28:24.967500",
     "date": "2025-11-12"
   },
   "containers": {
@@ -277,33 +277,6 @@
           "priority": "early_out"
         },
         {
-          "task_id": 218717,
-          "logistic_code": 618,
-          "client_id": 67,
-          "premium": false,
-          "address": "VIA VOGHERA, 4",
-          "lat": "45.454632",
-          "lng": "9.168536",
-          "cleaning_time": 30,
-          "checkin_date": "2025-11-12",
-          "checkout_date": "2025-11-12",
-          "checkin_time": null,
-          "checkout_time": "09:30",
-          "pax_in": 2,
-          "pax_out": 0,
-          "small_equipment": true,
-          "operation_id": 2,
-          "confirmed_operation": true,
-          "straordinaria": false,
-          "type_apt": "A",
-          "alias": "EXPRDS",
-          "customer_name": "EXPERIENCE DESIGN BED & SHOW",
-          "reasons": [
-            "checkout_time<=eo_time"
-          ],
-          "priority": "early_out"
-        },
-        {
           "task_id": 218649,
           "logistic_code": 1571,
           "client_id": 61,
@@ -358,9 +331,36 @@
           "priority": "early_out"
         },
         {
+          "task_id": 218717,
+          "logistic_code": 618,
+          "client_id": 67,
+          "premium": false,
+          "address": "VIA VOGHERA, 4",
+          "lat": "45.454632",
+          "lng": "9.168536",
+          "cleaning_time": 30,
+          "checkin_date": "2025-11-12",
+          "checkout_date": "2025-11-12",
+          "checkin_time": null,
+          "checkout_time": "09:30",
+          "pax_in": 2,
+          "pax_out": 0,
+          "small_equipment": true,
+          "operation_id": 2,
+          "confirmed_operation": true,
+          "straordinaria": false,
+          "type_apt": "A",
+          "alias": "EXPRDS",
+          "customer_name": "EXPERIENCE DESIGN BED & SHOW",
+          "reasons": [
+            "checkout_time<=eo_time"
+          ],
+          "priority": "early_out"
+        },
+        {
           "task_id": 218718,
           "logistic_code": 619,
-          "client_id": 67,
+          "client_id": null,
           "premium": false,
           "address": "VIA TORTONA, 10",
           "lat": "45.4542397",
@@ -379,15 +379,14 @@
           "type_apt": "B",
           "alias": "EXPRDS",
           "customer_name": "EXPERIENCE DESIGN BED & SHOW",
-          "reasons": [
-            "checkout_time<=eo_time"
-          ],
-          "priority": "early_out"
+          "reasons": [],
+          "priority": "early_out",
+          "modified_by": "Admin"
         },
         {
           "task_id": 218768,
           "logistic_code": 714,
-          "client_id": 61,
+          "client_id": null,
           "premium": false,
           "address": "VIA CHINOTTO 26",
           "lat": "45.4668897",
@@ -399,17 +398,16 @@
           "checkout_time": null,
           "pax_in": 0,
           "pax_out": 0,
-          "small_equipment": true,
+          "small_equipment": false,
           "operation_id": 4,
           "confirmed_operation": true,
           "straordinaria": false,
           "type_apt": "A",
           "alias": "NTM",
           "customer_name": "NOTA-MI",
-          "reasons": [
-            "client_forced_eo"
-          ],
-          "priority": "early_out"
+          "reasons": [],
+          "priority": "early_out",
+          "modified_by": "Admin"
         }
       ],
       "count": 15
