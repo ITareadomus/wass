@@ -904,7 +904,7 @@ export default function TimelineView({
     <>
       <div
         ref={timelineRef}
-        className={`bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800 rounded-lg border-2 border-sky-400 shadow-sm ${isFullscreen ? 'fixed inset-0 z-50 overflow-auto' : ''}`}
+        className={`bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800 rounded-lg border-2 border-sky-400 dark:border-blue-800 shadow-sm ${isFullscreen ? 'fixed inset-0 z-50 overflow-auto' : ''}`}
       >
         <div className="p-4 border-b border-border">
           <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
@@ -927,7 +927,7 @@ export default function TimelineView({
                 onClick={() => setLocation('/convocazioni')}
                 variant="outline"
                 size="sm"
-                className="flex items-center gap-2 border-2 border-sky-400"
+                className="flex items-center gap-2 border-2 border-sky-400 dark:border-blue-800"
                 disabled={isReadOnly}
               >
                 <Users className="w-4 h-4" />
@@ -937,7 +937,7 @@ export default function TimelineView({
                 onClick={handleResetAssignments}
                 variant="outline"
                 size="sm"
-                className="flex items-center gap-2 border-2 border-sky-400"
+                className="flex items-center gap-2 border-2 border-sky-400 dark:border-blue-800"
                 disabled={isReadOnly}
               >
                 <RotateCcw className="w-4 h-4" />
@@ -965,7 +965,7 @@ export default function TimelineView({
           {/* Righe dei cleaners - mostra solo se ci sono cleaners selezionati */}
           <div className="flex-1 overflow-auto px-4 pb-4">
             {allCleanersToShow.length === 0 && !isReadOnly ? (
-              <div className="flex items-center justify-center h-64 bg-yellow-50 dark:bg-yellow-950/20 border-2 border-yellow-300 dark:border-yellow-700 rounded-lg">
+              <div className="flex items-center justify-center h-64 bg-yellow-50 dark:bg-yellow-950/20 border-2 border-yellow-300 dark:border-blue-800 rounded-lg">
                 <div className="text-center p-6">
                   <Users className="mx-auto h-12 w-12 text-yellow-600 dark:text-yellow-400 mb-3" />
                   <h3 className="text-lg font-semibold text-yellow-800 dark:text-yellow-200 mb-2">
@@ -977,7 +977,7 @@ export default function TimelineView({
                 </div>
               </div>
             ) : allCleanersToShow.length === 0 && isReadOnly ? (
-              <div className="flex items-center justify-center h-64 bg-red-50 dark:bg-red-950/20 border-2 border-red-300 dark:border-red-700 rounded-lg">
+              <div className="flex items-center justify-center h-64 bg-red-50 dark:bg-red-950/20 border-2 border-red-300 dark:border-blue-800 rounded-lg">
                 <div className="text-center p-6">
                   <Calendar className="mx-auto h-12 w-12 text-red-600 dark:text-red-400 mb-3" />
                   <h3 className="text-lg font-semibold text-red-800 dark:text-red-200 mb-2">
@@ -1215,7 +1215,7 @@ export default function TimelineView({
                   }}
                   variant="ghost"
                   size="sm"
-                  className="w-full h-full border-2 border-sky-400"
+                  className="w-full h-full border-2 border-sky-400 dark:border-blue-800"
                   disabled={isReadOnly}
                 >
                   <UserPlus className="w-5 h-5" />
@@ -1228,7 +1228,7 @@ export default function TimelineView({
                     onClick={handleConfirmAssignments}
                     disabled={!hasUnsavedChanges}
                     variant="outline"
-                    className={`flex-1 h-full border-2 border-sky-400 ${
+                    className={`flex-1 h-full border-2 border-sky-400 dark:border-blue-800 ${
                       hasUnsavedChanges 
                         ? 'bg-green-600 hover:bg-green-700 text-white animate-pulse' 
                         : 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200 cursor-default'
@@ -1243,7 +1243,7 @@ export default function TimelineView({
                   <Button
                     disabled
                     variant="outline"
-                    className="flex-1 h-full border-2 border-sky-400 bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-200 cursor-default"
+                    className="flex-1 h-full border-2 border-sky-400 dark:border-blue-800 bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-200 cursor-default"
                   >
                     📜 Sei in modalità storico
                   </Button>

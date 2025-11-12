@@ -92,11 +92,11 @@ export default function PriorityColumn({
   const getColumnClass = (priority: string, tasks: Task[]) => {
     switch (priority) {
       case "early-out":
-        return "bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800 border-sky-400";
+        return "bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800 border-sky-400 dark:border-blue-800";
       case "high":
-        return "bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800 border-sky-400";
+        return "bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800 border-sky-400 dark:border-blue-800";
       case "low":
-        return "bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800 border-sky-400";
+        return "bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800 border-sky-400 dark:border-blue-800";
       default:
         return "bg-gray-50 border-gray-300";
     }
@@ -223,7 +223,7 @@ export default function PriorityColumn({
             size="sm"
             onClick={toggleMode}
             disabled={tasks.length === 0 || isDateInPast}
-            className="text-xs px-2 py-1 h-7 border-2 border-sky-400"
+            className="text-xs px-2 py-1 h-7 border-2 border-sky-400 dark:border-blue-800"
             title={isMultiSelectMode ? "Disattiva selezione multipla" : "Attiva selezione multipla"}
             data-testid="button-toggle-multiselect"
           >
@@ -235,7 +235,7 @@ export default function PriorityColumn({
             size="sm"
             onClick={handleAssign} // Utilizza handleAssign
             disabled={isAssigning || tasks.length === 0 || isDateInPast}
-            className="text-xs px-2 py-1 h-7 border-2 border-sky-400"
+            className="text-xs px-2 py-1 h-7 border-2 border-sky-400 dark:border-blue-800"
             title={isDateInPast ? "Non puoi assegnare task per date passate" : ""}
             data-testid="button-assign"
           >
