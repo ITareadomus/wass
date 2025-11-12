@@ -132,19 +132,8 @@ const getCurrentUsername = (): string => {
 };
 
 export default function GenerateAssignments() {
-  // Ripristina l'ultima data selezionata da localStorage, altrimenti usa oggi
+  // Usa sempre la data odierna al mount iniziale
   const [selectedDate, setSelectedDate] = useState<Date>(() => {
-    const savedDate = localStorage.getItem('selected_work_date');
-    if (savedDate) {
-      try {
-        // Parse formato YYYY-MM-DD
-        const [year, month, day] = savedDate.split('-').map(Number);
-        return new Date(year, month - 1, day); // month è 0-indexed in JS
-      } catch (e) {
-        console.error('Errore parsing data salvata:', e);
-        return new Date();
-      }
-    }
     return new Date();
   });
 
@@ -473,6 +462,7 @@ export default function GenerateAssignments() {
           console.log("✏️ Data presente/futura - modalità EDITABILE");
           setIsTimelineReadOnly(false);
         }
+
         await extractData(date);
       }
     } catch (error) {
@@ -1144,19 +1134,17 @@ export default function GenerateAssignments() {
         priority = 'high_priority';
       }
 
-      const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
-      const response = await fetch("/api/save-timeline-assignment", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
+      const response = await fetch('/api/save-timeline-assignment', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          taskId: task.id,
-          logisticCode: task.name,
-          cleanerId: cleanerId,
-          dropIndex: dropIndex,
-          taskData: task,
-          priority: priority,
+          taskId, // Chiave univoca
+          cleanerId,
+          logisticCode, // Attributo non univoco
           date: dateStr,
-          modified_by: currentUser.username || 'unknown'
+          dropIndex,
+          priority,
+          taskData: task
         }),
       });
       if (!response.ok) {
@@ -1772,6 +1760,7 @@ export default function GenerateAssignments() {
     }
   };
 
+
   return (
     <div className="bg-background text-foreground min-h-screen">
       <div className="w-full px-4 py-6">
@@ -1805,6 +1794,27 @@ export default function GenerateAssignments() {
             </Popover>
           </div>
           <div className="flex items-center gap-3">
+            {/* Settings button for admin */}
+            {(() => {
+              const user = localStorage.getItem("user");
+              if (user) {
+                const userData = JSON.parse(user);
+                if (userData.role === "admin") {
+                  return (
+                    <Button
+                      onClick={() => setLocation("/settings")}
+                      variant="outline"
+                      size="icon"
+                      className="rounded-full"
+                      title="Impostazioni"
+                    >
+                      <Settings className="h-5 w-5" />
+                    </Button>
+                  );
+                }
+              }
+              return null;
+            })()}
             <ThemeToggle />
           </div>
         </div>

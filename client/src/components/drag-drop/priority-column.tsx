@@ -92,11 +92,11 @@ export default function PriorityColumn({
   const getColumnClass = (priority: string, tasks: Task[]) => {
     switch (priority) {
       case "early-out":
-        return "bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800 border-sky-400 dark:border-blue-800";
+        return "bg-sky-100 border-sky-400";
       case "high":
-        return "bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800 border-sky-400 dark:border-blue-800";
+        return "bg-sky-100 border-sky-400";
       case "low":
-        return "bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800 border-sky-400 dark:border-blue-800";
+        return "bg-sky-100 border-sky-400";
       default:
         return "bg-gray-50 border-gray-300";
     }
@@ -204,7 +204,7 @@ export default function PriorityColumn({
     <div className={`${getColumnClass(priority, tasks)} rounded-lg p-4 border-2`}>
       <div className="flex items-center justify-between mb-4">
         <div>
-          <h3 className="font-semibold flex items-center text-sky-400 dark:text-[#3c83f6]">
+          <h3 className={`font-semibold ${getHeaderClass(priority)} flex items-center`}>
             {renderIcon()}
             {title}
           </h3>
@@ -223,7 +223,7 @@ export default function PriorityColumn({
             size="sm"
             onClick={toggleMode}
             disabled={tasks.length === 0 || isDateInPast}
-            className="text-xs px-2 py-1 h-7 border-2 border-sky-400 dark:border-blue-800"
+            className="text-xs px-2 py-1 h-7"
             title={isMultiSelectMode ? "Disattiva selezione multipla" : "Attiva selezione multipla"}
             data-testid="button-toggle-multiselect"
           >
@@ -235,7 +235,7 @@ export default function PriorityColumn({
             size="sm"
             onClick={handleAssign} // Utilizza handleAssign
             disabled={isAssigning || tasks.length === 0 || isDateInPast}
-            className="text-xs px-2 py-1 h-7 border-2 border-sky-400 dark:border-blue-800"
+            className="text-xs px-2 py-1 h-7"
             title={isDateInPast ? "Non puoi assegnare task per date passate" : ""}
             data-testid="button-assign"
           >
@@ -253,6 +253,7 @@ export default function PriorityColumn({
           </Button>
         </div>
       </div>
+
       <Droppable droppableId={droppableId}>
         {(provided, snapshot) => (
           <div
