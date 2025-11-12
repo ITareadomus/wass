@@ -64,7 +64,7 @@
   --priority-column-low-bg: hsl(199 89% 88%);
   
   /* Priority border colors - Light mode */
-  --priority-border-color: hsl(199 89% 48%);
+  --priority-border-color: hsl(217 91% 22%);
 
   /* Timeline colors */
   --timeline-early-bg: hsl(199 89% 84%);
@@ -98,7 +98,7 @@
   --ring: hsl(224.3 76.3% 94.1%);
   
   /* Priority border colors - Dark mode (blu) */
-  --priority-border-color: hsl(297 91% 22%);
+  --priority-border-color: hsl(217 91% 22%);
 }
 
 @layer base {
@@ -129,6 +129,11 @@
 }
 
 @layer components {
+  /* Border color personalizzato per container, timeline e pulsanti */
+  .border-custom-blue {
+    border-color: var(--priority-border-color) !important;
+  }
+
   /* Task styling basato su premium e straordinaria */
   .task-straordinaria {
     background-color: #fca5a5;

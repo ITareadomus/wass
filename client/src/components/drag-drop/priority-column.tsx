@@ -92,11 +92,11 @@ export default function PriorityColumn({
   const getColumnClass = (priority: string, tasks: Task[]) => {
     switch (priority) {
       case "early-out":
-        return "bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800 border-sky-400 dark:border-blue-500";
+        return "bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800 border-custom-blue";
       case "high":
-        return "bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800 border-sky-400 dark:border-blue-500";
+        return "bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800 border-custom-blue";
       case "low":
-        return "bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800 border-sky-400 dark:border-blue-500";
+        return "bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800 border-custom-blue";
       default:
         return "bg-gray-50 border-gray-300";
     }
@@ -105,11 +105,11 @@ export default function PriorityColumn({
   const getHeaderClass = (priority: string) => {
     switch (priority) {
       case "early-out":
-        return "text-sky-800 dark:text-blue-500";
+        return "text-[hsl(217,91%,22%)]";
       case "high":
-        return "text-sky-800 dark:text-blue-500";
+        return "text-[hsl(217,91%,22%)]";
       case "low":
-        return "text-sky-800 dark:text-blue-500";
+        return "text-[hsl(217,91%,22%)]";
       default:
         return "text-foreground";
     }
@@ -204,7 +204,7 @@ export default function PriorityColumn({
     <div className={`${getColumnClass(priority, tasks)} rounded-lg p-4 border-2`}>
       <div className="flex items-center justify-between mb-4">
         <div>
-          <h3 className="font-semibold flex items-center text-sky-400 dark:text-blue-500">
+          <h3 className="font-semibold flex items-center text-[hsl(217,91%,22%)]">
             {renderIcon()}
             {title}
           </h3>
@@ -223,7 +223,7 @@ export default function PriorityColumn({
             size="sm"
             onClick={toggleMode}
             disabled={tasks.length === 0 || isDateInPast}
-            className="text-xs px-2 py-1 h-7 border-2 border-sky-400 dark:border-blue-500"
+            className="text-xs px-2 py-1 h-7 border-2 border-custom-blue"
             title={isMultiSelectMode ? "Disattiva selezione multipla" : "Attiva selezione multipla"}
             data-testid="button-toggle-multiselect"
           >
@@ -235,7 +235,7 @@ export default function PriorityColumn({
             size="sm"
             onClick={handleAssign} // Utilizza handleAssign
             disabled={isAssigning || tasks.length === 0 || isDateInPast}
-            className="text-xs px-2 py-1 h-7 border-2 border-sky-400 dark:border-blue-500"
+            className="text-xs px-2 py-1 h-7 border-2 border-custom-blue"
             title={isDateInPast ? "Non puoi assegnare task per date passate" : ""}
             data-testid="button-assign"
           >
