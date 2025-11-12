@@ -117,14 +117,8 @@ export const useMultiSelect = () => {
 };
 
 export default function GenerateAssignments() {
-  // Usa la data salvata in localStorage, oppure la data odierna se non presente
+  // Usa sempre la data odierna al mount iniziale
   const [selectedDate, setSelectedDate] = useState<Date>(() => {
-    const savedDate = localStorage.getItem('selected_work_date');
-    if (savedDate) {
-      // Converte yyyy-MM-dd in Date senza problemi di timezone
-      const [year, month, day] = savedDate.split('-').map(Number);
-      return new Date(year, month - 1, day);
-    }
     return new Date();
   });
 
