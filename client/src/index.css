@@ -87,27 +87,7 @@
 }
 
 .dark .border-sky-400 {
-  border-color: #00008B !important;
-}
-
-.dark .border {
-  border-color: #00008B !important;
-}
-
-.dark .border-border {
-  border-color: #00008B !important;
-}
-
-.dark .border-l {
-  border-left-color: #00008B !important;
-}
-
-.dark .border-r {
-  border-right-color: #00008B !important;
-}
-
-.dark .border-t {
-  border-top-color: #00008B !important;
+  border-color: hsl(217 91% 60%) !important;
 }
 
 @layer base {
