@@ -98,7 +98,7 @@
   --ring: hsl(224.3 76.3% 94.1%);
   
   /* Priority border colors - Dark mode (blu) */
-  --priority-border-color: hsl(217 91% 60%);
+  --priority-border-color: hsl(297 91% 22%);
 }
 
 @layer base {
