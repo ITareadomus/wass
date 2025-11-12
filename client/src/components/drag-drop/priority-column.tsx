@@ -92,11 +92,11 @@ export default function PriorityColumn({
   const getColumnClass = (priority: string, tasks: Task[]) => {
     switch (priority) {
       case "early-out":
-        return "bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800 border-custom-blue";
+        return "bg-custom-blue-light border-custom-blue";
       case "high":
-        return "bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800 border-custom-blue";
+        return "bg-custom-blue-light border-custom-blue";
       case "low":
-        return "bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800 border-custom-blue";
+        return "bg-custom-blue-light border-custom-blue";
       default:
         return "bg-gray-50 border-gray-300";
     }
