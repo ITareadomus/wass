@@ -3199,6 +3199,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // API per gestione workspace - Cancella file workspace non salvati
+  app.get("/api/workspace/list", async (req, res) => {
+    try {
+      const dates = await storageService.listWorkspaceDates();
+      res.json({ success: true, dates });
+    } catch (error: any) {
+      console.error("Errore nel listing workspace:", error);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  app.delete("/api/workspace/:workDate", async (req, res) => {
+    try {
+      const { workDate } = req.params;
+      
+      if (!workDate || !/^\d{4}-\d{2}-\d{2}$/.test(workDate)) {
+        return res.status(400).json({ 
+          success: false, 
+          error: "Data non valida. Formato richiesto: YYYY-MM-DD" 
+        });
+      }
+
+      const result = await storageService.deleteWorkspaceFiles(workDate);
+      
+      res.json({ 
+        success: result.success, 
+        deletedFiles: result.deletedFiles,
+        errors: result.errors,
+        message: result.success 
+          ? `File workspace cancellati per ${workDate}` 
+          : `Errori durante la cancellazione: ${result.errors.join(', ')}`
+      });
+    } catch (error: any) {
+      console.error("Errore nella cancellazione workspace:", error);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
 
   const httpServer = createServer(app);
   return httpServer;
