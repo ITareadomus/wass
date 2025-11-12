@@ -600,7 +600,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Carica timeline esistente o crea nuova struttura usando workspace helper
       let timelineData = await workspaceFiles.loadTimeline(workDate);
-      
+
       if (!timelineData) {
         // Crea nuova struttura se non esiste
         timelineData = {
@@ -989,10 +989,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const client = new Client();
 
       const workDate = req.body?.date || format(new Date(), "yyyy-MM-dd");
+      const createdBy = req.body?.created_by || "unknown";
 
       // Leggi timeline.json corrente
       const timelinePath = path.join(process.cwd(), 'client/public/data/output/timeline.json');
       const timelineData = JSON.parse(await fs.readFile(timelinePath, 'utf8'));
+
+      // Aggiungi il campo created_by ai metadata
+      if (!timelineData.metadata) {
+        timelineData.metadata = {};
+      }
+      timelineData.metadata.created_by = createdBy;
+
+      // Salva timeline.json aggiornato con created_by (dual-write)
+      await workspaceFiles.saveTimeline(workDate, timelineData);
 
       const { key, d } = buildKey(workDate);
       const jsonContent = JSON.stringify(timelineData, null, 2);
@@ -3044,15 +3054,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const index = accountsData.users.findIndex((u: any) => u.id === req.body.id);
       if (index !== -1) {
         const currentAccount = accountsData.users[index];
-        
+
         // Impedisci modifica ruolo se è l'account admin principale (id=1)
         if (currentAccount.id === 1 && req.body.role && req.body.role !== 'admin') {
-          return res.status(403).json({ 
-            success: false, 
-            message: "Non puoi modificare il ruolo dell'account admin principale." 
+          return res.status(403).json({
+            success: false,
+            message: "Non puoi modificare il ruolo dell'account admin principale."
           });
         }
-        
+
         accountsData.users[index] = { ...accountsData.users[index], ...req.body };
         await fs.writeFile(accountsPath, JSON.stringify(accountsData, null, 2));
         res.json({ success: true, message: "Account aggiornato con successo." });
@@ -3074,9 +3084,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Impedisci eliminazione dell'account admin principale (id=1)
       if (id === 1) {
-        return res.status(403).json({ 
-          success: false, 
-          message: "Non puoi eliminare l'account admin principale." 
+        return res.status(403).json({
+          success: false,
+          message: "Non puoi eliminare l'account admin principale."
         });
       }
 
