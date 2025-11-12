@@ -1170,7 +1170,7 @@ export default function TimelineView({
 
                                 // Calcola offset dinamico basato su start_time della task
                                 let timeOffset = 0;
-                                if (taskObj.sequence === 1 && taskObj.start_time) {
+                                if (idx === 0 && taskObj.start_time) {
                                   // La timeline inizia alle 10:00 (= 0 minuti dall'inizio)
                                   const [hours, minutes] = taskObj.start_time.split(':').map(Number);
                                   const taskStartMinutes = (hours * 60 + minutes) - (10 * 60); // minuti dall'inizio timeline
@@ -1179,24 +1179,20 @@ export default function TimelineView({
                                   }
                                 }
 
-                                // DEBUG: log per capire cosa sta succedendo
-                                if (idx > 0) {
-                                  console.log(`Task ${taskObj.task_id || taskObj.id}: travel_time=${travelTime} min`);
-                                }
-
                                 // Calcola larghezza EFFETTIVA in base ai minuti reali di travel_time
                                 // La timeline copre 600 minuti (10:00-19:00)
-                                // Se travelTime è 0, usa almeno 1 minuto per visibilità
-                                const effectiveTravelMinutes = travelTime === 0 ? 1 : travelTime;
-                                const totalWidth = (effectiveTravelMinutes / 600) * 100;
+                                // Per idx=0 (prima task), non c'è travel time indicator
+                                // Per idx>0, mostra l'indicatore SOLO se c'è travel_time > 0
+                                const effectiveTravelMinutes = idx > 0 && travelTime > 0 ? travelTime : 0;
+                                const totalWidth = effectiveTravelMinutes > 0 ? (effectiveTravelMinutes / 600) * 100 : 0;
 
                                 // Usa task.id o task.task_id come chiave univoca (non logistic_code che può essere duplicato)
                                 const uniqueKey = taskObj.task_id || taskObj.id;
 
                                 return (
                                   <>
-                                    {/* Spazio vuoto per task con sequence=1 e start_time=11:00 */}
-                                    {timeOffset > 0 && (
+                                    {/* Spazio vuoto per prima task con start_time posticipato */}
+                                    {idx === 0 && timeOffset > 0 && (
                                       <div
                                         key={`offset-${uniqueKey}`}
                                         className="flex-shrink-0"
@@ -1204,8 +1200,8 @@ export default function TimelineView({
                                       />
                                     )}
 
-                                    {/* Indicatore di travel time: solo omino */}
-                                    {idx > 0 && (
+                                    {/* Indicatore di travel time: solo se idx > 0 E travel_time > 0 */}
+                                    {idx > 0 && travelTime > 0 && (
                                       <div
                                         key={`marker-${uniqueKey}`}
                                         className="flex items-center justify-center flex-shrink-0 py-3"
