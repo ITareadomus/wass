@@ -508,7 +508,7 @@ export default function TaskCard({
                         <span
                           className={cn(
                             "text-[#ff0000] font-extrabold",
-                            isSmallTask ? "text-[10px]" : "text-[13px]"
+                            isInTimeline && isSmallTask ? "text-[10px]" : "text-[13px]"
                           )}
                           data-testid={`task-name-${getTaskKey(task)}`}
                         >
@@ -516,7 +516,7 @@ export default function TaskCard({
                         </span>
                         <span className={cn(
                           "opacity-60 leading-none font-bold text-[#000000]",
-                          isSmallTask ? "text-[8px]" : "text-[11px]"
+                          isInTimeline && isSmallTask ? "text-[8px]" : "text-[11px]"
                         )}>
                           ({(task.duration || "0.0").replace(".", ":")}h)
                         </span>
@@ -524,7 +524,7 @@ export default function TaskCard({
                       {task.alias && (
                         <span className={cn(
                           "opacity-70 leading-none mt-0.5 text-[#000000] font-bold",
-                          isSmallTask ? "text-[9px]" : "text-[11px]"
+                          isInTimeline && isSmallTask ? "text-[9px]" : "text-[11px]"
                         )}>
                           {task.alias}{(task as any).type_apt ? ` (${(task as any).type_apt})` : ''}
                         </span>
