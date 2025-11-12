@@ -65,10 +65,10 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800">
-      <Card className="w-full max-w-md">
+    <div className="min-h-screen flex items-center justify-center bg-custom-blue-light">
+      <Card className="w-full max-w-md border-2 border-custom-blue">
         <CardHeader className="space-y-3">
-          <CardTitle className="text-3xl font-bold text-center text-primary">WASS 2.0</CardTitle>
+          <CardTitle className="text-3xl font-bold text-center text-custom-blue">WASS 2.0</CardTitle>
           <CardTitle className="text-xl font-bold text-center">Area Domus</CardTitle>
           <CardDescription className="text-center">
             Inserisci le tue credenziali per accedere
