@@ -1208,7 +1208,7 @@ export default function TimelineView({
                                     {idx > 0 && (
                                       <div
                                         key={`marker-${uniqueKey}`}
-                                        className="flex items-center justify-center flex-shrink-0 py-3 px-2"
+                                        className="flex items-center justify-center flex-shrink-0 py-3"
                                         style={{ width: `${totalWidth}%`, minHeight: '50px' }}
                                         title={`${travelTime} min`}
                                       >
