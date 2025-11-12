@@ -55,6 +55,7 @@ export default function TaskCard({
   isReadOnly = false,
 }: TaskCardProps) {
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [clickTimer, setClickTimer] = useState<NodeJS.Timeout | null>(null);
   
   // Usa il context per multi-select (solo per container, non timeline)
   const multiSelectContext = !isInTimeline ? useMultiSelect() : null;
@@ -69,9 +70,41 @@ export default function TaskCard({
     // In multi-select mode nei container: toggle selezione invece di aprire modale
     if (isMultiSelectMode && !isInTimeline && multiSelectContext) {
       multiSelectContext.toggleTask(task.id);
+      return;
+    }
+    
+    // Gestione doppio click per mostrare task sulla mappa
+    if (clickTimer) {
+      // Doppio click rilevato
+      clearTimeout(clickTimer);
+      setClickTimer(null);
+      
+      // Toggle filtro mappa per questa task
+      const currentFilteredTaskId = (window as any).mapFilteredTaskId;
+      if (currentFilteredTaskId === task.name) {
+        // Rimuovi filtro
+        (window as any).mapFilteredTaskId = null;
+        toast({
+          title: "Filtro rimosso",
+          description: "Ora visualizzi tutti gli appartamenti sulla mappa",
+        });
+      } else {
+        // Applica filtro
+        (window as any).mapFilteredTaskId = task.name;
+        toast({
+          title: "Task evidenziata",
+          description: `Visualizzi solo ${task.name} sulla mappa`,
+        });
+      }
     } else {
-      // Default: apri modale
-      setIsModalOpen(true);
+      // Primo click: avvia timer
+      const timer = setTimeout(() => {
+        // Singolo click: apri modale
+        setIsModalOpen(true);
+        setClickTimer(null);
+      }, 250);
+      
+      setClickTimer(timer);
     }
   };
 
