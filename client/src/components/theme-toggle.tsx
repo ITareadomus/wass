@@ -72,12 +72,12 @@ export function ThemeToggle() {
   };
 
   const switchAccount = (account: Account) => {
-    localStorage.setItem("user", JSON.stringify(account));
+    localStorage.removeItem("user");
     toast({
-      title: "Account cambiato",
-      description: `Sei ora loggato come ${account.username}`,
+      title: "Cambio account",
+      description: "Effettua il login con le credenziali desiderate",
     });
-    window.location.reload();
+    setLocation("/login");
   };
 
   const getCurrentUser = () => {
