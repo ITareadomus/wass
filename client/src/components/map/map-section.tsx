@@ -245,6 +245,16 @@ export default function MapSection({ tasks }: MapSectionProps) {
     // Adatta la vista per mostrare tutti i marker
     if (tasksWithCoordinates.length > 0) {
       googleMapRef.current.fitBounds(bounds);
+      
+      // Se c'è solo una task (filtro attivo), imposta uno zoom più lontano
+      if (tasksWithCoordinates.length === 1) {
+        setTimeout(() => {
+          const currentZoom = googleMapRef.current.getZoom();
+          if (currentZoom > 15) {
+            googleMapRef.current.setZoom(15);
+          }
+        }, 100);
+      }
     }
   }, [tasks, isMapLoaded, cleaners, filteredCleanerId, filteredTaskId]);
 
