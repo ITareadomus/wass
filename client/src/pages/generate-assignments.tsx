@@ -473,7 +473,6 @@ export default function GenerateAssignments() {
           console.log("✏️ Data presente/futura - modalità EDITABILE");
           setIsTimelineReadOnly(false);
         }
-
         await extractData(date);
       }
     } catch (error) {
@@ -980,8 +979,8 @@ export default function GenerateAssignments() {
     try {
       // Format date in local timezone to avoid UTC shift
       const year = selectedDate.getFullYear();
-      const month = String(date.getMonth() + 1).padStart(2, '0');
-      const day = String(date.getDate()).padStart(2, '0');
+      const month = String(selectedDate.getMonth() + 1).padStart(2, '0');
+      const day = String(selectedDate.getDate()).padStart(2, '0');
       const dateStr = `${year}-${month}-${day}`;
 
       // VALIDAZIONE: Verifica che ci siano cleaner convocati
@@ -1045,8 +1044,8 @@ export default function GenerateAssignments() {
     try {
       // Format date in local timezone to avoid UTC shift
       const year = selectedDate.getFullYear();
-      const month = String(date.getMonth() + 1).padStart(2, '0');
-      const day = String(date.getDate()).padStart(2, '0');
+      const month = String(selectedDate.getMonth() + 1).padStart(2, '0');
+      const day = String(selectedDate.getDate()).padStart(2, '0');
       const dateStr = `${year}-${month}-${day}`;
 
       // VALIDAZIONE: Verifica che ci siano cleaner convocati
