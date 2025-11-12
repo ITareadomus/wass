@@ -394,6 +394,16 @@ export default function TaskCard({
     }
   };
 
+  // Determina se la task è < 1 ora per ridurre le dimensioni del testo
+  const isSmallTask = (() => {
+    const safeDuration = task.duration || "0.0";
+    const parts = safeDuration.split(".");
+    const hours = parseInt(parts[0] || "0");
+    const minutes = parts[1] ? parseInt(parts[1]) : 0;
+    const totalMinutes = hours * 60 + minutes;
+    return totalMinutes < 60;
+  })();
+
   // Verifica se end_time sfora checkin_time (considerando le date!)
   const isOverdue = (() => {
     const taskObj = displayTask as any;
@@ -496,17 +506,26 @@ export default function TaskCard({
                     >
                       <div className="flex items-center gap-1">
                         <span
-                          className="text-[13px] text-[#ff0000] font-extrabold"
+                          className={cn(
+                            "text-[#ff0000] font-extrabold",
+                            isSmallTask ? "text-[10px]" : "text-[13px]"
+                          )}
                           data-testid={`task-name-${getTaskKey(task)}`}
                         >
                           {task.name}
                         </span>
-                        <span className="text-[11px] opacity-60 leading-none font-bold text-[#000000]">
+                        <span className={cn(
+                          "opacity-60 leading-none font-bold text-[#000000]",
+                          isSmallTask ? "text-[8px]" : "text-[11px]"
+                        )}>
                           ({(task.duration || "0.0").replace(".", ":")}h)
                         </span>
                       </div>
                       {task.alias && (
-                        <span className="text-[11px] opacity-70 leading-none mt-0.5 text-[#000000] font-bold">
+                        <span className={cn(
+                          "opacity-70 leading-none mt-0.5 text-[#000000] font-bold",
+                          isSmallTask ? "text-[9px]" : "text-[11px]"
+                        )}>
                           {task.alias}{(task as any).type_apt ? ` (${(task as any).type_apt})` : ''}
                         </span>
                       )}
