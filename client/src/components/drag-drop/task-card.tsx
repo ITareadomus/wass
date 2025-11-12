@@ -492,7 +492,7 @@ export default function TaskCard({
                       </div>
                     )}
                     <div
-                      className="flex flex-col items-start justify-center h-full gap-0 pl-0.5"
+                      className="flex flex-col items-start justify-center h-full gap-0"
                     >
                       <div className="flex items-center gap-1">
                         <span
