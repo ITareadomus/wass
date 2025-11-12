@@ -909,7 +909,7 @@ export default function TimelineView({
         <div className="p-4 border-b border-border">
           <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
             <div>
-              <h2 className="text-xl font-bold text-foreground flex items-center">
+              <h2 className="text-xl text-foreground flex items-center font-semibold">
                 <Calendar className="w-5 h-5 mr-2 text-primary" />
                 Timeline Assegnazioni - {cleaners.length} Cleaners
               </h2>
@@ -1253,7 +1253,6 @@ export default function TimelineView({
           </div>
         </div>
       </div>
-
       {/* Add Cleaner Dialog */}
       <Dialog open={isAddCleanerDialogOpen} onOpenChange={(open) => {
         setIsAddCleanerDialogOpen(open);
@@ -1332,7 +1331,6 @@ export default function TimelineView({
           </div>
         </DialogContent>
       </Dialog>
-
       {/* Cleaner Details Dialog */}
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
         <DialogContent className={`sm:max-w-2xl max-h-[80vh] overflow-y-auto ${
