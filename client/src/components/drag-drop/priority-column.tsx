@@ -281,6 +281,7 @@ export default function PriorityColumn({
                   isDuplicate={isDuplicate}
                   isDragDisabled={isDragDisabled || isDateInPast}
                   isReadOnly={isDateInPast}
+                  useRealWidth={true}
                 />
               );
             })}
