@@ -100,8 +100,8 @@
   /* Priority border colors - Dark mode (blu scuro) */
   --priority-border-color: hsl(217 91% 22%);
   
-  /* Container background colors - Dark mode */
-  --container-bg-light: hsl(217 50% 12%);
+  /* Container background colors - Dark mode (più blu e visibile) */
+  --container-bg-light: hsl(217 80% 20%);
 }
 
 @layer base {
