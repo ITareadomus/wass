@@ -1184,9 +1184,11 @@ export default function TimelineView({
                                   console.log(`Task ${taskObj.task_id || taskObj.id}: travel_time=${travelTime} min`);
                                 }
 
-                                // Calcola larghezza per icona travel time
-                                // Usa una larghezza fissa piccola per non sforare la timeline
-                                const totalWidth = 2; // 2% fisso per icona travel time
+                                // Calcola larghezza EFFETTIVA in base ai minuti reali di travel_time
+                                // La timeline copre 600 minuti (10:00-19:00)
+                                // Se travelTime è 0, usa almeno 1 minuto per visibilità
+                                const effectiveTravelMinutes = travelTime === 0 ? 1 : travelTime;
+                                const totalWidth = (effectiveTravelMinutes / 600) * 100;
 
                                 // Usa task.id o task.task_id come chiave univoca (non logistic_code che può essere duplicato)
                                 const uniqueKey = taskObj.task_id || taskObj.id;
