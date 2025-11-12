@@ -222,7 +222,7 @@ export default function MapSection({ tasks }: MapSectionProps) {
           },
           zIndex: isHighlighted ? 1000 : index,
           animation: isHighlighted ? window.google.maps.Animation.BOUNCE : null,
-          optimized: false
+          optimized: true
         });
 
         marker.addListener('click', () => {
@@ -246,7 +246,7 @@ export default function MapSection({ tasks }: MapSectionProps) {
           },
           zIndex: isHighlighted ? 1000 : index,
           animation: isHighlighted ? window.google.maps.Animation.BOUNCE : null,
-          optimized: false
+          optimized: true
         });
 
         marker.addListener('click', () => {
