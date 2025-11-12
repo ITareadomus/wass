@@ -533,12 +533,10 @@ export default function TaskCard({
                   </div>
                 </TooltipTrigger>
                 <TooltipContent side="top" className="max-w-xs text-base px-3 py-2">
-                  <div className="flex items-start gap-3">
-                    <div className="flex-1">
-                      <p className="font-semibold">{displayTask.address?.toUpperCase() || "INDIRIZZO NON DISPONIBILE"}</p>
-                    </div>
+                  <div className="flex flex-col items-center gap-2">
+                    <p className="font-semibold">{displayTask.address?.toUpperCase() || "INDIRIZZO NON DISPONIBILE"}</p>
                     {((displayTask as any).checkout_time || (displayTask as any).checkin_time) && (
-                      <div className="flex flex-col gap-1 text-sm">
+                      <div className="flex items-center gap-3 text-sm">
                         {(displayTask as any).checkout_time && (
                           <div className="flex items-center gap-1">
                             <span className="text-green-500">↑</span>
