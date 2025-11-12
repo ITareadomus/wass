@@ -199,65 +199,81 @@ export default function MapSection({ tasks }: MapSectionProps) {
       const strokeWeight = isHighlighted ? 4 : 2; // Bordo più spesso se evidenziata
       const strokeColor = isHighlighted ? '#FFD700' : '#ffffff'; // Bordo dorato se evidenziata
 
-      // Se c'è una sequenza, usa un marker con testo
+      // Crea un marker HTML custom per far rimbalzare tutto insieme
+      const markerDiv = document.createElement('div');
+      markerDiv.style.cssText = `
+        position: relative;
+        width: ${markerScale * 2}px;
+        height: ${markerScale * 2}px;
+        cursor: pointer;
+        ${isHighlighted ? 'filter: drop-shadow(0 0 8px ' + strokeColor + ');' : ''}
+      `;
+      
+      const circle = document.createElement('div');
+      circle.style.cssText = `
+        width: 100%;
+        height: 100%;
+        border-radius: 50%;
+        background-color: ${markerColor};
+        border: ${strokeWeight}px solid ${strokeColor};
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-sizing: border-box;
+      `;
+      
       if (sequence !== undefined && sequence !== null) {
-        const marker = new window.google.maps.Marker({
-          position,
-          map: googleMapRef.current,
-          title: `${task.name} - ${task.type} (Seq: ${sequence})`,
-          label: {
-            text: String(sequence),
-            color: '#ffffff',
-            fontSize: isHighlighted ? '14px' : '12px',
-            fontWeight: 'bold'
-          },
-          icon: {
-            path: window.google.maps.SymbolPath.CIRCLE,
-            fillColor: markerColor,
-            fillOpacity: 1,
-            strokeColor: strokeColor,
-            strokeWeight: strokeWeight,
-            scale: markerScale,
-            // Importante: anchor per centrare il label
-            anchor: new window.google.maps.Point(0, 0)
-          },
-          zIndex: isHighlighted ? 1000 : index,
-          // BOUNCE farà rimbalzare marker + label insieme
-          animation: isHighlighted ? window.google.maps.Animation.BOUNCE : null,
-          // Ottimizza rendering per animazione fluida
-          optimized: false
-        });
-
-        marker.addListener('click', () => {
-          setSelectedTask(task);
-        });
-
-        markersRef.current.push(marker);
-      } else {
-        // Marker senza sequenza (non assegnato)
-        const marker = new window.google.maps.Marker({
-          position,
-          map: googleMapRef.current,
-          title: `${task.name} - ${task.type}`,
-          icon: {
-            path: window.google.maps.SymbolPath.CIRCLE,
-            fillColor: markerColor,
-            fillOpacity: 1,
-            strokeColor: strokeColor,
-            strokeWeight: strokeWeight,
-            scale: markerScale
-          },
-          zIndex: isHighlighted ? 1000 : index,
-          animation: isHighlighted ? window.google.maps.Animation.BOUNCE : null,
-          optimized: false
-        });
-
-        marker.addListener('click', () => {
-          setSelectedTask(task);
-        });
-
-        markersRef.current.push(marker);
+        const label = document.createElement('span');
+        label.textContent = String(sequence);
+        label.style.cssText = `
+          color: #ffffff;
+          font-size: ${isHighlighted ? '14px' : '12px'};
+          font-weight: bold;
+          user-select: none;
+        `;
+        circle.appendChild(label);
       }
+      
+      markerDiv.appendChild(circle);
+
+      const marker = new window.google.maps.marker.AdvancedMarkerElement({
+        position,
+        map: googleMapRef.current,
+        title: sequence !== undefined 
+          ? `${task.name} - ${task.type} (Seq: ${sequence})`
+          : `${task.name} - ${task.type}`,
+        content: markerDiv,
+        zIndex: isHighlighted ? 1000 : index,
+      });
+
+      // Applica animazione BOUNCE manualmente all'elemento HTML
+      if (isHighlighted) {
+        markerDiv.style.animation = 'bounce 1s infinite';
+        const style = document.createElement('style');
+        style.textContent = `
+          @keyframes bounce {
+            0%, 20%, 50%, 80%, 100% {
+              transform: translateY(0);
+            }
+            40% {
+              transform: translateY(-20px);
+            }
+            60% {
+              transform: translateY(-10px);
+            }
+          }
+        `;
+        if (!document.head.querySelector('style[data-bounce-animation]')) {
+          style.setAttribute('data-bounce-animation', 'true');
+          document.head.appendChild(style);
+        }
+      }
+
+      markerDiv.addEventListener('click', () => {
+        setSelectedTask(task);
+      });
+
+      markersRef.current.push(marker);
 
       bounds.extend(position);
     });
