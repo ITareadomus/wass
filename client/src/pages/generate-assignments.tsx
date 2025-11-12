@@ -251,9 +251,6 @@ export default function GenerateAssignments() {
   const { toast } = useToast();
   const [, setLocation] = useLocation();
 
-  // Nuova variabile di stato per gestire il caricamento generale
-  const [isLoading, setIsLoading] = useState(false);
-
   // Callback per notificare modifiche dopo movimenti task
   const handleTaskMoved = useCallback(() => {
     setHasUnsavedChanges(true);
@@ -329,23 +326,16 @@ export default function GenerateAssignments() {
     date: Date = selectedDate
   ) => {
     console.log(`🔄 refreshAssignments chiamato con trigger: "${trigger}"`);
-    setIsLoading(true);
 
-    try {
-      if (trigger === "manual") {
-        // Refresh manuale dopo drag-and-drop: solo reload file, NO auto-load, NO extractData
-        console.log('📂 Refresh manuale - solo reload file JSON');
-        await loadTasks(true);
-        return;
-      }
-
-      // Per tutti gli altri trigger, esegui auto-load completo
-      await checkAndAutoLoadSavedAssignments(date);
-    } catch (error) {
-      console.error("Errore durante refreshAssignments:", error);
-    } finally {
-      setIsLoading(false);
+    if (trigger === "manual") {
+      // Refresh manuale dopo drag-and-drop: solo reload file, NO auto-load, NO extractData
+      console.log('📂 Refresh manuale - solo reload file JSON');
+      await loadTasks(true);
+      return;
     }
+
+    // Per tutti gli altri trigger, esegui auto-load completo
+    await checkAndAutoLoadSavedAssignments(date);
   };
 
   // Funzione per controllare e caricare automaticamente assegnazioni salvate
@@ -408,7 +398,7 @@ export default function GenerateAssignments() {
 
           if (timelineCheckResponse.ok) {
             const timelineText = await timelineCheckResponse.text();
-            if (!timelineText.trim().startsWith('{') && !timelineText.trim().startsWith('[')) {
+            if (!timelineText.trim().startsWith('{')) {
               console.error("❌ timeline.json corrotto dopo caricamento da Object Storage");
               toast({
                 title: "Errore",
@@ -656,20 +646,46 @@ export default function GenerateAssignments() {
 
       if (timelineResponse.ok) {
         try {
-          const contentType = timelineResponse.headers.get('content-type');
-          if (contentType && contentType.includes('application/json')) {
-            timelineAssignmentsData = await timelineResponse.json();
-            console.log("Timeline assignments data:", timelineAssignmentsData);
+          const timelineText = await timelineResponse.text();
+
+          // CRITICAL: Verifica che sia JSON valido
+          if (!timelineText.trim().startsWith('{') && !timelineText.trim().startsWith('[')) {
+            console.error("❌ timeline.json contiene HTML/testo non valido - file non pronto");
+            console.log("🔄 Attesa aggiuntiva per sincronizzazione file...");
+
+            // Attendi un po' di più e riprova
+            await new Promise(resolve => setTimeout(resolve, 500));
+
+            const retryResponse = await fetch(`/data/output/timeline.json?t=${Date.now() + Math.random()}`, {
+              cache: 'no-store',
+              headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' }
+            });
+
+            if (retryResponse.ok) {
+              const retryText = await retryResponse.text();
+              if (retryText.trim().startsWith('{')) {
+                timelineAssignmentsData = JSON.parse(retryText);
+                console.log("✅ Timeline caricata dopo retry:", {
+                  cleaners: timelineAssignmentsData.cleaners_assignments?.length || 0,
+                  date: timelineAssignmentsData.metadata?.date
+                });
+              } else {
+                console.warn("⚠️ Retry fallito, usa timeline vuota");
+              }
+            }
           } else {
-            console.warn('Timeline file is not JSON, using empty timeline');
+            timelineAssignmentsData = JSON.parse(timelineText);
+            console.log("✅ Caricato da timeline.json:", {
+              cleaners: timelineAssignmentsData.cleaners_assignments?.length || 0,
+              date: timelineAssignmentsData.metadata?.date
+            });
           }
-        } catch (e) {
-          console.error('Errore parsing timeline.json:', e);
-          // In caso di errore, usa timeline vuota
-          timelineAssignmentsData = { metadata: {}, cleaners_assignments: [] };
+        } catch (parseError) {
+          console.error("❌ Errore parsing timeline.json:", parseError);
+          console.log("ℹ️ Uso timeline vuota per questa data");
         }
       } else {
-        console.warn(`Timeline file not found (${timelineResponse.status}), using empty timeline`);
+        console.warn("⚠️ timeline.json non trovato (HTTP", timelineResponse.status, "), uso timeline vuota");
       }
 
       console.log("Containers data:", containersData);
@@ -1558,7 +1574,78 @@ export default function GenerateAssignments() {
 
           // Salva in timeline.json (rimuove automaticamente da containers.json)
           await saveTimelineAssignment(taskId, toCleanerId, logisticCode, destination.index);
-          await refreshAssignments("manual");
+
+          // CRITICAL FIX: Ricarica SOLO i file locali, non da Object Storage
+          await new Promise(resolve => setTimeout(resolve, 100));
+
+          const timestamp = Date.now() + Math.random();
+          const [containersResponse, timelineResponse] = await Promise.all([
+            fetch(`/data/output/containers.json?t=${timestamp}`, {
+              cache: 'no-store',
+              headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' }
+            }),
+            fetch(`/data/output/timeline.json?t=${timestamp}`, {
+              cache: 'no-store',
+              headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' }
+            })
+          ]);
+
+          if (containersResponse.ok && timelineResponse.ok) {
+            const [containersData, timelineData] = await Promise.all([
+              containersResponse.json(),
+              timelineResponse.json()
+            ]);
+
+            // Aggiorna containers
+            setEarlyOutTasks((containersData.containers?.early_out?.tasks || []).map((t: any) => convertRawTask(t, "early_out")));
+            setHighPriorityTasks((containersData.containers?.high_priority?.tasks || []).map((t: any) => convertRawTask(t, "high_priority")));
+            setLowPriorityTasks((containersData.containers?.low_priority?.tasks || []).map((t: any) => convertRawTask(t, "low_priority")));
+
+            // Ricostruisci allTasksWithAssignments
+            const tasksWithAssignments: Task[] = [];
+            const addedIds = new Set<string>();
+
+            for (const task of [...earlyOutTasks, ...highPriorityTasks, ...lowPriorityTasks]) {
+              const tid = String(task.id);
+              if (!addedIds.has(tid)) {
+                tasksWithAssignments.push(task);
+                addedIds.add(tid);
+              }
+            }
+
+            for (const cleanerEntry of timelineData.cleaners_assignments || []) {
+              for (const task of cleanerEntry.tasks || []) {
+                const taskWithAssignment = {
+                  ...task,
+                  id: String(task.task_id),
+                  name: String(task.logistic_code),
+                  type: task.customer_name || 'Unknown',
+                  duration: formatDuration(task.cleaning_time || 0),
+                  priority: task.priority || 'unknown',
+                  assignedCleaner: cleanerEntry.cleaner.id,
+                  sequence: task.sequence,
+                  start_time: task.start_time,
+                  end_time: task.end_time,
+                  startTime: task.start_time,
+                  endTime: task.end_time,
+                  travelTime: task.travel_time || 0,
+                  assignedTo: null,
+                  status: "pending",
+                  scheduledTime: null,
+                  createdAt: new Date().toISOString(),
+                  updatedAt: new Date().toISOString()
+                };
+
+                const tid = String(task.task_id);
+                if (!addedIds.has(tid)) {
+                  tasksWithAssignments.push(taskWithAssignment as any);
+                  addedIds.add(tid);
+                }
+              }
+            }
+
+            setAllTasksWithAssignments(tasksWithAssignments);
+          }
 
           // CRITICAL: Marca modifiche dopo assegnazione
           setHasUnsavedChanges(true);
@@ -1648,7 +1735,7 @@ export default function GenerateAssignments() {
   const hasAssignedTasks = allTasksWithAssignments.some(task => task.assignedCleaner);
 
   // Mostra loader durante l'estrazione
-  if (isExtracting || isLoadingTasks || isLoading) {
+  if (isExtracting || isLoadingTasks) {
     return (
       <div className="bg-background text-foreground min-h-screen flex items-center justify-center">
         <div className="text-center space-y-4">
@@ -1656,7 +1743,7 @@ export default function GenerateAssignments() {
             <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-primary"></div>
           </div>
           <h2 className="text-2xl font-bold text-foreground">
-            {isExtracting ? "Estrazione Dati in Corso" : isLoadingTasks ? "Caricamento Task" : "Caricamento Dati"}
+            {isExtracting ? "Estrazione Dati in Corso" : "Caricamento Task"}
           </h2>
           <p className="text-muted-foreground">{extractionStep}</p>
           <div className="flex items-center justify-center space-x-2 text-sm text-muted-foreground">
@@ -1670,12 +1757,6 @@ export default function GenerateAssignments() {
               <>
                 <span className="inline-block w-2 h-2 bg-primary rounded-full animate-pulse"></span>
                 <span>Step 2/2: Caricamento nei contenitori</span>
-              </>
-            )}
-            {isLoading && (
-              <>
-                <span className="inline-block w-2 h-2 bg-primary rounded-full animate-pulse"></span>
-                <span>Caricamento generale...</span>
               </>
             )}
           </div>
