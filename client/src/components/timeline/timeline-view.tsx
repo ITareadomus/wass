@@ -90,9 +90,11 @@ export default function TimelineView({
   // Mutation per rimuovere un cleaner da selected_cleaners.json
   const removeCleanerMutation = useMutation({
     mutationFn: async (cleanerId: number) => {
+      const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
       const response = await apiRequest("POST", "/api/remove-cleaner-from-selected", {
         cleanerId,
-        date: workDate // Passa la data selezionata
+        date: workDate,
+        modified_by: currentUser.username || 'unknown'
       });
       return await response.json();
     },
@@ -136,9 +138,11 @@ export default function TimelineView({
   // Mutation per aggiungere un cleaner alla timeline
   const addCleanerMutation = useMutation({
     mutationFn: async (cleanerId: number) => {
+      const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
       const response = await apiRequest("POST", "/api/add-cleaner-to-timeline", {
         cleanerId,
-        date: workDate
+        date: workDate,
+        modified_by: currentUser.username || 'unknown'
       });
       return await response.json();
     },
@@ -196,10 +200,12 @@ export default function TimelineView({
   // Mutation per scambiare task tra cleaners
   const swapCleanersMutation = useMutation({
     mutationFn: async ({ sourceCleanerId, destCleanerId }: { sourceCleanerId: number; destCleanerId: number }) => {
+      const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
       const response = await apiRequest("POST", "/api/swap-cleaners-tasks", {
         sourceCleanerId,
         destCleanerId,
-        date: workDate
+        date: workDate,
+        modified_by: currentUser.username || 'unknown'
       });
       return await response.json();
     },
@@ -676,10 +682,10 @@ export default function TimelineView({
       })();
 
       // 1. Reset timeline_assignments.json (file principale)
-      const resetResponse = await fetch('/api/reset-timeline-assignments', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ date: dateStr })
+      const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
+      const resetResponse = await apiRequest("POST", "/api/reset-timeline-assignments", {
+        date: workDate,
+        modified_by: currentUser.username || 'unknown'
       });
 
       if (!resetResponse.ok) {
@@ -900,11 +906,44 @@ export default function TimelineView({
   // Variabile per determinare se ci sono task assegnate (per mostrare/nascondere pulsante conferma)
   const hasAssignedTasks = tasks.some(task => (task as any).assignedCleaner !== undefined);
 
+  // Mutation per rimuovere task dalla timeline
+  const removeTaskMutation = useMutation({
+    mutationFn: async ({ taskId, logisticCode }: { taskId: number | string; logisticCode: number | string }) => {
+      const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
+      const response = await apiRequest("POST", "/api/remove-timeline-assignment", {
+        taskId,
+        logisticCode,
+        date: workDate,
+        modified_by: currentUser.username || 'unknown'
+      });
+      return await response.json();
+    },
+    onSuccess: async (data) => {
+      if (onTaskMoved) onTaskMoved();
+      if ((window as any).setHasUnsavedChanges) (window as any).setHasUnsavedChanges(true);
+      await loadTimelineCleaners(); // Ricarica i cleaners della timeline
+      await loadTimelineData(); // Aggiorna i metadata
+      toast({
+        title: "Task rimossa",
+        description: "Task rimossa dalla timeline",
+        variant: "success",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Errore",
+        description: error.message || "Impossibile rimuovere la task",
+        variant: "destructive",
+      });
+    },
+  });
+
+
   return (
     <>
       <div
         ref={timelineRef}
-        className={`bg-card rounded-lg border shadow-sm ${isFullscreen ? 'fixed inset-0 z-50 overflow-auto' : ''}`}
+        className={`bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800 rounded-lg border-2 border-sky-400 dark:border-blue-800 shadow-sm ${isFullscreen ? 'fixed inset-0 z-50 overflow-auto' : ''}`}
       >
         <div className="p-4 border-b border-border">
           <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
@@ -922,28 +961,28 @@ export default function TimelineView({
                 </p>
               )}
             </div>
-          </div>
-          <div className="flex gap-3 print:hidden">
-            <Button
-              onClick={() => setLocation('/convocazioni')}
-              variant="outline"
-              size="sm"
-              className="flex items-center gap-2 print:hidden"
-              disabled={isReadOnly}
-            >
-              <Users className="w-4 h-4" />
-              Convocazioni
-            </Button>
-            <Button
-              onClick={handleResetAssignments}
-              variant="outline"
-              size="sm"
-              className="flex items-center gap-2 print:hidden"
-              disabled={isReadOnly}
-            >
-              <RotateCcw className="w-4 h-4" />
-              Reset Assegnazioni
-            </Button>
+            <div className="flex gap-3 print:hidden">
+              <Button
+                onClick={() => setLocation('/convocazioni')}
+                variant="outline"
+                size="sm"
+                className="flex items-center gap-2 border-2 border-sky-400 dark:border-blue-800"
+                disabled={isReadOnly}
+              >
+                <Users className="w-4 h-4" />
+                Convocazioni
+              </Button>
+              <Button
+                onClick={handleResetAssignments}
+                variant="outline"
+                size="sm"
+                className="flex items-center gap-2 border-2 border-sky-400 dark:border-blue-800"
+                disabled={isReadOnly}
+              >
+                <RotateCcw className="w-4 h-4" />
+                Reset Assegnazioni
+              </Button>
+            </div>
           </div>
         </div>
         <div className="p-4 overflow-x-auto">
@@ -965,7 +1004,7 @@ export default function TimelineView({
           {/* Righe dei cleaners - mostra solo se ci sono cleaners selezionati */}
           <div className="flex-1 overflow-auto px-4 pb-4">
             {allCleanersToShow.length === 0 && !isReadOnly ? (
-              <div className="flex items-center justify-center h-64 bg-yellow-50 dark:bg-yellow-950/20 border-2 border-yellow-300 dark:border-yellow-700 rounded-lg">
+              <div className="flex items-center justify-center h-64 bg-yellow-50 dark:bg-yellow-950/20 border-2 border-yellow-300 dark:border-blue-800 rounded-lg">
                 <div className="text-center p-6">
                   <Users className="mx-auto h-12 w-12 text-yellow-600 dark:text-yellow-400 mb-3" />
                   <h3 className="text-lg font-semibold text-yellow-800 dark:text-yellow-200 mb-2">
@@ -977,7 +1016,7 @@ export default function TimelineView({
                 </div>
               </div>
             ) : allCleanersToShow.length === 0 && isReadOnly ? (
-              <div className="flex items-center justify-center h-64 bg-red-50 dark:bg-red-950/20 border-2 border-red-300 dark:border-red-700 rounded-lg">
+              <div className="flex items-center justify-center h-64 bg-red-50 dark:bg-red-950/20 border-2 border-red-300 dark:border-blue-800 rounded-lg">
                 <div className="text-center p-6">
                   <Calendar className="mx-auto h-12 w-12 text-red-600 dark:text-red-400 mb-3" />
                   <h3 className="text-lg font-semibold text-red-800 dark:text-red-200 mb-2">
@@ -1011,7 +1050,11 @@ export default function TimelineView({
                           ? '#9CA3AF' // Grigio per cleaners rimossi
                           : filteredCleanerId === cleaner.id ? `${color.bg}` : color.bg,
                         color: isRemoved ? '#1F2937' : color.text,
-                        boxShadow: filteredCleanerId === cleaner.id ? '0 0 0 3px rgba(59, 130, 246, 0.5)' : 'none',
+                        boxShadow: filteredCleanerId === cleaner.id 
+                          ? '0 0 0 3px #3B82F6, 0 0 20px 5px rgba(59, 130, 246, 0.5)' 
+                          : 'none',
+                        transform: filteredCleanerId === cleaner.id ? 'scale(1.05)' : 'none',
+                        zIndex: filteredCleanerId === cleaner.id ? 10 : 'auto',
                         userSelect: 'none',
                         opacity: isRemoved ? 0.7 : 1
                       }}
@@ -1165,7 +1208,7 @@ export default function TimelineView({
                                     {idx > 0 && (
                                       <div
                                         key={`marker-${uniqueKey}`}
-                                        className="flex items-center justify-center flex-shrink-0 py-3 px-2"
+                                        className="flex items-center justify-center flex-shrink-0 py-3"
                                         style={{ width: `${totalWidth}%`, minHeight: '50px' }}
                                         title={`${travelTime} min`}
                                       >
@@ -1215,7 +1258,7 @@ export default function TimelineView({
                   }}
                   variant="ghost"
                   size="sm"
-                  className="w-full h-full"
+                  className="w-full h-full border-2 border-sky-400 dark:border-blue-800"
                   disabled={isReadOnly}
                 >
                   <UserPlus className="w-5 h-5" />
@@ -1228,10 +1271,10 @@ export default function TimelineView({
                     onClick={handleConfirmAssignments}
                     disabled={!hasUnsavedChanges}
                     variant="outline"
-                    className={`flex-1 h-full ${
+                    className={`flex-1 h-full border-2 border-sky-400 dark:border-blue-800 ${
                       hasUnsavedChanges 
-                        ? 'bg-green-600 hover:bg-green-700 text-white border-green-700 animate-pulse' 
-                        : 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200 border-green-300 dark:border-green-700 cursor-default'
+                        ? 'bg-green-600 hover:bg-green-700 text-white animate-pulse' 
+                        : 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200 cursor-default'
                     }`}
                     data-testid="button-confirm-assignments"
                   >
@@ -1243,7 +1286,7 @@ export default function TimelineView({
                   <Button
                     disabled
                     variant="outline"
-                    className="flex-1 h-full bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-200 border-yellow-300 dark:border-yellow-700 cursor-default"
+                    className="flex-1 h-full border-2 border-sky-400 dark:border-blue-800 bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-200 cursor-default"
                   >
                     📜 Sei in modalità storico
                   </Button>

@@ -177,9 +177,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Endpoint per resettare le assegnazioni della timeline
   app.post("/api/reset-timeline-assignments", async (req, res) => {
     try {
-      const { date } = req.body;
+      const { date, modified_by } = req.body;
       const workDate = date || format(new Date(), 'yyyy-MM-dd');
-      const currentUsername = getCurrentUsername(req);
+      const currentUsername = modified_by || getCurrentUsername(req);
       const timelinePath = path.join(process.cwd(), 'client/public/data/output/timeline.json');
 
       // Svuota il file timeline.json con struttura corretta
@@ -339,10 +339,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      // 5. Aggiorna metadata (mantieni cleaner anche se vuoti)
+      // 5. Aggiorna metadata (mantieni cleaner anche se vuoti), preservando created_by e aggiornando modified_by
+      const modifyingUser = req.body.modified_by || req.body.created_by || getCurrentUsername(req);
+
       timelineData.metadata = timelineData.metadata || {};
       timelineData.metadata.last_updated = new Date().toISOString();
       timelineData.metadata.date = workDate;
+
+      // Preserva created_by se già esiste
+      if (!timelineData.metadata.created_by) {
+        timelineData.metadata.created_by = modifyingUser;
+      }
+
+      // Aggiorna modified_by array solo se l'utente non è 'system' o 'unknown'
+      timelineData.metadata.modified_by = timelineData.metadata.modified_by || [];
+      // Rimuovi 'system' e 'unknown' dall'array se presenti
+      timelineData.metadata.modified_by = timelineData.metadata.modified_by.filter((user: string) => 
+        user !== 'system' && user !== 'unknown'
+      );
+      if (modifyingUser && modifyingUser !== 'system' && modifyingUser !== 'unknown' && !timelineData.metadata.modified_by.includes(modifyingUser)) {
+        timelineData.metadata.modified_by.push(modifyingUser);
+      }
+
       timelineData.meta.total_cleaners = timelineData.cleaners_assignments.length;
       timelineData.meta.total_tasks = timelineData.cleaners_assignments.reduce(
         (sum: number, c: any) => sum + c.tasks.length,
@@ -363,7 +381,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Endpoint per scambiare tutte le task tra due cleaners
   app.post("/api/swap-cleaners-tasks", async (req, res) => {
     try {
-      const { sourceCleanerId, destCleanerId, date } = req.body;
+      const { sourceCleanerId, destCleanerId, date, modified_by } = req.body;
 
       if (!sourceCleanerId || !destCleanerId) {
         return res.status(400).json({
@@ -494,10 +512,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
         updateSequence(destEntry.tasks);
       }
 
-      // Aggiorna metadata (mantieni cleaner anche se vuoti)
+      // Aggiorna metadata (mantieni cleaner anche se vuoti), preservando created_by e aggiornando modified_by
+      const modifyingUser = modified_by || getCurrentUsername(req);
+
       timelineData.metadata = timelineData.metadata || {};
       timelineData.metadata.last_updated = new Date().toISOString();
       timelineData.metadata.date = workDate;
+
+      // Preserva created_by se già esiste
+      if (!timelineData.metadata.created_by) {
+        timelineData.metadata.created_by = modifyingUser;
+      }
+
+      // Aggiorna modified_by array solo se l'utente non è 'system' o 'unknown'
+      timelineData.metadata.modified_by = timelineData.metadata.modified_by || [];
+      timelineData.metadata.modified_by = timelineData.metadata.modified_by.filter((user: string) => 
+        user !== 'system' && user !== 'unknown'
+      );
+      if (modifyingUser && modifyingUser !== 'system' && modifyingUser !== 'unknown' && !timelineData.metadata.modified_by.includes(modifyingUser)) {
+        timelineData.metadata.modified_by.push(modifyingUser);
+      }
+
       timelineData.meta.total_cleaners = timelineData.cleaners_assignments.length;
       timelineData.meta.total_tasks = timelineData.cleaners_assignments.reduce(
         (sum: number, c: any) => sum + c.tasks.length,
@@ -527,6 +562,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { taskId, cleanerId, logisticCode, date, dropIndex, taskData, priority, modified_by } = req.body;
       const workDate = date || format(new Date(), 'yyyy-MM-dd');
+      const currentUsername = modified_by || getCurrentUsername(req);
       const timelinePath = path.join(process.cwd(), 'client/public/data/output/timeline.json');
       const containersPath = path.join(process.cwd(), 'client/public/data/output/containers.json');
 
@@ -622,10 +658,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
           },
           metadata: {
             date: workDate,
-            last_updated: new Date().toISOString()
+            last_updated: new Date().toISOString(),
+            created_by: currentUsername,
+            modified_by: []
           }
         };
-        console.log(`Creazione nuovo file timeline per ${workDate}`);
+        console.log(`Creazione nuovo file timeline per ${workDate} da utente ${currentUsername}`);
+      } else {
+        // Preserva created_by e aggiorna modified_by
+        timelineData.metadata = timelineData.metadata || {};
+        if (!timelineData.metadata.created_by) {
+          timelineData.metadata.created_by = currentUsername;
+        }
+        timelineData.metadata.modified_by = timelineData.metadata.modified_by || [];
+        if (currentUsername && !timelineData.metadata.modified_by.includes(currentUsername)) {
+          timelineData.metadata.modified_by.push(currentUsername);
+        }
       }
 
       // Migrazione da vecchia struttura a nuova se necessario
@@ -767,10 +815,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      // Aggiorna metadata e meta
+      // Aggiorna metadata e meta, preservando created_by e aggiornando modified_by
       timelineData.metadata = timelineData.metadata || {};
       timelineData.metadata.last_updated = new Date().toISOString();
       timelineData.metadata.date = workDate;
+
+      // Ottieni username corretto dalla richiesta
+      const modifyingUser = req.body.modified_by || req.body.created_by || currentUsername;
+
+      // Preserva created_by se già esiste, altrimenti usa l'utente corrente
+      if (!timelineData.metadata.created_by) {
+        timelineData.metadata.created_by = modifyingUser;
+      }
+
+      // Aggiorna modified_by array solo se l'utente non è 'system' o 'unknown'
+      timelineData.metadata.modified_by = timelineData.metadata.modified_by || [];
+      // Rimuovi 'system' e 'unknown' dall'array se presenti
+      timelineData.metadata.modified_by = timelineData.metadata.modified_by.filter((user: string) => 
+        user !== 'system' && user !== 'unknown'
+      );
+      if (modifyingUser && modifyingUser !== 'system' && modifyingUser !== 'unknown' && !timelineData.metadata.modified_by.includes(modifyingUser)) {
+        timelineData.metadata.modified_by.push(modifyingUser);
+      }
+
       timelineData.meta.total_cleaners = timelineData.cleaners_assignments.length;
       timelineData.meta.total_tasks = timelineData.cleaners_assignments.reduce(
         (sum: number, c: any) => sum + c.tasks.length,
@@ -835,13 +902,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-
-
   // Endpoint per rimuovere un'assegnazione dalla timeline
   app.post("/api/remove-timeline-assignment", async (req, res) => {
     try {
-      const { taskId, logisticCode, date } = req.body;
+      const { taskId, logisticCode, date, modified_by } = req.body;
       const workDate = date || format(new Date(), 'yyyy-MM-dd');
+      const currentUsername = modified_by || getCurrentUsername(req);
       const timelinePath = path.join(process.cwd(), 'client/public/data/output/timeline.json');
       const containersPath = path.join(process.cwd(), 'client/public/data/output/containers.json');
 
@@ -881,10 +947,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       console.log(`Rimosse ${removedCount} assegnazioni`);
 
-      // Aggiorna metadata e meta
+      // Aggiorna metadata e meta, preservando created_by e aggiornando modified_by
+      const modifyingUser = req.body.modified_by || req.body.created_by || currentUsername;
+
       assignmentsData.metadata = assignmentsData.metadata || {};
       assignmentsData.metadata.last_updated = new Date().toISOString();
       assignmentsData.metadata.date = workDate;
+
+      // Preserva created_by se già esiste
+      if (!assignmentsData.metadata.created_by) {
+        assignmentsData.metadata.created_by = modifyingUser;
+      }
+
+      // Aggiorna modified_by array solo se l'utente non è 'system' o 'unknown'
+      assignmentsData.metadata.modified_by = assignmentsData.metadata.modified_by || [];
+      // Rimuovi 'system' e 'unknown' dall'array se presenti
+      assignmentsData.metadata.modified_by = assignmentsData.metadata.modified_by.filter((user: string) => 
+        user !== 'system' && user !== 'unknown'
+      );
+      if (modifyingUser && modifyingUser !== 'system' && modifyingUser !== 'unknown' && !assignmentsData.metadata.modified_by.includes(modifyingUser)) {
+        assignmentsData.metadata.modified_by.push(modifyingUser);
+      }
+
       assignmentsData.meta.total_cleaners = assignmentsData.cleaners_assignments.length;
       assignmentsData.meta.total_tasks = assignmentsData.cleaners_assignments.reduce(
         (sum: number, c: any) => sum + c.tasks.length,
@@ -1001,23 +1085,57 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const client = new Client();
 
       const workDate = req.body?.date || format(new Date(), "yyyy-MM-dd");
-      const createdBy = req.body?.created_by || "unknown";
+      const username = getCurrentUsername(req); // Usa username da req.body
+      let cleanersAssignments = req.body?.cleanersAssignments; // Usa let invece di const
 
-      // Leggi timeline.json corrente
-      const timelinePath = path.join(process.cwd(), 'client/public/data/output/timeline.json');
-      const timelineData = JSON.parse(await fs.readFile(timelinePath, 'utf8'));
-
-      // Aggiungi il campo created_by ai metadata
-      if (!timelineData.metadata) {
-        timelineData.metadata = {};
+      if (!cleanersAssignments) {
+        // Se cleanersAssignments non è passato, prova a caricarlo dal file
+        try {
+          const timelinePath = path.join(process.cwd(), 'client/public/data/output/timeline.json');
+          const timelineData = JSON.parse(await fs.readFile(timelinePath, 'utf8'));
+          cleanersAssignments = timelineData.cleaners_assignments || [];
+        } catch (err) {
+          console.error("Errore nel caricamento di timeline.json per confirm-assignments:", err);
+          return res.status(500).json({ success: false, message: "Errore nel caricamento delle assegnazioni correnti." });
+        }
       }
-      timelineData.metadata.created_by = createdBy;
 
-      // Salva timeline.json aggiornato con created_by (dual-write)
-      await workspaceFiles.saveTimeline(workDate, timelineData);
+      // Carica timeline esistente per preservare created_by e modified_by
+      let existingTimeline: any = null;
+      try {
+        existingTimeline = await workspaceFiles.loadTimeline(workDate);
+      } catch (err) {
+        console.log("Timeline non esistente, sarà creata");
+      }
+
+      // Prepara modified_by array
+      const modifiedBy = existingTimeline?.metadata?.modified_by || [];
+      if (username && !modifiedBy.includes(username)) { // Assicurati che username non sia 'system' o vuoto
+        modifiedBy.push(username);
+      }
+
+      // Prepara i dati per il salvataggio
+      const dataToSave = {
+        metadata: {
+          last_updated: new Date().toISOString(),
+          date: workDate,
+          created_by: existingTimeline?.metadata?.created_by || username,
+          modified_by: modifiedBy
+        },
+        cleaners_assignments: cleanersAssignments,
+        meta: {
+          total_cleaners: cleanersAssignments.length,
+          used_cleaners: cleanersAssignments.filter((c: any) => c.tasks && c.tasks.length > 0).length,
+          assigned_tasks: cleanersAssignments.reduce((sum: number, c: any) => sum + (c.tasks?.length || 0), 0),
+          total_tasks: cleanersAssignments.reduce((sum: number, c: any) => sum + (c.tasks?.length || 0), 0)
+        }
+      };
+
+      // Salva timeline.json aggiornato con created_by e modified_by (dual-write)
+      await workspaceFiles.saveTimeline(workDate, dataToSave);
 
       const { key, d } = buildKey(workDate);
-      const jsonContent = JSON.stringify(timelineData, null, 2);
+      const jsonContent = JSON.stringify(dataToSave, null, 2);
 
       // Upload con uploadFromText
       const result = await client.uploadFromText(key, jsonContent, {
@@ -1044,6 +1162,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         selectedCleanersData = { cleaners: [], total_selected: 0 };
       }
 
+      // Aggiorna metadata se esiste o crealo
       selectedCleanersData.metadata = selectedCleanersData.metadata || {};
       selectedCleanersData.metadata.date = workDate;
       selectedCleanersData.metadata.saved_at = new Date().toISOString();
@@ -1116,7 +1235,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       savedData.metadata = savedData.metadata || {};
       savedData.metadata.date = workDate;
       savedData.metadata.last_updated = new Date().toISOString();
-      
+
       // Preserva created_by se esiste, altrimenti usa 'loaded_from_storage'
       if (!savedData.metadata.created_by) {
         savedData.metadata.created_by = 'loaded_from_storage';
@@ -2418,7 +2537,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log(`▶ Eseguendo assign_lp.py per data: ${workDate}`);
 
       // Verifica che timeline.json abbia la data corretta
-      const timelinePath = path.join(process.cwd(), 'client/public/data/output/timeline.json');
       try {
         const timelineData = JSON.parse(await fs.readFile(timelinePath, 'utf8'));
         if (timelineData.metadata?.date !== workDate) {
@@ -2562,43 +2680,61 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // CRITICAL: Svuota selected_cleaners.json SOLO se la data è cambiata
-      const selectedCleanersPath = path.join(
-        process.cwd(),
-        'client/public/data/cleaners/selected_cleaners.json'
-      );
+      // Questo permette di mantenere la selezione cleaners per la stessa data
+      // ma resettarla quando si cambia giorno
+      const selectedCleanersPath = path.join(process.cwd(), 'client/public/data/cleaners/selected_cleaners.json');
+      let currentSelectedDate: string | null = null;
 
-      let shouldResetSelectedCleaners = false;
       try {
-        const existingSelectedData = JSON.parse(await fs.readFile(selectedCleanersPath, 'utf8'));
-        const existingDate = existingSelectedData.metadata?.date;
-
-        if (existingDate !== date) {
-          shouldResetSelectedCleaners = true;
-          console.log(`📅 Data cambiata da ${existingDate} a ${date} - reset selected_cleaners.json`);
-        } else {
-          console.log(`✅ Stessa data (${date}) - mantieni selected_cleaners.json`);
-        }
+        const selectedContent = await fs.readFile(selectedCleanersPath, 'utf8');
+        const selectedData = JSON.parse(selectedContent);
+        currentSelectedDate = selectedData.metadata?.date || null;
       } catch (err) {
-        // File non esiste o è corrotto - crealo vuoto
-        shouldResetSelectedCleaners = true;
-        console.log(`📝 selected_cleaners.json non esiste - creazione nuovo`);
+        currentSelectedDate = null;
       }
 
-      if (shouldResetSelectedCleaners) {
-        const emptySelected = {
+      // Verifica se esistono dati salvati per la data target
+      let hasExistingTimeline = false;
+      let timelineDataForCheck: any = null; // Store timelineData if loaded
+      try {
+        const timelineContent = await fs.readFile(timelinePath, 'utf8');
+        timelineDataForCheck = JSON.parse(timelineContent); // Parse it here
+        hasExistingTimeline = timelineDataForCheck.metadata?.date === date &&
+                             timelineDataForCheck.cleaners_assignments?.length > 0;
+      } catch (err) {
+        hasExistingTimeline = false;
+      }
+
+      // Resetta SOLO se:
+      // 1. La data è diversa E
+      // 2. NON esistono già assegnazioni salvate per la nuova data
+      if (currentSelectedDate !== date && !hasExistingTimeline) {
+        console.log(`📅 Data cambiata da ${currentSelectedDate} a ${date} - reset selected_cleaners.json (nessuna timeline esistente)`);
+        const emptySelection = {
           cleaners: [],
           total_selected: 0,
-          metadata: {
-            date,
-            reset_at: new Date().toISOString()
-          }
+          metadata: { date }
         };
-
-        const tmpScPath = `${selectedCleanersPath}.tmp`;
-        await fs.writeFile(tmpScPath, JSON.stringify(emptySelected, null, 2));
-        await fs.rename(tmpScPath, selectedCleanersPath);
-
+        const tmpSelectedPath = `${selectedCleanersPath}.tmp`;
+        await fs.writeFile(tmpSelectedPath, JSON.stringify(emptySelection, null, 2));
+        await fs.rename(tmpSelectedPath, selectedCleanersPath);
         console.log(`ℹ️ selected_cleaners.json resettato per ${date}`);
+      } else if (currentSelectedDate !== date && hasExistingTimeline) {
+        console.log(`✅ Data cambiata da ${currentSelectedDate} a ${date} - mantieni dati esistenti (timeline con ${timelineDataForCheck.cleaners_assignments.length} cleaners)`);
+        // Ricostruisci selected_cleaners.json dalla timeline esistente
+        const cleanersInTimeline = timelineDataForCheck.cleaners_assignments.map((ca: any) => ca.cleaner).filter(Boolean);
+
+        const selectionFromTimeline = {
+          cleaners: cleanersInTimeline,
+          total_selected: cleanersInTimeline.length,
+          metadata: { date }
+        };
+        const tmpSelectedPath = `${selectedCleanersPath}.tmp`;
+        await fs.writeFile(tmpSelectedPath, JSON.stringify(selectionFromTimeline, null, 2));
+        await fs.rename(tmpSelectedPath, selectedCleanersPath);
+        console.log(`✅ selected_cleaners.json ricostruito da timeline per ${date}`);
+      } else {
+        console.log(`✅ Stessa data (${date}) - mantieni selected_cleaners.json`);
       }
 
       // Esegui SEMPRE create_containers.py per avere dati freschi dal database
@@ -3053,10 +3189,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      // Aggiorna metadata e meta
+      // Aggiorna metadata e meta, preservando created_by e aggiornando modified_by
+      const modifyingUser = req.body.modified_by || req.body.created_by || getCurrentUsername(req);
+
       timelineData.metadata = timelineData.metadata || {};
       timelineData.metadata.last_updated = new Date().toISOString();
       timelineData.metadata.date = workDate;
+
+      // Preserva created_by se già esiste
+      if (!timelineData.metadata.created_by) {
+        timelineData.metadata.created_by = modifyingUser;
+      }
+
+      // Aggiorna modified_by array solo se l'utente non è 'system' o 'unknown'
+      timelineData.metadata.modified_by = timelineData.metadata.modified_by || [];
+      // Rimuovi 'system' e 'unknown' dall'array se presenti
+      timelineData.metadata.modified_by = timelineData.metadata.modified_by.filter((user: string) => 
+        user !== 'system' && user !== 'unknown'
+      );
+      if (modifyingUser && modifyingUser !== 'system' && modifyingUser !== 'unknown' && !timelineData.metadata.modified_by.includes(modifyingUser)) {
+        timelineData.metadata.modified_by.push(modifyingUser);
+      }
 
       timelineData.meta = timelineData.meta || {};
       timelineData.meta.total_tasks = timelineData.cleaners_assignments.reduce(
@@ -3196,6 +3349,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Errore nel cambio password:", error);
       res.status(500).json({ success: false, message: "Errore del server" });
+    }
+  });
+
+  // API per gestione workspace - Cancella file workspace non salvati
+  app.get("/api/workspace/list", async (req, res) => {
+    try {
+      const dates = await storageService.listWorkspaceDates();
+      res.json({ success: true, dates });
+    } catch (error: any) {
+      console.error("Errore nel listing workspace:", error);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  app.delete("/api/workspace/:workDate", async (req, res) => {
+    try {
+      const { workDate } = req.params;
+
+      if (!workDate || !/^\d{4}-\d{2}-\d{2}$/.test(workDate)) {
+        return res.status(400).json({
+          success: false,
+          error: "Data non valida. Formato richiesto: YYYY-MM-DD"
+        });
+      }
+
+      const result = await storageService.deleteWorkspaceFiles(workDate);
+
+      res.json({
+        success: result.success,
+        deletedFiles: result.deletedFiles,
+        errors: result.errors,
+        message: result.success
+          ? `File workspace cancellati per ${workDate}`
+          : `Errori durante la cancellazione: ${result.errors.join(', ')}`
+      });
+    } catch (error: any) {
+      console.error("Errore nella cancellazione workspace:", error);
+      res.status(500).json({ success: false, error: error.message });
     }
   });
 

@@ -1,6 +1,6 @@
 {
   "metadata": {
-    "last_updated": "2025-11-12T10:20:16.003954",
+    "last_updated": "2025-11-12T16:53:48.740005",
     "date": "2025-11-12"
   },
   "containers": {
@@ -526,34 +526,6 @@
           "priority": "high_priority"
         },
         {
-          "task_id": 218712,
-          "logistic_code": 1545,
-          "client_id": 64,
-          "premium": false,
-          "address": "VIA NICOLA PICCINNI, 5",
-          "lat": "45.4829445",
-          "lng": "9.2151596",
-          "cleaning_time": 60,
-          "checkin_date": "2025-11-12",
-          "checkout_date": "2025-11-12",
-          "checkin_time": "14:00",
-          "checkout_time": "11:00",
-          "pax_in": 2,
-          "pax_out": 2,
-          "small_equipment": true,
-          "operation_id": 2,
-          "confirmed_operation": true,
-          "straordinaria": false,
-          "type_apt": "A",
-          "alias": "RELSTAY",
-          "customer_name": "RELSTAY - FERRARA GIULIA",
-          "reasons": [
-            "same_day_checkin_between_eo_hp",
-            "client_forced_hp"
-          ],
-          "priority": "high_priority"
-        },
-        {
           "task_id": 218746,
           "logistic_code": 1050,
           "client_id": 64,
@@ -744,7 +716,7 @@
           "priority": "high_priority"
         }
       ],
-      "count": 12
+      "count": 11
     },
     "low_priority": {
       "tasks": [
@@ -949,9 +921,9 @@
     }
   },
   "summary": {
-    "total_tasks": 34,
+    "total_tasks": 33,
     "early_out": 15,
-    "high_priority": 12,
+    "high_priority": 11,
     "low_priority": 7
   }
 }
