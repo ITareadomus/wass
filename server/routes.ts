@@ -1112,6 +1112,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       await new Promise(resolve => setTimeout(resolve, 200));
 
       // === Scarica e ripristina selected_cleaners per la stessa data ===
+      // CRITICAL: Verifica se l'utente sta modificando i cleaners
+      const flagPath = path.join(process.cwd(), 'client/public/data/cleaners/.editing_cleaners');
+      let isEditingCleaners = false;
+      try {
+        const flagData = JSON.parse(await fs.readFile(flagPath, 'utf8'));
+        // Considera il flag valido solo se recente (ultimi 10 secondi)
+        isEditingCleaners = (Date.now() - flagData.timestamp) < 10000 && flagData.date === workDate;
+        if (isEditingCleaners) {
+          console.log(`🔒 Utente sta modificando cleaners - SKIP ripristino da Object Storage`);
+        }
+      } catch (e) {
+        // Flag non esiste, procedi normalmente
+      }
+
       const dateObj = new Date(workDate);
       const day = String(dateObj.getDate()).padStart(2, '0');
       const month = String(dateObj.getMonth() + 1).padStart(2, '0');
@@ -1121,7 +1135,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const scKey = `${folderPath}/selected_cleaners_${day}${month}${year}.json`;
 
       let selectedCleanersBackup: any = null;
-      try {
+      
+      // SKIP ripristino se utente sta modificando
+      if (!isEditingCleaners) {
+        try {
         const scResult = await client.downloadAsText(scKey, { bucket: BUCKET });
         const selectedCleanersPath = path.join(
           process.cwd(),
@@ -1156,8 +1173,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
           console.log(`ℹ️ Nessun selected_cleaners salvato per ${workDate} - creato vuoto`);
         }
-      } catch (e) {
-        console.warn(`⚠️ Impossibile caricare ${scKey}:`, e);
+        } catch (e) {
+          console.warn(`⚠️ Impossibile caricare ${scKey}:`, e);
+        }
+      } else {
+        console.log(`⏭️ Skip ripristino selected_cleaners - utente in modalità editing`);
       }
       // === END ===
 
@@ -1395,6 +1415,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Usa la data fornita o la data corrente
       const workDate = date || format(new Date(), 'yyyy-MM-dd');
+      
+      // CRITICAL: Imposta un flag temporaneo per prevenire il ripristino automatico
+      const flagPath = path.join(process.cwd(), 'client/public/data/cleaners/.editing_cleaners');
+      await fs.writeFile(flagPath, JSON.stringify({ 
+        date: workDate, 
+        timestamp: Date.now(),
+        action: 'editing_cleaners'
+      }));
 
       // Carica cleaners.json per ottenere can_do_straordinaria
       const cleanersPath = path.join(process.cwd(), 'client/public/data/cleaners/cleaners.json');
@@ -1438,6 +1466,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       await fs.rename(tmpPath, selectedCleanersPath);
 
       console.log(`✅ Salvati ${enrichedCleaners.length} cleaners in selected_cleaners.json per ${workDate} (con can_do_straordinaria e metadata)`);
+
+      // Rimuovi il flag di editing dopo un breve delay
+      setTimeout(async () => {
+        try {
+          const flagPath = path.join(process.cwd(), 'client/public/data/cleaners/.editing_cleaners');
+          await fs.unlink(flagPath).catch(() => {});
+        } catch (e) {}
+      }, 5000); // 5 secondi di protezione
 
       res.json({
         success: true,
