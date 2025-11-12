@@ -1886,7 +1886,7 @@ export default function GenerateAssignments() {
                   </div>
 
                   {/* Premium */}
-                  <div className="bg-yellow-50 dark:bg-yellow-950/20 rounded-lg p-3 border border-yellow-200 dark:border-yellow-800">
+                  <div className="bg-yellow-50 dark:bg-yellow-950/20 rounded-lg p-3 border border-yellow-200 dark:border-blue-800">
                     <div className="text-xs text-yellow-600 dark:text-yellow-400 font-medium mb-1">Premium</div>
                     <div className="text-2xl font-bold text-yellow-700 dark:text-yellow-300">
                       {allTasksWithAssignments.filter(t => !t.straordinaria && t.premium).length}
@@ -1894,7 +1894,7 @@ export default function GenerateAssignments() {
                   </div>
 
                   {/* Standard */}
-                  <div className="bg-green-50 dark:bg-green-950/20 rounded-lg p-3 border border-green-200 dark:border-green-800">
+                  <div className="bg-green-50 dark:bg-green-950/20 rounded-lg p-3 border border-green-200 dark:border-blue-800">
                     <div className="text-xs text-green-600 dark:text-green-400 font-medium mb-1">Standard</div>
                     <div className="text-2xl font-bold text-green-700 dark:text-green-300">
                       {allTasksWithAssignments.filter(t => !t.straordinaria && !t.premium).length}
@@ -1902,7 +1902,7 @@ export default function GenerateAssignments() {
                   </div>
 
                   {/* Straordinarie */}
-                  <div className="bg-red-50 dark:bg-red-950/20 rounded-lg p-3 border border-red-200 dark:border-red-800">
+                  <div className="bg-red-50 dark:bg-red-950/20 rounded-lg p-3 border border-red-200 dark:border-blue-800">
                     <div className="text-xs text-red-600 dark:text-red-400 font-medium mb-1">Straordinarie</div>
                     <div className="text-2xl font-bold text-red-700 dark:text-red-300">
                       {allTasksWithAssignments.filter(t => t.straordinaria).length}
@@ -1910,7 +1910,7 @@ export default function GenerateAssignments() {
                   </div>
 
                   {/* Non Assegnate */}
-                  <div className="bg-gray-50 dark:bg-gray-950/20 rounded-lg p-3 border border-gray-200 dark:border-gray-800 col-span-2 text-center">
+                  <div className="bg-gray-50 dark:bg-gray-950/20 rounded-lg p-3 border border-gray-200 dark:border-blue-800 col-span-2 text-center">
                     <div className="text-xs text-gray-600 dark:text-gray-400 font-medium mb-1">Non Assegnate</div>
                     <div className="text-2xl font-bold text-gray-700 dark:text-gray-300">
                       {unassignedTasks.length}
