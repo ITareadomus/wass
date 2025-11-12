@@ -516,7 +516,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Endpoint per salvare un'assegnazione nella timeline
   app.post("/api/save-timeline-assignment", async (req, res) => {
     try {
-      const { taskId, cleanerId, logisticCode, date, dropIndex, taskData, priority } = req.body;
+      const { taskId, cleanerId, logisticCode, date, dropIndex, taskData, priority, modified_by } = req.body;
       const workDate = date || format(new Date(), 'yyyy-MM-dd');
       const timelinePath = path.join(process.cwd(), 'client/public/data/output/timeline.json');
       const containersPath = path.join(process.cwd(), 'client/public/data/output/containers.json');
@@ -724,7 +724,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         end_time: null,
         followup: false,
         sequence: 0,
-        travel_time: 0
+        travel_time: 0,
+
+        // Aggiungi il campo modified_by
+        modified_by: modified_by || null
       };
 
       console.log('📝 Task salvato in timeline:', {
