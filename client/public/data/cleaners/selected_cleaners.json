@@ -1,27 +1,48 @@
 {
   "cleaners": [
     {
-      "id": 626,
-      "name": "DORA PATRICIA",
-      "lastname": "JIMENEZ",
-      "role": "Formatore",
+      "id": 132,
+      "name": "JOHOISER ERNESTO",
+      "lastname": "LOPEZ GIRON",
+      "role": "Premium",
       "active": true,
       "ranking": 0,
-      "counter_hours": 14.25,
+      "counter_hours": 16,
       "counter_days": 2,
-      "available": false,
-      "contract_type": "B",
-      "preferred_customers": [],
-      "telegram_id": null,
+      "available": true,
+      "contract_type": "C",
+      "preferred_customers": [
+        2,
+        3,
+        9,
+        52,
+        61,
+        64,
+        67,
+        72,
+        75,
+        84,
+        85,
+        87,
+        91,
+        94,
+        101,
+        113,
+        115,
+        118,
+        120,
+        121,
+        123,
+        124
+      ],
+      "telegram_id": 1577716674,
       "start_time": "10:00",
-      "can_do_straordinaria": false
+      "can_do_straordinaria": true
     }
   ],
   "total_selected": 1,
   "metadata": {
     "date": "2025-11-12",
-    "reset_at": "2025-11-12T11:06:08.505Z",
-    "saved_at": "2025-11-12T13:35:07.108Z",
-    "loaded_at": "2025-11-12T13:42:32.199Z"
+    "saved_at": "2025-11-12T13:58:29.954Z"
   }
 }
