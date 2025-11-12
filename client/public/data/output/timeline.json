@@ -1,16 +1,16 @@
 {
   "metadata": {
-    "last_updated": "2025-11-12T13:54:54.117Z",
+    "last_updated": "2025-11-12T13:59:29.741Z",
     "date": "2025-11-12",
-    "created_by": "Admin"
+    "created_by": "Sefora"
   },
   "cleaners_assignments": [
     {
       "cleaner": {
-        "id": 626,
-        "name": "DORA PATRICIA",
-        "lastname": "JIMENEZ",
-        "role": "Formatore",
+        "id": 132,
+        "name": "JOHOISER ERNESTO",
+        "lastname": "LOPEZ GIRON",
+        "role": "Premium",
         "premium": false
       },
       "tasks": [
@@ -46,39 +46,6 @@
           "sequence": 1,
           "travel_time": 0,
           "modified_by": null
-        },
-        {
-          "task_id": 218763,
-          "logistic_code": 1600,
-          "client_id": null,
-          "premium": true,
-          "address": "VIA VIVAIO, 15",
-          "lat": "45.46967",
-          "lng": "9.2034764",
-          "cleaning_time": 120,
-          "checkin_date": "2025-11-17",
-          "checkout_date": "2025-11-12",
-          "checkin_time": null,
-          "checkout_time": null,
-          "pax_in": 3,
-          "pax_out": 2,
-          "small_equipment": false,
-          "operation_id": 2,
-          "confirmed_operation": true,
-          "straordinaria": false,
-          "type_apt": "B",
-          "alias": "TBR",
-          "customer_name": "THE BEST RENT S.r.l.",
-          "reasons": [
-            "manually_moved_to_timeline"
-          ],
-          "priority": "high_priority",
-          "start_time": "11:20",
-          "end_time": "13:20",
-          "followup": true,
-          "sequence": 2,
-          "travel_time": 50,
-          "modified_by": null
         }
       ]
     }
@@ -87,6 +54,6 @@
     "total_cleaners": 1,
     "used_cleaners": 0,
     "assigned_tasks": 0,
-    "total_tasks": 2
+    "total_tasks": 1
   }
 }
