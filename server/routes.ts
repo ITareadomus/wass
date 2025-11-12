@@ -340,21 +340,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // 5. Aggiorna metadata (mantieni cleaner anche se vuoti), preservando created_by e aggiornando modified_by
-      const currentUsername = req.body.modified_by || getCurrentUsername(req);
+      const modifyingUser = req.body.modified_by || req.body.created_by || getCurrentUsername(req);
       
       timelineData.metadata = timelineData.metadata || {};
       timelineData.metadata.last_updated = new Date().toISOString();
       timelineData.metadata.date = workDate;
       
-      // Preserva created_by
+      // Preserva created_by se già esiste
       if (!timelineData.metadata.created_by) {
-        timelineData.metadata.created_by = currentUsername;
+        timelineData.metadata.created_by = modifyingUser;
       }
       
-      // Aggiorna modified_by array
+      // Aggiorna modified_by array solo se l'utente non è 'system' o 'unknown'
       timelineData.metadata.modified_by = timelineData.metadata.modified_by || [];
-      if (currentUsername && !timelineData.metadata.modified_by.includes(currentUsername)) {
-        timelineData.metadata.modified_by.push(currentUsername);
+      if (modifyingUser && modifyingUser !== 'system' && modifyingUser !== 'unknown' && !timelineData.metadata.modified_by.includes(modifyingUser)) {
+        timelineData.metadata.modified_by.push(modifyingUser);
       }
       
       timelineData.meta.total_cleaners = timelineData.cleaners_assignments.length;
@@ -799,15 +799,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       timelineData.metadata.last_updated = new Date().toISOString();
       timelineData.metadata.date = workDate;
       
-      // Preserva created_by se già esiste
+      // Ottieni username corretto dalla richiesta
+      const modifyingUser = req.body.modified_by || req.body.created_by || currentUsername;
+      
+      // Preserva created_by se già esiste, altrimenti usa l'utente corrente
       if (!timelineData.metadata.created_by) {
-        timelineData.metadata.created_by = currentUsername;
+        timelineData.metadata.created_by = modifyingUser;
       }
       
-      // Aggiorna modified_by array
+      // Aggiorna modified_by array solo se l'utente non è 'system' o 'unknown'
       timelineData.metadata.modified_by = timelineData.metadata.modified_by || [];
-      if (currentUsername && !timelineData.metadata.modified_by.includes(currentUsername)) {
-        timelineData.metadata.modified_by.push(currentUsername);
+      if (modifyingUser && modifyingUser !== 'system' && modifyingUser !== 'unknown' && !timelineData.metadata.modified_by.includes(modifyingUser)) {
+        timelineData.metadata.modified_by.push(modifyingUser);
       }
       
       timelineData.meta.total_cleaners = timelineData.cleaners_assignments.length;
@@ -920,19 +923,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log(`Rimosse ${removedCount} assegnazioni`);
 
       // Aggiorna metadata e meta, preservando created_by e aggiornando modified_by
+      const modifyingUser = req.body.modified_by || req.body.created_by || currentUsername;
+      
       assignmentsData.metadata = assignmentsData.metadata || {};
       assignmentsData.metadata.last_updated = new Date().toISOString();
       assignmentsData.metadata.date = workDate;
       
-      // Preserva created_by
+      // Preserva created_by se già esiste
       if (!assignmentsData.metadata.created_by) {
-        assignmentsData.metadata.created_by = currentUsername;
+        assignmentsData.metadata.created_by = modifyingUser;
       }
       
-      // Aggiorna modified_by array
+      // Aggiorna modified_by array solo se l'utente non è 'system' o 'unknown'
       assignmentsData.metadata.modified_by = assignmentsData.metadata.modified_by || [];
-      if (currentUsername && !assignmentsData.metadata.modified_by.includes(currentUsername)) {
-        assignmentsData.metadata.modified_by.push(currentUsername);
+      if (modifyingUser && modifyingUser !== 'system' && modifyingUser !== 'unknown' && !assignmentsData.metadata.modified_by.includes(modifyingUser)) {
+        assignmentsData.metadata.modified_by.push(modifyingUser);
       }
       
       assignmentsData.meta.total_cleaners = assignmentsData.cleaners_assignments.length;
@@ -3155,21 +3160,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Aggiorna metadata e meta, preservando created_by e aggiornando modified_by
-      const currentUsername = req.body.modified_by || getCurrentUsername(req);
+      const modifyingUser = req.body.modified_by || req.body.created_by || getCurrentUsername(req);
       
       timelineData.metadata = timelineData.metadata || {};
       timelineData.metadata.last_updated = new Date().toISOString();
       timelineData.metadata.date = workDate;
       
-      // Preserva created_by
+      // Preserva created_by se già esiste
       if (!timelineData.metadata.created_by) {
-        timelineData.metadata.created_by = currentUsername;
+        timelineData.metadata.created_by = modifyingUser;
       }
       
-      // Aggiorna modified_by array
+      // Aggiorna modified_by array solo se l'utente non è 'system' o 'unknown'
       timelineData.metadata.modified_by = timelineData.metadata.modified_by || [];
-      if (currentUsername && !timelineData.metadata.modified_by.includes(currentUsername)) {
-        timelineData.metadata.modified_by.push(currentUsername);
+      if (modifyingUser && modifyingUser !== 'system' && modifyingUser !== 'unknown' && !timelineData.metadata.modified_by.includes(modifyingUser)) {
+        timelineData.metadata.modified_by.push(modifyingUser);
       }
 
       timelineData.meta = timelineData.meta || {};
