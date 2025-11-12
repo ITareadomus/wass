@@ -127,28 +127,32 @@ export default function MapSection({ tasks }: MapSectionProps) {
     markersRef.current.forEach(marker => marker.setMap(null));
     markersRef.current = [];
 
-    // Filtra task con coordinate valide
+    // Filtra task con coordinate valide - MA NON FILTRARE PER VISUALIZZAZIONE
     let tasksWithCoordinates = tasks.filter(task => {
       const hasCoordinates = task.address && task.lat && task.lng;
       return hasCoordinates;
     });
 
+    // Determina quali task evidenziare (non nascondere le altre)
+    const highlightedTaskIds = new Set<string>();
+    
     // Se c'è un filtro per task ID (doppio click su task card)
     if (filteredTaskId !== null && filteredTaskId !== undefined) {
-      tasksWithCoordinates = tasksWithCoordinates.filter(task => 
-        task.name === filteredTaskId
-      );
+      highlightedTaskIds.add(filteredTaskId);
     }
-    // Altrimenti, se c'è un filtro per cleaner (doppio click su cleaner nella timeline)
+    // Se c'è un filtro per cleaner (doppio click su cleaner nella timeline)
     else if (filteredCleanerId !== null && filteredCleanerId !== undefined && filteredCleanerId !== 0) {
-      tasksWithCoordinates = tasksWithCoordinates.filter(task => 
-        (task as any).assignedCleaner === filteredCleanerId
-      );
+      tasksWithCoordinates.forEach(task => {
+        if ((task as any).assignedCleaner === filteredCleanerId) {
+          highlightedTaskIds.add(task.name);
+        }
+      });
     }
 
     console.log('Task totali:', tasks.length);
     console.log('Task con coordinate:', tasksWithCoordinates.length);
     console.log('Cleaners caricati:', cleaners.length);
+    console.log('Task evidenziate:', highlightedTaskIds.size);
     console.log('Prime 3 task con coordinate:', tasksWithCoordinates.slice(0, 3).map(t => ({
       name: t.name,
       address: t.address,
@@ -188,6 +192,12 @@ export default function MapSection({ tasks }: MapSectionProps) {
       const assignedCleaner = (task as any).assignedCleaner;
       const markerColor = assignedCleaner ? getCleanerColor(assignedCleaner) : '#6B7280';
       const sequence = (task as any).sequence;
+      
+      // Verifica se questa task è evidenziata
+      const isHighlighted = highlightedTaskIds.has(task.name);
+      const markerScale = isHighlighted ? 18 : 12; // Più grande se evidenziata
+      const strokeWeight = isHighlighted ? 4 : 2; // Bordo più spesso se evidenziata
+      const strokeColor = isHighlighted ? '#FFD700' : '#ffffff'; // Bordo dorato se evidenziata
 
       // Se c'è una sequenza, usa un marker con testo
       if (sequence !== undefined && sequence !== null) {
@@ -198,17 +208,19 @@ export default function MapSection({ tasks }: MapSectionProps) {
           label: {
             text: String(sequence),
             color: '#ffffff',
-            fontSize: '12px',
+            fontSize: isHighlighted ? '14px' : '12px',
             fontWeight: 'bold'
           },
           icon: {
             path: window.google.maps.SymbolPath.CIRCLE,
             fillColor: markerColor,
             fillOpacity: 1,
-            strokeColor: '#ffffff',
-            strokeWeight: 2,
-            scale: 12
-          }
+            strokeColor: strokeColor,
+            strokeWeight: strokeWeight,
+            scale: markerScale
+          },
+          zIndex: isHighlighted ? 1000 : index,
+          animation: isHighlighted ? window.google.maps.Animation.BOUNCE : null
         });
 
         marker.addListener('click', () => {
@@ -226,10 +238,12 @@ export default function MapSection({ tasks }: MapSectionProps) {
             path: window.google.maps.SymbolPath.CIRCLE,
             fillColor: markerColor,
             fillOpacity: 1,
-            strokeColor: '#ffffff',
-            strokeWeight: 2,
-            scale: 12
-          }
+            strokeColor: strokeColor,
+            strokeWeight: strokeWeight,
+            scale: markerScale
+          },
+          zIndex: isHighlighted ? 1000 : index,
+          animation: isHighlighted ? window.google.maps.Animation.BOUNCE : null
         });
 
         marker.addListener('click', () => {
@@ -246,9 +260,21 @@ export default function MapSection({ tasks }: MapSectionProps) {
     if (tasksWithCoordinates.length > 0) {
       googleMapRef.current.fitBounds(bounds);
       
-      // Se c'è solo una task (filtro attivo), imposta uno zoom più lontano
-      if (tasksWithCoordinates.length === 1) {
+      // Se ci sono task evidenziate, centra sulla loro area
+      if (highlightedTaskIds.size > 0 && highlightedTaskIds.size < tasksWithCoordinates.length) {
+        const highlightedBounds = new window.google.maps.LatLngBounds();
+        tasksWithCoordinates.forEach(task => {
+          if (highlightedTaskIds.has(task.name)) {
+            const lat = parseFloat(task.lat || '0');
+            const lng = parseFloat(task.lng || '0');
+            if (!isNaN(lat) && !isNaN(lng) && lat !== 0 && lng !== 0) {
+              highlightedBounds.extend({ lat, lng });
+            }
+          }
+        });
+        
         setTimeout(() => {
+          googleMapRef.current.fitBounds(highlightedBounds);
           const currentZoom = googleMapRef.current.getZoom();
           if (currentZoom > 15) {
             googleMapRef.current.setZoom(15);
