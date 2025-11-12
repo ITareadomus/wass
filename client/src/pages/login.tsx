@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { Eye, EyeOff } from "lucide-react";
+import { ThemeToggle } from "@/components/theme-toggle";
 
 export default function Login() {
   const [, setLocation] = useLocation();
@@ -65,7 +66,10 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-custom-blue-light">
+    <div className="min-h-screen flex items-center justify-center bg-custom-blue-light relative">
+      <div className="absolute top-4 right-4">
+        <ThemeToggle />
+      </div>
       <Card className="w-full max-w-md border-2 border-custom-blue">
         <CardHeader className="space-y-3">
           <CardTitle className="text-3xl font-bold text-center text-custom-blue">WASS 2.0</CardTitle>
