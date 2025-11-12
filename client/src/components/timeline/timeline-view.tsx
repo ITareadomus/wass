@@ -949,7 +949,7 @@ export default function TimelineView({
           <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
             <div>
               <h2 className="text-xl font-bold text-foreground flex items-center">
-                <Calendar className="w-5 h-5 mr-2 text-primary" />
+                <Calendar className="w-5 h-5 mr-2 text-[hsl(217,91%,22%)]" />
                 Timeline Assegnazioni - {cleaners.length} Cleaners
               </h2>
               {timelineData?.metadata?.last_modified_by && (
