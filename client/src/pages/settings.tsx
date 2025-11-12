@@ -195,6 +195,7 @@ export default function Settings() {
       <div className="container mx-auto px-4 py-8">
         <div className="flex justify-between items-center mb-8">
           <div className="flex items-center gap-3">
+            <h1 className="text-3xl font-bold">Impostazioni Account</h1>
             <Button 
               onClick={() => setLocation("/")} 
               variant="outline" 
@@ -204,7 +205,6 @@ export default function Settings() {
             >
               <Home className="h-5 w-5" />
             </Button>
-            <h1 className="text-3xl font-bold">Impostazioni Account</h1>
           </div>
           <ThemeToggle />
         </div>
