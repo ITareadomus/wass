@@ -194,8 +194,7 @@ export default function Settings() {
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800">
       <div className="container mx-auto px-4 py-8">
         <div className="flex justify-between items-center mb-8">
-          <h1 className="text-3xl font-bold">Impostazioni Account</h1>
-          <div className="flex gap-2">
+          <div className="flex items-center gap-3">
             <Button 
               onClick={() => setLocation("/")} 
               variant="outline" 
@@ -205,8 +204,9 @@ export default function Settings() {
             >
               <Home className="h-5 w-5" />
             </Button>
-            <ThemeToggle />
+            <h1 className="text-3xl font-bold">Impostazioni Account</h1>
           </div>
+          <ThemeToggle />
         </div>
 
         <Card className="mb-6">
