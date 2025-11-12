@@ -987,7 +987,7 @@ export default function TimelineView({
         </div>
         <div className="p-4 overflow-x-auto">
           {/* Header con orari */}
-          <div className="flex mb-2">
+          <div className="flex mb-2 px-4">
             <div className="flex-shrink-0" style={{ width: `${cleanerColumnWidth}px` }}></div>
             <div className="flex-1 grid grid-cols-10">
               {timeSlots.map((slot, idx) => (
