@@ -1,11 +1,7 @@
 {
   "metadata": {
-    "last_updated": "2025-11-12T15:42:33.028Z",
-    "date": "2025-11-12",
-    "created_by": "Admin",
-    "modified_by": [
-      "Admin"
-    ]
+    "last_updated": "2025-11-12T15:46:58.868504",
+    "date": "2025-11-12"
   },
   "cleaners_assignments": [
     {
@@ -95,12 +91,88 @@
           "modified_by": "Admin"
         }
       ]
+    },
+    {
+      "cleaner": {
+        "id": 132,
+        "name": "JOHOISER ERNESTO",
+        "lastname": "LOPEZ GIRON",
+        "role": "Premium",
+        "premium": true
+      },
+      "tasks": [
+        {
+          "task_id": 218630,
+          "logistic_code": 1646,
+          "client_id": 87,
+          "premium": false,
+          "address": "Via Matteo Bandello 4/1",
+          "lat": "45.465877",
+          "lng": "9.1667974",
+          "cleaning_time": 60,
+          "checkin_date": "2025-11-15",
+          "checkout_date": "2025-11-12",
+          "checkin_time": "19:00",
+          "checkout_time": null,
+          "pax_in": 2,
+          "pax_out": 2,
+          "small_equipment": true,
+          "operation_id": 2,
+          "confirmed_operation": true,
+          "straordinaria": false,
+          "type_apt": "A",
+          "alias": "HACCA",
+          "customer_name": "HACCA SRL",
+          "reasons": [
+            "client_forced_eo",
+            "automatic_assignment_eo"
+          ],
+          "priority": "early_out",
+          "start_time": "10:00",
+          "end_time": "11:00",
+          "followup": false,
+          "sequence": 1,
+          "travel_time": 0
+        },
+        {
+          "task_id": 218629,
+          "logistic_code": 1643,
+          "client_id": 87,
+          "premium": true,
+          "address": "Viale Majno 23",
+          "lat": "45.47048",
+          "lng": "9.2052883",
+          "cleaning_time": 180,
+          "checkin_date": "2025-11-17",
+          "checkout_date": "2025-11-12",
+          "checkin_time": null,
+          "checkout_time": null,
+          "pax_in": 5,
+          "pax_out": 5,
+          "small_equipment": false,
+          "operation_id": 2,
+          "confirmed_operation": true,
+          "straordinaria": false,
+          "type_apt": "E",
+          "alias": "HACCA",
+          "customer_name": "HACCA SRL",
+          "reasons": [
+            "client_forced_eo",
+            "automatic_assignment_eo"
+          ],
+          "priority": "early_out",
+          "start_time": "11:28",
+          "end_time": "14:28",
+          "followup": true,
+          "sequence": 2,
+          "travel_time": 28
+        }
+      ]
     }
   ],
   "meta": {
-    "total_cleaners": 2,
-    "used_cleaners": 0,
-    "assigned_tasks": 0,
-    "total_tasks": 2
+    "total_cleaners": 1,
+    "used_cleaners": 3,
+    "assigned_tasks": 4
   }
 }
