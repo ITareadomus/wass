@@ -217,10 +217,15 @@ export default function MapSection({ tasks }: MapSectionProps) {
             fillOpacity: 1,
             strokeColor: strokeColor,
             strokeWeight: strokeWeight,
-            scale: markerScale
+            scale: markerScale,
+            // Importante: anchor per centrare il label
+            anchor: new window.google.maps.Point(0, 0)
           },
           zIndex: isHighlighted ? 1000 : index,
-          animation: isHighlighted ? window.google.maps.Animation.BOUNCE : null
+          // BOUNCE farà rimbalzare marker + label insieme
+          animation: isHighlighted ? window.google.maps.Animation.BOUNCE : null,
+          // Ottimizza rendering per animazione fluida
+          optimized: false
         });
 
         marker.addListener('click', () => {
@@ -243,7 +248,8 @@ export default function MapSection({ tasks }: MapSectionProps) {
             scale: markerScale
           },
           zIndex: isHighlighted ? 1000 : index,
-          animation: isHighlighted ? window.google.maps.Animation.BOUNCE : null
+          animation: isHighlighted ? window.google.maps.Animation.BOUNCE : null,
+          optimized: false
         });
 
         marker.addListener('click', () => {
