@@ -368,11 +368,21 @@ export default function Convocazioni() {
         throw new Error('Errore nel salvataggio');
       }
 
-      toast({
-        variant: "success",
-        title: `${newCleaners.length} cleaner selezionati correttamente!`,
-        description: `Totale cleaners: ${mergedCleaners.length} per il ${format(selectedDate, "dd/MM/yyyy", { locale: it })}`
-      });
+      if (newCleaners.length === 0) {
+        toast({
+          variant: "warning",
+          title: "Nessun nuovo cleaner aggiunto",
+          description: `Tutti i cleaners selezionati sono già presenti per il ${format(selectedDate, "dd/MM/yyyy", { locale: it })}`,
+          duration: 4000
+        });
+      } else {
+        toast({
+          variant: "success",
+          title: `${newCleaners.length} cleaner aggiunti correttamente!`,
+          description: `Totale cleaners: ${mergedCleaners.length} per il ${format(selectedDate, "dd/MM/yyyy", { locale: it })}`,
+          duration: 3000
+        });
+      }
 
       // Torna alla pagina principale SENZA resettare la timeline
       sessionStorage.setItem('preserveAssignments', 'true');
