@@ -17,15 +17,6 @@
   animation: blink-border 1s ease-in-out infinite;
 }
 
-@keyframes bounce {
-  0% {
-    transform: translateY(0);
-  }
-  100% {
-    transform: translateY(-10px);
-  }
-}
-
 :root {
   --background: hsl(0 0% 100%);
   --foreground: hsl(222.2 84% 4.9%);
@@ -96,7 +87,27 @@
 }
 
 .dark .border-sky-400 {
-  border-color: hsl(217 91% 60%) !important;
+  border-color: #00008B !important;
+}
+
+.dark .border {
+  border-color: #00008B !important;
+}
+
+.dark .border-border {
+  border-color: #00008B !important;
+}
+
+.dark .border-l {
+  border-left-color: #00008B !important;
+}
+
+.dark .border-r {
+  border-right-color: #00008B !important;
+}
+
+.dark .border-t {
+  border-top-color: #00008B !important;
 }
 
 @layer base {

@@ -1050,11 +1050,7 @@ export default function TimelineView({
                           ? '#9CA3AF' // Grigio per cleaners rimossi
                           : filteredCleanerId === cleaner.id ? `${color.bg}` : color.bg,
                         color: isRemoved ? '#1F2937' : color.text,
-                        boxShadow: filteredCleanerId === cleaner.id 
-                          ? '0 0 0 3px #3B82F6, 0 0 20px 5px rgba(59, 130, 246, 0.5)' 
-                          : 'none',
-                        transform: filteredCleanerId === cleaner.id ? 'scale(1.05)' : 'none',
-                        zIndex: filteredCleanerId === cleaner.id ? 10 : 'auto',
+                        boxShadow: filteredCleanerId === cleaner.id ? '0 0 0 3px rgba(59, 130, 246, 0.5)' : 'none',
                         userSelect: 'none',
                         opacity: isRemoved ? 0.7 : 1
                       }}
@@ -1208,7 +1204,7 @@ export default function TimelineView({
                                     {idx > 0 && (
                                       <div
                                         key={`marker-${uniqueKey}`}
-                                        className="flex items-center justify-center flex-shrink-0 py-3"
+                                        className="flex items-center justify-center flex-shrink-0 py-3 px-2"
                                         style={{ width: `${totalWidth}%`, minHeight: '50px' }}
                                         title={`${travelTime} min`}
                                       >
