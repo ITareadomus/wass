@@ -177,9 +177,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Endpoint per resettare le assegnazioni della timeline
   app.post("/api/reset-timeline-assignments", async (req, res) => {
     try {
-      const { date } = req.body;
+      const { date, modified_by } = req.body;
       const workDate = date || format(new Date(), 'yyyy-MM-dd');
-      const currentUsername = getCurrentUsername(req);
+      const currentUsername = modified_by || getCurrentUsername(req);
       const timelinePath = path.join(process.cwd(), 'client/public/data/output/timeline.json');
 
       // Svuota il file timeline.json con struttura corretta
@@ -381,7 +381,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Endpoint per scambiare tutte le task tra due cleaners
   app.post("/api/swap-cleaners-tasks", async (req, res) => {
     try {
-      const { sourceCleanerId, destCleanerId, date } = req.body;
+      const { sourceCleanerId, destCleanerId, date, modified_by } = req.body;
 
       if (!sourceCleanerId || !destCleanerId) {
         return res.status(400).json({
@@ -512,10 +512,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
         updateSequence(destEntry.tasks);
       }
 
-      // Aggiorna metadata (mantieni cleaner anche se vuoti)
+      // Aggiorna metadata (mantieni cleaner anche se vuoti), preservando created_by e aggiornando modified_by
+      const modifyingUser = modified_by || getCurrentUsername(req);
+
       timelineData.metadata = timelineData.metadata || {};
       timelineData.metadata.last_updated = new Date().toISOString();
       timelineData.metadata.date = workDate;
+
+      // Preserva created_by se già esiste
+      if (!timelineData.metadata.created_by) {
+        timelineData.metadata.created_by = modifyingUser;
+      }
+
+      // Aggiorna modified_by array solo se l'utente non è 'system' o 'unknown'
+      timelineData.metadata.modified_by = timelineData.metadata.modified_by || [];
+      timelineData.metadata.modified_by = timelineData.metadata.modified_by.filter((user: string) => 
+        user !== 'system' && user !== 'unknown'
+      );
+      if (modifyingUser && modifyingUser !== 'system' && modifyingUser !== 'unknown' && !timelineData.metadata.modified_by.includes(modifyingUser)) {
+        timelineData.metadata.modified_by.push(modifyingUser);
+      }
+
       timelineData.meta.total_cleaners = timelineData.cleaners_assignments.length;
       timelineData.meta.total_tasks = timelineData.cleaners_assignments.reduce(
         (sum: number, c: any) => sum + c.tasks.length,

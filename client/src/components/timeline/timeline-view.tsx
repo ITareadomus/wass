@@ -90,9 +90,11 @@ export default function TimelineView({
   // Mutation per rimuovere un cleaner da selected_cleaners.json
   const removeCleanerMutation = useMutation({
     mutationFn: async (cleanerId: number) => {
+      const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
       const response = await apiRequest("POST", "/api/remove-cleaner-from-selected", {
         cleanerId,
-        date: workDate // Passa la data selezionata
+        date: workDate,
+        modified_by: currentUser.username || 'unknown'
       });
       return await response.json();
     },
@@ -136,9 +138,11 @@ export default function TimelineView({
   // Mutation per aggiungere un cleaner alla timeline
   const addCleanerMutation = useMutation({
     mutationFn: async (cleanerId: number) => {
+      const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
       const response = await apiRequest("POST", "/api/add-cleaner-to-timeline", {
         cleanerId,
-        date: workDate
+        date: workDate,
+        modified_by: currentUser.username || 'unknown'
       });
       return await response.json();
     },
@@ -196,10 +200,12 @@ export default function TimelineView({
   // Mutation per scambiare task tra cleaners
   const swapCleanersMutation = useMutation({
     mutationFn: async ({ sourceCleanerId, destCleanerId }: { sourceCleanerId: number; destCleanerId: number }) => {
+      const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
       const response = await apiRequest("POST", "/api/swap-cleaners-tasks", {
         sourceCleanerId,
         destCleanerId,
-        date: workDate
+        date: workDate,
+        modified_by: currentUser.username || 'unknown'
       });
       return await response.json();
     },
@@ -676,10 +682,10 @@ export default function TimelineView({
       })();
 
       // 1. Reset timeline_assignments.json (file principale)
-      const resetResponse = await fetch('/api/reset-timeline-assignments', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ date: dateStr })
+      const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
+      const resetResponse = await apiRequest("POST", "/api/reset-timeline-assignments", {
+        date: workDate,
+        modified_by: currentUser.username || 'unknown'
       });
 
       if (!resetResponse.ok) {
@@ -899,6 +905,39 @@ export default function TimelineView({
 
   // Variabile per determinare se ci sono task assegnate (per mostrare/nascondere pulsante conferma)
   const hasAssignedTasks = tasks.some(task => (task as any).assignedCleaner !== undefined);
+
+  // Mutation per rimuovere task dalla timeline
+  const removeTaskMutation = useMutation({
+    mutationFn: async ({ taskId, logisticCode }: { taskId: number | string; logisticCode: number | string }) => {
+      const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
+      const response = await apiRequest("POST", "/api/remove-timeline-assignment", {
+        taskId,
+        logisticCode,
+        date: workDate,
+        modified_by: currentUser.username || 'unknown'
+      });
+      return await response.json();
+    },
+    onSuccess: async (data) => {
+      if (onTaskMoved) onTaskMoved();
+      if ((window as any).setHasUnsavedChanges) (window as any).setHasUnsavedChanges(true);
+      await loadTimelineCleaners(); // Ricarica i cleaners della timeline
+      await loadTimelineData(); // Aggiorna i metadata
+      toast({
+        title: "Task rimossa",
+        description: "Task rimossa dalla timeline",
+        variant: "success",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Errore",
+        description: error.message || "Impossibile rimuovere la task",
+        variant: "destructive",
+      });
+    },
+  });
+
 
   return (
     <>
