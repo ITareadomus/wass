@@ -1135,44 +1135,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const scKey = `${folderPath}/selected_cleaners_${day}${month}${year}.json`;
 
       let selectedCleanersBackup: any = null;
-      
+
       // SKIP ripristino se utente sta modificando
       if (!isEditingCleaners) {
         try {
-        const scResult = await client.downloadAsText(scKey, { bucket: BUCKET });
-        const selectedCleanersPath = path.join(
-          process.cwd(),
-          'client/public/data/cleaners/selected_cleaners.json'
-        );
+          const scResult = await client.downloadAsText(scKey, { bucket: BUCKET });
+          const selectedCleanersPath = path.join(
+            process.cwd(),
+            'client/public/data/cleaners/selected_cleaners.json'
+          );
 
-        if (scResult.ok) {
-          const scData = JSON.parse(scResult.value);
+          if (scResult.ok) {
+            const scData = JSON.parse(scResult.value);
 
-          scData.metadata = scData.metadata || {};
-          scData.metadata.date = workDate;
-          scData.metadata.loaded_at = new Date().toISOString();
+            scData.metadata = scData.metadata || {};
+            scData.metadata.date = workDate;
+            scData.metadata.loaded_at = new Date().toISOString();
 
-          // Salva backup in memoria per ripristino post-create_containers
-          selectedCleanersBackup = scData;
+            // Salva backup in memoria per ripristino post-create_containers
+            selectedCleanersBackup = scData;
 
-          const tmpScPath = `${selectedCleanersPath}.tmp`;
-          await fs.writeFile(tmpScPath, JSON.stringify(scData, null, 2));
-          await fs.rename(tmpScPath, selectedCleanersPath);
+            const tmpScPath = `${selectedCleanersPath}.tmp`;
+            await fs.writeFile(tmpScPath, JSON.stringify(scData, null, 2));
+            await fs.rename(tmpScPath, selectedCleanersPath);
 
-          console.log(`✅ Selected cleaners ripristinati da Object Storage: ${scKey}`);
-        } else {
-          const emptySelected = {
-            cleaners: [],
-            total_selected: 0,
-            metadata: { date: workDate, reset_at: new Date().toISOString() }
-          };
+            console.log(`✅ Selected cleaners ripristinati da Object Storage: ${scKey}`);
+          } else {
+            const emptySelected = {
+              cleaners: [],
+              total_selected: 0,
+              metadata: { date: workDate, reset_at: new Date().toISOString() }
+            };
 
-          const tmpScPath = `${selectedCleanersPath}.tmp`;
-          await fs.writeFile(tmpScPath, JSON.stringify(emptySelected, null, 2));
-          await fs.rename(tmpScPath, selectedCleanersPath);
+            const tmpScPath = `${selectedCleanersPath}.tmp`;
+            await fs.writeFile(tmpScPath, JSON.stringify(emptySelected, null, 2));
+            await fs.rename(tmpScPath, selectedCleanersPath);
 
-          console.log(`ℹ️ Nessun selected_cleaners salvato per ${workDate} - creato vuoto`);
-        }
+            console.log(`ℹ️ Nessun selected_cleaners salvato per ${workDate} - creato vuoto`);
+          }
         } catch (e) {
           console.warn(`⚠️ Impossibile caricare ${scKey}:`, e);
         }
@@ -1415,11 +1415,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Usa la data fornita o la data corrente
       const workDate = date || format(new Date(), 'yyyy-MM-dd');
-      
+
       // CRITICAL: Imposta un flag temporaneo per prevenire il ripristino automatico
       const flagPath = path.join(process.cwd(), 'client/public/data/cleaners/.editing_cleaners');
-      await fs.writeFile(flagPath, JSON.stringify({ 
-        date: workDate, 
+      await fs.writeFile(flagPath, JSON.stringify({
+        date: workDate,
         timestamp: Date.now(),
         action: 'editing_cleaners'
       }));
@@ -2494,7 +2494,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Endpoint per estrarre i dati
   app.post("/api/extract-data", async (req, res) => {
     try {
-      const { date } = req.body;
+      const { date, created_by } = req.body;
+      const createdBy = created_by || 'unknown';
       const timelinePath = path.join(process.cwd(), 'client/public/data/output/timeline.json');
       const assignedDir = path.join(process.cwd(), 'client/public/data/assigned');
 
@@ -2519,6 +2520,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           console.log(`🔄 Timeline esiste per data ${existingTimeline.metadata?.date}, aggiorno metadata.date a ${date}`);
           existingTimeline.metadata.date = date;
           existingTimeline.metadata.last_updated = new Date().toISOString();
+          // Mantieni created_by se esiste
+          if (!existingTimeline.metadata.created_by) {
+            existingTimeline.metadata.created_by = createdBy;
+          }
           await workspaceFiles.saveTimeline(date, existingTimeline);
         } else {
           console.log(`✅ Timeline.json già presente per ${date}, mantieni assegnazioni esistenti`);
@@ -2527,7 +2532,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // File non esiste o è corrotto - crealo vuoto
         console.log(`📝 Timeline.json non esiste o corrotto, creazione nuova per ${date}`);
         const emptyTimeline = {
-          metadata: { last_updated: new Date().toISOString(), date },
+          metadata: {
+            last_updated: new Date().toISOString(),
+            date,
+            created_by: createdBy
+          },
           cleaners_assignments: [],
           meta: { total_cleaners: 0, used_cleaners: 0, assigned_tasks: 0 }
         };
