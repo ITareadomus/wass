@@ -1,24 +1,13 @@
 {
   "metadata": {
-    "last_updated": "2025-11-12T16:14:21.878Z",
+    "last_updated": "2025-11-12T16:16:34.103Z",
     "date": "2025-11-12",
     "created_by": "Admin",
     "modified_by": [
-      "Admin",
-      "admin"
+      "Admin"
     ]
   },
   "cleaners_assignments": [
-    {
-      "cleaner": {
-        "id": 132,
-        "name": "JOHOISER ERNESTO",
-        "lastname": "LOPEZ GIRON",
-        "role": "Premium",
-        "premium": false
-      },
-      "tasks": []
-    },
     {
       "cleaner": {
         "id": 626,
@@ -29,27 +18,27 @@
       },
       "tasks": [
         {
-          "task_id": 218768,
-          "logistic_code": 714,
+          "task_id": 218717,
+          "logistic_code": 618,
           "client_id": null,
           "premium": false,
-          "address": "VIA CHINOTTO 26",
-          "lat": "45.4668897",
-          "lng": "9.1272539",
+          "address": "VIA VOGHERA, 4",
+          "lat": "45.454632",
+          "lng": "9.168536",
           "cleaning_time": 30,
           "checkin_date": "2025-11-12",
           "checkout_date": "2025-11-12",
           "checkin_time": null,
-          "checkout_time": null,
-          "pax_in": 0,
+          "checkout_time": "09:30",
+          "pax_in": 2,
           "pax_out": 0,
           "small_equipment": false,
-          "operation_id": 4,
+          "operation_id": 2,
           "confirmed_operation": true,
           "straordinaria": false,
           "type_apt": "A",
-          "alias": "NTM",
-          "customer_name": "NOTA-MI",
+          "alias": "EXPRDS",
+          "customer_name": "EXPERIENCE DESIGN BED & SHOW",
           "reasons": [
             "manually_moved_to_timeline"
           ],
@@ -59,7 +48,7 @@
           "followup": false,
           "sequence": 1,
           "travel_time": 0,
-          "modified_by": "admin"
+          "modified_by": "Admin"
         }
       ]
     }
