@@ -1000,7 +1000,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const workDate = req.body?.date || format(new Date(), "yyyy-MM-dd");
       const username = getCurrentUsername(req); // Usa username da req.body
-      const cleanersAssignments = req.body?.cleanersAssignments; // Assicurati che venga passato se necessario
+      let cleanersAssignments = req.body?.cleanersAssignments; // Usa let invece di const
 
       if (!cleanersAssignments) {
         // Se cleanersAssignments non è passato, prova a caricarlo dal file
