@@ -65,9 +65,6 @@
   
   /* Priority border colors - Light mode */
   --priority-border-color: hsl(217 91% 22%);
-  
-  /* Container background colors - Light mode */
-  --container-bg-light: hsl(217 70% 96%);
 
   /* Timeline colors */
   --timeline-early-bg: hsl(199 89% 84%);
@@ -142,7 +139,11 @@
   
   /* Background color personalizzato per container e timeline */
   .bg-custom-blue-light {
-    background-color: var(--container-bg-light) !important;
+    background: linear-gradient(to bottom right, hsl(199, 89%, 97%), hsl(217, 89%, 95%));
+  }
+  
+  .dark .bg-custom-blue-light {
+    background: var(--container-bg-light);
   }
 
   /* Task styling basato su premium e straordinaria */
