@@ -106,6 +106,18 @@ export function ThemeToggle() {
 
   return (
     <div className="flex items-center gap-2">
+      <Button
+        variant="outline"
+        size="icon"
+        onClick={toggleTheme}
+        className="rounded-full"
+      >
+        {isDark ? (
+          <Sun className="h-5 w-5" />
+        ) : (
+          <Moon className="h-5 w-5" />
+        )}
+      </Button>
       {user && (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
@@ -170,18 +182,6 @@ export function ThemeToggle() {
           </DropdownMenuContent>
         </DropdownMenu>
       )}
-      <Button
-        variant="outline"
-        size="icon"
-        onClick={toggleTheme}
-        className="rounded-full"
-      >
-        {isDark ? (
-          <Sun className="h-5 w-5" />
-        ) : (
-          <Moon className="h-5 w-5" />
-        )}
-      </Button>
     </div>
   );
 }
