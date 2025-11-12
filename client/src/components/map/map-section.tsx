@@ -108,6 +108,13 @@ export default function MapSection({ tasks }: MapSectionProps) {
       center: { lat: 45.464, lng: 9.19 },
       zoom: 12,
       gestureHandling: 'greedy',
+      disableDefaultUI: true,
+      zoomControl: false,
+      mapTypeControl: false,
+      scaleControl: false,
+      streetViewControl: false,
+      rotateControl: false,
+      fullscreenControl: false,
       styles: [
         {
           featureType: 'poi',
