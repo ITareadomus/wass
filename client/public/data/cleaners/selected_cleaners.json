@@ -9,7 +9,7 @@
       "ranking": 0,
       "counter_hours": 14.25,
       "counter_days": 2,
-      "available": true,
+      "available": false,
       "contract_type": "B",
       "preferred_customers": [],
       "telegram_id": null,
@@ -20,6 +20,6 @@
   "total_selected": 1,
   "metadata": {
     "date": "2025-11-12",
-    "saved_at": "2025-11-12T11:02:32.758Z"
+    "reset_at": "2025-11-12T11:06:08.505Z"
   }
 }
