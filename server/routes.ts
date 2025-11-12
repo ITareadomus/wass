@@ -2575,7 +2575,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Verifica se esistono dati salvati per la data target
-      const timelinePath = path.join(process.cwd(), 'client/public/data/output/timeline.json');
       let hasExistingTimeline = false;
       let timelineDataForCheck: any = null; // Store timelineData if loaded
       try {
