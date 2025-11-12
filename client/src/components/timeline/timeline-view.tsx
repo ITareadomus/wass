@@ -927,7 +927,7 @@ export default function TimelineView({
                 onClick={() => setLocation('/convocazioni')}
                 variant="outline"
                 size="sm"
-                className="flex items-center gap-2"
+                className="flex items-center gap-2 border-2 border-sky-400"
                 disabled={isReadOnly}
               >
                 <Users className="w-4 h-4" />
@@ -937,7 +937,7 @@ export default function TimelineView({
                 onClick={handleResetAssignments}
                 variant="outline"
                 size="sm"
-                className="flex items-center gap-2"
+                className="flex items-center gap-2 border-2 border-sky-400"
                 disabled={isReadOnly}
               >
                 <RotateCcw className="w-4 h-4" />
@@ -1215,7 +1215,7 @@ export default function TimelineView({
                   }}
                   variant="ghost"
                   size="sm"
-                  className="w-full h-full"
+                  className="w-full h-full border-2 border-sky-400"
                   disabled={isReadOnly}
                 >
                   <UserPlus className="w-5 h-5" />
@@ -1228,10 +1228,10 @@ export default function TimelineView({
                     onClick={handleConfirmAssignments}
                     disabled={!hasUnsavedChanges}
                     variant="outline"
-                    className={`flex-1 h-full ${
+                    className={`flex-1 h-full border-2 border-sky-400 ${
                       hasUnsavedChanges 
-                        ? 'bg-green-600 hover:bg-green-700 text-white border-green-700 animate-pulse' 
-                        : 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200 border-green-300 dark:border-green-700 cursor-default'
+                        ? 'bg-green-600 hover:bg-green-700 text-white animate-pulse' 
+                        : 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200 cursor-default'
                     }`}
                     data-testid="button-confirm-assignments"
                   >
@@ -1243,7 +1243,7 @@ export default function TimelineView({
                   <Button
                     disabled
                     variant="outline"
-                    className="flex-1 h-full bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-200 border-yellow-300 dark:border-yellow-700 cursor-default"
+                    className="flex-1 h-full border-2 border-sky-400 bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-200 cursor-default"
                   >
                     📜 Sei in modalità storico
                   </Button>

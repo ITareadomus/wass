@@ -223,7 +223,7 @@ export default function PriorityColumn({
             size="sm"
             onClick={toggleMode}
             disabled={tasks.length === 0 || isDateInPast}
-            className="text-xs px-2 py-1 h-7"
+            className="text-xs px-2 py-1 h-7 border-2 border-sky-400"
             title={isMultiSelectMode ? "Disattiva selezione multipla" : "Attiva selezione multipla"}
             data-testid="button-toggle-multiselect"
           >
@@ -235,7 +235,7 @@ export default function PriorityColumn({
             size="sm"
             onClick={handleAssign} // Utilizza handleAssign
             disabled={isAssigning || tasks.length === 0 || isDateInPast}
-            className="text-xs px-2 py-1 h-7"
+            className="text-xs px-2 py-1 h-7 border-2 border-sky-400"
             title={isDateInPast ? "Non puoi assegnare task per date passate" : ""}
             data-testid="button-assign"
           >
