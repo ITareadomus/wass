@@ -11,6 +11,12 @@
       "username": "Sefora",
       "password": "WASSef@2025",
       "role": "user"
+    },
+    {
+      "id": 3,
+      "username": "Paolo",
+      "password": "WASSef@2025",
+      "role": "admin"
     }
   ]
 }
