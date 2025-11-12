@@ -70,15 +70,15 @@ export default function Login() {
       <div className="absolute top-4 right-4">
         <ThemeToggle />
       </div>
-      <Card className="w-full max-w-md border-2 border-custom-blue">
-        <CardHeader className="space-y-3">
+      <Card className="w-full max-w-md border-2 border-custom-blue bg-custom-blue-light">
+        <CardHeader className="space-y-3 bg-custom-blue-light">
           <CardTitle className="text-3xl font-bold text-center text-custom-blue">WASS 2.0</CardTitle>
           <CardTitle className="text-xl font-bold text-center">Area Domus</CardTitle>
           <CardDescription className="text-center">
             Inserisci le tue credenziali per accedere
           </CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="bg-custom-blue-light">
           <form onSubmit={handleLogin} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="username">Username</Label>
