@@ -471,17 +471,20 @@ export default function GenerateAssignments() {
 
       console.log("Estrazione dati per data:", dateStr);
 
+      // Ottieni username corrente
+      const currentUsername = getCurrentUsername();
+
       // Resetta la timeline
       await fetch('/api/reset-timeline-assignments', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ date: dateStr })
+        body: JSON.stringify({ date: dateStr, created_by: currentUsername })
       });
 
       const response = await fetch('/api/extract-data', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ date: dateStr })
+        body: JSON.stringify({ date: dateStr, created_by: currentUsername })
       });
 
       if (!response.ok) {
