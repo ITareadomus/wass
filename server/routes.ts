@@ -2418,7 +2418,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log(`▶ Eseguendo assign_lp.py per data: ${workDate}`);
 
       // Verifica che timeline.json abbia la data corretta
-      const timelinePath = path.join(process.cwd(), 'client/public/data/output/timeline.json');
       try {
         const timelineData = JSON.parse(await fs.readFile(timelinePath, 'utf8'));
         if (timelineData.metadata?.date !== workDate) {
