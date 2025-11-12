@@ -514,7 +514,7 @@ export default function TaskCard({
                         </div>
                       )}
                       
-                      <div className="flex flex-col items-start justify-center h-full gap-0 flex-1">
+                      <div className="flex flex-col items-center justify-center h-full gap-0 flex-1">
                         <div className="flex items-center gap-1">
                           <span
                             className="text-[13px] text-[#ff0000] font-extrabold"
