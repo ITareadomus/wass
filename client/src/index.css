@@ -101,10 +101,6 @@
   --priority-border-color: hsl(217 91% 60%);
 }
 
-.dark .border-sky-400 {
-  border-color: hsl(217 91% 60%) !important;
-}
-
 @layer base {
   * {
     @apply border-border;
