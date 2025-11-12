@@ -339,10 +339,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      // 5. Aggiorna metadata (mantieni cleaner anche se vuoti)
+      // 5. Aggiorna metadata (mantieni cleaner anche se vuoti), preservando created_by e aggiornando modified_by
+      const currentUsername = req.body.modified_by || getCurrentUsername(req);
+      
       timelineData.metadata = timelineData.metadata || {};
       timelineData.metadata.last_updated = new Date().toISOString();
       timelineData.metadata.date = workDate;
+      
+      // Preserva created_by
+      if (!timelineData.metadata.created_by) {
+        timelineData.metadata.created_by = currentUsername;
+      }
+      
+      // Aggiorna modified_by array
+      timelineData.metadata.modified_by = timelineData.metadata.modified_by || [];
+      if (currentUsername && !timelineData.metadata.modified_by.includes(currentUsername)) {
+        timelineData.metadata.modified_by.push(currentUsername);
+      }
+      
       timelineData.meta.total_cleaners = timelineData.cleaners_assignments.length;
       timelineData.meta.total_tasks = timelineData.cleaners_assignments.reduce(
         (sum: number, c: any) => sum + c.tasks.length,
@@ -527,6 +541,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { taskId, cleanerId, logisticCode, date, dropIndex, taskData, priority, modified_by } = req.body;
       const workDate = date || format(new Date(), 'yyyy-MM-dd');
+      const currentUsername = modified_by || getCurrentUsername(req);
       const timelinePath = path.join(process.cwd(), 'client/public/data/output/timeline.json');
       const containersPath = path.join(process.cwd(), 'client/public/data/output/containers.json');
 
@@ -622,10 +637,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
           },
           metadata: {
             date: workDate,
-            last_updated: new Date().toISOString()
+            last_updated: new Date().toISOString(),
+            created_by: currentUsername,
+            modified_by: []
           }
         };
-        console.log(`Creazione nuovo file timeline per ${workDate}`);
+        console.log(`Creazione nuovo file timeline per ${workDate} da utente ${currentUsername}`);
+      } else {
+        // Preserva created_by e aggiorna modified_by
+        timelineData.metadata = timelineData.metadata || {};
+        if (!timelineData.metadata.created_by) {
+          timelineData.metadata.created_by = currentUsername;
+        }
+        timelineData.metadata.modified_by = timelineData.metadata.modified_by || [];
+        if (currentUsername && !timelineData.metadata.modified_by.includes(currentUsername)) {
+          timelineData.metadata.modified_by.push(currentUsername);
+        }
       }
 
       // Migrazione da vecchia struttura a nuova se necessario
@@ -767,10 +794,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      // Aggiorna metadata e meta
+      // Aggiorna metadata e meta, preservando created_by e aggiornando modified_by
       timelineData.metadata = timelineData.metadata || {};
       timelineData.metadata.last_updated = new Date().toISOString();
       timelineData.metadata.date = workDate;
+      
+      // Preserva created_by se già esiste
+      if (!timelineData.metadata.created_by) {
+        timelineData.metadata.created_by = currentUsername;
+      }
+      
+      // Aggiorna modified_by array
+      timelineData.metadata.modified_by = timelineData.metadata.modified_by || [];
+      if (currentUsername && !timelineData.metadata.modified_by.includes(currentUsername)) {
+        timelineData.metadata.modified_by.push(currentUsername);
+      }
+      
       timelineData.meta.total_cleaners = timelineData.cleaners_assignments.length;
       timelineData.meta.total_tasks = timelineData.cleaners_assignments.reduce(
         (sum: number, c: any) => sum + c.tasks.length,
@@ -838,8 +877,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Endpoint per rimuovere un'assegnazione dalla timeline
   app.post("/api/remove-timeline-assignment", async (req, res) => {
     try {
-      const { taskId, logisticCode, date } = req.body;
+      const { taskId, logisticCode, date, modified_by } = req.body;
       const workDate = date || format(new Date(), 'yyyy-MM-dd');
+      const currentUsername = modified_by || getCurrentUsername(req);
       const timelinePath = path.join(process.cwd(), 'client/public/data/output/timeline.json');
       const containersPath = path.join(process.cwd(), 'client/public/data/output/containers.json');
 
@@ -879,10 +919,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       console.log(`Rimosse ${removedCount} assegnazioni`);
 
-      // Aggiorna metadata e meta
+      // Aggiorna metadata e meta, preservando created_by e aggiornando modified_by
       assignmentsData.metadata = assignmentsData.metadata || {};
       assignmentsData.metadata.last_updated = new Date().toISOString();
       assignmentsData.metadata.date = workDate;
+      
+      // Preserva created_by
+      if (!assignmentsData.metadata.created_by) {
+        assignmentsData.metadata.created_by = currentUsername;
+      }
+      
+      // Aggiorna modified_by array
+      assignmentsData.metadata.modified_by = assignmentsData.metadata.modified_by || [];
+      if (currentUsername && !assignmentsData.metadata.modified_by.includes(currentUsername)) {
+        assignmentsData.metadata.modified_by.push(currentUsername);
+      }
+      
       assignmentsData.meta.total_cleaners = assignmentsData.cleaners_assignments.length;
       assignmentsData.meta.total_tasks = assignmentsData.cleaners_assignments.reduce(
         (sum: number, c: any) => sum + c.tasks.length,
@@ -3102,10 +3154,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      // Aggiorna metadata e meta
+      // Aggiorna metadata e meta, preservando created_by e aggiornando modified_by
+      const currentUsername = req.body.modified_by || getCurrentUsername(req);
+      
       timelineData.metadata = timelineData.metadata || {};
       timelineData.metadata.last_updated = new Date().toISOString();
       timelineData.metadata.date = workDate;
+      
+      // Preserva created_by
+      if (!timelineData.metadata.created_by) {
+        timelineData.metadata.created_by = currentUsername;
+      }
+      
+      // Aggiorna modified_by array
+      timelineData.metadata.modified_by = timelineData.metadata.modified_by || [];
+      if (currentUsername && !timelineData.metadata.modified_by.includes(currentUsername)) {
+        timelineData.metadata.modified_by.push(currentUsername);
+      }
 
       timelineData.meta = timelineData.meta || {};
       timelineData.meta.total_tasks = timelineData.cleaners_assignments.reduce(
