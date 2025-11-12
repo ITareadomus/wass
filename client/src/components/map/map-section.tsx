@@ -236,7 +236,7 @@ export default function MapSection({ tasks }: MapSectionProps) {
   }, [tasks, isMapLoaded, cleaners, filteredCleanerId]);
 
   return (
-    <div className="bg-card rounded-lg border-2 border-gray-700 shadow-sm">
+    <div className="bg-card rounded-lg border shadow-sm">
       <div className="p-4 border-b border-border">
         <h3 className="font-semibold text-foreground flex items-center">
           <svg 
