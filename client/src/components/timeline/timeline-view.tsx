@@ -922,28 +922,28 @@ export default function TimelineView({
                 </p>
               )}
             </div>
-          </div>
-          <div className="flex gap-3 print:hidden">
-            <Button
-              onClick={() => setLocation('/convocazioni')}
-              variant="outline"
-              size="sm"
-              className="flex items-center gap-2 print:hidden"
-              disabled={isReadOnly}
-            >
-              <Users className="w-4 h-4" />
-              Convocazioni
-            </Button>
-            <Button
-              onClick={handleResetAssignments}
-              variant="outline"
-              size="sm"
-              className="flex items-center gap-2 print:hidden"
-              disabled={isReadOnly}
-            >
-              <RotateCcw className="w-4 h-4" />
-              Reset Assegnazioni
-            </Button>
+            <div className="flex gap-3 print:hidden">
+              <Button
+                onClick={() => setLocation('/convocazioni')}
+                variant="outline"
+                size="sm"
+                className="flex items-center gap-2"
+                disabled={isReadOnly}
+              >
+                <Users className="w-4 h-4" />
+                Convocazioni
+              </Button>
+              <Button
+                onClick={handleResetAssignments}
+                variant="outline"
+                size="sm"
+                className="flex items-center gap-2"
+                disabled={isReadOnly}
+              >
+                <RotateCcw className="w-4 h-4" />
+                Reset Assegnazioni
+              </Button>
+            </div>
           </div>
         </div>
         <div className="p-4 overflow-x-auto">
