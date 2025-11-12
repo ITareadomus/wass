@@ -18,6 +18,13 @@ const execAsync = promisify(exec);
 // Costante bucket per Object Storage
 const BUCKET = "wass_assignments";
 
+// Helper per ottenere l'username corrente dalla richiesta
+function getCurrentUsername(req?: any): string {
+  // Prova a ottenere username dalla sessione/header se disponibile
+  // Per ora ritorna 'system' se non specificato
+  return req?.body?.created_by || req?.body?.modified_by || 'system';
+}
+
 // Utility: costruzione chiave file consistente
 function buildKey(isoDate: string) {
   const d = new Date(isoDate);
@@ -172,13 +179,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { date } = req.body;
       const workDate = date || format(new Date(), 'yyyy-MM-dd');
+      const currentUsername = getCurrentUsername(req);
       const timelinePath = path.join(process.cwd(), 'client/public/data/output/timeline.json');
 
       // Svuota il file timeline.json con struttura corretta
       const emptyTimeline = {
         metadata: {
           last_updated: new Date().toISOString(),
-          date: workDate
+          date: workDate,
+          created_by: currentUsername
         },
         cleaners_assignments: [],
         meta: {
@@ -1107,6 +1116,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       savedData.metadata = savedData.metadata || {};
       savedData.metadata.date = workDate;
       savedData.metadata.last_updated = new Date().toISOString();
+      
+      // Preserva created_by se esiste, altrimenti usa 'loaded_from_storage'
+      if (!savedData.metadata.created_by) {
+        savedData.metadata.created_by = 'loaded_from_storage';
+      }
 
       // Salva i dati caricati in timeline.json (dual-write: filesystem + Object Storage)
       await workspaceFiles.saveTimeline(workDate, savedData);

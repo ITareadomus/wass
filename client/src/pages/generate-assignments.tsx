@@ -116,6 +116,21 @@ export const useMultiSelect = () => {
   return context;
 };
 
+// Helper per ottenere lo username corrente dal localStorage
+const getCurrentUsername = (): string => {
+  const user = localStorage.getItem("user");
+  if (user) {
+    try {
+      const userData = JSON.parse(user);
+      return userData.username || "unknown";
+    } catch (e) {
+      console.error("Failed to parse user data from localStorage", e);
+      return "unknown";
+    }
+  }
+  return "unknown";
+};
+
 export default function GenerateAssignments() {
   // Usa sempre la data odierna al mount iniziale
   const [selectedDate, setSelectedDate] = useState<Date>(() => {
