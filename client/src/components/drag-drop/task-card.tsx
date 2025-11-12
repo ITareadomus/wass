@@ -55,6 +55,7 @@ export default function TaskCard({
   isReadOnly = false,
 }: TaskCardProps) {
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [clickTimer, setClickTimer] = useState<NodeJS.Timeout | null>(null);
   
   // Usa il context per multi-select (solo per container, non timeline)
   const multiSelectContext = !isInTimeline ? useMultiSelect() : null;
@@ -69,9 +70,41 @@ export default function TaskCard({
     // In multi-select mode nei container: toggle selezione invece di aprire modale
     if (isMultiSelectMode && !isInTimeline && multiSelectContext) {
       multiSelectContext.toggleTask(task.id);
+      return;
+    }
+    
+    // Gestione doppio click per mostrare task sulla mappa
+    if (clickTimer) {
+      // Doppio click rilevato
+      clearTimeout(clickTimer);
+      setClickTimer(null);
+      
+      // Toggle filtro mappa per questa task
+      const currentFilteredTaskId = (window as any).mapFilteredTaskId;
+      if (currentFilteredTaskId === task.name) {
+        // Rimuovi filtro
+        (window as any).mapFilteredTaskId = null;
+        toast({
+          title: "Filtro rimosso",
+          description: "Ora visualizzi tutti gli appartamenti sulla mappa",
+        });
+      } else {
+        // Applica filtro
+        (window as any).mapFilteredTaskId = task.name;
+        toast({
+          title: "Task evidenziata",
+          description: `Visualizzi solo ${task.name} sulla mappa`,
+        });
+      }
     } else {
-      // Default: apri modale
-      setIsModalOpen(true);
+      // Primo click: avvia timer
+      const timer = setTimeout(() => {
+        // Singolo click: apri modale
+        setIsModalOpen(true);
+        setClickTimer(null);
+      }, 250);
+      
+      setClickTimer(timer);
     }
   };
 
@@ -361,6 +394,16 @@ export default function TaskCard({
     }
   };
 
+  // Determina se la task è < 1 ora per ridurre le dimensioni del testo
+  const isSmallTask = (() => {
+    const safeDuration = task.duration || "0.0";
+    const parts = safeDuration.split(".");
+    const hours = parseInt(parts[0] || "0");
+    const minutes = parts[1] ? parseInt(parts[1]) : 0;
+    const totalMinutes = hours * 60 + minutes;
+    return totalMinutes < 60;
+  })();
+
   // Verifica se end_time sfora checkin_time (considerando le date!)
   const isOverdue = (() => {
     const taskObj = displayTask as any;
@@ -416,6 +459,11 @@ export default function TaskCard({
                       ...provided.draggableProps.style,
                       width: cardWidth,
                       minHeight: "40px",
+                      ...(((window as any).mapFilteredTaskId === task.name) ? {
+                        boxShadow: '0 0 0 3px #3B82F6, 0 0 20px 5px rgba(59, 130, 246, 0.5)',
+                        transform: 'scale(1.05)',
+                        zIndex: 10,
+                      } : {})
                     }}
                     data-testid={`task-card-${getTaskKey(task)}`}
                     onClick={(e) => {
@@ -458,17 +506,26 @@ export default function TaskCard({
                     >
                       <div className="flex items-center gap-1">
                         <span
-                          className="text-[13px] text-[#ff0000] font-extrabold"
+                          className={cn(
+                            "text-[#ff0000] font-extrabold",
+                            isSmallTask ? "text-[10px]" : "text-[13px]"
+                          )}
                           data-testid={`task-name-${getTaskKey(task)}`}
                         >
                           {task.name}
                         </span>
-                        <span className="text-[11px] opacity-60 leading-none font-bold text-[#000000]">
+                        <span className={cn(
+                          "opacity-60 leading-none font-bold text-[#000000]",
+                          isSmallTask ? "text-[8px]" : "text-[11px]"
+                        )}>
                           ({(task.duration || "0.0").replace(".", ":")}h)
                         </span>
                       </div>
                       {task.alias && (
-                        <span className="text-[11px] opacity-70 leading-none mt-0.5 text-[#000000] font-bold">
+                        <span className={cn(
+                          "opacity-70 leading-none mt-0.5 text-[#000000] font-bold",
+                          isSmallTask ? "text-[9px]" : "text-[11px]"
+                        )}>
                           {task.alias}{(task as any).type_apt ? ` (${(task as any).type_apt})` : ''}
                         </span>
                       )}

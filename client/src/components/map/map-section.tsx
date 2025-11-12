@@ -22,6 +22,7 @@ export default function MapSection({ tasks }: MapSectionProps) {
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [cleaners, setCleaners] = useState<any[]>([]);
   const [filteredCleanerId, setFilteredCleanerId] = useState<number | null>(null);
+  const [filteredTaskId, setFilteredTaskId] = useState<string | null>(null);
 
   // Carica i cleaners
   useEffect(() => {
@@ -42,11 +43,19 @@ export default function MapSection({ tasks }: MapSectionProps) {
 
     // Listener per aggiornamenti del filtro dalla timeline
     const checkFilterUpdates = setInterval(() => {
-      const newFilterId = (window as any).mapFilteredCleanerId;
+      const newFilterCleanerId = (window as any).mapFilteredCleanerId;
+      const newFilterTaskId = (window as any).mapFilteredTaskId;
+      
       setFilteredCleanerId(prev => {
-        // Aggiorna solo se cambia davvero
-        if (prev !== newFilterId) {
-          return newFilterId;
+        if (prev !== newFilterCleanerId) {
+          return newFilterCleanerId;
+        }
+        return prev;
+      });
+      
+      setFilteredTaskId(prev => {
+        if (prev !== newFilterTaskId) {
+          return newFilterTaskId;
         }
         return prev;
       });
@@ -78,7 +87,7 @@ export default function MapSection({ tasks }: MapSectionProps) {
     }
 
     const script = document.createElement('script');
-    script.src = `https://maps.googleapis.com/maps/api/js?key=AIzaSyBRKGlNnryWd0psedJholmVPlaxQUmSlY0`;
+    script.src = `https://maps.googleapis.com/maps/api/js?key=AIzaSyBRKGlNnryWd0psedJholmVPlaxQUmSlY0&v=weekly`;
     script.async = true;
     script.defer = true;
     script.onload = () => setIsMapLoaded(true);
@@ -99,6 +108,8 @@ export default function MapSection({ tasks }: MapSectionProps) {
       center: { lat: 45.464, lng: 9.19 },
       zoom: 12,
       gestureHandling: 'greedy',
+      disableDefaultUI: true,
+      fullscreenControl: true,
       styles: [
         {
           featureType: 'poi',
@@ -118,24 +129,32 @@ export default function MapSection({ tasks }: MapSectionProps) {
     markersRef.current.forEach(marker => marker.setMap(null));
     markersRef.current = [];
 
-    // Filtra task con coordinate valide
+    // Filtra task con coordinate valide - MA NON FILTRARE PER VISUALIZZAZIONE
     let tasksWithCoordinates = tasks.filter(task => {
       const hasCoordinates = task.address && task.lat && task.lng;
       return hasCoordinates;
     });
 
-    // Se c'è un filtro attivo (un cleaner specifico selezionato nella timeline),
-    // mostra solo gli appartamenti del cleaner selezionato
-    // Altrimenti mostra tutte le task con coordinate
-    if (filteredCleanerId !== null && filteredCleanerId !== undefined && filteredCleanerId !== 0) {
-      tasksWithCoordinates = tasksWithCoordinates.filter(task => 
-        (task as any).assignedCleaner === filteredCleanerId
-      );
+    // Determina quali task evidenziare (non nascondere le altre)
+    const highlightedTaskIds = new Set<string>();
+    
+    // Se c'è un filtro per task ID (doppio click su task card)
+    if (filteredTaskId !== null && filteredTaskId !== undefined) {
+      highlightedTaskIds.add(filteredTaskId);
+    }
+    // Se c'è un filtro per cleaner (doppio click su cleaner nella timeline)
+    else if (filteredCleanerId !== null && filteredCleanerId !== undefined && filteredCleanerId !== 0) {
+      tasksWithCoordinates.forEach(task => {
+        if ((task as any).assignedCleaner === filteredCleanerId) {
+          highlightedTaskIds.add(task.name);
+        }
+      });
     }
 
     console.log('Task totali:', tasks.length);
     console.log('Task con coordinate:', tasksWithCoordinates.length);
     console.log('Cleaners caricati:', cleaners.length);
+    console.log('Task evidenziate:', highlightedTaskIds.size);
     console.log('Prime 3 task con coordinate:', tasksWithCoordinates.slice(0, 3).map(t => ({
       name: t.name,
       address: t.address,
@@ -175,34 +194,79 @@ export default function MapSection({ tasks }: MapSectionProps) {
       const assignedCleaner = (task as any).assignedCleaner;
       const markerColor = assignedCleaner ? getCleanerColor(assignedCleaner) : '#6B7280';
       const sequence = (task as any).sequence;
+      
+      // Verifica se questa task è evidenziata
+      const isHighlighted = highlightedTaskIds.has(task.name);
+      const markerScale = 12; // Dimensione costante per tutti i marker
+      const strokeWeight = isHighlighted ? 2 : 2; // Bordo più sottile anche se evidenziata
+      const strokeColor = isHighlighted ? '#FFD700' : '#ffffff'; // Bordo dorato se evidenziata
 
-      // Se c'è una sequenza, usa un marker con testo
+      // Se c'è una sequenza, usa un custom HTML marker
       if (sequence !== undefined && sequence !== null) {
-        const marker = new window.google.maps.Marker({
-          position,
-          map: googleMapRef.current,
-          title: `${task.name} - ${task.type} (Seq: ${sequence})`,
-          label: {
-            text: String(sequence),
-            color: '#ffffff',
-            fontSize: '12px',
-            fontWeight: 'bold'
-          },
-          icon: {
-            path: window.google.maps.SymbolPath.CIRCLE,
-            fillColor: markerColor,
-            fillOpacity: 1,
-            strokeColor: '#ffffff',
-            strokeWeight: 2,
-            scale: 12
+        // Crea un custom overlay
+        class CustomMarker extends window.google.maps.OverlayView {
+          position: any;
+          div: HTMLDivElement | null = null;
+          
+          constructor(position: any) {
+            super();
+            this.position = position;
           }
-        });
-
-        marker.addListener('click', () => {
-          setSelectedTask(task);
-        });
-
-        markersRef.current.push(marker);
+          
+          onAdd() {
+            const div = document.createElement('div');
+            div.style.position = 'absolute';
+            div.style.cursor = 'pointer';
+            div.style.width = `${markerScale * 2}px`;
+            div.style.height = `${markerScale * 2}px`;
+            div.style.borderRadius = '50%';
+            div.style.backgroundColor = markerColor;
+            div.style.border = `${strokeWeight}px solid ${strokeColor}`;
+            div.style.display = 'flex';
+            div.style.alignItems = 'center';
+            div.style.justifyContent = 'center';
+            div.style.color = '#ffffff';
+            div.style.fontSize = isHighlighted ? '14px' : '12px';
+            div.style.fontWeight = 'bold';
+            div.style.zIndex = isHighlighted ? '1000' : String(index);
+            div.textContent = String(sequence);
+            div.title = `${task.name} - ${task.type} (Seq: ${sequence})`;
+            
+            // Aggiungi animazione bounce se evidenziato
+            if (isHighlighted) {
+              div.style.animation = 'bounce 0.5s ease infinite alternate';
+            }
+            
+            div.addEventListener('click', () => {
+              setSelectedTask(task);
+            });
+            
+            this.div = div;
+            const panes = this.getPanes();
+            panes.overlayMouseTarget.appendChild(div);
+          }
+          
+          draw() {
+            if (!this.div) return;
+            const overlayProjection = this.getProjection();
+            const pos = overlayProjection.fromLatLngToDivPixel(this.position);
+            if (pos) {
+              this.div.style.left = `${pos.x - markerScale}px`;
+              this.div.style.top = `${pos.y - markerScale}px`;
+            }
+          }
+          
+          onRemove() {
+            if (this.div && this.div.parentNode) {
+              this.div.parentNode.removeChild(this.div);
+              this.div = null;
+            }
+          }
+        }
+        
+        const customMarker = new CustomMarker(position);
+        customMarker.setMap(googleMapRef.current);
+        markersRef.current.push(customMarker);
       } else {
         // Marker senza sequenza (non assegnato)
         const marker = new window.google.maps.Marker({
@@ -213,10 +277,13 @@ export default function MapSection({ tasks }: MapSectionProps) {
             path: window.google.maps.SymbolPath.CIRCLE,
             fillColor: markerColor,
             fillOpacity: 1,
-            strokeColor: '#ffffff',
-            strokeWeight: 2,
-            scale: 12
-          }
+            strokeColor: strokeColor,
+            strokeWeight: strokeWeight,
+            scale: markerScale
+          },
+          zIndex: isHighlighted ? 1000 : index,
+          animation: isHighlighted ? window.google.maps.Animation.BOUNCE : null,
+          optimized: true
         });
 
         marker.addListener('click', () => {
@@ -232,8 +299,30 @@ export default function MapSection({ tasks }: MapSectionProps) {
     // Adatta la vista per mostrare tutti i marker
     if (tasksWithCoordinates.length > 0) {
       googleMapRef.current.fitBounds(bounds);
+      
+      // Se ci sono task evidenziate, centra sulla loro area
+      if (highlightedTaskIds.size > 0 && highlightedTaskIds.size < tasksWithCoordinates.length) {
+        const highlightedBounds = new window.google.maps.LatLngBounds();
+        tasksWithCoordinates.forEach(task => {
+          if (highlightedTaskIds.has(task.name)) {
+            const lat = parseFloat(task.lat || '0');
+            const lng = parseFloat(task.lng || '0');
+            if (!isNaN(lat) && !isNaN(lng) && lat !== 0 && lng !== 0) {
+              highlightedBounds.extend({ lat, lng });
+            }
+          }
+        });
+        
+        setTimeout(() => {
+          googleMapRef.current.fitBounds(highlightedBounds);
+          const currentZoom = googleMapRef.current.getZoom();
+          if (currentZoom > 15) {
+            googleMapRef.current.setZoom(15);
+          }
+        }, 100);
+      }
     }
-  }, [tasks, isMapLoaded, cleaners, filteredCleanerId]);
+  }, [tasks, isMapLoaded, cleaners, filteredCleanerId, filteredTaskId]);
 
   return (
     <div className="bg-card rounded-lg border shadow-sm">

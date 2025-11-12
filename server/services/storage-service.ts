@@ -182,6 +182,65 @@ export class StorageService {
   }
 
   /**
+   * Delete all workspace files for a specific date
+   */
+  async deleteWorkspaceFiles(workDate: string): Promise<{success: boolean, deletedFiles: string[], errors: string[]}> {
+    const deletedFiles: string[] = [];
+    const errors: string[] = [];
+    
+    const filesToDelete = ['timeline', 'containers', 'selected_cleaners'] as const;
+    
+    for (const fileType of filesToDelete) {
+      try {
+        const key = this.buildWorkspaceKey(workDate, fileType);
+        const result = await this.client.delete(key);
+        
+        if (result.ok) {
+          deletedFiles.push(`${fileType}.json`);
+        } else {
+          // File might not exist, which is ok
+          console.log(`File ${key} not found or already deleted`);
+        }
+      } catch (error: any) {
+        errors.push(`${fileType}: ${error.message}`);
+      }
+    }
+    
+    return {
+      success: errors.length === 0,
+      deletedFiles,
+      errors
+    };
+  }
+
+  /**
+   * List all workspace dates that have files
+   */
+  async listWorkspaceDates(): Promise<string[]> {
+    try {
+      const result = await this.client.list();
+      
+      if (!result.ok) {
+        return [];
+      }
+      
+      const dates = new Set<string>();
+      for (const key of result.value) {
+        // Extract date from workspace/YYYY-MM-DD/filename.json
+        const match = key.match(/^workspace\/(\d{4}-\d{2}-\d{2})\//);
+        if (match) {
+          dates.add(match[1]);
+        }
+      }
+      
+      return Array.from(dates).sort();
+    } catch (error) {
+      console.error('Error listing workspace dates:', error);
+      return [];
+    }
+  }
+
+  /**
    * Get confirmed assignments (backward compatible)
    */
   async getConfirmedAssignments(workDate: string): Promise<any | null> {

@@ -1,5 +1,5 @@
 
-import { Moon, Sun, LogOut, History, User, Check } from "lucide-react";
+import { Moon, Sun, LogOut, History, User, Check, Settings } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
@@ -72,12 +72,12 @@ export function ThemeToggle() {
   };
 
   const switchAccount = (account: Account) => {
-    localStorage.setItem("user", JSON.stringify(account));
+    localStorage.removeItem("user");
     toast({
-      title: "Account cambiato",
-      description: `Sei ora loggato come ${account.username}`,
+      title: "Cambio account",
+      description: "Effettua il login con le credenziali desiderate",
     });
-    window.location.reload();
+    setLocation("/login");
   };
 
   const getCurrentUser = () => {
@@ -102,16 +102,44 @@ export function ThemeToggle() {
     }
   };
 
+  const getAvatarColor = (userId: number) => {
+    const colors = [
+      "bg-blue-500",
+      "bg-green-500",
+      "bg-purple-500",
+      "bg-orange-500",
+      "bg-pink-500",
+      "bg-teal-500",
+      "bg-red-500",
+      "bg-indigo-500",
+      "bg-yellow-500",
+      "bg-cyan-500",
+    ];
+    return colors[(userId - 1) % colors.length];
+  };
+
   const currentUser = getCurrentUser();
 
   return (
     <div className="flex items-center gap-2">
+      <Button
+        variant="outline"
+        size="icon"
+        onClick={toggleTheme}
+        className="rounded-full"
+      >
+        {isDark ? (
+          <Sun className="h-5 w-5" />
+        ) : (
+          <Moon className="h-5 w-5" />
+        )}
+      </Button>
       {user && (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" size="icon" className="rounded-full h-9 w-9 p-0">
               <Avatar className="h-9 w-9 cursor-pointer">
-                <AvatarFallback className="bg-primary text-primary-foreground font-semibold">
+                <AvatarFallback className={`${currentUser ? getAvatarColor(currentUser.id) : 'bg-primary'} text-white font-semibold`}>
                   {getUserInitial()}
                 </AvatarFallback>
               </Avatar>
@@ -137,7 +165,11 @@ export function ThemeToggle() {
                   >
                     <div className="flex items-center justify-between w-full">
                       <div className="flex items-center gap-2">
-                        <User className="h-4 w-4" />
+                        <Avatar className="h-6 w-6">
+                          <AvatarFallback className={`${getAvatarColor(account.id)} text-white text-xs font-semibold`}>
+                            {account.username.charAt(0).toUpperCase()}
+                          </AvatarFallback>
+                        </Avatar>
                         <span>{account.username}</span>
                       </div>
                       {currentUser?.id === account.id && (
@@ -153,6 +185,13 @@ export function ThemeToggle() {
               <History className="mr-2 h-4 w-4" />
               <span>History</span>
             </DropdownMenuItem>
+
+            {currentUser?.role === "admin" && (
+              <DropdownMenuItem onClick={() => setLocation("/settings")} className="cursor-pointer">
+                <Settings className="mr-2 h-4 w-4" />
+                <span>Settings</span>
+              </DropdownMenuItem>
+            )}
             
             <DropdownMenuSeparator />
             
@@ -163,18 +202,6 @@ export function ThemeToggle() {
           </DropdownMenuContent>
         </DropdownMenu>
       )}
-      <Button
-        variant="outline"
-        size="icon"
-        onClick={toggleTheme}
-        className="rounded-full"
-      >
-        {isDark ? (
-          <Sun className="h-5 w-5" />
-        ) : (
-          <Moon className="h-5 w-5" />
-        )}
-      </Button>
     </div>
   );
 }
