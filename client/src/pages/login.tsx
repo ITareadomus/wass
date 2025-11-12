@@ -117,7 +117,11 @@ export default function Login() {
                 </Button>
               </div>
             </div>
-            <Button type="submit" className="w-full" disabled={isLoading}>
+            <Button 
+              type="submit" 
+              className="w-full bg-custom-blue-light border-2 border-custom-blue text-black hover:opacity-80" 
+              disabled={isLoading}
+            >
               {isLoading ? "Accesso in corso..." : "Accedi"}
             </Button>
           </form>
