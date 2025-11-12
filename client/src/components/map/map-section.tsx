@@ -87,7 +87,7 @@ export default function MapSection({ tasks }: MapSectionProps) {
     }
 
     const script = document.createElement('script');
-    script.src = `https://maps.googleapis.com/maps/api/js?key=AIzaSyBRKGlNnryWd0psedJholmVPlaxQUmSlY0`;
+    script.src = `https://maps.googleapis.com/maps/api/js?key=AIzaSyBRKGlNnryWd0psedJholmVPlaxQUmSlY0&v=weekly`;
     script.async = true;
     script.defer = true;
     script.onload = () => setIsMapLoaded(true);
