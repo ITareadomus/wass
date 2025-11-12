@@ -438,7 +438,7 @@ export default function TaskCard({
                     {...provided.dragHandleProps}
                     className={`
                       ${cardColorClass}
-                      rounded-sm px-1 py-1 shadow-sm border transition-all duration-200
+                      rounded-sm px-0.5 py-1 shadow-sm border transition-all duration-200
                       ${snapshot.isDragging ? "shadow-lg scale-105" : ""}
                       ${isOverdue && isInTimeline ? "animate-blink" : ""}
                       ${isDuplicate && !isInTimeline ? "animate-blink-yellow" : ""}
