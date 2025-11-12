@@ -506,7 +506,11 @@ export default function TaskCard({
                       {shouldShowCheckInOutArrows() && (
                         <div className="flex flex-col items-center justify-center flex-shrink-0">
                           <ArrowUp className="w-3 h-3 text-green-600" strokeWidth={3} />
-                          <span className="text-[7px] font-bold text-green-600 leading-none">OUT</span>
+                          {(task as any).checkout_time && (
+                            <span className="text-[7px] font-bold text-green-600 leading-none">
+                              {(task as any).checkout_time}
+                            </span>
+                          )}
                         </div>
                       )}
                       
@@ -533,7 +537,11 @@ export default function TaskCard({
                       {shouldShowCheckInOutArrows() && (
                         <div className="flex flex-col items-center justify-center flex-shrink-0">
                           <ArrowDown className="w-3 h-3 text-red-600" strokeWidth={3} />
-                          <span className="text-[7px] font-bold text-red-600 leading-none">IN</span>
+                          {(task as any).checkin_time && (
+                            <span className="text-[7px] font-bold text-red-600 leading-none">
+                              {(task as any).checkin_time}
+                            </span>
+                          )}
                         </div>
                       )}
                     </div>
