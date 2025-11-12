@@ -87,7 +87,7 @@
 }
 
 .dark .border-sky-400 {
-  border-color: hsl(217 91% 60%) !important;
+  border-color: #00008B !important;
 }
 
 @layer base {
