@@ -488,31 +488,81 @@ def plan_day(tasks: List[Task], cleaners: List[Cleaner], assigned_logistic_codes
     - Max 2 task per cleaner (3ª solo se entro 10')
     - DEDUPLICA: Solo una task per logistic_code viene assegnata
     - CLUSTERING PREVENTIVO: Raggruppa task stesso edificio prima dell'assegnazione
+    - CLUSTERING CROSS-CONTAINER: Raggruppa task vicine a quelle già assegnate (EO/HP/LP)
     """
     if assigned_logistic_codes is None:
         assigned_logistic_codes = set()
 
     unassigned = []
     
-    # CLUSTERING PREVENTIVO: Raggruppa task per edificio prima di assegnare
+    # CLUSTERING PREVENTIVO CROSS-CONTAINER: Carica task già assegnate dalla timeline
+    timeline_path = OUTPUT_ASSIGN.parent / "timeline.json"
+    assigned_tasks_by_location = []  # Lista di (lat, lng, address) delle task già assegnate
+    
+    if timeline_path.exists():
+        try:
+            timeline_data = json.loads(timeline_path.read_text(encoding="utf-8"))
+            for cleaner_entry in timeline_data.get("cleaners_assignments", []):
+                for t in cleaner_entry.get("tasks", []):
+                    lat = t.get("lat")
+                    lng = t.get("lng")
+                    addr = t.get("address")
+                    if lat is not None and lng is not None:
+                        assigned_tasks_by_location.append((float(lat), float(lng), addr))
+            print(f"   🔄 CROSS-CONTAINER: Caricate {len(assigned_tasks_by_location)} task già assegnate")
+        except Exception as e:
+            print(f"   ⚠️ Errore caricamento timeline per clustering: {e}")
+    
+    # CLUSTERING PREVENTIVO: Raggruppa task per vicinanza (edificio o task già assegnate)
     building_groups = {}
+    cross_container_groups = {}  # Nuovi gruppi per task vicine a quelle già assegnate
+    
     for task in tasks:
         if task.logistic_code in assigned_logistic_codes:
             continue
         
-        # Trova se esiste già un gruppo per questo edificio
-        found_group = False
+        # 1. Controlla se è nello stesso edificio di una task da assegnare
+        found_building_group = False
         for group_key, group_tasks in building_groups.items():
             if same_building(group_tasks[0].address, task.address):
                 group_tasks.append(task)
-                found_group = True
+                found_building_group = True
                 break
         
-        if not found_group:
-            building_groups[task.address or f"task_{task.task_id}"] = [task]
+        if found_building_group:
+            continue
+        
+        # 2. Controlla se è vicina a una task già assegnata (cross-container)
+        found_cross_container = False
+        for assigned_lat, assigned_lng, assigned_addr in assigned_tasks_by_location:
+            # Stesso edificio con task già assegnata
+            if assigned_addr and same_building(assigned_addr, task.address):
+                key = f"cross_{assigned_addr}_{assigned_lat}_{assigned_lng}"
+                if key not in cross_container_groups:
+                    cross_container_groups[key] = []
+                cross_container_groups[key].append(task)
+                found_cross_container = True
+                break
+            # Stessa zona (≤800m)
+            if same_zone(task.lat, task.lng, assigned_lat, assigned_lng, task.address, assigned_addr):
+                key = f"cross_{assigned_addr}_{assigned_lat}_{assigned_lng}"
+                if key not in cross_container_groups:
+                    cross_container_groups[key] = []
+                cross_container_groups[key].append(task)
+                found_cross_container = True
+                break
+        
+        if found_cross_container:
+            continue
+        
+        # 3. Nessuna vicinanza: crea nuovo gruppo
+        building_groups[task.address or f"task_{task.task_id}"] = [task]
     
-    # Ordina i gruppi: prima quelli con più task (stesso edificio)
-    sorted_groups = sorted(building_groups.values(), key=lambda g: -len(g))
+    # Ordina i gruppi: prima cross-container (massima priorità), poi stesso edificio
+    all_groups = []
+    all_groups.extend(cross_container_groups.values())
+    all_groups.extend(building_groups.values())
+    sorted_groups = sorted(all_groups, key=lambda g: -len(g))
     
     # Appiattisci mantenendo l'ordine dei gruppi
     ordered_tasks = []
