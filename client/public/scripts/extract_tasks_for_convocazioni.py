@@ -68,7 +68,7 @@ def get_operation_names(operation_ids):
     query = f"""
         SELECT structure_operation_id, name
         FROM app_structure_operation_langs
-        WHERE lang_id = 1 AND structure_operation_id IN ({placeholders})
+        WHERE id_lang = 1 AND structure_operation_id IN ({placeholders})
     """
     
     cursor.execute(query, operation_ids)
