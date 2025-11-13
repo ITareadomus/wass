@@ -418,6 +418,7 @@ export default function Settings() {
                             }}
                             variant="destructive"
                             size="sm"
+                            className="border-2 border-custom-blue"
                             disabled={account.id === 1}
                           >
                             <Trash2 className="w-4 h-4" />
