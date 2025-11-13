@@ -303,7 +303,7 @@ export default function Settings() {
               {/* Lista Account */}
               {accounts.map((account) => (
                 <Card key={account.id} className="bg-custom-blue-light border-2 border-custom-blue">
-                  <CardContent className="pt-6 bg-custom-blue-light">
+                  <CardContent className="pt-6 bg-[#020817]">
                     {editingAccount?.id === account.id ? (
                       <div className="space-y-4">
                         <div>
