@@ -476,17 +476,17 @@ export default function Convocazioni() {
               const canDoStraordinaria = (cleaner as any).can_do_straordinaria === true;
 
               const borderColor = !isAvailable
-                ? "border-gray-400 dark:border-gray-300"
-                : isFormatore ? "border-orange-500 dark:border-orange-400"
-                : isPremium ? "border-yellow-500 dark:border-yellow-400" : "border-green-500 dark:border-green-400";
+                ? "border-gray-500 dark:border-gray-300"
+                : isFormatore ? "border-orange-600 dark:border-orange-400"
+                : isPremium ? "border-yellow-600 dark:border-yellow-400" : "border-green-600 dark:border-green-400";
               const bgColor = !isAvailable
-                ? "bg-gray-300/30 dark:bg-gray-600/60"
-                : isFormatore ? "bg-orange-500/10 dark:bg-orange-500/30"
-                : isPremium ? "bg-yellow-500/10 dark:bg-yellow-500/30" : "bg-green-500/10 dark:bg-green-500/30";
+                ? "bg-gray-400/50 dark:bg-gray-600/60"
+                : isFormatore ? "bg-orange-500/25 dark:bg-orange-500/30"
+                : isPremium ? "bg-yellow-500/25 dark:bg-yellow-500/30" : "bg-green-500/25 dark:bg-green-500/30";
               const badgeColor = !isAvailable
-                ? "bg-gray-400/20 text-gray-700 dark:bg-gray-500/40 dark:text-gray-100 border-gray-400 dark:border-gray-400"
-                : isFormatore ? "bg-orange-500/20 text-orange-700 dark:bg-orange-500/40 dark:text-orange-200 border-orange-500 dark:border-orange-400"
-                : isPremium ? "bg-yellow-500/20 text-yellow-700 dark:bg-yellow-500/40 dark:text-yellow-200 border-yellow-500 dark:border-yellow-400" : "bg-green-500/20 text-green-700 dark:bg-green-500/40 dark:text-green-200 border-green-500 dark:border-green-400";
+                ? "bg-gray-500/30 text-gray-800 dark:bg-gray-500/40 dark:text-gray-100 border-gray-500 dark:border-gray-400"
+                : isFormatore ? "bg-orange-500/30 text-orange-800 dark:bg-orange-500/40 dark:text-orange-200 border-orange-600 dark:border-orange-400"
+                : isPremium ? "bg-yellow-500/30 text-yellow-800 dark:bg-yellow-500/40 dark:text-yellow-200 border-yellow-600 dark:border-yellow-400" : "bg-green-500/30 text-green-800 dark:bg-green-500/40 dark:text-green-200 border-green-600 dark:border-green-400";
 
               return (
                 <div
