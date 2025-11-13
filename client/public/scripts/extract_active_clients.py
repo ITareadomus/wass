@@ -2,7 +2,7 @@
 #!/usr/bin/env python3
 """
 Script per estrarre i clienti attivi dal database.
-Output: JSON con client_id e operation_name
+Output: JSON con client_id e customer_name
 """
 
 import json
@@ -22,19 +22,23 @@ def get_db_connection():
     )
 
 def extract_active_clients():
-    """Estrae tutti i clienti attivi dal database."""
+    """Estrae tutti i clienti attivi che hanno strutture con housekeeping."""
     conn = get_db_connection()
     cursor = conn.cursor(cursor_factory=RealDictCursor)
     
     try:
-        # Query per ottenere i clienti attivi
+        # Query per ottenere i clienti attivi dalle strutture con housekeeping
         query = """
-            SELECT 
-                operation_id as client_id,
-                operation_name
-            FROM wass_operations
-            WHERE active = true
-            ORDER BY operation_name
+            SELECT DISTINCT
+                s.customer_id as client_id,
+                c.name as customer_name
+            FROM app_structures s
+            LEFT JOIN app_customers c ON s.customer_id = c.id
+            WHERE s.customer_id IS NOT NULL
+              AND c.name IS NOT NULL
+              AND s.deleted_at IS NULL
+              AND c.deleted_at IS NULL
+            ORDER BY c.name
         """
         
         cursor.execute(query)
