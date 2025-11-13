@@ -531,7 +531,7 @@ export default function TaskCard({
                         {(task as any).checkin_time && (
                           <div className="flex items-center gap-0.5">
                             <span className={cn("text-red-600 font-bold leading-none", isInTimeline && isSmallTask ? "text-[9px]" : "text-[11px]")}>↓</span>
-                            <span className={cn("text-red-600 font-semibold leading-none", isInTimeline && isSmallTask ? "text-[9px]" : "text-[11px]")}>{(task as any).checkin_time}</span>
+                            <span className="text-red-600 text-[11px] font-bold">{(task as any).checkin_time}</span>
                           </div>
                         )}
                       </div>
