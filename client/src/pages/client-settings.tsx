@@ -1,14 +1,39 @@
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { Home } from "lucide-react";
+import { Home, Save, RefreshCw } from "lucide-react";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+
+interface Client {
+  client_id: number;
+  operation_name: string;
+}
+
+interface ClientWindow {
+  client_id: number;
+  checkin_time: string;
+  checkout_time: string;
+}
+
+interface ClientWindowsData {
+  windows: ClientWindow[];
+  metadata: {
+    last_updated: string;
+  };
+}
 
 export default function ClientSettings() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
+  const [clients, setClients] = useState<Client[]>([]);
+  const [windows, setWindows] = useState<Map<number, { checkin: string; checkout: string }>>(new Map());
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
     const user = localStorage.getItem("user");
@@ -27,7 +52,119 @@ export default function ClientSettings() {
       setLocation("/");
       return;
     }
+
+    loadData();
   }, [setLocation, toast]);
+
+  const loadData = async () => {
+    setIsLoading(true);
+    try {
+      // Carica clienti attivi
+      const clientsResponse = await fetch("/api/get-active-clients");
+      if (!clientsResponse.ok) throw new Error("Errore nel caricamento dei clienti");
+      const clientsData = await clientsResponse.json();
+      setClients(clientsData.clients);
+
+      // Carica client_windows.json se esiste
+      try {
+        const windowsResponse = await fetch(`/data/input/client_windows.json?t=${Date.now()}`, {
+          cache: 'no-store',
+          headers: { 'Cache-Control': 'no-cache' }
+        });
+        
+        if (windowsResponse.ok) {
+          const windowsData: ClientWindowsData = await windowsResponse.json();
+          const windowsMap = new Map<number, { checkin: string; checkout: string }>();
+          
+          windowsData.windows.forEach(w => {
+            windowsMap.set(w.client_id, {
+              checkin: w.checkin_time || "",
+              checkout: w.checkout_time || ""
+            });
+          });
+          
+          setWindows(windowsMap);
+        }
+      } catch (err) {
+        console.log("client_windows.json non trovato, usando valori vuoti");
+      }
+    } catch (error) {
+      toast({
+        title: "Errore",
+        description: "Impossibile caricare i dati",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleTimeChange = (clientId: number, type: 'checkin' | 'checkout', value: string) => {
+    setWindows(prev => {
+      const newMap = new Map(prev);
+      const current = newMap.get(clientId) || { checkin: "", checkout: "" };
+      newMap.set(clientId, {
+        ...current,
+        [type]: value
+      });
+      return newMap;
+    });
+  };
+
+  const handleSave = async () => {
+    setIsSaving(true);
+    try {
+      const windowsArray: ClientWindow[] = [];
+      
+      windows.forEach((value, clientId) => {
+        if (value.checkin || value.checkout) {
+          windowsArray.push({
+            client_id: clientId,
+            checkin_time: value.checkin,
+            checkout_time: value.checkout
+          });
+        }
+      });
+
+      const data: ClientWindowsData = {
+        windows: windowsArray,
+        metadata: {
+          last_updated: new Date().toISOString()
+        }
+      };
+
+      const response = await fetch("/api/save-client-windows", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+
+      if (response.ok) {
+        toast({
+          title: "Salvato",
+          description: "Client windows salvate con successo",
+        });
+      } else {
+        throw new Error();
+      }
+    } catch (error) {
+      toast({
+        title: "Errore",
+        description: "Impossibile salvare le client windows",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <p>Caricamento...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -44,13 +181,77 @@ export default function ClientSettings() {
             >
               <Home className="h-5 w-5" />
             </Button>
+            <Button 
+              onClick={loadData} 
+              variant="outline" 
+              size="icon"
+              className="rounded-full"
+              title="Ricarica dati"
+            >
+              <RefreshCw className="h-5 w-5" />
+            </Button>
           </div>
           <ThemeToggle />
         </div>
 
-        <div className="flex items-center justify-center h-96">
-          <p className="text-muted-foreground text-lg">Pagina in costruzione...</p>
-        </div>
+        <Card className="bg-background border-2 border-custom-blue">
+          <CardHeader className="bg-background">
+            <CardTitle>Finestre Temporali Clienti</CardTitle>
+            <CardDescription>
+              Configura gli orari di checkin e checkout per ogni cliente attivo
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="bg-background">
+            <div className="rounded-md border">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-[100px]">Client ID</TableHead>
+                    <TableHead>Nome Cliente</TableHead>
+                    <TableHead className="w-[150px]">Checkin</TableHead>
+                    <TableHead className="w-[150px]">Checkout</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {clients.map((client) => {
+                    const windowData = windows.get(client.client_id) || { checkin: "", checkout: "" };
+                    return (
+                      <TableRow key={client.client_id}>
+                        <TableCell className="font-medium">{client.client_id}</TableCell>
+                        <TableCell>{client.operation_name}</TableCell>
+                        <TableCell>
+                          <Input
+                            type="time"
+                            value={windowData.checkin}
+                            onChange={(e) => handleTimeChange(client.client_id, 'checkin', e.target.value)}
+                            className="h-9"
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <Input
+                            type="time"
+                            value={windowData.checkout}
+                            onChange={(e) => handleTimeChange(client.client_id, 'checkout', e.target.value)}
+                            className="h-9"
+                          />
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </div>
+
+            <Button
+              onClick={handleSave}
+              disabled={isSaving}
+              className="w-full mt-6 bg-background border-2 border-custom-blue text-black dark:text-white hover:opacity-80"
+            >
+              <Save className="w-4 h-4 mr-2" />
+              {isSaving ? "Salvataggio..." : "Salva Client Windows"}
+            </Button>
+          </CardContent>
+        </Card>
       </div>
     </div>
   );

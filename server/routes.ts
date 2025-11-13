@@ -2819,6 +2819,53 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Endpoint per caricare clienti attivi
+  app.get("/api/get-active-clients", async (req, res) => {
+    try {
+      const result = await new Promise<string>((resolve, reject) => {
+        exec(
+          'python3 client/public/scripts/extract_active_clients.py',
+          { cwd: process.cwd() },
+          (error, stdout, stderr) => {
+            if (error) {
+              reject(new Error(stderr || error.message));
+            } else {
+              resolve(stdout);
+            }
+          }
+        );
+      });
+
+      const clients = JSON.parse(result);
+      res.json({ success: true, clients });
+    } catch (error: any) {
+      console.error("Errore nel caricamento dei clienti attivi:", error);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  // Endpoint per salvare client_windows.json
+  app.post("/api/save-client-windows", async (req, res) => {
+    try {
+      const clientWindowsData = req.body;
+      const clientWindowsPath = path.join(process.cwd(), "client/public/data/input/client_windows.json");
+      
+      await fs.promises.writeFile(
+        clientWindowsPath,
+        JSON.stringify(clientWindowsData, null, 2),
+        "utf-8"
+      );
+
+      res.json({
+        success: true,
+        message: "Client windows salvate con successo",
+      });
+    } catch (error: any) {
+      console.error("Errore nel salvataggio delle client windows:", error);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
   // Endpoint for running the optimizer script
   app.post("/api/run-optimizer", async (req, res) => {
     try {
