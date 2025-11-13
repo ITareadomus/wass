@@ -20,10 +20,39 @@ OUTPUT_ASSIGN = BASE / "output" / "low_priority_assignments.json"
 
 # =============================
 # CONFIG - REGOLE CLUSTERING OTTIMIZZATE
+# =============================
+BASE_MAX_TASKS = 2  # Base: max 2 task per cleaner
 CLUSTER_PRIORITY_TRAVEL = 5.0
 CLUSTER_EXTENDED_TRAVEL = 10.0
 CLUSTER_MAX_TRAVEL = 15.0
-ZONE_RADIUS_KM = 0.25  # ~250m, micro-zona
+ZONE_RADIUS_KM = 0.8  # ~800m, zona
+ABSOLUTE_MAX_TASKS = 4  # Max assoluto 4 task
+ABSOLUTE_MAX_TASKS_IF_BEFORE_18 = 5  # Max 5 task se finisce entro le 18:00
+
+# NUOVO: Limite per tipologia FLESSIBILE (può essere infranto da cluster)
+BASE_MAX_TASKS_PER_PRIORITY = 2  # Max 2 task Low-Priority per cleaner (base)
+
+# NUOVO: Limite giornaliero totale
+MAX_DAILY_TASKS = 5  # Max 5 task totali per cleaner al giorno (hard limit)
+PREFERRED_DAILY_TASKS = 4  # Preferibile max 4 task totali (soft limit)
+PREFERRED_TRAVEL = 20.0  # Preferenza per percorsi < 20'
+
+# Travel model (min)
+SHORT_RANGE_KM = 0.30
+SHORT_BASE_MIN = 3.5
+WALK_SLOW_MIN_PER_KM = 16.0
+
+BASE_OVERHEAD_MIN = 6.0
+SCALED_OH_KM = 0.50
+K_SWITCH_KM = 1.2
+WALK_MIN_PER_KM = 12.0
+RIDE_MIN_PER_KM = 4.5
+
+EQ_EXTRA_LT05 = 2.0
+EQ_EXTRA_GE05 = 1.0
+
+MIN_TRAVEL = 2.0
+MAX_TRAVEL = 45.0
 </old_str>
 
 # NUOVO: Limite per tipologia FLESSIBILE (può essere infranto da cluster)
@@ -131,6 +160,29 @@ def same_street(a: Optional[str], b: Optional[str]) -> bool:
     sa, _ = split_street_number(na)
     sb, _ = split_street_number(nb)
     return sa == sb
+
+
+def same_zone(a_lat: float, a_lng: float, b_lat: float, b_lng: float,
+              a_addr: Optional[str] = None, b_addr: Optional[str] = None) -> bool:
+    """
+    Due task sono nella stessa 'zona' se:
+    - stesso edificio, oppure
+    - stessa via, oppure
+    - distanza geografica <= ZONE_RADIUS_KM
+    """
+    # stesso edificio o stessa via = stessa zona
+    if a_addr and b_addr:
+        if same_building(a_addr, b_addr):
+            return True
+        if same_street(a_addr, b_addr):
+            return True
+
+    try:
+        km = haversine_km(a_lat, a_lng, b_lat, b_lng)
+    except Exception:
+        return False
+
+    return km <= ZONE_RADIUS_KM
 
 
 def haversine_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:

@@ -620,6 +620,17 @@ def plan_day(tasks: List[Task], cleaners: List[Cleaner], assigned_logistic_codes
                     else:
                         others.sort(key=lambda x: (-len(x[0].route), x[2]))
                         chosen = others[0]
+        else:
+            # Fallback finale: scegli il candidato con minor viaggio
+            preferred = [(c, p, t) for c, p, t in candidates if t < PREFERRED_TRAVEL]
+            others = [(c, p, t) for c, p, t in candidates if t >= PREFERRED_TRAVEL]
+
+            if preferred:
+                preferred.sort(key=lambda x: (-len(x[0].route), x[2]))
+                chosen = preferred[0]
+            else:
+                others.sort(key=lambda x: (-len(x[0].route), x[2]))
+                chosen = others[0]
 
         cleaner, pos, travel = chosen
         cleaner.route.insert(pos, task)

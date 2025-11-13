@@ -146,6 +146,29 @@ def same_street(a: Optional[str], b: Optional[str]) -> bool:
     return sa == sb
 
 
+def same_zone(a_lat: float, a_lng: float, b_lat: float, b_lng: float,
+              a_addr: Optional[str] = None, b_addr: Optional[str] = None) -> bool:
+    """
+    Due task sono nella stessa 'zona' se:
+    - stesso edificio, oppure
+    - stessa via, oppure
+    - distanza geografica <= ZONE_RADIUS_KM
+    """
+    # stesso edificio o stessa via = stessa zona
+    if a_addr and b_addr:
+        if same_building(a_addr, b_addr):
+            return True
+        if same_street(a_addr, b_addr):
+            return True
+
+    try:
+        km = haversine_km(a_lat, a_lng, b_lat, b_lng)
+    except Exception:
+        return False
+
+    return km <= ZONE_RADIUS_KM
+
+
 def haversine_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
     R = 6371.0
     phi1, phi2 = math.radians(lat1), math.radians(lat2)
