@@ -648,17 +648,33 @@ def plan_day(tasks: List[Task], cleaners: List[Cleaner], assigned_logistic_codes
             unassigned.append(task)
             continue
 
-        # PRIORITÀ ASSOLUTA: Cerca se qualche cleaner ha già una task nello stesso edificio (HP o EO)
+        # PRIORITÀ ASSOLUTA: Cerca se qualche cleaner ha già una task nello stesso edificio (HP, LP o EO)
         same_building_cleaner = None
         for cleaner in cleaners:
             # Controlla task HP già in route
             if any(same_building(existing_task.address, task.address) for existing_task in cleaner.route):
                 same_building_cleaner = cleaner
                 break
-            # CROSS-CONTAINER: Controlla anche task EO già assegnate (dalla last_eo_address)
-            if cleaner.last_eo_address and same_building(cleaner.last_eo_address, task.address):
-                same_building_cleaner = cleaner
-                print(f"   🔄 CROSS-CONTAINER: Task {task.task_id} vicina a task EO di {cleaner.name}")
+            # CROSS-CONTAINER: Controlla TUTTE le task già assegnate al cleaner nella timeline
+            # Carica timeline e verifica task vicine
+            timeline_path = OUTPUT_ASSIGN.parent / "timeline.json"
+            if timeline_path.exists():
+                try:
+                    timeline_data = json.loads(timeline_path.read_text(encoding="utf-8"))
+                    for cleaner_entry in timeline_data.get("cleaners_assignments", []):
+                        if cleaner_entry["cleaner"]["id"] == cleaner.id:
+                            # Controlla tutte le task del cleaner
+                            for t in cleaner_entry.get("tasks", []):
+                                if same_building(t.get("address"), task.address):
+                                    same_building_cleaner = cleaner
+                                    priority = t.get("priority", "unknown")
+                                    print(f"   🔄 CROSS-CONTAINER: Task {task.task_id} vicina a task {priority.upper()} di {cleaner.name}")
+                                    break
+                            if same_building_cleaner:
+                                break
+                except:
+                    pass
+            if same_building_cleaner:
                 break
 
         # Se trovato un cleaner con stesso edificio, prova ad assegnare solo a lui
