@@ -53,35 +53,9 @@ EQ_EXTRA_GE05 = 1.0
 
 MIN_TRAVEL = 2.0
 MAX_TRAVEL = 45.0
-</old_str>
-
-# NUOVO: Limite per tipologia FLESSIBILE (può essere infranto da cluster)
-BASE_MAX_TASKS_PER_PRIORITY = 2  # Max 2 task Low-Priority per cleaner (base)
-
-# NUOVO: Limite giornaliero totale
-MAX_DAILY_TASKS = 5  # Max 5 task totali per cleaner al giorno (hard limit)
-PREFERRED_DAILY_TASKS = 4  # Preferibile max 4 task totali (soft limit)
-
-# Travel model (min)
-SHORT_RANGE_KM = 0.30
-SHORT_BASE_MIN = 3.5
-WALK_SLOW_MIN_PER_KM = 16.0
-
-BASE_OVERHEAD_MIN = 6.0
-SCALED_OH_KM = 0.50
-K_SWITCH_KM = 1.2
-WALK_MIN_PER_KM = 12.0
-RIDE_MIN_PER_KM = 4.5
-
-EQ_EXTRA_LT05 = 2.0
-EQ_EXTRA_GE05 = 1.0
-
-MIN_TRAVEL = 2.0
-MAX_TRAVEL = 45.0
 
 
-@dataclass
-class Task:
+@dataclass class Task:
     task_id: str
     logistic_code: str
     lat: float
@@ -97,8 +71,7 @@ class Task:
     straordinaria: bool = False
 
 
-@dataclass
-class Cleaner:
+@dataclass class Cleaner:
     id: Any
     name: str
     lastname: str
@@ -371,7 +344,7 @@ def can_add_task(cleaner: Cleaner, task: Task) -> bool:
             (travel_minutes(existing_task.lat, existing_task.lng, task.lat, task.lng,
                           existing_task.address, task.address) <= CLUSTER_EXTENDED_TRAVEL or
              travel_minutes(task.lat, task.lng, existing_task.lat, existing_task.lng,
-                          task.address, existing_task.address) <= CLUSTER_EXTENDED_TRAVEL)
+                          task.address, task.address) <= CLUSTER_EXTENDED_TRAVEL)
             for existing_task in cleaner.route
         )
 
@@ -718,7 +691,7 @@ def plan_day(tasks: List[Task], cleaners: List[Cleaner], assigned_logistic_codes
                     travel_minutes(existing_task.lat, existing_task.lng, task.lat, task.lng,
                                    existing_task.address, task.address) <= CLUSTER_MAX_TRAVEL or
                     travel_minutes(task.lat, task.lng, existing_task.lat, existing_task.lng,
-                                   task.address, existing_task.address) <= CLUSTER_MAX_TRAVEL
+                                   task.address, task.address) <= CLUSTER_MAX_TRAVEL
                     for existing_task in c.route
                 )
                 if has_cluster:
