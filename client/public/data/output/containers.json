@@ -127,34 +127,6 @@
           ]
         },
         {
-          "task_id": 218804,
-          "logistic_code": 754,
-          "client_id": 3,
-          "premium": false,
-          "address": "VIA STRADIVARI, 4",
-          "lat": "45.4842098",
-          "lng": "9.2155099",
-          "cleaning_time": 120,
-          "checkin_date": "2025-11-14",
-          "checkout_date": "2025-11-13",
-          "checkin_time": "15:00",
-          "checkout_time": null,
-          "pax_in": 2,
-          "pax_out": 2,
-          "small_equipment": false,
-          "operation_id": 2,
-          "confirmed_operation": true,
-          "straordinaria": false,
-          "type_apt": "B",
-          "alias": "TBR",
-          "customer_name": "THE BEST RENT S.r.l.",
-          "priority": "low_priority",
-          "reasons": [
-            "not_eo",
-            "not_hp"
-          ]
-        },
-        {
           "task_id": 218805,
           "logistic_code": 1072,
           "client_id": 3,
@@ -209,6 +181,32 @@
             "not_eo",
             "not_hp"
           ]
+        },
+        {
+          "task_id": 218804,
+          "logistic_code": 754,
+          "client_id": null,
+          "premium": false,
+          "address": "VIA STRADIVARI, 4",
+          "lat": "45.4842098",
+          "lng": "9.2155099",
+          "cleaning_time": 120,
+          "checkin_date": "2025-11-14",
+          "checkout_date": "2025-11-13",
+          "checkin_time": "15:00",
+          "checkout_time": null,
+          "pax_in": 2,
+          "pax_out": 2,
+          "small_equipment": false,
+          "operation_id": 2,
+          "confirmed_operation": true,
+          "straordinaria": false,
+          "type_apt": "B",
+          "alias": "TBR",
+          "customer_name": "THE BEST RENT S.r.l.",
+          "reasons": [],
+          "priority": "low_priority",
+          "modified_by": "Admin"
         }
       ],
       "count": 5
