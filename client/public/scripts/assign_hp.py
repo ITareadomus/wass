@@ -615,11 +615,11 @@ def plan_day(tasks: List[Task], cleaners: List[Cleaner], assigned_logistic_codes
         assigned_logistic_codes = set()
 
     unassigned = []
-    
+
     # CLUSTERING PREVENTIVO CROSS-CONTAINER: Carica task già assegnate dalla timeline
     timeline_path = OUTPUT_ASSIGN.parent / "timeline.json"
     assigned_tasks_by_location = []  # Lista di (lat, lng, address) delle task già assegnate
-    
+
     if timeline_path.exists():
         try:
             timeline_data = json.loads(timeline_path.read_text(encoding="utf-8"))
@@ -633,15 +633,15 @@ def plan_day(tasks: List[Task], cleaners: List[Cleaner], assigned_logistic_codes
             print(f"   🔄 CROSS-CONTAINER: Caricate {len(assigned_tasks_by_location)} task già assegnate")
         except Exception as e:
             print(f"   ⚠️ Errore caricamento timeline per clustering: {e}")
-    
+
     # CLUSTERING PREVENTIVO: Raggruppa task per vicinanza (edificio o task già assegnate)
     building_groups = {}
     cross_container_groups = {}  # Nuovi gruppi per task vicine a quelle già assegnate
-    
+
     for task in tasks:
         if task.logistic_code in assigned_logistic_codes:
             continue
-        
+
         # 1. Controlla se è nello stesso edificio di una task da assegnare
         found_building_group = False
         for group_key, group_tasks in building_groups.items():
@@ -649,10 +649,10 @@ def plan_day(tasks: List[Task], cleaners: List[Cleaner], assigned_logistic_codes
                 group_tasks.append(task)
                 found_building_group = True
                 break
-        
+
         if found_building_group:
             continue
-        
+
         # 2. Controlla se è vicina a una task già assegnata (cross-container)
         found_cross_container = False
         for assigned_lat, assigned_lng, assigned_addr in assigned_tasks_by_location:
@@ -672,24 +672,24 @@ def plan_day(tasks: List[Task], cleaners: List[Cleaner], assigned_logistic_codes
                 cross_container_groups[key].append(task)
                 found_cross_container = True
                 break
-        
+
         if found_cross_container:
             continue
-        
+
         # 3. Nessuna vicinanza: crea nuovo gruppo
         building_groups[task.address or f"task_{task.task_id}"] = [task]
-    
+
     # Ordina i gruppi: prima cross-container (massima priorità), poi stesso edificio
     all_groups = []
     all_groups.extend(cross_container_groups.values())
     all_groups.extend(building_groups.values())
     sorted_groups = sorted(all_groups, key=lambda g: -len(g))
-    
+
     # Appiattisci mantenendo l'ordine dei gruppi
     ordered_tasks = []
     for group in sorted_groups:
         ordered_tasks.extend(group)
-    
+
     for task in ordered_tasks:
         # DEDUPLICA: Skippa task con logistic_code già assegnato
         if task.logistic_code in assigned_logistic_codes:
@@ -699,47 +699,72 @@ def plan_day(tasks: List[Task], cleaners: List[Cleaner], assigned_logistic_codes
 
         # PRIORITÀ ASSOLUTA: Cerca se qualche cleaner ha già una task nello stesso edificio (HP, LP o EO)
         same_building_cleaner = None
+        same_zone_cleaner = None
+
+        # Leggi timeline una sola volta
+        timeline_data = None
+        timeline_path = OUTPUT_ASSIGN.parent / "timeline.json"
+        if timeline_path.exists():
+            try:
+                timeline_data = json.loads(timeline_path.read_text(encoding="utf-8"))
+            except Exception as e:
+                print(f"   ⚠️ Errore caricamento timeline per clustering cross-container: {e}")
+                timeline_data = None
+
         for cleaner in cleaners:
-            # Controlla task HP già in route
+            # 1) Controlla task HP già in route (stesso edificio)
             if any(same_building(existing_task.address, task.address) for existing_task in cleaner.route):
                 same_building_cleaner = cleaner
                 break
-            # CROSS-CONTAINER: Controlla TUTTE le task già assegnate al cleaner nella timeline
-            # Carica timeline e verifica task vicine
-            timeline_path = OUTPUT_ASSIGN.parent / "timeline.json"
-            if timeline_path.exists():
-                try:
-                    timeline_data = json.loads(timeline_path.read_text(encoding="utf-8"))
-                    for cleaner_entry in timeline_data.get("cleaners_assignments", []):
-                        if cleaner_entry["cleaner"]["id"] == cleaner.id:
-                            # Controlla tutte le task del cleaner
-                            for t in cleaner_entry.get("tasks", []):
-                                if same_building(t.get("address"), task.address):
-                                    same_building_cleaner = cleaner
+
+            # 2) CROSS-CONTAINER: controlla tutte le task di questo cleaner in timeline
+            if timeline_data:
+                for cleaner_entry in timeline_data.get("cleaners_assignments", []):
+                    if cleaner_entry["cleaner"]["id"] != cleaner.id:
+                        continue
+
+                    for t in cleaner_entry.get("tasks", []):
+                        t_addr = t.get("address")
+                        t_lat = t.get("lat")
+                        t_lng = t.get("lng")
+
+                        # 2a) stesso edificio -> priorità massima
+                        if same_building(t_addr, task.address):
+                            same_building_cleaner = cleaner
+                            priority = t.get("priority", "unknown")
+                            print(f"   🔄 CROSS-CONTAINER EDIFICIO: task {task.task_id} vicina a task {priority.upper()} di {cleaner.name}")
+                            break
+
+                        # 2b) stessa ZONA -> memorizza come candidato di zona
+                        if t_lat is not None and t_lng is not None:
+                            if same_zone(float(t_lat), float(t_lng),
+                                         task.lat, task.lng,
+                                         t_addr, task.address):
+                                if same_zone_cleaner is None:
+                                    same_zone_cleaner = cleaner
                                     priority = t.get("priority", "unknown")
-                                    print(f"   🔄 CROSS-CONTAINER: Task {task.task_id} vicina a task {priority.upper()} di {cleaner.name}")
-                                    break
-                            if same_building_cleaner:
-                                break
-                except:
-                    pass
+                                    print(f"   🔄 CROSS-CONTAINER ZONA: task {task.task_id} vicina (zona) a task {priority.upper()} di {cleaner.name}")
+                    if same_building_cleaner:
+                        break
+
             if same_building_cleaner:
                 break
 
-        # Se trovato un cleaner con stesso edificio, prova ad assegnare solo a lui
-        if same_building_cleaner:
-            result = find_best_position(same_building_cleaner, task)
+        # Usa prima stesso edificio, altrimenti stessa zona
+        target_cleaner = same_building_cleaner or same_zone_cleaner
+        if target_cleaner:
+            result = find_best_position(target_cleaner, task)
             if result is not None:
                 pos, travel = result
-                same_building_cleaner.route.insert(pos, task)
+                target_cleaner.route.insert(pos, task)
                 assigned_logistic_codes.add(task.logistic_code)
-                print(f"   🏢 Task {task.task_id} assegnata a {same_building_cleaner.name} (stesso edificio: {task.address})")
+                print(f"   🧩 Task {task.task_id} assegnata a {target_cleaner.name} (cross-container: {task.address})")
                 continue
             else:
-                # Stesso edificio ma non può prendere la task (limite raggiunto)
-                print(f"   ⚠️  Task {task.task_id} stesso edificio di {same_building_cleaner.name} ma limite raggiunto")
+                print(f"   ⚠️  Task {task.task_id} vicina a {target_cleaner.name} ma limite raggiunto")
 
-        # Se non c'è stesso edificio, procedi con logica normale
+
+        # Se non c'è stesso edificio o zona, procedi con logica normale
         candidates = []
 
         for cleaner in cleaners:
@@ -1003,8 +1028,8 @@ def main():
     seed_cleaners_from_eo(cleaners, ref_date)
 
     print(f"📋 Caricamento dati...")
-    print(f"👥 Cleaner disponibili: {len(cleaners)}")
-    print(f"📦 Task High-Priority da assegnare: {len(tasks)}")
+    print(f"   - Cleaner disponibili: {len(cleaners)}")
+    print(f"   - Task High-Priority da assegnare: {len(tasks)}")
 
     # Leggi i logistic_code già assegnati dalla timeline
     assigned_logistic_codes = set()
@@ -1064,8 +1089,9 @@ def main():
                     if c["cleaner"]["id"] not in new_hp_cleaner_ids or
                        not any(t.get("reasons") and "automatic_assignment_hp" in t.get("reasons", []) for t in c.get("tasks", []))
                 ]
-        except:
-            pass
+        except Exception as e:
+            print(f"⚠️ Errore nel leggere la timeline esistente: {e}")
+            timeline_data["cleaners_assignments"] = [] # Reset assignments on error
 
     # Aggiungi le nuove assegnazioni HP organizzate per cleaner
     for cleaner_entry in output["high_priority_tasks_assigned"]:
@@ -1101,46 +1127,58 @@ def main():
     )
 
     # Scrivi il file timeline.json
-    timeline_path.write_text(json.dumps(timeline_data, ensure_ascii=False, indent=2), encoding="utf-8")
+    try:
+        timeline_path.write_text(json.dumps(timeline_data, ensure_ascii=False, indent=2), encoding="utf-8")
+        print(f"✅ Aggiornato {timeline_path}")
+    except Exception as e:
+        print(f"❌ Errore nella scrittura di {timeline_path}: {e}")
+
 
     hp_count = len([c for c in timeline_data["cleaners_assignments"]
                    if any(t.get("reasons") and "automatic_assignment_hp" in t.get("reasons", []) for t in c.get("tasks", []))])
-    print(f"✅ Aggiornato {timeline_path}")
     print(f"   - Cleaner con assegnazioni HP: {hp_count}")
-    print(f"   - Totale task: {timeline_data['meta']['assigned_tasks']}")
+    print(f"   - Totale task assegnate: {timeline_data['meta']['assigned_tasks']}")
 
     # SPOSTAMENTO: Rimuovi le task assegnate da containers.json
     containers_path = INPUT_CONTAINERS
     if containers_path.exists():
-        containers_data = json.loads(containers_path.read_text(encoding="utf-8"))
+        try:
+            containers_data = json.loads(containers_path.read_text(encoding="utf-8"))
 
-        # Trova tutti i task_id assegnati (NON logistic_code per permettere duplicati)
-        assigned_task_ids = set()
-        for cleaner_entry in output["high_priority_tasks_assigned"]:
-            for task in cleaner_entry.get("tasks", []):
-                assigned_task_ids.add(int(task["task_id"]))
+            # Trova tutti i task_id assegnati (NON logistic_code per permettere duplicati)
+            assigned_task_ids = set()
+            for cleaner_entry in output["high_priority_tasks_assigned"]:
+                for task in cleaner_entry.get("tasks", []):
+                    assigned_task_ids.add(int(task["task_id"]))
 
-        # Rimuovi le task assegnate dal container high_priority usando task_id
-        if "containers" in containers_data and "high_priority" in containers_data["containers"]:
-            original_count = len(containers_data["containers"]["high_priority"]["tasks"])
-            containers_data["containers"]["high_priority"]["tasks"] = [
-                t for t in containers_data["containers"]["high_priority"]["tasks"]
-                if int(t.get("task_id", 0)) not in assigned_task_ids
-            ]
-            new_count = len(containers_data["containers"]["high_priority"]["tasks"])
-            containers_data["containers"]["high_priority"]["count"] = new_count
+            # Rimuovi le task assegnate dal container high_priority usando task_id
+            if "containers" in containers_data and "high_priority" in containers_data["containers"]:
+                original_count = len(containers_data["containers"]["high_priority"]["tasks"])
+                containers_data["containers"]["high_priority"]["tasks"] = [
+                    t for t in containers_data["containers"]["high_priority"]["tasks"]
+                    if int(t.get("task_id", 0)) not in assigned_task_ids
+                ]
+                new_count = len(containers_data["containers"]["high_priority"]["tasks"])
+                containers_data["containers"]["high_priority"]["count"] = new_count
 
-            # Aggiorna summary
-            containers_data["summary"]["high_priority"] = new_count
-            containers_data["summary"]["total_tasks"] = (
-                containers_data["summary"].get("total_tasks", 0) - (original_count - new_count)
-            )
+                # Aggiorna summary
+                if "summary" in containers_data:
+                    containers_data["summary"]["high_priority"] = new_count
+                    containers_data["summary"]["total_tasks"] = (
+                        containers_data["summary"].get("total_tasks", 0) - (original_count - new_count)
+                    )
 
-            # Scrivi containers.json aggiornato
-            containers_path.write_text(json.dumps(containers_data, ensure_ascii=False, indent=2), encoding="utf-8")
-            print(f"✅ Rimosse {original_count - new_count} task da containers.json (high_priority) usando task_id")
-            print(f"   - Task rimaste in high_priority: {new_count}")
-            print(f"   💡 Task con logistic_code duplicati rimangono disponibili nei container")
+                # Scrivi containers.json aggiornato
+                containers_path.write_text(json.dumps(containers_data, ensure_ascii=False, indent=2), encoding="utf-8")
+                print(f"✅ Rimosse {original_count - new_count} task da containers.json (high_priority) usando task_id")
+                print(f"   - Task rimaste in high_priority: {new_count}")
+                print(f"   💡 Task con logistic_code duplicati rimangono disponibili nei container")
+            else:
+                print(f"   ℹ️ Nessuna sezione 'high_priority' trovata in containers.json per la rimozione delle task.")
+        except Exception as e:
+            print(f"❌ Errore durante la rimozione delle task assegnate da containers.json: {e}")
+    else:
+        print(f"   ℹ️ containers.json non trovato, impossibile rimuovere le task assegnate.")
 
 
 if __name__ == "__main__":
