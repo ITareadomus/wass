@@ -567,7 +567,7 @@ export default function TaskCard({
                 <TooltipContent side="top" className="max-w-xs text-base px-3 py-2">
                   <div className="flex flex-col items-center gap-2">
                     <p className="font-semibold">{displayTask.address?.toUpperCase() || "INDIRIZZO NON DISPONIBILE"}</p>
-                    {((displayTask as any).checkout_time || (displayTask as any).checkin_time) && (
+                    {!shouldShowCheckInOutArrows && ((displayTask as any).checkout_time || (displayTask as any).checkin_time) && (
                       <div className="flex items-center gap-3 text-sm">
                         {(displayTask as any).checkout_time && (
                           <div className="flex items-center gap-1">
