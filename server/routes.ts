@@ -2164,6 +2164,46 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Endpoint per recuperare i nomi delle operazioni
+  app.get("/api/get-operation-names", async (req, res) => {
+    try {
+      const mysql = require('mysql2/promise');
+      
+      const connection = await mysql.createConnection({
+        host: '139.59.132.41',
+        user: 'admin',
+        password: 'ed329a875c6c4ebdf4e87e2bbe53a15771b5844ef6606dde',
+        database: 'adamdb'
+      });
+
+      const [rows] = await connection.execute(`
+        SELECT structure_operation_id, name
+        FROM app_structure_operation_langs
+        WHERE lang_id = 1
+      `);
+
+      await connection.end();
+
+      // Crea una mappa id -> nome
+      const operationNames: Record<number, string> = {};
+      rows.forEach((row: any) => {
+        operationNames[row.structure_operation_id] = row.name;
+      });
+
+      res.json({
+        success: true,
+        operationNames
+      });
+    } catch (error: any) {
+      console.error("Errore durante il recupero dei nomi delle operazioni:", error);
+      res.status(500).json({
+        success: false,
+        message: "Errore durante il recupero dei nomi delle operazioni",
+        error: error.message
+      });
+    }
+  });
+
   // Endpoint per estrarre i cleaners (versione ottimizzata)
   app.post("/api/extract-cleaners-optimized", async (req, res) => {
     try {
