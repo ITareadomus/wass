@@ -19,16 +19,20 @@ OUTPUT_ASSIGN = BASE / "output" / "high_priority_assignments.json"
 
 # =============================
 # CONFIG - REGOLE CLUSTERING OTTIMIZZATE
+CLUSTER_PRIORITY_TRAVEL = 5.0
+CLUSTER_EXTENDED_TRAVEL = 10.0
+CLUSTER_MAX_TRAVEL = 15.0
+ZONE_RADIUS_KM = 0.25  # ~250m, micro-zona
 # =============================
 BASE_MAX_TASKS = 2  # Base: max 2 task per cleaner
-CLUSTER_PRIORITY_TRAVEL = 5.0  # Cluster prioritario: <= 5' (massima priorità)
-CLUSTER_EXTENDED_TRAVEL = 10.0  # Cluster esteso: <= 10' (infrange limiti tipologia)
+# CLUSTER_PRIORITY_TRAVEL = 5.0  # Cluster prioritario: <= 5' (massima priorità)
+# CLUSTER_EXTENDED_TRAVEL = 10.0  # Cluster esteso: <= 10' (infrange limiti tipologia)
 ABSOLUTE_MAX_TASKS = 4  # Max assoluto 4 task
 ABSOLUTE_MAX_TASKS_IF_BEFORE_18 = 5  # Max 5 task se finisce entro le 18:00
 DAILY_TASK_LIMIT = 5  # Limite giornaliero HARD
 
 PREFERRED_TRAVEL = 20.0  # Preferenza per percorsi < 20'
-CLUSTER_MAX_TRAVEL = 15.0  # Cluster: <= 15' (per controllo vicinanza task)
+# CLUSTER_MAX_TRAVEL = 15.0  # Cluster: <= 15' (per controllo vicinanza task)
 
 # NUOVO: Limite per tipologia FLESSIBILE (può essere infranto da cluster)
 MAX_TASKS_PER_PRIORITY = 2  # Max 2 task High-Priority per cleaner (base, infrangibile da cluster vicini)
@@ -233,7 +237,7 @@ def evaluate_route(cleaner: Cleaner, route: List[Task]) -> Tuple[bool, List[Tupl
     # 1. Il cleaner è libero (arrival < 11:00)
     # 2. Il checkout lo permette
     hp_hard_earliest = datetime(arrival.year, arrival.month, arrival.day, HP_HARD_EARLIEST_H, HP_HARD_EARLIEST_M)
-    
+
     # Se il cleaner è libero prima delle 11:00, può iniziare prima (rispettando il checkout)
     if first.checkout_dt:
         # Rispetta il checkout, ma può iniziare prima delle 11:00 se libero
@@ -298,7 +302,7 @@ def can_add_task(cleaner: Cleaner, task: Task) -> bool:
     Verifica se è possibile aggiungere una task al cleaner secondo le regole:
     1. Premium task -> premium cleaner
     2. Straordinaria -> premium cleaner, deve essere la prima (pos=0)
-    3. CLUSTERING: appartamenti vicini (≤10') possono infrangere limiti tipologia
+    3. CLUSTERING: appartamenti vicini (≤10') possono infrangere limite tipologia
     4. Stessa via o ≤5': massima priorità cluster
     5. Limite giornaliero: max 5 task totali (EO+HP+LP)
     """
@@ -306,7 +310,7 @@ def can_add_task(cleaner: Cleaner, task: Task) -> bool:
         return False
 
     current_count = len(cleaner.route)
-    
+
     # Calcola totale task giornaliere (EO già fatte + HP in route)
     total_daily = cleaner.eo_last_sequence + current_count
 
@@ -584,7 +588,7 @@ def plan_day(tasks: List[Task], cleaners: List[Cleaner], assigned_logistic_codes
     """
     if assigned_logistic_codes is None:
         assigned_logistic_codes = set()
-    
+
     unassigned = []
 
     for task in tasks:
@@ -593,14 +597,14 @@ def plan_day(tasks: List[Task], cleaners: List[Cleaner], assigned_logistic_codes
             print(f"   ⏭️  Skippata task {task.task_id} (logistic_code {task.logistic_code} già assegnato)")
             unassigned.append(task)
             continue
-        
+
         # PRIORITÀ ASSOLUTA: Cerca se qualche cleaner ha già una task nello stesso edificio
         same_building_cleaner = None
         for cleaner in cleaners:
             if any(same_building(existing_task.address, task.address) for existing_task in cleaner.route):
                 same_building_cleaner = cleaner
                 break
-        
+
         # Se trovato un cleaner con stesso edificio, prova ad assegnare solo a lui
         if same_building_cleaner:
             result = find_best_position(same_building_cleaner, task)
@@ -613,7 +617,7 @@ def plan_day(tasks: List[Task], cleaners: List[Cleaner], assigned_logistic_codes
             else:
                 # Stesso edificio ma non può prendere la task (limite raggiunto)
                 print(f"   ⚠️  Task {task.task_id} stesso edificio di {same_building_cleaner.name} ma limite raggiunto")
-        
+
         # Se non c'è stesso edificio, procedi con logica normale
         candidates = []
 
@@ -638,32 +642,36 @@ def plan_day(tasks: List[Task], cleaners: List[Cleaner], assigned_logistic_codes
                 same_building_candidates.append((c, p, t))
 
         if same_building_candidates:
-            # PRIORITÀ MASSIMA: stesso edificio = massima aggregazione
-            # Preferisci chi ha già più task (massimo clustering)
             same_building_candidates.sort(key=lambda x: (-len(x[0].route), x[2]))
             chosen = same_building_candidates[0]
-        # Priorità 2: Stessa via (senza numero civico)
+
+        # Priorità 2: stessa ZONA
         elif any(
-            same_street(c.route[0].address if c.route else "", task.address)
+            any(
+                same_zone(ex.lat, ex.lng, task.lat, task.lng, ex.address, task.address)
+                for ex in c.route
+            )
             for c, _, _ in candidates if c.route
         ):
-            same_street_candidates = [
+            zone_candidates = [
                 (c, p, t) for c, p, t in candidates
-                if any(same_street(ex.address, task.address) for ex in c.route)
+                if any(
+                    same_zone(ex.lat, ex.lng, task.lat, task.lng, ex.address, task.address)
+                    for ex in c.route
+                )
             ]
-            # Preferisci chi ha già più task nella stessa via
-            same_street_candidates.sort(key=lambda x: (-len(x[0].route), x[2]))
-            chosen = same_street_candidates[0]
+            zone_candidates.sort(key=lambda x: (-len(x[0].route), x[2]))
+            chosen = zone_candidates[0]
+
         else:
-            # Priorità 2: Cleaner con task entro 10 minuti (cluster)
+            # Priorità successiva: cleaner con task entro 10 minuti (cluster generico)
             cluster_candidates = []
             for c, p, t in candidates:
-                # Controlla se il cleaner ha task entro 10 minuti
                 has_cluster = any(
                     travel_minutes(existing_task.lat, existing_task.lng, task.lat, task.lng,
-                                 existing_task.address, task.address) <= CLUSTER_MAX_TRAVEL or
+                                   existing_task.address, task.address) <= CLUSTER_MAX_TRAVEL or
                     travel_minutes(task.lat, task.lng, existing_task.lat, existing_task.lng,
-                                 task.address, existing_task.address) <= CLUSTER_MAX_TRAVEL
+                                   task.address, existing_task.address) <= CLUSTER_MAX_TRAVEL
                     for existing_task in c.route
                 )
                 if has_cluster:
@@ -875,7 +883,7 @@ def main():
     print(f"📋 Caricamento dati...")
     print(f"👥 Cleaner disponibili: {len(cleaners)}")
     print(f"📦 Task High-Priority da assegnare: {len(tasks)}")
-    
+
     # Leggi i logistic_code già assegnati dalla timeline
     assigned_logistic_codes = set()
     timeline_path = OUTPUT_ASSIGN.parent / "timeline.json"
@@ -891,7 +899,7 @@ def main():
                 print(f"📌 Logistic codes già assegnati in timeline: {len(assigned_logistic_codes)}")
         except Exception as e:
             print(f"⚠️ Errore lettura timeline per deduplica: {e}")
-    
+
     print()
     print(f"🔄 Assegnazione in corso...")
 

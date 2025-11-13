@@ -47,6 +47,9 @@ EQ_EXTRA_GE05 = 1.0
 MIN_TRAVEL = 2.0
 MAX_TRAVEL = 45.0
 
+# NUOVO: Configurazione zona geografica
+ZONE_RADIUS_KM = 0.8 # Raggio per definire una "zona" (circa 1 km)
+
 
 @dataclass
 class Task:
@@ -128,6 +131,31 @@ def same_street(a: Optional[str], b: Optional[str]) -> bool:
     return sa == sb
 
 
+def same_zone(a: Optional["Task"], b: Optional["Task"]) -> bool:
+    """
+    Due task sono nella stessa 'zona' se:
+    - stesso edificio, oppure
+    - stessa via, oppure
+    - distanza geografica <= ZONE_RADIUS_KM
+    """
+    if a is None or b is None:
+        return False
+
+    # stesso edificio o stessa via = stessa zona
+    if same_building(a.address, b.address):
+        return True
+    if same_street(a.address, b.address):
+        return True
+
+    try:
+        km = haversine_km(a.lat, a.lng, b.lat, b.lng)
+    except Exception:
+        return False
+
+    return km <= ZONE_RADIUS_KM
+
+
+# === CALCOLO DISTANZE E TEMPI ===
 def haversine_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
     R = 6371.0
     phi1, phi2 = math.radians(lat1), math.radians(lat2)
@@ -286,8 +314,11 @@ def can_add_task(cleaner: Cleaner, task: Task) -> bool:
             for existing_task in cleaner.route
         )
 
-        # Se è in cluster prioritario: ignora limiti tipologia, rispetta SEMPRE limite giornaliero
-        if is_priority_cluster:
+        # NUOVO: Cluster geografico
+        is_geo_cluster = any(same_zone(existing_task, task) for existing_task in cleaner.route)
+
+        # Se è in cluster prioritario o geografico: ignora limiti tipologia, rispetta SEMPRE limite giornaliero
+        if is_priority_cluster or is_geo_cluster:
             # Verifica limite giornaliero HARD
             if current_count >= DAILY_TASK_LIMIT:
                 return False
@@ -468,14 +499,14 @@ def plan_day(tasks: List[Task], cleaners: List[Cleaner], assigned_logistic_codes
             print(f"   ⏭️  Skippata task {task.task_id} (logistic_code {task.logistic_code} già assegnato)")
             unassigned.append(task)
             continue
-        
+
         # PRIORITÀ ASSOLUTA: Cerca se qualche cleaner ha già una task nello stesso edificio
         same_building_cleaner = None
         for cleaner in cleaners:
             if any(same_building(existing_task.address, task.address) for existing_task in cleaner.route):
                 same_building_cleaner = cleaner
                 break
-        
+
         # Se trovato un cleaner con stesso edificio, prova ad assegnare solo a lui
         if same_building_cleaner:
             result = find_best_position(same_building_cleaner, task)
@@ -488,7 +519,7 @@ def plan_day(tasks: List[Task], cleaners: List[Cleaner], assigned_logistic_codes
             else:
                 # Stesso edificio ma non può prendere la task (limite raggiunto)
                 print(f"   ⚠️  Task {task.task_id} stesso edificio di {same_building_cleaner.name} ma limite raggiunto")
-        
+
         # Se non c'è stesso edificio, procedi con logica normale
         candidates = []
 
@@ -529,8 +560,24 @@ def plan_day(tasks: List[Task], cleaners: List[Cleaner], assigned_logistic_codes
             # Preferisci chi ha già più task nella stessa via
             same_street_candidates.sort(key=lambda x: (-len(x[0].route), x[2]))
             chosen = same_street_candidates[0]
-        else:
-            # Priorità 3: Cluster prioritario (≤5' o stessa via)
+        # Priorità 3: Cluster geografico (stessa zona)
+        elif any(
+            same_zone(c.route[0], task)
+            for c, _, _ in candidates if c.route
+        ):
+            geo_cluster_candidates = [
+                (c, p, t) for c, p, t in candidates
+                if any(same_zone(ex, task) for ex in c.route)
+            ]
+            geo_cluster_candidates.sort(key=lambda x: (-len(x[0].route), x[2]))
+            chosen = geo_cluster_candidates[0]
+        # Priorità 4: Cluster prioritario (≤5' o stessa via)
+        elif any(
+            (travel_minutes(existing_task, task) <= CLUSTER_PRIORITY_TRAVEL or
+             travel_minutes(task, existing_task) <= CLUSTER_PRIORITY_TRAVEL or
+             same_street(existing_task.address, task.address))
+            for c, _, _ in candidates if c.route for existing_task in c.route
+        ):
             priority_cluster_candidates = []
             for c, p, t in candidates:
                 has_priority_cluster = any(
@@ -547,7 +594,7 @@ def plan_day(tasks: List[Task], cleaners: List[Cleaner], assigned_logistic_codes
                 priority_cluster_candidates.sort(key=lambda x: (-len(x[0].route), x[2]))
                 chosen = priority_cluster_candidates[0]
             else:
-                # Priorità 4: Cluster esteso (≤10')
+                # Priorità 5: Cluster esteso (≤10')
                 extended_cluster_candidates = []
                 for c, p, t in candidates:
                     has_extended_cluster = any(
@@ -707,7 +754,7 @@ def build_output(cleaners: List[Cleaner], unassigned: List[Task], original_tasks
             "algorithm": "simplified_greedy",
             "notes": [
                 "REGOLE EARLY-OUT OTTIMIZZATE:",
-                "1. Max 2 task EO per cleaner (3 se travel <= 10')",
+                "1. Max 2 task EO per cleaner (3 se travel <= 10' o stessa zona)",
                 "2. NO vincolo minimo task (può assegnare anche 1 sola task)",
                 "3. Favorisce distribuzione: meglio 1 task per cleaner che aggregare",
                 "4. Cluster esteso a 15' (favorisce aggregazione quando possibile)",
@@ -730,8 +777,8 @@ def main():
     tasks = load_tasks()
 
     print(f"📋 Caricamento dati...")
-    print(f"👥 Cleaner disponibili: {len(cleaners)}")
-    print(f"📦 Task Early-Out da assegnare: {len(tasks)}")
+    print(f"   - Cleaner disponibili: {len(cleaners)}")
+    print(f"   - Task Early-Out da assegnare: {len(tasks)}")
 
     # Leggi i logistic_code già assegnati dalla timeline
     assigned_logistic_codes = set()
@@ -745,7 +792,7 @@ def main():
                     if logistic_code:
                         assigned_logistic_codes.add(logistic_code)
             if assigned_logistic_codes:
-                print(f"📌 Logistic codes già assegnati in timeline: {len(assigned_logistic_codes)}")
+                print(f"   - Logistic codes già assegnati in timeline: {len(assigned_logistic_codes)}")
         except Exception as e:
             print(f"⚠️ Errore lettura timeline per deduplica: {e}")
 
@@ -786,7 +833,8 @@ def main():
         "cleaners_assignments": [],
         "meta": {
             "total_cleaners": 0,
-            "total_tasks": 0
+            "used_cleaners": 0,
+            "assigned_tasks": 0
         }
     }
 
@@ -802,8 +850,8 @@ def main():
                     if c["cleaner"]["id"] not in new_eo_cleaner_ids or
                        not any(t.get("reasons") and "automatic_assignment_eo" in t.get("reasons", []) for t in c.get("tasks", []))
                 ]
-        except:
-            pass
+        except Exception as e:
+            print(f"⚠️ Errore nel caricamento della timeline esistente: {e}")
 
     # Aggiungi le nuove assegnazioni EO organizzate per cleaner
     for cleaner_entry in output["early_out_tasks_assigned"]:
@@ -813,27 +861,20 @@ def main():
         })
 
     # Aggiorna meta
-    # Combina con le assegnazioni esistenti
-    combined = timeline_data["cleaners_assignments"]
-
-    # Conta i cleaners totali disponibili
+    # Conta i cleaner totali disponibili
     total_available_cleaners = len(cleaners)
 
-    # Conta i cleaners effettivamente usati (con almeno una task)
-    used_cleaners = len([c for c in combined if len(c.get("tasks", [])) > 0])
+    # Conta i cleaner effettivamente usati (con almeno una task)
+    used_cleaners_count = len([c for c in timeline_data["cleaners_assignments"] if len(c.get("tasks", [])) > 0])
+
+    # Conta le task totali assegnate
+    total_assigned_tasks = sum(len(c["tasks"]) for c in timeline_data["cleaners_assignments"])
 
     # Salva timeline.json
-    timeline_data = {
-        "metadata": {
-            "last_updated": dt.now().isoformat(),
-            "date": ref_date
-        },
-        "cleaners_assignments": combined,
-        "meta": {
-            "total_cleaners": total_available_cleaners,
-            "used_cleaners": used_cleaners,
-            "assigned_tasks": sum(len(c["tasks"]) for c in combined)
-        }
+    timeline_data["meta"] = {
+        "total_cleaners": total_available_cleaners,
+        "used_cleaners": used_cleaners_count,
+        "assigned_tasks": total_assigned_tasks
     }
     timeline_path.write_text(json.dumps(timeline_data, ensure_ascii=False, indent=2), encoding="utf-8")
     print(f"✅ Timeline aggiornata: {timeline_path}")
@@ -849,40 +890,43 @@ def main():
     print(f"   - Cleaner con assegnazioni EO: {eo_count}")
     print(f"   - Cleaner con assegnazioni HP: {hp_count}")
     print(f"   - Cleaner con assegnazioni LP: {lp_count}")
-    print(f"   - Totale task: {timeline_data['meta']['assigned_tasks']}")
+    print(f"   - Totale task assegnate: {timeline_data['meta']['assigned_tasks']}")
 
     # SPOSTAMENTO: Rimuovi le task assegnate da containers.json
     containers_path = INPUT_CONTAINERS
     if containers_path.exists():
-        containers_data = json.loads(containers_path.read_text(encoding="utf-8"))
+        try:
+            containers_data = json.loads(containers_path.read_text(encoding="utf-8"))
 
-        # Trova tutti i task_id assegnati (NON logistic_code per permettere duplicati)
-        assigned_task_ids = set()
-        for cleaner_entry in output["early_out_tasks_assigned"]:
-            for task in cleaner_entry.get("tasks", []):
-                assigned_task_ids.add(int(task["task_id"]))
+            # Trova tutti i task_id assegnati (NON logistic_code per permettere duplicati)
+            assigned_task_ids = set()
+            for cleaner_entry in output["early_out_tasks_assigned"]:
+                for task in cleaner_entry.get("tasks", []):
+                    assigned_task_ids.add(int(task["task_id"]))
 
-        # Rimuovi le task assegnate dal container early_out usando task_id
-        if "containers" in containers_data and "early_out" in containers_data["containers"]:
-            original_count = len(containers_data["containers"]["early_out"]["tasks"])
-            containers_data["containers"]["early_out"]["tasks"] = [
-                t for t in containers_data["containers"]["early_out"]["tasks"]
-                if int(t.get("task_id", 0)) not in assigned_task_ids
-            ]
-            new_count = len(containers_data["containers"]["early_out"]["tasks"])
-            containers_data["containers"]["early_out"]["count"] = new_count
+            # Rimuovi le task assegnate dal container early_out usando task_id
+            if "containers" in containers_data and "early_out" in containers_data["containers"]:
+                original_count = len(containers_data["containers"]["early_out"]["tasks"])
+                containers_data["containers"]["early_out"]["tasks"] = [
+                    t for t in containers_data["containers"]["early_out"]["tasks"]
+                    if int(t.get("task_id", 0)) not in assigned_task_ids
+                ]
+                new_count = len(containers_data["containers"]["early_out"]["tasks"])
+                containers_data["containers"]["early_out"]["count"] = new_count
 
-            # Aggiorna summary
-            containers_data["summary"]["early_out"] = new_count
-            containers_data["summary"]["total_tasks"] = (
-                containers_data["summary"].get("total_tasks", 0) - (original_count - new_count)
-            )
+                # Aggiorna summary
+                containers_data["summary"]["early_out"] = new_count
+                containers_data["summary"]["total_tasks"] = (
+                    containers_data["summary"].get("total_tasks", 0) - (original_count - new_count)
+                )
 
-            # Scrivi containers.json aggiornato
-            containers_path.write_text(json.dumps(containers_data, ensure_ascii=False, indent=2), encoding="utf-8")
-            print(f"✅ Rimosse {original_count - new_count} task da containers.json (early_out) usando task_id")
-            print(f"   - Task rimaste in early_out: {new_count}")
-            print(f"   💡 Task con logistic_code duplicati rimangono disponibili nei container")
+                # Scrivi containers.json aggiornato
+                containers_path.write_text(json.dumps(containers_data, ensure_ascii=False, indent=2), encoding="utf-8")
+                print(f"✅ Rimosse {original_count - new_count} task da containers.json (early_out) usando task_id")
+                print(f"   - Task rimaste in early_out: {new_count}")
+                print(f"   💡 Task con logistic_code duplicati rimangono disponibili nei container")
+        except Exception as e:
+            print(f"⚠️ Errore durante la rimozione delle task da containers.json: {e}")
 
 
 if __name__ == "__main__":
