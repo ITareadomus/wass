@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { Save, Home } from "lucide-react";
+import { Save, Home, Settings } from "lucide-react";
 
 interface SettingsData {
   "early-out": {
@@ -137,19 +137,20 @@ export default function SystemSettings() {
           <ThemeToggle />
         </div>
 
-        <div className="space-y-6">
-          {/* Early-Out Settings */}
-          <Card className="bg-background border-2 border-custom-blue">
-            <CardHeader className="bg-background">
-              <CardTitle>Early-Out</CardTitle>
-              <CardDescription>
-                Configurazione per le task Early-Out
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="bg-background space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="eo_start_time">Start Time</Label>
+        <div className="space-y-4">
+          {/* Early-Out e High-Priority sulla stessa riga */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Early-Out Settings */}
+            <Card className="bg-background border-2 border-custom-blue">
+              <CardHeader className="bg-background py-3">
+                <CardTitle className="text-lg">Early-Out</CardTitle>
+                <CardDescription className="text-xs">
+                  Configurazione per le task Early-Out
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="bg-background space-y-3">
+                <div className="space-y-2">
+                  <Label htmlFor="eo_start_time" className="text-sm">Start Time</Label>
                   <Input
                     id="eo_start_time"
                     type="time"
@@ -165,8 +166,8 @@ export default function SystemSettings() {
                     }
                   />
                 </div>
-                <div>
-                  <Label htmlFor="eo_time">EO Time</Label>
+                <div className="space-y-2">
+                  <Label htmlFor="eo_time" className="text-sm">EO Time</Label>
                   <Input
                     id="eo_time"
                     type="time"
@@ -182,41 +183,39 @@ export default function SystemSettings() {
                     }
                   />
                 </div>
-              </div>
-              <div>
-                <Label htmlFor="eo_clients">EO Clients (IDs separati da virgola)</Label>
-                <Input
-                  id="eo_clients"
-                  value={settings["early-out"].eo_clients.join(", ")}
-                  onChange={(e) =>
-                    setSettings({
-                      ...settings,
-                      "early-out": {
-                        ...settings["early-out"],
-                        eo_clients: e.target.value
-                          .split(",")
-                          .map((id) => parseInt(id.trim()))
-                          .filter((id) => !isNaN(id)),
-                      },
-                    })
-                  }
-                />
-              </div>
-            </CardContent>
-          </Card>
+                <div className="space-y-2">
+                  <Label htmlFor="eo_clients" className="text-sm">EO Clients</Label>
+                  <Input
+                    id="eo_clients"
+                    value={settings["early-out"].eo_clients.join(", ")}
+                    onChange={(e) =>
+                      setSettings({
+                        ...settings,
+                        "early-out": {
+                          ...settings["early-out"],
+                          eo_clients: e.target.value
+                            .split(",")
+                            .map((id) => parseInt(id.trim()))
+                            .filter((id) => !isNaN(id)),
+                        },
+                      })
+                    }
+                  />
+                </div>
+              </CardContent>
+            </Card>
 
-          {/* High-Priority Settings */}
-          <Card className="bg-background border-2 border-custom-blue">
-            <CardHeader className="bg-background">
-              <CardTitle>High-Priority</CardTitle>
-              <CardDescription>
-                Configurazione per le task High-Priority
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="bg-background space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="hp_start_time">Start Time</Label>
+            {/* High-Priority Settings */}
+            <Card className="bg-background border-2 border-custom-blue">
+              <CardHeader className="bg-background py-3">
+                <CardTitle className="text-lg">High-Priority</CardTitle>
+                <CardDescription className="text-xs">
+                  Configurazione per le task High-Priority
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="bg-background space-y-3">
+                <div className="space-y-2">
+                  <Label htmlFor="hp_start_time" className="text-sm">Start Time</Label>
                   <Input
                     id="hp_start_time"
                     type="time"
@@ -232,8 +231,8 @@ export default function SystemSettings() {
                     }
                   />
                 </div>
-                <div>
-                  <Label htmlFor="hp_time">HP Time</Label>
+                <div className="space-y-2">
+                  <Label htmlFor="hp_time" className="text-sm">HP Time</Label>
                   <Input
                     id="hp_time"
                     type="time"
@@ -249,22 +248,47 @@ export default function SystemSettings() {
                     }
                   />
                 </div>
-              </div>
-              <div>
-                <Label htmlFor="hp_clients">HP Clients (IDs separati da virgola)</Label>
+                <div className="space-y-2">
+                  <Label htmlFor="hp_clients" className="text-sm">HP Clients</Label>
+                  <Input
+                    id="hp_clients"
+                    value={settings["high-priority"].hp_clients.join(", ")}
+                    onChange={(e) =>
+                      setSettings({
+                        ...settings,
+                        "high-priority": {
+                          ...settings["high-priority"],
+                          hp_clients: e.target.value
+                            .split(",")
+                            .map((id) => parseInt(id.trim()))
+                            .filter((id) => !isNaN(id)),
+                        },
+                      })
+                    }
+                  />
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Dedupe Strategy */}
+          <Card className="bg-background border-2 border-custom-blue">
+            <CardHeader className="bg-background py-3">
+              <CardTitle className="text-lg">Dedupe Strategy</CardTitle>
+              <CardDescription className="text-xs">
+                Strategia di deduplicazione
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="bg-background">
+              <div className="space-y-2">
+                <Label htmlFor="dedupe_strategy" className="text-sm">Strategy</Label>
                 <Input
-                  id="hp_clients"
-                  value={settings["high-priority"].hp_clients.join(", ")}
+                  id="dedupe_strategy"
+                  value={settings.dedupe_strategy}
                   onChange={(e) =>
                     setSettings({
                       ...settings,
-                      "high-priority": {
-                        ...settings["high-priority"],
-                        hp_clients: e.target.value
-                          .split(",")
-                          .map((id) => parseInt(id.trim()))
-                          .filter((id) => !isNaN(id)),
-                      },
+                      dedupe_strategy: e.target.value,
                     })
                   }
                 />
@@ -272,40 +296,17 @@ export default function SystemSettings() {
             </CardContent>
           </Card>
 
-          {/* Dedupe Strategy */}
-          <Card className="bg-background border-2 border-custom-blue">
-            <CardHeader className="bg-background">
-              <CardTitle>Dedupe Strategy</CardTitle>
-              <CardDescription>
-                Strategia di deduplicazione
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="bg-background">
-              <Label htmlFor="dedupe_strategy">Strategy</Label>
-              <Input
-                id="dedupe_strategy"
-                value={settings.dedupe_strategy}
-                onChange={(e) =>
-                  setSettings({
-                    ...settings,
-                    dedupe_strategy: e.target.value,
-                  })
-                }
-              />
-            </CardContent>
-          </Card>
-
           {/* Apartment Types */}
           <Card className="bg-background border-2 border-custom-blue">
-            <CardHeader className="bg-background">
-              <CardTitle>Apartment Types</CardTitle>
-              <CardDescription>
+            <CardHeader className="bg-background py-3">
+              <CardTitle className="text-lg">Apartment Types</CardTitle>
+              <CardDescription className="text-xs">
                 Tipi di appartamento per categoria
               </CardDescription>
             </CardHeader>
-            <CardContent className="bg-background space-y-4">
-              <div>
-                <Label htmlFor="standard_apt">Standard Apartments (lettere separate da virgola)</Label>
+            <CardContent className="bg-background space-y-3">
+              <div className="space-y-2">
+                <Label htmlFor="standard_apt" className="text-sm">Standard Apartments</Label>
                 <Input
                   id="standard_apt"
                   value={settings.apartment_types.standard_apt.join(", ")}
@@ -323,8 +324,8 @@ export default function SystemSettings() {
                   }
                 />
               </div>
-              <div>
-                <Label htmlFor="premium_apt">Premium Apartments (lettere separate da virgola)</Label>
+              <div className="space-y-2">
+                <Label htmlFor="premium_apt" className="text-sm">Premium Apartments</Label>
                 <Input
                   id="premium_apt"
                   value={settings.apartment_types.premium_apt.join(", ")}
@@ -342,8 +343,8 @@ export default function SystemSettings() {
                   }
                 />
               </div>
-              <div>
-                <Label htmlFor="formatore_apt">Formatore Apartments (lettere separate da virgola)</Label>
+              <div className="space-y-2">
+                <Label htmlFor="formatore_apt" className="text-sm">Formatore Apartments</Label>
                 <Input
                   id="formatore_apt"
                   value={settings.apartment_types.formatore_apt.join(", ")}
@@ -372,6 +373,16 @@ export default function SystemSettings() {
           >
             <Save className="w-4 h-4 mr-2" />
             {isSaving ? "Salvataggio..." : "Salva Impostazioni"}
+          </Button>
+
+          {/* Shortcut to Client Settings */}
+          <Button
+            onClick={() => setLocation("/client-settings")}
+            variant="outline"
+            className="w-full border-2 border-custom-blue hover:bg-custom-blue hover:text-white"
+          >
+            <Settings className="w-4 h-4 mr-2" />
+            Vai a Client Settings
           </Button>
         </div>
       </div>
