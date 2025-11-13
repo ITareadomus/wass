@@ -605,21 +605,21 @@ export default function Convocazioni() {
           <div className="mb-4 pb-3 border-b border-border">
             <h4 className="text-xs font-semibold text-muted-foreground mb-2">Task Giornata</h4>
             <div className="grid grid-cols-2 gap-2">
-              <div className="bg-blue-50 dark:bg-blue-950/20 rounded-lg p-2 border border-blue-200 dark:border-blue-800">
-                <div className="text-lg font-bold text-blue-600">{taskStats.total}</div>
-                <div className="text-[10px] text-blue-700 dark:text-blue-300">Totale</div>
+              <div className="bg-blue-100 dark:bg-blue-950/50 rounded-lg p-2 border-2 border-blue-300 dark:border-blue-700">
+                <div className="text-lg font-bold text-blue-800 dark:text-blue-200">{taskStats.total}</div>
+                <div className="text-[10px] text-blue-800 dark:text-blue-200">Totale</div>
               </div>
-              <div className="bg-yellow-50 dark:bg-yellow-950/20 rounded-lg p-2 border border-yellow-200 dark:border-yellow-800">
-                <div className="text-lg font-bold text-yellow-600">{taskStats.premium}</div>
-                <div className="text-[10px] text-yellow-700 dark:text-yellow-300">Premium</div>
+              <div className="bg-yellow-100 dark:bg-yellow-950/50 rounded-lg p-2 border-2 border-yellow-300 dark:border-yellow-700">
+                <div className="text-lg font-bold text-yellow-800 dark:text-yellow-200">{taskStats.premium}</div>
+                <div className="text-[10px] text-yellow-800 dark:text-yellow-200">Premium</div>
               </div>
-              <div className="bg-green-50 dark:bg-green-950/20 rounded-lg p-2 border border-green-200 dark:border-green-800">
-                <div className="text-lg font-bold text-green-600">{taskStats.standard}</div>
-                <div className="text-[10px] text-green-700 dark:text-green-300">Standard</div>
+              <div className="bg-green-100 dark:bg-green-950/50 rounded-lg p-2 border-2 border-green-300 dark:border-green-700">
+                <div className="text-lg font-bold text-green-800 dark:text-green-200">{taskStats.standard}</div>
+                <div className="text-[10px] text-green-800 dark:text-green-200">Standard</div>
               </div>
-              <div className="bg-red-50 dark:bg-red-950/20 rounded-lg p-2 border border-red-200 dark:border-red-800">
-                <div className="text-lg font-bold text-red-600">{taskStats.straordinarie}</div>
-                <div className="text-[10px] text-red-700 dark:text-red-300">Straordinarie</div>
+              <div className="bg-red-100 dark:bg-red-950/50 rounded-lg p-2 border-2 border-red-300 dark:border-red-700">
+                <div className="text-lg font-bold text-red-800 dark:text-red-200">{taskStats.straordinarie}</div>
+                <div className="text-[10px] text-red-800 dark:text-red-200">Straordinarie</div>
               </div>
             </div>
           </div>
@@ -628,7 +628,7 @@ export default function Convocazioni() {
           <h4 className="text-xs font-semibold text-muted-foreground mb-2">Cleaners</h4>
           <div className="grid grid-cols-2 gap-2 flex-1">
             {/* Disponibili */}
-            <div className="bg-blue-50 dark:bg-blue-950/20 rounded-lg p-2 flex flex-col items-center justify-center border border-blue-200 dark:border-blue-800">
+            <div className="bg-blue-100 dark:bg-blue-950/50 rounded-lg p-2 flex flex-col items-center justify-center border-2 border-blue-300 dark:border-blue-700">
               <svg className="w-16 h-16 mb-1" viewBox="0 0 100 100">
                 <circle
                   cx="50"
@@ -662,14 +662,14 @@ export default function Convocazioni() {
                   {filteredCleaners.length > 0 ? Math.round((filteredCleaners.filter(c => c.available !== false).length / filteredCleaners.length) * 100) : 0}%
                 </text>
               </svg>
-              <span className="text-[10px] font-semibold text-blue-700 dark:text-blue-300 text-center">Disponibili</span>
-              <span className="text-[9px] text-blue-600 dark:text-blue-400">
+              <span className="text-[10px] font-semibold text-blue-800 dark:text-blue-200 text-center">Disponibili</span>
+              <span className="text-[9px] text-blue-800 dark:text-blue-200">
                 {filteredCleaners.filter(c => c.available !== false).length}/{filteredCleaners.length}
               </span>
             </div>
 
             {/* Non Disponibili */}
-            <div className="bg-gray-50 dark:bg-gray-950/20 rounded-lg p-2 flex flex-col items-center justify-center border border-gray-200 dark:border-gray-700">
+            <div className="bg-gray-100 dark:bg-gray-950/50 rounded-lg p-2 flex flex-col items-center justify-center border-2 border-gray-300 dark:border-gray-700">
               <svg className="w-16 h-16 mb-1" viewBox="0 0 100 100">
                 <circle
                   cx="50"
@@ -703,14 +703,14 @@ export default function Convocazioni() {
                   {filteredCleaners.length > 0 ? Math.round((filteredCleaners.filter(c => c.available === false).length / filteredCleaners.length) * 100) : 0}%
                 </text>
               </svg>
-              <span className="text-[10px] font-semibold text-gray-700 dark:text-gray-300 text-center">Non Disponibili</span>
-              <span className="text-[9px] text-gray-600 dark:text-gray-400">
+              <span className="text-[10px] font-semibold text-gray-800 dark:text-gray-200 text-center">Non Disponibili</span>
+              <span className="text-[9px] text-gray-800 dark:text-gray-200">
                 {filteredCleaners.filter(c => c.available === false).length}/{filteredCleaners.length}
               </span>
             </div>
 
             {/* Premium */}
-            <div className="bg-yellow-50 dark:bg-yellow-950/20 rounded-lg p-2 flex flex-col items-center justify-center border border-yellow-200 dark:border-yellow-800">
+            <div className="bg-yellow-100 dark:bg-yellow-950/50 rounded-lg p-2 flex flex-col items-center justify-center border-2 border-yellow-300 dark:border-yellow-700">
               <svg className="w-16 h-16 mb-1" viewBox="0 0 100 100">
                 <circle
                   cx="50"
@@ -744,14 +744,14 @@ export default function Convocazioni() {
                   {filteredCleaners.length > 0 ? Math.round((filteredCleaners.filter(c => c.role === "Premium").length / filteredCleaners.length) * 100) : 0}%
                 </text>
               </svg>
-              <span className="text-[10px] font-semibold text-yellow-700 dark:text-yellow-300 text-center">Premium</span>
-              <span className="text-[9px] text-yellow-600 dark:text-yellow-400">
+              <span className="text-[10px] font-semibold text-yellow-800 dark:text-yellow-200 text-center">Premium</span>
+              <span className="text-[9px] text-yellow-800 dark:text-yellow-200">
                 {filteredCleaners.filter(c => c.role === "Premium").length}/{filteredCleaners.length}
               </span>
             </div>
 
             {/* Standard */}
-            <div className="bg-green-50 dark:bg-green-950/20 rounded-lg p-2 flex flex-col items-center justify-center border border-green-200 dark:border-green-800">
+            <div className="bg-green-100 dark:bg-green-950/50 rounded-lg p-2 flex flex-col items-center justify-center border-2 border-green-300 dark:border-green-700">
               <svg className="w-16 h-16 mb-1" viewBox="0 0 100 100">
                 <circle
                   cx="50"
@@ -785,14 +785,14 @@ export default function Convocazioni() {
                   {filteredCleaners.length > 0 ? Math.round((filteredCleaners.filter(c => c.role === "Standard").length / filteredCleaners.length) * 100) : 0}%
                 </text>
               </svg>
-              <span className="text-[10px] font-semibold text-green-700 dark:text-green-300 text-center">Standard</span>
-              <span className="text-[9px] text-green-600 dark:text-green-400">
+              <span className="text-[10px] font-semibold text-green-800 dark:text-green-200 text-center">Standard</span>
+              <span className="text-[9px] text-green-800 dark:text-green-200">
                 {filteredCleaners.filter(c => c.role === "Standard").length}/{filteredCleaners.length}
               </span>
             </div>
 
             {/* Formatori */}
-            <div className="bg-orange-50 dark:bg-orange-950/20 rounded-lg p-2 flex flex-col items-center justify-center border border-orange-200 dark:border-orange-800">
+            <div className="bg-orange-100 dark:bg-orange-950/50 rounded-lg p-2 flex flex-col items-center justify-center border-2 border-orange-300 dark:border-orange-700">
               <svg className="w-16 h-16 mb-1" viewBox="0 0 100 100">
                 <circle
                   cx="50"
@@ -826,14 +826,14 @@ export default function Convocazioni() {
                   {filteredCleaners.length > 0 ? Math.round((filteredCleaners.filter(c => c.role === "Formatore").length / filteredCleaners.length) * 100) : 0}%
                 </text>
               </svg>
-              <span className="text-[10px] font-semibold text-orange-700 dark:text-orange-300 text-center">Formatori</span>
-              <span className="text-[9px] text-orange-600 dark:text-orange-400">
+              <span className="text-[10px] font-semibold text-orange-800 dark:text-orange-200 text-center">Formatori</span>
+              <span className="text-[9px] text-orange-800 dark:text-orange-200">
                 {filteredCleaners.filter(c => c.role === "Formatore").length}/{filteredCleaners.length}
               </span>
             </div>
 
             {/* Straordinari */}
-            <div className="bg-red-50 dark:bg-red-950/20 rounded-lg p-2 flex flex-col items-center justify-center border border-red-200 dark:border-red-800">
+            <div className="bg-red-100 dark:bg-red-950/50 rounded-lg p-2 flex flex-col items-center justify-center border-2 border-red-300 dark:border-red-700">
               <svg className="w-16 h-16 mb-1" viewBox="0 0 100 100">
                 <circle
                   cx="50"
@@ -867,8 +867,8 @@ export default function Convocazioni() {
                   {filteredCleaners.length > 0 ? Math.round((filteredCleaners.filter(c => (c as any).can_do_straordinaria === true).length / filteredCleaners.length) * 100) : 0}%
                 </text>
               </svg>
-              <span className="text-[10px] font-semibold text-red-700 dark:text-red-300 text-center">Straordinari</span>
-              <span className="text-[9px] text-red-600 dark:text-red-400">
+              <span className="text-[10px] font-semibold text-red-800 dark:text-red-200 text-center">Straordinari</span>
+              <span className="text-[9px] text-red-800 dark:text-red-200">
                 {filteredCleaners.filter(c => (c as any).can_do_straordinaria === true).length}/{filteredCleaners.length}
               </span>
             </div>
