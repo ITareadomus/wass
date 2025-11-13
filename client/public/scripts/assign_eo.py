@@ -16,19 +16,19 @@ INPUT_CLEANERS = BASE / "cleaners" / "selected_cleaners.json"
 OUTPUT_ASSIGN = BASE / "output" / "early_out_assignments.json"
 
 # =============================
-# CONFIG - REGOLE SEMPLIFICATE
+# CONFIG - REGOLE CLUSTERING OTTIMIZZATE
 # =============================
 BASE_MAX_TASKS = 2  # Base: max 2 task per cleaner
-BONUS_TASK_MAX_TRAVEL = 10.0  # +1 task se travel <= 10'
+CLUSTER_PRIORITY_TRAVEL = 5.0  # Cluster prioritario: <= 5' (massima priorità)
+CLUSTER_EXTENDED_TRAVEL = 10.0  # Cluster esteso: <= 10' (infrange limiti tipologia)
 ABSOLUTE_MAX_TASKS = 4  # Max assoluto 4 task
 ABSOLUTE_MAX_TASKS_IF_BEFORE_18 = 5  # Max 5 task se finisce entro le 18:00
-MIN_TASKS_PER_CLEANER = 2  # Minimo 2 task per cleaner
-CLUSTER_MAX_TRAVEL = 15.0  # Se task <= 15' da qualsiasi altra, ignora limite di task
+DAILY_TASK_LIMIT = 5  # Limite giornaliero HARD
 
-# NUOVO: Limite per tipologia di priorità
-MAX_TASKS_PER_PRIORITY = 2  # Max 2 task Early-Out per cleaner
+# NUOVO: Limite per tipologia FLESSIBILE (può essere infranto da cluster)
+MAX_TASKS_PER_PRIORITY = 2  # Max 2 task Early-Out per cleaner (base, infrangibile da cluster vicini)
 
-PREFERRED_TRAVEL = 20.0  # Preferenza per percorsi < 20' (aumentato per favorire aggregazione)
+PREFERRED_TRAVEL = 20.0  # Preferenza per percorsi < 20'
 
 # Travel model (min)
 SHORT_RANGE_KM = 0.30
@@ -245,59 +245,61 @@ def can_add_task(cleaner: Cleaner, task: Task) -> bool:
     Verifica se è possibile aggiungere una task al cleaner secondo le regole:
     1. Premium task -> premium cleaner
     2. Straordinaria -> premium cleaner, deve essere la prima (pos=0)
-    3. Max 2 task base, +1 se travel <= 10', max assoluto 4 (o 5 se finisce entro 18:00)
-    4. Max 2 task Early-Out per cleaner
+    3. CLUSTERING: appartamenti vicini (≤10') possono infrangere limiti tipologia
+    4. Stessa via o ≤5': massima priorità cluster
+    5. Limite giornaliero: max 5 task totali
     """
     # Check premium/straordinaria
     if not can_handle_premium(cleaner, task):
         return False
 
-    # NUOVO: Limite max 2 task Early-Out per cleaner
-    if len(cleaner.route) >= MAX_TASKS_PER_PRIORITY:
+    current_count = len(cleaner.route)
+
+    # Limite giornaliero HARD: max 5 task
+    if current_count >= DAILY_TASK_LIMIT:
         return False
 
     # Straordinaria deve essere la prima
     if task.straordinaria:
-        if len(cleaner.route) > 0:
+        if current_count > 0:
             return False
 
     # Se il cleaner ha già una straordinaria, non può aggiungerne altre
-    if len(cleaner.route) > 0 and cleaner.route[0].straordinaria:
+    if current_count > 0 and cleaner.route[0].straordinaria:
         if task.straordinaria:
             return False
 
-    current_count = len(cleaner.route)
+    # CLUSTERING AVANZATO: controlla vicinanza con task esistenti
+    if current_count > 0:
+        # Cluster prioritario: ≤5' o stessa via
+        is_priority_cluster = any(
+            (travel_minutes(existing_task, task) <= CLUSTER_PRIORITY_TRAVEL or
+             travel_minutes(task, existing_task) <= CLUSTER_PRIORITY_TRAVEL or
+             same_street(existing_task.address, task.address))
+            for existing_task in cleaner.route
+        )
 
-    # Task in cluster <= 15': ignora limiti (ma rispetta max assoluto)
-    is_within_cluster = any(
-        travel_minutes(existing_task, task) <= CLUSTER_MAX_TRAVEL or
-        travel_minutes(task, existing_task) <= CLUSTER_MAX_TRAVEL
-        for existing_task in cleaner.route
-    ) if current_count > 0 else False
+        # Cluster esteso: ≤10' (infrange limite tipologia)
+        is_extended_cluster = any(
+            (travel_minutes(existing_task, task) <= CLUSTER_EXTENDED_TRAVEL or
+             travel_minutes(task, existing_task) <= CLUSTER_EXTENDED_TRAVEL)
+            for existing_task in cleaner.route
+        )
 
-    if is_within_cluster and current_count < ABSOLUTE_MAX_TASKS:
-        return True
+        # Se è in cluster prioritario: ignora tutti i limiti (tranne giornaliero)
+        if is_priority_cluster and current_count < DAILY_TASK_LIMIT:
+            return True
+
+        # Se è in cluster esteso: ignora limite tipologia, rispetta max assoluto
+        if is_extended_cluster and current_count < ABSOLUTE_MAX_TASKS:
+            return True
 
     # Regola base: max 2 task
     if current_count < BASE_MAX_TASKS:
         return True
 
-    # 3ª task: solo se travel <= 10' dalla task precedente
-    if current_count == BASE_MAX_TASKS:
-        last_task = cleaner.route[-1]
-        tt = travel_minutes(last_task, task)
-        if tt <= BONUS_TASK_MAX_TRAVEL:
-            return True
-
-    # 4ª task o più: DEVE rispettare il vincolo dei 10' E max assoluto
-    if current_count >= BASE_MAX_TASKS + 1 and current_count < ABSOLUTE_MAX_TASKS:
-        # Prima verifica: travel <= 10' dalla task precedente
-        last_task = cleaner.route[-1]
-        tt = travel_minutes(last_task, task)
-        if tt > BONUS_TASK_MAX_TRAVEL:
-            return False  # Blocca se travel > 10'
-
-        # Seconda verifica: fattibilità temporale
+    # 3ª-5ª task: solo se fattibile temporalmente
+    if current_count >= BASE_MAX_TASKS and current_count < ABSOLUTE_MAX_TASKS:
         test_route = cleaner.route + [task]
         feasible, schedule = evaluate_route(test_route)
         if feasible and schedule:
@@ -467,10 +469,9 @@ def plan_day(tasks: List[Task], cleaners: List[Cleaner], assigned_logistic_codes
             unassigned.append(task)
             continue
 
-        # Priorità 1: Cleaner che hanno già task nello stesso indirizzo
+        # Priorità 1: Cleaner con stesso indirizzo
         same_address_candidates = []
         for c, p, t in candidates:
-            # Controlla se il cleaner ha già task nello stesso indirizzo
             has_same_address = any(
                 existing_task.address == task.address
                 for existing_task in c.route
@@ -479,42 +480,53 @@ def plan_day(tasks: List[Task], cleaners: List[Cleaner], assigned_logistic_codes
                 same_address_candidates.append((c, p, t))
 
         if same_address_candidates:
-            # Priorità assoluta a cleaner con stesso indirizzo (minor numero di task)
+            # Priorità assoluta a cleaner con stesso indirizzo
             same_address_candidates.sort(key=lambda x: (len(x[0].route), x[2]))
             chosen = same_address_candidates[0]
         else:
-            # Priorità 2: Cleaner con task entro 10 minuti (cluster)
-            cluster_candidates = []
+            # Priorità 2: Cluster prioritario (≤5' o stessa via)
+            priority_cluster_candidates = []
             for c, p, t in candidates:
-                # Controlla se il cleaner ha task entro 10 minuti
-                has_cluster = any(
-                    travel_minutes(existing_task, task) <= CLUSTER_MAX_TRAVEL or
-                    travel_minutes(task, existing_task) <= CLUSTER_MAX_TRAVEL
+                has_priority_cluster = any(
+                    (travel_minutes(existing_task, task) <= CLUSTER_PRIORITY_TRAVEL or
+                     travel_minutes(task, existing_task) <= CLUSTER_PRIORITY_TRAVEL or
+                     same_street(existing_task.address, task.address))
                     for existing_task in c.route
-                )
-                if has_cluster:
-                    cluster_candidates.append((c, p, t))
+                ) if len(c.route) > 0 else False
+                if has_priority_cluster:
+                    priority_cluster_candidates.append((c, p, t))
 
-            if cluster_candidates:
-                # Priorità alta a cleaner in cluster (minor numero di task, poi minor viaggio)
-                cluster_candidates.sort(key=lambda x: (len(x[0].route), x[2]))
-                chosen = cluster_candidates[0]
+            if priority_cluster_candidates:
+                # Massima priorità: più task = più cluster
+                priority_cluster_candidates.sort(key=lambda x: (-len(x[0].route), x[2]))
+                chosen = priority_cluster_candidates[0]
             else:
-                # Nessun cluster, usa logica normale
-                # Dividi i candidati in due gruppi: < 20' e >= 20'
-                preferred = [(c, p, t) for c, p, t in candidates if t < PREFERRED_TRAVEL]
-                others = [(c, p, t) for c, p, t in candidates if t >= PREFERRED_TRAVEL]
+                # Priorità 3: Cluster esteso (≤10')
+                extended_cluster_candidates = []
+                for c, p, t in candidates:
+                    has_extended_cluster = any(
+                        (travel_minutes(existing_task, task) <= CLUSTER_EXTENDED_TRAVEL or
+                         travel_minutes(task, existing_task) <= CLUSTER_EXTENDED_TRAVEL)
+                        for existing_task in c.route
+                    ) if len(c.route) > 0 else False
+                    if has_extended_cluster:
+                        extended_cluster_candidates.append((c, p, t))
 
-                # Scegli dal gruppo preferito se esiste, altrimenti dal gruppo altri
-                if preferred:
-                    # PRIORITÀ: cleaner con più task (per usare meno cleaner)
-                    # Ordina per numero di task DECRESCENTE, poi per minor viaggio
-                    preferred.sort(key=lambda x: (-len(x[0].route), x[2]))
-                    chosen = preferred[0]
+                if extended_cluster_candidates:
+                    # Alta priorità: più task = più cluster
+                    extended_cluster_candidates.sort(key=lambda x: (-len(x[0].route), x[2]))
+                    chosen = extended_cluster_candidates[0]
                 else:
-                    # Stesso per gli altri
-                    others.sort(key=lambda x: (-len(x[0].route), x[2]))
-                    chosen = others[0]
+                    # Nessun cluster: logica normale
+                    preferred = [(c, p, t) for c, p, t in candidates if t < PREFERRED_TRAVEL]
+                    others = [(c, p, t) for c, p, t in candidates if t >= PREFERRED_TRAVEL]
+
+                    if preferred:
+                        preferred.sort(key=lambda x: (-len(x[0].route), x[2]))
+                        chosen = preferred[0]
+                    else:
+                        others.sort(key=lambda x: (-len(x[0].route), x[2]))
+                        chosen = others[0]
 
         cleaner, pos, travel = chosen
         cleaner.route.insert(pos, task)
