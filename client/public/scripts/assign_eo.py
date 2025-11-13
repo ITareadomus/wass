@@ -487,13 +487,39 @@ def plan_day(tasks: List[Task], cleaners: List[Cleaner], assigned_logistic_codes
     - Se non ci sono percorsi < 15', sceglie il minore dei > 15'
     - Max 2 task per cleaner (3ª solo se entro 10')
     - DEDUPLICA: Solo una task per logistic_code viene assegnata
+    - CLUSTERING PREVENTIVO: Raggruppa task stesso edificio prima dell'assegnazione
     """
     if assigned_logistic_codes is None:
         assigned_logistic_codes = set()
 
     unassigned = []
-
+    
+    # CLUSTERING PREVENTIVO: Raggruppa task per edificio prima di assegnare
+    building_groups = {}
     for task in tasks:
+        if task.logistic_code in assigned_logistic_codes:
+            continue
+        
+        # Trova se esiste già un gruppo per questo edificio
+        found_group = False
+        for group_key, group_tasks in building_groups.items():
+            if same_building(group_tasks[0].address, task.address):
+                group_tasks.append(task)
+                found_group = True
+                break
+        
+        if not found_group:
+            building_groups[task.address or f"task_{task.task_id}"] = [task]
+    
+    # Ordina i gruppi: prima quelli con più task (stesso edificio)
+    sorted_groups = sorted(building_groups.values(), key=lambda g: -len(g))
+    
+    # Appiattisci mantenendo l'ordine dei gruppi
+    ordered_tasks = []
+    for group in sorted_groups:
+        ordered_tasks.extend(group)
+    
+    for task in ordered_tasks:
         # DEDUPLICA: Skippa task con logistic_code già assegnato
         if task.logistic_code in assigned_logistic_codes:
             print(f"   ⏭️  Skippata task {task.task_id} (logistic_code {task.logistic_code} già assegnato)")
