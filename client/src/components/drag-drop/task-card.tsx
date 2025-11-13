@@ -524,7 +524,7 @@ export default function TaskCard({
                       <div className="absolute right-1 top-1/2 -translate-y-1/2 flex flex-col gap-0.5 z-40">
                         {(task as any).checkout_time && (
                           <div className="flex items-center gap-0.5">
-                            <span className={cn("text-green-600 font-bold leading-none", isInTimeline && isSmallTask ? "text-[9px]" : "text-[11px]")}>↑</span>
+                            <span className="font-black text-[15px] text-[#257537]">↑</span>
                             <span className="text-[11px] text-[#137537] font-bold">{(task as any).checkout_time}</span>
                           </div>
                         )}
