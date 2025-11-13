@@ -545,10 +545,17 @@ export default function Convocazioni() {
                 </DialogDescription>
               </DialogHeader>
               <DialogFooter>
-                <Button variant="outline" onClick={() => setConfirmDialog({ open: false, cleanerId: null })}>
+                <Button 
+                  variant="outline" 
+                  onClick={() => setConfirmDialog({ open: false, cleanerId: null })}
+                  className="border-2 border-custom-blue"
+                >
                   Annulla
                 </Button>
-                <Button onClick={handleConfirmUnavailable}>
+                <Button 
+                  onClick={handleConfirmUnavailable}
+                  className="bg-background border-2 border-custom-blue text-black dark:text-white hover:opacity-80"
+                >
                   Conferma
                 </Button>
               </DialogFooter>
