@@ -178,6 +178,15 @@ export function ThemeToggle() {
                     </div>
                   </DropdownMenuItem>
                 ))}
+                {currentUser?.role === "admin" && (
+                  <>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={() => setLocation("/accounts-settings")} className="cursor-pointer">
+                      <Settings className="mr-2 h-4 w-4" />
+                      <span>Settings</span>
+                    </DropdownMenuItem>
+                  </>
+                )}
               </DropdownMenuSubContent>
             </DropdownMenuSub>
 
@@ -185,13 +194,6 @@ export function ThemeToggle() {
               <History className="mr-2 h-4 w-4" />
               <span>History</span>
             </DropdownMenuItem>
-
-            {currentUser?.role === "admin" && (
-              <DropdownMenuItem onClick={() => setLocation("/accounts-settings")} className="cursor-pointer">
-                <Settings className="mr-2 h-4 w-4" />
-                <span>Settings</span>
-              </DropdownMenuItem>
-            )}
             
             <DropdownMenuSeparator />
             
