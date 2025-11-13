@@ -54,6 +54,7 @@ export default function TaskCard({
   isDragDisabled = false,
   isReadOnly = false,
 }: TaskCardProps) {
+  console.log('🔧 TaskCard render - isReadOnly:', isReadOnly, 'for task:', task.name);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [clickTimer, setClickTimer] = useState<NodeJS.Timeout | null>(null);
   const [operationNames, setOperationNames] = useState<Record<number, string>>({});
@@ -709,7 +710,15 @@ export default function TaskCard({
                 ) : (
                   <p
                     className={`text-sm p-1 rounded ${!isReadOnly ? 'cursor-pointer hover:bg-muted/50' : ''}`}
-                    onClick={() => !isReadOnly && setEditingField('duration')}
+                    onClick={() => {
+                      console.log('🖱️ Click su Durata - isReadOnly:', isReadOnly, '!isReadOnly:', !isReadOnly);
+                      if (!isReadOnly) {
+                        console.log('✅ Apertura campo edit per duration');
+                        setEditingField('duration');
+                      } else {
+                        console.log('❌ Campo bloccato perché isReadOnly è true');
+                      }
+                    }}
                   >
                     {(displayTask.duration || "0.0").replace(".", ":")} ore
                   </p>
@@ -751,7 +760,10 @@ export default function TaskCard({
                 ) : (
                   <p
                     className={`text-sm p-1 rounded ${!isReadOnly ? 'cursor-pointer hover:bg-muted/50' : ''}`}
-                    onClick={() => !isReadOnly && setEditingField('checkout')}
+                    onClick={() => {
+                      console.log('🖱️ Click su Check-out - isReadOnly:', isReadOnly);
+                      if (!isReadOnly) setEditingField('checkout');
+                    }}
                   >
                     {(displayTask as any).checkout_date
                       ? new Date((displayTask as any).checkout_date).toLocaleDateString(
@@ -799,7 +811,10 @@ export default function TaskCard({
                 ) : (
                   <p
                     className={`text-sm p-1 rounded ${!isReadOnly ? 'cursor-pointer hover:bg-muted/50' : ''}`}
-                    onClick={() => !isReadOnly && setEditingField('checkin')}
+                    onClick={() => {
+                      console.log('🖱️ Click su Check-in - isReadOnly:', isReadOnly);
+                      if (!isReadOnly) setEditingField('checkin');
+                    }}
                   >
                     {(displayTask as any).checkin_date
                       ? new Date((displayTask as any).checkin_date).toLocaleDateString(
@@ -889,7 +904,10 @@ export default function TaskCard({
                 ) : (
                   <p
                     className={`text-sm p-1 rounded ${!isReadOnly ? 'cursor-pointer hover:bg-muted/50' : ''}`}
-                    onClick={() => !isReadOnly && setEditingField('paxin')}
+                    onClick={() => {
+                      console.log('🖱️ Click su Pax-in - isReadOnly:', isReadOnly);
+                      if (!isReadOnly) setEditingField('paxin');
+                    }}
                   >
                     {(displayTask as any).pax_in ?? "non migrato"}
                   </p>
