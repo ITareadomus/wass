@@ -593,7 +593,28 @@ def plan_day(tasks: List[Task], cleaners: List[Cleaner], assigned_logistic_codes
             print(f"   ⏭️  Skippata task {task.task_id} (logistic_code {task.logistic_code} già assegnato)")
             unassigned.append(task)
             continue
-        # Trova tutti i cleaner che possono prendere questa task
+        
+        # PRIORITÀ ASSOLUTA: Cerca se qualche cleaner ha già una task nello stesso edificio
+        same_building_cleaner = None
+        for cleaner in cleaners:
+            if any(same_building(existing_task.address, task.address) for existing_task in cleaner.route):
+                same_building_cleaner = cleaner
+                break
+        
+        # Se trovato un cleaner con stesso edificio, prova ad assegnare solo a lui
+        if same_building_cleaner:
+            result = find_best_position(same_building_cleaner, task)
+            if result is not None:
+                pos, travel = result
+                same_building_cleaner.route.insert(pos, task)
+                assigned_logistic_codes.add(task.logistic_code)
+                print(f"   🏢 Task {task.task_id} assegnata a {same_building_cleaner.name} (stesso edificio: {task.address})")
+                continue
+            else:
+                # Stesso edificio ma non può prendere la task (limite raggiunto)
+                print(f"   ⚠️  Task {task.task_id} stesso edificio di {same_building_cleaner.name} ma limite raggiunto")
+        
+        # Se non c'è stesso edificio, procedi con logica normale
         candidates = []
 
         for cleaner in cleaners:
@@ -606,7 +627,7 @@ def plan_day(tasks: List[Task], cleaners: List[Cleaner], assigned_logistic_codes
             unassigned.append(task)
             continue
 
-        # Priorità 1: Stesso EDIFICIO (indirizzo completo uguale)
+        # Priorità 1: Stesso EDIFICIO (indirizzo completo uguale) - solo nuove assegnazioni
         same_building_candidates = []
         for c, p, t in candidates:
             has_same_building = any(
