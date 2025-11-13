@@ -1,6 +1,6 @@
 {
   "metadata": {
-    "last_updated": "2025-11-13T15:06:00.086741",
+    "last_updated": "2025-11-13T15:07:28.624Z",
     "date": "2025-11-13"
   },
   "cleaners_assignments": [
@@ -73,11 +73,11 @@
             "automatic_assignment_eo"
           ],
           "priority": "early_out",
-          "start_time": "10:43",
-          "end_time": "11:23",
+          "start_time": "10:40",
+          "end_time": "11:20",
           "followup": true,
           "sequence": 2,
-          "travel_time": 3
+          "travel_time": 0
         },
         {
           "task_id": 218780,
@@ -106,11 +106,11 @@
             "automatic_assignment_eo"
           ],
           "priority": "early_out",
-          "start_time": "11:30",
-          "end_time": "12:00",
+          "start_time": "11:25",
+          "end_time": "11:55",
           "followup": true,
           "sequence": 3,
-          "travel_time": 7
+          "travel_time": 5
         },
         {
           "task_id": 218779,
@@ -139,11 +139,11 @@
             "automatic_assignment_eo"
           ],
           "priority": "early_out",
-          "start_time": "12:04",
-          "end_time": "12:34",
+          "start_time": "11:55",
+          "end_time": "12:25",
           "followup": true,
           "sequence": 4,
-          "travel_time": 4
+          "travel_time": 0
         }
       ]
     },
@@ -216,11 +216,11 @@
             "automatic_assignment_eo"
           ],
           "priority": "early_out",
-          "start_time": "12:17",
-          "end_time": "14:17",
+          "start_time": "12:18",
+          "end_time": "14:18",
           "followup": true,
           "sequence": 2,
-          "travel_time": 17
+          "travel_time": 18
         }
       ]
     },
