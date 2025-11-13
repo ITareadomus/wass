@@ -647,18 +647,19 @@ def plan_day(tasks: List[Task], cleaners: List[Cleaner], assigned_logistic_codes
         if task.logistic_code in assigned_logistic_codes:
             continue
         
-        # 1. Controlla se è nello stesso edificio di una task da assegnare
+        # 1. PRIORITÀ MASSIMA: Controlla se è nello stesso edificio di una task da assegnare
         found_building_group = False
         for group_key, group_tasks in building_groups.items():
             if same_building(group_tasks[0].address, task.address):
                 group_tasks.append(task)
                 found_building_group = True
+                print(f"   🏢 Task {task.task_id} aggiunta al gruppo edificio: {task.address}")
                 break
         
         if found_building_group:
             continue
         
-        # 2. Controlla se è vicina a una task già assegnata (cross-container)
+        # 2. PRIORITÀ ALTA: Controlla se è vicina a una task già assegnata (cross-container)
         found_cross_container = False
         for assigned_lat, assigned_lng, assigned_addr in assigned_tasks_by_location:
             # Stesso edificio con task già assegnata
@@ -668,20 +669,22 @@ def plan_day(tasks: List[Task], cleaners: List[Cleaner], assigned_logistic_codes
                     cross_container_groups[key] = []
                 cross_container_groups[key].append(task)
                 found_cross_container = True
+                print(f"   🔄 Task {task.task_id} vicina a edificio già assegnato: {assigned_addr}")
                 break
             # Stessa zona (≤800m)
             if same_zone(task.lat, task.lng, assigned_lat, assigned_lng, task.address, assigned_addr):
-                key = f"cross_{assigned_addr}_{assigned_lat}_{assigned_lng}"
+                key = f"cross_zone_{assigned_lat}_{assigned_lng}"
                 if key not in cross_container_groups:
                     cross_container_groups[key] = []
                 cross_container_groups[key].append(task)
                 found_cross_container = True
+                print(f"   🔄 Task {task.task_id} in zona di task già assegnata")
                 break
         
         if found_cross_container:
             continue
         
-        # 3. Nessuna vicinanza: crea nuovo gruppo
+        # 3. Nessuna vicinanza: crea nuovo gruppo edificio
         building_groups[task.address or f"task_{task.task_id}"] = [task]
     
     # Ordina i gruppi: prima cross-container (massima priorità), poi stesso edificio
@@ -690,10 +693,18 @@ def plan_day(tasks: List[Task], cleaners: List[Cleaner], assigned_logistic_codes
     all_groups.extend(building_groups.values())
     sorted_groups = sorted(all_groups, key=lambda g: -len(g))
     
+    # Log statistiche clustering
+    if cross_container_groups:
+        print(f"   ✅ Gruppi cross-container: {len(cross_container_groups)}")
+    if building_groups:
+        print(f"   ✅ Gruppi stesso edificio: {len(building_groups)}")
+    
     # Appiattisci mantenendo l'ordine dei gruppi
     ordered_tasks = []
     for group in sorted_groups:
         ordered_tasks.extend(group)
+    
+    print(f"   📦 Task ordinate per clustering: {len(ordered_tasks)}")
     
     for task in ordered_tasks:
         # DEDUPLICA: Skippa task con logistic_code già assegnato
