@@ -18,6 +18,11 @@ const execAsync = promisify(exec);
 // Costante bucket per Object Storage
 const BUCKET = "wass_assignments";
 
+// Directory per i dati di output (es. timeline.json, containers.json)
+const DATA_OUTPUT_DIR = path.join(process.cwd(), 'client/public/data/output');
+const CLEANERS_DIR = path.join(process.cwd(), 'client/public/data/cleaners');
+const SCRIPTS_DIR = path.join(process.cwd(), 'client/public/scripts');
+
 // Helper per ottenere l'username corrente dalla richiesta
 function getCurrentUsername(req?: any): string {
   // Prova a ottenere username dalla sessione/header se disponibile
@@ -1008,7 +1013,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             containersData.containers[containerType].tasks = [];
           }
 
-          // CRITICAL FIX: Rimuovi eventuali duplicati esistenti prima di aggiungere
+          // CRITICAL: Rimuovi eventuali duplicati esistenti prima di aggiungere
           const removedTaskId = String(removedTask.task_id);
           containersData.containers[containerType].tasks = containersData.containers[containerType].tasks.filter(
             (t: any) => String(t.task_id) !== removedTaskId
@@ -1259,7 +1264,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           console.log(`🔒 Utente sta modificando cleaners - SKIP ripristino da Object Storage`);
         }
       } catch (e) {
-        // Flag non esiste, procedi normalmente
+        // Flag non esiste, procedi normally
       }
 
       const dateObj = new Date(workDate);
@@ -2536,7 +2541,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log(`📅 LP Assignment - Ricevuta data dal frontend: ${workDate}`);
       console.log(`▶ Eseguendo assign_lp.py per data: ${workDate}`);
 
-      // Verifica che timeline.json abbia la data corretta
+      const timelinePath = path.join(DATA_OUTPUT_DIR, 'timeline.json'); // Corretto qui
+
+      // Verifica che la timeline esista prima di procedere
       try {
         const timelineData = JSON.parse(await fs.readFile(timelinePath, 'utf8'));
         if (timelineData.metadata?.date !== workDate) {
@@ -2669,7 +2676,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const emptyTimeline = {
           metadata: {
             last_updated: new Date().toISOString(),
-            date,
+            date: date,
             created_by: createdBy
           },
           cleaners_assignments: [],
