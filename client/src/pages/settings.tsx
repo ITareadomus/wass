@@ -406,6 +406,7 @@ export default function Settings() {
                             onClick={() => setEditingAccount(account)}
                             variant="outline"
                             size="sm"
+                            className="border-2 border-custom-blue"
                             disabled={account.id === 1 && account.role === 'admin'}
                           >
                             Modifica
