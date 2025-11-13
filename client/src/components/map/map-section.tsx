@@ -42,27 +42,32 @@ export default function MapSection({ tasks }: MapSectionProps) {
     loadCleaners();
 
     // Listener per aggiornamenti del filtro dalla timeline
+    // REGOLA: solo uno dei due filtri può essere attivo alla volta
     const checkFilterUpdates = setInterval(() => {
       const newFilterCleanerId = (window as any).mapFilteredCleanerId;
       const newFilterTaskId = (window as any).mapFilteredTaskId;
       
-      setFilteredCleanerId(prev => {
-        if (prev !== newFilterCleanerId) {
-          return newFilterCleanerId;
-        }
-        return prev;
-      });
-      
-      setFilteredTaskId(prev => {
-        if (prev !== newFilterTaskId) {
-          return newFilterTaskId;
-        }
-        return prev;
-      });
+      // Se è stato impostato un nuovo filtro cleaner, cancella il filtro task
+      if (newFilterCleanerId !== filteredCleanerId && newFilterCleanerId !== null && newFilterCleanerId !== undefined) {
+        setFilteredCleanerId(newFilterCleanerId);
+        setFilteredTaskId(null);
+        (window as any).mapFilteredTaskId = null;
+      }
+      // Se è stato impostato un nuovo filtro task, cancella il filtro cleaner
+      else if (newFilterTaskId !== filteredTaskId && newFilterTaskId !== null && newFilterTaskId !== undefined) {
+        setFilteredTaskId(newFilterTaskId);
+        setFilteredCleanerId(null);
+        (window as any).mapFilteredCleanerId = null;
+      }
+      // Se entrambi sono stati cancellati, aggiorna
+      else if (newFilterCleanerId === null && newFilterTaskId === null) {
+        setFilteredCleanerId(null);
+        setFilteredTaskId(null);
+      }
     }, 300);
 
     return () => clearInterval(checkFilterUpdates);
-  }, []);
+  }, [filteredCleanerId, filteredTaskId]);
 
   // Funzione per ottenere il colore del cleaner
   const getCleanerColor = (cleanerId: number) => {
