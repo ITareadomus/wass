@@ -579,7 +579,7 @@ export default function Convocazioni() {
         </Card>
 
         {/* Pannello Statistiche - 1/3 dello spazio - FISSO */}
-        <Card className="p-6 border-2 border-custom-blue flex flex-col h-full overflow-hidden">
+        <Card className="p-6 border-2 bg-custom-blue-light flex flex-col h-full overflow-hidden">
           <h3 className="text-lg font-semibold text-foreground mb-4">Statistiche</h3>
 
           {/* Statistiche Task */}
