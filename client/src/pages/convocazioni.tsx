@@ -470,7 +470,7 @@ export default function Convocazioni() {
         {/* Grid con lista cleaners e statistiche affiancate */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-[calc(100vh-200px)]">
           {/* Lista Cleaners - 2/3 dello spazio */}
-          <Card className="p-6 lg:col-span-2 flex flex-col overflow-hidden border-2 border-custom-blue">
+          <Card className="p-6 lg:col-span-2 flex flex-col overflow-hidden border-2 border-custom-blue bg-custom-blue-light">
           <div className="space-y-3 flex-1 overflow-y-auto pr-2">
             {filteredCleaners.map((cleaner) => { // Itera su filteredCleaners
               const isPremium = cleaner.role === "Premium";
