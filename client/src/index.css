@@ -63,8 +63,8 @@
   --priority-column-high-bg: hsl(199 89% 88%);
   --priority-column-low-bg: hsl(199 89% 88%);
   
-  /* Priority border colors - Light mode (azzurro) */
-  --priority-border-color: hsl(199 89% 48%);
+  /* Priority border colors - Light mode (azzurro con luminosità blue-300) */
+  --priority-border-color: hsl(199 89% 87%);
 
   /* Timeline colors */
   --timeline-early-bg: hsl(199 89% 84%);
@@ -97,8 +97,8 @@
   --input: hsl(217.2 32.6% 17.5%);
   --ring: hsl(224.3 76.3% 94.1%);
   
-  /* Priority border colors - Dark mode (blu scuro con luminosità aumentata per visibilità) */
-  --priority-border-color: hsl(217 91% 45%);
+  /* Priority border colors - Dark mode (blu scuro con luminosità blue-700) */
+  --priority-border-color: hsl(217 91% 53%);
   
   /* Container background colors - Dark mode */
   --container-bg-light: hsl(217 50% 12%);
@@ -152,7 +152,7 @@
   }
   
   .dark .text-custom-blue {
-    color: hsl(217, 91%, 45%);
+    color: hsl(217, 91%, 53%);
   }
 
   /* Task styling basato su premium e straordinaria */
