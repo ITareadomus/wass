@@ -613,6 +613,7 @@ def plan_day(tasks: List[Task], cleaners: List[Cleaner], assigned_logistic_codes
     - Se non ci sono percorsi < 15', sceglie il minore dei > 15'
     - Max 4 task per cleaner per LP
     - DEDUPLICA: Solo una task per logistic_code viene assegnata
+    - CROSS-CONTAINER: Favorisce vicinanza con task EO e HP già assegnate
     """
     if assigned_logistic_codes is None:
         assigned_logistic_codes = set()
@@ -626,11 +627,17 @@ def plan_day(tasks: List[Task], cleaners: List[Cleaner], assigned_logistic_codes
             unassigned.append(task)
             continue
 
-        # PRIORITÀ ASSOLUTA: Cerca se qualche cleaner ha già una task nello stesso edificio
+        # PRIORITÀ ASSOLUTA: Cerca se qualche cleaner ha già una task nello stesso edificio (LP, HP o EO)
         same_building_cleaner = None
         for cleaner in cleaners:
+            # Controlla task LP già in route
             if any(same_building(existing_task.address, task.address) for existing_task in cleaner.route):
                 same_building_cleaner = cleaner
+                break
+            # CROSS-CONTAINER: Controlla anche task EO/HP già assegnate (dalla last_address)
+            if cleaner.last_address and same_building(cleaner.last_address, task.address):
+                same_building_cleaner = cleaner
+                print(f"   🔄 CROSS-CONTAINER: Task {task.task_id} vicina a task EO/HP di {cleaner.name}")
                 break
 
         # Se trovato un cleaner con stesso edificio, prova ad assegnare solo a lui
@@ -921,7 +928,8 @@ def build_output(cleaners: List[Cleaner], unassigned: List[Task], original_tasks
                 "8. Check-in strict: deve finire prima del check-in time (INFRANGIBILE)",
                 "9. Vincolo orario: nessuna task deve finire dopo le 19:00",
                 "10. Seed da EO e HP: disponibilità e posizione dall'ultima task",
-                "11. FORMATORE: solo task type_apt A o B, massimo 2 task LP al giorno"
+                "11. FORMATORE: solo task type_apt A o B, massimo 2 task LP al giorno",
+                "12. CROSS-CONTAINER: Favorisce vicinanza con task EO e HP già assegnate"
             ]
         }
     }

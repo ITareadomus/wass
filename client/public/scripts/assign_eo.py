@@ -797,8 +797,9 @@ def build_output(cleaners: List[Cleaner], unassigned: List[Task], original_tasks
                 "4. Cluster esteso a 15' (favorisce aggregazione quando possibile)",
                 "5. Straordinarie solo a premium cleaner, devono essere la prima task",
                 "6. Premium task solo a premium cleaner",
-                "7. Check-in strict: deve finire prima del check-in time",
-                "8. Vincolo orario: nessuna task deve finire dopo le 19:00"
+                "7. Check-in strict: deve finire prima del check-in time (INFRANGIBILE)",
+                "8. Vincolo orario: nessuna task deve finire dopo le 19:00",
+                "9. CROSS-CONTAINER: Favorisce vicinanza geografica anche tra container diversi"
             ]
         }
     }

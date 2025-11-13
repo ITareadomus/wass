@@ -609,6 +609,7 @@ def plan_day(tasks: List[Task], cleaners: List[Cleaner], assigned_logistic_codes
     - Max 2 task per cleaner (3ª solo se entro 10')
     - DEDUPLICA: Solo una task per logistic_code viene assegnata
     - CLUSTERING PREVENTIVO: Raggruppa task stesso edificio prima dell'assegnazione
+    - CROSS-CONTAINER: Favorisce vicinanza con task EO già assegnate
     """
     if assigned_logistic_codes is None:
         assigned_logistic_codes = set()
@@ -647,11 +648,17 @@ def plan_day(tasks: List[Task], cleaners: List[Cleaner], assigned_logistic_codes
             unassigned.append(task)
             continue
 
-        # PRIORITÀ ASSOLUTA: Cerca se qualche cleaner ha già una task nello stesso edificio
+        # PRIORITÀ ASSOLUTA: Cerca se qualche cleaner ha già una task nello stesso edificio (HP o EO)
         same_building_cleaner = None
         for cleaner in cleaners:
+            # Controlla task HP già in route
             if any(same_building(existing_task.address, task.address) for existing_task in cleaner.route):
                 same_building_cleaner = cleaner
+                break
+            # CROSS-CONTAINER: Controlla anche task EO già assegnate (dalla last_eo_address)
+            if cleaner.last_eo_address and same_building(cleaner.last_eo_address, task.address):
+                same_building_cleaner = cleaner
+                print(f"   🔄 CROSS-CONTAINER: Task {task.task_id} vicina a task EO di {cleaner.name}")
                 break
 
         # Se trovato un cleaner con stesso edificio, prova ad assegnare solo a lui
@@ -903,7 +910,8 @@ def build_output(cleaners: List[Cleaner], unassigned: List[Task], original_tasks
                 "6. Premium task solo a premium cleaner",
                 "7. Check-in strict: deve finire prima del check-in time",
                 "8. HP hard earliest: 11:00",
-                "9. Vincolo orario: nessuna task deve finire dopo le 19:00"
+                "9. Vincolo orario: nessuna task deve finire dopo le 19:00",
+                "10. CROSS-CONTAINER: Favorisce vicinanza con task EO già assegnate"
             ]
         }
     }
