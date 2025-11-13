@@ -195,7 +195,7 @@ export default function Settings() {
       <div className="container mx-auto px-4 py-8">
         <div className="flex justify-between items-center mb-8">
           <div className="flex items-center gap-3">
-            <h1 className="text-3xl font-bold">Impostazioni Account</h1>
+            <h1 className="text-3xl font-bold">Account Settings</h1>
             <Button 
               onClick={() => setLocation("/")} 
               variant="outline" 
