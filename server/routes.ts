@@ -2167,32 +2167,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Endpoint per recuperare i nomi delle operazioni
   app.get("/api/get-operation-names", async (req, res) => {
     try {
-      const mysql = require('mysql2/promise');
-      
-      const connection = await mysql.createConnection({
-        host: '139.59.132.41',
-        user: 'admin',
-        password: 'ed329a875c6c4ebdf4e87e2bbe53a15771b5844ef6606dde',
-        database: 'adamdb'
-      });
-
-      const [rows] = await connection.execute(`
-        SELECT structure_operation_id, name
-        FROM app_structure_operation_langs
-        WHERE lang_id = 1
-      `);
-
-      await connection.end();
-
-      // Crea una mappa id -> nome
-      const operationNames: Record<number, string> = {};
-      rows.forEach((row: any) => {
-        operationNames[row.structure_operation_id] = row.name;
-      });
+      // Carica operations.json che ora contiene anche i nomi
+      const operationsPath = path.join(process.cwd(), 'client/public/data/input/operations.json');
+      const operationsData = JSON.parse(await fs.readFile(operationsPath, 'utf8'));
 
       res.json({
         success: true,
-        operationNames
+        operationNames: operationsData.operation_names || {}
       });
     } catch (error: any) {
       console.error("Errore durante il recupero dei nomi delle operazioni:", error);
