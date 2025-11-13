@@ -454,7 +454,7 @@ export default function Convocazioni() {
           {/* Barra Contatore */}
           <div className="bg-custom-blue-light rounded-xl border-2 border-custom-blue shadow-lg p-6">
             <div className="flex items-center gap-4">
-              <div className="text-lg font-semibold text-muted-foreground">CLEANERS SELEZIONATI</div>
+              <div className="text-lg font-semibold text-foreground">CLEANERS SELEZIONATI</div>
               <div className="text-lg font-bold">
                 <span className="text-primary">{selectedCleaners.size}</span>
                 <span className="text-muted-foreground mx-1">/</span>
@@ -476,17 +476,17 @@ export default function Convocazioni() {
               const canDoStraordinaria = (cleaner as any).can_do_straordinaria === true;
 
               const borderColor = !isAvailable
-                ? "border-gray-400"
-                : isFormatore ? "border-orange-500"
-                : isPremium ? "border-yellow-500" : "border-green-500";
+                ? "border-gray-400 dark:border-gray-300"
+                : isFormatore ? "border-orange-500 dark:border-orange-400"
+                : isPremium ? "border-yellow-500 dark:border-yellow-400" : "border-green-500 dark:border-green-400";
               const bgColor = !isAvailable
-                ? "bg-gray-300/30 dark:bg-gray-700/30"
-                : isFormatore ? "bg-orange-500/10"
-                : isPremium ? "bg-yellow-500/10" : "bg-green-500/10";
+                ? "bg-gray-300/30 dark:bg-gray-600/60"
+                : isFormatore ? "bg-orange-500/10 dark:bg-orange-500/30"
+                : isPremium ? "bg-yellow-500/10 dark:bg-yellow-500/30" : "bg-green-500/10 dark:bg-green-500/30";
               const badgeColor = !isAvailable
-                ? "bg-gray-400/20 text-gray-700 dark:text-gray-200 border-gray-400 dark:border-gray-500"
-                : isFormatore ? "bg-orange-500/20 text-orange-700 border-orange-500"
-                : isPremium ? "bg-yellow-500/20 text-yellow-700 border-yellow-500" : "bg-green-500/20 text-green-700 border-green-500";
+                ? "bg-gray-400/20 text-gray-700 dark:bg-gray-500/40 dark:text-gray-100 border-gray-400 dark:border-gray-400"
+                : isFormatore ? "bg-orange-500/20 text-orange-700 dark:bg-orange-500/40 dark:text-orange-200 border-orange-500 dark:border-orange-400"
+                : isPremium ? "bg-yellow-500/20 text-yellow-700 dark:bg-yellow-500/40 dark:text-yellow-200 border-yellow-500 dark:border-yellow-400" : "bg-green-500/20 text-green-700 dark:bg-green-500/40 dark:text-green-200 border-green-500 dark:border-green-400";
 
               return (
                 <div
