@@ -1,0 +1,389 @@
+Ti propongo una correzione mirata che ho fatto guardando i tuoi file nel progetto:
+
+Idea chiave: introdurre un concetto di “zona” (es. raggio 250m) e trattare:
+
+stesso edificio → priorità massima (come già fai);
+
+stessa zona (anche vie diverse) → priorità subito dopo lo stesso edificio;
+
+solo dopo guardare il resto (altri cluster, travel time, ecc).
+
+Così appartamenti in via Tortona 10 e via Voghera 4 (sono a ~45 m) vengono visti come stessa zona e finiscono quasi sempre sullo stesso cleaner.
+
+1️⃣ Modifiche a client/public/scripts/assign_eo.py
+1.1. Aggiungi costante per il raggio di zona
+
+Cerca il blocco:
+
+# CONFIG - REGOLE CLUSTERING OTTIMIZZATE
+# =============================
+BASE_MAX_TASKS = 2  # Base: max 2 task per cleaner
+CLUSTER_PRIORITY_TRAVEL = 5.0  # Cluster prioritario: <= 5' (massima priorità)
+CLUSTER_EXTENDED_TRAVEL = 10.0  # Cluster esteso: <= 10' (infrange limiti tipologia)
+ABSOLUTE_MAX_TASKS = 4  # Max assoluto 4 task
+ABSOLUTE_MAX_TASKS_IF_BEFORE_18 = 5  # Max 5 task se finisce entro le 18:00
+DAILY_TASK_LIMIT = 5  # Limite giornaliero HARD
+
+# NUOVO: Limite per tipologia FLESSIBILE (può essere infranto da cluster)
+MAX_TASKS_PER_PRIORITY = 2  # Max 2 task Early-Out per cleaner (base, infrangibile da cluster vicini)
+
+
+Subito sotto aggiungi:
+
+# Zona geografica “micro-cluster”: es. Tortona/Voghera
+ZONE_RADIUS_KM = 0.25  # ~250 metri
+
+
+Puoi tarare lo 0.25 a piacere (0.2–0.3 km di solito è ok per “stessa zona”).
+
+1.2. Aggiungi same_zone vicino a same_street
+
+Hai già:
+
+def same_building(a: Optional[str], b: Optional[str]) -> bool:
+    ...
+
+def same_street(a: Optional[str], b: Optional[str]) -> bool:
+    na, nb = normalize_addr(a), normalize_addr(b)
+    if not na or not nb:
+        return False
+    sa, _ = split_street_number(na)
+    sb, _ = split_street_number(nb)
+    return sa == sb
+
+
+Subito dopo same_street aggiungi:
+
+def same_zone(a: Optional["Task"], b: Optional["Task"]) -> bool:
+    """
+    Due task sono nella stessa 'zona' se:
+    - stesso edificio, oppure
+    - stessa via, oppure
+    - distanza geografica <= ZONE_RADIUS_KM
+    """
+    if a is None or b is None:
+        return False
+
+    # stesso edificio o stessa via = stessa zona
+    if same_building(a.address, b.address):
+        return True
+    if same_street(a.address, b.address):
+        return True
+
+    try:
+        km = haversine_km(a.lat, a.lng, b.lat, b.lng)
+    except Exception:
+        return False
+
+    return km <= ZONE_RADIUS_KM
+
+
+(from __future__ import annotations in testa al file ti permette il tipo "Task" come stringa.)
+
+1.3. Rafforza il clustering in can_add_task
+
+Nel blocco “CLUSTERING AVANZATO” dentro can_add_task, ora hai:
+
+    # CLUSTERING AVANZATO: controlla vicinanza con task esistenti
+    if current_count > 0:
+        # Cluster prioritario: ≤5' o stessa via
+        is_priority_cluster = any(
+            (travel_minutes(existing_task, task) <= CLUSTER_PRIORITY_TRAVEL or
+             travel_minutes(task, existing_task) <= CLUSTER_PRIORITY_TRAVEL or
+             same_street(existing_task.address, task.address))
+            for existing_task in cleaner.route
+        )
+
+
+Sostituisci con:
+
+    # CLUSTERING AVANZATO: controlla vicinanza con task esistenti
+    if current_count > 0:
+        # Cluster prioritario: stessa ZONA oppure travel ≤ 5'
+        is_priority_cluster = any(
+            (
+                same_zone(existing_task, task)
+                or travel_minutes(existing_task, task) <= CLUSTER_PRIORITY_TRAVEL
+                or travel_minutes(task, existing_task) <= CLUSTER_PRIORITY_TRAVEL
+            )
+            for existing_task in cleaner.route
+        )
+
+
+Il resto del blocco (is_extended_cluster ecc.) lo lasci com’è.
+
+1.4. Nuova priorità “stessa zona” in plan_day
+
+In plan_day trovi il pezzo:
+
+        if same_building_candidates:
+            # PRIORITÀ MASSIMA: stesso edificio = massima aggregazione
+            # Preferisci chi ha già più task (massimo clustering)
+            same_building_candidates.sort(key=lambda x: (-len(x[0].route), x[2]))
+            chosen = same_building_candidates[0]
+        # Priorità 2: Stessa via (senza numero civico)
+        elif any(
+            same_street(c.route[0].address if c.route else "", task.address)
+            for c, _, _ in candidates if c.route
+        ):
+            same_street_candidates = [
+                (c, p, t) for c, p, t in candidates
+                if any(same_street(ex.address, task.address) for ex in c.route)
+            ]
+            # Preferisci chi ha già più task nella stessa via
+            same_street_candidates.sort(key=lambda x: (-len(x[0].route), x[2]))
+            chosen = same_street_candidates[0]
+        else:
+            # Priorità 3: Cluster prioritario (≤5' o stessa via)
+            priority_cluster_candidates = []
+            for c, p, t in candidates:
+                has_priority_cluster = any(
+                    (travel_minutes(existing_task, task) <= CLUSTER_PRIORITY_TRAVEL or
+                     travel_minutes(task, existing_task) <= CLUSTER_PRIORITY_TRAVEL or
+                     same_street(existing_task.address, task.address))
+                    for existing_task in c.route
+                ) if len(c.route) > 0 else False
+                ...
+
+
+Sostituisci TUTTO quel blocco con questa versione:
+
+        if same_building_candidates:
+            # PRIORITÀ MASSIMA: stesso edificio = massima aggregazione
+            same_building_candidates.sort(key=lambda x: (-len(x[0].route), x[2]))
+            chosen = same_building_candidates[0]
+
+        # Priorità 2: stessa ZONA (via uguale o molto vicini, es. Tortona/Voghera)
+        elif any(
+            any(same_zone(ex, task) for ex in c.route)
+            for c, _, _ in candidates if c.route
+        ):
+            zone_candidates = [
+                (c, p, t) for c, p, t in candidates
+                if any(same_zone(ex, task) for ex in c.route)
+            ]
+            # preferisci chi ha più task nella zona, poi viaggio minore
+            zone_candidates.sort(key=lambda x: (-len(x[0].route), x[2]))
+            chosen = zone_candidates[0]
+
+        else:
+            # Priorità 3: Cluster prioritario (≤5' o stessa zona)
+            priority_cluster_candidates = []
+            for c, p, t in candidates:
+                has_priority_cluster = any(
+                    (
+                        same_zone(existing_task, task)
+                        or travel_minutes(existing_task, task) <= CLUSTER_PRIORITY_TRAVEL
+                        or travel_minutes(task, existing_task) <= CLUSTER_PRIORITY_TRAVEL
+                    )
+                    for existing_task in c.route
+                ) if len(c.route) > 0 else False
+
+                if has_priority_cluster:
+                    priority_cluster_candidates.append((c, p, t))
+
+            if priority_cluster_candidates:
+                # Massima priorità: più task = più cluster
+                priority_cluster_candidates.sort(key=lambda x: (-len(x[0].route), x[2]))
+                chosen = priority_cluster_candidates[0]
+            else:
+                # Priorità 4: Cluster esteso (≤10')
+                extended_cluster_candidates = []
+                for c, p, t in candidates:
+                    has_extended_cluster = any(
+                        (travel_minutes(existing_task, task) <= CLUSTER_EXTENDED_TRAVEL or
+                         travel_minutes(task, existing_task) <= CLUSTER_EXTENDED_TRAVEL)
+                        for existing_task in c.route
+                    ) if len(c.route) > 0 else False
+                    if has_extended_cluster:
+                        extended_cluster_candidates.append((c, p, t))
+
+                if extended_cluster_candidates:
+                    # Alta priorità: più task = più cluster
+                    extended_cluster_candidates.sort(key=lambda x: (-len(x[0].route), x[2]))
+                    chosen = extended_cluster_candidates[0]
+                else:
+                    # Nessun cluster: logica normale
+                    preferred = [(c, p, t) for c, p, t in candidates if t < PREFERRED_TRAVEL]
+                    others = [(c, p, t) for c, p, t in candidates if t >= PREFERRED_TRAVEL]
+
+                    if preferred:
+                        preferred.sort(key=lambda x: (-len(x[0].route), x[2]))
+                        chosen = preferred[0]
+                    else:
+                        others.sort(key=lambda x: (-len(x[0].route), x[2]))
+                        chosen = others[0]
+
+2️⃣ Modifiche a assign_hp.py e assign_lp.py
+
+La logica lì è praticamente la stessa, solo che travel_minutes prende lat/lng separati.
+
+2.1. Aggiungi ZONE_RADIUS_KM
+
+In entrambi i file, vicino a:
+
+# CONFIG - REGOLE CLUSTERING OTTIMIZZATE
+CLUSTER_PRIORITY_TRAVEL = 5.0
+CLUSTER_EXTENDED_TRAVEL = 10.0
+CLUSTER_MAX_TRAVEL = 15.0
+
+
+aggiungi:
+
+ZONE_RADIUS_KM = 0.25  # ~250m, micro-zona
+
+2.2. Aggiungi same_zone (versione con lat/lng)
+
+Subito dopo same_street in ciascun file:
+
+def same_street(a: Optional[str], b: Optional[str]) -> bool:
+    na, nb = normalize_addr(a), normalize_addr(b)
+    if not na or not nb:
+        return False
+    sa, _ = split_street_number(na)
+    sb, _ = split_street_number(nb)
+    return sa == sb
+
+
+aggiungi:
+
+def same_zone(a_lat: float, a_lng: float, b_lat: float, b_lng: float,
+              a_addr: Optional[str] = None, b_addr: Optional[str] = None) -> bool:
+    """
+    Zona condivisa se:
+    - stesso edificio
+    - oppure stessa via
+    - oppure distanza <= ZONE_RADIUS_KM
+    """
+    if a_addr and b_addr and same_building(a_addr, b_addr):
+        return True
+    if a_addr and b_addr and same_street(a_addr, b_addr):
+        return True
+
+    try:
+        km = haversine_km(a_lat, a_lng, b_lat, b_lng)
+    except Exception:
+        return False
+
+    return km <= ZONE_RADIUS_KM
+
+2.3. Usa same_zone in can_add_task (HP e LP)
+
+Nel blocco CLUSTERING AVANZATO hai attualmente:
+
+        # Cluster prioritario: ≤5' o stessa via
+        is_priority_cluster = any(
+            (travel_minutes(existing_task.lat, existing_task.lng, task.lat, task.lng,
+                          existing_task.address, task.address) <= CLUSTER_PRIORITY_TRAVEL or
+             travel_minutes(task.lat, task.lng, existing_task.lat, existing_task.lng,
+                          task.address, existing_task.address) <= CLUSTER_PRIORITY_TRAVEL or
+             same_street(existing_task.address, task.address))
+            for existing_task in cleaner.route
+        )
+
+
+Sostituisci con:
+
+        # Cluster prioritario: stessa ZONA oppure travel ≤ 5'
+        is_priority_cluster = any(
+            (
+                same_zone(existing_task.lat, existing_task.lng, task.lat, task.lng,
+                          existing_task.address, task.address)
+                or travel_minutes(existing_task.lat, existing_task.lng, task.lat, task.lng,
+                                  existing_task.address, task.address) <= CLUSTER_PRIORITY_TRAVEL
+                or travel_minutes(task.lat, task.lng, existing_task.lat, existing_task.lng,
+                                  task.address, existing_task.address) <= CLUSTER_PRIORITY_TRAVEL
+            )
+            for existing_task in cleaner.route
+        )
+
+
+Il resto (is_extended_cluster ecc.) resta com’è.
+
+2.4. Priorità “zona” in plan_day (HP e LP)
+
+In entrambi i file, dentro plan_day, sostituisci il blocco:
+
+        if same_building_candidates:
+            ...
+        # Priorità 2: Stessa via (senza numero civico)
+        elif any(
+            same_street(c.route[0].address if c.route else "", task.address)
+            for c, _, _ in candidates if c.route
+        ):
+            same_street_candidates = [
+                (c, p, t) for c, p, t in candidates
+                if any(same_street(ex.address, task.address) for ex in c.route)
+            ]
+            same_street_candidates.sort(key=lambda x: (-len(x[0].route), x[2]))
+            chosen = same_street_candidates[0]
+        else:
+            # Priorità 2: Cleaner con task entro 10 minuti (cluster)
+            ...
+
+
+con qualcosa sullo schema:
+
+        if same_building_candidates:
+            same_building_candidates.sort(key=lambda x: (-len(x[0].route), x[2]))
+            chosen = same_building_candidates[0]
+
+        # Priorità 2: stessa ZONA
+        elif any(
+            any(
+                same_zone(ex.lat, ex.lng, task.lat, task.lng, ex.address, task.address)
+                for ex in c.route
+            )
+            for c, _, _ in candidates if c.route
+        ):
+            zone_candidates = [
+                (c, p, t) for c, p, t in candidates
+                if any(
+                    same_zone(ex.lat, ex.lng, task.lat, task.lng, ex.address, task.address)
+                    for ex in c.route
+                )
+            ]
+            zone_candidates.sort(key=lambda x: (-len(x[0].route), x[2]))
+            chosen = zone_candidates[0]
+
+        else:
+            # Priorità successiva: cleaner con task entro 10 minuti (cluster generico)
+            cluster_candidates = []
+            for c, p, t in candidates:
+                has_cluster = any(
+                    travel_minutes(existing_task.lat, existing_task.lng, task.lat, task.lng,
+                                   existing_task.address, task.address) <= CLUSTER_MAX_TRAVEL or
+                    travel_minutes(task.lat, task.lng, existing_task.lat, existing_task.lng,
+                                   task.address, existing_task.address) <= CLUSTER_MAX_TRAVEL
+                    for existing_task in c.route
+                )
+                if has_cluster:
+                    cluster_candidates.append((c, p, t))
+
+            if cluster_candidates:
+                cluster_candidates.sort(key=lambda x: (len(x[0].route), x[2]))
+                chosen = cluster_candidates[0]
+            else:
+                # fallback già presente (preferred/others)
+                ...
+
+
+(dove nel ... rimetti la tua logica attuale di fallback.)
+
+3️⃣ Cosa ottieni sul caso Tortona / Voghera
+
+Con queste modifiche:
+
+Task in VIA VOGHERA, 4 e task in VIA TORTONA, 10 hanno distanza ≈ 0.045 km (45 m).
+
+same_zone(...) le considera stessa zona (km ≤ 0.25).
+
+In plan_day, per la seconda task in quella zona:
+
+prima si controlla se qualche cleaner ha già quella zona → sì, il cleaner che ha la prima Voghera/Tortona;
+
+viene scelto lui come chosen a priorità 2;
+
+e in can_add_task avere già task nella stessa zona sblocca i limiti di tipologia come un vero cluster prioritario.
+
+Risultato pratico: tutte le ExPRDS / NTM di Tortona/Voghera tenderanno a finire sullo stesso cleaner (Alexander o chi parte da lì) in sequenza, invece di spalmarsi su Aracely / Lafortune / ecc.
