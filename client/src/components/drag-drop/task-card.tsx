@@ -710,7 +710,8 @@ export default function TaskCard({
                 ) : (
                   <p
                     className={`text-sm p-1 rounded ${!isReadOnly ? 'cursor-pointer hover:bg-muted/50' : ''}`}
-                    onClick={() => {
+                    onClick={(e) => {
+                      e.stopPropagation();
                       console.log('🖱️ Click su Durata - isReadOnly:', isReadOnly, '!isReadOnly:', !isReadOnly);
                       if (!isReadOnly) {
                         console.log('✅ Apertura campo edit per duration');
@@ -760,7 +761,8 @@ export default function TaskCard({
                 ) : (
                   <p
                     className={`text-sm p-1 rounded ${!isReadOnly ? 'cursor-pointer hover:bg-muted/50' : ''}`}
-                    onClick={() => {
+                    onClick={(e) => {
+                      e.stopPropagation();
                       console.log('🖱️ Click su Check-out - isReadOnly:', isReadOnly);
                       if (!isReadOnly) setEditingField('checkout');
                     }}
@@ -811,7 +813,8 @@ export default function TaskCard({
                 ) : (
                   <p
                     className={`text-sm p-1 rounded ${!isReadOnly ? 'cursor-pointer hover:bg-muted/50' : ''}`}
-                    onClick={() => {
+                    onClick={(e) => {
+                      e.stopPropagation();
                       console.log('🖱️ Click su Check-in - isReadOnly:', isReadOnly);
                       if (!isReadOnly) setEditingField('checkin');
                     }}
@@ -865,7 +868,10 @@ export default function TaskCard({
                 ) : (
                   <p
                     className={`text-sm p-1 rounded ${!isReadOnly ? 'cursor-pointer hover:bg-muted/50' : ''}`}
-                    onClick={() => !isReadOnly && setEditingField('operation')}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (!isReadOnly) setEditingField('operation');
+                    }}
                   >
                     {!isConfirmedOperation 
                       ? "non migrato" 
@@ -904,7 +910,8 @@ export default function TaskCard({
                 ) : (
                   <p
                     className={`text-sm p-1 rounded ${!isReadOnly ? 'cursor-pointer hover:bg-muted/50' : ''}`}
-                    onClick={() => {
+                    onClick={(e) => {
+                      e.stopPropagation();
                       console.log('🖱️ Click su Pax-in - isReadOnly:', isReadOnly);
                       if (!isReadOnly) setEditingField('paxin');
                     }}
