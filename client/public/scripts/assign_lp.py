@@ -611,55 +611,64 @@ def plan_day(tasks: List[Task], cleaners: List[Cleaner], assigned_logistic_codes
             same_address_candidates.sort(key=lambda x: (len(x[0].route), x[2]))
             chosen = same_address_candidates[0]
         else:
-            # Priorità 2: Cleaner con task entro 15 minuti (cluster)
-            cluster_candidates = []
+            # Priorità 2: Cluster prioritario (≤5' o stessa via)
+            # REGOLA SPECIALE: ignora distribuzione e limiti per cluster stretti
+            priority_cluster_candidates = []
             for c, p, t in candidates:
-                # Controlla se il cleaner ha task entro 15 minuti
-                has_cluster = any(
+                has_priority_cluster = any(
                     travel_minutes(existing_task.lat, existing_task.lng, task.lat, task.lng,
-                                 existing_task.address, task.address) <= CLUSTER_MAX_TRAVEL or
+                                 existing_task.address, task.address) <= CLUSTER_PRIORITY_TRAVEL or
                     travel_minutes(task.lat, task.lng, existing_task.lat, existing_task.lng,
-                                 task.address, existing_task.address) <= CLUSTER_MAX_TRAVEL
+                                 task.address, existing_task.address) <= CLUSTER_PRIORITY_TRAVEL or
+                    same_street(existing_task.address, task.address)
                     for existing_task in c.route
                 )
-                if has_cluster:
-                    cluster_candidates.append((c, p, t))
+                if has_priority_cluster:
+                    priority_cluster_candidates.append((c, p, t))
 
-            if cluster_candidates:
-                # Priorità alta a cleaner in cluster
-                # NUOVO: preferisci chi ha meno task totali (per evitare di superare 4)
-                cluster_candidates.sort(key=lambda x: (
-                    x[0].total_daily_tasks + len(x[0].route),  # Totale task (EO+HP+LP)
-                    len(x[0].route),  # Task LP
-                    x[2]  # Travel time
-                ))
-                chosen = cluster_candidates[0]
+            if priority_cluster_candidates:
+                # CLUSTER STRETTO: preferisci aggregazione (più task, minor viaggio)
+                # Ignora limite distribuzione - favorisci creazione cluster
+                priority_cluster_candidates.sort(key=lambda x: (-len(x[0].route), x[2]))
+                chosen = priority_cluster_candidates[0]
             else:
-                # Nessun cluster, usa logica normale
-                # Dividi i candidati in due gruppi: < 20' e >= 20'
-                preferred = [(c, p, t) for c, p, t in candidates if t < PREFERRED_TRAVEL]
-                others = [(c, p, t) for c, p, t in candidates if t >= PREFERRED_TRAVEL]
+                # Priorità 3: Cluster esteso (≤15')
+                cluster_candidates = []
+                for c, p, t in candidates:
+                    has_cluster = any(
+                        travel_minutes(existing_task.lat, existing_task.lng, task.lat, task.lng,
+                                     existing_task.address, task.address) <= CLUSTER_MAX_TRAVEL or
+                        travel_minutes(task.lat, task.lng, existing_task.lat, existing_task.lng,
+                                     task.address, existing_task.address) <= CLUSTER_MAX_TRAVEL
+                        for existing_task in c.route
+                    )
+                    if has_cluster:
+                        cluster_candidates.append((c, p, t))
 
-                # Scegli dal gruppo preferito se esiste, altrimenti dal gruppo altri
-                if preferred:
-                    # NUOVO: preferisci chi ha meno task totali (per evitare di superare 4)
-                    # Ma tra quelli con stesso totale, preferisci chi ha più LP (per aggregare)
-                    preferred.sort(key=lambda x: (
-                        x[0].total_daily_tasks + len(x[0].route) >= PREFERRED_DAILY_TASKS,  # Evita >= 4
-                        x[0].total_daily_tasks + len(x[0].route),  # Totale task
-                        -len(x[0].route),  # Più task LP (aggregazione)
-                        x[2]  # Travel time
-                    ))
-                    chosen = preferred[0]
+                if cluster_candidates:
+                    # Cluster esteso: favorisci aggregazione
+                    cluster_candidates.sort(key=lambda x: (-len(x[0].route), x[2]))
+                    chosen = cluster_candidates[0]
                 else:
-                    # Stesso per gli altri
-                    others.sort(key=lambda x: (
-                        x[0].total_daily_tasks + len(x[0].route) >= PREFERRED_DAILY_TASKS,
-                        x[0].total_daily_tasks + len(x[0].route),
-                        -len(x[0].route),
-                        x[2]
-                    ))
-                    chosen = others[0]
+                    # Nessun cluster: applica priorità alla distribuzione
+                    preferred = [(c, p, t) for c, p, t in candidates if t < PREFERRED_TRAVEL]
+                    others = [(c, p, t) for c, p, t in candidates if t >= PREFERRED_TRAVEL]
+
+                    if preferred:
+                        # Distribuzione: preferisci cleaners con MENO task totali
+                        preferred.sort(key=lambda x: (
+                            x[0].total_daily_tasks + len(x[0].route),  # Totale task
+                            len(x[0].route),  # Task LP
+                            x[2]  # Travel time
+                        ))
+                        chosen = preferred[0]
+                    else:
+                        others.sort(key=lambda x: (
+                            x[0].total_daily_tasks + len(x[0].route),
+                            len(x[0].route),
+                            x[2]
+                        ))
+                        chosen = others[0]
 
         cleaner, pos, travel = chosen
         cleaner.route.insert(pos, task)

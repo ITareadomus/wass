@@ -485,6 +485,7 @@ def plan_day(tasks: List[Task], cleaners: List[Cleaner], assigned_logistic_codes
             chosen = same_address_candidates[0]
         else:
             # Priorità 2: Cluster prioritario (≤5' o stessa via)
+            # REGOLA SPECIALE: ignora distribuzione e limiti per cluster stretti
             priority_cluster_candidates = []
             for c, p, t in candidates:
                 has_priority_cluster = any(
@@ -497,7 +498,8 @@ def plan_day(tasks: List[Task], cleaners: List[Cleaner], assigned_logistic_codes
                     priority_cluster_candidates.append((c, p, t))
 
             if priority_cluster_candidates:
-                # Massima priorità: più task = più cluster
+                # CLUSTER STRETTO: preferisci aggregazione (più task, minor viaggio)
+                # Ignora limite distribuzione - favorisci creazione cluster
                 priority_cluster_candidates.sort(key=lambda x: (-len(x[0].route), x[2]))
                 chosen = priority_cluster_candidates[0]
             else:
@@ -513,19 +515,20 @@ def plan_day(tasks: List[Task], cleaners: List[Cleaner], assigned_logistic_codes
                         extended_cluster_candidates.append((c, p, t))
 
                 if extended_cluster_candidates:
-                    # Alta priorità: più task = più cluster
+                    # Cluster esteso: favorisci aggregazione
                     extended_cluster_candidates.sort(key=lambda x: (-len(x[0].route), x[2]))
                     chosen = extended_cluster_candidates[0]
                 else:
-                    # Nessun cluster: logica normale
+                    # Nessun cluster: applica priorità alla distribuzione
                     preferred = [(c, p, t) for c, p, t in candidates if t < PREFERRED_TRAVEL]
                     others = [(c, p, t) for c, p, t in candidates if t >= PREFERRED_TRAVEL]
 
                     if preferred:
-                        preferred.sort(key=lambda x: (-len(x[0].route), x[2]))
+                        # Distribuzione: preferisci cleaners con MENO task
+                        preferred.sort(key=lambda x: (len(x[0].route), x[2]))
                         chosen = preferred[0]
                     else:
-                        others.sort(key=lambda x: (-len(x[0].route), x[2]))
+                        others.sort(key=lambda x: (len(x[0].route), x[2]))
                         chosen = others[0]
 
         cleaner, pos, travel = chosen
