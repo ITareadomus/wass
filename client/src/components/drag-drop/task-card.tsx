@@ -691,7 +691,7 @@ export default function TaskCard({
                   {!isReadOnly && <Pencil className="w-3 h-3 text-muted-foreground/60" />}
                 </p>
                 {editingField === 'duration' && !isReadOnly ? (
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
                     <Input
                       type="text"
                       inputMode="numeric"
@@ -701,6 +701,9 @@ export default function TaskCard({
                         const value = e.target.value.replace(/\D/g, '');
                         setEditedDuration(value);
                       }}
+                      onFocus={(e) => e.stopPropagation()}
+                      onBlur={(e) => e.stopPropagation()}
+                      onClick={(e) => e.stopPropagation()}
                       className="text-sm w-20 [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                       min="0"
                       autoFocus
@@ -735,14 +738,19 @@ export default function TaskCard({
                   {!isReadOnly && <Pencil className="w-3 h-3 text-muted-foreground/60" />}
                 </p>
                 {editingField === 'checkout' && !isReadOnly ? (
-                  <div className="space-y-2">
+                  <div className="space-y-2" onClick={(e) => e.stopPropagation()}>
                     <div className="relative">
                       <Input
                         id="checkout-date-input"
                         type="date"
                         value={editedCheckoutDate}
                         onChange={(e) => setEditedCheckoutDate(e.target.value)}
-                        onFocus={(e) => e.target.showPicker?.()}
+                        onFocus={(e) => {
+                          e.stopPropagation();
+                          e.target.showPicker?.();
+                        }}
+                        onBlur={(e) => e.stopPropagation()}
+                        onClick={(e) => e.stopPropagation()}
                         className="text-sm cursor-text"
                         autoFocus
                       />
@@ -753,7 +761,12 @@ export default function TaskCard({
                         type="time"
                         value={editedCheckoutTime}
                         onChange={(e) => setEditedCheckoutTime(e.target.value)}
-                        onFocus={(e) => e.target.showPicker?.()}
+                        onFocus={(e) => {
+                          e.stopPropagation();
+                          e.target.showPicker?.();
+                        }}
+                        onBlur={(e) => e.stopPropagation()}
+                        onClick={(e) => e.stopPropagation()}
                         className="text-sm cursor-text"
                       />
                     </div>
@@ -787,14 +800,19 @@ export default function TaskCard({
                   {!isReadOnly && <Pencil className="w-3 h-3 text-muted-foreground/60" />}
                 </p>
                 {editingField === 'checkin' && !isReadOnly ? (
-                  <div className="space-y-2">
+                  <div className="space-y-2" onClick={(e) => e.stopPropagation()}>
                     <div className="relative">
                       <Input
                         id="checkin-date-input"
                         type="date"
                         value={editedCheckinDate}
                         onChange={(e) => setEditedCheckinDate(e.target.value)}
-                        onFocus={(e) => e.target.showPicker?.()}
+                        onFocus={(e) => {
+                          e.stopPropagation();
+                          e.target.showPicker?.();
+                        }}
+                        onBlur={(e) => e.stopPropagation()}
+                        onClick={(e) => e.stopPropagation()}
                         className="text-sm cursor-text"
                         autoFocus
                       />
@@ -805,7 +823,12 @@ export default function TaskCard({
                         type="time"
                         value={editedCheckinTime}
                         onChange={(e) => setEditedCheckinTime(e.target.value)}
-                        onFocus={(e) => e.target.showPicker?.()}
+                        onFocus={(e) => {
+                          e.stopPropagation();
+                          e.target.showPicker?.();
+                        }}
+                        onBlur={(e) => e.stopPropagation()}
+                        onClick={(e) => e.stopPropagation()}
                         className="text-sm cursor-text"
                       />
                     </div>
@@ -849,7 +872,7 @@ export default function TaskCard({
                   {!isReadOnly && <Pencil className="w-3 h-3 text-muted-foreground/60" />}
                 </p>
                 {editingField === 'operation' && !isReadOnly ? (
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
                     <Input
                       type="text"
                       inputMode="numeric"
@@ -859,6 +882,9 @@ export default function TaskCard({
                         const value = e.target.value.replace(/\D/g, '');
                         setEditedOperationId(value);
                       }}
+                      onFocus={(e) => e.stopPropagation()}
+                      onBlur={(e) => e.stopPropagation()}
+                      onClick={(e) => e.stopPropagation()}
                       className="text-sm w-20 [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                       min="0"
                       autoFocus
@@ -891,7 +917,7 @@ export default function TaskCard({
                   {!isReadOnly && <Pencil className="w-3 h-3 text-muted-foreground/60" />}
                 </p>
                 {editingField === 'paxin' && !isReadOnly ? (
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
                     <Input
                       type="text"
                       inputMode="numeric"
@@ -901,6 +927,9 @@ export default function TaskCard({
                         const value = e.target.value.replace(/\D/g, '');
                         setEditedPaxIn(value);
                       }}
+                      onFocus={(e) => e.stopPropagation()}
+                      onBlur={(e) => e.stopPropagation()}
+                      onClick={(e) => e.stopPropagation()}
                       className="text-sm w-20 [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                       min="0"
                       autoFocus
