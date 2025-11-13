@@ -1,23 +1,6 @@
 {
-  "cleaners": [
-    {
-      "id": 626,
-      "name": "DORA PATRICIA",
-      "lastname": "JIMENEZ",
-      "role": "Formatore",
-      "active": true,
-      "ranking": 0,
-      "counter_hours": 20.25,
-      "counter_days": 3,
-      "available": false,
-      "contract_type": "B",
-      "preferred_customers": [],
-      "telegram_id": null,
-      "start_time": "10:00",
-      "can_do_straordinaria": false
-    }
-  ],
-  "total_selected": 1,
+  "cleaners": [],
+  "total_selected": 0,
   "metadata": {
     "date": "2025-11-13",
     "saved_at": "2025-11-13T15:36:12.829Z",
