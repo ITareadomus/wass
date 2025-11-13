@@ -518,6 +518,22 @@ export default function TaskCard({
                         />
                       </div>
                     )}
+                    
+                    {/* Frecce check-in e check-out */}
+                    {((task as any).checkout_time || (task as any).checkin_time) && (
+                      <div className="absolute right-1 top-1/2 -translate-y-1/2 flex flex-col gap-0.5 z-40">
+                        {(task as any).checkout_time && (
+                          <div className="flex items-center gap-0.5">
+                            <span className="text-green-600 font-bold text-xs leading-none">↑</span>
+                          </div>
+                        )}
+                        {(task as any).checkin_time && (
+                          <div className="flex items-center gap-0.5">
+                            <span className="text-red-600 font-bold text-xs leading-none">↓</span>
+                          </div>
+                        )}
+                      </div>
+                    )}
                     <div
                       className="flex flex-col items-start justify-start h-full gap-0 p-[0.5px] pl-1"
                     >
