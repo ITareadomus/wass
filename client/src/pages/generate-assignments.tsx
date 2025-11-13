@@ -1796,41 +1796,41 @@ export default function GenerateAssignments() {
                 </div>
                 <div className="p-4 grid grid-cols-2 gap-3">
                   {/* Totale Task */}
-                  <div className="bg-blue-50 dark:bg-blue-950/20 rounded-lg p-3 border border-blue-200 dark:border-blue-800">
-                    <div className="text-xs text-blue-600 dark:text-blue-400 font-medium mb-1">Totale</div>
-                    <div className="text-2xl font-bold text-blue-700 dark:text-blue-300">
+                  <div className="bg-blue-100 dark:bg-blue-950/50 rounded-lg p-3 border-2 border-blue-300 dark:border-blue-700">
+                    <div className="text-xs text-blue-700 dark:text-blue-300 font-medium mb-1">Totale</div>
+                    <div className="text-2xl font-bold text-blue-800 dark:text-blue-200">
                       {allTasksWithAssignments.length}
                     </div>
                   </div>
 
                   {/* Premium */}
-                  <div className="bg-yellow-50 dark:bg-yellow-950/20 rounded-lg p-3 border border-yellow-200 dark:border-yellow-800">
-                    <div className="text-xs text-yellow-600 dark:text-yellow-400 font-medium mb-1">Premium</div>
-                    <div className="text-2xl font-bold text-yellow-700 dark:text-yellow-300">
+                  <div className="bg-yellow-100 dark:bg-yellow-950/50 rounded-lg p-3 border-2 border-yellow-300 dark:border-yellow-700">
+                    <div className="text-xs text-yellow-700 dark:text-yellow-300 font-medium mb-1">Premium</div>
+                    <div className="text-2xl font-bold text-yellow-800 dark:text-yellow-200">
                       {allTasksWithAssignments.filter(t => !t.straordinaria && t.premium).length}
                     </div>
                   </div>
 
                   {/* Standard */}
-                  <div className="bg-green-50 dark:bg-green-950/20 rounded-lg p-3 border border-green-200 dark:border-green-800">
-                    <div className="text-xs text-green-600 dark:text-green-400 font-medium mb-1">Standard</div>
-                    <div className="text-2xl font-bold text-green-700 dark:text-green-300">
+                  <div className="bg-green-100 dark:bg-green-950/50 rounded-lg p-3 border-2 border-green-300 dark:border-green-700">
+                    <div className="text-xs text-green-700 dark:text-green-300 font-medium mb-1">Standard</div>
+                    <div className="text-2xl font-bold text-green-800 dark:text-green-200">
                       {allTasksWithAssignments.filter(t => !t.straordinaria && !t.premium).length}
                     </div>
                   </div>
 
                   {/* Straordinarie */}
-                  <div className="bg-red-50 dark:bg-red-950/20 rounded-lg p-3 border border-red-200 dark:border-red-800">
-                    <div className="text-xs text-red-600 dark:text-red-400 font-medium mb-1">Straordinarie</div>
-                    <div className="text-2xl font-bold text-red-700 dark:text-red-300">
+                  <div className="bg-red-100 dark:bg-red-950/50 rounded-lg p-3 border-2 border-red-300 dark:border-red-700">
+                    <div className="text-xs text-red-700 dark:text-red-300 font-medium mb-1">Straordinarie</div>
+                    <div className="text-2xl font-bold text-red-800 dark:text-red-200">
                       {allTasksWithAssignments.filter(t => t.straordinaria).length}
                     </div>
                   </div>
 
                   {/* Non Assegnate */}
-                  <div className="bg-gray-50 dark:bg-gray-950/20 rounded-lg p-3 border border-gray-200 dark:border-gray-800 col-span-2 text-center">
-                    <div className="text-xs text-gray-600 dark:text-gray-400 font-medium mb-1">Non Assegnate</div>
-                    <div className="text-2xl font-bold text-gray-700 dark:text-gray-300">
+                  <div className="bg-gray-100 dark:bg-gray-950/50 rounded-lg p-3 border-2 border-gray-300 dark:border-gray-700 col-span-2 text-center">
+                    <div className="text-xs text-gray-700 dark:text-gray-300 font-medium mb-1">Non Assegnate</div>
+                    <div className="text-2xl font-bold text-gray-800 dark:text-gray-200">
                       {unassignedTasks.length}
                     </div>
                   </div>
