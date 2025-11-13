@@ -18,19 +18,19 @@ INPUT_EO_ASSIGN = BASE / "output" / "early_out_assignments.json"
 OUTPUT_ASSIGN = BASE / "output" / "high_priority_assignments.json"
 
 # =============================
-# CONFIG - REGOLE SEMPLIFICATE
+# CONFIG - REGOLE CLUSTERING OTTIMIZZATE
 # =============================
 BASE_MAX_TASKS = 2  # Base: max 2 task per cleaner
-BONUS_TASK_MAX_TRAVEL = 10.0  # +1 task se travel <= 10'
+CLUSTER_PRIORITY_TRAVEL = 5.0  # Cluster prioritario: <= 5' (massima priorità)
+CLUSTER_EXTENDED_TRAVEL = 10.0  # Cluster esteso: <= 10' (infrange limiti tipologia)
 ABSOLUTE_MAX_TASKS = 4  # Max assoluto 4 task
 ABSOLUTE_MAX_TASKS_IF_BEFORE_18 = 5  # Max 5 task se finisce entro le 18:00
-MIN_TASKS_PER_CLEANER = 2  # Minimo 2 task per cleaner
-CLUSTER_MAX_TRAVEL = 15.0  # Se task <= 15' da qualsiasi altra, ignora limite di task
+DAILY_TASK_LIMIT = 5  # Limite giornaliero HARD
 
-PREFERRED_TRAVEL = 20.0  # Preferenza per percorsi < 20' (aumentato per favorire aggregazione)
+PREFERRED_TRAVEL = 20.0  # Preferenza per percorsi < 20'
 
-# NUOVO: Limite per tipologia di priorità
-MAX_TASKS_PER_PRIORITY = 2  # Max 2 task High-Priority per cleaner
+# NUOVO: Limite per tipologia FLESSIBILE (può essere infranto da cluster)
+MAX_TASKS_PER_PRIORITY = 2  # Max 2 task High-Priority per cleaner (base, infrangibile da cluster vicini)
 
 HP_HARD_EARLIEST_H = 11
 HP_HARD_EARLIEST_M = 0
@@ -297,63 +297,67 @@ def can_add_task(cleaner: Cleaner, task: Task) -> bool:
     Verifica se è possibile aggiungere una task al cleaner secondo le regole:
     1. Premium task -> premium cleaner
     2. Straordinaria -> premium cleaner, deve essere la prima (pos=0)
-    3. Max 2 task base, +1 se travel <= 10', max assoluto 4 (o 5 se finisce entro 18:00)
-    4. Max 2 task High-Priority per cleaner
+    3. CLUSTERING: appartamenti vicini (≤10') possono infrangere limiti tipologia
+    4. Stessa via o ≤5': massima priorità cluster
+    5. Limite giornaliero: max 5 task totali (EO+HP+LP)
     """
     if not can_handle_premium(cleaner, task):
         return False
 
-    # NUOVO: Limite max 2 task High-Priority per cleaner
-    # Conta solo le task HP già nella route (non contare EO)
-    if len(cleaner.route) >= MAX_TASKS_PER_PRIORITY:
+    current_count = len(cleaner.route)
+    
+    # Calcola totale task giornaliere (EO già fatte + HP in route)
+    total_daily = cleaner.eo_last_sequence + current_count
+
+    # Limite giornaliero HARD: max 5 task
+    if total_daily >= DAILY_TASK_LIMIT:
         return False
 
     # Straordinaria deve andare per forza in pos 0
     if task.straordinaria:
-        if len(cleaner.route) > 0:
+        if current_count > 0:
             return False
 
     # Se il cleaner ha già una straordinaria, non può aggiungerne altre
-    if len(cleaner.route) > 0 and cleaner.route[0].straordinaria:
+    if current_count > 0 and cleaner.route[0].straordinaria:
         if task.straordinaria:
             return False
 
-    current_count = len(cleaner.route)
+    # CLUSTERING AVANZATO: controlla vicinanza con task esistenti
+    if current_count > 0:
+        # Cluster prioritario: ≤5' o stessa via
+        is_priority_cluster = any(
+            (travel_minutes(existing_task.lat, existing_task.lng, task.lat, task.lng,
+                          existing_task.address, task.address) <= CLUSTER_PRIORITY_TRAVEL or
+             travel_minutes(task.lat, task.lng, existing_task.lat, existing_task.lng,
+                          task.address, existing_task.address) <= CLUSTER_PRIORITY_TRAVEL or
+             same_street(existing_task.address, task.address))
+            for existing_task in cleaner.route
+        )
 
-    # Task in cluster <= 15': ignora limiti (ma rispetta max assoluto)
-    is_within_cluster = any(
-        travel_minutes(existing_task.lat, existing_task.lng, task.lat, task.lng,
-                     existing_task.address, task.address) <= CLUSTER_MAX_TRAVEL or
-        travel_minutes(task.lat, task.lng, existing_task.lat, existing_task.lng,
-                     task.address, existing_task.address) <= CLUSTER_MAX_TRAVEL
-        for existing_task in cleaner.route
-    ) if current_count > 0 else False
+        # Cluster esteso: ≤10' (infrange limite tipologia)
+        is_extended_cluster = any(
+            (travel_minutes(existing_task.lat, existing_task.lng, task.lat, task.lng,
+                          existing_task.address, task.address) <= CLUSTER_EXTENDED_TRAVEL or
+             travel_minutes(task.lat, task.lng, existing_task.lat, existing_task.lng,
+                          task.address, existing_task.address) <= CLUSTER_EXTENDED_TRAVEL)
+            for existing_task in cleaner.route
+        )
 
-    if is_within_cluster and current_count < ABSOLUTE_MAX_TASKS:
-        return True
+        # Se è in cluster prioritario: ignora tutti i limiti (tranne giornaliero)
+        if is_priority_cluster and total_daily < DAILY_TASK_LIMIT:
+            return True
+
+        # Se è in cluster esteso: ignora limite tipologia, rispetta max assoluto
+        if is_extended_cluster and current_count < ABSOLUTE_MAX_TASKS:
+            return True
 
     # Regola base: max 2 task
     if current_count < BASE_MAX_TASKS:
         return True
 
-    # 3ª task: solo se travel <= 10' dalla task precedente
-    if current_count == BASE_MAX_TASKS:
-        last_task = cleaner.route[-1]
-        tt = travel_minutes(last_task.lat, last_task.lng, task.lat, task.lng,
-                          last_task.address, task.address)
-        if tt <= BONUS_TASK_MAX_TRAVEL:
-            return True
-
-    # 4ª task o più: DEVE rispettare il vincolo dei 10' E max assoluto
-    if current_count >= BASE_MAX_TASKS + 1 and current_count < ABSOLUTE_MAX_TASKS:
-        # Prima verifica: travel <= 10' dalla task precedente
-        last_task = cleaner.route[-1]
-        tt = travel_minutes(last_task.lat, last_task.lng, task.lat, task.lng,
-                          last_task.address, task.address)
-        if tt > BONUS_TASK_MAX_TRAVEL:
-            return False  # Blocca se travel > 10'
-
-        # Seconda verifica: fattibilità temporale
+    # 3ª-5ª task: solo se fattibile temporalmente
+    if current_count >= BASE_MAX_TASKS and current_count < ABSOLUTE_MAX_TASKS:
         test_route = cleaner.route + [task]
         feasible, schedule = evaluate_route(cleaner, test_route)
         if feasible and schedule:
