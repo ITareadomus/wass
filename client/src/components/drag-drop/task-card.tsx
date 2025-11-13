@@ -514,12 +514,6 @@ export default function TaskCard({
                         >
                           {task.name}
                         </span>
-                        <span className={cn(
-                          "opacity-60 leading-none font-bold text-[#000000]",
-                          isInTimeline && isSmallTask ? "text-[8px]" : "text-[11px]"
-                        )}>
-                          ({(task.duration || "0.0").replace(".", ":")}h)
-                        </span>
                       </div>
                       {task.alias && (
                         <span className={cn(
