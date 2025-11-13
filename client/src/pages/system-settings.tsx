@@ -369,16 +369,16 @@ export default function SystemSettings() {
 
             {/* Client Settings Shortcut */}
             <Card className="bg-background border-2 border-custom-blue hover:bg-custom-blue hover:text-white transition-colors cursor-pointer" onClick={() => setLocation("/client-settings")}>
-              <CardHeader className="bg-background py-3">
+              <CardHeader className="bg-background py-2">
                 <CardTitle className="text-lg">Client Settings</CardTitle>
                 <CardDescription className="text-xs">
                   Configurazione impostazioni client
                 </CardDescription>
               </CardHeader>
-              <CardContent className="bg-background flex items-center justify-center h-full min-h-[180px]">
+              <CardContent className="bg-background flex items-center justify-center p-4">
                 <div className="text-center">
-                  <Settings className="w-12 h-12 mx-auto mb-3" />
-                  <p className="text-lg font-semibold">Vai a Client Settings</p>
+                  <Settings className="w-8 h-8 mx-auto mb-2" />
+                  <p className="text-sm font-semibold">Vai a Client Settings</p>
                 </div>
               </CardContent>
             </Card>
