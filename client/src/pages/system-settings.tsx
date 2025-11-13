@@ -296,74 +296,93 @@ export default function SystemSettings() {
             </CardContent>
           </Card>
 
-          {/* Apartment Types */}
-          <Card className="bg-background border-2 border-custom-blue">
-            <CardHeader className="bg-background py-3">
-              <CardTitle className="text-lg">Apartment Types</CardTitle>
-              <CardDescription className="text-xs">
-                Tipi di appartamento per categoria
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="bg-background space-y-3">
-              <div className="space-y-2">
-                <Label htmlFor="standard_apt" className="text-sm">Standard Apartments</Label>
-                <Input
-                  id="standard_apt"
-                  value={settings.apartment_types.standard_apt.join(", ")}
-                  onChange={(e) =>
-                    setSettings({
-                      ...settings,
-                      apartment_types: {
-                        ...settings.apartment_types,
-                        standard_apt: e.target.value
-                          .split(",")
-                          .map((letter) => letter.trim().toUpperCase())
-                          .filter((letter) => letter),
-                      },
-                    })
-                  }
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="premium_apt" className="text-sm">Premium Apartments</Label>
-                <Input
-                  id="premium_apt"
-                  value={settings.apartment_types.premium_apt.join(", ")}
-                  onChange={(e) =>
-                    setSettings({
-                      ...settings,
-                      apartment_types: {
-                        ...settings.apartment_types,
-                        premium_apt: e.target.value
-                          .split(",")
-                          .map((letter) => letter.trim().toUpperCase())
-                          .filter((letter) => letter),
-                      },
-                    })
-                  }
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="formatore_apt" className="text-sm">Formatore Apartments</Label>
-                <Input
-                  id="formatore_apt"
-                  value={settings.apartment_types.formatore_apt.join(", ")}
-                  onChange={(e) =>
-                    setSettings({
-                      ...settings,
-                      apartment_types: {
-                        ...settings.apartment_types,
-                        formatore_apt: e.target.value
-                          .split(",")
-                          .map((letter) => letter.trim().toUpperCase())
-                          .filter((letter) => letter),
-                      },
-                    })
-                  }
-                />
-              </div>
-            </CardContent>
-          </Card>
+          {/* Apartment Types e Client Settings sulla stessa riga */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Apartment Types */}
+            <Card className="bg-background border-2 border-custom-blue">
+              <CardHeader className="bg-background py-3">
+                <CardTitle className="text-lg">Apartment Types</CardTitle>
+                <CardDescription className="text-xs">
+                  Tipi di appartamento per categoria
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="bg-background space-y-3">
+                <div className="space-y-2">
+                  <Label htmlFor="standard_apt" className="text-sm">Standard Apartments</Label>
+                  <Input
+                    id="standard_apt"
+                    value={settings.apartment_types.standard_apt.join(", ")}
+                    onChange={(e) =>
+                      setSettings({
+                        ...settings,
+                        apartment_types: {
+                          ...settings.apartment_types,
+                          standard_apt: e.target.value
+                            .split(",")
+                            .map((letter) => letter.trim().toUpperCase())
+                            .filter((letter) => letter),
+                        },
+                      })
+                    }
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="premium_apt" className="text-sm">Premium Apartments</Label>
+                  <Input
+                    id="premium_apt"
+                    value={settings.apartment_types.premium_apt.join(", ")}
+                    onChange={(e) =>
+                      setSettings({
+                        ...settings,
+                        apartment_types: {
+                          ...settings.apartment_types,
+                          premium_apt: e.target.value
+                            .split(",")
+                            .map((letter) => letter.trim().toUpperCase())
+                            .filter((letter) => letter),
+                        },
+                      })
+                    }
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="formatore_apt" className="text-sm">Formatore Apartments</Label>
+                  <Input
+                    id="formatore_apt"
+                    value={settings.apartment_types.formatore_apt.join(", ")}
+                    onChange={(e) =>
+                      setSettings({
+                        ...settings,
+                        apartment_types: {
+                          ...settings.apartment_types,
+                          formatore_apt: e.target.value
+                            .split(",")
+                            .map((letter) => letter.trim().toUpperCase())
+                            .filter((letter) => letter),
+                        },
+                      })
+                    }
+                  />
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Client Settings Shortcut */}
+            <Card className="bg-background border-2 border-custom-blue hover:bg-custom-blue hover:text-white transition-colors cursor-pointer" onClick={() => setLocation("/client-settings")}>
+              <CardHeader className="bg-background py-3">
+                <CardTitle className="text-lg">Client Settings</CardTitle>
+                <CardDescription className="text-xs">
+                  Configurazione impostazioni client
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="bg-background flex items-center justify-center h-full min-h-[180px]">
+                <div className="text-center">
+                  <Settings className="w-12 h-12 mx-auto mb-3" />
+                  <p className="text-lg font-semibold">Vai a Client Settings</p>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
 
           {/* Save Button */}
           <Button
@@ -373,16 +392,6 @@ export default function SystemSettings() {
           >
             <Save className="w-4 h-4 mr-2" />
             {isSaving ? "Salvataggio..." : "Salva Impostazioni"}
-          </Button>
-
-          {/* Shortcut to Client Settings */}
-          <Button
-            onClick={() => setLocation("/client-settings")}
-            variant="outline"
-            className="w-full border-2 border-custom-blue hover:bg-custom-blue hover:text-white h-16 text-lg"
-          >
-            <Settings className="w-6 h-6 mr-3" />
-            Vai a Client Settings
           </Button>
         </div>
       </div>
