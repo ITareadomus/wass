@@ -332,14 +332,14 @@ export default function GenerateAssignments() {
     setIsLoading(true);
 
     try {
-      if (trigger === "manual") {
+      if (trigger === "manual" || trigger === "manual-refresh") {
         // Refresh manuale dopo drag-and-drop: solo reload file, NO auto-load, NO extractData
-        console.log('📂 Refresh manuale - solo reload file JSON');
+        console.log('📂 Refresh manuale - solo reload file JSON (preserva timeline.json)');
         await loadTasks(true);
         return;
       }
 
-      // Per tutti gli altri trigger, esegui auto-load completo
+      // Per initial e date-change, esegui auto-load completo
       await checkAndAutoLoadSavedAssignments(date);
     } catch (error) {
       console.error("Errore durante refreshAssignments:", error);
@@ -352,7 +352,7 @@ export default function GenerateAssignments() {
   const checkAndAutoLoadSavedAssignments = async (date: Date) => {
     try {
       setIsExtracting(true);
-      setExtractionStep("Verifica assegnazioni salvate...");
+      setExtractionStep("Caricamento dati...");
 
       const year = date.getFullYear();
       const month = String(date.getMonth() + 1).padStart(2, '0');
@@ -472,12 +472,41 @@ export default function GenerateAssignments() {
           await extractData(date);
         }
       } else {
-        // NON esistono assegnazioni salvate
-        console.log("ℹ️ Nessuna assegnazione salvata per", dateStr);
+        // NON esistono assegnazioni salvate in Object Storage
+        console.log("ℹ️ Nessuna assegnazione salvata in Object Storage per", dateStr);
+
+        // Verifica se esiste timeline.json locale (non salvata)
+        try {
+          const timelineResponse = await fetch(`/data/output/timeline.json?t=${Date.now()}`, {
+            cache: 'no-store',
+            headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' }
+          });
+
+          if (timelineResponse.ok) {
+            const timelineData = await timelineResponse.json();
+            const hasLocalAssignments = timelineData.cleaners_assignments?.length > 0;
+
+            if (hasLocalAssignments && timelineData.metadata?.date === dateStr) {
+              console.log("✅ Timeline.json locale esistente con assegnazioni - mantieni senza resettare");
+              
+              // SOLO date STRETTAMENTE passate sono read-only
+              setIsTimelineReadOnly(isPastDate);
+              
+              // Carica solo i task senza estrarre
+              await loadTasks(true);
+              setExtractionStep("Dati caricati!");
+              await new Promise(resolve => setTimeout(resolve, 100));
+              setIsExtracting(false);
+              return;
+            }
+          }
+        } catch (err) {
+          console.log("Timeline.json locale non trovata o vuota, procedo con estrazione");
+        }
 
         // SOLO date STRETTAMENTE passate sono read-only
         if (isPastDate) {
-          console.log("🔒 Data passata senza assegnazioni salvate - modalità READ-ONLY con container");
+          console.log("🔒 Data passata senza assegnazioni - modalità READ-ONLY");
           setIsTimelineReadOnly(true);
         } else {
           console.log("✏️ Data presente/futura - modalità EDITABILE");
