@@ -488,10 +488,10 @@ export default function GenerateAssignments() {
 
             if (hasLocalAssignments && timelineData.metadata?.date === dateStr) {
               console.log("✅ Timeline.json locale esistente con assegnazioni - mantieni senza resettare");
-              
+
               // SOLO date STRETTAMENTE passate sono read-only
               setIsTimelineReadOnly(isPastDate);
-              
+
               // Carica solo i task senza estrarre
               await loadTasks(true);
               setExtractionStep("Dati caricati!");
