@@ -56,6 +56,7 @@ export default function TaskCard({
 }: TaskCardProps) {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [clickTimer, setClickTimer] = useState<NodeJS.Timeout | null>(null);
+  const [operationNames, setOperationNames] = useState<Record<number, string>>({});
   
   // Usa il context per multi-select (solo per container, non timeline)
   const multiSelectContext = !isInTimeline ? useMultiSelect() : null;
@@ -195,6 +196,22 @@ export default function TaskCard({
       console.log(`➡️ Navigazione verso task successiva: ${nextTask.name}`);
     }
   };
+
+  // Carica i nomi delle operazioni
+  useEffect(() => {
+    const loadOperationNames = async () => {
+      try {
+        const response = await fetch('/api/get-operation-names');
+        const data = await response.json();
+        if (data.success) {
+          setOperationNames(data.operationNames);
+        }
+      } catch (error) {
+        console.error('Errore nel caricamento dei nomi operazioni:', error);
+      }
+    };
+    loadOperationNames();
+  }, []);
 
   // Reset currentTaskId quando il modale si apre
   useEffect(() => {
@@ -814,7 +831,11 @@ export default function TaskCard({
                     className={`text-sm p-1 rounded ${!isReadOnly ? 'cursor-pointer hover:bg-muted/50' : ''}`}
                     onClick={() => !isReadOnly && setEditingField('operation')}
                   >
-                    {!isConfirmedOperation ? "non migrato" : (displayTask as any).operation_id ?? "-"}
+                    {!isConfirmedOperation 
+                      ? "non migrato" 
+                      : (displayTask as any).operation_id 
+                        ? operationNames[(displayTask as any).operation_id] || `ID: ${(displayTask as any).operation_id}`
+                        : "-"}
                   </p>
                 )}
               </div>
