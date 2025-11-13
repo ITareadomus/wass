@@ -66,16 +66,44 @@ def get_active_operations():
     connection.close()
     return [row['id'] for row in results]
 
+def get_operation_names(operation_ids):
+    """Recupera i nomi delle operazioni dalla tabella app_structure_operation_langs"""
+    connection = mysql.connector.connect(**DB_CONFIG)
+    cursor = connection.cursor(dictionary=True)
+    
+    placeholders = ','.join(['%s'] * len(operation_ids))
+    query = f"""
+        SELECT structure_operation_id, name
+        FROM app_structure_operation_langs
+        WHERE lang_id = 1 AND structure_operation_id IN ({placeholders})
+    """
+    
+    cursor.execute(query, operation_ids)
+    results = cursor.fetchall()
+    cursor.close()
+    connection.close()
+    
+    # Crea dizionario id -> nome
+    operation_names = {}
+    for row in results:
+        operation_names[row['structure_operation_id']] = row['name']
+    
+    return operation_names
+
 def save_operations_to_file(operation_ids):
+    # Recupera i nomi delle operazioni
+    operation_names = get_operation_names(operation_ids)
+    
     operations_data = {
         "timestamp": datetime.now().isoformat(),
         "active_operation_ids": operation_ids,
-        "total_operations": len(operation_ids)
+        "total_operations": len(operation_ids),
+        "operation_names": operation_names
     }
     ops_file = INPUT_DIR / "operations.json"
     with open(ops_file, "w", encoding="utf-8") as f:
         json.dump(operations_data, f, indent=4, ensure_ascii=False)
-    print(f"Salvati {len(operation_ids)} operation_id validi in {ops_file}")
+    print(f"Salvati {len(operation_ids)} operation_id validi con nomi in {ops_file}")
 
 # ---------- Estrazione task dal DB ----------
 def get_tasks_from_db(selected_date, assigned_task_ids=None):
