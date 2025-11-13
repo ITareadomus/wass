@@ -147,16 +147,16 @@ def travel_minutes(a: Optional[Task], b: Optional[Task]) -> float:
     """
     if a is None or b is None:
         return 0.0
-    
+
     # Stesso edificio
     if same_building(a.address, b.address):
         return max(MIN_TRAVEL, min(MAX_TRAVEL, SHORT_BASE_MIN))
-    
+
     km = haversine_km(a.lat, a.lng, b.lat, b.lng)
-    
+
     # Fattore correzione percorsi non rettilinei
     dist_reale = km * 1.5
-    
+
     # Modello progressivo
     if dist_reale < 0.8:
         travel_time = dist_reale * 6.0  # ~10 km/h a piedi
@@ -164,19 +164,19 @@ def travel_minutes(a: Optional[Task], b: Optional[Task]) -> float:
         travel_time = dist_reale * 10.0  # ~6 km/h misto
     else:
         travel_time = dist_reale * 5.0  # ~12 km/h mezzi
-    
+
     # Tempo base
     base_time = 5.0
     total_time = base_time + travel_time
-    
+
     # Penalità small_equipment
     if getattr(a, "small_equipment", False) or getattr(b, "small_equipment", False):
         total_time += (EQ_EXTRA_LT05 if km < 0.5 else EQ_EXTRA_GE05)
-    
+
     # Bonus stesso strada (riduce tempo base)
     if same_street(a.address, b.address) and km < 0.10:
         total_time = max(total_time - 2.0, MIN_TRAVEL)
-    
+
     return max(MIN_TRAVEL, min(MAX_TRAVEL, total_time))
 
 
@@ -407,7 +407,7 @@ def load_tasks() -> List[Task]:
         # Parse checkin e checkout datetime
         checkin_dt = None
         checkout_dt = None
-        
+
         checkin_date = t.get("checkin_date")
         checkin_time = t.get("checkin_time")
         if checkin_date and checkin_time:
@@ -415,7 +415,7 @@ def load_tasks() -> List[Task]:
                 checkin_dt = datetime.strptime(f"{checkin_date} {checkin_time}", "%Y-%m-%d %H:%M")
             except:
                 pass
-        
+
         checkout_date = t.get("checkout_date")
         checkout_time = t.get("checkout_time")
         if checkout_date and checkout_time:
@@ -459,7 +459,7 @@ def plan_day(tasks: List[Task], cleaners: List[Cleaner], assigned_logistic_codes
     """
     if assigned_logistic_codes is None:
         assigned_logistic_codes = set()
-    
+
     unassigned = []
 
     for task in tasks:
@@ -481,22 +481,35 @@ def plan_day(tasks: List[Task], cleaners: List[Cleaner], assigned_logistic_codes
             unassigned.append(task)
             continue
 
-        # Priorità 1: Cleaner con stesso indirizzo
-        same_address_candidates = []
+        # Priorità 1: Stesso EDIFICIO (indirizzo completo uguale)
+        same_building_candidates = []
         for c, p, t in candidates:
-            has_same_address = any(
-                existing_task.address == task.address
+            has_same_building = any(
+                same_building(existing_task.address, task.address)
                 for existing_task in c.route
             )
-            if has_same_address:
-                same_address_candidates.append((c, p, t))
+            if has_same_building:
+                same_building_candidates.append((c, p, t))
 
-        if same_address_candidates:
-            # Priorità assoluta a cleaner con stesso indirizzo
-            same_address_candidates.sort(key=lambda x: (len(x[0].route), x[2]))
-            chosen = same_address_candidates[0]
+        if same_building_candidates:
+            # PRIORITÀ MASSIMA: stesso edificio = massima aggregazione
+            # Preferisci chi ha già più task (massimo clustering)
+            same_building_candidates.sort(key=lambda x: (-len(x[0].route), x[2]))
+            chosen = same_building_candidates[0]
+        # Priorità 2: Stessa via (senza numero civico)
+        elif any(
+            same_street(c.route[0].address if c.route else "", task.address)
+            for c, _, _ in candidates if c.route
+        ):
+            same_street_candidates = [
+                (c, p, t) for c, p, t in candidates
+                if any(same_street(ex.address, task.address) for ex in c.route)
+            ]
+            # Preferisci chi ha già più task nella stessa via
+            same_street_candidates.sort(key=lambda x: (-len(x[0].route), x[2]))
+            chosen = same_street_candidates[0]
         else:
-            # Priorità 2: Cluster prioritario (≤5' o stessa via)
+            # Priorità 3: Cluster prioritario (≤5' o stessa via)
             priority_cluster_candidates = []
             for c, p, t in candidates:
                 has_priority_cluster = any(
@@ -513,7 +526,7 @@ def plan_day(tasks: List[Task], cleaners: List[Cleaner], assigned_logistic_codes
                 priority_cluster_candidates.sort(key=lambda x: (-len(x[0].route), x[2]))
                 chosen = priority_cluster_candidates[0]
             else:
-                # Priorità 3: Cluster esteso (≤10')
+                # Priorità 4: Cluster esteso (≤10')
                 extended_cluster_candidates = []
                 for c, p, t in candidates:
                     has_extended_cluster = any(
@@ -698,7 +711,7 @@ def main():
     print(f"📋 Caricamento dati...")
     print(f"👥 Cleaner disponibili: {len(cleaners)}")
     print(f"📦 Task Early-Out da assegnare: {len(tasks)}")
-    
+
     # Leggi i logistic_code già assegnati dalla timeline
     assigned_logistic_codes = set()
     timeline_path = OUTPUT_ASSIGN.parent / "timeline.json"
@@ -714,7 +727,7 @@ def main():
                 print(f"📌 Logistic codes già assegnati in timeline: {len(assigned_logistic_codes)}")
         except Exception as e:
             print(f"⚠️ Errore lettura timeline per deduplica: {e}")
-    
+
     print()
     print(f"🔄 Assegnazione in corso...")
 

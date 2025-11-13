@@ -607,21 +607,33 @@ def plan_day(tasks: List[Task], cleaners: List[Cleaner], assigned_logistic_codes
             unassigned.append(task)
             continue
 
-        # Priorità 1: Cleaner che hanno già task nello stesso indirizzo
-        same_address_candidates = []
+        # Priorità 1: Stesso EDIFICIO (indirizzo completo uguale)
+        same_building_candidates = []
         for c, p, t in candidates:
-            # Controlla se il cleaner ha già task nello stesso indirizzo
-            has_same_address = any(
-                existing_task.address == task.address
+            has_same_building = any(
+                same_building(existing_task.address, task.address)
                 for existing_task in c.route
             )
-            if has_same_address:
-                same_address_candidates.append((c, p, t))
+            if has_same_building:
+                same_building_candidates.append((c, p, t))
 
-        if same_address_candidates:
-            # Priorità assoluta a cleaner con stesso indirizzo (minor numero di task)
-            same_address_candidates.sort(key=lambda x: (len(x[0].route), x[2]))
-            chosen = same_address_candidates[0]
+        if same_building_candidates:
+            # PRIORITÀ MASSIMA: stesso edificio = massima aggregazione
+            # Preferisci chi ha già più task (massimo clustering)
+            same_building_candidates.sort(key=lambda x: (-len(x[0].route), x[2]))
+            chosen = same_building_candidates[0]
+        # Priorità 2: Stessa via (senza numero civico)
+        elif any(
+            same_street(c.route[0].address if c.route else "", task.address)
+            for c, _, _ in candidates if c.route
+        ):
+            same_street_candidates = [
+                (c, p, t) for c, p, t in candidates
+                if any(same_street(ex.address, task.address) for ex in c.route)
+            ]
+            # Preferisci chi ha già più task nella stessa via
+            same_street_candidates.sort(key=lambda x: (-len(x[0].route), x[2]))
+            chosen = same_street_candidates[0]
         else:
             # Priorità 2: Cleaner con task entro 15 minuti (cluster)
             cluster_candidates = []
