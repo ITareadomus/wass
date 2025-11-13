@@ -6,8 +6,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import GenerateAssignments from "@/pages/generate-assignments";
 import Convocazioni from "@/pages/convocazioni";
 import Login from "@/pages/login";
-import Settings from "@/pages/settings";
-import AccountsSettings from "@/pages/accounts-settings"; // Assuming this is the new component for accounts-settings
+import AccountsSettings from "@/pages/accounts-settings";
 import NotFound from "@/pages/not-found";
 import { useEffect } from "react";
 
