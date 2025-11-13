@@ -519,17 +519,19 @@ export default function TaskCard({
                       </div>
                     )}
                     
-                    {/* Frecce check-in e check-out */}
+                    {/* Frecce check-in e check-out con orari */}
                     {((task as any).checkout_time || (task as any).checkin_time) && (
                       <div className="absolute right-1 top-1/2 -translate-y-1/2 flex flex-col gap-0.5 z-40">
                         {(task as any).checkout_time && (
                           <div className="flex items-center gap-0.5">
-                            <span className="text-green-600 font-bold text-xs leading-none">↑</span>
+                            <span className="text-green-600 font-bold text-[10px] leading-none">↑</span>
+                            <span className="text-green-600 font-semibold text-[9px] leading-none">{(task as any).checkout_time}</span>
                           </div>
                         )}
                         {(task as any).checkin_time && (
                           <div className="flex items-center gap-0.5">
-                            <span className="text-red-600 font-bold text-xs leading-none">↓</span>
+                            <span className="text-red-600 font-bold text-[10px] leading-none">↓</span>
+                            <span className="text-red-600 font-semibold text-[9px] leading-none">{(task as any).checkin_time}</span>
                           </div>
                         )}
                       </div>
