@@ -421,6 +421,9 @@ export default function TaskCard({
     return totalMinutes < 60;
   })();
 
+  // Determina se mostrare le frecce check-in/out (solo per task >= 1 ora)
+  const shouldShowCheckInOutArrows = !isSmallTask;
+
   // Verifica se end_time sfora checkin_time (considerando le date!)
   const isOverdue = (() => {
     const taskObj = displayTask as any;
@@ -519,8 +522,8 @@ export default function TaskCard({
                       </div>
                     )}
                     
-                    {/* Frecce check-in e check-out con orari */}
-                    {((task as any).checkout_time || (task as any).checkin_time) && (
+                    {/* Frecce check-in e check-out con orari - solo per task >= 1 ora */}
+                    {shouldShowCheckInOutArrows && ((task as any).checkout_time || (task as any).checkin_time) && (
                       <div className="absolute right-1 top-1/2 -translate-y-1/2 flex flex-col gap-0.5 z-40">
                         {(task as any).checkout_time && (
                           <div className="flex items-center gap-0.5">
