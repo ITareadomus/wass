@@ -41,7 +41,7 @@ function Router() {
       <Route path="/convocazioni">
         {() => <ProtectedRoute component={Convocazioni} />}
       </Route>
-      <Route path="/settings">
+      <Route path="/account-settings">
         {() => <ProtectedRoute component={Settings} />}
       </Route>
       <Route component={NotFound} />
