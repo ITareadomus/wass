@@ -8,6 +8,7 @@ import Convocazioni from "@/pages/convocazioni";
 import Login from "@/pages/login";
 import Settings from "@/pages/settings";
 import SystemSettings from "@/pages/system-settings";
+import ClientSettings from "@/pages/client-settings";
 import NotFound from "@/pages/not-found";
 import { useEffect } from "react";
 
@@ -47,6 +48,9 @@ function Router() {
       </Route>
       <Route path="/settings">
         {() => <ProtectedRoute component={SystemSettings} />}
+      </Route>
+      <Route path="/client-settings">
+        {() => <ProtectedRoute component={ClientSettings} />}
       </Route>
       <Route component={NotFound} />
     </Switch>
