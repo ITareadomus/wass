@@ -1,6 +1,6 @@
 {
   "metadata": {
-    "last_updated": "2025-11-13T13:44:32.978209",
+    "last_updated": "2025-11-13T14:01:29.041702",
     "date": "2025-11-13"
   },
   "containers": {
@@ -53,7 +53,7 @@
           "confirmed_operation": true,
           "straordinaria": false,
           "type_apt": "C",
-          "alias": "HACCA",
+          "alias": "HCC",
           "customer_name": "HACCA SRL",
           "reasons": [
             "client_forced_eo"
@@ -80,7 +80,7 @@
           "confirmed_operation": true,
           "straordinaria": false,
           "type_apt": "C",
-          "alias": "HACCA",
+          "alias": "HCC",
           "customer_name": "HACCA SRL",
           "reasons": [
             "client_forced_eo"
@@ -296,7 +296,7 @@
           "confirmed_operation": true,
           "straordinaria": false,
           "type_apt": "A",
-          "alias": "EXPRDS",
+          "alias": "EXP",
           "customer_name": "EXPERIENCE DESIGN BED & SHOW",
           "reasons": [
             "checkout_time<=eo_time"
@@ -323,7 +323,7 @@
           "confirmed_operation": true,
           "straordinaria": false,
           "type_apt": "A",
-          "alias": "EXPRDS",
+          "alias": "EXP",
           "customer_name": "EXPERIENCE DESIGN BED & SHOW",
           "reasons": [
             "checkout_time<=eo_time"
@@ -350,7 +350,7 @@
           "confirmed_operation": true,
           "straordinaria": false,
           "type_apt": "B",
-          "alias": "EXPRDS",
+          "alias": "EXP",
           "customer_name": "EXPERIENCE DESIGN BED & SHOW",
           "reasons": [
             "checkout_time<=eo_time"
@@ -377,7 +377,7 @@
           "confirmed_operation": true,
           "straordinaria": false,
           "type_apt": "B",
-          "alias": "EXPRDS",
+          "alias": "EXP",
           "customer_name": "EXPERIENCE DESIGN BED & SHOW",
           "reasons": [
             "checkout_time<=eo_time"
@@ -409,7 +409,7 @@
           "confirmed_operation": true,
           "straordinaria": false,
           "type_apt": "B",
-          "alias": "HOMST",
+          "alias": "HMST",
           "customer_name": "HOMING STAYS",
           "reasons": [
             "same_day_checkin_between_eo_hp"
@@ -436,7 +436,7 @@
           "confirmed_operation": true,
           "straordinaria": false,
           "type_apt": "A",
-          "alias": "RELSTAY",
+          "alias": "RLST",
           "customer_name": "RELSTAY - FERRARA GIULIA",
           "reasons": [
             "same_day_checkin_between_eo_hp",
@@ -464,7 +464,7 @@
           "confirmed_operation": true,
           "straordinaria": false,
           "type_apt": "A",
-          "alias": "RELSTAY",
+          "alias": "RLST",
           "customer_name": "RELSTAY - FERRARA GIULIA",
           "reasons": [
             "same_day_checkin_between_eo_hp",
@@ -492,7 +492,7 @@
           "confirmed_operation": true,
           "straordinaria": false,
           "type_apt": "A",
-          "alias": "RELSTAY",
+          "alias": "RLST",
           "customer_name": "RELSTAY - FERRARA GIULIA",
           "reasons": [
             "same_day_checkin_between_eo_hp",
@@ -520,7 +520,7 @@
           "confirmed_operation": true,
           "straordinaria": false,
           "type_apt": "B",
-          "alias": "PRTTLZ",
+          "alias": "PRTL",
           "customer_name": "PERETTI LORENZO",
           "reasons": [
             "same_day_checkin_between_eo_hp"
