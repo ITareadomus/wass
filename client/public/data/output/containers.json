@@ -1,6 +1,6 @@
 {
   "metadata": {
-    "last_updated": "2025-11-13T09:49:21.276347",
+    "last_updated": "2025-11-13T09:52:39.035377",
     "date": "2025-11-13"
   },
   "containers": {
@@ -49,7 +49,7 @@
           "cleaning_time": 90,
           "checkin_date": "2025-11-13",
           "checkout_date": "2025-11-13",
-          "checkin_time": "15:00",
+          "checkin_time": "14:30",
           "checkout_time": "11:00",
           "pax_in": 2,
           "pax_out": 2,
