@@ -2797,6 +2797,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Route legacy del database rimosse - il progetto usa solo file JSON
 
+  // Endpoint for saving settings.json
+  app.post("/api/save-settings", async (req, res) => {
+    try {
+      const settingsData = req.body;
+      const settingsPath = path.join(process.cwd(), "client/public/data/input/settings.json");
+      
+      await fs.promises.writeFile(
+        settingsPath,
+        JSON.stringify(settingsData, null, 2),
+        "utf-8"
+      );
+
+      res.json({
+        success: true,
+        message: "Impostazioni salvate con successo",
+      });
+    } catch (error: any) {
+      console.error("Errore nel salvataggio delle impostazioni:", error);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
   // Endpoint for running the optimizer script
   app.post("/api/run-optimizer", async (req, res) => {
     try {
