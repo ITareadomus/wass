@@ -455,7 +455,7 @@ export default function Convocazioni() {
           </div>
 
           {/* Barra Contatore */}
-          <div className="bg-gradient-to-r from-primary/10 via-primary/20 to-primary/10 rounded-xl border-2 border-primary/30 shadow-lg p-6">
+          <div className="bg-custom-blue-light rounded-xl border-2 border-custom-blue shadow-lg p-6">
             <div className="flex items-center gap-4">
               <div className="text-lg font-semibold text-muted-foreground">CLEANERS SELEZIONATI</div>
               <div className="text-lg font-bold">
@@ -470,7 +470,7 @@ export default function Convocazioni() {
         {/* Grid con lista cleaners e statistiche affiancate */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-[calc(100vh-200px)]">
           {/* Lista Cleaners - 2/3 dello spazio */}
-          <Card className="p-6 lg:col-span-2 flex flex-col overflow-hidden">
+          <Card className="p-6 lg:col-span-2 flex flex-col overflow-hidden border-2 border-custom-blue">
           <div className="space-y-3 flex-1 overflow-y-auto pr-2">
             {filteredCleaners.map((cleaner) => { // Itera su filteredCleaners
               const isPremium = cleaner.role === "Premium";
@@ -562,7 +562,7 @@ export default function Convocazioni() {
               onClick={handleSaveSelection}
               size="lg"
               disabled={selectedCleaners.size === 0}
-              className="flex items-center gap-2"
+              className="flex items-center gap-2 bg-background border-2 border-custom-blue text-black dark:text-white hover:opacity-80"
             >
               <Save className="w-4 h-4" />
               Salva
@@ -570,7 +570,7 @@ export default function Convocazioni() {
             <Button
               variant="outline"
               onClick={() => setLocation('/')}
-              className="flex items-center gap-2"
+              className="flex items-center gap-2 border-2 border-custom-blue"
             >
               <ArrowLeft className="w-4 h-4" />
               Torna Indietro
@@ -579,7 +579,7 @@ export default function Convocazioni() {
         </Card>
 
         {/* Pannello Statistiche - 1/3 dello spazio - FISSO */}
-        <Card className="p-6 border-2 flex flex-col h-full overflow-hidden">
+        <Card className="p-6 border-2 border-custom-blue flex flex-col h-full overflow-hidden">
           <h3 className="text-lg font-semibold text-foreground mb-4">Statistiche</h3>
 
           {/* Statistiche Task */}
