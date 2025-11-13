@@ -774,10 +774,28 @@ def plan_day(tasks: List[Task], cleaners: List[Cleaner], assigned_logistic_codes
                 pos, travel = result
                 target_cleaner.route.insert(pos, task)
                 assigned_logistic_codes.add(task.logistic_code)
-                print(f"   🧩 Task {task.task_id} assegnata a {target_cleaner.name} (cross-container: {task.address})")
+                tipo = "edificio" if same_building_cleaner else "zona"
+                print(f"   🧩 Task {task.task_id} assegnata a {target_cleaner.name} (cross-container {tipo}: {task.address})")
                 continue
             else:
-                print(f"   ⚠️  Task {task.task_id} vicina a {target_cleaner.name} ma limite raggiunto")
+                # Se ha limite raggiunto per LP, ma è in zona, forza comunque l'assegnazione
+                # solo se il limite giornaliero lo permette
+                if same_zone_cleaner:
+                    current_count = len(same_zone_cleaner.route)
+                    total_daily = same_zone_cleaner.total_daily_tasks + current_count
+                    
+                    # Se non ha superato il limite giornaliero assoluto, forza l'assegnazione
+                    if total_daily < MAX_DAILY_TASKS:
+                        # Prova ad aggiungere alla fine della route
+                        test_route = same_zone_cleaner.route + [task]
+                        feasible, _ = evaluate_route(same_zone_cleaner, test_route)
+                        if feasible:
+                            same_zone_cleaner.route.append(task)
+                            assigned_logistic_codes.add(task.logistic_code)
+                            print(f"   🔥 Task {task.task_id} FORZATA a {same_zone_cleaner.name} (cross-container zona, limite LP superato ma fattibile)")
+                            continue
+                
+                print(f"   ⚠️  Task {task.task_id} vicina a {target_cleaner.name} ma limite raggiunto e non fattibile")
 
 
         # Se non c'è stesso edificio o zona, procedi con logica normale
