@@ -6,7 +6,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import GenerateAssignments from "@/pages/generate-assignments";
 import Convocazioni from "@/pages/convocazioni";
 import Login from "@/pages/login";
-import AccountsSettings from "@/pages/accounts-settings";
+import Settings from "@/pages/settings";
 import NotFound from "@/pages/not-found";
 import { useEffect } from "react";
 
@@ -41,8 +41,8 @@ function Router() {
       <Route path="/convocazioni">
         {() => <ProtectedRoute component={Convocazioni} />}
       </Route>
-      <Route path="/accounts-settings">
-        {() => <ProtectedRoute component={AccountsSettings} />}
+      <Route path="/settings">
+        {() => <ProtectedRoute component={Settings} />}
       </Route>
       <Route component={NotFound} />
     </Switch>
