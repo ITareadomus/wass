@@ -214,9 +214,17 @@ export default function TaskCard({
     loadOperationNames();
   }, []);
 
-  // Reset currentTaskId quando il modale si apre
+  // Reset editingField SOLO quando il modal si chiude
   useEffect(() => {
-    if (isModalOpen) {
+    if (!isModalOpen) {
+      setEditingField(null);
+    }
+  }, [isModalOpen]);
+
+  // Inizializza i campi quando il modale si apre o quando displayTask cambia
+  // MA NON se l'utente sta già modificando un campo
+  useEffect(() => {
+    if (isModalOpen && !editingField) {
       console.log('🔓 Modale aperto per task:', {
         taskId: task.id,
         allTasksCount: allTasks?.length || 0,
@@ -226,7 +234,6 @@ export default function TaskCard({
       });
 
       setCurrentTaskId(getTaskKey(task)); // Assicura che currentTaskId sia all'inizio quando si apre il modale
-      setEditingField(null);
 
       // Inizializza campi editabili con i valori attuali della task visualizzata
       setEditedCheckoutDate((displayTask as any).checkout_date || "");
@@ -246,7 +253,7 @@ export default function TaskCard({
       // Inizializza operation_id
       setEditedOperationId(String((displayTask as any).operation_id || ""));
     }
-  }, [isModalOpen, task.id, displayTask, allTasks, isInTimeline, currentContainer]);
+  }, [isModalOpen, task.id, displayTask, allTasks, isInTimeline, currentContainer, editingField]);
 
   // DEBUG: verifica se displayTask è corretto
   useEffect(() => {
