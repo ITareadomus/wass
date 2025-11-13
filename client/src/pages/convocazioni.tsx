@@ -417,39 +417,36 @@ export default function Convocazioni() {
         <div className="mb-6 space-y-4">
           {/* Header con titolo e selettore data */}
           <div className="flex justify-between items-center flex-wrap gap-4">
-            <h1 className="text-3xl font-bold text-foreground flex items-center gap-2">
-              <Users className="w-8 h-8 text-custom-blue" />
-              CONVOCAZIONI
-              <span className="text-2xl font-normal text-muted-foreground ml-4">
-                del {format(selectedDate, "dd/MM/yyyy", { locale: it })}
-              </span>
-            </h1>
-
-            {/* Selettore Data e Dark Mode Toggle */}
             <div className="flex items-center gap-3">
+              <h1 className="text-3xl font-bold text-foreground flex items-center gap-2">
+                <Users className="w-8 h-8 text-custom-blue" />
+                CONVOCAZIONI del
+              </h1>
               <Popover>
-              <PopoverTrigger asChild>
-                <Button
-                  variant="outline"
-                  className={cn(
-                    "w-[240px] justify-start text-left font-normal",
-                    !selectedDate && "text-muted-foreground"
-                  )}
-                >
-                  <CalendarIcon className="mr-2 h-4 w-4" />
-                  {selectedDate ? format(selectedDate, "PPP", { locale: it }) : <span>Seleziona data</span>}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0" align="end">
-                <Calendar
-                  mode="single"
-                  selected={selectedDate}
-                  onSelect={(date) => date && setSelectedDate(date)}
-                  initialFocus
-                  locale={it}
-                />
-              </PopoverContent>
-            </Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className={cn(
+                      "justify-start text-left font-normal",
+                      !selectedDate && "text-muted-foreground"
+                    )}
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {selectedDate ? format(selectedDate, "dd/MM/yyyy", { locale: it }) : <span>Seleziona data</span>}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar
+                    mode="single"
+                    selected={selectedDate}
+                    onSelect={(date) => date && setSelectedDate(date)}
+                    initialFocus
+                    locale={it}
+                  />
+                </PopoverContent>
+              </Popover>
+            </div>
+            <div className="flex items-center gap-3">
               <ThemeToggle />
             </div>
           </div>
