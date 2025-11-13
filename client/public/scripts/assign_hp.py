@@ -28,6 +28,7 @@ ABSOLUTE_MAX_TASKS_IF_BEFORE_18 = 5  # Max 5 task se finisce entro le 18:00
 DAILY_TASK_LIMIT = 5  # Limite giornaliero HARD
 
 PREFERRED_TRAVEL = 20.0  # Preferenza per percorsi < 20'
+CLUSTER_MAX_TRAVEL = 15.0  # Cluster: <= 15' (per controllo vicinanza task)
 
 # NUOVO: Limite per tipologia FLESSIBILE (può essere infranto da cluster)
 MAX_TASKS_PER_PRIORITY = 2  # Max 2 task High-Priority per cleaner (base, infrangibile da cluster vicini)
