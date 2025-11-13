@@ -1696,7 +1696,7 @@ export default function GenerateAssignments() {
       <div className="w-full px-4 py-6">
         <div className="mb-6 flex justify-between items-center flex-wrap gap-4">
           <div className="flex items-center gap-3">
-            <h1 className="text-3xl font-bold text-foreground flex items-center gap-2">
+            <h1 className="text-3xl flex items-center gap-2 text-[#1a6ef4] font-bold">
               GENERA ASSEGNAZIONI del
             </h1>
             <Popover>
