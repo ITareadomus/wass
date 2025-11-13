@@ -54,8 +54,16 @@ EQ_EXTRA_GE05 = 1.0
 MIN_TRAVEL = 2.0
 MAX_TRAVEL = 45.0
 
+# NUOVO: Limite per tipologia FLESSIBILE (può essere infranto da cluster)
+BASE_MAX_TASKS_PER_PRIORITY = 2  # Max 2 task Low-Priority per cleaner (base)
 
-@dataclass class Task:
+# NUOVO: Limite giornaliero totale
+MAX_DAILY_TASKS = 5  # Max 5 task totali per cleaner al giorno (hard limit)
+PREFERRED_DAILY_TASKS = 4  # Preferibile max 4 task totali (soft limit)
+
+
+@dataclass
+class Task:
     task_id: str
     logistic_code: str
     lat: float
@@ -71,7 +79,8 @@ MAX_TRAVEL = 45.0
     straordinaria: bool = False
 
 
-@dataclass class Cleaner:
+@dataclass
+class Cleaner:
     id: Any
     name: str
     lastname: str
