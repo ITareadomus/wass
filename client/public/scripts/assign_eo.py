@@ -286,12 +286,24 @@ def can_add_task(cleaner: Cleaner, task: Task) -> bool:
             for existing_task in cleaner.route
         )
 
-        # Se è in cluster prioritario: ignora tutti i limiti (tranne giornaliero)
-        if is_priority_cluster and current_count < DAILY_TASK_LIMIT:
+        # Se è in cluster prioritario: ignora limiti tipologia, rispetta SEMPRE limite giornaliero
+        if is_priority_cluster:
+            # Verifica limite giornaliero HARD
+            if current_count >= DAILY_TASK_LIMIT:
+                return False
+            # Verifica max assoluto (anche se in cluster)
+            if current_count >= ABSOLUTE_MAX_TASKS:
+                return False
             return True
 
-        # Se è in cluster esteso: ignora limite tipologia, rispetta max assoluto
-        if is_extended_cluster and current_count < ABSOLUTE_MAX_TASKS:
+        # Se è in cluster esteso: ignora limite tipologia, rispetta limiti giornaliero e max assoluto
+        if is_extended_cluster:
+            # Verifica limite giornaliero HARD
+            if current_count >= DAILY_TASK_LIMIT:
+                return False
+            # Verifica max assoluto
+            if current_count >= ABSOLUTE_MAX_TASKS:
+                return False
             return True
 
     # Regola base: max 2 task
@@ -485,7 +497,6 @@ def plan_day(tasks: List[Task], cleaners: List[Cleaner], assigned_logistic_codes
             chosen = same_address_candidates[0]
         else:
             # Priorità 2: Cluster prioritario (≤5' o stessa via)
-            # REGOLA SPECIALE: ignora distribuzione e limiti per cluster stretti
             priority_cluster_candidates = []
             for c, p, t in candidates:
                 has_priority_cluster = any(
@@ -498,8 +509,7 @@ def plan_day(tasks: List[Task], cleaners: List[Cleaner], assigned_logistic_codes
                     priority_cluster_candidates.append((c, p, t))
 
             if priority_cluster_candidates:
-                # CLUSTER STRETTO: preferisci aggregazione (più task, minor viaggio)
-                # Ignora limite distribuzione - favorisci creazione cluster
+                # Massima priorità: più task = più cluster
                 priority_cluster_candidates.sort(key=lambda x: (-len(x[0].route), x[2]))
                 chosen = priority_cluster_candidates[0]
             else:
@@ -515,20 +525,19 @@ def plan_day(tasks: List[Task], cleaners: List[Cleaner], assigned_logistic_codes
                         extended_cluster_candidates.append((c, p, t))
 
                 if extended_cluster_candidates:
-                    # Cluster esteso: favorisci aggregazione
+                    # Alta priorità: più task = più cluster
                     extended_cluster_candidates.sort(key=lambda x: (-len(x[0].route), x[2]))
                     chosen = extended_cluster_candidates[0]
                 else:
-                    # Nessun cluster: applica priorità alla distribuzione
+                    # Nessun cluster: logica normale
                     preferred = [(c, p, t) for c, p, t in candidates if t < PREFERRED_TRAVEL]
                     others = [(c, p, t) for c, p, t in candidates if t >= PREFERRED_TRAVEL]
 
                     if preferred:
-                        # Distribuzione: preferisci cleaners con MENO task
-                        preferred.sort(key=lambda x: (len(x[0].route), x[2]))
+                        preferred.sort(key=lambda x: (-len(x[0].route), x[2]))
                         chosen = preferred[0]
                     else:
-                        others.sort(key=lambda x: (len(x[0].route), x[2]))
+                        others.sort(key=lambda x: (-len(x[0].route), x[2]))
                         chosen = others[0]
 
         cleaner, pos, travel = chosen
