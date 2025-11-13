@@ -379,9 +379,9 @@ export default function SystemSettings() {
           <Button
             onClick={() => setLocation("/client-settings")}
             variant="outline"
-            className="w-full border-2 border-custom-blue hover:bg-custom-blue hover:text-white"
+            className="w-full border-2 border-custom-blue hover:bg-custom-blue hover:text-white h-16 text-lg"
           >
-            <Settings className="w-4 h-4 mr-2" />
+            <Settings className="w-6 h-6 mr-3" />
             Vai a Client Settings
           </Button>
         </div>
