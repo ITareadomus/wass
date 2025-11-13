@@ -1,65 +1,11 @@
 {
   "metadata": {
-    "last_updated": "2025-11-13T09:22:40.202587",
+    "last_updated": "2025-11-13T09:23:08.221504",
     "date": "2025-11-13"
   },
   "containers": {
     "early_out": {
       "tasks": [
-        {
-          "task_id": 218090,
-          "logistic_code": 1395,
-          "client_id": 2,
-          "premium": false,
-          "address": "Via Vigevano 7",
-          "lat": "45.4527004",
-          "lng": "9.1751151",
-          "cleaning_time": 120,
-          "checkin_date": null,
-          "checkout_date": "2025-11-13",
-          "checkin_time": null,
-          "checkout_time": "09:00",
-          "pax_in": 2,
-          "pax_out": 1,
-          "small_equipment": false,
-          "operation_id": 2,
-          "confirmed_operation": true,
-          "straordinaria": false,
-          "type_apt": "C",
-          "alias": "ITW",
-          "customer_name": "ITALIANWAY SRL",
-          "reasons": [
-            "checkout_time<=eo_time"
-          ],
-          "priority": "early_out"
-        },
-        {
-          "task_id": 218660,
-          "logistic_code": 980,
-          "client_id": 87,
-          "premium": true,
-          "address": "LARGO CORSIA DEI SERVI 11",
-          "lat": "45.4650722",
-          "lng": "9.196025",
-          "cleaning_time": 120,
-          "checkin_date": "2025-11-14",
-          "checkout_date": "2025-11-13",
-          "checkin_time": null,
-          "checkout_time": null,
-          "pax_in": 4,
-          "pax_out": 3,
-          "small_equipment": false,
-          "operation_id": 2,
-          "confirmed_operation": true,
-          "straordinaria": false,
-          "type_apt": "C",
-          "alias": "HACCA",
-          "customer_name": "HACCA SRL",
-          "reasons": [
-            "client_forced_eo"
-          ],
-          "priority": "early_out"
-        },
         {
           "task_id": 218661,
           "logistic_code": 1650,
@@ -385,7 +331,7 @@
           "priority": "early_out"
         }
       ],
-      "count": 14
+      "count": 12
     },
     "high_priority": {
       "tasks": [
@@ -759,8 +705,8 @@
     }
   },
   "summary": {
-    "total_tasks": 27,
-    "early_out": 14,
+    "total_tasks": 25,
+    "early_out": 12,
     "high_priority": 8,
     "low_priority": 5
   }
