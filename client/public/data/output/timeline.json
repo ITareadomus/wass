@@ -1,6 +1,6 @@
 {
   "metadata": {
-    "last_updated": "2025-11-14T11:28:52.322Z",
+    "last_updated": "2025-11-14T11:36:55.417Z",
     "date": "2025-11-14",
     "created_by": "Admin"
   },
@@ -14,10 +14,30 @@
         "premium": true
       },
       "tasks": []
+    },
+    {
+      "cleaner": {
+        "id": 596,
+        "name": "TRACY",
+        "lastname": "OKE",
+        "role": "Premium",
+        "premium": true
+      },
+      "tasks": []
+    },
+    {
+      "cleaner": {
+        "id": 1063,
+        "name": "ALEXANDER DENNYS",
+        "lastname": "CARDENAS OLAYA",
+        "role": "Standard",
+        "premium": false
+      },
+      "tasks": []
     }
   ],
   "meta": {
-    "total_cleaners": 1,
+    "total_cleaners": 3,
     "used_cleaners": 0,
     "assigned_tasks": 0,
     "total_tasks": 0
