@@ -138,14 +138,15 @@ export default function SystemSettings() {
         </div>
 
         <div className="space-y-4">
-          {/* Early-Out e High-Priority in un'unica card */}
-          <Card className="bg-background border-2 border-custom-blue">
-            <CardHeader className="bg-background py-3">
-              <CardTitle className="text-lg">Early-Out & High-Priority</CardTitle>
-              <CardDescription className="text-xs">
-                Configurazione per le task Early-Out e High-Priority
-              </CardDescription>
-            </CardHeader>
+          {/* Early-Out e High-Priority in un'unica card a metà pagina */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Card className="bg-background border-2 border-custom-blue">
+              <CardHeader className="bg-background py-3">
+                <CardTitle className="text-lg">Early-Out & High-Priority</CardTitle>
+                <CardDescription className="text-xs">
+                  Configurazione per le task Early-Out e High-Priority
+                </CardDescription>
+              </CardHeader>
             <CardContent className="bg-background">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {/* Early-Out Settings */}
@@ -266,6 +267,7 @@ export default function SystemSettings() {
               </div>
             </CardContent>
           </Card>
+          </div>
 
           {/* Dedupe Strategy */}
           <Card className="bg-background border-2 border-custom-blue">
