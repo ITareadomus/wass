@@ -578,15 +578,25 @@ export default function TaskCard({
                           <div className="flex items-center gap-0.5">
                             <span className="text-red-600 font-black text-[15px]">↓</span>
                             {isFutureCheckin && (
-                              <svg className="w-4 h-4 text-red-600" viewBox="0 0 24 24" fill="currentColor" title="Check-in futuro">
-                                <path d="M20 16c0 2.21-1.79 4-4 4s-4-1.79-4-4c0-1.5.83-2.8 2.04-3.5-.46-.35-.76-.89-.76-1.5 0-1.1.9-2 2-2s2 .9 2 2c0 .61-.3 1.15-.76 1.5C19.17 13.2 20 14.5 20 16zM9 18c-2.21 0-4-1.79-4-4 0-1.5.83-2.8 2.04-3.5C6.58 10.15 6.28 9.61 6.28 9c0-1.1.9-2 2-2s2 .9 2 2c0 .61-.3 1.15-.76 1.5C10.73 11.2 11.56 12.5 11.56 14c0 .34-.05.67-.13.98-.85.31-1.59.84-2.14 1.52-.1 0-.19 0-.29 0zm5.72-2.5c-.85-.31-1.59-.84-2.14-1.52-.1 0-.19 0-.29 0-2.21 0-4-1.79-4-4 0-1.5.83-2.8 2.04-3.5-.46-.35-.76-.89-.76-1.5 0-1.1.9-2 2-2s2 .9 2 2c0 .61-.3 1.15-.76 1.5 1.21.7 2.04 2 2.04 3.5 0 .34-.05.67-.13.98z"/>
-                              </svg>
+                              <img
+                                src="/snail-icon.svg"
+                                alt="Check-in futuro"
+                                title="Check-in futuro"
+                                className="w-4 h-4"
+                                style={{ filter: 'invert(17%) sepia(91%) saturate(7497%) hue-rotate(359deg) brightness(95%) contrast(118%)' }}
+                              />
                             )}
                             <span className="text-red-600 text-[11px] font-bold">{(task as any).checkin_time}</span>
                           </div>
                         )}
                         {!((task as any).checkin_time) && isFutureCheckin && (
-                          <span className="text-red-600 text-[15px]" title="Check-in futuro senza orario">🐌</span>
+                          <img
+                            src="/snail-icon.svg"
+                            alt="Check-in futuro senza orario"
+                            title="Check-in futuro senza orario"
+                            className="w-4 h-4"
+                            style={{ filter: 'invert(17%) sepia(91%) saturate(7497%) hue-rotate(359deg) brightness(95%) contrast(118%)' }}
+                          />
                         )}
                       </div>
                     )}
