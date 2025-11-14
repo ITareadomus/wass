@@ -192,12 +192,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         metadata: {
           last_updated: new Date().toISOString(),
           date: workDate,
-          created_by: currentUsername,
-          assignments_completed: {
-            early_out: false,
-            high_priority: false,
-            low_priority: false
-          }
+          created_by: currentUsername
         },
         cleaners_assignments: [],
         meta: {
@@ -1253,15 +1248,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Salva i dati caricati in timeline.json (dual-write: filesystem + Object Storage)
       await workspaceFiles.saveTimeline(workDate, savedData);
-
-      // CRITICAL: Ripristina assignments_completed
-      if (!savedData.metadata.assignments_completed) {
-        savedData.metadata.assignments_completed = {
-          early_out: false,
-          high_priority: false,
-          low_priority: false
-        };
-      }
 
       // CRITICAL: Attendi che il file sia effettivamente scritto
       await new Promise(resolve => setTimeout(resolve, 200));
@@ -2469,23 +2455,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
 
         console.log("assign_eo output:", stdoutData);
-        // Marca l'assegnazione come completata in timeline.json
-        try {
-          const timelineData = JSON.parse(await fs.readFile(timelinePath, 'utf8'));
-          if (!timelineData.metadata) timelineData.metadata = {};
-          if (!timelineData.metadata.assignments_completed) {
-            timelineData.metadata.assignments_completed = {
-              early_out: false,
-              high_priority: false,
-              low_priority: false
-            };
-          }
-          timelineData.metadata.assignments_completed.early_out = true;
-          await fs.writeFile(timelinePath, JSON.stringify(timelineData, null, 2));
-        } catch (e) {
-          console.error("Errore aggiornamento metadata timeline:", e);
-        }
-
         res.json({
           success: true,
           message: "Early Out tasks assegnati con successo in timeline.json",
@@ -2562,23 +2531,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
 
         console.log("assign_hp output:", stdoutData);
-        // Marca l'assegnazione come completata in timeline.json
-        try {
-          const timelineData = JSON.parse(await fs.readFile(timelinePath, 'utf8'));
-          if (!timelineData.metadata) timelineData.metadata = {};
-          if (!timelineData.metadata.assignments_completed) {
-            timelineData.metadata.assignments_completed = {
-              early_out: false,
-              high_priority: false,
-              low_priority: false
-            };
-          }
-          timelineData.metadata.assignments_completed.high_priority = true;
-          await fs.writeFile(timelinePath, JSON.stringify(timelineData, null, 2));
-        } catch (e) {
-          console.error("Errore aggiornamento metadata timeline:", e);
-        }
-
         res.json({
           success: true,
           message: "High Priority tasks assegnati con successo in timeline.json",
@@ -2656,23 +2608,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
 
         console.log("assign_lp output:", stdoutData);
-        // Marca l'assegnazione come completata in timeline.json
-        try {
-          const timelineData = JSON.parse(await fs.readFile(timelinePath, 'utf8'));
-          if (!timelineData.metadata) timelineData.metadata = {};
-          if (!timelineData.metadata.assignments_completed) {
-            timelineData.metadata.assignments_completed = {
-              early_out: false,
-              high_priority: false,
-              low_priority: false
-            };
-          }
-          timelineData.metadata.assignments_completed.low_priority = true;
-          await fs.writeFile(timelinePath, JSON.stringify(timelineData, null, 2));
-        } catch (e) {
-          console.error("Errore aggiornamento metadata timeline:", e);
-        }
-
         res.json({
           success: true,
           message: "Low Priority tasks assegnati con successo in timeline.json",
@@ -2763,12 +2698,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           metadata: {
             last_updated: new Date().toISOString(),
             date: date,
-            created_by: createdBy,
-            assignments_completed: { // Reset assignments_completed on new timeline creation
-              early_out: false,
-              high_priority: false,
-              low_priority: false
-            }
+            created_by: createdBy
           },
           cleaners_assignments: [],
           meta: { total_cleaners: 0, used_cleaners: 0, assigned_tasks: 0 }

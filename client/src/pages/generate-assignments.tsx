@@ -290,13 +290,6 @@ export default function GenerateAssignments() {
   // Nuova variabile di stato per gestire il caricamento generale
   const [isLoading, setIsLoading] = useState(false);
 
-  // Stati per tracciare se le assegnazioni sono già state eseguite
-  const [assignmentsCompleted, setAssignmentsCompleted] = useState({
-    early_out: false,
-    high_priority: false,
-    low_priority: false
-  });
-
   // Callback per notificare modifiche dopo movimenti task
   const handleTaskMoved = useCallback(() => {
     setHasUnsavedChanges(true);
@@ -763,7 +756,7 @@ export default function GenerateAssignments() {
       // Nuova struttura: cleaners_assignments è un array di {cleaner, tasks}
       const timelineAssignmentsMap = new Map<string, any>();
 
-      if (timelineAssignmentsData.cleaners_assignments && timelineAssignmentsData.cleaners_assignments.length > 0) {
+      if (timelineAssignmentsData.cleaners_assignments) {
         // Nuova struttura organizzata per cleaner
         console.log('📋 Caricamento da cleaners_assignments:', timelineAssignmentsData.cleaners_assignments.length, 'cleaners');
         for (const cleanerEntry of timelineAssignmentsData.cleaners_assignments) {
@@ -781,7 +774,6 @@ export default function GenerateAssignments() {
             timelineAssignmentsMap.set(taskId, {
               ...task,
               cleanerId: cleanerEntry.cleaner.id,
-              assignedCleaner: cleanerEntry.cleaner.id, // CRITICAL: aggiungi questo campo per il frontend
               sequence: task.sequence
             });
           }
@@ -790,10 +782,7 @@ export default function GenerateAssignments() {
         // Vecchia struttura piatta (fallback)
         console.log('📋 Caricamento da assignments (vecchia struttura):', timelineAssignmentsData.assignments.length);
         for (const a of timelineAssignmentsData.assignments) {
-          timelineAssignmentsMap.set(String(a.task_id), {
-            ...a,
-            assignedCleaner: a.cleanerId // CRITICAL: aggiungi questo campo per il frontend
-          });
+          timelineAssignmentsMap.set(String(a.task_id), a);
         }
       }
 
@@ -910,14 +899,13 @@ export default function GenerateAssignments() {
           const taskWithAssignment = {
             ...baseTask,
             priority: timelineAssignment.priority || baseTask.priority,
-            assignedCleaner: timelineAssignment.cleanerId || timelineAssignment.assignedCleaner, // CRITICAL: doppio fallback
+            assignedCleaner: timelineAssignment.cleanerId,
             sequence: timelineAssignment.sequence,
             start_time: timelineAssignment.start_time,
             end_time: timelineAssignment.end_time,
             startTime: timelineAssignment.start_time || (baseTask as any).startTime,
             endTime: timelineAssignment.end_time || (baseTask as any).endTime,
             travelTime: timelineAssignment.travel_time || 0,
-            travel_time: timelineAssignment.travel_time || 0, // CRITICAL: aggiungi anche snake_case
             address: timelineAssignment.address || baseTask.address,
             lat: timelineAssignment.lat || baseTask.lat,
             lng: timelineAssignment.lng || baseTask.lng,
@@ -936,7 +924,6 @@ export default function GenerateAssignments() {
             alias: timelineAssignment.alias,
           } as any;
 
-          console.log(`✅ Task ${taskLogCode} preparata con assignedCleaner=${taskWithAssignment.assignedCleaner}`);
           tasksWithAssignments.push(taskWithAssignment);
         }
       }
@@ -951,19 +938,6 @@ export default function GenerateAssignments() {
       console.log(`   - Task nei containers: ${dedupedTasks.filter(t => !(t as any).assignedCleaner).length}`);
 
       setAllTasksWithAssignments(dedupedTasks);
-
-      // Carica lo stato delle assegnazioni completate da timeline.json
-      if (timelineAssignmentsData.metadata?.assignments_completed) {
-        setAssignmentsCompleted(timelineAssignmentsData.metadata.assignments_completed);
-        console.log(`📋 Stato assegnazioni completate:`, timelineAssignmentsData.metadata.assignments_completed);
-      } else {
-        // Reset se non ci sono informazioni
-        setAssignmentsCompleted({
-          early_out: false,
-          high_priority: false,
-          low_priority: false
-        });
-      }
 
       setIsLoadingTasks(false);
       setExtractionStep("Task caricati con successo!");
@@ -1024,9 +998,6 @@ export default function GenerateAssignments() {
       const result = await response.json();
 
       if (result.success) {
-        // Marca l'assegnazione come completata
-        setAssignmentsCompleted(prev => ({ ...prev, early_out: true }));
-
         toast({
           title: "Early Out Assegnati!",
           description: result.message,
@@ -1088,9 +1059,6 @@ export default function GenerateAssignments() {
       const result = await response.json();
 
       if (result.success) {
-        // Marca l'assegnazione come completata
-        setAssignmentsCompleted(prev => ({ ...prev, high_priority: true }));
-
         toast({
           title: "High Priority Assegnati!",
           description: result.message,
@@ -1156,9 +1124,6 @@ export default function GenerateAssignments() {
       const result = await response.json();
 
       if (result.success) {
-        // Marca l'assegnazione come completata
-        setAssignmentsCompleted(prev => ({ ...prev, low_priority: true }));
-
         toast({
           title: "Low Priority Assegnati!",
           description: result.message,
@@ -1830,7 +1795,6 @@ export default function GenerateAssignments() {
                 icon="clock"
                 assignAction={assignEarlyOutToTimeline}
                 containerMultiSelectState={getContainerMultiSelectState('early_out')}
-                isAssignmentCompleted={assignmentsCompleted.early_out}
               />
               <PriorityColumn
                 title="HIGH PRIORITY"
@@ -1840,7 +1804,6 @@ export default function GenerateAssignments() {
                 icon="alert-circle"
                 assignAction={assignHighPriorityToTimeline}
                 containerMultiSelectState={getContainerMultiSelectState('high_priority')}
-                isAssignmentCompleted={assignmentsCompleted.high_priority}
               />
             <PriorityColumn
               title="LOW PRIORITY"
@@ -1850,7 +1813,6 @@ export default function GenerateAssignments() {
               icon="arrow-down"
               assignAction={assignLowPriorityToTimeline}
               containerMultiSelectState={getContainerMultiSelectState('low_priority')}
-              isAssignmentCompleted={assignmentsCompleted.low_priority}
             />
           </div>
 
