@@ -9,9 +9,9 @@ import { useState, useEffect, useMemo } from "react";
 
 interface ContainerMultiSelectState {
   isMultiSelectMode: boolean;
-  selectedTasks: Array<{ taskId: string; order: number }>;
+  selectedTasks: Array<{ taskId: string; order: number; container: string }>;
   setIsMultiSelectMode: (value: boolean) => void;
-  setSelectedTasks: (value: Array<{ taskId: string; order: number }>) => void;
+  setSelectedTasks: (value: Array<{ taskId: string; order: number; container: string }>) => void;
 }
 
 interface PriorityColumnProps {
@@ -46,7 +46,7 @@ export default function PriorityColumn({
   const setIsMultiSelectMode = containerMultiSelectState?.setIsMultiSelectMode ?? (() => {});
   const setSelectedTasks = containerMultiSelectState?.setSelectedTasks ?? (() => {});
   
-  // Funzioni per gestire la selezione multipla
+  // Funzioni per gestire la selezione multipla cross-container
   const toggleMode = () => {
     setIsMultiSelectMode(!isMultiSelectMode);
     if (isMultiSelectMode) {
@@ -55,13 +55,18 @@ export default function PriorityColumn({
   };
   
   const toggleTask = (taskId: string) => {
+    // Converti droppableId in container key
+    const containerKey = droppableId === 'early-out' ? 'early_out' : 
+                        droppableId === 'high' ? 'high_priority' : 
+                        droppableId === 'low' ? 'low_priority' : droppableId;
+    
     setSelectedTasks(prev => {
       const existing = prev.find(t => t.taskId === taskId);
       if (existing) {
         return prev.filter(t => t.taskId !== taskId);
       } else {
         const maxOrder = prev.length > 0 ? Math.max(...prev.map(t => t.order)) : 0;
-        return [...prev, { taskId, order: maxOrder + 1 }];
+        return [...prev, { taskId, order: maxOrder + 1, container: containerKey }];
       }
     });
   };
@@ -262,7 +267,7 @@ export default function PriorityColumn({
             {tasks.length} task
             {isMultiSelectMode && selectedTasks.length > 0 && (
               <span className="ml-2 text-sky-600 font-semibold">
-                ({selectedTasks.filter(st => tasks.some(t => String(t.id) === st.taskId)).length} selezionate)
+                ({selectedTasks.filter(st => tasks.some(t => String(t.id) === st.taskId)).length} in questo / {selectedTasks.length} totali)
               </span>
             )}
           </div>
