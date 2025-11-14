@@ -151,145 +151,148 @@ export default function SystemSettings() {
                 {/* Early-Out */}
                 <div className="space-y-3">
                   <h3 className="font-semibold text-sm border-b pb-2">Early-Out</h3>
-                <div className="space-y-2">
-                  <Label htmlFor="eo_start_time" className="text-sm">Start Time</Label>
-                  <Input
-                    id="eo_start_time"
-                    type="time"
-                    value={settings["early-out"].eo_start_time}
-                    onChange={(e) =>
-                      setSettings({
-                        ...settings,
-                        "early-out": {
-                          ...settings["early-out"],
-                          eo_start_time: e.target.value,
-                        },
-                      })
-                    }
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="eo_time" className="text-sm">EO Time</Label>
-                  <Input
-                    id="eo_time"
-                    type="time"
-                    value={settings["early-out"].eo_time}
-                    onChange={(e) =>
-                      setSettings({
-                        ...settings,
-                        "early-out": {
-                          ...settings["early-out"],
-                          eo_time: e.target.value,
-                        },
-                      })
-                    }
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="eo_clients" className="text-sm">EO Clients</Label>
-                  <Input
-                    id="eo_clients"
-                    value={settings["early-out"].eo_clients.join(", ")}
-                    onChange={(e) =>
-                      setSettings({
-                        ...settings,
-                        "early-out": {
-                          ...settings["early-out"],
-                          eo_clients: e.target.value
-                            .split(",")
-                            .map((id) => parseInt(id.trim()))
-                            .filter((id) => !isNaN(id)),
-                        },
-                      })
-                    }
-                  />
+                  <div className="space-y-2">
+                    <Label htmlFor="eo_start_time" className="text-sm">Start Time</Label>
+                    <Input
+                      id="eo_start_time"
+                      type="time"
+                      value={settings["early-out"].eo_start_time}
+                      onChange={(e) =>
+                        setSettings({
+                          ...settings,
+                          "early-out": {
+                            ...settings["early-out"],
+                            eo_start_time: e.target.value,
+                          },
+                        })
+                      }
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="eo_time" className="text-sm">EO Time</Label>
+                    <Input
+                      id="eo_time"
+                      type="time"
+                      value={settings["early-out"].eo_time}
+                      onChange={(e) =>
+                        setSettings({
+                          ...settings,
+                          "early-out": {
+                            ...settings["early-out"],
+                            eo_time: e.target.value,
+                          },
+                        })
+                      }
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="eo_clients" className="text-sm">EO Clients</Label>
+                    <Input
+                      id="eo_clients"
+                      value={settings["early-out"].eo_clients.join(", ")}
+                      onChange={(e) =>
+                        setSettings({
+                          ...settings,
+                          "early-out": {
+                            ...settings["early-out"],
+                            eo_clients: e.target.value
+                              .split(",")
+                              .map((id) => parseInt(id.trim()))
+                              .filter((id) => !isNaN(id)),
+                          },
+                        })
+                      }
+                    />
+                  </div>
                 </div>
 
                 {/* High-Priority */}
                 <div className="space-y-3">
                   <h3 className="font-semibold text-sm border-b pb-2">High-Priority</h3>
-                <div className="space-y-2">
-                  <Label htmlFor="hp_start_time" className="text-sm">Start Time</Label>
-                  <Input
-                    id="hp_start_time"
-                    type="time"
-                    value={settings["high-priority"].hp_start_time}
-                    onChange={(e) =>
-                      setSettings({
-                        ...settings,
-                        "high-priority": {
-                          ...settings["high-priority"],
-                          hp_start_time: e.target.value,
-                        },
-                      })
-                    }
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="hp_time" className="text-sm">HP Time</Label>
-                  <Input
-                    id="hp_time"
-                    type="time"
-                    value={settings["high-priority"].hp_time}
-                    onChange={(e) =>
-                      setSettings({
-                        ...settings,
-                        "high-priority": {
-                          ...settings["high-priority"],
-                          hp_time: e.target.value,
-                        },
-                      })
-                    }
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="hp_clients" className="text-sm">HP Clients</Label>
-                  <Input
-                    id="hp_clients"
-                    value={settings["high-priority"].hp_clients.join(", ")}
-                    onChange={(e) =>
-                      setSettings({
-                        ...settings,
-                        "high-priority": {
-                          ...settings["high-priority"],
-                          hp_clients: e.target.value
-                            .split(",")
-                            .map((id) => parseInt(id.trim()))
-                            .filter((id) => !isNaN(id)),
-                        },
-                      })
-                    }
-                  />
+                  <div className="space-y-2">
+                    <Label htmlFor="hp_start_time" className="text-sm">Start Time</Label>
+                    <Input
+                      id="hp_start_time"
+                      type="time"
+                      value={settings["high-priority"].hp_start_time}
+                      onChange={(e) =>
+                        setSettings({
+                          ...settings,
+                          "high-priority": {
+                            ...settings["high-priority"],
+                            hp_start_time: e.target.value,
+                          },
+                        })
+                      }
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="hp_time" className="text-sm">HP Time</Label>
+                    <Input
+                      id="hp_time"
+                      type="time"
+                      value={settings["high-priority"].hp_time}
+                      onChange={(e) =>
+                        setSettings({
+                          ...settings,
+                          "high-priority": {
+                            ...settings["high-priority"],
+                            hp_time: e.target.value,
+                          },
+                        })
+                      }
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="hp_clients" className="text-sm">HP Clients</Label>
+                    <Input
+                      id="hp_clients"
+                      value={settings["high-priority"].hp_clients.join(", ")}
+                      onChange={(e) =>
+                        setSettings({
+                          ...settings,
+                          "high-priority": {
+                            ...settings["high-priority"],
+                            hp_clients: e.target.value
+                              .split(",")
+                              .map((id) => parseInt(id.trim()))
+                              .filter((id) => !isNaN(id)),
+                          },
+                        })
+                      }
+                    />
+                  </div>
                 </div>
 
                 {/* Low-Priority */}
                 <div className="space-y-3">
                   <h3 className="font-semibold text-sm border-b pb-2">Low-Priority</h3>
-                <div className="space-y-2">
-                  <Label htmlFor="lp_start_time" className="text-sm text-muted-foreground">Start Time</Label>
-                  <Input
-                    id="lp_start_time"
-                    type="time"
-                    disabled
-                    placeholder="Non valorizzato"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="lp_time" className="text-sm text-muted-foreground">LP Time</Label>
-                  <Input
-                    id="lp_time"
-                    type="time"
-                    disabled
-                    placeholder="Non valorizzato"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="lp_clients" className="text-sm text-muted-foreground">LP Clients</Label>
-                  <Input
-                    id="lp_clients"
-                    disabled
-                    placeholder="Non valorizzato"
-                  />
+                  <div className="space-y-2">
+                    <Label htmlFor="lp_start_time" className="text-sm text-muted-foreground">Start Time</Label>
+                    <Input
+                      id="lp_start_time"
+                      type="time"
+                      disabled
+                      placeholder="Non valorizzato"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="lp_time" className="text-sm text-muted-foreground">LP Time</Label>
+                    <Input
+                      id="lp_time"
+                      type="time"
+                      disabled
+                      placeholder="Non valorizzato"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="lp_clients" className="text-sm text-muted-foreground">LP Clients</Label>
+                    <Input
+                      id="lp_clients"
+                      disabled
+                      placeholder="Non valorizzato"
+                    />
+                  </div>
                 </div>
               </div>
             </CardContent>
