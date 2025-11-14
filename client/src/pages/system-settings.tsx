@@ -138,8 +138,8 @@ export default function SystemSettings() {
         </div>
 
         <div className="space-y-4">
-          {/* Early-Out, High-Priority e Apartment Types sulla stessa riga */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {/* Early-Out, High-Priority, Low-Priority e Apartment Types sulla stessa riga */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             {/* Early-Out */}
             <Card className="bg-background border-2 border-custom-blue">
               <CardHeader className="bg-background py-3">
@@ -265,6 +265,44 @@ export default function SystemSettings() {
                         },
                       })
                     }
+                  />
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Low-Priority */}
+            <Card className="bg-background border-2 border-custom-blue">
+              <CardHeader className="bg-background py-3">
+                <CardTitle className="text-lg">Low-Priority</CardTitle>
+                <CardDescription className="text-xs">
+                  Configurazione per le task Low-Priority (non valorizzato)
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="bg-background space-y-3">
+                <div className="space-y-2">
+                  <Label htmlFor="lp_start_time" className="text-sm text-muted-foreground">Start Time</Label>
+                  <Input
+                    id="lp_start_time"
+                    type="time"
+                    disabled
+                    placeholder="Non valorizzato"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="lp_time" className="text-sm text-muted-foreground">LP Time</Label>
+                  <Input
+                    id="lp_time"
+                    type="time"
+                    disabled
+                    placeholder="Non valorizzato"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="lp_clients" className="text-sm text-muted-foreground">LP Clients</Label>
+                  <Input
+                    id="lp_clients"
+                    disabled
+                    placeholder="Non valorizzato"
                   />
                 </div>
               </CardContent>
