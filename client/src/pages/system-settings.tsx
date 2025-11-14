@@ -466,7 +466,7 @@ export default function SystemSettings() {
               <CardHeader className="bg-background py-2">
                 <CardTitle className="text-lg">Client Settings</CardTitle>
                 <CardDescription className="text-xs">
-                  Configurazione impostazioni client
+                  Impostazioni per modificare Check-in e Check-out pre-impostati per cliente
                 </CardDescription>
               </CardHeader>
               <CardContent className="bg-background flex items-center justify-center p-4">
