@@ -1,13 +1,25 @@
 {
   "metadata": {
-    "last_updated": "2025-11-14T11:27:05.502Z",
+    "last_updated": "2025-11-14T11:28:52.322Z",
     "date": "2025-11-14",
     "created_by": "Admin"
   },
-  "cleaners_assignments": [],
+  "cleaners_assignments": [
+    {
+      "cleaner": {
+        "id": 132,
+        "name": "JOHOISER ERNESTO",
+        "lastname": "LOPEZ GIRON",
+        "role": "Premium",
+        "premium": true
+      },
+      "tasks": []
+    }
+  ],
   "meta": {
-    "total_cleaners": 0,
+    "total_cleaners": 1,
     "used_cleaners": 0,
-    "assigned_tasks": 0
+    "assigned_tasks": 0,
+    "total_tasks": 0
   }
 }
