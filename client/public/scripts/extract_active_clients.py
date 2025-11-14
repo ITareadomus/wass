@@ -29,7 +29,8 @@ def extract_active_clients():
         query = """
             SELECT DISTINCT
                 s.customer_id AS client_id,
-                c.name AS customer_name
+                c.name AS customer_name,
+                c.alias AS alias
             FROM app_structures s
             JOIN app_customers c ON c.id = s.customer_id
             WHERE s.customer_id IS NOT NULL
