@@ -1,6 +1,6 @@
 {
   "metadata": {
-    "last_updated": "2025-11-14T16:05:54.357Z",
+    "last_updated": "2025-11-14T16:07:34.654Z",
     "date": "2025-11-14",
     "created_by": "Admin"
   },
@@ -8,6 +8,7 @@
   "meta": {
     "total_cleaners": 0,
     "used_cleaners": 0,
-    "assigned_tasks": 0
+    "assigned_tasks": 0,
+    "total_tasks": 0
   }
 }
