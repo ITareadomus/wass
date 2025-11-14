@@ -321,7 +321,7 @@ export default function SystemSettings() {
               <CardHeader className="bg-background py-3">
                 <CardTitle className="text-lg">Apartment Types</CardTitle>
                 <CardDescription className="text-xs">
-                  Tipi di appartamento per categoria
+                  Seleziona i tipi di appartamenti che i cleaner possono pulire
                 </CardDescription>
               </CardHeader>
               <CardContent className="bg-background space-y-3">
