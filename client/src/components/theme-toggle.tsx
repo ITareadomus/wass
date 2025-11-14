@@ -1,5 +1,5 @@
 
-import { Moon, Sun, LogOut, History, User, Check, Settings } from "lucide-react";
+import { Moon, Sun, LogOut, History, User, Check, Settings, Home } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
@@ -16,6 +16,7 @@ import {
 import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
 import { useToast } from "@/hooks/use-toast";
+import { useLocation } from "wouter";
 
 interface Account {
   id: number;
@@ -25,7 +26,7 @@ interface Account {
 }
 
 export function ThemeToggle() {
-  const [, setLocation] = useLocation();
+  const [location, setLocation] = useLocation();
   const { toast } = useToast();
   const [isDark, setIsDark] = useState(false);
   const [accounts, setAccounts] = useState<Account[]>([]);
@@ -134,6 +135,17 @@ export function ThemeToggle() {
           <Moon className="h-5 w-5" />
         )}
       </Button>
+      {location !== "/" && location !== "/generate-assignments" && (
+        <Button 
+          onClick={() => setLocation("/")} 
+          variant="outline" 
+          size="icon"
+          className="rounded-full"
+          title="Torna alla Home"
+        >
+          <Home className="h-5 w-5" />
+        </Button>
+      )}
       {user && (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
