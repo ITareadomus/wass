@@ -581,7 +581,7 @@ export default function TaskCard({
                           </div>
                         )}
                         {((task as any).checkin_time || isFutureCheckin) && (
-                          <div className="flex items-center gap-0.5">
+                          <div className={`flex items-center ${(task as any).checkin_time ? 'gap-0.5' : 'gap-0'}`}>
                             {(task as any).checkin_time && !isFutureCheckin && (
                               <>
                                 <span className="text-red-600 font-black text-[15px]">↓</span>
