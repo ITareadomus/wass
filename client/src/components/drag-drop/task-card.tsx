@@ -28,10 +28,10 @@ interface MultiSelectContextType {
   isMultiSelectMode: boolean;
   selectedTasks: Array<{ taskId: number; order: number }>;
   toggleMode: () => void;
-  toggleTask: (taskId: number) => void;
+  toggleTask: (taskId: string) => void; // Changed to string
   clearSelection: () => void;
-  isTaskSelected: (taskId: number) => boolean;
-  getTaskOrder: (taskId: number) => number | undefined;
+  isTaskSelected: (taskId: string) => boolean; // Changed to string
+  getTaskOrder: (taskId: string) => number | undefined; // Changed to string
 }
 
 interface TaskCardProps {
@@ -72,8 +72,8 @@ export default function TaskCard({
 
   // Usa il context multi-select dalla prop (solo per container, non timeline)
   const isMultiSelectMode = multiSelectContext?.isMultiSelectMode ?? false;
-  const isSelected = multiSelectContext?.isTaskSelected(task.id) ?? false;
-  const selectionOrder = multiSelectContext?.getTaskOrder(task.id);
+  const isSelected = multiSelectContext?.isTaskSelected(String(task.id)) ?? false; // Pass String ID
+  const selectionOrder = multiSelectContext?.getTaskOrder(String(task.id)); // Pass String ID
 
   // Gestisce il click sulla card: se multi-select toggle selezione, altrimenti apri modale
   const handleCardClick = (e: React.MouseEvent) => {
@@ -81,7 +81,7 @@ export default function TaskCard({
 
     // In multi-select mode nei container: toggle selezione invece di aprire modale
     if (isMultiSelectMode && !isInTimeline && multiSelectContext) {
-      multiSelectContext.toggleTask(task.id);
+      multiSelectContext.toggleTask(String(task.id)); // Pass String ID
       return;
     }
 
@@ -446,7 +446,7 @@ export default function TaskCard({
     return totalMinutes < 60;
   })();
 
-  // Determina se mostrare le frecce check-in/out:
+  // Determina se mostrare le frecce check-in e check-out:
   // - Nei containers: SEMPRE mostrare le frecce
   // - Nella timeline: mostrare SOLO per task >= 1 ora
   const shouldShowCheckInOutArrows = isInTimeline ? !isSmallTask : true;
@@ -546,7 +546,7 @@ export default function TaskCard({
                       <div className="absolute top-0.5 left-0.5 z-50">
                         <Checkbox
                           checked={isSelected}
-                          onCheckedChange={() => multiSelectContext?.toggleTask(task.id)}
+                          onCheckedChange={() => multiSelectContext?.toggleTask(String(task.id))} // Pass String ID
                           className="w-4 h-4 bg-white border-2 border-sky-600"
                           data-testid={`checkbox-task-${task.id}`}
                         />

@@ -7,6 +7,13 @@ import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { useState, useEffect, useMemo } from "react";
 
+interface ContainerMultiSelectState {
+  isMultiSelectMode: boolean;
+  selectedTasks: Array<{ taskId: string; order: number }>;
+  setIsMultiSelectMode: (value: boolean) => void;
+  setSelectedTasks: (value: Array<{ taskId: string; order: number }>) => void;
+}
+
 interface PriorityColumnProps {
   title: string;
   priority: string;
@@ -15,6 +22,7 @@ interface PriorityColumnProps {
   icon: "clock" | "alert-circle" | "arrow-down";
   assignAction?: () => Promise<void>;
   isDragDisabled?: boolean;
+  containerMultiSelectState?: ContainerMultiSelectState;
 }
 
 export default function PriorityColumn({
@@ -25,17 +33,20 @@ export default function PriorityColumn({
   icon,
   assignAction,
   isDragDisabled = false,
+  containerMultiSelectState,
 }: PriorityColumnProps) {
   const [isAssigning, setIsAssigning] = useState(false);
   const [isDateInPast, setIsDateInPast] = useState(false);
   const { toast } = useToast();
   const [hasAssigned, setHasAssigned] = useState(false);
   
-  // Stato locale per multi-select specifico di questo container
-  const [isMultiSelectMode, setIsMultiSelectMode] = useState(false);
-  const [selectedTasks, setSelectedTasks] = useState<Array<{ taskId: number; order: number }>>([]);
+  // Usa lo stato passato dal parent se disponibile, altrimenti fallback
+  const isMultiSelectMode = containerMultiSelectState?.isMultiSelectMode ?? false;
+  const selectedTasks = containerMultiSelectState?.selectedTasks ?? [];
+  const setIsMultiSelectMode = containerMultiSelectState?.setIsMultiSelectMode ?? (() => {});
+  const setSelectedTasks = containerMultiSelectState?.setSelectedTasks ?? (() => {});
   
-  // Funzioni per gestire la selezione multipla locale
+  // Funzioni per gestire la selezione multipla
   const toggleMode = () => {
     setIsMultiSelectMode(!isMultiSelectMode);
     if (isMultiSelectMode) {
@@ -43,7 +54,7 @@ export default function PriorityColumn({
     }
   };
   
-  const toggleTask = (taskId: number) => {
+  const toggleTask = (taskId: string) => {
     setSelectedTasks(prev => {
       const existing = prev.find(t => t.taskId === taskId);
       if (existing) {
@@ -55,11 +66,11 @@ export default function PriorityColumn({
     });
   };
   
-  const isTaskSelected = (taskId: number) => {
+  const isTaskSelected = (taskId: string) => {
     return selectedTasks.some(t => t.taskId === taskId);
   };
   
-  const getTaskOrder = (taskId: number) => {
+  const getTaskOrder = (taskId: string) => {
     const task = selectedTasks.find(t => t.taskId === taskId);
     return task?.order;
   };
@@ -251,7 +262,7 @@ export default function PriorityColumn({
             {tasks.length} task
             {isMultiSelectMode && selectedTasks.length > 0 && (
               <span className="ml-2 text-sky-600 font-semibold">
-                ({selectedTasks.filter(st => tasks.some(t => t.id === st.taskId)).length} selezionate)
+                ({selectedTasks.filter(st => tasks.some(t => String(t.id) === st.taskId)).length} selezionate)
               </span>
             )}
           </div>
