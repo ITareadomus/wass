@@ -471,6 +471,22 @@ export default function TaskCard({
     return checkoutDateTime > checkinDateTime;
   })();
 
+  // Verifica se il check-in è per una data futura (non oggi)
+  const isFutureCheckin = (() => {
+    const taskObj = task as any;
+    const checkinDate = taskObj.checkin_date;
+    
+    if (!checkinDate) return false;
+    
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    const checkin = new Date(checkinDate);
+    checkin.setHours(0, 0, 0, 0);
+    
+    return checkin > today;
+  })();
+
   // Determina se il drag è disabilitato in base alla data e se la task è già salvata
   const shouldDisableDrag = isDragDisabled || (displayTask as any).checkin_date;
 
@@ -560,6 +576,9 @@ export default function TaskCard({
                         {(task as any).checkin_time && (
                           <div className="flex items-center gap-0.5">
                             <span className="text-red-600 font-black text-[15px]">↓</span>
+                            {isFutureCheckin && (
+                              <span className="text-red-600 text-[15px]" title="Check-in futuro">🐌</span>
+                            )}
                             <span className="text-red-600 text-[11px] font-bold">{(task as any).checkin_time}</span>
                           </div>
                         )}
