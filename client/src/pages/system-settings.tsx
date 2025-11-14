@@ -494,8 +494,8 @@ export default function SystemSettings() {
                 {/* Appartamento Standard */}
                 <div className="space-y-3">
                   <div className="border-b pb-2 flex items-center gap-2">
-                    <span className="text-sm font-medium text-blue-800 dark:text-blue-200">Apt</span>
-                    <span className="px-2 py-0.5 rounded border font-medium text-sm bg-blue-500/30 text-blue-800 dark:bg-blue-500/40 dark:text-blue-200 border-blue-600 dark:border-blue-400">
+                    <span className="text-sm font-medium text-green-800 dark:text-green-200">Apt</span>
+                    <span className="px-2 py-0.5 rounded border font-medium text-sm bg-green-500/30 text-green-800 dark:bg-green-500/40 dark:text-green-200 border-green-600 dark:border-green-400">
                       Standard
                     </span>
                   </div>
