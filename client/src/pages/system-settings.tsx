@@ -151,8 +151,8 @@ export default function SystemSettings() {
                 {/* Early-Out */}
                 <div className="space-y-3">
                   <div className="border-b pb-2">
-                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200">
-                      Early-Out
+                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-500 text-white border-blue-700">
+                      EO
                     </span>
                   </div>
                   <div className="space-y-2">
@@ -213,8 +213,8 @@ export default function SystemSettings() {
                 {/* High-Priority */}
                 <div className="space-y-3">
                   <div className="border-b pb-2">
-                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
-                      High-Priority
+                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-orange-500 text-white border-orange-700">
+                      HP
                     </span>
                   </div>
                   <div className="space-y-2">
@@ -275,8 +275,8 @@ export default function SystemSettings() {
                 {/* Low-Priority */}
                 <div className="space-y-3">
                   <div className="border-b pb-2">
-                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-lime-100 text-lime-800 dark:bg-lime-900 dark:text-lime-200">
-                      Low-Priority
+                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-500 text-white border-gray-700">
+                      LP
                     </span>
                   </div>
                   <div className="space-y-2">
