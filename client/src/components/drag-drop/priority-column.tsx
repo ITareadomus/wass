@@ -5,8 +5,7 @@ import { Clock, AlertCircle, ArrowDown, Calendar, CheckSquare } from "lucide-rea
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
-import { useState, useEffect } from "react";
-import { useMultiSelect } from "@/pages/generate-assignments";
+import { useState, useEffect, useMemo } from "react";
 
 interface PriorityColumnProps {
   title: string;
@@ -32,9 +31,49 @@ export default function PriorityColumn({
   const { toast } = useToast();
   const [hasAssigned, setHasAssigned] = useState(false);
   
-  // Usa il context per multi-select
-  const multiSelectCtx = useMultiSelect();
-  const { isMultiSelectMode, selectedTasks, toggleMode, toggleTask, isTaskSelected, getTaskOrder } = multiSelectCtx;
+  // Stato locale per multi-select specifico di questo container
+  const [isMultiSelectMode, setIsMultiSelectMode] = useState(false);
+  const [selectedTasks, setSelectedTasks] = useState<Array<{ taskId: number; order: number }>>([]);
+  
+  // Funzioni per gestire la selezione multipla locale
+  const toggleMode = () => {
+    setIsMultiSelectMode(!isMultiSelectMode);
+    if (isMultiSelectMode) {
+      setSelectedTasks([]);
+    }
+  };
+  
+  const toggleTask = (taskId: number) => {
+    setSelectedTasks(prev => {
+      const existing = prev.find(t => t.taskId === taskId);
+      if (existing) {
+        return prev.filter(t => t.taskId !== taskId);
+      } else {
+        const maxOrder = prev.length > 0 ? Math.max(...prev.map(t => t.order)) : 0;
+        return [...prev, { taskId, order: maxOrder + 1 }];
+      }
+    });
+  };
+  
+  const isTaskSelected = (taskId: number) => {
+    return selectedTasks.some(t => t.taskId === taskId);
+  };
+  
+  const getTaskOrder = (taskId: number) => {
+    const task = selectedTasks.find(t => t.taskId === taskId);
+    return task?.order;
+  };
+  
+  // Context mock per passare ai TaskCard
+  const multiSelectCtx = useMemo(() => ({
+    isMultiSelectMode,
+    selectedTasks,
+    toggleMode,
+    toggleTask,
+    clearSelection: () => setSelectedTasks([]),
+    isTaskSelected,
+    getTaskOrder,
+  }), [isMultiSelectMode, selectedTasks]);
   
   console.log('[DEBUG PriorityColumn]', priority, 'isMultiSelectMode:', isMultiSelectMode, 'selectedTasks:', selectedTasks.length);
 
@@ -281,6 +320,7 @@ export default function PriorityColumn({
                   isDuplicate={isDuplicate}
                   isDragDisabled={isDragDisabled || isDateInPast}
                   isReadOnly={isDateInPast}
+                  multiSelectContext={multiSelectCtx}
                 />
               );
             })}

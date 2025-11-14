@@ -20,10 +20,19 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { HelpCircle, ChevronLeft, ChevronRight, Save, Pencil } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
-import { useMultiSelect } from "@/pages/generate-assignments";
 
 // Normalizza la chiave di una task indipendentemente dal campo usato
 const getTaskKey = (t: any) => String(t?.id ?? t?.task_id ?? t?.logistic_code ?? "");
+
+interface MultiSelectContextType {
+  isMultiSelectMode: boolean;
+  selectedTasks: Array<{ taskId: number; order: number }>;
+  toggleMode: () => void;
+  toggleTask: (taskId: number) => void;
+  clearSelection: () => void;
+  isTaskSelected: (taskId: number) => boolean;
+  getTaskOrder: (taskId: number) => number | undefined;
+}
 
 interface TaskCardProps {
   task: Task;
@@ -34,6 +43,7 @@ interface TaskCardProps {
   isDuplicate?: boolean;
   isDragDisabled?: boolean;
   isReadOnly?: boolean;
+  multiSelectContext?: MultiSelectContextType;
 }
 
 interface AssignedTask {
@@ -53,14 +63,14 @@ export default function TaskCard({
   isDuplicate = false,
   isDragDisabled = false,
   isReadOnly = false,
+  multiSelectContext = null,
 }: TaskCardProps) {
   console.log('🔧 TaskCard render - isReadOnly:', isReadOnly, 'for task:', task.name);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [clickTimer, setClickTimer] = useState<NodeJS.Timeout | null>(null);
   const [operationNames, setOperationNames] = useState<Record<number, string>>({});
 
-  // Usa il context per multi-select (solo per container, non timeline)
-  const multiSelectContext = !isInTimeline ? useMultiSelect() : null;
+  // Usa il context multi-select dalla prop (solo per container, non timeline)
   const isMultiSelectMode = multiSelectContext?.isMultiSelectMode ?? false;
   const isSelected = multiSelectContext?.isTaskSelected(task.id) ?? false;
   const selectionOrder = multiSelectContext?.getTaskOrder(task.id);
