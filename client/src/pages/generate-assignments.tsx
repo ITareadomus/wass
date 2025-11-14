@@ -139,7 +139,19 @@ export default function GenerateAssignments() {
       try {
         // Parse formato YYYY-MM-DD
         const [year, month, day] = savedDate.split('-').map(Number);
-        return new Date(year, month - 1, day); // month è 0-indexed in JS
+        const parsedDate = new Date(year, month - 1, day); // month è 0-indexed in JS
+        
+        // CRITICAL: Se la data salvata è nel PASSATO, usa OGGI invece
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        parsedDate.setHours(0, 0, 0, 0);
+        
+        if (parsedDate < today) {
+          console.log(`⏰ Data salvata (${savedDate}) è nel passato, uso oggi`);
+          return new Date();
+        }
+        
+        return parsedDate;
       } catch (e) {
         console.error('Errore parsing data salvata:', e);
         return new Date();
