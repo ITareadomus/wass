@@ -173,15 +173,6 @@ export default function ClientSettings() {
           <div className="flex items-center gap-3">
             <h1 className="text-3xl font-bold">Client Settings</h1>
             <Button 
-              onClick={() => setLocation("/")} 
-              variant="outline" 
-              size="icon"
-              className="rounded-full"
-              title="Torna alla Home"
-            >
-              <Home className="h-5 w-5" />
-            </Button>
-            <Button 
               onClick={loadData} 
               variant="outline" 
               size="icon"

@@ -194,18 +194,7 @@ export default function Settings() {
     <div className="min-h-screen bg-background text-foreground">
       <div className="container mx-auto px-4 py-8">
         <div className="flex justify-between items-center mb-8">
-          <div className="flex items-center gap-3">
-            <h1 className="text-3xl font-bold">Account Settings</h1>
-            <Button 
-              onClick={() => setLocation("/")} 
-              variant="outline" 
-              size="icon"
-              className="rounded-full"
-              title="Torna alla Home"
-            >
-              <Home className="h-5 w-5" />
-            </Button>
-          </div>
+          <h1 className="text-3xl font-bold">Account Settings</h1>
           <ThemeToggle />
         </div>
 
