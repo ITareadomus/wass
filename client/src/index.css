@@ -128,9 +128,9 @@
     animation: blink-yellow 1.5s ease-in-out infinite;
   }
 
-  /* Icona orologio bianca per input time in dark mode */
-  .dark input[type="time"]::-webkit-calendar-picker-indicator {
-    filter: invert(1);
+  /* Nasconde l'icona dell'orologio negli input time */
+  input[type="time"]::-webkit-calendar-picker-indicator {
+    display: none;
   }
 
   }
