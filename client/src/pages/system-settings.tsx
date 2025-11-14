@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Save, Home, Settings } from "lucide-react";
@@ -312,17 +313,23 @@ export default function SystemSettings() {
               <div className="md:col-span-3 mt-4 pt-4 border-t">
                 <div className="space-y-2 max-w-[66%]">
                   <Label htmlFor="dedupe_strategy" className="text-sm font-semibold">Dedupe Strategy</Label>
-                  <Input
-                    id="dedupe_strategy"
+                  <Select
                     value={settings.dedupe_strategy}
-                    onChange={(e) =>
+                    onValueChange={(value) =>
                       setSettings({
                         ...settings,
-                        dedupe_strategy: e.target.value,
+                        dedupe_strategy: value,
                       })
                     }
-                    placeholder="es. eo_wins"
-                  />
+                  >
+                    <SelectTrigger id="dedupe_strategy">
+                      <SelectValue placeholder="Seleziona strategia" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="eo_wins">eo_wins</SelectItem>
+                      <SelectItem value="hp_wins">hp_wins</SelectItem>
+                    </SelectContent>
+                  </Select>
                   <p className="text-xs text-muted-foreground mt-1">
                     Strategia per le task duplex, cioè che rispecchiano entrambi i criteri EO e HP (eo_wins → le task duplex saranno EO - hp_wins → viceversa)
                   </p>
