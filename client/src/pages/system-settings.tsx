@@ -131,14 +131,14 @@ export default function SystemSettings() {
 
         <div className="space-y-4">
           {/* Early-Out, High-Priority e Low-Priority in un'unica card full-width */}
-          <Card className="bg-background border-2 border-custom-blue">
-            <CardHeader className="bg-background py-3">
+          <Card className="bg-custom-blue-light border-2 border-custom-blue">
+            <CardHeader className="bg-custom-blue-light py-3">
               <CardTitle className="text-lg">Priority Settings</CardTitle>
               <CardDescription className="text-xs">
                 Configurazione per le task Early-Out, High-Priority e Low-Priority
               </CardDescription>
             </CardHeader>
-            <CardContent className="bg-background">
+            <CardContent className="bg-custom-blue-light">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 {/* Early-Out */}
                 <div className="space-y-3">
@@ -354,14 +354,14 @@ export default function SystemSettings() {
           </Card>
 
           {/* Apartment Types */}
-          <Card className="bg-background border-2 border-custom-blue">
-              <CardHeader className="bg-background py-3">
+          <Card className="bg-custom-blue-light border-2 border-custom-blue">
+              <CardHeader className="bg-custom-blue-light py-3">
                 <CardTitle className="text-lg">Apartment Types</CardTitle>
                 <CardDescription className="text-xs">
                   Tipi di appartamento (dimensioni) che ogni categoria di cleaner può gestire
                 </CardDescription>
               </CardHeader>
-              <CardContent className="bg-background">
+              <CardContent className="bg-custom-blue-light">
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                   {/* Cleaner STANDARD */}
                   <div className="space-y-3">
@@ -482,14 +482,14 @@ export default function SystemSettings() {
             </Card>
 
           {/* Task Types - Tipi di appartamento che i cleaner possono fare */}
-          <Card className="bg-background border-2 border-custom-blue">
-            <CardHeader className="bg-background py-3">
+          <Card className="bg-custom-blue-light border-2 border-custom-blue">
+            <CardHeader className="bg-custom-blue-light py-3">
               <CardTitle className="text-lg">Task Types</CardTitle>
               <CardDescription className="text-xs">
                 Tipi di appartamento che ogni categoria di cleaner può gestire
               </CardDescription>
             </CardHeader>
-            <CardContent className="bg-background">
+            <CardContent className="bg-custom-blue-light">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 {/* Appartamento Standard */}
                 <div className="space-y-3">
@@ -678,7 +678,7 @@ export default function SystemSettings() {
           <Button
             onClick={handleSave}
             disabled={isSaving}
-            className="w-full bg-background border-2 border-custom-blue text-black dark:text-white hover:opacity-80"
+            className="w-full border-2 border-custom-blue hover:opacity-80"
           >
             <Save className="w-4 h-4 mr-2" />
             {isSaving ? "Salvataggio..." : "Salva Impostazioni"}
