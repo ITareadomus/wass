@@ -340,7 +340,11 @@ export default function SystemSettings() {
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                   {/* Cleaner STANDARD */}
                   <div className="space-y-3">
-                    <h3 className="font-semibold text-sm border-b pb-2 text-green-600 dark:text-green-400">Cleaner STANDARD</h3>
+                    <div className="border-b pb-2">
+                      <span className="px-2 py-0.5 rounded border font-medium text-sm bg-green-500/30 text-green-800 dark:bg-green-500/40 dark:text-green-200 border-green-600 dark:border-green-400">
+                        Standard
+                      </span>
+                    </div>
                     <div className="space-y-2">
                       {["A", "B", "C", "D", "E", "F", "X"].map((type) => (
                         <div key={`standard-${type}`} className="flex items-center space-x-2">
@@ -372,7 +376,11 @@ export default function SystemSettings() {
 
                   {/* Cleaner PREMIUM */}
                   <div className="space-y-3">
-                    <h3 className="font-semibold text-sm border-b pb-2 text-yellow-600 dark:text-yellow-400">Cleaner PREMIUM</h3>
+                    <div className="border-b pb-2">
+                      <span className="px-2 py-0.5 rounded border font-medium text-sm bg-yellow-500/30 text-yellow-800 dark:bg-yellow-500/40 dark:text-yellow-200 border-yellow-600 dark:border-yellow-400">
+                        Premium
+                      </span>
+                    </div>
                     <div className="space-y-2">
                       {["A", "B", "C", "D", "E", "F", "X"].map((type) => (
                         <div key={`premium-${type}`} className="flex items-center space-x-2">
@@ -404,7 +412,11 @@ export default function SystemSettings() {
 
                   {/* Cleaner FORMATORE */}
                   <div className="space-y-3">
-                    <h3 className="font-semibold text-sm border-b pb-2 text-orange-600 dark:text-orange-400">Cleaner FORMATORE</h3>
+                    <div className="border-b pb-2">
+                      <span className="px-2 py-0.5 rounded border font-medium text-sm bg-orange-500/30 text-orange-800 dark:bg-orange-500/40 dark:text-orange-200 border-orange-600 dark:border-orange-400">
+                        Formatore
+                      </span>
+                    </div>
                     <div className="space-y-2">
                       {["A", "B", "C", "D", "E", "F", "X"].map((type) => (
                         <div key={`formatore-${type}`} className="flex items-center space-x-2">
