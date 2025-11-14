@@ -211,7 +211,7 @@ export default function Settings() {
               {!isAddingNew && (
                 <Button 
                   onClick={() => setIsAddingNew(true)} 
-                  className="w-full border-2 border-custom-blue hover:opacity-80"
+                  className="w-full bg-background border-2 border-custom-blue text-black dark:text-white hover:opacity-80"
                 >
                   <Plus className="w-4 h-4 mr-2" />
                   Aggiungi Nuovo Account
