@@ -342,7 +342,7 @@ export default function SystemSettings() {
                   {/* Cleaner STANDARD */}
                   <div className="space-y-3">
                     <div className="border-b pb-2 flex items-center gap-2">
-                      <span className="text-sm font-medium">Cleaner</span>
+                      <span className="text-sm font-medium text-green-800 dark:text-green-200">Cleaner</span>
                       <span className="px-2 py-0.5 rounded border font-medium text-sm bg-green-500/30 text-green-800 dark:bg-green-500/40 dark:text-green-200 border-green-600 dark:border-green-400">
                         Standard
                       </span>
@@ -379,7 +379,7 @@ export default function SystemSettings() {
                   {/* Cleaner PREMIUM */}
                   <div className="space-y-3">
                     <div className="border-b pb-2 flex items-center gap-2">
-                      <span className="text-sm font-medium">Cleaner</span>
+                      <span className="text-sm font-medium text-yellow-800 dark:text-yellow-200">Cleaner</span>
                       <span className="px-2 py-0.5 rounded border font-medium text-sm bg-yellow-500/30 text-yellow-800 dark:bg-yellow-500/40 dark:text-yellow-200 border-yellow-600 dark:border-yellow-400">
                         Premium
                       </span>
@@ -416,7 +416,7 @@ export default function SystemSettings() {
                   {/* Cleaner FORMATORE */}
                   <div className="space-y-3">
                     <div className="border-b pb-2 flex items-center gap-2">
-                      <span className="text-sm font-medium">Cleaner</span>
+                      <span className="text-sm font-medium text-orange-800 dark:text-orange-200">Cleaner</span>
                       <span className="px-2 py-0.5 rounded border font-medium text-sm bg-orange-500/30 text-orange-800 dark:bg-orange-500/40 dark:text-orange-200 border-orange-600 dark:border-orange-400">
                         Formatore
                       </span>
@@ -465,9 +465,10 @@ export default function SystemSettings() {
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 {/* Appartamento Standard */}
                 <div className="space-y-3">
-                  <div className="border-b pb-2">
+                  <div className="border-b pb-2 flex items-center gap-2">
+                    <span className="text-sm font-medium text-blue-800 dark:text-blue-200">Apt</span>
                     <span className="px-2 py-0.5 rounded border font-medium text-sm bg-blue-500/30 text-blue-800 dark:bg-blue-500/40 dark:text-blue-200 border-blue-600 dark:border-blue-400">
-                      Apt Standard
+                      Standard
                     </span>
                   </div>
                   <div className="space-y-2">
@@ -524,9 +525,10 @@ export default function SystemSettings() {
 
                 {/* Appartamento Premium */}
                 <div className="space-y-3">
-                  <div className="border-b pb-2">
+                  <div className="border-b pb-2 flex items-center gap-2">
+                    <span className="text-sm font-medium text-yellow-800 dark:text-yellow-200">Apt</span>
                     <span className="px-2 py-0.5 rounded border font-medium text-sm bg-yellow-500/30 text-yellow-800 dark:bg-yellow-500/40 dark:text-yellow-200 border-yellow-600 dark:border-yellow-400">
-                      Apt Premium
+                      Premium
                     </span>
                   </div>
                   <div className="space-y-2">
@@ -583,9 +585,10 @@ export default function SystemSettings() {
 
                 {/* Appartamento Straordinario */}
                 <div className="space-y-3">
-                  <div className="border-b pb-2">
+                  <div className="border-b pb-2 flex items-center gap-2">
+                    <span className="text-sm font-medium text-red-800 dark:text-red-200">Apt</span>
                     <span className="px-2 py-0.5 rounded border font-medium text-sm bg-red-500/30 text-red-800 dark:bg-red-500/40 dark:text-red-200 border-red-600 dark:border-red-400">
-                      Apt Straordinario
+                      Straordinario
                     </span>
                   </div>
                   <div className="space-y-2">
