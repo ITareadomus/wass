@@ -343,7 +343,7 @@ export default function SystemSettings() {
                       <div className="text-left">
                         <p className="text-xs font-semibold">Vai a Client Settings</p>
                         <p className="text-[10px] text-muted-foreground mt-0.5">
-                          Modifica Check-in/out
+                          Modifica Check-in/out per cliente
                         </p>
                       </div>
                     </Button>
