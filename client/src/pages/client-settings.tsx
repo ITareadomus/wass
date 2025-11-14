@@ -183,6 +183,15 @@ export default function ClientSettings() {
             </CardDescription>
           </CardHeader>
           <CardContent className="bg-custom-blue-light">
+            <Button
+              onClick={handleSave}
+              disabled={isSaving}
+              className="w-full mb-6 bg-background border-2 border-custom-blue text-black dark:text-white hover:opacity-80"
+            >
+              <Save className="w-4 h-4 mr-2" />
+              {isSaving ? "Salvataggio..." : "Salva Client Windows"}
+            </Button>
+
             <div className="rounded-md border">
               <Table>
                 <TableHeader>
@@ -224,15 +233,6 @@ export default function ClientSettings() {
                 </TableBody>
               </Table>
             </div>
-
-            <Button
-              onClick={handleSave}
-              disabled={isSaving}
-              className="w-full mt-6 bg-background border-2 border-custom-blue text-black dark:text-white hover:opacity-80"
-            >
-              <Save className="w-4 h-4 mr-2" />
-              {isSaving ? "Salvataggio..." : "Salva Client Windows"}
-            </Button>
           </CardContent>
         </Card>
       </div>
