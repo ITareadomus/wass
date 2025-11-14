@@ -582,17 +582,19 @@ export default function TaskCard({
                         )}
                         {((task as any).checkin_time || isFutureCheckin) && (
                           <div className="flex items-center gap-0.5">
-                            {(task as any).checkin_time && (
+                            {(task as any).checkin_time && !isFutureCheckin && (
                               <>
                                 <span className="text-red-600 font-black text-[15px]">↓</span>
-                                {isFutureCheckin && (
-                                  <span className="text-red-600 text-[15px]" title="Check-in futuro">🐌</span>
-                                )}
                                 <span className="text-red-600 text-[11px] font-bold">{(task as any).checkin_time}</span>
                               </>
                             )}
-                            {!((task as any).checkin_time) && isFutureCheckin && (
-                              <span className="text-red-600 text-[15px]" title="Check-in futuro senza orario">🐌</span>
+                            {isFutureCheckin && (
+                              <>
+                                <Calendar className="w-3.5 h-3.5 text-red-600" strokeWidth={2.5} />
+                                {(task as any).checkin_time && (
+                                  <span className="text-red-600 text-[11px] font-bold">{(task as any).checkin_time}</span>
+                                )}
+                              </>
                             )}
                           </div>
                         )}
