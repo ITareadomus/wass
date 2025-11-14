@@ -11,7 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 
 interface Client {
   client_id: number;
-  operation_name: string;
+  customer_name: string;
 }
 
 interface ClientWindow {
@@ -198,7 +198,7 @@ export default function ClientSettings() {
                     return (
                       <TableRow key={client.client_id}>
                         <TableCell className="font-medium">{client.client_id}</TableCell>
-                        <TableCell>{client.operation_name}</TableCell>
+                        <TableCell>{client.customer_name}</TableCell>
                         <TableCell>
                           <Input
                             type="time"

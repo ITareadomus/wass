@@ -1,4 +1,3 @@
-
 #!/usr/bin/env python3
 """
 Script per estrarre i clienti attivi dal database.
@@ -24,39 +23,34 @@ def extract_active_clients():
     """Estrae tutti i clienti attivi che hanno strutture con housekeeping."""
     conn = get_db_connection()
     cursor = conn.cursor(dictionary=True)
-    
+
     try:
         # Query per ottenere i clienti attivi dalle strutture con housekeeping
         query = """
             SELECT DISTINCT
-                s.customer_id as client_id,
-                s.operation_name
+                s.customer_id AS client_id,
+                c.name AS customer_name
             FROM app_structures s
+            JOIN app_customers c ON c.id = s.customer_id
             WHERE s.customer_id IS NOT NULL
-              AND s.operation_name IS NOT NULL
+              AND c.name IS NOT NULL
               AND s.deleted_at IS NULL
-            ORDER BY s.operation_name
+            ORDER BY c.name
         """
-        
+
         cursor.execute(query)
         clients = cursor.fetchall()
-        
-        # Converti in lista di dict
-        clients_list = [dict(client) for client in clients]
-        
-        return clients_list
-        
+        return [dict(client) for client in clients]
     finally:
         cursor.close()
         conn.close()
 
-def main():
+if __name__ == "__main__":
     try:
         clients = extract_active_clients()
-        print(json.dumps(clients, indent=2))
+        # In caso di successo, stampo JSON valido
+        print(json.dumps({"success": True, "clients": clients}, indent=2))
     except Exception as e:
-        print(json.dumps({"error": str(e)}), file=sys.stderr)
+        # IMPORTANTE: stampo su stdout e NON su stderr
+        print(json.dumps({"success": False, "error": str(e), "clients": []}))
         sys.exit(1)
-
-if __name__ == "__main__":
-    main()
