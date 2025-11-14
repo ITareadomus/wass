@@ -9,6 +9,14 @@ import { useToast } from "@/hooks/use-toast";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Save, Home, Settings } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
+import { ScrollArea } from "@/components/ui/scroll-area";
+
+interface Client {
+  client_id: number;
+  customer_name: string;
+  alias: string | null;
+}
 
 interface SettingsData {
   "early-out": {
@@ -33,6 +41,7 @@ export default function SystemSettings() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const [settings, setSettings] = useState<SettingsData | null>(null);
+  const [clients, setClients] = useState<Client[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
 
@@ -55,6 +64,7 @@ export default function SystemSettings() {
     }
 
     loadSettings();
+    loadClients();
   }, [setLocation, toast]);
 
   const loadSettings = async () => {
@@ -80,6 +90,23 @@ export default function SystemSettings() {
       setIsLoading(false);
     }
   };
+
+  const loadClients = async () => {
+    try {
+      const response = await fetch("/api/extract_active_clients");
+      if (response.ok) {
+        const data: Client[] = await response.json();
+        setClients(data);
+      }
+    } catch (error) {
+      toast({
+        title: "Errore",
+        description: "Impossibile caricare l'elenco dei clienti",
+        variant: "destructive",
+      });
+    }
+  };
+
 
   const handleSave = async () => {
     if (!settings) return;
@@ -118,6 +145,30 @@ export default function SystemSettings() {
       </div>
     );
   }
+
+  const handleClientToggle = (clientId: number, type: "eo" | "hp") => {
+    setSettings(prevSettings => {
+      if (!prevSettings) return null;
+      const currentClients = prevSettings[type === "eo" ? "early-out" : "high-priority"].eo_clients || [];
+      const updatedClients = currentClients.includes(clientId)
+        ? currentClients.filter(id => id !== clientId)
+        : [...currentClients, clientId];
+
+      return {
+        ...prevSettings,
+        [type === "eo" ? "early-out" : "high-priority"]: {
+          ...(type === "eo" ? prevSettings["early-out"] : prevSettings["high-priority"]),
+          eo_clients: updatedClients,
+        },
+      };
+    });
+  };
+
+  const getClientName = (clientId: number): string => {
+    const client = clients.find(c => c.client_id === clientId);
+    return client ? client.customer_name : `ID ${clientId}`;
+  };
+
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -184,22 +235,28 @@ export default function SystemSettings() {
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="eo_clients" className="text-sm">EO Clients</Label>
-                    <Input
-                      id="eo_clients"
-                      value={settings["early-out"].eo_clients.join(", ")}
-                      onChange={(e) =>
-                        setSettings({
-                          ...settings,
-                          "early-out": {
-                            ...settings["early-out"],
-                            eo_clients: e.target.value
-                              .split(",")
-                              .map((id) => parseInt(id.trim()))
-                              .filter((id) => !isNaN(id)),
-                          },
-                        })
-                      }
-                    />
+                    {/* Input nascosto, useremo i checkboxes */}
+                    <Input id="eo_clients" className="hidden" />
+                    <ScrollArea className="h-40 w-full rounded-md border p-4">
+                      {clients.map((client) => (
+                        <div key={`eo-client-${client.client_id}`} className="flex items-center space-x-2 mb-2">
+                          <Checkbox
+                            id={`eo-client-${client.client_id}`}
+                            checked={settings["early-out"].eo_clients.includes(client.client_id)}
+                            onCheckedChange={(checked) => {
+                              if (checked) {
+                                handleClientToggle(client.client_id, "eo");
+                              } else {
+                                handleClientToggle(client.client_id, "eo");
+                              }
+                            }}
+                          />
+                          <Label htmlFor={`eo-client-${client.client_id}`} className="text-sm cursor-pointer">
+                            {client.customer_name}
+                          </Label>
+                        </div>
+                      ))}
+                    </ScrollArea>
                   </div>
                 </div>
 
@@ -247,22 +304,28 @@ export default function SystemSettings() {
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="hp_clients" className="text-sm">HP Clients</Label>
-                    <Input
-                      id="hp_clients"
-                      value={settings["high-priority"].hp_clients.join(", ")}
-                      onChange={(e) =>
-                        setSettings({
-                          ...settings,
-                          "high-priority": {
-                            ...settings["high-priority"],
-                            hp_clients: e.target.value
-                              .split(",")
-                              .map((id) => parseInt(id.trim()))
-                              .filter((id) => !isNaN(id)),
-                          },
-                        })
-                      }
-                    />
+                    {/* Input nascosto, useremo i checkboxes */}
+                    <Input id="hp_clients" className="hidden" />
+                    <ScrollArea className="h-40 w-full rounded-md border p-4">
+                      {clients.map((client) => (
+                        <div key={`hp-client-${client.client_id}`} className="flex items-center space-x-2 mb-2">
+                          <Checkbox
+                            id={`hp-client-${client.client_id}`}
+                            checked={settings["high-priority"].hp_clients.includes(client.client_id)}
+                            onCheckedChange={(checked) => {
+                              if (checked) {
+                                handleClientToggle(client.client_id, "hp");
+                              } else {
+                                handleClientToggle(client.client_id, "hp");
+                              }
+                            }}
+                          />
+                          <Label htmlFor={`hp-client-${client.client_id}`} className="text-sm cursor-pointer">
+                            {client.customer_name}
+                          </Label>
+                        </div>
+                      ))}
+                    </ScrollArea>
                   </div>
                 </div>
 
