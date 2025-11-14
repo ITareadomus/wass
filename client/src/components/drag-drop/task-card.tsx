@@ -155,16 +155,24 @@ export default function TaskCard({
     const normalizedCurrentId = currentTaskId ? String(currentTaskId) : null;
     const normalizedTaskId    = getTaskKey(task);
 
-    const effId = normalizedCurrentId && navigableTasks.some(t => (t as any).__key === normalizedCurrentId)
-      ? normalizedCurrentId
-      : normalizedTaskId;
-
-    const currIdx = navigableTasks.findIndex(t => (t as any).__key === effId);
+    // Cerca prima usando currentTaskId, poi fallback su task corrente
+    let currIdx = -1;
+    if (normalizedCurrentId) {
+      currIdx = navigableTasks.findIndex(t => (t as any).__key === normalizedCurrentId);
+    }
+    
+    // Se non trovato, cerca la task originale
+    if (currIdx === -1) {
+      currIdx = navigableTasks.findIndex(t => (t as any).__key === normalizedTaskId);
+    }
+    
+    // Se ancora non trovato, usa 0 come fallback
     const safeIdx = currIdx >= 0 ? currIdx : 0;
+    const effId = currIdx >= 0 ? (navigableTasks[currIdx] as any).__key : normalizedTaskId;
 
     return {
       effectiveCurrentId: effId,
-      currentTaskInNavigable: currIdx,
+      currentTaskInNavigable: safeIdx,
       displayTask: currIdx >= 0 ? navigableTasks[currIdx] : { ...task, __key: normalizedTaskId },
       canGoPrev: navigableTasks.length > 0 && safeIdx > 0,
       canGoNext: navigableTasks.length > 0 && safeIdx < navigableTasks.length - 1
@@ -184,8 +192,9 @@ export default function TaskCard({
     e.stopPropagation();
     if (canGoPrev && currentTaskInNavigable > 0) {
       const prevTask = navigableTasks[currentTaskInNavigable - 1];
-      setCurrentTaskId(getTaskKey(prevTask));
-      console.log(`⬅️ Navigazione verso task precedente: ${prevTask.name}`);
+      const prevTaskKey = (prevTask as any).__key;
+      setCurrentTaskId(prevTaskKey);
+      console.log(`⬅️ Navigazione verso task precedente: ${prevTask.name} (key: ${prevTaskKey}, index: ${currentTaskInNavigable - 1})`);
     }
   };
 
@@ -193,8 +202,9 @@ export default function TaskCard({
     e.stopPropagation();
     if (canGoNext && currentTaskInNavigable < navigableTasks.length - 1) {
       const nextTask = navigableTasks[currentTaskInNavigable + 1];
-      setCurrentTaskId(getTaskKey(nextTask));
-      console.log(`➡️ Navigazione verso task successiva: ${nextTask.name}`);
+      const nextTaskKey = (nextTask as any).__key;
+      setCurrentTaskId(nextTaskKey);
+      console.log(`➡️ Navigazione verso task successiva: ${nextTask.name} (key: ${nextTaskKey}, index: ${currentTaskInNavigable + 1})`);
     }
   };
 
@@ -233,7 +243,8 @@ export default function TaskCard({
         currentContainer
       });
 
-      setCurrentTaskId(getTaskKey(task)); // Assicura che currentTaskId sia all'inizio quando si apre il modale
+      // CRITICAL: Sincronizza currentTaskId con displayTask corrente
+      setCurrentTaskId(getTaskKey(displayTask));
 
       // Inizializza campi editabili con i valori attuali della task visualizzata
       setEditedCheckoutDate((displayTask as any).checkout_date || "");
