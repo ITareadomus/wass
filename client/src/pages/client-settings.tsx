@@ -188,8 +188,8 @@ export default function ClientSettings() {
                 <TableHeader>
                   <TableRow>
                     <TableHead className="w-[100px]">Client ID</TableHead>
-                    <TableHead>Nome Cliente</TableHead>
                     <TableHead className="w-[120px]">Alias</TableHead>
+                    <TableHead>Nome Cliente</TableHead>
                     <TableHead className="w-[150px]">Checkin</TableHead>
                     <TableHead className="w-[150px]">Checkout</TableHead>
                   </TableRow>
@@ -200,8 +200,8 @@ export default function ClientSettings() {
                     return (
                       <TableRow key={client.client_id}>
                         <TableCell className="font-medium">{client.client_id}</TableCell>
-                        <TableCell>{client.customer_name}</TableCell>
                         <TableCell className="text-muted-foreground">{client.alias || "-"}</TableCell>
+                        <TableCell>{client.customer_name}</TableCell>
                         <TableCell>
                           <Input
                             type="time"
