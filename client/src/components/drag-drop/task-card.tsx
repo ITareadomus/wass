@@ -58,29 +58,29 @@ export default function TaskCard({
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [clickTimer, setClickTimer] = useState<NodeJS.Timeout | null>(null);
   const [operationNames, setOperationNames] = useState<Record<number, string>>({});
-  
+
   // Usa il context per multi-select (solo per container, non timeline)
   const multiSelectContext = !isInTimeline ? useMultiSelect() : null;
   const isMultiSelectMode = multiSelectContext?.isMultiSelectMode ?? false;
   const isSelected = multiSelectContext?.isTaskSelected(task.id) ?? false;
   const selectionOrder = multiSelectContext?.getTaskOrder(task.id);
-  
+
   // Gestisce il click sulla card: se multi-select toggle selezione, altrimenti apri modale
   const handleCardClick = (e: React.MouseEvent) => {
     e.stopPropagation();
-    
+
     // In multi-select mode nei container: toggle selezione invece di aprire modale
     if (isMultiSelectMode && !isInTimeline && multiSelectContext) {
       multiSelectContext.toggleTask(task.id);
       return;
     }
-    
+
     // Gestione doppio click per mostrare task sulla mappa
     if (clickTimer) {
       // Doppio click rilevato
       clearTimeout(clickTimer);
       setClickTimer(null);
-      
+
       // Toggle filtro mappa per questa task
       const currentFilteredTaskId = (window as any).mapFilteredTaskId;
       if (currentFilteredTaskId === task.name) {
@@ -105,7 +105,7 @@ export default function TaskCard({
         setIsModalOpen(true);
         setClickTimer(null);
       }, 250);
-      
+
       setClickTimer(timer);
     }
   };
@@ -151,7 +151,7 @@ export default function TaskCard({
   }, [allTasks, task]);
 
   // Trova l'indice effettivo della task nel cleaner
-  const { effectiveCurrentId, currentTaskInNavigable, displayTask, canGoPrev, canGoNext } = (() => {
+  const { currentIndex, effectiveCurrentId, currentTaskInNavigable, displayTask, canGoPrev, canGoNext } = (() => {
     const normalizedCurrentId = currentTaskId ? String(currentTaskId) : null;
     const normalizedTaskId    = getTaskKey(task);
 
@@ -160,22 +160,28 @@ export default function TaskCard({
     if (normalizedCurrentId) {
       currIdx = navigableTasks.findIndex(t => (t as any).__key === normalizedCurrentId);
     }
-    
+
     // Se non trovato, cerca la task originale
     if (currIdx === -1) {
       currIdx = navigableTasks.findIndex(t => (t as any).__key === normalizedTaskId);
     }
-    
+
     // Se ancora non trovato, usa 0 come fallback
     const safeIdx = currIdx >= 0 ? currIdx : 0;
     const effId = currIdx >= 0 ? (navigableTasks[currIdx] as any).__key : normalizedTaskId;
+    const curr = navigableTasks[safeIdx];
+    const disp = curr || task;
+
+    const prev = safeIdx > 0;
+    const next = safeIdx < navigableTasks.length - 1;
 
     return {
+      currentIndex: safeIdx,
       effectiveCurrentId: effId,
-      currentTaskInNavigable: safeIdx,
-      displayTask: currIdx >= 0 ? navigableTasks[currIdx] : { ...task, __key: normalizedTaskId },
-      canGoPrev: navigableTasks.length > 0 && safeIdx > 0,
-      canGoNext: navigableTasks.length > 0 && safeIdx < navigableTasks.length - 1
+      currentTaskInNavigable: curr,
+      displayTask: disp,
+      canGoPrev: prev,
+      canGoNext: next
     };
   })();
 
@@ -183,28 +189,22 @@ export default function TaskCard({
     currentTaskId,
     effectiveCurrentId,
     navigableTasksCount: navigableTasks.length,
-    currentIndex: currentTaskInNavigable,
+    currentIndex: currentIndex,
     canGoPrev: canGoPrev,
     canGoNext: canGoNext
   });
 
-  const handlePrevTask = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (canGoPrev && currentTaskInNavigable > 0) {
-      const prevTask = navigableTasks[currentTaskInNavigable - 1];
-      const prevTaskKey = (prevTask as any).__key;
-      setCurrentTaskId(prevTaskKey);
-      console.log(`⬅️ Navigazione verso task precedente: ${prevTask.name} (key: ${prevTaskKey}, index: ${currentTaskInNavigable - 1})`);
+  const handlePrevTask = () => {
+    if (canGoPrev && currentIndex > 0) {
+      const prevTask = navigableTasks[currentIndex - 1];
+      setCurrentTaskId((prevTask as any).__key);
     }
   };
 
-  const handleNextTask = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (canGoNext && currentTaskInNavigable < navigableTasks.length - 1) {
-      const nextTask = navigableTasks[currentTaskInNavigable + 1];
-      const nextTaskKey = (nextTask as any).__key;
-      setCurrentTaskId(nextTaskKey);
-      console.log(`➡️ Navigazione verso task successiva: ${nextTask.name} (key: ${nextTaskKey}, index: ${currentTaskInNavigable + 1})`);
+  const handleNextTask = () => {
+    if (canGoNext && currentIndex < navigableTasks.length - 1) {
+      const nextTask = navigableTasks[currentIndex + 1];
+      setCurrentTaskId((nextTask as any).__key);
     }
   };
 
@@ -352,7 +352,7 @@ export default function TaskCard({
 
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [isModalOpen, canGoPrev, canGoNext, currentTaskInNavigable, navigableTasks]);
+  }, [isModalOpen, canGoPrev, canGoNext, currentIndex, navigableTasks]);
 
   const handleSaveChanges = async () => {
     try {
@@ -476,15 +476,15 @@ export default function TaskCard({
   const isFutureCheckin = (() => {
     const taskObj = task as any;
     const checkinDate = taskObj.checkin_date;
-    
+
     if (!checkinDate) return false;
-    
+
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    
+
     const checkin = new Date(checkinDate);
     checkin.setHours(0, 0, 0, 0);
-    
+
     return checkin > today;
   })();
 
@@ -546,7 +546,7 @@ export default function TaskCard({
                         />
                       </div>
                     )}
-                    
+
                     {/* Badge ordine selezione (solo se selezionata) */}
                     {isSelected && selectionOrder && !isInTimeline && (
                       <div className="absolute top-0.5 right-0.5 z-50">
@@ -555,7 +555,7 @@ export default function TaskCard({
                         </div>
                       </div>
                     )}
-                    
+
                     {!isConfirmedOperation && !isSelected && (
                       <div className="absolute top-0.5 right-0.5 z-50">
                         <HelpCircle
@@ -564,7 +564,7 @@ export default function TaskCard({
                         />
                       </div>
                     )}
-                    
+
                     {/* Frecce check-in e check-out con orari - solo per task >= 1 ora */}
                     {shouldShowCheckInOutArrows && ((task as any).checkout_time || (task as any).checkin_time || isFutureCheckin) && (
                       <div className="absolute right-1 top-1/2 -translate-y-1/2 flex flex-col gap-0.5 z-40">
@@ -951,9 +951,9 @@ export default function TaskCard({
                       if (!isReadOnly) setEditingField('operation');
                     }}
                   >
-                    {!isConfirmedOperation 
-                      ? "non migrato" 
-                      : (displayTask as any).operation_id 
+                    {!isConfirmedOperation
+                      ? "non migrato"
+                      : (displayTask as any).operation_id
                         ? operationNames[(displayTask as any).operation_id] || `ID: ${(displayTask as any).operation_id}`
                         : "-"}
                   </p>
