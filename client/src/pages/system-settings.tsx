@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
@@ -9,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Save, Home, Settings } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 
 interface SettingsData {
   "early-out": {
@@ -65,7 +65,7 @@ export default function SystemSettings() {
         cache: 'no-store',
         headers: { 'Cache-Control': 'no-cache' }
       });
-      
+
       if (response.ok) {
         const data = await response.json();
         setSettings(data);
