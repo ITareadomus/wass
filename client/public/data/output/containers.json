@@ -1,6 +1,6 @@
 {
   "metadata": {
-    "last_updated": "2025-11-13T15:36:29.953843",
+    "last_updated": "2025-11-14T09:37:10.751608",
     "date": "2025-11-13"
   },
   "containers": {
@@ -501,6 +501,33 @@
           "priority": "high_priority"
         },
         {
+          "task_id": 218784,
+          "logistic_code": 730,
+          "client_id": 72,
+          "premium": false,
+          "address": "VIA VERTOIBA 9",
+          "lat": "45.4587042",
+          "lng": "9.2168473",
+          "cleaning_time": 90,
+          "checkin_date": "2025-11-13",
+          "checkout_date": "2025-11-13",
+          "checkin_time": "12:00",
+          "checkout_time": "11:00",
+          "pax_in": 2,
+          "pax_out": 1,
+          "small_equipment": false,
+          "operation_id": 2,
+          "confirmed_operation": true,
+          "straordinaria": false,
+          "type_apt": "B",
+          "alias": "PRTL",
+          "customer_name": "PERETTI LORENZO",
+          "reasons": [
+            "same_day_checkin_between_eo_hp"
+          ],
+          "priority": "high_priority"
+        },
+        {
           "task_id": 218802,
           "logistic_code": 635,
           "client_id": 3,
@@ -583,7 +610,7 @@
           "priority": "high_priority"
         }
       ],
-      "count": 7
+      "count": 8
     },
     "low_priority": {
       "tasks": [
@@ -732,9 +759,9 @@
     }
   },
   "summary": {
-    "total_tasks": 26,
+    "total_tasks": 27,
     "early_out": 14,
-    "high_priority": 7,
+    "high_priority": 8,
     "low_priority": 5
   }
 }
