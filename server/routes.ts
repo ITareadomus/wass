@@ -2838,24 +2838,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Endpoint per salvare le client windows
-  app.post("/api/save-client-windows", async (req, res) => {
+  // Endpoint per salvare le finestre temporali clienti
+  app.post("/api/save-client-timewindows", async (req, res) => {
     try {
-      const clientWindowsData = req.body;
-      const clientWindowsPath = path.join(process.cwd(), "client/public/data/input/client_windows.json");
+      const clientTimeWindowsData = req.body;
+      const clientTimeWindowsPath = path.join(process.cwd(), "client/public/data/input/client_timewindows.json");
 
-      await fs.promises.writeFile(
-        clientWindowsPath,
-        JSON.stringify(clientWindowsData, null, 2),
+      await fs.writeFile(
+        clientTimeWindowsPath,
+        JSON.stringify(clientTimeWindowsData, null, 2),
         "utf-8"
       );
 
       res.json({
         success: true,
-        message: "Client windows salvate con successo"
+        message: "Finestre temporali salvate con successo"
       });
     } catch (error: any) {
-      console.error("Errore nel salvataggio delle client windows:", error);
+      console.error("Errore nel salvataggio delle finestre temporali:", error);
       res.status(500).json({ 
         success: false, 
         error: error.message 
