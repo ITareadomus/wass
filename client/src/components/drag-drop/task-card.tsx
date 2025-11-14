@@ -472,6 +472,7 @@ export default function TaskCard({
   })();
 
   // Verifica se il check-in è per una data futura (non oggi)
+  // Include anche i casi dove l'orario non è migrato ma la data è futura
   const isFutureCheckin = (() => {
     const taskObj = task as any;
     const checkinDate = taskObj.checkin_date;
@@ -565,7 +566,7 @@ export default function TaskCard({
                     )}
                     
                     {/* Frecce check-in e check-out con orari - solo per task >= 1 ora */}
-                    {shouldShowCheckInOutArrows && ((task as any).checkout_time || (task as any).checkin_time) && (
+                    {shouldShowCheckInOutArrows && ((task as any).checkout_time || (task as any).checkin_time || isFutureCheckin) && (
                       <div className="absolute right-1 top-1/2 -translate-y-1/2 flex flex-col gap-0.5 z-40">
                         {(task as any).checkout_time && (
                           <div className="flex items-center gap-0.5">
@@ -573,13 +574,20 @@ export default function TaskCard({
                             <span className="text-[11px] text-[#137537] font-bold">{(task as any).checkout_time}</span>
                           </div>
                         )}
-                        {(task as any).checkin_time && (
+                        {((task as any).checkin_time || isFutureCheckin) && (
                           <div className="flex items-center gap-0.5">
-                            <span className="text-red-600 font-black text-[15px]">↓</span>
-                            {isFutureCheckin && (
-                              <span className="text-red-600 text-[15px]" title="Check-in futuro">🐌</span>
+                            {(task as any).checkin_time && (
+                              <>
+                                <span className="text-red-600 font-black text-[15px]">↓</span>
+                                {isFutureCheckin && (
+                                  <span className="text-red-600 text-[15px]" title="Check-in futuro">🐌</span>
+                                )}
+                                <span className="text-red-600 text-[11px] font-bold">{(task as any).checkin_time}</span>
+                              </>
                             )}
-                            <span className="text-red-600 text-[11px] font-bold">{(task as any).checkin_time}</span>
+                            {!((task as any).checkin_time) && isFutureCheckin && (
+                              <span className="text-red-600 text-[15px]" title="Check-in futuro senza orario">🐌</span>
+                            )}
                           </div>
                         )}
                       </div>
