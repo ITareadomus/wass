@@ -305,9 +305,9 @@ export default function SystemSettings() {
 
               {/* Dedupe Strategy e Client Settings - sotto EO e HP */}
               <div className="md:col-span-3 mt-4 pt-4 border-t">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {/* Dedupe Strategy */}
-                  <div className="space-y-2">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  {/* Dedupe Strategy - 2/3 della larghezza */}
+                  <div className="space-y-2 md:col-span-2">
                     <Label htmlFor="dedupe_strategy" className="text-sm font-semibold">Dedupe Strategy</Label>
                     <Select
                       value={settings.dedupe_strategy}
@@ -331,19 +331,19 @@ export default function SystemSettings() {
                     </p>
                   </div>
 
-                  {/* Client Settings */}
-                  <div className="space-y-2">
+                  {/* Client Settings - 1/3 della larghezza */}
+                  <div className="space-y-2 md:col-span-1">
                     <Label className="text-sm font-semibold">Client Settings</Label>
                     <Button
                       onClick={() => setLocation("/client-settings")}
                       variant="outline"
-                      className="w-full justify-start h-auto py-3 border-2 hover:bg-custom-blue hover:text-white transition-colors"
+                      className="w-full justify-start h-auto py-2 border-2 hover:bg-custom-blue hover:text-white transition-colors"
                     >
-                      <Settings className="w-4 h-4 mr-2" />
+                      <Settings className="w-4 h-4 mr-2 flex-shrink-0" />
                       <div className="text-left">
-                        <p className="text-sm font-semibold">Vai a Client Settings</p>
-                        <p className="text-xs text-muted-foreground mt-0.5">
-                          Modifica Check-in e Check-out per cliente
+                        <p className="text-xs font-semibold">Vai a Client Settings</p>
+                        <p className="text-[10px] text-muted-foreground mt-0.5">
+                          Modifica Check-in/out
                         </p>
                       </div>
                     </Button>
