@@ -244,6 +244,8 @@ export default function MapSection({ tasks }: MapSectionProps) {
             
             div.addEventListener('click', () => {
               setSelectedTask(task);
+              // Evidenzia la task nella timeline e nei container
+              (window as any).mapFilteredTaskId = task.name;
             });
             
             this.div = div;
@@ -293,6 +295,8 @@ export default function MapSection({ tasks }: MapSectionProps) {
 
         marker.addListener('click', () => {
           setSelectedTask(task);
+          // Evidenzia la task nella timeline e nei container
+          (window as any).mapFilteredTaskId = task.name;
         });
 
         markersRef.current.push(marker);
