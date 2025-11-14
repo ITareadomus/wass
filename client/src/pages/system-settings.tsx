@@ -323,6 +323,9 @@ export default function SystemSettings() {
                     }
                     placeholder="es. eo_wins"
                   />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Strategia per le task duplex, cioè che rispecchiano entrambi i criteri EO e HP (eo_wins → le task duplex saranno EO - hp_wins → viceversa)
+                  </p>
                 </div>
               </div>
             </CardContent>
