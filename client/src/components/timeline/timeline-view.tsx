@@ -487,6 +487,40 @@ export default function TimelineView({
     }
   };
 
+  // Funzione per caricare i cleaners disponibili (non già in timeline)
+  const loadAvailableCleaners = async () => {
+    try {
+      // Carica tutti i cleaners per la data corrente
+      const cleanersResponse = await fetch(`/data/cleaners/cleaners.json?t=${Date.now()}`, {
+        cache: 'no-store',
+        headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' }
+      });
+
+      if (!cleanersResponse.ok) {
+        console.error('Impossibile caricare cleaners.json');
+        setAvailableCleaners([]);
+        return;
+      }
+
+      const cleanersData = await cleanersResponse.json();
+      const dateCleaners = cleanersData.dates?.[workDate]?.cleaners || [];
+
+      // Filtra solo i cleaners attivi e non già selezionati
+      const selectedCleanerIds = new Set(cleaners.map(c => c.id));
+      const available = dateCleaners.filter((c: any) => 
+        c.active === true && !selectedCleanerIds.has(c.id)
+      );
+
+      // Ordina per counter_hours (decrescente)
+      available.sort((a: any, b: any) => b.counter_hours - a.counter_hours);
+
+      setAvailableCleaners(available);
+    } catch (error) {
+      console.error('Errore nel caricamento dei cleaners disponibili:', error);
+      setAvailableCleaners([]);
+    }
+  };
+
   // Handler per aprire il dialog di aggiunta cleaner
   const handleOpenAddCleanerDialog = () => {
     loadAvailableCleaners();
