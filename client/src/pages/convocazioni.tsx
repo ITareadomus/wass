@@ -577,7 +577,7 @@ export default function Convocazioni() {
               className="flex items-center gap-2 border-2 border-custom-blue"
             >
               <ArrowLeft className="w-4 h-4" />
-              Torna Indietro
+              Torna alla Home
             </Button>
           </div>
         </Card>
