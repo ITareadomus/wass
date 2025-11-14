@@ -58,29 +58,29 @@ export default function TaskCard({
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [clickTimer, setClickTimer] = useState<NodeJS.Timeout | null>(null);
   const [operationNames, setOperationNames] = useState<Record<number, string>>({});
-  
+
   // Usa il context per multi-select (solo per container, non timeline)
   const multiSelectContext = !isInTimeline ? useMultiSelect() : null;
   const isMultiSelectMode = multiSelectContext?.isMultiSelectMode ?? false;
   const isSelected = multiSelectContext?.isTaskSelected(task.id) ?? false;
   const selectionOrder = multiSelectContext?.getTaskOrder(task.id);
-  
+
   // Gestisce il click sulla card: se multi-select toggle selezione, altrimenti apri modale
   const handleCardClick = (e: React.MouseEvent) => {
     e.stopPropagation();
-    
+
     // In multi-select mode nei container: toggle selezione invece di aprire modale
     if (isMultiSelectMode && !isInTimeline && multiSelectContext) {
       multiSelectContext.toggleTask(task.id);
       return;
     }
-    
+
     // Gestione doppio click per mostrare task sulla mappa
     if (clickTimer) {
       // Doppio click rilevato
       clearTimeout(clickTimer);
       setClickTimer(null);
-      
+
       // Toggle filtro mappa per questa task
       const currentFilteredTaskId = (window as any).mapFilteredTaskId;
       if (currentFilteredTaskId === task.name) {
@@ -105,7 +105,7 @@ export default function TaskCard({
         setIsModalOpen(true);
         setClickTimer(null);
       }, 250);
-      
+
       setClickTimer(timer);
     }
   };
@@ -160,12 +160,12 @@ export default function TaskCard({
     if (normalizedCurrentId) {
       currIdx = navigableTasks.findIndex(t => (t as any).__key === normalizedCurrentId);
     }
-    
+
     // Se non trovato, cerca la task originale
     if (currIdx === -1) {
       currIdx = navigableTasks.findIndex(t => (t as any).__key === normalizedTaskId);
     }
-    
+
     // Se ancora non trovato, usa 0 come fallback
     const safeIdx = currIdx >= 0 ? currIdx : 0;
     const effId = currIdx >= 0 ? (navigableTasks[currIdx] as any).__key : normalizedTaskId;
@@ -476,15 +476,15 @@ export default function TaskCard({
   const isFutureCheckin = (() => {
     const taskObj = task as any;
     const checkinDate = taskObj.checkin_date;
-    
+
     if (!checkinDate) return false;
-    
+
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    
+
     const checkin = new Date(checkinDate);
     checkin.setHours(0, 0, 0, 0);
-    
+
     return checkin > today;
   })();
 
@@ -546,7 +546,7 @@ export default function TaskCard({
                         />
                       </div>
                     )}
-                    
+
                     {/* Badge ordine selezione (solo se selezionata) */}
                     {isSelected && selectionOrder && !isInTimeline && (
                       <div className="absolute top-0.5 right-0.5 z-50">
@@ -555,7 +555,7 @@ export default function TaskCard({
                         </div>
                       </div>
                     )}
-                    
+
                     {!isConfirmedOperation && !isSelected && (
                       <div className="absolute top-0.5 right-0.5 z-50">
                         <HelpCircle
@@ -564,7 +564,7 @@ export default function TaskCard({
                         />
                       </div>
                     )}
-                    
+
                     {/* Frecce check-in e check-out con orari - solo per task >= 1 ora */}
                     {shouldShowCheckInOutArrows && ((task as any).checkout_time || (task as any).checkin_time || isFutureCheckin) && (
                       <div className="absolute right-1 top-1/2 -translate-y-1/2 flex flex-col gap-0.5 z-40">
@@ -576,19 +576,17 @@ export default function TaskCard({
                         )}
                         {((task as any).checkin_time || isFutureCheckin) && (
                           <div className="flex items-center gap-0.5">
-                            {(task as any).checkin_time && (
-                              <>
-                                <span className="text-red-600 font-black text-[15px]">↓</span>
-                                {isFutureCheckin && (
-                                  <span className="text-red-600 text-[15px]" title="Check-in futuro">🐌</span>
-                                )}
-                                <span className="text-red-600 text-[11px] font-bold">{(task as any).checkin_time}</span>
-                              </>
+                            <span className="text-red-600 font-black text-[15px]">↓</span>
+                            {isFutureCheckin && (
+                              <svg className="w-4 h-4 text-red-600" viewBox="0 0 24 24" fill="currentColor" title="Check-in futuro">
+                                <path d="M20 16c0 2.21-1.79 4-4 4s-4-1.79-4-4c0-1.5.83-2.8 2.04-3.5-.46-.35-.76-.89-.76-1.5 0-1.1.9-2 2-2s2 .9 2 2c0 .61-.3 1.15-.76 1.5C19.17 13.2 20 14.5 20 16zM9 18c-2.21 0-4-1.79-4-4 0-1.5.83-2.8 2.04-3.5C6.58 10.15 6.28 9.61 6.28 9c0-1.1.9-2 2-2s2 .9 2 2c0 .61-.3 1.15-.76 1.5C10.73 11.2 11.56 12.5 11.56 14c0 .34-.05.67-.13.98-.85.31-1.59.84-2.14 1.52-.1 0-.19 0-.29 0zm5.72-2.5c-.85-.31-1.59-.84-2.14-1.52-.1 0-.19 0-.29 0-2.21 0-4-1.79-4-4 0-1.5.83-2.8 2.04-3.5-.46-.35-.76-.89-.76-1.5 0-1.1.9-2 2-2s2 .9 2 2c0 .61-.3 1.15-.76 1.5 1.21.7 2.04 2 2.04 3.5 0 .34-.05.67-.13.98z"/>
+                              </svg>
                             )}
-                            {!((task as any).checkin_time) && isFutureCheckin && (
-                              <span className="text-red-600 text-[15px]" title="Check-in futuro senza orario">🐌</span>
-                            )}
+                            <span className="text-red-600 text-[11px] font-bold">{(task as any).checkin_time}</span>
                           </div>
+                        )}
+                        {!((task as any).checkin_time) && isFutureCheckin && (
+                          <span className="text-red-600 text-[15px]" title="Check-in futuro senza orario">🐌</span>
                         )}
                       </div>
                     )}
@@ -951,9 +949,9 @@ export default function TaskCard({
                       if (!isReadOnly) setEditingField('operation');
                     }}
                   >
-                    {!isConfirmedOperation 
-                      ? "non migrato" 
-                      : (displayTask as any).operation_id 
+                    {!isConfirmedOperation
+                      ? "non migrato"
+                      : (displayTask as any).operation_id
                         ? operationNames[(displayTask as any).operation_id] || `ID: ${(displayTask as any).operation_id}`
                         : "-"}
                   </p>
