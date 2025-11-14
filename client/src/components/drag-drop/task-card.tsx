@@ -142,9 +142,8 @@ export default function TaskCard({
   const navigableTasks = React.useMemo(() => {
     const tasks = allTasks.filter(t => {
       const sameCleaner = (t as any).assignedCleaner === (task as any).assignedCleaner;
-      const notCurrent  = getTaskKey(t) !== getTaskKey(task);
       // NON escludere task senza assignedCleaner: basta che sia lo stesso cleaner della corrente
-      return sameCleaner && notCurrent;
+      return sameCleaner;
     });
     // Mappa con una chiave consistente
     return tasks.map(t => ({ ...t, __key: getTaskKey(t) }));
@@ -155,13 +154,10 @@ export default function TaskCard({
     const normalizedCurrentId = currentTaskId ? String(currentTaskId) : null;
     const normalizedTaskId    = getTaskKey(task);
 
-    // Cerca prima usando currentTaskId, poi fallback su task corrente
-    let currIdx = -1;
-    if (normalizedCurrentId) {
-      currIdx = navigableTasks.findIndex(t => (t as any).__key === normalizedCurrentId);
-    }
+    // CRITICAL: Cerca l'indice della task corrente (quella cliccata)
+    let currIdx = navigableTasks.findIndex(t => (t as any).__key === (normalizedCurrentId || normalizedTaskId));
 
-    // Se non trovato, cerca la task originale
+    // Se non trovato, usa l'indice della task originale
     if (currIdx === -1) {
       currIdx = navigableTasks.findIndex(t => (t as any).__key === normalizedTaskId);
     }
