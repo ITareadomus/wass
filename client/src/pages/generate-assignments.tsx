@@ -424,7 +424,7 @@ export default function GenerateAssignments() {
           // Ricarica i task per mostrare i dati aggiornati
           await loadTasks(true);
 
-          // CRITICAL: SOLO date passate sono READ-ONLY, tutte le altre (corrente e future) sono EDITABILI
+          // SOLO date passate sono READ-ONLY, tutte le altre (corrente e future) sono EDITABILI
           const toastMessage = isPastDate
             ? "📥 Assegnazioni caricate (sola lettura)"
             : "📥 Assegnazioni caricate (modificabili)";
@@ -488,9 +488,6 @@ export default function GenerateAssignments() {
 
             if (hasLocalAssignments && timelineData.metadata?.date === dateStr) {
               console.log("✅ Timeline.json locale esistente con assegnazioni - mantieni senza resettare");
-
-              // SOLO date STRETTAMENTE passate sono read-only
-              setIsTimelineReadOnly(isPastDate);
 
               // Carica solo i task senza estrarre
               await loadTasks(true);
