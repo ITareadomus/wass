@@ -296,9 +296,9 @@ export default function SystemSettings() {
                 </div>
               </div>
 
-              {/* Dedupe Strategy - sotto EO e HP */}
-              <div className="md:col-span-2 mt-4 pt-4 border-t">
-                <div className="space-y-2">
+              {/* Dedupe Strategy - sotto EO e HP, max width per occupare solo 2 colonne */}
+              <div className="md:col-span-3 mt-4 pt-4 border-t">
+                <div className="space-y-2 max-w-[66%]">
                   <Label htmlFor="dedupe_strategy" className="text-sm font-semibold">Dedupe Strategy</Label>
                   <Input
                     id="dedupe_strategy"
