@@ -23,6 +23,7 @@ export default function MapSection({ tasks }: MapSectionProps) {
   const [cleaners, setCleaners] = useState<any[]>([]);
   const [filteredCleanerId, setFilteredCleanerId] = useState<number | null>(null);
   const [filteredTaskId, setFilteredTaskId] = useState<string | null>(null);
+  const [shouldAnimate, setShouldAnimate] = useState(false);
 
   // Carica i cleaners
   useEffect(() => {
@@ -46,23 +47,27 @@ export default function MapSection({ tasks }: MapSectionProps) {
     const checkFilterUpdates = setInterval(() => {
       const newFilterCleanerId = (window as any).mapFilteredCleanerId;
       const newFilterTaskId = (window as any).mapFilteredTaskId;
+      const animateFromTimeline = (window as any).mapAnimateMarker || false;
       
       // Se è stato impostato un nuovo filtro cleaner, cancella il filtro task
       if (newFilterCleanerId !== filteredCleanerId && newFilterCleanerId !== null && newFilterCleanerId !== undefined) {
         setFilteredCleanerId(newFilterCleanerId);
         setFilteredTaskId(null);
+        setShouldAnimate(animateFromTimeline);
         (window as any).mapFilteredTaskId = null;
       }
       // Se è stato impostato un nuovo filtro task, cancella il filtro cleaner
       else if (newFilterTaskId !== filteredTaskId && newFilterTaskId !== null && newFilterTaskId !== undefined) {
         setFilteredTaskId(newFilterTaskId);
         setFilteredCleanerId(null);
+        setShouldAnimate(animateFromTimeline);
         (window as any).mapFilteredCleanerId = null;
       }
       // Se entrambi sono stati cancellati, aggiorna
       else if (newFilterCleanerId === null && newFilterTaskId === null) {
         setFilteredCleanerId(null);
         setFilteredTaskId(null);
+        setShouldAnimate(false);
       }
     }, 300);
 
@@ -205,6 +210,7 @@ export default function MapSection({ tasks }: MapSectionProps) {
       const markerScale = 12; // Dimensione costante per tutti i marker
       const strokeWeight = isHighlighted ? 2 : 2; // Bordo più sottile anche se evidenziata
       const strokeColor = isHighlighted ? '#FFD700' : '#ffffff'; // Bordo dorato se evidenziata
+      const shouldBounce = isHighlighted && shouldAnimate; // Lampeggia solo se viene da timeline
 
       // Se c'è una sequenza, usa un custom HTML marker
       if (sequence !== undefined && sequence !== null) {
@@ -237,15 +243,16 @@ export default function MapSection({ tasks }: MapSectionProps) {
             div.textContent = String(sequence);
             div.title = `${task.name} - ${task.type} (Seq: ${sequence})`;
             
-            // Aggiungi animazione bounce se evidenziato
-            if (isHighlighted) {
+            // Aggiungi animazione bounce solo se evidenziato DA TIMELINE
+            if (shouldBounce) {
               div.style.animation = 'bounce 0.5s ease infinite alternate';
             }
             
             div.addEventListener('click', () => {
               setSelectedTask(task);
-              // Evidenzia la task nella timeline
+              // Evidenzia la task nella timeline SENZA animazione
               (window as any).mapFilteredTaskId = task.name;
+              (window as any).mapAnimateMarker = false;
             });
             
             this.div = div;
@@ -289,14 +296,15 @@ export default function MapSection({ tasks }: MapSectionProps) {
             scale: markerScale
           },
           zIndex: isHighlighted ? 1000 : index,
-          animation: isHighlighted ? window.google.maps.Animation.BOUNCE : null,
+          animation: shouldBounce ? window.google.maps.Animation.BOUNCE : null,
           optimized: true
         });
 
         marker.addListener('click', () => {
           setSelectedTask(task);
-          // Evidenzia la task nella timeline
+          // Evidenzia la task nella timeline SENZA animazione
           (window as any).mapFilteredTaskId = task.name;
+          (window as any).mapAnimateMarker = false;
         });
 
         markersRef.current.push(marker);

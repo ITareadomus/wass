@@ -101,8 +101,9 @@ export default function TaskCard({
           description: "Ora visualizzi tutti gli appartamenti sulla mappa",
         });
       } else {
-        // Applica filtro
+        // Applica filtro CON animazione (doppio click da timeline)
         (window as any).mapFilteredTaskId = task.name;
+        (window as any).mapAnimateMarker = true;
         toast({
           title: "Task evidenziata",
           description: `Visualizzi solo ${task.name} sulla mappa`,
