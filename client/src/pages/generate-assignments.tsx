@@ -169,92 +169,64 @@ export default function GenerateAssignments() {
   // Stato per tracciare se è in corso un'operazione di drag-and-drop
   const [isDragging, setIsDragging] = useState<boolean>(false);
 
-  // Stati per selezione multipla container-specific (3 stati separati)
-  const [isMultiSelectModeEO, setIsMultiSelectModeEO] = useState<boolean>(false);
-  const [selectedTasksEO, setSelectedTasksEO] = useState<Array<{taskId: string; order: number}>>([]);
-  
-  const [isMultiSelectModeHP, setIsMultiSelectModeHP] = useState<boolean>(false);
-  const [selectedTasksHP, setSelectedTasksHP] = useState<Array<{taskId: string; order: number}>>([]);
-  
-  const [isMultiSelectModeLP, setIsMultiSelectModeLP] = useState<boolean>(false);
-  const [selectedTasksLP, setSelectedTasksLP] = useState<Array<{taskId: string; order: number}>>([]);
+  // Stati per selezione multipla UNIFICATA cross-container
+  const [isMultiSelectMode, setIsMultiSelectMode] = useState<boolean>(false);
+  const [selectedTasks, setSelectedTasks] = useState<Array<{taskId: string; order: number; container: string}>>([]);
 
-  // Helper function per ottenere lo stato corretto in base al container
+  // Helper function per ottenere lo stato unificato (tutti i container condividono lo stesso stato)
   const getContainerMultiSelectState = (container: string) => {
-    switch(container) {
-      case 'early_out':
-        return { 
-          isMultiSelectMode: isMultiSelectModeEO, 
-          selectedTasks: selectedTasksEO,
-          setIsMultiSelectMode: setIsMultiSelectModeEO,
-          setSelectedTasks: setSelectedTasksEO
-        };
-      case 'high_priority':
-        return { 
-          isMultiSelectMode: isMultiSelectModeHP, 
-          selectedTasks: selectedTasksHP,
-          setIsMultiSelectMode: setIsMultiSelectModeHP,
-          setSelectedTasks: setSelectedTasksHP
-        };
-      case 'low_priority':
-        return { 
-          isMultiSelectMode: isMultiSelectModeLP, 
-          selectedTasks: selectedTasksLP,
-          setIsMultiSelectMode: setIsMultiSelectModeLP,
-          setSelectedTasks: setSelectedTasksLP
-        };
-      default:
-        return { 
-          isMultiSelectMode: false, 
-          selectedTasks: [],
-          setIsMultiSelectMode: () => {},
-          setSelectedTasks: () => {}
-        };
-    }
+    return { 
+      isMultiSelectMode, 
+      selectedTasks,
+      setIsMultiSelectMode,
+      setSelectedTasks
+    };
   };
 
-  // Helper functions per multi-select context (NON PIU' USATI - mantieni per compatibilità)
+  // Helper functions per multi-select context unificato
   const toggleMode = useCallback(() => {
-    console.log('[DEBUG] toggleMode called (legacy - should not be used)');
-  }, []);
+    setIsMultiSelectMode(prev => !prev);
+    if (isMultiSelectMode) {
+      setSelectedTasks([]);
+    }
+  }, [isMultiSelectMode]);
 
-  const toggleTask = useCallback((taskId: string) => {
-    console.log('[DEBUG] toggleTask called (legacy - should not be used)');
+  const toggleTask = useCallback((taskId: string, container: string) => {
+    setSelectedTasks(prev => {
+      const existing = prev.find(t => t.taskId === taskId);
+      if (existing) {
+        return prev.filter(t => t.taskId !== taskId);
+      } else {
+        const maxOrder = prev.length > 0 ? Math.max(...prev.map(t => t.order)) : 0;
+        return [...prev, { taskId, order: maxOrder + 1, container }];
+      }
+    });
   }, []);
 
   const clearSelection = useCallback(() => {
     console.log('[DEBUG] Clearing all selections');
-    setSelectedTasksEO([]);
-    setSelectedTasksHP([]);
-    setSelectedTasksLP([]);
+    setSelectedTasks([]);
   }, []);
 
   const isTaskSelected = useCallback((taskId: string) => {
-    return selectedTasksEO.some(t => t.taskId === taskId) ||
-           selectedTasksHP.some(t => t.taskId === taskId) ||
-           selectedTasksLP.some(t => t.taskId === taskId);
-  }, [selectedTasksEO, selectedTasksHP, selectedTasksLP]);
+    return selectedTasks.some(t => t.taskId === taskId);
+  }, [selectedTasks]);
 
   const getTaskOrder = useCallback((taskId: string) => {
-    const eo = selectedTasksEO.find(t => t.taskId === taskId);
-    if (eo) return eo.order;
-    const hp = selectedTasksHP.find(t => t.taskId === taskId);
-    if (hp) return hp.order;
-    const lp = selectedTasksLP.find(t => t.taskId === taskId);
-    if (lp) return lp.order;
-    return undefined;
-  }, [selectedTasksEO, selectedTasksHP, selectedTasksLP]);
+    const task = selectedTasks.find(t => t.taskId === taskId);
+    return task?.order;
+  }, [selectedTasks]);
 
-  // Memoizza il context value (legacy - non più usato dai container)
+  // Memoizza il context value unificato
   const multiSelectContextValue: MultiSelectContextType = useMemo(() => ({
-    isMultiSelectMode: isMultiSelectModeEO || isMultiSelectModeHP || isMultiSelectModeLP,
-    selectedTasks: [...selectedTasksEO, ...selectedTasksHP, ...selectedTasksLP],
+    isMultiSelectMode,
+    selectedTasks,
     toggleMode,
     toggleTask,
     clearSelection,
     isTaskSelected,
     getTaskOrder,
-  }), [isMultiSelectModeEO, isMultiSelectModeHP, isMultiSelectModeLP, selectedTasksEO, selectedTasksHP, selectedTasksLP, toggleMode, toggleTask, clearSelection, isTaskSelected, getTaskOrder]);
+  }), [isMultiSelectMode, selectedTasks, toggleMode, toggleTask, clearSelection, isTaskSelected, getTaskOrder]);
 
   // Salva la data in localStorage ogni volta che cambia (formato locale senza timezone)
   useEffect(() => {
@@ -1352,12 +1324,10 @@ export default function GenerateAssignments() {
       const toContainer = parseContainerKey(destination.droppableId);
 
       // 🔸 BATCH MOVE: Se multi-select è attivo, ci sono task selezionate, E la task trascinata è tra quelle selezionate
-      // Ottieni lo stato del container corretto
-      const containerState = getContainerMultiSelectState(fromContainer || '');
-      const isDraggedTaskSelected = containerState.selectedTasks.some(st => st.taskId === taskId);
+      const isDraggedTaskSelected = selectedTasks.some(st => st.taskId === taskId);
 
-      if (containerState.isMultiSelectMode && containerState.selectedTasks.length > 0 && isDraggedTaskSelected && fromContainer && toCleanerId !== null && !toContainer) {
-        console.log(`🔄 BATCH MOVE: Spostamento di ${containerState.selectedTasks.length} task selezionate da ${fromContainer} a cleaner ${toCleanerId}`);
+      if (isMultiSelectMode && selectedTasks.length > 0 && isDraggedTaskSelected && toCleanerId !== null && !toContainer) {
+        console.log(`🔄 BATCH MOVE CROSS-CONTAINER: Spostamento di ${selectedTasks.length} task selezionate a cleaner ${toCleanerId}`);
 
         try {
           // Carica i dati del cleaner
@@ -1370,7 +1340,7 @@ export default function GenerateAssignments() {
           const cleanerName = cleaner ? `${cleaner.name} ${cleaner.lastname}` : `ID ${toCleanerId}`;
 
           // Ordina le task selezionate per ordine di selezione
-          const sortedTasks = [...containerState.selectedTasks].sort((a, b) => a.order - b.order);
+          const sortedTasks = [...selectedTasks].sort((a, b) => a.order - b.order);
 
           // Sposta ciascuna task in sequenza alla destinazione
           let currentIndex = destination.index;
@@ -1383,7 +1353,7 @@ export default function GenerateAssignments() {
           }
 
           // Pulisci selezione e ricarica
-          containerState.setSelectedTasks([]);
+          setSelectedTasks([]);
           await refreshAssignments("manual");
 
           // Marca modifiche
@@ -1394,7 +1364,7 @@ export default function GenerateAssignments() {
 
           toast({
             title: "Task assegnate",
-            description: `${containerState.selectedTasks.length} task assegnate a ${cleanerName}`,
+            description: `${selectedTasks.length} task cross-container assegnate a ${cleanerName}`,
             variant: "success",
           });
         } catch (err) {

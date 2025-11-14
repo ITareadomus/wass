@@ -26,12 +26,12 @@ const getTaskKey = (t: any) => String(t?.id ?? t?.task_id ?? t?.logistic_code ??
 
 interface MultiSelectContextType {
   isMultiSelectMode: boolean;
-  selectedTasks: Array<{ taskId: number; order: number }>;
+  selectedTasks: Array<{ taskId: string; order: number; container?: string }>;
   toggleMode: () => void;
-  toggleTask: (taskId: string) => void; // Changed to string
+  toggleTask: (taskId: string, container?: string) => void;
   clearSelection: () => void;
-  isTaskSelected: (taskId: string) => boolean; // Changed to string
-  getTaskOrder: (taskId: string) => number | undefined; // Changed to string
+  isTaskSelected: (taskId: string) => boolean;
+  getTaskOrder: (taskId: string) => number | undefined;
 }
 
 interface TaskCardProps {
@@ -81,7 +81,7 @@ export default function TaskCard({
 
     // In multi-select mode nei container: toggle selezione invece di aprire modale
     if (isMultiSelectMode && !isInTimeline && multiSelectContext) {
-      multiSelectContext.toggleTask(String(task.id)); // Pass String ID
+      multiSelectContext.toggleTask(String(task.id), currentContainer);
       return;
     }
 
@@ -546,7 +546,7 @@ export default function TaskCard({
                       <div className="absolute top-0.5 left-0.5 z-50">
                         <Checkbox
                           checked={isSelected}
-                          onCheckedChange={() => multiSelectContext?.toggleTask(String(task.id))} // Pass String ID
+                          onCheckedChange={() => multiSelectContext?.toggleTask(String(task.id), currentContainer)}
                           className="w-4 h-4 bg-white border-2 border-sky-600"
                           data-testid={`checkbox-task-${task.id}`}
                         />
