@@ -324,63 +324,103 @@ export default function SystemSettings() {
                   Seleziona i tipi di appartamenti che i cleaner possono pulire
                 </CardDescription>
               </CardHeader>
-              <CardContent className="bg-background space-y-3">
-                <div className="space-y-2">
-                  <Label htmlFor="standard_apt" className="text-sm">Standard Apartments</Label>
-                  <Input
-                    id="standard_apt"
-                    value={settings.apartment_types.standard_apt.join(", ")}
-                    onChange={(e) =>
-                      setSettings({
-                        ...settings,
-                        apartment_types: {
-                          ...settings.apartment_types,
-                          standard_apt: e.target.value
-                            .split(",")
-                            .map((letter) => letter.trim().toUpperCase())
-                            .filter((letter) => letter),
-                        },
-                      })
-                    }
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="premium_apt" className="text-sm">Premium Apartments</Label>
-                  <Input
-                    id="premium_apt"
-                    value={settings.apartment_types.premium_apt.join(", ")}
-                    onChange={(e) =>
-                      setSettings({
-                        ...settings,
-                        apartment_types: {
-                          ...settings.apartment_types,
-                          premium_apt: e.target.value
-                            .split(",")
-                            .map((letter) => letter.trim().toUpperCase())
-                            .filter((letter) => letter),
-                        },
-                      })
-                    }
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="formatore_apt" className="text-sm">Formatore Apartments</Label>
-                  <Input
-                    id="formatore_apt"
-                    value={settings.apartment_types.formatore_apt.join(", ")}
-                    onChange={(e) =>
-                      setSettings({
-                        ...settings,
-                        apartment_types: {
-                          ...settings.apartment_types,
-                          formatore_apt: e.target.value
-                            .split(",")
-                            .map((letter) => letter.trim().toUpperCase())
-                            .filter((letter) => letter),
-                        },
-                      })
-                    }
-                  />
+              <CardContent className="bg-background">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  {/* Cleaner STANDARD */}
+                  <div className="space-y-3">
+                    <h3 className="font-semibold text-sm border-b pb-2 text-green-600 dark:text-green-400">Cleaner STANDARD</h3>
+                    <div className="space-y-2">
+                      {["A", "B", "C", "D", "E", "F", "X"].map((type) => (
+                        <div key={`standard-${type}`} className="flex items-center space-x-2">
+                          <input
+                            type="checkbox"
+                            id={`standard-${type}`}
+                            checked={settings.apartment_types.standard_apt.includes(type)}
+                            onChange={(e) => {
+                              const newTypes = e.target.checked
+                                ? [...settings.apartment_types.standard_apt, type]
+                                : settings.apartment_types.standard_apt.filter((t) => t !== type);
+                              setSettings({
+                                ...settings,
+                                apartment_types: {
+                                  ...settings.apartment_types,
+                                  standard_apt: newTypes,
+                                },
+                              });
+                            }}
+                            className="h-4 w-4 rounded border-gray-300"
+                          />
+                          <Label htmlFor={`standard-${type}`} className="text-sm cursor-pointer">
+                            Tipo {type}
+                          </Label>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Cleaner PREMIUM */}
+                  <div className="space-y-3">
+                    <h3 className="font-semibold text-sm border-b pb-2 text-yellow-600 dark:text-yellow-400">Cleaner PREMIUM</h3>
+                    <div className="space-y-2">
+                      {["A", "B", "C", "D", "E", "F", "X"].map((type) => (
+                        <div key={`premium-${type}`} className="flex items-center space-x-2">
+                          <input
+                            type="checkbox"
+                            id={`premium-${type}`}
+                            checked={settings.apartment_types.premium_apt.includes(type)}
+                            onChange={(e) => {
+                              const newTypes = e.target.checked
+                                ? [...settings.apartment_types.premium_apt, type]
+                                : settings.apartment_types.premium_apt.filter((t) => t !== type);
+                              setSettings({
+                                ...settings,
+                                apartment_types: {
+                                  ...settings.apartment_types,
+                                  premium_apt: newTypes,
+                                },
+                              });
+                            }}
+                            className="h-4 w-4 rounded border-gray-300"
+                          />
+                          <Label htmlFor={`premium-${type}`} className="text-sm cursor-pointer">
+                            Tipo {type}
+                          </Label>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Cleaner FORMATORE */}
+                  <div className="space-y-3">
+                    <h3 className="font-semibold text-sm border-b pb-2 text-orange-600 dark:text-orange-400">Cleaner FORMATORE</h3>
+                    <div className="space-y-2">
+                      {["A", "B", "C", "D", "E", "F", "X"].map((type) => (
+                        <div key={`formatore-${type}`} className="flex items-center space-x-2">
+                          <input
+                            type="checkbox"
+                            id={`formatore-${type}`}
+                            checked={settings.apartment_types.formatore_apt.includes(type)}
+                            onChange={(e) => {
+                              const newTypes = e.target.checked
+                                ? [...settings.apartment_types.formatore_apt, type]
+                                : settings.apartment_types.formatore_apt.filter((t) => t !== type);
+                              setSettings({
+                                ...settings,
+                                apartment_types: {
+                                  ...settings.apartment_types,
+                                  formatore_apt: newTypes,
+                                },
+                              });
+                            }}
+                            className="h-4 w-4 rounded border-gray-300"
+                          />
+                          <Label htmlFor={`formatore-${type}`} className="text-sm cursor-pointer">
+                            Tipo {type}
+                          </Label>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
                 </div>
               </CardContent>
             </Card>
