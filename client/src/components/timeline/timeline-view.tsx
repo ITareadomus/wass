@@ -70,6 +70,8 @@ export default function TimelineView({
   const [cleanerToReplace, setCleanerToReplace] = useState<number | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const timelineRef = useRef<HTMLDivElement>(null);
+  const [confirmDialog, setConfirmDialog] = useState<{ open: boolean; cleanerId: number | null }>({ open: false, cleanerId: null });
+  const [confirmUnavailableDialog, setConfirmUnavailableDialog] = useState<{ open: boolean; cleanerId: number | null }>({ open: false, cleanerId: null });
   const { toast } = useToast();
   const [, setLocation] = useLocation();
 
@@ -485,105 +487,6 @@ export default function TimelineView({
     }
   };
 
-  // Carica cleaner disponibili per aggiungerli alla timeline
-  // FILTRA CONTRO selected_cleaners.json (cleaners già selezionati)
-  // NON contro timeline.json (che contiene anche cleaners rimossi con task)
-  const loadAvailableCleaners = async () => {
-    try {
-      const [cleanersResponse, selectedCleanersResponse] = await Promise.all([
-        fetch(`/data/cleaners/cleaners.json?t=${Date.now()}`, {
-          cache: 'no-store',
-          headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' }
-        }),
-        fetch(`/data/cleaners/selected_cleaners.json?t=${Date.now()}`, {
-          cache: 'no-store',
-          headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' }
-        })
-      ]);
-
-      const data = await cleanersResponse.json();
-
-      console.log('🔍 DEBUG loadAvailableCleaners:');
-      console.log('   - workDate (normalizzata):', workDate);
-      console.log('   - Date disponibili in cleaners.json:', Object.keys(data.dates || {}));
-
-      // Trova i cleaner per la data selezionata
-      let dateCleaners = data.dates?.[workDate]?.cleaners || [];
-
-      // Se non ci sono cleaners per la data, prova a cercare in tutte le date disponibili
-      if (dateCleaners.length === 0) {
-        console.log(`⚠️ Nessun cleaner trovato per ${workDate}, cerco in tutte le date...`);
-        const allDates = Object.keys(data.dates || {});
-        if (allDates.length > 0) {
-          // Usa la data più recente disponibile
-          const latestDate = allDates.sort().reverse()[0];
-          console.log(`   - Uso la data più recente disponibile: ${latestDate}`);
-          dateCleaners = data.dates[latestDate]?.cleaners || [];
-        }
-      }
-
-      console.log(`   - Cleaner trovati per la data: ${dateCleaners.length}`);
-
-      // FILTRA CONTRO selected_cleaners.json (NON timeline.json)
-      // Questo permette di sostituire cleaners rimossi dalla selezione ma ancora con task
-      const selectedCleanersData = selectedCleanersResponse.ok
-        ? await selectedCleanersResponse.json()
-        : { cleaners: [] };
-
-      // Crea Set di ID già selezionati
-      const selectedCleanerIds = new Set<number>(
-        (selectedCleanersData.cleaners || []).map((c: any) => Number(c.id))
-      );
-
-      console.log(`   - Cleaner già in selected_cleaners.json: ${selectedCleanerIds.size}`, Array.from(selectedCleanerIds));
-
-      // Escludi solo i cleaners già in selected_cleaners.json
-      const available = dateCleaners.filter((c: Cleaner) =>
-        c.active && !selectedCleanerIds.has(Number(c.id))
-      );
-
-      console.log(`   - Cleaner disponibili da aggiungere: ${available.length}/${dateCleaners.length}`);
-
-      // Ordina in 4 sezioni con priorità:
-      // 1. Formatore
-      // 2. Premium/Straordinario (Premium che possono fare straordinaria)
-      // 3. Premium (senza straordinaria)
-      // 4. Standard
-      // All'interno di ogni sezione, ordina per counter_hours decrescente
-      available.sort((a, b) => {
-        // Determina la sezione di appartenenza
-        const getSectionPriority = (c: Cleaner) => {
-          if (c.role === "Formatore") return 1;
-          if (c.role === "Premium" && c.can_do_straordinaria) return 2;
-          if (c.role === "Premium") return 3;
-          return 4; // Standard
-        };
-
-        const sectionA = getSectionPriority(a);
-        const sectionB = getSectionPriority(b);
-
-        // Prima ordina per sezione
-        if (sectionA !== sectionB) {
-          return sectionA - sectionB;
-        }
-
-        // All'interno della stessa sezione, ordina per counter_hours decrescente
-        return b.counter_hours - a.counter_hours;
-      });
-
-      setAvailableCleaners(available);
-
-      console.log(`✅ Cleaner disponibili da aggiungere: ${available.length}/${dateCleaners.length}`);
-    } catch (error) {
-      console.error('Errore nel caricamento dei cleaner disponibili:', error);
-      toast({
-        title: "Errore",
-        description: "Impossibile caricare i cleaner disponibili",
-        variant: "destructive",
-      });
-    }
-  };
-
   // Handler per aprire il dialog di aggiunta cleaner
   const handleOpenAddCleanerDialog = () => {
     loadAvailableCleaners();
@@ -591,21 +494,52 @@ export default function TimelineView({
   };
 
   // Handler per aggiungere/sostituire un cleaner
-  const handleAddCleaner = (cleanerId: number) => {
-    if ((window as any).setHasUnsavedChanges) {
-      (window as any).setHasUnsavedChanges(true);
-    }
-    if (cleanerToReplace) {
-      // Sostituzione: prima rimuovi il vecchio, poi aggiungi il nuovo
-      removeCleanerMutation.mutate(cleanerToReplace, {
-        onSuccess: () => {
-          addCleanerMutation.mutate(cleanerId);
-          setCleanerToReplace(null);
-        }
-      });
+  const handleAddCleaner = (cleanerId: number, isAvailable: boolean) => {
+    if (!isAvailable) {
+      // Se il cleaner non è disponibile, apri il dialog di conferma
+      setConfirmUnavailableDialog({ open: true, cleanerId: cleanerId });
     } else {
-      // Aggiunta normale
-      addCleanerMutation.mutate(cleanerId);
+      // Altrimenti, procedi con l'aggiunta/sostituzione normale
+      if ((window as any).setHasUnsavedChanges) {
+        (window as any).setHasUnsavedChanges(true);
+      }
+      if (cleanerToReplace) {
+        // Sostituzione: prima rimuovi il vecchio, poi aggiungi il nuovo
+        removeCleanerMutation.mutate(cleanerToReplace, {
+          onSuccess: () => {
+            addCleanerMutation.mutate(cleanerId);
+            setCleanerToReplace(null);
+          }
+        });
+      } else {
+        // Aggiunta normale
+        addCleanerMutation.mutate(cleanerId);
+      }
+      setIsAddCleanerDialogOpen(false); // Chiudi il dialog di aggiunta
+    }
+  };
+
+  // Handler per confermare l'aggiunta di un cleaner non disponibile
+  const handleConfirmAddUnavailableCleaner = () => {
+    if (confirmUnavailableDialog.cleanerId) {
+      // Chiudi il dialog di conferma e procedi con l'aggiunta
+      setConfirmUnavailableDialog({ open: false, cleanerId: null });
+
+      // Procedi con l'aggiunta/sostituzione come al solito
+      if ((window as any).setHasUnsavedChanges) {
+        (window as any).setHasUnsavedChanges(true);
+      }
+      if (cleanerToReplace) {
+        removeCleanerMutation.mutate(cleanerToReplace, {
+          onSuccess: () => {
+            addCleanerMutation.mutate(confirmUnavailableDialog.cleanerId!);
+            setCleanerToReplace(null);
+          }
+        });
+      } else {
+        addCleanerMutation.mutate(confirmUnavailableDialog.cleanerId!);
+      }
+      setIsAddCleanerDialogOpen(false); // Chiudi anche il dialog di aggiunta
     }
   };
 
@@ -954,8 +888,8 @@ export default function TimelineView({
               </h2>
               {timelineData?.metadata?.last_modified_by && (
                 <p className="text-xs text-muted-foreground">
-                  Ultima modifica: {timelineData.metadata.last_modified_by} 
-                  {timelineData.metadata.last_updated && 
+                  Ultima modifica: {timelineData.metadata.last_modified_by}
+                  {timelineData.metadata.last_updated &&
                     ` - ${new Date(timelineData.metadata.last_updated).toLocaleString('it-IT')}`
                   }
                 </p>
@@ -1050,8 +984,8 @@ export default function TimelineView({
                           ? '#9CA3AF' // Grigio per cleaners rimossi
                           : filteredCleanerId === cleaner.id ? `${color.bg}` : color.bg,
                         color: isRemoved ? '#1F2937' : color.text,
-                        boxShadow: filteredCleanerId === cleaner.id 
-                          ? '0 0 0 3px #3B82F6, 0 0 20px 5px rgba(59, 130, 246, 0.5)' 
+                        boxShadow: filteredCleanerId === cleaner.id
+                          ? '0 0 0 3px #3B82F6, 0 0 20px 5px rgba(59, 130, 246, 0.5)'
                           : 'none',
                         transform: filteredCleanerId === cleaner.id ? 'scale(1.05)' : 'none',
                         zIndex: filteredCleanerId === cleaner.id ? 10 : 'auto',
@@ -1268,8 +1202,8 @@ export default function TimelineView({
                     disabled={!hasUnsavedChanges}
                     variant="outline"
                     className={`flex-1 h-full border-2 border-custom-blue ${
-                      hasUnsavedChanges 
-                        ? 'bg-green-600 hover:bg-green-700 text-white animate-pulse' 
+                      hasUnsavedChanges
+                        ? 'bg-green-600 hover:bg-green-700 text-white animate-pulse'
                         : 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200 cursor-default'
                     }`}
                     data-testid="button-confirm-assignments"
@@ -1295,7 +1229,10 @@ export default function TimelineView({
       {/* Add Cleaner Dialog */}
       <Dialog open={isAddCleanerDialogOpen} onOpenChange={(open) => {
         setIsAddCleanerDialogOpen(open);
-        if (!open) setCleanerToReplace(null);
+        if (!open) {
+          setCleanerToReplace(null);
+          setConfirmUnavailableDialog({ open: false, cleanerId: null }); // Chiudi anche il dialog di conferma
+        }
       }}>
         <DialogContent className="sm:max-w-2xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
@@ -1325,51 +1262,86 @@ export default function TimelineView({
                 Nessun cleaner disponibile da aggiungere
               </p>
             ) : (
-              availableCleaners.map((cleaner) => (
-                <div
-                  key={cleaner.id}
-                  className="flex items-center justify-between p-3 border rounded-lg hover:bg-accent cursor-pointer"
-                  onClick={() => handleAddCleaner(cleaner.id)}
-                  data-testid={`cleaner-option-${cleaner.id}`}
-                >
-                  <div className="flex items-center gap-3">
-                    <div>
-                      <p className="font-semibold">
-                        {cleaner.name} {cleaner.lastname}
-                      </p>
-                      <p className="text-sm text-muted-foreground">
-                        {cleaner.role} • Contratto: {cleaner.contract_type} • {cleaner.counter_hours?.toFixed(2) || '0.00'}h
-                      </p>
+              availableCleaners.map((cleaner) => {
+                const isAvailable = cleaner.available !== false;
+
+                return (
+                  <div
+                    key={cleaner.id}
+                    className={`flex items-center justify-between p-3 border rounded-lg cursor-pointer ${
+                      !isAvailable ? 'opacity-70 hover:opacity-80' : 'hover:bg-accent'
+                    }`}
+                    onClick={() => handleAddCleaner(cleaner.id, isAvailable)}
+                    data-testid={`cleaner-option-${cleaner.id}`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div>
+                        <p className="font-semibold">
+                          {cleaner.name} {cleaner.lastname}
+                        </p>
+                        <p className="text-sm text-muted-foreground">
+                          {cleaner.role} • Contratto: {cleaner.contract_type} • {cleaner.counter_hours?.toFixed(2) || '0.00'}h
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {!isAvailable && (
+                        <span className="px-2 py-1 rounded bg-gray-400 text-white text-xs font-bold">
+                          Non disponibile
+                        </span>
+                      )}
+                      {cleaner.role === "Premium" && (
+                        <span className="px-2 py-1 rounded bg-yellow-400 text-black text-xs font-bold">
+                          Premium
+                        </span>
+                      )}
+                      {cleaner.role === "Formatore" && (
+                        <span className="px-2 py-1 rounded bg-orange-500 text-black text-xs font-bold">
+                          Formatore
+                        </span>
+                      )}
+                      {cleaner.role === "Standard" && (
+                        <span className="px-2 py-1 rounded bg-green-500 text-white text-xs font-bold">
+                          Standard
+                        </span>
+                      )}
+                      {cleaner.can_do_straordinaria && (
+                        <span className="px-2 py-1 rounded bg-red-500 text-black text-xs font-bold">
+                          Straordinario
+                        </span>
+                      )}
                     </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    {cleaner.role === "Premium" && (
-                      <span className="px-2 py-1 rounded bg-yellow-400 text-black text-xs font-bold">
-                        Premium
-                      </span>
-                    )}
-                    {cleaner.role === "Formatore" && (
-                      <span className="px-2 py-1 rounded bg-orange-500 text-black text-xs font-bold">
-                        Formatore
-                      </span>
-                    )}
-                    {cleaner.role === "Standard" && (
-                      <span className="px-2 py-1 rounded bg-green-500 text-white text-xs font-bold">
-                        Standard
-                      </span>
-                    )}
-                    {cleaner.can_do_straordinaria && (
-                      <span className="px-2 py-1 rounded bg-red-500 text-black text-xs font-bold">
-                        Straordinario
-                      </span>
-                    )}
-                  </div>
-                </div>
-              ))
+                );
+              })
             )}
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Confirmation Dialog for Unavailable Cleaners */}
+      <Dialog open={confirmUnavailableDialog.open} onOpenChange={(open) => setConfirmUnavailableDialog({ open, cleanerId: null })}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Conferma Aggiunta Cleaner</DialogTitle>
+            <DialogDescription>
+              Il cleaner selezionato "{confirmUnavailableDialog.cleanerId ? (() => {
+                const cleaner = availableCleaners.find(c => c.id === confirmUnavailableDialog.cleanerId);
+                return cleaner ? `${cleaner.name} ${cleaner.lastname}` : 'Unknown';
+              })() : ''}" non è attualmente disponibile. Vuoi comunque aggiungerlo?
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex justify-end gap-2 mt-4">
+            <Button variant="outline" onClick={() => setConfirmUnavailableDialog({ open: false, cleanerId: null })}>
+              Annulla
+            </Button>
+            <Button onClick={handleConfirmAddUnavailableCleaner}>
+              Conferma e Aggiungi
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {/* Cleaner Details Dialog */}
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
         <DialogContent className={`sm:max-w-2xl max-h-[80vh] overflow-y-auto ${
