@@ -1,6 +1,6 @@
 {
     "metadata": {
-        "last_updated": "2025-11-14T16:02:34.724867",
+        "last_updated": "2025-11-14T16:41:12.913868",
         "db_config": {
             "host": "139.59.132.41",
             "user": "admin",
@@ -10,8 +10,8 @@
         "schema_version": "1.0"
     },
     "dates": {
-        "2025-11-14": {
-            "timestamp": "2025-11-14T16:02:34.724882",
+        "2025-11-16": {
+            "timestamp": "2025-11-14T16:41:12.913887",
             "cleaners": [
                 {
                     "id": 24,
@@ -335,7 +335,7 @@
                     "ranking": 0,
                     "counter_hours": 20.25,
                     "counter_days": 0,
-                    "available": false,
+                    "available": true,
                     "contract_type": "B",
                     "preferred_customers": [],
                     "telegram_id": null,
@@ -438,7 +438,7 @@
                     "role": "Premium",
                     "active": true,
                     "ranking": 0,
-                    "counter_hours": 14.0,
+                    "counter_hours": 17.0,
                     "counter_days": 0,
                     "available": true,
                     "contract_type": "B",
@@ -952,7 +952,7 @@
                 }
             ],
             "total_cleaners": 42,
-            "date": "2025-11-14",
+            "date": "2025-11-16",
             "data_source": "database_query"
         }
     }
