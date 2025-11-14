@@ -763,7 +763,7 @@ export default function GenerateAssignments() {
       // Nuova struttura: cleaners_assignments è un array di {cleaner, tasks}
       const timelineAssignmentsMap = new Map<string, any>();
 
-      if (timelineAssignmentsData.cleaners_assignments) {
+      if (timelineAssignmentsData.cleaners_assignments && timelineAssignmentsData.cleaners_assignments.length > 0) {
         // Nuova struttura organizzata per cleaner
         console.log('📋 Caricamento da cleaners_assignments:', timelineAssignmentsData.cleaners_assignments.length, 'cleaners');
         for (const cleanerEntry of timelineAssignmentsData.cleaners_assignments) {
@@ -781,6 +781,7 @@ export default function GenerateAssignments() {
             timelineAssignmentsMap.set(taskId, {
               ...task,
               cleanerId: cleanerEntry.cleaner.id,
+              assignedCleaner: cleanerEntry.cleaner.id, // CRITICAL: aggiungi questo campo per il frontend
               sequence: task.sequence
             });
           }
@@ -789,7 +790,10 @@ export default function GenerateAssignments() {
         // Vecchia struttura piatta (fallback)
         console.log('📋 Caricamento da assignments (vecchia struttura):', timelineAssignmentsData.assignments.length);
         for (const a of timelineAssignmentsData.assignments) {
-          timelineAssignmentsMap.set(String(a.task_id), a);
+          timelineAssignmentsMap.set(String(a.task_id), {
+            ...a,
+            assignedCleaner: a.cleanerId // CRITICAL: aggiungi questo campo per il frontend
+          });
         }
       }
 
@@ -906,13 +910,14 @@ export default function GenerateAssignments() {
           const taskWithAssignment = {
             ...baseTask,
             priority: timelineAssignment.priority || baseTask.priority,
-            assignedCleaner: timelineAssignment.cleanerId,
+            assignedCleaner: timelineAssignment.cleanerId || timelineAssignment.assignedCleaner, // CRITICAL: doppio fallback
             sequence: timelineAssignment.sequence,
             start_time: timelineAssignment.start_time,
             end_time: timelineAssignment.end_time,
             startTime: timelineAssignment.start_time || (baseTask as any).startTime,
             endTime: timelineAssignment.end_time || (baseTask as any).endTime,
             travelTime: timelineAssignment.travel_time || 0,
+            travel_time: timelineAssignment.travel_time || 0, // CRITICAL: aggiungi anche snake_case
             address: timelineAssignment.address || baseTask.address,
             lat: timelineAssignment.lat || baseTask.lat,
             lng: timelineAssignment.lng || baseTask.lng,
@@ -931,6 +936,7 @@ export default function GenerateAssignments() {
             alias: timelineAssignment.alias,
           } as any;
 
+          console.log(`✅ Task ${taskLogCode} preparata con assignedCleaner=${taskWithAssignment.assignedCleaner}`);
           tasksWithAssignments.push(taskWithAssignment);
         }
       }
