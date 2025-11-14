@@ -383,6 +383,10 @@ export default function SystemSettings() {
                       <span className="px-2 py-0.5 rounded border font-medium text-sm bg-yellow-500/30 text-yellow-800 dark:bg-yellow-500/40 dark:text-yellow-200 border-yellow-600 dark:border-yellow-400">
                         Premium
                       </span>
+                      <span className="text-sm font-medium">e</span>
+                      <span className="px-2 py-0.5 rounded border font-medium text-sm bg-red-500/30 text-red-800 dark:bg-red-500/40 dark:text-red-200 border-red-600 dark:border-red-400">
+                        Straordinario
+                      </span>
                     </div>
                     <div className="space-y-2">
                       {["A", "B", "C", "D", "E", "F", "X"].map((type) => (
