@@ -450,6 +450,196 @@ export default function SystemSettings() {
               </CardContent>
             </Card>
 
+          {/* Task Types - Tipi di appartamento che i cleaner possono fare */}
+          <Card className="bg-background border-2 border-custom-blue">
+            <CardHeader className="bg-background py-3">
+              <CardTitle className="text-lg">Task Types</CardTitle>
+              <CardDescription className="text-xs">
+                Tipi di appartamento che ogni categoria di cleaner può gestire
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="bg-background">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                {/* Appartamento Standard */}
+                <div className="space-y-3">
+                  <div className="border-b pb-2">
+                    <span className="px-2 py-0.5 rounded border font-medium text-sm bg-blue-500/30 text-blue-800 dark:bg-blue-500/40 dark:text-blue-200 border-blue-600 dark:border-blue-400">
+                      Apt Standard
+                    </span>
+                  </div>
+                  <div className="space-y-2">
+                    <div className="flex items-center space-x-2">
+                      <input
+                        type="checkbox"
+                        id="std-cleaner-standard"
+                        checked={true}
+                        disabled
+                        className="h-4 w-4 rounded border-gray-300"
+                      />
+                      <Label htmlFor="std-cleaner-standard" className="text-sm">
+                        Cleaner Standard
+                      </Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <input
+                        type="checkbox"
+                        id="std-cleaner-premium"
+                        checked={true}
+                        disabled
+                        className="h-4 w-4 rounded border-gray-300"
+                      />
+                      <Label htmlFor="std-cleaner-premium" className="text-sm">
+                        Cleaner Premium
+                      </Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <input
+                        type="checkbox"
+                        id="std-cleaner-straordinario"
+                        checked={true}
+                        disabled
+                        className="h-4 w-4 rounded border-gray-300"
+                      />
+                      <Label htmlFor="std-cleaner-straordinario" className="text-sm">
+                        Cleaner Straordinario
+                      </Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <input
+                        type="checkbox"
+                        id="std-cleaner-formatore"
+                        checked={true}
+                        disabled
+                        className="h-4 w-4 rounded border-gray-300"
+                      />
+                      <Label htmlFor="std-cleaner-formatore" className="text-sm">
+                        Cleaner Formatore
+                      </Label>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Appartamento Premium */}
+                <div className="space-y-3">
+                  <div className="border-b pb-2">
+                    <span className="px-2 py-0.5 rounded border font-medium text-sm bg-yellow-500/30 text-yellow-800 dark:bg-yellow-500/40 dark:text-yellow-200 border-yellow-600 dark:border-yellow-400">
+                      Apt Premium
+                    </span>
+                  </div>
+                  <div className="space-y-2">
+                    <div className="flex items-center space-x-2">
+                      <input
+                        type="checkbox"
+                        id="prem-cleaner-standard"
+                        checked={false}
+                        disabled
+                        className="h-4 w-4 rounded border-gray-300"
+                      />
+                      <Label htmlFor="prem-cleaner-standard" className="text-sm text-muted-foreground">
+                        Cleaner Standard
+                      </Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <input
+                        type="checkbox"
+                        id="prem-cleaner-premium"
+                        checked={true}
+                        disabled
+                        className="h-4 w-4 rounded border-gray-300"
+                      />
+                      <Label htmlFor="prem-cleaner-premium" className="text-sm">
+                        Cleaner Premium
+                      </Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <input
+                        type="checkbox"
+                        id="prem-cleaner-straordinario"
+                        checked={true}
+                        disabled
+                        className="h-4 w-4 rounded border-gray-300"
+                      />
+                      <Label htmlFor="prem-cleaner-straordinario" className="text-sm">
+                        Cleaner Straordinario
+                      </Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <input
+                        type="checkbox"
+                        id="prem-cleaner-formatore"
+                        checked={false}
+                        disabled
+                        className="h-4 w-4 rounded border-gray-300"
+                      />
+                      <Label htmlFor="prem-cleaner-formatore" className="text-sm text-muted-foreground">
+                        Cleaner Formatore
+                      </Label>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Appartamento Straordinario */}
+                <div className="space-y-3">
+                  <div className="border-b pb-2">
+                    <span className="px-2 py-0.5 rounded border font-medium text-sm bg-red-500/30 text-red-800 dark:bg-red-500/40 dark:text-red-200 border-red-600 dark:border-red-400">
+                      Apt Straordinario
+                    </span>
+                  </div>
+                  <div className="space-y-2">
+                    <div className="flex items-center space-x-2">
+                      <input
+                        type="checkbox"
+                        id="stra-cleaner-standard"
+                        checked={false}
+                        disabled
+                        className="h-4 w-4 rounded border-gray-300"
+                      />
+                      <Label htmlFor="stra-cleaner-standard" className="text-sm text-muted-foreground">
+                        Cleaner Standard
+                      </Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <input
+                        type="checkbox"
+                        id="stra-cleaner-premium"
+                        checked={false}
+                        disabled
+                        className="h-4 w-4 rounded border-gray-300"
+                      />
+                      <Label htmlFor="stra-cleaner-premium" className="text-sm text-muted-foreground">
+                        Cleaner Premium
+                      </Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <input
+                        type="checkbox"
+                        id="stra-cleaner-straordinario"
+                        checked={true}
+                        disabled
+                        className="h-4 w-4 rounded border-gray-300"
+                      />
+                      <Label htmlFor="stra-cleaner-straordinario" className="text-sm">
+                        Cleaner Straordinario
+                      </Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <input
+                        type="checkbox"
+                        id="stra-cleaner-formatore"
+                        checked={false}
+                        disabled
+                        className="h-4 w-4 rounded border-gray-300"
+                      />
+                      <Label htmlFor="stra-cleaner-formatore" className="text-sm text-muted-foreground">
+                        Cleaner Formatore
+                      </Label>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
           {/* Client Settings a tutta larghezza */}
           <div className="grid grid-cols-1 gap-4">
             {/* Client Settings Shortcut */}
