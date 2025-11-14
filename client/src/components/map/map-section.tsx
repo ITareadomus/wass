@@ -200,11 +200,11 @@ export default function MapSection({ tasks }: MapSectionProps) {
       const markerColor = assignedCleaner ? getCleanerColor(assignedCleaner) : '#6B7280';
       const sequence = (task as any).sequence;
       
-      // I marker NON vengono evidenziati (solo le task nella timeline)
-      const isHighlighted = false; // Non evidenziare i marker
+      // Verifica se questa task è evidenziata
+      const isHighlighted = highlightedTaskIds.has(task.name);
       const markerScale = 12; // Dimensione costante per tutti i marker
-      const strokeWeight = 2; // Bordo costante
-      const strokeColor = '#ffffff'; // Bordo bianco costante
+      const strokeWeight = isHighlighted ? 2 : 2; // Bordo più sottile anche se evidenziata
+      const strokeColor = isHighlighted ? '#FFD700' : '#ffffff'; // Bordo dorato se evidenziata
 
       // Se c'è una sequenza, usa un custom HTML marker
       if (sequence !== undefined && sequence !== null) {
@@ -231,16 +231,19 @@ export default function MapSection({ tasks }: MapSectionProps) {
             div.style.alignItems = 'center';
             div.style.justifyContent = 'center';
             div.style.color = '#ffffff';
-            div.style.fontSize = '12px';
+            div.style.fontSize = isHighlighted ? '14px' : '12px';
             div.style.fontWeight = 'bold';
-            div.style.zIndex = String(index);
+            div.style.zIndex = isHighlighted ? '1000' : String(index);
             div.textContent = String(sequence);
             div.title = `${task.name} - ${task.type} (Seq: ${sequence})`;
             
+            // Aggiungi animazione bounce se evidenziato
+            if (isHighlighted) {
+              div.style.animation = 'bounce 0.5s ease infinite alternate';
+            }
+            
             div.addEventListener('click', () => {
               setSelectedTask(task);
-              // Evidenzia la task nella timeline e nei container
-              (window as any).mapFilteredTaskId = task.name;
             });
             
             this.div = div;
@@ -283,15 +286,13 @@ export default function MapSection({ tasks }: MapSectionProps) {
             strokeWeight: strokeWeight,
             scale: markerScale
           },
-          zIndex: index,
-          animation: null, // Nessuna animazione sui marker
+          zIndex: isHighlighted ? 1000 : index,
+          animation: isHighlighted ? window.google.maps.Animation.BOUNCE : null,
           optimized: true
         });
 
         marker.addListener('click', () => {
           setSelectedTask(task);
-          // Evidenzia la task nella timeline e nei container
-          (window as any).mapFilteredTaskId = task.name;
         });
 
         markersRef.current.push(marker);
@@ -303,6 +304,28 @@ export default function MapSection({ tasks }: MapSectionProps) {
     // Adatta la vista per mostrare tutti i marker
     if (tasksWithCoordinates.length > 0) {
       googleMapRef.current.fitBounds(bounds);
+      
+      // Se ci sono task evidenziate, centra sulla loro area
+      if (highlightedTaskIds.size > 0 && highlightedTaskIds.size < tasksWithCoordinates.length) {
+        const highlightedBounds = new window.google.maps.LatLngBounds();
+        tasksWithCoordinates.forEach(task => {
+          if (highlightedTaskIds.has(task.name)) {
+            const lat = parseFloat(task.lat || '0');
+            const lng = parseFloat(task.lng || '0');
+            if (!isNaN(lat) && !isNaN(lng) && lat !== 0 && lng !== 0) {
+              highlightedBounds.extend({ lat, lng });
+            }
+          }
+        });
+        
+        setTimeout(() => {
+          googleMapRef.current.fitBounds(highlightedBounds);
+          const currentZoom = googleMapRef.current.getZoom();
+          if (currentZoom > 15) {
+            googleMapRef.current.setZoom(15);
+          }
+        }, 100);
+      }
     }
   }, [tasks, isMapLoaded, cleaners, filteredCleanerId, filteredTaskId]);
 
