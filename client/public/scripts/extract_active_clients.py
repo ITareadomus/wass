@@ -2,29 +2,28 @@
 #!/usr/bin/env python3
 """
 Script per estrarre i clienti attivi dal database.
-Output: JSON con client_id e customer_name
+Output: JSON con client_id e operation_name
 """
 
 import json
-import psycopg2
-from psycopg2.extras import RealDictCursor
+import mysql.connector
 import os
 import sys
 
 def get_db_connection():
-    """Crea connessione al database."""
-    return psycopg2.connect(
-        host=os.getenv("PGHOST", "ep-old-glade-a2aezwcs.eu-central-1.aws.neon.tech"),
-        database=os.getenv("PGDATABASE", "WASS_data"),
-        user=os.getenv("PGUSER", "WASS_data_owner"),
-        password=os.getenv("PGPASSWORD", "fTaXwWBsNqcc"),
-        sslmode="require"
+    """Crea connessione al database MySQL."""
+    return mysql.connector.connect(
+        host=os.getenv("DB_HOST", "139.59.132.41"),
+        database=os.getenv("DB_NAME", "adamdb"),
+        user=os.getenv("DB_USER", "admin"),
+        password=os.getenv("DB_PASSWORD", "ed329a875c6c4ebdf4e87e2bbe53a15771b5844ef6606dde"),
+        port=int(os.getenv("DB_PORT", "3306"))
     )
 
 def extract_active_clients():
     """Estrae tutti i clienti attivi che hanno strutture con housekeeping."""
     conn = get_db_connection()
-    cursor = conn.cursor(cursor_factory=RealDictCursor)
+    cursor = conn.cursor(dictionary=True)
     
     try:
         # Query per ottenere i clienti attivi dalle strutture con housekeeping
