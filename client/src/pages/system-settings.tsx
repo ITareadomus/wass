@@ -150,7 +150,11 @@ export default function SystemSettings() {
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 {/* Early-Out */}
                 <div className="space-y-3">
-                  <h3 className="font-semibold text-sm border-b pb-2">Early-Out</h3>
+                  <div className="border-b pb-2">
+                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200">
+                      Early-Out
+                    </span>
+                  </div>
                   <div className="space-y-2">
                     <Label htmlFor="eo_start_time" className="text-sm">Start Time</Label>
                     <Input
@@ -208,7 +212,11 @@ export default function SystemSettings() {
 
                 {/* High-Priority */}
                 <div className="space-y-3">
-                  <h3 className="font-semibold text-sm border-b pb-2">High-Priority</h3>
+                  <div className="border-b pb-2">
+                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
+                      High-Priority
+                    </span>
+                  </div>
                   <div className="space-y-2">
                     <Label htmlFor="hp_start_time" className="text-sm">Start Time</Label>
                     <Input
@@ -266,7 +274,11 @@ export default function SystemSettings() {
 
                 {/* Low-Priority */}
                 <div className="space-y-3">
-                  <h3 className="font-semibold text-sm border-b pb-2">Low-Priority</h3>
+                  <div className="border-b pb-2">
+                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-lime-100 text-lime-800 dark:bg-lime-900 dark:text-lime-200">
+                      Low-Priority
+                    </span>
+                  </div>
                   <div className="space-y-2">
                     <Label htmlFor="lp_start_time" className="text-sm text-muted-foreground">Start Time</Label>
                     <Input
