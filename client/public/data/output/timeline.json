@@ -1,6 +1,6 @@
 {
   "metadata": {
-    "last_updated": "2025-11-14T18:05:25.923Z",
+    "last_updated": "2025-11-14T18:08:07.783Z",
     "date": "2025-11-15",
     "created_by": "Admin",
     "modified_by": [
@@ -10,10 +10,54 @@
   "cleaners_assignments": [
     {
       "cleaner": {
-        "id": 132,
-        "name": "JOHOISER ERNESTO",
-        "lastname": "LOPEZ GIRON",
-        "role": "Premium",
+        "id": 1045,
+        "name": "ARACELY ROCIO",
+        "lastname": "MORLA ZAMBRANO",
+        "role": "Standard",
+        "premium": false
+      },
+      "tasks": [
+        {
+          "task_id": 218761,
+          "logistic_code": 584,
+          "client_id": null,
+          "premium": false,
+          "address": "VIA DEL TURCHINO 25",
+          "lat": "45.4523635",
+          "lng": "9.2287281",
+          "cleaning_time": 60,
+          "checkin_date": "2025-11-15",
+          "checkout_date": "2025-11-15",
+          "checkin_time": "09:00",
+          "checkout_time": null,
+          "pax_in": 2,
+          "pax_out": 1,
+          "small_equipment": false,
+          "operation_id": 2,
+          "confirmed_operation": false,
+          "straordinaria": false,
+          "type_apt": "A",
+          "alias": "NTM",
+          "customer_name": "NOTA-MI",
+          "reasons": [
+            "manually_moved_to_timeline"
+          ],
+          "priority": "early_out",
+          "start_time": "10:00",
+          "end_time": "11:00",
+          "followup": false,
+          "sequence": 1,
+          "travel_time": 0,
+          "modified_by": "Admin"
+        }
+      ]
+    },
+    {
+      "cleaner": {
+        "id": 1063,
+        "name": "ALEXANDER DENNYS",
+        "lastname": "CARDENAS OLAYA",
+        "role": "Standard",
         "premium": false
       },
       "tasks": [
@@ -54,9 +98,9 @@
     }
   ],
   "meta": {
-    "total_cleaners": 1,
+    "total_cleaners": 2,
     "used_cleaners": 0,
     "assigned_tasks": 0,
-    "total_tasks": 1
+    "total_tasks": 2
   }
 }
