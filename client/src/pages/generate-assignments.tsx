@@ -290,6 +290,13 @@ export default function GenerateAssignments() {
   // Nuova variabile di stato per gestire il caricamento generale
   const [isLoading, setIsLoading] = useState(false);
 
+  // Stati per tracciare se le assegnazioni sono già state eseguite
+  const [assignmentsCompleted, setAssignmentsCompleted] = useState({
+    early_out: false,
+    high_priority: false,
+    low_priority: false
+  });
+
   // Callback per notificare modifiche dopo movimenti task
   const handleTaskMoved = useCallback(() => {
     setHasUnsavedChanges(true);
@@ -939,6 +946,19 @@ export default function GenerateAssignments() {
 
       setAllTasksWithAssignments(dedupedTasks);
 
+      // Carica lo stato delle assegnazioni completate da timeline.json
+      if (timelineAssignmentsData.metadata?.assignments_completed) {
+        setAssignmentsCompleted(timelineAssignmentsData.metadata.assignments_completed);
+        console.log(`📋 Stato assegnazioni completate:`, timelineAssignmentsData.metadata.assignments_completed);
+      } else {
+        // Reset se non ci sono informazioni
+        setAssignmentsCompleted({
+          early_out: false,
+          high_priority: false,
+          low_priority: false
+        });
+      }
+
       setIsLoadingTasks(false);
       setExtractionStep("Task caricati con successo!");
 
@@ -998,6 +1018,9 @@ export default function GenerateAssignments() {
       const result = await response.json();
 
       if (result.success) {
+        // Marca l'assegnazione come completata
+        setAssignmentsCompleted(prev => ({ ...prev, early_out: true }));
+
         toast({
           title: "Early Out Assegnati!",
           description: result.message,
@@ -1059,6 +1082,9 @@ export default function GenerateAssignments() {
       const result = await response.json();
 
       if (result.success) {
+        // Marca l'assegnazione come completata
+        setAssignmentsCompleted(prev => ({ ...prev, high_priority: true }));
+
         toast({
           title: "High Priority Assegnati!",
           description: result.message,
@@ -1124,6 +1150,9 @@ export default function GenerateAssignments() {
       const result = await response.json();
 
       if (result.success) {
+        // Marca l'assegnazione come completata
+        setAssignmentsCompleted(prev => ({ ...prev, low_priority: true }));
+
         toast({
           title: "Low Priority Assegnati!",
           description: result.message,
@@ -1795,6 +1824,7 @@ export default function GenerateAssignments() {
                 icon="clock"
                 assignAction={assignEarlyOutToTimeline}
                 containerMultiSelectState={getContainerMultiSelectState('early_out')}
+                isAssignmentCompleted={assignmentsCompleted.early_out}
               />
               <PriorityColumn
                 title="HIGH PRIORITY"
@@ -1804,6 +1834,7 @@ export default function GenerateAssignments() {
                 icon="alert-circle"
                 assignAction={assignHighPriorityToTimeline}
                 containerMultiSelectState={getContainerMultiSelectState('high_priority')}
+                isAssignmentCompleted={assignmentsCompleted.high_priority}
               />
             <PriorityColumn
               title="LOW PRIORITY"
@@ -1813,6 +1844,7 @@ export default function GenerateAssignments() {
               icon="arrow-down"
               assignAction={assignLowPriorityToTimeline}
               containerMultiSelectState={getContainerMultiSelectState('low_priority')}
+              isAssignmentCompleted={assignmentsCompleted.low_priority}
             />
           </div>
 
