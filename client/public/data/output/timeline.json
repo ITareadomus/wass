@@ -1,6 +1,6 @@
 {
   "metadata": {
-    "last_updated": "2025-11-14T11:36:55.417Z",
+    "last_updated": "2025-11-14T15:46:08.739Z",
     "date": "2025-11-14",
     "created_by": "Admin"
   },
@@ -34,10 +34,20 @@
         "premium": false
       },
       "tasks": []
+    },
+    {
+      "cleaner": {
+        "id": 626,
+        "name": "DORA PATRICIA",
+        "lastname": "JIMENEZ",
+        "role": "Formatore",
+        "premium": false
+      },
+      "tasks": []
     }
   ],
   "meta": {
-    "total_cleaners": 3,
+    "total_cleaners": 4,
     "used_cleaners": 0,
     "assigned_tasks": 0,
     "total_tasks": 0
