@@ -1,5 +1,5 @@
 import { Personnel, TaskType as Task } from "@shared/schema";
-import { Calendar, RotateCcw, Users, RefreshCw, UserPlus, Maximize2, Minimize2, Check, CheckCircle } from "lucide-react";
+import { Calendar as CalendarIcon, RotateCcw, Users, RefreshCw, UserPlus, Maximize2, Minimize2, Check, CheckCircle } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import * as React from "react";
 import { Droppable, Draggable } from "react-beautiful-dnd";
@@ -883,7 +883,7 @@ export default function TimelineView({
           <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
             <div>
               <h2 className="text-xl font-bold text-foreground flex items-center">
-                <Calendar className="w-5 h-5 mr-2 text-custom-blue" />
+                <CalendarIcon className="w-5 h-5 mr-2 text-custom-blue" />
                 Timeline Assegnazioni - {cleaners.length} Cleaners
               </h2>
               {timelineData?.metadata?.last_modified_by && (
@@ -952,7 +952,7 @@ export default function TimelineView({
             ) : allCleanersToShow.length === 0 && isReadOnly ? (
               <div className="flex items-center justify-center h-64 bg-red-50 dark:bg-red-950/20 border-2 border-red-300 dark:border-blue-800 rounded-lg">
                 <div className="text-center p-6">
-                  <Calendar className="mx-auto h-12 w-12 text-red-600 dark:text-red-400 mb-3" />
+                  <CalendarIcon className="mx-auto h-12 w-12 text-red-600 dark:text-red-400 mb-3" />
                   <h3 className="text-lg font-semibold text-red-800 dark:text-red-200 mb-2">
                     Nessuna assegnazione presente per questa data
                   </h3>
