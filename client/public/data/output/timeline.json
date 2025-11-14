@@ -1,55 +1,13 @@
 {
   "metadata": {
-    "last_updated": "2025-11-14T15:46:08.739Z",
+    "last_updated": "2025-11-14T15:52:40.970Z",
     "date": "2025-11-14",
     "created_by": "Admin"
   },
-  "cleaners_assignments": [
-    {
-      "cleaner": {
-        "id": 132,
-        "name": "JOHOISER ERNESTO",
-        "lastname": "LOPEZ GIRON",
-        "role": "Premium",
-        "premium": true
-      },
-      "tasks": []
-    },
-    {
-      "cleaner": {
-        "id": 596,
-        "name": "TRACY",
-        "lastname": "OKE",
-        "role": "Premium",
-        "premium": true
-      },
-      "tasks": []
-    },
-    {
-      "cleaner": {
-        "id": 1063,
-        "name": "ALEXANDER DENNYS",
-        "lastname": "CARDENAS OLAYA",
-        "role": "Standard",
-        "premium": false
-      },
-      "tasks": []
-    },
-    {
-      "cleaner": {
-        "id": 626,
-        "name": "DORA PATRICIA",
-        "lastname": "JIMENEZ",
-        "role": "Formatore",
-        "premium": false
-      },
-      "tasks": []
-    }
-  ],
+  "cleaners_assignments": [],
   "meta": {
-    "total_cleaners": 4,
+    "total_cleaners": 0,
     "used_cleaners": 0,
-    "assigned_tasks": 0,
-    "total_tasks": 0
+    "assigned_tasks": 0
   }
 }
