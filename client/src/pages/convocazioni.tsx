@@ -554,7 +554,7 @@ export default function Convocazioni() {
                 </Button>
                 <Button 
                   onClick={handleConfirmUnavailable}
-                  className="bg-custom-blue hover:bg-custom-blue/90 text-white"
+                  className="bg-background border-2 border-custom-blue text-black dark:text-white hover:opacity-80"
                 >
                   Conferma
                 </Button>
