@@ -93,10 +93,12 @@ export default function SystemSettings() {
 
   const loadClients = async () => {
     try {
-      const response = await fetch("/api/extract_active_clients");
+      const response = await fetch("/api/get-active-clients");
       if (response.ok) {
-        const data: Client[] = await response.json();
-        setClients(data);
+        const data = await response.json();
+        if (data.success && data.clients) {
+          setClients(data.clients);
+        }
       }
     } catch (error) {
       toast({
