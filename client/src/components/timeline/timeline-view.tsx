@@ -1004,7 +1004,7 @@ export default function TimelineView({
           {/* Righe dei cleaners - mostra solo se ci sono cleaners selezionati */}
           <div className="flex-1 overflow-auto px-4 pb-4">
             {allCleanersToShow.length === 0 && !isReadOnly ? (
-              <div className="flex items-center justify-center h-64 bg-yellow-50 dark:bg-yellow-950/20 border-2 border-yellow-300 dark:border-blue-800 rounded-lg">
+              <div className="flex items-center justify-center h-64 bg-yellow-100 dark:bg-yellow-950/50 border-2 border-yellow-300 dark:border-yellow-700 rounded-lg">
                 <div className="text-center p-6">
                   <Users className="mx-auto h-12 w-12 text-yellow-600 dark:text-yellow-400 mb-3" />
                   <h3 className="text-lg font-semibold text-yellow-800 dark:text-yellow-200 mb-2">
