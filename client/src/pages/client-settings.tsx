@@ -199,7 +199,7 @@ export default function ClientSettings() {
                     const windowData = windows.get(client.client_id) || { checkin: "", checkout: "" };
                     return (
                       <TableRow key={client.client_id}>
-                        <TableCell className="font-light">{client.client_id}</TableCell>
+                        <TableCell className="font-light text-center">{client.client_id}</TableCell>
                         <TableCell className="text-[#f8fafc] font-thin">{client.alias || "-"}</TableCell>
                         <TableCell className="font-semibold">{client.customer_name}</TableCell>
                         <TableCell>
