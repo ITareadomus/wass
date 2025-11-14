@@ -477,7 +477,7 @@ export default function TaskCard({
     return checkoutDateTime > checkinDateTime;
   })();
 
-  // Verifica se il check-in è per una data futura (non oggi)
+  // Verifica se il check-in è per una data futura rispetto alla data selezionata
   // Include anche i casi dove l'orario non è migrato ma la data è futura
   const isFutureCheckin = (() => {
     const taskObj = task as any;
@@ -485,13 +485,15 @@ export default function TaskCard({
 
     if (!checkinDate) return false;
 
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    // Usa la data selezionata dal calendario invece di oggi
+    const savedDate = localStorage.getItem('selected_work_date');
+    const selectedDate = savedDate ? new Date(savedDate) : new Date();
+    selectedDate.setHours(0, 0, 0, 0);
 
     const checkin = new Date(checkinDate);
     checkin.setHours(0, 0, 0, 0);
 
-    return checkin > today;
+    return checkin > selectedDate;
   })();
 
   // Determina se il drag è disabilitato in base alla data e se la task è già salvata
