@@ -30,20 +30,13 @@ def extract_active_clients():
         # Query per ottenere i clienti attivi dalle strutture con housekeeping
         query = """
             SELECT DISTINCT
-                customer_id as client_id,
-                customer_name
-            FROM (
-                SELECT 
-                    s.customer_id,
-                    c.name as customer_name
-                FROM app_structures s
-                LEFT JOIN app_customers c ON s.customer_id = c.id
-                WHERE s.customer_id IS NOT NULL
-                  AND c.name IS NOT NULL
-                  AND s.deleted_at IS NULL
-                  AND c.deleted_at IS NULL
-            ) subquery
-            ORDER BY customer_name
+                s.customer_id as client_id,
+                s.operation_name
+            FROM app_structures s
+            WHERE s.customer_id IS NOT NULL
+              AND s.operation_name IS NOT NULL
+              AND s.deleted_at IS NULL
+            ORDER BY s.operation_name
         """
         
         cursor.execute(query)

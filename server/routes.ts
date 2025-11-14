@@ -2797,6 +2797,63 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Route legacy del database rimosse - il progetto usa solo file JSON
 
+  // Endpoint per ottenere i clienti attivi dal database
+  app.get("/api/get-active-clients", async (req, res) => {
+    try {
+      const { exec } = await import("child_process");
+      const { promisify } = await import("util");
+      const execPromise = promisify(exec);
+
+      console.log("Eseguendo extract_active_clients.py...");
+      const { stdout, stderr } = await execPromise(
+        "python3 client/public/scripts/extract_active_clients.py"
+      );
+
+      if (stderr) {
+        console.error("Stderr da extract_active_clients:", stderr);
+      }
+
+      const clients = JSON.parse(stdout);
+      
+      res.json({
+        success: true,
+        clients: clients
+      });
+    } catch (error: any) {
+      console.error("Errore nell'estrazione dei clienti attivi:", error);
+      res.status(500).json({ 
+        success: false, 
+        error: error.message,
+        clients: []
+      });
+    }
+  });
+
+  // Endpoint per salvare le client windows
+  app.post("/api/save-client-windows", async (req, res) => {
+    try {
+      const clientWindowsData = req.body;
+      const clientWindowsPath = path.join(process.cwd(), "client/public/data/input/client_windows.json");
+      
+      await fs.promises.writeFile(
+        clientWindowsPath,
+        JSON.stringify(clientWindowsData, null, 2),
+        "utf-8"
+      );
+
+      res.json({
+        success: true,
+        message: "Client windows salvate con successo"
+      });
+    } catch (error: any) {
+      console.error("Errore nel salvataggio delle client windows:", error);
+      res.status(500).json({ 
+        success: false, 
+        error: error.message 
+      });
+    }
+  });
+
   // Endpoint for saving settings.json
   app.post("/api/save-settings", async (req, res) => {
     try {
