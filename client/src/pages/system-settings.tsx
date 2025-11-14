@@ -295,6 +295,24 @@ export default function SystemSettings() {
                   </div>
                 </div>
               </div>
+
+              {/* Dedupe Strategy - sotto EO e HP */}
+              <div className="md:col-span-2 mt-4 pt-4 border-t">
+                <div className="space-y-2">
+                  <Label htmlFor="dedupe_strategy" className="text-sm font-semibold">Dedupe Strategy</Label>
+                  <Input
+                    id="dedupe_strategy"
+                    value={settings.dedupe_strategy}
+                    onChange={(e) =>
+                      setSettings({
+                        ...settings,
+                        dedupe_strategy: e.target.value,
+                      })
+                    }
+                    placeholder="es. eo_wins"
+                  />
+                </div>
+              </div>
             </CardContent>
           </Card>
 
@@ -366,31 +384,6 @@ export default function SystemSettings() {
                 </div>
               </CardContent>
             </Card>
-
-          {/* Dedupe Strategy */}
-          <Card className="bg-background border-2 border-custom-blue">
-            <CardHeader className="bg-background py-3">
-              <CardTitle className="text-lg">Dedupe Strategy</CardTitle>
-              <CardDescription className="text-xs">
-                Strategia di deduplicazione
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="bg-background">
-              <div className="space-y-2">
-                <Label htmlFor="dedupe_strategy" className="text-sm">Strategy</Label>
-                <Input
-                  id="dedupe_strategy"
-                  value={settings.dedupe_strategy}
-                  onChange={(e) =>
-                    setSettings({
-                      ...settings,
-                      dedupe_strategy: e.target.value,
-                    })
-                  }
-                />
-              </div>
-            </CardContent>
-          </Card>
 
           {/* Client Settings a tutta larghezza */}
           <div className="grid grid-cols-1 gap-4">
