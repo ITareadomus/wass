@@ -138,8 +138,8 @@ export default function SystemSettings() {
         </div>
 
         <div className="space-y-4">
-          {/* Early-Out & High-Priority e Apartment Types sulla stessa riga */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Early-Out, High-Priority e Apartment Types sulla stessa riga */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {/* Early-Out */}
             <Card className="bg-background border-2 border-custom-blue">
               <CardHeader className="bg-background py-3">
