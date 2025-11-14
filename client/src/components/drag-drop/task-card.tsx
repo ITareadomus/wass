@@ -672,12 +672,12 @@ export default function TaskCard({
                 <Badge
                   variant="outline"
                   className={cn(
-                    "text-xs shrink-0",
+                    "text-xs shrink-0 px-2 py-0.5 rounded border font-medium",
                     Boolean(displayTask.straordinaria)
-                      ? "bg-red-500 text-white border-red-700"
+                      ? "bg-red-500/20 text-red-700 dark:text-red-300 border-red-500"
                       : Boolean(displayTask.premium)
-                        ? "bg-yellow-400 text-black border-yellow-600"
-                        : "bg-green-500 text-white border-green-700"
+                        ? "bg-yellow-500/30 text-yellow-800 dark:bg-yellow-500/40 dark:text-yellow-200 border-yellow-600 dark:border-yellow-400"
+                        : "bg-green-500/30 text-green-800 dark:bg-green-500/40 dark:text-green-200 border-green-600 dark:border-green-400"
                   )}
                 >
                   {getTaskTypeStyle(Boolean(displayTask.straordinaria), Boolean(displayTask.premium)).label}
