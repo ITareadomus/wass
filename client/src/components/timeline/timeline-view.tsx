@@ -1366,10 +1366,17 @@ export default function TimelineView({
             </DialogDescription>
           </DialogHeader>
           <div className="flex justify-end gap-2 mt-4">
-            <Button variant="outline" onClick={() => setConfirmUnavailableDialog({ open: false, cleanerId: null })}>
+            <Button 
+              variant="outline" 
+              onClick={() => setConfirmUnavailableDialog({ open: false, cleanerId: null })}
+              className="border-2 border-custom-blue"
+            >
               Annulla
             </Button>
-            <Button onClick={handleConfirmAddUnavailableCleaner}>
+            <Button 
+              onClick={handleConfirmAddUnavailableCleaner}
+              className="bg-custom-blue hover:bg-custom-blue/90 text-white"
+            >
               Conferma e Aggiungi
             </Button>
           </div>
