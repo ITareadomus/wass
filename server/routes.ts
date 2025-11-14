@@ -2813,18 +2813,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.error("Stderr da extract_active_clients:", stderr);
       }
 
-      const clients = JSON.parse(stdout);
-      
+      const parsed = JSON.parse(stdout);
+
+      if (!parsed.success) {
+        console.error("Errore da extract_active_clients.py:", parsed.error);
+        return res.status(500).json({
+          success: false,
+          error: parsed.error,
+          clients: [],
+        });
+      }
+
       res.json({
         success: true,
-        clients: clients
+        clients: parsed.clients,
       });
     } catch (error: any) {
-      console.error("Errore nell'estrazione dei clienti attivi:", error);
-      res.status(500).json({ 
-        success: false, 
-        error: error.message,
-        clients: []
+      console.error("Errore extract_active_clients:", error);
+      res.status(500).json({
+        success: false,
+        error: error.message || "Errore nell'estrazione dei clienti attivi",
+        clients: [],
       });
     }
   });
@@ -2834,7 +2843,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const clientWindowsData = req.body;
       const clientWindowsPath = path.join(process.cwd(), "client/public/data/input/client_windows.json");
-      
+
       await fs.promises.writeFile(
         clientWindowsPath,
         JSON.stringify(clientWindowsData, null, 2),
@@ -2859,7 +2868,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const settingsData = req.body;
       const settingsPath = path.join(process.cwd(), "client/public/data/input/settings.json");
-      
+
       await fs.promises.writeFile(
         settingsPath,
         JSON.stringify(settingsData, null, 2),
@@ -2906,7 +2915,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const clientWindowsData = req.body;
       const clientWindowsPath = path.join(process.cwd(), "client/public/data/input/client_windows.json");
-      
+
       await fs.promises.writeFile(
         clientWindowsPath,
         JSON.stringify(clientWindowsData, null, 2),
