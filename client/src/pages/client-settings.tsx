@@ -12,6 +12,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 interface Client {
   client_id: number;
   customer_name: string;
+  alias: string | null;
 }
 
 interface ClientWindow {
@@ -188,6 +189,7 @@ export default function ClientSettings() {
                   <TableRow>
                     <TableHead className="w-[100px]">Client ID</TableHead>
                     <TableHead>Nome Cliente</TableHead>
+                    <TableHead className="w-[120px]">Alias</TableHead>
                     <TableHead className="w-[150px]">Checkin</TableHead>
                     <TableHead className="w-[150px]">Checkout</TableHead>
                   </TableRow>
@@ -197,8 +199,9 @@ export default function ClientSettings() {
                     const windowData = windows.get(client.client_id) || { checkin: "", checkout: "" };
                     return (
                       <TableRow key={client.client_id}>
-                        <TableCell className="font-medium text-center">{client.client_id}</TableCell>
+                        <TableCell className="font-medium">{client.client_id}</TableCell>
                         <TableCell>{client.customer_name}</TableCell>
+                        <TableCell className="text-muted-foreground">{client.alias || "-"}</TableCell>
                         <TableCell>
                           <Input
                             type="time"
