@@ -174,14 +174,14 @@ export default function ClientSettings() {
           <ThemeToggle />
         </div>
 
-        <Card className="bg-background border-2 border-custom-blue">
-          <CardHeader className="bg-background">
+        <Card className="bg-custom-blue-light border-2 border-custom-blue">
+          <CardHeader className="bg-custom-blue-light">
             <CardTitle>Finestre Temporali Clienti</CardTitle>
             <CardDescription>
               Configura gli orari di checkin e checkout per ogni cliente attivo
             </CardDescription>
           </CardHeader>
-          <CardContent className="bg-background">
+          <CardContent className="bg-custom-blue-light">
             <div className="rounded-md border">
               <Table>
                 <TableHeader>
