@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { Home, Save, RefreshCw } from "lucide-react";
+import { Home, Save } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
@@ -170,18 +170,7 @@ export default function ClientSettings() {
     <div className="min-h-screen bg-background text-foreground">
       <div className="container mx-auto px-4 py-8">
         <div className="flex justify-between items-center mb-8">
-          <div className="flex items-center gap-3">
-            <h1 className="text-3xl font-bold">Client Settings</h1>
-            <Button 
-              onClick={loadData} 
-              variant="outline" 
-              size="icon"
-              className="rounded-full"
-              title="Ricarica dati"
-            >
-              <RefreshCw className="h-5 w-5" />
-            </Button>
-          </div>
+          <h1 className="text-3xl font-bold">Client Settings</h1>
           <ThemeToggle />
         </div>
 
