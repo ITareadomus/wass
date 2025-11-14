@@ -16,7 +16,6 @@ import {
 import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
 import { useToast } from "@/hooks/use-toast";
-import { useLocation } from "wouter";
 
 interface Account {
   id: number;
