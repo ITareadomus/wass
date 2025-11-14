@@ -303,30 +303,51 @@ export default function SystemSettings() {
                 </div>
               </div>
 
-              {/* Dedupe Strategy - sotto EO e HP, max width per occupare solo 2 colonne */}
+              {/* Dedupe Strategy e Client Settings - sotto EO e HP */}
               <div className="md:col-span-3 mt-4 pt-4 border-t">
-                <div className="space-y-2 max-w-[66%]">
-                  <Label htmlFor="dedupe_strategy" className="text-sm font-semibold">Dedupe Strategy</Label>
-                  <Select
-                    value={settings.dedupe_strategy}
-                    onValueChange={(value) =>
-                      setSettings({
-                        ...settings,
-                        dedupe_strategy: value,
-                      })
-                    }
-                  >
-                    <SelectTrigger id="dedupe_strategy">
-                      <SelectValue placeholder="Seleziona strategia" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="eo_wins">eo_wins</SelectItem>
-                      <SelectItem value="hp_wins">hp_wins</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Strategia per le task duplex, cioè che rispecchiano entrambi i criteri EO e HP (eo_wins → le task duplex saranno EO - hp_wins → viceversa)
-                  </p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* Dedupe Strategy */}
+                  <div className="space-y-2">
+                    <Label htmlFor="dedupe_strategy" className="text-sm font-semibold">Dedupe Strategy</Label>
+                    <Select
+                      value={settings.dedupe_strategy}
+                      onValueChange={(value) =>
+                        setSettings({
+                          ...settings,
+                          dedupe_strategy: value,
+                        })
+                      }
+                    >
+                      <SelectTrigger id="dedupe_strategy">
+                        <SelectValue placeholder="Seleziona strategia" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="eo_wins">eo_wins</SelectItem>
+                        <SelectItem value="hp_wins">hp_wins</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Strategia per le task duplex, cioè che rispecchiano entrambi i criteri EO e HP (eo_wins → le task duplex saranno EO - hp_wins → viceversa)
+                    </p>
+                  </div>
+
+                  {/* Client Settings */}
+                  <div className="space-y-2">
+                    <Label className="text-sm font-semibold">Client Settings</Label>
+                    <Button
+                      onClick={() => setLocation("/client-settings")}
+                      variant="outline"
+                      className="w-full justify-start h-auto py-3 border-2 hover:bg-custom-blue hover:text-white transition-colors"
+                    >
+                      <Settings className="w-4 h-4 mr-2" />
+                      <div className="text-left">
+                        <p className="text-sm font-semibold">Vai a Client Settings</p>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          Modifica Check-in e Check-out per cliente
+                        </p>
+                      </div>
+                    </Button>
+                  </div>
                 </div>
               </div>
             </CardContent>
@@ -652,25 +673,6 @@ export default function SystemSettings() {
               </div>
             </CardContent>
           </Card>
-
-          {/* Client Settings a tutta larghezza */}
-          <div className="grid grid-cols-1 gap-4">
-            {/* Client Settings Shortcut */}
-            <Card className="bg-background border-2 border-custom-blue hover:bg-custom-blue hover:text-white transition-colors cursor-pointer" onClick={() => setLocation("/client-settings")}>
-              <CardHeader className="bg-background py-2">
-                <CardTitle className="text-lg">Client Settings</CardTitle>
-                <CardDescription className="text-xs">
-                  Impostazioni per modificare Check-in e Check-out pre-impostati per cliente
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="bg-background flex items-center justify-center p-4">
-                <div className="text-center">
-                  <Settings className="w-8 h-8 mx-auto mb-2" />
-                  <p className="text-sm font-semibold">Vai a Client Settings</p>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
 
           {/* Save Button */}
           <Button
