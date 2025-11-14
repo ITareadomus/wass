@@ -429,8 +429,15 @@ export default function TaskCard({
     return totalMinutes < 60;
   })();
 
-  // Determina se mostrare le frecce check-in/out (solo per task >= 1 ora)
-  const shouldShowCheckInOutArrows = !isSmallTask;
+  // Determina se mostrare le frecce check-in/out:
+  // - Nei containers: SEMPRE mostrare le frecce
+  // - Nella timeline: mostrare SOLO per task >= 1 ora
+  const shouldShowCheckInOutArrows = isInTimeline ? !isSmallTask : true;
+
+  // Determina se mostrare il tooltip con orari:
+  // - Nei containers: MAI (le frecce sono già visibili)
+  // - Nella timeline: SOLO per task < 1 ora
+  const shouldShowTooltipTimes = isInTimeline && isSmallTask;
 
   // Verifica se end_time sfora checkin_time (considerando le date!)
   const isOverdue = (() => {
@@ -575,7 +582,7 @@ export default function TaskCard({
                 <TooltipContent side="top" className="max-w-xs text-base px-3 py-2">
                   <div className="flex flex-col items-center gap-2">
                     <p className="font-semibold">{displayTask.address?.toUpperCase() || "INDIRIZZO NON DISPONIBILE"}</p>
-                    {!shouldShowCheckInOutArrows && ((displayTask as any).checkout_time || (displayTask as any).checkin_time) && (
+                    {shouldShowTooltipTimes && ((displayTask as any).checkout_time || (displayTask as any).checkin_time) && (
                       <div className="flex items-center gap-3 text-sm">
                         {(displayTask as any).checkout_time && (
                           <div className="flex items-center gap-1">
