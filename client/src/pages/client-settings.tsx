@@ -200,7 +200,7 @@ export default function ClientSettings() {
                     return (
                       <TableRow key={client.client_id}>
                         <TableCell className="font-light">{client.client_id}</TableCell>
-                        <TableCell className="text-[#f8fafc]">{client.alias || "-"}</TableCell>
+                        <TableCell className="text-[#f8fafc] font-thin">{client.alias || "-"}</TableCell>
                         <TableCell>{client.customer_name}</TableCell>
                         <TableCell>
                           <Input
