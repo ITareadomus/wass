@@ -236,11 +236,12 @@ export default function TaskCard({
     if (!isModalOpen) {
       setEditingField(null);
       // Rimuovi l'evidenziazione del task quando chiudi il modale
-      if ((window as any).mapFilteredTaskId === task.name) {
+      // Usa displayTask invece di task per gestire la navigazione
+      if ((window as any).mapFilteredTaskId === displayTask.name) {
         (window as any).mapFilteredTaskId = null;
       }
     }
-  }, [isModalOpen, task.name]);
+  }, [isModalOpen, displayTask.name]);
 
   // Inizializza i campi quando il modale si apre o quando displayTask cambia
   // MA NON se l'utente sta già modificando un campo
