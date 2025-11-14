@@ -198,20 +198,20 @@ export default function Settings() {
           <ThemeToggle />
         </div>
 
-        <Card className="mb-6 bg-background border-2 border-custom-blue">
-          <CardHeader className="bg-background">
+        <Card className="mb-6 bg-custom-blue-light border-2 border-custom-blue">
+          <CardHeader className="bg-custom-blue-light">
             <CardTitle>Gestione Account</CardTitle>
             <CardDescription>
               Aggiungi, modifica o elimina gli account
             </CardDescription>
           </CardHeader>
-          <CardContent className="bg-background">
+          <CardContent className="bg-custom-blue-light">
             <div className="space-y-4">
               {/* Pulsante Aggiungi Nuovo */}
               {!isAddingNew && (
                 <Button 
                   onClick={() => setIsAddingNew(true)} 
-                  className="w-full bg-background border-2 border-custom-blue text-black dark:text-white hover:opacity-80"
+                  className="w-full border-2 border-custom-blue hover:opacity-80"
                 >
                   <Plus className="w-4 h-4 mr-2" />
                   Aggiungi Nuovo Account
@@ -220,8 +220,8 @@ export default function Settings() {
 
               {/* Form Nuovo Account */}
               {isAddingNew && (
-                <Card className="border-2 border-custom-blue bg-background">
-                  <CardContent className="pt-6 bg-background">
+                <Card className="border-2 border-custom-blue bg-custom-blue-light">
+                  <CardContent className="pt-6 bg-custom-blue-light">
                     <div className="space-y-4">
                       <div>
                         <Label htmlFor="new-username">Username</Label>
@@ -267,7 +267,7 @@ export default function Settings() {
                       <div className="flex gap-2">
                         <Button 
                           onClick={handleAddAccount} 
-                          className="flex-1 bg-background border-2 border-custom-blue text-black dark:text-white hover:opacity-80"
+                          className="flex-1 border-2 border-custom-blue hover:opacity-80"
                         >
                           <Save className="w-4 h-4 mr-2" />
                           Salva
@@ -342,7 +342,7 @@ export default function Settings() {
                         <div className="flex gap-2">
                           <Button
                             onClick={() => handleSaveAccount(editingAccount)}
-                            className="flex-1 bg-background border-2 border-custom-blue text-black dark:text-white hover:opacity-80"
+                            className="flex-1 border-2 border-custom-blue hover:opacity-80"
                           >
                             <Save className="w-4 h-4 mr-2" />
                             Salva
