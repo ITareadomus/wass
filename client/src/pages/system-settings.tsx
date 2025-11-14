@@ -138,8 +138,9 @@ export default function SystemSettings() {
         </div>
 
         <div className="space-y-4">
-          {/* Early-Out e High-Priority in un'unica card a metà pagina */}
+          {/* Early-Out & High-Priority e Apartment Types sulla stessa riga */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Early-Out & High-Priority */}
             <Card className="bg-background border-2 border-custom-blue">
               <CardHeader className="bg-background py-3">
                 <CardTitle className="text-lg">Early-Out & High-Priority</CardTitle>
@@ -267,35 +268,7 @@ export default function SystemSettings() {
               </div>
             </CardContent>
           </Card>
-          </div>
 
-          {/* Dedupe Strategy */}
-          <Card className="bg-background border-2 border-custom-blue">
-            <CardHeader className="bg-background py-3">
-              <CardTitle className="text-lg">Dedupe Strategy</CardTitle>
-              <CardDescription className="text-xs">
-                Strategia di deduplicazione
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="bg-background">
-              <div className="space-y-2">
-                <Label htmlFor="dedupe_strategy" className="text-sm">Strategy</Label>
-                <Input
-                  id="dedupe_strategy"
-                  value={settings.dedupe_strategy}
-                  onChange={(e) =>
-                    setSettings({
-                      ...settings,
-                      dedupe_strategy: e.target.value,
-                    })
-                  }
-                />
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Apartment Types e Client Settings sulla stessa riga */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* Apartment Types */}
             <Card className="bg-background border-2 border-custom-blue">
               <CardHeader className="bg-background py-3">
@@ -364,7 +337,35 @@ export default function SystemSettings() {
                 </div>
               </CardContent>
             </Card>
+          </div>
 
+          {/* Dedupe Strategy */}
+          <Card className="bg-background border-2 border-custom-blue">
+            <CardHeader className="bg-background py-3">
+              <CardTitle className="text-lg">Dedupe Strategy</CardTitle>
+              <CardDescription className="text-xs">
+                Strategia di deduplicazione
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="bg-background">
+              <div className="space-y-2">
+                <Label htmlFor="dedupe_strategy" className="text-sm">Strategy</Label>
+                <Input
+                  id="dedupe_strategy"
+                  value={settings.dedupe_strategy}
+                  onChange={(e) =>
+                    setSettings({
+                      ...settings,
+                      dedupe_strategy: e.target.value,
+                    })
+                  }
+                />
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Client Settings a tutta larghezza */}
+          <div className="grid grid-cols-1 gap-4">
             {/* Client Settings Shortcut */}
             <Card className="bg-background border-2 border-custom-blue hover:bg-custom-blue hover:text-white transition-colors cursor-pointer" onClick={() => setLocation("/client-settings")}>
               <CardHeader className="bg-background py-2">
