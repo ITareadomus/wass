@@ -169,27 +169,54 @@ export default function GenerateAssignments() {
   // Stato per tracciare se è in corso un'operazione di drag-and-drop
   const [isDragging, setIsDragging] = useState<boolean>(false);
 
-  // Stati per selezione multipla UNIFICATA cross-container
-  const [isMultiSelectMode, setIsMultiSelectMode] = useState<boolean>(false);
+  // Stati per selezione multipla INDIPENDENTE per container (ma selezione CROSS-CONTAINER)
+  const [multiSelectModes, setMultiSelectModes] = useState<{
+    early_out: boolean;
+    high_priority: boolean;
+    low_priority: boolean;
+  }>({
+    early_out: false,
+    high_priority: false,
+    low_priority: false
+  });
   const [selectedTasks, setSelectedTasks] = useState<Array<{taskId: string; order: number; container: string}>>([]);
 
-  // Helper function per ottenere lo stato unificato (tutti i container condividono lo stesso stato)
+  // Determina se ALMENO un container ha multi-select attivo
+  const isAnyMultiSelectActive = multiSelectModes.early_out || multiSelectModes.high_priority || multiSelectModes.low_priority;
+
+  // Helper function per ottenere lo stato specifico del container
   const getContainerMultiSelectState = (container: string) => {
+    const containerKey = container === 'early-out' ? 'early_out' : 
+                        container === 'high' ? 'high_priority' : 
+                        container === 'low' ? 'low_priority' : container as keyof typeof multiSelectModes;
+    
     return { 
-      isMultiSelectMode, 
+      isMultiSelectMode: multiSelectModes[containerKey] || false,
       selectedTasks,
-      setIsMultiSelectMode,
+      setIsMultiSelectMode: (value: boolean) => {
+        setMultiSelectModes(prev => ({ ...prev, [containerKey]: value }));
+        // Se disattivo, rimuovi selezioni di questo container
+        if (!value) {
+          setSelectedTasks(prev => prev.filter(t => t.container !== containerKey));
+        }
+      },
       setSelectedTasks
     };
   };
 
-  // Helper functions per multi-select context unificato
+  // Helper functions per multi-select context cross-container
   const toggleMode = useCallback(() => {
-    setIsMultiSelectMode(prev => !prev);
-    if (isMultiSelectMode) {
+    // Toggle globale (attiva/disattiva tutti i container)
+    const newState = !isAnyMultiSelectActive;
+    setMultiSelectModes({
+      early_out: newState,
+      high_priority: newState,
+      low_priority: newState
+    });
+    if (!newState) {
       setSelectedTasks([]);
     }
-  }, [isMultiSelectMode]);
+  }, [isAnyMultiSelectActive]);
 
   const toggleTask = useCallback((taskId: string, container: string) => {
     setSelectedTasks(prev => {
@@ -217,16 +244,16 @@ export default function GenerateAssignments() {
     return task?.order;
   }, [selectedTasks]);
 
-  // Memoizza il context value unificato
+  // Memoizza il context value cross-container
   const multiSelectContextValue: MultiSelectContextType = useMemo(() => ({
-    isMultiSelectMode,
+    isMultiSelectMode: isAnyMultiSelectActive,
     selectedTasks,
     toggleMode,
     toggleTask,
     clearSelection,
     isTaskSelected,
     getTaskOrder,
-  }), [isMultiSelectMode, selectedTasks, toggleMode, toggleTask, clearSelection, isTaskSelected, getTaskOrder]);
+  }), [isAnyMultiSelectActive, selectedTasks, toggleMode, toggleTask, clearSelection, isTaskSelected, getTaskOrder]);
 
   // Salva la data in localStorage ogni volta che cambia (formato locale senza timezone)
   useEffect(() => {
@@ -1326,7 +1353,7 @@ export default function GenerateAssignments() {
       // 🔸 BATCH MOVE: Se multi-select è attivo, ci sono task selezionate, E la task trascinata è tra quelle selezionate
       const isDraggedTaskSelected = selectedTasks.some(st => st.taskId === taskId);
 
-      if (isMultiSelectMode && selectedTasks.length > 0 && isDraggedTaskSelected && toCleanerId !== null && !toContainer) {
+      if (isAnyMultiSelectActive && selectedTasks.length > 0 && isDraggedTaskSelected && toCleanerId !== null && !toContainer) {
         console.log(`🔄 BATCH MOVE CROSS-CONTAINER: Spostamento di ${selectedTasks.length} task selezionate a cleaner ${toCleanerId}`);
 
         try {

@@ -49,9 +49,7 @@ export default function PriorityColumn({
   // Funzioni per gestire la selezione multipla cross-container
   const toggleMode = () => {
     setIsMultiSelectMode(!isMultiSelectMode);
-    if (isMultiSelectMode) {
-      setSelectedTasks([]);
-    }
+    // Non pulire più le selezioni globali, solo quelle del container
   };
   
   const toggleTask = (taskId: string) => {
@@ -265,9 +263,19 @@ export default function PriorityColumn({
           </h3>
           <div className="text-xs text-muted-foreground mt-1">
             {tasks.length} task
-            {isMultiSelectMode && selectedTasks.length > 0 && (
+            {isMultiSelectMode && (
               <span className="ml-2 text-sky-600 font-semibold">
-                ({selectedTasks.filter(st => tasks.some(t => String(t.id) === st.taskId)).length} in questo / {selectedTasks.length} totali)
+                ({selectedTasks.filter(st => tasks.some(t => String(t.id) === st.taskId)).length} selezionate)
+              </span>
+            )}
+            {!isMultiSelectMode && selectedTasks.filter(st => tasks.some(t => String(t.id) === st.taskId)).length > 0 && (
+              <span className="ml-2 text-amber-600 font-semibold">
+                ({selectedTasks.filter(st => tasks.some(t => String(t.id) === st.taskId)).length} da altri container)
+              </span>
+            )}
+            {selectedTasks.length > 0 && (
+              <span className="ml-2 text-green-600 font-semibold">
+                [TOT: {selectedTasks.length}]
               </span>
             )}
           </div>
