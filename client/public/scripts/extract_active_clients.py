@@ -9,15 +9,17 @@ import mysql.connector
 import os
 import sys
 
+
 def get_db_connection():
     """Crea connessione al database MySQL."""
     return mysql.connector.connect(
         host=os.getenv("DB_HOST", "139.59.132.41"),
         database=os.getenv("DB_NAME", "adamdb"),
         user=os.getenv("DB_USER", "admin"),
-        password=os.getenv("DB_PASSWORD", "ed329a875c6c4ebdf4e87e2bbe53a15771b5844ef6606dde"),
-        port=int(os.getenv("DB_PORT", "3306"))
-    )
+        password=os.getenv("DB_PASSWORD",
+                           "ed329a875c6c4ebdf4e87e2bbe53a15771b5844ef6606dde"),
+        port=int(os.getenv("DB_PORT", "3306")))
+
 
 def extract_active_clients():
     """Estrae tutti i clienti attivi che hanno strutture con housekeeping."""
@@ -33,7 +35,7 @@ def extract_active_clients():
                 c.alias AS alias
             FROM app_structures s
             JOIN app_customers c ON c.id = s.customer_id
-            WHERE s.customer_id IS NOT NULL
+            WHERE s.customer_id IS NOT NULL AND c.active = 1
               AND c.name IS NOT NULL
               AND s.deleted_at IS NULL
             ORDER BY c.name
@@ -45,6 +47,7 @@ def extract_active_clients():
     finally:
         cursor.close()
         conn.close()
+
 
 if __name__ == "__main__":
     try:
