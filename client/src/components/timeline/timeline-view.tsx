@@ -1387,20 +1387,20 @@ export default function TimelineView({
               {selectedCleaner && (
                 <>
                   {selectedCleaner.role === "Formatore" ? (
-                    <span className="px-3 py-1 rounded-md bg-orange-500 text-black border-2 border-black font-semibold text-sm">
+                    <span className="px-2 py-0.5 rounded border font-medium text-sm bg-orange-500/30 text-orange-800 dark:bg-orange-500/40 dark:text-orange-200 border-orange-600 dark:border-orange-400">
                       Formatore
                     </span>
                   ) : selectedCleaner.role === "Premium" ? (
-                    <span className="px-3 py-1 rounded-md bg-yellow-400 text-black border-2 border-black font-semibold text-sm">
+                    <span className="px-2 py-0.5 rounded border font-medium text-sm bg-yellow-500/30 text-yellow-800 dark:bg-yellow-500/40 dark:text-yellow-200 border-yellow-600 dark:border-yellow-400">
                       Premium
                     </span>
                   ) : (
-                    <span className="px-3 py-1 rounded-md bg-green-500 text-white border-2 border-black font-semibold text-sm">
+                    <span className="px-2 py-0.5 rounded border font-medium text-sm bg-green-500/30 text-green-800 dark:bg-green-500/40 dark:text-green-200 border-green-600 dark:border-green-400">
                       Standard
                     </span>
                   )}
                   {selectedCleaner.can_do_straordinaria && (
-                    <span className="px-3 py-1 rounded-md bg-red-500 text-black border-2 border-black font-semibold text-sm">
+                    <span className="px-2 py-0.5 rounded border font-medium text-sm bg-red-500/20 text-red-700 dark:text-red-300 border-red-500">
                       Straordinario
                     </span>
                   )}
