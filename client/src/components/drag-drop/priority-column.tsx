@@ -23,6 +23,7 @@ interface PriorityColumnProps {
   assignAction?: () => Promise<void>;
   isDragDisabled?: boolean;
   containerMultiSelectState?: ContainerMultiSelectState;
+  isAssignmentCompleted?: boolean;
 }
 
 export default function PriorityColumn({
@@ -34,30 +35,31 @@ export default function PriorityColumn({
   assignAction,
   isDragDisabled = false,
   containerMultiSelectState,
+  isAssignmentCompleted = false
 }: PriorityColumnProps) {
   const [isAssigning, setIsAssigning] = useState(false);
   const [isDateInPast, setIsDateInPast] = useState(false);
   const { toast } = useToast();
   const [hasAssigned, setHasAssigned] = useState(false);
-  
+
   // Usa lo stato passato dal parent se disponibile, altrimenti fallback
   const isMultiSelectMode = containerMultiSelectState?.isMultiSelectMode ?? false;
   const selectedTasks = containerMultiSelectState?.selectedTasks ?? [];
   const setIsMultiSelectMode = containerMultiSelectState?.setIsMultiSelectMode ?? (() => {});
   const setSelectedTasks = containerMultiSelectState?.setSelectedTasks ?? (() => {});
-  
+
   // Funzioni per gestire la selezione multipla cross-container
   const toggleMode = () => {
     setIsMultiSelectMode(!isMultiSelectMode);
     // Non pulire più le selezioni globali, solo quelle del container
   };
-  
+
   const toggleTask = (taskId: string) => {
     // Converti droppableId in container key
-    const containerKey = droppableId === 'early-out' ? 'early_out' : 
-                        droppableId === 'high' ? 'high_priority' : 
+    const containerKey = droppableId === 'early-out' ? 'early_out' :
+                        droppableId === 'high' ? 'high_priority' :
                         droppableId === 'low' ? 'low_priority' : droppableId;
-    
+
     setSelectedTasks(prev => {
       const existing = prev.find(t => t.taskId === taskId);
       if (existing) {
@@ -68,16 +70,16 @@ export default function PriorityColumn({
       }
     });
   };
-  
+
   const isTaskSelected = (taskId: string) => {
     return selectedTasks.some(t => t.taskId === taskId);
   };
-  
+
   const getTaskOrder = (taskId: string) => {
     const task = selectedTasks.find(t => t.taskId === taskId);
     return task?.order;
   };
-  
+
   // Context mock per passare ai TaskCard
   const multiSelectCtx = useMemo(() => ({
     isMultiSelectMode,
@@ -88,7 +90,7 @@ export default function PriorityColumn({
     isTaskSelected,
     getTaskOrder,
   }), [isMultiSelectMode, selectedTasks]);
-  
+
   console.log('[DEBUG PriorityColumn]', priority, 'isMultiSelectMode:', isMultiSelectMode, 'selectedTasks:', selectedTasks.length);
 
   // Verifica se la data selezionata è nel passato
@@ -296,10 +298,10 @@ export default function PriorityColumn({
           <Button
             variant="outline"
             size="sm"
-            onClick={handleAssign} // Utilizza handleAssign
-            disabled={isAssigning || tasks.length === 0 || isDateInPast}
+            onClick={handleAssignContainer} // Utilizza handleAssignContainer
+            disabled={isAssigning || tasks.length === 0 || isDateInPast || isAssignmentCompleted}
             className="text-xs px-2 py-1 h-7 border-2 border-custom-blue"
-            title={isDateInPast ? "Non puoi assegnare task per date passate" : ""}
+            title={isDateInPast ? "Non puoi assegnare task per date passate" : isAssignmentCompleted ? "Assegnazioni completate per questa data" : ""}
             data-testid="button-assign"
           >
             {isAssigning ? (
@@ -332,7 +334,7 @@ export default function PriorityColumn({
               const isDuplicate = hasAssigned && tasks.some(
                 t => t.name === task.name && t.id !== task.id
               );
-              
+
               return (
                 <TaskCard
                   key={task.id}
