@@ -337,7 +337,7 @@ export default function SystemSettings() {
                     <Button
                       onClick={() => setLocation("/client-settings")}
                       variant="outline"
-                      className="w-full justify-start h-auto py-2 border-2 hover:bg-custom-blue hover:text-white transition-colors"
+                      className="w-full justify-start h-auto py-2 bg-background border-2 border-custom-blue text-black dark:text-white hover:opacity-80 transition-colors"
                     >
                       <Settings className="w-4 h-4 mr-2 flex-shrink-0" />
                       <div className="text-left">
@@ -678,7 +678,7 @@ export default function SystemSettings() {
           <Button
             onClick={handleSave}
             disabled={isSaving}
-            className="w-full border-2 border-custom-blue hover:opacity-80"
+            className="w-full bg-background border-2 border-custom-blue text-black dark:text-white hover:opacity-80"
           >
             <Save className="w-4 h-4 mr-2" />
             {isSaving ? "Salvataggio..." : "Salva Impostazioni"}
