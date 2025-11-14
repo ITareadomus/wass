@@ -190,8 +190,8 @@ export default function ClientSettings() {
                     <TableHead className="w-[100px] text-center">Client ID</TableHead>
                     <TableHead className="w-[120px] text-center">Alias</TableHead>
                     <TableHead>Nome Cliente</TableHead>
-                    <TableHead className="w-[150px]">Checkin</TableHead>
-                    <TableHead className="w-[150px]">Checkout</TableHead>
+                    <TableHead className="w-[150px] text-left">Checkin</TableHead>
+                    <TableHead className="w-[150px] text-left">Checkout</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
