@@ -66,9 +66,9 @@ export default function ClientSettings() {
       const clientsData = await clientsResponse.json();
       setClients(clientsData.clients);
 
-      // Carica client_timewindows.json se esiste
+      // Carica client_windows.json se esiste
       try {
-        const windowsResponse = await fetch(`/data/input/client_timewindows.json?t=${Date.now()}`, {
+        const windowsResponse = await fetch(`/data/input/client_windows.json?t=${Date.now()}`, {
           cache: 'no-store',
           headers: { 'Cache-Control': 'no-cache' }
         });
@@ -87,7 +87,7 @@ export default function ClientSettings() {
           setWindows(windowsMap);
         }
       } catch (err) {
-        console.log("client_timewindows.json non trovato, usando valori vuoti");
+        console.log("client_windows.json non trovato, usando valori vuoti");
       }
     } catch (error) {
       toast({
@@ -134,7 +134,7 @@ export default function ClientSettings() {
         }
       };
 
-      const response = await fetch("/api/save-client-timewindows", {
+      const response = await fetch("/api/save-client-windows", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
@@ -143,7 +143,7 @@ export default function ClientSettings() {
       if (response.ok) {
         toast({
           title: "Salvato",
-          description: "Finestre temporali salvate con successo",
+          description: "Client windows salvate con successo",
         });
       } else {
         throw new Error();
@@ -151,7 +151,7 @@ export default function ClientSettings() {
     } catch (error) {
       toast({
         title: "Errore",
-        description: "Impossibile salvare le finestre temporali",
+        description: "Impossibile salvare le client windows",
         variant: "destructive",
       });
     } finally {
