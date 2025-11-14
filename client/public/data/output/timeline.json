@@ -1,13 +1,62 @@
 {
   "metadata": {
-    "last_updated": "2025-11-14T18:11:03.402Z",
-    "date": "2025-11-14",
-    "created_by": "Admin"
+    "last_updated": "2025-11-14T18:05:25.923Z",
+    "date": "2025-11-15",
+    "created_by": "Admin",
+    "modified_by": [
+      "Admin"
+    ]
   },
-  "cleaners_assignments": [],
+  "cleaners_assignments": [
+    {
+      "cleaner": {
+        "id": 132,
+        "name": "JOHOISER ERNESTO",
+        "lastname": "LOPEZ GIRON",
+        "role": "Premium",
+        "premium": false
+      },
+      "tasks": [
+        {
+          "task_id": 218752,
+          "logistic_code": 1650,
+          "client_id": null,
+          "premium": false,
+          "address": "VIA VIGNOLA 4",
+          "lat": "45.449398",
+          "lng": "9.196514",
+          "cleaning_time": 120,
+          "checkin_date": "2025-11-15",
+          "checkout_date": "2025-11-15",
+          "checkin_time": null,
+          "checkout_time": null,
+          "pax_in": 4,
+          "pax_out": 4,
+          "small_equipment": false,
+          "operation_id": 2,
+          "confirmed_operation": false,
+          "straordinaria": false,
+          "type_apt": "C",
+          "alias": "HCC",
+          "customer_name": "HACCA SRL",
+          "reasons": [
+            "manually_moved_to_timeline"
+          ],
+          "priority": "early_out",
+          "start_time": "10:00",
+          "end_time": "12:00",
+          "followup": false,
+          "sequence": 1,
+          "travel_time": 0,
+          "modified_by": "Admin"
+        }
+      ]
+    }
+  ],
   "meta": {
-    "total_cleaners": 0,
+    "total_cleaners": 1,
     "used_cleaners": 0,
-    "assigned_tasks": 0
+    "assigned_tasks": 0,
+    "total_tasks": 1
   }
 }

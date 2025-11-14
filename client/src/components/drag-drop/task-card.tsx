@@ -231,17 +231,12 @@ export default function TaskCard({
     loadOperationNames();
   }, []);
 
-  // Reset editingField e filtro mappa quando il modal si chiude
+  // Reset editingField SOLO quando il modal si chiude
   useEffect(() => {
     if (!isModalOpen) {
       setEditingField(null);
-      // Rimuovi l'evidenziazione del task quando chiudi il modale
-      // Usa displayTask invece di task per gestire la navigazione
-      if ((window as any).mapFilteredTaskId === displayTask.name) {
-        (window as any).mapFilteredTaskId = null;
-      }
     }
-  }, [isModalOpen, displayTask.name]);
+  }, [isModalOpen]);
 
   // Inizializza i campi quando il modale si apre o quando displayTask cambia
   // MA NON se l'utente sta già modificando un campo
