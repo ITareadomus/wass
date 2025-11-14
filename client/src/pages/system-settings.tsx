@@ -138,17 +138,19 @@ export default function SystemSettings() {
         </div>
 
         <div className="space-y-4">
-          {/* Early-Out, High-Priority, Low-Priority e Apartment Types sulla stessa riga */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            {/* Early-Out */}
-            <Card className="bg-background border-2 border-custom-blue">
-              <CardHeader className="bg-background py-3">
-                <CardTitle className="text-lg">Early-Out</CardTitle>
-                <CardDescription className="text-xs">
-                  Configurazione per le task Early-Out
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="bg-background space-y-3">
+          {/* Early-Out, High-Priority e Low-Priority in un'unica card full-width */}
+          <Card className="bg-background border-2 border-custom-blue">
+            <CardHeader className="bg-background py-3">
+              <CardTitle className="text-lg">Priority Settings</CardTitle>
+              <CardDescription className="text-xs">
+                Configurazione per le task Early-Out, High-Priority e Low-Priority
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="bg-background">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                {/* Early-Out */}
+                <div className="space-y-3">
+                  <h3 className="font-semibold text-sm border-b pb-2">Early-Out</h3>
                 <div className="space-y-2">
                   <Label htmlFor="eo_start_time" className="text-sm">Start Time</Label>
                   <Input
@@ -202,18 +204,10 @@ export default function SystemSettings() {
                     }
                   />
                 </div>
-              </CardContent>
-            </Card>
 
-            {/* High-Priority */}
-            <Card className="bg-background border-2 border-custom-blue">
-              <CardHeader className="bg-background py-3">
-                <CardTitle className="text-lg">High-Priority</CardTitle>
-                <CardDescription className="text-xs">
-                  Configurazione per le task High-Priority
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="bg-background space-y-3">
+                {/* High-Priority */}
+                <div className="space-y-3">
+                  <h3 className="font-semibold text-sm border-b pb-2">High-Priority</h3>
                 <div className="space-y-2">
                   <Label htmlFor="hp_start_time" className="text-sm">Start Time</Label>
                   <Input
@@ -267,18 +261,10 @@ export default function SystemSettings() {
                     }
                   />
                 </div>
-              </CardContent>
-            </Card>
 
-            {/* Low-Priority */}
-            <Card className="bg-background border-2 border-custom-blue">
-              <CardHeader className="bg-background py-3">
-                <CardTitle className="text-lg">Low-Priority</CardTitle>
-                <CardDescription className="text-xs">
-                  Configurazione per le task Low-Priority (non valorizzato)
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="bg-background space-y-3">
+                {/* Low-Priority */}
+                <div className="space-y-3">
+                  <h3 className="font-semibold text-sm border-b pb-2">Low-Priority</h3>
                 <div className="space-y-2">
                   <Label htmlFor="lp_start_time" className="text-sm text-muted-foreground">Start Time</Label>
                   <Input
@@ -305,11 +291,12 @@ export default function SystemSettings() {
                     placeholder="Non valorizzato"
                   />
                 </div>
-              </CardContent>
-            </Card>
+              </div>
+            </CardContent>
+          </Card>
 
-            {/* Apartment Types */}
-            <Card className="bg-background border-2 border-custom-blue">
+          {/* Apartment Types */}
+          <Card className="bg-background border-2 border-custom-blue">
               <CardHeader className="bg-background py-3">
                 <CardTitle className="text-lg">Apartment Types</CardTitle>
                 <CardDescription className="text-xs">
@@ -376,7 +363,6 @@ export default function SystemSettings() {
                 </div>
               </CardContent>
             </Card>
-          </div>
 
           {/* Dedupe Strategy */}
           <Card className="bg-background border-2 border-custom-blue">
