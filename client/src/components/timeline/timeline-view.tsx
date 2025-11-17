@@ -521,7 +521,7 @@ export default function TimelineView({
 
       // Filtra solo i cleaners attivi e non già selezionati
       const selectedCleanerIds = new Set(cleaners.map(c => c.id));
-      const available = dateCleaners.filter((c: any) => 
+      const available = dateCleaners.filter((c: any) =>
         c.active === true && !selectedCleanerIds.has(c.id)
       );
 
@@ -1171,6 +1171,12 @@ export default function TimelineView({
                                 // Usa task.id o task.task_id come chiave univoca (non logistic_code che può essere duplicato)
                                 const uniqueKey = taskObj.task_id || taskObj.id;
 
+                                // Verifica compatibilità task-cleaner
+                                const isIncompatible = validationRules && cleaner?.role
+                                  ? !canCleanerHandleTaskSync(cleaner.role, task, validationRules)
+                                  : false;
+
+
                                 return (
                                   <>
                                     {/* Spazio vuoto per prima task con start_time posticipato */}
@@ -1210,11 +1216,7 @@ export default function TimelineView({
                                       allTasks={cleanerTasks}
                                       isDragDisabled={isReadOnly}
                                       isReadOnly={isReadOnly}
-                                      isIncompatible={validationRules ? !canCleanerHandleTaskSync(
-                                        cleaner.role,
-                                        task.straordinaria ? 'straordinario_apt' : (task.is_premium ? 'premium_apt' : 'standard_apt'),
-                                        validationRules
-                                      ) : false}
+                                      isIncompatible={isIncompatible}
                                     />
                                   </>
                                 );
@@ -1385,14 +1387,14 @@ export default function TimelineView({
             </DialogDescription>
           </DialogHeader>
           <div className="flex justify-end gap-2 mt-4">
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               onClick={() => setConfirmUnavailableDialog({ open: false, cleanerId: null })}
               className="border-2 border-custom-blue"
             >
               Annulla
             </Button>
-            <Button 
+            <Button
               onClick={handleConfirmAddUnavailableCleaner}
               className="bg-custom-blue hover:bg-custom-blue/90 text-white"
             >
