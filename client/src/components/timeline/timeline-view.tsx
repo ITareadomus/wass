@@ -1398,7 +1398,7 @@ export default function TimelineView({
                 return cleaner ? (
                   <>
                     <p className="font-semibold text-foreground">
-                      Il cleaner <span className="text-white">{cleaner.name} {cleaner.lastname}</span> ({cleaner.role}) ha delle task non compatibili con il suo ruolo:
+                      Il cleaner <span className="text-black dark:text-white">{cleaner.name} {cleaner.lastname}</span> ({cleaner.role}) ha delle task non compatibili con il suo ruolo:
                     </p>
                     <ul className="list-disc list-inside space-y-2 pl-2">
                       {incompatibleDialog.tasks.map((task, idx) => (
