@@ -799,9 +799,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         priority: taskForTimeline.priority
       });
 
-      // Inserisci in posizione dropIndex
-      const targetIndex = dropIndex !== undefined
-        ? Math.max(0, Math.min(dropIndex, cleanerEntry.tasks.length))
+      // Inserisci in posizione insertAt (il parametro effettivo che arriva dal frontend)
+      const targetIndex = insertAt !== undefined
+        ? Math.max(0, Math.min(insertAt, cleanerEntry.tasks.length))
         : cleanerEntry.tasks.length;
 
       cleanerEntry.tasks.splice(targetIndex, 0, taskForTimeline);
@@ -3058,6 +3058,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         toCleanerId,
         sourceIndex,
         destIndex,
+        insertAt,
         fromContainer,
       } = req.body as {
         taskId?: string | number;
@@ -3066,6 +3067,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         toCleanerId: number;
         sourceIndex?: number;
         destIndex?: number;
+        insertAt?: number;
         fromContainer?: 'early_out' | 'high_priority' | 'low_priority';
       };
 
