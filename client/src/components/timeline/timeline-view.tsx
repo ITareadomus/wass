@@ -1,5 +1,5 @@
 import { Personnel, TaskType as Task } from "@shared/schema";
-import { Calendar as CalendarIcon, RotateCcw, Users, RefreshCw, UserPlus, Maximize2, Minimize2, Check, CheckCircle } from "lucide-react";
+import { Calendar as CalendarIcon, RotateCcw, Users, RefreshCw, UserPlus, Maximize2, Minimize2, Check, CheckCircle, Save, Pencil } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import * as React from "react";
 import { Droppable, Draggable } from "react-beautiful-dnd";
@@ -81,6 +81,7 @@ export default function TimelineView({
   const [, setLocation] = useLocation();
   const [editingAlias, setEditingAlias] = useState<string>("");
   const [isSavingAlias, setIsSavingAlias] = useState(false);
+  const [editingField, setEditingField] = useState<'alias' | null>(null);
 
   // Stato per le regole di validazione task-cleaner
   const [validationRules, setValidationRules] = useState<any>(null);
@@ -683,8 +684,8 @@ export default function TimelineView({
         variant: "success",
       });
 
-      // Chiudi il dialog di modifica alias
-      setIsModalOpen(false); // Chiude il dialog principale
+      // Chiudi il campo di modifica
+      setEditingField(null);
 
     } catch (error: any) {
       console.error("Errore nel salvataggio dell'alias:", error);
@@ -1717,24 +1718,34 @@ export default function TimelineView({
                 </div>
                 {/* Alias Field */}
                 <div className="col-span-2">
-                  <p className="text-sm font-semibold text-muted-foreground mb-1">Alias</p>
-                  <div className="flex items-center gap-2">
-                    <Input
-                      value={editingAlias}
-                      onChange={(e) => setEditingAlias(e.target.value)}
-                      placeholder="Inserisci alias"
-                      className="flex-1"
-                      disabled={isSavingAlias}
-                    />
-                    <Button
-                      onClick={handleSaveAlias}
-                      disabled={isSavingAlias || editingAlias === (cleanersAliases[selectedCleaner.id]?.alias || "")}
-                      className="flex-shrink-0"
-                      data-testid="save-alias-button"
+                  <p className="text-sm font-semibold text-muted-foreground mb-1 flex items-center gap-1">
+                    Alias
+                    {!isReadOnly && <Pencil className="w-3 h-3 text-muted-foreground/60" />}
+                  </p>
+                  {editingField === 'alias' && !isReadOnly ? (
+                    <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                      <Input
+                        value={editingAlias}
+                        onChange={(e) => setEditingAlias(e.target.value)}
+                        onFocus={(e) => e.stopPropagation()}
+                        onBlur={(e) => e.stopPropagation()}
+                        onClick={(e) => e.stopPropagation()}
+                        placeholder="Inserisci alias"
+                        className="text-sm flex-1"
+                        autoFocus
+                      />
+                    </div>
+                  ) : (
+                    <p
+                      className={`text-sm p-1 rounded ${!isReadOnly ? 'cursor-pointer hover:bg-muted/50' : ''}`}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (!isReadOnly) setEditingField('alias');
+                      }}
                     >
-                      {isSavingAlias ? "Salvataggio..." : "Salva Alias"}
-                    </Button>
-                  </div>
+                      {cleanersAliases[selectedCleaner.id]?.alias || `${selectedCleaner.name} ${selectedCleaner.lastname}`}
+                    </p>
+                  )}
                 </div>
                 <div>
                   <p className="text-sm font-semibold text-muted-foreground">Giorni lavorati</p>
@@ -1753,6 +1764,31 @@ export default function TimelineView({
                   <p className="text-sm">{selectedCleaner.contract_type}</p>
                 </div>
               </div>
+
+              {/* Pulsante Salva Modifiche Alias */}
+              {editingField === 'alias' && !isReadOnly && (
+                <div className="pt-4 border-t mt-4 flex gap-2">
+                  <Button
+                    onClick={handleSaveAlias}
+                    disabled={isSavingAlias}
+                    className="flex-1"
+                    data-testid="save-alias-button"
+                  >
+                    <Save className="w-4 h-4 mr-2" />
+                    {isSavingAlias ? "Salvataggio..." : "Salva Modifiche"}
+                  </Button>
+                  <Button
+                    onClick={() => {
+                      setEditingField(null);
+                      // Ripristina il valore originale
+                      setEditingAlias(cleanersAliases[selectedCleaner.id]?.alias || "");
+                    }}
+                    variant="outline"
+                  >
+                    Annulla
+                  </Button>
+                </div>
+              )}
 
               {/* Sezione Scambia Cleaner */}
               <div className="border-t pt-4 mt-4">
