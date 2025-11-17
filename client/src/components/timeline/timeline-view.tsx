@@ -1565,9 +1565,9 @@ export default function TimelineView({
               Annulla
             </Button>
             <Button
+              variant="outline"
               onClick={handleSaveAlias}
               disabled={isSavingAlias}
-              className="bg-custom-blue hover:bg-custom-blue/90"
             >
               {isSavingAlias ? (
                 <>
@@ -1787,21 +1787,20 @@ export default function TimelineView({
                   <p className="text-sm font-semibold text-muted-foreground">Cognome</p>
                   <p className="text-sm">{selectedCleaner.lastname.toUpperCase()}</p>
                 </div>
-                <div>
-                  <p className="text-sm font-semibold text-muted-foreground">Alias</p>
-                  <p className="text-sm">{cleanersAliases[selectedCleaner.id]?.alias || `${selectedCleaner.name} ${selectedCleaner.lastname}`}</p>
-                </div>
-                <div className="flex items-end">
-                  <Button
-                    onClick={() => handleOpenAliasDialog(selectedCleaner)}
-                    disabled={isReadOnly}
-                    variant="outline"
-                    size="sm"
-                    className="w-full"
+                <div className="col-span-2">
+                  <p className="text-sm font-semibold text-muted-foreground mb-1 flex items-center gap-1">
+                    Alias
+                    {!isReadOnly && <Pencil className="w-3 h-3 text-muted-foreground/60" />}
+                  </p>
+                  <p
+                    className={`text-sm p-2 rounded ${!isReadOnly ? 'cursor-pointer hover:bg-muted/50 border border-transparent hover:border-border' : ''}`}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (!isReadOnly) handleOpenAliasDialog(selectedCleaner);
+                    }}
                   >
-                    <Pencil className="w-4 h-4 mr-2" />
-                    Modifica Alias
-                  </Button>
+                    {cleanersAliases[selectedCleaner.id]?.alias || `${selectedCleaner.name} ${selectedCleaner.lastname}`}
+                  </p>
                 </div>
                 <div>
                   <p className="text-sm font-semibold text-muted-foreground">Giorni lavorati</p>
