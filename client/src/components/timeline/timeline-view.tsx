@@ -1021,6 +1021,28 @@ export default function TimelineView({
 
                 const isRemoved = removedCleanerIds.has(cleaner.id);
 
+                // Verifica se ci sono task incompatibili per questo cleaner
+                const hasIncompatibleTasks = validationRules && cleaner?.role
+                  ? cleanerTasks.some(task => !canCleanerHandleTaskSync(cleaner.role, task, validationRules))
+                  : false;
+
+                // Mostra toast solo una volta quando viene rilevata incompatibilità
+                React.useEffect(() => {
+                  if (hasIncompatibleTasks && !isRemoved) {
+                    const incompatibleTasksList = cleanerTasks
+                      .filter(task => !canCleanerHandleTaskSync(cleaner.role, task, validationRules))
+                      .map(task => task.name)
+                      .join(', ');
+
+                    toast({
+                      title: "⚠️ Assegnazione incompatibile",
+                      description: `${cleaner.name} ${cleaner.lastname} (${cleaner.role}) ha task incompatibili: ${incompatibleTasksList}`,
+                      variant: "default",
+                      className: "bg-yellow-100 dark:bg-yellow-900/50 border-yellow-500 text-yellow-900 dark:text-yellow-100",
+                    });
+                  }
+                }, [hasIncompatibleTasks]);
+
                 return (
                   <div key={cleaner.id} className="flex mb-0.5">
                     {/* Info cleaner */}
@@ -1032,13 +1054,16 @@ export default function TimelineView({
                           ? '#9CA3AF' // Grigio per cleaners rimossi
                           : filteredCleanerId === cleaner.id ? `${color.bg}` : color.bg,
                         color: isRemoved ? '#1F2937' : color.text,
-                        boxShadow: filteredCleanerId === cleaner.id
-                          ? '0 0 0 3px #3B82F6, 0 0 20px 5px rgba(59, 130, 246, 0.5)'
-                          : 'none',
-                        transform: filteredCleanerId === cleaner.id ? 'scale(1.05)' : 'none',
-                        zIndex: filteredCleanerId === cleaner.id ? 10 : 'auto',
+                        boxShadow: hasIncompatibleTasks && !isRemoved
+                          ? '0 0 0 3px #EAB308, 0 0 20px 5px rgba(234, 179, 8, 0.6), inset 0 0 15px rgba(234, 179, 8, 0.3)'
+                          : filteredCleanerId === cleaner.id
+                            ? '0 0 0 3px #3B82F6, 0 0 20px 5px rgba(59, 130, 246, 0.5)'
+                            : 'none',
+                        transform: filteredCleanerId === cleaner.id || hasIncompatibleTasks ? 'scale(1.05)' : 'none',
+                        zIndex: filteredCleanerId === cleaner.id || hasIncompatibleTasks ? 10 : 'auto',
                         userSelect: 'none',
-                        opacity: isRemoved ? 0.7 : 1
+                        opacity: isRemoved ? 0.7 : 1,
+                        animation: hasIncompatibleTasks && !isRemoved ? 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite' : 'none'
                       }}
                       onClick={(e) => {
                         e.preventDefault();
@@ -1052,7 +1077,7 @@ export default function TimelineView({
                           handleCleanerClick(cleaner, e);
                         }
                       }}
-                      title={isRemoved ? "Cleaner rimosso - Click per sostituire" : "Click: dettagli | Doppio click: filtra mappa"}
+                      title={isRemoved ? "Cleaner rimosso - Click per sostituire" : hasIncompatibleTasks ? "⚠️ Cleaner con task incompatibili" : "Click: dettagli | Doppio click: filtra mappa"}
                     >
                       <div className="w-full flex items-center gap-1">
                         <div className="break-words font-bold text-[13px] flex-1">
