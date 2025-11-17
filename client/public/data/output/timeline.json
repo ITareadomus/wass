@@ -1,6 +1,6 @@
 {
   "metadata": {
-    "last_updated": "2025-11-17T14:29:29.742Z",
+    "last_updated": "2025-11-17T14:33:40.127Z",
     "date": "2025-11-17",
     "created_by": "unknown",
     "modified_by": [
@@ -49,6 +49,39 @@
           "sequence": 1,
           "travel_time": 0,
           "modified_by": "Admin"
+        },
+        {
+          "task_id": 218988,
+          "logistic_code": 1687,
+          "client_id": null,
+          "premium": false,
+          "address": "VIALE EMIO CALDARA 39",
+          "lat": "45.4560369",
+          "lng": "9.2030879",
+          "cleaning_time": 90,
+          "checkin_date": "2025-11-18",
+          "checkout_date": "2025-11-17",
+          "checkin_time": "11:00",
+          "checkout_time": "11:00",
+          "pax_in": 2,
+          "pax_out": 4,
+          "small_equipment": false,
+          "operation_id": 2,
+          "confirmed_operation": true,
+          "straordinaria": false,
+          "type_apt": "B",
+          "alias": "DRST",
+          "customer_name": "DREAM SUITES",
+          "reasons": [
+            "manually_moved_to_timeline"
+          ],
+          "priority": "low_priority",
+          "start_time": "12:57",
+          "end_time": "14:27",
+          "followup": true,
+          "sequence": 2,
+          "travel_time": 27,
+          "modified_by": "Admin"
         }
       ]
     }
@@ -57,6 +90,6 @@
     "total_cleaners": 1,
     "used_cleaners": 0,
     "assigned_tasks": 0,
-    "total_tasks": 1
+    "total_tasks": 2
   }
 }
