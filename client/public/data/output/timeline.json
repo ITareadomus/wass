@@ -1,6 +1,6 @@
 {
   "metadata": {
-    "last_updated": "2025-11-17T13:03:41.538Z",
+    "last_updated": "2025-11-17T13:32:46.232Z",
     "date": "2025-11-17",
     "created_by": "Admin",
     "modified_by": [
@@ -82,6 +82,39 @@
           "sequence": 2,
           "travel_time": 34,
           "modified_by": "Admin"
+        },
+        {
+          "task_id": 218888,
+          "logistic_code": 751,
+          "client_id": null,
+          "premium": false,
+          "address": "Via L. Cagnola, 12",
+          "lat": "45.4776",
+          "lng": "9.17287",
+          "cleaning_time": 60,
+          "checkin_date": "2025-11-17",
+          "checkout_date": "2025-11-17",
+          "checkin_time": "14:00",
+          "checkout_time": "11:00",
+          "pax_in": 2,
+          "pax_out": 2,
+          "small_equipment": false,
+          "operation_id": 2,
+          "confirmed_operation": true,
+          "straordinaria": false,
+          "type_apt": "A",
+          "alias": "RLST",
+          "customer_name": "RELSTAY - FERRARA GIULIA",
+          "reasons": [
+            "manually_moved_to_timeline"
+          ],
+          "priority": "high_priority",
+          "start_time": "13:00",
+          "end_time": "14:00",
+          "followup": true,
+          "sequence": 3,
+          "travel_time": 26,
+          "modified_by": "Admin"
         }
       ]
     },
@@ -125,39 +158,6 @@
           "followup": false,
           "sequence": 1,
           "travel_time": 0,
-          "modified_by": "Admin"
-        },
-        {
-          "task_id": 218888,
-          "logistic_code": 751,
-          "client_id": null,
-          "premium": false,
-          "address": "Via L. Cagnola, 12",
-          "lat": "45.4776",
-          "lng": "9.17287",
-          "cleaning_time": 60,
-          "checkin_date": "2025-11-17",
-          "checkout_date": "2025-11-17",
-          "checkin_time": "14:00",
-          "checkout_time": "11:00",
-          "pax_in": 2,
-          "pax_out": 2,
-          "small_equipment": false,
-          "operation_id": 2,
-          "confirmed_operation": true,
-          "straordinaria": false,
-          "type_apt": "A",
-          "alias": "RLST",
-          "customer_name": "RELSTAY - FERRARA GIULIA",
-          "reasons": [
-            "manually_moved_to_timeline"
-          ],
-          "priority": "high_priority",
-          "start_time": "12:01",
-          "end_time": "13:01",
-          "followup": true,
-          "sequence": 2,
-          "travel_time": 31,
           "modified_by": "Admin"
         }
       ]
