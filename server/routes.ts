@@ -565,7 +565,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Endpoint per salvare un'assegnazione nella timeline
   app.post("/api/save-timeline-assignment", async (req, res) => {
     try {
-      const { taskId, cleanerId, logisticCode, date, dropIndex, taskData, priority, modified_by } = req.body;
+      const { taskId, cleanerId, logisticCode, date, dropIndex, taskData, priority, modified_by, insertAt } = req.body;
       const workDate = date || format(new Date(), 'yyyy-MM-dd');
       const currentUsername = modified_by || getCurrentUsername(req);
       const timelinePath = path.join(process.cwd(), 'client/public/data/output/timeline.json');
@@ -1325,20 +1325,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Rigenera containers.json per la data caricata
       // CRITICAL: Aggiorna timeline.json con la data corretta DOPO create_containers
       console.log(`🔄 Rigenerazione containers.json per data ${workDate}...`);
-      const containersResult = await new Promise<string>((resolve, reject) => {
-        exec(
-          `python3 client/public/scripts/create_containers.py ${workDate}`,
-          (error, stdout, stderr) => {
-            if (error) {
-              console.error("Errore create_containers:", stderr);
-              reject(new Error(stderr || error.message));
-            } else {
-              resolve(stdout);
+      const createContainersPath = path.join(process.cwd(), 'client/public/scripts/create_containers.py');
+      const createContainersResult = await new Promise<string>((resolve, reject) => {
+        // Usa --skip-extract per evitare di sovrascrivere selected_cleaners.json
+        exec(`python3 "${createContainersPath}" --date "${workDate}" --skip-extract`, (error, stdout, stderr) => {
+          if (error) {
+            console.error(`❌ Errore create_containers: ${error.message}`);
+            reject(new Error(stderr || error.message));
+          } else {
+            if (stderr) {
+              console.error(`create_containers stderr: ${stderr}`);
             }
+            console.log(`create_containers output: ${stdout}`);
+            resolve(stdout);
           }
-        );
+        });
       });
-      console.log("create_containers output:", containersResult);
+      console.log(`✅ Containers rigenerati preservando i cleaners salvati (${selectedCleanersBackup?.cleaners?.length || 0} cleaners)`);
+
 
       // CRITICAL: Ripristina selected_cleaners.json DOPO create_containers
       // perché lo script Python potrebbe averlo sovrascritto
@@ -2084,7 +2088,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Carica i dati del cleaner da cleaners.json per ottenere nome e cognome
       const cleanersPath = path.join(process.cwd(), 'client/public/data/cleaners/cleaners.json');
       const cleanersData = JSON.parse(await fs.readFile(cleanersPath, 'utf8'));
-      
+
       // Cerca il cleaner in tutte le date
       let cleanerInfo: any = null;
       for (const date of Object.keys(cleanersData.dates || {})) {

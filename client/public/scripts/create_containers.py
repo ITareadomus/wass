@@ -4,6 +4,8 @@ import mysql.connector
 import sys
 from datetime import datetime, date, timedelta
 from pathlib import Path
+import argparse
+import subprocess
 
 # ---------- Config ----------
 BASE_DIR = Path(__file__).parent.parent / "data"
@@ -11,6 +13,11 @@ INPUT_DIR = BASE_DIR / "input"
 OUTPUT_DIR = BASE_DIR / "output"
 SETTINGS_PATH = INPUT_DIR / "settings.json"
 OUTPUT_CONTAINERS = OUTPUT_DIR / "containers.json"
+
+# Script paths
+EXTRACT_CLEANERS_SCRIPT = Path(__file__).parent / "extract_cleaners_optimized.py"
+EXTRACT_ACTIVE_CLIENTS_SCRIPT = Path(__file__).parent / "extract_active_clients.py"
+
 
 # Crea le directory se non esistono
 INPUT_DIR.mkdir(parents=True, exist_ok=True)
@@ -70,30 +77,30 @@ def get_operation_names(operation_ids):
     """Recupera i nomi delle operazioni dalla tabella app_structure_operation_langs"""
     connection = mysql.connector.connect(**DB_CONFIG)
     cursor = connection.cursor(dictionary=True)
-    
+
     placeholders = ','.join(['%s'] * len(operation_ids))
     query = f"""
         SELECT structure_operation_id, name
         FROM app_structure_operation_langs
         WHERE id_lang = 1 AND structure_operation_id IN ({placeholders})
     """
-    
+
     cursor.execute(query, operation_ids)
     results = cursor.fetchall()
     cursor.close()
     connection.close()
-    
+
     # Crea dizionario id -> nome
     operation_names = {}
     for row in results:
         operation_names[row['structure_operation_id']] = row['name']
-    
+
     return operation_names
 
 def save_operations_to_file(operation_ids):
     # Recupera i nomi delle operazioni
     operation_names = get_operation_names(operation_ids)
-    
+
     operations_data = {
         "timestamp": datetime.now().isoformat(),
         "active_operation_ids": operation_ids,
@@ -109,7 +116,7 @@ def save_operations_to_file(operation_ids):
 def get_tasks_from_db(selected_date, assigned_task_ids=None):
     if assigned_task_ids is None:
         assigned_task_ids = set()
-    
+
     print(f"Aggiorno la lista delle operazioni attive dal DB...")
     ops = get_active_operations()
     save_operations_to_file(ops)
@@ -178,7 +185,7 @@ def get_tasks_from_db(selected_date, assigned_task_ids=None):
     filtered_count = 0
     for r in rows:
         task_id = r.get("task_id")
-        
+
         # Filtra task già assegnate
         if task_id and task_id in assigned_task_ids:
             filtered_count += 1
@@ -224,7 +231,7 @@ def get_tasks_from_db(selected_date, assigned_task_ids=None):
 
     if filtered_count > 0:
         print(f"✅ Filtrate {filtered_count} task già assegnate (rimangono {len(results)})")
-    
+
     return results
 
 # ---------- Classificazione task ----------
@@ -329,7 +336,7 @@ def deduplicate_tasks(tasks):
     3. Task_id più alto (fallback)
     """
     from datetime import datetime
-    
+
     # Raggruppa per logistic_code
     by_logistic_code = {}
     for task in tasks:
@@ -337,11 +344,11 @@ def deduplicate_tasks(tasks):
         if code not in by_logistic_code:
             by_logistic_code[code] = []
         by_logistic_code[code].append(task)
-    
+
     # Per ogni gruppo, scegli la migliore
     deduplicated = []
     duplicates_removed = 0
-    
+
     for code, task_group in by_logistic_code.items():
         if len(task_group) == 1:
             # Nessun duplicato
@@ -349,7 +356,7 @@ def deduplicate_tasks(tasks):
         else:
             # Duplicati trovati - scegli la migliore
             duplicates_removed += len(task_group) - 1
-            
+
             # Ordina per:
             # 1. checkin_date più recente (None = meno prioritario)
             # 2. confirmed_operation = True
@@ -366,45 +373,60 @@ def deduplicate_tasks(tasks):
                         checkin_score = float('inf')  # Data invalida = meno prioritario
                 else:
                     checkin_score = float('inf')  # Nessuna data = meno prioritario
-                
+
                 # confirmed_operation (True = 0, False = 1 per ordinamento)
                 confirmed = t.get("confirmed_operation", False)
                 confirmed_score = 0 if confirmed else 1
-                
+
                 # task_id più alto
                 task_id = t.get("task_id", 0)
                 task_id_score = -task_id  # Inverti per ordinare dal più alto
-                
+
                 return (checkin_score, confirmed_score, task_id_score)
-            
+
             best_task = min(task_group, key=task_priority)
             deduplicated.append(best_task)
-            
+
             print(f"   🔍 Duplicato {code}: mantenuta task_id={best_task.get('task_id')} "
                   f"(checkin={best_task.get('checkin_date') or 'N/A'}, "
                   f"confirmed={best_task.get('confirmed_operation')})")
-    
+
     if duplicates_removed > 0:
         print(f"✅ Rimosse {duplicates_removed} task duplicate dai containers")
-    
+
     return deduplicated
 
 # ---------- Main ----------
 def main():
-    import sys
+    parser = argparse.ArgumentParser(description='Crea containers.json per una data specifica.')
+    parser.add_argument('--date', type=str, help='Data nel formato YYYY-MM-DD (es. 2025-11-17)')
+    parser.add_argument('--skip-extract', action='store_true', help='Salta estrazione cleaners (usa quelli già presenti)')
+    args = parser.parse_args()
 
-    # Leggi la data da argomento CLI se fornita
-    if len(sys.argv) > 1:
-        work_date = sys.argv[1]
-        print(f"Usando data specifica: {work_date}")
+    target_date = args.date if args.date else None
+    if target_date:
+        print(f"Usando data specifica: {target_date}")
     else:
-        work_date = None  # Se non specificata, usa la data corrente
+        target_date = datetime.now().strftime('%Y-%m-%d')
+        print(f"Nessuna data specificata, usando oggi: {target_date}")
+
+    # Aggiorna operations.json
+    print("Aggiorno la lista delle operazioni attive dal DB...")
+    subprocess.run(["python3", str(EXTRACT_ACTIVE_CLIENTS_SCRIPT), "--date", target_date], check=True)
+
+    # Estrai i cleaners per la data target SOLO se non usiamo dati salvati
+    if not args.skip_extract:
+        print("Estraggo i cleaners dal database...")
+        subprocess.run(["python3", str(EXTRACT_CLEANERS_SCRIPT), "--date", target_date], check=True)
+    else:
+        print("⏭️ Salto estrazione cleaners (--skip-extract attivo), uso selected_cleaners.json esistente")
+
 
     # Leggi timeline.json per aggiornare i dati delle task assegnate
     assigned_task_ids = set()
     timeline_path = OUTPUT_DIR / "timeline.json"
     timeline_data = None
-    
+
     if timeline_path.exists():
         try:
             timeline_data = json.loads(timeline_path.read_text(encoding="utf-8"))
@@ -419,19 +441,19 @@ def main():
             print(f"⚠️ Errore lettura timeline: {e}")
 
     # Estrai TUTTE le task dal database (anche quelle assegnate per aggiornarle)
-    all_tasks_from_db = get_tasks_from_db(work_date, assigned_task_ids=set())  # Non filtrare
-    
+    all_tasks_from_db = get_tasks_from_db(target_date, assigned_task_ids=set())  # Non filtrare
+
     # CRITICAL: Preserva timeline.json aggiornando SOLO i dati modificati dal DB
     if timeline_data and assigned_task_ids:
         db_tasks_map = {task["task_id"]: task for task in all_tasks_from_db}
         updated_count = 0
-        
+
         for cleaner_entry in timeline_data.get("cleaners_assignments", []):
             for task in cleaner_entry.get("tasks", []):
                 task_id = task.get("task_id")
                 if task_id and task_id in db_tasks_map:
                     fresh_data = db_tasks_map[task_id]
-                    
+
                     # CRITICAL: Campi da aggiornare dal DB (NON toccare campi timeline)
                     # Preserva: start_time, end_time, travel_time, sequence, followup, priority, reasons
                     fields_to_update = [
@@ -441,32 +463,32 @@ def main():
                         "operation_id", "confirmed_operation", "straordinaria",
                         "type_apt", "alias", "customer_name"
                     ]
-                    
+
                     for field in fields_to_update:
                         if field in fresh_data:
                             task[field] = fresh_data[field]
-                    
+
                     updated_count += 1
-        
+
         if updated_count > 0:
             # Salva timeline.json preservando metadata e struttura
             timeline_data["metadata"]["last_updated"] = datetime.now().isoformat()
             # NON cambiare la data - mantieni quella della timeline
             timeline_path.write_text(json.dumps(timeline_data, ensure_ascii=False, indent=2), encoding="utf-8")
             print(f"✅ Aggiornate {updated_count} task in timeline.json (preservati campi timeline: start_time, end_time, travel_time, sequence)")
-    
+
     # Filtra le task già assegnate per containers.json
     all_tasks = [t for t in all_tasks_from_db if t["task_id"] not in assigned_task_ids]
 
     # Classifica task (senza deduplica - le task duplicate rimangono visibili)
     print(f"🔄 Classificazione task in containers...")
-    early_out, high_priority, low_priority = classify_tasks(all_tasks, work_date)
+    early_out, high_priority, low_priority = classify_tasks(all_tasks, target_date)
 
     # Crea output
     output = {
         "metadata": {
             "last_updated": datetime.now().isoformat(),
-            "date": work_date
+            "date": target_date
         },
         "containers": {
             "early_out": {
@@ -495,7 +517,7 @@ def main():
         json.dump(output, f, indent=2, ensure_ascii=False)
 
     print(f"\n✅ File containers.json creato con successo!")
-    print(f"   📅 Data: {work_date}")
+    print(f"   📅 Data: {target_date}")
     print(f"   📦 Task totali: {len(all_tasks)}")
     print(f"   🔴 Early-Out: {len(early_out)}")
     print(f"   🟡 High-Priority: {len(high_priority)}")
