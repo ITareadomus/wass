@@ -1559,15 +1559,19 @@ export default function TimelineView({
           <div className="flex justify-end gap-2 mt-6">
             <Button
               variant="outline"
+              size="sm"
               onClick={() => setAliasDialog({ open: false, cleanerId: null, cleanerName: '' })}
               disabled={isSavingAlias}
+              className="border-2 border-custom-blue"
             >
               Annulla
             </Button>
             <Button
               variant="outline"
+              size="sm"
               onClick={handleSaveAlias}
               disabled={isSavingAlias}
+              className="border-2 border-custom-blue"
             >
               {isSavingAlias ? (
                 <>
@@ -1779,28 +1783,22 @@ export default function TimelineView({
           {selectedCleaner && (
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <p className="text-sm font-semibold text-muted-foreground">Nome</p>
-                  <p className="text-sm">{selectedCleaner.name.toUpperCase()}</p>
-                </div>
-                <div>
-                  <p className="text-sm font-semibold text-muted-foreground">Cognome</p>
-                  <p className="text-sm">{selectedCleaner.lastname.toUpperCase()}</p>
-                </div>
                 <div className="col-span-2">
-                  <p className="text-sm font-semibold text-muted-foreground mb-1 flex items-center gap-1">
-                    Alias
-                    {!isReadOnly && <Pencil className="w-3 h-3 text-muted-foreground/60" />}
-                  </p>
-                  <p
-                    className={`text-sm p-2 rounded ${!isReadOnly ? 'cursor-pointer hover:bg-muted/50 border border-transparent hover:border-border' : ''}`}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      if (!isReadOnly) handleOpenAliasDialog(selectedCleaner);
-                    }}
-                  >
-                    {cleanersAliases[selectedCleaner.id]?.alias || `${selectedCleaner.name} ${selectedCleaner.lastname}`}
-                  </p>
+                  <p className="text-sm font-semibold text-muted-foreground mb-1">Nome, Cognome e Alias</p>
+                  <div className="flex items-center gap-3">
+                    <p className="text-sm">{selectedCleaner.name.toUpperCase()}</p>
+                    <p className="text-sm">{selectedCleaner.lastname.toUpperCase()}</p>
+                    <p
+                      className={`text-sm p-2 rounded flex items-center gap-1 ${!isReadOnly ? 'cursor-pointer hover:bg-muted/50 border border-transparent hover:border-border' : ''}`}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (!isReadOnly) handleOpenAliasDialog(selectedCleaner);
+                      }}
+                    >
+                      {cleanersAliases[selectedCleaner.id]?.alias || `${selectedCleaner.name} ${selectedCleaner.lastname}`}
+                      {!isReadOnly && <Pencil className="w-3 h-3 text-muted-foreground/60" />}
+                    </p>
+                  </div>
                 </div>
                 <div>
                   <p className="text-sm font-semibold text-muted-foreground">Giorni lavorati</p>
