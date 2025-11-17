@@ -1,6 +1,6 @@
 {
   "metadata": {
-    "last_updated": "2025-11-17T14:46:46.102Z",
+    "last_updated": "2025-11-17T14:50:22.965Z",
     "date": "2025-11-17",
     "created_by": "unknown",
     "modified_by": [
@@ -17,39 +17,6 @@
         "premium": false
       },
       "tasks": [
-        {
-          "task_id": 218876,
-          "logistic_code": 1543,
-          "client_id": null,
-          "premium": false,
-          "address": "via Forcella 11",
-          "lat": "45.4524898",
-          "lng": "9.1673869",
-          "cleaning_time": 60,
-          "checkin_date": "2025-11-17",
-          "checkout_date": "2025-11-17",
-          "checkin_time": "16:30",
-          "checkout_time": null,
-          "pax_in": 1,
-          "pax_out": 2,
-          "small_equipment": false,
-          "operation_id": 2,
-          "confirmed_operation": true,
-          "straordinaria": false,
-          "type_apt": "A",
-          "alias": "NTM",
-          "customer_name": "NOTA-MI",
-          "reasons": [
-            "manually_moved_to_timeline"
-          ],
-          "priority": "early_out",
-          "start_time": "10:00",
-          "end_time": "11:00",
-          "followup": false,
-          "sequence": 1,
-          "travel_time": 0,
-          "modified_by": "Admin"
-        },
         {
           "task_id": 218975,
           "logistic_code": 1537,
@@ -73,15 +40,47 @@
           "alias": "TBR",
           "customer_name": "THE BEST RENT S.r.l.",
           "reasons": [
-            "manually_moved_to_timeline",
-            "manual_assignment"
+            "manually_moved_to_timeline"
           ],
           "priority": "high_priority",
-          "start_time": "11:30",
-          "end_time": "14:00",
+          "start_time": "10:00",
+          "end_time": "12:30",
+          "followup": false,
+          "sequence": 1,
+          "travel_time": 0,
+          "modified_by": "Admin"
+        },
+        {
+          "task_id": 218988,
+          "logistic_code": 1687,
+          "client_id": null,
+          "premium": false,
+          "address": "VIALE EMIO CALDARA 39",
+          "lat": "45.4560369",
+          "lng": "9.2030879",
+          "cleaning_time": 90,
+          "checkin_date": "2025-11-18",
+          "checkout_date": "2025-11-17",
+          "checkin_time": "11:00",
+          "checkout_time": "11:00",
+          "pax_in": 2,
+          "pax_out": 4,
+          "small_equipment": false,
+          "operation_id": 2,
+          "confirmed_operation": true,
+          "straordinaria": false,
+          "type_apt": "B",
+          "alias": "DRST",
+          "customer_name": "DREAM SUITES",
+          "reasons": [
+            "manually_moved_to_timeline"
+          ],
+          "priority": "low_priority",
+          "start_time": "12:57",
+          "end_time": "14:27",
           "followup": true,
           "sequence": 2,
-          "travel_time": 30,
+          "travel_time": 27,
           "modified_by": "Admin"
         }
       ]
@@ -118,8 +117,7 @@
           "alias": "NTM",
           "customer_name": "NOTA-MI",
           "reasons": [
-            "manually_moved_to_timeline",
-            "manual_assignment"
+            "manually_moved_to_timeline"
           ],
           "priority": "early_out",
           "start_time": "10:00",
@@ -127,39 +125,6 @@
           "followup": false,
           "sequence": 1,
           "travel_time": 0,
-          "modified_by": "Admin"
-        },
-        {
-          "task_id": 218888,
-          "logistic_code": 751,
-          "client_id": null,
-          "premium": false,
-          "address": "Via L. Cagnola, 12",
-          "lat": "45.4776",
-          "lng": "9.17287",
-          "cleaning_time": 60,
-          "checkin_date": "2025-11-17",
-          "checkout_date": "2025-11-17",
-          "checkin_time": "14:00",
-          "checkout_time": "11:00",
-          "pax_in": 2,
-          "pax_out": 2,
-          "small_equipment": false,
-          "operation_id": 2,
-          "confirmed_operation": true,
-          "straordinaria": false,
-          "type_apt": "A",
-          "alias": "RLST",
-          "customer_name": "RELSTAY - FERRARA GIULIA",
-          "reasons": [
-            "manually_moved_to_timeline"
-          ],
-          "priority": "high_priority",
-          "start_time": "11:31",
-          "end_time": "12:31",
-          "followup": true,
-          "sequence": 2,
-          "travel_time": 31,
           "modified_by": "Admin"
         }
       ]
@@ -169,6 +134,6 @@
     "total_cleaners": 2,
     "used_cleaners": 0,
     "assigned_tasks": 0,
-    "total_tasks": 4
+    "total_tasks": 3
   }
 }
