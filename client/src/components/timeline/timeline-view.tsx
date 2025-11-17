@@ -1783,6 +1783,16 @@ export default function TimelineView({
           {selectedCleaner && (
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <p className="text-sm font-semibold text-muted-foreground mb-1">Nome</p>
+                    <p className="text-sm">{selectedCleaner.name.toUpperCase()}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold text-muted-foreground mb-1">Cognome</p>
+                    <p className="text-sm">{selectedCleaner.lastname.toUpperCase()}</p>
+                  </div>
+                </div>
                 <div>
                   <p className="text-sm font-semibold text-muted-foreground mb-1 flex items-center gap-1">
                     Alias
@@ -1797,16 +1807,6 @@ export default function TimelineView({
                   >
                     {cleanersAliases[selectedCleaner.id]?.alias || `${selectedCleaner.name} ${selectedCleaner.lastname}`}
                   </p>
-                </div>
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <p className="text-sm font-semibold text-muted-foreground mb-1">Nome</p>
-                    <p className="text-sm">{selectedCleaner.name.toUpperCase()}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm font-semibold text-muted-foreground mb-1">Cognome</p>
-                    <p className="text-sm">{selectedCleaner.lastname.toUpperCase()}</p>
-                  </div>
                 </div>
                 <div>
                   <p className="text-sm font-semibold text-muted-foreground">Giorni lavorati</p>
