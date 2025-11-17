@@ -184,26 +184,6 @@ export default function GenerateAssignments() {
   // Determina se ALMENO un container ha multi-select attivo
   const isAnyMultiSelectActive = multiSelectModes.early_out || multiSelectModes.high_priority || multiSelectModes.low_priority;
 
-  // Helper function per ottenere lo stato specifico del container
-  const getContainerMultiSelectState = (container: string) => {
-    const containerKey = container === 'early-out' ? 'early_out' :
-                        container === 'high' ? 'high_priority' :
-                        container === 'low' ? 'low_priority' : container as keyof typeof multiSelectModes;
-
-    return {
-      isMultiSelectMode: multiSelectModes[containerKey] || false,
-      selectedTasks,
-      setIsMultiSelectMode: (value: boolean) => {
-        setMultiSelectModes(prev => ({ ...prev, [containerKey]: value }));
-        // Se disattivo, rimuovi selezioni di questo container
-        if (!value) {
-          setSelectedTasks(prev => prev.filter(t => t.container !== containerKey));
-        }
-      },
-      setSelectedTasks
-    };
-  };
-
   // Helper functions per multi-select context cross-container
   const toggleMode = useCallback(() => {
     // Toggle globale (attiva/disattiva tutti i container)
@@ -708,7 +688,7 @@ export default function GenerateAssignments() {
       }
 
       const containersText = await containersResponse.text();
-      
+
       // Verifica che il contenuto sia JSON valido
       if (!containersText.trim().startsWith('{') && !containersText.trim().startsWith('[')) {
         console.error('❌ containers.json corrotto, non è JSON:', containersText.substring(0, 100));
@@ -729,7 +709,7 @@ export default function GenerateAssignments() {
           const contentType = timelineResponse.headers.get('content-type');
           if (contentType && contentType.includes('application/json')) {
             const timelineText = await timelineResponse.text();
-            
+
             // Verifica che il contenuto sia JSON valido
             if (!timelineText.trim().startsWith('{') && !timelineText.trim().startsWith('[')) {
               console.warn('Timeline.json corrotto, non è JSON:', timelineText.substring(0, 100));
@@ -1437,7 +1417,7 @@ export default function GenerateAssignments() {
             cache: 'no-store',
             headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' }
           });
-          const cleanersData = await cleanersResponse.json();
+          const cleanersData = await.json();
           const cleaner = cleanersData.cleaners.find((c: any) => c.id === toCleanerId);
           const cleanerName = cleaner ? `${cleaner.name} ${cleaner.lastname}` : `ID ${toCleanerId}`;
 
@@ -1526,10 +1506,10 @@ export default function GenerateAssignments() {
             console.log('✅ Movimento completato - response.ok:', response.ok, 'data.success:', data.success);
             console.log('✅ Movimento salvato automaticamente in timeline.json');
 
-            // Preserva lo stato acknowledged per entrambi i cleaner coinvolti
-            if ((window as any).preserveAcknowledgedIncompatibleCleaners) {
-              (window as any).preserveAcknowledgedIncompatibleCleaners(fromCleanerId);
-              (window as any).preserveAcknowledgedIncompatibleCleaners(toCleanerId);
+            // CRITICAL: Invalida l'acknowledged state per vedere nuove incompatibilità dopo lo spostamento
+            if ((window as any).invalidateAcknowledgedIncompatibleCleaners) {
+              (window as any).invalidateAcknowledgedIncompatibleCleaners(fromCleanerId);
+              (window as any).invalidateAcknowledgedIncompatibleCleaners(toCleanerId);
             }
 
             // CRITICAL: Marca modifiche dopo spostamento tra cleaners
