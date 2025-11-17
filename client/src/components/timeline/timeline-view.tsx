@@ -673,17 +673,15 @@ export default function TimelineView({
       }
 
       const result = await response.json();
+      
+      // Ricarica gli alias dal file aggiornato
+      await loadAliases();
+      
       toast({
         title: "Alias salvato",
         description: `L'alias di ${selectedCleaner.name} ${selectedCleaner.lastname} è stato aggiornato.`,
         variant: "success",
       });
-
-      // Aggiorna lo stato locale degli alias
-      setCleanersAliases(prev => ({
-        ...prev,
-        [selectedCleaner.id]: { alias: editingAlias }
-      }));
 
       // Chiudi il dialog di modifica alias
       setIsModalOpen(false); // Chiude il dialog principale

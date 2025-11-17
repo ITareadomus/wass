@@ -2054,6 +2054,73 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Endpoint per aggiornare l'alias di un cleaner
+  app.post("/api/update-cleaner-alias", async (req, res) => {
+    try {
+      const { cleanerId, alias } = req.body;
+
+      if (!cleanerId) {
+        return res.status(400).json({ success: false, error: "cleanerId richiesto" });
+      }
+
+      const aliasesPath = path.join(process.cwd(), 'client/public/data/cleaners/cleaners_aliases.json');
+
+      // Carica il file degli alias
+      let aliasesData: any;
+      try {
+        const content = await fs.readFile(aliasesPath, 'utf8');
+        aliasesData = JSON.parse(content);
+      } catch (error) {
+        // Se il file non esiste, crealo
+        aliasesData = {
+          metadata: {
+            last_updated: new Date().toISOString(),
+            description: "Alias personalizzati per i cleaners da visualizzare sulla timeline"
+          },
+          aliases: {}
+        };
+      }
+
+      // Carica i dati del cleaner da cleaners.json per ottenere nome e cognome
+      const cleanersPath = path.join(process.cwd(), 'client/public/data/cleaners/cleaners.json');
+      const cleanersData = JSON.parse(await fs.readFile(cleanersPath, 'utf8'));
+      
+      // Cerca il cleaner in tutte le date
+      let cleanerInfo: any = null;
+      for (const date of Object.keys(cleanersData.dates || {})) {
+        const dateCleaners = cleanersData.dates[date]?.cleaners || [];
+        cleanerInfo = dateCleaners.find((c: any) => c.id === cleanerId);
+        if (cleanerInfo) break;
+      }
+
+      if (!cleanerInfo) {
+        return res.status(404).json({ success: false, error: "Cleaner non trovato" });
+      }
+
+      // Aggiorna o aggiungi l'alias
+      aliasesData.aliases = aliasesData.aliases || {};
+      aliasesData.aliases[cleanerId] = {
+        name: cleanerInfo.name,
+        lastname: cleanerInfo.lastname,
+        alias: alias || ""
+      };
+
+      // Aggiorna metadata
+      aliasesData.metadata.last_updated = new Date().toISOString();
+
+      // Salva il file
+      const tmpPath = `${aliasesPath}.tmp`;
+      await fs.writeFile(tmpPath, JSON.stringify(aliasesData, null, 2));
+      await fs.rename(tmpPath, aliasesPath);
+
+      console.log(`✅ Alias aggiornato per cleaner ${cleanerId}: "${alias}"`);
+      res.json({ success: true, message: "Alias aggiornato con successo" });
+    } catch (error: any) {
+      console.error("Errore nell'aggiornamento dell'alias:", error);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
   // Endpoint per aggiornare i dettagli di una task (checkout, checkin, durata)
   app.post("/api/update-task-details", async (req, res) => {
     try {
