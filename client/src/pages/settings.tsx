@@ -192,6 +192,27 @@ export default function Settings() {
     setHasUnsavedChanges(true);
   };
 
+  const handleClientToggle = (clientId: number, type: "eo" | "hp") => {
+    if (!systemSettings) return;
+
+    const section = type === "eo" ? "early-out" : "high-priority";
+    const clientsKey = type === "eo" ? "eo_clients" : "hp_clients";
+    const currentClients = systemSettings[section][clientsKey];
+
+    const updatedClients = currentClients.includes(clientId)
+      ? currentClients.filter(id => id !== clientId)
+      : [...currentClients, clientId];
+
+    setSystemSettings({
+      ...systemSettings,
+      [section]: {
+        ...systemSettings[section],
+        [clientsKey]: updatedClients
+      }
+    });
+    setHasUnsavedChanges(true);
+  };
+
   const handleSaveAccount = async (account: Account) => {
     try {
       const response = await fetch("/api/accounts/update", {
