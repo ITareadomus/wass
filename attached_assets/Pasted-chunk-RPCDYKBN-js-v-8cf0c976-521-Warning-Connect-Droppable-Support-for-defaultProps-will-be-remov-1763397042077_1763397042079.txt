@@ -1,0 +1,209 @@
+chunk-RPCDYKBN.js?v=8cf0c976:521 Warning: Connect(Droppable): Support for defaultProps will be removed from memo components in a future major release. Use JavaScript default parameters instead.
+    at div
+    at PriorityColumn (https://965a6a9a-cac5-4b93-ae2c-e0bb23d6e4e3-00-yfpq5bxeq2p0.riker.replit.dev/src/components/drag-drop/priority-column.tsx:25:3)
+    at div
+    at Provider (https://965a6a9a-cac5-4b93-ae2c-e0bb23d6e4e3-00-yfpq5bxeq2p0.riker.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/react-beautiful-dnd.js?v=8cf0c976:1738:20)
+    at App (https://965a6a9a-cac5-4b93-ae2c-e0bb23d6e4e3-00-yfpq5bxeq2p0.riker.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/react-beautiful-dnd.js?v=8cf0c976:8281:25)
+    at ErrorBoundary2 (https://965a6a9a-cac5-4b93-ae2c-e0bb23d6e4e3-00-yfpq5bxeq2p0.riker.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/react-beautiful-dnd.js?v=8cf0c976:2778:35)
+    at DragDropContext (https://965a6a9a-cac5-4b93-ae2c-e0bb23d6e4e3-00-yfpq5bxeq2p0.riker.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/react-beautiful-dnd.js?v=8cf0c976:8401:19)
+    at div
+    at div
+    at GenerateAssignments (https://965a6a9a-cac5-4b93-ae2c-e0bb23d6e4e3-00-yfpq5bxeq2p0.riker.replit.dev/src/pages/generate-assignments.tsx:98:43)
+    at ProtectedRoute (https://965a6a9a-cac5-4b93-ae2c-e0bb23d6e4e3-00-yfpq5bxeq2p0.riker.replit.dev/src/App.tsx?v=tCR8Zl__20Oewnbd0Amdr:31:38)
+    at Route (https://965a6a9a-cac5-4b93-ae2c-e0bb23d6e4e3-00-yfpq5bxeq2p0.riker.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/wouter.js?v=8cf0c976:323:16)
+    at Switch (https://965a6a9a-cac5-4b93-ae2c-e0bb23d6e4e3-00-yfpq5bxeq2p0.riker.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/wouter.js?v=8cf0c976:379:17)
+    at Router
+    at Provider (https://965a6a9a-cac5-4b93-ae2c-e0bb23d6e4e3-00-yfpq5bxeq2p0.riker.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-IKZDNW7I.js?v=8cf0c976:43:15)
+    at TooltipProvider (https://965a6a9a-cac5-4b93-ae2c-e0bb23d6e4e3-00-yfpq5bxeq2p0.riker.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/@radix-ui_react-tooltip.js?v=8cf0c976:63:5)
+    at QueryClientProvider (https://965a6a9a-cac5-4b93-ae2c-e0bb23d6e4e3-00-yfpq5bxeq2p0.riker.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/@tanstack_react-query.js?v=8cf0c976:2805:3)
+    at App
+printWarning @ chunk-RPCDYKBN.js?v=8cf0c976:521
+error @ chunk-RPCDYKBN.js?v=8cf0c976:505
+updateMemoComponent @ chunk-RPCDYKBN.js?v=8cf0c976:14382
+beginWork @ chunk-RPCDYKBN.js?v=8cf0c976:15977
+beginWork$1 @ chunk-RPCDYKBN.js?v=8cf0c976:19753
+performUnitOfWork @ chunk-RPCDYKBN.js?v=8cf0c976:19198
+workLoopSync @ chunk-RPCDYKBN.js?v=8cf0c976:19137
+renderRootSync @ chunk-RPCDYKBN.js?v=8cf0c976:19116
+performConcurrentWorkOnRoot @ chunk-RPCDYKBN.js?v=8cf0c976:18678
+workLoop @ chunk-RPCDYKBN.js?v=8cf0c976:197
+flushWork @ chunk-RPCDYKBN.js?v=8cf0c976:176
+performWorkUntilDeadline @ chunk-RPCDYKBN.js?v=8cf0c976:384
+timeline-view.tsx:1317 Warning: Each child in a list should have a unique "key" prop.
+
+Check the render method of `Droppable`. See https://reactjs.org/link/warning-keys for more information.
+    at Droppable (https://965a6a9a-cac5-4b93-ae2c-e0bb23d6e4e3-00-yfpq5bxeq2p0.riker.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/react-beautiful-dnd.js?v=8cf0c976:9460:49)
+    at ConnectFunction (https://965a6a9a-cac5-4b93-ae2c-e0bb23d6e4e3-00-yfpq5bxeq2p0.riker.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/react-beautiful-dnd.js?v=8cf0c976:1918:48)
+    at div
+    at div
+    at div
+    at div
+    at TimelineView (https://965a6a9a-cac5-4b93-ae2c-e0bb23d6e4e3-00-yfpq5bxeq2p0.riker.replit.dev/src/components/timeline/timeline-view.tsx:45:3)
+    at div
+    at div
+    at div
+    at Provider (https://965a6a9a-cac5-4b93-ae2c-e0bb23d6e4e3-00-yfpq5bxeq2p0.riker.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/react-beautiful-dnd.js?v=8cf0c976:1738:20)
+    at App (https://965a6a9a-cac5-4b93-ae2c-e0bb23d6e4e3-00-yfpq5bxeq2p0.riker.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/react-beautiful-dnd.js?v=8cf0c976:8281:25)
+    at ErrorBoundary2 (https://965a6a9a-cac5-4b93-ae2c-e0bb23d6e4e3-00-yfpq5bxeq2p0.riker.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/react-beautiful-dnd.js?v=8cf0c976:2778:35)
+    at DragDropContext (https://965a6a9a-cac5-4b93-ae2c-e0bb23d6e4e3-00-yfpq5bxeq2p0.riker.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/react-beautiful-dnd.js?v=8cf0c976:8401:19)
+    at div
+    at div
+    at GenerateAssignments (https://965a6a9a-cac5-4b93-ae2c-e0bb23d6e4e3-00-yfpq5bxeq2p0.riker.replit.dev/src/pages/generate-assignments.tsx:98:43)
+    at ProtectedRoute (https://965a6a9a-cac5-4b93-ae2c-e0bb23d6e4e3-00-yfpq5bxeq2p0.riker.replit.dev/src/App.tsx?v=tCR8Zl__20Oewnbd0Amdr:31:38)
+    at Route (https://965a6a9a-cac5-4b93-ae2c-e0bb23d6e4e3-00-yfpq5bxeq2p0.riker.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/wouter.js?v=8cf0c976:323:16)
+    at Switch (https://965a6a9a-cac5-4b93-ae2c-e0bb23d6e4e3-00-yfpq5bxeq2p0.riker.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/wouter.js?v=8cf0c976:379:17)
+    at Router
+    at Provider (https://965a6a9a-cac5-4b93-ae2c-e0bb23d6e4e3-00-yfpq5bxeq2p0.riker.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-IKZDNW7I.js?v=8cf0c976:43:15)
+    at TooltipProvider (https://965a6a9a-cac5-4b93-ae2c-e0bb23d6e4e3-00-yfpq5bxeq2p0.riker.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/@radix-ui_react-tooltip.js?v=8cf0c976:63:5)
+    at QueryClientProvider (https://965a6a9a-cac5-4b93-ae2c-e0bb23d6e4e3-00-yfpq5bxeq2p0.riker.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/@tanstack_react-query.js?v=8cf0c976:2805:3)
+    at App
+printWarning @ react_jsx-dev-runtime.js?v=8cf0c976:64
+error @ react_jsx-dev-runtime.js?v=8cf0c976:48
+validateExplicitKey @ react_jsx-dev-runtime.js?v=8cf0c976:724
+validateChildKeys @ react_jsx-dev-runtime.js?v=8cf0c976:737
+jsxWithValidation @ react_jsx-dev-runtime.js?v=8cf0c976:846
+children @ timeline-view.tsx:1317
+Droppable @ react-beautiful-dnd.js?v=8cf0c976:9551
+renderWithHooks @ chunk-RPCDYKBN.js?v=8cf0c976:11548
+mountIndeterminateComponent @ chunk-RPCDYKBN.js?v=8cf0c976:14926
+beginWork @ chunk-RPCDYKBN.js?v=8cf0c976:15914
+beginWork$1 @ chunk-RPCDYKBN.js?v=8cf0c976:19753
+performUnitOfWork @ chunk-RPCDYKBN.js?v=8cf0c976:19198
+workLoopSync @ chunk-RPCDYKBN.js?v=8cf0c976:19137
+renderRootSync @ chunk-RPCDYKBN.js?v=8cf0c976:19116
+performConcurrentWorkOnRoot @ chunk-RPCDYKBN.js?v=8cf0c976:18678
+workLoop @ chunk-RPCDYKBN.js?v=8cf0c976:197
+flushWork @ chunk-RPCDYKBN.js?v=8cf0c976:176
+performWorkUntilDeadline @ chunk-RPCDYKBN.js?v=8cf0c976:384
+chunk-RPCDYKBN.js?v=8cf0c976:521 Warning: validateDOMNesting(...): <p> cannot appear as a descendant of <p>.
+    at p
+    at p
+    at https://965a6a9a-cac5-4b93-ae2c-e0bb23d6e4e3-00-yfpq5bxeq2p0.riker.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-D7OHDVF4.js?v=8cf0c976:42:13
+    at https://965a6a9a-cac5-4b93-ae2c-e0bb23d6e4e3-00-yfpq5bxeq2p0.riker.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-IWUNBFAF.js?v=8cf0c976:283:13
+    at _c9 (https://965a6a9a-cac5-4b93-ae2c-e0bb23d6e4e3-00-yfpq5bxeq2p0.riker.replit.dev/src/components/ui/dialog.tsx:163:12)
+    at div
+    at DialogHeader (https://965a6a9a-cac5-4b93-ae2c-e0bb23d6e4e3-00-yfpq5bxeq2p0.riker.replit.dev/src/components/ui/dialog.tsx:88:3)
+    at div
+    at https://965a6a9a-cac5-4b93-ae2c-e0bb23d6e4e3-00-yfpq5bxeq2p0.riker.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-D7OHDVF4.js?v=8cf0c976:42:13
+    at https://965a6a9a-cac5-4b93-ae2c-e0bb23d6e4e3-00-yfpq5bxeq2p0.riker.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-E6YIEDFE.js?v=8cf0c976:61:7
+    at https://965a6a9a-cac5-4b93-ae2c-e0bb23d6e4e3-00-yfpq5bxeq2p0.riker.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-2K77HOHX.js?v=8cf0c976:79:13
+    at https://965a6a9a-cac5-4b93-ae2c-e0bb23d6e4e3-00-yfpq5bxeq2p0.riker.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-2K77HOHX.js?v=8cf0c976:56:13
+    at https://965a6a9a-cac5-4b93-ae2c-e0bb23d6e4e3-00-yfpq5bxeq2p0.riker.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-D7OHDVF4.js?v=8cf0c976:42:13
+    at https://965a6a9a-cac5-4b93-ae2c-e0bb23d6e4e3-00-yfpq5bxeq2p0.riker.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-GLSLJ34Y.js?v=8cf0c976:29:5
+    at https://965a6a9a-cac5-4b93-ae2c-e0bb23d6e4e3-00-yfpq5bxeq2p0.riker.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-IWUNBFAF.js?v=8cf0c976:235:13
+    at https://965a6a9a-cac5-4b93-ae2c-e0bb23d6e4e3-00-yfpq5bxeq2p0.riker.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-IWUNBFAF.js?v=8cf0c976:158:58
+    at Presence (https://965a6a9a-cac5-4b93-ae2c-e0bb23d6e4e3-00-yfpq5bxeq2p0.riker.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-X6232BML.js?v=8cf0c976:24:11)
+    at https://965a6a9a-cac5-4b93-ae2c-e0bb23d6e4e3-00-yfpq5bxeq2p0.riker.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-IWUNBFAF.js?v=8cf0c976:149:64
+    at https://965a6a9a-cac5-4b93-ae2c-e0bb23d6e4e3-00-yfpq5bxeq2p0.riker.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-2K77HOHX.js?v=8cf0c976:79:13
+    at https://965a6a9a-cac5-4b93-ae2c-e0bb23d6e4e3-00-yfpq5bxeq2p0.riker.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-2K77HOHX.js?v=8cf0c976:56:13
+    at https://965a6a9a-cac5-4b93-ae2c-e0bb23d6e4e3-00-yfpq5bxeq2p0.riker.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-D7OHDVF4.js?v=8cf0c976:42:13
+    at https://965a6a9a-cac5-4b93-ae2c-e0bb23d6e4e3-00-yfpq5bxeq2p0.riker.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-E6YIEDFE.js?v=8cf0c976:260:22
+    at Presence (https://965a6a9a-cac5-4b93-ae2c-e0bb23d6e4e3-00-yfpq5bxeq2p0.riker.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-X6232BML.js?v=8cf0c976:24:11)
+    at Provider (https://965a6a9a-cac5-4b93-ae2c-e0bb23d6e4e3-00-yfpq5bxeq2p0.riker.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-IKZDNW7I.js?v=8cf0c976:43:15)
+    at DialogPortal (https://965a6a9a-cac5-4b93-ae2c-e0bb23d6e4e3-00-yfpq5bxeq2p0.riker.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-IWUNBFAF.js?v=8cf0c976:111:11)
+    at _c3 (https://965a6a9a-cac5-4b93-ae2c-e0bb23d6e4e3-00-yfpq5bxeq2p0.riker.replit.dev/src/components/ui/dialog.tsx:51:12)
+    at Provider (https://965a6a9a-cac5-4b93-ae2c-e0bb23d6e4e3-00-yfpq5bxeq2p0.riker.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-IKZDNW7I.js?v=8cf0c976:43:15)
+    at Dialog (https://965a6a9a-cac5-4b93-ae2c-e0bb23d6e4e3-00-yfpq5bxeq2p0.riker.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-IWUNBFAF.js?v=8cf0c976:52:5)
+    at TimelineView (https://965a6a9a-cac5-4b93-ae2c-e0bb23d6e4e3-00-yfpq5bxeq2p0.riker.replit.dev/src/components/timeline/timeline-view.tsx:45:3)
+    at div
+    at div
+    at div
+    at Provider (https://965a6a9a-cac5-4b93-ae2c-e0bb23d6e4e3-00-yfpq5bxeq2p0.riker.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/react-beautiful-dnd.js?v=8cf0c976:1738:20)
+    at App (https://965a6a9a-cac5-4b93-ae2c-e0bb23d6e4e3-00-yfpq5bxeq2p0.riker.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/react-beautiful-dnd.js?v=8cf0c976:8281:25)
+    at ErrorBoundary2 (https://965a6a9a-cac5-4b93-ae2c-e0bb23d6e4e3-00-yfpq5bxeq2p0.riker.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/react-beautiful-dnd.js?v=8cf0c976:2778:35)
+    at DragDropContext (https://965a6a9a-cac5-4b93-ae2c-e0bb23d6e4e3-00-yfpq5bxeq2p0.riker.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/react-beautiful-dnd.js?v=8cf0c976:8401:19)
+    at div
+    at div
+    at GenerateAssignments (https://965a6a9a-cac5-4b93-ae2c-e0bb23d6e4e3-00-yfpq5bxeq2p0.riker.replit.dev/src/pages/generate-assignments.tsx:98:43)
+    at ProtectedRoute (https://965a6a9a-cac5-4b93-ae2c-e0bb23d6e4e3-00-yfpq5bxeq2p0.riker.replit.dev/src/App.tsx?v=tCR8Zl__20Oewnbd0Amdr:31:38)
+    at Route (https://965a6a9a-cac5-4b93-ae2c-e0bb23d6e4e3-00-yfpq5bxeq2p0.riker.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/wouter.js?v=8cf0c976:323:16)
+    at Switch (https://965a6a9a-cac5-4b93-ae2c-e0bb23d6e4e3-00-yfpq5bxeq2p0.riker.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/wouter.js?v=8cf0c976:379:17)
+    at Router
+    at Provider (https://965a6a9a-cac5-4b93-ae2c-e0bb23d6e4e3-00-yfpq5bxeq2p0.riker.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-IKZDNW7I.js?v=8cf0c976:43:15)
+    at TooltipProvider (https://965a6a9a-cac5-4b93-ae2c-e0bb23d6e4e3-00-yfpq5bxeq2p0.riker.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/@radix-ui_react-tooltip.js?v=8cf0c976:63:5)
+    at QueryClientProvider (https://965a6a9a-cac5-4b93-ae2c-e0bb23d6e4e3-00-yfpq5bxeq2p0.riker.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/@tanstack_react-query.js?v=8cf0c976:2805:3)
+    at App
+printWarning @ chunk-RPCDYKBN.js?v=8cf0c976:521
+error @ chunk-RPCDYKBN.js?v=8cf0c976:505
+validateDOMNesting @ chunk-RPCDYKBN.js?v=8cf0c976:8256
+createInstance @ chunk-RPCDYKBN.js?v=8cf0c976:8328
+completeWork @ chunk-RPCDYKBN.js?v=8cf0c976:16290
+completeUnitOfWork @ chunk-RPCDYKBN.js?v=8cf0c976:19224
+performUnitOfWork @ chunk-RPCDYKBN.js?v=8cf0c976:19206
+workLoopSync @ chunk-RPCDYKBN.js?v=8cf0c976:19137
+renderRootSync @ chunk-RPCDYKBN.js?v=8cf0c976:19116
+performSyncWorkOnRoot @ chunk-RPCDYKBN.js?v=8cf0c976:18874
+flushSyncCallbacks @ chunk-RPCDYKBN.js?v=8cf0c976:9119
+commitRootImpl @ chunk-RPCDYKBN.js?v=8cf0c976:19432
+commitRoot @ chunk-RPCDYKBN.js?v=8cf0c976:19277
+finishConcurrentRender @ chunk-RPCDYKBN.js?v=8cf0c976:18805
+performConcurrentWorkOnRoot @ chunk-RPCDYKBN.js?v=8cf0c976:18718
+workLoop @ chunk-RPCDYKBN.js?v=8cf0c976:197
+flushWork @ chunk-RPCDYKBN.js?v=8cf0c976:176
+performWorkUntilDeadline @ chunk-RPCDYKBN.js?v=8cf0c976:384
+chunk-RPCDYKBN.js?v=8cf0c976:521 Warning: validateDOMNesting(...): <ul> cannot appear as a descendant of <p>.
+    at ul
+    at p
+    at https://965a6a9a-cac5-4b93-ae2c-e0bb23d6e4e3-00-yfpq5bxeq2p0.riker.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-D7OHDVF4.js?v=8cf0c976:42:13
+    at https://965a6a9a-cac5-4b93-ae2c-e0bb23d6e4e3-00-yfpq5bxeq2p0.riker.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-IWUNBFAF.js?v=8cf0c976:283:13
+    at _c9 (https://965a6a9a-cac5-4b93-ae2c-e0bb23d6e4e3-00-yfpq5bxeq2p0.riker.replit.dev/src/components/ui/dialog.tsx:163:12)
+    at div
+    at DialogHeader (https://965a6a9a-cac5-4b93-ae2c-e0bb23d6e4e3-00-yfpq5bxeq2p0.riker.replit.dev/src/components/ui/dialog.tsx:88:3)
+    at div
+    at https://965a6a9a-cac5-4b93-ae2c-e0bb23d6e4e3-00-yfpq5bxeq2p0.riker.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-D7OHDVF4.js?v=8cf0c976:42:13
+    at https://965a6a9a-cac5-4b93-ae2c-e0bb23d6e4e3-00-yfpq5bxeq2p0.riker.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-E6YIEDFE.js?v=8cf0c976:61:7
+    at https://965a6a9a-cac5-4b93-ae2c-e0bb23d6e4e3-00-yfpq5bxeq2p0.riker.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-2K77HOHX.js?v=8cf0c976:79:13
+    at https://965a6a9a-cac5-4b93-ae2c-e0bb23d6e4e3-00-yfpq5bxeq2p0.riker.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-2K77HOHX.js?v=8cf0c976:56:13
+    at https://965a6a9a-cac5-4b93-ae2c-e0bb23d6e4e3-00-yfpq5bxeq2p0.riker.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-D7OHDVF4.js?v=8cf0c976:42:13
+    at https://965a6a9a-cac5-4b93-ae2c-e0bb23d6e4e3-00-yfpq5bxeq2p0.riker.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-GLSLJ34Y.js?v=8cf0c976:29:5
+    at https://965a6a9a-cac5-4b93-ae2c-e0bb23d6e4e3-00-yfpq5bxeq2p0.riker.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-IWUNBFAF.js?v=8cf0c976:235:13
+    at https://965a6a9a-cac5-4b93-ae2c-e0bb23d6e4e3-00-yfpq5bxeq2p0.riker.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-IWUNBFAF.js?v=8cf0c976:158:58
+    at Presence (https://965a6a9a-cac5-4b93-ae2c-e0bb23d6e4e3-00-yfpq5bxeq2p0.riker.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-X6232BML.js?v=8cf0c976:24:11)
+    at https://965a6a9a-cac5-4b93-ae2c-e0bb23d6e4e3-00-yfpq5bxeq2p0.riker.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-IWUNBFAF.js?v=8cf0c976:149:64
+    at https://965a6a9a-cac5-4b93-ae2c-e0bb23d6e4e3-00-yfpq5bxeq2p0.riker.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-2K77HOHX.js?v=8cf0c976:79:13
+    at https://965a6a9a-cac5-4b93-ae2c-e0bb23d6e4e3-00-yfpq5bxeq2p0.riker.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-2K77HOHX.js?v=8cf0c976:56:13
+    at https://965a6a9a-cac5-4b93-ae2c-e0bb23d6e4e3-00-yfpq5bxeq2p0.riker.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-D7OHDVF4.js?v=8cf0c976:42:13
+    at https://965a6a9a-cac5-4b93-ae2c-e0bb23d6e4e3-00-yfpq5bxeq2p0.riker.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-E6YIEDFE.js?v=8cf0c976:260:22
+    at Presence (https://965a6a9a-cac5-4b93-ae2c-e0bb23d6e4e3-00-yfpq5bxeq2p0.riker.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-X6232BML.js?v=8cf0c976:24:11)
+    at Provider (https://965a6a9a-cac5-4b93-ae2c-e0bb23d6e4e3-00-yfpq5bxeq2p0.riker.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-IKZDNW7I.js?v=8cf0c976:43:15)
+    at DialogPortal (https://965a6a9a-cac5-4b93-ae2c-e0bb23d6e4e3-00-yfpq5bxeq2p0.riker.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-IWUNBFAF.js?v=8cf0c976:111:11)
+    at _c3 (https://965a6a9a-cac5-4b93-ae2c-e0bb23d6e4e3-00-yfpq5bxeq2p0.riker.replit.dev/src/components/ui/dialog.tsx:51:12)
+    at Provider (https://965a6a9a-cac5-4b93-ae2c-e0bb23d6e4e3-00-yfpq5bxeq2p0.riker.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-IKZDNW7I.js?v=8cf0c976:43:15)
+    at Dialog (https://965a6a9a-cac5-4b93-ae2c-e0bb23d6e4e3-00-yfpq5bxeq2p0.riker.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-IWUNBFAF.js?v=8cf0c976:52:5)
+    at TimelineView (https://965a6a9a-cac5-4b93-ae2c-e0bb23d6e4e3-00-yfpq5bxeq2p0.riker.replit.dev/src/components/timeline/timeline-view.tsx:45:3)
+    at div
+    at div
+    at div
+    at Provider (https://965a6a9a-cac5-4b93-ae2c-e0bb23d6e4e3-00-yfpq5bxeq2p0.riker.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/react-beautiful-dnd.js?v=8cf0c976:1738:20)
+    at App (https://965a6a9a-cac5-4b93-ae2c-e0bb23d6e4e3-00-yfpq5bxeq2p0.riker.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/react-beautiful-dnd.js?v=8cf0c976:8281:25)
+    at ErrorBoundary2 (https://965a6a9a-cac5-4b93-ae2c-e0bb23d6e4e3-00-yfpq5bxeq2p0.riker.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/react-beautiful-dnd.js?v=8cf0c976:2778:35)
+    at DragDropContext (https://965a6a9a-cac5-4b93-ae2c-e0bb23d6e4e3-00-yfpq5bxeq2p0.riker.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/react-beautiful-dnd.js?v=8cf0c976:8401:19)
+    at div
+    at div
+    at GenerateAssignments (https://965a6a9a-cac5-4b93-ae2c-e0bb23d6e4e3-00-yfpq5bxeq2p0.riker.replit.dev/src/pages/generate-assignments.tsx:98:43)
+    at ProtectedRoute (https://965a6a9a-cac5-4b93-ae2c-e0bb23d6e4e3-00-yfpq5bxeq2p0.riker.replit.dev/src/App.tsx?v=tCR8Zl__20Oewnbd0Amdr:31:38)
+    at Route (https://965a6a9a-cac5-4b93-ae2c-e0bb23d6e4e3-00-yfpq5bxeq2p0.riker.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/wouter.js?v=8cf0c976:323:16)
+    at Switch (https://965a6a9a-cac5-4b93-ae2c-e0bb23d6e4e3-00-yfpq5bxeq2p0.riker.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/wouter.js?v=8cf0c976:379:17)
+    at Router
+    at Provider (https://965a6a9a-cac5-4b93-ae2c-e0bb23d6e4e3-00-yfpq5bxeq2p0.riker.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-IKZDNW7I.js?v=8cf0c976:43:15)
+    at TooltipProvider (https://965a6a9a-cac5-4b93-ae2c-e0bb23d6e4e3-00-yfpq5bxeq2p0.riker.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/@radix-ui_react-tooltip.js?v=8cf0c976:63:5)
+    at QueryClientProvider (https://965a6a9a-cac5-4b93-ae2c-e0bb23d6e4e3-00-yfpq5bxeq2p0.riker.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/@tanstack_react-query.js?v=8cf0c976:2805:3)
+    at App
+printWarning @ chunk-RPCDYKBN.js?v=8cf0c976:521
+error @ chunk-RPCDYKBN.js?v=8cf0c976:505
+validateDOMNesting @ chunk-RPCDYKBN.js?v=8cf0c976:8256
+createInstance @ chunk-RPCDYKBN.js?v=8cf0c976:8328
+completeWork @ chunk-RPCDYKBN.js?v=8cf0c976:16290
+completeUnitOfWork @ chunk-RPCDYKBN.js?v=8cf0c976:19224
+performUnitOfWork @ chunk-RPCDYKBN.js?v=8cf0c976:19206
+workLoopSync @ chunk-RPCDYKBN.js?v=8cf0c976:19137
+renderRootSync @ chunk-RPCDYKBN.js?v=8cf0c976:19116
+performSyncWorkOnRoot @ chunk-RPCDYKBN.js?v=8cf0c976:18874
+flushSyncCallbacks @ chunk-RPCDYKBN.js?v=8cf0c976:9119
+commitRootImpl @ chunk-RPCDYKBN.js?v=8cf0c976:19432
+commitRoot @ chunk-RPCDYKBN.js?v=8cf0c976:19277
+finishConcurrentRender @ chunk-RPCDYKBN.js?v=8cf0c976:18805
+performConcurrentWorkOnRoot @ chunk-RPCDYKBN.js?v=8cf0c976:18718
+workLoop @ chunk-RPCDYKBN.js?v=8cf0c976:197
+flushWork @ chunk-RPCDYKBN.js?v=8cf0c976:176
+performWorkUntilDeadline @ chunk-RPCDYKBN.js?v=8cf0c976:384
