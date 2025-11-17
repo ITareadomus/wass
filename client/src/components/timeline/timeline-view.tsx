@@ -73,6 +73,7 @@ export default function TimelineView({
   const timelineRef = useRef<HTMLDivElement>(null);
   const [confirmDialog, setConfirmDialog] = useState<{ open: boolean; cleanerId: number | null }>({ open: false, cleanerId: null });
   const [confirmUnavailableDialog, setConfirmUnavailableDialog] = useState<{ open: boolean; cleanerId: number | null }>({ open: false, cleanerId: null });
+  const [confirmRemovalDialog, setConfirmRemovalDialog] = useState<{ open: boolean; cleanerId: number | null }>({ open: false, cleanerId: null });
   const { toast } = useToast();
   const [, setLocation] = useLocation();
 
@@ -591,6 +592,14 @@ export default function TimelineView({
         addCleanerMutation.mutate(confirmUnavailableDialog.cleanerId!);
       }
       setIsAddCleanerDialogOpen(false); // Chiudi anche il dialog di aggiunta
+    }
+  };
+
+  // Handler per confermare la rimozione di un cleaner
+  const handleConfirmRemoveCleaner = () => {
+    if (confirmRemovalDialog.cleanerId) {
+      removeCleanerMutation.mutate(confirmRemovalDialog.cleanerId);
+      setConfirmRemovalDialog({ open: false, cleanerId: null });
     }
   };
 
@@ -1346,6 +1355,36 @@ export default function TimelineView({
           </div>
         </div>
       </div>
+      {/* Confirmation Dialog for Cleaner Removal */}
+      <Dialog open={confirmRemovalDialog.open} onOpenChange={(open) => setConfirmRemovalDialog({ open, cleanerId: null })}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Conferma Rimozione Cleaner</DialogTitle>
+            <DialogDescription>
+              Sei sicuro di voler rimuovere "{confirmRemovalDialog.cleanerId ? (() => {
+                const cleaner = allCleanersToShow.find(c => c.id === confirmRemovalDialog.cleanerId);
+                return cleaner ? `${cleaner.name} ${cleaner.lastname}` : 'Unknown';
+              })() : ''}" dalla selezione? Le sue task rimarranno in timeline finché non verrà sostituito.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex justify-end gap-2 mt-4">
+            <Button
+              variant="outline"
+              onClick={() => setConfirmRemovalDialog({ open: false, cleanerId: null })}
+              className="border-2 border-custom-blue"
+            >
+              Annulla
+            </Button>
+            <Button
+              onClick={handleConfirmRemoveCleaner}
+              variant="destructive"
+            >
+              Conferma Rimozione
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {/* Add Cleaner Dialog */}
       <Dialog open={isAddCleanerDialogOpen} onOpenChange={(open) => {
         setIsAddCleanerDialogOpen(open);
@@ -1597,13 +1636,16 @@ export default function TimelineView({
                   Il cleaner sarà rimosso dalla timeline ma le sue task rimarranno finché non verrà sostituito.
                 </p>
                 <Button
-                  onClick={() => removeCleanerMutation.mutate(selectedCleaner.id)}
+                  onClick={() => {
+                    setConfirmRemovalDialog({ open: true, cleanerId: selectedCleaner.id });
+                    setIsModalOpen(false);
+                  }}
                   disabled={removeCleanerMutation.isPending || isReadOnly}
                   variant="destructive"
                   className="w-full"
                   data-testid="button-remove-cleaner"
                 >
-                  {removeCleanerMutation.isPending ? "Rimozione..." : "Rimuovi dalla selezione"}
+                  Rimuovi dalla selezione
                 </Button>
               </div>
             </div>
