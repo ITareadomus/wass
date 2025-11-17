@@ -1379,9 +1379,8 @@ export default function GenerateAssignments() {
             }
           }
 
-          // Pulisci selezione e ricarica
+          // Pulisci selezione
           setSelectedTasks([]);
-          await refreshAssignments("manual");
 
           // Marca modifiche
           setHasUnsavedChanges(true);
@@ -1394,6 +1393,12 @@ export default function GenerateAssignments() {
             description: `${selectedTasks.length} task cross-container assegnate a ${cleanerName}`,
             variant: "success",
           });
+
+          // Rilascia lock PRIMA del reload
+          setIsDragging(false);
+
+          // Reload in background
+          await refreshAssignments("manual");
         } catch (err) {
           console.error("Errore nel batch move:", err);
           toast({
@@ -1401,7 +1406,7 @@ export default function GenerateAssignments() {
             description: "Impossibile assegnare le task selezionate.",
             variant: "destructive",
           });
-        } finally {
+          // Rilascia lock anche in caso di errore
           setIsDragging(false);
         }
         return;
@@ -1422,7 +1427,6 @@ export default function GenerateAssignments() {
 
           // Salva in timeline.json (rimuove automaticamente da containers.json)
           await saveTaskAssignment(taskId, toCleanerId, logisticCode, destination.index);
-          await refreshAssignments("manual");
 
           // CRITICAL: Marca modifiche dopo drag-and-drop da container
           setHasUnsavedChanges(true);
@@ -1435,6 +1439,12 @@ export default function GenerateAssignments() {
             description: `Task ${logisticCode} assegnata a ${cleanerName}`,
             variant: "success",
           });
+
+          // Rilascia lock PRIMA del reload
+          setIsDragging(false);
+
+          // Reload in background
+          await refreshAssignments("manual");
         } catch (err) {
           console.error("Errore nel salvataggio in timeline:", err);
           toast({
@@ -1442,8 +1452,7 @@ export default function GenerateAssignments() {
             description: "Impossibile assegnare la task alla timeline.",
             variant: "destructive",
           });
-        } finally {
-          // Rilascia lock indipendentemente dall'esito
+          // Rilascia lock anche in caso di errore
           setIsDragging(false);
         }
         return;
@@ -1522,6 +1531,9 @@ export default function GenerateAssignments() {
               });
             }
 
+            // CRITICAL: Rilascia il lock PRIMA del reload asincrono
+            setIsDragging(false);
+
             // Reload in background (non blocca e non genera errori se fallisce)
             refreshAssignments("manual").catch(err => {
               console.warn('⚠️ Reload fallito dopo movimento (movimento già salvato):', err);
@@ -1535,10 +1547,8 @@ export default function GenerateAssignments() {
             variant: "destructive"
           });
         } finally {
-          // Rilascia lock indipendentemente dall'esito
-          if (isDragging) { // Controlla se il lock è ancora attivo
-            setIsDragging(false);
-          }
+          // Assicura che il lock sia sempre rilasciato
+          setIsDragging(false);
         }
         return;
       }
@@ -1583,9 +1593,6 @@ export default function GenerateAssignments() {
             return;
           }
 
-          // Ricarica i task dai containers aggiornati
-          await refreshAssignments("manual");
-
           // CRITICAL: Marca modifiche dopo spostamento tra containers
           setHasUnsavedChanges(true);
           if (handleTaskMoved) {
@@ -1596,6 +1603,12 @@ export default function GenerateAssignments() {
             title: "Task spostata",
             description: `Task spostata tra containers`,
           });
+
+          // Rilascia lock PRIMA del reload
+          setIsDragging(false);
+
+          // Ricarica i task dai containers aggiornati in background
+          await refreshAssignments("manual");
         } catch (err) {
           console.error('update-task-json fetch failed', err);
           toast({
@@ -1603,8 +1616,7 @@ export default function GenerateAssignments() {
             description: "Errore di rete nello spostamento",
             variant: "destructive"
           });
-        } finally {
-          // Rilascia lock indipendentemente dall'esito
+          // Rilascia lock anche in caso di errore
           setIsDragging(false);
         }
         return;
@@ -1654,31 +1666,30 @@ export default function GenerateAssignments() {
 
         // Rimuovi da timeline.json
         await removeTimelineAssignment(taskId, logisticCode);
-        await refreshAssignments("manual");
 
         // CRITICAL: Marca modifiche dopo rimozione da timeline
         setHasUnsavedChanges(true);
         if (handleTaskMoved) {
           handleTaskMoved();
         }
-        // Rilascia lock indipendentemente dall'esito
+
+        // Rilascia lock PRIMA del reload
         setIsDragging(false);
+
+        // Reload in background
+        await refreshAssignments("manual");
         return;
       }
 
     } catch (error) {
       console.error('Errore nello spostamento:', error);
-      // NON ricaricare - mostra solo errore
       toast({
         title: "Errore",
         description: "Errore nello spostamento della task",
         variant: "destructive",
       });
-    } finally {
-      // Assicurati che il lock venga rilasciato anche in caso di errori inaspettati
-      if (isDragging) { // Controlla se il lock è ancora attivo
-        setIsDragging(false);
-      }
+      // Assicurati che il lock venga sempre rilasciato
+      setIsDragging(false);
     }
   };
 
