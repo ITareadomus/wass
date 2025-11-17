@@ -1534,9 +1534,7 @@ export default function GenerateAssignments() {
           });
         } finally {
           // Rilascia lock indipendentemente dall'esito
-          if (isDragging) { // Controlla se il lock è ancora attivo
-            setIsDragging(false);
-          }
+          setIsDragging(false);
         }
         return;
       }
