@@ -69,11 +69,25 @@ export default function TaskCard({
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [clickTimer, setClickTimer] = useState<NodeJS.Timeout | null>(null);
   const [operationNames, setOperationNames] = useState<Record<number, string>>({});
+  const [isMapFiltered, setIsMapFiltered] = useState(false);
 
   // Usa il context multi-select dalla prop (solo per container, non timeline)
   const isMultiSelectMode = multiSelectContext?.isMultiSelectMode ?? false;
   const isSelected = multiSelectContext?.isTaskSelected(String(task.id)) ?? false; // Pass String ID
   const selectionOrder = multiSelectContext?.getTaskOrder(String(task.id)); // Pass String ID
+
+  // Sincronizza con il filtro mappa per evidenziazione
+  useEffect(() => {
+    const checkMapFilter = setInterval(() => {
+      const currentFilteredTaskId = (window as any).mapFilteredTaskId;
+      const shouldBeFiltered = currentFilteredTaskId === task.name;
+      if (shouldBeFiltered !== isMapFiltered) {
+        setIsMapFiltered(shouldBeFiltered);
+      }
+    }, 100);
+
+    return () => clearInterval(checkMapFilter);
+  }, [task.name, isMapFiltered]);
 
   // Gestisce il click sulla card: se multi-select toggle selezione, altrimenti apri modale
   const handleCardClick = (e: React.MouseEvent) => {
@@ -525,7 +539,7 @@ export default function TaskCard({
                       ...provided.draggableProps.style,
                       width: cardWidth,
                       minHeight: "40px",
-                      ...(((window as any).mapFilteredTaskId === task.name) ? {
+                      ...(isMapFiltered ? {
                         boxShadow: '0 0 0 3px #3B82F6, 0 0 20px 5px rgba(59, 130, 246, 0.5)',
                         transform: 'scale(1.05)',
                         zIndex: 10,
