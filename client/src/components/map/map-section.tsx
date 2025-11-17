@@ -242,8 +242,27 @@ export default function MapSection({ tasks }: MapSectionProps) {
               div.style.animation = 'bounce 0.5s ease infinite alternate';
             }
             
+            let clickTimer: NodeJS.Timeout | null = null;
             div.addEventListener('click', () => {
-              setSelectedTask(task);
+              if (clickTimer) {
+                // Doppio click rilevato
+                clearTimeout(clickTimer);
+                clickTimer = null;
+                
+                // Toggle filtro
+                const currentFilteredTaskId = (window as any).mapFilteredTaskId;
+                if (currentFilteredTaskId === task.name) {
+                  (window as any).mapFilteredTaskId = null;
+                } else {
+                  (window as any).mapFilteredTaskId = task.name;
+                }
+              } else {
+                // Primo click: apri dettagli
+                clickTimer = setTimeout(() => {
+                  setSelectedTask(task);
+                  clickTimer = null;
+                }, 250);
+              }
             });
             
             this.div = div;
@@ -291,8 +310,27 @@ export default function MapSection({ tasks }: MapSectionProps) {
           optimized: true
         });
 
+        let clickTimer: NodeJS.Timeout | null = null;
         marker.addListener('click', () => {
-          setSelectedTask(task);
+          if (clickTimer) {
+            // Doppio click rilevato
+            clearTimeout(clickTimer);
+            clickTimer = null;
+            
+            // Toggle filtro
+            const currentFilteredTaskId = (window as any).mapFilteredTaskId;
+            if (currentFilteredTaskId === task.name) {
+              (window as any).mapFilteredTaskId = null;
+            } else {
+              (window as any).mapFilteredTaskId = task.name;
+            }
+          } else {
+            // Primo click: apri dettagli
+            clickTimer = setTimeout(() => {
+              setSelectedTask(task);
+              clickTimer = null;
+            }, 250);
+          }
         });
 
         markersRef.current.push(marker);
