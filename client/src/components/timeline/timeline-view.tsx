@@ -906,7 +906,7 @@ export default function TimelineView({
             title: "⚠️ Assegnazione incompatibile",
             description: `${assignment.cleanerName} (${assignment.role}) ha task incompatibili: ${assignment.taskNames}`,
             variant: "default",
-            className: "bg-yellow-100 dark:bg-yellow-900/50 border-yellow-500 text-yellow-900 dark:text-yellow-100",
+            className: "bg-yellow-200 dark:bg-yellow-800 border-2 border-yellow-600 dark:border-yellow-500 text-yellow-900 dark:text-yellow-50 shadow-lg",
           });
         }
       });
