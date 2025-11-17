@@ -814,6 +814,56 @@ export default function TimelineView({
   // Nota: il tracking delle modifiche avviene SOLO tramite onTaskMoved
   // chiamato esplicitamente durante drag-and-drop e altre azioni utente
 
+  // Mostra cleaners da selected_cleaners.json + cleaners che hanno task in timeline.json
+  // Questo permette di vedere cleaners rimossi che hanno ancora task assegnate
+  const allCleanersToShow = React.useMemo(() => {
+    const selectedCleanerIds = new Set(cleaners.map(c => c.id));
+    const timelineCleanersWithTasks = timelineCleaners
+      .filter(tc => tc.tasks && tc.tasks.length > 0) // Solo cleaners con task
+      .filter(tc => !selectedCleanerIds.has(tc.cleaner?.id)) // Non già in selected_cleaners
+      .map(tc => ({ ...tc.cleaner, isRemoved: true })); // Marca come rimosso
+
+    // Combina selected_cleaners + timeline cleaners con task (quelli rimossi andranno in fondo)
+    return [...cleaners, ...timelineCleanersWithTasks];
+  }, [cleaners, timelineCleaners]);
+
+  // Crea Set di ID cleaner rimossi per facile lookup
+  const removedCleanerIds = React.useMemo(() => {
+    const selectedIds = new Set(cleaners.map(c => c.id));
+    return new Set(
+      timelineCleaners
+        .filter(tc => tc.tasks && tc.tasks.length > 0 && !selectedIds.has(tc.cleaner?.id))
+        .map(tc => tc.cleaner?.id)
+    );
+  }, [cleaners, timelineCleaners]);
+
+  // --- NORMALIZZAZIONI TIMELINE ---
+  // NON normalizzare task.type - lo determiniamo dai flag
+  const normalizeTask = (task: any) => {
+    // Normalizza SOLO i flag straordinaria/premium, NON il type
+    const isPremium = Boolean(task.premium);
+    const isStraordinaria = Boolean(task.straordinaria);
+
+    // Normalizza confirmed_operation
+    const rawConfirmed = task.confirmed_operation;
+    const isConfirmedOperation =
+      typeof rawConfirmed === "boolean"
+        ? rawConfirmed
+        : typeof rawConfirmed === "number"
+          ? rawConfirmed !== 0
+          : typeof rawConfirmed === "string"
+            ? ["true", "1", "yes"].includes(rawConfirmed.toLowerCase().trim())
+            : false;
+
+    return {
+      ...task,
+      // NON sovrascrivere task.type - lascialo undefined se non esiste
+      premium: isPremium,
+      straordinaria: isStraordinaria,
+      confirmed_operation: isConfirmedOperation,
+    };
+  };
+
   // Gestione toast per incompatibilità task-cleaner
   useEffect(() => {
     if (!validationRules) return;
@@ -890,56 +940,6 @@ export default function TimelineView({
     } catch (error) {
       console.error("Errore nel controllo delle assegnazioni salvate:", error);
     }
-  };
-
-  // Mostra cleaners da selected_cleaners.json + cleaners che hanno task in timeline.json
-  // Questo permette di vedere cleaners rimossi che hanno ancora task assegnate
-  const allCleanersToShow = React.useMemo(() => {
-    const selectedCleanerIds = new Set(cleaners.map(c => c.id));
-    const timelineCleanersWithTasks = timelineCleaners
-      .filter(tc => tc.tasks && tc.tasks.length > 0) // Solo cleaners con task
-      .filter(tc => !selectedCleanerIds.has(tc.cleaner?.id)) // Non già in selected_cleaners
-      .map(tc => ({ ...tc.cleaner, isRemoved: true })); // Marca come rimosso
-
-    // Combina selected_cleaners + timeline cleaners con task (quelli rimossi andranno in fondo)
-    return [...cleaners, ...timelineCleanersWithTasks];
-  }, [cleaners, timelineCleaners]);
-
-  // Crea Set di ID cleaner rimossi per facile lookup
-  const removedCleanerIds = React.useMemo(() => {
-    const selectedIds = new Set(cleaners.map(c => c.id));
-    return new Set(
-      timelineCleaners
-        .filter(tc => tc.tasks && tc.tasks.length > 0 && !selectedIds.has(tc.cleaner?.id))
-        .map(tc => tc.cleaner?.id)
-    );
-  }, [cleaners, timelineCleaners]);
-
-  // --- NORMALIZZAZIONI TIMELINE ---
-  // NON normalizzare task.type - lo determiniamo dai flag
-  const normalizeTask = (task: any) => {
-    // Normalizza SOLO i flag straordinaria/premium, NON il type
-    const isPremium = Boolean(task.premium);
-    const isStraordinaria = Boolean(task.straordinaria);
-
-    // Normalizza confirmed_operation
-    const rawConfirmed = task.confirmed_operation;
-    const isConfirmedOperation =
-      typeof rawConfirmed === "boolean"
-        ? rawConfirmed
-        : typeof rawConfirmed === "number"
-          ? rawConfirmed !== 0
-          : typeof rawConfirmed === "string"
-            ? ["true", "1", "yes"].includes(rawConfirmed.toLowerCase().trim())
-            : false;
-
-    return {
-      ...task,
-      // NON sovrascrivere task.type - lascialo undefined se non esiste
-      premium: isPremium,
-      straordinaria: isStraordinaria,
-      confirmed_operation: isConfirmedOperation,
-    };
   };
 
   // Variabile per determinare se ci sono task assegnate (per mostrare/nascondere pulsante conferma)
