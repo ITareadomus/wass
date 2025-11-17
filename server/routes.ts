@@ -2940,7 +2940,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const settingsData = req.body;
       const settingsPath = path.join(process.cwd(), "client/public/data/input/settings.json");
 
-      await fs.promises.writeFile(
+      await fs.writeFile(
         settingsPath,
         JSON.stringify(settingsData, null, 2),
         "utf-8"
