@@ -1785,7 +1785,7 @@ export default function TimelineView({
               <div className="grid grid-cols-2 gap-4">
                 <div className="col-span-2">
                   <p className="text-sm font-semibold text-muted-foreground mb-1">Nome, Cognome e Alias</p>
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-6">
                     <p className="text-sm">{selectedCleaner.name.toUpperCase()}</p>
                     <p className="text-sm">{selectedCleaner.lastname.toUpperCase()}</p>
                     <p
