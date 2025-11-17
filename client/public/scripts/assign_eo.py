@@ -5,6 +5,7 @@ from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Tuple
 from pathlib import Path
 from datetime import datetime
+from task_validation import can_cleaner_handle_task
 
 # =============================
 # I/O paths
@@ -585,21 +586,32 @@ def plan_day(tasks: List[Task], cleaners: List[Cleaner], assigned_logistic_codes
 
         # Se trovato un cleaner con stesso edificio, prova ad assegnare solo a lui
         if same_building_cleaner:
-            result = find_best_position(same_building_cleaner, task)
-            if result is not None:
-                pos, travel = result
-                same_building_cleaner.route.insert(pos, task)
-                assigned_logistic_codes.add(task.logistic_code)
-                print(f"   🏢 Task {task.task_id} assegnata a {same_building_cleaner.name} (stesso edificio: {task.address})")
-                continue
+            # VALIDAZIONE: Verifica compatibilità anche per fast-path stesso edificio
+            task_type = 'straordinario_apt' if task.straordinaria else ('premium_apt' if task.is_premium else 'standard_apt')
+            if not can_cleaner_handle_task(same_building_cleaner.role, task_type):
+                print(f"   ⚠️  Same-building cleaner {same_building_cleaner.name} ({same_building_cleaner.role}) non può gestire task {task_type} - SKIPPATO fast-path")
             else:
-                # Stesso edificio ma non può prendere la task (limite raggiunto)
-                print(f"   ⚠️  Task {task.task_id} stesso edificio di {same_building_cleaner.name} ma limite raggiunto")
+                result = find_best_position(same_building_cleaner, task)
+                if result is not None:
+                    pos, travel = result
+                    same_building_cleaner.route.insert(pos, task)
+                    assigned_logistic_codes.add(task.logistic_code)
+                    print(f"   🏢 Task {task.task_id} assegnata a {same_building_cleaner.name} (stesso edificio: {task.address})")
+                    continue
+                else:
+                    # Stesso edificio ma non può prendere la task (limite raggiunto)
+                    print(f"   ⚠️  Task {task.task_id} stesso edificio di {same_building_cleaner.name} ma limite raggiunto")
 
         # Se non c'è stesso edificio, procedi con logica normale
         candidates = []
 
         for cleaner in cleaners:
+            # VALIDAZIONE: Verifica se il cleaner può gestire questo tipo di task
+            task_type = 'straordinario_apt' if task.straordinaria else ('premium_apt' if task.is_premium else 'standard_apt')
+            if not can_cleaner_handle_task(cleaner.role, task_type):
+                print(f"   ⚠️  Cleaner {cleaner.name} ({cleaner.role}) non può gestire task {task_type} - SKIPPATO")
+                continue
+            
             result = find_best_position(cleaner, task)
             if result is not None:
                 pos, travel = result

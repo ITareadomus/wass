@@ -1196,6 +1196,7 @@ export default function TimelineView({
                                       allTasks={cleanerTasks}
                                       isDragDisabled={isReadOnly}
                                       isReadOnly={isReadOnly}
+                                      cleanerRole={cleaner.role}
                                     />
                                   </>
                                 );

@@ -20,6 +20,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { HelpCircle, ChevronLeft, ChevronRight, Save, Pencil, Calendar } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
+import { isIncompatibleAssignment } from "@/lib/taskValidation";
 
 // Normalizza la chiave di una task indipendentemente dal campo usato
 const getTaskKey = (t: any) => String(t?.id ?? t?.task_id ?? t?.logistic_code ?? "");
@@ -44,6 +45,7 @@ interface TaskCardProps {
   isDragDisabled?: boolean;
   isReadOnly?: boolean;
   multiSelectContext?: MultiSelectContextType;
+  cleanerRole?: string;
 }
 
 interface AssignedTask {
@@ -64,17 +66,30 @@ export default function TaskCard({
   isDragDisabled = false,
   isReadOnly = false,
   multiSelectContext = null,
+  cleanerRole = undefined,
 }: TaskCardProps) {
   console.log('🔧 TaskCard render - isReadOnly:', isReadOnly, 'for task:', task.name);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [clickTimer, setClickTimer] = useState<NodeJS.Timeout | null>(null);
   const [operationNames, setOperationNames] = useState<Record<number, string>>({});
   const [isMapFiltered, setIsMapFiltered] = useState(false);
+  const [isIncompatible, setIsIncompatible] = useState(false);
 
   // Usa il context multi-select dalla prop (solo per container, non timeline)
   const isMultiSelectMode = multiSelectContext?.isMultiSelectMode ?? false;
   const isSelected = multiSelectContext?.isTaskSelected(String(task.id)) ?? false; // Pass String ID
   const selectionOrder = multiSelectContext?.getTaskOrder(String(task.id)); // Pass String ID
+
+  // Verifica compatibilità cleaner-task (solo se nella timeline con cleanerRole)
+  useEffect(() => {
+    if (isInTimeline && cleanerRole) {
+      isIncompatibleAssignment(cleanerRole, task).then(incompatible => {
+        setIsIncompatible(incompatible);
+      });
+    } else {
+      setIsIncompatible(false);
+    }
+  }, [isInTimeline, cleanerRole, task]);
 
   // Sincronizza con il filtro mappa per evidenziazione
   useEffect(() => {
@@ -528,7 +543,8 @@ export default function TaskCard({
                     {...provided.dragHandleProps}
                     className={`
                       ${cardColorClass}
-                      rounded-sm px-2 py-1 shadow-sm border transition-all duration-200
+                      rounded-sm px-2 py-1 shadow-sm transition-all duration-200
+                      ${isIncompatible ? "border-2 border-red-500 dark:border-red-400" : "border"}
                       ${snapshot.isDragging ? "shadow-lg scale-105" : ""}
                       ${isOverdue && isInTimeline ? "animate-blink" : ""}
                       ${isDuplicate && !isInTimeline ? "animate-blink-yellow" : ""}
