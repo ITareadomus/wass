@@ -195,21 +195,34 @@ export default function Settings() {
   const handleClientToggle = (clientId: number, type: "eo" | "hp") => {
     if (!systemSettings) return;
 
-    const section = type === "eo" ? "early-out" : "high-priority";
-    const clientsKey = type === "eo" ? "eo_clients" : "hp_clients";
-    const currentClients = systemSettings[section][clientsKey];
+    if (type === "eo") {
+      const currentClients = systemSettings["early-out"].eo_clients;
+      const updatedClients = currentClients.includes(clientId)
+        ? currentClients.filter(id => id !== clientId)
+        : [...currentClients, clientId];
 
-    const updatedClients = currentClients.includes(clientId)
-      ? currentClients.filter(id => id !== clientId)
-      : [...currentClients, clientId];
+      setSystemSettings({
+        ...systemSettings,
+        "early-out": {
+          ...systemSettings["early-out"],
+          eo_clients: updatedClients
+        }
+      });
+    } else {
+      const currentClients = systemSettings["high-priority"].hp_clients;
+      const updatedClients = currentClients.includes(clientId)
+        ? currentClients.filter(id => id !== clientId)
+        : [...currentClients, clientId];
 
-    setSystemSettings({
-      ...systemSettings,
-      [section]: {
-        ...systemSettings[section],
-        [clientsKey]: updatedClients
-      }
-    });
+      setSystemSettings({
+        ...systemSettings,
+        "high-priority": {
+          ...systemSettings["high-priority"],
+          hp_clients: updatedClients
+        }
+      });
+    }
+    
     setHasUnsavedChanges(true);
   };
 
