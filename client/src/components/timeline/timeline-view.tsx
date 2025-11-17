@@ -1425,7 +1425,6 @@ export default function TimelineView({
                                       allTasks={cleanerTasks}
                                       isDragDisabled={isReadOnly}
                                       isReadOnly={isReadOnly}
-                                      isIncompatible={isIncompatible}
                                     />
                                   </>
                                 );
