@@ -707,7 +707,15 @@ export default function GenerateAssignments() {
         throw new Error('Errore nel caricamento del file containers.json');
       }
 
-      const containersData = await containersResponse.json();
+      const containersText = await containersResponse.text();
+      
+      // Verifica che il contenuto sia JSON valido
+      if (!containersText.trim().startsWith('{') && !containersText.trim().startsWith('[')) {
+        console.error('❌ containers.json corrotto, non è JSON:', containersText.substring(0, 100));
+        throw new Error('containers.json corrotto - riprova tra qualche secondo');
+      }
+
+      const containersData = JSON.parse(containersText);
 
       // Carica da timeline.json con gestione errori robusta
       let timelineAssignmentsData = {
@@ -720,8 +728,16 @@ export default function GenerateAssignments() {
         try {
           const contentType = timelineResponse.headers.get('content-type');
           if (contentType && contentType.includes('application/json')) {
-            timelineAssignmentsData = await timelineResponse.json();
-            console.log("Timeline assignments data:", timelineAssignmentsData);
+            const timelineText = await timelineResponse.text();
+            
+            // Verifica che il contenuto sia JSON valido
+            if (!timelineText.trim().startsWith('{') && !timelineText.trim().startsWith('[')) {
+              console.warn('Timeline.json corrotto, non è JSON:', timelineText.substring(0, 100));
+              timelineAssignmentsData = { metadata: {}, cleaners_assignments: [] };
+            } else {
+              timelineAssignmentsData = JSON.parse(timelineText);
+              console.log("Timeline assignments data:", timelineAssignmentsData);
+            }
           } else {
             console.warn('Timeline file is not JSON, using empty timeline');
           }
