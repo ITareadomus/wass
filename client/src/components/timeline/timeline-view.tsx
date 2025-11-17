@@ -15,6 +15,7 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -78,6 +79,8 @@ export default function TimelineView({
   const [acknowledgedIncompatibleCleaners, setAcknowledgedIncompatibleCleaners] = useState<Set<number>>(new Set());
   const { toast } = useToast();
   const [, setLocation] = useLocation();
+  const [editingAlias, setEditingAlias] = useState<string>("");
+  const [isSavingAlias, setIsSavingAlias] = useState(false);
 
   // Stato per le regole di validazione task-cleaner
   const [validationRules, setValidationRules] = useState<any>(null);
@@ -474,11 +477,10 @@ export default function TimelineView({
     (window as any).loadTimelineCleaners = loadTimelineCleaners;
   }, []);
 
-  const handleCleanerClick = (cleaner: Cleaner, e: React.MouseEvent) => {
-    e.preventDefault();
-
-    // Se c'è già un timer attivo, è un doppio click
+  const handleCleanerClick = (cleaner: Cleaner, e?: React.MouseEvent) => {
+    // Solo click singolo apre il dialog
     if (clickTimer) {
+      // È un doppio click, annulla il click singolo
       clearTimeout(clickTimer);
       setClickTimer(null);
 
@@ -525,6 +527,9 @@ export default function TimelineView({
 
         // Singolo click: apri modal normale se non ci sono incompatibilità
         setSelectedCleaner(cleaner);
+        // Inizializza l'alias dal cleanersAliases
+        const currentAlias = cleanersAliases[cleaner.id]?.alias || "";
+        setEditingAlias(currentAlias);
         setIsModalOpen(true);
         setClickTimer(null);
       }, 250); // 250ms per distinguere singolo da doppio click
@@ -628,6 +633,52 @@ export default function TimelineView({
     if (confirmRemovalDialog.cleanerId) {
       removeCleanerMutation.mutate(confirmRemovalDialog.cleanerId);
       setConfirmRemovalDialog({ open: false, cleanerId: null });
+    }
+  };
+
+  // Salva l'alias modificato
+  const handleSaveAlias = async () => {
+    if (!selectedCleaner) return;
+    setIsSavingAlias(true);
+    try {
+      const response = await fetch('/api/update-cleaner-alias', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          cleanerId: selectedCleaner.id,
+          alias: editingAlias,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Errore nel salvataggio dell\'alias');
+      }
+
+      const result = await response.json();
+      toast({
+        title: "Alias salvato",
+        description: `L'alias di ${selectedCleaner.name} ${selectedCleaner.lastname} è stato aggiornato.`,
+        variant: "success",
+      });
+
+      // Aggiorna lo stato locale degli alias
+      setCleanersAliases(prev => ({
+        ...prev,
+        [selectedCleaner.id]: { alias: editingAlias }
+      }));
+
+      // Chiudi il dialog di modifica alias
+      setIsModalOpen(false); // Chiude il dialog principale
+
+    } catch (error: any) {
+      console.error("Errore nel salvataggio dell'alias:", error);
+      toast({
+        title: "Errore",
+        description: error.message || "Impossibile salvare l'alias",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSavingAlias(false);
     }
   };
 
@@ -1647,6 +1698,27 @@ export default function TimelineView({
                 <div>
                   <p className="text-sm font-semibold text-muted-foreground">Cognome</p>
                   <p className="text-sm">{selectedCleaner.lastname.toUpperCase()}</p>
+                </div>
+                {/* Alias Field */}
+                <div className="col-span-2">
+                  <p className="text-sm font-semibold text-muted-foreground mb-1">Alias</p>
+                  <div className="flex items-center gap-2">
+                    <Input
+                      value={editingAlias}
+                      onChange={(e) => setEditingAlias(e.target.value)}
+                      placeholder="Inserisci alias"
+                      className="flex-1"
+                      disabled={isSavingAlias}
+                    />
+                    <Button
+                      onClick={handleSaveAlias}
+                      disabled={isSavingAlias || editingAlias === (cleanersAliases[selectedCleaner.id]?.alias || "")}
+                      className="flex-shrink-0"
+                      data-testid="save-alias-button"
+                    >
+                      {isSavingAlias ? "Salvataggio..." : "Salva Alias"}
+                    </Button>
+                  </div>
                 </div>
                 <div>
                   <p className="text-sm font-semibold text-muted-foreground">Giorni lavorati</p>

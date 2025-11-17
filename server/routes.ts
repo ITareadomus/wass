@@ -3394,6 +3394,80 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Endpoint per salvare alias cleaner
+  app.post("/api/save-cleaner-alias", async (req, res) => {
+    try {
+      const { cleanerId, alias } = req.body;
+
+      if (!cleanerId) {
+        return res.status(400).json({
+          success: false,
+          message: "cleanerId è obbligatorio"
+        });
+      }
+
+      const aliasesPath = path.join(process.cwd(), "client/public/data/cleaners/cleaners_aliases.json");
+      let aliasesData: any;
+
+      try {
+        const content = await fs.readFile(aliasesPath, 'utf8');
+        aliasesData = JSON.parse(content);
+      } catch (error) {
+        // Se il file non esiste, crea la struttura base
+        aliasesData = {
+          metadata: {
+            last_updated: new Date().toISOString(),
+            description: "Alias personalizzati per i cleaners da visualizzare sulla timeline"
+          },
+          aliases: {}
+        };
+      }
+
+      // Carica i dati del cleaner da cleaners.json per ottenere name e lastname
+      const cleanersPath = path.join(process.cwd(), "client/public/data/cleaners/cleaners.json");
+      const cleanersData = JSON.parse(await fs.readFile(cleanersPath, 'utf8'));
+
+      let cleanerInfo = null;
+      for (const date of Object.keys(cleanersData.dates || {})) {
+        const dateCleaners = cleanersData.dates[date]?.cleaners || [];
+        cleanerInfo = dateCleaners.find((c: any) => c.id === cleanerId);
+        if (cleanerInfo) break;
+      }
+
+      if (!cleanerInfo) {
+        return res.status(404).json({
+          success: false,
+          message: "Cleaner non trovato"
+        });
+      }
+
+      // Aggiorna o crea l'alias
+      aliasesData.aliases[cleanerId] = {
+        name: cleanerInfo.name,
+        lastname: cleanerInfo.lastname,
+        alias: alias || ""
+      };
+
+      // Aggiorna metadata
+      aliasesData.metadata.last_updated = new Date().toISOString();
+
+      // Salva il file
+      const tmpPath = `${aliasesPath}.tmp`;
+      await fs.writeFile(tmpPath, JSON.stringify(aliasesData, null, 2));
+      await fs.rename(tmpPath, aliasesPath);
+
+      console.log(`✅ Alias salvato per cleaner ${cleanerId}: "${alias}"`);
+
+      res.json({
+        success: true,
+        message: "Alias salvato con successo"
+      });
+    } catch (error: any) {
+      console.error("Errore nel salvataggio dell'alias:", error);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
   // API per la gestione degli account utente
   app.get("/api/accounts", async (req, res) => {
     try {
