@@ -1,12 +1,12 @@
 {
   "windows": [
     {
-      "client_id": 43,
-      "checkin_time": "10:00",
-      "checkout_time": ""
+      "client_id": 64,
+      "checkin_time": "11:00",
+      "checkout_time": "14:00"
     }
   ],
   "metadata": {
-    "last_updated": "2025-11-14T17:45:00.227Z"
+    "last_updated": "2025-11-17T09:40:22.639Z"
   }
 }
