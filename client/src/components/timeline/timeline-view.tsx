@@ -177,15 +177,13 @@ export default function TimelineView({
         onTaskMoved();
       }
 
-      // Preserva il cleaner aggiunto/sostituito nel set acknowledged
-      // Questo previene che riappaia l'animazione dopo l'aggiunta
+      // Invalida l'acknowledge per vedere nuove incompatibilità
       setAcknowledgedIncompatibleCleaners(prev => {
         const newSet = new Set(prev);
-        newSet.add(cleanerId);
-        // Se era una sostituzione, mantieni anche il cleaner sostituito
         if (cleanerToReplace) {
-          newSet.add(cleanerToReplace);
+          newSet.delete(cleanerToReplace);
         }
+        newSet.delete(cleanerId); // il nuovo cleaner NON è acknowledged di default
         return newSet;
       });
 
@@ -1103,11 +1101,22 @@ export default function TimelineView({
     });
   };
 
-  // Esponi la funzione globalmente per essere chiamata dopo drag & drop
+  // Funzione per invalidare lo stato acknowledged (mostra incompatibilità)
+  const invalidateAcknowledgedState = (cleanerId: number) => {
+    setAcknowledgedIncompatibleCleaners(prev => {
+      const newSet = new Set(prev);
+      newSet.delete(cleanerId);
+      return newSet;
+    });
+  };
+
+  // Esponi le funzioni globalmente per essere chiamate dopo drag & drop
   useEffect(() => {
     (window as any).preserveAcknowledgedIncompatibleCleaners = preserveAcknowledgedState;
+    (window as any).invalidateAcknowledgedIncompatibleCleaners = invalidateAcknowledgedState;
     return () => {
       delete (window as any).preserveAcknowledgedIncompatibleCleaners;
+      delete (window as any).invalidateAcknowledgedIncompatibleCleaners;
     };
   }, []);
 
