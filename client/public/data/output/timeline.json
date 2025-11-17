@@ -1,6 +1,6 @@
 {
   "metadata": {
-    "last_updated": "2025-11-17T13:52:24.229Z",
+    "last_updated": "2025-11-17T13:54:28.400Z",
     "date": "2025-11-17",
     "created_by": "unknown",
     "modified_by": [
@@ -82,6 +82,72 @@
           "sequence": 2,
           "travel_time": 22,
           "modified_by": "Admin"
+        },
+        {
+          "task_id": 217652,
+          "logistic_code": 1198,
+          "client_id": null,
+          "premium": false,
+          "address": "Via Bergognone 31",
+          "lat": "45.453707852983",
+          "lng": "9.1641459982137",
+          "cleaning_time": 180,
+          "checkin_date": "2025-11-17",
+          "checkout_date": "2025-11-17",
+          "checkin_time": "15:00",
+          "checkout_time": "11:00",
+          "pax_in": 5,
+          "pax_out": 4,
+          "small_equipment": false,
+          "operation_id": 2,
+          "confirmed_operation": true,
+          "straordinaria": false,
+          "type_apt": "D",
+          "alias": "ITW",
+          "customer_name": "ITALIANWAY SRL",
+          "reasons": [
+            "manually_moved_to_timeline"
+          ],
+          "priority": "high_priority",
+          "start_time": "14:11",
+          "end_time": "17:11",
+          "followup": true,
+          "sequence": 3,
+          "travel_time": 19,
+          "modified_by": "Admin"
+        },
+        {
+          "task_id": 218854,
+          "logistic_code": 490,
+          "client_id": null,
+          "premium": false,
+          "address": "VIA DELLA COMMENDA, 28",
+          "lat": "45.4551641",
+          "lng": "9.1994733",
+          "cleaning_time": 60,
+          "checkin_date": "2025-11-19",
+          "checkout_date": "2025-11-17",
+          "checkin_time": "15:00",
+          "checkout_time": null,
+          "pax_in": 2,
+          "pax_out": 1,
+          "small_equipment": false,
+          "operation_id": 2,
+          "confirmed_operation": true,
+          "straordinaria": false,
+          "type_apt": "A",
+          "alias": "NTM",
+          "customer_name": "NOTA-MI",
+          "reasons": [
+            "manually_moved_to_timeline"
+          ],
+          "priority": "early_out",
+          "start_time": "17:37",
+          "end_time": "18:37",
+          "followup": true,
+          "sequence": 4,
+          "travel_time": 26,
+          "modified_by": "Admin"
         }
       ]
     },
@@ -134,6 +200,6 @@
     "total_cleaners": 2,
     "used_cleaners": 0,
     "assigned_tasks": 0,
-    "total_tasks": 3
+    "total_tasks": 5
   }
 }
