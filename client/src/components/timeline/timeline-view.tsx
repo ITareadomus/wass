@@ -81,7 +81,7 @@ export default function TimelineView({
   const [, setLocation] = useLocation();
   const [editingAlias, setEditingAlias] = useState<string>("");
   const [isSavingAlias, setIsSavingAlias] = useState(false);
-  const [editingField, setEditingField] = useState<'alias' | null>(null);
+  const [aliasDialog, setAliasDialog] = useState<{ open: boolean; cleanerId: number | null; cleanerName: string }>({ open: false, cleanerId: null, cleanerName: '' });
 
   // Stato per le regole di validazione task-cleaner
   const [validationRules, setValidationRules] = useState<any>(null);
@@ -655,16 +655,27 @@ export default function TimelineView({
     }
   };
 
+  // Apri dialog modifica alias
+  const handleOpenAliasDialog = (cleaner: Cleaner) => {
+    const currentAlias = cleanersAliases[cleaner.id]?.alias || "";
+    setEditingAlias(currentAlias);
+    setAliasDialog({
+      open: true,
+      cleanerId: cleaner.id,
+      cleanerName: `${cleaner.name} ${cleaner.lastname}`
+    });
+  };
+
   // Salva l'alias modificato
   const handleSaveAlias = async () => {
-    if (!selectedCleaner) return;
+    if (!aliasDialog.cleanerId) return;
     setIsSavingAlias(true);
     try {
       const response = await fetch('/api/update-cleaner-alias', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          cleanerId: selectedCleaner.id,
+          cleanerId: aliasDialog.cleanerId,
           alias: editingAlias,
         }),
       });
@@ -680,12 +691,12 @@ export default function TimelineView({
       
       toast({
         title: "Alias salvato",
-        description: `L'alias di ${selectedCleaner.name} ${selectedCleaner.lastname} è stato aggiornato.`,
+        description: `L'alias è stato aggiornato con successo.`,
         variant: "success",
       });
 
-      // Chiudi il campo di modifica
-      setEditingField(null);
+      // Chiudi il dialog
+      setAliasDialog({ open: false, cleanerId: null, cleanerName: '' });
 
     } catch (error: any) {
       console.error("Errore nel salvataggio dell'alias:", error);
@@ -1514,6 +1525,66 @@ export default function TimelineView({
         </DialogContent>
       </Dialog>
 
+      {/* Alias Edit Dialog */}
+      <Dialog open={aliasDialog.open} onOpenChange={(open) => !open && setAliasDialog({ open: false, cleanerId: null, cleanerName: '' })}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Pencil className="w-5 h-5 text-custom-blue" />
+              Modifica Alias
+            </DialogTitle>
+            <DialogDescription>
+              Stai modificando l'alias di <strong>{aliasDialog.cleanerName}</strong>
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 mt-4">
+            <div>
+              <label className="text-sm font-semibold text-muted-foreground mb-2 block">
+                Nuovo Alias
+              </label>
+              <Input
+                value={editingAlias}
+                onChange={(e) => setEditingAlias(e.target.value)}
+                placeholder="Inserisci alias"
+                className="w-full"
+                autoFocus
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    handleSaveAlias();
+                  }
+                }}
+              />
+            </div>
+          </div>
+          <div className="flex justify-end gap-2 mt-6">
+            <Button
+              variant="outline"
+              onClick={() => setAliasDialog({ open: false, cleanerId: null, cleanerName: '' })}
+              disabled={isSavingAlias}
+            >
+              Annulla
+            </Button>
+            <Button
+              onClick={handleSaveAlias}
+              disabled={isSavingAlias}
+              className="bg-custom-blue hover:bg-custom-blue/90"
+            >
+              {isSavingAlias ? (
+                <>
+                  <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                  Salvataggio...
+                </>
+              ) : (
+                <>
+                  <Save className="w-4 h-4 mr-2" />
+                  Salva
+                </>
+              )}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {/* Confirmation Dialog for Cleaner Removal */}
       <Dialog open={confirmRemovalDialog.open} onOpenChange={(open) => setConfirmRemovalDialog({ open, cleanerId: null })}>
         <DialogContent className="sm:max-w-md">
@@ -1707,53 +1778,35 @@ export default function TimelineView({
           </DialogHeader>
           {selectedCleaner && (
             <div className="space-y-4">
-              <div className="grid grid-cols-1 gap-4">
-                <div className="grid grid-cols-3 gap-4">
-                  <div>
-                    <p className="text-sm font-semibold text-muted-foreground">Nome</p>
-                    <p className="text-sm">{selectedCleaner.name.toUpperCase()}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm font-semibold text-muted-foreground">Cognome</p>
-                    <p className="text-sm">{selectedCleaner.lastname.toUpperCase()}</p>
-                  </div>
-                  {/* Alias Field */}
-                  <div>
-                    <p className="text-sm font-semibold text-muted-foreground mb-1 flex items-center gap-1">
-                      Alias
-                      {!isReadOnly && <Pencil className="w-3 h-3 text-muted-foreground/60" />}
-                    </p>
-                    {editingField === 'alias' && !isReadOnly ? (
-                      <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
-                        <Input
-                          value={editingAlias}
-                          onChange={(e) => setEditingAlias(e.target.value)}
-                          onFocus={(e) => e.stopPropagation()}
-                          onBlur={(e) => e.stopPropagation()}
-                          onClick={(e) => e.stopPropagation()}
-                          placeholder="Inserisci alias"
-                          className="text-sm flex-1"
-                          autoFocus
-                        />
-                      </div>
-                    ) : (
-                      <p
-                        className={`text-sm p-1 rounded ${!isReadOnly ? 'cursor-pointer hover:bg-muted/50' : ''}`}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          if (!isReadOnly) setEditingField('alias');
-                        }}
-                      >
-                        {cleanersAliases[selectedCleaner.id]?.alias || `${selectedCleaner.name} ${selectedCleaner.lastname}`}
-                      </p>
-                    )}
-                  </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-sm font-semibold text-muted-foreground">Nome</p>
+                  <p className="text-sm">{selectedCleaner.name.toUpperCase()}</p>
                 </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <p className="text-sm font-semibold text-muted-foreground">Giorni lavorati</p>
-                    <p className="text-sm">{selectedCleaner.counter_days}</p>
-                  </div>
+                <div>
+                  <p className="text-sm font-semibold text-muted-foreground">Cognome</p>
+                  <p className="text-sm">{selectedCleaner.lastname.toUpperCase()}</p>
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-muted-foreground">Alias</p>
+                  <p className="text-sm">{cleanersAliases[selectedCleaner.id]?.alias || `${selectedCleaner.name} ${selectedCleaner.lastname}`}</p>
+                </div>
+                <div className="flex items-end">
+                  <Button
+                    onClick={() => handleOpenAliasDialog(selectedCleaner)}
+                    disabled={isReadOnly}
+                    variant="outline"
+                    size="sm"
+                    className="w-full"
+                  >
+                    <Pencil className="w-4 h-4 mr-2" />
+                    Modifica Alias
+                  </Button>
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-muted-foreground">Giorni lavorati</p>
+                  <p className="text-sm">{selectedCleaner.counter_days}</p>
+                </div>
                 <div>
                   <p className="text-sm font-semibold text-muted-foreground">Ore lavorate (totali)</p>
                   <p className="text-sm">{selectedCleaner.counter_hours}</p>
@@ -1767,31 +1820,6 @@ export default function TimelineView({
                   <p className="text-sm">{selectedCleaner.contract_type}</p>
                 </div>
               </div>
-
-              {/* Pulsante Salva Modifiche Alias */}
-              {editingField === 'alias' && !isReadOnly && (
-                <div className="pt-4 border-t mt-4 flex gap-2">
-                  <Button
-                    onClick={handleSaveAlias}
-                    disabled={isSavingAlias}
-                    className="flex-1"
-                    data-testid="save-alias-button"
-                  >
-                    <Save className="w-4 h-4 mr-2" />
-                    {isSavingAlias ? "Salvataggio..." : "Salva Modifiche"}
-                  </Button>
-                  <Button
-                    onClick={() => {
-                      setEditingField(null);
-                      // Ripristina il valore originale
-                      setEditingAlias(cleanersAliases[selectedCleaner.id]?.alias || "");
-                    }}
-                    variant="outline"
-                  >
-                    Annulla
-                  </Button>
-                </div>
-              )}
 
               {/* Sezione Scambia Cleaner */}
               <div className="border-t pt-4 mt-4">
