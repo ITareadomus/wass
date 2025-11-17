@@ -367,7 +367,9 @@ export default function TimelineView({
 
       // Verifica selected_cleaners.json
       if (!selectedResponse.ok) {
-        throw new Error(`HTTP error! status: ${selectedResponse.status}`);
+        console.warn(`HTTP error loading cleaners! status: ${selectedResponse.status}`);
+        setCleaners([]);
+        return;
       }
 
       const contentType = selectedResponse.headers.get('content-type');
@@ -377,20 +379,36 @@ export default function TimelineView({
         return;
       }
 
-      const selectedData = await selectedResponse.json();
+      const selectedText = await selectedResponse.text();
+      
+      // Verifica che il contenuto sia JSON valido
+      if (!selectedText.trim().startsWith('{') && !selectedText.trim().startsWith('[')) {
+        console.error('File corrotto, non è JSON:', selectedText.substring(0, 100));
+        setCleaners([]);
+        return;
+      }
+
+      const selectedData = JSON.parse(selectedText);
       console.log("Cleaners caricati da selected_cleaners.json:", selectedData);
 
       // Verifica se timeline.json esiste e ha cleaners
       let timelineCleaners: any[] = [];
       if (timelineResponse.ok) {
         try {
-          const timelineData = await timelineResponse.json();
-          timelineCleaners = timelineData.cleaners_assignments?.map((c: any) => ({
-            id: c.cleaner?.id,
-            name: c.cleaner?.name,
-            lastname: c.cleaner?.lastname,
-            role: c.cleaner?.role,
-          })).filter((c: any) => c.id) || [];
+          const timelineText = await timelineResponse.text();
+          
+          // Verifica che il contenuto sia JSON valido
+          if (!timelineText.trim().startsWith('{') && !timelineText.trim().startsWith('[')) {
+            console.warn('Timeline.json corrotto, non è JSON:', timelineText.substring(0, 100));
+          } else {
+            const timelineData = JSON.parse(timelineText);
+            timelineCleaners = timelineData.cleaners_assignments?.map((c: any) => ({
+              id: c.cleaner?.id,
+              name: c.cleaner?.name,
+              lastname: c.cleaner?.lastname,
+              role: c.cleaner?.role,
+            })).filter((c: any) => c.id) || [];
+          }
         } catch (e) {
           console.warn('Errore parsing timeline.json:', e);
         }
