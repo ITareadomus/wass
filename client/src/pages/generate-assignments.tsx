@@ -1175,7 +1175,7 @@ export default function GenerateAssignments() {
     }
   };
 
-  const saveTimelineAssignment = async (taskId: string, cleanerId: number, logisticCode?: string, dropIndex?: number) => {
+  const saveTaskAssignment = async (taskId: string, cleanerId: number, logisticCode?: string, dropIndex?: number) => {
     try {
       const dateStr = format(selectedDate, "yyyy-MM-dd");
 
@@ -1374,7 +1374,7 @@ export default function GenerateAssignments() {
           for (const selectedTask of sortedTasks) {
             const task = allTasksWithAssignments.find(t => String(t.id) === selectedTask.taskId);
             if (task) {
-              await saveTimelineAssignment(selectedTask.taskId, toCleanerId, task.name, currentIndex);
+              await saveTaskAssignment(selectedTask.taskId, toCleanerId, task.name, currentIndex);
               currentIndex++; // Incrementa l'indice per la prossima task
             }
           }
@@ -1421,7 +1421,7 @@ export default function GenerateAssignments() {
           const cleanerName = cleaner ? `${cleaner.name} ${cleaner.lastname}` : `ID ${toCleanerId}`;
 
           // Salva in timeline.json (rimuove automaticamente da containers.json)
-          await saveTimelineAssignment(taskId, toCleanerId, logisticCode, destination.index);
+          await saveTaskAssignment(taskId, toCleanerId, logisticCode, destination.index);
           await refreshAssignments("manual");
 
           // CRITICAL: Marca modifiche dopo drag-and-drop da container
@@ -1536,7 +1536,9 @@ export default function GenerateAssignments() {
           });
         } finally {
           // Rilascia lock indipendentemente dall'esito
-          setIsDragging(false);
+          if (isDragging) { // Controlla se il lock è ancora attivo
+            setIsDragging(false);
+          }
         }
         return;
       }
@@ -1623,7 +1625,7 @@ export default function GenerateAssignments() {
           const cleanerName = cleaner ? `${cleaner.name} ${cleaner.lastname}` : `ID ${toCleanerId}`;
 
           // Salva in timeline.json (rimuove automaticamente da containers.json)
-          await saveTimelineAssignment(taskId, toCleanerId, logisticCode, destination.index);
+          await saveTaskAssignment(taskId, toCleanerId, logisticCode, destination.index);
           await refreshAssignments("manual");
 
           // CRITICAL: Marca modifiche dopo assegnazione
