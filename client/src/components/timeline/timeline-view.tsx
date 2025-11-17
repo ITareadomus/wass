@@ -24,6 +24,7 @@ import {
 } from "@/components/ui/select";
 import { useLocation } from 'wouter';
 import { format } from 'date-fns';
+import { loadValidationRules, canCleanerHandleTaskSync } from "@/lib/taskValidation";
 
 interface TimelineViewProps {
   personnel: Personnel[];
@@ -74,6 +75,19 @@ export default function TimelineView({
   const [confirmUnavailableDialog, setConfirmUnavailableDialog] = useState<{ open: boolean; cleanerId: number | null }>({ open: false, cleanerId: null });
   const { toast } = useToast();
   const [, setLocation] = useLocation();
+
+  // Stato per le regole di validazione task-cleaner
+  const [validationRules, setValidationRules] = useState<any>(null);
+
+  // Carica le regole di validazione una sola volta all'init
+  useEffect(() => {
+    loadValidationRules().then(rules => {
+      setValidationRules(rules);
+    }).catch(err => {
+      console.error('Failed to load validation rules:', err);
+      setValidationRules(null); // Fallback permissive
+    });
+  }, []);
 
   // Stato per memorizzare i dati della timeline (inclusi i metadata)
   const [timelineData, setTimelineData] = useState<any>(null);
@@ -1196,7 +1210,11 @@ export default function TimelineView({
                                       allTasks={cleanerTasks}
                                       isDragDisabled={isReadOnly}
                                       isReadOnly={isReadOnly}
-                                      cleanerRole={cleaner.role}
+                                      isIncompatible={validationRules ? !canCleanerHandleTaskSync(
+                                        cleaner.role,
+                                        task.straordinaria ? 'straordinario_apt' : (task.is_premium ? 'premium_apt' : 'standard_apt'),
+                                        validationRules
+                                      ) : false}
                                     />
                                   </>
                                 );

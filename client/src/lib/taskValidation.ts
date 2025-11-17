@@ -22,7 +22,7 @@ let cachedRules: TaskValidationSettings['task_types'] | null = null;
 /**
  * Carica le regole di validazione da settings.json
  */
-async function loadValidationRules(): Promise<TaskValidationSettings['task_types']> {
+export async function loadValidationRules(): Promise<TaskValidationSettings['task_types']> {
   if (cachedRules) {
     return cachedRules;
   }
@@ -124,14 +124,14 @@ function normalizeCleanerRole(role: string): keyof TaskTypeRules {
 }
 
 /**
- * Verifica se un cleaner può gestire un determinato tipo di task
+ * Verifica se un cleaner può gestire un determinato tipo di task (versione sincrona)
+ * Richiede che le regole siano già state caricate
  */
-export async function canCleanerHandleTask(
+export function canCleanerHandleTaskSync(
   cleanerRole: string,
-  taskType: string | { premium?: boolean; straordinaria?: boolean }
-): Promise<boolean> {
-  const rules = await loadValidationRules();
-  
+  taskType: string | { premium?: boolean; straordinaria?: boolean },
+  rules: TaskValidationSettings['task_types']
+): boolean {
   // Determina il tipo di task
   let taskTypeKey: keyof TaskValidationSettings['task_types'];
   if (typeof taskType === 'object') {
@@ -144,6 +144,17 @@ export async function canCleanerHandleTask(
   
   // Verifica se il cleaner può gestire questo tipo di task
   return rules[taskTypeKey]?.[cleanerKey] ?? true;
+}
+
+/**
+ * Verifica se un cleaner può gestire un determinato tipo di task (versione async)
+ */
+export async function canCleanerHandleTask(
+  cleanerRole: string,
+  taskType: string | { premium?: boolean; straordinaria?: boolean }
+): Promise<boolean> {
+  const rules = await loadValidationRules();
+  return canCleanerHandleTaskSync(cleanerRole, taskType, rules);
 }
 
 /**
