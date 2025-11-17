@@ -74,6 +74,7 @@ export default function TimelineView({
   const [confirmDialog, setConfirmDialog] = useState<{ open: boolean; cleanerId: number | null }>({ open: false, cleanerId: null });
   const [confirmUnavailableDialog, setConfirmUnavailableDialog] = useState<{ open: boolean; cleanerId: number | null }>({ open: false, cleanerId: null });
   const [confirmRemovalDialog, setConfirmRemovalDialog] = useState<{ open: boolean; cleanerId: number | null }>({ open: false, cleanerId: null });
+  const [incompatibleDialog, setIncompatibleDialog] = useState<{ open: boolean; cleanerId: number | null; tasks: Array<{ logisticCode: string; taskType: string }> }>({ open: false, cleanerId: null, tasks: [] });
   const { toast } = useToast();
   const [, setLocation] = useLocation();
 
@@ -495,7 +496,29 @@ export default function TimelineView({
     } else {
       // Primo click: avvia timer
       const timer = setTimeout(() => {
-        // Singolo click: apri modal
+        // Verifica se ci sono task incompatibili
+        if (validationRules && cleaner?.role) {
+          const cleanerTasks = tasks
+            .filter(task => (task as any).assignedCleaner === cleaner.id)
+            .map(normalizeTask);
+
+          const incompatibleTasks = cleanerTasks.filter(
+            task => !canCleanerHandleTaskSync(cleaner.role, task, validationRules)
+          );
+
+          if (incompatibleTasks.length > 0) {
+            // Mostra dialog incompatibilità invece del modal normale
+            const tasksInfo = incompatibleTasks.map(task => ({
+              logisticCode: task.name,
+              taskType: task.straordinaria ? 'Straordinaria' : task.premium ? 'Premium' : 'Standard'
+            }));
+            setIncompatibleDialog({ open: true, cleanerId: cleaner.id, tasks: tasksInfo });
+            setClickTimer(null);
+            return;
+          }
+        }
+
+        // Singolo click: apri modal normale se non ci sono incompatibilità
         setSelectedCleaner(cleaner);
         setIsModalOpen(true);
         setClickTimer(null);
@@ -1355,6 +1378,47 @@ export default function TimelineView({
           </div>
         </div>
       </div>
+      {/* Incompatible Tasks Warning Dialog */}
+      <Dialog open={incompatibleDialog.open} onOpenChange={(open) => !open && setIncompatibleDialog({ open: false, cleanerId: null, tasks: [] })}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="text-yellow-600 dark:text-yellow-400 flex items-center gap-2">
+              ⚠️ Attenzione: Task Incompatibili
+            </DialogTitle>
+            <DialogDescription className="text-base space-y-3">
+              {incompatibleDialog.cleanerId && (() => {
+                const cleaner = allCleanersToShow.find(c => c.id === incompatibleDialog.cleanerId);
+                return cleaner ? (
+                  <>
+                    <p className="font-semibold text-foreground">
+                      Il cleaner <span className="text-yellow-600 dark:text-yellow-400">{cleaner.name} {cleaner.lastname}</span> ({cleaner.role}) ha delle task non compatibili con il suo ruolo:
+                    </p>
+                    <ul className="list-disc list-inside space-y-2 pl-2">
+                      {incompatibleDialog.tasks.map((task, idx) => (
+                        <li key={idx} className="text-foreground">
+                          Task <span className="font-bold text-red-600">{task.logisticCode}</span> di tipo <span className="font-bold">{task.taskType}</span>
+                        </li>
+                      ))}
+                    </ul>
+                    <p className="text-sm text-muted-foreground mt-4">
+                      Si consiglia di riassegnare queste task a un cleaner più appropriato.
+                    </p>
+                  </>
+                ) : null;
+              })()}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex justify-end mt-4">
+            <Button
+              onClick={() => setIncompatibleDialog({ open: false, cleanerId: null, tasks: [] })}
+              className="bg-yellow-600 hover:bg-yellow-700 text-white"
+            >
+              Ho capito
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {/* Confirmation Dialog for Cleaner Removal */}
       <Dialog open={confirmRemovalDialog.open} onOpenChange={(open) => setConfirmRemovalDialog({ open, cleanerId: null })}>
         <DialogContent className="sm:max-w-md">
