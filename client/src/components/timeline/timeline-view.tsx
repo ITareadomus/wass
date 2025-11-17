@@ -1707,50 +1707,53 @@ export default function TimelineView({
           </DialogHeader>
           {selectedCleaner && (
             <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <p className="text-sm font-semibold text-muted-foreground">Nome</p>
-                  <p className="text-sm">{selectedCleaner.name.toUpperCase()}</p>
-                </div>
-                <div>
-                  <p className="text-sm font-semibold text-muted-foreground">Cognome</p>
-                  <p className="text-sm">{selectedCleaner.lastname.toUpperCase()}</p>
-                </div>
-                {/* Alias Field */}
-                <div className="col-span-2">
-                  <p className="text-sm font-semibold text-muted-foreground mb-1 flex items-center gap-1">
-                    Alias
-                    {!isReadOnly && <Pencil className="w-3 h-3 text-muted-foreground/60" />}
-                  </p>
-                  {editingField === 'alias' && !isReadOnly ? (
-                    <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
-                      <Input
-                        value={editingAlias}
-                        onChange={(e) => setEditingAlias(e.target.value)}
-                        onFocus={(e) => e.stopPropagation()}
-                        onBlur={(e) => e.stopPropagation()}
-                        onClick={(e) => e.stopPropagation()}
-                        placeholder="Inserisci alias"
-                        className="text-sm flex-1"
-                        autoFocus
-                      />
-                    </div>
-                  ) : (
-                    <p
-                      className={`text-sm p-1 rounded ${!isReadOnly ? 'cursor-pointer hover:bg-muted/50' : ''}`}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        if (!isReadOnly) setEditingField('alias');
-                      }}
-                    >
-                      {cleanersAliases[selectedCleaner.id]?.alias || `${selectedCleaner.name} ${selectedCleaner.lastname}`}
+              <div className="grid grid-cols-1 gap-4">
+                <div className="grid grid-cols-3 gap-4">
+                  <div>
+                    <p className="text-sm font-semibold text-muted-foreground">Nome</p>
+                    <p className="text-sm">{selectedCleaner.name.toUpperCase()}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold text-muted-foreground">Cognome</p>
+                    <p className="text-sm">{selectedCleaner.lastname.toUpperCase()}</p>
+                  </div>
+                  {/* Alias Field */}
+                  <div>
+                    <p className="text-sm font-semibold text-muted-foreground mb-1 flex items-center gap-1">
+                      Alias
+                      {!isReadOnly && <Pencil className="w-3 h-3 text-muted-foreground/60" />}
                     </p>
-                  )}
+                    {editingField === 'alias' && !isReadOnly ? (
+                      <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                        <Input
+                          value={editingAlias}
+                          onChange={(e) => setEditingAlias(e.target.value)}
+                          onFocus={(e) => e.stopPropagation()}
+                          onBlur={(e) => e.stopPropagation()}
+                          onClick={(e) => e.stopPropagation()}
+                          placeholder="Inserisci alias"
+                          className="text-sm flex-1"
+                          autoFocus
+                        />
+                      </div>
+                    ) : (
+                      <p
+                        className={`text-sm p-1 rounded ${!isReadOnly ? 'cursor-pointer hover:bg-muted/50' : ''}`}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (!isReadOnly) setEditingField('alias');
+                        }}
+                      >
+                        {cleanersAliases[selectedCleaner.id]?.alias || `${selectedCleaner.name} ${selectedCleaner.lastname}`}
+                      </p>
+                    )}
+                  </div>
                 </div>
-                <div>
-                  <p className="text-sm font-semibold text-muted-foreground">Giorni lavorati</p>
-                  <p className="text-sm">{selectedCleaner.counter_days}</p>
-                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-sm font-semibold text-muted-foreground">Giorni lavorati</p>
+                    <p className="text-sm">{selectedCleaner.counter_days}</p>
+                  </div>
                 <div>
                   <p className="text-sm font-semibold text-muted-foreground">Ore lavorate (totali)</p>
                   <p className="text-sm">{selectedCleaner.counter_hours}</p>
