@@ -1465,11 +1465,13 @@ export default function GenerateAssignments() {
           const toCleanerName = toCleaner ? `${toCleaner.name} ${toCleaner.lastname}` : `ID ${toCleanerId}`;
 
           const payload = {
-            date: format(selectedDate, "yyyy-MM-dd"), // Assicurati che workDate sia definito o usa selectedDate
+            date: format(selectedDate, "yyyy-MM-dd"),
             taskId,
             logisticCode,
             fromCleanerId,
             toCleanerId,
+            sourceIndex: source.index,
+            destIndex: destination.index,
             insertAt: destination.index
           };
 
