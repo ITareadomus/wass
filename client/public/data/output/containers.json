@@ -1,6 +1,6 @@
 {
   "metadata": {
-    "last_updated": "2025-11-17T16:42:14.117789",
+    "last_updated": "2025-11-17T16:45:57.879895",
     "date": "2025-11-17"
   },
   "containers": {
@@ -574,7 +574,8 @@
           "alias": "HMST",
           "customer_name": "HOMING STAYS",
           "reasons": [
-            "same_day_checkin_between_eo_hp"
+            "same_day_checkin_between_eo_hp",
+            "client_forced_hp"
           ],
           "priority": "high_priority"
         },
