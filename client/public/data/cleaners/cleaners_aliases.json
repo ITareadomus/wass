@@ -1,6 +1,6 @@
 {
   "metadata": {
-    "last_updated": "2025-01-31T00:00:00.000000",
+    "last_updated": "2025-11-17T15:34:58.077Z",
     "description": "Alias personalizzati per i cleaners da visualizzare sulla timeline"
   },
   "aliases": {
@@ -173,6 +173,11 @@
       "name": "ANDREW",
       "lastname": "OGUNKANMI",
       "alias": "ANDREW"
+    },
+    "1070": {
+      "name": "ABUBACAR",
+      "lastname": "DIAMMEH",
+      "alias": "ABUBACAR"
     }
   }
 }
