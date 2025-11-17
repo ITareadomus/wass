@@ -75,6 +75,7 @@ export default function TimelineView({
   const [confirmUnavailableDialog, setConfirmUnavailableDialog] = useState<{ open: boolean; cleanerId: number | null }>({ open: false, cleanerId: null });
   const [confirmRemovalDialog, setConfirmRemovalDialog] = useState<{ open: boolean; cleanerId: number | null }>({ open: false, cleanerId: null });
   const [incompatibleDialog, setIncompatibleDialog] = useState<{ open: boolean; cleanerId: number | null; tasks: Array<{ logisticCode: string; taskType: string }> }>({ open: false, cleanerId: null, tasks: [] });
+  const [acknowledgedIncompatibleCleaners, setAcknowledgedIncompatibleCleaners] = useState<Set<number>>(new Set());
   const { toast } = useToast();
   const [, setLocation] = useLocation();
 
@@ -905,6 +906,7 @@ export default function TimelineView({
     allCleanersToShow.forEach(cleaner => {
       if (removedCleanerIds.has(cleaner.id)) return;
       if (!cleaner.role) return;
+      if (acknowledgedIncompatibleCleaners.has(cleaner.id)) return; // Skip se già confermato
 
       const cleanerTasks = tasks
         .filter(task => (task as any).assignedCleaner === cleaner.id)
@@ -948,7 +950,7 @@ export default function TimelineView({
     if (incompatibleAssignments.length === 0) {
       shownToastsRef.current.clear();
     }
-  }, [validationRules, allCleanersToShow, tasks, removedCleanerIds, toast]);
+  }, [validationRules, allCleanersToShow, tasks, removedCleanerIds, acknowledgedIncompatibleCleaners, toast]);
 
   // Funzione per verificare SE esistono assegnazioni salvate (senza caricarle)
   const checkSavedAssignmentExists = async () => {
@@ -1111,7 +1113,8 @@ export default function TimelineView({
                 const isRemoved = removedCleanerIds.has(cleaner.id);
 
                 // Verifica se ci sono task incompatibili per questo cleaner
-                const hasIncompatibleTasks = validationRules && cleaner?.role
+                // MA solo se non è già stato confermato dall'utente
+                const hasIncompatibleTasks = validationRules && cleaner?.role && !acknowledgedIncompatibleCleaners.has(cleaner.id)
                   ? cleanerTasks.some(task => !canCleanerHandleTaskSync(cleaner.role, task, validationRules))
                   : false;
 
@@ -1407,7 +1410,12 @@ export default function TimelineView({
           </DialogHeader>
           <div className="flex justify-end mt-4">
             <Button
-              onClick={() => setIncompatibleDialog({ open: false, cleanerId: null, tasks: [] })}
+              onClick={() => {
+                if (incompatibleDialog.cleanerId) {
+                  setAcknowledgedIncompatibleCleaners(prev => new Set(prev).add(incompatibleDialog.cleanerId!));
+                }
+                setIncompatibleDialog({ open: false, cleanerId: null, tasks: [] });
+              }}
               variant="outline"
               className="border-2 border-custom-blue"
             >
