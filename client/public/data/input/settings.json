@@ -11,9 +11,7 @@
     "hp_start_time": "11:00",
     "hp_time": "15:30",
     "hp_clients": [
-      64
-    ],
-    "eo_clients": [
+      64,
       1,
       43,
       124
