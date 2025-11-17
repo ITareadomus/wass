@@ -140,17 +140,17 @@ export default function GenerateAssignments() {
         // Parse formato YYYY-MM-DD
         const [year, month, day] = savedDate.split('-').map(Number);
         const parsedDate = new Date(year, month - 1, day); // month è 0-indexed in JS
-        
+
         // CRITICAL: Se la data salvata è nel PASSATO, usa OGGI invece
         const today = new Date();
         today.setHours(0, 0, 0, 0);
         parsedDate.setHours(0, 0, 0, 0);
-        
+
         if (parsedDate < today) {
           console.log(`⏰ Data salvata (${savedDate}) è nel passato, uso oggi`);
           return new Date();
         }
-        
+
         return parsedDate;
       } catch (e) {
         console.error('Errore parsing data salvata:', e);
@@ -186,11 +186,11 @@ export default function GenerateAssignments() {
 
   // Helper function per ottenere lo stato specifico del container
   const getContainerMultiSelectState = (container: string) => {
-    const containerKey = container === 'early-out' ? 'early_out' : 
-                        container === 'high' ? 'high_priority' : 
+    const containerKey = container === 'early-out' ? 'early_out' :
+                        container === 'high' ? 'high_priority' :
                         container === 'low' ? 'low_priority' : container as keyof typeof multiSelectModes;
-    
-    return { 
+
+    return {
       isMultiSelectMode: multiSelectModes[containerKey] || false,
       selectedTasks,
       setIsMultiSelectMode: (value: boolean) => {
@@ -1450,7 +1450,7 @@ export default function GenerateAssignments() {
       }
 
       if (fromCleanerId !== null && toCleanerId !== null) {
-        console.log(`🔄 Timeline move: task ${logisticCode} da cleaner ${fromCleanerId} (idx ${source.index}) a cleaner ${toCleanerId} (idx ${destination.index})`);
+        console.log(`🔄 Spostamento tra cleaners: task ${logisticCode} da cleaner ${fromCleanerId} (idx ${source.index}) a cleaner ${toCleanerId} (idx ${destination.index})`);
 
         try {
           // Carica i dati dei cleaner per mostrare nome e cognome
@@ -1465,12 +1465,12 @@ export default function GenerateAssignments() {
           const toCleanerName = toCleaner ? `${toCleaner.name} ${toCleaner.lastname}` : `ID ${toCleanerId}`;
 
           const payload = {
-            taskId: draggableId,
+            date: format(selectedDate, "yyyy-MM-dd"), // Assicurati che workDate sia definito o usa selectedDate
+            taskId,
             logisticCode,
             fromCleanerId,
             toCleanerId,
-            sourceIndex: source.index,
-            destIndex: destination.index,
+            insertAt: destination.index
           };
 
           console.log('Payload inviato:', payload);
@@ -1499,9 +1499,17 @@ export default function GenerateAssignments() {
             console.log('✅ Movimento completato - response.ok:', response.ok, 'data.success:', data.success);
             console.log('✅ Movimento salvato automaticamente in timeline.json');
 
-            // CRITICAL: Marca modifiche dopo drag and drop riuscito
+            // Preserva lo stato acknowledged per entrambi i cleaner coinvolti
+            if ((window as any).preserveAcknowledgedIncompatibleCleaners) {
+              (window as any).preserveAcknowledgedIncompatibleCleaners(fromCleanerId);
+              (window as any).preserveAcknowledgedIncompatibleCleaners(toCleanerId);
+            }
+
+            // CRITICAL: Marca modifiche dopo spostamento tra cleaners
             setHasUnsavedChanges(true);
-            handleTaskMoved();
+            if (handleTaskMoved) {
+              handleTaskMoved();
+            }
 
             // Mostra toast SUBITO (non aspettare il reload)
             if (fromCleanerId !== toCleanerId) {
@@ -1526,7 +1534,9 @@ export default function GenerateAssignments() {
           });
         } finally {
           // Rilascia lock indipendentemente dall'esito
-          setIsDragging(false);
+          if (isDragging) { // Controlla se il lock è ancora attivo
+            setIsDragging(false);
+          }
         }
         return;
       }
