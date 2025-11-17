@@ -14,5 +14,22 @@
     "standard_apt": ["A", "B", "C", "D", "E", "F", "X"],
     "premium_apt": ["A", "B", "C", "D", "E", "F", "X"],
     "formatore_apt": ["B", "C"]
+  },
+  "task_types": {
+    "standard_cleaner": {
+      "standard_apt": true,
+      "premium_apt": false,
+      "straordinaria_apt": false
+    },
+    "premium_cleaner": {
+      "standard_apt": true,
+      "premium_apt": true,
+      "straordinaria_apt": false
+    },
+    "formatore_cleaner": {
+      "standard_apt": true,
+      "premium_apt": true,
+      "straordinaria_apt": true
+    }
   }
 }
