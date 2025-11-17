@@ -1417,7 +1417,7 @@ export default function GenerateAssignments() {
             cache: 'no-store',
             headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' }
           });
-          const cleanersData = await.json();
+          const cleanersData = await cleanersResponse.json();
           const cleaner = cleanersData.cleaners.find((c: any) => c.id === toCleanerId);
           const cleanerName = cleaner ? `${cleaner.name} ${cleaner.lastname}` : `ID ${toCleanerId}`;
 
