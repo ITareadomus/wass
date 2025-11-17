@@ -399,9 +399,17 @@ export default function TaskCard({
         setEditingField(null);
         setIsModalOpen(false);
 
+        // Preserva lo stato acknowledged per il cleaner di destinazione
+        if ((window as any).preserveAcknowledgedIncompatibleCleaners && (displayTask as any).assignedCleaner) {
+          (window as any).preserveAcknowledgedIncompatibleCleaners((displayTask as any).assignedCleaner);
+        }
+
         // Ricarica i task per mostrare le modifiche
         if ((window as any).reloadAllTasks) {
           await (window as any).reloadAllTasks();
+        }
+        if ((window as any).loadTimelineCleaners) {
+          await (window as any).loadTimelineCleaners();
         }
       } else {
         throw new Error(result.error || 'Errore nel salvataggio');

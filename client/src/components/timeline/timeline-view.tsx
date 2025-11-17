@@ -1015,6 +1015,23 @@ export default function TimelineView({
     },
   });
 
+  // Funzione per preservare lo stato acknowledged durante le operazioni
+  const preserveAcknowledgedState = (cleanerId: number) => {
+    setAcknowledgedIncompatibleCleaners(prev => {
+      const newSet = new Set(prev);
+      newSet.add(cleanerId);
+      return newSet;
+    });
+  };
+
+  // Esponi la funzione globalmente per essere chiamata dopo drag & drop
+  useEffect(() => {
+    (window as any).preserveAcknowledgedIncompatibleCleaners = preserveAcknowledgedState;
+    return () => {
+      delete (window as any).preserveAcknowledgedIncompatibleCleaners;
+    };
+  }, []);
+
 
   return (
     <>
