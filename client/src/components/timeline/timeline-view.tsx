@@ -1387,7 +1387,7 @@ export default function TimelineView({
 
 
                                 return (
-                                  <>
+                                  <React.Fragment key={`task-fragment-${uniqueKey}`}>
                                     {/* Spazio vuoto per prima task con start_time posticipato */}
                                     {idx === 0 && timeOffset > 0 && (
                                       <div
@@ -1426,7 +1426,7 @@ export default function TimelineView({
                                       isDragDisabled={isReadOnly}
                                       isReadOnly={isReadOnly}
                                     />
-                                  </>
+                                  </React.Fragment>
                                 );
                               });
                             })()}
@@ -1496,24 +1496,26 @@ export default function TimelineView({
             <DialogTitle className="text-yellow-600 dark:text-yellow-400 flex items-center gap-2">
               ⚠️ Attenzione: Task Incompatibili
             </DialogTitle>
-            <DialogDescription className="text-base space-y-3">
-              {incompatibleDialog.cleanerId && (() => {
-                const cleaner = allCleanersToShow.find(c => c.id === incompatibleDialog.cleanerId);
-                return cleaner ? (
-                  <>
-                    <p className="font-semibold text-foreground">
-                      Il cleaner <span className="text-black dark:text-white">{cleaner.name} {cleaner.lastname}</span> ({cleaner.role}) ha delle task non compatibili con il suo ruolo:
-                    </p>
-                    <ul className="list-disc list-inside space-y-2 pl-2">
-                      {incompatibleDialog.tasks.map((task, idx) => (
-                        <li key={idx} className="text-foreground">
-                          Task <span className="font-bold text-red-600">{task.logisticCode}</span> di tipo <span className="font-bold">{task.taskType}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </>
-                ) : null;
-              })()}
+            <DialogDescription asChild>
+              <div className="text-base space-y-3">
+                {incompatibleDialog.cleanerId && (() => {
+                  const cleaner = allCleanersToShow.find(c => c.id === incompatibleDialog.cleanerId);
+                  return cleaner ? (
+                    <>
+                      <p className="font-semibold text-foreground">
+                        Il cleaner <span className="text-black dark:text-white">{cleaner.name} {cleaner.lastname}</span> ({cleaner.role}) ha delle task non compatibili con il suo ruolo:
+                      </p>
+                      <ul className="list-disc list-inside space-y-2 pl-2">
+                        {incompatibleDialog.tasks.map((task, idx) => (
+                          <li key={idx} className="text-foreground">
+                            Task <span className="font-bold text-red-600">{task.logisticCode}</span> di tipo <span className="font-bold">{task.taskType}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </>
+                  ) : null;
+                })()}
+              </div>
             </DialogDescription>
           </DialogHeader>
           <div className="flex justify-end mt-4">
