@@ -17,9 +17,8 @@
       124
     ],
     "eo_clients": [
-      43,
-      1,
-      124
+      9,
+      43
     ]
   },
   "dedupe_strategy": "eo_wins",
