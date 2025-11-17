@@ -16,20 +16,23 @@
     "formatore_apt": ["B", "C"]
   },
   "task_types": {
-    "standard_cleaner": {
-      "standard_apt": true,
-      "premium_apt": false,
-      "straordinaria_apt": false
+    "standard_apt": {
+      "standard_cleaner": true,
+      "premium_cleaner": true,
+      "straordinaria_cleaner": true,
+      "formatore_cleaner": true
     },
-    "premium_cleaner": {
-      "standard_apt": true,
-      "premium_apt": true,
-      "straordinaria_apt": false
+    "premium_apt": {
+      "standard_cleaner": false,
+      "premium_cleaner": true,
+      "straordinaria_cleaner": true,
+      "formatore_cleaner": false
     },
-    "formatore_cleaner": {
-      "standard_apt": true,
-      "premium_apt": true,
-      "straordinaria_apt": true
+    "straordinario_apt": {
+      "standard_cleaner": false,
+      "premium_cleaner": false,
+      "straordinaria_cleaner": true,
+      "formatore_cleaner": false
     }
   }
 }
