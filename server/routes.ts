@@ -3235,14 +3235,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Inserimento con clamp + fix stesso cleaner
-      let insertAt = typeof destIndex === 'number' ? destIndex : dstEntry.tasks.length;
-      if (removedFromIndex !== null && removedFromIndex < insertAt) {
-        insertAt = insertAt - 1;
+      let finalInsertAt = typeof destIndex === 'number' ? destIndex : dstEntry.tasks.length;
+      if (removedFromIndex !== null && removedFromIndex < finalInsertAt) {
+        finalInsertAt = finalInsertAt - 1;
       }
-      if (insertAt < 0) insertAt = 0;
-      if (insertAt > dstEntry.tasks.length) insertAt = dstEntry.tasks.length;
+      if (finalInsertAt < 0) finalInsertAt = 0;
+      if (finalInsertAt > dstEntry.tasks.length) finalInsertAt = dstEntry.tasks.length;
 
-      dstEntry.tasks.splice(insertAt, 0, moved);
+      dstEntry.tasks.splice(finalInsertAt, 0, moved);
 
       // Aggiorna sequence nel cleaner destinazione
       dstEntry.tasks.forEach((t: any, i: number) => { t.sequence = i + 1; });
