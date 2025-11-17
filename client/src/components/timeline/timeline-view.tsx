@@ -1391,7 +1391,7 @@ export default function TimelineView({
                 return cleaner ? (
                   <>
                     <p className="font-semibold text-foreground">
-                      Il cleaner <span className="text-yellow-600 dark:text-yellow-400">{cleaner.name} {cleaner.lastname}</span> ({cleaner.role}) ha delle task non compatibili con il suo ruolo:
+                      Il cleaner <span className="text-white">{cleaner.name} {cleaner.lastname}</span> ({cleaner.role}) ha delle task non compatibili con il suo ruolo:
                     </p>
                     <ul className="list-disc list-inside space-y-2 pl-2">
                       {incompatibleDialog.tasks.map((task, idx) => (
@@ -1400,9 +1400,6 @@ export default function TimelineView({
                         </li>
                       ))}
                     </ul>
-                    <p className="text-sm text-muted-foreground mt-4">
-                      Si consiglia di riassegnare queste task a un cleaner più appropriato.
-                    </p>
                   </>
                 ) : null;
               })()}
@@ -1411,7 +1408,8 @@ export default function TimelineView({
           <div className="flex justify-end mt-4">
             <Button
               onClick={() => setIncompatibleDialog({ open: false, cleanerId: null, tasks: [] })}
-              className="bg-yellow-600 hover:bg-yellow-700 text-white"
+              variant="outline"
+              className="border-2 border-custom-blue"
             >
               Ho capito
             </Button>
