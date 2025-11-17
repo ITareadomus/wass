@@ -1,6 +1,6 @@
 {
   "metadata": {
-    "last_updated": "2025-11-17T16:23:32.073288",
+    "last_updated": "2025-11-17T16:27:10.821099",
     "date": "2025-11-17"
   },
   "containers": {
@@ -412,6 +412,33 @@
           "priority": "early_out"
         },
         {
+          "task_id": 218877,
+          "logistic_code": 1571,
+          "client_id": 61,
+          "premium": false,
+          "address": "VIALE MONTENERO, 23",
+          "lat": "45.4557027",
+          "lng": "9.2042573",
+          "cleaning_time": 90,
+          "checkin_date": "2025-11-18",
+          "checkout_date": "2025-11-17",
+          "checkin_time": "15:00",
+          "checkout_time": null,
+          "pax_in": 2,
+          "pax_out": 1,
+          "small_equipment": false,
+          "operation_id": 2,
+          "confirmed_operation": true,
+          "straordinaria": false,
+          "type_apt": "B",
+          "alias": "NTM",
+          "customer_name": "NOTA-MI",
+          "reasons": [
+            "client_forced_eo"
+          ],
+          "priority": "early_out"
+        },
+        {
           "task_id": 218874,
           "logistic_code": 1487,
           "client_id": 61,
@@ -458,33 +485,6 @@
           "confirmed_operation": true,
           "straordinaria": false,
           "type_apt": "A",
-          "alias": "NTM",
-          "customer_name": "NOTA-MI",
-          "reasons": [
-            "client_forced_eo"
-          ],
-          "priority": "early_out"
-        },
-        {
-          "task_id": 218877,
-          "logistic_code": 1571,
-          "client_id": 61,
-          "premium": false,
-          "address": "VIALE MONTENERO, 23",
-          "lat": "45.4557027",
-          "lng": "9.2042573",
-          "cleaning_time": 90,
-          "checkin_date": "2025-11-18",
-          "checkout_date": "2025-11-17",
-          "checkin_time": "15:00",
-          "checkout_time": null,
-          "pax_in": 2,
-          "pax_out": 1,
-          "small_equipment": false,
-          "operation_id": 2,
-          "confirmed_operation": true,
-          "straordinaria": false,
-          "type_apt": "B",
           "alias": "NTM",
           "customer_name": "NOTA-MI",
           "reasons": [

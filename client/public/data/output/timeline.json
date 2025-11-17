@@ -1,6 +1,6 @@
 {
   "metadata": {
-    "last_updated": "2025-11-17T16:24:42.695Z",
+    "last_updated": "2025-11-17T16:30:56.446Z",
     "date": "2025-11-17",
     "created_by": "unknown",
     "modified_by": [
@@ -51,50 +51,6 @@
           "modified_by": "Admin"
         },
         {
-          "task_id": 218924,
-          "logistic_code": 1625,
-          "client_id": null,
-          "premium": false,
-          "address": "via Goffredo Mameli 9",
-          "lat": "45.466406",
-          "lng": "9.2134926",
-          "cleaning_time": 60,
-          "checkin_date": "2025-11-22",
-          "checkout_date": "2025-11-17",
-          "checkin_time": null,
-          "checkout_time": null,
-          "pax_in": 2,
-          "pax_out": 1,
-          "small_equipment": false,
-          "operation_id": 2,
-          "confirmed_operation": true,
-          "straordinaria": false,
-          "type_apt": "A",
-          "alias": "NTM",
-          "customer_name": "NOTA-MI",
-          "reasons": [
-            "manually_moved_to_timeline"
-          ],
-          "priority": "early_out",
-          "start_time": "12:52",
-          "end_time": "13:52",
-          "followup": true,
-          "sequence": 2,
-          "travel_time": 22,
-          "modified_by": "Admin"
-        }
-      ]
-    },
-    {
-      "cleaner": {
-        "id": 596,
-        "name": "TRACY",
-        "lastname": "OKE",
-        "role": "Premium",
-        "premium": false
-      },
-      "tasks": [
-        {
           "task_id": 218876,
           "logistic_code": 1543,
           "client_id": null,
@@ -120,11 +76,44 @@
             "manually_moved_to_timeline"
           ],
           "priority": "early_out",
-          "start_time": "10:00",
-          "end_time": "11:00",
-          "followup": false,
-          "sequence": 1,
-          "travel_time": 0,
+          "start_time": "13:00",
+          "end_time": "14:00",
+          "followup": true,
+          "sequence": 2,
+          "travel_time": 30,
+          "modified_by": "Admin"
+        },
+        {
+          "task_id": 218973,
+          "logistic_code": 1276,
+          "client_id": null,
+          "premium": true,
+          "address": "Via GAUDENZIO Ferrari,3 20123 (MI)",
+          "lat": "45.4558873",
+          "lng": "9.1754552",
+          "cleaning_time": 150,
+          "checkin_date": "2025-11-20",
+          "checkout_date": "2025-11-17",
+          "checkin_time": null,
+          "checkout_time": null,
+          "pax_in": 3,
+          "pax_out": 1,
+          "small_equipment": false,
+          "operation_id": 2,
+          "confirmed_operation": true,
+          "straordinaria": false,
+          "type_apt": "C",
+          "alias": "TBR",
+          "customer_name": "THE BEST RENT S.r.l.",
+          "reasons": [
+            "manually_moved_to_timeline"
+          ],
+          "priority": "high_priority",
+          "start_time": "14:16",
+          "end_time": "16:46",
+          "followup": true,
+          "sequence": 3,
+          "travel_time": 16,
           "modified_by": "Admin"
         },
         {
@@ -153,11 +142,55 @@
             "manually_moved_to_timeline"
           ],
           "priority": "early_out",
-          "start_time": "11:39",
-          "end_time": "12:39",
+          "start_time": "17:24",
+          "end_time": "18:24",
           "followup": true,
-          "sequence": 2,
-          "travel_time": 39,
+          "sequence": 4,
+          "travel_time": 38,
+          "modified_by": "Admin"
+        }
+      ]
+    },
+    {
+      "cleaner": {
+        "id": 596,
+        "name": "TRACY",
+        "lastname": "OKE",
+        "role": "Premium",
+        "premium": false
+      },
+      "tasks": [
+        {
+          "task_id": 218924,
+          "logistic_code": 1625,
+          "client_id": null,
+          "premium": false,
+          "address": "via Goffredo Mameli 9",
+          "lat": "45.466406",
+          "lng": "9.2134926",
+          "cleaning_time": 60,
+          "checkin_date": "2025-11-22",
+          "checkout_date": "2025-11-17",
+          "checkin_time": null,
+          "checkout_time": null,
+          "pax_in": 2,
+          "pax_out": 1,
+          "small_equipment": false,
+          "operation_id": 2,
+          "confirmed_operation": true,
+          "straordinaria": false,
+          "type_apt": "A",
+          "alias": "NTM",
+          "customer_name": "NOTA-MI",
+          "reasons": [
+            "manually_moved_to_timeline"
+          ],
+          "priority": "early_out",
+          "start_time": "10:00",
+          "end_time": "11:00",
+          "followup": false,
+          "sequence": 1,
+          "travel_time": 0,
           "modified_by": "Admin"
         }
       ]
@@ -167,6 +200,6 @@
     "total_cleaners": 2,
     "used_cleaners": 0,
     "assigned_tasks": 0,
-    "total_tasks": 4
+    "total_tasks": 5
   }
 }
