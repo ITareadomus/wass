@@ -1784,17 +1784,17 @@ export default function TimelineView({
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div className="col-span-2">
-                  <div className="flex items-center gap-6">
+                  <div className="flex items-center justify-between">
                     <div>
                       <p className="text-sm font-semibold text-muted-foreground mb-1">Nome</p>
                       <p className="text-sm">{selectedCleaner.name.toUpperCase()}</p>
                     </div>
-                    <div>
+                    <div className="text-center">
                       <p className="text-sm font-semibold text-muted-foreground mb-1">Cognome</p>
                       <p className="text-sm">{selectedCleaner.lastname.toUpperCase()}</p>
                     </div>
-                    <div>
-                      <p className="text-sm font-semibold text-muted-foreground mb-1 flex items-center gap-1">
+                    <div className="text-right">
+                      <p className="text-sm font-semibold text-muted-foreground mb-1 flex items-center justify-end gap-1">
                         Alias
                         {!isReadOnly && <Pencil className="w-3 h-3 text-muted-foreground/60" />}
                       </p>
