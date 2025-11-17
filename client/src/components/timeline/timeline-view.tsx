@@ -811,6 +811,47 @@ export default function TimelineView({
   // Nota: il tracking delle modifiche avviene SOLO tramite onTaskMoved
   // chiamato esplicitamente durante drag-and-drop e altre azioni utente
 
+  // Gestione toast per incompatibilità task-cleaner
+  useEffect(() => {
+    if (!validationRules) return;
+
+    const incompatibleAssignments: Array<{ cleanerId: number; cleanerName: string; role: string; taskNames: string }> = [];
+
+    allCleanersToShow.forEach(cleaner => {
+      if (removedCleanerIds.has(cleaner.id)) return;
+      if (!cleaner.role) return;
+
+      const cleanerTasks = tasks
+        .filter(task => (task as any).assignedCleaner === cleaner.id)
+        .map(normalizeTask);
+
+      const incompatibleTasks = cleanerTasks.filter(
+        task => !canCleanerHandleTaskSync(cleaner.role, task, validationRules)
+      );
+
+      if (incompatibleTasks.length > 0) {
+        incompatibleAssignments.push({
+          cleanerId: cleaner.id,
+          cleanerName: `${cleaner.name} ${cleaner.lastname}`,
+          role: cleaner.role,
+          taskNames: incompatibleTasks.map(t => t.name).join(', ')
+        });
+      }
+    });
+
+    // Mostra toast solo se ci sono incompatibilità
+    if (incompatibleAssignments.length > 0) {
+      incompatibleAssignments.forEach(assignment => {
+        toast({
+          title: "⚠️ Assegnazione incompatibile",
+          description: `${assignment.cleanerName} (${assignment.role}) ha task incompatibili: ${assignment.taskNames}`,
+          variant: "default",
+          className: "bg-yellow-100 dark:bg-yellow-900/50 border-yellow-500 text-yellow-900 dark:text-yellow-100",
+        });
+      });
+    }
+  }, [validationRules, allCleanersToShow, tasks, removedCleanerIds]);
+
   // Funzione per verificare SE esistono assegnazioni salvate (senza caricarle)
   const checkSavedAssignmentExists = async () => {
     try {
@@ -1025,23 +1066,6 @@ export default function TimelineView({
                 const hasIncompatibleTasks = validationRules && cleaner?.role
                   ? cleanerTasks.some(task => !canCleanerHandleTaskSync(cleaner.role, task, validationRules))
                   : false;
-
-                // Mostra toast solo una volta quando viene rilevata incompatibilità
-                React.useEffect(() => {
-                  if (hasIncompatibleTasks && !isRemoved) {
-                    const incompatibleTasksList = cleanerTasks
-                      .filter(task => !canCleanerHandleTaskSync(cleaner.role, task, validationRules))
-                      .map(task => task.name)
-                      .join(', ');
-
-                    toast({
-                      title: "⚠️ Assegnazione incompatibile",
-                      description: `${cleaner.name} ${cleaner.lastname} (${cleaner.role}) ha task incompatibili: ${incompatibleTasksList}`,
-                      variant: "default",
-                      className: "bg-yellow-100 dark:bg-yellow-900/50 border-yellow-500 text-yellow-900 dark:text-yellow-100",
-                    });
-                  }
-                }, [hasIncompatibleTasks]);
 
                 return (
                   <div key={cleaner.id} className="flex mb-0.5">
