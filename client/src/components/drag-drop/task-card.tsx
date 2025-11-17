@@ -91,22 +91,14 @@ export default function TaskCard({
       clearTimeout(clickTimer);
       setClickTimer(null);
 
-      // Toggle filtro mappa per questa task
+      // Toggle filtro mappa per questa task (attiva/disattiva animazione)
       const currentFilteredTaskId = (window as any).mapFilteredTaskId;
       if (currentFilteredTaskId === task.name) {
-        // Rimuovi filtro
+        // Spegni animazione
         (window as any).mapFilteredTaskId = null;
-        toast({
-          title: "Filtro rimosso",
-          description: "Ora visualizzi tutti gli appartamenti sulla mappa",
-        });
       } else {
-        // Applica filtro
+        // Accendi animazione
         (window as any).mapFilteredTaskId = task.name;
-        toast({
-          title: "Task evidenziata",
-          description: `Visualizzi solo ${task.name} sulla mappa`,
-        });
       }
     } else {
       // Primo click: avvia timer

@@ -249,11 +249,13 @@ export default function MapSection({ tasks }: MapSectionProps) {
                 clearTimeout(clickTimer);
                 clickTimer = null;
                 
-                // Toggle filtro
+                // Toggle filtro (attiva/disattiva animazione)
                 const currentFilteredTaskId = (window as any).mapFilteredTaskId;
                 if (currentFilteredTaskId === task.name) {
+                  // Spegni animazione
                   (window as any).mapFilteredTaskId = null;
                 } else {
+                  // Accendi animazione
                   (window as any).mapFilteredTaskId = task.name;
                 }
               } else {
@@ -317,11 +319,13 @@ export default function MapSection({ tasks }: MapSectionProps) {
             clearTimeout(clickTimer);
             clickTimer = null;
             
-            // Toggle filtro
+            // Toggle filtro (attiva/disattiva animazione)
             const currentFilteredTaskId = (window as any).mapFilteredTaskId;
             if (currentFilteredTaskId === task.name) {
+              // Spegni animazione
               (window as any).mapFilteredTaskId = null;
             } else {
+              // Accendi animazione
               (window as any).mapFilteredTaskId = task.name;
             }
           } else {
