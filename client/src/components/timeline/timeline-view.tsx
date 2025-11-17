@@ -81,7 +81,7 @@ export default function TimelineView({
 
   // Stato per le regole di validazione task-cleaner
   const [validationRules, setValidationRules] = useState<any>(null);
-  
+
   // Ref per tracciare i toast già mostrati (previene duplicati)
   const shownToastsRef = useRef<Set<string>>(new Set());
 
@@ -139,7 +139,7 @@ export default function TimelineView({
 
       const message = data.removedFromTimeline
         ? `${selectedCleaner?.name} ${selectedCleaner?.lastname} è stato rimosso completamente (nessuna task).`
-        : `${selectedCleaner?.name} ${selectedCleaner?.lastname} è stato rimosso dalla selezione. Le sue task rimangono in timeline.`;
+        : `${selectedCleaner?.name} ${selectedCleaner?.lastname} è è stato rimosso dalla selezione. Le sue task rimangono in timeline.`;
 
       toast({
         title: "Cleaner rimosso",
@@ -169,13 +169,21 @@ export default function TimelineView({
       return await response.json();
     },
     onSuccess: async (data, cleanerId) => {
-      // CRITICAL: Marca modifiche SOLO dopo azioni utente
-      if ((window as any).setHasUnsavedChanges) {
-        (window as any).setHasUnsavedChanges(true);
-      }
       if (onTaskMoved) {
         onTaskMoved();
       }
+
+      // Preserva il cleaner aggiunto/sostituito nel set acknowledged
+      // Questo previene che riappaia l'animazione dopo l'aggiunta
+      setAcknowledgedIncompatibleCleaners(prev => {
+        const newSet = new Set(prev);
+        newSet.add(cleanerId);
+        // Se era una sostituzione, mantieni anche il cleaner sostituito
+        if (cleanerToReplace) {
+          newSet.add(cleanerToReplace);
+        }
+        return newSet;
+      });
 
       // Ricarica ENTRAMBI i file per sincronizzare la vista
       await Promise.all([
@@ -232,10 +240,6 @@ export default function TimelineView({
       return await response.json();
     },
     onSuccess: async (data, variables) => {
-      // CRITICAL: Marca modifiche SOLO dopo azioni utente
-      if ((window as any).setHasUnsavedChanges) {
-        (window as any).setHasUnsavedChanges(true);
-      }
       if (onTaskMoved) {
         onTaskMoved();
       }
@@ -931,11 +935,11 @@ export default function TimelineView({
       incompatibleAssignments.forEach(assignment => {
         // Crea una chiave univoca per questo toast
         const toastKey = `${assignment.cleanerId}-${assignment.taskNames}`;
-        
+
         // Mostra solo se non è già stato mostrato
         if (!shownToastsRef.current.has(toastKey)) {
           shownToastsRef.current.add(toastKey);
-          
+
           toast({
             title: "⚠️ Assegnazione incompatibile",
             description: `${assignment.cleanerName} (${assignment.role}) ha task incompatibili: ${assignment.taskNames}`,
@@ -945,7 +949,7 @@ export default function TimelineView({
         }
       });
     }
-    
+
     // Pulisci i toast mostrati quando non ci sono più incompatibilità
     if (incompatibleAssignments.length === 0) {
       shownToastsRef.current.clear();
