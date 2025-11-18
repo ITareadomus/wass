@@ -244,6 +244,7 @@ def classify_tasks(tasks, selected_date):
     high_priority_config = settings.get("high-priority", {})
 
     eo_time = parse_time(early_out_config.get("eo_time")) or datetime.strptime("10:00", "%H:%M").time()
+    eo_end_time = parse_time(early_out_config.get("eo_end_time")) or datetime.strptime("12:00", "%H:%M").time() # Nuova configurazione
     hp_time = parse_time(high_priority_config.get("hp_time")) or datetime.strptime("15:30", "%H:%M").time()
 
     eo_clients = early_out_config.get("eo_clients") or []
@@ -265,8 +266,9 @@ def classify_tasks(tasks, selected_date):
 
         # EARLY OUT
         checkout_time = parse_time(task.get("checkout_time"))
-        if checkout_time and checkout_time <= eo_time:
-            eo_reasons.append("checkout_time<=eo_time")
+        # EO logic using new eo_end_time
+        if checkout_time and checkout_time <= eo_end_time:
+            eo_reasons.append("checkout_time<=eo_end_time")
         if client_id in eo_clients:
             eo_reasons.append("client_forced_eo")
 
@@ -279,11 +281,10 @@ def classify_tasks(tasks, selected_date):
             bool(checkin_date) and bool(checkout_date) and (checkin_date == checkout_date)
         )
 
+        # HP window begins immediately after eo_end_time
         in_time_window = (
-            checkin_time is not None
-            and eo_time is not None
-            and hp_time is not None
-            and (eo_time < checkin_time <= hp_time)
+            checkin_time is not None and eo_end_time is not None and hp_time is not None
+            and (eo_end_time < checkin_time <= hp_time)
         )
 
         if same_day_turnover and in_time_window:
