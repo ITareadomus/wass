@@ -734,6 +734,8 @@ export default function GenerateAssignments() {
             } else {
               timelineAssignmentsData = JSON.parse(timelineText);
               console.log("Timeline assignments data:", timelineAssignmentsData);
+              console.log("Cleaners assignments count:", timelineAssignmentsData.cleaners_assignments?.length || 0);
+              console.log("Total tasks in timeline:", timelineAssignmentsData.cleaners_assignments?.reduce((sum: number, c: any) => sum + (c.tasks?.length || 0), 0) || 0);
             }
           } else {
             console.warn('Timeline file is not JSON, using empty timeline');
@@ -748,7 +750,6 @@ export default function GenerateAssignments() {
       }
 
       console.log("Containers data:", containersData);
-      console.log("Timeline assignments data:", timelineAssignmentsData);
 
       // Estrai task dai container
       const initialEarlyOut: Task[] = (containersData.containers?.early_out?.tasks || []).map((task: RawTask) =>
@@ -765,16 +766,14 @@ export default function GenerateAssignments() {
 
       console.log("Task convertiti - Early:", initialEarlyOut.length, "High:", initialHigh.length, "Low:", initialLow.length);
 
-      // Crea una mappa di task_id -> assegnazione timeline completa
-      // Nuova struttura: cleaners_assignments è un array di {cleaner, tasks}
-      const timelineAssignmentsMap = new Map<string, any>();
+      // Costruisci la mappa task_id -> assegnazione dalla timeline
+      const timelineAssignmentsMap = new Map();
+      const timelineTasks: Task[] = [];
 
       if (timelineAssignmentsData.cleaners_assignments) {
-        // Nuova struttura organizzata per cleaner
-        console.log('📋 Caricamento da cleaners_assignments:', timelineAssignmentsData.cleaners_assignments.length, 'cleaners');
+        console.log('📋 Caricamento da cleaners_assignments:', timelineAssignmentsData.cleaners_assignments.length);
         for (const cleanerEntry of timelineAssignmentsData.cleaners_assignments) {
-          // Verifica che cleanerEntry.cleaner esista
-          if (!cleanerEntry.cleaner) {
+          if (!cleanerEntry.cleaner || !cleanerEntry.cleaner.id) {
             console.warn('⚠️ Trovata entry senza cleaner, salto:', cleanerEntry);
             continue;
           }
@@ -784,22 +783,40 @@ export default function GenerateAssignments() {
             const taskId = String(task.task_id);
             const taskLC = String(task.logistic_code);
             console.log(`      → Task ${taskLC} (ID: ${taskId}) assegnata a cleaner ${cleanerEntry.cleaner.id}`);
-            timelineAssignmentsMap.set(taskId, {
+
+            const taskWithAssignment = {
               ...task,
+              id: task.task_id || task.id,
+              name: String(task.logistic_code),
+              assignedCleaner: cleanerEntry.cleaner.id,
               cleanerId: cleanerEntry.cleaner.id,
-              sequence: task.sequence
-            });
+              sequence: task.sequence,
+              priority: task.priority || 'low_priority'
+            };
+
+            timelineAssignmentsMap.set(taskId, taskWithAssignment);
+            timelineTasks.push(taskWithAssignment as Task);
           }
         }
       } else if (timelineAssignmentsData.assignments) {
         // Vecchia struttura piatta (fallback)
         console.log('📋 Caricamento da assignments (vecchia struttura):', timelineAssignmentsData.assignments.length);
         for (const a of timelineAssignmentsData.assignments) {
-          timelineAssignmentsMap.set(String(a.task_id), a);
+          const taskWithAssignment = {
+            ...a,
+            id: a.task_id || a.id,
+            name: String(a.logistic_code),
+            assignedCleaner: a.cleanerId || a.cleaner_id,
+            priority: a.priority || 'low_priority'
+          };
+          timelineAssignmentsMap.set(String(a.task_id), taskWithAssignment);
+          timelineTasks.push(taskWithAssignment as Task);
         }
       }
 
       console.log("✅ Task assegnate nella timeline (task_id):", Array.from(timelineAssignmentsMap.keys()));
+      console.log("✅ Timeline tasks array length:", timelineTasks.length);
+
 
       // Filtra le task già presenti nella timeline dai container usando l'id univoco
       const filteredEarlyOut = initialEarlyOut.filter(task => {
