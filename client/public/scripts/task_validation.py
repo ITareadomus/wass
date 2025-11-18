@@ -161,6 +161,11 @@ def can_cleaner_handle_apartment_type(cleaner_role: str, apartment_type: str) ->
     return get_validation_rules().can_cleaner_handle_apartment_type(cleaner_role, apartment_type)
 
 
+def can_cleaner_handle_apartment(cleaner_role: str, apartment_type: str) -> bool:
+    """Alias per can_cleaner_handle_apartment_type"""
+    return can_cleaner_handle_apartment_type(cleaner_role, apartment_type)
+
+
 def validate_apartment_assignment(cleaner_role: str, apartment_type: str) -> Optional[str]:
     """Wrapper convenience per ottenere messaggi di validazione tipo di appartamento"""
     return get_validation_rules().get_apartment_validation_message(cleaner_role, apartment_type)
