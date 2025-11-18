@@ -311,14 +311,6 @@ export default function Settings() {
           <h1 className="text-3xl font-bold">Settings</h1>
           <div className="flex gap-2 items-center">
             <ThemeToggle />
-            <Button
-              onClick={() => setLocation("/")}
-              variant="outline"
-              size="sm"
-            >
-              <Home className="w-4 h-4 mr-2" />
-              Home
-            </Button>
           </div>
         </div>
 
