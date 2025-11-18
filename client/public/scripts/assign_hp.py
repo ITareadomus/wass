@@ -5,7 +5,7 @@ from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Tuple
 from pathlib import Path
 from datetime import datetime, timedelta
-from task_validation import can_cleaner_handle_task
+from task_validation import can_cleaner_handle_task, can_cleaner_handle_apartment
 
 # =============================
 # I/O paths
@@ -332,6 +332,9 @@ def can_add_task(cleaner: Cleaner, task: Task) -> bool:
     """
     if not can_handle_premium(cleaner, task):
         return False
+    # NUOVO: Verifica compatibilità tipo appartamento
+    if not can_cleaner_handle_apartment(cleaner.role, task.apt_type):
+        return False
 
     current_count = len(cleaner.route)
 
@@ -400,7 +403,7 @@ def can_add_task(cleaner: Cleaner, task: Task) -> bool:
     # 3ª-5ª task: solo se fattibile temporalmente
     if current_count >= BASE_MAX_TASKS and current_count < ABSOLUTE_MAX_TASKS:
         test_route = cleaner.route + [task]
-        feasible, schedule = evaluate_route(cleaner, test_route)
+        feasible, _ = evaluate_route(cleaner, test_route)
         if feasible and schedule:
             last_finish = schedule[-1][2]  # finish datetime
             if current_count < ABSOLUTE_MAX_TASKS_IF_BEFORE_18 and last_finish.hour < 18:
@@ -759,6 +762,10 @@ def plan_day(tasks: List[Task], cleaners: List[Cleaner], assigned_logistic_codes
             if not can_cleaner_handle_task(target_cleaner.role, task_type):
                 tipo = "edificio" if same_building_cleaner else "zona"
                 print(f"   ⚠️  Cross-container {tipo} cleaner {target_cleaner.name} ({target_cleaner.role}) non può gestire task {task_type} - SKIPPATO fast-path")
+            # NUOVO: Aggiungi validazione tipo appartamento per cross-container
+            elif not can_cleaner_handle_apartment(target_cleaner.role, task.apt_type):
+                tipo = "edificio" if same_building_cleaner else "zona"
+                print(f"   ⚠️  Cross-container {tipo} cleaner {target_cleaner.name} ({target_cleaner.role}) non può gestire appartamento {task.apt_type} - SKIPPATO fast-path")
             else:
                 result = find_best_position(target_cleaner, task)
                 if result is not None:
@@ -775,11 +782,13 @@ def plan_day(tasks: List[Task], cleaners: List[Cleaner], assigned_logistic_codes
                         # VALIDAZIONE: Verifica compatibilità anche per forced assignment
                         task_type = 'straordinario_apt' if task.straordinaria else ('premium_apt' if task.is_premium else 'standard_apt')
                         if not can_cleaner_handle_task(same_zone_cleaner.role, task_type):
-                            print(f"   ⚠️  Forced assignment a {same_zone_cleaner.name} ({same_zone_cleaner.role}) non può gestire task {task_type} - SKIPPATO")
+                            print(f"   ⚠️  Forced assignment: cleaner {same_zone_cleaner.name} ({same_zone_cleaner.role}) non può gestire task {task_type} - SKIPPATO")
+                        elif not can_cleaner_handle_apartment(same_zone_cleaner.role, task.apt_type):
+                            print(f"   ⚠️  Forced assignment: cleaner {same_zone_cleaner.name} ({same_zone_cleaner.role}) non può gestire appartamento {task.apt_type} - SKIPPATO")
                         else:
                             current_count = len(same_zone_cleaner.route)
                             total_daily = same_zone_cleaner.eo_last_sequence + current_count
-                            
+
                             # Se non ha superato il limite giornaliero assoluto, forza l'assegnazione
                             if total_daily < DAILY_TASK_LIMIT:
                                 # Prova ad aggiungere alla fine della route
@@ -790,7 +799,7 @@ def plan_day(tasks: List[Task], cleaners: List[Cleaner], assigned_logistic_codes
                                     assigned_logistic_codes.add(task.logistic_code)
                                     print(f"   🔥 Task {task.task_id} FORZATA a {same_zone_cleaner.name} (cross-container zona, limite HP superato ma fattibile)")
                                     continue
-                    
+
                     print(f"   ⚠️  Task {task.task_id} vicina a {target_cleaner.name} ma limite raggiunto e non fattibile")
 
 
@@ -798,12 +807,17 @@ def plan_day(tasks: List[Task], cleaners: List[Cleaner], assigned_logistic_codes
         candidates = []
 
         for cleaner in cleaners:
-            # VALIDAZIONE: Verifica se il cleaner può gestire questo tipo di task
+            # VALIDAZIONE: tipo di task
             task_type = 'straordinario_apt' if task.straordinaria else ('premium_apt' if task.is_premium else 'standard_apt')
             if not can_cleaner_handle_task(cleaner.role, task_type):
                 print(f"   ⚠️  Cleaner {cleaner.name} ({cleaner.role}) non può gestire task {task_type} - SKIPPATO")
                 continue
-            
+
+            # NUOVO: VALIDAZIONE appartamento
+            if not can_cleaner_handle_apartment(cleaner.role, task.apt_type):
+                print(f"   ⚠️  Cleaner {cleaner.name} ({cleaner.role}) non può gestire appartamento {task.apt_type} - SKIPPATO")
+                continue
+
             result = find_best_position(cleaner, task)
             if result is not None:
                 pos, travel = result

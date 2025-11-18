@@ -6,7 +6,7 @@ from typing import Any, Dict, List, Optional, Tuple
 from pathlib import Path
 import sys
 from datetime import datetime
-from task_validation import can_cleaner_handle_task
+from task_validation import can_cleaner_handle_task, can_cleaner_handle_apartment
 
 # =============================
 # I/O paths
@@ -344,7 +344,7 @@ def can_add_task(cleaner: Cleaner, task: Task) -> bool:
             (travel_minutes(existing_task.lat, existing_task.lng, task.lat, task.lng,
                           existing_task.address, task.address) <= CLUSTER_PRIORITY_TRAVEL or
              travel_minutes(task.lat, task.lng, existing_task.lat, existing_task.lng,
-                          task.address, existing_task.address) <= CLUSTER_PRIORITY_TRAVEL or
+                          task.address, task.address) <= CLUSTER_PRIORITY_TRAVEL or
              same_street(existing_task.address, task.address))
             for existing_task in cleaner.route
         )
@@ -615,7 +615,7 @@ def plan_day(tasks: List[Task], cleaners: List[Cleaner], assigned_logistic_codes
     - Max 4 task per cleaner per LP
     - DEDUPLICA: Solo una task per logistic_code viene assegnata
     - CLUSTERING PREVENTIVO: Raggruppa task stesso edificio prima dell'assegnazione
-    - CLUSTERING CROSS-CONTAINER: Raggruppa task vicine a quelle già assegnate (EO/HP/LP)
+    - CLUSTERING CROSS-CONTAINER: Raggruppa task vicine a quelle già assegnate (EO/HP)
     """
     if assigned_logistic_codes is None:
         assigned_logistic_codes = set()
@@ -795,7 +795,7 @@ def plan_day(tasks: List[Task], cleaners: List[Cleaner], assigned_logistic_codes
                         else:
                             current_count = len(same_zone_cleaner.route)
                             total_daily = same_zone_cleaner.total_daily_tasks + current_count
-                            
+
                             # Se non ha superato il limite giornaliero assoluto, forza l'assegnazione
                             if total_daily < MAX_DAILY_TASKS:
                                 # Prova ad aggiungere alla fine della route
@@ -806,7 +806,7 @@ def plan_day(tasks: List[Task], cleaners: List[Cleaner], assigned_logistic_codes
                                     assigned_logistic_codes.add(task.logistic_code)
                                     print(f"   🔥 Task {task.task_id} FORZATA a {same_zone_cleaner.name} (cross-container zona, limite LP superato ma fattibile)")
                                     continue
-                    
+
                     print(f"   ⚠️  Task {task.task_id} vicina a {target_cleaner.name} ma limite raggiunto e non fattibile")
 
 
@@ -819,11 +819,17 @@ def plan_day(tasks: List[Task], cleaners: List[Cleaner], assigned_logistic_codes
             if not can_cleaner_handle_task(cleaner.role, task_type):
                 print(f"   ⚠️  Cleaner {cleaner.name} ({cleaner.role}) non può gestire task {task_type} - SKIPPATO")
                 continue
-            
-            result = find_best_position(cleaner, task)
-            if result is not None:
-                pos, travel = result
-                candidates.append((cleaner, pos, travel))
+
+            # NUOVO: Validazione tipo appartamento
+            if not can_cleaner_handle_apartment(cleaner.role, task.apt_type):
+                print(f"   ⚠️  Cleaner {cleaner.name} ({cleaner.role}) non può gestire appartamento {task.apt_type} - SKIPPATO")
+                continue
+
+            if can_add_task(cleaner, task):
+                result = find_best_position(cleaner, task)
+                if result is not None:
+                    pos, travel = result
+                    candidates.append((cleaner, pos, travel))
 
         if not candidates:
             unassigned.append(task)
