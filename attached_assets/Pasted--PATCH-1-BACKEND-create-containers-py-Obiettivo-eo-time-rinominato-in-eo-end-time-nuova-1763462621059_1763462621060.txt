@@ -1,0 +1,138 @@
+✅ PATCH 1 — BACKEND (create_containers.py)
+🔧 Obiettivo:
+
+eo_time → rinominato in eo_end_time
+
+nuova soglia EO: checkout_time <= eo_end_time
+
+finestra HP: eo_end_time < checkin_time <= hp_time
+
+mantenere compatibilità se esiste ancora eo_time
+
+📌 Patch (copia-incolla)
+diff --git a/client/public/scripts/create_containers.py b/client/public/scripts/create_containers.py
+index XXXXXXX..YYYYYYY 100644
+--- a/client/public/scripts/create_containers.py
++++ b/client/public/scripts/create_containers.py
+@@ -240,11 +240,19 @@ def main():
+-    eo_time = parse_time(early_out_config.get("eo_time")) or datetime.strptime("10:00", "%H:%M").time()
++    # New EO end time field, with backward compatibility
++    eo_end_time = (
++        parse_time(early_out_config.get("eo_end_time"))
++        or parse_time(early_out_config.get("eo_time"))  # legacy fallback
++        or datetime.strptime("10:59", "%H:%M").time()
++    )
+
+@@ -300,9 +308,9 @@ def main():
+-    # EO logic: checkout_time <= eo_time
+-    if checkout_time and checkout_time <= eo_time:
+-        eo_reasons.append("checkout_time<=eo_time")
++    # EO logic using new eo_end_time
++    if checkout_time and checkout_time <= eo_end_time:
++        eo_reasons.append("checkout_time<=eo_end_time")
+
+@@ -325,10 +333,10 @@ def main():
+-    # HP window: eo_time < checkin_time <= hp_time
+-    in_time_window = (
+-        checkin_time is not None and eo_time is not None and hp_time is not None
+-        and (eo_time < checkin_time <= hp_time)
++    # HP window begins immediately after eo_end_time
++    in_time_window = (
++        checkin_time is not None and eo_end_time is not None and hp_time is not None
++        and (eo_end_time < checkin_time <= hp_time)
+     )
+
+✅ PATCH 2 — TypeScript typings (vecchia pagina settings)
+
+File: client/src/pages/settings.tsx
+
+📌 Patch
+diff --git a/client/src/pages/settings.tsx b/client/src/pages/settings.tsx
+index XXXXXXX..YYYYYYY 100644
+--- a/client/src/pages/settings.tsx
++++ b/client/src/pages/settings.tsx
+@@ -25,7 +25,7 @@ interface SystemSettings {
+     "early-out": {
+         eo_start_time: string;
+-        eo_time: string;
++        eo_end_time: string;
+         eo_clients: number[];
+     };
+
+✅ PATCH 3 — TypeScript typings (NUOVA pagina /settings)
+
+File: client/src/pages/system-settings.tsx
+
+📌 Patch
+diff --git a/client/src/pages/system-settings.tsx b/client/src/pages/system-settings.tsx
+index XXXXXXX..YYYYYYY 100644
+--- a/client/src/pages/system-settings.tsx
++++ b/client/src/pages/system-settings.tsx
+@@ -21,7 +21,7 @@ interface SettingsData {
+     "early-out": {
+         eo_start_time: string;
+-        eo_time: string;
++        eo_end_time: string;
+         eo_clients: number[];
+     };
+
+✅ PATCH 4 — UI Input (pagina /settings)
+
+Trova il blocco nella card Early-Out:
+
+📌 Patch
+diff --git a/client/src/pages/system-settings.tsx b/client/src/pages/system-settings.tsx
+index XXXXXXX..YYYYYYY 100644
+--- a/client/src/pages/system-settings.tsx
++++ b/client/src/pages/system-settings.tsx
+@@ -220,18 +220,18 @@
+ <Label htmlFor="eo_start_time" className="text-sm">EO Start Time</Label>
+ <Input
+     id="eo_start_time"
+     type="time"
+     value={settings["early-out"].eo_start_time}
+     onChange={(e) =>
+         setSettings({
+             ...settings,
+             "early-out": {
+                 ...settings["early-out"],
+                 eo_start_time: e.target.value,
+             },
+         })
+     }
+ />
+
+-<Label htmlFor="eo_time" className="text-sm">EO Time</Label>
++<Label htmlFor="eo_end_time" className="text-sm">EO End Time</Label>
+ <Input
+-    id="eo_time"
++    id="eo_end_time"
+     type="time"
+-    value={settings["early-out"].eo_time}
++    value={settings["early-out"].eo_end_time}
+     onChange={(e) =>
+         setSettings({
+             ...settings,
+             "early-out": {
+                 ...settings["early-out"],
+-                eo_time: e.target.value,
++                eo_end_time: e.target.value,
+             },
+         })
+     }
+ />
+
+✅ PATCH 5 — Containers output (sola stringa, opzionale)
+
+Solo per coerenza nelle label del report.
+
+📌 Patch
+diff --git a/client/public/data/output/containers.json b/client/public/data/output/containers.json
+--- a/client/public/data/output/containers.json
++++ b/client/public/data/output/containers.json
+@@ -190,7 +190,7 @@
+- "checkout_time<=eo_time",
++ "checkout_time<=eo_end_time",
+
+
+(Questo file viene rigenerato comunque dallo script.)
