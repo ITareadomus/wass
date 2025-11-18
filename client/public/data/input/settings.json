@@ -2,45 +2,18 @@
   "early-out": {
     "eo_start_time": "10:00",
     "eo_time": "10:00",
-    "eo_clients": [
-      61,
-      87
-    ]
+    "eo_clients": [61, 87]
   },
   "high-priority": {
     "hp_start_time": "11:00",
     "hp_time": "15:30",
-    "hp_clients": [
-      64,
-      1,
-      43,
-      124
-    ]
+    "hp_clients": [64]
   },
   "dedupe_strategy": "eo_wins",
   "apartment_types": {
-    "standard_apt": [
-      "A",
-      "B",
-      "C",
-      "D",
-      "E",
-      "F",
-      "X"
-    ],
-    "premium_apt": [
-      "A",
-      "B",
-      "C",
-      "D",
-      "E",
-      "F",
-      "X"
-    ],
-    "formatore_apt": [
-      "B",
-      "C"
-    ]
+    "standard_apt": ["A", "B", "C", "D", "E", "F", "X"],
+    "premium_apt": ["A", "B", "C", "D", "E", "F", "X"],
+    "formatore_apt": ["B", "C"]
   },
   "task_types": {
     "standard_apt": {
