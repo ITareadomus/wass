@@ -304,14 +304,14 @@ def can_add_task(cleaner: Cleaner, task: Task) -> bool:
     3. CLUSTERING: appartamenti vicini (≤10') possono infrangere limiti tipologia
     4. Stessa via o ≤5': massima priorità cluster
     5. Limite giornaliero: max 5 task totali (EO+HP+LP)
-    6. FORMATORE: solo task con type_apt A o B, massimo 2 al giorno
+    6. FORMATORE: vincoli da settings.json (apartment_types)
     """
-    # NUOVO: Regole per Formatore
+    # Validazione tipo appartamento (legge da settings.json)
+    if task.apt_type and not can_cleaner_handle_apartment(cleaner.role, task.apt_type):
+        return False
+
+    # Formatore max 2 task LP al giorno (totale)
     if cleaner.role.lower() == "formatore":
-        # Formatore può solo task type_apt A o B
-        if task.apt_type not in ["A", "B"]:
-            return False
-        # Formatore max 2 task LP al giorno (totale)
         if len(cleaner.route) >= 2:
             return False
 
