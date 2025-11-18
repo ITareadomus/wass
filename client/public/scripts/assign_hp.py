@@ -84,8 +84,8 @@ class Cleaner:
     lastname: str
     role: str
     is_premium: bool
-    can_do_straordinaria: bool = False
     start_time: datetime
+    can_do_straordinaria: bool = False
     available_from: Optional[datetime] = None
     last_eo_address: Optional[str] = None
     last_eo_lat: Optional[float] = None
