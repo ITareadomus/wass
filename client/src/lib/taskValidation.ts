@@ -17,16 +17,10 @@ interface TaskValidationSettings {
   };
 }
 
-// Define ValidationRules interface to match the structure expected by canCleanerHandleTaskSync
-interface ValidationRules {
-  task_types: {
-    standard_apt: TaskTypeRules;
-    premium_apt: TaskTypeRules;
-    straordinario_apt: TaskTypeRules;
-  };
-}
+// Le regole che usiamo sono direttamente la mappa task_types di settings.json
+type ValidationRules = TaskValidationSettings["task_types"];
 
-let cachedRules: TaskValidationSettings['task_types'] | null = null;
+let cachedRules: ValidationRules | null = null;
 
 /**
  * Carica le regole di validazione da settings.json
@@ -160,15 +154,16 @@ export function canCleanerHandleTaskSync(
   if (!taskType) return true;
 
   // Per straordinarie, usa il flag can_do_straordinaria del cleaner
-  if (taskType === 'straordinario_apt') {
+  if (taskType === "straordinario_apt") {
     return canDoStraordinaria;
   }
 
   const normalizedRole = normalizeCleanerRole(cleanerRole);
-  // FIX: normalizedRole è già una chiave di TaskTypeRules (es. "premium_cleaner")
+  // normalizedRole è già "standard_cleaner" | "premium_cleaner" | ...
   const roleKey: keyof TaskTypeRules = normalizedRole;
 
-  const taskRules = rules.task_types?.[taskType];
+  // rules è direttamente settings.task_types
+  const taskRules = rules[taskType];
   if (!taskRules) return true;
 
   return taskRules[roleKey] ?? false;
