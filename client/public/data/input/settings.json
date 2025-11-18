@@ -39,24 +39,26 @@
       "B"
     ]
   },
-  "task_types": {
-    "standard_apt": {
-      "standard_cleaner": true,
-      "premium_cleaner": true,
-      "straordinaria_cleaner": true,
-      "formatore_cleaner": true
+  "task_types_by_cleaner": {
+    "standard_cleaner": {
+      "standard_apt": true,
+      "premium_apt": false,
+      "straordinario_apt": false
     },
-    "premium_apt": {
-      "standard_cleaner": false,
-      "premium_cleaner": true,
-      "straordinaria_cleaner": true,
-      "formatore_cleaner": false
+    "premium_cleaner": {
+      "standard_apt": true,
+      "premium_apt": true,
+      "straordinario_apt": false
     },
-    "straordinario_apt": {
-      "standard_cleaner": false,
-      "premium_cleaner": false,
-      "straordinaria_cleaner": true,
-      "formatore_cleaner": false
+    "straordinario_cleaner": {
+      "standard_apt": true,
+      "premium_apt": true,
+      "straordinario_apt": true
+    },
+    "formatore_cleaner": {
+      "standard_apt": true,
+      "premium_apt": false,
+      "straordinario_apt": false
     }
   }
 }
