@@ -372,6 +372,7 @@ export default function Settings() {
                         }}
                         disabled={false}
                         data-testid="checkbox-std-standard"
+                        className="border-2 border-custom-blue data-[state=checked]:bg-custom-blue data-[state=checked]:border-custom-blue"
                       />
                     <Label htmlFor="std-standard" className="text-sm cursor-pointer">
                       Standard Cleaner
@@ -385,6 +386,7 @@ export default function Settings() {
                         updateTaskTypeRule('standard_apt', 'premium_cleaner', checked === true)
                       }
                       disabled={false}
+                      className="border-2 border-custom-blue data-[state=checked]:bg-custom-blue data-[state=checked]:border-custom-blue"
                     />
                     <Label htmlFor="std-premium" className="text-sm cursor-pointer">
                       Premium Cleaner
@@ -398,6 +400,7 @@ export default function Settings() {
                         updateTaskTypeRule('standard_apt', 'straordinaria_cleaner', checked === true)
                       }
                       disabled={false}
+                      className="border-2 border-custom-blue data-[state=checked]:bg-custom-blue data-[state=checked]:border-custom-blue"
                     />
                     <Label htmlFor="std-straordinaria" className="text-sm cursor-pointer">
                       Straordinaria Cleaner
@@ -411,6 +414,7 @@ export default function Settings() {
                         updateTaskTypeRule('standard_apt', 'formatore_cleaner', checked === true)
                       }
                       disabled={false}
+                      className="border-2 border-custom-blue data-[state=checked]:bg-custom-blue data-[state=checked]:border-custom-blue"
                     />
                     <Label htmlFor="std-formatore" className="text-sm cursor-pointer">
                       Formatore Cleaner
@@ -436,6 +440,7 @@ export default function Settings() {
                         updateTaskTypeRule('premium_apt', 'standard_cleaner', checked === true)
                       }
                       disabled={false}
+                      className="border-2 border-custom-blue data-[state=checked]:bg-custom-blue data-[state=checked]:border-custom-blue"
                     />
                     <Label htmlFor="prem-standard" className="text-sm cursor-pointer">
                       Standard Cleaner
@@ -449,6 +454,7 @@ export default function Settings() {
                         updateTaskTypeRule('premium_apt', 'premium_cleaner', checked === true)
                       }
                       disabled={false}
+                      className="border-2 border-custom-blue data-[state=checked]:bg-custom-blue data-[state=checked]:border-custom-blue"
                     />
                     <Label htmlFor="prem-premium" className="text-sm cursor-pointer">
                       Premium Cleaner
@@ -462,6 +468,7 @@ export default function Settings() {
                         updateTaskTypeRule('premium_apt', 'straordinaria_cleaner', checked === true)
                       }
                       disabled={false}
+                      className="border-2 border-custom-blue data-[state=checked]:bg-custom-blue data-[state=checked]:border-custom-blue"
                     />
                     <Label htmlFor="prem-straordinaria" className="text-sm cursor-pointer">
                       Straordinaria Cleaner
@@ -475,6 +482,7 @@ export default function Settings() {
                         updateTaskTypeRule('premium_apt', 'formatore_cleaner', checked === true)
                       }
                       disabled={false}
+                      className="border-2 border-custom-blue data-[state=checked]:bg-custom-blue data-[state=checked]:border-custom-blue"
                     />
                     <Label htmlFor="prem-formatore" className="text-sm cursor-pointer">
                       Formatore Cleaner
@@ -500,6 +508,7 @@ export default function Settings() {
                         updateTaskTypeRule('straordinario_apt', 'standard_cleaner', checked === true)
                       }
                       disabled={false}
+                      className="border-2 border-custom-blue data-[state=checked]:bg-custom-blue data-[state=checked]:border-custom-blue"
                     />
                     <Label htmlFor="straord-standard" className="text-sm cursor-pointer">
                       Standard Cleaner
@@ -513,6 +522,7 @@ export default function Settings() {
                         updateTaskTypeRule('straordinario_apt', 'premium_cleaner', checked === true)
                       }
                       disabled={false}
+                      className="border-2 border-custom-blue data-[state=checked]:bg-custom-blue data-[state=checked]:border-custom-blue"
                     />
                     <Label htmlFor="straord-premium" className="text-sm cursor-pointer">
                       Premium Cleaner
@@ -526,6 +536,7 @@ export default function Settings() {
                         updateTaskTypeRule('straordinario_apt', 'straordinaria_cleaner', checked === true)
                       }
                       disabled={false}
+                      className="border-2 border-custom-blue data-[state=checked]:bg-custom-blue data-[state=checked]:border-custom-blue"
                     />
                     <Label htmlFor="straord-straordinaria" className="text-sm cursor-pointer">
                       Straordinaria Cleaner
@@ -539,6 +550,7 @@ export default function Settings() {
                         updateTaskTypeRule('straordinario_apt', 'formatore_cleaner', checked === true)
                       }
                       disabled={false}
+                      className="border-2 border-custom-blue data-[state=checked]:bg-custom-blue data-[state=checked]:border-custom-blue"
                     />
                     <Label htmlFor="straord-formatore" className="text-sm cursor-pointer">
                       Formatore Cleaner
