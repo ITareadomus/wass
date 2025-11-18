@@ -593,9 +593,10 @@ export default function SystemSettings() {
                 {/* Appartamento Standard */}
                 <div className="space-y-3">
                   <div className="border-b pb-2 flex items-center gap-2">
-                    <Badge variant="outline" className="bg-white text-custom-blue border-custom-blue">
-                      Standard Apt
-                    </Badge>
+                    <span className="text-sm font-medium text-green-800 dark:text-green-200">Apt</span>
+                    <span className="px-2 py-0.5 rounded border font-medium text-sm bg-green-500/30 text-green-800 dark:bg-green-500/40 dark:text-green-200 border-green-600 dark:border-green-400">
+                      Standard
+                    </span>
                   </div>
                   <div className="space-y-2">
                     <div className="flex items-center space-x-2">
@@ -652,9 +653,10 @@ export default function SystemSettings() {
                 {/* Appartamento Premium */}
                 <div className="space-y-3">
                   <div className="border-b pb-2 flex items-center gap-2">
-                    <Badge variant="outline" className="bg-white text-custom-blue border-custom-blue">
-                      Premium Apt
-                    </Badge>
+                    <span className="text-sm font-medium text-yellow-800 dark:text-yellow-200">Apt</span>
+                    <span className="px-2 py-0.5 rounded border font-medium text-sm bg-yellow-500/30 text-yellow-800 dark:bg-yellow-500/40 dark:text-yellow-200 border-yellow-600 dark:border-yellow-400">
+                      Premium
+                    </span>
                   </div>
                   <div className="space-y-2">
                     <div className="flex items-center space-x-2">
@@ -711,9 +713,10 @@ export default function SystemSettings() {
                 {/* Appartamento Straordinario */}
                 <div className="space-y-3">
                   <div className="border-b pb-2 flex items-center gap-2">
-                    <Badge variant="outline" className="bg-white text-custom-blue border-custom-blue">
-                      Straordinario Apt
-                    </Badge>
+                    <span className="text-sm font-medium text-red-800 dark:text-red-200">Apt</span>
+                    <span className="px-2 py-0.5 rounded border font-medium text-sm bg-red-500/30 text-red-800 dark:bg-red-500/40 dark:text-red-200 border-red-600 dark:border-red-400">
+                      Straordinario
+                    </span>
                   </div>
                   <div className="space-y-2">
                     <div className="flex items-center space-x-2">
