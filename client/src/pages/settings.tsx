@@ -83,6 +83,7 @@ export default function Settings() {
 
   const [systemSettings, setSystemSettings] = useState<SystemSettings | null>(null);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [isSavingSettings, setIsSavingSettings] = useState(false);
 
   useEffect(() => {
     const user = localStorage.getItem("user");
@@ -147,6 +148,7 @@ export default function Settings() {
   const saveSystemSettings = async () => {
     if (!systemSettings) return;
 
+    setIsSavingSettings(true);
     try {
       const response = await fetch("/api/save-settings", {
         method: "POST",
@@ -160,6 +162,8 @@ export default function Settings() {
           description: "Le modifiche sono state salvate con successo",
         });
         setHasUnsavedChanges(false);
+        // Ricarica le impostazioni per assicurarsi che siano aggiornate
+        await loadSystemSettings();
       } else {
         throw new Error();
       }
@@ -169,6 +173,8 @@ export default function Settings() {
         description: "Impossibile salvare le impostazioni",
         variant: "destructive",
       });
+    } finally {
+      setIsSavingSettings(false);
     }
   };
 
@@ -192,39 +198,7 @@ export default function Settings() {
     setHasUnsavedChanges(true);
   };
 
-  const handleClientToggle = (clientId: number, type: "eo" | "hp") => {
-    if (!systemSettings) return;
-
-    if (type === "eo") {
-      const currentClients = systemSettings["early-out"].eo_clients;
-      const updatedClients = currentClients.includes(clientId)
-        ? currentClients.filter(id => id !== clientId)
-        : [...currentClients, clientId];
-
-      setSystemSettings({
-        ...systemSettings,
-        "early-out": {
-          ...systemSettings["early-out"],
-          eo_clients: updatedClients
-        }
-      });
-    } else {
-      const currentClients = systemSettings["high-priority"].hp_clients;
-      const updatedClients = currentClients.includes(clientId)
-        ? currentClients.filter(id => id !== clientId)
-        : [...currentClients, clientId];
-
-      setSystemSettings({
-        ...systemSettings,
-        "high-priority": {
-          ...systemSettings["high-priority"],
-          hp_clients: updatedClients
-        }
-      });
-    }
-    
-    setHasUnsavedChanges(true);
-  };
+  
 
   const handleSaveAccount = async (account: Account) => {
     try {
@@ -359,10 +333,11 @@ export default function Settings() {
               {hasUnsavedChanges && (
                 <Button 
                   onClick={saveSystemSettings}
+                  disabled={isSavingSettings}
                   className="bg-green-600 hover:bg-green-700 text-white"
                 >
                   <Save className="w-4 h-4 mr-2" />
-                  Salva Modifiche
+                  {isSavingSettings ? "Salvataggio..." : "Salva Modifiche"}
                 </Button>
               )}
             </div>
