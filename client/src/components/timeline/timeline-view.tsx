@@ -530,8 +530,7 @@ export default function TimelineView({
             .map(normalizeTask);
 
           const incompatibleTasks = cleanerTasks.filter(task => {
-            const canDoStraordinaria = Boolean(cleaner.can_do_straordinaria);
-            if (canCleanerHandleTaskSync(cleaner.role, task, validationRules, canDoStraordinaria)) return false;
+            if (canCleanerHandleTaskSync(cleaner.role, task, validationRules)) return false;
             const key = getIncompatibleKey(task, cleaner.id);
             return !acknowledgedIncompatibleAssignments.has(key);
           });
@@ -1000,8 +999,7 @@ export default function TimelineView({
 
       // Verifica se ci sono task incompatibili NON ancora ackate per questo cleaner
       const incompatibleTasks = cleanerTasks.filter(task => {
-        const canDoStraordinaria = Boolean(cleaner.can_do_straordinaria);
-        if (canCleanerHandleTaskSync(cleaner.role, task, validationRules, canDoStraordinaria)) return false;
+        if (canCleanerHandleTaskSync(cleaner.role, task, validationRules)) return false;
         const key = getIncompatibleKey(task, cleaner.id);
         return !acknowledgedIncompatibleAssignments.has(key);
       });
@@ -1209,8 +1207,7 @@ export default function TimelineView({
                 const hasIncompatibleTasks = validationRules && cleaner?.role
                   ? cleanerTasks.some(task => {
                       // Se la task è compatibile, ok
-                      const canDoStraordinaria = Boolean(cleaner.can_do_straordinaria);
-                      if (canCleanerHandleTaskSync(cleaner.role, task, validationRules, canDoStraordinaria)) return false;
+                      if (canCleanerHandleTaskSync(cleaner.role, task, validationRules)) return false;
                       
                       // Se è incompatibile, controlliamo se la coppia task-cleaner è già stata "acknowledged"
                       const key = getIncompatibleKey(task, cleaner.id);
@@ -1527,8 +1524,7 @@ export default function TimelineView({
                       const next = new Set(prev);
                       
                       cleanerTasks.forEach(task => {
-                        const canDoStraordinaria = Boolean(cleaner.can_do_straordinaria);
-                        if (!canCleanerHandleTaskSync(cleaner.role, task, validationRules, canDoStraordinaria)) {
+                        if (!canCleanerHandleTaskSync(cleaner.role, task, validationRules)) {
                           const key = getIncompatibleKey(task, cleanerId);
                           next.add(key);
                         }
