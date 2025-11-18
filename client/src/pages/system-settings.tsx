@@ -18,6 +18,13 @@ interface Client {
   alias: string | null;
 }
 
+interface TaskTypeRules {
+  standard_cleaner: boolean;
+  premium_cleaner: boolean;
+  straordinaria_cleaner: boolean;
+  formatore_cleaner: boolean;
+}
+
 interface SettingsData {
   "early-out": {
     eo_start_time: string;
@@ -34,6 +41,11 @@ interface SettingsData {
     standard_apt: string[];
     premium_apt: string[];
     formatore_apt: string[];
+  };
+  task_types: {
+    standard_apt: TaskTypeRules;
+    premium_apt: TaskTypeRules;
+    straordinario_apt: TaskTypeRules;
   };
 }
 
@@ -148,37 +160,43 @@ export default function SystemSettings() {
     );
   }
 
-  const handleClientToggle = (clientId: number, type: "eo" | "hp") => {
-    setSettings(prevSettings => {
-      if (!prevSettings) return null;
+  const handleClientToggle = (priority: 'early-out' | 'high-priority', clientId: number) => {
+    setSettings(prev => {
+      if (!prev) return prev;
 
-      if (type === "eo") {
-        const currentClients = prevSettings["early-out"].eo_clients || [];
-        const updatedClients = currentClients.includes(clientId)
-          ? currentClients.filter(id => id !== clientId)
-          : [...currentClients, clientId];
+      const clients = prev[priority][priority === 'early-out' ? 'eo_clients' : 'hp_clients'];
+      const newClients = clients.includes(clientId)
+        ? clients.filter(id => id !== clientId)
+        : [...clients, clientId];
 
-        return {
-          ...prevSettings,
-          "early-out": {
-            ...prevSettings["early-out"],
-            eo_clients: updatedClients,
+      return {
+        ...prev,
+        [priority]: {
+          ...prev[priority],
+          [priority === 'early-out' ? 'eo_clients' : 'hp_clients']: newClients
+        }
+      };
+    });
+  };
+
+  const updateTaskTypeRule = (
+    aptType: keyof SettingsData["task_types"],
+    cleanerType: keyof TaskTypeRules,
+    value: boolean
+  ) => {
+    setSettings(prev => {
+      if (!prev) return prev;
+
+      return {
+        ...prev,
+        task_types: {
+          ...prev.task_types,
+          [aptType]: {
+            ...prev.task_types[aptType],
+            [cleanerType]: value,
           },
-        };
-      } else {
-        const currentClients = prevSettings["high-priority"].hp_clients || [];
-        const updatedClients = currentClients.includes(clientId)
-          ? currentClients.filter(id => id !== clientId)
-          : [...currentClients, clientId];
-
-        return {
-          ...prevSettings,
-          "high-priority": {
-            ...prevSettings["high-priority"],
-            hp_clients: updatedClients,
-          },
-        };
-      }
+        },
+      };
     });
   };
 
@@ -575,57 +593,59 @@ export default function SystemSettings() {
                 {/* Appartamento Standard */}
                 <div className="space-y-3">
                   <div className="border-b pb-2 flex items-center gap-2">
-                    <span className="text-sm font-medium text-green-800 dark:text-green-200">Apt</span>
-                    <span className="px-2 py-0.5 rounded border font-medium text-sm bg-green-500/30 text-green-800 dark:bg-green-500/40 dark:text-green-200 border-green-600 dark:border-green-400">
-                      Standard
+                    <Badge variant="outline" className="bg-white text-custom-blue border-custom-blue">
+                      Standard Apt
+                    </Badge>
+                    <span className="text-xs text-muted-foreground">
+                      Seleziona quali cleaner possono fare gli appartamenti standard
                     </span>
                   </div>
                   <div className="space-y-2">
                     <div className="flex items-center space-x-2">
-                      <input
-                        type="checkbox"
-                        id="std-cleaner-standard"
-                        checked={true}
-                        disabled
-                        className="h-4 w-4 rounded border-gray-300"
+                      <Checkbox
+                        id="std-standard"
+                        checked={settings.task_types.standard_apt.standard_cleaner}
+                        onCheckedChange={(checked) =>
+                          updateTaskTypeRule("standard_apt", "standard_cleaner", !!checked)
+                        }
                       />
-                      <Label htmlFor="std-cleaner-standard" className="text-sm">
-                        Cleaner Standard
+                      <Label htmlFor="std-standard" className="text-sm cursor-pointer">
+                        Standard Cleaner
                       </Label>
                     </div>
                     <div className="flex items-center space-x-2">
-                      <input
-                        type="checkbox"
-                        id="std-cleaner-premium"
-                        checked={true}
-                        disabled
-                        className="h-4 w-4 rounded border-gray-300"
+                      <Checkbox
+                        id="std-premium"
+                        checked={settings.task_types.standard_apt.premium_cleaner}
+                        onCheckedChange={(checked) =>
+                          updateTaskTypeRule("standard_apt", "premium_cleaner", !!checked)
+                        }
                       />
-                      <Label htmlFor="std-cleaner-premium" className="text-sm">
-                        Cleaner Premium
+                      <Label htmlFor="std-premium" className="text-sm cursor-pointer">
+                        Premium Cleaner
                       </Label>
                     </div>
                     <div className="flex items-center space-x-2">
-                      <input
-                        type="checkbox"
-                        id="std-cleaner-straordinario"
-                        checked={true}
-                        disabled
-                        className="h-4 w-4 rounded border-gray-300"
+                      <Checkbox
+                        id="std-straordinaria"
+                        checked={settings.task_types.standard_apt.straordinaria_cleaner}
+                        onCheckedChange={(checked) =>
+                          updateTaskTypeRule("standard_apt", "straordinaria_cleaner", !!checked)
+                        }
                       />
-                      <Label htmlFor="std-cleaner-straordinario" className="text-sm">
-                        Cleaner Straordinario
+                      <Label htmlFor="std-straordinaria" className="text-sm cursor-pointer">
+                        Straordinaria Cleaner
                       </Label>
                     </div>
                     <div className="flex items-center space-x-2">
-                      <input
-                        type="checkbox"
-                        id="std-cleaner-formatore"
-                        checked={true}
-                        disabled
-                        className="h-4 w-4 rounded border-gray-300"
+                      <Checkbox
+                        id="std-formatore"
+                        checked={settings.task_types.standard_apt.formatore_cleaner}
+                        onCheckedChange={(checked) =>
+                          updateTaskTypeRule("standard_apt", "formatore_cleaner", !!checked)
+                        }
                       />
-                      <Label htmlFor="std-cleaner-formatore" className="text-sm">
+                      <Label htmlFor="std-formatore" className="text-sm cursor-pointer">
                         Cleaner Formatore
                       </Label>
                     </div>
@@ -635,57 +655,59 @@ export default function SystemSettings() {
                 {/* Appartamento Premium */}
                 <div className="space-y-3">
                   <div className="border-b pb-2 flex items-center gap-2">
-                    <span className="text-sm font-medium text-yellow-800 dark:text-yellow-200">Apt</span>
-                    <span className="px-2 py-0.5 rounded border font-medium text-sm bg-yellow-500/30 text-yellow-800 dark:bg-yellow-500/40 dark:text-yellow-200 border-yellow-600 dark:border-yellow-400">
-                      Premium
+                    <Badge variant="outline" className="bg-white text-custom-blue border-custom-blue">
+                      Premium Apt
+                    </Badge>
+                    <span className="text-xs text-muted-foreground">
+                      Seleziona quali cleaner possono fare gli appartamenti premium
                     </span>
                   </div>
                   <div className="space-y-2">
                     <div className="flex items-center space-x-2">
-                      <input
-                        type="checkbox"
-                        id="prem-cleaner-standard"
-                        checked={false}
-                        disabled
-                        className="h-4 w-4 rounded border-gray-300"
+                      <Checkbox
+                        id="prem-standard"
+                        checked={settings.task_types.premium_apt.standard_cleaner}
+                        onCheckedChange={(checked) =>
+                          updateTaskTypeRule("premium_apt", "standard_cleaner", !!checked)
+                        }
                       />
-                      <Label htmlFor="prem-cleaner-standard" className="text-sm text-muted-foreground">
-                        Cleaner Standard
+                      <Label htmlFor="prem-standard" className="text-sm cursor-pointer">
+                        Standard Cleaner
                       </Label>
                     </div>
                     <div className="flex items-center space-x-2">
-                      <input
-                        type="checkbox"
-                        id="prem-cleaner-premium"
-                        checked={true}
-                        disabled
-                        className="h-4 w-4 rounded border-gray-300"
+                      <Checkbox
+                        id="prem-premium"
+                        checked={settings.task_types.premium_apt.premium_cleaner}
+                        onCheckedChange={(checked) =>
+                          updateTaskTypeRule("premium_apt", "premium_cleaner", !!checked)
+                        }
                       />
-                      <Label htmlFor="prem-cleaner-premium" className="text-sm">
-                        Cleaner Premium
+                      <Label htmlFor="prem-premium" className="text-sm cursor-pointer">
+                        Premium Cleaner
                       </Label>
                     </div>
                     <div className="flex items-center space-x-2">
-                      <input
-                        type="checkbox"
-                        id="prem-cleaner-straordinario"
-                        checked={true}
-                        disabled
-                        className="h-4 w-4 rounded border-gray-300"
+                      <Checkbox
+                        id="prem-straordinaria"
+                        checked={settings.task_types.premium_apt.straordinaria_cleaner}
+                        onCheckedChange={(checked) =>
+                          updateTaskTypeRule("premium_apt", "straordinaria_cleaner", !!checked)
+                        }
                       />
-                      <Label htmlFor="prem-cleaner-straordinario" className="text-sm">
-                        Cleaner Straordinario
+                      <Label htmlFor="prem-straordinaria" className="text-sm cursor-pointer">
+                        Straordinaria Cleaner
                       </Label>
                     </div>
                     <div className="flex items-center space-x-2">
-                      <input
-                        type="checkbox"
-                        id="prem-cleaner-formatore"
-                        checked={false}
-                        disabled
-                        className="h-4 w-4 rounded border-gray-300"
+                      <Checkbox
+                        id="prem-formatore"
+                        checked={settings.task_types.premium_apt.formatore_cleaner}
+                        onCheckedChange={(checked) =>
+                          updateTaskTypeRule("premium_apt", "formatore_cleaner", !!checked)
+                        }
                       />
-                      <Label htmlFor="prem-cleaner-formatore" className="text-sm text-muted-foreground">
+                      <Label htmlFor="prem-formatore" className="text-sm cursor-pointer">
                         Cleaner Formatore
                       </Label>
                     </div>
@@ -695,57 +717,59 @@ export default function SystemSettings() {
                 {/* Appartamento Straordinario */}
                 <div className="space-y-3">
                   <div className="border-b pb-2 flex items-center gap-2">
-                    <span className="text-sm font-medium text-red-800 dark:text-red-200">Apt</span>
-                    <span className="px-2 py-0.5 rounded border font-medium text-sm bg-red-500/30 text-red-800 dark:bg-red-500/40 dark:text-red-200 border-red-600 dark:border-red-400">
-                      Straordinario
+                    <Badge variant="outline" className="bg-white text-custom-blue border-custom-blue">
+                      Straordinario Apt
+                    </Badge>
+                    <span className="text-xs text-muted-foreground">
+                      Seleziona quali cleaner possono fare gli straordinari
                     </span>
                   </div>
                   <div className="space-y-2">
                     <div className="flex items-center space-x-2">
-                      <input
-                        type="checkbox"
-                        id="stra-cleaner-standard"
-                        checked={false}
-                        disabled
-                        className="h-4 w-4 rounded border-gray-300"
+                      <Checkbox
+                        id="straord-standard"
+                        checked={settings.task_types.straordinario_apt.standard_cleaner}
+                        onCheckedChange={(checked) =>
+                          updateTaskTypeRule("straordinario_apt", "standard_cleaner", !!checked)
+                        }
                       />
-                      <Label htmlFor="stra-cleaner-standard" className="text-sm text-muted-foreground">
-                        Cleaner Standard
+                      <Label htmlFor="straord-standard" className="text-sm cursor-pointer">
+                        Standard Cleaner
                       </Label>
                     </div>
                     <div className="flex items-center space-x-2">
-                      <input
-                        type="checkbox"
-                        id="stra-cleaner-premium"
-                        checked={false}
-                        disabled
-                        className="h-4 w-4 rounded border-gray-300"
+                      <Checkbox
+                        id="straord-premium"
+                        checked={settings.task_types.straordinario_apt.premium_cleaner}
+                        onCheckedChange={(checked) =>
+                          updateTaskTypeRule("straordinario_apt", "premium_cleaner", !!checked)
+                        }
                       />
-                      <Label htmlFor="stra-cleaner-premium" className="text-sm text-muted-foreground">
-                        Cleaner Premium
+                      <Label htmlFor="straord-premium" className="text-sm cursor-pointer">
+                        Premium Cleaner
                       </Label>
                     </div>
                     <div className="flex items-center space-x-2">
-                      <input
-                        type="checkbox"
-                        id="stra-cleaner-straordinario"
-                        checked={true}
-                        disabled
-                        className="h-4 w-4 rounded border-gray-300"
+                      <Checkbox
+                        id="straord-straordinaria"
+                        checked={settings.task_types.straordinario_apt.straordinaria_cleaner}
+                        onCheckedChange={(checked) =>
+                          updateTaskTypeRule("straordinario_apt", "straordinaria_cleaner", !!checked)
+                        }
                       />
-                      <Label htmlFor="stra-cleaner-straordinario" className="text-sm">
-                        Cleaner Straordinario
+                      <Label htmlFor="straord-straordinaria" className="text-sm cursor-pointer">
+                        Straordinaria Cleaner
                       </Label>
                     </div>
                     <div className="flex items-center space-x-2">
-                      <input
-                        type="checkbox"
-                        id="stra-cleaner-formatore"
-                        checked={false}
-                        disabled
-                        className="h-4 w-4 rounded border-gray-300"
+                      <Checkbox
+                        id="straord-formatore"
+                        checked={settings.task_types.straordinario_apt.formatore_cleaner}
+                        onCheckedChange={(checked) =>
+                          updateTaskTypeRule("straordinario_apt", "formatore_cleaner", !!checked)
+                        }
                       />
-                      <Label htmlFor="stra-cleaner-formatore" className="text-sm text-muted-foreground">
+                      <Label htmlFor="straord-formatore" className="text-sm cursor-pointer">
                         Cleaner Formatore
                       </Label>
                     </div>
