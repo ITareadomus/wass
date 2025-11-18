@@ -1,6 +1,6 @@
 {
   "metadata": {
-    "last_updated": "2025-11-18T15:51:00.043173",
+    "last_updated": "2025-11-18T15:54:31.019738",
     "date": "2025-11-19"
   },
   "containers": {
@@ -395,6 +395,174 @@
     "low_priority": {
       "tasks": [
         {
+          "task_id": 214753,
+          "logistic_code": 1198,
+          "client_id": 2,
+          "premium": false,
+          "address": "Via Bergognone 31",
+          "lat": "45.453707852983",
+          "lng": "9.1641459982137",
+          "cleaning_time": 180,
+          "checkin_date": "2025-11-21",
+          "checkout_date": "2025-11-19",
+          "checkin_time": null,
+          "checkout_time": null,
+          "pax_in": 5,
+          "pax_out": 5,
+          "small_equipment": false,
+          "operation_id": 2,
+          "confirmed_operation": true,
+          "straordinaria": false,
+          "type_apt": "D",
+          "alias": "ITW",
+          "customer_name": "ITALIANWAY SRL",
+          "priority": "low_priority",
+          "reasons": [
+            "not_eo",
+            "not_hp"
+          ]
+        },
+        {
+          "task_id": 215506,
+          "logistic_code": 571,
+          "client_id": 2,
+          "premium": false,
+          "address": "VIA FORCELLA 15",
+          "lat": "45.452359",
+          "lng": "9.1668683",
+          "cleaning_time": 90,
+          "checkin_date": "2025-11-19",
+          "checkout_date": "2025-11-19",
+          "checkin_time": null,
+          "checkout_time": null,
+          "pax_in": 2,
+          "pax_out": 1,
+          "small_equipment": false,
+          "operation_id": 2,
+          "confirmed_operation": true,
+          "straordinaria": false,
+          "type_apt": "B",
+          "alias": "ITW",
+          "customer_name": "ITALIANWAY SRL",
+          "priority": "low_priority",
+          "reasons": [
+            "not_eo",
+            "not_hp"
+          ]
+        },
+        {
+          "task_id": 218086,
+          "logistic_code": 289,
+          "client_id": 2,
+          "premium": false,
+          "address": "VIA VIGEVANO 13",
+          "lat": "45.4528415",
+          "lng": "9.1742551",
+          "cleaning_time": 90,
+          "checkin_date": "2025-11-20",
+          "checkout_date": "2025-11-19",
+          "checkin_time": null,
+          "checkout_time": null,
+          "pax_in": 3,
+          "pax_out": 2,
+          "small_equipment": false,
+          "operation_id": 2,
+          "confirmed_operation": true,
+          "straordinaria": false,
+          "type_apt": "B",
+          "alias": "ITW",
+          "customer_name": "ITALIANWAY SRL",
+          "priority": "low_priority",
+          "reasons": [
+            "not_eo",
+            "not_hp"
+          ]
+        },
+        {
+          "task_id": 218945,
+          "logistic_code": 1552,
+          "client_id": 94,
+          "premium": false,
+          "address": "VIA CASCINA BELCASULE, 4",
+          "lat": "45.4328209",
+          "lng": "9.1973986",
+          "cleaning_time": 60,
+          "checkin_date": "2025-11-21",
+          "checkout_date": "2025-11-19",
+          "checkin_time": "20:00",
+          "checkout_time": null,
+          "pax_in": 3,
+          "pax_out": 2,
+          "small_equipment": true,
+          "operation_id": 2,
+          "confirmed_operation": false,
+          "straordinaria": false,
+          "type_apt": "A",
+          "alias": "IHST",
+          "customer_name": "IHOST",
+          "priority": "low_priority",
+          "reasons": [
+            "not_eo",
+            "not_hp"
+          ]
+        },
+        {
+          "task_id": 218955,
+          "logistic_code": 1662,
+          "client_id": 123,
+          "premium": false,
+          "address": "VIA  VICO  MAGISTRETTI 3",
+          "lat": "45.4889546",
+          "lng": "9.147833",
+          "cleaning_time": 120,
+          "checkin_date": "2025-11-23",
+          "checkout_date": "2025-11-19",
+          "checkin_time": null,
+          "checkout_time": null,
+          "pax_in": 3,
+          "pax_out": 2,
+          "small_equipment": false,
+          "operation_id": 2,
+          "confirmed_operation": false,
+          "straordinaria": false,
+          "type_apt": "C",
+          "alias": "YHST",
+          "customer_name": "YOUHOSTY",
+          "priority": "low_priority",
+          "reasons": [
+            "not_eo",
+            "not_hp"
+          ]
+        },
+        {
+          "task_id": 219026,
+          "logistic_code": null,
+          "client_id": 123,
+          "premium": false,
+          "address": "Via Fiuggi, 12/3",
+          "lat": "45.503623",
+          "lng": "9.1936885",
+          "cleaning_time": null,
+          "checkin_date": "2025-11-28",
+          "checkout_date": "2025-11-19",
+          "checkin_time": "16:00",
+          "checkout_time": null,
+          "pax_in": 2,
+          "pax_out": 2,
+          "small_equipment": false,
+          "operation_id": 2,
+          "confirmed_operation": false,
+          "straordinaria": false,
+          "type_apt": "X",
+          "alias": "YHST",
+          "customer_name": "YOUHOSTY",
+          "priority": "low_priority",
+          "reasons": [
+            "not_eo",
+            "not_hp"
+          ]
+        },
+        {
           "task_id": 219027,
           "logistic_code": null,
           "client_id": 123,
@@ -421,15 +589,43 @@
             "not_eo",
             "not_hp"
           ]
+        },
+        {
+          "task_id": 219059,
+          "logistic_code": 1495,
+          "client_id": 3,
+          "premium": false,
+          "address": "Corso Sempione, 58,",
+          "lat": "45.4834103",
+          "lng": "9.1632373",
+          "cleaning_time": 120,
+          "checkin_date": null,
+          "checkout_date": "2025-11-19",
+          "checkin_time": null,
+          "checkout_time": null,
+          "pax_in": 0,
+          "pax_out": 1,
+          "small_equipment": false,
+          "operation_id": 2,
+          "confirmed_operation": false,
+          "straordinaria": false,
+          "type_apt": "B",
+          "alias": "TBR",
+          "customer_name": "THE BEST RENT S.r.l.",
+          "priority": "low_priority",
+          "reasons": [
+            "not_eo",
+            "not_hp"
+          ]
         }
       ],
-      "count": 1
+      "count": 8
     }
   },
   "summary": {
-    "total_tasks": 15,
+    "total_tasks": 22,
     "early_out": 11,
     "high_priority": 3,
-    "low_priority": 1
+    "low_priority": 8
   }
 }
