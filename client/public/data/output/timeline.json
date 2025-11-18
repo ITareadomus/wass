@@ -1,106 +1,13 @@
 {
   "metadata": {
-    "last_updated": "2025-11-18T11:02:33.854Z",
+    "last_updated": "2025-11-18T13:47:12.826Z",
     "date": "2025-11-18",
-    "created_by": "Admin",
-    "modified_by": [
-      "Admin"
-    ]
+    "created_by": "Admin"
   },
-  "cleaners_assignments": [
-    {
-      "cleaner": {
-        "id": 626,
-        "name": "DORA PATRICIA",
-        "lastname": "JIMENEZ",
-        "role": "Formatore",
-        "premium": false
-      },
-      "tasks": [
-        {
-          "task_id": 219024,
-          "logistic_code": 1577,
-          "client_id": null,
-          "premium": true,
-          "address": "VIA CROCEFISSO, 25",
-          "lat": "45.4570059",
-          "lng": "9.1848347",
-          "cleaning_time": 270,
-          "checkin_date": "2025-11-20",
-          "checkout_date": "2025-11-18",
-          "checkin_time": null,
-          "checkout_time": null,
-          "pax_in": 7,
-          "pax_out": 6,
-          "small_equipment": false,
-          "operation_id": 2,
-          "confirmed_operation": true,
-          "straordinaria": false,
-          "type_apt": "E",
-          "alias": "TBR",
-          "customer_name": "THE BEST RENT S.r.l.",
-          "reasons": [
-            "manually_moved_to_timeline"
-          ],
-          "priority": "high_priority",
-          "start_time": "10:00",
-          "end_time": "14:30",
-          "followup": false,
-          "sequence": 1,
-          "travel_time": 0,
-          "modified_by": "Admin"
-        }
-      ]
-    },
-    {
-      "cleaner": {
-        "id": 1063,
-        "name": "ALEXANDER DENNYS",
-        "lastname": "CARDENAS OLAYA",
-        "role": "Standard",
-        "premium": false
-      },
-      "tasks": [
-        {
-          "task_id": 219025,
-          "logistic_code": 1683,
-          "client_id": null,
-          "premium": false,
-          "address": "VIA ROSMINI 5",
-          "lat": "45.4797178",
-          "lng": "9.1747245",
-          "cleaning_time": 90,
-          "checkin_date": "2025-12-19",
-          "checkout_date": "2025-11-18",
-          "checkin_time": null,
-          "checkout_time": null,
-          "pax_in": 1,
-          "pax_out": 1,
-          "small_equipment": false,
-          "operation_id": 2,
-          "confirmed_operation": true,
-          "straordinaria": false,
-          "type_apt": "A",
-          "alias": "TBR",
-          "customer_name": "THE BEST RENT S.r.l.",
-          "reasons": [
-            "manually_moved_to_timeline"
-          ],
-          "priority": "low_priority",
-          "start_time": "10:00",
-          "end_time": "11:30",
-          "followup": false,
-          "sequence": 1,
-          "travel_time": 0,
-          "modified_by": "Admin"
-        }
-      ]
-    }
-  ],
+  "cleaners_assignments": [],
   "meta": {
-    "total_cleaners": 2,
+    "total_cleaners": 0,
     "used_cleaners": 0,
-    "assigned_tasks": 0,
-    "total_tasks": 2
+    "assigned_tasks": 0
   }
 }
