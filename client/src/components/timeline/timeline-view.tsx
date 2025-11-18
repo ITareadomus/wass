@@ -76,17 +76,17 @@ export default function TimelineView({
   const [confirmUnavailableDialog, setConfirmUnavailableDialog] = useState<{ open: boolean; cleanerId: number | null }>({ open: false, cleanerId: null });
   const [confirmRemovalDialog, setConfirmRemovalDialog] = useState<{ open: boolean; cleanerId: number | null }>({ open: false, cleanerId: null });
   const [incompatibleDialog, setIncompatibleDialog] = useState<{ open: boolean; cleanerId: number | null; tasks: Array<{ logisticCode: string; taskType: string }> }>({ open: false, cleanerId: null, tasks: [] });
-  
+
   // Stato per tracciare acknowledge per coppie (task, cleaner)
   type IncompatibleKey = string; // chiave del tipo `${taskId}-${cleanerId}`
   const [acknowledgedIncompatibleAssignments, setAcknowledgedIncompatibleAssignments] = useState<Set<IncompatibleKey>>(new Set());
-  
+
   // Helper per costruire la chiave univoca task-cleaner
   const getIncompatibleKey = (task: any, cleanerId: number): IncompatibleKey => {
     const taskId = task.task_id ?? task.id ?? task.logisticCode;
     return `${taskId}-${cleanerId}`;
   };
-  
+
   const { toast } = useToast();
   const [, setLocation] = useLocation();
   const [editingAlias, setEditingAlias] = useState<string>("");
@@ -382,7 +382,7 @@ export default function TimelineView({
       }
 
       const selectedText = await selectedResponse.text();
-      
+
       // Verifica che il contenuto sia JSON valido
       if (!selectedText.trim().startsWith('{') && !selectedText.trim().startsWith('[')) {
         console.error('File corrotto, non è JSON:', selectedText.substring(0, 100));
@@ -398,7 +398,7 @@ export default function TimelineView({
       if (timelineResponse.ok) {
         try {
           const timelineText = await timelineResponse.text();
-          
+
           // Verifica che il contenuto sia JSON valido
           if (!timelineText.trim().startsWith('{') && !timelineText.trim().startsWith('[')) {
             console.warn('Timeline.json corrotto, non è JSON:', timelineText.substring(0, 100));
@@ -688,10 +688,10 @@ export default function TimelineView({
       }
 
       const result = await response.json();
-      
+
       // Ricarica gli alias dal file aggiornato
       await loadAliases();
-      
+
       toast({
         title: "Alias salvato",
         description: `L'alias è stato aggiornato con successo.`,
@@ -1099,7 +1099,7 @@ export default function TimelineView({
     },
   });
 
-  
+
 
 
   return (
@@ -1208,7 +1208,7 @@ export default function TimelineView({
                   ? cleanerTasks.some(task => {
                       // Se la task è compatibile, ok
                       if (canCleanerHandleTaskSync(cleaner.role, task, validationRules)) return false;
-                      
+
                       // Se è incompatibile, controlliamo se la coppia task-cleaner è già stata "acknowledged"
                       const key = getIncompatibleKey(task, cleaner.id);
                       return !acknowledgedIncompatibleAssignments.has(key);
@@ -1512,24 +1512,24 @@ export default function TimelineView({
                 if (incompatibleDialog.cleanerId) {
                   const cleanerId = incompatibleDialog.cleanerId;
                   const cleaner = allCleanersToShow.find(c => c.id === cleanerId);
-                  
+
                   if (cleaner && validationRules) {
                     // Recupera tutte le task di questo cleaner
                     const cleanerTasks = tasks
                       .filter(task => (task as any).assignedCleaner === cleanerId)
                       .map(normalizeTask);
-                    
+
                     // Aggiungi tutte le coppie (task incompatibile, cleaner) al Set
                     setAcknowledgedIncompatibleAssignments(prev => {
                       const next = new Set(prev);
-                      
+
                       cleanerTasks.forEach(task => {
                         if (!canCleanerHandleTaskSync(cleaner.role, task, validationRules)) {
                           const key = getIncompatibleKey(task, cleanerId);
                           next.add(key);
                         }
                       });
-                      
+
                       return next;
                     });
                   }

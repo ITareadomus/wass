@@ -17,6 +17,15 @@ interface TaskValidationSettings {
   };
 }
 
+// Define ValidationRules interface to match the structure expected by canCleanerHandleTaskSync
+interface ValidationRules {
+  task_types: {
+    standard_apt: TaskTypeRules;
+    premium_apt: TaskTypeRules;
+    straordinario_apt: TaskTypeRules;
+  };
+}
+
 let cachedRules: TaskValidationSettings['task_types'] | null = null;
 
 /**
@@ -83,7 +92,7 @@ function normalizeTaskType(taskType: string | boolean): keyof TaskValidationSett
   }
 
   const type = taskType.toLowerCase();
-  
+
   if (type.includes('straord')) {
     return 'straordinario_apt';
   } else if (type.includes('premium')) {
@@ -111,7 +120,7 @@ export function getTaskType(task: { premium?: boolean; straordinaria?: boolean }
  */
 function normalizeCleanerRole(role: string): keyof TaskTypeRules {
   const roleLower = role.toLowerCase();
-  
+
   if (roleLower.includes('form')) {
     return 'formatore_cleaner';
   } else if (roleLower.includes('straord')) {
@@ -124,26 +133,44 @@ function normalizeCleanerRole(role: string): keyof TaskTypeRules {
 }
 
 /**
+ * Helper function to determine task type key (used internally by canCleanerHandleTaskSync)
+ */
+function determineTaskType(task: any): keyof TaskValidationSettings['task_types'] | null {
+  if (typeof task === 'object' && task !== null) {
+    return getTaskType(task);
+  } else if (typeof task === 'string') {
+    return normalizeTaskType(task);
+  }
+  return null;
+}
+
+/**
  * Verifica se un cleaner può gestire un determinato tipo di task (versione sincrona)
  * Richiede che le regole siano già state caricate
  */
 export function canCleanerHandleTaskSync(
   cleanerRole: string,
-  taskType: string | { premium?: boolean; straordinaria?: boolean },
-  rules: TaskValidationSettings['task_types']
+  task: any,
+  rules: ValidationRules | null,
+  canDoStraordinaria: boolean = false
 ): boolean {
-  // Determina il tipo di task
-  let taskTypeKey: keyof TaskValidationSettings['task_types'];
-  if (typeof taskType === 'object') {
-    taskTypeKey = getTaskType(taskType);
-  } else {
-    taskTypeKey = normalizeTaskType(taskType);
+  if (!rules) return true;
+
+  const taskType = determineTaskType(task);
+  if (!taskType) return true;
+
+  // Per straordinarie, usa il flag can_do_straordinaria del cleaner
+  if (taskType === 'straordinario_apt') {
+    return canDoStraordinaria;
   }
-  
-  const cleanerKey = normalizeCleanerRole(cleanerRole);
-  
-  // Verifica se il cleaner può gestire questo tipo di task
-  return rules[taskTypeKey]?.[cleanerKey] ?? true;
+
+  const normalizedRole = normalizeCleanerRole(cleanerRole);
+  const roleKey = `${normalizedRole}_cleaner`;
+
+  const taskRules = rules.task_types?.[taskType];
+  if (!taskRules) return true;
+
+  return taskRules[roleKey] ?? false;
 }
 
 /**
@@ -151,10 +178,12 @@ export function canCleanerHandleTaskSync(
  */
 export async function canCleanerHandleTask(
   cleanerRole: string,
-  taskType: string | { premium?: boolean; straordinaria?: boolean }
+  taskType: string | { premium?: boolean; straordinaria?: boolean },
+  cleanerData?: { can_do_straordinaria?: boolean } // Added cleanerData to pass can_do_straordinaria
 ): Promise<boolean> {
   const rules = await loadValidationRules();
-  return canCleanerHandleTaskSync(cleanerRole, taskType, rules);
+  const canDoStraordinaria = cleanerData?.can_do_straordinaria ?? false; // Get the flag
+  return canCleanerHandleTaskSync(cleanerRole, taskType, rules, canDoStraordinaria); // Pass the flag
 }
 
 /**
@@ -162,10 +191,11 @@ export async function canCleanerHandleTask(
  */
 export async function getValidationWarning(
   cleanerRole: string,
-  taskType: string | { premium?: boolean; straordinaria?: boolean }
+  taskType: string | { premium?: boolean; straordinaria?: boolean },
+  cleanerData?: { can_do_straordinaria?: boolean } // Added cleanerData
 ): Promise<string | null> {
-  const isValid = await canCleanerHandleTask(cleanerRole, taskType);
-  
+  const isValid = await canCleanerHandleTask(cleanerRole, taskType, cleanerData); // Pass cleanerData
+
   if (!isValid) {
     let taskTypeName = '';
     if (typeof taskType === 'object') {
@@ -175,10 +205,10 @@ export async function getValidationWarning(
     } else {
       taskTypeName = taskType;
     }
-    
+
     return `⚠️ Cleaner ${cleanerRole} non dovrebbe gestire task ${taskTypeName}`;
   }
-  
+
   return null;
 }
 
@@ -187,9 +217,10 @@ export async function getValidationWarning(
  */
 export async function isIncompatibleAssignment(
   cleanerRole: string,
-  task: { premium?: boolean; straordinaria?: boolean }
+  task: { premium?: boolean; straordinaria?: boolean },
+  cleanerData?: { can_do_straordinaria?: boolean } // Added cleanerData
 ): Promise<boolean> {
-  const isValid = await canCleanerHandleTask(cleanerRole, task);
+  const isValid = await canCleanerHandleTask(cleanerRole, task, cleanerData); // Pass cleanerData
   return !isValid;
 }
 
