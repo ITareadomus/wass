@@ -253,7 +253,7 @@ export default function SystemSettings() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="eo_end_time" className="text-sm">EO End Time</Label>
+                    <Label htmlFor="eo_end_time" className="text-sm">End Time</Label>
                     <Input
                       id="eo_end_time"
                       type="time"
