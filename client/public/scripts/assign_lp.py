@@ -770,11 +770,14 @@ def plan_day(tasks: List[Task], cleaners: List[Cleaner], assigned_logistic_codes
         # Usa prima stesso edificio, altrimenti stessa zona
         target_cleaner = same_building_cleaner or same_zone_cleaner
         if target_cleaner:
-            # VALIDAZIONE: Verifica compatibilità anche per fast-path cross-container
+            # VALIDAZIONE: Verifica compatibilità task_type e apartment_type per fast-path cross-container
             task_type = 'straordinario_apt' if task.straordinaria else ('premium_apt' if task.is_premium else 'standard_apt')
             if not can_cleaner_handle_task(target_cleaner.role, task_type):
                 tipo = "edificio" if same_building_cleaner else "zona"
                 print(f"   ⚠️  Cross-container {tipo} cleaner {target_cleaner.name} ({target_cleaner.role}) non può gestire task {task_type} - SKIPPATO fast-path")
+            elif not can_cleaner_handle_apartment(target_cleaner.role, task.apt_type):
+                tipo = "edificio" if same_building_cleaner else "zona"
+                print(f"   ⚠️  Cross-container {tipo} cleaner {target_cleaner.name} ({target_cleaner.role}) non può gestire appartamento {task.apt_type} - SKIPPATO fast-path")
             else:
                 result = find_best_position(target_cleaner, task)
                 if result is not None:
@@ -788,10 +791,12 @@ def plan_day(tasks: List[Task], cleaners: List[Cleaner], assigned_logistic_codes
                     # Se ha limite raggiunto per LP, ma è in zona, forza comunque l'assegnazione
                     # solo se il limite giornaliero lo permette
                     if same_zone_cleaner:
-                        # VALIDAZIONE: Verifica compatibilità anche per forced assignment
+                        # VALIDAZIONE: Verifica compatibilità task_type e apartment_type per forced assignment
                         task_type = 'straordinario_apt' if task.straordinaria else ('premium_apt' if task.is_premium else 'standard_apt')
                         if not can_cleaner_handle_task(same_zone_cleaner.role, task_type):
                             print(f"   ⚠️  Forced assignment a {same_zone_cleaner.name} ({same_zone_cleaner.role}) non può gestire task {task_type} - SKIPPATO")
+                        elif not can_cleaner_handle_apartment(same_zone_cleaner.role, task.apt_type):
+                            print(f"   ⚠️  Forced assignment a {same_zone_cleaner.name} ({same_zone_cleaner.role}) non può gestire appartamento {task.apt_type} - SKIPPATO")
                         else:
                             current_count = len(same_zone_cleaner.route)
                             total_daily = same_zone_cleaner.total_daily_tasks + current_count
