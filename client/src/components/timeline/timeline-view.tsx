@@ -76,7 +76,17 @@ export default function TimelineView({
   const [confirmUnavailableDialog, setConfirmUnavailableDialog] = useState<{ open: boolean; cleanerId: number | null }>({ open: false, cleanerId: null });
   const [confirmRemovalDialog, setConfirmRemovalDialog] = useState<{ open: boolean; cleanerId: number | null }>({ open: false, cleanerId: null });
   const [incompatibleDialog, setIncompatibleDialog] = useState<{ open: boolean; cleanerId: number | null; tasks: Array<{ logisticCode: string; taskType: string }> }>({ open: false, cleanerId: null, tasks: [] });
-  const [acknowledgedIncompatibleCleaners, setAcknowledgedIncompatibleCleaners] = useState<Set<number>>(new Set());
+  
+  // Stato per tracciare acknowledge per coppie (task, cleaner)
+  type IncompatibleKey = string; // chiave del tipo `${taskId}-${cleanerId}`
+  const [acknowledgedIncompatibleAssignments, setAcknowledgedIncompatibleAssignments] = useState<Set<IncompatibleKey>>(new Set());
+  
+  // Helper per costruire la chiave univoca task-cleaner
+  const getIncompatibleKey = (task: any, cleanerId: number): IncompatibleKey => {
+    const taskId = task.task_id ?? task.id ?? task.logisticCode;
+    return `${taskId}-${cleanerId}`;
+  };
+  
   const { toast } = useToast();
   const [, setLocation] = useLocation();
   const [editingAlias, setEditingAlias] = useState<string>("");
@@ -177,15 +187,8 @@ export default function TimelineView({
         onTaskMoved();
       }
 
-      // Invalida l'acknowledge per vedere nuove incompatibilità
-      setAcknowledgedIncompatibleCleaners(prev => {
-        const newSet = new Set(prev);
-        if (cleanerToReplace) {
-          newSet.delete(cleanerToReplace);
-        }
-        newSet.delete(cleanerId); // il nuovo cleaner NON è acknowledged di default
-        return newSet;
-      });
+      // Con il sistema per coppie (task, cleaner), non serve invalidare nulla:
+      // le nuove coppie non sono ackate di default
 
       // Ricarica ENTRAMBI i file per sincronizzare la vista
       await Promise.all([
@@ -520,15 +523,17 @@ export default function TimelineView({
     } else {
       // Primo click: avvia timer
       const timer = setTimeout(() => {
-        // Verifica se ci sono task incompatibili
+        // Verifica se ci sono task incompatibili NON ancora ackate
         if (validationRules && cleaner?.role) {
           const cleanerTasks = tasks
             .filter(task => (task as any).assignedCleaner === cleaner.id)
             .map(normalizeTask);
 
-          const incompatibleTasks = cleanerTasks.filter(
-            task => !canCleanerHandleTaskSync(cleaner.role, task, validationRules)
-          );
+          const incompatibleTasks = cleanerTasks.filter(task => {
+            if (canCleanerHandleTaskSync(cleaner.role, task, validationRules)) return false;
+            const key = getIncompatibleKey(task, cleaner.id);
+            return !acknowledgedIncompatibleAssignments.has(key);
+          });
 
           if (incompatibleTasks.length > 0) {
             // Mostra dialog incompatibilità invece del modal normale
@@ -978,7 +983,7 @@ export default function TimelineView({
     };
   };
 
-  // Gestione toast per incompatibilità task-cleaner
+  // Gestione toast per incompatibilità task-cleaner (con sistema per coppie)
   useEffect(() => {
     if (!validationRules) return;
 
@@ -987,15 +992,17 @@ export default function TimelineView({
     allCleanersToShow.forEach(cleaner => {
       if (removedCleanerIds.has(cleaner.id)) return;
       if (!cleaner.role) return;
-      if (acknowledgedIncompatibleCleaners.has(cleaner.id)) return; // Skip se già confermato
 
       const cleanerTasks = tasks
         .filter(task => (task as any).assignedCleaner === cleaner.id)
         .map(normalizeTask);
 
-      const incompatibleTasks = cleanerTasks.filter(
-        task => !canCleanerHandleTaskSync(cleaner.role, task, validationRules)
-      );
+      // Verifica se ci sono task incompatibili NON ancora ackate per questo cleaner
+      const incompatibleTasks = cleanerTasks.filter(task => {
+        if (canCleanerHandleTaskSync(cleaner.role, task, validationRules)) return false;
+        const key = getIncompatibleKey(task, cleaner.id);
+        return !acknowledgedIncompatibleAssignments.has(key);
+      });
 
       if (incompatibleTasks.length > 0) {
         incompatibleAssignments.push({
@@ -1031,7 +1038,7 @@ export default function TimelineView({
     if (incompatibleAssignments.length === 0) {
       shownToastsRef.current.clear();
     }
-  }, [validationRules, allCleanersToShow, tasks, removedCleanerIds, acknowledgedIncompatibleCleaners, toast]);
+  }, [validationRules, allCleanersToShow, tasks, removedCleanerIds, acknowledgedIncompatibleAssignments, toast]);
 
   // Funzione per verificare SE esistono assegnazioni salvate (senza caricarle)
   const checkSavedAssignmentExists = async () => {
@@ -1092,33 +1099,7 @@ export default function TimelineView({
     },
   });
 
-  // Funzione per preservare lo stato acknowledged durante le operazioni
-  const preserveAcknowledgedState = (cleanerId: number) => {
-    setAcknowledgedIncompatibleCleaners(prev => {
-      const newSet = new Set(prev);
-      newSet.add(cleanerId);
-      return newSet;
-    });
-  };
-
-  // Funzione per invalidare lo stato acknowledged (mostra incompatibilità)
-  const invalidateAcknowledgedState = (cleanerId: number) => {
-    setAcknowledgedIncompatibleCleaners(prev => {
-      const newSet = new Set(prev);
-      newSet.delete(cleanerId);
-      return newSet;
-    });
-  };
-
-  // Esponi le funzioni globalmente per essere chiamate dopo drag & drop
-  useEffect(() => {
-    (window as any).preserveAcknowledgedIncompatibleCleaners = preserveAcknowledgedState;
-    (window as any).invalidateAcknowledgedIncompatibleCleaners = invalidateAcknowledgedState;
-    return () => {
-      delete (window as any).preserveAcknowledgedIncompatibleCleaners;
-      delete (window as any).invalidateAcknowledgedIncompatibleCleaners;
-    };
-  }, []);
+  
 
 
   return (
@@ -1222,9 +1203,16 @@ export default function TimelineView({
                 const isRemoved = removedCleanerIds.has(cleaner.id);
 
                 // Verifica se ci sono task incompatibili per questo cleaner
-                // MA solo se non è già stato confermato dall'utente
-                const hasIncompatibleTasks = validationRules && cleaner?.role && !acknowledgedIncompatibleCleaners.has(cleaner.id)
-                  ? cleanerTasks.some(task => !canCleanerHandleTaskSync(cleaner.role, task, validationRules))
+                // Controlla ogni coppia (task, cleaner) invece del solo cleanerId
+                const hasIncompatibleTasks = validationRules && cleaner?.role
+                  ? cleanerTasks.some(task => {
+                      // Se la task è compatibile, ok
+                      if (canCleanerHandleTaskSync(cleaner.role, task, validationRules)) return false;
+                      
+                      // Se è incompatibile, controlliamo se la coppia task-cleaner è già stata "acknowledged"
+                      const key = getIncompatibleKey(task, cleaner.id);
+                      return !acknowledgedIncompatibleAssignments.has(key);
+                    })
                   : false;
 
                 return (
@@ -1522,7 +1510,29 @@ export default function TimelineView({
             <Button
               onClick={() => {
                 if (incompatibleDialog.cleanerId) {
-                  setAcknowledgedIncompatibleCleaners(prev => new Set(prev).add(incompatibleDialog.cleanerId!));
+                  const cleanerId = incompatibleDialog.cleanerId;
+                  const cleaner = allCleanersToShow.find(c => c.id === cleanerId);
+                  
+                  if (cleaner && validationRules) {
+                    // Recupera tutte le task di questo cleaner
+                    const cleanerTasks = tasks
+                      .filter(task => (task as any).assignedCleaner === cleanerId)
+                      .map(normalizeTask);
+                    
+                    // Aggiungi tutte le coppie (task incompatibile, cleaner) al Set
+                    setAcknowledgedIncompatibleAssignments(prev => {
+                      const next = new Set(prev);
+                      
+                      cleanerTasks.forEach(task => {
+                        if (!canCleanerHandleTaskSync(cleaner.role, task, validationRules)) {
+                          const key = getIncompatibleKey(task, cleanerId);
+                          next.add(key);
+                        }
+                      });
+                      
+                      return next;
+                    });
+                  }
                 }
                 setIncompatibleDialog({ open: false, cleanerId: null, tasks: [] });
               }}
