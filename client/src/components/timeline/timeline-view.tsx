@@ -563,6 +563,23 @@ export default function TimelineView({
   // Funzione per caricare i cleaners disponibili (non già in timeline)
   const loadAvailableCleaners = async () => {
     try {
+      // CRITICAL: Prima estrai i cleaners dal database per la data corrente
+      // Questo assicura che anche per date future (es. domani) i cleaners siano disponibili
+      console.log(`🔄 Estrazione cleaners dal database per ${workDate}...`);
+      const extractResponse = await fetch('/api/extract-cleaners-optimized', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ date: workDate })
+      });
+
+      if (!extractResponse.ok) {
+        console.error('Errore durante l\'estrazione dei cleaners');
+        // Continua comunque a provare a caricare cleaners.json
+      } else {
+        const extractResult = await extractResponse.json();
+        console.log('✅ Cleaners estratti:', extractResult);
+      }
+
       // Carica tutti i cleaners per la data corrente
       const cleanersResponse = await fetch(`/data/cleaners/cleaners.json?t=${Date.now()}`, {
         cache: 'no-store',
@@ -578,6 +595,8 @@ export default function TimelineView({
       const cleanersData = await cleanersResponse.json();
       const dateCleaners = cleanersData.dates?.[workDate]?.cleaners || [];
 
+      console.log(`✅ Cleaners trovati per ${workDate}:`, dateCleaners.length);
+
       // Filtra solo i cleaners attivi e non già selezionati
       const selectedCleanerIds = new Set(cleaners.map(c => c.id));
       const available = dateCleaners.filter((c: any) =>
@@ -587,6 +606,7 @@ export default function TimelineView({
       // Ordina per counter_hours (decrescente)
       available.sort((a: any, b: any) => b.counter_hours - a.counter_hours);
 
+      console.log(`✅ Cleaners disponibili da aggiungere: ${available.length}`);
       setAvailableCleaners(available);
     } catch (error) {
       console.error('Errore nel caricamento dei cleaners disponibili:', error);
