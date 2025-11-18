@@ -37,13 +37,14 @@ class TaskValidationRules:
             self.rules = {}
             self.apartment_types = {}
 
-    def can_cleaner_handle_task(self, cleaner_role: str, task_type: str) -> bool:
+    def can_cleaner_handle_task(self, cleaner_role: str, task_type: str, can_do_straordinaria: bool = False) -> bool:
         """
         Verifica se un cleaner può gestire un determinato tipo di task
 
         Args:
             cleaner_role: Il ruolo del cleaner ("Standard", "Premium", "Formatore")
             task_type: Il tipo di task ("standard_apt", "premium_apt", "straordinario_apt")
+            can_do_straordinaria: Flag che indica se il cleaner può fare straordinarie
 
         Returns:
             True se il cleaner può gestire la task, False altrimenti
@@ -55,6 +56,10 @@ class TaskValidationRules:
         # Se non ci sono regole, permetti tutto (fallback safe)
         if not self.rules or task_type_key not in self.rules:
             return True
+
+        # Per straordinarie, usa il flag can_do_straordinaria
+        if task_type_key == 'straordinario_apt':
+            return can_do_straordinaria
 
         task_rules = self.rules[task_type_key]
 
@@ -146,14 +151,16 @@ def get_validation_rules() -> TaskValidationRules:
 
 
 # Convenience functions
-def can_cleaner_handle_task(cleaner_role: str, task_type: str) -> bool:
+def can_cleaner_handle_task(cleaner_role: str, task_type: str, can_do_straordinaria: bool = False) -> bool:
     """Wrapper convenience per la validazione dei task"""
-    return get_validation_rules().can_cleaner_handle_task(cleaner_role, task_type)
+    return get_validation_rules().can_cleaner_handle_task(cleaner_role, task_type, can_do_straordinaria)
 
 
-def validate_assignment(cleaner_role: str, task_type: str) -> Optional[str]:
+def validate_assignment(cleaner_role: str, task_type: str, can_do_straordinaria: bool = False) -> Optional[str]:
     """Wrapper convenience per ottenere messaggi di validazione task"""
-    return get_validation_rules().get_validation_message(cleaner_role, task_type)
+    if not get_validation_rules().can_cleaner_handle_task(cleaner_role, task_type, can_do_straordinaria):
+        return f"⚠️ Cleaner {cleaner_role} non può gestire task {task_type}"
+    return None
 
 
 def can_cleaner_handle_apartment_type(cleaner_role: str, apartment_type: str) -> bool:
