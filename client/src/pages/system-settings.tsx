@@ -18,11 +18,10 @@ interface Client {
   alias: string | null;
 }
 
-interface TaskTypeRules {
-  standard_cleaner: boolean;
-  premium_cleaner: boolean;
-  straordinaria_cleaner: boolean;
-  formatore_cleaner: boolean;
+interface CleanerAptRules {
+  standard_apt: boolean;
+  premium_apt: boolean;
+  straordinario_apt: boolean;
 }
 
 interface SettingsData {
@@ -42,10 +41,11 @@ interface SettingsData {
     premium_apt: string[];
     formatore_apt: string[];
   };
-  task_types: {
-    standard_apt: TaskTypeRules;
-    premium_apt: TaskTypeRules;
-    straordinario_apt: TaskTypeRules;
+  task_types_by_cleaner: {
+    standard_cleaner: CleanerAptRules;
+    premium_cleaner: CleanerAptRules;
+    straordinario_cleaner: CleanerAptRules;
+    formatore_cleaner: CleanerAptRules;
   };
 }
 
@@ -180,8 +180,8 @@ export default function SystemSettings() {
   };
 
   const updateTaskTypeRule = (
-    aptType: keyof SettingsData["task_types"],
-    cleanerType: keyof TaskTypeRules,
+    cleanerType: keyof SettingsData["task_types_by_cleaner"],
+    aptType: keyof CleanerAptRules,
     value: boolean
   ) => {
     setSettings(prev => {
@@ -189,11 +189,11 @@ export default function SystemSettings() {
 
       return {
         ...prev,
-        task_types: {
-          ...prev.task_types,
-          [aptType]: {
-            ...prev.task_types[aptType],
-            [cleanerType]: value,
+        task_types_by_cleaner: {
+          ...prev.task_types_by_cleaner,
+          [cleanerType]: {
+            ...prev.task_types_by_cleaner[cleanerType],
+            [aptType]: value,
           },
         },
       };
@@ -589,182 +589,190 @@ export default function SystemSettings() {
               </CardDescription>
             </CardHeader>
             <CardContent className="bg-custom-blue-light">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                {/* Appartamento Standard */}
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                {/* Cleaner Standard */}
                 <div className="space-y-3">
                   <div className="border-b pb-2 flex items-center gap-2">
-                    <span className="text-sm font-medium text-green-800 dark:text-green-200">Apt</span>
                     <span className="px-2 py-0.5 rounded border font-medium text-sm bg-green-500/30 text-green-800 dark:bg-green-500/40 dark:text-green-200 border-green-600 dark:border-green-400">
-                      Standard
+                      Cleaner Standard
                     </span>
                   </div>
                   <div className="space-y-2">
                     <div className="flex items-center space-x-2">
                       <Checkbox
-                        id="std-standard"
-                        checked={settings.task_types.standard_apt.standard_cleaner}
+                        id="standard-std"
+                        checked={settings.task_types_by_cleaner.standard_cleaner.standard_apt}
                         onCheckedChange={(checked) =>
-                          updateTaskTypeRule("standard_apt", "standard_cleaner", !!checked)
+                          updateTaskTypeRule("standard_cleaner", "standard_apt", !!checked)
                         }
                       />
-                      <Label htmlFor="std-standard" className="text-sm cursor-pointer">
-                        Cleaner Standard
+                      <Label htmlFor="standard-std" className="text-sm cursor-pointer">
+                        Apt Standard
                       </Label>
                     </div>
                     <div className="flex items-center space-x-2">
                       <Checkbox
-                        id="std-premium"
-                        checked={settings.task_types.standard_apt.premium_cleaner}
+                        id="standard-prem"
+                        checked={settings.task_types_by_cleaner.standard_cleaner.premium_apt}
                         onCheckedChange={(checked) =>
-                          updateTaskTypeRule("standard_apt", "premium_cleaner", !!checked)
+                          updateTaskTypeRule("standard_cleaner", "premium_apt", !!checked)
                         }
                       />
-                      <Label htmlFor="std-premium" className="text-sm cursor-pointer">
-                        Cleaner Premium
+                      <Label htmlFor="standard-prem" className="text-sm cursor-pointer">
+                        Apt Premium
                       </Label>
                     </div>
                     <div className="flex items-center space-x-2">
                       <Checkbox
-                        id="std-straordinaria"
-                        checked={settings.task_types.standard_apt.straordinaria_cleaner}
+                        id="standard-straord"
+                        checked={settings.task_types_by_cleaner.standard_cleaner.straordinario_apt}
                         onCheckedChange={(checked) =>
-                          updateTaskTypeRule("standard_apt", "straordinaria_cleaner", !!checked)
+                          updateTaskTypeRule("standard_cleaner", "straordinario_apt", !!checked)
                         }
                       />
-                      <Label htmlFor="std-straordinaria" className="text-sm cursor-pointer">
-                        Cleaner Straordinario
-                      </Label>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <Checkbox
-                        id="std-formatore"
-                        checked={settings.task_types.standard_apt.formatore_cleaner}
-                        onCheckedChange={(checked) =>
-                          updateTaskTypeRule("standard_apt", "formatore_cleaner", !!checked)
-                        }
-                      />
-                      <Label htmlFor="std-formatore" className="text-sm cursor-pointer">
-                        Cleaner Formatore 
+                      <Label htmlFor="standard-straord" className="text-sm cursor-pointer">
+                        Apt Straordinario
                       </Label>
                     </div>
                   </div>
                 </div>
 
-                {/* Appartamento Premium */}
+                {/* Cleaner Premium */}
                 <div className="space-y-3">
                   <div className="border-b pb-2 flex items-center gap-2">
-                    <span className="text-sm font-medium text-yellow-800 dark:text-yellow-200">Apt</span>
                     <span className="px-2 py-0.5 rounded border font-medium text-sm bg-yellow-500/30 text-yellow-800 dark:bg-yellow-500/40 dark:text-yellow-200 border-yellow-600 dark:border-yellow-400">
-                      Premium
+                      Cleaner Premium
                     </span>
                   </div>
                   <div className="space-y-2">
                     <div className="flex items-center space-x-2">
                       <Checkbox
-                        id="prem-standard"
-                        checked={settings.task_types.premium_apt.standard_cleaner}
+                        id="premium-std"
+                        checked={settings.task_types_by_cleaner.premium_cleaner.standard_apt}
                         onCheckedChange={(checked) =>
-                          updateTaskTypeRule("premium_apt", "standard_cleaner", !!checked)
+                          updateTaskTypeRule("premium_cleaner", "standard_apt", !!checked)
                         }
                       />
-                      <Label htmlFor="prem-standard" className="text-sm cursor-pointer">
-                        Cleaner Standard
+                      <Label htmlFor="premium-std" className="text-sm cursor-pointer">
+                        Apt Standard
                       </Label>
                     </div>
                     <div className="flex items-center space-x-2">
                       <Checkbox
-                        id="prem-premium"
-                        checked={settings.task_types.premium_apt.premium_cleaner}
+                        id="premium-prem"
+                        checked={settings.task_types_by_cleaner.premium_cleaner.premium_apt}
                         onCheckedChange={(checked) =>
-                          updateTaskTypeRule("premium_apt", "premium_cleaner", !!checked)
+                          updateTaskTypeRule("premium_cleaner", "premium_apt", !!checked)
                         }
                       />
-                      <Label htmlFor="prem-premium" className="text-sm cursor-pointer">
-                        Cleaner Premium
+                      <Label htmlFor="premium-prem" className="text-sm cursor-pointer">
+                        Apt Premium
                       </Label>
                     </div>
                     <div className="flex items-center space-x-2">
                       <Checkbox
-                        id="prem-straordinaria"
-                        checked={settings.task_types.premium_apt.straordinaria_cleaner}
+                        id="premium-straord"
+                        checked={settings.task_types_by_cleaner.premium_cleaner.straordinario_apt}
                         onCheckedChange={(checked) =>
-                          updateTaskTypeRule("premium_apt", "straordinaria_cleaner", !!checked)
+                          updateTaskTypeRule("premium_cleaner", "straordinario_apt", !!checked)
                         }
                       />
-                      <Label htmlFor="prem-straordinaria" className="text-sm cursor-pointer">
-                        Cleaner Straordinaria
-                      </Label>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <Checkbox
-                        id="prem-formatore"
-                        checked={settings.task_types.premium_apt.formatore_cleaner}
-                        onCheckedChange={(checked) =>
-                          updateTaskTypeRule("premium_apt", "formatore_cleaner", !!checked)
-                        }
-                      />
-                      <Label htmlFor="prem-formatore" className="text-sm cursor-pointer">
-                        Cleaner Formatore
+                      <Label htmlFor="premium-straord" className="text-sm cursor-pointer">
+                        Apt Straordinario
                       </Label>
                     </div>
                   </div>
                 </div>
 
-                {/* Appartamento Straordinario */}
+                {/* Cleaner Straordinario */}
                 <div className="space-y-3">
                   <div className="border-b pb-2 flex items-center gap-2">
-                    <span className="text-sm font-medium text-red-800 dark:text-red-200">Apt</span>
                     <span className="px-2 py-0.5 rounded border font-medium text-sm bg-red-500/30 text-red-800 dark:bg-red-500/40 dark:text-red-200 border-red-600 dark:border-red-400">
-                      Straordinario
+                      Cleaner Straordinario
                     </span>
                   </div>
                   <div className="space-y-2">
                     <div className="flex items-center space-x-2">
                       <Checkbox
-                        id="straord-standard"
-                        checked={settings.task_types.straordinario_apt.standard_cleaner}
+                        id="straord-std"
+                        checked={settings.task_types_by_cleaner.straordinario_cleaner.standard_apt}
                         onCheckedChange={(checked) =>
-                          updateTaskTypeRule("straordinario_apt", "standard_cleaner", !!checked)
+                          updateTaskTypeRule("straordinario_cleaner", "standard_apt", !!checked)
                         }
                       />
-                      <Label htmlFor="straord-standard" className="text-sm cursor-pointer">
-                        Cleaner Standard
+                      <Label htmlFor="straord-std" className="text-sm cursor-pointer">
+                        Apt Standard
                       </Label>
                     </div>
                     <div className="flex items-center space-x-2">
                       <Checkbox
-                        id="straord-premium"
-                        checked={settings.task_types.straordinario_apt.premium_cleaner}
+                        id="straord-prem"
+                        checked={settings.task_types_by_cleaner.straordinario_cleaner.premium_apt}
                         onCheckedChange={(checked) =>
-                          updateTaskTypeRule("straordinario_apt", "premium_cleaner", !!checked)
+                          updateTaskTypeRule("straordinario_cleaner", "premium_apt", !!checked)
                         }
                       />
-                      <Label htmlFor="straord-premium" className="text-sm cursor-pointer">
-                        Cleaner Premium
+                      <Label htmlFor="straord-prem" className="text-sm cursor-pointer">
+                        Apt Premium
                       </Label>
                     </div>
                     <div className="flex items-center space-x-2">
                       <Checkbox
-                        id="straord-straordinaria"
-                        checked={settings.task_types.straordinario_apt.straordinaria_cleaner}
+                        id="straord-straord"
+                        checked={settings.task_types_by_cleaner.straordinario_cleaner.straordinario_apt}
                         onCheckedChange={(checked) =>
-                          updateTaskTypeRule("straordinario_apt", "straordinaria_cleaner", !!checked)
+                          updateTaskTypeRule("straordinario_cleaner", "straordinario_apt", !!checked)
                         }
                       />
-                      <Label htmlFor="straord-straordinaria" className="text-sm cursor-pointer">
-                        Cleaner Straordinaria
+                      <Label htmlFor="straord-straord" className="text-sm cursor-pointer">
+                        Apt Straordinario
+                      </Label>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Cleaner Formatore */}
+                <div className="space-y-3">
+                  <div className="border-b pb-2 flex items-center gap-2">
+                    <span className="px-2 py-0.5 rounded border font-medium text-sm bg-orange-500/30 text-orange-800 dark:bg-orange-500/40 dark:text-orange-200 border-orange-600 dark:border-orange-400">
+                      Cleaner Formatore
+                    </span>
+                  </div>
+                  <div className="space-y-2">
+                    <div className="flex items-center space-x-2">
+                      <Checkbox
+                        id="formatore-std"
+                        checked={settings.task_types_by_cleaner.formatore_cleaner.standard_apt}
+                        onCheckedChange={(checked) =>
+                          updateTaskTypeRule("formatore_cleaner", "standard_apt", !!checked)
+                        }
+                      />
+                      <Label htmlFor="formatore-std" className="text-sm cursor-pointer">
+                        Apt Standard
                       </Label>
                     </div>
                     <div className="flex items-center space-x-2">
                       <Checkbox
-                        id="straord-formatore"
-                        checked={settings.task_types.straordinario_apt.formatore_cleaner}
+                        id="formatore-prem"
+                        checked={settings.task_types_by_cleaner.formatore_cleaner.premium_apt}
                         onCheckedChange={(checked) =>
-                          updateTaskTypeRule("straordinario_apt", "formatore_cleaner", !!checked)
+                          updateTaskTypeRule("formatore_cleaner", "premium_apt", !!checked)
                         }
                       />
-                      <Label htmlFor="straord-formatore" className="text-sm cursor-pointer">
-                        Cleaner Formatore 
+                      <Label htmlFor="formatore-prem" className="text-sm cursor-pointer">
+                        Apt Premium
+                      </Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Checkbox
+                        id="formatore-straord"
+                        checked={settings.task_types_by_cleaner.formatore_cleaner.straordinario_apt}
+                        onCheckedChange={(checked) =>
+                          updateTaskTypeRule("formatore_cleaner", "straordinario_apt", !!checked)
+                        }
+                      />
+                      <Label htmlFor="formatore-straord" className="text-sm cursor-pointer">
+                        Apt Straordinario
                       </Label>
                     </div>
                   </div>
