@@ -1,6 +1,6 @@
 {
   "metadata": {
-    "last_updated": "2025-11-18T11:02:17.231129",
+    "last_updated": "2025-11-18T13:47:21.299047",
     "date": "2025-11-18"
   },
   "containers": {
@@ -304,7 +304,7 @@
           "alias": "RLST",
           "customer_name": "RELSTAY - FERRARA GIULIA",
           "reasons": [
-            "same_day_checkin_between_eo_hp",
+            "same_day_checkin_between_hp_start_hp_end",
             "client_forced_hp"
           ],
           "priority": "high_priority"
@@ -332,7 +332,7 @@
           "alias": "SFST",
           "customer_name": "SEFORA SARTORE",
           "reasons": [
-            "same_day_checkin_between_eo_hp"
+            "same_day_checkin_between_hp_start_hp_end"
           ],
           "priority": "high_priority"
         },
@@ -359,7 +359,7 @@
           "alias": "SFST",
           "customer_name": "SEFORA SARTORE",
           "reasons": [
-            "same_day_checkin_between_eo_hp"
+            "same_day_checkin_between_hp_start_hp_end"
           ],
           "priority": "high_priority"
         },
@@ -494,7 +494,7 @@
           "alias": "TBR",
           "customer_name": "THE BEST RENT S.r.l.",
           "reasons": [
-            "same_day_checkin_between_eo_hp",
+            "same_day_checkin_between_hp_start_hp_end",
             "premium"
           ],
           "priority": "high_priority"

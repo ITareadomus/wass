@@ -305,7 +305,7 @@ export default function SystemSettings() {
                     </span>
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="hp_start_time" className="text-sm">HP Start Time</Label>
+                    <Label htmlFor="hp_start_time" className="text-sm">Start Time</Label>
                     <Input
                       id="hp_start_time"
                       type="time"
@@ -322,7 +322,7 @@ export default function SystemSettings() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="hp_end_time" className="text-sm">HP End Time</Label>
+                    <Label htmlFor="hp_end_time" className="text-sm">End Time</Label>
                     <Input
                       id="hp_end_time"
                       type="time"
@@ -383,7 +383,7 @@ export default function SystemSettings() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="lp_time" className="text-sm text-muted-foreground">LP Time</Label>
+                    <Label htmlFor="lp_time" className="text-sm text-muted-foreground">End Time</Label>
                     <Input
                       id="lp_time"
                       type="time"
