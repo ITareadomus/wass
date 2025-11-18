@@ -596,9 +596,6 @@ export default function SystemSettings() {
                     <Badge variant="outline" className="bg-white text-custom-blue border-custom-blue">
                       Standard Apt
                     </Badge>
-                    <span className="text-xs text-muted-foreground">
-                      Seleziona quali cleaner possono fare gli appartamenti standard
-                    </span>
                   </div>
                   <div className="space-y-2">
                     <div className="flex items-center space-x-2">
@@ -658,9 +655,6 @@ export default function SystemSettings() {
                     <Badge variant="outline" className="bg-white text-custom-blue border-custom-blue">
                       Premium Apt
                     </Badge>
-                    <span className="text-xs text-muted-foreground">
-                      Seleziona quali cleaner possono fare gli appartamenti premium
-                    </span>
                   </div>
                   <div className="space-y-2">
                     <div className="flex items-center space-x-2">
@@ -720,9 +714,6 @@ export default function SystemSettings() {
                     <Badge variant="outline" className="bg-white text-custom-blue border-custom-blue">
                       Straordinario Apt
                     </Badge>
-                    <span className="text-xs text-muted-foreground">
-                      Seleziona quali cleaner possono fare gli straordinari
-                    </span>
                   </div>
                   <div className="space-y-2">
                     <div className="flex items-center space-x-2">
