@@ -151,18 +151,34 @@ export default function SystemSettings() {
   const handleClientToggle = (clientId: number, type: "eo" | "hp") => {
     setSettings(prevSettings => {
       if (!prevSettings) return null;
-      const currentClients = prevSettings[type === "eo" ? "early-out" : "high-priority"].eo_clients || [];
-      const updatedClients = currentClients.includes(clientId)
-        ? currentClients.filter(id => id !== clientId)
-        : [...currentClients, clientId];
 
-      return {
-        ...prevSettings,
-        [type === "eo" ? "early-out" : "high-priority"]: {
-          ...(type === "eo" ? prevSettings["early-out"] : prevSettings["high-priority"]),
-          eo_clients: updatedClients,
-        },
-      };
+      if (type === "eo") {
+        const currentClients = prevSettings["early-out"].eo_clients || [];
+        const updatedClients = currentClients.includes(clientId)
+          ? currentClients.filter(id => id !== clientId)
+          : [...currentClients, clientId];
+
+        return {
+          ...prevSettings,
+          "early-out": {
+            ...prevSettings["early-out"],
+            eo_clients: updatedClients,
+          },
+        };
+      } else {
+        const currentClients = prevSettings["high-priority"].hp_clients || [];
+        const updatedClients = currentClients.includes(clientId)
+          ? currentClients.filter(id => id !== clientId)
+          : [...currentClients, clientId];
+
+        return {
+          ...prevSettings,
+          "high-priority": {
+            ...prevSettings["high-priority"],
+            hp_clients: updatedClients,
+          },
+        };
+      }
     });
   };
 
