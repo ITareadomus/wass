@@ -2,227 +2,151 @@
  * Utility per validare la compatibilità tra cleaner e task basata su settings.json
  */
 
-interface TaskTypeRules {
-  standard_cleaner: boolean;
-  premium_cleaner: boolean;
-  straordinaria_cleaner: boolean;
-  formatore_cleaner: boolean;
+interface CleanerTaskRules {
+  standard_apt: boolean;
+  premium_apt: boolean;
+  straordinario_apt: boolean;
 }
 
-interface TaskValidationSettings {
-  task_types: {
-    standard_apt: TaskTypeRules;
-    premium_apt: TaskTypeRules;
-    straordinario_apt: TaskTypeRules;
-  };
+interface TaskTypesByCleaner {
+  [role: string]: CleanerTaskRules;
 }
 
-// Le regole che usiamo sono direttamente la mappa task_types di settings.json
-type ValidationRules = TaskValidationSettings["task_types"];
+interface ApartmentTypesConfig {
+  standard_apt?: string[];
+  premium_apt?: string[];
+  formatore_apt?: string[];
+}
 
-let cachedRules: ValidationRules | null = null;
+interface SettingsSchema {
+  task_types: TaskTypesByCleaner;
+  apartment_types?: ApartmentTypesConfig;
+}
 
-/**
- * Carica le regole di validazione da settings.json
- */
-export async function loadValidationRules(): Promise<TaskValidationSettings['task_types']> {
-  if (cachedRules) {
-    return cachedRules;
-  }
+let cachedRules: TaskTypesByCleaner | null = null;
+let cachedApartmentTypes: ApartmentTypesConfig | null = null;
+
+export async function loadValidationRules(): Promise<TaskTypesByCleaner> {
+  if (cachedRules) return cachedRules;
 
   try {
     const response = await fetch(`/data/input/settings.json?t=${Date.now()}`, {
-      cache: 'no-store',
+      cache: "no-store",
       headers: { 'Cache-Control': 'no-cache' }
     });
 
+    // If the response is not ok, we should still return default rules to avoid crashing
     if (!response.ok) {
-      console.warn('⚠️ Warning: Could not load settings.json, using permissive defaults');
-      return getDefaultRules();
+      console.warn('⚠️ Warning: Could not load settings.json, using empty rules and no apartment types.');
+      cachedRules = {};
+      cachedApartmentTypes = null;
+      return cachedRules;
     }
 
-    const settings: TaskValidationSettings = await response.json();
-    cachedRules = settings.task_types || getDefaultRules();
+    const settings: SettingsSchema = await response.json();
+    cachedRules = settings.task_types ?? {};
+    cachedApartmentTypes = settings.apartment_types ?? null;
+
     return cachedRules;
   } catch (error) {
     console.warn('⚠️ Warning: Error loading settings.json:', error);
-    return getDefaultRules();
+    cachedRules = {};
+    cachedApartmentTypes = null;
+    return cachedRules;
   }
 }
 
-/**
- * Regole di default permissive (tutto permesso) in caso di errore
- */
-function getDefaultRules(): TaskValidationSettings['task_types'] {
-  return {
-    standard_apt: {
-      standard_cleaner: true,
-      premium_cleaner: true,
-      straordinaria_cleaner: true,
-      formatore_cleaner: true
-    },
-    premium_apt: {
-      standard_cleaner: true,
-      premium_cleaner: true,
-      straordinaria_cleaner: true,
-      formatore_cleaner: true
-    },
-    straordinario_apt: {
-      standard_cleaner: true,
-      premium_cleaner: true,
-      straordinaria_cleaner: true,
-      formatore_cleaner: true
-    }
-  };
+function normalizeCleanerRole(role: string): string {
+  const normalized = role.toLowerCase().trim();
+
+  if (normalized.includes('standard')) return 'standard_cleaner';
+  if (normalized.includes('premium')) return 'premium_cleaner';
+  if (normalized.includes('straord')) return 'straordinaria_cleaner';
+  if (normalized.includes('formatore')) return 'formatore_cleaner';
+
+  // If none of the specific roles match, return the normalized role itself.
+  // This might be useful for custom cleaner roles not explicitly handled.
+  return normalized;
 }
 
-/**
- * Normalizza il tipo di task al formato usato in settings.json
- */
-function normalizeTaskType(taskType: string | boolean): keyof TaskValidationSettings['task_types'] {
-  if (typeof taskType === 'boolean') {
-    // Se è un boolean (straordinaria o premium), usa la logica esistente
-    return 'standard_apt'; // fallback
+function determineTaskType(task: any): string | null {
+  // Ensure task is an object and not null before accessing properties
+  if (typeof task !== 'object' || task === null) {
+    return null;
   }
 
-  const type = taskType.toLowerCase();
+  const isPremium = Boolean(task.premium);
+  const isStraordinaria = Boolean(task.straordinaria);
 
-  if (type.includes('straord')) {
-    return 'straordinario_apt';
-  } else if (type.includes('premium')) {
-    return 'premium_apt';
+  if (isStraordinaria) return 'straordinario_apt';
+  if (isPremium) return 'premium_apt';
+  return 'standard_apt';
+}
+
+function canHandleApartment(cleanerRole: string, task: any): boolean {
+  // If apartment types are not configured, assume any apartment type is allowed.
+  if (!cachedApartmentTypes) return true;
+
+  // Extract apartment type from task, checking for common naming conventions.
+  const aptType = task.apt_type || task.aptType;
+
+  // If no apartment type is specified in the task, assume it's allowed.
+  if (!aptType) return true;
+
+  const roleKey = normalizeCleanerRole(cleanerRole);
+
+  let allowedApts: string[] = [];
+  if (roleKey === 'standard_cleaner') {
+    allowedApts = cachedApartmentTypes.standard_apt || [];
+  } else if (roleKey === 'premium_cleaner' || roleKey === 'straordinario_cleaner') {
+    // Both premium and straordinario cleaners can handle premium apartments
+    allowedApts = cachedApartmentTypes.premium_apt || [];
+  } else if (roleKey === 'formatore_cleaner') {
+    allowedApts = cachedApartmentTypes.formatore_apt || [];
   } else {
-    return 'standard_apt';
+    // For any other cleaner roles, check if there's a general fallback or no specific rules.
+    // If we want to be strict, we could return false here. For now, assume if no rule, it's allowed.
+    return true;
   }
+
+  // Check if the task's apartment type is included in the allowed list for the cleaner's role.
+  return allowedApts.includes(aptType);
 }
 
-/**
- * Determina il tipo di task dalle sue proprietà
- */
-export function getTaskType(task: { premium?: boolean; straordinaria?: boolean }): keyof TaskValidationSettings['task_types'] {
-  if (task.straordinaria) {
-    return 'straordinario_apt';
-  } else if (task.premium) {
-    return 'premium_apt';
-  } else {
-    return 'standard_apt';
-  }
-}
-
-/**
- * Normalizza il ruolo del cleaner al formato usato in settings.json
- */
-function normalizeCleanerRole(role: string): keyof TaskTypeRules {
-  const roleLower = role.toLowerCase();
-
-  if (roleLower.includes('form')) {
-    return 'formatore_cleaner';
-  } else if (roleLower.includes('straord')) {
-    return 'straordinaria_cleaner';
-  } else if (roleLower.includes('premium')) {
-    return 'premium_cleaner';
-  } else {
-    return 'standard_cleaner';
-  }
-}
-
-/**
- * Helper function to determine task type key (used internally by canCleanerHandleTaskSync)
- */
-function determineTaskType(task: any): keyof TaskValidationSettings['task_types'] | null {
-  if (typeof task === 'object' && task !== null) {
-    return getTaskType(task);
-  } else if (typeof task === 'string') {
-    return normalizeTaskType(task);
-  }
-  return null;
-}
-
-/**
- * Verifica se un cleaner può gestire un determinato tipo di task (versione sincrona)
- * Richiede che le regole siano già state caricate
- */
 export function canCleanerHandleTaskSync(
   cleanerRole: string,
   task: any,
-  rules: ValidationRules | null,
+  rules: TaskTypesByCleaner | null,
   canDoStraordinaria: boolean = false
 ): boolean {
+  // If no rules are provided, assume any task can be handled.
   if (!rules) return true;
 
   const taskType = determineTaskType(task);
+  // If the task type cannot be determined, assume it can be handled.
   if (!taskType) return true;
 
-  // Per straordinarie, usa il flag can_do_straordinaria del cleaner
+  const roleKey = normalizeCleanerRole(cleanerRole);
+
+  // Get the specific rules for the cleaner's role.
+  const roleRules = rules[roleKey];
+  // If there are no specific rules for this role, assume it can handle the task.
+  if (!roleRules) return true;
+
+  // Special handling for 'straordinario_apt' tasks: rely on the canDoStraordinaria flag.
   if (taskType === "straordinario_apt") {
     return canDoStraordinaria;
   }
 
-  const normalizedRole = normalizeCleanerRole(cleanerRole);
-  // normalizedRole è già "standard_cleaner" | "premium_cleaner" | ...
-  const roleKey: keyof TaskTypeRules = normalizedRole;
+  // Check if the cleaner's role is allowed to handle this specific task type based on task_types rules.
+  const allowedByTaskType = roleRules[taskType];
+  if (!allowedByTaskType) return false;
 
-  // rules è direttamente settings.task_types
-  const taskRules = rules[taskType];
-  if (!taskRules) return true;
-
-  return taskRules[roleKey] ?? false;
-}
-
-/**
- * Verifica se un cleaner può gestire un determinato tipo di task (versione async)
- */
-export async function canCleanerHandleTask(
-  cleanerRole: string,
-  taskType: string | { premium?: boolean; straordinaria?: boolean },
-  cleanerData?: { can_do_straordinaria?: boolean } // Added cleanerData to pass can_do_straordinaria
-): Promise<boolean> {
-  const rules = await loadValidationRules();
-  const canDoStraordinaria = cleanerData?.can_do_straordinaria ?? false; // Get the flag
-  return canCleanerHandleTaskSync(cleanerRole, taskType, rules, canDoStraordinaria); // Pass the flag
-}
-
-/**
- * Restituisce un messaggio di warning se l'assegnazione non è valida
- */
-export async function getValidationWarning(
-  cleanerRole: string,
-  taskType: string | { premium?: boolean; straordinaria?: boolean },
-  cleanerData?: { can_do_straordinaria?: boolean } // Added cleanerData
-): Promise<string | null> {
-  const isValid = await canCleanerHandleTask(cleanerRole, taskType, cleanerData); // Pass cleanerData
-
-  if (!isValid) {
-    let taskTypeName = '';
-    if (typeof taskType === 'object') {
-      const type = getTaskType(taskType);
-      taskTypeName = type === 'straordinario_apt' ? 'Straordinaria' :
-                     type === 'premium_apt' ? 'Premium' : 'Standard';
-    } else {
-      taskTypeName = taskType;
-    }
-
-    return `⚠️ Cleaner ${cleanerRole} non dovrebbe gestire task ${taskTypeName}`;
+  // Additionally, check if the cleaner can handle the apartment type associated with the task.
+  if (!canHandleApartment(cleanerRole, task)) {
+    return false;
   }
 
-  return null;
-}
-
-/**
- * Verifica se un'assegnazione è incompatibile (per evidenziazione visiva)
- */
-export async function isIncompatibleAssignment(
-  cleanerRole: string,
-  task: { premium?: boolean; straordinaria?: boolean },
-  cleanerData?: { can_do_straordinaria?: boolean } // Added cleanerData
-): Promise<boolean> {
-  const isValid = await canCleanerHandleTask(cleanerRole, task, cleanerData); // Pass cleanerData
-  return !isValid;
-}
-
-/**
- * Invalida la cache delle regole (utile dopo un reload di settings.json)
- */
-export function invalidateRulesCache(): void {
-  cachedRules = null;
+  // If all checks pass, the cleaner can handle the task.
+  return true;
 }

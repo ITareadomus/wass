@@ -39,7 +39,7 @@
       "B"
     ]
   },
-  "task_types_by_cleaner": {
+  "task_types": {
     "standard_cleaner": {
       "standard_apt": true,
       "premium_apt": false,
