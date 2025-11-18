@@ -1,0 +1,223 @@
+1️⃣ Backend – create_containers.py
+
+File:
+TaskFlowMaster/client/public/scripts/create_containers.py
+
+1.1. Leggere hp_start_time e hp_end_time dai settings
+
+Cerca il blocco subito dopo:
+
+early_out_config = settings.get("early-out", {})
+high_priority_config = settings.get("high-priority", {})
+
+
+Adesso da te è così (o molto simile):
+
+early_out_config = settings.get("early-out", {})
+high_priority_config = settings.get("high-priority", {})
+
+eo_end_time = parse_time(early_out_config.get("eo_end_time")) or datetime.strptime("10:59", "%H:%M").time()
+hp_time = parse_time(high_priority_config.get("hp_time")) or datetime.strptime("15:30", "%H:%M").time()
+
+eo_clients = early_out_config.get("eo_clients") or []
+hp_clients = high_priority_config.get("hp_clients") or []
+
+
+🔁 Sostituisci SOLO la parte HP con questa:
+
+early_out_config = settings.get("early-out", {})
+high_priority_config = settings.get("high-priority", {})
+
+eo_end_time = parse_time(early_out_config.get("eo_end_time")) or datetime.strptime("10:59", "%H:%M").time()
+
+# Nuova logica HP: finestra esplicita hp_start_time / hp_end_time
+hp_start_time = (
+    parse_time(high_priority_config.get("hp_start_time"))
+    or datetime.strptime("11:00", "%H:%M").time()
+)
+
+hp_end_time = (
+    parse_time(high_priority_config.get("hp_end_time"))
+    or parse_time(high_priority_config.get("hp_time"))  # fallback per vecchia chiave
+    or datetime.strptime("15:30", "%H:%M").time()
+)
+
+eo_clients = early_out_config.get("eo_clients") or []
+hp_clients = high_priority_config.get("hp_clients") or []
+
+
+Nota: qui non usiamo mai eo_time, solo eo_end_time per EO e hp_start_time / hp_end_time per HP.
+
+1.2. Nuova finestra HP nella classificazione
+
+Cerca il blocco HP che ora è così:
+
+# HIGH PRIORITY
+checkin_date = task.get("checkin_date")
+checkout_date = task.get("checkout_date")
+checkin_time = parse_time(task.get("checkin_time"))
+
+same_day_turnover = (
+    bool(checkin_date) and bool(checkout_date) and (checkin_date == checkout_date)
+)
+
+# HP window begins immediately after eo_end_time
+in_time_window = (
+    checkin_time is not None and eo_end_time is not None and hp_time is not None
+    and (eo_end_time < checkin_time <= hp_time)
+)
+
+if same_day_turnover and in_time_window:
+    hp_reasons.append("same_day_checkin_between_eo_hp")
+
+if is_premium:
+    hp_reasons.append("premium")
+
+
+🔁 Sostituiscilo con questo:
+
+        # HIGH PRIORITY
+        checkin_date = task.get("checkin_date")
+        checkout_date = task.get("checkout_date")
+        checkin_time = parse_time(task.get("checkin_time"))
+
+        same_day_turnover = (
+            bool(checkin_date) and bool(checkout_date) and (checkin_date == checkout_date)
+        )
+
+        # Finestra HP esplicita: hp_start_time <= checkin_time <= hp_end_time
+        in_time_window = (
+            checkin_time is not None
+            and hp_start_time is not None
+            and hp_end_time is not None
+            and (hp_start_time <= checkin_time <= hp_end_time)
+        )
+
+        if same_day_turnover and in_time_window:
+            hp_reasons.append("same_day_checkin_between_hp_start_hp_end")
+
+        if is_premium:
+            hp_reasons.append("premium")
+
+
+Ora la task è HP se:
+
+check-in e check-out sono lo stesso giorno
+
+hp_start_time <= checkin_time <= hp_end_time
+
+e/o altri motivi (premium, client_forced_hp ecc).
+
+2️⃣ Typings – settings.tsx
+
+File:
+TaskFlowMaster/client/src/pages/settings.tsx
+
+Cerca l’interfaccia SystemSettings e, dentro "high-priority", ora hai:
+
+"high-priority": {
+  hp_start_time: string;
+  hp_time: string;
+  hp_clients: number[];
+};
+
+
+🔁 Cambiala in:
+
+"high-priority": {
+  hp_start_time: string;
+  hp_end_time: string;
+  hp_clients: number[];
+};
+
+3️⃣ Typings + UI – system-settings.tsx (pagina /settings)
+
+File:
+TaskFlowMaster/client/src/pages/system-settings.tsx
+
+3.1. Interfaccia SettingsData
+
+In alto, cerca:
+
+interface SettingsData {
+  "early-out": {
+    eo_start_time: string;
+    eo_end_time: string;
+    eo_clients: number[];
+  };
+  "high-priority": {
+    hp_start_time: string;
+    hp_time: string;
+    hp_clients: number[];
+  };
+  ...
+}
+
+
+🔁 Cambia solo la parte HP in:
+
+  "high-priority": {
+    hp_start_time: string;
+    hp_end_time: string;
+    hp_clients: number[];
+  };
+
+3.2. Input HP End nella card High Priority
+
+Più giù (intorno a dove hai HP arancione), ora è così:
+
+<Label htmlFor="hp_start_time" className="text-sm">Start Time</Label>
+<Input
+  id="hp_start_time"
+  type="time"
+  value={settings["high-priority"].hp_start_time}
+  onChange={(e) =>
+    setSettings({
+      ...settings,
+      "high-priority": {
+        ...settings["high-priority"],
+        hp_start_time: e.target.value,
+      },
+    })
+  }
+/>
+
+<Label htmlFor="hp_time" className="text-sm">HP Time</Label>
+<Input
+  id="hp_time"
+  type="time"
+  value={settings["high-priority"].hp_time}
+  onChange={(e) =>
+    setSettings({
+      ...settings,
+      "high-priority": {
+        ...settings["high-priority"],
+        hp_time: e.target.value,
+      },
+    })
+  }
+/>
+
+
+🔁 Sostituisci SOLO il secondo blocco con:
+
+<Label htmlFor="hp_end_time" className="text-sm">HP End Time</Label>
+<Input
+  id="hp_end_time"
+  type="time"
+  value={settings["high-priority"].hp_end_time}
+  onChange={(e) =>
+    setSettings({
+      ...settings,
+      "high-priority": {
+        ...settings["high-priority"],
+        hp_end_time: e.target.value,
+      },
+    })
+  }
+/>
+
+
+Se vuoi più chiaro, puoi anche cambiare il testo del primo label:
+
+<Label htmlFor="hp_start_time" className="text-sm">HP Start Time</Label>
