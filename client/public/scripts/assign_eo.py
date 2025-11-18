@@ -5,7 +5,7 @@ from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Tuple
 from pathlib import Path
 from datetime import datetime
-from task_validation import can_cleaner_handle_task
+from task_validation import can_cleaner_handle_task, can_cleaner_handle_apartment
 
 # =============================
 # I/O paths
@@ -245,10 +245,10 @@ def evaluate_route(route: List[Task]) -> Tuple[bool, List[Tuple[int, int, int]]]
         finish = start + t.cleaning_time
 
         # Check-in strict: applica SOLO se abbiamo un limite valido per il giorno corrente
-        effective_checkin_limit = None
 
         # Se abbiamo un checkin_dt "valido" (stesso giorno), in load_tasks l'abbiamo lasciato,
         # altrimenti è None. In quel caso usiamo la sola t.checkin_time.
+        effective_checkin_limit = None
         if hasattr(t, "checkin_dt") and t.checkin_dt:
             effective_checkin_limit = t.checkin_dt.hour * 60 + t.checkin_dt.minute
         elif t.checkin_time and t.checkin_time < 24 * 60:
@@ -280,6 +280,10 @@ def can_add_task(cleaner: Cleaner, task: Task) -> bool:
     """
     # Check premium/straordinaria
     if not can_handle_premium(cleaner, task):
+        return False
+
+    # NUOVO: Check tipo appartamento
+    if not can_cleaner_handle_apartment(cleaner.role, task.apt_type):
         return False
 
     current_count = len(cleaner.route)
@@ -590,6 +594,9 @@ def plan_day(tasks: List[Task], cleaners: List[Cleaner], assigned_logistic_codes
             task_type = 'straordinario_apt' if task.straordinaria else ('premium_apt' if task.is_premium else 'standard_apt')
             if not can_cleaner_handle_task(same_building_cleaner.role, task_type):
                 print(f"   ⚠️  Same-building cleaner {same_building_cleaner.name} ({same_building_cleaner.role}) non può gestire task {task_type} - SKIPPATO fast-path")
+            # NUOVO: VALIDAZIONE appartamento per stesso edificio
+            elif not can_cleaner_handle_apartment(same_building_cleaner.role, task.apt_type):
+                print(f"   ⚠️  Same-building cleaner {same_building_cleaner.name} ({same_building_cleaner.role}) non può gestire appartamento {task.apt_type} - SKIPPATO fast-path")
             else:
                 result = find_best_position(same_building_cleaner, task)
                 if result is not None:
@@ -611,7 +618,12 @@ def plan_day(tasks: List[Task], cleaners: List[Cleaner], assigned_logistic_codes
             if not can_cleaner_handle_task(cleaner.role, task_type):
                 print(f"   ⚠️  Cleaner {cleaner.name} ({cleaner.role}) non può gestire task {task_type} - SKIPPATO")
                 continue
-            
+
+            # NUOVO: VALIDAZIONE appartamento (lettera A/B/C...) da settings.apartment_types
+            if not can_cleaner_handle_apartment(cleaner.role, task.apt_type):
+                print(f"   ⚠️  Cleaner {cleaner.name} ({cleaner.role}) non può gestire appartamento {task.apt_type} - SKIPPATO")
+                continue
+
             result = find_best_position(cleaner, task)
             if result is not None:
                 pos, travel = result
@@ -757,9 +769,9 @@ def build_output(cleaners: List[Cleaner], unassigned: List[Task], original_tasks
             # Cerca la task nei containers
             for container_type in ['early_out', 'high_priority', 'low_priority']:
                 container = containers_data.get('containers', {}).get(container_type, {})
-                for task in container.get('tasks', []):
-                    if str(task.get('task_id')) == str(t.task_id) or str(task.get('logistic_code')) == str(t.logistic_code):
-                        original_task_data = task
+                for task_data in container.get('tasks', []):
+                    if str(task_data.get('task_id')) == str(t.task_id) or str(task_data.get('logistic_code')) == str(t.logistic_code):
+                        original_task_data = task_data
                         break
                 if original_task_data:
                     break
