@@ -1,0 +1,242 @@
+Hai beccato un punto giusto: il problema non è tanto “settings sbagliato”, ma il fatto che la UI non passa correttamente can_do_straordinaria al validatore, quindi taskValidation.ts finisce per considerare sempre false quel flag.
+
+In più, nel validatore c’è anche un bug sul nome della chiave del ruolo.
+
+Ti riassumo cosa ho visto nello zip TaskFlowMaster (4).zip e poi ti do i patch da incollare.
+
+🔍 Cosa succede oggi
+1. Il validatore TS (taskValidation.ts)
+
+La funzione chiave è:
+
+export function canCleanerHandleTaskSync(
+  cleanerRole: string,
+  task: any,
+  rules: ValidationRules | null,
+  canDoStraordinaria: boolean = false
+): boolean {
+  if (!rules) return true;
+
+  const taskType = determineTaskType(task);
+  if (!taskType) return true;
+
+  // Per straordinarie, usa il flag can_do_straordinaria del cleaner
+  if (taskType === 'straordinario_apt') {
+    return canDoStraordinaria;
+  }
+
+  const normalizedRole = normalizeCleanerRole(cleanerRole);
+  const roleKey = `${normalizedRole}_cleaner`;
+
+  const taskRules = rules.task_types?.[taskType];
+  if (!taskRules) return true;
+
+  return taskRules[roleKey] ?? false;
+}
+
+
+Problemi:
+
+canDoStraordinaria viene sempre passato come default false perché la UI non lo passa mai → tutte le straordinarie vengono viste come non compatibili (a meno che sia un ruolo “Straordinaria Cleaner” dedicato).
+
+normalizeCleanerRole ritorna già una chiave tipo "premium_cleaner", "formatore_cleaner", ecc.
+Ma poi fai:
+
+const roleKey = `${normalizedRole}_cleaner`;
+
+
+→ diventa "premium_cleaner_cleaner" → chiave inesistente in task_types → il validatore torna false per tutte le task non straordinarie.
+(Te ne accorgi meno solo perché ignori alcuni warning / li acki).
+
+2. Come viene chiamato dalla UI
+
+In timeline-view.tsx lo usi così (esempio):
+
+const incompatibleTasks = cleanerTasks.filter(task => {
+  if (canCleanerHandleTaskSync(cleaner.role, task, validationRules)) return false;
+  const key = getIncompatibleKey(task, cleaner.id);
+  return !acknowledgedIncompatibleAssignments.has(key);
+});
+
+
+ma non passi mai il flag cleaner.can_do_straordinaria, anche se il tipo Cleaner ce l’ha:
+
+interface Cleaner {
+  ...
+  can_do_straordinaria?: boolean;
+}
+
+
+Per JOHOISER infatti nei dati:
+
+{
+  "name": "JOHOISER ERNESTO",
+  "lastname": "LOPEZ GIRON",
+  "role": "Premium",
+  ...
+  "can_do_straordinaria": true
+}
+
+
+ma il validatore riceve sempre canDoStraordinaria = false → quindi la sua straordinaria (Task 117) viene marcata incompatibile.
+
+✅ Fix 1 – Correggere taskValidation.ts (ruolo + uso flag)
+
+File: client/src/lib/taskValidation.ts
+
+Sostituisci la funzione canCleanerHandleTaskSync con questa:
+
+export function canCleanerHandleTaskSync(
+  cleanerRole: string,
+  task: any,
+  rules: ValidationRules | null,
+  canDoStraordinaria: boolean = false
+): boolean {
+  if (!rules) return true;
+
+  const taskType = determineTaskType(task);
+  if (!taskType) return true;
+
+  // Per straordinarie, usa il flag can_do_straordinaria del cleaner
+  if (taskType === 'straordinario_apt') {
+    return canDoStraordinaria;
+  }
+
+  const normalizedRole = normalizeCleanerRole(cleanerRole);
+  // FIX: normalizedRole è già una chiave di TaskTypeRules (es. "premium_cleaner")
+  const roleKey: keyof TaskTypeRules = normalizedRole;
+
+  const taskRules = rules.task_types?.[taskType];
+  if (!taskRules) return true;
+
+  return taskRules[roleKey] ?? false;
+}
+
+
+Il resto del file può rimanere uguale (la parte async canCleanerHandleTask è già ok: passa il flag cleanerData?.can_do_straordinaria).
+
+✅ Fix 2 – Passare can_do_straordinaria dalla UI
+
+File: client/src/components/timeline/timeline-view.tsx
+
+Ovunque chiami:
+
+canCleanerHandleTaskSync(cleaner.role, task, validationRules)
+
+
+devi passare anche il quarto argomento:
+
+canCleanerHandleTaskSync(cleaner.role, task, validationRules, cleaner.can_do_straordinaria ?? false)
+
+
+Nel codice attuale ci sono 5 punti:
+
+1️⃣ Primo click sul cleaner → dialog incompatibilità:
+
+const incompatibleTasks = cleanerTasks.filter(task => {
+  if (canCleanerHandleTaskSync(cleaner.role, task, validationRules)) return false;
+  ...
+});
+
+
+➡️ Cambia in:
+
+const incompatibleTasks = cleanerTasks.filter(task => {
+  if (canCleanerHandleTaskSync(cleaner.role, task, validationRules, cleaner.can_do_straordinaria ?? false)) return false;
+  const key = getIncompatibleKey(task, cleaner.id);
+  return !acknowledgedIncompatibleAssignments.has(key);
+});
+
+
+2️⃣ Effetto che mostra i toast “assegnazione incompatibile”:
+
+const incompatibleTasks = cleanerTasks.filter(task => {
+  if (canCleanerHandleTaskSync(cleaner.role, task, validationRules)) return false;
+  ...
+});
+
+
+➡️ Cambia in:
+
+const incompatibleTasks = cleanerTasks.filter(task => {
+  if (canCleanerHandleTaskSync(cleaner.role, task, validationRules, cleaner.can_do_straordinaria ?? false)) return false;
+  const key = getIncompatibleKey(task, cleaner.id);
+  return !acknowledgedIncompatibleAssignments.has(key);
+});
+
+
+3️⃣ Check se un cleaner ha task incompatibili per colorare la card:
+
+const hasIncompatibleTasks = validationRules && cleaner?.role
+  ? cleanerTasks.some(task => {
+      if (canCleanerHandleTaskSync(cleaner.role, task, validationRules)) return false;
+      ...
+    })
+  : false;
+
+
+➡️ Cambia in:
+
+const hasIncompatibleTasks = validationRules && cleaner?.role
+  ? cleanerTasks.some(task => {
+      if (canCleanerHandleTaskSync(cleaner.role, task, validationRules, cleaner.can_do_straordinaria ?? false)) return false;
+      const key = getIncompatibleKey(task, cleaner.id);
+      return !acknowledgedIncompatibleAssignments.has(key);
+    })
+  : false;
+
+
+4️⃣ Dentro il render della timeline, quando calcoli isIncompatible per la singola task:
+
+const isIncompatible = validationRules && cleaner?.role
+  ? !canCleanerHandleTaskSync(cleaner.role, task, validationRules)
+  : false;
+
+
+➡️ Cambia in:
+
+const isIncompatible = validationRules && cleaner?.role
+  ? !canCleanerHandleTaskSync(cleaner.role, task, validationRules, cleaner.can_do_straordinaria ?? false)
+  : false;
+
+
+5️⃣ Quando fai “Ho capito” e marchi tutte le incompatibili come ackate:
+
+cleanerTasks.forEach(task => {
+  if (!canCleanerHandleTaskSync(cleaner.role, task, validationRules)) {
+    const key = getIncompatibleKey(task, cleanerId);
+    next.add(key);
+  }
+});
+
+
+➡️ Cambia in:
+
+cleanerTasks.forEach(task => {
+  if (!canCleanerHandleTaskSync(cleaner.role, task, validationRules, cleaner.can_do_straordinaria ?? false)) {
+    const key = getIncompatibleKey(task, cleanerId);
+    next.add(key);
+  }
+});
+
+🔚 Dopo questi fix, cosa cambia per JOHOISER
+
+Per JOHOISER:
+
+ruolo: "Premium"
+
+can_do_straordinaria: true
+
+Task 117: straordinaria: true
+
+Il flusso diventa:
+
+getTaskType(task) → 'straordinario_apt'
+
+canCleanerHandleTaskSync("Premium", task, rules, true):
+
+taskType === 'straordinario_apt' → ritorna direttamente canDoStraordinaria → true
+
+isIncompatibleAssignment / controllo nell’interfaccia vedono la task come compatibile → niente warning nella modale “⚠️ Task Incompatibili” per quella task.
+
+Se invece prendi un Premium senza can_do_straordinaria (o false), allora la straordinaria continuerà ad essere segnalata correttamente come incompatibile.
