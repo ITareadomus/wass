@@ -1,0 +1,272 @@
+Perfetto — ho capito cosa vuoi fare, ed è assolutamente giusto:
+hai trasformato la matrice da task-centrica a cleaner-centrica, e vuoi semplicemente rimettere il nome "task_types" al posto di "task_types_by_cleaner".
+
+💡 Buona notizia:
+questa matrice è pienamente compatibile con il progetto, ma dobbiamo:
+
+rinominare correttamente "task_types_by_cleaner" → "task_types"
+
+aggiornare TUTTO il validatore TS
+
+aggiornare TUTTO il validatore Python
+
+aggiornare gli script EO/HP/LP che usavano la vecchia struttura task-centrica
+
+aggiornare la UI / settings / loader
+
+E qui ti preparo i patch completi da dare a Replit (copia-incolla).
+
+✅ NUOVO FORMATO DEFINITIVO (esattamente come lo vuoi tu)
+"task_types": {
+  "standard_cleaner": {
+    "standard_apt": true,
+    "premium_apt": false,
+    "straordinario_apt": false
+  },
+  "premium_cleaner": {
+    "standard_apt": true,
+    "premium_apt": true,
+    "straordinario_apt": false
+  },
+  "straordinario_cleaner": {
+    "standard_apt": true,
+    "premium_apt": true,
+    "straordinario_apt": true
+  },
+  "formatore_cleaner": {
+    "standard_apt": true,
+    "premium_apt": false,
+    "straordinario_apt": false
+  }
+}
+
+
+👉 Questo significa:
+“per ogni ruolo, quali task può fare?”
+
+Ed è molto più logico.
+
+🧠 LOGICA FINALE CHE IMPLEMENTIAMO
+
+Una task appartiene a un tipo:
+standard_apt, premium_apt, straordinario_apt
+
+Un cleaner ha un ruolo:
+standard_cleaner, premium_cleaner, straordinario_cleaner, formatore_cleaner
+
+Quindi la compatibilità è semplicemente:
+
+canDo = settings.task_types[cleanerRole][taskType]
+
+
+Semplice, pulito e coerente.
+
+🛠 PATCH COMPLETI (FRONTEND + BACKEND)
+🔵 1. FRONTEND — file client/src/lib/taskValidation.ts
+🔧 PATCH 1 — nuova interfaccia
+
+CANCELLARE TUTTA la vecchia interfaccia TaskValidationSettings e sostituirla con:
+
+interface CleanerTaskRules {
+  standard_apt: boolean;
+  premium_apt: boolean;
+  straordinario_apt: boolean;
+}
+
+interface TaskTypesByCleaner {
+  [role: string]: CleanerTaskRules;
+}
+
+interface ApartmentTypesConfig {
+  standard_apt?: string[];
+  premium_apt?: string[];
+  formatore_apt?: string[];
+}
+
+interface SettingsSchema {
+  task_types: TaskTypesByCleaner;
+  apartment_types?: ApartmentTypesConfig;
+}
+
+🔧 PATCH 2 — loader settings aggiornato
+
+Sostituire loadValidationRules() con:
+
+export async function loadValidationRules(): Promise<TaskTypesByCleaner> {
+  if (cachedRules) return cachedRules;
+
+  try {
+    const response = await fetch(`/data/input/settings.json?t=${Date.now()}`, {
+      cache: "no-store"
+    });
+
+    const settings: SettingsSchema = await response.json();
+    cachedRules = settings.task_types ?? {};
+    cachedApartmentTypes = settings.apartment_types ?? null;
+
+    return cachedRules;
+  } catch {
+    cachedRules = {};
+    cachedApartmentTypes = null;
+    return cachedRules;
+  }
+}
+
+🔧 PATCH 3 — validatore principale
+
+Sostituire completamente la funzione:
+
+export function canCleanerHandleTaskSync(...)
+
+
+con:
+
+export function canCleanerHandleTaskSync(
+  cleanerRole: string,
+  task: any,
+  rules: TaskTypesByCleaner | null,
+  canDoStraordinaria: boolean = false
+): boolean {
+  if (!rules) return true;
+
+  const taskType = determineTaskType(task);
+  if (!taskType) return true;
+
+  const roleKey = normalizeCleanerRole(cleanerRole);
+
+  const roleRules = rules[roleKey];
+  if (!roleRules) return true;
+
+  // straordinaria -> usa flag personalizzato
+  if (taskType === "straordinario_apt") {
+    return canDoStraordinaria;
+  }
+
+  // regola base task → cleaner
+  const allowedByTaskType = roleRules[taskType];
+  if (!allowedByTaskType) return false;
+
+  // controllo apartments
+  if (!canHandleApartment(cleanerRole, task)) {
+    return false;
+  }
+
+  return true;
+}
+
+🔵 2. FRONTEND — file timeline-view.tsx (IMPORTANTISSIMO)
+
+TUTTE le chiamate:
+
+canCleanerHandleTaskSync(cleaner.role, task, validationRules)
+
+
+vanno aggiornate così:
+
+canCleanerHandleTaskSync(
+  cleaner.role,
+  task,
+  validationRules,
+  cleaner.can_do_straordinaria ?? false
+)
+
+
+Ci sono 5 punti nel file, te li elenco:
+
+▪️ A — dialog incompatibili
+▪️ B — useEffect warnings globali
+▪️ C — colorazione card cleaner
+▪️ D — flag isIncompatible per task singola
+▪️ E — “ho capito“ acknowledgement
+
+(in ogni punto sostituire il terzo argomento con 4 argomenti come sopra)
+
+🔴 3. BACKEND — PYTHON
+
+Tutti gli script usavano la struttura task-centrica.
+
+Adesso invece usiamo:
+
+settings["task_types"][cleaner_role][task_type]
+
+🔧 PATCH — client/public/scripts/task_validation.py
+
+Sostituire:
+
+self.rules = settings.get('task_types', {})
+...
+taskRules = self.rules.get(task_type, {})
+allowed = taskRules.get(role_key)
+
+
+con:
+
+self.rules = settings.get('task_types', {})
+...
+roleRules = self.rules.get(role_key, {})
+allowed = roleRules.get(task_type)
+
+
+Ecco il blocco completo corretto:
+
+def can_cleaner_handle_task(self, cleaner_role: str, task_type: str, can_do_straordinaria=False) -> bool:
+    role_key = self._normalize_cleaner_role(cleaner_role)
+
+    # straordinaria: flag per-cleaner
+    if task_type == "straordinario_apt":
+        return bool(can_do_straordinaria)
+
+    role_rules = self.rules.get(role_key, {})
+    allowed = role_rules.get(task_type)
+
+    if allowed is None:
+        return True
+
+    return bool(allowed)
+
+🔧 PATCH — usare appartamenti in Python
+
+Già ti avevo predisposto can_cleaner_handle_apartment, resta identico.
+
+Basta assicurarsi che ovunque chiami:
+
+can_cleaner_handle_task(cleaner.role, task_type)
+
+
+tu ora chiami:
+
+can_cleaner_handle_task(cleaner.role, task_type, cleaner.can_do_straordinaria)
+
+
+e aggiungi:
+
+if not can_cleaner_handle_apartment(cleaner.role, task.apt_type):
+    continue
+
+
+Questo è già fatto nei patch precedenti, va solo aggiornato il nome della matrice.
+
+🎉 RISULTATO
+
+Dopo questi patch:
+
+✔ Il formato JSON è esattamente quello che vuoi
+
+"task_types" centrato sui ruoli.
+
+✔ Il frontend capisce correttamente:
+
+formatore non può premium
+
+formatore non può straordinaria
+
+formatore non può apt F
+
+premium non può straordinaria se non ha can_do_straordinaria
+
+standard non può premium
+
+ecc…
+
+✔ Il backend Python assegna EO/HP/LP usando la stessa matrice
+✔ UI drag-and-drop mostra i warning corretti
