@@ -134,9 +134,12 @@ export default function Settings() {
       });
       if (response.ok) {
         const data = await response.json();
+        console.log('✅ Settings loaded:', data);
+        console.log('✅ Task types loaded:', data?.task_types);
         setSystemSettings(data);
       }
     } catch (error) {
+      console.error('❌ Error loading settings:', error);
       toast({
         title: "Errore",
         description: "Impossibile caricare le impostazioni di sistema",
@@ -343,25 +346,33 @@ export default function Settings() {
             </div>
           </CardHeader>
           <CardContent className="bg-custom-blue-light pt-6">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              {/* Appartamento Standard */}
-              <div className="space-y-3">
-                <div className="border-b pb-2 flex items-center gap-2">
-                  <span className="text-sm font-medium">Apt</span>
-                  <span className="px-2 py-0.5 rounded border font-medium text-sm bg-green-500/30 text-green-800 dark:bg-green-500/40 dark:text-green-200 border-green-600 dark:border-green-400">
-                    Standard
-                  </span>
-                </div>
+            {!systemSettings && (
+              <div className="text-center py-4">
+                <p className="text-muted-foreground">Caricamento impostazioni...</p>
+              </div>
+            )}
+            {systemSettings && (
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                {/* Appartamento Standard */}
                 <div className="space-y-3">
-                  <div className="flex items-center space-x-2">
-                    <Checkbox
-                      id="std-standard"
-                      checked={systemSettings?.task_types.standard_apt.standard_cleaner ?? false}
-                      onCheckedChange={(checked) =>
-                        updateTaskTypeRule('standard_apt', 'standard_cleaner', checked === true)
-                      }
-                      disabled={false}
-                    />
+                  <div className="border-b pb-2 flex items-center gap-2">
+                    <span className="text-sm font-medium">Apt</span>
+                    <span className="px-2 py-0.5 rounded border font-medium text-sm bg-green-500/30 text-green-800 dark:bg-green-500/40 dark:text-green-200 border-green-600 dark:border-green-400">
+                      Standard
+                    </span>
+                  </div>
+                  <div className="space-y-3">
+                    <div className="flex items-center space-x-2">
+                      <Checkbox
+                        id="std-standard"
+                        checked={systemSettings?.task_types.standard_apt.standard_cleaner ?? false}
+                        onCheckedChange={(checked) => {
+                          console.log('Checkbox clicked:', checked);
+                          updateTaskTypeRule('standard_apt', 'standard_cleaner', checked === true);
+                        }}
+                        disabled={false}
+                        data-testid="checkbox-std-standard"
+                      />
                     <Label htmlFor="std-standard" className="text-sm cursor-pointer">
                       Standard Cleaner
                     </Label>
@@ -536,6 +547,7 @@ export default function Settings() {
                 </div>
               </div>
             </div>
+            )}
           </CardContent>
         </Card>
 
