@@ -530,7 +530,7 @@ export default function TimelineView({
             .map(normalizeTask);
 
           const incompatibleTasks = cleanerTasks.filter(task => {
-            if (canCleanerHandleTaskSync(cleaner.role, task, validationRules)) return false;
+            if (canCleanerHandleTaskSync(cleaner.role, task, validationRules, cleaner.can_do_straordinaria ?? false)) return false;
             const key = getIncompatibleKey(task, cleaner.id);
             return !acknowledgedIncompatibleAssignments.has(key);
           });
@@ -1019,7 +1019,7 @@ export default function TimelineView({
 
       // Verifica se ci sono task incompatibili NON ancora ackate per questo cleaner
       const incompatibleTasks = cleanerTasks.filter(task => {
-        if (canCleanerHandleTaskSync(cleaner.role, task, validationRules)) return false;
+        if (canCleanerHandleTaskSync(cleaner.role, task, validationRules, cleaner.can_do_straordinaria ?? false)) return false;
         const key = getIncompatibleKey(task, cleaner.id);
         return !acknowledgedIncompatibleAssignments.has(key);
       });
@@ -1226,10 +1226,7 @@ export default function TimelineView({
                 // Controlla ogni coppia (task, cleaner) invece del solo cleanerId
                 const hasIncompatibleTasks = validationRules && cleaner?.role
                   ? cleanerTasks.some(task => {
-                      // Se la task è compatibile, ok
-                      if (canCleanerHandleTaskSync(cleaner.role, task, validationRules)) return false;
-
-                      // Se è incompatibile, controlliamo se la coppia task-cleaner è già stata "acknowledged"
+                      if (canCleanerHandleTaskSync(cleaner.role, task, validationRules, cleaner.can_do_straordinaria ?? false)) return false;
                       const key = getIncompatibleKey(task, cleaner.id);
                       return !acknowledgedIncompatibleAssignments.has(key);
                     })
@@ -1390,7 +1387,7 @@ export default function TimelineView({
 
                                 // Verifica compatibilità task-cleaner
                                 const isIncompatible = validationRules && cleaner?.role
-                                  ? !canCleanerHandleTaskSync(cleaner.role, task, validationRules)
+                                  ? !canCleanerHandleTaskSync(cleaner.role, task, validationRules, cleaner.can_do_straordinaria ?? false)
                                   : false;
 
 
@@ -1531,7 +1528,7 @@ export default function TimelineView({
               onClick={() => {
                 if (incompatibleDialog.cleanerId) {
                   const cleanerId = incompatibleDialog.cleanerId;
-                  const cleaner = allCleanersToShow.find(c => c.id === cleanerId);
+                  const cleaner = allCleanersToShow.find(c => c.id === incompatibleDialog.cleanerId);
 
                   if (cleaner && validationRules) {
                     // Recupera tutte le task di questo cleaner
@@ -1544,7 +1541,7 @@ export default function TimelineView({
                       const next = new Set(prev);
 
                       cleanerTasks.forEach(task => {
-                        if (!canCleanerHandleTaskSync(cleaner.role, task, validationRules)) {
+                        if (!canCleanerHandleTaskSync(cleaner.role, task, validationRules, cleaner.can_do_straordinaria ?? false)) {
                           const key = getIncompatibleKey(task, cleanerId);
                           next.add(key);
                         }
