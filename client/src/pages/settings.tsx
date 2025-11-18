@@ -367,12 +367,10 @@ export default function Settings() {
                         id="std-standard"
                         checked={systemSettings?.task_types.standard_apt.standard_cleaner ?? false}
                         onCheckedChange={(checked) => {
-                          console.log('Checkbox clicked:', checked);
+                          console.log('✅ Checkbox std-standard clicked:', checked);
                           updateTaskTypeRule('standard_apt', 'standard_cleaner', checked === true);
                         }}
-                        disabled={false}
-                        data-testid="checkbox-std-standard"
-                        className="border-2 border-custom-blue data-[state=checked]:bg-custom-blue data-[state=checked]:border-custom-blue"
+                        className="border-2 border-custom-blue data-[state=checked]:bg-custom-blue data-[state=checked]:border-custom-blue cursor-pointer"
                       />
                     <Label htmlFor="std-standard" className="text-sm cursor-pointer">
                       Standard Cleaner
@@ -382,11 +380,11 @@ export default function Settings() {
                     <Checkbox
                       id="std-premium"
                       checked={systemSettings?.task_types.standard_apt.premium_cleaner ?? false}
-                      onCheckedChange={(checked) =>
-                        updateTaskTypeRule('standard_apt', 'premium_cleaner', checked === true)
-                      }
-                      disabled={false}
-                      className="border-2 border-custom-blue data-[state=checked]:bg-custom-blue data-[state=checked]:border-custom-blue"
+                      onCheckedChange={(checked) => {
+                        console.log('✅ Checkbox std-premium clicked:', checked);
+                        updateTaskTypeRule('standard_apt', 'premium_cleaner', checked === true);
+                      }}
+                      className="border-2 border-custom-blue data-[state=checked]:bg-custom-blue data-[state=checked]:border-custom-blue cursor-pointer"
                     />
                     <Label htmlFor="std-premium" className="text-sm cursor-pointer">
                       Premium Cleaner
@@ -396,11 +394,11 @@ export default function Settings() {
                     <Checkbox
                       id="std-straordinaria"
                       checked={systemSettings?.task_types.standard_apt.straordinaria_cleaner ?? false}
-                      onCheckedChange={(checked) =>
-                        updateTaskTypeRule('standard_apt', 'straordinaria_cleaner', checked === true)
-                      }
-                      disabled={false}
-                      className="border-2 border-custom-blue data-[state=checked]:bg-custom-blue data-[state=checked]:border-custom-blue"
+                      onCheckedChange={(checked) => {
+                        console.log('✅ Checkbox std-straordinaria clicked:', checked);
+                        updateTaskTypeRule('standard_apt', 'straordinaria_cleaner', checked === true);
+                      }}
+                      className="border-2 border-custom-blue data-[state=checked]:bg-custom-blue data-[state=checked]:border-custom-blue cursor-pointer"
                     />
                     <Label htmlFor="std-straordinaria" className="text-sm cursor-pointer">
                       Straordinaria Cleaner
@@ -410,11 +408,11 @@ export default function Settings() {
                     <Checkbox
                       id="std-formatore"
                       checked={systemSettings?.task_types.standard_apt.formatore_cleaner ?? false}
-                      onCheckedChange={(checked) =>
-                        updateTaskTypeRule('standard_apt', 'formatore_cleaner', checked === true)
-                      }
-                      disabled={false}
-                      className="border-2 border-custom-blue data-[state=checked]:bg-custom-blue data-[state=checked]:border-custom-blue"
+                      onCheckedChange={(checked) => {
+                        console.log('✅ Checkbox std-formatore clicked:', checked);
+                        updateTaskTypeRule('standard_apt', 'formatore_cleaner', checked === true);
+                      }}
+                      className="border-2 border-custom-blue data-[state=checked]:bg-custom-blue data-[state=checked]:border-custom-blue cursor-pointer"
                     />
                     <Label htmlFor="std-formatore" className="text-sm cursor-pointer">
                       Formatore Cleaner
@@ -436,11 +434,11 @@ export default function Settings() {
                     <Checkbox
                       id="prem-standard"
                       checked={systemSettings?.task_types.premium_apt.standard_cleaner ?? false}
-                      onCheckedChange={(checked) =>
-                        updateTaskTypeRule('premium_apt', 'standard_cleaner', checked === true)
-                      }
-                      disabled={false}
-                      className="border-2 border-custom-blue data-[state=checked]:bg-custom-blue data-[state=checked]:border-custom-blue"
+                      onCheckedChange={(checked) => {
+                        console.log('✅ Checkbox prem-standard clicked:', checked);
+                        updateTaskTypeRule('premium_apt', 'standard_cleaner', checked === true);
+                      }}
+                      className="border-2 border-custom-blue data-[state=checked]:bg-custom-blue data-[state=checked]:border-custom-blue cursor-pointer"
                     />
                     <Label htmlFor="prem-standard" className="text-sm cursor-pointer">
                       Standard Cleaner
@@ -450,11 +448,11 @@ export default function Settings() {
                     <Checkbox
                       id="prem-premium"
                       checked={systemSettings?.task_types.premium_apt.premium_cleaner ?? false}
-                      onCheckedChange={(checked) =>
-                        updateTaskTypeRule('premium_apt', 'premium_cleaner', checked === true)
-                      }
-                      disabled={false}
-                      className="border-2 border-custom-blue data-[state=checked]:bg-custom-blue data-[state=checked]:border-custom-blue"
+                      onCheckedChange={(checked) => {
+                        console.log('✅ Checkbox prem-premium clicked:', checked);
+                        updateTaskTypeRule('premium_apt', 'premium_cleaner', checked === true);
+                      }}
+                      className="border-2 border-custom-blue data-[state=checked]:bg-custom-blue data-[state=checked]:border-custom-blue cursor-pointer"
                     />
                     <Label htmlFor="prem-premium" className="text-sm cursor-pointer">
                       Premium Cleaner
@@ -464,11 +462,11 @@ export default function Settings() {
                     <Checkbox
                       id="prem-straordinaria"
                       checked={systemSettings?.task_types.premium_apt.straordinaria_cleaner ?? false}
-                      onCheckedChange={(checked) =>
-                        updateTaskTypeRule('premium_apt', 'straordinaria_cleaner', checked === true)
-                      }
-                      disabled={false}
-                      className="border-2 border-custom-blue data-[state=checked]:bg-custom-blue data-[state=checked]:border-custom-blue"
+                      onCheckedChange={(checked) => {
+                        console.log('✅ Checkbox prem-straordinaria clicked:', checked);
+                        updateTaskTypeRule('premium_apt', 'straordinaria_cleaner', checked === true);
+                      }}
+                      className="border-2 border-custom-blue data-[state=checked]:bg-custom-blue data-[state=checked]:border-custom-blue cursor-pointer"
                     />
                     <Label htmlFor="prem-straordinaria" className="text-sm cursor-pointer">
                       Straordinaria Cleaner
@@ -478,11 +476,11 @@ export default function Settings() {
                     <Checkbox
                       id="prem-formatore"
                       checked={systemSettings?.task_types.premium_apt.formatore_cleaner ?? false}
-                      onCheckedChange={(checked) =>
-                        updateTaskTypeRule('premium_apt', 'formatore_cleaner', checked === true)
-                      }
-                      disabled={false}
-                      className="border-2 border-custom-blue data-[state=checked]:bg-custom-blue data-[state=checked]:border-custom-blue"
+                      onCheckedChange={(checked) => {
+                        console.log('✅ Checkbox prem-formatore clicked:', checked);
+                        updateTaskTypeRule('premium_apt', 'formatore_cleaner', checked === true);
+                      }}
+                      className="border-2 border-custom-blue data-[state=checked]:bg-custom-blue data-[state=checked]:border-custom-blue cursor-pointer"
                     />
                     <Label htmlFor="prem-formatore" className="text-sm cursor-pointer">
                       Formatore Cleaner
@@ -504,11 +502,11 @@ export default function Settings() {
                     <Checkbox
                       id="straord-standard"
                       checked={systemSettings?.task_types.straordinario_apt.standard_cleaner ?? false}
-                      onCheckedChange={(checked) =>
-                        updateTaskTypeRule('straordinario_apt', 'standard_cleaner', checked === true)
-                      }
-                      disabled={false}
-                      className="border-2 border-custom-blue data-[state=checked]:bg-custom-blue data-[state=checked]:border-custom-blue"
+                      onCheckedChange={(checked) => {
+                        console.log('✅ Checkbox straord-standard clicked:', checked);
+                        updateTaskTypeRule('straordinario_apt', 'standard_cleaner', checked === true);
+                      }}
+                      className="border-2 border-custom-blue data-[state=checked]:bg-custom-blue data-[state=checked]:border-custom-blue cursor-pointer"
                     />
                     <Label htmlFor="straord-standard" className="text-sm cursor-pointer">
                       Standard Cleaner
@@ -518,11 +516,11 @@ export default function Settings() {
                     <Checkbox
                       id="straord-premium"
                       checked={systemSettings?.task_types.straordinario_apt.premium_cleaner ?? false}
-                      onCheckedChange={(checked) =>
-                        updateTaskTypeRule('straordinario_apt', 'premium_cleaner', checked === true)
-                      }
-                      disabled={false}
-                      className="border-2 border-custom-blue data-[state=checked]:bg-custom-blue data-[state=checked]:border-custom-blue"
+                      onCheckedChange={(checked) => {
+                        console.log('✅ Checkbox straord-premium clicked:', checked);
+                        updateTaskTypeRule('straordinario_apt', 'premium_cleaner', checked === true);
+                      }}
+                      className="border-2 border-custom-blue data-[state=checked]:bg-custom-blue data-[state=checked]:border-custom-blue cursor-pointer"
                     />
                     <Label htmlFor="straord-premium" className="text-sm cursor-pointer">
                       Premium Cleaner
@@ -532,11 +530,11 @@ export default function Settings() {
                     <Checkbox
                       id="straord-straordinaria"
                       checked={systemSettings?.task_types.straordinario_apt.straordinaria_cleaner ?? false}
-                      onCheckedChange={(checked) =>
-                        updateTaskTypeRule('straordinario_apt', 'straordinaria_cleaner', checked === true)
-                      }
-                      disabled={false}
-                      className="border-2 border-custom-blue data-[state=checked]:bg-custom-blue data-[state=checked]:border-custom-blue"
+                      onCheckedChange={(checked) => {
+                        console.log('✅ Checkbox straord-straordinaria clicked:', checked);
+                        updateTaskTypeRule('straordinario_apt', 'straordinaria_cleaner', checked === true);
+                      }}
+                      className="border-2 border-custom-blue data-[state=checked]:bg-custom-blue data-[state=checked]:border-custom-blue cursor-pointer"
                     />
                     <Label htmlFor="straord-straordinaria" className="text-sm cursor-pointer">
                       Straordinaria Cleaner
@@ -546,11 +544,11 @@ export default function Settings() {
                     <Checkbox
                       id="straord-formatore"
                       checked={systemSettings?.task_types.straordinario_apt.formatore_cleaner ?? false}
-                      onCheckedChange={(checked) =>
-                        updateTaskTypeRule('straordinario_apt', 'formatore_cleaner', checked === true)
-                      }
-                      disabled={false}
-                      className="border-2 border-custom-blue data-[state=checked]:bg-custom-blue data-[state=checked]:border-custom-blue"
+                      onCheckedChange={(checked) => {
+                        console.log('✅ Checkbox straord-formatore clicked:', checked);
+                        updateTaskTypeRule('straordinario_apt', 'formatore_cleaner', checked === true);
+                      }}
+                      className="border-2 border-custom-blue data-[state=checked]:bg-custom-blue data-[state=checked]:border-custom-blue cursor-pointer"
                     />
                     <Label htmlFor="straord-formatore" className="text-sm cursor-pointer">
                       Formatore Cleaner
