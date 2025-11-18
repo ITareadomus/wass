@@ -1,3 +1,4 @@
+
 # -*- coding: utf-8 -*-
 """
 Utility per validare la compatibilità tra cleaner e task basata su settings.json
@@ -11,168 +12,156 @@ from pathlib import Path
 BASE = Path(__file__).parent.parent / "data"
 SETTINGS_PATH = BASE / "input" / "settings.json"
 
+# Cache per evitare letture ripetute
+_settings_cache: Optional[Dict] = None
 
-class TaskValidationRules:
-    """Gestisce le regole di validazione task_types e apartment_types da settings.json"""
 
-    def __init__(self):
-        self.rules: Dict[str, Dict[str, bool]] = {}
-        # mappa: "standard_cleaner" -> ["A","B",...]
-        self.apartment_types: Dict[str, List[str]] = {}
-        self.load_rules()
-
-    def load_rules(self) -> None:
-        """Carica le regole task_types e apartment_types da settings.json"""
+def _load_settings() -> Dict:
+    """Carica settings.json con caching"""
+    global _settings_cache
+    if _settings_cache is None:
         try:
             with open(SETTINGS_PATH, 'r', encoding='utf-8') as f:
-                settings = json.load(f)
-                self.rules = settings.get('task_types', {})
-                self.apartment_types = settings.get('apartment_types', {})
-        except FileNotFoundError:
-            print(f"⚠️ Warning: {SETTINGS_PATH} not found, using empty rules")
-            self.rules = {}
-            self.apartment_types = {}
-        except json.JSONDecodeError as e:
-            print(f"⚠️ Warning: Error parsing {SETTINGS_PATH}: {e}")
-            self.rules = {}
-            self.apartment_types = {}
-
-    def can_cleaner_handle_task(self, cleaner_role: str, task_type: str, can_do_straordinaria: bool = False) -> bool:
-        """
-        Verifica se un cleaner può gestire un determinato tipo di task
-
-        Args:
-            cleaner_role: Il ruolo del cleaner ("Standard", "Premium", "Formatore")
-            task_type: Il tipo di task ("standard_apt", "premium_apt", "straordinario_apt")
-            can_do_straordinaria: Flag che indica se il cleaner può fare straordinarie
-
-        Returns:
-            True se il cleaner può gestire la task, False altrimenti
-        """
-        # Normalizza i nomi
-        task_type_key = self._normalize_task_type(task_type)
-        cleaner_key = self._normalize_cleaner_role(cleaner_role)
-
-        # Se non ci sono regole, permetti tutto (fallback safe)
-        if not self.rules or task_type_key not in self.rules:
-            return True
-
-        # Per straordinarie, usa il flag can_do_straordinaria
-        if task_type_key == 'straordinario_apt':
-            return can_do_straordinaria
-
-        task_rules = self.rules[task_type_key]
-
-        # Verifica se il cleaner può gestire questo tipo di task
-        return task_rules.get(cleaner_key, False)
-
-    def can_cleaner_handle_apartment_type(self, cleaner_role: str, apartment_type: str) -> bool:
-        """
-        Verifica se un cleaner può gestire un determinato tipo di appartamento
-
-        Args:
-            cleaner_role: Il ruolo del cleaner ("Standard", "Premium", "Formatore")
-            apartment_type: Il tipo di appartamento ("A", "B", "C", etc.)
-
-        Returns:
-            True se il cleaner può gestire questo tipo di appartamento, False altrimenti
-        """
-        # Normalizza i nomi
-        cleaner_key = self._normalize_cleaner_role(cleaner_role)
-
-        # Se non ci sono regole, permetti tutto (fallback safe)
-        if not self.apartment_types or cleaner_key not in self.apartment_types:
-            return True
-
-        allowed_apartment_types = self.apartment_types[cleaner_key]
-
-        # Verifica se il tipo di appartamento è permesso
-        return apartment_type in allowed_apartment_types
-
-    def _normalize_task_type(self, task_type: str) -> str:
-        """Normalizza il tipo di task al formato usato in settings.json"""
-        # Gestisce varianti: "standard", "premium", "straordinaria", etc.
-        task_type_lower = task_type.lower()
-
-        if 'straord' in task_type_lower:
-            return 'straordinario_apt'
-        elif 'premium' in task_type_lower:
-            return 'premium_apt'
-        else:  # default to standard
-            return 'standard_apt'
-
-    def _normalize_cleaner_role(self, role: str) -> str:
-        """Normalizza il ruolo del cleaner al formato usato in settings.json"""
-        # Gestisce varianti: "Standard", "Premium", "Formatore", etc.
-        role_lower = role.lower()
-
-        if 'form' in role_lower:
-            return 'formatore_cleaner'
-        elif 'straord' in role_lower:
-            return 'straordinaria_cleaner'
-        elif 'premium' in role_lower:
-            return 'premium_cleaner'
-        else:  # default to standard
-            return 'standard_cleaner'
-
-    def get_validation_message(self, cleaner_role: str, task_type: str) -> Optional[str]:
-        """
-        Restituisce un messaggio di errore se l'assegnazione non è valida
-
-        Returns:
-            Messaggio di errore o None se la validazione passa
-        """
-        if not self.can_cleaner_handle_task(cleaner_role, task_type):
-            return f"⚠️ Cleaner {cleaner_role} non può gestire task {task_type}"
-        return None
-
-    def get_apartment_validation_message(self, cleaner_role: str, apartment_type: str) -> Optional[str]:
-        """
-        Restituisce un messaggio di errore se l'assegnazione del tipo di appartamento non è valida
-
-        Returns:
-            Messaggio di errore o None se la validazione passa
-        """
-        if not self.can_cleaner_handle_apartment_type(cleaner_role, apartment_type):
-            return f"⚠️ Cleaner {cleaner_role} non può gestire appartamento tipo {apartment_type}"
-        return None
+                _settings_cache = json.load(f)
+        except Exception as e:
+            print(f"⚠️ Errore caricamento settings.json: {e}")
+            _settings_cache = {}
+    return _settings_cache
 
 
-# Singleton instance
-_validation_rules: Optional[TaskValidationRules] = None
+def _normalize_cleaner_role(role: str) -> str:
+    """Normalizza il ruolo del cleaner al formato usato in settings.json"""
+    role_lower = role.lower().strip()
+    
+    if 'form' in role_lower:
+        return 'formatore'
+    elif 'straord' in role_lower:
+        return 'straordinaria'
+    elif 'premium' in role_lower:
+        return 'premium'
+    else:
+        return 'standard'
 
 
-def get_validation_rules() -> TaskValidationRules:
-    """Restituisce l'istanza singleton delle regole di validazione"""
-    global _validation_rules
-    if _validation_rules is None:
-        _validation_rules = TaskValidationRules()
-    return _validation_rules
-
-
-# Convenience functions
 def can_cleaner_handle_task(cleaner_role: str, task_type: str, can_do_straordinaria: bool = False) -> bool:
-    """Wrapper convenience per la validazione dei task"""
-    return get_validation_rules().can_cleaner_handle_task(cleaner_role, task_type, can_do_straordinaria)
+    """
+    Verifica se un cleaner può gestire un determinato tipo di task.
+    
+    Args:
+        cleaner_role: Il ruolo del cleaner (Standard, Premium, Formatore, etc.)
+        task_type: Il tipo di task ('standard_apt', 'premium_apt', 'straordinario_apt')
+        can_do_straordinaria: Flag che indica se il cleaner può fare straordinarie
+    
+    Returns:
+        True se il cleaner può gestire la task, False altrimenti
+    """
+    settings = _load_settings()
+    
+    if not settings or 'task_types' not in settings:
+        print(f"⚠️ Settings non valido, permetto task {task_type} per {cleaner_role}")
+        return True
+    
+    task_types = settings['task_types']
+    
+    # Normalizza task_type
+    if task_type not in task_types:
+        print(f"⚠️ Tipo task {task_type} non trovato in settings, permetto")
+        return True
+    
+    # Per straordinarie, usa il flag can_do_straordinaria
+    if task_type == 'straordinario_apt':
+        return can_do_straordinaria
+    
+    # Normalizza ruolo
+    normalized_role = _normalize_cleaner_role(cleaner_role)
+    role_key = f"{normalized_role}_cleaner"
+    
+    # Verifica permesso
+    rules = task_types[task_type]
+    allowed = rules.get(role_key, False)
+    
+    if not allowed:
+        print(f"   ⚠️ Cleaner {cleaner_role} ({normalized_role}) non può gestire {task_type}")
+    
+    return allowed
 
 
-def validate_assignment(cleaner_role: str, task_type: str, can_do_straordinaria: bool = False) -> Optional[str]:
-    """Wrapper convenience per ottenere messaggi di validazione task"""
-    if not get_validation_rules().can_cleaner_handle_task(cleaner_role, task_type, can_do_straordinaria):
-        return f"⚠️ Cleaner {cleaner_role} non può gestire task {task_type}"
-    return None
+def can_cleaner_handle_apartment(cleaner_role: str, apt_type: Optional[str]) -> bool:
+    """
+    Verifica se un cleaner può gestire un determinato tipo di appartamento.
+    
+    Args:
+        cleaner_role: Il ruolo del cleaner (Standard, Premium, Formatore, etc.)
+        apt_type: Il tipo di appartamento (A, B, C, D, E, F, X)
+    
+    Returns:
+        True se il cleaner può gestire l'appartamento, False altrimenti
+    """
+    # Se apt_type è None o vuoto, permetti (task non migrata)
+    if not apt_type:
+        return True
+    
+    settings = _load_settings()
+    
+    if not settings or 'apartment_types' not in settings:
+        print(f"⚠️ Settings apartment_types non valido, permetto apt {apt_type} per {cleaner_role}")
+        return True
+    
+    apartment_types = settings['apartment_types']
+    
+    # Normalizza ruolo
+    normalized_role = _normalize_cleaner_role(cleaner_role)
+    
+    # Mappa ruolo normalizzato a chiave apartment_types
+    role_to_key = {
+        'standard': 'standard_apt',
+        'premium': 'premium_apt',
+        'straordinaria': 'premium_apt',  # Straordinari usano stesse regole dei Premium
+        'formatore': 'formatore_apt'
+    }
+    
+    apt_key = role_to_key.get(normalized_role)
+    
+    if not apt_key or apt_key not in apartment_types:
+        print(f"⚠️ Ruolo {cleaner_role} ({normalized_role}) non trovato in apartment_types, permetto")
+        return True
+    
+    # Verifica se l'appartamento è nella lista permessa
+    allowed_types = apartment_types[apt_key]
+    allowed = apt_type in allowed_types
+    
+    if not allowed:
+        print(f"   ⚠️ Cleaner {cleaner_role} ({normalized_role}) non può gestire appartamento tipo {apt_type}")
+        print(f"      Tipi permessi: {allowed_types}")
+    
+    return allowed
 
 
-def can_cleaner_handle_apartment_type(cleaner_role: str, apartment_type: str) -> bool:
-    """Wrapper convenience per la validazione dei tipi di appartamento"""
-    return get_validation_rules().can_cleaner_handle_apartment_type(cleaner_role, apartment_type)
-
-
-def can_cleaner_handle_apartment(cleaner_role: str, apartment_type: str) -> bool:
-    """Alias per can_cleaner_handle_apartment_type"""
-    return can_cleaner_handle_apartment_type(cleaner_role, apartment_type)
-
-
-def validate_apartment_assignment(cleaner_role: str, apartment_type: str) -> Optional[str]:
-    """Wrapper convenience per ottenere messaggi di validazione tipo di appartamento"""
-    return get_validation_rules().get_apartment_validation_message(cleaner_role, apartment_type)
+def get_allowed_apartment_types(cleaner_role: str) -> List[str]:
+    """
+    Restituisce la lista di tipi di appartamento permessi per un ruolo.
+    
+    Args:
+        cleaner_role: Il ruolo del cleaner
+    
+    Returns:
+        Lista di tipi di appartamento permessi (es. ['A', 'B', 'C'])
+    """
+    settings = _load_settings()
+    
+    if not settings or 'apartment_types' not in settings:
+        return ['A', 'B', 'C', 'D', 'E', 'F', 'X']  # Default: tutti
+    
+    apartment_types = settings['apartment_types']
+    normalized_role = _normalize_cleaner_role(cleaner_role)
+    
+    role_to_key = {
+        'standard': 'standard_apt',
+        'premium': 'premium_apt',
+        'straordinaria': 'premium_apt',
+        'formatore': 'formatore_apt'
+    }
+    
+    apt_key = role_to_key.get(normalized_role, 'standard_apt')
+    
+    return apartment_types.get(apt_key, ['A', 'B', 'C', 'D', 'E', 'F', 'X'])
