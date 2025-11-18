@@ -78,6 +78,7 @@ class Cleaner:
     lastname: str
     role: str
     is_premium: bool
+    can_do_straordinaria: bool = False
     home_lat: Optional[float] = None
     home_lng: Optional[float] = None
     route: List[Task] = field(default_factory=list)
@@ -416,6 +417,7 @@ def load_cleaners() -> List[Cleaner]:
     for c in data.get("cleaners", []):
         role = (c.get("role") or "").strip()
         is_premium = bool(c.get("premium", (role.lower() == "premium")))
+        can_do_straordinaria = bool(c.get("can_do_straordinaria", False))
         # Escludi Formatori da Early-Out
         if (role or "").lower() == "formatore":
             continue
@@ -426,6 +428,7 @@ def load_cleaners() -> List[Cleaner]:
                 lastname=c.get("lastname", ""),
                 role=role or ("Premium" if is_premium else "Standard"),
                 is_premium=is_premium,
+                can_do_straordinaria=can_do_straordinaria,
                 home_lat=c.get("home_lat"),
                 home_lng=c.get("home_lng"),
             ))
@@ -592,7 +595,7 @@ def plan_day(tasks: List[Task], cleaners: List[Cleaner], assigned_logistic_codes
         if same_building_cleaner:
             # VALIDAZIONE: Verifica compatibilità anche per fast-path stesso edificio
             task_type = 'straordinario_apt' if task.straordinaria else ('premium_apt' if task.is_premium else 'standard_apt')
-            if not can_cleaner_handle_task(same_building_cleaner.role, task_type):
+            if not can_cleaner_handle_task(same_building_cleaner.role, task_type, same_building_cleaner.can_do_straordinaria):
                 print(f"   ⚠️  Same-building cleaner {same_building_cleaner.name} ({same_building_cleaner.role}) non può gestire task {task_type} - SKIPPATO fast-path")
             # NUOVO: VALIDAZIONE appartamento per stesso edificio
             elif not can_cleaner_handle_apartment(same_building_cleaner.role, task.apt_type):
@@ -615,7 +618,7 @@ def plan_day(tasks: List[Task], cleaners: List[Cleaner], assigned_logistic_codes
         for cleaner in cleaners:
             # VALIDAZIONE: Verifica se il cleaner può gestire questo tipo di task
             task_type = 'straordinario_apt' if task.straordinaria else ('premium_apt' if task.is_premium else 'standard_apt')
-            if not can_cleaner_handle_task(cleaner.role, task_type):
+            if not can_cleaner_handle_task(cleaner.role, task_type, cleaner.can_do_straordinaria):
                 print(f"   ⚠️  Cleaner {cleaner.name} ({cleaner.role}) non può gestire task {task_type} - SKIPPATO")
                 continue
 
