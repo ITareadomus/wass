@@ -1,0 +1,147 @@
+Ok, allora adesso andiamo un po’ più “chirurgici” 😄
+Il problema che descrivi (“sposto una task ad un altro cleaner e mi si riattiva uno stato già confermato”) succede perché stiamo salvando l’acknowledge per cleaner, non per singola coppia task–cleaner, e in più lo stiamo invalidando in modo troppo aggressivo.
+
+La soluzione pulita è:
+👉 memorizzare l’ack per (task, cleaner), non solo per cleanerId
+👉 smettere di toccare questo stato quando fai drag & drop generico
+
+Ti scrivo cosa dire a Replit passo passo.
+
+1️⃣ Cambiare lo stato: da Set<number> a Set<string> (task-cleaner)
+
+Dì a Replit:
+
+Nel file dove c’è:
+
+const [acknowledgedIncompatibleCleaners, setAcknowledgedIncompatibleCleaners] =
+  useState<Set<number>>(new Set());
+
+
+sostituiscilo con qualcosa tipo:
+
+type IncompatibleKey = string; // chiave del tipo `${taskId}-${cleanerId}`
+
+const [acknowledgedIncompatibleAssignments, setAcknowledgedIncompatibleAssignments] =
+  useState<Set<IncompatibleKey>>(new Set());
+
+
+Poi aggiungi un helper per costruire la chiave (adatta il campo task giusto: id, logisticCode, ecc.):
+
+const getIncompatibleKey = (task: any, cleanerId: number): IncompatibleKey => {
+  // usa task.id se esiste, altrimenti logisticCode o quello che avete come identificativo univoco
+  const taskId = task.id ?? task.logisticCode;
+  return `${taskId}-${cleanerId}`;
+};
+
+2️⃣ Calcolo di hasIncompatibleTasks per coppia task–cleaner
+
+Ora cerca dove calcoli se un cleaner ha task incompatibili, qualcosa tipo:
+
+const hasIncompatibleTasks =
+  validationRules && cleaner?.role && !acknowledgedIncompatibleCleaners.has(cleaner.id)
+    ? cleanerTasks.some(task => !canCleanerHandleTaskSync(cleaner.role, task, validationRules))
+    : false;
+
+
+e sostituiscilo con:
+
+const hasIncompatibleTasks =
+  validationRules && cleaner?.role
+    ? cleanerTasks.some(task => {
+        // se la task è compatibile, ok
+        if (canCleanerHandleTaskSync(cleaner.role, task, validationRules)) return false;
+
+        // se è incompatibile, controlliamo se la coppia task-cleaner è già stata “acknowledged”
+        const key = getIncompatibleKey(task, cleaner.id);
+        return !acknowledgedIncompatibleAssignments.has(key);
+      })
+    : false;
+
+
+👉 Risultato: l’effetto isIncompatible scatta solo quando esiste almeno una task incompatibile non ancora ackata per quella coppia (task, cleaner).
+
+3️⃣ Click sul bottone “Ho capito”: aggiungi tutte le coppie task–cleaner correnti
+
+Ora cerca il codice che gestisce il click su “Ho capito” nel dialog delle incompatibilità, qualcosa tipo:
+
+if (incompatibleDialog.cleanerId) {
+  setAcknowledgedIncompatibleCleaners(prev => new Set(prev).add(incompatibleDialog.cleanerId!));
+}
+
+
+e sostituiscilo con (adattando nomi di variabili):
+
+if (incompatibleDialog.cleanerId) {
+  const cleanerId = incompatibleDialog.cleanerId;
+  // recupera le task di quel cleaner (lo stesso array che usi per `cleanerTasks`)
+  const cleanerTasks = getTasksForCleaner(cleanerId); // usa la funzione/primo parametro che avete già
+
+  setAcknowledgedIncompatibleAssignments(prev => {
+    const next = new Set(prev);
+
+    cleanerTasks.forEach(task => {
+      if (
+        validationRules &&
+        cleaner?.role && // oppure prendi il ruolo dal cleaner con questo id
+        !canCleanerHandleTaskSync(cleaner.role, task, validationRules)
+      ) {
+        const key = getIncompatibleKey(task, cleanerId);
+        next.add(key);
+      }
+    });
+
+    return next;
+  });
+}
+
+
+Se non hai direttamente cleaner qui, fai prendere il ruolo dal tuo store (per id) — ma il concetto è: quando l’utente dice “Ho capito”, tutte le coppie (task incompatibile, cleaner) attuali vengono segnate come ack.
+
+4️⃣ Rimuovere la logica preserve/invalidate su window (che crea il casino)
+
+Adesso dillo chiaro a Replit:
+
+Nel componente timeline (dove prima avevamo preserveAcknowledgedIncompatibleCleaners / invalidateAcknowledgedIncompatibleCleaners esposti su window), puoi eliminare completamente:
+
+la funzione preserveAcknowledgedState / invalidateAcknowledgedState
+
+l’useEffect che fa:
+
+(window as any).preserveAcknowledgedIncompatibleCleaners = ...
+(window as any).invalidateAcknowledgedIncompatibleCleaners = ...
+
+
+In tutti i file dove usi:
+
+(window as any).preserveAcknowledgedIncompatibleCleaners(...)
+(window as any).invalidateAcknowledgedIncompatibleCleaners(...)
+
+
+rimuovi proprio queste chiamate (non servono più).
+
+Perché?
+Con la logica per coppia (task, cleaner) non abbiamo più bisogno di “invalidare” a mano:
+
+se sposti una task su un altro cleaner, la chiave cambia (taskId-altroCleanerId) → è una nuova coppia, non ackata → se è incompatibile vedrai il warning (come da tue regole: swap/drag su incompatibile).
+
+se sposti altre task non correlate, le chiavi delle task già ackate restano le stesse → non viene riattivato nulla a caso.
+
+5️⃣ Cosa succede dopo questi fix (comportamento atteso)
+
+Dopo queste modifiche:
+
+Premi “Ho capito” su un cleaner
+→ tutte le coppie (task incompatibili, quel cleaner) vengono marcate come ack → niente più effetto per quelle specifiche coppie.
+
+Se sposti quella stessa task:
+
+a un cleaner compatibile → niente effetto (perché non è incompatibile).
+
+a un cleaner non compatibile → nuova coppia (task, nuovoCleaner) → mai ackata → l’effetto torna (come da tue regole: drag su cleaner non compatibile).
+
+Se sposti un’altra task tra cleaners
+→ le coppie già ackate restano ackate; non si riattivano warning che avevi già confermato.
+
+Esattamente quello che volevi:
+
+lo stato confermato non si riattiva “a caso” solo perché sposto altre task.
