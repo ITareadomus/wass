@@ -84,6 +84,7 @@ class Cleaner:
     lastname: str
     role: str
     is_premium: bool
+    can_do_straordinaria: bool = False
     start_time: datetime
     available_from: Optional[datetime] = None
     last_eo_address: Optional[str] = None
@@ -494,6 +495,7 @@ def load_cleaners(ref_date: str) -> List[Cleaner]:
     for c in data.get("cleaners", []):
         role = (c.get("role") or "").strip()
         is_premium = bool(c.get("premium", (role.lower() == "premium")))
+        can_do_straordinaria = bool(c.get("can_do_straordinaria", False))
         # Escludi Formatori da High-Priority
         if (role or "").lower() == "formatore":
             continue
@@ -512,6 +514,7 @@ def load_cleaners(ref_date: str) -> List[Cleaner]:
                 lastname=c.get("lastname", ""),
                 role=role or ("Premium" if is_premium else "Standard"),
                 is_premium=is_premium,
+                can_do_straordinaria=can_do_straordinaria,
                 start_time=start_dt,
             ))
     return cleaners
@@ -759,7 +762,7 @@ def plan_day(tasks: List[Task], cleaners: List[Cleaner], assigned_logistic_codes
         if target_cleaner:
             # VALIDAZIONE: Verifica compatibilità anche per fast-path cross-container
             task_type = 'straordinario_apt' if task.straordinaria else ('premium_apt' if task.is_premium else 'standard_apt')
-            if not can_cleaner_handle_task(target_cleaner.role, task_type):
+            if not can_cleaner_handle_task(target_cleaner.role, task_type, target_cleaner.can_do_straordinaria):
                 tipo = "edificio" if same_building_cleaner else "zona"
                 print(f"   ⚠️  Cross-container {tipo} cleaner {target_cleaner.name} ({target_cleaner.role}) non può gestire task {task_type} - SKIPPATO fast-path")
             # NUOVO: Aggiungi validazione tipo appartamento per cross-container
@@ -781,7 +784,7 @@ def plan_day(tasks: List[Task], cleaners: List[Cleaner], assigned_logistic_codes
                     if same_zone_cleaner:
                         # VALIDAZIONE: Verifica compatibilità anche per forced assignment
                         task_type = 'straordinario_apt' if task.straordinaria else ('premium_apt' if task.is_premium else 'standard_apt')
-                        if not can_cleaner_handle_task(same_zone_cleaner.role, task_type):
+                        if not can_cleaner_handle_task(same_zone_cleaner.role, task_type, same_zone_cleaner.can_do_straordinaria):
                             print(f"   ⚠️  Forced assignment: cleaner {same_zone_cleaner.name} ({same_zone_cleaner.role}) non può gestire task {task_type} - SKIPPATO")
                         elif not can_cleaner_handle_apartment(same_zone_cleaner.role, task.apt_type):
                             print(f"   ⚠️  Forced assignment: cleaner {same_zone_cleaner.name} ({same_zone_cleaner.role}) non può gestire appartamento {task.apt_type} - SKIPPATO")
@@ -809,7 +812,7 @@ def plan_day(tasks: List[Task], cleaners: List[Cleaner], assigned_logistic_codes
         for cleaner in cleaners:
             # VALIDAZIONE: tipo di task
             task_type = 'straordinario_apt' if task.straordinaria else ('premium_apt' if task.is_premium else 'standard_apt')
-            if not can_cleaner_handle_task(cleaner.role, task_type):
+            if not can_cleaner_handle_task(cleaner.role, task_type, cleaner.can_do_straordinaria):
                 print(f"   ⚠️  Cleaner {cleaner.name} ({cleaner.role}) non può gestire task {task_type} - SKIPPATO")
                 continue
 
