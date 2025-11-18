@@ -385,6 +385,7 @@ export default function Settings() {
                       onCheckedChange={(checked) =>
                         updateTaskTypeRule('standard_apt', 'standard_cleaner', checked === true)
                       }
+                      disabled={false}
                     />
                     <Label htmlFor="std-standard" className="text-sm cursor-pointer">
                       Standard Cleaner
@@ -397,6 +398,7 @@ export default function Settings() {
                       onCheckedChange={(checked) =>
                         updateTaskTypeRule('standard_apt', 'premium_cleaner', checked === true)
                       }
+                      disabled={false}
                     />
                     <Label htmlFor="std-premium" className="text-sm cursor-pointer">
                       Premium Cleaner
@@ -409,6 +411,7 @@ export default function Settings() {
                       onCheckedChange={(checked) =>
                         updateTaskTypeRule('standard_apt', 'straordinaria_cleaner', checked === true)
                       }
+                      disabled={false}
                     />
                     <Label htmlFor="std-straordinaria" className="text-sm cursor-pointer">
                       Straordinaria Cleaner
@@ -421,6 +424,7 @@ export default function Settings() {
                       onCheckedChange={(checked) =>
                         updateTaskTypeRule('standard_apt', 'formatore_cleaner', checked === true)
                       }
+                      disabled={false}
                     />
                     <Label htmlFor="std-formatore" className="text-sm cursor-pointer">
                       Formatore Cleaner
@@ -445,6 +449,7 @@ export default function Settings() {
                       onCheckedChange={(checked) =>
                         updateTaskTypeRule('premium_apt', 'standard_cleaner', checked === true)
                       }
+                      disabled={false}
                     />
                     <Label htmlFor="prem-standard" className="text-sm cursor-pointer">
                       Standard Cleaner
@@ -457,6 +462,7 @@ export default function Settings() {
                       onCheckedChange={(checked) =>
                         updateTaskTypeRule('premium_apt', 'premium_cleaner', checked === true)
                       }
+                      disabled={false}
                     />
                     <Label htmlFor="prem-premium" className="text-sm cursor-pointer">
                       Premium Cleaner
@@ -469,6 +475,7 @@ export default function Settings() {
                       onCheckedChange={(checked) =>
                         updateTaskTypeRule('premium_apt', 'straordinaria_cleaner', checked === true)
                       }
+                      disabled={false}
                     />
                     <Label htmlFor="prem-straordinaria" className="text-sm cursor-pointer">
                       Straordinaria Cleaner
@@ -481,6 +488,7 @@ export default function Settings() {
                       onCheckedChange={(checked) =>
                         updateTaskTypeRule('premium_apt', 'formatore_cleaner', checked === true)
                       }
+                      disabled={false}
                     />
                     <Label htmlFor="prem-formatore" className="text-sm cursor-pointer">
                       Formatore Cleaner
@@ -505,6 +513,7 @@ export default function Settings() {
                       onCheckedChange={(checked) =>
                         updateTaskTypeRule('straordinario_apt', 'standard_cleaner', checked === true)
                       }
+                      disabled={false}
                     />
                     <Label htmlFor="straord-standard" className="text-sm cursor-pointer">
                       Standard Cleaner
@@ -517,6 +526,7 @@ export default function Settings() {
                       onCheckedChange={(checked) =>
                         updateTaskTypeRule('straordinario_apt', 'premium_cleaner', checked === true)
                       }
+                      disabled={false}
                     />
                     <Label htmlFor="straord-premium" className="text-sm cursor-pointer">
                       Premium Cleaner
@@ -529,6 +539,7 @@ export default function Settings() {
                       onCheckedChange={(checked) =>
                         updateTaskTypeRule('straordinario_apt', 'straordinaria_cleaner', checked === true)
                       }
+                      disabled={false}
                     />
                     <Label htmlFor="straord-straordinaria" className="text-sm cursor-pointer">
                       Straordinaria Cleaner
@@ -541,6 +552,7 @@ export default function Settings() {
                       onCheckedChange={(checked) =>
                         updateTaskTypeRule('straordinario_apt', 'formatore_cleaner', checked === true)
                       }
+                      disabled={false}
                     />
                     <Label htmlFor="straord-formatore" className="text-sm cursor-pointer">
                       Formatore Cleaner
