@@ -44,7 +44,7 @@ interface TaskTypeRules {
 interface SystemSettings {
   "early-out": {
     eo_start_time: string;
-    eo_time: string;
+    eo_end_time: string;
     eo_clients: number[];
   };
   "high-priority": {

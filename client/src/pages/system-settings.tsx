@@ -28,7 +28,7 @@ interface TaskTypeRules {
 interface SettingsData {
   "early-out": {
     eo_start_time: string;
-    eo_time: string;
+    eo_end_time: string;
     eo_clients: number[];
   };
   "high-priority": {
@@ -253,17 +253,17 @@ export default function SystemSettings() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="eo_time" className="text-sm">EO Time</Label>
+                    <Label htmlFor="eo_end_time" className="text-sm">EO End Time</Label>
                     <Input
-                      id="eo_time"
+                      id="eo_end_time"
                       type="time"
-                      value={settings["early-out"].eo_time}
+                      value={settings["early-out"].eo_end_time}
                       onChange={(e) =>
                         setSettings({
                           ...settings,
                           "early-out": {
                             ...settings["early-out"],
-                            eo_time: e.target.value,
+                            eo_end_time: e.target.value,
                           },
                         })
                       }
