@@ -403,7 +403,7 @@ def can_add_task(cleaner: Cleaner, task: Task) -> bool:
     # 3ª-5ª task: solo se fattibile temporalmente
     if current_count >= BASE_MAX_TASKS and current_count < ABSOLUTE_MAX_TASKS:
         test_route = cleaner.route + [task]
-        feasible, _ = evaluate_route(cleaner, test_route)
+        feasible, schedule = evaluate_route(cleaner, test_route)
         if feasible and schedule:
             last_finish = schedule[-1][2]  # finish datetime
             if current_count < ABSOLUTE_MAX_TASKS_IF_BEFORE_18 and last_finish.hour < 18:
