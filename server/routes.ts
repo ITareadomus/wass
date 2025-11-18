@@ -210,7 +210,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log(`Rieseguendo create_containers.py per ripristinare i containers...`);
       const containersResult = await new Promise<string>((resolve, reject) => {
         exec(
-          `python3 client/public/scripts/create_containers.py ${workDate}`,
+          `python3 client/public/scripts/create_containers.py --date ${workDate}`,
           (error, stdout, stderr) => {
             if (error) {
               console.error("Errore create_containers:", stderr);
@@ -2733,6 +2733,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const timelinePath = path.join(process.cwd(), 'client/public/data/output/timeline.json');
       const assignedDir = path.join(process.cwd(), 'client/public/data/assigned');
 
+      // CRITICAL: Esegui SEMPRE extract_cleaners_optimized.py per avere i cleaners aggiornati
+      console.log(`🔄 Estrazione cleaners dal database per ${date}...`);
+      const extractCleanersResult = await new Promise<string>((resolve, reject) => {
+        exec(
+          `python3 client/public/scripts/extract_cleaners_optimized.py ${date}`,
+          (error, stdout, stderr) => {
+            if (error) {
+              console.error("Errore extract_cleaners_optimized:", stderr);
+              reject(new Error(stderr || error.message));
+            } else {
+              resolve(stdout);
+            }
+          }
+        );
+      });
+      console.log("extract_cleaners_optimized output:", extractCleanersResult);
+
       // CRITICAL: NON resettare timeline.json - preservalo sempre
       // Anche se la data cambia, mantieni le assegnazioni esistenti
       // create_containers.py aggiornerà i dati delle task esistenti
@@ -2840,7 +2857,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log(`Eseguendo create_containers.py per data ${date}...`);
       const containersResult = await new Promise<string>((resolve, reject) => {
         exec(
-          `python3 client/public/scripts/create_containers.py ${date}`,
+          `python3 client/public/scripts/create_containers.py --date ${date}`,
           (error, stdout, stderr) => {
             if (error) {
               console.error("Errore create_containers:", stderr);
