@@ -608,7 +608,7 @@ export default function SystemSettings() {
                         }
                       />
                       <Label htmlFor="std-standard" className="text-sm cursor-pointer">
-                        Standard Cleaner
+                        Cleaner Standard
                       </Label>
                     </div>
                     <div className="flex items-center space-x-2">
@@ -620,7 +620,7 @@ export default function SystemSettings() {
                         }
                       />
                       <Label htmlFor="std-premium" className="text-sm cursor-pointer">
-                        Premium Cleaner
+                        Cleaner Premium
                       </Label>
                     </div>
                     <div className="flex items-center space-x-2">
@@ -632,7 +632,7 @@ export default function SystemSettings() {
                         }
                       />
                       <Label htmlFor="std-straordinaria" className="text-sm cursor-pointer">
-                        Straordinaria Cleaner
+                        Cleaner Straordinario
                       </Label>
                     </div>
                     <div className="flex items-center space-x-2">
@@ -644,7 +644,7 @@ export default function SystemSettings() {
                         }
                       />
                       <Label htmlFor="std-formatore" className="text-sm cursor-pointer">
-                        Cleaner Formatore
+                        Cleaner Formatore 
                       </Label>
                     </div>
                   </div>
@@ -668,7 +668,7 @@ export default function SystemSettings() {
                         }
                       />
                       <Label htmlFor="prem-standard" className="text-sm cursor-pointer">
-                        Standard Cleaner
+                        Cleaner Standard
                       </Label>
                     </div>
                     <div className="flex items-center space-x-2">
@@ -680,7 +680,7 @@ export default function SystemSettings() {
                         }
                       />
                       <Label htmlFor="prem-premium" className="text-sm cursor-pointer">
-                        Premium Cleaner
+                        Cleaner Premium
                       </Label>
                     </div>
                     <div className="flex items-center space-x-2">
@@ -692,7 +692,7 @@ export default function SystemSettings() {
                         }
                       />
                       <Label htmlFor="prem-straordinaria" className="text-sm cursor-pointer">
-                        Straordinaria Cleaner
+                        Cleaner Straordinaria
                       </Label>
                     </div>
                     <div className="flex items-center space-x-2">
@@ -728,7 +728,7 @@ export default function SystemSettings() {
                         }
                       />
                       <Label htmlFor="straord-standard" className="text-sm cursor-pointer">
-                        Standard Cleaner
+                        Cleaner Standard
                       </Label>
                     </div>
                     <div className="flex items-center space-x-2">
@@ -740,7 +740,7 @@ export default function SystemSettings() {
                         }
                       />
                       <Label htmlFor="straord-premium" className="text-sm cursor-pointer">
-                        Premium Cleaner
+                        Cleaner Premium
                       </Label>
                     </div>
                     <div className="flex items-center space-x-2">
@@ -752,7 +752,7 @@ export default function SystemSettings() {
                         }
                       />
                       <Label htmlFor="straord-straordinaria" className="text-sm cursor-pointer">
-                        Straordinaria Cleaner
+                        Cleaner Straordinaria
                       </Label>
                     </div>
                     <div className="flex items-center space-x-2">
@@ -764,7 +764,7 @@ export default function SystemSettings() {
                         }
                       />
                       <Label htmlFor="straord-formatore" className="text-sm cursor-pointer">
-                        Cleaner Formatore
+                        Cleaner Formatore 
                       </Label>
                     </div>
                   </div>
