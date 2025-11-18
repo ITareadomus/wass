@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
@@ -104,7 +103,7 @@ export default function Settings() {
     }
 
     loadAccounts();
-    loadSystemSettings();
+    // loadSystemSettings(); // No longer needed
   }, [setLocation, toast]);
 
   const loadAccounts = async () => {
@@ -126,82 +125,82 @@ export default function Settings() {
     }
   };
 
-  const loadSystemSettings = async () => {
-    try {
-      const response = await fetch(`/data/input/settings.json?t=${Date.now()}`, {
-        cache: 'no-store',
-        headers: { 'Cache-Control': 'no-cache' }
-      });
-      if (response.ok) {
-        const data = await response.json();
-        console.log('✅ Settings loaded:', data);
-        console.log('✅ Task types loaded:', data?.task_types);
-        setSystemSettings(data);
-      }
-    } catch (error) {
-      console.error('❌ Error loading settings:', error);
-      toast({
-        title: "Errore",
-        description: "Impossibile caricare le impostazioni di sistema",
-        variant: "destructive",
-      });
-    }
-  };
+  // const loadSystemSettings = async () => {
+  //   try {
+  //     const response = await fetch(`/data/input/settings.json?t=${Date.now()}`, {
+  //       cache: 'no-store',
+  //       headers: { 'Cache-Control': 'no-cache' }
+  //     });
+  //     if (response.ok) {
+  //       const data = await response.json();
+  //       console.log('✅ Settings loaded:', data);
+  //       console.log('✅ Task types loaded:', data?.task_types);
+  //       setSystemSettings(data);
+  //     }
+  //   } catch (error) {
+  //     console.error('❌ Error loading settings:', error);
+  //     toast({
+  //       title: "Errore",
+  //       description: "Impossibile caricare le impostazioni di sistema",
+  //       variant: "destructive",
+  //     });
+  //   }
+  // };
 
-  const saveSystemSettings = async () => {
-    if (!systemSettings) return;
+  // const saveSystemSettings = async () => {
+  //   if (!systemSettings) return;
 
-    setIsSavingSettings(true);
-    try {
-      const response = await fetch("/api/save-settings", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(systemSettings),
-      });
+  //   setIsSavingSettings(true);
+  //   try {
+  //     const response = await fetch("/api/save-settings", {
+  //       method: "POST",
+  //       headers: { "Content-Type": "application/json" },
+  //       body: JSON.stringify(systemSettings),
+  //     });
 
-      if (response.ok) {
-        toast({
-          title: "Impostazioni salvate",
-          description: "Le modifiche sono state salvate con successo",
-        });
-        setHasUnsavedChanges(false);
-        // Ricarica le impostazioni per assicurarsi che siano aggiornate
-        await loadSystemSettings();
-      } else {
-        throw new Error();
-      }
-    } catch (error) {
-      toast({
-        title: "Errore",
-        description: "Impossibile salvare le impostazioni",
-        variant: "destructive",
-      });
-    } finally {
-      setIsSavingSettings(false);
-    }
-  };
+  //     if (response.ok) {
+  //       toast({
+  //         title: "Impostazioni salvate",
+  //         description: "Le modifiche sono state salvate con successo",
+  //       });
+  //       setHasUnsavedChanges(false);
+  //       // Ricarica le impostazioni per assicurarsi che siano aggiornate
+  //       await loadSystemSettings();
+  //     } else {
+  //       throw new Error();
+  //     }
+  //   } catch (error) {
+  //     toast({
+  //       title: "Errore",
+  //       description: "Impossibile salvare le impostazioni",
+  //       variant: "destructive",
+  //     });
+  //   } finally {
+  //     setIsSavingSettings(false);
+  //   }
+  // };
 
-  const updateTaskTypeRule = (
-    taskType: keyof SystemSettings['task_types'],
-    cleanerType: keyof TaskTypeRules,
-    value: boolean
-  ) => {
-    if (!systemSettings) return;
+  // const updateTaskTypeRule = (
+  //   taskType: keyof SystemSettings['task_types'],
+  //   cleanerType: keyof TaskTypeRules,
+  //   value: boolean
+  // ) => {
+  //   if (!systemSettings) return;
 
-    setSystemSettings({
-      ...systemSettings,
-      task_types: {
-        ...systemSettings.task_types,
-        [taskType]: {
-          ...systemSettings.task_types[taskType],
-          [cleanerType]: value
-        }
-      }
-    });
-    setHasUnsavedChanges(true);
-  };
+  //   setSystemSettings({
+  //     ...systemSettings,
+  //     task_types: {
+  //       ...systemSettings.task_types,
+  //       [taskType]: {
+  //         ...systemSettings.task_types[taskType],
+  //         [cleanerType]: value
+  //       }
+  //     }
+  //   });
+  //   setHasUnsavedChanges(true);
+  // };
 
-  
+
 
   const handleSaveAccount = async (account: Account) => {
     try {
@@ -297,7 +296,7 @@ export default function Settings() {
     }
   };
 
-  if (isLoading || !systemSettings) {
+  if (isLoading) { // systemSettings check is removed as it's not loaded anymore
     return (
       <div className="min-h-screen flex items-center justify-center">
         <p>Caricamento...</p>
@@ -323,243 +322,7 @@ export default function Settings() {
           </div>
         </div>
 
-        {/* Task Types Settings */}
-        <Card className="mb-6 bg-custom-blue-light border-2 border-custom-blue">
-          <CardHeader className="bg-custom-blue-light">
-            <div className="flex justify-between items-center">
-              <div>
-                <CardTitle>Task Types - Regole Compatibilità</CardTitle>
-                <CardDescription>
-                  Configura quali tipi di cleaner possono gestire ogni tipo di appartamento
-                </CardDescription>
-              </div>
-              {hasUnsavedChanges && (
-                <Button 
-                  onClick={saveSystemSettings}
-                  disabled={isSavingSettings}
-                  className="bg-green-600 hover:bg-green-700 text-white"
-                >
-                  <Save className="w-4 h-4 mr-2" />
-                  {isSavingSettings ? "Salvataggio..." : "Salva Modifiche"}
-                </Button>
-              )}
-            </div>
-          </CardHeader>
-          <CardContent className="bg-custom-blue-light pt-6">
-            {!systemSettings && (
-              <div className="text-center py-4">
-                <p className="text-muted-foreground">Caricamento impostazioni...</p>
-              </div>
-            )}
-            {systemSettings && (
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                {/* Appartamento Standard */}
-                <div className="space-y-3">
-                  <div className="border-b pb-2 flex items-center gap-2">
-                    <span className="text-sm font-medium">Apt</span>
-                    <span className="px-2 py-0.5 rounded border font-medium text-sm bg-green-500/30 text-green-800 dark:bg-green-500/40 dark:text-green-200 border-green-600 dark:border-green-400">
-                      Standard
-                    </span>
-                  </div>
-                  <div className="space-y-3">
-                    <div className="flex items-center space-x-2">
-                      <Checkbox
-                        id="std-standard"
-                        checked={systemSettings?.task_types.standard_apt.standard_cleaner ?? false}
-                        onCheckedChange={(checked) => {
-                          console.log('✅ Checkbox std-standard clicked:', checked);
-                          updateTaskTypeRule('standard_apt', 'standard_cleaner', checked === true);
-                        }}
-                        className="border-2 border-custom-blue data-[state=checked]:bg-custom-blue data-[state=checked]:border-custom-blue cursor-pointer"
-                      />
-                    <Label htmlFor="std-standard" className="text-sm cursor-pointer">
-                      Standard Cleaner
-                    </Label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <Checkbox
-                      id="std-premium"
-                      checked={systemSettings?.task_types.standard_apt.premium_cleaner ?? false}
-                      onCheckedChange={(checked) => {
-                        console.log('✅ Checkbox std-premium clicked:', checked);
-                        updateTaskTypeRule('standard_apt', 'premium_cleaner', checked === true);
-                      }}
-                      className="border-2 border-custom-blue data-[state=checked]:bg-custom-blue data-[state=checked]:border-custom-blue cursor-pointer"
-                    />
-                    <Label htmlFor="std-premium" className="text-sm cursor-pointer">
-                      Premium Cleaner
-                    </Label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <Checkbox
-                      id="std-straordinaria"
-                      checked={systemSettings?.task_types.standard_apt.straordinaria_cleaner ?? false}
-                      onCheckedChange={(checked) => {
-                        console.log('✅ Checkbox std-straordinaria clicked:', checked);
-                        updateTaskTypeRule('standard_apt', 'straordinaria_cleaner', checked === true);
-                      }}
-                      className="border-2 border-custom-blue data-[state=checked]:bg-custom-blue data-[state=checked]:border-custom-blue cursor-pointer"
-                    />
-                    <Label htmlFor="std-straordinaria" className="text-sm cursor-pointer">
-                      Straordinaria Cleaner
-                    </Label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <Checkbox
-                      id="std-formatore"
-                      checked={systemSettings?.task_types.standard_apt.formatore_cleaner ?? false}
-                      onCheckedChange={(checked) => {
-                        console.log('✅ Checkbox std-formatore clicked:', checked);
-                        updateTaskTypeRule('standard_apt', 'formatore_cleaner', checked === true);
-                      }}
-                      className="border-2 border-custom-blue data-[state=checked]:bg-custom-blue data-[state=checked]:border-custom-blue cursor-pointer"
-                    />
-                    <Label htmlFor="std-formatore" className="text-sm cursor-pointer">
-                      Formatore Cleaner
-                    </Label>
-                  </div>
-                </div>
-              </div>
-
-              {/* Appartamento Premium */}
-              <div className="space-y-3">
-                <div className="border-b pb-2 flex items-center gap-2">
-                  <span className="text-sm font-medium">Apt</span>
-                  <span className="px-2 py-0.5 rounded border font-medium text-sm bg-purple-500/30 text-purple-800 dark:bg-purple-500/40 dark:text-purple-200 border-purple-600 dark:border-purple-400">
-                    Premium
-                  </span>
-                </div>
-                <div className="space-y-3">
-                  <div className="flex items-center space-x-2">
-                    <Checkbox
-                      id="prem-standard"
-                      checked={systemSettings?.task_types.premium_apt.standard_cleaner ?? false}
-                      onCheckedChange={(checked) => {
-                        console.log('✅ Checkbox prem-standard clicked:', checked);
-                        updateTaskTypeRule('premium_apt', 'standard_cleaner', checked === true);
-                      }}
-                      className="border-2 border-custom-blue data-[state=checked]:bg-custom-blue data-[state=checked]:border-custom-blue cursor-pointer"
-                    />
-                    <Label htmlFor="prem-standard" className="text-sm cursor-pointer">
-                      Standard Cleaner
-                    </Label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <Checkbox
-                      id="prem-premium"
-                      checked={systemSettings?.task_types.premium_apt.premium_cleaner ?? false}
-                      onCheckedChange={(checked) => {
-                        console.log('✅ Checkbox prem-premium clicked:', checked);
-                        updateTaskTypeRule('premium_apt', 'premium_cleaner', checked === true);
-                      }}
-                      className="border-2 border-custom-blue data-[state=checked]:bg-custom-blue data-[state=checked]:border-custom-blue cursor-pointer"
-                    />
-                    <Label htmlFor="prem-premium" className="text-sm cursor-pointer">
-                      Premium Cleaner
-                    </Label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <Checkbox
-                      id="prem-straordinaria"
-                      checked={systemSettings?.task_types.premium_apt.straordinaria_cleaner ?? false}
-                      onCheckedChange={(checked) => {
-                        console.log('✅ Checkbox prem-straordinaria clicked:', checked);
-                        updateTaskTypeRule('premium_apt', 'straordinaria_cleaner', checked === true);
-                      }}
-                      className="border-2 border-custom-blue data-[state=checked]:bg-custom-blue data-[state=checked]:border-custom-blue cursor-pointer"
-                    />
-                    <Label htmlFor="prem-straordinaria" className="text-sm cursor-pointer">
-                      Straordinaria Cleaner
-                    </Label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <Checkbox
-                      id="prem-formatore"
-                      checked={systemSettings?.task_types.premium_apt.formatore_cleaner ?? false}
-                      onCheckedChange={(checked) => {
-                        console.log('✅ Checkbox prem-formatore clicked:', checked);
-                        updateTaskTypeRule('premium_apt', 'formatore_cleaner', checked === true);
-                      }}
-                      className="border-2 border-custom-blue data-[state=checked]:bg-custom-blue data-[state=checked]:border-custom-blue cursor-pointer"
-                    />
-                    <Label htmlFor="prem-formatore" className="text-sm cursor-pointer">
-                      Formatore Cleaner
-                    </Label>
-                  </div>
-                </div>
-              </div>
-
-              {/* Appartamento Straordinario */}
-              <div className="space-y-3">
-                <div className="border-b pb-2 flex items-center gap-2">
-                  <span className="text-sm font-medium">Apt</span>
-                  <span className="px-2 py-0.5 rounded border font-medium text-sm bg-orange-500/30 text-orange-800 dark:bg-orange-500/40 dark:text-orange-200 border-orange-600 dark:border-orange-400">
-                    Straordinario
-                  </span>
-                </div>
-                <div className="space-y-3">
-                  <div className="flex items-center space-x-2">
-                    <Checkbox
-                      id="straord-standard"
-                      checked={systemSettings?.task_types.straordinario_apt.standard_cleaner ?? false}
-                      onCheckedChange={(checked) => {
-                        console.log('✅ Checkbox straord-standard clicked:', checked);
-                        updateTaskTypeRule('straordinario_apt', 'standard_cleaner', checked === true);
-                      }}
-                      className="border-2 border-custom-blue data-[state=checked]:bg-custom-blue data-[state=checked]:border-custom-blue cursor-pointer"
-                    />
-                    <Label htmlFor="straord-standard" className="text-sm cursor-pointer">
-                      Standard Cleaner
-                    </Label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <Checkbox
-                      id="straord-premium"
-                      checked={systemSettings?.task_types.straordinario_apt.premium_cleaner ?? false}
-                      onCheckedChange={(checked) => {
-                        console.log('✅ Checkbox straord-premium clicked:', checked);
-                        updateTaskTypeRule('straordinario_apt', 'premium_cleaner', checked === true);
-                      }}
-                      className="border-2 border-custom-blue data-[state=checked]:bg-custom-blue data-[state=checked]:border-custom-blue cursor-pointer"
-                    />
-                    <Label htmlFor="straord-premium" className="text-sm cursor-pointer">
-                      Premium Cleaner
-                    </Label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <Checkbox
-                      id="straord-straordinaria"
-                      checked={systemSettings?.task_types.straordinario_apt.straordinaria_cleaner ?? false}
-                      onCheckedChange={(checked) => {
-                        console.log('✅ Checkbox straord-straordinaria clicked:', checked);
-                        updateTaskTypeRule('straordinario_apt', 'straordinaria_cleaner', checked === true);
-                      }}
-                      className="border-2 border-custom-blue data-[state=checked]:bg-custom-blue data-[state=checked]:border-custom-blue cursor-pointer"
-                    />
-                    <Label htmlFor="straord-straordinaria" className="text-sm cursor-pointer">
-                      Straordinaria Cleaner
-                    </Label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <Checkbox
-                      id="straord-formatore"
-                      checked={systemSettings?.task_types.straordinario_apt.formatore_cleaner ?? false}
-                      onCheckedChange={(checked) => {
-                        console.log('✅ Checkbox straord-formatore clicked:', checked);
-                        updateTaskTypeRule('straordinario_apt', 'formatore_cleaner', checked === true);
-                      }}
-                      className="border-2 border-custom-blue data-[state=checked]:bg-custom-blue data-[state=checked]:border-custom-blue cursor-pointer"
-                    />
-                    <Label htmlFor="straord-formatore" className="text-sm cursor-pointer">
-                      Formatore Cleaner
-                    </Label>
-                  </div>
-                </div>
-              </div>
-            </div>
-            )}
-          </CardContent>
-        </Card>
+        {/* Task Types Settings - Removed */}
 
         {/* Account Management */}
         <Card className="mb-6 bg-custom-blue-light border-2 border-custom-blue">
@@ -572,8 +335,8 @@ export default function Settings() {
           <CardContent className="bg-custom-blue-light">
             <div className="space-y-4">
               {!isAddingNew && (
-                <Button 
-                  onClick={() => setIsAddingNew(true)} 
+                <Button
+                  onClick={() => setIsAddingNew(true)}
                   className="w-full bg-background border-2 border-custom-blue text-black dark:text-white hover:opacity-80"
                 >
                   <Plus className="w-4 h-4 mr-2" />
@@ -627,8 +390,8 @@ export default function Settings() {
                         </Select>
                       </div>
                       <div className="flex gap-2">
-                        <Button 
-                          onClick={handleAddAccount} 
+                        <Button
+                          onClick={handleAddAccount}
                           className="flex-1 border-2 border-custom-blue hover:opacity-80"
                         >
                           <Save className="w-4 h-4 mr-2" />
