@@ -165,7 +165,8 @@ export function canCleanerHandleTaskSync(
   }
 
   const normalizedRole = normalizeCleanerRole(cleanerRole);
-  const roleKey = `${normalizedRole}_cleaner`;
+  // FIX: normalizedRole è già una chiave di TaskTypeRules (es. "premium_cleaner")
+  const roleKey: keyof TaskTypeRules = normalizedRole;
 
   const taskRules = rules.task_types?.[taskType];
   if (!taskRules) return true;
