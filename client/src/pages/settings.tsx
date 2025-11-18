@@ -49,7 +49,7 @@ interface SystemSettings {
   };
   "high-priority": {
     hp_start_time: string;
-    hp_time: string;
+    hp_end_time: string;
     hp_clients: number[];
   };
   dedupe_strategy: string;

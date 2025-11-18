@@ -33,7 +33,7 @@ interface SettingsData {
   };
   "high-priority": {
     hp_start_time: string;
-    hp_time: string;
+    hp_end_time: string;
     hp_clients: number[];
   };
   dedupe_strategy: string;
@@ -305,7 +305,7 @@ export default function SystemSettings() {
                     </span>
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="hp_start_time" className="text-sm">Start Time</Label>
+                    <Label htmlFor="hp_start_time" className="text-sm">HP Start Time</Label>
                     <Input
                       id="hp_start_time"
                       type="time"
@@ -322,17 +322,17 @@ export default function SystemSettings() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="hp_time" className="text-sm">HP Time</Label>
+                    <Label htmlFor="hp_end_time" className="text-sm">HP End Time</Label>
                     <Input
-                      id="hp_time"
+                      id="hp_end_time"
                       type="time"
-                      value={settings["high-priority"].hp_time}
+                      value={settings["high-priority"].hp_end_time}
                       onChange={(e) =>
                         setSettings({
                           ...settings,
                           "high-priority": {
                             ...settings["high-priority"],
-                            hp_time: e.target.value,
+                            hp_end_time: e.target.value,
                           },
                         })
                       }

@@ -243,9 +243,19 @@ def classify_tasks(tasks, selected_date):
     early_out_config = settings.get("early-out", {})
     high_priority_config = settings.get("high-priority", {})
 
-    eo_time = parse_time(early_out_config.get("eo_time")) or datetime.strptime("10:00", "%H:%M").time()
-    eo_end_time = parse_time(early_out_config.get("eo_end_time")) or datetime.strptime("12:00", "%H:%M").time() # Nuova configurazione
-    hp_time = parse_time(high_priority_config.get("hp_time")) or datetime.strptime("15:30", "%H:%M").time()
+    eo_end_time = parse_time(early_out_config.get("eo_end_time")) or datetime.strptime("10:59", "%H:%M").time()
+
+    # Nuova logica HP: finestra esplicita hp_start_time / hp_end_time
+    hp_start_time = (
+        parse_time(high_priority_config.get("hp_start_time"))
+        or datetime.strptime("11:00", "%H:%M").time()
+    )
+
+    hp_end_time = (
+        parse_time(high_priority_config.get("hp_end_time"))
+        or parse_time(high_priority_config.get("hp_time"))  # fallback per vecchia chiave
+        or datetime.strptime("15:30", "%H:%M").time()
+    )
 
     eo_clients = early_out_config.get("eo_clients") or []
     hp_clients = high_priority_config.get("hp_clients") or []
@@ -281,14 +291,16 @@ def classify_tasks(tasks, selected_date):
             bool(checkin_date) and bool(checkout_date) and (checkin_date == checkout_date)
         )
 
-        # HP window begins immediately after eo_end_time
+        # Finestra HP esplicita: hp_start_time <= checkin_time <= hp_end_time
         in_time_window = (
-            checkin_time is not None and eo_end_time is not None and hp_time is not None
-            and (eo_end_time < checkin_time <= hp_time)
+            checkin_time is not None
+            and hp_start_time is not None
+            and hp_end_time is not None
+            and (hp_start_time <= checkin_time <= hp_end_time)
         )
 
         if same_day_turnover and in_time_window:
-            hp_reasons.append("same_day_checkin_between_eo_hp")
+            hp_reasons.append("same_day_checkin_between_hp_start_hp_end")
 
         if is_premium:
             hp_reasons.append("premium")
