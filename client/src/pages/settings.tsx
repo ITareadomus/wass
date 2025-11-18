@@ -381,7 +381,7 @@ export default function Settings() {
                   <div className="flex items-center space-x-2">
                     <Checkbox
                       id="std-standard"
-                      checked={systemSettings.task_types.standard_apt.standard_cleaner}
+                      checked={systemSettings?.task_types.standard_apt.standard_cleaner}
                       onCheckedChange={(checked) =>
                         updateTaskTypeRule('standard_apt', 'standard_cleaner', checked as boolean)
                       }
@@ -393,7 +393,7 @@ export default function Settings() {
                   <div className="flex items-center space-x-2">
                     <Checkbox
                       id="std-premium"
-                      checked={systemSettings.task_types.standard_apt.premium_cleaner}
+                      checked={systemSettings?.task_types.standard_apt.premium_cleaner}
                       onCheckedChange={(checked) =>
                         updateTaskTypeRule('standard_apt', 'premium_cleaner', checked as boolean)
                       }
@@ -405,7 +405,7 @@ export default function Settings() {
                   <div className="flex items-center space-x-2">
                     <Checkbox
                       id="std-straordinaria"
-                      checked={systemSettings.task_types.standard_apt.straordinaria_cleaner}
+                      checked={systemSettings?.task_types.standard_apt.straordinaria_cleaner}
                       onCheckedChange={(checked) =>
                         updateTaskTypeRule('standard_apt', 'straordinaria_cleaner', checked as boolean)
                       }
@@ -417,7 +417,7 @@ export default function Settings() {
                   <div className="flex items-center space-x-2">
                     <Checkbox
                       id="std-formatore"
-                      checked={systemSettings.task_types.standard_apt.formatore_cleaner}
+                      checked={systemSettings?.task_types.standard_apt.formatore_cleaner}
                       onCheckedChange={(checked) =>
                         updateTaskTypeRule('standard_apt', 'formatore_cleaner', checked as boolean)
                       }
@@ -441,7 +441,7 @@ export default function Settings() {
                   <div className="flex items-center space-x-2">
                     <Checkbox
                       id="prem-standard"
-                      checked={systemSettings.task_types.premium_apt.standard_cleaner}
+                      checked={systemSettings?.task_types.premium_apt.standard_cleaner}
                       onCheckedChange={(checked) =>
                         updateTaskTypeRule('premium_apt', 'standard_cleaner', checked as boolean)
                       }
@@ -453,7 +453,7 @@ export default function Settings() {
                   <div className="flex items-center space-x-2">
                     <Checkbox
                       id="prem-premium"
-                      checked={systemSettings.task_types.premium_apt.premium_cleaner}
+                      checked={systemSettings?.task_types.premium_apt.premium_cleaner}
                       onCheckedChange={(checked) =>
                         updateTaskTypeRule('premium_apt', 'premium_cleaner', checked as boolean)
                       }
@@ -465,7 +465,7 @@ export default function Settings() {
                   <div className="flex items-center space-x-2">
                     <Checkbox
                       id="prem-straordinaria"
-                      checked={systemSettings.task_types.premium_apt.straordinaria_cleaner}
+                      checked={systemSettings?.task_types.premium_apt.straordinaria_cleaner}
                       onCheckedChange={(checked) =>
                         updateTaskTypeRule('premium_apt', 'straordinaria_cleaner', checked as boolean)
                       }
@@ -477,7 +477,7 @@ export default function Settings() {
                   <div className="flex items-center space-x-2">
                     <Checkbox
                       id="prem-formatore"
-                      checked={systemSettings.task_types.premium_apt.formatore_cleaner}
+                      checked={systemSettings?.task_types.premium_apt.formatore_cleaner}
                       onCheckedChange={(checked) =>
                         updateTaskTypeRule('premium_apt', 'formatore_cleaner', checked as boolean)
                       }
@@ -501,7 +501,7 @@ export default function Settings() {
                   <div className="flex items-center space-x-2">
                     <Checkbox
                       id="straord-standard"
-                      checked={systemSettings.task_types.straordinario_apt.standard_cleaner}
+                      checked={systemSettings?.task_types.straordinario_apt.standard_cleaner}
                       onCheckedChange={(checked) =>
                         updateTaskTypeRule('straordinario_apt', 'standard_cleaner', checked as boolean)
                       }
@@ -513,7 +513,7 @@ export default function Settings() {
                   <div className="flex items-center space-x-2">
                     <Checkbox
                       id="straord-premium"
-                      checked={systemSettings.task_types.straordinario_apt.premium_cleaner}
+                      checked={systemSettings?.task_types.straordinario_apt.premium_cleaner}
                       onCheckedChange={(checked) =>
                         updateTaskTypeRule('straordinario_apt', 'premium_cleaner', checked as boolean)
                       }
@@ -525,7 +525,7 @@ export default function Settings() {
                   <div className="flex items-center space-x-2">
                     <Checkbox
                       id="straord-straordinaria"
-                      checked={systemSettings.task_types.straordinario_apt.straordinaria_cleaner}
+                      checked={systemSettings?.task_types.straordinario_apt.straordinaria_cleaner}
                       onCheckedChange={(checked) =>
                         updateTaskTypeRule('straordinario_apt', 'straordinaria_cleaner', checked as boolean)
                       }
@@ -537,7 +537,7 @@ export default function Settings() {
                   <div className="flex items-center space-x-2">
                     <Checkbox
                       id="straord-formatore"
-                      checked={systemSettings.task_types.straordinario_apt.formatore_cleaner}
+                      checked={systemSettings?.task_types.straordinario_apt.formatore_cleaner}
                       onCheckedChange={(checked) =>
                         updateTaskTypeRule('straordinario_apt', 'formatore_cleaner', checked as boolean)
                       }
