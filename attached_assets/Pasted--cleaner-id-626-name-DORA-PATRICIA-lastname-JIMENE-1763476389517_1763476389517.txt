@@ -1,10 +1,4 @@
 {
-  "metadata": {
-    "last_updated": "2025-11-18T14:31:49.547941",
-    "date": "2025-11-18"
-  },
-  "cleaners_assignments": [
-    {
       "cleaner": {
         "id": 626,
         "name": "DORA PATRICIA",
@@ -83,11 +77,3 @@
         }
       ]
     }
-  ],
-  "meta": {
-    "total_cleaners": 1,
-    "total_tasks": 0,
-    "used_cleaners": 1,
-    "assigned_tasks": 2
-  }
-}
