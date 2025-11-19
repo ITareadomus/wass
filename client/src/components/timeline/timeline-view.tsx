@@ -1374,6 +1374,9 @@ export default function TimelineView({
                           className={`relative min-h-[45px] flex-1 border-l border-border ${
                             snapshot.isDraggingOver && !isReadOnly ? 'bg-primary/20 ring-2 ring-primary' : 'bg-background'
                           }`}
+                          style={{
+                            zIndex: filteredCleanerId === cleaner.id || hasIncompatibleTasks ? 10 : 'auto'
+                          }}
                         >
                           {/* Griglia oraria di sfondo (solo visiva) */}
                           <div className="absolute inset-0 grid grid-cols-10 pointer-events-none opacity-10">
