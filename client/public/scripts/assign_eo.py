@@ -245,18 +245,18 @@ def evaluate_route(route: List[Task]) -> Tuple[bool, List[Tuple[int, int, int]]]
         start = cur
         finish = start + t.cleaning_time
 
-        # Check-in strict: applica SOLO se abbiamo un limite valido per il giorno corrente
-
-        # Se abbiamo un checkin_dt "valido" (stesso giorno), in load_tasks l'abbiamo lasciato,
-        # altrimenti è None. In quel caso usiamo la sola t.checkin_time.
-        effective_checkin_limit = None
-        if hasattr(t, "checkin_dt") and t.checkin_dt:
+        # Check-in strict: applica SOLO se il check-in è lo stesso giorno del checkout
+        if hasattr(t, "checkin_dt") and t.checkin_dt and hasattr(t, "checkout_dt") and t.checkout_dt:
+            same_day = t.checkin_dt.date() == t.checkout_dt.date()
+            if same_day:
+                effective_checkin_limit = t.checkin_dt.hour * 60 + t.checkin_dt.minute
+                if finish > effective_checkin_limit:
+                    return False, []
+        elif hasattr(t, "checkin_dt") and t.checkin_dt:
+            # Fallback: se non c'è checkout_dt, assume stesso giorno
             effective_checkin_limit = t.checkin_dt.hour * 60 + t.checkin_dt.minute
-        elif t.checkin_time and t.checkin_time < 24 * 60:
-            effective_checkin_limit = t.checkin_time
-
-        if effective_checkin_limit is not None and finish > effective_checkin_limit:
-            return False, []
+            if finish > effective_checkin_limit:
+                return False, []
 
         # Vincolo orario: nessuna task deve finire dopo le 19:00
         if finish > MAX_END_TIME:

@@ -280,8 +280,15 @@ def evaluate_route(cleaner: Cleaner, route: List[Task]) -> Tuple[bool, List[Tupl
     finish = start + timedelta(minutes=first.cleaning_time)
 
     # Check-in strict - INFRANGIBILE
-    if first.checkin_dt and finish > first.checkin_dt:
-        return False, []
+    # SOLO se il check-in è OGGI (stesso giorno del checkout)
+    if first.checkin_dt and first.checkout_dt:
+        same_day = first.checkin_dt.date() == first.checkout_dt.date()
+        if same_day and finish > first.checkin_dt:
+            return False, []
+    elif first.checkin_dt:
+        # Fallback: se non c'è checkout_dt, assume stesso giorno
+        if finish > first.checkin_dt:
+            return False, []
 
     # Vincolo orario: nessuna task deve finire dopo le 19:00
     if finish > max_end_time:
@@ -308,8 +315,15 @@ def evaluate_route(cleaner: Cleaner, route: List[Task]) -> Tuple[bool, List[Tupl
         finish = start + timedelta(minutes=t.cleaning_time)
 
         # Check-in strict - INFRANGIBILE
-        if t.checkin_dt and finish > t.checkin_dt:
-            return False, []
+        # SOLO se il check-in è OGGI (stesso giorno del checkout)
+        if t.checkin_dt and t.checkout_dt:
+            same_day = t.checkin_dt.date() == t.checkout_dt.date()
+            if same_day and finish > t.checkin_dt:
+                return False, []
+        elif t.checkin_dt:
+            # Fallback: se non c'è checkout_dt, assume stesso giorno
+            if finish > t.checkin_dt:
+                return False, []
 
         # Vincolo orario: nessuna task deve finire dopo le 19:00
         if finish > max_end_time:
