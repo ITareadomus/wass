@@ -1072,16 +1072,15 @@ export default function TimelineView({
         .filter(task => (task as any).assignedCleaner === cleaner.id)
         .map(normalizeTask);
 
-      // Verifica se ci sono task incompatibili NON ancora ackate per questo cleaner
+      // CRITICAL: Verifica TUTTE le task incompatibili, ignorando lo stato di acknowledge
+      // L'acknowledge serve solo per non mostrare il dialog al click, NON per nascondere i toast
       const incompatibleTasks = cleanerTasks.filter(task => {
-        if (canCleanerHandleTaskSync(
+        return !canCleanerHandleTaskSync(
           cleaner.role,
           task,
           validationRules,
           cleaner.can_do_straordinaria ?? false
-        )) return false;
-        const key = getIncompatibleKey(task, cleaner.id);
-        return !acknowledgedIncompatibleAssignments.has(key);
+        );
       });
 
       if (incompatibleTasks.length > 0) {
@@ -1094,13 +1093,15 @@ export default function TimelineView({
       }
     });
 
-    // Mostra toast solo se ci sono incompatibilità E non sono già state notificate
+    // Mostra toast SEMPRE per incompatibilità, resettando i toast mostrati ad ogni cambio
+    shownToastsRef.current.clear();
+    
     if (incompatibleAssignments.length > 0) {
       incompatibleAssignments.forEach(assignment => {
         // Crea una chiave univoca per questo toast
         const toastKey = `${assignment.cleanerId}-${assignment.taskNames}`;
 
-        // Mostra solo se non è già stato mostrato
+        // Mostra solo se non è già stato mostrato in questo ciclo
         if (!shownToastsRef.current.has(toastKey)) {
           shownToastsRef.current.add(toastKey);
 
@@ -1113,12 +1114,7 @@ export default function TimelineView({
         }
       });
     }
-
-    // Pulisci i toast mostrati quando non ci sono più incompatibilità
-    if (incompatibleAssignments.length === 0) {
-      shownToastsRef.current.clear();
-    }
-  }, [validationRules, allCleanersToShow, tasks, removedCleanerIds, acknowledgedIncompatibleAssignments, toast]);
+  }, [validationRules, allCleanersToShow, tasks, removedCleanerIds, toast]);
 
   // Funzione per verificare SE esistono assegnazioni salvate (senza caricarle)
   const checkSavedAssignmentExists = async () => {
