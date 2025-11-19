@@ -454,7 +454,7 @@ export default function MapSection({ tasks }: MapSectionProps) {
                     <span className="font-semibold">Checkin:</span> {(selectedTask as any).checkin_time}
                   </div>
                 )}
-                <div className="pt-2 flex gap-2">
+                <div className="pt-2 flex gap-2 flex-wrap">
                   {selectedTask.straordinaria && (
                     <span className="inline-flex items-center px-2.5 py-0.5 rounded border text-xs font-medium bg-red-100 text-red-800 dark:bg-red-950/50 dark:text-red-200 border-red-300 dark:border-red-700">
                       Straordinaria
@@ -468,6 +468,21 @@ export default function MapSection({ tasks }: MapSectionProps) {
                   {!selectedTask.premium && !selectedTask.straordinaria && (
                     <span className="inline-flex items-center px-2.5 py-0.5 rounded border text-xs font-medium bg-green-100 text-green-800 dark:bg-green-950/50 dark:text-green-200 border-green-300 dark:border-green-700">
                       Standard
+                    </span>
+                  )}
+                  {(selectedTask as any).priority && (
+                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded border text-xs font-medium ${
+                      (selectedTask as any).priority === "early_out"
+                        ? "bg-blue-500 text-white border-blue-700"
+                        : (selectedTask as any).priority === "high_priority"
+                          ? "bg-orange-500 text-white border-orange-700"
+                          : "bg-gray-500 text-white border-gray-700"
+                    }`}>
+                      {(selectedTask as any).priority === "early_out"
+                        ? "EO"
+                        : (selectedTask as any).priority === "high_priority"
+                          ? "HP"
+                          : "LP"}
                     </span>
                   )}
                 </div>
