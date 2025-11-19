@@ -8,10 +8,13 @@ import { format } from "date-fns";
 import { useState, useEffect, useMemo } from "react";
 
 interface ContainerMultiSelectState {
-  isMultiSelectMode: boolean;
+  isActive: boolean;
+  toggleMode: () => void;
   selectedTasks: Array<{ taskId: string; order: number; container: string }>;
-  setIsMultiSelectMode: (value: boolean) => void;
-  setSelectedTasks: (value: Array<{ taskId: string; order: number; container: string }>) => void;
+  toggleTask: (taskId: string) => void;
+  clearSelection: () => void;
+  isTaskSelected: (taskId: string) => boolean;
+  getTaskOrder: (taskId: string) => number | undefined;
 }
 
 interface PriorityColumnProps {
@@ -40,62 +43,25 @@ export default function PriorityColumn({
   const { toast } = useToast();
   const [hasAssigned, setHasAssigned] = useState(false);
   
-  // Usa lo stato passato dal parent se disponibile, altrimenti fallback
-  const isMultiSelectMode = containerMultiSelectState?.isMultiSelectMode ?? false;
+  // Usa lo stato passato dal parent
+  const isMultiSelectMode = containerMultiSelectState?.isActive ?? false;
   const selectedTasks = containerMultiSelectState?.selectedTasks ?? [];
-  const setIsMultiSelectMode = containerMultiSelectState?.setIsMultiSelectMode ?? (() => {});
-  const setSelectedTasks = containerMultiSelectState?.setSelectedTasks ?? (() => {});
+  const toggleMode = containerMultiSelectState?.toggleMode ?? (() => {});
+  const toggleTask = containerMultiSelectState?.toggleTask ?? (() => {});
+  const clearSelection = containerMultiSelectState?.clearSelection ?? (() => {});
+  const isTaskSelected = containerMultiSelectState?.isTaskSelected ?? (() => false);
+  const getTaskOrder = containerMultiSelectState?.getTaskOrder ?? (() => undefined);
   
-  // Funzioni per gestire la selezione multipla cross-container
-  const toggleMode = () => {
-    // Usa la funzione toggleMode dal containerMultiSelectState se esiste
-    if (containerMultiSelectState?.toggleMode) {
-      containerMultiSelectState.toggleMode();
-    } else {
-      const newMode = !isMultiSelectMode;
-      setIsMultiSelectMode(newMode);
-      if (!newMode) {
-        setSelectedTasks([]);
-      }
-    }
-  };
-  
-  const toggleTask = (taskId: string) => {
-    // Converti droppableId in container key
-    const containerKey = droppableId === 'early-out' ? 'early_out' : 
-                        droppableId === 'high' ? 'high_priority' : 
-                        droppableId === 'low' ? 'low_priority' : droppableId;
-    
-    setSelectedTasks(prev => {
-      const existing = prev.find(t => t.taskId === taskId);
-      if (existing) {
-        return prev.filter(t => t.taskId !== taskId);
-      } else {
-        const maxOrder = prev.length > 0 ? Math.max(...prev.map(t => t.order)) : 0;
-        return [...prev, { taskId, order: maxOrder + 1, container: containerKey }];
-      }
-    });
-  };
-  
-  const isTaskSelected = (taskId: string) => {
-    return selectedTasks.some(t => t.taskId === taskId);
-  };
-  
-  const getTaskOrder = (taskId: string) => {
-    const task = selectedTasks.find(t => t.taskId === taskId);
-    return task?.order;
-  };
-  
-  // Context mock per passare ai TaskCard
+  // Context per passare ai TaskCard
   const multiSelectCtx = useMemo(() => ({
     isMultiSelectMode,
     selectedTasks,
     toggleMode,
     toggleTask,
-    clearSelection: () => setSelectedTasks([]),
+    clearSelection,
     isTaskSelected,
     getTaskOrder,
-  }), [isMultiSelectMode, selectedTasks]);
+  }), [isMultiSelectMode, selectedTasks, toggleMode, toggleTask, clearSelection, isTaskSelected, getTaskOrder]);
   
   console.log('[DEBUG PriorityColumn]', priority, 'isMultiSelectMode:', isMultiSelectMode, 'selectedTasks:', selectedTasks.length);
 

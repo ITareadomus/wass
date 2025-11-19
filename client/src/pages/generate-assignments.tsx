@@ -184,23 +184,6 @@ export default function GenerateAssignments() {
   // Determina se ALMENO un container ha multi-select attivo
   const isAnyMultiSelectActive = multiSelectModes.early_out || multiSelectModes.high_priority || multiSelectModes.low_priority;
 
-  // Helper per ottenere lo stato multi-select di un container specifico
-  const getContainerMultiSelectState = useCallback((container: 'early_out' | 'high_priority' | 'low_priority') => {
-    return {
-      isActive: multiSelectModes[container],
-      toggleMode: () => {
-        setMultiSelectModes(prev => ({
-          ...prev,
-          [container]: !prev[container]
-        }));
-        if (multiSelectModes[container]) {
-          // Se stiamo disattivando, rimuovi le task selezionate da questo container
-          setSelectedTasks(prev => prev.filter(t => t.container !== container));
-        }
-      }
-    };
-  }, [multiSelectModes]);
-
   // Helper functions per multi-select context cross-container
   const toggleMode = useCallback(() => {
     // Toggle globale (attiva/disattiva tutti i container)
@@ -240,6 +223,28 @@ export default function GenerateAssignments() {
     const task = selectedTasks.find(t => t.taskId === taskId);
     return task?.order;
   }, [selectedTasks]);
+
+  // Helper per ottenere lo stato multi-select di un container specifico
+  const getContainerMultiSelectState = useCallback((container: 'early_out' | 'high_priority' | 'low_priority') => {
+    return {
+      isActive: multiSelectModes[container],
+      toggleMode: () => {
+        setMultiSelectModes(prev => ({
+          ...prev,
+          [container]: !prev[container]
+        }));
+        if (multiSelectModes[container]) {
+          // Se stiamo disattivando, rimuovi le task selezionate da questo container
+          setSelectedTasks(prev => prev.filter(t => t.container !== container));
+        }
+      },
+      selectedTasks,
+      toggleTask: (taskId: string) => toggleTask(taskId, container),
+      clearSelection,
+      isTaskSelected,
+      getTaskOrder,
+    };
+  }, [multiSelectModes, selectedTasks, toggleTask, clearSelection, isTaskSelected, getTaskOrder]);
 
   // Memoizza il context value cross-container
   const multiSelectContextValue: MultiSelectContextType = useMemo(() => ({
