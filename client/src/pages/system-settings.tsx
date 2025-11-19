@@ -568,7 +568,7 @@ export default function SystemSettings() {
                           }
                         />
                         <Label htmlFor="standard-straord" className="text-sm cursor-pointer">
-                          Apt Straord.
+                          Apt Straordinario
                         </Label>
                       </div>
                       <div className="border-t pt-2 space-y-2">
@@ -685,7 +685,7 @@ export default function SystemSettings() {
                           }
                         />
                         <Label htmlFor="premium-straord" className="text-sm cursor-pointer">
-                          Apt Straord.
+                          Apt Straordinario
                         </Label>
                       </div>
                       <div className="border-t pt-2 space-y-2">
@@ -802,7 +802,7 @@ export default function SystemSettings() {
                           }
                         />
                         <Label htmlFor="straord-straord" className="text-sm cursor-pointer">
-                          Apt Straord.
+                          Apt Straordinario
                         </Label>
                       </div>
                       <div className="border-t pt-2 space-y-2">
@@ -919,7 +919,7 @@ export default function SystemSettings() {
                           }
                         />
                         <Label htmlFor="formatore-straord" className="text-sm cursor-pointer">
-                          Apt Straord.
+                          Apt Straordinario
                         </Label>
                       </div>
                       <div className="border-t pt-2 space-y-2">

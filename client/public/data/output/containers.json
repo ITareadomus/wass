@@ -1,6 +1,6 @@
 {
   "metadata": {
-    "last_updated": "2025-11-19T11:24:46.152108",
+    "last_updated": "2025-11-19T11:33:06.153452",
     "date": "2025-11-20"
   },
   "containers": {
@@ -250,6 +250,33 @@
           "priority": "early_out"
         },
         {
+          "task_id": 219041,
+          "logistic_code": 1096,
+          "client_id": 2,
+          "premium": false,
+          "address": "Corso Cristoforo Colombo 5",
+          "lat": "45.4547051",
+          "lng": "9.1721028",
+          "cleaning_time": 120,
+          "checkin_date": "2025-11-21",
+          "checkout_date": "2025-11-20",
+          "checkin_time": "15:00",
+          "checkout_time": "00:00",
+          "pax_in": 3,
+          "pax_out": 2,
+          "small_equipment": false,
+          "operation_id": 2,
+          "confirmed_operation": true,
+          "straordinaria": false,
+          "type_apt": "C",
+          "alias": "ITW",
+          "customer_name": "ITALIANWAY SRL",
+          "reasons": [
+            "checkout_time_eo_window_or_before_start"
+          ],
+          "priority": "early_out"
+        },
+        {
           "task_id": 219044,
           "logistic_code": 494,
           "client_id": 61,
@@ -331,7 +358,7 @@
           "priority": "early_out"
         }
       ],
-      "count": 12
+      "count": 13
     },
     "high_priority": {
       "tasks": [
@@ -588,43 +615,15 @@
             "not_eo",
             "not_hp"
           ]
-        },
-        {
-          "task_id": 219041,
-          "logistic_code": 1096,
-          "client_id": 2,
-          "premium": false,
-          "address": "Corso Cristoforo Colombo 5",
-          "lat": "45.4547051",
-          "lng": "9.1721028",
-          "cleaning_time": 120,
-          "checkin_date": "2025-11-21",
-          "checkout_date": "2025-11-20",
-          "checkin_time": null,
-          "checkout_time": null,
-          "pax_in": 3,
-          "pax_out": 2,
-          "small_equipment": false,
-          "operation_id": 2,
-          "confirmed_operation": true,
-          "straordinaria": false,
-          "type_apt": "C",
-          "alias": "ITW",
-          "customer_name": "ITALIANWAY SRL",
-          "priority": "low_priority",
-          "reasons": [
-            "not_eo",
-            "not_hp"
-          ]
         }
       ],
-      "count": 4
+      "count": 3
     }
   },
   "summary": {
     "total_tasks": 22,
-    "early_out": 12,
+    "early_out": 13,
     "high_priority": 6,
-    "low_priority": 4
+    "low_priority": 3
   }
 }
