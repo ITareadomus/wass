@@ -547,9 +547,19 @@ export default function TimelineView({
             const tasksInfo = incompatibleTasks.map(task => {
               const taskType = task.straordinaria ? 'Straordinaria' : task.premium ? 'Premium' : 'Standard';
               const aptType = (task as any).apt_type || (task as any).aptType || (task as any).type_apt || '';
+              
+              // Determina priorità
+              const isEarlyOut = Boolean((task as any).early_out || (task as any).earlyOut || (task as any).is_early_out);
+              const isHighPriority = Boolean((task as any).high_priority || (task as any).highPriority || (task as any).is_high_priority);
+              const priority = isEarlyOut ? 'EO' : isHighPriority ? 'HP' : 'LP';
+              
+              let fullType = taskType;
+              if (aptType) fullType += ` (Tipo ${aptType})`;
+              fullType += ` [${priority}]`;
+              
               return {
                 logisticCode: task.name,
-                taskType: aptType ? `${taskType} (Tipo ${aptType})` : taskType
+                taskType: fullType
               };
             });
             setIncompatibleDialog({ open: true, cleanerId: cleaner.id, tasks: tasksInfo });
