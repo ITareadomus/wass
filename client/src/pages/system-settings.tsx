@@ -967,18 +967,6 @@ export default function SystemSettings() {
             </CardContent>
           </Card>
 
-          {/* Rimosso il resto della vecchia card Task Types */}
-          <Card className="bg-custom-blue-light border-2 border-custom-blue" style={{display: 'none'}}>
-            <CardHeader className="bg-custom-blue-light py-3">
-              <CardTitle className="text-lg">Task Types</CardTitle>
-              <CardDescription className="text-xs">
-                Tipi di appartamento e priorità che ogni categoria di cleaner può gestire
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="bg-custom-blue-light">
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                
-
           {/* Save Button */}
           <Button
             onClick={handleSave}
