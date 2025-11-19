@@ -142,9 +142,27 @@ export function canCleanerHandleTaskSync(
   const allowedByTaskType = roleRules[taskType];
   if (!allowedByTaskType) return false;
 
-  // Additionally, check if the cleaner can handle the apartment type associated with the task.
-  if (!canHandleApartment(cleanerRole, task)) {
-    return false;
+  // CRITICAL: Check apartment type compatibility FIRST (before priority)
+  // Extract apt_type from task (checking common field names)
+  const aptType = task.apt_type || task.aptType || task.type_apt;
+  
+  if (aptType && cachedApartmentTypes) {
+    let allowedApts: string[] = [];
+    
+    if (roleKey === 'standard_cleaner') {
+      allowedApts = cachedApartmentTypes.standard_apt || [];
+    } else if (roleKey === 'premium_cleaner') {
+      allowedApts = cachedApartmentTypes.premium_apt || [];
+    } else if (roleKey === 'straordinario_cleaner') {
+      allowedApts = cachedApartmentTypes.straordinario_apt || [];
+    } else if (roleKey === 'formatore_cleaner') {
+      allowedApts = cachedApartmentTypes.formatore_apt || [];
+    }
+    
+    // If the apartment type is NOT in the allowed list, return false
+    if (allowedApts.length > 0 && !allowedApts.includes(aptType)) {
+      return false;
+    }
   }
 
   // If all checks pass, the cleaner can handle the task.
