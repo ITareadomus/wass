@@ -2,6 +2,8 @@
 import { useEffect, useRef, useState } from "react";
 import { TaskType as Task } from "@shared/schema";
 import TaskCard from "@/components/drag-drop/task-card";
+import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
 
 interface MapSectionProps {
   tasks: Task[];
@@ -471,19 +473,23 @@ export default function MapSection({ tasks }: MapSectionProps) {
                     </span>
                   )}
                   {(selectedTask as any).priority && (
-                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded border text-xs font-medium ${
-                      (selectedTask as any).priority === "early_out"
-                        ? "bg-blue-500 text-white border-blue-700"
-                        : (selectedTask as any).priority === "high_priority"
-                          ? "bg-orange-500 text-white border-orange-700"
-                          : "bg-gray-500 text-white border-gray-700"
-                    }`}>
+                    <Badge
+                      variant="outline"
+                      className={cn(
+                        "text-xs shrink-0",
+                        (selectedTask as any).priority === "early_out"
+                          ? "bg-blue-500 text-white border-blue-700"
+                          : (selectedTask as any).priority === "high_priority"
+                            ? "bg-orange-500 text-white border-orange-700"
+                            : "bg-gray-500 text-white border-gray-700"
+                      )}
+                    >
                       {(selectedTask as any).priority === "early_out"
                         ? "EO"
                         : (selectedTask as any).priority === "high_priority"
                           ? "HP"
                           : "LP"}
-                    </span>
+                    </Badge>
                   )}
                 </div>
               </div>
