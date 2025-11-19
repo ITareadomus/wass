@@ -1327,12 +1327,12 @@ export default function TimelineView({
                           /* Altrimenti mostra badge role normale */
                           <>
                             {!isRemoved && cleaner.role === "Premium" && (
-                              <div className="bg-yellow-500 text-black font-bold text-[10px] px-1 py-0.5 rounded flex-shrink-0">
+                              <div className="bg-yellow-500 text-white font-bold text-[10px] px-1 py-0.5 rounded flex-shrink-0">
                                 P
                               </div>
                             )}
                             {!isRemoved && cleaner.role === "Formatore" && (
-                              <div className="bg-orange-500 text-black font-bold text-[10px] px-1 py-0.5 rounded flex-shrink-0">
+                              <div className="bg-orange-500 text-white font-bold text-[10px] px-1 py-0.5 rounded flex-shrink-0">
                                 F
                               </div>
                             )}
