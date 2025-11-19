@@ -259,10 +259,19 @@ def evaluate_route(cleaner: Cleaner, route: List[Task]) -> Tuple[bool, List[Tupl
     finish = start + first.cleaning_time
 
     # NUOVO: Check-in strict - deve finire prima del check-in
+    # SOLO se il check-in è OGGI (stesso giorno del checkout)
     if hasattr(first, 'checkin_dt') and first.checkin_dt:
-        checkin_minutes = first.checkin_dt.hour * 60 + first.checkin_dt.minute
-        if finish > checkin_minutes:
-            return False, []
+        # Calcola la data di oggi dalla route
+        if hasattr(first, 'checkout_dt') and first.checkout_dt:
+            same_day = first.checkin_dt.date() == first.checkout_dt.date()
+        else:
+            # Fallback: assume stesso giorno se non c'è checkout_dt
+            same_day = True
+        
+        if same_day:
+            checkin_minutes = first.checkin_dt.hour * 60 + first.checkin_dt.minute
+            if finish > checkin_minutes:
+                return False, []
 
     # Vincolo orario: nessuna task deve finire dopo le 19:00
     if finish > MAX_END_TIME:
@@ -282,10 +291,19 @@ def evaluate_route(cleaner: Cleaner, route: List[Task]) -> Tuple[bool, List[Tupl
         finish = start + t.cleaning_time
 
         # NUOVO: Check-in strict - deve finire prima del check-in
+        # SOLO se il check-in è OGGI (stesso giorno del checkout)
         if hasattr(t, 'checkin_dt') and t.checkin_dt:
-            checkin_minutes = t.checkin_dt.hour * 60 + t.checkin_dt.minute
-            if finish > checkin_minutes:
-                return False, []
+            # Calcola se check-in è stesso giorno del checkout
+            if hasattr(t, 'checkout_dt') and t.checkout_dt:
+                same_day = t.checkin_dt.date() == t.checkout_dt.date()
+            else:
+                # Fallback: assume stesso giorno se non c'è checkout_dt
+                same_day = True
+            
+            if same_day:
+                checkin_minutes = t.checkin_dt.hour * 60 + t.checkin_dt.minute
+                if finish > checkin_minutes:
+                    return False, []
 
         # Vincolo orario: nessuna task deve finire dopo le 19:00
         if finish > MAX_END_TIME:
