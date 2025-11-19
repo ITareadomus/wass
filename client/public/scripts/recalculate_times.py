@@ -178,11 +178,9 @@ def recalculate_cleaner_times(cleaner_data: Dict[str, Any]) -> Dict[str, Any]:
         checkout_time_str = task.get("checkout_time")
         checkin_time_str = task.get("checkin_time")
 
-        # Start time: max(current_time, checkout_time se presente)
+        # Start time: per task successive alla prima, è SEMPRE end_time precedente + travel_time
+        # Il checkout_time è solo un vincolo informativo, NON forza lo start_time
         start_time_min = current_time_min
-        if checkout_time_str:
-            checkout_min = time_to_minutes(checkout_time_str)
-            start_time_min = max(start_time_min, checkout_min)
 
         # End time: start + cleaning_time
         end_time_min = start_time_min + cleaning_time
