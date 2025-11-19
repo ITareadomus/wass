@@ -18,13 +18,23 @@ interface ApartmentTypesConfig {
   formatore_apt?: string[];
 }
 
+interface PriorityTypesConfig {
+  [role: string]: {
+    early_out?: boolean;
+    high_priority?: boolean;
+    low_priority?: boolean;
+  };
+}
+
 interface SettingsSchema {
   task_types: TaskTypesByCleaner;
   apartment_types?: ApartmentTypesConfig;
+  priority_types?: PriorityTypesConfig;
 }
 
 let cachedRules: TaskTypesByCleaner | null = null;
 let cachedApartmentTypes: ApartmentTypesConfig | null = null;
+let cachedPriorityTypes: PriorityTypesConfig | null = null;
 
 export async function loadValidationRules(): Promise<TaskTypesByCleaner> {
   if (cachedRules) return cachedRules;
@@ -46,6 +56,7 @@ export async function loadValidationRules(): Promise<TaskTypesByCleaner> {
     const settings: SettingsSchema = await response.json();
     cachedRules = settings.task_types ?? {};
     cachedApartmentTypes = settings.apartment_types ?? null;
+    cachedPriorityTypes = settings.priority_types ?? null;
 
     return cachedRules;
   } catch (error) {
@@ -162,6 +173,32 @@ export function canCleanerHandleTaskSync(
     // If the apartment type is NOT in the allowed list, return false
     if (allowedApts.length > 0 && !allowedApts.includes(aptType)) {
       return false;
+    }
+  }
+
+  // NEW: Check priority compatibility (EO/HP/LP)
+  if (cachedPriorityTypes) {
+    const priorityRules = cachedPriorityTypes[roleKey];
+    
+    if (priorityRules) {
+      // Determina la priorità della task
+      const isEarlyOut = Boolean(task.early_out || task.earlyOut || task.is_early_out);
+      const isHighPriority = Boolean(task.high_priority || task.highPriority || task.is_high_priority);
+      
+      // Se è EO, verifica se il cleaner può gestirla
+      if (isEarlyOut && !priorityRules.early_out) {
+        return false;
+      }
+      
+      // Se è HP (e non EO), verifica se il cleaner può gestirla
+      if (!isEarlyOut && isHighPriority && !priorityRules.high_priority) {
+        return false;
+      }
+      
+      // Se è LP (né EO né HP), verifica se il cleaner può gestirla
+      if (!isEarlyOut && !isHighPriority && !priorityRules.low_priority) {
+        return false;
+      }
     }
   }
 
