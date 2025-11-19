@@ -181,22 +181,19 @@ export function canCleanerHandleTaskSync(
     const priorityRules = cachedPriorityTypes[roleKey];
     
     if (priorityRules) {
-      // Determina la priorità della task
-      const isEarlyOut = Boolean(task.early_out || task.earlyOut || task.is_early_out);
-      const isHighPriority = Boolean(task.high_priority || task.highPriority || task.is_high_priority);
+      // CRITICAL: Determina la priorità della task dal campo "priority" (stringa)
+      // Le task in timeline.json hanno "priority": "early_out" | "high_priority" | "low_priority"
+      const taskPriority = task.priority || task.task_priority;
       
-      // Se è EO, verifica se il cleaner può gestirla
-      if (isEarlyOut && !priorityRules.early_out) {
+      if (taskPriority === 'early_out' && !priorityRules.early_out) {
         return false;
       }
       
-      // Se è HP (e non EO), verifica se il cleaner può gestirla
-      if (!isEarlyOut && isHighPriority && !priorityRules.high_priority) {
+      if (taskPriority === 'high_priority' && !priorityRules.high_priority) {
         return false;
       }
       
-      // Se è LP (né EO né HP), verifica se il cleaner può gestirla
-      if (!isEarlyOut && !isHighPriority && !priorityRules.low_priority) {
+      if (taskPriority === 'low_priority' && !priorityRules.low_priority) {
         return false;
       }
     }
