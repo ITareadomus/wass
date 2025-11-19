@@ -485,7 +485,7 @@ export default function SystemSettings() {
             <CardHeader className="bg-custom-blue-light py-3">
               <CardTitle className="text-lg">Apartment Types & Task Types</CardTitle>
               <CardDescription className="text-xs">
-                Tipi di appartamento, task types e priorità che ogni categoria di cleaner può gestire
+                Tipi di task, appartamento e priorità che ogni categoria di cleaner può gestire
               </CardDescription>
             </CardHeader>
             <CardContent className="bg-custom-blue-light">
