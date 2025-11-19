@@ -544,10 +544,14 @@ export default function TimelineView({
 
           if (incompatibleTasks.length > 0) {
             // Mostra dialog incompatibilità invece del modal normale
-            const tasksInfo = incompatibleTasks.map(task => ({
-              logisticCode: task.name,
-              taskType: task.straordinaria ? 'Straordinaria' : task.premium ? 'Premium' : 'Standard'
-            }));
+            const tasksInfo = incompatibleTasks.map(task => {
+              const taskType = task.straordinaria ? 'Straordinaria' : task.premium ? 'Premium' : 'Standard';
+              const aptType = (task as any).apt_type || (task as any).aptType || (task as any).type_apt || '';
+              return {
+                logisticCode: task.name,
+                taskType: aptType ? `${taskType} (Tipo ${aptType})` : taskType
+              };
+            });
             setIncompatibleDialog({ open: true, cleanerId: cleaner.id, tasks: tasksInfo });
             setClickTimer(null);
             return;
@@ -1940,6 +1944,9 @@ export default function TimelineView({
                 <p className="text-sm font-semibold text-muted-foreground mb-3">
                   Scambia Cleaner
                 </p>
+                <p className="text-xs text-muted-foreground mb-3">
+                  Seleziona un altro cleaner per scambiare le task assegnate.
+                </p>
                 <div className="flex gap-3 items-end">
                   <div className="flex-1">
                     <Select
@@ -1993,7 +2000,7 @@ export default function TimelineView({
                   Rimuovi Cleaner
                 </p>
                 <p className="text-xs text-muted-foreground mb-3">
-                  Il cleaner sarà rimosso dalla timeline ma le sue task rimarranno finché non verrà sostituito.
+                  Il cleaner sarà rimosso dalla selezione, ma le sue task rimarranno in timeline. Sarà necessario assegnarle a un altro cleaner.
                 </p>
                 <Button
                   onClick={() => {
