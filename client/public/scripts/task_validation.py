@@ -1,13 +1,30 @@
 import json
 import os
+from typing import Optional
+
+# Funzione helper per caricare le impostazioni da settings.json
+def load_settings(settings_path='client/public/data/input/settings.json'):
+    """Carica le impostazioni dal file JSON specificato."""
+    if not os.path.exists(settings_path):
+        print(f"Errore: Il file delle impostazioni non esiste: {settings_path}")
+        return {}
+    try:
+        with open(settings_path, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    except json.JSONDecodeError:
+        print(f"Errore: Impossibile decodificare il file JSON: {settings_path}")
+        return {}
+    except Exception as e:
+        print(f"Errore durante il caricamento delle impostazioni: {e}")
+        return {}
 
 class TaskValidator:
     def __init__(self, settings_path='client/public/data/input/settings.json'):
-        with open(settings_path, 'r', encoding='utf-8') as f:
-            settings = json.load(f)
+        settings = load_settings(settings_path)
 
         self.rules = settings.get('task_types', {})
         self.apartment_types = settings.get('apartment_types', {})
+        self.priority_types = settings.get('priority_types', {}) # Aggiunto per le priorità
 
     def _normalize_cleaner_role(self, role: str) -> str:
         normalized = role.lower().strip()
@@ -57,6 +74,19 @@ class TaskValidator:
 
         return apt_type in allowed_apts
 
+    # Nuova funzione per validare la priorità
+    def can_cleaner_handle_priority(self, cleaner_role: str, priority: str) -> bool:
+        """
+        Verifica se un cleaner con un certo ruolo può gestire una task con una certa priorità
+        basandosi su settings.json -> priority_types
+        """
+        role_key = self._normalize_cleaner_role(cleaner_role)
+        allowed_priorities = self.priority_types.get(role_key, {})
+
+        # Se la priorità non è esplicitamente permessa, allora non è permessa
+        # Se la chiave di ruolo non esiste, allowed_priorities sarà {}, e .get(priority, False) restituirà False
+        return allowed_priorities.get(priority, False)
+
 
 # Istanza globale del validator
 _validator = TaskValidator()
@@ -67,3 +97,11 @@ def can_cleaner_handle_task(cleaner_role: str, task_type: str, can_do_straordina
 
 def can_cleaner_handle_apartment(cleaner_role: str, apt_type: str) -> bool:
     return _validator.can_cleaner_handle_apartment(cleaner_role, apt_type)
+
+# Nuova funzione standalone per la validazione della priorità
+def can_cleaner_handle_priority(cleaner_role: str, priority: str) -> bool:
+    """
+    Verifica se un cleaner con un certo ruolo può gestire una task con una certa priorità
+    basandosi su settings.json -> priority_types.
+    """
+    return _validator.can_cleaner_handle_priority(cleaner_role, priority)
