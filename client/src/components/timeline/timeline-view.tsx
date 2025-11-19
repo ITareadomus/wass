@@ -1829,12 +1829,14 @@ export default function TimelineView({
       {/* Cleaner Details Dialog */}
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
         <DialogContent className={`sm:max-w-2xl max-h-[80vh] overflow-y-auto ${
-          selectedCleaner?.role === "Formatore"
-            ? "border-4 border-orange-500 bg-orange-500/30"
+          selectedCleaner?.can_do_straordinaria
+            ? "bg-red-100 dark:bg-red-950/50 border-2 border-red-300 dark:border-red-700"
+            : selectedCleaner?.role === "Formatore"
+            ? "bg-orange-100 dark:bg-orange-950/50 border-2 border-orange-300 dark:border-orange-700"
             : selectedCleaner?.role === "Premium"
-            ? "border-4 border-yellow-500 bg-yellow-500/30"
+            ? "bg-yellow-100 dark:bg-yellow-950/50 border-2 border-yellow-300 dark:border-yellow-700"
             : selectedCleaner?.role === "Standard"
-            ? "border-4 border-green-500 bg-green-500/30"
+            ? "bg-green-100 dark:bg-green-950/50 border-2 border-green-300 dark:border-green-700"
             : ""
         }`}>
           <DialogHeader>
