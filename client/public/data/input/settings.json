@@ -1,7 +1,7 @@
 {
   "early-out": {
-    "eo_start_time": "10:00",
-    "eo_end_time": "10:59",
+    "eo_start_time": "13:00",
+    "eo_end_time": "15:59",
     "eo_clients": [
       61,
       87
@@ -26,13 +26,13 @@
       "X"
     ],
     "premium_apt": [
+      "A",
       "B",
       "C",
       "D",
       "E",
       "F",
-      "X",
-      "A"
+      "X"
     ],
     "straordinario_apt": [
       "A",
