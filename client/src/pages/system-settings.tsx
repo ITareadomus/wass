@@ -486,24 +486,26 @@ export default function SystemSettings() {
             </CardContent>
           </Card>
 
-          {/* Apartment Types */}
+          {/* Apartment Types + Task Types - Card unificata */}
           <Card className="bg-custom-blue-light border-2 border-custom-blue">
-              <CardHeader className="bg-custom-blue-light py-3">
-                <CardTitle className="text-lg">Apartment Types</CardTitle>
-                <CardDescription className="text-xs">
-                  Tipi di appartamento (dimensioni) che ogni categoria di cleaner può gestire
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="bg-custom-blue-light">
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                  {/* Cleaner STANDARD */}
-                  <div className="space-y-3">
-                    <div className="border-b pb-2 flex items-center gap-2">
-                      <span className="text-sm font-medium text-green-800 dark:text-green-200">Cleaner</span>
-                      <span className="px-2 py-0.5 rounded border font-medium text-sm bg-green-500/30 text-green-800 dark:bg-green-500/40 dark:text-green-200 border-green-600 dark:border-green-400">
-                        Standard
-                      </span>
-                    </div>
+            <CardHeader className="bg-custom-blue-light py-3">
+              <CardTitle className="text-lg">Apartment Types & Task Types</CardTitle>
+              <CardDescription className="text-xs">
+                Tipi di appartamento, task types e priorità che ogni categoria di cleaner può gestire
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="bg-custom-blue-light">
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                {/* Cleaner STANDARD */}
+                <div className="space-y-3">
+                  <div className="border-b pb-2 flex items-center gap-2">
+                    <span className="text-sm font-medium text-green-800 dark:text-green-200">Cleaner</span>
+                    <span className="px-2 py-0.5 rounded border font-medium text-sm bg-green-500/30 text-green-800 dark:bg-green-500/40 dark:text-green-200 border-green-600 dark:border-green-400">
+                      Standard
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-x-4 gap-y-2">
+                    {/* Colonna sinistra: Tipo A-X */}
                     <div className="space-y-2">
                       {["A", "B", "C", "D", "E", "F", "X"].map((type) => (
                         <div key={`standard-${type}`} className="flex items-center space-x-2">
@@ -531,16 +533,96 @@ export default function SystemSettings() {
                         </div>
                       ))}
                     </div>
-                  </div>
-
-                  {/* Cleaner PREMIUM */}
-                  <div className="space-y-3">
-                    <div className="border-b pb-2 flex items-center gap-2">
-                      <span className="text-sm font-medium text-yellow-800 dark:text-yellow-200">Cleaner</span>
-                      <span className="px-2 py-0.5 rounded border font-medium text-sm bg-yellow-500/30 text-yellow-800 dark:bg-yellow-500/40 dark:text-yellow-200 border-yellow-600 dark:border-yellow-400">
-                        Premium
-                      </span>
+                    {/* Colonna destra: Apt Types + Priorità */}
+                    <div className="space-y-2">
+                      <div className="flex items-center space-x-2">
+                        <Checkbox
+                          id="standard-std"
+                          checked={settings.task_types.standard_cleaner.standard_apt}
+                          onCheckedChange={(checked) =>
+                            updateTaskTypeRule("standard_cleaner", "standard_apt", !!checked)
+                          }
+                        />
+                        <Label htmlFor="standard-std" className="text-sm cursor-pointer">
+                          Apt Standard
+                        </Label>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <Checkbox
+                          id="standard-prem"
+                          checked={settings.task_types.standard_cleaner.premium_apt}
+                          onCheckedChange={(checked) =>
+                            updateTaskTypeRule("standard_cleaner", "premium_apt", !!checked)
+                          }
+                        />
+                        <Label htmlFor="standard-prem" className="text-sm cursor-pointer">
+                          Apt Premium
+                        </Label>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <Checkbox
+                          id="standard-straord"
+                          checked={settings.task_types.standard_cleaner.straordinario_apt}
+                          onCheckedChange={(checked) =>
+                            updateTaskTypeRule("standard_cleaner", "straordinario_apt", !!checked)
+                          }
+                        />
+                        <Label htmlFor="standard-straord" className="text-sm cursor-pointer">
+                          Apt Straord.
+                        </Label>
+                      </div>
+                      <div className="border-t pt-2 space-y-2">
+                        <div className="flex items-center space-x-2">
+                          <Checkbox
+                            id="standard-eo"
+                            checked={settings.priority_types.standard_cleaner.early_out}
+                            onCheckedChange={(checked) =>
+                              updatePriorityTypeRule("standard_cleaner", "early_out", !!checked)
+                            }
+                          />
+                          <Badge className="bg-blue-500 text-white border-blue-700 text-xs px-2 py-0">
+                            EO
+                          </Badge>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <Checkbox
+                            id="standard-hp"
+                            checked={settings.priority_types.standard_cleaner.high_priority}
+                            onCheckedChange={(checked) =>
+                              updatePriorityTypeRule("standard_cleaner", "high_priority", !!checked)
+                            }
+                          />
+                          <Badge className="bg-orange-500 text-white border-orange-700 text-xs px-2 py-0">
+                            HP
+                          </Badge>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <Checkbox
+                            id="standard-lp"
+                            checked={settings.priority_types.standard_cleaner.low_priority}
+                            onCheckedChange={(checked) =>
+                              updatePriorityTypeRule("standard_cleaner", "low_priority", !!checked)
+                            }
+                          />
+                          <Badge className="bg-gray-500 text-white border-gray-700 text-xs px-2 py-0">
+                            LP
+                          </Badge>
+                        </div>
+                      </div>
                     </div>
+                  </div>
+                </div>
+
+                {/* Cleaner PREMIUM */}
+                <div className="space-y-3">
+                  <div className="border-b pb-2 flex items-center gap-2">
+                    <span className="text-sm font-medium text-yellow-800 dark:text-yellow-200">Cleaner</span>
+                    <span className="px-2 py-0.5 rounded border font-medium text-sm bg-yellow-500/30 text-yellow-800 dark:bg-yellow-500/40 dark:text-yellow-200 border-yellow-600 dark:border-yellow-400">
+                      Premium
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-x-4 gap-y-2">
+                    {/* Colonna sinistra: Tipo A-X */}
                     <div className="space-y-2">
                       {["A", "B", "C", "D", "E", "F", "X"].map((type) => (
                         <div key={`premium-${type}`} className="flex items-center space-x-2">
@@ -568,16 +650,96 @@ export default function SystemSettings() {
                         </div>
                       ))}
                     </div>
-                  </div>
-
-                  {/* Cleaner STRAORDINARIO */}
-                  <div className="space-y-3">
-                    <div className="border-b pb-2 flex items-center gap-2">
-                      <span className="text-sm font-medium text-red-800 dark:text-red-200">Cleaner</span>
-                      <span className="px-2 py-0.5 rounded border font-medium text-sm bg-red-500/30 text-red-800 dark:bg-red-500/40 dark:text-red-200 border-red-600 dark:border-red-400">
-                        Straordinario
-                      </span>
+                    {/* Colonna destra: Apt Types + Priorità */}
+                    <div className="space-y-2">
+                      <div className="flex items-center space-x-2">
+                        <Checkbox
+                          id="premium-std"
+                          checked={settings.task_types.premium_cleaner.standard_apt}
+                          onCheckedChange={(checked) =>
+                            updateTaskTypeRule("premium_cleaner", "standard_apt", !!checked)
+                          }
+                        />
+                        <Label htmlFor="premium-std" className="text-sm cursor-pointer">
+                          Apt Standard
+                        </Label>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <Checkbox
+                          id="premium-prem"
+                          checked={settings.task_types.premium_cleaner.premium_apt}
+                          onCheckedChange={(checked) =>
+                            updateTaskTypeRule("premium_cleaner", "premium_apt", !!checked)
+                          }
+                        />
+                        <Label htmlFor="premium-prem" className="text-sm cursor-pointer">
+                          Apt Premium
+                        </Label>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <Checkbox
+                          id="premium-straord"
+                          checked={settings.task_types.premium_cleaner.straordinario_apt}
+                          onCheckedChange={(checked) =>
+                            updateTaskTypeRule("premium_cleaner", "straordinario_apt", !!checked)
+                          }
+                        />
+                        <Label htmlFor="premium-straord" className="text-sm cursor-pointer">
+                          Apt Straord.
+                        </Label>
+                      </div>
+                      <div className="border-t pt-2 space-y-2">
+                        <div className="flex items-center space-x-2">
+                          <Checkbox
+                            id="premium-eo"
+                            checked={settings.priority_types.premium_cleaner.early_out}
+                            onCheckedChange={(checked) =>
+                              updatePriorityTypeRule("premium_cleaner", "early_out", !!checked)
+                            }
+                          />
+                          <Badge className="bg-blue-500 text-white border-blue-700 text-xs px-2 py-0">
+                            EO
+                          </Badge>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <Checkbox
+                            id="premium-hp"
+                            checked={settings.priority_types.premium_cleaner.high_priority}
+                            onCheckedChange={(checked) =>
+                              updatePriorityTypeRule("premium_cleaner", "high_priority", !!checked)
+                            }
+                          />
+                          <Badge className="bg-orange-500 text-white border-orange-700 text-xs px-2 py-0">
+                            HP
+                          </Badge>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <Checkbox
+                            id="premium-lp"
+                            checked={settings.priority_types.premium_cleaner.low_priority}
+                            onCheckedChange={(checked) =>
+                              updatePriorityTypeRule("premium_cleaner", "low_priority", !!checked)
+                            }
+                          />
+                          <Badge className="bg-gray-500 text-white border-gray-700 text-xs px-2 py-0">
+                            LP
+                          </Badge>
+                        </div>
+                      </div>
                     </div>
+                  </div>
+                </div>
+
+                {/* Cleaner STRAORDINARIO */}
+                <div className="space-y-3">
+                  <div className="border-b pb-2 flex items-center gap-2">
+                    <span className="text-sm font-medium text-red-800 dark:text-red-200">Cleaner</span>
+                    <span className="px-2 py-0.5 rounded border font-medium text-sm bg-red-500/30 text-red-800 dark:bg-red-500/40 dark:text-red-200 border-red-600 dark:border-red-400">
+                      Straordinario
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-x-4 gap-y-2">
+                    {/* Colonna sinistra: Tipo A-X */}
                     <div className="space-y-2">
                       {["A", "B", "C", "D", "E", "F", "X"].map((type) => (
                         <div key={`straordinario-${type}`} className="flex items-center space-x-2">
@@ -605,16 +767,96 @@ export default function SystemSettings() {
                         </div>
                       ))}
                     </div>
-                  </div>
-
-                  {/* Cleaner FORMATORE */}
-                  <div className="space-y-3">
-                    <div className="border-b pb-2 flex items-center gap-2">
-                      <span className="text-sm font-medium text-orange-800 dark:text-orange-200">Cleaner</span>
-                      <span className="px-2 py-0.5 rounded border font-medium text-sm bg-orange-500/30 text-orange-800 dark:bg-orange-500/40 dark:text-orange-200 border-orange-600 dark:border-orange-400">
-                        Formatore
-                      </span>
+                    {/* Colonna destra: Apt Types + Priorità */}
+                    <div className="space-y-2">
+                      <div className="flex items-center space-x-2">
+                        <Checkbox
+                          id="straord-std"
+                          checked={settings.task_types.straordinario_cleaner.standard_apt}
+                          onCheckedChange={(checked) =>
+                            updateTaskTypeRule("straordinario_cleaner", "standard_apt", !!checked)
+                          }
+                        />
+                        <Label htmlFor="straord-std" className="text-sm cursor-pointer">
+                          Apt Standard
+                        </Label>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <Checkbox
+                          id="straord-prem"
+                          checked={settings.task_types.straordinario_cleaner.premium_apt}
+                          onCheckedChange={(checked) =>
+                            updateTaskTypeRule("straordinario_cleaner", "premium_apt", !!checked)
+                          }
+                        />
+                        <Label htmlFor="straord-prem" className="text-sm cursor-pointer">
+                          Apt Premium
+                        </Label>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <Checkbox
+                          id="straord-straord"
+                          checked={settings.task_types.straordinario_cleaner.straordinario_apt}
+                          onCheckedChange={(checked) =>
+                            updateTaskTypeRule("straordinario_cleaner", "straordinario_apt", !!checked)
+                          }
+                        />
+                        <Label htmlFor="straord-straord" className="text-sm cursor-pointer">
+                          Apt Straord.
+                        </Label>
+                      </div>
+                      <div className="border-t pt-2 space-y-2">
+                        <div className="flex items-center space-x-2">
+                          <Checkbox
+                            id="straord-eo"
+                            checked={settings.priority_types.straordinario_cleaner.early_out}
+                            onCheckedChange={(checked) =>
+                              updatePriorityTypeRule("straordinario_cleaner", "early_out", !!checked)
+                            }
+                          />
+                          <Badge className="bg-blue-500 text-white border-blue-700 text-xs px-2 py-0">
+                            EO
+                          </Badge>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <Checkbox
+                            id="straord-hp"
+                            checked={settings.priority_types.straordinario_cleaner.high_priority}
+                            onCheckedChange={(checked) =>
+                              updatePriorityTypeRule("straordinario_cleaner", "high_priority", !!checked)
+                            }
+                          />
+                          <Badge className="bg-orange-500 text-white border-orange-700 text-xs px-2 py-0">
+                            HP
+                          </Badge>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <Checkbox
+                            id="straord-lp"
+                            checked={settings.priority_types.straordinario_cleaner.low_priority}
+                            onCheckedChange={(checked) =>
+                              updatePriorityTypeRule("straordinario_cleaner", "low_priority", !!checked)
+                            }
+                          />
+                          <Badge className="bg-gray-500 text-white border-gray-700 text-xs px-2 py-0">
+                            LP
+                          </Badge>
+                        </div>
+                      </div>
                     </div>
+                  </div>
+                </div>
+
+                {/* Cleaner FORMATORE */}
+                <div className="space-y-3">
+                  <div className="border-b pb-2 flex items-center gap-2">
+                    <span className="text-sm font-medium text-orange-800 dark:text-orange-200">Cleaner</span>
+                    <span className="px-2 py-0.5 rounded border font-medium text-sm bg-orange-500/30 text-orange-800 dark:bg-orange-500/40 dark:text-orange-200 border-orange-600 dark:border-orange-400">
+                      Formatore
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-x-4 gap-y-2">
+                    {/* Colonna sinistra: Tipo A-X */}
                     <div className="space-y-2">
                       {["A", "B", "C", "D", "E", "F", "X"].map((type) => (
                         <div key={`formatore-${type}`} className="flex items-center space-x-2">
@@ -642,13 +884,91 @@ export default function SystemSettings() {
                         </div>
                       ))}
                     </div>
+                    {/* Colonna destra: Apt Types + Priorità */}
+                    <div className="space-y-2">
+                      <div className="flex items-center space-x-2">
+                        <Checkbox
+                          id="formatore-std"
+                          checked={settings.task_types.formatore_cleaner.standard_apt}
+                          onCheckedChange={(checked) =>
+                            updateTaskTypeRule("formatore_cleaner", "standard_apt", !!checked)
+                          }
+                        />
+                        <Label htmlFor="formatore-std" className="text-sm cursor-pointer">
+                          Apt Standard
+                        </Label>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <Checkbox
+                          id="formatore-prem"
+                          checked={settings.task_types.formatore_cleaner.premium_apt}
+                          onCheckedChange={(checked) =>
+                            updateTaskTypeRule("formatore_cleaner", "premium_apt", !!checked)
+                          }
+                        />
+                        <Label htmlFor="formatore-prem" className="text-sm cursor-pointer">
+                          Apt Premium
+                        </Label>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <Checkbox
+                          id="formatore-straord"
+                          checked={settings.task_types.formatore_cleaner.straordinario_apt}
+                          onCheckedChange={(checked) =>
+                            updateTaskTypeRule("formatore_cleaner", "straordinario_apt", !!checked)
+                          }
+                        />
+                        <Label htmlFor="formatore-straord" className="text-sm cursor-pointer">
+                          Apt Straord.
+                        </Label>
+                      </div>
+                      <div className="border-t pt-2 space-y-2">
+                        <div className="flex items-center space-x-2">
+                          <Checkbox
+                            id="formatore-eo"
+                            checked={settings.priority_types.formatore_cleaner.early_out}
+                            onCheckedChange={(checked) =>
+                              updatePriorityTypeRule("formatore_cleaner", "early_out", !!checked)
+                            }
+                          />
+                          <Badge className="bg-blue-500 text-white border-blue-700 text-xs px-2 py-0">
+                            EO
+                          </Badge>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <Checkbox
+                            id="formatore-hp"
+                            checked={settings.priority_types.formatore_cleaner.high_priority}
+                            onCheckedChange={(checked) =>
+                              updatePriorityTypeRule("formatore_cleaner", "high_priority", !!checked)
+                            }
+                          />
+                          <Badge className="bg-orange-500 text-white border-orange-700 text-xs px-2 py-0">
+                            HP
+                          </Badge>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <Checkbox
+                            id="formatore-lp"
+                            checked={settings.priority_types.formatore_cleaner.low_priority}
+                            onCheckedChange={(checked) =>
+                              updatePriorityTypeRule("formatore_cleaner", "low_priority", !!checked)
+                            }
+                          />
+                          <Badge className="bg-gray-500 text-white border-gray-700 text-xs px-2 py-0">
+                            LP
+                          </Badge>
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 </div>
-              </CardContent>
-            </Card>
+              </div>
+            </CardContent>
+          </Card>
 
-          {/* Task Types - Tipi di appartamento e priorità che i cleaner possono fare */}
-          <Card className="bg-custom-blue-light border-2 border-custom-blue">
+          {/* Rimosso il resto della vecchia card Task Types */}
+          <Card className="bg-custom-blue-light border-2 border-custom-blue" style={{display: 'none'}}>
             <CardHeader className="bg-custom-blue-light py-3">
               <CardTitle className="text-lg">Task Types</CardTitle>
               <CardDescription className="text-xs">
@@ -657,352 +977,7 @@ export default function SystemSettings() {
             </CardHeader>
             <CardContent className="bg-custom-blue-light">
               <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                {/* Cleaner Standard */}
-                <div className="space-y-3">
-                  <div className="border-b pb-2 flex items-center gap-2">
-                    <span className="text-sm font-medium text-green-800 dark:text-green-200">Cleaner</span>
-                    <span className="px-2 py-0.5 rounded border font-medium text-sm bg-green-500/30 text-green-800 dark:bg-green-500/40 dark:text-green-200 border-green-600 dark:border-green-400">
-                      Standard
-                    </span>
-                  </div>
-                  <div className="space-y-2">
-                    <div className="flex items-center space-x-2">
-                      <Checkbox
-                        id="standard-std"
-                        checked={settings.task_types.standard_cleaner.standard_apt}
-                        onCheckedChange={(checked) =>
-                          updateTaskTypeRule("standard_cleaner", "standard_apt", !!checked)
-                        }
-                      />
-                      <Label htmlFor="standard-std" className="text-sm cursor-pointer">
-                        Apt Standard
-                      </Label>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <Checkbox
-                        id="standard-prem"
-                        checked={settings.task_types.standard_cleaner.premium_apt}
-                        onCheckedChange={(checked) =>
-                          updateTaskTypeRule("standard_cleaner", "premium_apt", !!checked)
-                        }
-                      />
-                      <Label htmlFor="standard-prem" className="text-sm cursor-pointer">
-                        Apt Premium
-                      </Label>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <Checkbox
-                        id="standard-straord"
-                        checked={settings.task_types.standard_cleaner.straordinario_apt}
-                        onCheckedChange={(checked) =>
-                          updateTaskTypeRule("standard_cleaner", "straordinario_apt", !!checked)
-                        }
-                      />
-                      <Label htmlFor="standard-straord" className="text-sm cursor-pointer">
-                        Apt Straordinario
-                      </Label>
-                    </div>
-                    <div className="border-t pt-2 mt-2 space-y-2">
-                      <div className="flex items-center space-x-2">
-                        <Checkbox
-                          id="standard-eo"
-                          checked={settings.priority_types.standard_cleaner.early_out}
-                          onCheckedChange={(checked) =>
-                            updatePriorityTypeRule("standard_cleaner", "early_out", !!checked)
-                          }
-                        />
-                        <Badge className="bg-blue-500 text-white border-blue-700 text-xs px-2 py-0">
-                          EO
-                        </Badge>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <Checkbox
-                          id="standard-hp"
-                          checked={settings.priority_types.standard_cleaner.high_priority}
-                          onCheckedChange={(checked) =>
-                            updatePriorityTypeRule("standard_cleaner", "high_priority", !!checked)
-                          }
-                        />
-                        <Badge className="bg-orange-500 text-white border-orange-700 text-xs px-2 py-0">
-                          HP
-                        </Badge>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <Checkbox
-                          id="standard-lp"
-                          checked={settings.priority_types.standard_cleaner.low_priority}
-                          onCheckedChange={(checked) =>
-                            updatePriorityTypeRule("standard_cleaner", "low_priority", !!checked)
-                          }
-                        />
-                        <Badge className="bg-gray-500 text-white border-gray-700 text-xs px-2 py-0">
-                          LP
-                        </Badge>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Cleaner Premium */}
-                <div className="space-y-3">
-                  <div className="border-b pb-2 flex items-center gap-2">
-                    <span className="text-sm font-medium text-yellow-800 dark:text-yellow-200">Cleaner</span>
-                    <span className="px-2 py-0.5 rounded border font-medium text-sm bg-yellow-500/30 text-yellow-800 dark:bg-yellow-500/40 dark:text-yellow-200 border-yellow-600 dark:border-yellow-400">
-                      Premium
-                    </span>
-                  </div>
-                  <div className="space-y-2">
-                    <div className="flex items-center space-x-2">
-                      <Checkbox
-                        id="premium-std"
-                        checked={settings.task_types.premium_cleaner.standard_apt}
-                        onCheckedChange={(checked) =>
-                          updateTaskTypeRule("premium_cleaner", "standard_apt", !!checked)
-                        }
-                      />
-                      <Label htmlFor="premium-std" className="text-sm cursor-pointer">
-                        Apt Standard
-                      </Label>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <Checkbox
-                        id="premium-prem"
-                        checked={settings.task_types.premium_cleaner.premium_apt}
-                        onCheckedChange={(checked) =>
-                          updateTaskTypeRule("premium_cleaner", "premium_apt", !!checked)
-                        }
-                      />
-                      <Label htmlFor="premium-prem" className="text-sm cursor-pointer">
-                        Apt Premium
-                      </Label>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <Checkbox
-                        id="premium-straord"
-                        checked={settings.task_types.premium_cleaner.straordinario_apt}
-                        onCheckedChange={(checked) =>
-                          updateTaskTypeRule("premium_cleaner", "straordinario_apt", !!checked)
-                        }
-                      />
-                      <Label htmlFor="premium-straord" className="text-sm cursor-pointer">
-                        Apt Straordinario
-                      </Label>
-                    </div>
-                    <div className="border-t pt-2 mt-2 space-y-2">
-                      <div className="flex items-center space-x-2">
-                        <Checkbox
-                          id="premium-eo"
-                          checked={settings.priority_types.premium_cleaner.early_out}
-                          onCheckedChange={(checked) =>
-                            updatePriorityTypeRule("premium_cleaner", "early_out", !!checked)
-                          }
-                        />
-                        <Badge className="bg-blue-500 text-white border-blue-700 text-xs px-2 py-0">
-                          EO
-                        </Badge>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <Checkbox
-                          id="premium-hp"
-                          checked={settings.priority_types.premium_cleaner.high_priority}
-                          onCheckedChange={(checked) =>
-                            updatePriorityTypeRule("premium_cleaner", "high_priority", !!checked)
-                          }
-                        />
-                        <Badge className="bg-orange-500 text-white border-orange-700 text-xs px-2 py-0">
-                          HP
-                        </Badge>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <Checkbox
-                          id="premium-lp"
-                          checked={settings.priority_types.premium_cleaner.low_priority}
-                          onCheckedChange={(checked) =>
-                            updatePriorityTypeRule("premium_cleaner", "low_priority", !!checked)
-                          }
-                        />
-                        <Badge className="bg-gray-500 text-white border-gray-700 text-xs px-2 py-0">
-                          LP
-                        </Badge>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Cleaner Straordinario */}
-                <div className="space-y-3">
-                  <div className="border-b pb-2 flex items-center gap-2">
-                    <span className="text-sm font-medium text-red-800 dark:text-red-200">Cleaner</span>
-                    <span className="px-2 py-0.5 rounded border font-medium text-sm bg-red-500/30 text-red-800 dark:bg-red-500/40 dark:text-red-200 border-red-600 dark:border-red-400">
-                      Straordinario
-                    </span>
-                  </div>
-                  <div className="space-y-2">
-                    <div className="flex items-center space-x-2">
-                      <Checkbox
-                        id="straord-std"
-                        checked={settings.task_types.straordinario_cleaner.standard_apt}
-                        onCheckedChange={(checked) =>
-                          updateTaskTypeRule("straordinario_cleaner", "standard_apt", !!checked)
-                        }
-                      />
-                      <Label htmlFor="straord-std" className="text-sm cursor-pointer">
-                        Apt Standard
-                      </Label>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <Checkbox
-                        id="straord-prem"
-                        checked={settings.task_types.straordinario_cleaner.premium_apt}
-                        onCheckedChange={(checked) =>
-                          updateTaskTypeRule("straordinario_cleaner", "premium_apt", !!checked)
-                        }
-                      />
-                      <Label htmlFor="straord-prem" className="text-sm cursor-pointer">
-                        Apt Premium
-                      </Label>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <Checkbox
-                        id="straord-straord"
-                        checked={settings.task_types.straordinario_cleaner.straordinario_apt}
-                        onCheckedChange={(checked) =>
-                          updateTaskTypeRule("straordinario_cleaner", "straordinario_apt", !!checked)
-                        }
-                      />
-                      <Label htmlFor="straord-straord" className="text-sm cursor-pointer">
-                        Apt Straordinario
-                      </Label>
-                    </div>
-                    <div className="border-t pt-2 mt-2 space-y-2">
-                      <div className="flex items-center space-x-2">
-                        <Checkbox
-                          id="straord-eo"
-                          checked={settings.priority_types.straordinario_cleaner.early_out}
-                          onCheckedChange={(checked) =>
-                            updatePriorityTypeRule("straordinario_cleaner", "early_out", !!checked)
-                          }
-                        />
-                        <Badge className="bg-blue-500 text-white border-blue-700 text-xs px-2 py-0">
-                          EO
-                        </Badge>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <Checkbox
-                          id="straord-hp"
-                          checked={settings.priority_types.straordinario_cleaner.high_priority}
-                          onCheckedChange={(checked) =>
-                            updatePriorityTypeRule("straordinario_cleaner", "high_priority", !!checked)
-                          }
-                        />
-                        <Badge className="bg-orange-500 text-white border-orange-700 text-xs px-2 py-0">
-                          HP
-                        </Badge>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <Checkbox
-                          id="straord-lp"
-                          checked={settings.priority_types.straordinario_cleaner.low_priority}
-                          onCheckedChange={(checked) =>
-                            updatePriorityTypeRule("straordinario_cleaner", "low_priority", !!checked)
-                          }
-                        />
-                        <Badge className="bg-gray-500 text-white border-gray-700 text-xs px-2 py-0">
-                          LP
-                        </Badge>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Cleaner Formatore */}
-                <div className="space-y-3">
-                  <div className="border-b pb-2 flex items-center gap-2">
-                    <span className="text-sm font-medium text-orange-800 dark:text-orange-200">Cleaner</span>
-                    <span className="px-2 py-0.5 rounded border font-medium text-sm bg-orange-500/30 text-orange-800 dark:bg-orange-500/40 dark:text-orange-200 border-orange-600 dark:border-orange-400">
-                      Formatore
-                    </span>
-                  </div>
-                  <div className="space-y-2">
-                    <div className="flex items-center space-x-2">
-                      <Checkbox
-                        id="formatore-std"
-                        checked={settings.task_types.formatore_cleaner.standard_apt}
-                        onCheckedChange={(checked) =>
-                          updateTaskTypeRule("formatore_cleaner", "standard_apt", !!checked)
-                        }
-                      />
-                      <Label htmlFor="formatore-std" className="text-sm cursor-pointer">
-                        Apt Standard
-                      </Label>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <Checkbox
-                        id="formatore-prem"
-                        checked={settings.task_types.formatore_cleaner.premium_apt}
-                        onCheckedChange={(checked) =>
-                          updateTaskTypeRule("formatore_cleaner", "premium_apt", !!checked)
-                        }
-                      />
-                      <Label htmlFor="formatore-prem" className="text-sm cursor-pointer">
-                        Apt Premium
-                      </Label>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <Checkbox
-                        id="formatore-straord"
-                        checked={settings.task_types.formatore_cleaner.straordinario_apt}
-                        onCheckedChange={(checked) =>
-                          updateTaskTypeRule("formatore_cleaner", "straordinario_apt", !!checked)
-                        }
-                      />
-                      <Label htmlFor="formatore-straord" className="text-sm cursor-pointer">
-                        Apt Straordinario
-                      </Label>
-                    </div>
-                    <div className="border-t pt-2 mt-2 space-y-2">
-                      <div className="flex items-center space-x-2">
-                        <Checkbox
-                          id="formatore-eo"
-                          checked={settings.priority_types.formatore_cleaner.early_out}
-                          onCheckedChange={(checked) =>
-                            updatePriorityTypeRule("formatore_cleaner", "early_out", !!checked)
-                          }
-                        />
-                        <Badge className="bg-blue-500 text-white border-blue-700 text-xs px-2 py-0">
-                          EO
-                        </Badge>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <Checkbox
-                          id="formatore-hp"
-                          checked={settings.priority_types.formatore_cleaner.high_priority}
-                          onCheckedChange={(checked) =>
-                            updatePriorityTypeRule("formatore_cleaner", "high_priority", !!checked)
-                          }
-                        />
-                        <Badge className="bg-orange-500 text-white border-orange-700 text-xs px-2 py-0">
-                          HP
-                        </Badge>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <Checkbox
-                          id="formatore-lp"
-                          checked={settings.priority_types.formatore_cleaner.low_priority}
-                          onCheckedChange={(checked) =>
-                            updatePriorityTypeRule("formatore_cleaner", "low_priority", !!checked)
-                          }
-                        />
-                        <Badge className="bg-gray-500 text-white border-gray-700 text-xs px-2 py-0">
-                          LP
-                        </Badge>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+                
 
           {/* Save Button */}
           <Button
