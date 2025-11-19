@@ -1767,11 +1767,6 @@ export default function TimelineView({
                           Non disponibile
                         </span>
                       )}
-                      {cleaner.role === "Premium" && (
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded border text-xs font-medium bg-yellow-500/30 text-yellow-800 dark:bg-yellow-500/40 dark:text-yellow-200 border-yellow-600 dark:border-yellow-400">
-                          Premium
-                        </span>
-                      )}
                       {cleaner.role === "Formatore" && (
                         <span className="inline-flex items-center px-2.5 py-0.5 rounded border text-xs font-medium bg-orange-500/30 text-orange-800 dark:bg-orange-500/40 dark:text-orange-200 border-orange-600 dark:border-orange-400">
                           Formatore
