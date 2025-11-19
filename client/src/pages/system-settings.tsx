@@ -39,6 +39,7 @@ interface SettingsData {
   apartment_types: {
     standard_apt: string[];
     premium_apt: string[];
+    straordinario_apt: string[];
     formatore_apt: string[];
   };
   task_types: {
@@ -461,7 +462,7 @@ export default function SystemSettings() {
                 </CardDescription>
               </CardHeader>
               <CardContent className="bg-custom-blue-light">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
                   {/* Cleaner STANDARD */}
                   <div className="space-y-3">
                     <div className="border-b pb-2 flex items-center gap-2">
@@ -506,10 +507,6 @@ export default function SystemSettings() {
                       <span className="px-2 py-0.5 rounded border font-medium text-sm bg-yellow-500/30 text-yellow-800 dark:bg-yellow-500/40 dark:text-yellow-200 border-yellow-600 dark:border-yellow-400">
                         Premium
                       </span>
-                      <span className="text-sm font-medium text-red-800 dark:text-red-200">e</span>
-                      <span className="px-2 py-0.5 rounded border font-medium text-sm bg-red-500/30 text-red-800 dark:bg-red-500/40 dark:text-red-200 border-red-600 dark:border-red-400">
-                        Straordinario
-                      </span>
                     </div>
                     <div className="space-y-2">
                       {["A", "B", "C", "D", "E", "F", "X"].map((type) => (
@@ -533,6 +530,43 @@ export default function SystemSettings() {
                             className="h-4 w-4 rounded border-gray-300"
                           />
                           <Label htmlFor={`premium-${type}`} className="text-sm cursor-pointer">
+                            Tipo {type}
+                          </Label>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Cleaner STRAORDINARIO */}
+                  <div className="space-y-3">
+                    <div className="border-b pb-2 flex items-center gap-2">
+                      <span className="text-sm font-medium text-red-800 dark:text-red-200">Cleaner</span>
+                      <span className="px-2 py-0.5 rounded border font-medium text-sm bg-red-500/30 text-red-800 dark:bg-red-500/40 dark:text-red-200 border-red-600 dark:border-red-400">
+                        Straordinario
+                      </span>
+                    </div>
+                    <div className="space-y-2">
+                      {["A", "B", "C", "D", "E", "F", "X"].map((type) => (
+                        <div key={`straordinario-${type}`} className="flex items-center space-x-2">
+                          <input
+                            type="checkbox"
+                            id={`straordinario-${type}`}
+                            checked={settings.apartment_types.straordinario_apt.includes(type)}
+                            onChange={(e) => {
+                              const newTypes = e.target.checked
+                                ? [...settings.apartment_types.straordinario_apt, type]
+                                : settings.apartment_types.straordinario_apt.filter((t) => t !== type);
+                              setSettings({
+                                ...settings,
+                                apartment_types: {
+                                  ...settings.apartment_types,
+                                  straordinario_apt: newTypes,
+                                },
+                              });
+                            }}
+                            className="h-4 w-4 rounded border-gray-300"
+                          />
+                          <Label htmlFor={`straordinario-${type}`} className="text-sm cursor-pointer">
                             Tipo {type}
                           </Label>
                         </div>
