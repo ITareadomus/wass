@@ -24,6 +24,12 @@ interface CleanerAptRules {
   straordinario_apt: boolean;
 }
 
+interface CleanerPriorityRules {
+  early_out: boolean;
+  high_priority: boolean;
+  low_priority: boolean;
+}
+
 interface SettingsData {
   "early-out": {
     eo_start_time: string;
@@ -47,6 +53,12 @@ interface SettingsData {
     premium_cleaner: CleanerAptRules;
     straordinario_cleaner: CleanerAptRules;
     formatore_cleaner: CleanerAptRules;
+  };
+  priority_types: {
+    standard_cleaner: CleanerPriorityRules;
+    premium_cleaner: CleanerPriorityRules;
+    straordinario_cleaner: CleanerPriorityRules;
+    formatore_cleaner: CleanerPriorityRules;
   };
 }
 
@@ -195,6 +207,27 @@ export default function SystemSettings() {
           [cleanerType]: {
             ...prev.task_types[cleanerType],
             [aptType]: value,
+          },
+        },
+      };
+    });
+  };
+
+  const updatePriorityTypeRule = (
+    cleanerType: keyof SettingsData["priority_types"],
+    priorityType: keyof CleanerPriorityRules,
+    value: boolean
+  ) => {
+    setSettings(prev => {
+      if (!prev) return prev;
+
+      return {
+        ...prev,
+        priority_types: {
+          ...prev.priority_types,
+          [cleanerType]: {
+            ...prev.priority_types[cleanerType],
+            [priorityType]: value,
           },
         },
       };
@@ -614,12 +647,12 @@ export default function SystemSettings() {
               </CardContent>
             </Card>
 
-          {/* Task Types - Tipi di appartamento che i cleaner possono fare */}
+          {/* Task Types - Tipi di appartamento e priorità che i cleaner possono fare */}
           <Card className="bg-custom-blue-light border-2 border-custom-blue">
             <CardHeader className="bg-custom-blue-light py-3">
               <CardTitle className="text-lg">Task Types</CardTitle>
               <CardDescription className="text-xs">
-                Tipi di appartamento che ogni categoria di cleaner può gestire
+                Tipi di appartamento e priorità che ogni categoria di cleaner può gestire
               </CardDescription>
             </CardHeader>
             <CardContent className="bg-custom-blue-light">
@@ -669,6 +702,44 @@ export default function SystemSettings() {
                         Apt Straordinario
                       </Label>
                     </div>
+                    <div className="border-t pt-2 mt-2 space-y-2">
+                      <div className="flex items-center space-x-2">
+                        <Checkbox
+                          id="standard-eo"
+                          checked={settings.priority_types.standard_cleaner.early_out}
+                          onCheckedChange={(checked) =>
+                            updatePriorityTypeRule("standard_cleaner", "early_out", !!checked)
+                          }
+                        />
+                        <Badge className="bg-blue-500 text-white border-blue-700 text-xs px-2 py-0">
+                          EO
+                        </Badge>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <Checkbox
+                          id="standard-hp"
+                          checked={settings.priority_types.standard_cleaner.high_priority}
+                          onCheckedChange={(checked) =>
+                            updatePriorityTypeRule("standard_cleaner", "high_priority", !!checked)
+                          }
+                        />
+                        <Badge className="bg-orange-500 text-white border-orange-700 text-xs px-2 py-0">
+                          HP
+                        </Badge>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <Checkbox
+                          id="standard-lp"
+                          checked={settings.priority_types.standard_cleaner.low_priority}
+                          onCheckedChange={(checked) =>
+                            updatePriorityTypeRule("standard_cleaner", "low_priority", !!checked)
+                          }
+                        />
+                        <Badge className="bg-gray-500 text-white border-gray-700 text-xs px-2 py-0">
+                          LP
+                        </Badge>
+                      </div>
+                    </div>
                   </div>
                 </div>
 
@@ -716,6 +787,44 @@ export default function SystemSettings() {
                       <Label htmlFor="premium-straord" className="text-sm cursor-pointer">
                         Apt Straordinario
                       </Label>
+                    </div>
+                    <div className="border-t pt-2 mt-2 space-y-2">
+                      <div className="flex items-center space-x-2">
+                        <Checkbox
+                          id="premium-eo"
+                          checked={settings.priority_types.premium_cleaner.early_out}
+                          onCheckedChange={(checked) =>
+                            updatePriorityTypeRule("premium_cleaner", "early_out", !!checked)
+                          }
+                        />
+                        <Badge className="bg-blue-500 text-white border-blue-700 text-xs px-2 py-0">
+                          EO
+                        </Badge>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <Checkbox
+                          id="premium-hp"
+                          checked={settings.priority_types.premium_cleaner.high_priority}
+                          onCheckedChange={(checked) =>
+                            updatePriorityTypeRule("premium_cleaner", "high_priority", !!checked)
+                          }
+                        />
+                        <Badge className="bg-orange-500 text-white border-orange-700 text-xs px-2 py-0">
+                          HP
+                        </Badge>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <Checkbox
+                          id="premium-lp"
+                          checked={settings.priority_types.premium_cleaner.low_priority}
+                          onCheckedChange={(checked) =>
+                            updatePriorityTypeRule("premium_cleaner", "low_priority", !!checked)
+                          }
+                        />
+                        <Badge className="bg-gray-500 text-white border-gray-700 text-xs px-2 py-0">
+                          LP
+                        </Badge>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -765,6 +874,44 @@ export default function SystemSettings() {
                         Apt Straordinario
                       </Label>
                     </div>
+                    <div className="border-t pt-2 mt-2 space-y-2">
+                      <div className="flex items-center space-x-2">
+                        <Checkbox
+                          id="straord-eo"
+                          checked={settings.priority_types.straordinario_cleaner.early_out}
+                          onCheckedChange={(checked) =>
+                            updatePriorityTypeRule("straordinario_cleaner", "early_out", !!checked)
+                          }
+                        />
+                        <Badge className="bg-blue-500 text-white border-blue-700 text-xs px-2 py-0">
+                          EO
+                        </Badge>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <Checkbox
+                          id="straord-hp"
+                          checked={settings.priority_types.straordinario_cleaner.high_priority}
+                          onCheckedChange={(checked) =>
+                            updatePriorityTypeRule("straordinario_cleaner", "high_priority", !!checked)
+                          }
+                        />
+                        <Badge className="bg-orange-500 text-white border-orange-700 text-xs px-2 py-0">
+                          HP
+                        </Badge>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <Checkbox
+                          id="straord-lp"
+                          checked={settings.priority_types.straordinario_cleaner.low_priority}
+                          onCheckedChange={(checked) =>
+                            updatePriorityTypeRule("straordinario_cleaner", "low_priority", !!checked)
+                          }
+                        />
+                        <Badge className="bg-gray-500 text-white border-gray-700 text-xs px-2 py-0">
+                          LP
+                        </Badge>
+                      </div>
+                    </div>
                   </div>
                 </div>
 
@@ -812,6 +959,46 @@ export default function SystemSettings() {
                       <Label htmlFor="formatore-straord" className="text-sm cursor-pointer">
                         Apt Straordinario
                       </Label>
+                    </div>
+                    <div className="border-t pt-2 mt-2 space-y-2">
+                      <div className="flex items-center space-x-2">
+                        <Checkbox
+                          id="formatore-eo"
+                          checked={settings.priority_types.formatore_cleaner.early_out}
+                          onCheckedChange={(checked) =>
+                            updatePriorityTypeRule("formatore_cleaner", "early_out", !!checked)
+                          }
+                          disabled
+                        />
+                        <Badge className="bg-blue-500 text-white border-blue-700 text-xs px-2 py-0 opacity-50">
+                          EO
+                        </Badge>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <Checkbox
+                          id="formatore-hp"
+                          checked={settings.priority_types.formatore_cleaner.high_priority}
+                          onCheckedChange={(checked) =>
+                            updatePriorityTypeRule("formatore_cleaner", "high_priority", !!checked)
+                          }
+                          disabled
+                        />
+                        <Badge className="bg-orange-500 text-white border-orange-700 text-xs px-2 py-0 opacity-50">
+                          HP
+                        </Badge>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <Checkbox
+                          id="formatore-lp"
+                          checked={settings.priority_types.formatore_cleaner.low_priority}
+                          onCheckedChange={(checked) =>
+                            updatePriorityTypeRule("formatore_cleaner", "low_priority", !!checked)
+                          }
+                        />
+                        <Badge className="bg-gray-500 text-white border-gray-700 text-xs px-2 py-0">
+                          LP
+                        </Badge>
+                      </div>
                     </div>
                   </div>
                 </div>
