@@ -263,7 +263,7 @@ export default function SystemSettings() {
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 {/* Early-Out */}
                 <div className="space-y-3">
-                  <div className="border-b pb-2 flex items-center gap-2">
+                  <div className="border-b pb-2 flex items-center justify-center gap-2">
                     <span className="text-sm font-medium text-blue-800 dark:text-blue-200">Apt</span>
                     <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-500 text-white border-blue-700">
                       EO
@@ -332,7 +332,7 @@ export default function SystemSettings() {
 
                 {/* High-Priority */}
                 <div className="space-y-3">
-                  <div className="border-b pb-2 flex items-center gap-2">
+                  <div className="border-b pb-2 flex items-center justify-center gap-2">
                     <span className="text-sm font-medium text-orange-800 dark:text-orange-200">Apt</span>
                     <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-orange-500 text-white border-orange-700">
                       HP
@@ -401,7 +401,7 @@ export default function SystemSettings() {
 
                 {/* Low-Priority */}
                 <div className="space-y-3">
-                  <div className="border-b pb-2 flex items-center gap-2">
+                  <div className="border-b pb-2 flex items-center justify-center gap-2">
                     <span className="text-sm font-medium text-gray-800 dark:text-gray-200">Apt</span>
                     <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-500 text-white border-gray-700">
                       LP
