@@ -1,6 +1,6 @@
 {
   "metadata": {
-    "last_updated": "2025-11-19T15:31:45.894Z",
+    "last_updated": "2025-11-19T15:51:36.026720",
     "date": "2025-11-19",
     "created_by": "system",
     "modified_by": [
@@ -373,7 +373,7 @@
         {
           "task_id": 219144,
           "logistic_code": 1496,
-          "client_id": null,
+          "client_id": 113,
           "premium": false,
           "address": "VIA TORINO 44",
           "lat": "45.4613523",
@@ -385,7 +385,7 @@
           "checkout_time": "16:30",
           "pax_in": 2,
           "pax_out": 2,
-          "small_equipment": false,
+          "small_equipment": true,
           "operation_id": 2,
           "confirmed_operation": true,
           "straordinaria": false,
