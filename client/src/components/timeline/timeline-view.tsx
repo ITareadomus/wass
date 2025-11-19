@@ -608,8 +608,29 @@ export default function TimelineView({
         c.active === true && !selectedCleanerIds.has(c.id)
       );
 
-      // Ordina per counter_hours (decrescente)
-      available.sort((a: any, b: any) => b.counter_hours - a.counter_hours);
+      // Ordina per tipologia (Formatori → Straordinari → Premium → Standard)
+      // e per weekly_hours DESC all'interno di ogni gruppo
+      available.sort((a: any, b: any) => {
+        // Priorità tipologie: Formatori (1) → Straordinari (2) → Premium (3) → Standard (4)
+        const getPriority = (cleaner: any) => {
+          if (cleaner.role === "Formatore") return 1;
+          if (cleaner.can_do_straordinaria) return 2;
+          if (cleaner.role === "Premium") return 3;
+          return 4; // Standard
+        };
+
+        const priorityA = getPriority(a);
+        const priorityB = getPriority(b);
+
+        if (priorityA !== priorityB) {
+          return priorityA - priorityB; // Ordine crescente per priorità
+        }
+
+        // Stessa tipologia: ordina per weekly_hours DESC
+        const hoursA = a.weekly_hours || 0;
+        const hoursB = b.weekly_hours || 0;
+        return hoursB - hoursA;
+      });
 
       console.log(`✅ Cleaners disponibili da aggiungere: ${available.length}`);
       setAvailableCleaners(available);
