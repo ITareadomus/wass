@@ -238,17 +238,17 @@ export default function TaskCard({
     loadOperationNames();
   }, []);
 
-  // Reset editingField SOLO quando il modal si chiude
+  // Reset editingField quando il modal si chiude o quando diventa readonly
   useEffect(() => {
-    if (!isModalOpen) {
+    if (!isModalOpen || isReadOnly) {
       setEditingField(null);
     }
-  }, [isModalOpen]);
+  }, [isModalOpen, isReadOnly]);
 
   // Inizializza i campi quando il modale si apre o quando displayTask cambia
-  // MA NON se l'utente sta già modificando un campo
+  // MA NON se l'utente sta già modificando un campo o se è readonly
   useEffect(() => {
-    if (isModalOpen && !editingField) {
+    if (isModalOpen && !editingField && !isReadOnly) {
       console.log('🔓 Modale aperto per task:', {
         taskId: task.id,
         allTasksCount: allTasks?.length || 0,
