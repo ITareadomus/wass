@@ -69,5 +69,27 @@
       "premium_apt": false,
       "straordinario_apt": false
     }
+  },
+  "priority_types": {
+    "standard_cleaner": {
+      "early_out": true,
+      "high_priority": true,
+      "low_priority": true
+    },
+    "premium_cleaner": {
+      "early_out": true,
+      "high_priority": true,
+      "low_priority": true
+    },
+    "straordinario_cleaner": {
+      "early_out": true,
+      "high_priority": true,
+      "low_priority": true
+    },
+    "formatore_cleaner": {
+      "early_out": false,
+      "high_priority": false,
+      "low_priority": true
+    }
   }
 }
