@@ -452,25 +452,11 @@ export default function TaskCard({
     }
   };
 
-  // Determina se la task è < 1 ora per ridurre le dimensioni del testo
-  const isSmallTask = (() => {
-    const safeDuration = task.duration || "0.0";
-    const parts = safeDuration.split(".");
-    const hours = parseInt(parts[0] || "0");
-    const minutes = parts[1] ? parseInt(parts[1]) : 0;
-    const totalMinutes = hours * 60 + minutes;
-    return totalMinutes < 60;
-  })();
+  // Mostra sempre le frecce check-in/check-out
+  const shouldShowCheckInOutArrows = true;
 
-  // Determina se mostrare le frecce check-in e check-out:
-  // - Nei containers: SEMPRE mostrare le frecce
-  // - Nella timeline: mostrare SOLO per task >= 1 ora
-  const shouldShowCheckInOutArrows = isInTimeline ? !isSmallTask : true;
-
-  // Determina se mostrare il tooltip con orari:
-  // - Nei containers: MAI (le frecce sono già visibili)
-  // - Nella timeline: SOLO per task < 1 ora
-  const shouldShowTooltipTimes = isInTimeline && isSmallTask;
+  // Non mostrare mai orari nel tooltip (le frecce sono sempre visibili)
+  const shouldShowTooltipTimes = false;
 
   // Verifica se end_time sfora checkin_time (considerando le date!)
   const isOverdue = (() => {
@@ -626,20 +612,14 @@ export default function TaskCard({
                     >
                       <div className="flex items-center gap-1">
                         <span
-                          className={cn(
-                            "text-[#ff0000] font-extrabold",
-                            isInTimeline && isSmallTask ? "text-[10px]" : "text-[13px]"
-                          )}
+                          className="text-[#ff0000] font-extrabold text-[13px]"
                           data-testid={`task-name-${getTaskKey(task)}`}
                         >
                           {task.name}
                         </span>
                       </div>
                       {task.alias && (
-                        <span className={cn(
-                          "opacity-70 leading-none mt-0.5 text-[#000000] font-bold",
-                          isInTimeline && isSmallTask ? "text-[9px]" : "text-[11px]"
-                        )}>
+                        <span className="opacity-70 leading-none mt-0.5 text-[#000000] font-bold text-[11px]">
                           {task.alias}{(task as any).type_apt ? ` (${(task as any).type_apt})` : ''}
                         </span>
                       )}
