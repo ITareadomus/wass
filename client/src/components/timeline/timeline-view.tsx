@@ -1830,13 +1830,13 @@ export default function TimelineView({
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
         <DialogContent className={`sm:max-w-2xl max-h-[80vh] overflow-y-auto ${
           selectedCleaner?.can_do_straordinaria
-            ? "bg-red-100 dark:bg-red-950/50 border-2 border-red-300 dark:border-red-700"
+            ? "bg-red-100/50 dark:bg-red-950/50 border-2 border-red-300 dark:border-red-700"
             : selectedCleaner?.role === "Formatore"
-            ? "bg-orange-100 dark:bg-orange-950/50 border-2 border-orange-300 dark:border-orange-700"
+            ? "bg-orange-100/50 dark:bg-orange-950/50 border-2 border-orange-300 dark:border-orange-700"
             : selectedCleaner?.role === "Premium"
-            ? "bg-yellow-100 dark:bg-yellow-950/50 border-2 border-yellow-300 dark:border-yellow-700"
+            ? "bg-yellow-100/50 dark:bg-yellow-950/50 border-2 border-yellow-300 dark:border-yellow-700"
             : selectedCleaner?.role === "Standard"
-            ? "bg-green-100 dark:bg-green-950/50 border-2 border-green-300 dark:border-green-700"
+            ? "bg-green-100/50 dark:bg-green-950/50 border-2 border-green-300 dark:border-green-700"
             : ""
         }`}>
           <DialogHeader>
