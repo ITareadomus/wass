@@ -1,62 +1,13 @@
 {
   "metadata": {
-    "last_updated": "2025-11-19T11:20:58.529Z",
+    "last_updated": "2025-11-19T11:24:46.189Z",
     "date": "2025-11-20",
-    "created_by": "Admin",
-    "modified_by": [
-      "Admin"
-    ]
+    "created_by": "unknown"
   },
-  "cleaners_assignments": [
-    {
-      "cleaner": {
-        "id": 785,
-        "name": "RACHEL",
-        "lastname": "OTSHINGA",
-        "role": "Premium",
-        "premium": true
-      },
-      "tasks": [
-        {
-          "task_id": 218974,
-          "logistic_code": 1647,
-          "client_id": null,
-          "premium": true,
-          "address": "Viale Piave 35",
-          "lat": "45.472932",
-          "lng": "9.2062841",
-          "cleaning_time": 180,
-          "checkin_date": "2025-11-21",
-          "checkout_date": "2025-11-20",
-          "checkin_time": null,
-          "checkout_time": null,
-          "pax_in": 4,
-          "pax_out": 3,
-          "small_equipment": false,
-          "operation_id": 2,
-          "confirmed_operation": false,
-          "straordinaria": false,
-          "type_apt": "E",
-          "alias": "HCC",
-          "customer_name": "HACCA SRL",
-          "reasons": [
-            "manually_moved_to_timeline"
-          ],
-          "priority": "early_out",
-          "start_time": "10:00",
-          "end_time": "13:00",
-          "followup": false,
-          "sequence": 1,
-          "travel_time": 0,
-          "modified_by": "Admin"
-        }
-      ]
-    }
-  ],
+  "cleaners_assignments": [],
   "meta": {
-    "total_cleaners": 1,
+    "total_cleaners": 0,
     "used_cleaners": 0,
-    "assigned_tasks": 0,
-    "total_tasks": 1
+    "assigned_tasks": 0
   }
 }
