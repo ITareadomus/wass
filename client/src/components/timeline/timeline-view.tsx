@@ -1,5 +1,5 @@
 import { Personnel, TaskType as Task } from "@shared/schema";
-import { Calendar as CalendarIcon, RotateCcw, Users, RefreshCw, UserPlus, Maximize2, Minimize2, Check, CheckCircle, Save, Pencil } from "lucide-react";
+import { Calendar as CalendarIcon, RotateCcw, Users, RefreshCw, UserPlus, Maximize2, Minimize2, Check, CheckCircle, Save, Pencil, ChevronLeft, ChevronRight } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import * as React from "react";
 import { Droppable, Draggable } from "react-beautiful-dnd";
@@ -26,6 +26,8 @@ import {
 import { useLocation } from 'wouter';
 import { format } from 'date-fns';
 import { loadValidationRules, canCleanerHandleTaskSync } from "@/lib/taskValidation";
+import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
 
 interface TimelineViewProps {
   personnel: Personnel[];
@@ -565,7 +567,7 @@ export default function TimelineView({
     }
   };
 
-  // Funzione per caricare i cleaners disponibili (non già in timeline)
+  // Funzione per caricare i cleaner disponibili (non già in timeline)
   const loadAvailableCleaners = async () => {
     try {
       // CRITICAL: Prima estrai i cleaners dal database per la data corrente
@@ -1674,7 +1676,7 @@ export default function TimelineView({
 
       {/* Confirmation Dialog for Cleaner Removal */}
       <Dialog open={confirmRemovalDialog.open} onOpenChange={(open) => setConfirmRemovalDialog({ open, cleanerId: null })}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-md">
           <DialogHeader>
             <DialogTitle>Conferma Rimozione Cleaner</DialogTitle>
             <DialogDescription>
@@ -1798,7 +1800,7 @@ export default function TimelineView({
 
       {/* Confirmation Dialog for Unavailable Cleaners */}
       <Dialog open={confirmUnavailableDialog.open} onOpenChange={(open) => setConfirmUnavailableDialog({ open, cleanerId: null })}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-md">
           <DialogHeader>
             <DialogTitle>Conferma Aggiunta Cleaner</DialogTitle>
             <DialogDescription>
@@ -1844,23 +1846,28 @@ export default function TimelineView({
               Dettagli Cleaner #{selectedCleaner?.id}
               {selectedCleaner && (
                 <>
-                  {selectedCleaner.role === "Formatore" ? (
-                    <span className="px-2 py-0.5 rounded border font-medium text-sm bg-orange-500/30 text-orange-800 dark:bg-orange-500/40 dark:text-orange-200 border-orange-600 dark:border-orange-400">
-                      Formatore
-                    </span>
-                  ) : selectedCleaner.role === "Premium" ? (
-                    <span className="px-2 py-0.5 rounded border font-medium text-sm bg-yellow-500/30 text-yellow-800 dark:bg-yellow-500/40 dark:text-yellow-200 border-yellow-600 dark:border-yellow-400">
-                      Premium
-                    </span>
-                  ) : (
-                    <span className="px-2 py-0.5 rounded border font-medium text-sm bg-green-500/30 text-green-800 dark:bg-green-500/40 dark:text-green-200 border-green-600 dark:border-green-400">
-                      Standard
-                    </span>
-                  )}
-                  {selectedCleaner.can_do_straordinaria && (
+                  {/* Se straordinario, mostra SOLO badge straordinario */}
+                  {selectedCleaner.can_do_straordinaria ? (
                     <span className="px-2 py-0.5 rounded border font-medium text-sm bg-red-500/20 text-red-700 dark:text-red-300 border-red-500">
                       Straordinario
                     </span>
+                  ) : (
+                    /* Altrimenti mostra badge role normale */
+                    <>
+                      {selectedCleaner.role === "Formatore" ? (
+                        <span className="px-2 py-0.5 rounded border font-medium text-sm bg-orange-500/30 text-orange-800 dark:bg-orange-500/40 dark:text-orange-200 border-orange-600 dark:border-orange-400">
+                          Formatore
+                        </span>
+                      ) : selectedCleaner.role === "Premium" ? (
+                        <span className="px-2 py-0.5 rounded border font-medium text-sm bg-yellow-500/30 text-yellow-800 dark:bg-yellow-500/40 dark:text-yellow-200 border-yellow-600 dark:border-yellow-400">
+                          Premium
+                        </span>
+                      ) : (
+                        <span className="px-2 py-0.5 rounded border font-medium text-sm bg-green-500/30 text-green-800 dark:bg-green-500/40 dark:text-green-200 border-green-600 dark:border-green-400">
+                          Standard
+                        </span>
+                      )}
+                    </>
                   )}
                 </>
               )}
