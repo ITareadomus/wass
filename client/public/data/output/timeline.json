@@ -1,9 +1,10 @@
 {
   "metadata": {
-    "last_updated": "2025-11-19T15:25:39.734438",
+    "last_updated": "2025-11-19T15:31:45.894Z",
     "date": "2025-11-19",
     "created_by": "system",
     "modified_by": [
+      "Admin",
       "system"
     ]
   },
@@ -161,39 +162,6 @@
           "travel_time": 0
         },
         {
-          "task_id": 219052,
-          "logistic_code": 618,
-          "client_id": 67,
-          "premium": false,
-          "address": "VIA VOGHERA, 4",
-          "lat": "45.454632",
-          "lng": "9.168536",
-          "cleaning_time": 30,
-          "checkin_date": "2025-11-19",
-          "checkout_date": "2025-11-19",
-          "checkin_time": null,
-          "checkout_time": "09:30",
-          "pax_in": 1,
-          "pax_out": 0,
-          "small_equipment": true,
-          "operation_id": 2,
-          "confirmed_operation": true,
-          "straordinaria": false,
-          "type_apt": "A",
-          "alias": "EXP",
-          "customer_name": "EXPERIENCE DESIGN BED & SHOW",
-          "reasons": [
-            "checkout_time<=eo_end_time",
-            "automatic_assignment_eo"
-          ],
-          "priority": "early_out",
-          "start_time": "11:07",
-          "end_time": "11:37",
-          "followup": true,
-          "sequence": 2,
-          "travel_time": 7
-        },
-        {
           "task_id": 219053,
           "logistic_code": 619,
           "client_id": 67,
@@ -220,7 +188,40 @@
             "automatic_assignment_eo"
           ],
           "priority": "early_out",
-          "start_time": "11:42",
+          "start_time": "11:07",
+          "end_time": "11:47",
+          "followup": true,
+          "sequence": 2,
+          "travel_time": 7
+        },
+        {
+          "task_id": 219052,
+          "logistic_code": 618,
+          "client_id": 67,
+          "premium": false,
+          "address": "VIA VOGHERA, 4",
+          "lat": "45.454632",
+          "lng": "9.168536",
+          "cleaning_time": 30,
+          "checkin_date": "2025-11-19",
+          "checkout_date": "2025-11-19",
+          "checkin_time": null,
+          "checkout_time": "09:30",
+          "pax_in": 1,
+          "pax_out": 0,
+          "small_equipment": true,
+          "operation_id": 2,
+          "confirmed_operation": true,
+          "straordinaria": false,
+          "type_apt": "A",
+          "alias": "EXP",
+          "customer_name": "EXPERIENCE DESIGN BED & SHOW",
+          "reasons": [
+            "checkout_time<=eo_end_time",
+            "automatic_assignment_eo"
+          ],
+          "priority": "early_out",
+          "start_time": "11:52",
           "end_time": "12:22",
           "followup": true,
           "sequence": 3,
@@ -253,11 +254,11 @@
             "automatic_assignment_eo"
           ],
           "priority": "early_out",
-          "start_time": "12:27",
-          "end_time": "12:57",
+          "start_time": "12:25",
+          "end_time": "12:55",
           "followup": true,
           "sequence": 4,
-          "travel_time": 5
+          "travel_time": 3
         }
       ]
     },
@@ -270,39 +271,6 @@
         "premium": true
       },
       "tasks": [
-        {
-          "task_id": 218956,
-          "logistic_code": 1153,
-          "client_id": 61,
-          "premium": false,
-          "address": "VIA CELESTINO IV, 9",
-          "lat": "45.4596054",
-          "lng": "9.1821442",
-          "cleaning_time": 120,
-          "checkin_date": "2025-11-20",
-          "checkout_date": "2025-11-19",
-          "checkin_time": null,
-          "checkout_time": null,
-          "pax_in": 2,
-          "pax_out": 1,
-          "small_equipment": false,
-          "operation_id": 2,
-          "confirmed_operation": true,
-          "straordinaria": false,
-          "type_apt": "C",
-          "alias": "NTM",
-          "customer_name": "NOTA-MI",
-          "reasons": [
-            "client_forced_eo",
-            "automatic_assignment_eo"
-          ],
-          "priority": "early_out",
-          "start_time": "10:00",
-          "end_time": "12:00",
-          "followup": false,
-          "sequence": 1,
-          "travel_time": 0
-        },
         {
           "task_id": 218944,
           "logistic_code": 1645,
@@ -330,11 +298,11 @@
             "automatic_assignment_eo"
           ],
           "priority": "early_out",
-          "start_time": "12:14",
-          "end_time": "13:14",
-          "followup": true,
-          "sequence": 2,
-          "travel_time": 14
+          "start_time": "10:00",
+          "end_time": "11:00",
+          "followup": false,
+          "sequence": 1,
+          "travel_time": 0
         },
         {
           "task_id": 218942,
@@ -363,11 +331,77 @@
             "automatic_assignment_eo"
           ],
           "priority": "early_out",
-          "start_time": "13:24",
-          "end_time": "16:24",
+          "start_time": "11:10",
+          "end_time": "14:10",
+          "followup": true,
+          "sequence": 2,
+          "travel_time": 10
+        },
+        {
+          "task_id": 218956,
+          "logistic_code": 1153,
+          "client_id": 61,
+          "premium": false,
+          "address": "VIA CELESTINO IV, 9",
+          "lat": "45.4596054",
+          "lng": "9.1821442",
+          "cleaning_time": 120,
+          "checkin_date": "2025-11-20",
+          "checkout_date": "2025-11-19",
+          "checkin_time": null,
+          "checkout_time": null,
+          "pax_in": 2,
+          "pax_out": 1,
+          "small_equipment": false,
+          "operation_id": 2,
+          "confirmed_operation": true,
+          "straordinaria": false,
+          "type_apt": "C",
+          "alias": "NTM",
+          "customer_name": "NOTA-MI",
+          "reasons": [
+            "client_forced_eo",
+            "automatic_assignment_eo"
+          ],
+          "priority": "early_out",
+          "start_time": "14:29",
+          "end_time": "16:29",
           "followup": true,
           "sequence": 3,
-          "travel_time": 10
+          "travel_time": 19
+        },
+        {
+          "task_id": 219144,
+          "logistic_code": 1496,
+          "client_id": null,
+          "premium": false,
+          "address": "VIA TORINO 44",
+          "lat": "45.4613523",
+          "lng": "9.1849551",
+          "cleaning_time": 60,
+          "checkin_date": "2025-11-19",
+          "checkout_date": "2025-11-19",
+          "checkin_time": null,
+          "checkout_time": "16:30",
+          "pax_in": 2,
+          "pax_out": 2,
+          "small_equipment": false,
+          "operation_id": 2,
+          "confirmed_operation": true,
+          "straordinaria": false,
+          "type_apt": "A",
+          "alias": "ELT",
+          "customer_name": "ELITE APARTMENTS",
+          "reasons": [
+            "manually_moved_to_timeline"
+          ],
+          "priority": "low_priority",
+          "start_time": "16:37",
+          "end_time": "17:37",
+          "followup": true,
+          "sequence": 4,
+          "travel_time": 8,
+          "modified_by": "Admin"
         }
       ]
     },
@@ -822,7 +856,7 @@
   "meta": {
     "total_cleaners": 7,
     "used_cleaners": 7,
-    "assigned_tasks": 22,
-    "total_tasks": 22
+    "assigned_tasks": 23,
+    "total_tasks": 23
   }
 }
