@@ -478,15 +478,15 @@ export default function Convocazioni() {
               const borderColor = !isAvailable
                 ? "border-gray-500 dark:border-gray-300"
                 : isFormatore ? "border-orange-600 dark:border-orange-400"
-                : isPremium ? "border-yellow-600 dark:border-yellow-400" : "border-green-600 dark:border-green-400";
+                : canDoStraordinaria ? "border-red-600 dark:border-red-400"
+                : isPremium ? "border-yellow-600 dark:border-yellow-400" 
+                : "border-green-600 dark:border-green-400";
               const bgColor = !isAvailable
                 ? "bg-gray-400/50 dark:bg-gray-600/60"
                 : isFormatore ? "bg-orange-500/25 dark:bg-orange-500/30"
-                : isPremium ? "bg-yellow-500/25 dark:bg-yellow-500/30" : "bg-green-500/25 dark:bg-green-500/30";
-              const badgeColor = !isAvailable
-                ? "bg-gray-500/30 text-gray-800 dark:bg-gray-500/40 dark:text-gray-100 border-gray-500 dark:border-gray-400"
-                : isFormatore ? "bg-orange-500/30 text-orange-800 dark:bg-orange-500/40 dark:text-orange-200 border-orange-600 dark:border-orange-400"
-                : isPremium ? "bg-yellow-500/30 text-yellow-800 dark:bg-yellow-500/40 dark:text-yellow-200 border-yellow-600 dark:border-yellow-400" : "bg-green-500/30 text-green-800 dark:bg-green-500/40 dark:text-green-200 border-green-600 dark:border-green-400";
+                : canDoStraordinaria ? "bg-red-500/25 dark:bg-red-500/30"
+                : isPremium ? "bg-yellow-500/25 dark:bg-yellow-500/30" 
+                : "bg-green-500/25 dark:bg-green-500/30";
 
               return (
                 <div
@@ -505,12 +505,24 @@ export default function Convocazioni() {
                           {cleaner.name.toUpperCase()} {cleaner.lastname.toUpperCase()}
                         </span>
                         <div className="flex items-center gap-1.5">
-                          <span className={`px-2 py-0.5 rounded border font-medium text-sm ${badgeColor}`}>
-                            {cleaner.role}
-                          </span>
+                          {!isAvailable && (
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded border text-xs font-medium bg-gray-500/30 text-gray-800 dark:bg-gray-500/40 dark:text-gray-200 border-gray-600 dark:border-gray-400">
+                              Non disponibile
+                            </span>
+                          )}
+                          {isFormatore && (
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded border text-xs font-medium bg-orange-500/30 text-orange-800 dark:bg-orange-500/40 dark:text-orange-200 border-orange-600 dark:border-orange-400">
+                              Formatore
+                            </span>
+                          )}
                           {canDoStraordinaria && (
-                            <span className="px-2 py-0.5 rounded border font-medium text-sm bg-red-500/20 text-red-700 dark:text-red-300 border-red-500">
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded border text-xs font-medium bg-red-500/30 text-red-800 dark:bg-red-500/40 dark:text-red-200 border-red-600 dark:border-red-400">
                               Straordinario
+                            </span>
+                          )}
+                          {isPremium && !canDoStraordinaria && (
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded border text-xs font-medium bg-yellow-500/30 text-yellow-800 dark:bg-yellow-500/40 dark:text-yellow-200 border-yellow-600 dark:border-yellow-400">
+                              Premium
                             </span>
                           )}
                         </div>
