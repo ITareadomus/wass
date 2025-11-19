@@ -1782,6 +1782,11 @@ export default function TimelineView({
                           Straordinario
                         </span>
                       )}
+                      {cleaner.role === "Premium" && !cleaner.can_do_straordinaria && (
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded border text-xs font-medium bg-yellow-500/30 text-yellow-800 dark:bg-yellow-500/40 dark:text-yellow-200 border-yellow-600 dark:border-yellow-400">
+                          Premium
+                        </span>
+                      )}
                     </div>
                   </div>
                 );
