@@ -461,7 +461,7 @@ export default function TaskCard({
   // Mostra orari nel tooltip solo per task < 1 ora (quando le frecce sono nascoste)
   const shouldShowTooltipTimes = totalMinutes < 60;
 
-  // Verifica se end_time sfora checkin_time O start_time è prima di checkout_time (considerando le date!)
+  // Verifica violazioni temporali (considerando le date!)
   const isOverdue = (() => {
     const taskObj = displayTask as any;
     const startTime = assignmentTimes.start_time || taskObj.start_time || taskObj.startTime;
@@ -480,11 +480,18 @@ export default function TaskCard({
       if (checkoutDateTime > checkinDateTime) return true;
     }
 
-    // Caso 2: start_time è prima di checkout_time (stessa data)
+    // Caso 2: start_time è prima di checkout_time (task inizia prima che proprietà sia libera)
     if (startTime && checkoutTime && checkoutDate) {
       const taskStartDateTime = new Date(checkoutDate + 'T' + startTime + ':00');
       const checkoutDateTime = new Date(checkoutDate + 'T' + checkoutTime + ':00');
       if (taskStartDateTime < checkoutDateTime) return true;
+    }
+
+    // Caso 3: start_time è dopo o uguale a checkin_time (task inizia quando ospiti sono già arrivati)
+    if (startTime && checkinTime && checkoutDate && checkinDate) {
+      const taskStartDateTime = new Date(checkoutDate + 'T' + startTime + ':00');
+      const checkinDateTime = new Date(checkinDate + 'T' + checkinTime + ':00');
+      if (taskStartDateTime >= checkinDateTime) return true;
     }
 
     return false;
