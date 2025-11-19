@@ -178,9 +178,10 @@ def travel_minutes(a: Optional[Task], b: Optional[Task]) -> float:
     if a is None or b is None:
         return 0.0
 
-    # Stesso edificio
+    # Stesso edificio: 3 minuti per cambio appartamento
+    # (raccolta attrezzature, scale/ascensore, spostamento)
     if same_building(a.address, b.address):
-        return max(MIN_TRAVEL, min(MAX_TRAVEL, SHORT_BASE_MIN))
+        return 3.0
 
     km = haversine_km(a.lat, a.lng, b.lat, b.lng)
 

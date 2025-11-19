@@ -189,9 +189,10 @@ def travel_minutes(a_lat: float, a_lng: float, b_lat: float, b_lng: float,
     - Velocità variabile per distanza
     - Tempo base preparazione
     """
-    # Stesso edificio
+    # Stesso edificio: 3 minuti per cambio appartamento
+    # (raccolta attrezzature, scale/ascensore, spostamento)
     if a_addr and b_addr and same_building(a_addr, b_addr):
-        return max(MIN_TRAVEL, min(MAX_TRAVEL, SHORT_BASE_MIN))
+        return 3.0
 
     km = haversine_km(a_lat, a_lng, b_lat, b_lng)
 
