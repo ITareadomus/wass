@@ -72,8 +72,8 @@
   },
   "priority_types": {
     "standard_cleaner": {
-      "early_out": true,
-      "high_priority": false,
+      "early_out": false,
+      "high_priority": true,
       "low_priority": true
     },
     "premium_cleaner": {
