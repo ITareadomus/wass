@@ -1,6 +1,6 @@
 {
     "metadata": {
-        "last_updated": "2025-11-19T11:33:02.933174",
+        "last_updated": "2025-11-19T13:08:26.495323",
         "db_config": {
             "host": "139.59.132.41",
             "user": "admin",
@@ -10,8 +10,8 @@
         "schema_version": "1.0"
     },
     "dates": {
-        "2025-11-19": {
-            "timestamp": "2025-11-19T11:33:02.933188",
+        "2025-11-20": {
+            "timestamp": "2025-11-19T13:08:26.495335",
             "cleaners": [
                 {
                     "id": 24,
@@ -43,7 +43,7 @@
                     "role": "Premium",
                     "active": true,
                     "ranking": 0,
-                    "counter_hours": 14.5,
+                    "counter_hours": 15.5,
                     "counter_days": 3,
                     "available": true,
                     "contract_type": "C",
@@ -326,7 +326,7 @@
                     "ranking": 0,
                     "counter_hours": 6.5,
                     "counter_days": 4,
-                    "available": true,
+                    "available": false,
                     "contract_type": "B",
                     "preferred_customers": [
                         2,
@@ -421,7 +421,7 @@
                     "role": "Premium",
                     "active": true,
                     "ranking": 0,
-                    "counter_hours": 5.0,
+                    "counter_hours": 7.5,
                     "counter_days": 0,
                     "available": true,
                     "contract_type": "B",
@@ -552,7 +552,7 @@
                     "ranking": 0,
                     "counter_hours": 4.0,
                     "counter_days": 0,
-                    "available": true,
+                    "available": false,
                     "contract_type": "a chiamata",
                     "preferred_customers": [
                         2
@@ -584,7 +584,7 @@
                     "role": "Standard",
                     "active": true,
                     "ranking": 0,
-                    "counter_hours": 8.0,
+                    "counter_hours": 10.0,
                     "counter_days": 2,
                     "available": true,
                     "contract_type": "a chiamata",
@@ -755,7 +755,7 @@
                 }
             ],
             "total_cleaners": 31,
-            "date": "2025-11-19",
+            "date": "2025-11-20",
             "data_source": "database_query"
         }
     }
