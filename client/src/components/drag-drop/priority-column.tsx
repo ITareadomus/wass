@@ -48,11 +48,15 @@ export default function PriorityColumn({
   
   // Funzioni per gestire la selezione multipla cross-container
   const toggleMode = () => {
-    const newMode = !isMultiSelectMode;
-    setIsMultiSelectMode(newMode);
-    // Se disattivo la modalità multipla, pulisco le selezioni
-    if (!newMode) {
-      setSelectedTasks([]);
+    // Usa la funzione toggleMode dal containerMultiSelectState se esiste
+    if (containerMultiSelectState?.toggleMode) {
+      containerMultiSelectState.toggleMode();
+    } else {
+      const newMode = !isMultiSelectMode;
+      setIsMultiSelectMode(newMode);
+      if (!newMode) {
+        setSelectedTasks([]);
+      }
     }
   };
   
