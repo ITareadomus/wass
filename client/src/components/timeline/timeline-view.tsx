@@ -620,9 +620,9 @@ export default function TimelineView({
   };
 
   // Handler per aprire il dialog di aggiunta cleaner
-  const handleOpenAddCleanerDialog = () => {
-    loadAvailableCleaners();
-    setIsAddCleanerDialogOpen(true);
+  const handleOpenAddCleanerDialog = async () => {
+    setIsAddCleanerDialogOpen(true); // Apri il dialog subito per mostrare loading
+    await loadAvailableCleaners(); // Attendi il caricamento
   };
 
   // Handler per aggiungere/sostituire un cleaner
@@ -1713,9 +1713,10 @@ export default function TimelineView({
           </DialogHeader>
           <div className="space-y-2 mt-4">
             {availableCleaners.length === 0 ? (
-              <p className="text-center text-muted-foreground py-8">
-                Nessun cleaner disponibile da aggiungere
-              </p>
+              <div className="flex items-center justify-center py-8">
+                <RefreshCw className="h-6 w-6 animate-spin text-custom-blue mr-2" />
+                <p className="text-muted-foreground">Caricamento cleaners disponibili...</p>
+              </div>
             ) : (
               availableCleaners.map((cleaner) => {
                 const isAvailable = cleaner.available !== false;
