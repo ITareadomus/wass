@@ -1306,8 +1306,8 @@ export default function TimelineView({
                             ? '0 0 0 3px #3B82F6, 0 0 20px 5px rgba(59, 130, 246, 0.5)'
                             : 'none',
                         transform: filteredCleanerId === cleaner.id || hasIncompatibleTasks ? 'scale(1.05)' : 'none',
-                        zIndex: filteredCleanerId === cleaner.id || hasIncompatibleTasks ? 10 : 'auto',
-                        position: filteredCleanerId === cleaner.id || hasIncompatibleTasks ? 'relative' : 'static',
+                        zIndex: filteredCleanerId === cleaner.id || hasIncompatibleTasks ? 20 : 'auto',
+                        position: 'relative',
                         userSelect: 'none',
                         opacity: isRemoved ? 0.7 : 1,
                         animation: hasIncompatibleTasks && !isRemoved ? 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite' : 'none'
@@ -1376,7 +1376,7 @@ export default function TimelineView({
                             snapshot.isDraggingOver && !isReadOnly ? 'bg-primary/20 ring-2 ring-primary' : 'bg-background'
                           }`}
                           style={{
-                            zIndex: filteredCleanerId === cleaner.id || hasIncompatibleTasks ? 10 : 'auto'
+                            zIndex: filteredCleanerId === cleaner.id || hasIncompatibleTasks ? 15 : 'auto'
                           }}
                         >
                           {/* Griglia oraria di sfondo (solo visiva) */}
