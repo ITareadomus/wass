@@ -50,8 +50,8 @@
   },
   "task_types": {
     "standard_cleaner": {
-      "standard_apt": false,
-      "premium_apt": true,
+      "standard_apt": true,
+      "premium_apt": false,
       "straordinario_apt": false
     },
     "premium_cleaner": {
