@@ -1,0 +1,114 @@
+1️⃣ create_containers.py – logica EO completa
+
+Obiettivo:
+EO se:
+
+eo_start_time <= checkout_time <= eo_end_time, oppure
+
+checkout_time < eo_start_time (checkout notturno), oppure
+
+client_id è nella lista eo_clients.
+
+Sostituisci la parte EO nella funzione classify_tasks come segue.
+
+Patch (solo blocco EO + definizione tempi)
+--- client/public/scripts/create_containers.py
++++ client/public/scripts/create_containers.py
+@@ -243,7 +243,18 @@
+     early_out_config = settings.get("early-out", {})
+     high_priority_config = settings.get("high-priority", {})
+ 
+-    eo_end_time = parse_time(early_out_config.get("eo_end_time")) or datetime.strptime("10:59", "%H:%M").time()
++    # Finestra EO esplicita: eo_start_time / eo_end_time
++    # Se non specificati, usiamo dei default sensati,
++    # ma manteniamo compatibilità col vecchio comportamento (solo eo_end_time).
++    eo_start_time = parse_time(early_out_config.get("eo_start_time"))
++    if eo_start_time is None:
++        # default: 10:00, come usato finora nel resto del codice
++        eo_start_time = datetime.strptime("10:00", "%H:%M").time()
++
++    eo_end_time = parse_time(early_out_config.get("eo_end_time"))
++    if eo_end_time is None:
++        # default storico: 10:59
++        eo_end_time = datetime.strptime("10:59", "%H:%M").time()
+@@ -276,9 +287,33 @@
+ 
+         # EARLY OUT
+         checkout_time = parse_time(task.get("checkout_time"))
+-        # EO logic using new eo_end_time
+-        if checkout_time and checkout_time <= eo_end_time:
+-            eo_reasons.append("checkout_time<=eo_end_time")
++
++        # Logica EO:
++        # 1) checkout_time tra eo_start_time ed eo_end_time
++        # 2) OPPURE checkout_time < eo_start_time (checkout notturno)
++        # 3) OPPURE client forzato EO
++        #
++        # Gestiamo anche il caso (raro) di finestra che scavalca mezzanotte.
++        if checkout_time:
++            if eo_start_time and eo_end_time:
++                if eo_start_time <= eo_end_time:
++                    # finestra normale: es. 10:00–10:59
++                    if (
++                        eo_start_time <= checkout_time <= eo_end_time
++                        or checkout_time < eo_start_time
++                    ):
++                        eo_reasons.append(
++                            "checkout_time_eo_window_or_before_start"
++                        )
++                else:
++                    # finestra che scavalca mezzanotte, es. 22:00–02:00
++                    if checkout_time >= eo_start_time or checkout_time <= eo_end_time:
++                        eo_reasons.append("checkout_time_eo_wrapped_window")
++            else:
++                # Fallback di compatibilità: se per qualche motivo mancano i tempi,
++                # usiamo il vecchio criterio "checkout_time <= eo_end_time"
++                if checkout_time <= eo_end_time:
++                    eo_reasons.append("checkout_time<=eo_end_time")
++
+         if client_id in eo_clients:
+             eo_reasons.append("client_forced_eo")
+
+
+Con questa logica:
+
+Una task alle 03:00 con eo_start_time = 10:00 → checkout_time < eo_start_time → EO.
+
+Una task alle 10:30 → compresa tra 10:00 e 10:59 → EO.
+
+Una task alle 13:00 → non EO, a meno che il client sia in eo_clients.
+
+2️⃣ assign_eo.py – usare eo_start_time da settings
+
+Questa parte la manteniamo: serve solo a far sì che lo script EO non abbia più la "10:00" hardcoded, ma prenda lo stesso valore da settings.json.
+
+Se non hai ancora applicato questa patch, eccola:
+
+--- client/public/scripts/assign_eo.py
++++ client/public/scripts/assign_eo.py
+@@ -11,6 +11,7 @@
+ # I/O paths
+ # =============================
+ BASE = Path(__file__).parent.parent / "data"
++SETTINGS_PATH = BASE / "input" / "settings.json"
+ 
+ INPUT_CONTAINERS = BASE / "output" / "containers.json"
+ INPUT_CLEANERS = BASE / "cleaners" / "selected_cleaners.json"
+@@ -440,7 +441,16 @@
+ 
+ def load_tasks() -> List[Task]:
+     data = json.loads(INPUT_CONTAINERS.read_text(encoding="utf-8"))
+-    eo_start_min = hhmm_to_min("10:00")
++
++    # Carica settings per leggere eo_start_time dinamicamente
++    try:
++        settings = json.loads(SETTINGS_PATH.read_text(encoding="utf-8"))
++    except Exception:
++        settings = {}
++
++    early_out_cfg = settings.get("early-out", {}) if isinstance(settings, dict) else {}
++    eo_start_str = early_out_cfg.get("eo_start_time") or "10:00"
++    eo_start_min = hhmm_to_min(eo_start_str, default="10:00")
+     tasks: List[Task] = []
+     for t in data.get("containers", {}).get("early_out", {}).get("tasks", []):
+         checkout = eo_start_min
