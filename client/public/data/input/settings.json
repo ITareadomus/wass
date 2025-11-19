@@ -9,7 +9,7 @@
   },
   "high-priority": {
     "hp_start_time": "11:00",
-    "hp_end_time": "15:29",
+    "hp_end_time": "15:30",
     "hp_clients": [
       64
     ]
@@ -74,7 +74,7 @@
     "standard_cleaner": {
       "early_out": true,
       "high_priority": false,
-      "low_priority": false
+      "low_priority": true
     },
     "premium_cleaner": {
       "early_out": true,
