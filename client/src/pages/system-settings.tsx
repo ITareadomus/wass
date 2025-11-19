@@ -173,24 +173,26 @@ export default function SystemSettings() {
     );
   }
 
-  const handleClientToggle = (priority: 'early-out' | 'high-priority', clientId: number) => {
+  const handleClientToggle = (clientId: number, priority: "eo" | "hp") => {
     setSettings(prev => {
       if (!prev) return prev;
 
-      const clients = prev[priority][priority === 'early-out' ? 'eo_clients' : 'hp_clients'];
+      const key = priority === "eo" ? "eo_clients" : "hp_clients";
+      const clients = prev[priority === "eo" ? "early-out" : "high-priority"][key];
       const newClients = clients.includes(clientId)
         ? clients.filter(id => id !== clientId)
         : [...clients, clientId];
 
       return {
         ...prev,
-        [priority]: {
-          ...prev[priority],
-          [priority === 'early-out' ? 'eo_clients' : 'hp_clients']: newClients
+        [priority === "eo" ? "early-out" : "high-priority"]: {
+          ...prev[priority === "eo" ? "early-out" : "high-priority"],
+          [key]: newClients
         }
       };
     });
   };
+
 
   const updateTaskTypeRule = (
     cleanerType: keyof SettingsData["task_types"],
@@ -314,11 +316,7 @@ export default function SystemSettings() {
                             id={`eo-client-${client.client_id}`}
                             checked={settings["early-out"].eo_clients.includes(client.client_id)}
                             onCheckedChange={(checked) => {
-                              if (checked) {
-                                handleClientToggle(client.client_id, "eo");
-                              } else {
-                                handleClientToggle(client.client_id, "eo");
-                              }
+                              handleClientToggle(client.client_id, "eo");
                             }}
                           />
                           <Label htmlFor={`eo-client-${client.client_id}`} className="text-sm cursor-pointer">
@@ -383,11 +381,7 @@ export default function SystemSettings() {
                             id={`hp-client-${client.client_id}`}
                             checked={settings["high-priority"].hp_clients.includes(client.client_id)}
                             onCheckedChange={(checked) => {
-                              if (checked) {
-                                handleClientToggle(client.client_id, "hp");
-                              } else {
-                                handleClientToggle(client.client_id, "hp");
-                              }
+                              handleClientToggle(client.client_id, "hp");
                             }}
                           />
                           <Label htmlFor={`hp-client-${client.client_id}`} className="text-sm cursor-pointer">
@@ -500,7 +494,7 @@ export default function SystemSettings() {
                 <div className="space-y-3">
                   <div className="border-b pb-2 flex items-center justify-center gap-2">
                     <span className="text-sm font-medium text-green-800 dark:text-green-200">Cleaner</span>
-                    <span className="px-2 py-0.5 rounded border font-medium text-sm bg-green-500/30 text-green-800 dark:bg-green-500/40 dark:text-green-200 border-green-600 dark:border-green-400">
+                    <span className="inline-flex items-center px-2.5 py-0.5 rounded border text-xs font-medium bg-green-500/30 text-green-800 dark:bg-green-500/40 dark:text-green-200 border-green-600 dark:border-green-400">
                       Standard
                     </span>
                   </div>
@@ -617,7 +611,7 @@ export default function SystemSettings() {
                 <div className="space-y-3">
                   <div className="border-b pb-2 flex items-center justify-center gap-2">
                     <span className="text-sm font-medium text-yellow-800 dark:text-yellow-200">Cleaner</span>
-                    <span className="px-2 py-0.5 rounded border font-medium text-sm bg-yellow-500/30 text-yellow-800 dark:bg-yellow-500/40 dark:text-yellow-200 border-yellow-600 dark:border-yellow-400">
+                    <span className="inline-flex items-center px-2.5 py-0.5 rounded border text-xs font-medium bg-yellow-500/30 text-yellow-800 dark:bg-yellow-500/40 dark:text-yellow-200 border-yellow-600 dark:border-yellow-400">
                       Premium
                     </span>
                   </div>
@@ -734,7 +728,7 @@ export default function SystemSettings() {
                 <div className="space-y-3">
                   <div className="border-b pb-2 flex items-center justify-center gap-2">
                     <span className="text-sm font-medium text-red-800 dark:text-red-200">Cleaner</span>
-                    <span className="px-2 py-0.5 rounded border font-medium text-sm bg-red-500/30 text-red-800 dark:bg-red-500/40 dark:text-red-200 border-red-600 dark:border-red-400">
+                    <span className="inline-flex items-center px-2.5 py-0.5 rounded border text-xs font-medium bg-red-500/30 text-red-800 dark:bg-red-500/40 dark:text-red-200 border-red-600 dark:border-red-400">
                       Straordinario
                     </span>
                   </div>
@@ -851,7 +845,7 @@ export default function SystemSettings() {
                 <div className="space-y-3">
                   <div className="border-b pb-2 flex items-center justify-center gap-2">
                     <span className="text-sm font-medium text-orange-800 dark:text-orange-200">Cleaner</span>
-                    <span className="px-2 py-0.5 rounded border font-medium text-sm bg-orange-500/30 text-orange-800 dark:bg-orange-500/40 dark:text-orange-200 border-orange-600 dark:border-orange-400">
+                    <span className="inline-flex items-center px-2.5 py-0.5 rounded border text-xs font-medium bg-orange-500/30 text-orange-800 dark:bg-orange-500/40 dark:text-orange-200 border-orange-600 dark:border-orange-400">
                       Formatore
                     </span>
                   </div>
