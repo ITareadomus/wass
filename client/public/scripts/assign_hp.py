@@ -221,7 +221,8 @@ def travel_minutes(a_lat: float, a_lng: float, b_lat: float, b_lng: float,
 def can_handle_premium(cleaner: Cleaner, task: Task) -> bool:
     if task.is_premium and not cleaner.is_premium:
         return False
-    if task.straordinaria and not cleaner.is_premium:
+    # Straordinaria requires cleaner with can_do_straordinaria=True
+    if task.straordinaria and not cleaner.can_do_straordinaria:
         return False
     return True
 
