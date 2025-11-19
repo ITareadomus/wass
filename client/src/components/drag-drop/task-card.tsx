@@ -461,25 +461,33 @@ export default function TaskCard({
   // Mostra orari nel tooltip solo per task < 1 ora (quando le frecce sono nascoste)
   const shouldShowTooltipTimes = totalMinutes < 60;
 
-  // Verifica se end_time sfora checkin_time (considerando le date!)
+  // Verifica se end_time sfora checkin_time O start_time è prima di checkout_time (considerando le date!)
   const isOverdue = (() => {
     const taskObj = displayTask as any;
+    const startTime = assignmentTimes.start_time || taskObj.start_time || taskObj.startTime;
     const endTime = assignmentTimes.end_time || taskObj.end_time || taskObj.endTime;
+    const checkoutTime = taskObj.checkout_time;
     const checkinTime = taskObj.checkin_time;
     const checkoutDate = taskObj.checkout_date;
     const checkinDate = taskObj.checkin_date;
 
-    if (!endTime || !checkinTime || !isInTimeline) return false;
+    if (!isInTimeline) return false;
 
-    // Se non abbiamo le date, non possiamo determinare con certezza
-    if (!checkoutDate || !checkinDate) return false;
+    // Caso 1: end_time sfora checkin_time
+    if (endTime && checkinTime && checkoutDate && checkinDate) {
+      const checkoutDateTime = new Date(checkoutDate + 'T' + endTime + ':00');
+      const checkinDateTime = new Date(checkinDate + 'T' + checkinTime + ':00');
+      if (checkoutDateTime > checkinDateTime) return true;
+    }
 
-    // Converti date in oggetti Date per confronto corretto
-    const checkoutDateTime = new Date(checkoutDate + 'T' + endTime + ':00');
-    const checkinDateTime = new Date(checkinDate + 'T' + checkinTime + ':00');
+    // Caso 2: start_time è prima di checkout_time (stessa data)
+    if (startTime && checkoutTime && checkoutDate) {
+      const taskStartDateTime = new Date(checkoutDate + 'T' + startTime + ':00');
+      const checkoutDateTime = new Date(checkoutDate + 'T' + checkoutTime + ':00');
+      if (taskStartDateTime < checkoutDateTime) return true;
+    }
 
-    // Overdue solo se end_time è DOPO checkin_time (considerando data + ora)
-    return checkoutDateTime > checkinDateTime;
+    return false;
   })();
 
   // Verifica se il check-in è per una data futura (rispetto alla data selezionata)
