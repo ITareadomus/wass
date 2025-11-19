@@ -456,17 +456,17 @@ export default function MapSection({ tasks }: MapSectionProps) {
                 )}
                 <div className="pt-2 flex gap-2">
                   {selectedTask.straordinaria && (
-                    <span className="bg-red-500 text-white px-2 py-1 rounded text-xs">
+                    <span className="inline-flex items-center px-2.5 py-0.5 rounded border text-xs font-medium bg-red-100 text-red-800 dark:bg-red-950/50 dark:text-red-200 border-red-300 dark:border-red-700">
                       Straordinaria
                     </span>
                   )}
                   {selectedTask.premium && (
-                    <span className="bg-yellow-400 text-black px-2 py-1 rounded text-xs">
+                    <span className="inline-flex items-center px-2.5 py-0.5 rounded border text-xs font-medium bg-yellow-100 text-yellow-800 dark:bg-yellow-950/50 dark:text-yellow-200 border-yellow-300 dark:border-yellow-700">
                       Premium
                     </span>
                   )}
                   {!selectedTask.premium && !selectedTask.straordinaria && (
-                    <span className="bg-green-500 text-white px-2 py-1 rounded text-xs">
+                    <span className="inline-flex items-center px-2.5 py-0.5 rounded border text-xs font-medium bg-green-100 text-green-800 dark:bg-green-950/50 dark:text-green-200 border-green-300 dark:border-green-700">
                       Standard
                     </span>
                   )}
