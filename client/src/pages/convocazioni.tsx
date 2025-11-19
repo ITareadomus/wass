@@ -151,7 +151,7 @@ export default function Convocazioni() {
           try {
             const timelineData = await timelineResponse.json();
             const timelineDateFromFile = timelineData.metadata?.date;
-            
+
             // Solo se la data corrisponde
             if (timelineDateFromFile === dateStr && timelineData.cleaners_assignments) {
               for (const cleanerEntry of timelineData.cleaners_assignments) {
@@ -182,13 +182,13 @@ export default function Convocazioni() {
 
         setCleaners(availableCleaners);
         setFilteredCleaners(availableCleaners);
-        
+
         // Unisci TUTTI i cleaners pre-selezionati (da selected_cleaners.json E dalla timeline)
         const allPreselectedIds = new Set([...alreadySelectedIds, ...preselectedIds]);
         setSelectedCleaners(allPreselectedIds);
-        
+
         console.log(`✅ Cleaners mostrati: ${availableCleaners.length}, pre-selezionati totali: ${allPreselectedIds.size}`);
-        
+
         console.log(`✅ Cleaners mostrati: ${availableCleaners.length}, pre-selezionati: ${preselectedIds.size}`);
 
         // Carica statistiche task
@@ -523,6 +523,11 @@ export default function Convocazioni() {
                           {isPremium && !canDoStraordinaria && (
                             <span className="inline-flex items-center px-2.5 py-0.5 rounded border text-xs font-medium bg-yellow-500/30 text-yellow-800 dark:bg-yellow-500/40 dark:text-yellow-200 border-yellow-600 dark:border-yellow-400">
                               Premium
+                            </span>
+                          )}
+                          {!isPremium && !isFormatore && !canDoStraordinaria && (
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded border text-xs font-medium bg-green-500/30 text-green-800 dark:bg-green-500/40 dark:text-green-200 border-green-600 dark:border-green-400">
+                              Standard
                             </span>
                           )}
                         </div>
