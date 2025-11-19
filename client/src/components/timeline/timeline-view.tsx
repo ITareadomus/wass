@@ -1274,13 +1274,9 @@ export default function TimelineView({
                   <div key={cleaner.id} className="flex mb-0.5">
                     {/* Info cleaner */}
                     <div
-                      className="flex-shrink-0 p-1 flex items-center border cursor-pointer hover:opacity-90 transition-opacity"
+                      className="flex-shrink-0 p-1 flex items-center border border-border bg-background cursor-pointer hover:opacity-90 transition-opacity"
                       style={{
                         width: `${cleanerColumnWidth}px`,
-                        backgroundColor: isRemoved
-                          ? '#9CA3AF' // Grigio per cleaners rimossi
-                          : filteredCleanerId === cleaner.id ? `${color.bg}` : color.bg,
-                        color: isRemoved ? '#1F2937' : color.text,
                         boxShadow: hasIncompatibleTasks && !isRemoved
                           ? '0 0 0 3px #EAB308, 0 0 20px 5px rgba(234, 179, 8, 0.6), inset 0 0 15px rgba(234, 179, 8, 0.3)'
                           : filteredCleanerId === cleaner.id
@@ -1306,7 +1302,14 @@ export default function TimelineView({
                       }}
                       title={isRemoved ? "Cleaner rimosso - Click per sostituire" : hasIncompatibleTasks ? "⚠️ Cleaner con task incompatibili" : "Click: dettagli | Doppio click: filtra mappa"}
                     >
-                      <div className="w-full flex items-center gap-1">
+                      <div className="w-full flex items-center gap-2">
+                        {/* Pallino colorato identificativo */}
+                        {!isRemoved && (
+                          <div
+                            className="flex-shrink-0 w-3 h-3 rounded-full"
+                            style={{ backgroundColor: color.bg }}
+                          />
+                        )}
                         <div className="break-words font-bold text-[13px] flex-1">
                           {cleanersAliases[cleaner.id]?.alias || `${cleaner.name.toUpperCase()} ${cleaner.lastname.toUpperCase()}`}
                         </div>
@@ -1345,14 +1348,9 @@ export default function TimelineView({
                           {...provided.droppableProps}
                           data-testid={`timeline-cleaner-${cleaner.id}`}
                           data-cleaner-id={cleaner.id}
-                          className={`relative min-h-[45px] flex-1 ${
-                            snapshot.isDraggingOver && !isReadOnly ? 'bg-primary/20 ring-2 ring-primary' : ''
+                          className={`relative min-h-[45px] flex-1 border-l border-border ${
+                            snapshot.isDraggingOver && !isReadOnly ? 'bg-primary/20 ring-2 ring-primary' : 'bg-background'
                           }`}
-                          style={{
-                            backgroundColor: snapshot.isDraggingOver && !isReadOnly
-                              ? `${color.bg}40`
-                              : `${color.bg}10`
-                          }}
                         >
                           {/* Griglia oraria di sfondo (solo visiva) */}
                           <div className="absolute inset-0 grid grid-cols-10 pointer-events-none opacity-10">
