@@ -1,6 +1,6 @@
 {
   "metadata": {
-    "last_updated": "2025-11-19T09:25:25.203Z",
+    "last_updated": "2025-11-19T09:30:08.060861",
     "date": "2025-11-19"
   },
   "cleaners_assignments": [
@@ -13,39 +13,6 @@
         "premium": true
       },
       "tasks": [
-        {
-          "task_id": 218838,
-          "logistic_code": 1671,
-          "client_id": 124,
-          "premium": false,
-          "address": "VIA MARCELLO PRESTINARI 15",
-          "lat": "45.5014741",
-          "lng": "9.1679818",
-          "cleaning_time": 90,
-          "checkin_date": "2025-11-19",
-          "checkout_date": "2025-11-19",
-          "checkin_time": "14:30",
-          "checkout_time": "11:00",
-          "pax_in": 2,
-          "pax_out": 2,
-          "small_equipment": false,
-          "operation_id": 2,
-          "confirmed_operation": true,
-          "straordinaria": false,
-          "type_apt": "B",
-          "alias": "HMST",
-          "customer_name": "HOMING STAYS",
-          "reasons": [
-            "same_day_checkin_between_hp_start_hp_end",
-            "automatic_assignment_hp"
-          ],
-          "priority": "high_priority",
-          "start_time": "11:00",
-          "end_time": "12:30",
-          "followup": false,
-          "sequence": 1,
-          "travel_time": 0
-        },
         {
           "task_id": 218959,
           "logistic_code": 1381,
@@ -73,11 +40,11 @@
             "automatic_assignment_eo"
           ],
           "priority": "early_out",
-          "start_time": "12:59",
-          "end_time": "14:29",
-          "followup": true,
-          "sequence": 2,
-          "travel_time": 29
+          "start_time": "10:00",
+          "end_time": "11:30",
+          "followup": false,
+          "sequence": 1,
+          "travel_time": 0
         },
         {
           "task_id": 218958,
@@ -106,11 +73,11 @@
             "automatic_assignment_eo"
           ],
           "priority": "early_out",
-          "start_time": "14:29",
-          "end_time": "15:59",
+          "start_time": "11:33",
+          "end_time": "13:03",
           "followup": true,
-          "sequence": 3,
-          "travel_time": 0
+          "sequence": 2,
+          "travel_time": 3
         }
       ]
     },
@@ -698,7 +665,41 @@
         "role": "Premium",
         "premium": true
       },
-      "tasks": []
+      "tasks": [
+        {
+          "task_id": 218838,
+          "logistic_code": 1671,
+          "client_id": 124,
+          "premium": false,
+          "address": "VIA MARCELLO PRESTINARI 15",
+          "lat": "45.5014741",
+          "lng": "9.1679818",
+          "cleaning_time": 90,
+          "checkin_date": "2025-11-19",
+          "checkout_date": "2025-11-19",
+          "checkin_time": "14:30",
+          "checkout_time": "11:00",
+          "pax_in": 2,
+          "pax_out": 2,
+          "small_equipment": false,
+          "operation_id": 2,
+          "confirmed_operation": true,
+          "straordinaria": false,
+          "type_apt": "B",
+          "alias": "HMST",
+          "customer_name": "HOMING STAYS",
+          "reasons": [
+            "same_day_checkin_between_hp_start_hp_end",
+            "automatic_assignment_hp"
+          ],
+          "priority": "high_priority",
+          "start_time": "11:00",
+          "end_time": "12:30",
+          "followup": false,
+          "sequence": 1,
+          "travel_time": 0
+        }
+      ]
     },
     {
       "cleaner": {
