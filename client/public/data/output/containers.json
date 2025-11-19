@@ -1,6 +1,6 @@
 {
   "metadata": {
-    "last_updated": "2025-11-19T15:00:31.850976",
+    "last_updated": "2025-11-19T15:04:03.627400",
     "date": "2025-11-19"
   },
   "containers": {
@@ -13,14 +13,43 @@
       "count": 0
     },
     "low_priority": {
-      "tasks": [],
-      "count": 0
+      "tasks": [
+        {
+          "task_id": 219144,
+          "logistic_code": 1496,
+          "client_id": 113,
+          "premium": false,
+          "address": "VIA TORINO 44",
+          "lat": "45.4613523",
+          "lng": "9.1849551",
+          "cleaning_time": 60,
+          "checkin_date": "2025-11-19",
+          "checkout_date": "2025-11-19",
+          "checkin_time": null,
+          "checkout_time": "16:30",
+          "pax_in": 2,
+          "pax_out": 2,
+          "small_equipment": true,
+          "operation_id": 2,
+          "confirmed_operation": false,
+          "straordinaria": false,
+          "type_apt": "A",
+          "alias": "ELT",
+          "customer_name": "ELITE APARTMENTS",
+          "priority": "low_priority",
+          "reasons": [
+            "not_eo",
+            "not_hp"
+          ]
+        }
+      ],
+      "count": 1
     }
   },
   "summary": {
-    "total_tasks": 0,
+    "total_tasks": 1,
     "early_out": 0,
     "high_priority": 0,
-    "low_priority": 0
+    "low_priority": 1
   }
 }
