@@ -452,11 +452,14 @@ export default function TaskCard({
     }
   };
 
-  // Mostra sempre le frecce check-in/check-out
-  const shouldShowCheckInOutArrows = true;
+  // Mostra frecce solo per task >= 1 ora
+  const duration = task.duration || "0.0";
+  const [hours, mins] = duration.split('.').map(Number);
+  const totalMinutes = (hours || 0) * 60 + (mins || 0);
+  const shouldShowCheckInOutArrows = totalMinutes >= 60;
 
-  // Non mostrare mai orari nel tooltip (le frecce sono sempre visibili)
-  const shouldShowTooltipTimes = false;
+  // Mostra orari nel tooltip solo per task < 1 ora (quando le frecce sono nascoste)
+  const shouldShowTooltipTimes = totalMinutes < 60;
 
   // Verifica se end_time sfora checkin_time (considerando le date!)
   const isOverdue = (() => {
