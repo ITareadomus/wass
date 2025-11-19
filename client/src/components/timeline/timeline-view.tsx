@@ -1314,25 +1314,25 @@ export default function TimelineView({
                           {cleanersAliases[cleaner.id]?.alias || `${cleaner.name.toUpperCase()} ${cleaner.lastname.toUpperCase()}`}
                         </div>
                         {isRemoved && (
-                          <div className="bg-red-600 text-white font-bold text-[10px] px-1 py-0.5 rounded flex-shrink-0 animate-pulse">
+                          <div className="bg-red-600 text-white font-bold text-[10px] px-1 py-0.5 rounded flex-shrink-0">
                             RIMOSSO
                           </div>
                         )}
                         {/* Se straordinario, mostra SOLO badge S */}
                         {!isRemoved && cleaner.can_do_straordinaria ? (
-                          <div className="bg-red-500 text-white font-bold text-[10px] px-1 py-0.5 rounded flex-shrink-0">
+                          <div className="bg-red-500 text-white dark:text-black font-bold text-[10px] px-1 py-0.5 rounded flex-shrink-0">
                             S
                           </div>
                         ) : (
                           /* Altrimenti mostra badge role normale */
                           <>
                             {!isRemoved && cleaner.role === "Premium" && (
-                              <div className="bg-yellow-500 text-white font-bold text-[10px] px-1 py-0.5 rounded flex-shrink-0">
+                              <div className="bg-yellow-500 text-white dark:text-black font-bold text-[10px] px-1 py-0.5 rounded flex-shrink-0">
                                 P
                               </div>
                             )}
                             {!isRemoved && cleaner.role === "Formatore" && (
-                              <div className="bg-orange-500 text-white font-bold text-[10px] px-1 py-0.5 rounded flex-shrink-0">
+                              <div className="bg-orange-500 text-white dark:text-black font-bold text-[10px] px-1 py-0.5 rounded flex-shrink-0">
                                 F
                               </div>
                             )}
