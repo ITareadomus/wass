@@ -55,6 +55,32 @@ class TaskValidator:
 
         return bool(allowed)
 
+    def can_cleaner_handle_priority(self, cleaner_role: str, task_priority: str) -> bool:
+        """Valida se il cleaner può gestire task con questa priorità (EO/HP/LP)"""
+        if not task_priority:
+            return True
+        
+        role_key = self._normalize_cleaner_role(cleaner_role)
+        priority_rules = self.priority_types.get(role_key, {})
+        
+        # Se non ci sono regole per questo ruolo, permetti tutto
+        if not priority_rules:
+            return True
+        
+        # Mappa priorità a chiavi di configurazione
+        priority_map = {
+            'early_out': 'early_out',
+            'high_priority': 'high_priority', 
+            'low_priority': 'low_priority'
+        }
+        
+        priority_key = priority_map.get(task_priority)
+        if not priority_key:
+            return True
+        
+        # Verifica se il cleaner può gestire questa priorità
+        return bool(priority_rules.get(priority_key, True))
+
     def can_cleaner_handle_apartment(self, cleaner_role: str, apt_type: str) -> bool:
         if not apt_type:
             return True
