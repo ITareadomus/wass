@@ -476,17 +476,17 @@ export default function Convocazioni() {
               const canDoStraordinaria = (cleaner as any).can_do_straordinaria === true;
 
               const borderColor = !isAvailable
-                ? "border-gray-500 dark:border-gray-300"
-                : isFormatore ? "border-orange-600 dark:border-orange-400"
-                : canDoStraordinaria ? "border-red-600 dark:border-red-400"
-                : isPremium ? "border-yellow-600 dark:border-yellow-400" 
-                : "border-green-600 dark:border-green-400";
+                ? "border-gray-300 dark:border-gray-700"
+                : isFormatore ? "border-orange-300 dark:border-orange-700"
+                : canDoStraordinaria ? "border-red-300 dark:border-red-700"
+                : isPremium ? "border-yellow-300 dark:border-yellow-700" 
+                : "border-green-300 dark:border-green-700";
               const bgColor = !isAvailable
-                ? "bg-gray-400/50 dark:bg-gray-600/60"
-                : isFormatore ? "bg-orange-500/25 dark:bg-orange-500/30"
-                : canDoStraordinaria ? "bg-red-500/25 dark:bg-red-500/30"
-                : isPremium ? "bg-yellow-500/25 dark:bg-yellow-500/30" 
-                : "bg-green-500/25 dark:bg-green-500/30";
+                ? "bg-gray-100 dark:bg-gray-950/50"
+                : isFormatore ? "bg-orange-100 dark:bg-orange-950/50"
+                : canDoStraordinaria ? "bg-red-100 dark:bg-red-950/50"
+                : isPremium ? "bg-yellow-100 dark:bg-yellow-950/50" 
+                : "bg-green-100 dark:bg-green-950/50";
 
               return (
                 <div
