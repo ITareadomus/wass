@@ -6,7 +6,7 @@ from typing import Any, Dict, List, Optional, Tuple
 from pathlib import Path
 import sys
 from datetime import datetime
-from task_validation import can_cleaner_handle_task, can_cleaner_handle_apartment
+from task_validation import can_cleaner_handle_task, can_cleaner_handle_apartment, can_cleaner_handle_priority
 
 # =============================
 # I/O paths
@@ -511,7 +511,11 @@ def load_cleaners() -> List[Cleaner]:
         role = (c.get("role") or "").strip()
         is_premium = bool(c.get("premium", (role.lower() == "premium")))
         can_do_straordinaria = bool(c.get("can_do_straordinaria", False))
-        # Includi Formatori in Low-Priority (non li filtriamo)
+        
+        # NUOVO: Valida se il cleaner può gestire Low-Priority basandosi su settings.json
+        if not can_cleaner_handle_priority(role, "low_priority"):
+            print(f"   ⏭️  Cleaner {c.get('name')} ({role}) escluso da Low-Priority (priority_types settings)")
+            continue
 
         cleaners.append(
             Cleaner(

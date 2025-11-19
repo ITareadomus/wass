@@ -5,7 +5,7 @@ from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Tuple
 from pathlib import Path
 from datetime import datetime
-from task_validation import can_cleaner_handle_task, can_cleaner_handle_apartment
+from task_validation import can_cleaner_handle_task, can_cleaner_handle_apartment, can_cleaner_handle_priority
 
 # =============================
 # I/O paths
@@ -419,8 +419,10 @@ def load_cleaners() -> List[Cleaner]:
         role = (c.get("role") or "").strip()
         is_premium = bool(c.get("premium", (role.lower() == "premium")))
         can_do_straordinaria = bool(c.get("can_do_straordinaria", False))
-        # Escludi Formatori da Early-Out
-        if (role or "").lower() == "formatore":
+        
+        # NUOVO: Valida se il cleaner può gestire Early-Out basandosi su settings.json
+        if not can_cleaner_handle_priority(role, "early_out"):
+            print(f"   ⏭️  Cleaner {c.get('name')} ({role}) escluso da Early-Out (priority_types settings)")
             continue
         cleaners.append(
             Cleaner(
