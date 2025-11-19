@@ -54,3 +54,14 @@ class TaskValidator:
             return True
 
         return apt_type in allowed_apts
+
+
+# Istanza globale del validator
+_validator = TaskValidator()
+
+# Funzioni standalone per l'import negli script di assegnazione
+def can_cleaner_handle_task(cleaner_role: str, task_type: str, can_do_straordinaria=False) -> bool:
+    return _validator.can_cleaner_handle_task(cleaner_role, task_type, can_do_straordinaria)
+
+def can_cleaner_handle_apartment(cleaner_role: str, apt_type: str) -> bool:
+    return _validator.can_cleaner_handle_apartment(cleaner_role, apt_type)
