@@ -456,10 +456,13 @@ export default function TaskCard({
   const duration = task.duration || "0.0";
   const [hours, mins] = duration.split('.').map(Number);
   const totalMinutes = (hours || 0) * 60 + (mins || 0);
-  const shouldShowCheckInOutArrows = totalMinutes >= 60;
+  
+  // CRITICAL: In timeline, mostra frecce SOLO se >= 1h
+  // Nei container, mostra frecce SEMPRE (anche per < 1h)
+  const shouldShowCheckInOutArrows = isInTimeline ? totalMinutes >= 60 : true;
 
-  // Mostra orari nel tooltip solo per task < 1 ora (quando le frecce sono nascoste)
-  const shouldShowTooltipTimes = totalMinutes < 60;
+  // Mostra orari nel tooltip solo per task < 1 ora E quando le frecce sono nascoste
+  const shouldShowTooltipTimes = totalMinutes < 60 && !shouldShowCheckInOutArrows;
 
   // Verifica violazioni temporali (considerando le date!)
   const isOverdue = (() => {
