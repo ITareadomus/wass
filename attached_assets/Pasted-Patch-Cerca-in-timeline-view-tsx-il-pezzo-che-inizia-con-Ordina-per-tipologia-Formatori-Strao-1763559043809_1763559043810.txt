@@ -1,0 +1,78 @@
+Patch
+
+Cerca in timeline-view.tsx il pezzo che inizia con
+// Ordina per tipologia (Formatori → Straordinari → Premium → Standard)
+e sostituiscilo con questo blocco:
+
+-      // Ordina per tipologia (Formatori → Straordinari → Premium → Standard)
+-      // e per weekly_hours DESC all'interno di ogni gruppo
+-      available.sort((a: any, b: any) => {
+-        // Priorità tipologie: Formatori (1) → Straordinari (2) → Premium (3) → Standard (4)
+-        const getPriority = (cleaner: any) => {
+-          if (cleaner.role === "Formatore") return 1;
+-          if (cleaner.can_do_straordinaria) return 2;
+-          if (cleaner.role === "Premium") return 3;
+-          return 4; // Standard
+-        };
+-
+-        const priorityA = getPriority(a);
+-        const priorityB = getPriority(b);
+-
+-        if (priorityA !== priorityB) {
+-          return priorityA - priorityB; // Ordine crescente per priorità
+-        }
+-
+-        // Stessa tipologia: ordina per weekly_hours DESC (dal più grande al più piccolo)
+-        const hoursA = a.weekly_hours || 0;
+-        const hoursB = b.weekly_hours || 0;
+-        return hoursB - hoursA;
+-      });
++      // Ordina per tipologia (Formatori → Straordinari → Premium → Standard)
++      // e per ore della settimana (weekly_hours) DESC all'interno di ogni gruppo
++      available.sort((a: any, b: any) => {
++        const getPriority = (cleaner: any) => {
++          // 1. Formatore
++          if (cleaner.role === "Formatore") return 1;
++          // 2. Straordinario (ruolo esplicito O flag straordinaria attivo)
++          if (cleaner.role === "Straordinario" || cleaner.can_do_straordinaria) return 2;
++          // 3. Premium
++          if (cleaner.role === "Premium") return 3;
++          // 4. Standard / qualsiasi altro
++          return 4;
++        };
++
++        const priorityA = getPriority(a);
++        const priorityB = getPriority(b);
++
++        if (priorityA !== priorityB) {
++          return priorityA - priorityB;
++        }
++
++        // Stessa tipologia → ordina per ore DESC.
++        // Usa weekly_hours, se mancante fai fallback su counter_hours.
++        const hoursA = Number(
++          a.weekly_hours !== undefined && a.weekly_hours !== null
++            ? a.weekly_hours
++            : a.counter_hours ?? 0
++        );
++        const hoursB = Number(
++          b.weekly_hours !== undefined && b.weekly_hours !== null
++            ? b.weekly_hours
++            : b.counter_hours ?? 0
++        );
++
++        return hoursB - hoursA;
++      });
+
+
+Questo ti garantisce:
+
+Ordine per tipologia: Formatore → Straordinario → Premium → Standard
+
+“Straordinario” se role === "Straordinario" oppure can_do_straordinaria === true
+
+Dentro ogni gruppo la lista è ordinata DESC per ore lavorate questa settimana, usando:
+
+weekly_hours se presente
+
+altrimenti counter_hours come fallback.
