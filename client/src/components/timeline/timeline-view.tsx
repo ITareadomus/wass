@@ -626,10 +626,10 @@ export default function TimelineView({
           return priorityA - priorityB; // Ordine crescente per priorità
         }
 
-        // Stessa tipologia: ordina per weekly_hours ASC
+        // Stessa tipologia: ordina per weekly_hours DESC (dal più grande al più piccolo)
         const hoursA = a.weekly_hours || 0;
         const hoursB = b.weekly_hours || 0;
-        return hoursA - hoursB;
+        return hoursB - hoursA;
       });
 
       console.log(`✅ Cleaners disponibili da aggiungere: ${available.length}`);
