@@ -11,6 +11,7 @@ from task_validation import can_cleaner_handle_task, can_cleaner_handle_apartmen
 # I/O paths
 # =============================
 BASE = Path(__file__).parent.parent / "data"
+SETTINGS_PATH = BASE / "input" / "settings.json"
 
 INPUT_CONTAINERS = BASE / "output" / "containers.json"
 INPUT_CLEANERS = BASE / "cleaners" / "selected_cleaners.json"
@@ -440,7 +441,16 @@ def load_cleaners() -> List[Cleaner]:
 
 def load_tasks() -> List[Task]:
     data = json.loads(INPUT_CONTAINERS.read_text(encoding="utf-8"))
-    eo_start_min = hhmm_to_min("10:00")
+
+    # Carica settings per leggere eo_start_time dinamicamente
+    try:
+        settings = json.loads(SETTINGS_PATH.read_text(encoding="utf-8"))
+    except Exception:
+        settings = {}
+
+    early_out_cfg = settings.get("early-out", {}) if isinstance(settings, dict) else {}
+    eo_start_str = early_out_cfg.get("eo_start_time") or "10:00"
+    eo_start_min = hhmm_to_min(eo_start_str, default="10:00")
     tasks: List[Task] = []
     for t in data.get("containers", {}).get("early_out", {}).get("tasks", []):
         checkout = eo_start_min

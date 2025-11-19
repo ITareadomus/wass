@@ -243,7 +243,18 @@ def classify_tasks(tasks, selected_date):
     early_out_config = settings.get("early-out", {})
     high_priority_config = settings.get("high-priority", {})
 
-    eo_end_time = parse_time(early_out_config.get("eo_end_time")) or datetime.strptime("10:59", "%H:%M").time()
+    # Finestra EO esplicita: eo_start_time / eo_end_time
+    # Se non specificati, usiamo dei default sensati,
+    # ma manteniamo compatibilità col vecchio comportamento (solo eo_end_time).
+    eo_start_time = parse_time(early_out_config.get("eo_start_time"))
+    if eo_start_time is None:
+        # default: 10:00, come usato finora nel resto del codice
+        eo_start_time = datetime.strptime("10:00", "%H:%M").time()
+
+    eo_end_time = parse_time(early_out_config.get("eo_end_time"))
+    if eo_end_time is None:
+        # default storico: 10:59
+        eo_end_time = datetime.strptime("10:59", "%H:%M").time()
 
     # Nuova logica HP: finestra esplicita hp_start_time / hp_end_time
     hp_start_time = (
@@ -276,9 +287,34 @@ def classify_tasks(tasks, selected_date):
 
         # EARLY OUT
         checkout_time = parse_time(task.get("checkout_time"))
-        # EO logic using new eo_end_time
-        if checkout_time and checkout_time <= eo_end_time:
-            eo_reasons.append("checkout_time<=eo_end_time")
+
+        # Logica EO:
+        # 1) checkout_time tra eo_start_time ed eo_end_time
+        # 2) OPPURE checkout_time < eo_start_time (checkout notturno)
+        # 3) OPPURE client forzato EO
+        #
+        # Gestiamo anche il caso (raro) di finestra che scavalca mezzanotte.
+        if checkout_time:
+            if eo_start_time and eo_end_time:
+                if eo_start_time <= eo_end_time:
+                    # finestra normale: es. 10:00–10:59
+                    if (
+                        eo_start_time <= checkout_time <= eo_end_time
+                        or checkout_time < eo_start_time
+                    ):
+                        eo_reasons.append(
+                            "checkout_time_eo_window_or_before_start"
+                        )
+                else:
+                    # finestra che scavalca mezzanotte, es. 22:00–02:00
+                    if checkout_time >= eo_start_time or checkout_time <= eo_end_time:
+                        eo_reasons.append("checkout_time_eo_wrapped_window")
+            else:
+                # Fallback di compatibilità: se per qualche motivo mancano i tempi,
+                # usiamo il vecchio criterio "checkout_time <= eo_end_time"
+                if checkout_time <= eo_end_time:
+                    eo_reasons.append("checkout_time<=eo_end_time")
+
         if client_id in eo_clients:
             eo_reasons.append("client_forced_eo")
 
