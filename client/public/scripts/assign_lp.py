@@ -825,12 +825,12 @@ def plan_day(tasks: List[Task], cleaners: List[Cleaner], assigned_logistic_codes
             # VALIDAZIONE: Verifica se il cleaner può gestire questo tipo di task
             task_type = 'straordinario_apt' if task.straordinaria else ('premium_apt' if task.is_premium else 'standard_apt')
             if not can_cleaner_handle_task(cleaner.role, task_type, cleaner.can_do_straordinaria):
-                print(f"   ⚠️  Cleaner {cleaner.name} ({cleaner.role}) non può gestire task {task_type} - SKIPPATO")
+                print(f"   ⚠️  Cleaner {cleaner.name} ({cleaner.role}) non può gestire task {task_type} - SKIPPATO (task_id: {task.task_id})")
                 continue
 
             # NUOVO: Validazione tipo appartamento
             if not can_cleaner_handle_apartment(cleaner.role, task.apt_type):
-                print(f"   ⚠️  Cleaner {cleaner.name} ({cleaner.role}) non può gestire appartamento {task.apt_type} - SKIPPATO")
+                print(f"   ⚠️  Cleaner {cleaner.name} ({cleaner.role}) non può gestire appartamento {task.apt_type} - SKIPPATO (task_id: {task.task_id}, logistic_code: {task.logistic_code})")
                 continue
 
             if can_add_task(cleaner, task):
@@ -838,6 +838,13 @@ def plan_day(tasks: List[Task], cleaners: List[Cleaner], assigned_logistic_codes
                 if result is not None:
                     pos, travel = result
                     candidates.append((cleaner, pos, travel))
+                else:
+                    print(f"   ⚠️  Cleaner {cleaner.name} può gestire task {task.task_id} ma find_best_position ha fallito (vincoli temporali)")
+            else:
+                # Debug: perché can_add_task ha fallito?
+                current_lp = len(cleaner.route)
+                total_daily = cleaner.total_daily_tasks + current_lp
+                print(f"   ⚠️  Cleaner {cleaner.name} non può aggiungere task {task.task_id}: LP={current_lp}, Total daily={total_daily}/{MAX_DAILY_TASKS}")
 
         if not candidates:
             unassigned.append(task)
