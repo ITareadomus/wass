@@ -1315,20 +1315,25 @@ export default function TimelineView({
                             RIMOSSO
                           </div>
                         )}
-                        {!isRemoved && cleaner.role === "Premium" && (
-                          <div className="bg-yellow-500 text-black font-bold text-[10px] px-1 py-0.5 rounded flex-shrink-0">
-                            P
-                          </div>
-                        )}
-                        {!isRemoved && cleaner.role === "Formatore" && (
-                          <div className="bg-orange-500 text-black font-bold text-[10px] px-1 py-0.5 rounded flex-shrink-0">
-                            F
-                          </div>
-                        )}
-                        {!isRemoved && cleaner.can_do_straordinaria && (
+                        {/* Se straordinario, mostra SOLO badge S */}
+                        {!isRemoved && cleaner.can_do_straordinaria ? (
                           <div className="bg-red-500 text-white font-bold text-[10px] px-1 py-0.5 rounded flex-shrink-0">
                             S
                           </div>
+                        ) : (
+                          /* Altrimenti mostra badge role normale */
+                          <>
+                            {!isRemoved && cleaner.role === "Premium" && (
+                              <div className="bg-yellow-500 text-black font-bold text-[10px] px-1 py-0.5 rounded flex-shrink-0">
+                                P
+                              </div>
+                            )}
+                            {!isRemoved && cleaner.role === "Formatore" && (
+                              <div className="bg-orange-500 text-black font-bold text-[10px] px-1 py-0.5 rounded flex-shrink-0">
+                                F
+                              </div>
+                            )}
+                          </>
                         )}
                       </div>
                     </div>
