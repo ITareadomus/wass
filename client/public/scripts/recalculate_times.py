@@ -37,17 +37,17 @@ def same_street(addr1: Optional[str], addr2: Optional[str]) -> bool:
     """Verifica se due indirizzi condividono la stessa via."""
     if not addr1 or not addr2:
         return False
-    
+
     def normalize_street(address: str) -> str:
         parts = [p.strip() for p in address.upper().split(',')]
         return parts[0] if parts else ""
-    
+
     street1 = normalize_street(addr1)
     street2 = normalize_street(addr2)
-    
+
     if not street1 or not street2:
         return False
-    
+
     return street1 == street2
 
 
@@ -59,18 +59,19 @@ def travel_minutes(lat1: float, lng1: float, lat2: float, lng2: float,
     - Velocità variabile per distanza
     - Tempo base preparazione
     """
-    # Stesso edificio
+    # Stesso edificio: 3 minuti per cambio appartamento
+    # (raccolta attrezzature, scale/ascensore, spostamento)
     if same_building(addr1, addr2):
-        return 0.0
-    
+        return 3.0
+
     dist_km = haversine_km(lat1, lng1, lat2, lng2)
-    
+
     if dist_km > MAX_DISTANCE_KM:
         return 9999.0
-    
+
     # Fattore correzione percorsi non rettilinei
     dist_reale = dist_km * 1.5
-    
+
     # Modello progressivo
     if dist_reale < 0.8:
         travel_time = dist_reale * 6.0  # ~10 km/h a piedi
@@ -78,15 +79,15 @@ def travel_minutes(lat1: float, lng1: float, lat2: float, lng2: float,
         travel_time = dist_reale * 10.0  # ~6 km/h misto
     else:
         travel_time = dist_reale * 5.0  # ~12 km/h mezzi
-    
+
     # Tempo base
     base_time = 5.0
     total_time = base_time + travel_time
-    
+
     # Bonus stesso strada (riduce tempo base solo se molto vicini)
     if same_street(addr1, addr2) and dist_km < 0.10:
         total_time = max(total_time - 2.0, 3.0)
-    
+
     # Limiti: min 3 min, max 50 min
     return max(3.0, min(50.0, total_time))
 
@@ -117,34 +118,34 @@ def parse_datetime(dt_str: Optional[str]) -> Optional[datetime]:
 def recalculate_cleaner_times(cleaner_data: Dict[str, Any]) -> Dict[str, Any]:
     """
     Ricalcola travel_time, start_time, end_time per tutte le task di un cleaner.
-    
+
     Args:
         cleaner_data: Dati del cleaner con formato:
             {
                 "cleaner": {...},
                 "tasks": [...]
             }
-    
+
     Returns:
         cleaner_data aggiornato con i nuovi tempi
     """
     tasks = cleaner_data.get("tasks", [])
     if not tasks:
         return cleaner_data
-    
+
     work_start_min = time_to_minutes(WORK_START_TIME)
     work_end_min = time_to_minutes(WORK_END_TIME)
-    
+
     current_time_min = work_start_min
     prev_lat: Optional[float] = None
     prev_lng: Optional[float] = None
     prev_addr: Optional[str] = None
-    
+
     for i, task in enumerate(tasks):
         # Estrai dati task (gestisci null values)
         lat_raw = task.get("lat")
         lng_raw = task.get("lng")
-        
+
         # Converti coordinate, usa 0 se null/invalid
         try:
             lat = float(lat_raw) if lat_raw is not None else 0.0
@@ -152,15 +153,15 @@ def recalculate_cleaner_times(cleaner_data: Dict[str, Any]) -> Dict[str, Any]:
         except (ValueError, TypeError):
             lat = 0.0
             lng = 0.0
-        
+
         addr = task.get("address", "")
-        
+
         # Converti cleaning_time, usa 60 se null/invalid
         try:
             cleaning_time = int(task.get("cleaning_time", 60))
         except (ValueError, TypeError):
             cleaning_time = 60
-        
+
         # Calcola travel_time
         if i == 0:
             travel_time = 0
@@ -168,49 +169,49 @@ def recalculate_cleaner_times(cleaner_data: Dict[str, Any]) -> Dict[str, Any]:
             travel_time = int(round(travel_minutes(
                 prev_lat, prev_lng, lat, lng, prev_addr, addr
             )))
-        
+
         # Aggiungi travel time al tempo corrente
         current_time_min += travel_time
-        
+
         # Calcola start_time e end_time
         # Verifica vincoli di checkout/checkin
         checkout_time_str = task.get("checkout_time")
         checkin_time_str = task.get("checkin_time")
-        
+
         # Start time: max(current_time, checkout_time se presente)
         start_time_min = current_time_min
         if checkout_time_str:
             checkout_min = time_to_minutes(checkout_time_str)
             start_time_min = max(start_time_min, checkout_min)
-        
+
         # End time: start + cleaning_time
         end_time_min = start_time_min + cleaning_time
-        
+
         # Verifica vincolo checkin (se presente, end_time non può superarlo)
         if checkin_time_str:
             checkin_min = time_to_minutes(checkin_time_str)
             if end_time_min > checkin_min:
                 # Non feasible, ma salviamo comunque i tempi calcolati
                 pass
-        
+
         # Verifica che non superi la fine del turno
         if end_time_min > work_end_min:
             # Non feasible, ma salviamo comunque i tempi calcolati
             pass
-        
+
         # Aggiorna task
         task["travel_time"] = travel_time
         task["start_time"] = minutes_to_time(start_time_min)
         task["end_time"] = minutes_to_time(end_time_min)
         task["sequence"] = i + 1
         task["followup"] = i > 0
-        
+
         # Aggiorna per prossima iterazione
         current_time_min = end_time_min
         prev_lat = lat
         prev_lng = lng
         prev_addr = addr
-    
+
     return cleaner_data
 
 
@@ -225,18 +226,18 @@ def main():
                 "error": "No input data provided on stdin"
             }))
             sys.exit(1)
-        
+
         cleaner_data = json.loads(input_data)
-        
+
         # Ricalcola tempi
         updated_data = recalculate_cleaner_times(cleaner_data)
-        
+
         # Output JSON
         print(json.dumps({
             "success": True,
             "cleaner_data": updated_data
         }, indent=2))
-        
+
     except Exception as e:
         print(json.dumps({
             "success": False,

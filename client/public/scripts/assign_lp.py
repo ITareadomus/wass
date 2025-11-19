@@ -187,9 +187,10 @@ def travel_minutes(a_lat: float, a_lng: float, b_lat: float, b_lng: float,
     - Velocità variabile per distanza
     - Tempo base preparazione
     """
-    # Stesso edificio
+    # Stesso edificio: 3 minuti per cambio appartamento
+    # (raccolta attrezzature, scale/ascensore, spostamento)
     if a_addr and b_addr and same_building(a_addr, b_addr):
-        return max(MIN_TRAVEL, min(MAX_TRAVEL, SHORT_BASE_MIN))
+        return 3.0
 
     km = haversine_km(a_lat, a_lng, b_lat, b_lng)
 
@@ -267,7 +268,7 @@ def evaluate_route(cleaner: Cleaner, route: List[Task]) -> Tuple[bool, List[Tupl
         else:
             # Fallback: assume stesso giorno se non c'è checkout_dt
             same_day = True
-        
+
         if same_day:
             checkin_minutes = first.checkin_dt.hour * 60 + first.checkin_dt.minute
             if finish > checkin_minutes:
@@ -299,7 +300,7 @@ def evaluate_route(cleaner: Cleaner, route: List[Task]) -> Tuple[bool, List[Tupl
             else:
                 # Fallback: assume stesso giorno se non c'è checkout_dt
                 same_day = True
-            
+
             if same_day:
                 checkin_minutes = t.checkin_dt.hour * 60 + t.checkin_dt.minute
                 if finish > checkin_minutes:
@@ -809,7 +810,7 @@ def plan_day(tasks: List[Task], cleaners: List[Cleaner], assigned_logistic_codes
                     print(f"   🧩 Task {task.task_id} assegnata a {target_cleaner.name} (cross-container {tipo}: {task.address})")
                     continue
                 else:
-                    # Se ha limite raggiunto per LP, ma è in zona, forza comunque l'assegnazione
+                    # Se ha limite raggiunto per LP, ma è in zona, forza l'assegnazione
                     # solo se il limite giornaliero lo permette
                     if same_zone_cleaner:
                         # VALIDAZIONE: Verifica compatibilità task_type e apartment_type per forced assignment
