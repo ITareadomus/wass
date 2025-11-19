@@ -229,14 +229,18 @@ export default function GenerateAssignments() {
     return {
       isActive: multiSelectModes[container],
       toggleMode: () => {
-        setMultiSelectModes(prev => ({
-          ...prev,
-          [container]: !prev[container]
-        }));
-        if (multiSelectModes[container]) {
-          // Se stiamo disattivando, rimuovi le task selezionate da questo container
-          setSelectedTasks(prev => prev.filter(t => t.container !== container));
-        }
+        // Use functional updates to avoid stale closures
+        setMultiSelectModes(prev => {
+          const wasActive = prev[container];
+          // If deactivating, clear selections from this container
+          if (wasActive) {
+            setSelectedTasks(prevTasks => prevTasks.filter(t => t.container !== container));
+          }
+          return {
+            ...prev,
+            [container]: !wasActive
+          };
+        });
       },
       selectedTasks,
       toggleTask: (taskId: string) => toggleTask(taskId, container),
