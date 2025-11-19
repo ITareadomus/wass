@@ -46,8 +46,10 @@ class TaskValidator:
 
         if role_key == 'standard_cleaner':
             allowed_apts = self.apartment_types.get('standard_apt', [])
-        elif role_key in ['premium_cleaner', 'straordinario_cleaner']:
+        elif role_key == 'premium_cleaner':
             allowed_apts = self.apartment_types.get('premium_apt', [])
+        elif role_key == 'straordinario_cleaner':
+            allowed_apts = self.apartment_types.get('straordinario_apt', [])
         elif role_key == 'formatore_cleaner':
             allowed_apts = self.apartment_types.get('formatore_apt', [])
         else:
