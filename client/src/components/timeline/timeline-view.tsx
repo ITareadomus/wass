@@ -1307,6 +1307,7 @@ export default function TimelineView({
                             : 'none',
                         transform: filteredCleanerId === cleaner.id || hasIncompatibleTasks ? 'scale(1.05)' : 'none',
                         zIndex: filteredCleanerId === cleaner.id || hasIncompatibleTasks ? 10 : 'auto',
+                        position: filteredCleanerId === cleaner.id || hasIncompatibleTasks ? 'relative' : 'static',
                         userSelect: 'none',
                         opacity: isRemoved ? 0.7 : 1,
                         animation: hasIncompatibleTasks && !isRemoved ? 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite' : 'none'
