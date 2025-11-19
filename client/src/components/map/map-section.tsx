@@ -418,7 +418,7 @@ export default function MapSection({ tasks }: MapSectionProps) {
         {/* TaskCard overlay quando un marker è selezionato */}
         {selectedTask && (
           <div className="absolute top-4 right-4 z-10 max-w-sm">
-            <div className="bg-background rounded-lg shadow-2xl border-2 border-primary p-4">
+            <div className="bg-background rounded-lg shadow-2xl border-2 border-custom-blue p-4">
               <div className="flex justify-between items-start mb-2">
                 <h4 className="font-bold text-base">Dettagli Appartamento</h4>
                 <button
