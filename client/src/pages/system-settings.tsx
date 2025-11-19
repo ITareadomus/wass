@@ -968,9 +968,8 @@ export default function SystemSettings() {
                           onCheckedChange={(checked) =>
                             updatePriorityTypeRule("formatore_cleaner", "early_out", !!checked)
                           }
-                          disabled
                         />
-                        <Badge className="bg-blue-500 text-white border-blue-700 text-xs px-2 py-0 opacity-50">
+                        <Badge className="bg-blue-500 text-white border-blue-700 text-xs px-2 py-0">
                           EO
                         </Badge>
                       </div>
@@ -981,9 +980,8 @@ export default function SystemSettings() {
                           onCheckedChange={(checked) =>
                             updatePriorityTypeRule("formatore_cleaner", "high_priority", !!checked)
                           }
-                          disabled
                         />
-                        <Badge className="bg-orange-500 text-white border-orange-700 text-xs px-2 py-0 opacity-50">
+                        <Badge className="bg-orange-500 text-white border-orange-700 text-xs px-2 py-0">
                           HP
                         </Badge>
                       </div>
