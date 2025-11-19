@@ -1274,7 +1274,7 @@ export default function TimelineView({
                   <div key={cleaner.id} className="flex mb-0.5">
                     {/* Info cleaner */}
                     <div
-                      className="flex-shrink-0 p-1 flex items-center border border-border bg-background cursor-pointer hover:opacity-90 transition-opacity"
+                      className="flex-shrink-0 p-1 flex items-center border-2 border-custom-blue bg-custom-blue/10 cursor-pointer hover:opacity-90 transition-opacity"
                       style={{
                         width: `${cleanerColumnWidth}px`,
                         boxShadow: hasIncompatibleTasks && !isRemoved
