@@ -250,11 +250,20 @@ def evaluate_route(cleaner: Cleaner, route: List[Task]) -> Tuple[bool, List[Tupl
 
     # Viaggio da ultima posizione a LP
     if cleaner.last_lat is not None and cleaner.last_lng is not None:
-        tt = travel_minutes(cleaner.last_lat, cleaner.last_lng,
-                          first.lat, first.lng,
-                          cleaner.last_address, first.address)
+        # Ha già una posizione finale da EO/HP/LP precedente
+        tt = travel_minutes(
+            cleaner.last_lat, cleaner.last_lng,
+            first.lat, first.lng,
+            cleaner.last_address, first.address
+        )
     else:
-        tt = 3.0 if same_street(cleaner.last_address, first.address) else 12.0
+        # Nessuna coordinata precedente: caso "inizio giornata"
+        # Se non ha mai fatto task (last_sequence == 0 e nessun indirizzo), niente viaggio iniziale
+        if cleaner.last_sequence == 0 and not cleaner.last_address:
+            tt = 0.0
+        else:
+            # Ha un indirizzo ma senza lat/lng, usa euristica 3'/12'
+            tt = 3.0 if same_street(cleaner.last_address, first.address) else 12.0
 
     arrival = work_start_min + tt
     start = arrival
@@ -511,7 +520,7 @@ def load_cleaners() -> List[Cleaner]:
         role = (c.get("role") or "").strip()
         is_premium = bool(c.get("premium", (role.lower() == "premium")))
         can_do_straordinaria = bool(c.get("can_do_straordinaria", False))
-        
+
         # NUOVO: Valida se il cleaner può gestire Low-Priority basandosi su settings.json
         if not can_cleaner_handle_priority(role, "low_priority"):
             print(f"   ⏭️  Cleaner {c.get('name')} ({role}) escluso da Low-Priority (priority_types settings)")
