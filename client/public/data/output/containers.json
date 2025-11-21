@@ -1,6 +1,6 @@
 {
   "metadata": {
-    "last_updated": "2025-11-21T08:17:53.025769",
+    "last_updated": "2025-11-21T08:20:16.559723",
     "date": "2025-11-21"
   },
   "containers": {
@@ -649,10 +649,10 @@
           "lat": "45.458444",
           "lng": "9.1718315",
           "cleaning_time": 210,
-          "checkin_date": "2025-11-20",
+          "checkin_date": "2025-11-21",
           "checkout_date": "2025-11-21",
           "checkin_time": "15:00",
-          "checkout_time": null,
+          "checkout_time": "",
           "pax_in": 2,
           "pax_out": 1,
           "small_equipment": false,
@@ -690,90 +690,6 @@
           "type_apt": "D",
           "alias": "LCRD",
           "customer_name": "LECARDI GUIDO",
-          "priority": "low_priority",
-          "reasons": [
-            "not_eo",
-            "not_hp"
-          ]
-        },
-        {
-          "task_id": 219014,
-          "logistic_code": 1618,
-          "client_id": 94,
-          "premium": false,
-          "address": "VIALE CERTOSA 92",
-          "lat": "45.4938429",
-          "lng": "9.1438164",
-          "cleaning_time": 90,
-          "checkin_date": "2025-11-21",
-          "checkout_date": "2025-11-21",
-          "checkin_time": "20:30",
-          "checkout_time": null,
-          "pax_in": 3,
-          "pax_out": 2,
-          "small_equipment": false,
-          "operation_id": 2,
-          "confirmed_operation": true,
-          "straordinaria": false,
-          "type_apt": "B",
-          "alias": "IHST",
-          "customer_name": "IHOST",
-          "priority": "low_priority",
-          "reasons": [
-            "not_eo",
-            "not_hp"
-          ]
-        },
-        {
-          "task_id": 219179,
-          "logistic_code": 223,
-          "client_id": 3,
-          "premium": false,
-          "address": "VIA NEGROLI 10A",
-          "lat": "45.4629317",
-          "lng": "9.2326585",
-          "cleaning_time": 150,
-          "checkin_date": "2025-12-31",
-          "checkout_date": "2025-11-21",
-          "checkin_time": null,
-          "checkout_time": null,
-          "pax_in": 1,
-          "pax_out": 1,
-          "small_equipment": false,
-          "operation_id": 2,
-          "confirmed_operation": false,
-          "straordinaria": false,
-          "type_apt": "C",
-          "alias": "TBR",
-          "customer_name": "THE BEST RENT S.r.l.",
-          "priority": "low_priority",
-          "reasons": [
-            "not_eo",
-            "not_hp"
-          ]
-        },
-        {
-          "task_id": 219180,
-          "logistic_code": 1072,
-          "client_id": 3,
-          "premium": false,
-          "address": "VIA AUSONIO, 6",
-          "lat": "45.4599303",
-          "lng": "9.1743487",
-          "cleaning_time": 90,
-          "checkin_date": "2025-11-21",
-          "checkout_date": "2025-11-21",
-          "checkin_time": "20:00",
-          "checkout_time": null,
-          "pax_in": 2,
-          "pax_out": 2,
-          "small_equipment": true,
-          "operation_id": 2,
-          "confirmed_operation": true,
-          "straordinaria": false,
-          "type_apt": "A",
-          "alias": "TBR",
-          "customer_name": "THE BEST RENT S.r.l.",
           "priority": "low_priority",
           "reasons": [
             "not_eo",
@@ -837,13 +753,13 @@
           ]
         }
       ],
-      "count": 7
+      "count": 4
     }
   },
   "summary": {
-    "total_tasks": 30,
+    "total_tasks": 27,
     "early_out": 9,
     "high_priority": 14,
-    "low_priority": 7
+    "low_priority": 4
   }
 }
