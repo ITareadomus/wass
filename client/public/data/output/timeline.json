@@ -1,13 +1,156 @@
 {
   "metadata": {
-    "last_updated": "2025-11-19T16:52:32.866Z",
-    "date": "2025-11-20",
-    "created_by": "Admin"
+    "last_updated": "2025-11-21T08:13:32.864566",
+    "date": "2025-11-21"
   },
-  "cleaners_assignments": [],
+  "cleaners_assignments": [
+    {
+      "cleaner": {
+        "id": 132,
+        "name": "JOHOISER ERNESTO",
+        "lastname": "LOPEZ GIRON",
+        "role": "Premium",
+        "premium": true
+      },
+      "tasks": [
+        {
+          "task_id": 219171,
+          "logistic_code": 1540,
+          "client_id": 118,
+          "premium": false,
+          "address": "VIA GONIN, 58",
+          "lat": "45.4423379",
+          "lng": "9.1195717",
+          "cleaning_time": 60,
+          "checkin_date": "2025-11-21",
+          "checkout_date": "2025-11-21",
+          "checkin_time": "15:00",
+          "checkout_time": "10:15",
+          "pax_in": 2,
+          "pax_out": 2,
+          "small_equipment": true,
+          "operation_id": 2,
+          "confirmed_operation": true,
+          "straordinaria": false,
+          "type_apt": "A",
+          "alias": "CLTR",
+          "customer_name": "CALLATRONI ELENA",
+          "reasons": [
+            "checkout_time_eo_window_or_before_start",
+            "automatic_assignment_eo"
+          ],
+          "priority": "early_out",
+          "start_time": "10:00",
+          "end_time": "11:00",
+          "followup": false,
+          "sequence": 1,
+          "travel_time": 0
+        },
+        {
+          "task_id": 219069,
+          "logistic_code": 1541,
+          "client_id": 118,
+          "premium": false,
+          "address": "VIA GONIN, 58",
+          "lat": "45.4423379",
+          "lng": "9.1195717",
+          "cleaning_time": 90,
+          "checkin_date": "2025-11-21",
+          "checkout_date": "2025-11-21",
+          "checkin_time": "15:00",
+          "checkout_time": "10:15",
+          "pax_in": 4,
+          "pax_out": 4,
+          "small_equipment": false,
+          "operation_id": 2,
+          "confirmed_operation": true,
+          "straordinaria": false,
+          "type_apt": "B",
+          "alias": "CLTR",
+          "customer_name": "CALLATRONI ELENA",
+          "reasons": [
+            "checkout_time_eo_window_or_before_start",
+            "automatic_assignment_eo"
+          ],
+          "priority": "early_out",
+          "start_time": "11:03",
+          "end_time": "12:33",
+          "followup": true,
+          "sequence": 2,
+          "travel_time": 3
+        },
+        {
+          "task_id": 218933,
+          "logistic_code": 1539,
+          "client_id": 118,
+          "premium": false,
+          "address": "VIA GONIN, 58",
+          "lat": "45.4423379",
+          "lng": "9.1195717",
+          "cleaning_time": 60,
+          "checkin_date": "2025-11-21",
+          "checkout_date": "2025-11-21",
+          "checkin_time": "15:00",
+          "checkout_time": "10:15",
+          "pax_in": 2,
+          "pax_out": 2,
+          "small_equipment": true,
+          "operation_id": 2,
+          "confirmed_operation": true,
+          "straordinaria": false,
+          "type_apt": "A",
+          "alias": "CLTR",
+          "customer_name": "CALLATRONI ELENA",
+          "reasons": [
+            "checkout_time_eo_window_or_before_start",
+            "automatic_assignment_eo"
+          ],
+          "priority": "early_out",
+          "start_time": "12:36",
+          "end_time": "13:36",
+          "followup": true,
+          "sequence": 3,
+          "travel_time": 3
+        },
+        {
+          "task_id": 219010,
+          "logistic_code": 980,
+          "client_id": 87,
+          "premium": true,
+          "address": "LARGO CORSIA DEI SERVI 11",
+          "lat": "45.4650722",
+          "lng": "9.196025",
+          "cleaning_time": 120,
+          "checkin_date": "2025-11-21",
+          "checkout_date": "2025-11-21",
+          "checkin_time": null,
+          "checkout_time": null,
+          "pax_in": 3,
+          "pax_out": 4,
+          "small_equipment": false,
+          "operation_id": 2,
+          "confirmed_operation": true,
+          "straordinaria": false,
+          "type_apt": "C",
+          "alias": "HCC",
+          "customer_name": "HACCA SRL",
+          "reasons": [
+            "client_forced_eo",
+            "automatic_assignment_eo"
+          ],
+          "priority": "early_out",
+          "start_time": "14:21",
+          "end_time": "16:21",
+          "followup": true,
+          "sequence": 4,
+          "travel_time": 45
+        }
+      ]
+    }
+  ],
   "meta": {
-    "total_cleaners": 0,
-    "used_cleaners": 0,
-    "assigned_tasks": 0
+    "total_cleaners": 1,
+    "used_cleaners": 1,
+    "assigned_tasks": 4
   }
 }
