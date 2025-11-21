@@ -133,6 +133,29 @@ def same_street(a: Optional[str], b: Optional[str]) -> bool:
     sb, _ = split_street_number(nb)
     return sa == sb
 
+def is_nearby_same_block(a: Task, b: Task) -> bool:
+    """
+    Due task sono nello stesso "blocco" se:
+    - sono sullo stesso stabile (stesso indirizzo e numero civico)
+    - sono sullo stesso piano e interno (non implementato qui, solo indirizzo)
+    - sono nella stessa via e vicinissimi (entro 100m)
+    """
+    if not a.address or not b.address:
+        return False
+
+    if same_building(a.address, b.address):
+        return True
+
+    if same_street(a.address, b.address):
+        # Considera "stesso blocco" se sono entro 100m
+        # (approssimazione: 100m ~ 0.001 gradi lat/lng)
+        try:
+            km = haversine_km(a.lat, a.lng, b.lat, b.lng)
+            return km <= 0.10
+        except Exception:
+            return False
+    return False
+
 
 def same_zone(a: Optional["Task"], b: Optional["Task"]) -> bool:
     """
@@ -517,43 +540,40 @@ def plan_day(
     assigned_logistic_codes: set = None,
 ) -> Tuple[List[Cleaner], List[Task]]:
     """
-    Assegna le task ai cleaner con:
-    - HARD CLUSTER edificio/via: se un cleaner ha già task nello stesso edificio/via,
-      si sceglie SOLO tra quei cleaner (se fattibile).
-    - FAIRNESS: evita che un cleaner abbia molte più task degli altri, ma
-      NON favorisce i cleaner vuoti (tranne il Formatore).
-    - BONUS Formatore: se il formatore è un candidato sensato, ha un piccolo vantaggio.
+    Assegna le task Early-Out con:
+    - HARD CLUSTER edificio/via o "stesso blocco" (same_building + is_nearby_same_block)
+    - FAIRNESS: evita che un cleaner abbia molte più task degli altri,
+      ignorando i cleaner vuoti (non forziamo a usarli per forza)
+    - TARGET MINIMO 3 TASK: se possibile, favorisce cleaner con 1–2 task
+      prima di aumentare ancora chi ne ha già 4.
 
     Usa:
+      - find_best_position(cleaner, task) -> (pos, travel) o None
       - same_building(address, address)
-      - find_best_position(cleaner, task)  -> (pos, travel) o None
-      - can_add_task all'interno di find_best_position
+      - is_nearby_same_block(t1, t2)
     """
 
     if assigned_logistic_codes is None:
         assigned_logistic_codes = set()
 
-    # Pesi tunabili
-    LOAD_WEIGHT = 10             # quanto pesa il numero di task nel punteggio
-    SAME_BUILDING_BONUS = -5     # bonus (negativo) se il cleaner ha già task nello stesso edificio
-    FAIRNESS_DELTA = 1           # un cleaner è "fair" se ha load <= min_load + FAIRNESS_DELTA
-    ROLE_TRAINER_BONUS = -5      # bonus per role == "Formatore" (valorizza il formatore)
+    LOAD_WEIGHT = 10            # peso del carico nel punteggio
+    SAME_BUILDING_BONUS = -5    # bonus (negativo) se il cleaner ha già task nello stesso edificio/blocco
+    FAIRNESS_DELTA = 1
+    TARGET_MIN_TASKS = 3        # "mi piacerebbe che tutti ne avessero almeno 3", se possibile
 
     unassigned: List[Task] = []
 
-    # NB: si assume che 'tasks' sia già ordinato da load_tasks() a monte
     for task in tasks:
-        # Dedup cross-container su logistic_code
+        # dedup su logistic_code cross-container
         if task.logistic_code in assigned_logistic_codes:
-            print(f"   ⏭️  Skippata task {task.task_id} (logistic_code {task.logistic_code} già assegnato)")
             unassigned.append(task)
             continue
 
         candidates: List[Tuple[Cleaner, int, float]] = []
 
-        # 1) Costruzione candidati: chi può fisicamente/praticamente prendere la task?
+        # 1) Trova tutti i cleaner che POSSONO prendere la task (vincoli gestiti da find_best_position)
         for cleaner in cleaners:
-            # Validazione tipo task (premium / straordinaria / standard)
+            # Validazione tipo di task (premium / straordinaria / standard)
             task_type = (
                 "straordinario_apt"
                 if task.straordinaria
@@ -566,9 +586,6 @@ def plan_day(
             if not can_cleaner_handle_apartment(cleaner.role, task.apt_type):
                 continue
 
-            # find_best_position tiene conto di:
-            # - can_add_task (premium, straordinaria, limiti giornalieri, ecc.)
-            # - vincoli temporali (checkout/checkin, evaluate_route)
             result = find_best_position(cleaner, task)
             if result is None:
                 continue
@@ -577,63 +594,42 @@ def plan_day(
             candidates.append((cleaner, pos, travel))
 
         if not candidates:
-            # Nessun cleaner può prendere questa task rispettando i vincoli
             unassigned.append(task)
             continue
 
         # -------------------------------------------------------------
-        # 2) HARD CLUSTER: se qualcuno ha già task nello stesso edificio/via,
-        #    scegliamo SOLO tra quei cleaner.
+        # 2) HARD CLUSTER edificio/via/blocco: stesso edificio o vicino + stesso cliente
         # -------------------------------------------------------------
         building_candidates: List[Tuple[Cleaner, int, float]] = []
         for c, p, t_travel in candidates:
-            if c.route and any(same_building(ex.address, task.address) for ex in c.route):
+            if c.route and any(
+                same_building(ex.address, task.address) or is_nearby_same_block(ex, task)
+                for ex in c.route
+            ):
                 building_candidates.append((c, p, t_travel))
 
         if building_candidates:
-            # Se esistono cluster di edificio/via,
-            # usiamo SOLO questi candidati e abbassiamo leggermente il peso del load
             pool = building_candidates
-            effective_load_weight = max(LOAD_WEIGHT - 3, 1)
+            effective_load_weight = max(LOAD_WEIGHT - 3, 1)  # cluster: carico pesa un po' meno
         else:
             # ---------------------------------------------------------
-            # 3) FAIRNESS "intelligente"
-            #    - non favorisce i cleaner vuoti (load=0), tranne il Formatore
-            #    - calcola min_load solo su:
-            #        * il formatore (comunque)
-            #        * cleaner con load > 0
+            # 3) FAIRNESS: ignora cleaner vuoti, bilancia tra quelli già in uso
             # ---------------------------------------------------------
             loads_for_fairness: List[int] = []
             for (c, _, _) in candidates:
-                role = getattr(c, "role", None)
                 load = len(c.route)
-
-                if role == "Formatore":
-                    # Il formatore partecipa sempre alla fairness
+                if load > 0:  # i cleaner vuoti non "tirano su" il min_load
                     loads_for_fairness.append(load)
-                else:
-                    # Gli altri entrano in fairness solo se hanno già almeno 1 task
-                    if load > 0:
-                        loads_for_fairness.append(load)
 
             if loads_for_fairness:
                 min_load = min(loads_for_fairness)
             else:
-                # Caso limite: tutti i candidati sono vuoti non-formatore
-                # -> niente fairness, si va solo di travel/cluster
+                # tutti i candidati sono vuoti -> nessuna fairness, andiamo solo di travel/cluster
                 min_load = 0
 
             fair_candidates: List[Tuple[Cleaner, int, float]] = []
             for (c, p, t_travel) in candidates:
-                role = getattr(c, "role", None)
                 load = len(c.route)
-
-                # Il formatore è sempre considerato "fair"
-                if role == "Formatore":
-                    fair_candidates.append((c, p, t_travel))
-                    continue
-
-                # Per gli altri, fairness solo se hanno già almeno 1 task
                 if load > 0 and load <= min_load + FAIRNESS_DELTA:
                     fair_candidates.append((c, p, t_travel))
 
@@ -641,10 +637,19 @@ def plan_day(
             effective_load_weight = LOAD_WEIGHT
 
         # -------------------------------------------------------------
-        # 4) Scelta finale: punteggio combinato
-        #    score = travel + effective_load_weight * load
-        #                     + SAME_BUILDING_BONUS (soft)
-        #                     + ROLE_TRAINER_BONUS (se Formatore)
+        # 4) TARGET MINIMO 3 TASK: se possibile, favorisci chi ha 1–2 task
+        # -------------------------------------------------------------
+        low_load_candidates: List[Tuple[Cleaner, int, float]] = [
+            (c, p, t_travel)
+            for (c, p, t_travel) in pool
+            if 0 < len(c.route) < TARGET_MIN_TASKS
+        ]
+
+        if low_load_candidates:
+            pool = low_load_candidates
+
+        # -------------------------------------------------------------
+        # 5) Scelta finale: score = travel + effective_load_weight * load + SAME_BUILDING_BONUS (soft)
         # -------------------------------------------------------------
         best_choice: Optional[Tuple[Cleaner, int, float]] = None
         best_score: Optional[float] = None
@@ -652,33 +657,25 @@ def plan_day(
         for c, p, t_travel in pool:
             load = len(c.route)
 
-            # Bonus soft per stesso edificio (anche se non siamo nel cluster "duro")
             sb_bonus = 0
-            if c.route and any(same_building(ex.address, task.address) for ex in c.route):
+            if c.route and any(
+                same_building(ex.address, task.address) or is_nearby_same_block(ex, task)
+                for ex in c.route
+            ):
                 sb_bonus = SAME_BUILDING_BONUS
 
-            # Bonus ruolo formatore
-            role_bonus = 0
-            if getattr(c, "role", None) == "Formatore":
-                role_bonus = ROLE_TRAINER_BONUS
-
-            score = t_travel + effective_load_weight * load + sb_bonus + role_bonus
+            score = t_travel + effective_load_weight * load + sb_bonus
 
             if best_score is None or score < best_score:
                 best_score = score
                 best_choice = (c, p, t_travel)
 
-        # Se per qualche motivo non abbiamo trovato nulla (non dovrebbe succedere)
         if best_choice is None:
             unassigned.append(task)
             continue
 
         cleaner, pos, travel = best_choice
-
-        # Inserisci la task nella posizione migliore trovata
         cleaner.route.insert(pos, task)
-
-        # Aggiorna logistic_code assegnati per cross-container
         assigned_logistic_codes.add(task.logistic_code)
 
     return cleaners, unassigned
