@@ -326,6 +326,62 @@ def evaluate_route(cleaner: Cleaner, route: List[Task]) -> Tuple[bool, List[Tupl
     return True, schedule
 
 
+def can_add_lp_task(cleaner: Cleaner) -> bool:
+    """
+    Verifica se è possibile aggiungere una task LP al cleaner secondo le regole:
+    1. Limite giornaliero: max 5 task totali (EO+HP+LP)
+    2. Limite LP dinamico: dipende dalle task già assegnate (EO+HP)
+       - Se cleaner ha 0 task EO+HP: può prendere max 3 task LP
+       - Se cleaner ha 1 task EO+HP: può prendere fino a 3 task LP (totale 4)
+       - Se cleaner ha 2 task EO+HP: può prendere fino a 2 task LP (totale 4)
+       - Se cleaner ha 3 task EO+HP: può prendere fino a 1 task LP (totale 4)
+       - Se cleaner ha 4+ task EO+HP: può prendere 0 task LP (ma 1 task LP se non ci sono altri cleaner con meno task)
+    3. Formatore: max 3 task LP al giorno (questo viene gestito da can_cleaner_handle_apartment)
+    """
+    current_lp_count = len(cleaner.route)
+    total_daily = cleaner.total_daily_tasks + current_lp_count
+
+    # Controllo limite giornaliero HARD (max 5 task totali)
+    if total_daily >= MAX_DAILY_TASKS:
+        return False
+
+    # Limite LP dinamico
+    eo_hp_count = cleaner.total_daily_tasks
+
+    dynamic_max_lp = 0
+    if eo_hp_count == 0:
+        dynamic_max_lp = 3
+    elif eo_hp_count == 1:
+        dynamic_max_lp = 3
+    elif eo_hp_count == 2:
+        dynamic_max_lp = 2
+    elif eo_hp_count == 3:
+        dynamic_max_lp = 1
+    else:
+        # Se ha già 4+ task EO+HP, normalmente non può prendere LP
+        # Ma se tutti gli altri cleaner sono pieni, permetti 1 task LP
+        dynamic_max_lp = 0
+
+    # Verifica se il limite dinamico è superato
+    if current_lp_count >= dynamic_max_lp:
+        # Eccezione: se tutti gli altri cleaner hanno già raggiunto PREFERRED_DAILY_TASKS
+        # e questo cleaner ha meno di PREFERRED_DAILY_TASKS, permetti una task LP in più
+        # per bilanciare il carico, ma solo se non supera MAX_DAILY_TASKS
+        preferred_daily_reached = [
+            (c.total_daily_tasks + len(c.route)) >= PREFERRED_DAILY_TASKS
+            for c in cleaners if c is not cleaner
+        ]
+        if all(preferred_daily_reached) and total_daily < MAX_DAILY_TASKS:
+            if current_lp_count < MAX_DAILY_TASKS - cleaner.total_daily_tasks:
+                return True
+            else:
+                return False
+        else:
+            return False
+
+    return True
+
+
 def can_add_task(cleaner: Cleaner, task: Task) -> bool:
     """
     Verifica se è possibile aggiungere una task al cleaner secondo le regole:
@@ -409,7 +465,7 @@ def can_add_task(cleaner: Cleaner, task: Task) -> bool:
     # NUOVO: Limite LP dinamico in base alle task già assegnate (EO+HP)
     # Obiettivo: spalmare equamente, minimo 3 task per cleaner quando possibile
     eo_hp_count = cleaner.total_daily_tasks
-    
+
     if eo_hp_count == 0:
         # Nessuna task precedente: può prendere fino a 3 LP
         dynamic_max_lp = 3
@@ -654,332 +710,98 @@ def load_tasks() -> List[Task]:
 
 
 # -------- Planner --------
-def plan_day(tasks: List[Task], cleaners: List[Cleaner], assigned_logistic_codes: set = None) -> Tuple[List[Cleaner], List[Task]]:
+def plan_day(
+    tasks: List[Task],
+    cleaners: List[Cleaner],
+    assigned_logistic_codes: set = None,
+) -> Tuple[List[Cleaner], List[Task]]:
     """
-    Assegna le task ai cleaner con regole semplificate:
-    - Favorisce percorsi < 15'
-    - Se non ci sono percorsi < 15', sceglie il minore dei > 15'
-    - Max 4 task per cleaner per LP
-    - DEDUPLICA: Solo una task per logistic_code viene assegnata
-    - CLUSTERING PREVENTIVO: Raggruppa task stesso edificio prima dell'assegnazione
-    - CLUSTERING CROSS-CONTAINER: Raggruppa task vicine a quelle già assegnate (EO/HP)
+    Assegna le task Low-Priority con:
+    - fairness: preferisce cleaners con meno LP (<= min_load + 1)
+    - score: travel + LOAD_WEIGHT * load + SAME_BUILDING_BONUS se già nello stesso edificio
+    - stesso edificio usato come BONUS soft (non vincolo assoluto/cross-container duro)
+    - dedup su logistic_code (coerente con EO+HP)
     """
     if assigned_logistic_codes is None:
         assigned_logistic_codes = set()
 
-    unassigned = []
+    LOAD_WEIGHT = 10
+    SAME_BUILDING_BONUS = -5
+    FAIRNESS_DELTA = 1
 
-    # CLUSTERING PREVENTIVO CROSS-CONTAINER: Carica task già assegnate dalla timeline
-    timeline_path = OUTPUT_ASSIGN.parent / "timeline.json"
-    assigned_tasks_by_location = []  # Lista di (lat, lng, address) delle task già assegnate
+    unassigned: List[Task] = []
 
-    if timeline_path.exists():
-        try:
-            timeline_data = json.loads(timeline_path.read_text(encoding="utf-8"))
-            for cleaner_entry in timeline_data.get("cleaners_assignments", []):
-                for t in cleaner_entry.get("tasks", []):
-                    lat = t.get("lat")
-                    lng = t.get("lng")
-                    addr = t.get("address")
-                    if lat is not None and lng is not None:
-                        assigned_tasks_by_location.append((float(lat), float(lng), addr))
-            print(f"   🔄 CROSS-CONTAINER: Caricate {len(assigned_tasks_by_location)} task già assegnate")
-        except Exception as e:
-            print(f"   ⚠️ Errore caricamento timeline per clustering: {e}")
-
-    # CLUSTERING PREVENTIVO: Raggruppa task per vicinanza (edificio o task già assegnate)
-    building_groups = {}
-    cross_container_groups = {}  # Nuovi gruppi per task vicine a quelle già assegnate
-
+    # tasks sono già ordinate in load_tasks()
     for task in tasks:
-        if task.logistic_code in assigned_logistic_codes:
-            continue
-
-        # 1. PRIORITÀ MASSIMA: Controlla se è nello stesso edificio di una task da assegnare
-        found_building_group = False
-        for group_key, group_tasks in building_groups.items():
-            if same_building(group_tasks[0].address, task.address):
-                group_tasks.append(task)
-                found_building_group = True
-                print(f"   🏢 Task {task.task_id} aggiunta al gruppo edificio: {task.address}")
-                break
-
-        if found_building_group:
-            continue
-
-        # 2. PRIORITÀ ALTA: Controlla se è vicina a una task già assegnata (cross-container)
-        found_cross_container = False
-        for assigned_lat, assigned_lng, assigned_addr in assigned_tasks_by_location:
-            # Stesso edificio con task già assegnata
-            if assigned_addr and same_building(assigned_addr, task.address):
-                key = f"cross_{assigned_addr}_{assigned_lat}_{assigned_lng}"
-                if key not in cross_container_groups:
-                    cross_container_groups[key] = []
-                cross_container_groups[key].append(task)
-                found_cross_container = True
-                print(f"   🔄 Task {task.task_id} vicina a edificio già assegnato: {assigned_addr}")
-                break
-            # Stessa zona (≤800m)
-            if same_zone(task.lat, task.lng, assigned_lat, assigned_lng, task.address, assigned_addr):
-                key = f"cross_zone_{assigned_lat}_{assigned_lng}"
-                if key not in cross_container_groups:
-                    cross_container_groups[key] = []
-                cross_container_groups[key].append(task)
-                found_cross_container = True
-                print(f"   🔄 Task {task.task_id} in zona di task già assegnata")
-                break
-
-        if found_cross_container:
-            continue
-
-        # 3. Nessuna vicinanza: crea nuovo gruppo edificio
-        building_groups[task.address or f"task_{task.task_id}"] = [task]
-
-    # Ordina i gruppi: prima cross-container (massima priorità), poi stesso edificio
-    all_groups = []
-    all_groups.extend(cross_container_groups.values())
-    all_groups.extend(building_groups.values())
-    sorted_groups = sorted(all_groups, key=lambda g: -len(g))
-
-    # Log statistiche clustering
-    if cross_container_groups:
-        print(f"   ✅ Gruppi cross-container: {len(cross_container_groups)}")
-    if building_groups:
-        print(f"   ✅ Gruppi stesso edificio: {len(building_groups)}")
-
-    # Appiattisci mantenendo l'ordine dei gruppi
-    ordered_tasks = []
-    for group in sorted_groups:
-        ordered_tasks.extend(group)
-
-    print(f"   📦 Task ordinate per clustering: {len(ordered_tasks)}")
-
-    for task in ordered_tasks:
-        # DEDUPLICA: Skippa task con logistic_code già assegnato
         if task.logistic_code in assigned_logistic_codes:
             print(f"   ⏭️  Skippata task {task.task_id} (logistic_code {task.logistic_code} già assegnato)")
             unassigned.append(task)
             continue
 
-        # PRIORITÀ ASSOLUTA: Cerca se qualche cleaner ha già una task nello stesso edificio (LP, HP o EO)
-        same_building_cleaner = None
-        same_zone_cleaner = None
-
-        # Leggi timeline una sola volta
-        timeline_data = None
-        timeline_path = OUTPUT_ASSIGN.parent / "timeline.json"
-        if timeline_path.exists():
-            try:
-                timeline_data = json.loads(timeline_path.read_text(encoding="utf-8"))
-            except Exception as e:
-                print(f"   ⚠️ Errore caricamento timeline per clustering cross-container: {e}")
-                timeline_data = None
+        candidates: List[Tuple[Cleaner, int, float]] = []
 
         for cleaner in cleaners:
-            # 1) Controlla task LP già in route (stesso edificio)
-            if any(same_building(existing_task.address, task.address) for existing_task in cleaner.route):
-                same_building_cleaner = cleaner
-                break
-
-            # 2) CROSS-CONTAINER: controlla tutte le task di questo cleaner in timeline
-            if timeline_data:
-                for cleaner_entry in timeline_data.get("cleaners_assignments", []):
-                    if cleaner_entry["cleaner"]["id"] != cleaner.id:
-                        continue
-
-                    for t in cleaner_entry.get("tasks", []):
-                        t_addr = t.get("address")
-                        t_lat = t.get("lat")
-                        t_lng = t.get("lng")
-
-                        # 2a) stesso edificio -> priorità massima
-                        if same_building(t_addr, task.address):
-                            same_building_cleaner = cleaner
-                            priority = t.get("priority", "unknown")
-                            print(f"   🔄 CROSS-CONTAINER EDIFICIO: task {task.task_id} vicina a task {priority.upper()} di {cleaner.name}")
-                            break
-
-                        # 2b) stessa ZONA -> memorizza come candidato di zona
-                        if t_lat is not None and t_lng is not None:
-                            if same_zone(float(t_lat), float(t_lng),
-                                         task.lat, task.lng,
-                                         t_addr, task.address):
-                                if same_zone_cleaner is None:
-                                    same_zone_cleaner = cleaner
-                                    priority = t.get("priority", "unknown")
-                                    print(f"   🔄 CROSS-CONTAINER ZONA: task {task.task_id} vicina (zona) a task {priority.upper()} di {cleaner.name}")
-                    if same_building_cleaner:
-                        break
-
-            if same_building_cleaner:
-                break
-
-        # Usa prima stesso edificio, altrimenti stessa zona
-        target_cleaner = same_building_cleaner or same_zone_cleaner
-        if target_cleaner:
-            # VALIDAZIONE: Verifica compatibilità task_type e apartment_type per fast-path cross-container
-            task_type = 'straordinario_apt' if task.straordinaria else ('premium_apt' if task.is_premium else 'standard_apt')
-            if not can_cleaner_handle_task(target_cleaner.role, task_type, target_cleaner.can_do_straordinaria):
-                tipo = "edificio" if same_building_cleaner else "zona"
-                print(f"   ⚠️  Cross-container {tipo} cleaner {target_cleaner.name} ({target_cleaner.role}) non può gestire task {task_type} - SKIPPATO fast-path")
-            elif not can_cleaner_handle_apartment(target_cleaner.role, task.apt_type):
-                tipo = "edificio" if same_building_cleaner else "zona"
-                print(f"   ⚠️  Cross-container {tipo} cleaner {target_cleaner.name} ({target_cleaner.role}) non può gestire appartamento {task.apt_type} - SKIPPATO fast-path")
-            else:
-                result = find_best_position(target_cleaner, task)
-                if result is not None:
-                    pos, travel = result
-                    target_cleaner.route.insert(pos, task)
-                    assigned_logistic_codes.add(task.logistic_code)
-                    tipo = "edificio" if same_building_cleaner else "zona"
-                    print(f"   🧩 Task {task.task_id} assegnata a {target_cleaner.name} (cross-container {tipo}: {task.address})")
-                    continue
-                else:
-                    # Se ha limite raggiunto per LP, ma è in zona, forza l'assegnazione
-                    # solo se il limite giornaliero lo permette
-                    if same_zone_cleaner:
-                        # VALIDAZIONE: Verifica compatibilità task_type e apartment_type per forced assignment
-                        task_type = 'straordinario_apt' if task.straordinaria else ('premium_apt' if task.is_premium else 'standard_apt')
-                        if not can_cleaner_handle_task(same_zone_cleaner.role, task_type, same_zone_cleaner.can_do_straordinaria):
-                            print(f"   ⚠️  Forced assignment a {same_zone_cleaner.name} ({same_zone_cleaner.role}) non può gestire task {task_type} - SKIPPATO")
-                        elif not can_cleaner_handle_apartment(same_zone_cleaner.role, task.apt_type):
-                            print(f"   ⚠️  Forced assignment a {same_zone_cleaner.name} ({same_zone_cleaner.role}) non può gestire appartamento {task.apt_type} - SKIPPATO")
-                        else:
-                            current_count = len(same_zone_cleaner.route)
-                            total_daily = same_zone_cleaner.total_daily_tasks + current_count
-
-                            # Se non ha superato il limite giornaliero assoluto, forza l'assegnazione
-                            if total_daily < MAX_DAILY_TASKS:
-                                # Prova ad aggiungere alla fine della route
-                                test_route = same_zone_cleaner.route + [task]
-                                feasible, _ = evaluate_route(same_zone_cleaner, test_route)
-                                if feasible:
-                                    same_zone_cleaner.route.append(task)
-                                    assigned_logistic_codes.add(task.logistic_code)
-                                    print(f"   🔥 Task {task.task_id} FORZATA a {same_zone_cleaner.name} (cross-container zona, limite LP superato ma fattibile)")
-                                    continue
-
-                    print(f"   ⚠️  Task {task.task_id} vicina a {target_cleaner.name} ma limite raggiunto e non fattibile")
-
-
-        # Se non c'è stesso edificio o zona, procedi con logica normale
-        candidates = []
-
-        for cleaner in cleaners:
-            # VALIDAZIONE: Verifica se il cleaner può gestire questo tipo di task
-            task_type = 'straordinario_apt' if task.straordinaria else ('premium_apt' if task.is_premium else 'standard_apt')
+            # Validazione tipo di task (premium / straordinaria / standard)
+            task_type = (
+                "straordinario_apt"
+                if task.straordinaria
+                else ("premium_apt" if task.is_premium else "standard_apt")
+            )
             if not can_cleaner_handle_task(cleaner.role, task_type, cleaner.can_do_straordinaria):
-                print(f"   ⚠️  Cleaner {cleaner.name} ({cleaner.role}) non può gestire task {task_type} - SKIPPATO (task_id: {task.task_id})")
+                # print(f"   ⚠️  Cleaner {cleaner.name} non può gestire task {task_type} - SKIPPATO")
                 continue
 
-            # NUOVO: Validazione tipo appartamento
+            # Validazione tipo appartamento
             if not can_cleaner_handle_apartment(cleaner.role, task.apt_type):
-                print(f"   ⚠️  Cleaner {cleaner.name} ({cleaner.role}) non può gestire appartamento {task.apt_type} - SKIPPATO (task_id: {task.task_id}, logistic_code: {task.logistic_code})")
+                # print(f"   ⚠️  Cleaner {cleaner.name} non può gestire appartamento {task.apt_type} - SKIPPATO")
                 continue
 
-            if can_add_task(cleaner, task):
-                result = find_best_position(cleaner, task)
-                if result is not None:
-                    pos, travel = result
-                    candidates.append((cleaner, pos, travel))
-                else:
-                    print(f"   ⚠️  Cleaner {cleaner.name} può gestire task {task.task_id} ma find_best_position ha fallito (vincoli temporali)")
-            else:
-                # Debug: perché can_add_task ha fallito?
-                current_lp = len(cleaner.route)
-                total_daily = cleaner.total_daily_tasks + current_lp
-                print(f"   ⚠️  Cleaner {cleaner.name} non può aggiungere task {task.task_id}: LP={current_lp}, Total daily={total_daily}/{MAX_DAILY_TASKS}")
+            # Validazione limiti LP dinamici
+            if not can_add_lp_task(cleaner):
+                continue
+
+            # find_best_position usa già can_add_task + evaluate_route
+            result = find_best_position(cleaner, task)
+            if result is None:
+                continue
+
+            pos, travel = result
+            candidates.append((cleaner, pos, travel))
 
         if not candidates:
             unassigned.append(task)
             continue
 
-        # Priorità 1: Stesso EDIFICIO (indirizzo completo uguale) - solo nuove assegnazioni
-        same_building_candidates = []
-        for c, p, t in candidates:
-            has_same_building = any(
-                same_building(existing_task.address, task.address)
-                for existing_task in c.route
-            )
-            if has_same_building:
-                same_building_candidates.append((c, p, t))
+        # FAIRNESS: calcola min load tra i candidati
+        loads = [len(c.route) for (c, _, _) in candidates]
+        min_load = min(loads) if loads else 0
 
-        if same_building_candidates:
-            # PRIORITÀ MASSIMA: stesso edificio = massima aggregazione
-            # Preferisci chi ha già più task (massimo clustering)
-            same_building_candidates.sort(key=lambda x: (-len(x[0].route), x[2]))
-            chosen = same_building_candidates[0]
-        # Priorità 2: stessa ZONA
-        elif any(
-            any(
-                same_zone(ex.lat, ex.lng, task.lat, task.lng, ex.address, task.address)
-                for ex in c.route
-            )
-            for c, _, _ in candidates if c.route
-        ):
-            zone_candidates = [
-                (c, p, t) for c, p, t in candidates
-                if any(
-                    same_zone(ex.lat, ex.lng, task.lat, task.lng, ex.address, task.address)
-                    for ex in c.route
-                )
-            ]
-            zone_candidates.sort(key=lambda x: (-len(x[0].route), x[2]))
-            chosen = zone_candidates[0]
-
+        fair_candidates = [
+            (c, p, t) for (c, p, t) in candidates
+            if len(c.route) <= min_load + FAIRNESS_DELTA
+        ]
+        if fair_candidates:
+            pool = fair_candidates
         else:
-            # Priorità successiva: cleaner con task entro 10 minuti (cluster generico)
-            cluster_candidates = []
-            for c, p, t in candidates:
-                has_cluster = any(
-                    travel_minutes(existing_task.lat, existing_task.lng, task.lat, task.lng,
-                                   existing_task.address, task.address) <= CLUSTER_MAX_TRAVEL or
-                    travel_minutes(task.lat, task.lng, existing_task.lat, existing_task.lng,
-                                   task.address, task.address) <= CLUSTER_MAX_TRAVEL
-                    for existing_task in c.route
-                )
-                if has_cluster:
-                    cluster_candidates.append((c, p, t))
+            pool = candidates
 
-            if cluster_candidates:
-                # Priorità alta a cleaner in cluster
-                # NUOVO: preferisci chi ha meno task totali (per evitare di superare 4)
-                cluster_candidates.sort(key=lambda x: (
-                    x[0].total_daily_tasks + len(x[0].route),  # Totale task (EO+HP+LP)
-                    len(x[0].route),  # Task LP
-                    x[2]  # Travel time
-                ))
-                chosen = cluster_candidates[0]
-            else:
-                # Nessun cluster, usa logica normale
-                # Dividi i candidati in due gruppi: < 20' e >= 20'
-                preferred = [(c, p, t) for c, p, t in candidates if t < PREFERRED_TRAVEL]
-                others = [(c, p, t) for c, p, t in candidates if t >= PREFERRED_TRAVEL]
+        best_choice = None
+        best_score = None
 
-                # Scegli dal gruppo preferito se esiste, altrimenti dal gruppo altri
-                if preferred:
-                    # NUOVO: preferisci chi ha meno task totali (per evitare di superare 4)
-                    # Ma tra quelli con stesso totale, preferisci chi ha più LP (per aggregare)
-                    preferred.sort(key=lambda x: (
-                        x[0].total_daily_tasks + len(x[0].route) >= PREFERRED_DAILY_TASKS,  # Evita >= 4
-                        x[0].total_daily_tasks + len(x[0].route),  # Totale task
-                        -len(x[0].route),  # Più task LP (aggregazione)
-                        x[2]  # Travel time
-                    ))
-                    chosen = preferred[0]
-                else:
-                    # Stesso per gli altri
-                    others.sort(key=lambda x: (
-                        x[0].total_daily_tasks + len(x[0].route) >= PREFERRED_DAILY_TASKS,
-                        x[0].total_daily_tasks + len(x[0].route),
-                        -len(x[0].route),
-                        x[2]
-                    ))
-                    chosen = others[0]
+        for c, p, t_travel in pool:
+            load = len(c.route)
+            sb_bonus = 0
+            if c.route and any(same_building(ex.address, task.address) for ex in c.route):
+                sb_bonus = SAME_BUILDING_BONUS
 
-        cleaner, pos, travel = chosen
+            score = t_travel + LOAD_WEIGHT * load + sb_bonus
+
+            if best_score is None or score < best_score:
+                best_score = score
+                best_choice = (c, p, t_travel)
+
+        cleaner, pos, travel = best_choice
         cleaner.route.insert(pos, task)
-        # Traccia il logistic_code come assegnato
         assigned_logistic_codes.add(task.logistic_code)
 
     return cleaners, unassigned
