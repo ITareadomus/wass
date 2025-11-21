@@ -1,22 +1,6 @@
 {
   "cleaners": [
     {
-      "id": 626,
-      "name": "DORA PATRICIA",
-      "lastname": "JIMENEZ",
-      "role": "Formatore",
-      "active": true,
-      "ranking": 0,
-      "counter_hours": 28.5,
-      "counter_days": 4,
-      "available": true,
-      "contract_type": "B",
-      "preferred_customers": [],
-      "telegram_id": null,
-      "start_time": "10:00",
-      "can_do_straordinaria": false
-    },
-    {
       "id": 1063,
       "name": "ALEXANDER DENNYS",
       "lastname": "CARDENAS OLAYA",
@@ -209,45 +193,6 @@
       "can_do_straordinaria": false
     },
     {
-      "id": 596,
-      "name": "TRACY",
-      "lastname": "OKE",
-      "role": "Premium",
-      "active": true,
-      "ranking": 0,
-      "counter_hours": 12,
-      "counter_days": 1,
-      "available": true,
-      "contract_type": "B",
-      "preferred_customers": [
-        1,
-        2,
-        3,
-        61,
-        64,
-        67,
-        72,
-        75,
-        80,
-        84,
-        87,
-        91,
-        94,
-        101,
-        113,
-        115,
-        118,
-        119,
-        120,
-        121,
-        123,
-        124
-      ],
-      "telegram_id": 6339409386,
-      "start_time": "10:00",
-      "can_do_straordinaria": false
-    },
-    {
       "id": 495,
       "name": "EL HADJI",
       "lastname": "BA",
@@ -281,9 +226,25 @@
       "telegram_id": 8035270407,
       "start_time": "10:00",
       "can_do_straordinaria": true
+    },
+    {
+      "id": 626,
+      "name": "DORA PATRICIA",
+      "lastname": "JIMENEZ",
+      "role": "Formatore",
+      "active": true,
+      "ranking": 0,
+      "counter_hours": 28.5,
+      "counter_days": 4,
+      "available": true,
+      "contract_type": "B",
+      "preferred_customers": [],
+      "telegram_id": null,
+      "start_time": "10:00",
+      "can_do_straordinaria": false
     }
   ],
-  "total_selected": 10,
+  "total_selected": 9,
   "metadata": {
     "date": "2025-11-21",
     "saved_at": "2025-11-21T09:18:53.187Z"
