@@ -1379,11 +1379,23 @@ export default function TimelineView({
                             zIndex: filteredCleanerId === cleaner.id || hasIncompatibleTasks ? 15 : 'auto'
                           }}
                         >
-                          {/* Griglia oraria di sfondo (solo visiva) */}
-                          <div className="absolute inset-0 grid grid-cols-10 pointer-events-none opacity-10">
-                            {timeSlots.map((slot, idx) => (
-                              <div key={idx} className="border-r border-border"></div>
-                            ))}
+                          {/* Griglia oraria di sfondo (solo visiva) con alternanza colori */}
+                          <div className="absolute inset-0 grid grid-cols-10 pointer-events-none">
+                            {timeSlots.map((slot, idx) => {
+                              // Ore pari (10:00, 12:00, 14:00, 16:00, 18:00) = idx 0, 2, 4, 6, 8
+                              // Ore dispari (11:00, 13:00, 15:00, 17:00, 19:00) = idx 1, 3, 5, 7, 9
+                              const isEvenHour = idx % 2 === 0;
+                              return (
+                                <div 
+                                  key={idx} 
+                                  className={`border-r border-border ${
+                                    isEvenHour 
+                                      ? 'bg-blue-50/30 dark:bg-blue-950/10' 
+                                      : 'bg-sky-100/30 dark:bg-sky-900/10'
+                                  }`}
+                                ></div>
+                              );
+                            })}
                           </div>
 
                           {/* Task posizionate in sequenza con indicatori di travel time */}
