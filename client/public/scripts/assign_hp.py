@@ -6,6 +6,12 @@ from typing import Any, Dict, List, Optional, Tuple
 from pathlib import Path
 from datetime import datetime, timedelta
 from task_validation import can_cleaner_handle_task, can_cleaner_handle_apartment, can_cleaner_handle_priority
+from assign_utils import (
+    NEARBY_TRAVEL_THRESHOLD, NEW_CLEANER_PENALTY_MIN, NEW_TRAINER_PENALTY_MIN,
+    TARGET_MIN_LOAD_MIN, FAIRNESS_DELTA_HOURS, LOAD_WEIGHT,
+    SAME_BUILDING_BONUS, ROLE_TRAINER_BONUS,
+    cleaner_load_minutes, cleaner_load_hours
+)
 
 # =============================
 # I/O paths
@@ -672,11 +678,6 @@ def plan_day(
     if assigned_logistic_codes is None:
         assigned_logistic_codes = set()
 
-    LOAD_WEIGHT = 10
-    SAME_BUILDING_BONUS = -5
-    FAIRNESS_DELTA = 1
-    TARGET_MIN_TASKS = 3
-
     unassigned: List[Task] = []
 
     for task in tasks:
@@ -724,42 +725,42 @@ def plan_day(
             pool = building_candidates
             effective_load_weight = max(LOAD_WEIGHT - 3, 1)
         else:
-            # FAIRNESS standard (ignora cleaner vuoti)
-            loads_for_fairness: List[int] = []
+            # FAIRNESS basata sulle ore, ignora cleaner vuoti
+            loads_for_fairness: List[float] = []
             for (c, _, _) in candidates:
-                load = len(c.route)
-                if load > 0:
-                    loads_for_fairness.append(load)
+                load_h = cleaner_load_hours(c)
+                if load_h > 0.0:
+                    loads_for_fairness.append(load_h)
 
             if loads_for_fairness:
-                min_load = min(loads_for_fairness)
+                min_load_h = min(loads_for_fairness)
             else:
-                min_load = 0
+                min_load_h = 0.0
 
             fair_candidates: List[Tuple[Cleaner, int, float]] = []
             for (c, p, t_travel) in candidates:
-                load = len(c.route)
-                if load > 0 and load <= min_load + FAIRNESS_DELTA:
+                load_h = cleaner_load_hours(c)
+                if load_h > 0.0 and load_h <= min_load_h + FAIRNESS_DELTA_HOURS:
                     fair_candidates.append((c, p, t_travel))
 
             pool = fair_candidates or candidates
             effective_load_weight = LOAD_WEIGHT
 
-        # TARGET MIN 3 TASK
+        # TARGET MINIMO DI CARICO (≈ 3 ore)
         low_load_candidates: List[Tuple[Cleaner, int, float]] = [
             (c, p, t_travel)
             for (c, p, t_travel) in pool
-            if 0 < len(c.route) < TARGET_MIN_TASKS
+            if cleaner_load_minutes(c) < TARGET_MIN_LOAD_MIN
         ]
         if low_load_candidates:
             pool = low_load_candidates
 
-        # Scoring finale
+        # Scoring finale con ore + penalità attivazione
         best_choice: Optional[Tuple[Cleaner, int, float]] = None
         best_score: Optional[float] = None
 
         for c, p, t_travel in pool:
-            load = len(c.route)
+            load_h = cleaner_load_hours(c)
 
             sb_bonus = 0
             if c.route and any(
@@ -768,7 +769,18 @@ def plan_day(
             ):
                 sb_bonus = SAME_BUILDING_BONUS
 
-            score = t_travel + effective_load_weight * load + sb_bonus
+            # penalità di attivazione per cleaner vuoti
+            if len(c.route) == 0:
+                activation_penalty = NEW_CLEANER_PENALTY_MIN
+            else:
+                activation_penalty = 0
+
+            score = (
+                t_travel
+                + effective_load_weight * load_h
+                + sb_bonus
+                + activation_penalty
+            )
 
             if best_score is None or score < best_score:
                 best_score = score

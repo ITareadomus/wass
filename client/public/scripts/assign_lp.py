@@ -7,6 +7,12 @@ from pathlib import Path
 import sys
 from datetime import datetime
 from task_validation import can_cleaner_handle_task, can_cleaner_handle_apartment, can_cleaner_handle_priority
+from assign_utils import (
+    NEARBY_TRAVEL_THRESHOLD, NEW_CLEANER_PENALTY_MIN, NEW_TRAINER_PENALTY_MIN,
+    TARGET_MIN_LOAD_MIN, FAIRNESS_DELTA_HOURS, LOAD_WEIGHT,
+    SAME_BUILDING_BONUS, ROLE_TRAINER_BONUS,
+    cleaner_load_minutes, cleaner_load_hours
+)
 
 # =============================
 # I/O paths
@@ -757,12 +763,6 @@ def plan_day(
     if assigned_logistic_codes is None:
         assigned_logistic_codes = set()
 
-    LOAD_WEIGHT = 10
-    SAME_BUILDING_BONUS = -5
-    FAIRNESS_DELTA = 1
-    TARGET_MIN_TASKS = 3
-    ROLE_TRAINER_BONUS = -5   # piccolo vantaggio per role == "Formatore"
-
     unassigned: List[Task] = []
 
     for task in tasks:
@@ -814,56 +814,56 @@ def plan_day(
             pool = building_candidates
             effective_load_weight = max(LOAD_WEIGHT - 3, 1)
         else:
-            # FAIRNESS con Formatore
-            loads_for_fairness: List[int] = []
+            # FAIRNESS con Formatore + ore
+            loads_for_fairness: List[float] = []
             for (c, _, _) in candidates:
                 role = getattr(c, "role", None)
-                load = len(c.route)
+                load_h = cleaner_load_hours(c)
 
                 if role == "Formatore":
-                    # il formatore partecipa sempre al calcolo
-                    loads_for_fairness.append(load)
+                    # il formatore partecipa sempre al calcolo delle ore minime
+                    loads_for_fairness.append(load_h)
                 else:
-                    if load > 0:
-                        loads_for_fairness.append(load)
+                    if load_h > 0.0:
+                        loads_for_fairness.append(load_h)
 
             if loads_for_fairness:
-                min_load = min(loads_for_fairness)
+                min_load_h = min(loads_for_fairness)
             else:
-                min_load = 0
+                min_load_h = 0.0
 
             fair_candidates: List[Tuple[Cleaner, int, float]] = []
             for (c, p, t_travel) in candidates:
                 role = getattr(c, "role", None)
-                load = len(c.route)
+                load_h = cleaner_load_hours(c)
 
                 if role == "Formatore":
                     fair_candidates.append((c, p, t_travel))
                     continue
 
-                if load > 0 and load <= min_load + FAIRNESS_DELTA:
+                if load_h > 0.0 and load_h <= min_load_h + FAIRNESS_DELTA_HOURS:
                     fair_candidates.append((c, p, t_travel))
 
             pool = fair_candidates or candidates
             effective_load_weight = LOAD_WEIGHT
 
-        # TARGET MIN 3 TASK (incluso formatore)
+        # TARGET MINIMO DI CARICO (≈ 3 ore) incluso formatore
         low_load_candidates: List[Tuple[Cleaner, int, float]] = [
             (c, p, t_travel)
             for (c, p, t_travel) in pool
-            if 0 < len(c.route) < TARGET_MIN_TASKS
-            or (getattr(c, "role", None) == "Formatore" and len(c.route) < TARGET_MIN_TASKS)
+            if cleaner_load_minutes(c) < TARGET_MIN_LOAD_MIN
         ]
         if low_load_candidates:
             pool = low_load_candidates
 
-        # Scoring finale con bonus Formatore
+        # Scoring finale con ore + penalità attivazione + bonus Formatore
         best_choice: Optional[Tuple[Cleaner, int, float]] = None
         best_score: Optional[float] = None
 
         for c, p, t_travel in pool:
-            load = len(c.route)
+            load_h = cleaner_load_hours(c)
 
+            # bonus cluster soft
             sb_bonus = 0
             if c.route and any(
                 same_building(ex.address, task.address) or is_nearby_same_block(ex, task)
@@ -871,11 +871,28 @@ def plan_day(
             ):
                 sb_bonus = SAME_BUILDING_BONUS
 
+            # penalità di attivazione per cleaner vuoti
+            if len(c.route) == 0:
+                role = getattr(c, "role", None)
+                if role == "Formatore":
+                    activation_penalty = NEW_TRAINER_PENALTY_MIN
+                else:
+                    activation_penalty = NEW_CLEANER_PENALTY_MIN
+            else:
+                activation_penalty = 0
+
+            # bonus ruolo per Formatore
             role_bonus = 0
             if getattr(c, "role", None) == "Formatore":
                 role_bonus = ROLE_TRAINER_BONUS
 
-            score = t_travel + effective_load_weight * load + sb_bonus + role_bonus
+            score = (
+                t_travel
+                + effective_load_weight * load_h
+                + sb_bonus
+                + activation_penalty
+                + role_bonus
+            )
 
             if best_score is None or score < best_score:
                 best_score = score
