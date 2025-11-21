@@ -1,5 +1,5 @@
 import { Personnel, TaskType as Task } from "@shared/schema";
-import { Calendar as CalendarIcon, RotateCcw, Users, RefreshCw, UserPlus, Maximize2, Minimize2, Check, CheckCircle, Save, Pencil, ChevronLeft, ChevronRight } from "lucide-react";
+import { Calendar as CalendarIcon, RotateCcw, Users, RefreshCw, UserPlus, Maximize2, Minimize2, Check, CheckCircle, Save, Pencil, ChevronLeft, ChevronRight, User } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import * as React from "react";
 import { Droppable, Draggable } from "react-beautiful-dnd";
@@ -547,16 +547,16 @@ export default function TimelineView({
             const tasksInfo = incompatibleTasks.map(task => {
               const taskType = task.straordinaria ? 'Straordinaria' : task.premium ? 'Premium' : 'Standard';
               const aptType = (task as any).apt_type || (task as any).aptType || (task as any).type_apt || '';
-              
+
               // Determina priorità
               const isEarlyOut = Boolean((task as any).early_out || (task as any).earlyOut || (task as any).is_early_out);
               const isHighPriority = Boolean((task as any).high_priority || (task as any).highPriority || (task as any).is_high_priority);
               const priority = isEarlyOut ? 'EO' : isHighPriority ? 'HP' : 'LP';
-              
+
               let fullType = taskType;
               if (aptType) fullType += ` (Tipo ${aptType})`;
               fullType += ` [${priority}]`;
-              
+
               return {
                 logisticCode: task.name,
                 taskType: fullType
@@ -1095,7 +1095,7 @@ export default function TimelineView({
 
     // Mostra toast SEMPRE per incompatibilità, resettando i toast mostrati ad ogni cambio
     shownToastsRef.current.clear();
-    
+
     if (incompatibleAssignments.length > 0) {
       incompatibleAssignments.forEach(assignment => {
         // Crea una chiave univoca per questo toast
@@ -1386,11 +1386,11 @@ export default function TimelineView({
                               // Ore dispari (11:00, 13:00, 15:00, 17:00, 19:00) = idx 1, 3, 5, 7, 9
                               const isEvenHour = idx % 2 === 0;
                               return (
-                                <div 
-                                  key={idx} 
+                                <div
+                                  key={idx}
                                   className={`border-r border-border ${
-                                    isEvenHour 
-                                      ? 'bg-blue-50/30 dark:bg-blue-950/10' 
+                                    isEvenHour
+                                      ? 'bg-blue-50/30 dark:bg-blue-950/10'
                                       : 'bg-sky-100/30 dark:bg-sky-900/10'
                                   }`}
                                 ></div>
@@ -1487,8 +1487,8 @@ export default function TimelineView({
                                       />
                                     )}
 
-                                    {/* Indicatore di travel time: solo se idx > 0 E travel_time > 0 */}
-                                    {idx > 0 && travelTime > 0 && (
+                                    {/* Indicatore di travel time: solo se idx > 0 E travel_time >= 7 */}
+                                    {idx > 0 && travelTime >= 7 && (
                                       <div
                                         key={`marker-${uniqueKey}`}
                                         className="flex items-center justify-center flex-shrink-0 py-3"
