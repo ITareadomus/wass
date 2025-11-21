@@ -547,16 +547,16 @@ export default function TimelineView({
             const tasksInfo = incompatibleTasks.map(task => {
               const taskType = task.straordinaria ? 'Straordinaria' : task.premium ? 'Premium' : 'Standard';
               const aptType = (task as any).apt_type || (task as any).aptType || (task as any).type_apt || '';
-
+              
               // Determina priorità
               const isEarlyOut = Boolean((task as any).early_out || (task as any).earlyOut || (task as any).is_early_out);
               const isHighPriority = Boolean((task as any).high_priority || (task as any).highPriority || (task as any).is_high_priority);
               const priority = isEarlyOut ? 'EO' : isHighPriority ? 'HP' : 'LP';
-
+              
               let fullType = taskType;
               if (aptType) fullType += ` (Tipo ${aptType})`;
               fullType += ` [${priority}]`;
-
+              
               return {
                 logisticCode: task.name,
                 taskType: fullType
@@ -1095,7 +1095,7 @@ export default function TimelineView({
 
     // Mostra toast SEMPRE per incompatibilità, resettando i toast mostrati ad ogni cambio
     shownToastsRef.current.clear();
-
+    
     if (incompatibleAssignments.length > 0) {
       incompatibleAssignments.forEach(assignment => {
         // Crea una chiave univoca per questo toast
@@ -1386,11 +1386,11 @@ export default function TimelineView({
                               // Ore dispari (11:00, 13:00, 15:00, 17:00, 19:00) = idx 1, 3, 5, 7, 9
                               const isEvenHour = idx % 2 === 0;
                               return (
-                                <div
-                                  key={idx}
+                                <div 
+                                  key={idx} 
                                   className={`border-r border-border ${
-                                    isEvenHour
-                                      ? 'bg-blue-50/30 dark:bg-blue-950/10'
+                                    isEvenHour 
+                                      ? 'bg-blue-50/30 dark:bg-blue-950/10' 
                                       : 'bg-sky-100/30 dark:bg-sky-900/10'
                                   }`}
                                 ></div>
@@ -1487,14 +1487,24 @@ export default function TimelineView({
                                       />
                                     )}
 
-                                    {/* Indicatore di travel time: mostra sempre se idx > 0 E travel_time > 0 */}
+                                    {/* Indicatore di travel time: solo se idx > 0 E travel_time > 0 */}
                                     {idx > 0 && travelTime > 0 && (
                                       <div
-                                        key={`travel-space-${uniqueKey}`}
-                                        className="flex-shrink-0"
-                                        style={{ width: `${totalWidth}%` }}
-                                        title={`Tempo viaggio: ${travelTime} min`}
-                                      />
+                                        key={`marker-${uniqueKey}`}
+                                        className="flex items-center justify-center flex-shrink-0 py-3"
+                                        style={{ width: `${totalWidth}%`, minHeight: '50px' }}
+                                        title={`${travelTime} min`}
+                                      >
+                                        <svg
+                                          width="20"
+                                          height="20"
+                                          viewBox="0 0 24 24"
+                                          fill="currentColor"
+                                          className="text-custom-blue flex-shrink-0"
+                                        >
+                                          <path d="M13.5 5.5c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zM9.8 8.9L7 23h2.1l1.8-8 2.1 2v6h2v-7.5l-2.1-2 .6-3C14.8 12 16.8 13 19 13v-2c-1.9 0-3.5-1-4.3-2.4l-1-1.6c-.4-.6-1-1-1.7-1-.3 0-.5.1-.8.1L6 8.3V13h2V9.6l1.8-.7"/>
+                                        </svg>
+                                      </div>
                                     )}
 
                                     <TaskCard
@@ -1644,7 +1654,7 @@ export default function TimelineView({
 
       {/* Alias Edit Dialog */}
       <Dialog open={aliasDialog.open} onOpenChange={(open) => !open && setAliasDialog({ open: false, cleanerId: null, cleanerName: '' })}>
-        <DialogContent className="sm:max-md">
+        <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Pencil className="w-5 h-5 text-custom-blue" />
