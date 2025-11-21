@@ -47,7 +47,10 @@ else:
 
 today = _today()
 yesterday = today - timedelta(days=1)
-week_start = _monday_of(today)
+
+# IMPORTANTE: Calcola la settimana basandosi sulla target_date, NON su oggi
+# Questo permette di vedere le ore corrette anche per date future
+week_start = _monday_of(target_date)
 week_end_excl = week_start + timedelta(days=7)  # [week_start, week_end_excl)
 
 # --- CONNESSIONE DB -----------------------------------------------------
