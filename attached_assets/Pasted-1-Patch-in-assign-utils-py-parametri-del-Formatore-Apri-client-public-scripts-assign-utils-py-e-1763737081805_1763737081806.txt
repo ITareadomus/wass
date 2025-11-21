@@ -1,0 +1,137 @@
+1️⃣ Patch in assign_utils.py – parametri del Formatore
+
+Apri client/public/scripts/assign_utils.py e cerca il blocco delle costanti che hai adesso (quello che abbiamo appena toccato):
+
+NEARBY_TRAVEL_THRESHOLD = 7
+NEW_CLEANER_PENALTY_MIN = 60
+NEW_TRAINER_PENALTY_MIN = 0
+TARGET_MIN_LOAD_MIN = 240
+FAIRNESS_DELTA_HOURS = 1.0
+LOAD_WEIGHT = 10
+SAME_BUILDING_BONUS = -5
+ROLE_TRAINER_BONUS = -5
+
+
+Sostituiscilo con:
+
+NEARBY_TRAVEL_THRESHOLD = 7        # min: soglia per considerare due apt "stesso blocco"
+
+NEW_CLEANER_PENALTY_MIN = 60       # costo di attivazione per cleaner vuoto
+NEW_TRAINER_PENALTY_MIN = 0        # il formatore non è penalizzato per il primo task
+
+TARGET_MIN_LOAD_MIN = 240          # 4 ore = carico minimo "desiderato" per TUTTI
+TRAINER_TARGET_MIN_LOAD_MIN = 240  # 4 ore = target specifico per il Formatore
+
+FAIRNESS_DELTA_HOURS = 1.0         # tolleranza di 1h tra cleaner per essere "fair"
+LOAD_WEIGHT = 10                   # peso delle ore nel punteggio
+SAME_BUILDING_BONUS = -5           # bonus per cluster edificio/blocco
+
+ROLE_TRAINER_BONUS = -10           # bonus extra per il Formatore (prima -5)
+
+
+Nota: ho introdotto TRAINER_TARGET_MIN_LOAD_MIN e reso il bonus del formatore un po’ più forte.
+
+2️⃣ Patch in assign_lp.py – priorità esplicita per il Formatore
+
+Qui modifichiamo solo la plan_day di LP.
+
+2.1. Dentro plan_day LP: priorità Formatore se sotto target
+
+In assign_lp.py, dentro plan_day, subito dopo aver deciso pool (cioè dopo il blocco HARD CLUSTER / FAIRNESS, ma prima di fare il ciclo che calcola lo score), aggiungi questo blocco:
+
+        # --- PRIORITÀ FORMATORE SE SOTTO TARGET ORE ---
+        trainer_low_candidates: List[Tuple[Cleaner, int, float]] = [
+            (c, p, t_travel)
+            for (c, p, t_travel) in pool
+            if getattr(c, "role", None) == "Formatore"
+            and cleaner_load_minutes(c) < TRAINER_TARGET_MIN_LOAD_MIN
+        ]
+
+        # Se il formatore è nel pool ed è sotto la soglia di ore,
+        # proviamo PRIMA a dargliela a lui (o a loro, se un giorno avrai 2 formatori)
+        if trainer_low_candidates:
+            pool = trainer_low_candidates
+
+
+👉 Questo cosa fa concretamente?
+
+in LP, quando scegli a chi dare una task:
+
+costruisci candidates,
+
+fai HARD CLUSTER (same_building + blocco vicino),
+
+fai FAIRNESS sulle ore → ottieni pool,
+
+poi: se nel pool c’è il Formatore e ha meno di 4h di carico, restringi pool a solo il Formatore.
+
+Quindi:
+
+finché il Formatore è sotto le 4 ore e può prendere quella LP (vincoli ok, travel ok, cluster ok),
+
+gli LP vicini tenderanno ad andare a lui prima che ad altri.
+
+Se per quella task il Formatore non è candidato (troppo lontano, orari incompatibili, tipo apt non permesso…), il pool resta com’era e l’algoritmo si comporta normalmente.
+
+2.2. Assicurati che il bonus Formatore sia usato nello score LP
+
+Nel pezzo di plan_day LP in cui calcoli lo score finale, cerca qualcosa tipo:
+
+role_bonus = 0
+# if getattr(c, "role", None) == "Formatore":
+#     role_bonus = ROLE_TRAINER_BONUS
+
+score = (
+    t_travel
+    + effective_load_weight * load_h
+    + sb_bonus
+    + activation_penalty
+    + role_bonus
+)
+
+
+e assicurati che in LP sia così (decommentato):
+
+        # Scoring finale con bonus Formatore
+        best_choice: Optional[Tuple[Cleaner, int, float]] = None
+        best_score: Optional[float] = None
+
+        for c, p, t_travel in pool:
+            load_h = cleaner_load_hours(c)
+
+            sb_bonus = 0
+            if c.route and any(
+                same_building(ex.address, task.address) or is_nearby_same_block(ex, task)
+                for ex in c.route
+            ):
+                sb_bonus = SAME_BUILDING_BONUS
+
+            # penalità di attivazione
+            if len(c.route) == 0:
+                role = getattr(c, "role", None)
+                if role == "Formatore":
+                    activation_penalty = NEW_TRAINER_PENALTY_MIN
+                else:
+                    activation_penalty = NEW_CLEANER_PENALTY_MIN
+            else:
+                activation_penalty = 0
+
+            # 🔹 BONUS Formatore (solo in LP)
+            role_bonus = 0
+            if getattr(c, "role", None) == "Formatore":
+                role_bonus = ROLE_TRAINER_BONUS
+
+            score = (
+                t_travel
+                + effective_load_weight * load_h
+                + sb_bonus
+                + activation_penalty
+                + role_bonus
+            )
+
+            if best_score is None or score < best_score:
+                best_score = score
+                best_choice = (c, p, t_travel)
+
+
+Negli script EO/HP lascia pure il bonus a 0 (non vogliamo che il formatore prenda EO/HP).
