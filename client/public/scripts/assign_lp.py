@@ -9,7 +9,7 @@ from datetime import datetime
 from task_validation import can_cleaner_handle_task, can_cleaner_handle_apartment, can_cleaner_handle_priority
 from assign_utils import (
     NEARBY_TRAVEL_THRESHOLD, NEW_CLEANER_PENALTY_MIN, NEW_TRAINER_PENALTY_MIN,
-    TARGET_MIN_LOAD_MIN, FAIRNESS_DELTA_HOURS, LOAD_WEIGHT,
+    TARGET_MIN_LOAD_MIN, TRAINER_TARGET_MIN_LOAD_MIN, FAIRNESS_DELTA_HOURS, LOAD_WEIGHT,
     SAME_BUILDING_BONUS, ROLE_TRAINER_BONUS,
     cleaner_load_minutes, cleaner_load_hours
 )
@@ -869,6 +869,19 @@ def plan_day(
         ]
         if low_load_candidates:
             pool = low_load_candidates
+
+        # --- PRIORITÀ FORMATORE SE SOTTO TARGET ORE ---
+        trainer_low_candidates: List[Tuple[Cleaner, int, float]] = [
+            (c, p, t_travel)
+            for (c, p, t_travel) in pool
+            if getattr(c, "role", None) == "Formatore"
+            and cleaner_load_minutes(c) < TRAINER_TARGET_MIN_LOAD_MIN
+        ]
+
+        # Se il formatore è nel pool ed è sotto la soglia di ore,
+        # proviamo PRIMA a dargliela a lui (o a loro, se un giorno avrai 2 formatori)
+        if trainer_low_candidates:
+            pool = trainer_low_candidates
 
         # Scoring finale con ore + penalità attivazione + bonus Formatore
         best_choice: Optional[Tuple[Cleaner, int, float]] = None
