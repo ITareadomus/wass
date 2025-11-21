@@ -603,9 +603,21 @@ def plan_day(
             unassigned.append(task)
             continue
 
-        # -------------------------------------------------------------
-        # 2) HARD CLUSTER edificio/via/blocco: stesso edificio o vicino + stesso cliente
-        # -------------------------------------------------------------
+        # 🔪 TAGLIA candidati con travel troppo alto rispetto al minimo
+        min_travel = min(t_travel for (_, _, t_travel) in candidates)
+        MAX_EXTRA_TRAVEL = 10  # minuti oltre il minimo consentiti
+
+        candidates = [
+            (c, p, t_travel)
+            for (c, p, t_travel) in candidates
+            if t_travel <= min_travel + MAX_EXTRA_TRAVEL
+        ]
+
+        if not candidates:
+            unassigned.append(task)
+            continue
+
+        # HARD CLUSTER edificio/via/blocco: stesso edificio o vicino + stesso cliente
         building_candidates: List[Tuple[Cleaner, int, float]] = []
         for c, p, t_travel in candidates:
             if c.route and any(
