@@ -340,10 +340,8 @@ def can_add_task(cleaner: Cleaner, task: Task) -> bool:
     if task.apt_type and not can_cleaner_handle_apartment(cleaner.role, task.apt_type):
         return False
 
-    # Formatore max 2 task LP al giorno (totale)
-    if cleaner.role.lower() == "formatore":
-        if len(cleaner.route) >= 2:
-            return False
+    # RIMOSSO: limite massimo 2 task LP per Formatori
+    # Obiettivo: Formatori devono avere minimo 3 task LP per valorizzarli
 
     if not can_handle_premium(cleaner, task):
         return False
@@ -1158,7 +1156,7 @@ def build_output(cleaners: List[Cleaner], unassigned: List[Task], original_tasks
                 "8. Check-in strict: deve finire prima del check-in time (INFRANGIBILE)",
                 "9. Vincolo orario: nessuna task deve finire dopo le 19:00",
                 "10. Seed da EO e HP: disponibilità e posizione dall'ultima task",
-                "11. FORMATORE: solo task type_apt A o B, massimo 2 task LP al giorno",
+                "11. FORMATORE: solo task type_apt A o B, MINIMO 3 task LP (nessun limite massimo specifico)",
                 "12. CROSS-CONTAINER: Favorisce vicinanza con task EO e HP già assegnate"
             ]
         }
