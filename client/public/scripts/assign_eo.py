@@ -243,16 +243,12 @@ def evaluate_route(route: List[Task]) -> Tuple[bool, List[Tuple[int, int, int]]]
         cur += tt
         arrival = cur
         
-        # CRITICAL: Per la prima task, start_time NON può essere prima del checkout_time
+        # CRITICAL: start_time NON può MAI essere prima del checkout_time
         # Il cleaner può iniziare solo DOPO che la proprietà è libera
-        if i == 0:
-            # Prima task: rispetta il checkout come vincolo minimo
-            start = max(arrival, float(t.checkout_time))
-        else:
-            # Task successive: calcola wait time se necessario
-            wait = max(0.0, t.checkout_time - arrival)
-            cur += wait
-            start = cur
+        # Questo vale per TUTTE le task, non solo la prima
+        wait = max(0.0, t.checkout_time - arrival)
+        cur += wait
+        start = cur
         
         finish = start + t.cleaning_time
 
