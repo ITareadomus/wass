@@ -1,6 +1,6 @@
 {
   "metadata": {
-    "last_updated": "2025-11-21T10:18:14.267240",
+    "last_updated": "2025-11-21T10:28:43.317Z",
     "date": "2025-11-21"
   },
   "cleaners_assignments": [
@@ -111,6 +111,40 @@
           "followup": true,
           "sequence": 3,
           "travel_time": 5
+        },
+        {
+          "task_id": 219183,
+          "logistic_code": 1470,
+          "client_id": 3,
+          "premium": false,
+          "address": "Via Pergolesi, 29",
+          "lat": "45.4858682",
+          "lng": "9.2081009",
+          "cleaning_time": 150,
+          "checkin_date": "2025-11-22",
+          "checkout_date": "2025-11-21",
+          "checkin_time": null,
+          "checkout_time": null,
+          "pax_in": 2,
+          "pax_out": 3,
+          "small_equipment": false,
+          "operation_id": 2,
+          "confirmed_operation": true,
+          "straordinaria": false,
+          "type_apt": "C",
+          "alias": "TBR",
+          "customer_name": "THE BEST RENT S.r.l.",
+          "priority": "low_priority",
+          "reasons": [
+            "not_eo",
+            "not_hp",
+            "automatic_assignment_lp"
+          ],
+          "start_time": "14:43",
+          "end_time": "17:13",
+          "followup": false,
+          "sequence": 4,
+          "travel_time": 30
         }
       ]
     },
@@ -331,6 +365,40 @@
           "followup": true,
           "sequence": 3,
           "travel_time": 31
+        },
+        {
+          "task_id": 219212,
+          "logistic_code": 533,
+          "client_id": 3,
+          "premium": false,
+          "address": "VIA NEERA, 29",
+          "lat": "45.4331936",
+          "lng": "9.1799247",
+          "cleaning_time": 30,
+          "checkin_date": "2025-11-21",
+          "checkout_date": "2025-11-21",
+          "checkin_time": null,
+          "checkout_time": null,
+          "pax_in": 0,
+          "pax_out": 0,
+          "small_equipment": false,
+          "operation_id": 4,
+          "confirmed_operation": true,
+          "straordinaria": false,
+          "type_apt": "B",
+          "alias": "TBR",
+          "customer_name": "THE BEST RENT S.r.l.",
+          "priority": "low_priority",
+          "reasons": [
+            "not_eo",
+            "not_hp",
+            "automatic_assignment_lp"
+          ],
+          "start_time": "14:43",
+          "end_time": "15:13",
+          "followup": false,
+          "sequence": 4,
+          "travel_time": 25
         }
       ]
     },
@@ -442,6 +510,40 @@
           "followup": true,
           "sequence": 3,
           "travel_time": 20
+        },
+        {
+          "task_id": 219179,
+          "logistic_code": 223,
+          "client_id": 3,
+          "premium": false,
+          "address": "VIA NEGROLI 10A",
+          "lat": "45.4629317",
+          "lng": "9.2326585",
+          "cleaning_time": 150,
+          "checkin_date": "2025-12-31",
+          "checkout_date": "2025-11-21",
+          "checkin_time": null,
+          "checkout_time": null,
+          "pax_in": 1,
+          "pax_out": 1,
+          "small_equipment": false,
+          "operation_id": 2,
+          "confirmed_operation": false,
+          "straordinaria": false,
+          "type_apt": "C",
+          "alias": "TBR",
+          "customer_name": "THE BEST RENT S.r.l.",
+          "priority": "low_priority",
+          "reasons": [
+            "not_eo",
+            "not_hp",
+            "automatic_assignment_lp"
+          ],
+          "start_time": "14:33",
+          "end_time": "17:03",
+          "followup": false,
+          "sequence": 4,
+          "travel_time": 22
         }
       ]
     },
@@ -553,6 +655,40 @@
           "followup": true,
           "sequence": 3,
           "travel_time": 23
+        },
+        {
+          "task_id": 218817,
+          "logistic_code": 1575,
+          "client_id": 120,
+          "premium": false,
+          "address": "VIALE FAMAGOSTA 55",
+          "lat": "45.4378165",
+          "lng": "9.1630438",
+          "cleaning_time": 150,
+          "checkin_date": "2025-11-21",
+          "checkout_date": "2025-11-21",
+          "checkin_time": null,
+          "checkout_time": "11:00",
+          "pax_in": 7,
+          "pax_out": 7,
+          "small_equipment": false,
+          "operation_id": 2,
+          "confirmed_operation": true,
+          "straordinaria": false,
+          "type_apt": "D",
+          "alias": "LCRD",
+          "customer_name": "LECARDI GUIDO",
+          "priority": "low_priority",
+          "reasons": [
+            "not_eo",
+            "not_hp",
+            "automatic_assignment_lp"
+          ],
+          "start_time": "16:18",
+          "end_time": "18:48",
+          "followup": false,
+          "sequence": 4,
+          "travel_time": 28
         }
       ]
     },
@@ -626,9 +762,9 @@
             "automatic_assignment_hp"
           ],
           "priority": "high_priority",
-          "start_time": "11:20",
-          "end_time": "12:20",
-          "followup": false,
+          "start_time": "11:21",
+          "end_time": "12:21",
+          "followup": true,
           "sequence": 2,
           "travel_time": 21
         },
@@ -659,8 +795,8 @@
             "automatic_assignment_hp"
           ],
           "priority": "high_priority",
-          "start_time": "12:41",
-          "end_time": "14:11",
+          "start_time": "12:42",
+          "end_time": "14:12",
           "followup": true,
           "sequence": 3,
           "travel_time": 21
@@ -912,11 +1048,45 @@
             "automatic_assignment_hp"
           ],
           "priority": "high_priority",
-          "start_time": "13:11",
-          "end_time": "14:11",
-          "followup": false,
+          "start_time": "13:12",
+          "end_time": "14:12",
+          "followup": true,
           "sequence": 3,
           "travel_time": 18
+        },
+        {
+          "task_id": 219180,
+          "logistic_code": 1072,
+          "client_id": 3,
+          "premium": false,
+          "address": "VIA AUSONIO, 6",
+          "lat": "45.4599303",
+          "lng": "9.1743487",
+          "cleaning_time": 90,
+          "checkin_date": "2025-11-21",
+          "checkout_date": "2025-11-21",
+          "checkin_time": "20:00",
+          "checkout_time": null,
+          "pax_in": 2,
+          "pax_out": 2,
+          "small_equipment": true,
+          "operation_id": 2,
+          "confirmed_operation": true,
+          "straordinaria": false,
+          "type_apt": "A",
+          "alias": "TBR",
+          "customer_name": "THE BEST RENT S.r.l.",
+          "priority": "low_priority",
+          "reasons": [
+            "not_eo",
+            "not_hp",
+            "automatic_assignment_lp"
+          ],
+          "start_time": "14:18",
+          "end_time": "15:48",
+          "followup": true,
+          "sequence": 4,
+          "travel_time": 6
         },
         {
           "task_id": 219145,
@@ -945,11 +1115,11 @@
             "automatic_assignment_hp"
           ],
           "priority": "high_priority",
-          "start_time": "14:28",
-          "end_time": "15:28",
+          "start_time": "16:06",
+          "end_time": "17:06",
           "followup": true,
-          "sequence": 4,
-          "travel_time": 16
+          "sequence": 5,
+          "travel_time": 18
         }
       ]
     },
@@ -996,12 +1166,57 @@
           "travel_time": 0
         }
       ]
+    },
+    {
+      "cleaner": {
+        "id": 626,
+        "name": "DORA PATRICIA",
+        "lastname": "JIMENEZ",
+        "role": "Formatore",
+        "premium": false
+      },
+      "tasks": [
+        {
+          "task_id": 219014,
+          "logistic_code": 1618,
+          "client_id": 94,
+          "premium": false,
+          "address": "VIALE CERTOSA 92",
+          "lat": "45.4938429",
+          "lng": "9.1438164",
+          "cleaning_time": 90,
+          "checkin_date": "2025-11-21",
+          "checkout_date": "2025-11-21",
+          "checkin_time": "20:30",
+          "checkout_time": null,
+          "pax_in": 3,
+          "pax_out": 2,
+          "small_equipment": false,
+          "operation_id": 2,
+          "confirmed_operation": true,
+          "straordinaria": false,
+          "type_apt": "B",
+          "alias": "IHST",
+          "customer_name": "IHOST",
+          "priority": "low_priority",
+          "reasons": [
+            "not_eo",
+            "not_hp",
+            "automatic_assignment_lp"
+          ],
+          "start_time": "10:00",
+          "end_time": "11:30",
+          "followup": false,
+          "sequence": 1,
+          "travel_time": 0
+        }
+      ]
     }
   ],
   "meta": {
-    "total_cleaners": 9,
+    "total_cleaners": 10,
     "total_tasks": 0,
-    "used_cleaners": 9,
-    "assigned_tasks": 27
+    "used_cleaners": 10,
+    "assigned_tasks": 33
   }
 }
