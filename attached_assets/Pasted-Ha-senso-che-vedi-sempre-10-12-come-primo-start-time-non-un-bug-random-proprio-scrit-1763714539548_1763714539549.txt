@@ -1,0 +1,113 @@
+Ha senso che vedi **sempre** `10:12` come primo `start_time`: non è un bug “random”, è proprio scritto così nel codice di `assign_lp.py` 😄
+
+Ti faccio vedere dov’è il problema e come fixarlo.
+
+---
+
+## 🔍 Perché il primo LP parte alle 10:12?
+
+Nel file `client/public/scripts/assign_lp.py` c’è la funzione:
+
+```python
+def evaluate_route(cleaner: Cleaner, route: List[Task]) -> Tuple[bool, List[Tuple[int, int, int]]]:
+    ...
+    # Primo task LP
+    first = route[0]
+
+    # Calcola l'arrivo al primo task
+    # available_from è già in minuti da mezzanotte (non serve hhmm_to_min)
+    # Se None, usa 10:00 (600 minuti) come default
+    work_start_min = cleaner.available_from if cleaner.available_from is not None else 10 * 60
+
+    # Viaggio da ultima posizione a LP
+    if cleaner.last_lat is not None and cleaner.last_lng is not None:
+        tt = travel_minutes(cleaner.last_lat, cleaner.last_lng,
+                          first.lat, first.lng,
+                          cleaner.last_address, first.address)
+    else:
+        tt = 3.0 if same_street(cleaner.last_address, first.address) else 12.0
+
+    arrival = work_start_min + tt
+    start = arrival
+    finish = start + first.cleaning_time
+```
+
+Scenario della tua DORA PATRICIA:
+
+* È il **primo LP del giorno** per quel cleaner
+* Non ha EO/HP prima → `seed_cleaners_from_assignments` **non** le setta `available_from`, `last_lat`, `last_lng`, `last_address`
+* Quindi:
+
+  * `available_from` = `None` → `work_start_min = 10 * 60 = 600` → **10:00**
+  * `last_lat` / `last_lng` = `None` → entra nell’`else`
+  * `same_street(cleaner.last_address, first.address)` è `False` perché `last_address` è `None`
+  * quindi `tt = 12.0`
+  * `arrival = 600 + 12 = 612` → `10:12`
+  * `start = arrival` → `start_time = "10:12"`
+
+In più, quando costruisci il JSON finale, fai:
+
+```python
+if overall_seq == 1:
+    travel_time = 0
+```
+
+quindi:
+
+* lo **schedule** è calcolato come se ci fossero **12 minuti di viaggio**
+* ma nel JSON metti `travel_time: 0`
+* risultato incoerente: `start_time: "10:12", travel_time: 0`.
+
+---
+
+## ✅ Come sistemarlo in `assign_lp.py`
+
+Per il **primissimo** LP della giornata, quando il cleaner non ha ancora nessuna task (nessun EO/HP, nessuna route precedente), ha senso dire:
+
+> “parti direttamente alle `available_from` (o 10:00 di default), senza viaggio iniziale”.
+
+Quindi in `evaluate_route` puoi cambiare il blocco sul viaggio iniziale così:
+
+```python
+    # Viaggio da ultima posizione a LP
+    if cleaner.last_lat is not None and cleaner.last_lng is not None:
+        # Ha già una posizione finale da EO/HP/LP precedente
+        tt = travel_minutes(
+            cleaner.last_lat, cleaner.last_lng,
+            first.lat, first.lng,
+            cleaner.last_address, first.address
+        )
+    else:
+        # Nessuna coordinata precedente: caso "inizio giornata"
+        # Se non ha mai fatto task (last_sequence == 0 e nessun indirizzo), niente viaggio iniziale
+        if cleaner.last_sequence == 0 and not cleaner.last_address:
+            tt = 0.0
+        else:
+            # Ha un indirizzo ma senza lat/lng, usa euristica 3'/12'
+            tt = 3.0 if same_street(cleaner.last_address, first.address) else 12.0
+
+    arrival = work_start_min + tt
+    start = arrival
+    finish = start + first.cleaning_time
+```
+
+Con questa patch:
+
+* se la DORA non ha mai fatto task prima:
+
+  * `last_sequence == 0` e `last_address` è `None` → `tt = 0.0`
+  * `arrival = 600 + 0 = 600` → **`start_time = "10:00"`**
+  * `travel_time` nel JSON resta 0 → **coerente** ✅
+* se invece è **primo LP dopo EO/HP**, i dati di seed (`last_lat`, `last_lng`, `last_address`, `last_sequence`) saranno compilati e:
+
+  * userai il `travel_minutes` reale
+  * nel JSON metterai un `travel_time` diverso da 0 nel ramo `elif idx == 0 and cl.last_sequence >= 1:` (che hai già).
+
+---
+
+### Riassunto in una frase
+
+Il `10:12` nasce da questo: **default “inizio lavoro alle 10:00” + euristica fissa “12 minuti di viaggio iniziale” quando il cleaner non ha posizione precedente**.
+Per il primissimo LP del giorno ti conviene **forzare il viaggio iniziale a 0** quando il cleaner non ha ancora fatto task (`last_sequence == 0` e nessun `last_address`).
+
+Se vuoi, nel prossimo messaggio posso anche suggerirti un piccolo test minimo (containers.json + cleaners) per verificare che dopo la patch il primo LP di giornata parta effettivamente alle 10:00.
