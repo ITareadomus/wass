@@ -1,0 +1,325 @@
+Puoi sostituire 1:1 le funzioni plan_day esistenti con queste.
+
+Cosa fanno tutte e tre:
+
+usano fairness: preferiscono cleaners con meno task (max min_load + 1)
+
+usano uno score: score = travel + LOAD_WEIGHT * load + same_building_bonus
+
+usano stesso edificio come bonus soft (same_building_bonus = -5), non più come vincolo assoluto
+
+rispettano:
+
+can_cleaner_handle_task
+
+can_cleaner_handle_apartment
+
+find_best_position (che dentro usa già can_add_task + vincoli orari)
+
+assigned_logistic_codes per la dedup di logistic_code
+
+1️⃣ assign_eo.py – nuova plan_day
+
+Sostituisci l’attuale plan_day in assign_eo.py con questa:
+
+def plan_day(
+    tasks: List[Task],
+    cleaners: List[Cleaner],
+    assigned_logistic_codes: set = None,
+) -> Tuple[List[Cleaner], List[Task]]:
+    """
+    Assegna le task Early-Out con:
+    - fairness: preferisce cleaners con meno task (<= min_load + 1)
+    - score: travel + LOAD_WEIGHT * load + SAME_BUILDING_BONUS se già nello stesso edificio
+    - stesso edificio usato come BONUS soft, non come vincolo assoluto
+    - dedup su logistic_code (cross-container)
+    """
+    if assigned_logistic_codes is None:
+        assigned_logistic_codes = set()
+
+    LOAD_WEIGHT = 10          # quanto pesa il numero di task nel punteggio
+    SAME_BUILDING_BONUS = -5  # sconto sul punteggio se il cleaner ha già task nello stesso edificio
+    FAIRNESS_DELTA = 1        # un cleaner è "fair" se ha load <= min_load + FAIRNESS_DELTA
+
+    unassigned: List[Task] = []
+
+    # NB: le task sono già ordinate in load_tasks()
+    for task in tasks:
+        # DEDUP per logistic_code (stringhe)
+        if task.logistic_code in assigned_logistic_codes:
+            print(f"   ⏭️  Skippata task {task.task_id} (logistic_code {task.logistic_code} già assegnato)")
+            unassigned.append(task)
+            continue
+
+        candidates: List[Tuple[Cleaner, int, float]] = []
+
+        # Costruisci lista candidati
+        for cleaner in cleaners:
+            # Validazione tipo task (premium / straordinaria / standard)
+            task_type = (
+                "straordinario_apt"
+                if task.straordinaria
+                else ("premium_apt" if task.is_premium else "standard_apt")
+            )
+            if not can_cleaner_handle_task(cleaner.role, task_type, cleaner.can_do_straordinaria):
+                # debug utile per capire chi è stato escluso
+                # print(f"   ⚠️  Cleaner {cleaner.name} ({cleaner.role}) non può gestire task {task_type} - SKIPPATO")
+                continue
+
+            # Validazione tipo appartamento
+            if not can_cleaner_handle_apartment(cleaner.role, task.apt_type):
+                # print(f"   ⚠️  Cleaner {cleaner.name} non può gestire appartamento {task.apt_type} - SKIPPATO")
+                continue
+
+            # Trova best position nella route (rispetta vincoli orari / check-in)
+            result = find_best_position(cleaner, task)
+            if result is None:
+                continue
+
+            pos, travel = result  # travel = max hop (prima/dopo)
+            candidates.append((cleaner, pos, travel))
+
+        if not candidates:
+            # Nessun cleaner può prendere questa task rispettando vincoli
+            unassigned.append(task)
+            continue
+
+        # FAIRNESS: calcola min load tra i candidati
+        loads = [len(c.route) for (c, _, _) in candidates]
+        min_load = min(loads) if loads else 0
+
+        # Tieni solo i cleaners "fair" (<= min_load + FAIRNESS_DELTA), se esistono
+        fair_candidates = [
+            (c, p, t) for (c, p, t) in candidates
+            if len(c.route) <= min_load + FAIRNESS_DELTA
+        ]
+        if fair_candidates:
+            pool = fair_candidates
+        else:
+            pool = candidates
+
+        # Seleziona candidato con punteggio minimo
+        best_choice = None
+        best_score = None
+
+        for c, p, t_travel in pool:
+            load = len(c.route)
+            sb_bonus = 0
+            if c.route and any(same_building(ex.address, task.address) for ex in c.route):
+                sb_bonus = SAME_BUILDING_BONUS
+
+            score = t_travel + LOAD_WEIGHT * load + sb_bonus
+
+            if best_score is None or score < best_score:
+                best_score = score
+                best_choice = (c, p, t_travel)
+
+        cleaner, pos, travel = best_choice
+        cleaner.route.insert(pos, task)
+        assigned_logistic_codes.add(task.logistic_code)
+
+    return cleaners, unassigned
+
+2️⃣ assign_hp.py – nuova plan_day
+
+Sostituisci l’attuale plan_day in assign_hp.py con questa:
+
+def plan_day(
+    tasks: List[Task],
+    cleaners: List[Cleaner],
+    assigned_logistic_codes: set = None,
+) -> Tuple[List[Cleaner], List[Task]]:
+    """
+    Assegna le task High-Priority con:
+    - fairness: preferisce cleaners con meno task HP (<= min_load + 1)
+    - score: travel + LOAD_WEIGHT * load + SAME_BUILDING_BONUS se già nello stesso edificio
+    - stesso edificio usato come BONUS soft (non più vincolo assoluto/cross-container duro)
+    - dedup su logistic_code
+    """
+    if assigned_logistic_codes is None:
+        assigned_logistic_codes = set()
+
+    LOAD_WEIGHT = 10
+    SAME_BUILDING_BONUS = -5
+    FAIRNESS_DELTA = 1
+
+    unassigned: List[Task] = []
+
+    # tasks sono già ordinate in load_tasks()
+    for task in tasks:
+        if task.logistic_code in assigned_logistic_codes:
+            print(f"   ⏭️  Skippata task {task.task_id} (logistic_code {task.logistic_code} già assegnato)")
+            unassigned.append(task)
+            continue
+
+        candidates: List[Tuple[Cleaner, int, float]] = []
+
+        for cleaner in cleaners:
+            # Validazione tipo di task (premium / straordinaria / standard)
+            task_type = (
+                "straordinario_apt"
+                if task.straordinaria
+                else ("premium_apt" if task.is_premium else "standard_apt")
+            )
+            if not can_cleaner_handle_task(cleaner.role, task_type, cleaner.can_do_straordinaria):
+                continue
+
+            # Validazione tipo appartamento
+            if not can_cleaner_handle_apartment(cleaner.role, task.apt_type):
+                continue
+
+            # find_best_position si occupa anche dei vincoli temporali (evaluate_route)
+            result = find_best_position(cleaner, task)
+            if result is None:
+                continue
+
+            pos, travel = result
+            candidates.append((cleaner, pos, travel))
+
+        if not candidates:
+            unassigned.append(task)
+            continue
+
+        # FAIRNESS: calcola min load tra i candidati
+        loads = [len(c.route) for (c, _, _) in candidates]
+        min_load = min(loads) if loads else 0
+
+        fair_candidates = [
+            (c, p, t) for (c, p, t) in candidates
+            if len(c.route) <= min_load + FAIRNESS_DELTA
+        ]
+        if fair_candidates:
+            pool = fair_candidates
+        else:
+            pool = candidates
+
+        best_choice = None
+        best_score = None
+
+        for c, p, t_travel in pool:
+            load = len(c.route)
+            sb_bonus = 0
+            if c.route and any(same_building(ex.address, task.address) for ex in c.route):
+                sb_bonus = SAME_BUILDING_BONUS
+
+            score = t_travel + LOAD_WEIGHT * load + sb_bonus
+
+            if best_score is None or score < best_score:
+                best_score = score
+                best_choice = (c, p, t_travel)
+
+        cleaner, pos, travel = best_choice
+        cleaner.route.insert(pos, task)
+        assigned_logistic_codes.add(task.logistic_code)
+
+    return cleaners, unassigned
+
+3️⃣ assign_lp.py – nuova plan_day
+
+Sostituisci l’attuale plan_day in assign_lp.py con questa:
+
+def plan_day(
+    tasks: List[Task],
+    cleaners: List[Cleaner],
+    assigned_logistic_codes: set = None,
+) -> Tuple[List[Cleaner], List[Task]]:
+    """
+    Assegna le task Low-Priority con:
+    - fairness: preferisce cleaners con meno LP (<= min_load + 1)
+    - score: travel + LOAD_WEIGHT * load + SAME_BUILDING_BONUS se già nello stesso edificio
+    - stesso edificio usato come BONUS soft (non vincolo assoluto/cross-container duro)
+    - dedup su logistic_code (coerente con EO+HP)
+    """
+    if assigned_logistic_codes is None:
+        assigned_logistic_codes = set()
+
+    LOAD_WEIGHT = 10
+    SAME_BUILDING_BONUS = -5
+    FAIRNESS_DELTA = 1
+
+    unassigned: List[Task] = []
+
+    # tasks sono già ordinate in load_tasks()
+    for task in tasks:
+        if task.logistic_code in assigned_logistic_codes:
+            print(f"   ⏭️  Skippata task {task.task_id} (logistic_code {task.logistic_code} già assegnato)")
+            unassigned.append(task)
+            continue
+
+        candidates: List[Tuple[Cleaner, int, float]] = []
+
+        for cleaner in cleaners:
+            # Validazione tipo di task (premium / straordinaria / standard)
+            task_type = (
+                "straordinario_apt"
+                if task.straordinaria
+                else ("premium_apt" if task.is_premium else "standard_apt")
+            )
+            if not can_cleaner_handle_task(cleaner.role, task_type, cleaner.can_do_straordinaria):
+                # print(f"   ⚠️  Cleaner {cleaner.name} non può gestire task {task_type} - SKIPPATO")
+                continue
+
+            # Validazione tipo appartamento
+            if not can_cleaner_handle_apartment(cleaner.role, task.apt_type):
+                # print(f"   ⚠️  Cleaner {cleaner.name} non può gestire appartamento {task.apt_type} - SKIPPATO")
+                continue
+
+            # find_best_position usa già can_add_task + evaluate_route
+            result = find_best_position(cleaner, task)
+            if result is None:
+                continue
+
+            pos, travel = result
+            candidates.append((cleaner, pos, travel))
+
+        if not candidates:
+            unassigned.append(task)
+            continue
+
+        # FAIRNESS: calcola min load tra i candidati
+        loads = [len(c.route) for (c, _, _) in candidates]
+        min_load = min(loads) if loads else 0
+
+        fair_candidates = [
+            (c, p, t) for (c, p, t) in candidates
+            if len(c.route) <= min_load + FAIRNESS_DELTA
+        ]
+        if fair_candidates:
+            pool = fair_candidates
+        else:
+            pool = candidates
+
+        best_choice = None
+        best_score = None
+
+        for c, p, t_travel in pool:
+            load = len(c.route)
+            sb_bonus = 0
+            if c.route and any(same_building(ex.address, task.address) for ex in c.route):
+                sb_bonus = SAME_BUILDING_BONUS
+
+            score = t_travel + LOAD_WEIGHT * load + sb_bonus
+
+            if best_score is None or score < best_score:
+                best_score = score
+                best_choice = (c, p, t_travel)
+
+        cleaner, pos, travel = best_choice
+        cleaner.route.insert(pos, task)
+        assigned_logistic_codes.add(task.logistic_code)
+
+    return cleaners, unassigned
+
+Cosa cambierà concretamente
+
+non c’è più il comportamento “accumula tutto sul cleaner che ha già il building”
+
+se un cleaner ha già 5 task e un altro ne ha 1:
+
+il secondo parte con vantaggio forte nello score, anche se il primo è leggermente più vicino
+
+lo stesso edificio:
+
+aiuta (bonus −5 minuti nel punteggio),
+
+ma non vince “a prescindere” se l’altro è molto più scarico.
