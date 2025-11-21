@@ -326,7 +326,7 @@ def evaluate_route(cleaner: Cleaner, route: List[Task]) -> Tuple[bool, List[Tupl
     return True, schedule
 
 
-def can_add_lp_task(cleaner: Cleaner) -> bool:
+def can_add_lp_task(cleaner: Cleaner, all_cleaners: List[Cleaner]) -> bool:
     """
     Verifica se è possibile aggiungere una task LP al cleaner secondo le regole:
     1. Limite giornaliero: max 5 task totali (EO+HP+LP)
@@ -369,7 +369,7 @@ def can_add_lp_task(cleaner: Cleaner) -> bool:
         # per bilanciare il carico, ma solo se non supera MAX_DAILY_TASKS
         preferred_daily_reached = [
             (c.total_daily_tasks + len(c.route)) >= PREFERRED_DAILY_TASKS
-            for c in cleaners if c is not cleaner
+            for c in all_cleaners if c is not cleaner
         ]
         if all(preferred_daily_reached) and total_daily < MAX_DAILY_TASKS:
             if current_lp_count < MAX_DAILY_TASKS - cleaner.total_daily_tasks:
@@ -757,7 +757,7 @@ def plan_day(
                 continue
 
             # Validazione limiti LP dinamici
-            if not can_add_lp_task(cleaner):
+            if not can_add_lp_task(cleaner, cleaners):
                 continue
 
             # find_best_position usa già can_add_task + evaluate_route
