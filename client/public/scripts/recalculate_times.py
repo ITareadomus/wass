@@ -178,9 +178,17 @@ def recalculate_cleaner_times(cleaner_data: Dict[str, Any]) -> Dict[str, Any]:
         checkout_time_str = task.get("checkout_time")
         checkin_time_str = task.get("checkin_time")
 
-        # Start time: per task successive alla prima, è SEMPRE end_time precedente + travel_time
-        # Il checkout_time è solo un vincolo informativo, NON forza lo start_time
+        # CRITICAL: Start time NON può essere prima del checkout_time
+        # Il cleaner può iniziare solo DOPO che la proprietà è libera
         start_time_min = current_time_min
+        
+        if checkout_time_str:
+            checkout_min = time_to_minutes(checkout_time_str)
+            # Se il tempo calcolato è prima del checkout, posticipa lo start
+            if start_time_min < checkout_min:
+                start_time_min = checkout_min
+                # Aggiorna anche current_time_min per mantenere coerenza
+                current_time_min = checkout_min
 
         # End time: start + cleaning_time
         end_time_min = start_time_min + cleaning_time
