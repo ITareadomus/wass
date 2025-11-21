@@ -1,6 +1,6 @@
 {
   "metadata": {
-    "last_updated": "2025-11-21T10:57:54.934Z",
+    "last_updated": "2025-11-21T11:28:47.257Z",
     "date": "2025-11-21"
   },
   "cleaners_assignments": [
@@ -183,11 +183,11 @@
             "automatic_assignment_eo"
           ],
           "priority": "early_out",
-          "start_time": "11:21",
-          "end_time": "13:21",
+          "start_time": "11:22",
+          "end_time": "13:22",
           "followup": true,
           "sequence": 2,
-          "travel_time": 21
+          "travel_time": 22
         },
         {
           "task_id": 219012,
@@ -216,11 +216,11 @@
             "automatic_assignment_eo"
           ],
           "priority": "early_out",
-          "start_time": "13:49",
-          "end_time": "14:49",
+          "start_time": "13:51",
+          "end_time": "14:51",
           "followup": true,
           "sequence": 3,
-          "travel_time": 28
+          "travel_time": 29
         },
         {
           "task_id": 219166,
@@ -249,44 +249,11 @@
             "automatic_assignment_eo"
           ],
           "priority": "early_out",
-          "start_time": "15:04",
-          "end_time": "15:34",
+          "start_time": "15:08",
+          "end_time": "15:38",
           "followup": true,
           "sequence": 4,
-          "travel_time": 15
-        },
-        {
-          "task_id": 219214,
-          "logistic_code": 619,
-          "client_id": 67,
-          "premium": false,
-          "address": "VIA TORTONA, 10",
-          "lat": "45.4542397",
-          "lng": "9.1686792",
-          "cleaning_time": 40,
-          "checkin_date": "2025-11-21",
-          "checkout_date": "2025-11-21",
-          "checkin_time": null,
-          "checkout_time": "09:30",
-          "pax_in": 3,
-          "pax_out": 0,
-          "small_equipment": false,
-          "operation_id": 2,
-          "confirmed_operation": true,
-          "straordinaria": false,
-          "type_apt": "B",
-          "alias": "EXP",
-          "customer_name": "EXPERIENCE DESIGN BED & SHOW",
-          "reasons": [
-            "checkout_time_eo_window_or_before_start",
-            "automatic_assignment_eo"
-          ],
-          "priority": "early_out",
-          "start_time": "15:39",
-          "end_time": "16:19",
-          "followup": true,
-          "sequence": 5,
-          "travel_time": 5
+          "travel_time": 17
         }
       ]
     },
@@ -359,11 +326,44 @@
             "automatic_assignment_eo"
           ],
           "priority": "early_out",
-          "start_time": "11:40",
-          "end_time": "12:40",
+          "start_time": "11:41",
+          "end_time": "12:41",
           "followup": true,
           "sequence": 2,
-          "travel_time": 40
+          "travel_time": 41
+        },
+        {
+          "task_id": 219214,
+          "logistic_code": 619,
+          "client_id": 67,
+          "premium": false,
+          "address": "VIA TORTONA, 10",
+          "lat": "45.4542397",
+          "lng": "9.1686792",
+          "cleaning_time": 40,
+          "checkin_date": "2025-11-21",
+          "checkout_date": "2025-11-21",
+          "checkin_time": null,
+          "checkout_time": "09:30",
+          "pax_in": 3,
+          "pax_out": 0,
+          "small_equipment": false,
+          "operation_id": 2,
+          "confirmed_operation": true,
+          "straordinaria": false,
+          "type_apt": "B",
+          "alias": "EXP",
+          "customer_name": "EXPERIENCE DESIGN BED & SHOW",
+          "reasons": [
+            "checkout_time_eo_window_or_before_start",
+            "automatic_assignment_eo"
+          ],
+          "priority": "early_out",
+          "start_time": "13:06",
+          "end_time": "13:46",
+          "followup": true,
+          "sequence": 3,
+          "travel_time": 25
         },
         {
           "task_id": 218817,
@@ -393,11 +393,11 @@
             "not_hp",
             "automatic_assignment_lp"
           ],
-          "start_time": "13:09",
-          "end_time": "15:39",
-          "followup": true,
-          "sequence": 3,
-          "travel_time": 29
+          "start_time": "14:05",
+          "end_time": "16:35",
+          "followup": false,
+          "sequence": 4,
+          "travel_time": 19
         }
       ]
     },
@@ -699,39 +699,6 @@
           "travel_time": 0
         },
         {
-          "task_id": 218887,
-          "logistic_code": 1578,
-          "client_id": 121,
-          "premium": false,
-          "address": "VIA MOLINO DELLE ARMI, 13",
-          "lat": "45.456241",
-          "lng": "9.185713",
-          "cleaning_time": 90,
-          "checkin_date": "2025-11-21",
-          "checkout_date": "2025-11-21",
-          "checkin_time": "15:00",
-          "checkout_time": "11:00",
-          "pax_in": 5,
-          "pax_out": 5,
-          "small_equipment": false,
-          "operation_id": 2,
-          "confirmed_operation": true,
-          "straordinaria": false,
-          "type_apt": "B",
-          "alias": "ANLW",
-          "customer_name": "WU ANGELO",
-          "reasons": [
-            "same_day_checkin_between_hp_start_hp_end",
-            "automatic_assignment_hp"
-          ],
-          "priority": "high_priority",
-          "start_time": "12:33",
-          "end_time": "14:03",
-          "followup": true,
-          "sequence": 2,
-          "travel_time": 33
-        },
-        {
           "task_id": 219145,
           "logistic_code": 1496,
           "client_id": 113,
@@ -758,11 +725,44 @@
             "automatic_assignment_hp"
           ],
           "priority": "high_priority",
-          "start_time": "14:16",
-          "end_time": "15:16",
+          "start_time": "13:30",
+          "end_time": "14:30",
+          "followup": true,
+          "sequence": 2,
+          "travel_time": 30
+        },
+        {
+          "task_id": 219182,
+          "logistic_code": 1236,
+          "client_id": 3,
+          "premium": true,
+          "address": "VIA DEI PIATTI, 5",
+          "lat": "45.460737",
+          "lng": "9.1853527",
+          "cleaning_time": 90,
+          "checkin_date": "2025-11-21",
+          "checkout_date": "2025-11-21",
+          "checkin_time": null,
+          "checkout_time": null,
+          "pax_in": 3,
+          "pax_out": 2,
+          "small_equipment": true,
+          "operation_id": 2,
+          "confirmed_operation": true,
+          "straordinaria": false,
+          "type_apt": "A",
+          "alias": "TBR",
+          "customer_name": "THE BEST RENT S.r.l.",
+          "reasons": [
+            "premium",
+            "automatic_assignment_hp"
+          ],
+          "priority": "high_priority",
+          "start_time": "14:36",
+          "end_time": "16:06",
           "followup": true,
           "sequence": 3,
-          "travel_time": 14
+          "travel_time": 6
         },
         {
           "task_id": 219184,
@@ -791,11 +791,11 @@
             "automatic_assignment_hp"
           ],
           "priority": "high_priority",
-          "start_time": "15:22",
-          "end_time": "17:52",
+          "start_time": "16:09",
+          "end_time": "18:39",
           "followup": true,
           "sequence": 4,
-          "travel_time": 6
+          "travel_time": 3
         }
       ]
     },
@@ -870,8 +870,8 @@
             "automatic_assignment_hp"
           ],
           "priority": "high_priority",
-          "start_time": "12:47",
-          "end_time": "13:47",
+          "start_time": "12:48",
+          "end_time": "13:48",
           "followup": true,
           "sequence": 2,
           "travel_time": 18
@@ -1032,39 +1032,6 @@
       },
       "tasks": [
         {
-          "task_id": 219182,
-          "logistic_code": 1236,
-          "client_id": 3,
-          "premium": true,
-          "address": "VIA DEI PIATTI, 5",
-          "lat": "45.460737",
-          "lng": "9.1853527",
-          "cleaning_time": 90,
-          "checkin_date": "2025-11-21",
-          "checkout_date": "2025-11-21",
-          "checkin_time": null,
-          "checkout_time": null,
-          "pax_in": 3,
-          "pax_out": 2,
-          "small_equipment": true,
-          "operation_id": 2,
-          "confirmed_operation": true,
-          "straordinaria": false,
-          "type_apt": "A",
-          "alias": "TBR",
-          "customer_name": "THE BEST RENT S.r.l.",
-          "reasons": [
-            "premium",
-            "automatic_assignment_hp"
-          ],
-          "priority": "high_priority",
-          "start_time": "10:00",
-          "end_time": "11:30",
-          "followup": false,
-          "sequence": 1,
-          "travel_time": 0
-        },
-        {
           "task_id": 219115,
           "logistic_code": 1688,
           "client_id": 131,
@@ -1091,8 +1058,41 @@
             "automatic_assignment_hp"
           ],
           "priority": "high_priority",
-          "start_time": "11:54",
-          "end_time": "13:24",
+          "start_time": "11:00",
+          "end_time": "12:30",
+          "followup": false,
+          "sequence": 1,
+          "travel_time": 0
+        },
+        {
+          "task_id": 218887,
+          "logistic_code": 1578,
+          "client_id": 121,
+          "premium": false,
+          "address": "VIA MOLINO DELLE ARMI, 13",
+          "lat": "45.456241",
+          "lng": "9.185713",
+          "cleaning_time": 90,
+          "checkin_date": "2025-11-21",
+          "checkout_date": "2025-11-21",
+          "checkin_time": "15:00",
+          "checkout_time": "11:00",
+          "pax_in": 5,
+          "pax_out": 5,
+          "small_equipment": false,
+          "operation_id": 2,
+          "confirmed_operation": true,
+          "straordinaria": false,
+          "type_apt": "B",
+          "alias": "ANLW",
+          "customer_name": "WU ANGELO",
+          "reasons": [
+            "same_day_checkin_between_hp_start_hp_end",
+            "automatic_assignment_hp"
+          ],
+          "priority": "high_priority",
+          "start_time": "12:55",
+          "end_time": "14:25",
           "followup": true,
           "sequence": 2,
           "travel_time": 25

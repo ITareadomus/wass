@@ -1,0 +1,276 @@
+1️⃣ Helper comuni da aggiungere (una volta sola)
+
+Metti queste funzioni e costanti in un posto condiviso
+(es. in assign_utils.py se ce l’hai, oppure all’inizio di ogni assign_*.py).
+
+# --- COSTANTI GLOBALI TUNABILI ---
+
+NEARBY_TRAVEL_THRESHOLD = 7        # min: soglia per considerare due apt "stesso blocco"
+NEW_CLEANER_PENALTY_MIN = 30       # costo di attivazione per cleaner vuoto
+NEW_TRAINER_PENALTY_MIN = 0        # il formatore non è penalizzato per il primo task
+TARGET_MIN_LOAD_MIN = 180          # 3 ore = carico minimo "desiderato"
+FAIRNESS_DELTA_HOURS = 1.0         # tolleranza di 1h tra cleaner per essere "fair"
+LOAD_WEIGHT = 10                   # peso delle ore nel punteggio
+SAME_BUILDING_BONUS = -5           # bonus per cluster edificio/blocco
+ROLE_TRAINER_BONUS = -5            # bonus extra per Formatore (solo LP)
+
+
+# --- HELPER CARICO ---
+
+def cleaner_load_minutes(cleaner: Cleaner) -> int:
+    """
+    Carico totale in minuti di un cleaner basato sulle task già assegnate.
+    Somma cleaning_time + eventuale travel_time se già presente.
+    """
+    total = 0
+    for t in cleaner.route:
+        total += getattr(t, "cleaning_time", 0) or 0
+        total += getattr(t, "travel_time", 0) or 0
+    return int(total)
+
+
+def cleaner_load_hours(cleaner: Cleaner) -> float:
+    return cleaner_load_minutes(cleaner) / 60.0
+
+
+# --- HELPER CLUSTER "STESSO BLOCCO" ---
+
+def is_nearby_same_block(t1: Task, t2: Task) -> bool:
+    """
+    True se:
+    - stesso edificio/via (same_building)
+    OPPURE
+    - stesso cliente/alias e travel_minutes <= NEARBY_TRAVEL_THRESHOLD
+
+    Serve per clusterizzare casi tipo 618/619 (EXP) o 1537/1236 (TBR).
+    """
+    # stesso edificio/via
+    if same_building(t1.address, t2.address):
+        return True
+
+    # stesso cliente (vari modi)
+    same_client = (
+        t1.client_id == t2.client_id
+        or t1.customer_name == t2.customer_name
+        or t1.alias == t2.alias
+    )
+    if not same_client:
+        return False
+
+    # vicini in termini di viaggio
+    if travel_minutes(t1, t2) <= NEARBY_TRAVEL_THRESHOLD:
+        return True
+
+    return False
+
+
+🔁 Questi helper li useremo in tutte le plan_day.
+
+2️⃣ Dentro plan_day: blocco HARD CLUSTER (edificio + “blocco vicino”)
+
+Cerca in ognuna delle plan_day (EO / HP / LP) il punto dove costruisci i building_candidates (o equivalente) e sostituiscilo con questo:
+
+# --- HARD CLUSTER edificio/via/blocco ---
+building_candidates: List[Tuple[Cleaner, int, float]] = []
+for c, p, t_travel in candidates:
+    if c.route and any(
+        same_building(ex.address, task.address) or is_nearby_same_block(ex, task)
+        for ex in c.route
+    ):
+        building_candidates.append((c, p, t_travel))
+
+if building_candidates:
+    pool = building_candidates
+    # nel cluster duro il carico pesa un po' meno per non rompere il cluster
+    effective_load_weight = max(LOAD_WEIGHT - 3, 1)
+else:
+    # qui sotto entra la fairness (vedi step 3)
+    ...
+
+
+Questo fa sì che:
+
+se qualcuno ha già una task nello stesso palazzo o sullo stesso “blocco vicino” (stesso cliente, <= 7’ di travel),
+
+la task nuova viene assegnata solo tra quei cleaner, quindi 618/619 e 1537/1236 tenderanno a finire assieme.
+
+3️⃣ Dentro plan_day: fairness basata sulle ORE, non sul numero di task
+3.1. Fairness “normale” (EO / HP)
+
+Subito dopo l’else del blocco sopra (cioè quando building_candidates è vuoto), metti questo al posto della fairness attuale:
+
+    # --- FAIRNESS basata sulle ore, ignora cleaner vuoti ---
+    loads_for_fairness: List[float] = []
+    for (c, _, _) in candidates:
+        load_h = cleaner_load_hours(c)
+        if load_h > 0.0:
+            loads_for_fairness.append(load_h)
+
+    if loads_for_fairness:
+        min_load_h = min(loads_for_fairness)
+    else:
+        # tutti vuoti -> niente fairness, andiamo di travel+cluster
+        min_load_h = 0.0
+
+    fair_candidates: List[Tuple[Cleaner, int, float]] = []
+    for (c, p, t_travel) in candidates:
+        load_h = cleaner_load_hours(c)
+        # consideriamo fair chi ha già qualcosa e non è troppo sopra il minimo
+        if load_h > 0.0 and load_h <= min_load_h + FAIRNESS_DELTA_HOURS:
+            fair_candidates.append((c, p, t_travel))
+
+    pool = fair_candidates or candidates
+    effective_load_weight = LOAD_WEIGHT
+
+3.2. Fairness con Formatore (solo in LP)
+
+In assign_lp.py, nello stesso punto, usa questa variante:
+
+    # --- FAIRNESS con Formatore + ore ---
+    loads_for_fairness: List[float] = []
+    for (c, _, _) in candidates:
+        role = getattr(c, "role", None)
+        load_h = cleaner_load_hours(c)
+
+        if role == "Formatore":
+            # il formatore partecipa sempre al calcolo delle ore minime
+            loads_for_fairness.append(load_h)
+        else:
+            if load_h > 0.0:
+                loads_for_fairness.append(load_h)
+
+    if loads_for_fairness:
+        min_load_h = min(loads_for_fairness)
+    else:
+        min_load_h = 0.0
+
+    fair_candidates: List[Tuple[Cleaner, int, float]] = []
+    for (c, p, t_travel) in candidates:
+        role = getattr(c, "role", None)
+        load_h = cleaner_load_hours(c)
+
+        if role == "Formatore":
+            fair_candidates.append((c, p, t_travel))
+            continue
+
+        if load_h > 0.0 and load_h <= min_load_h + FAIRNESS_DELTA_HOURS:
+            fair_candidates.append((c, p, t_travel))
+
+    pool = fair_candidates or candidates
+    effective_load_weight = LOAD_WEIGHT
+
+
+Così:
+
+i cleaner vuoti non vengono “spinti” solo perché vuoti,
+
+il Formatore rimane dentro al gioco e non rischia di restare vuoto,
+
+il bilanciamento è fatto sulle ore reali, non sul conteggio secco delle task.
+
+4️⃣ Dentro plan_day: target minimo di carico (3 ore) prima di “spingere” chi è già pieno
+
+Subito dopo aver deciso pool (sia nel ramo cluster che fairness), aggiungi:
+
+# --- TARGET MINIMO DI CARICO (≈ 3 ore) ---
+low_load_candidates: List[Tuple[Cleaner, int, float]] = [
+    (c, p, t_travel)
+    for (c, p, t_travel) in pool
+    if cleaner_load_minutes(c) < TARGET_MIN_LOAD_MIN
+]
+
+if low_load_candidates:
+    pool = low_load_candidates
+
+
+Se vuoi essere più selettivo, per LP puoi includere anche esplicitamente il Formatore:
+
+# in LP, se vuoi essere ancora più gentile col formatore
+low_load_candidates = [
+    (c, p, t_travel)
+    for (c, p, t_travel) in pool
+    if cleaner_load_minutes(c) < TARGET_MIN_LOAD_MIN
+       or (getattr(c, "role", None) == "Formatore" and cleaner_load_minutes(c) < TARGET_MIN_LOAD_MIN)
+]
+
+
+Effetto:
+
+finché esistono candidati nel pool con < 3 ore,
+la task viene proposta prima a loro (se i vincoli lo permettono),
+
+questo aiuta a portare chi ha solo 2 task (leggere) verso 3,
+senza obbligare chi ha già 4–5h a prendersi tutto.
+
+5️⃣ Dentro plan_day: scoring finale con ore + penalità di attivazione
+
+Infine, nel loop dove scegli il candidato migliore (quello in cui oggi fai il score = ...), sostituisci il calcolo dello score con questo:
+
+best_choice: Optional[Tuple[Cleaner, int, float]] = None
+best_score: Optional[float] = None
+
+for c, p, t_travel in pool:
+    load_h = cleaner_load_hours(c)
+
+    # bonus cluster soft (anche fuori dal cluster duro)
+    sb_bonus = 0
+    if c.route and any(
+        same_building(ex.address, task.address) or is_nearby_same_block(ex, task)
+        for ex in c.route
+    ):
+        sb_bonus = SAME_BUILDING_BONUS
+
+    # penalità di attivazione per cleaner vuoti
+    if len(c.route) == 0:
+        # in EO/HP basta NEW_CLEANER_PENALTY_MIN, in LP puoi usare NEW_TRAINER_PENALTY_MIN per il formatore
+        role = getattr(c, "role", None)
+        if role == "Formatore":
+            activation_penalty = NEW_TRAINER_PENALTY_MIN
+        else:
+            activation_penalty = NEW_CLEANER_PENALTY_MIN
+    else:
+        activation_penalty = 0
+
+    # bonus ruolo per LP (Formatore)
+    role_bonus = 0
+    # ⚠️ SOLO in LP:
+    # if getattr(c, "role", None) == "Formatore":
+    #     role_bonus = ROLE_TRAINER_BONUS
+
+    score = (
+        t_travel
+        + effective_load_weight * load_h
+        + sb_bonus
+        + activation_penalty
+        + role_bonus
+    )
+
+    if best_score is None or score < best_score:
+        best_score = score
+        best_choice = (c, p, t_travel)
+
+
+In EO / HP lascia il pezzo role_bonus = 0 così com’è.
+
+In LP, decommenta il blocco del Formatore:
+
+if getattr(c, "role", None) == "Formatore":
+    role_bonus = ROLE_TRAINER_BONUS
+
+6️⃣ Cosa dovresti vedere dopo queste patch
+
+Con queste modifiche, sui tuoi dati dovresti ottenere:
+
+Cluster migliorati:
+
+618/619 sullo stesso cleaner (EXP) se non ci sono vincoli orari che lo impediscono.
+
+1537/1236 sullo stesso cleaner TBR (Piatti 4/5) nella maggior parte dei casi.
+
+Distribuzione carico:
+
+meno cleaner “attivi”: l’algoritmo preferisce riempire chi ha già iniziato a lavorare,
+
+nessuno “veramente sottoutilizzato”: chi sta sotto ~3h viene favorito fino a salire,
+
+495 non viene più visto come “povero a 2 task” se è già a ~4,5h.
