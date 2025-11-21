@@ -458,7 +458,12 @@ def load_tasks() -> List[Task]:
     eo_start_min = hhmm_to_min(eo_start_str, default="10:00")
     tasks: List[Task] = []
     for t in data.get("containers", {}).get("early_out", {}).get("tasks", []):
-        checkout = eo_start_min
+        # Checkout reale dell'appartamento (in minuti)
+        real_checkout_min = hhmm_to_min(t.get("checkout_time"), default=eo_start_str)
+        
+        # Il vincolo effettivo è il massimo tra EO start e checkout reale
+        checkout = max(eo_start_min, real_checkout_min)
+        
         checkin = hhmm_to_min(t.get("checkin_time"), default="23:59")
 
         # Parse checkin e checkout datetime
