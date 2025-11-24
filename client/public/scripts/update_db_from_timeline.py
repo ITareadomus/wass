@@ -1,4 +1,3 @@
-
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
@@ -54,7 +53,7 @@ def main():
 
     # Timestamp Roma per updated_at
     timestamp_roma = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    
+
     # Username da metadata o default
     updated_by = timeline_data.get("metadata", {}).get("modified_by", ["E68"])
     if isinstance(updated_by, list):
@@ -68,7 +67,7 @@ def main():
     for assignment in cleaners_assignments:
         cleaner = assignment.get("cleaner")
         tasks = assignment.get("tasks", [])
-        
+
         if not cleaner or not tasks:
             continue
 
@@ -79,7 +78,7 @@ def main():
         for task in tasks:
             task_id = task.get("task_id")
             sequence = task.get("sequence")
-            
+
             if not task_id:
                 print(f"⚠️ Task senza task_id, skip")
                 continue
@@ -89,30 +88,46 @@ def main():
                 continue
 
             try:
-                # UPDATE app_housekeeping
-                update_query = """
+                # Aggiorna il record nel database
+                # CRITICAL: Include anche i campi modificabili dal dialog
+                query = """
                     UPDATE app_housekeeping
-                    SET cleaned_by_us = %s,
+                    SET 
+                        cleaned_by_us = %s,
                         sequence = %s,
+                        checkout_date = %s,
+                        checkout_time = %s,
+                        checkin_date = %s,
+                        checkin_time = %s,
+                        cleaning_time = %s,
+                        pax_in = %s,
+                        operation_id = %s,
                         updated_by = %s,
                         updated_at = %s
                     WHERE id = %s AND deleted_at IS NULL
                 """
-                
-                cursor.execute(update_query, (
+
+                cursor.execute(query, (
                     cleaner_id,
                     sequence,
+                    task.get("checkout_date"),
+                    task.get("checkout_time"),
+                    task.get("checkin_date"),
+                    task.get("checkin_time"),
+                    task.get("cleaning_time"),
+                    task.get("pax_in"),
+                    task.get("operation_id"),
                     updated_by,
                     timestamp_roma,
                     task_id
                 ))
-                
+
                 if cursor.rowcount > 0:
                     total_updated += 1
                     print(f"✅ Task {task_id} → cleaner {cleaner_id}, seq {sequence}")
                 else:
                     print(f"⚠️ Task {task_id} non trovata o già cancellata")
-                    
+
             except Exception as e:
                 total_errors += 1
                 print(f"❌ Errore aggiornamento task {task_id}: {e}")
