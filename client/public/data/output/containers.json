@@ -1,7 +1,7 @@
 {
   "metadata": {
-    "last_updated": "2025-11-24T08:39:59.007183",
-    "date": "2025-11-24"
+    "last_updated": "2025-11-24T08:43:22.338102",
+    "date": "2025-11-26"
   },
   "containers": {
     "early_out": {
@@ -9,18 +9,186 @@
       "count": 0
     },
     "high_priority": {
-      "tasks": [],
-      "count": 0
+      "tasks": [
+        {
+          "task_id": 219108,
+          "logistic_code": 1687,
+          "client_id": 131,
+          "premium": false,
+          "address": "VIALE EMIO CALDARA 39",
+          "lat": "45.4560369",
+          "lng": "9.2030879",
+          "cleaning_time": 90,
+          "checkin_date": "2025-11-26",
+          "checkout_date": "2025-11-26",
+          "checkin_time": "15:00",
+          "checkout_time": "11:00",
+          "pax_in": 4,
+          "pax_out": 0,
+          "small_equipment": false,
+          "operation_id": 2,
+          "confirmed_operation": true,
+          "straordinaria": false,
+          "type_apt": "B",
+          "alias": "DRST",
+          "customer_name": "DREAM SUITES",
+          "reasons": [
+            "same_day_checkin_between_hp_start_hp_end"
+          ],
+          "priority": "high_priority"
+        },
+        {
+          "task_id": 219301,
+          "logistic_code": 1578,
+          "client_id": 121,
+          "premium": false,
+          "address": "VIA MOLINO DELLE ARMI, 13",
+          "lat": "45.456241",
+          "lng": "9.185713",
+          "cleaning_time": 90,
+          "checkin_date": "2025-11-26",
+          "checkout_date": "2025-11-26",
+          "checkin_time": "15:00",
+          "checkout_time": "11:00",
+          "pax_in": 4,
+          "pax_out": 2,
+          "small_equipment": false,
+          "operation_id": 2,
+          "confirmed_operation": true,
+          "straordinaria": false,
+          "type_apt": "B",
+          "alias": "ANLW",
+          "customer_name": "WU ANGELO",
+          "reasons": [
+            "same_day_checkin_between_hp_start_hp_end"
+          ],
+          "priority": "high_priority"
+        }
+      ],
+      "count": 2
     },
     "low_priority": {
-      "tasks": [],
-      "count": 0
+      "tasks": [
+        {
+          "task_id": 218467,
+          "logistic_code": 1096,
+          "client_id": 2,
+          "premium": false,
+          "address": "Corso Cristoforo Colombo 5",
+          "lat": "45.4547051",
+          "lng": "9.1721028",
+          "cleaning_time": 120,
+          "checkin_date": "2025-12-04",
+          "checkout_date": "2025-11-26",
+          "checkin_time": null,
+          "checkout_time": null,
+          "pax_in": 2,
+          "pax_out": 3,
+          "small_equipment": false,
+          "operation_id": 2,
+          "confirmed_operation": true,
+          "straordinaria": false,
+          "type_apt": "C",
+          "alias": "ITW",
+          "customer_name": "ITALIANWAY SRL",
+          "priority": "low_priority",
+          "reasons": [
+            "not_eo",
+            "not_hp"
+          ]
+        },
+        {
+          "task_id": 219260,
+          "logistic_code": 1576,
+          "client_id": 94,
+          "premium": false,
+          "address": "VIA SAVONA 127",
+          "lat": "45.4484989",
+          "lng": "9.1467488",
+          "cleaning_time": 90,
+          "checkin_date": "2025-11-28",
+          "checkout_date": "2025-11-26",
+          "checkin_time": "23:00",
+          "checkout_time": null,
+          "pax_in": 2,
+          "pax_out": 2,
+          "small_equipment": false,
+          "operation_id": 2,
+          "confirmed_operation": false,
+          "straordinaria": false,
+          "type_apt": "B",
+          "alias": "IHST",
+          "customer_name": "IHOST",
+          "priority": "low_priority",
+          "reasons": [
+            "not_eo",
+            "not_hp"
+          ]
+        },
+        {
+          "task_id": 219263,
+          "logistic_code": 1674,
+          "client_id": 123,
+          "premium": false,
+          "address": "Via Disciplini, 4",
+          "lat": "45.45829",
+          "lng": "9.1866989",
+          "cleaning_time": 60,
+          "checkin_date": "2025-12-01",
+          "checkout_date": "2025-11-26",
+          "checkin_time": "17:00",
+          "checkout_time": null,
+          "pax_in": 1,
+          "pax_out": 2,
+          "small_equipment": true,
+          "operation_id": 2,
+          "confirmed_operation": false,
+          "straordinaria": false,
+          "type_apt": "A",
+          "alias": "YHST",
+          "customer_name": "YOUHOSTY",
+          "priority": "low_priority",
+          "reasons": [
+            "not_eo",
+            "not_hp"
+          ]
+        },
+        {
+          "task_id": 219272,
+          "logistic_code": 1676,
+          "client_id": 123,
+          "premium": false,
+          "address": "Via Francesco Albani, 55",
+          "lat": "45.481653",
+          "lng": "9.1449777",
+          "cleaning_time": 90,
+          "checkin_date": "2025-11-29",
+          "checkout_date": "2025-11-26",
+          "checkin_time": "19:00",
+          "checkout_time": null,
+          "pax_in": 2,
+          "pax_out": 2,
+          "small_equipment": false,
+          "operation_id": 2,
+          "confirmed_operation": false,
+          "straordinaria": false,
+          "type_apt": "B",
+          "alias": "YHST",
+          "customer_name": "YOUHOSTY",
+          "priority": "low_priority",
+          "reasons": [
+            "not_eo",
+            "not_hp"
+          ]
+        }
+      ],
+      "count": 4
     }
   },
   "summary": {
-    "total_tasks": 0,
+    "total_tasks": 6,
     "early_out": 0,
-    "high_priority": 0,
-    "low_priority": 0
+    "high_priority": 2,
+    "low_priority": 4
   }
 }
