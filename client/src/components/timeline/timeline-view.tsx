@@ -1575,52 +1575,16 @@ export default function TimelineView({
                   </Button>
                 )}
                 <Button
-                  onClick={async () => {
-                    try {
-                      const currentDate = selectedDate || new Date();
-                      const dateStr = format(currentDate, "yyyy-MM-dd");
-                      const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
-                      
-                      toast({
-                        title: "Trasferimento in corso...",
-                        description: "Invio dati al database ADAM",
-                      });
-
-                      const response = await fetch('/api/transfer-to-adam', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ 
-                          date: dateStr,
-                          username: currentUser.username || 'system'
-                        })
-                      });
-
-                      const result = await response.json();
-
-                      if (result.success) {
-                        toast({
-                          title: "✅ Trasferimento completato!",
-                          description: result.message || `${result.stats?.updated || 0} task trasferite su ADAM`,
-                          variant: "success",
-                          duration: 5000,
-                        });
-                      } else {
-                        throw new Error(result.message || 'Errore durante il trasferimento');
-                      }
-                    } catch (error: any) {
-                      console.error("Errore trasferimento ADAM:", error);
-                      toast({
-                        title: "❌ Errore trasferimento",
-                        description: error.message || "Impossibile trasferire i dati su ADAM",
-                        variant: "destructive",
-                        duration: 5000,
-                      });
-                    }
+                  onClick={() => {
+                    toast({
+                      title: "Trasferimento ADAM",
+                      description: "Funzionalità in fase di implementazione",
+                      variant: "default",
+                    });
                   }}
                   size="sm"
                   variant="outline"
-                  className="ml-2 border-2 border-custom-blue hover:bg-custom-blue hover:text-white"
-                  disabled={!selectedDate}
+                  className="ml-2 border-2 border-custom-blue"
                 >
                   <svg className="mr-2 h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
