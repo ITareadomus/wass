@@ -827,9 +827,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       timelineData.metadata.last_updated = new Date().toISOString();
       timelineData.metadata.date = workDate;
 
-      // Ottieni username corretto dalla richiesta
-      const modifyingUser = req.body.modified_by || req.body.created_by || currentUsername;
-
       // Preserva created_by se già esiste, altrimenti usa l'utente corrente
       if (!timelineData.metadata.created_by) {
         timelineData.metadata.created_by = modifyingUser;
