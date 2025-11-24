@@ -1,6 +1,6 @@
 {
   "metadata": {
-    "last_updated": "2025-11-24T09:43:40.996069",
+    "last_updated": "2025-11-24T09:52:11.214677",
     "date": "2025-11-25"
   },
   "containers": {
@@ -53,33 +53,6 @@
           "confirmed_operation": false,
           "straordinaria": false,
           "type_apt": "E",
-          "alias": "HCC",
-          "customer_name": "HACCA SRL",
-          "reasons": [
-            "client_forced_eo"
-          ],
-          "priority": "early_out"
-        },
-        {
-          "task_id": 219235,
-          "logistic_code": 1645,
-          "client_id": 87,
-          "premium": false,
-          "address": "Via Scaldasole, 4",
-          "lat": "45.454291",
-          "lng": "9.1800519",
-          "cleaning_time": 60,
-          "checkin_date": "2025-11-25",
-          "checkout_date": "2025-11-25",
-          "checkin_time": null,
-          "checkout_time": null,
-          "pax_in": 1,
-          "pax_out": 1,
-          "small_equipment": true,
-          "operation_id": 2,
-          "confirmed_operation": false,
-          "straordinaria": false,
-          "type_apt": "A",
           "alias": "HCC",
           "customer_name": "HACCA SRL",
           "reasons": [
@@ -225,7 +198,7 @@
         {
           "task_id": 219284,
           "logistic_code": 1279,
-          "client_id": null,
+          "client_id": 101,
           "premium": false,
           "address": "VIA CARDUCCI 36",
           "lat": "45.4625133",
@@ -244,12 +217,13 @@
           "type_apt": "C",
           "alias": "CO99",
           "customer_name": "CO99",
-          "reasons": [],
-          "priority": "early_out",
-          "modified_by": "Admin"
+          "reasons": [
+            "checkout_time_eo_window_or_before_start"
+          ],
+          "priority": "early_out"
         }
       ],
-      "count": 9
+      "count": 8
     },
     "high_priority": {
       "tasks": [
@@ -567,8 +541,8 @@
     }
   },
   "summary": {
-    "total_tasks": 20,
-    "early_out": 9,
+    "total_tasks": 19,
+    "early_out": 8,
     "high_priority": 6,
     "low_priority": 5
   }
