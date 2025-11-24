@@ -259,20 +259,32 @@ export default function TaskCard({
     }
   }, [isModalOpen, isReadOnly]);
 
-  // Inizializza i campi quando il modale si apre o quando displayTask cambia
-  // MA NON se l'utente sta già modificando un campo o se è readonly
+  // Inizializza i campi quando il modale si apre per la PRIMA VOLTA
+  // o quando la task visualizzata CAMBIA (navigazione con frecce)
+  // MA NON quando l'utente passa da un campo all'altro (editingField cambia)
+  const [lastInitializedTaskId, setLastInitializedTaskId] = useState<string | null>(null);
+
   useEffect(() => {
-    if (isModalOpen && !editingField && !isReadOnly) {
-      console.log('🔓 Modale aperto per task:', {
-        taskId: task.id,
-        allTasksCount: allTasks?.length || 0,
-        allTasksIds: allTasks?.map(t => getTaskKey(t)) || [],
-        isInTimeline,
-        currentContainer
+    const currentDisplayTaskId = getTaskKey(displayTask);
+    
+    // Inizializza solo se:
+    // 1. Il modale è appena stato aperto (lastInitializedTaskId è null)
+    // 2. L'utente ha navigato ad una task diversa (currentDisplayTaskId diverso)
+    // 3. Non è in modalità readonly
+    const shouldInitialize = isModalOpen && 
+                            !isReadOnly && 
+                            (lastInitializedTaskId === null || lastInitializedTaskId !== currentDisplayTaskId);
+
+    if (shouldInitialize) {
+      console.log('🔓 Inizializzazione campi per task:', {
+        taskId: currentDisplayTaskId,
+        previousTaskId: lastInitializedTaskId,
+        isFirstOpen: lastInitializedTaskId === null
       });
 
       // CRITICAL: Sincronizza currentTaskId con displayTask corrente
-      setCurrentTaskId(getTaskKey(displayTask));
+      setCurrentTaskId(currentDisplayTaskId);
+      setLastInitializedTaskId(currentDisplayTaskId);
 
       // Inizializza campi editabili con i valori attuali della task visualizzata
       setEditedCheckoutDate((displayTask as any).checkout_date || "");
@@ -292,7 +304,14 @@ export default function TaskCard({
       // Inizializza operation_id
       setEditedOperationId(String((displayTask as any).operation_id || ""));
     }
-  }, [isModalOpen, task.id, displayTask, allTasks, isInTimeline, currentContainer, editingField]);
+  }, [isModalOpen, displayTask, isReadOnly]);
+
+  // Reset lastInitializedTaskId quando il modale si chiude
+  useEffect(() => {
+    if (!isModalOpen) {
+      setLastInitializedTaskId(null);
+    }
+  }, [isModalOpen]);
 
   // DEBUG: verifica se displayTask è corretto
   useEffect(() => {
