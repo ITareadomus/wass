@@ -70,7 +70,8 @@ export default function TaskCard({
   console.log('🔧 TaskCard render - isReadOnly:', isReadOnly, 'for task:', task.name);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [clickTimer, setClickTimer] = useState<NodeJS.Timeout | null>(null);
-  const [operationNames, setOperationNames] = useState<Record<number, string>>({});
+  // Operation names rimossi - ora usiamo solo gli ID numerici
+
   const [isMapFiltered, setIsMapFiltered] = useState(false);
 
   // Usa il context multi-select dalla prop (solo per container, non timeline)
@@ -221,22 +222,6 @@ export default function TaskCard({
       setCurrentTaskId((nextTask as any).__key);
     }
   };
-
-  // Carica i nomi delle operazioni
-  useEffect(() => {
-    const loadOperationNames = async () => {
-      try {
-        const response = await fetch('/api/get-operation-names');
-        const data = await response.json();
-        if (data.success) {
-          setOperationNames(data.operationNames);
-        }
-      } catch (error) {
-        console.error('Errore nel caricamento dei nomi operazioni:', error);
-      }
-    };
-    loadOperationNames();
-  }, []);
 
   // Reset editingField quando il modal si chiude o quando diventa readonly
   useEffect(() => {
@@ -456,7 +441,7 @@ export default function TaskCard({
   const duration = task.duration || "0.0";
   const [hours, mins] = duration.split('.').map(Number);
   const totalMinutes = (hours || 0) * 60 + (mins || 0);
-  
+
   // CRITICAL: In timeline, mostra frecce SOLO se >= 1h
   // Nei container, mostra frecce SEMPRE (anche per < 1h)
   const shouldShowCheckInOutArrows = isInTimeline ? totalMinutes >= 60 : true;
@@ -984,7 +969,8 @@ export default function TaskCard({
                     {!isConfirmedOperation
                       ? "non migrato"
                       : (displayTask as any).operation_id
-                        ? operationNames[(displayTask as any).operation_id] || `ID: ${(displayTask as any).operation_id}`
+                        // Usa direttamente l'ID numerico, i nomi delle operazioni sono stati rimossi
+                        ? String((displayTask as any).operation_id)
                         : "-"}
                   </p>
                 )}

@@ -2235,26 +2235,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Endpoint per recuperare i nomi delle operazioni
-  app.get("/api/get-operation-names", async (req, res) => {
-    try {
-      // Carica operations.json che ora contiene anche i nomi
-      const operationsPath = path.join(process.cwd(), 'client/public/data/input/operations.json');
-      const operationsData = JSON.parse(await fs.readFile(operationsPath, 'utf8'));
-
-      res.json({
-        success: true,
-        operationNames: operationsData.operation_names || {}
-      });
-    } catch (error: any) {
-      console.error("Errore durante il recupero dei nomi delle operazioni:", error);
-      res.status(500).json({
-        success: false,
-        message: "Errore durante il recupero dei nomi delle operazioni",
-        error: error.message
-      });
-    }
-  });
+  // Endpoint rimosso: get-operation-names non più necessario
 
   // Endpoint per estrarre i cleaners (versione ottimizzata)
   app.post("/api/extract-cleaners-optimized", async (req, res) => {
