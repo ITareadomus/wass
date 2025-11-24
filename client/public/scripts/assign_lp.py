@@ -1,11 +1,12 @@
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-from __future__ import annotations
 import json, math
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Tuple
 from pathlib import Path
 import sys
 from datetime import datetime
+from zoneinfo import ZoneInfo
 from task_validation import can_cleaner_handle_task, can_cleaner_handle_apartment, can_cleaner_handle_priority
 from assign_utils import (
     NEARBY_TRAVEL_THRESHOLD, NEW_CLEANER_PENALTY_MIN, NEW_TRAINER_PENALTY_MIN,
@@ -1174,7 +1175,7 @@ def main():
     # Carica timeline esistente o crea nuova struttura
     timeline_data = {
         "metadata": {
-            "last_updated": dt.now().isoformat(),
+            "last_updated": dt.now(ZoneInfo("Europe/Rome")).isoformat(),
             "date": ref_date
         },
         "cleaners_assignments": [],
@@ -1230,7 +1231,7 @@ def main():
     # Conta i cleaners effettivamente usati (con almeno una task)
     used_cleaners = len([c for c in timeline_data["cleaners_assignments"] if len(c.get("tasks", [])) > 0])
 
-    timeline_data["metadata"]["last_updated"] = dt.now().isoformat()
+    timeline_data["metadata"]["last_updated"] = dt.now(ZoneInfo("Europe/Rome")).isoformat()
     timeline_data["metadata"]["date"] = ref_date
     timeline_data["meta"]["total_cleaners"] = total_available_cleaners
     timeline_data["meta"]["used_cleaners"] = used_cleaners
