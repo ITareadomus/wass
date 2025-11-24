@@ -2150,7 +2150,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Endpoint per aggiornare i dettagli di una task (checkout, checkin, durata)
   app.post("/api/update-task-details", async (req, res) => {
     try {
-      const { taskId, logisticCode, checkoutDate, checkoutTime, checkinDate, checkinTime, cleaningTime, date } = req.body;
+      const { taskId, logisticCode, checkoutDate, checkoutTime, checkinDate, checkinTime, cleaningTime, paxIn, operationId, date } = req.body;
 
       if (!taskId && !logisticCode) {
         return res.status(400).json({ success: false, error: "taskId o logisticCode richiesto" });
@@ -2168,15 +2168,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
       ]);
 
       let taskUpdated = false;
+      const updatedFields: string[] = [];
 
-      // Funzione helper per aggiornare una task
+      // Funzione helper per aggiornare una task (solo campi modificati)
       const updateTask = (task: any) => {
         if (String(task.task_id) === String(taskId) || String(task.logistic_code) === String(logisticCode)) {
-          task.checkout_date = checkoutDate;
-          task.checkout_time = checkoutTime;
-          task.checkin_date = checkinDate;
-          task.checkin_time = checkinTime;
-          task.cleaning_time = cleaningTime;
+          // Aggiorna solo i campi che sono stati effettivamente passati
+          if (checkoutDate !== undefined) {
+            task.checkout_date = checkoutDate;
+            if (!updatedFields.includes('checkout_date')) updatedFields.push('checkout_date');
+          }
+          if (checkoutTime !== undefined) {
+            task.checkout_time = checkoutTime;
+            if (!updatedFields.includes('checkout_time')) updatedFields.push('checkout_time');
+          }
+          if (checkinDate !== undefined) {
+            task.checkin_date = checkinDate;
+            if (!updatedFields.includes('checkin_date')) updatedFields.push('checkin_date');
+          }
+          if (checkinTime !== undefined) {
+            task.checkin_time = checkinTime;
+            if (!updatedFields.includes('checkin_time')) updatedFields.push('checkin_time');
+          }
+          if (cleaningTime !== undefined) {
+            task.cleaning_time = cleaningTime;
+            if (!updatedFields.includes('cleaning_time')) updatedFields.push('cleaning_time');
+          }
+          if (paxIn !== undefined) {
+            task.pax_in = paxIn;
+            if (!updatedFields.includes('pax_in')) updatedFields.push('pax_in');
+          }
+          if (operationId !== undefined) {
+            task.operation_id = operationId;
+            if (!updatedFields.includes('operation_id')) updatedFields.push('operation_id');
+          }
           taskUpdated = true;
           return true;
         }
@@ -2212,8 +2237,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         workspaceFiles.saveTimeline(workDate, timelineData)
       ]);
 
-      console.log(`✅ Task ${logisticCode} aggiornata con successo`);
-      res.json({ success: true, message: "Task aggiornata con successo" });
+      console.log(`✅ Task ${logisticCode} aggiornata con successo (campi: ${updatedFields.join(', ')})`);
+      res.json({ success: true, message: "Task aggiornata con successo", updatedFields });
     } catch (error: any) {
       console.error("Errore nell'aggiornamento della task:", error);
       res.status(500).json({ success: false, error: error.message });
