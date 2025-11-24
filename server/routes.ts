@@ -239,46 +239,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log(`✅ Reset completato - selected_cleaners.json NON modificato (rimane invariato)`);
       // === END ===
 
-      // CRITICAL: Dopo reset timeline, aggiorna il DB per rimuovere le assegnazioni
-      console.log(`🔄 Aggiornamento database MySQL dopo reset...`);
-      try {
-        const { spawn } = await import('child_process');
-        const updateDbScript = spawn('python3', [
-          path.join(process.cwd(), 'client/public/scripts/update_db_from_timeline.py')
-        ]);
-
-        let dbOutput = '';
-        let dbError = '';
-
-        updateDbScript.stdout.on('data', (data: Buffer) => {
-          const output = data.toString();
-          dbOutput += output;
-          console.log(output.trim());
-        });
-
-        updateDbScript.stderr.on('data', (data: Buffer) => {
-          const error = data.toString();
-          dbError += error;
-          console.error(error.trim());
-        });
-
-        await new Promise<void>((resolve, reject) => {
-          updateDbScript.on('close', (code: number) => {
-            if (code === 0) {
-              console.log(`✅ Database MySQL aggiornato dopo reset`);
-              resolve();
-            } else {
-              console.error(`❌ Errore aggiornamento DB (exit code ${code}):`, dbError);
-              reject(new Error(`Script update_db_from_timeline.py failed with code ${code}`));
-            }
-          });
-        });
-      } catch (dbUpdateError: any) {
-        console.error(`⚠️ Errore durante aggiornamento DB:`, dbUpdateError);
-        // Non bloccare il reset anche se l'aggiornamento DB fallisce
-      }
-
-      res.json({ success: true, message: "Timeline resettata con successo e DB aggiornato" });
+      res.json({ success: true, message: "Timeline resettata con successo" });
     } catch (error: any) {
       console.error("Errore nel reset della timeline:", error);
       res.status(500).json({ success: false, error: error.message });
@@ -860,11 +821,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Aggiorna metadata e meta, preservando created_by e aggiornando modified_by
-      const modifyingUser = req.body.modified_by || req.body.created_by || currentUsername;
-
       timelineData.metadata = timelineData.metadata || {};
       timelineData.metadata.last_updated = new Date().toISOString();
       timelineData.metadata.date = workDate;
+
+      // Ottieni username corretto dalla richiesta
+      const modifyingUser = req.body.modified_by || req.body.created_by || currentUsername;
 
       // Preserva created_by se già esiste, altrimenti usa l'utente corrente
       if (!timelineData.metadata.created_by) {
@@ -1143,9 +1105,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
-      // Le assegnazioni vengono salvate solo nei file JSON
-      // L'aggiornamento del database MySQL avviene tramite gli script Python quando necessario
-
       // Carica timeline esistente per preservare created_by e modified_by
       let existingTimeline: any = null;
       try {
@@ -1236,26 +1195,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const hours = String(now.getHours()).padStart(2, '0');
       const minutes = String(now.getMinutes()).padStart(2, '0');
       const formattedDateTime = `${day}/${month}/${year} alle ${hours}:${minutes}`;
-
-      // Esegui lo script Python per aggiornare il database MySQL
-      console.log("🔄 Esecuzione script update_db_from_timeline.py...");
-      try {
-        const scriptPath = path.join(process.cwd(), 'client/public/scripts/update_db_from_timeline.py');
-        const { stdout: scriptOutput, stderr: scriptError } = await execAsync(`python3 "${scriptPath}"`, {
-          maxBuffer: 1024 * 1024 * 10
-        });
-
-        if (scriptError && !scriptError.includes('Browserslist')) {
-          console.error("⚠️ Warning da update_db_from_timeline.py:", scriptError);
-        }
-
-        console.log("✅ Script update_db_from_timeline.py eseguito:");
-        console.log(scriptOutput);
-      } catch (scriptErr: any) {
-        console.error("❌ Errore esecuzione update_db_from_timeline.py:", scriptErr);
-        // Non blocchiamo la risposta anche se lo script fallisce
-        // Il salvataggio in Object Storage è già avvenuto con successo
-      }
 
       res.json({
         success: true,
@@ -2189,7 +2128,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Endpoint per aggiornare i dettagli di una task (checkout, checkin, durata)
   app.post("/api/update-task-details", async (req, res) => {
     try {
-      const { taskId, logisticCode, checkoutDate, checkoutTime, checkinDate, checkinTime, cleaningTime, paxIn, operationId, date } = req.body;
+      const { taskId, logisticCode, checkoutDate, checkoutTime, checkinDate, checkinTime, cleaningTime, date } = req.body;
 
       if (!taskId && !logisticCode) {
         return res.status(400).json({ success: false, error: "taskId o logisticCode richiesto" });
@@ -2207,40 +2146,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       ]);
 
       let taskUpdated = false;
-      const updatedFields: string[] = [];
 
-      // Funzione helper per aggiornare una task (solo campi modificati)
+      // Funzione helper per aggiornare una task
       const updateTask = (task: any) => {
         if (String(task.task_id) === String(taskId) || String(task.logistic_code) === String(logisticCode)) {
-          // Aggiorna solo i campi che sono stati effettivamente passati
-          if (checkoutDate !== undefined) {
-            task.checkout_date = checkoutDate;
-            if (!updatedFields.includes('checkout_date')) updatedFields.push('checkout_date');
-          }
-          if (checkoutTime !== undefined) {
-            task.checkout_time = checkoutTime;
-            if (!updatedFields.includes('checkout_time')) updatedFields.push('checkout_time');
-          }
-          if (checkinDate !== undefined) {
-            task.checkin_date = checkinDate;
-            if (!updatedFields.includes('checkin_date')) updatedFields.push('checkin_date');
-          }
-          if (checkinTime !== undefined) {
-            task.checkin_time = checkinTime;
-            if (!updatedFields.includes('checkin_time')) updatedFields.push('checkin_time');
-          }
-          if (cleaningTime !== undefined) {
-            task.cleaning_time = cleaningTime;
-            if (!updatedFields.includes('cleaning_time')) updatedFields.push('cleaning_time');
-          }
-          if (paxIn !== undefined) {
-            task.pax_in = paxIn;
-            if (!updatedFields.includes('pax_in')) updatedFields.push('pax_in');
-          }
-          if (operationId !== undefined) {
-            task.operation_id = operationId;
-            if (!updatedFields.includes('operation_id')) updatedFields.push('operation_id');
-          }
+          task.checkout_date = checkoutDate;
+          task.checkout_time = checkoutTime;
+          task.checkin_date = checkinDate;
+          task.checkin_time = checkinTime;
+          task.cleaning_time = cleaningTime;
           taskUpdated = true;
           return true;
         }
@@ -2276,8 +2190,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         workspaceFiles.saveTimeline(workDate, timelineData)
       ]);
 
-      console.log(`✅ Task ${logisticCode} aggiornata con successo (campi: ${updatedFields.join(', ')})`);
-      res.json({ success: true, message: "Task aggiornata con successo", updatedFields });
+      console.log(`✅ Task ${logisticCode} aggiornata con successo`);
+      res.json({ success: true, message: "Task aggiornata con successo" });
     } catch (error: any) {
       console.error("Errore nell'aggiornamento della task:", error);
       res.status(500).json({ success: false, error: error.message });
@@ -2324,17 +2238,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Endpoint per recuperare i nomi delle operazioni
   app.get("/api/get-operation-names", async (req, res) => {
     try {
-      // Mapping statico degli ID operazioni ai loro nomi
-      const operationNames: Record<number, string> = {
-        1: "FERMATA",
-        2: "PARTENZA",
-        3: "PULIZIA STRAORDINARIA",
-        4: "RIPASSO"
-      };
+      // Carica operations.json che ora contiene anche i nomi
+      const operationsPath = path.join(process.cwd(), 'client/public/data/input/operations.json');
+      const operationsData = JSON.parse(await fs.readFile(operationsPath, 'utf8'));
 
       res.json({
         success: true,
-        operationNames
+        operationNames: operationsData.operation_names || {}
       });
     } catch (error: any) {
       console.error("Errore durante il recupero dei nomi delle operazioni:", error);
@@ -3445,26 +3355,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Fallback: mantieni sequence manualmente (già fatto sopra)
       }
 
-      // Aggiorna metadata (fuso orario Europe/Rome)
+      // Aggiorna metadata
       timelineData.metadata = timelineData.metadata || {};
-      const now = new Date();
-      const romeTime = new Intl.DateTimeFormat('en-US', {
-        timeZone: 'Europe/Rome',
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit',
-        hour12: false
-      }).formatToParts(now);
-      const year = romeTime.find(p => p.type === 'year')?.value;
-      const month = romeTime.find(p => p.type === 'month')?.value;
-      const day = romeTime.find(p => p.type === 'day')?.value;
-      const hour = romeTime.find(p => p.type === 'hour')?.value;
-      const minute = romeTime.find(p => p.type === 'minute')?.value;
-      const second = romeTime.find(p => p.type === 'second')?.value;
-      timelineData.metadata.last_updated = `${year}-${month}-${day}T${hour}:${minute}:${second}+01:00`;
+      timelineData.metadata.last_updated = new Date().toISOString();
       const workDate = req.body.date || format(new Date(), 'yyyy-MM-dd'); // Usa la data della richiesta
       timelineData.metadata.date = workDate;
 

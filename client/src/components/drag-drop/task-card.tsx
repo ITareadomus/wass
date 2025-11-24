@@ -17,13 +17,6 @@ import {
 } from "@/components/ui/tooltip";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { HelpCircle, ChevronLeft, ChevronRight, Save, Pencil, Calendar } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
@@ -149,7 +142,6 @@ export default function TaskCard({
   const [editedPaxIn, setEditedPaxIn] = useState("");
   const [editedOperationId, setEditedOperationId] = useState("");
   const [isSaving, setIsSaving] = useState(false);
-  const [availableOperations, setAvailableOperations] = useState<Array<{ id: number; name: string }>>([]);
 
   // Determina le task navigabili in base al contesto
   const getNavigableTasks = (): Task[] => {
@@ -238,12 +230,6 @@ export default function TaskCard({
         const data = await response.json();
         if (data.success) {
           setOperationNames(data.operationNames);
-          // Converte l'oggetto operationNames in array per il Select
-          const opsArray = Object.entries(data.operationNames).map(([id, name]) => ({
-            id: parseInt(id),
-            name: name as string
-          }));
-          setAvailableOperations(opsArray);
         }
       } catch (error) {
         console.error('Errore nel caricamento dei nomi operazioni:', error);
@@ -259,32 +245,20 @@ export default function TaskCard({
     }
   }, [isModalOpen, isReadOnly]);
 
-  // Inizializza i campi quando il modale si apre per la PRIMA VOLTA
-  // o quando la task visualizzata CAMBIA (navigazione con frecce)
-  // MA NON quando l'utente passa da un campo all'altro (editingField cambia)
-  const [lastInitializedTaskId, setLastInitializedTaskId] = useState<string | null>(null);
-
+  // Inizializza i campi quando il modale si apre o quando displayTask cambia
+  // MA NON se l'utente sta già modificando un campo o se è readonly
   useEffect(() => {
-    const currentDisplayTaskId = getTaskKey(displayTask);
-    
-    // Inizializza solo se:
-    // 1. Il modale è appena stato aperto (lastInitializedTaskId è null)
-    // 2. L'utente ha navigato ad una task diversa (currentDisplayTaskId diverso)
-    // 3. Non è in modalità readonly
-    const shouldInitialize = isModalOpen && 
-                            !isReadOnly && 
-                            (lastInitializedTaskId === null || lastInitializedTaskId !== currentDisplayTaskId);
-
-    if (shouldInitialize) {
-      console.log('🔓 Inizializzazione campi per task:', {
-        taskId: currentDisplayTaskId,
-        previousTaskId: lastInitializedTaskId,
-        isFirstOpen: lastInitializedTaskId === null
+    if (isModalOpen && !editingField && !isReadOnly) {
+      console.log('🔓 Modale aperto per task:', {
+        taskId: task.id,
+        allTasksCount: allTasks?.length || 0,
+        allTasksIds: allTasks?.map(t => getTaskKey(t)) || [],
+        isInTimeline,
+        currentContainer
       });
 
       // CRITICAL: Sincronizza currentTaskId con displayTask corrente
-      setCurrentTaskId(currentDisplayTaskId);
-      setLastInitializedTaskId(currentDisplayTaskId);
+      setCurrentTaskId(getTaskKey(displayTask));
 
       // Inizializza campi editabili con i valori attuali della task visualizzata
       setEditedCheckoutDate((displayTask as any).checkout_date || "");
@@ -304,14 +278,7 @@ export default function TaskCard({
       // Inizializza operation_id
       setEditedOperationId(String((displayTask as any).operation_id || ""));
     }
-  }, [isModalOpen, displayTask, isReadOnly]);
-
-  // Reset lastInitializedTaskId quando il modale si chiude
-  useEffect(() => {
-    if (!isModalOpen) {
-      setLastInitializedTaskId(null);
-    }
-  }, [isModalOpen]);
+  }, [isModalOpen, task.id, displayTask, allTasks, isInTimeline, currentContainer, editingField]);
 
   // DEBUG: verifica se displayTask è corretto
   useEffect(() => {
@@ -405,150 +372,20 @@ export default function TaskCard({
     try {
       setIsSaving(true);
 
-      // ========== VALIDAZIONE E RACCOLTA CAMPI MODIFICATI ==========
-      const updates: any = {
-        taskId: getTaskKey(displayTask),
-        logisticCode: displayTask.name,
-      };
-
-      // 1. Durata pulizia (se modificata)
-      const originalDuration = displayTask.duration || "0.0";
-      const [origHours, origMins] = originalDuration.split('.').map(Number);
-      const originalMinutes = (origHours || 0) * 60 + (origMins || 0);
-      const editedMinutes = parseInt(editedDuration) || 0;
-
-      if (editedMinutes !== originalMinutes) {
-        if (editedMinutes <= 0 || editedMinutes > 480) {
-          toast({
-            title: "Errore validazione",
-            description: "La durata deve essere tra 1 e 480 minuti (8 ore)",
-            variant: "destructive",
-          });
-          setIsSaving(false);
-          return;
-        }
-        updates.cleaningTime = editedMinutes;
-      }
-
-      // 2. Pax-In (se modificato)
-      const originalPaxIn = (displayTask as any).pax_in || 0;
-      const editedPaxInValue = parseInt(editedPaxIn) || 0;
-
-      if (editedPaxInValue !== originalPaxIn) {
-        if (editedPaxInValue < 0 || editedPaxInValue > 50) {
-          toast({
-            title: "Errore validazione",
-            description: "Il numero di ospiti deve essere tra 0 e 50",
-            variant: "destructive",
-          });
-          setIsSaving(false);
-          return;
-        }
-        updates.paxIn = editedPaxInValue;
-      }
-
-      // 3. Check-out date/time (se modificati)
-      const originalCheckoutDate = (displayTask as any).checkout_date || "";
-      const originalCheckoutTime = (displayTask as any).checkout_time || "";
-
-      if (editedCheckoutDate !== originalCheckoutDate) {
-        updates.checkoutDate = editedCheckoutDate || null;
-      }
-      if (editedCheckoutTime !== originalCheckoutTime) {
-        updates.checkoutTime = editedCheckoutTime || null;
-      }
-
-      // 4. Check-in date/time (se modificati)
-      const originalCheckinDate = (displayTask as any).checkin_date || "";
-      const originalCheckinTime = (displayTask as any).checkin_time || "";
-
-      if (editedCheckinDate !== originalCheckinDate) {
-        updates.checkinDate = editedCheckinDate || null;
-      }
-      if (editedCheckinTime !== originalCheckinTime) {
-        updates.checkinTime = editedCheckinTime || null;
-      }
-
-      // 5. Validazione coerenza temporale (solo se almeno uno dei campi data/ora è modificato)
-      const hasDateTimeChanges = updates.checkoutDate !== undefined || 
-                                  updates.checkoutTime !== undefined || 
-                                  updates.checkinDate !== undefined || 
-                                  updates.checkinTime !== undefined;
-
-      if (hasDateTimeChanges) {
-        const finalCheckoutDate = updates.checkoutDate !== undefined ? updates.checkoutDate : originalCheckoutDate;
-        const finalCheckoutTime = updates.checkoutTime !== undefined ? updates.checkoutTime : originalCheckoutTime;
-        const finalCheckinDate = updates.checkinDate !== undefined ? updates.checkinDate : originalCheckinDate;
-        const finalCheckinTime = updates.checkinTime !== undefined ? updates.checkinTime : originalCheckinTime;
-
-        if (finalCheckoutDate && finalCheckoutTime && finalCheckinDate && finalCheckinTime) {
-          const checkoutDateTime = new Date(finalCheckoutDate + 'T' + finalCheckoutTime + ':00');
-          const checkinDateTime = new Date(finalCheckinDate + 'T' + finalCheckinTime + ':00');
-
-          if (isNaN(checkoutDateTime.getTime()) || isNaN(checkinDateTime.getTime())) {
-            toast({
-              title: "Errore validazione",
-              description: "Date o orari non validi",
-              variant: "destructive",
-            });
-            setIsSaving(false);
-            return;
-          }
-
-          if (checkoutDateTime >= checkinDateTime) {
-            toast({
-              title: "Errore validazione",
-              description: "Il check-out deve essere prima del check-in",
-              variant: "destructive",
-            });
-            setIsSaving(false);
-            return;
-          }
-        }
-      }
-
-      // 6. Operation ID (se modificato)
-      const originalOperationId = String((displayTask as any).operation_id || "");
-
-      if (editedOperationId !== originalOperationId) {
-        if (editedOperationId && editedOperationId.trim() !== "") {
-          const operationIdValue = parseInt(editedOperationId);
-          const validOperationIds = availableOperations.map(op => op.id);
-          if (!validOperationIds.includes(operationIdValue)) {
-            toast({
-              title: "Errore validazione",
-              description: "Tipologia intervento non valida",
-              variant: "destructive",
-            });
-            setIsSaving(false);
-            return;
-          }
-          updates.operationId = operationIdValue;
-        } else {
-          updates.operationId = null;
-        }
-      }
-
-      // Controlla se ci sono effettivamente modifiche da salvare
-      const hasChanges = Object.keys(updates).length > 2; // > 2 perché taskId e logisticCode sono sempre presenti
-
-      if (!hasChanges) {
-        toast({
-          title: "Nessuna modifica",
-          description: "Non ci sono modifiche da salvare",
-          variant: "default",
-        });
-        setIsSaving(false);
-        setEditingField(null);
-        return;
-      }
-
-      // ========== FINE VALIDAZIONE ==========
-
       const response = await fetch('/api/update-task-details', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(updates),
+        body: JSON.stringify({
+          taskId: getTaskKey(displayTask),
+          logisticCode: displayTask.name,
+          checkoutDate: editedCheckoutDate,
+          checkoutTime: editedCheckoutTime,
+          checkinDate: editedCheckinDate,
+          checkinTime: editedCheckinTime,
+          cleaningTime: parseInt(editedDuration),
+          paxIn: parseInt(editedPaxIn),
+          operationId: parseInt(editedOperationId) || null,
+        }),
       });
 
       const result = await response.json();
@@ -559,15 +396,8 @@ export default function TaskCard({
           description: "I dettagli della task sono stati aggiornati con successo.",
         });
 
-        // NON chiudere il modale, permetti all'utente di vedere le modifiche salvate
-        // e di continuare a modificare altri campi se necessario
         setEditingField(null);
-        // NON fare setIsModalOpen(false) qui
-
-        // CRITICAL: Marca la timeline come modificata (modifiche non salvate)
-        if ((window as any).setHasUnsavedChanges) {
-          (window as any).setHasUnsavedChanges(true);
-        }
+        setIsModalOpen(false);
 
         // Preserva lo stato acknowledged per il cleaner di destinazione
         if ((window as any).preserveAcknowledgedIncompatibleCleaners && (displayTask as any).assignedCleaner) {
@@ -626,7 +456,7 @@ export default function TaskCard({
   const duration = task.duration || "0.0";
   const [hours, mins] = duration.split('.').map(Number);
   const totalMinutes = (hours || 0) * 60 + (mins || 0);
-
+  
   // CRITICAL: In timeline, mostra frecce SOLO se >= 1h
   // Nei container, mostra frecce SEMPRE (anche per < 1h)
   const shouldShowCheckInOutArrows = isInTimeline ? totalMinutes >= 60 : true;
@@ -1124,22 +954,24 @@ export default function TaskCard({
                   {!isReadOnly && <Pencil className="w-3 h-3 text-muted-foreground/60" />}
                 </p>
                 {editingField === 'operation' && !isReadOnly ? (
-                  <div onClick={(e) => e.stopPropagation()}>
-                    <Select
+                  <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                    <Input
+                      type="text"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
                       value={editedOperationId}
-                      onValueChange={(value) => setEditedOperationId(value)}
-                    >
-                      <SelectTrigger className="text-sm">
-                        <SelectValue placeholder="Seleziona tipologia..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {availableOperations.map((op) => (
-                          <SelectItem key={op.id} value={String(op.id)}>
-                            {op.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                      onChange={(e) => {
+                        const value = e.target.value.replace(/\D/g, '');
+                        setEditedOperationId(value);
+                      }}
+                      onFocus={(e) => e.stopPropagation()}
+                      onBlur={(e) => e.stopPropagation()}
+                      onClick={(e) => e.stopPropagation()}
+                      className="text-sm w-20 [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                      min="0"
+                      autoFocus
+                    />
+                    <span className="text-sm text-muted-foreground">ID operazione</span>
                   </div>
                 ) : (
                   <p
@@ -1264,19 +1096,6 @@ export default function TaskCard({
                   variant="outline"
                 >
                   Annulla
-                </Button>
-              </div>
-            )}
-
-            {/* Pulsante per chiudere il modale dopo aver visto le modifiche salvate */}
-            {!editingField && !isReadOnly && (
-              <div className="pt-4 border-t mt-4 flex gap-2">
-                <Button
-                  onClick={() => setIsModalOpen(false)}
-                  variant="outline"
-                  className="flex-1"
-                >
-                  Chiudi
                 </Button>
               </div>
             )}
