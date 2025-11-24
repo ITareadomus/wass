@@ -1037,6 +1037,12 @@ export default function GenerateAssignments() {
       const result = await response.json();
 
       if (result.success) {
+        // CRITICAL: Marca modifiche dopo assegnazione automatica
+        setHasUnsavedChanges(true);
+        if (onTaskMoved) {
+          onTaskMoved();
+        }
+
         toast({
           title: "Early Out Assegnati!",
           description: result.message,
@@ -1098,6 +1104,12 @@ export default function GenerateAssignments() {
       const result = await response.json();
 
       if (result.success) {
+        // CRITICAL: Marca modifiche dopo assegnazione automatica
+        setHasUnsavedChanges(true);
+        if (onTaskMoved) {
+          onTaskMoved();
+        }
+
         toast({
           title: "High Priority Assegnati!",
           description: result.message,
@@ -1163,6 +1175,12 @@ export default function GenerateAssignments() {
       const result = await response.json();
 
       if (result.success) {
+        // CRITICAL: Marca modifiche dopo assegnazione automatica
+        setHasUnsavedChanges(true);
+        if (onTaskMoved) {
+          onTaskMoved();
+        }
+
         toast({
           title: "Low Priority Assegnati!",
           description: result.message,
