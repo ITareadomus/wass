@@ -11,9 +11,11 @@ import { it } from "date-fns/locale";
 import { storageService } from "./services/storage-service";
 import * as workspaceFiles from "./services/workspace-files";
 import { drizzle } from "drizzle-orm/node-postgres";
-import { Pool } from "pg";
+import pg from "pg";
 import { housekeeping } from "../shared/schema";
 import { eq, and, isNull } from "drizzle-orm";
+
+const { Pool } = pg;
 
 // Inizializza connessione database
 const pool = new Pool({
