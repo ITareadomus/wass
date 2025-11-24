@@ -1,10 +1,11 @@
 {
   "metadata": {
-    "last_updated": "2025-11-24T11:00:51.063Z",
+    "last_updated": "2025-11-24T11:01:22.468Z",
     "date": "2025-11-25",
     "created_by": "unknown",
     "modified_by": [
-      "Admin"
+      "Admin",
+      "system"
     ]
   },
   "cleaners_assignments": [
@@ -15,6 +16,16 @@
         "lastname": "JIMENEZ",
         "role": "Formatore",
         "premium": false
+      },
+      "tasks": []
+    },
+    {
+      "cleaner": {
+        "id": 132,
+        "name": "JOHOISER ERNESTO",
+        "lastname": "LOPEZ GIRON",
+        "role": "Premium",
+        "premium": true
       },
       "tasks": [
         {
@@ -40,7 +51,8 @@
           "alias": "HCC",
           "customer_name": "HACCA SRL",
           "reasons": [
-            "manually_moved_to_timeline"
+            "manually_moved_to_timeline",
+            "manual_assignment"
           ],
           "priority": "early_out",
           "start_time": "10:00",
@@ -54,9 +66,9 @@
     }
   ],
   "meta": {
-    "total_cleaners": 1,
-    "used_cleaners": 0,
-    "assigned_tasks": 0,
+    "total_cleaners": 2,
+    "used_cleaners": 1,
+    "assigned_tasks": 1,
     "total_tasks": 1
   }
 }
