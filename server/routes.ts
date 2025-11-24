@@ -821,6 +821,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Aggiorna metadata e meta, preservando created_by e aggiornando modified_by
+      const modifyingUser = req.body.modified_by || req.body.created_by || currentUsername;
+
       timelineData.metadata = timelineData.metadata || {};
       timelineData.metadata.last_updated = new Date().toISOString();
       timelineData.metadata.date = workDate;
