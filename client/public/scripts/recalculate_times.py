@@ -180,15 +180,24 @@ def recalculate_cleaner_times(cleaner_data: Dict[str, Any]) -> Dict[str, Any]:
 
         # CRITICAL: Start time NON può essere prima del checkout_time
         # Il cleaner può iniziare solo DOPO che la proprietà è libera
-        start_time_min = current_time_min
         
-        if checkout_time_str:
+        # Per la prima task (i==0), se ha checkout_time, inizia da lì invece che da work_start
+        if i == 0 and checkout_time_str:
             checkout_min = time_to_minutes(checkout_time_str)
-            # Se il tempo calcolato è prima del checkout, posticipa lo start
-            if start_time_min < checkout_min:
-                start_time_min = checkout_min
-                # Aggiorna anche current_time_min per mantenere coerenza
-                current_time_min = checkout_min
+            # Posiziona la prima task al checkout_time (mai prima)
+            start_time_min = max(work_start_min, checkout_min)
+            current_time_min = start_time_min
+        else:
+            start_time_min = current_time_min
+            
+            # Per task successive, rispetta comunque il checkout_time se presente
+            if checkout_time_str:
+                checkout_min = time_to_minutes(checkout_time_str)
+                # Se il tempo calcolato è prima del checkout, posticipa lo start
+                if start_time_min < checkout_min:
+                    start_time_min = checkout_min
+                    # Aggiorna anche current_time_min per mantenere coerenza
+                    current_time_min = checkout_min
 
         # End time: start + cleaning_time
         end_time_min = start_time_min + cleaning_time
