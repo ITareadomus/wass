@@ -10,6 +10,7 @@ import mysql.connector
 import sys
 from datetime import datetime
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 # ---------- Config ----------
 BASE_DIR = Path(__file__).parent.parent / "data"
@@ -65,7 +66,7 @@ def main():
                         updated_at = %s
                     WHERE DATE(checkin) = %s AND deleted_at IS NULL
                 """
-                timestamp_roma = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                timestamp_roma = datetime.now(ZoneInfo("Europe/Rome")).strftime("%Y-%m-%d %H:%M:%S")
                 updated_by = timeline_data.get("metadata", {}).get("modified_by", ["E68"])
                 if isinstance(updated_by, list):
                     updated_by = updated_by[-1] if updated_by else "E68"
@@ -87,7 +88,7 @@ def main():
         return
 
     # Timestamp Roma per updated_at
-    timestamp_roma = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    timestamp_roma = datetime.now(ZoneInfo("Europe/Rome")).strftime("%Y-%m-%d %H:%M:%S")
 
     # Username da metadata o default
     updated_by = timeline_data.get("metadata", {}).get("modified_by", ["E68"])
