@@ -6,6 +6,7 @@ from datetime import datetime, date, timedelta
 from pathlib import Path
 import argparse
 import subprocess
+from zoneinfo import ZoneInfo
 
 # ---------- Config ----------
 BASE_DIR = Path(__file__).parent.parent / "data"
@@ -517,7 +518,7 @@ def main():
 
         if updated_count > 0:
             # Salva timeline.json preservando metadata e struttura
-            timeline_data["metadata"]["last_updated"] = datetime.now().isoformat()
+            timeline_data["metadata"]["last_updated"] = datetime.now(ZoneInfo("Europe/Rome")).isoformat()
             # NON cambiare la data - mantieni quella della timeline
             timeline_path.write_text(json.dumps(timeline_data, ensure_ascii=False, indent=2), encoding="utf-8")
             print(f"✅ Aggiornate {updated_count} task in timeline.json (preservati campi timeline: start_time, end_time, travel_time, sequence)")
@@ -532,7 +533,7 @@ def main():
     # Crea output
     output = {
         "metadata": {
-            "last_updated": datetime.now().isoformat(),
+            "last_updated": datetime.now(ZoneInfo("Europe/Rome")).isoformat(),
             "date": target_date
         },
         "containers": {

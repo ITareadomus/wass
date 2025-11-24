@@ -3445,9 +3445,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Fallback: mantieni sequence manualmente (già fatto sopra)
       }
 
-      // Aggiorna metadata
+      // Aggiorna metadata (fuso orario Europe/Rome)
       timelineData.metadata = timelineData.metadata || {};
-      timelineData.metadata.last_updated = new Date().toISOString();
+      const now = new Date();
+      const romeTime = new Intl.DateTimeFormat('en-US', {
+        timeZone: 'Europe/Rome',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false
+      }).formatToParts(now);
+      const year = romeTime.find(p => p.type === 'year')?.value;
+      const month = romeTime.find(p => p.type === 'month')?.value;
+      const day = romeTime.find(p => p.type === 'day')?.value;
+      const hour = romeTime.find(p => p.type === 'hour')?.value;
+      const minute = romeTime.find(p => p.type === 'minute')?.value;
+      const second = romeTime.find(p => p.type === 'second')?.value;
+      timelineData.metadata.last_updated = `${year}-${month}-${day}T${hour}:${minute}:${second}+01:00`;
       const workDate = req.body.date || format(new Date(), 'yyyy-MM-dd'); // Usa la data della richiesta
       timelineData.metadata.date = workDate;
 
