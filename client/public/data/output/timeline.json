@@ -1,10 +1,11 @@
 {
   "metadata": {
-    "last_updated": "2025-11-24T09:44:42.877Z",
+    "last_updated": "2025-11-24T09:52:11.210770",
     "date": "2025-11-25",
     "created_by": "Admin",
     "modified_by": [
-      "Admin"
+      "Admin",
+      "system"
     ]
   },
   "cleaners_assignments": [
@@ -20,7 +21,7 @@
         {
           "task_id": 219235,
           "logistic_code": 1645,
-          "client_id": null,
+          "client_id": 87,
           "premium": false,
           "address": "Via Scaldasole, 4",
           "lat": "45.454291",
@@ -32,7 +33,7 @@
           "checkout_time": null,
           "pax_in": 1,
           "pax_out": 1,
-          "small_equipment": false,
+          "small_equipment": true,
           "operation_id": 2,
           "confirmed_operation": false,
           "straordinaria": false,
@@ -55,8 +56,8 @@
   ],
   "meta": {
     "total_cleaners": 1,
-    "used_cleaners": 0,
-    "assigned_tasks": 0,
+    "used_cleaners": 1,
+    "assigned_tasks": 1,
     "total_tasks": 1
   }
 }
