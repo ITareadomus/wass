@@ -399,6 +399,11 @@ export default function TaskCard({
         setEditingField(null);
         setIsModalOpen(false);
 
+        // CRITICAL: Marca la timeline come modificata (modifiche non salvate)
+        if ((window as any).setHasUnsavedChanges) {
+          (window as any).setHasUnsavedChanges(true);
+        }
+
         // Preserva lo stato acknowledged per il cleaner di destinazione
         if ((window as any).preserveAcknowledgedIncompatibleCleaners && (displayTask as any).assignedCleaner) {
           (window as any).preserveAcknowledgedIncompatibleCleaners((displayTask as any).assignedCleaner);
