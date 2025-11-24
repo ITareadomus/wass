@@ -299,7 +299,15 @@ def evaluate_route(cleaner: Cleaner, route: List[Task]) -> Tuple[bool, List[Tupl
             tt = 3.0 if same_street(cleaner.last_address, first.address) else 12.0
 
     arrival = work_start_min + tt
-    start = arrival
+    
+    # CRITICAL: Rispetta SEMPRE il checkout_time se presente
+    if hasattr(first, 'checkout_dt') and first.checkout_dt:
+        checkout_minutes = first.checkout_dt.hour * 60 + first.checkout_dt.minute
+        # Lo start_time è il MASSIMO tra arrivo e checkout
+        start = max(arrival, checkout_minutes)
+    else:
+        start = arrival
+    
     finish = start + first.cleaning_time
 
     # NUOVO: Check-in strict - deve finire prima del check-in
