@@ -1,3 +1,11 @@
 
-// Questo file è stato rimosso perché il progetto non utilizza alcun database.
-// Tutti i dati sono gestiti tramite file JSON in client/public/data/
+import { defineConfig } from "drizzle-kit";
+
+export default defineConfig({
+  schema: "./shared/schema.ts",
+  out: "./drizzle",
+  dialect: "postgresql",
+  dbCredentials: {
+    url: process.env.DATABASE_URL!,
+  },
+});

@@ -2,6 +2,7 @@ import { sql } from "drizzle-orm";
 import { pgTable, text, varchar, timestamp, integer } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
+import { pgTable, serial, integer, text, timestamp, boolean } from "drizzle-orm/pg-core";
 
 export const tasks = pgTable("tasks", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -121,3 +122,21 @@ export const timelineFileSchema = z.object({
 
 export type TimelineAssignment = z.infer<typeof timelineAssignmentSchema>;
 export type TimelineFile = z.infer<typeof timelineFileSchema>;
+
+export const housekeeping = pgTable("app_housekeeping", {
+  id: serial("id").primaryKey(),
+  structure_id: integer("structure_id"),
+  cleaned_by_us: integer("cleaned_by_us"),
+  sequence: integer("sequence"),
+  operation_id: integer("operation_id"),
+  checkin: timestamp("checkin"),
+  checkout: timestamp("checkout"),
+  checkin_time: text("checkin_time"),
+  checkout_time: text("checkout_time"),
+  checkin_pax: integer("checkin_pax"),
+  checkout_pax: integer("checkout_pax"),
+  updated_by: text("updated_by"),
+  updated_at: text("updated_at"),
+  deleted_at: timestamp("deleted_at"),
+  deleted_at_client: timestamp("deleted_at_client"),
+});
