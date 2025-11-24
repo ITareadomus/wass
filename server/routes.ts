@@ -2725,6 +2725,91 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Endpoint per trasferire assegnazioni su ADAM database
+  app.post("/api/transfer-to-adam", async (req, res) => {
+    try {
+      const { date, username } = req.body;
+      const workDate = date || format(new Date(), 'yyyy-MM-dd');
+      const currentUser = username || getCurrentUsername(req);
+
+      console.log(`🔄 Avvio trasferimento su ADAM per data ${workDate}...`);
+
+      const { spawn } = await import('child_process');
+      const scriptPath = path.join(process.cwd(), 'client/public/scripts/transfer_to_adam.py');
+
+      const pythonProcess = spawn('python3', [scriptPath, workDate, currentUser]);
+
+      let stdoutData = '';
+      pythonProcess.stdout.on('data', (data) => {
+        stdoutData += data.toString();
+        console.log(data.toString());
+      });
+
+      let stderrData = '';
+      pythonProcess.stderr.on('data', (data) => {
+        stderrData += data.toString();
+        console.error(`transfer_to_adam.py stderr: ${data}`);
+      });
+
+      pythonProcess.on('close', (code) => {
+        if (code !== 0) {
+          console.error(`transfer_to_adam.py exited with code ${code}`);
+          res.status(500).json({
+            success: false,
+            message: "Trasferimento ADAM fallito",
+            stderr: stderrData,
+            stdout: stdoutData
+          });
+          return;
+        }
+
+        try {
+          // Cerca l'ultimo JSON valido nell'output
+          const lines = stdoutData.split('\n');
+          let resultJson = null;
+
+          for (let i = lines.length - 1; i >= 0; i--) {
+            const line = lines[i].trim();
+            if (line.startsWith('{')) {
+              try {
+                resultJson = JSON.parse(line);
+                break;
+              } catch (e) {
+                continue;
+              }
+            }
+          }
+
+          if (resultJson) {
+            console.log("✅ Trasferimento ADAM completato");
+            res.json(resultJson);
+          } else {
+            console.log("⚠️ Nessun JSON trovato nell'output");
+            res.json({
+              success: true,
+              message: "Trasferimento completato",
+              output: stdoutData
+            });
+          }
+        } catch (parseError: any) {
+          console.error('Errore parsing output:', parseError);
+          res.json({
+            success: true,
+            message: "Trasferimento completato",
+            output: stdoutData
+          });
+        }
+      });
+
+    } catch (error: any) {
+      console.error("Errore nel trasferimento su ADAM:", error);
+      res.status(500).json({
+        success: false,
+        error: error.message
+      });
+    }
+  });
+
   // Endpoint per estrarre i dati
   app.post("/api/extract-data", async (req, res) => {
     try {
