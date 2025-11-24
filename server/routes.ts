@@ -10,6 +10,7 @@ import { format } from "date-fns";
 import { it } from "date-fns/locale";
 import { storageService } from "./services/storage-service";
 import * as workspaceFiles from "./services/workspace-files";
+import { utcToZonedTime, formatInTimeZone } from 'date-fns-tz';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -17,6 +18,7 @@ const execAsync = promisify(exec);
 
 // Costante bucket per Object Storage
 const BUCKET = "wass_assignments";
+const TIMEZONE = "Europe/Rome";
 
 // Directory per i dati di output (es. timeline.json, containers.json)
 const DATA_OUTPUT_DIR = path.join(process.cwd(), 'client/public/data/output');
@@ -28,6 +30,11 @@ function getCurrentUsername(req?: any): string {
   // Prova a ottenere username dalla sessione/header se disponibile
   // Per ora ritorna 'system' se non specificato
   return req?.body?.created_by || req?.body?.modified_by || 'system';
+}
+
+// Helper per ottenere il timestamp corrente nel fuso orario di Roma
+function getRomeTimestamp(): string {
+  return formatInTimeZone(new Date(), TIMEZONE, "yyyy-MM-dd'T'HH:mm:ss.SSSXXX");
 }
 
 // Utility: costruzione chiave file consistente
@@ -190,7 +197,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Svuota il file timeline.json con struttura corretta
       const emptyTimeline = {
         metadata: {
-          last_updated: new Date().toISOString(),
+          last_updated: getRomeTimestamp(),
           date: workDate,
           created_by: currentUsername
         },
@@ -348,7 +355,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const modifyingUser = req.body.modified_by || req.body.created_by || getCurrentUsername(req);
 
       timelineData.metadata = timelineData.metadata || {};
-      timelineData.metadata.last_updated = new Date().toISOString();
+      timelineData.metadata.last_updated = getRomeTimestamp();
       timelineData.metadata.date = workDate;
 
       // Preserva created_by se già esiste
@@ -521,7 +528,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const modifyingUser = modified_by || getCurrentUsername(req);
 
       timelineData.metadata = timelineData.metadata || {};
-      timelineData.metadata.last_updated = new Date().toISOString();
+      timelineData.metadata.last_updated = getRomeTimestamp();
       timelineData.metadata.date = workDate;
 
       // Preserva created_by se già esiste
@@ -659,11 +666,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
           meta: {
             total_cleaners: 0,
             total_tasks: 0,
-            last_updated: new Date().toISOString()
+            last_updated: getRomeTimestamp()
           },
           metadata: {
             date: workDate,
-            last_updated: new Date().toISOString(),
+            last_updated: getRomeTimestamp(),
             created_by: currentUsername,
             modified_by: []
           }
@@ -687,7 +694,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         timelineData.meta = {
           total_cleaners: 0,
           total_tasks: 0,
-          last_updated: new Date().toISOString()
+          last_updated: getRomeTimestamp()
         };
       }
 
@@ -821,16 +828,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Aggiorna metadata e meta, preservando created_by e aggiornando modified_by
+      const modifyingUser = req.body.modified_by || req.body.created_by || currentUsername;
+
       timelineData.metadata = timelineData.metadata || {};
-      timelineData.metadata.last_updated = new Date().toISOString();
+      timelineData.metadata.last_updated = getRomeTimestamp();
       timelineData.metadata.date = workDate;
 
       // Ottieni username corretto dalla richiesta
-      const modifyingUser = req.body.modified_by || req.body.created_by || currentUsername;
+      const modifyingUserReal = req.body.modified_by || req.body.created_by || currentUsername;
 
       // Preserva created_by se già esiste, altrimenti usa l'utente corrente
       if (!timelineData.metadata.created_by) {
-        timelineData.metadata.created_by = modifyingUser;
+        timelineData.metadata.created_by = modifyingUserReal;
       }
 
       // Aggiorna modified_by array solo se l'utente non è 'system' o 'unknown'
@@ -839,8 +848,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       timelineData.metadata.modified_by = timelineData.metadata.modified_by.filter((user: string) => 
         user !== 'system' && user !== 'unknown'
       );
-      if (modifyingUser && modifyingUser !== 'system' && modifyingUser !== 'unknown' && !timelineData.metadata.modified_by.includes(modifyingUser)) {
-        timelineData.metadata.modified_by.push(modifyingUser);
+      if (modifyingUserReal && modifyingUserReal !== 'system' && modifyingUserReal !== 'unknown' && !timelineData.metadata.modified_by.includes(modifyingUserReal)) {
+        timelineData.metadata.modified_by.push(modifyingUserReal);
       }
 
       timelineData.meta.total_cleaners = timelineData.cleaners_assignments.length;
@@ -925,8 +934,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         assignmentsData = {
           cleaners_assignments: [],
           current_date: workDate,
-          meta: { total_cleaners: 0, total_tasks: 0, last_updated: new Date().toISOString() },
-          metadata: { date: workDate, last_updated: new Date().toISOString() }
+          meta: { total_cleaners: 0, total_tasks: 0, last_updated: getRomeTimestamp() },
+          metadata: { date: workDate, last_updated: getRomeTimestamp() }
         };
       }
 
@@ -956,7 +965,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const modifyingUser = req.body.modified_by || req.body.created_by || currentUsername;
 
       assignmentsData.metadata = assignmentsData.metadata || {};
-      assignmentsData.metadata.last_updated = new Date().toISOString();
+      assignmentsData.metadata.last_updated = getRomeTimestamp();
       assignmentsData.metadata.date = workDate;
 
       // Preserva created_by se già esiste
@@ -1122,7 +1131,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Prepara i dati per il salvataggio
       const dataToSave = {
         metadata: {
-          last_updated: new Date().toISOString(),
+          last_updated: getRomeTimestamp(),
           date: workDate,
           created_by: existingTimeline?.metadata?.created_by || username,
           modified_by: modifiedBy
@@ -1170,7 +1179,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Aggiorna metadata se esiste o crealo
       selectedCleanersData.metadata = selectedCleanersData.metadata || {};
       selectedCleanersData.metadata.date = workDate;
-      selectedCleanersData.metadata.saved_at = new Date().toISOString();
+      selectedCleanersData.metadata.saved_at = getRomeTimestamp();
 
       // Costruisci chiave per selected_cleaners
       const dateObj = new Date(workDate);
@@ -1239,7 +1248,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Questo permette di caricare file salvati anche se la data interna non corrisponde
       savedData.metadata = savedData.metadata || {};
       savedData.metadata.date = workDate;
-      savedData.metadata.last_updated = new Date().toISOString();
+      savedData.metadata.last_updated = getRomeTimestamp();
 
       // Preserva created_by se esiste, altrimenti usa 'loaded_from_storage'
       if (!savedData.metadata.created_by) {
@@ -1291,7 +1300,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
             scData.metadata = scData.metadata || {};
             scData.metadata.date = workDate;
-            scData.metadata.loaded_at = new Date().toISOString();
+            scData.metadata.loaded_at = getRomeTimestamp();
 
             // Salva backup in memoria per ripristino post-create_containers
             selectedCleanersBackup = scData;
@@ -1305,7 +1314,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             const emptySelected = {
               cleaners: [],
               total_selected: 0,
-              metadata: { date: workDate, reset_at: new Date().toISOString() }
+              metadata: { date: workDate, reset_at: getRomeTimestamp() }
             };
 
             const tmpScPath = `${selectedCleanersPath}.tmp`;
@@ -1513,7 +1522,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         // Aggiorna metadata
         timelineData.metadata = timelineData.metadata || {};
-        timelineData.metadata.last_updated = new Date().toISOString();
+        timelineData.metadata.last_updated = getRomeTimestamp();
         timelineData.metadata.date = workDate;
         timelineData.meta = timelineData.meta || {};
         timelineData.meta.total_cleaners = timelineData.cleaners_assignments.length;
@@ -1601,7 +1610,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         total_selected: total_selected || enrichedCleaners.length,
         metadata: {
           date: workDate,
-          saved_at: new Date().toISOString()
+          saved_at: getRomeTimestamp()
         }
       };
 
@@ -1690,8 +1699,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let timelineData: any = {
         cleaners_assignments: [],
         current_date: workDate,
-        meta: { total_cleaners: 0, total_tasks: 0, last_updated: new Date().toISOString() },
-        metadata: { last_updated: new Date().toISOString(), date: workDate }
+        meta: { total_cleaners: 0, total_tasks: 0, last_updated: getRomeTimestamp() },
+        metadata: { last_updated: getRomeTimestamp(), date: workDate }
       };
 
       try {
@@ -1764,7 +1773,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Aggiorna metadata timeline
       timelineData.metadata = timelineData.metadata || {};
-      timelineData.metadata.last_updated = new Date().toISOString();
+      timelineData.metadata.last_updated = getRomeTimestamp();
       timelineData.metadata.date = workDate;
       timelineData.meta.total_cleaners = timelineData.cleaners_assignments.length;
       timelineData.meta.total_tasks = timelineData.cleaners_assignments.reduce(
@@ -2078,7 +2087,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Se il file non esiste, crealo
         aliasesData = {
           metadata: {
-            last_updated: new Date().toISOString(),
+            last_updated: getRomeTimestamp(),
             description: "Alias personalizzati per i cleaners da visualizzare sulla timeline"
           },
           aliases: {}
@@ -2110,7 +2119,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       };
 
       // Aggiorna metadata
-      aliasesData.metadata.last_updated = new Date().toISOString();
+      aliasesData.metadata.last_updated = getRomeTimestamp();
 
       // Salva il file
       const tmpPath = `${aliasesPath}.tmp`;
@@ -2836,7 +2845,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (existingTimeline.metadata?.date !== date) {
           console.log(`🔄 Timeline esiste per data ${existingTimeline.metadata?.date}, aggiorno metadata.date a ${date}`);
           existingTimeline.metadata.date = date;
-          existingTimeline.metadata.last_updated = new Date().toISOString();
+          existingTimeline.metadata.last_updated = getRomeTimestamp();
           // Mantieni created_by se esiste
           if (!existingTimeline.metadata.created_by) {
             existingTimeline.metadata.created_by = createdBy;
@@ -2850,7 +2859,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.log(`📝 Timeline.json non esiste o corrotto, creazione nuova per ${date}`);
         const emptyTimeline = {
           metadata: {
-            last_updated: new Date().toISOString(),
+            last_updated: getRomeTimestamp(),
             date: date,
             created_by: createdBy
           },
@@ -2992,8 +3001,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Endpoint per salvare le finestre temporali clienti
-  app.post("/api/save-client-timewindows", async (req, res) => {
+  // Endpoint per salvare i clienti attivi
+  app.post("/api/save-client-windows", async (req, res) => {
     try {
       const clientTimeWindowsData = req.body;
       const clientTimeWindowsPath = path.join(process.cwd(), "client/public/data/input/client_timewindows.json");
@@ -3423,7 +3432,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Aggiorna metadata
       timelineData.metadata = timelineData.metadata || {};
-      timelineData.metadata.last_updated = new Date().toISOString();
+      timelineData.metadata.last_updated = getRomeTimestamp();
       const workDate = req.body.date || format(new Date(), 'yyyy-MM-dd'); // Usa la data della richiesta
       timelineData.metadata.date = workDate;
 
@@ -3512,7 +3521,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const modifyingUser = req.body.modified_by || req.body.created_by || getCurrentUsername(req);
 
       timelineData.metadata = timelineData.metadata || {};
-      timelineData.metadata.last_updated = new Date().toISOString();
+      timelineData.metadata.last_updated = getRomeTimestamp();
       timelineData.metadata.date = workDate;
 
       // Preserva created_by se già esiste
@@ -3572,7 +3581,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Se il file non esiste, crea la struttura base
         aliasesData = {
           metadata: {
-            last_updated: new Date().toISOString(),
+            last_updated: getRomeTimestamp(),
             description: "Alias personalizzati per i cleaners da visualizzare sulla timeline"
           },
           aliases: {}
@@ -3605,7 +3614,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       };
 
       // Aggiorna metadata
-      aliasesData.metadata.last_updated = new Date().toISOString();
+      aliasesData.metadata.last_updated = getRomeTimestamp();
 
       // Salva il file
       const tmpPath = `${aliasesPath}.tmp`;
