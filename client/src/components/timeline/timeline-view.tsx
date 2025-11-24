@@ -1590,7 +1590,7 @@ export default function TimelineView({
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
-                          date: format(currentDate, 'yyyy-MM-dd'),
+                          date: workDate,
                           username: 'system'
                         }),
                         signal: controller.signal
