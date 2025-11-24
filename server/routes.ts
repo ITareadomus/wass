@@ -1198,6 +1198,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const minutes = String(now.getMinutes()).padStart(2, '0');
       const formattedDateTime = `${day}/${month}/${year} alle ${hours}:${minutes}`;
 
+      // Esegui lo script Python per aggiornare il database MySQL
+      console.log("🔄 Esecuzione script update_db_from_timeline.py...");
+      try {
+        const scriptPath = path.join(process.cwd(), 'client/public/scripts/update_db_from_timeline.py');
+        const { stdout: scriptOutput, stderr: scriptError } = await execAsync(`python3 "${scriptPath}"`, {
+          maxBuffer: 1024 * 1024 * 10
+        });
+
+        if (scriptError && !scriptError.includes('Browserslist')) {
+          console.error("⚠️ Warning da update_db_from_timeline.py:", scriptError);
+        }
+
+        console.log("✅ Script update_db_from_timeline.py eseguito:");
+        console.log(scriptOutput);
+      } catch (scriptErr: any) {
+        console.error("❌ Errore esecuzione update_db_from_timeline.py:", scriptErr);
+        // Non blocchiamo la risposta anche se lo script fallisce
+        // Il salvataggio in Object Storage è già avvenuto con successo
+      }
+
       res.json({
         success: true,
         filename: key,
