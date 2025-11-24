@@ -239,7 +239,46 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log(`✅ Reset completato - selected_cleaners.json NON modificato (rimane invariato)`);
       // === END ===
 
-      res.json({ success: true, message: "Timeline resettata con successo" });
+      // CRITICAL: Dopo reset timeline, aggiorna il DB per rimuovere le assegnazioni
+      console.log(`🔄 Aggiornamento database MySQL dopo reset...`);
+      try {
+        const { spawn } = await import('child_process');
+        const updateDbScript = spawn('python3', [
+          path.join(process.cwd(), 'client/public/scripts/update_db_from_timeline.py')
+        ]);
+
+        let dbOutput = '';
+        let dbError = '';
+
+        updateDbScript.stdout.on('data', (data: Buffer) => {
+          const output = data.toString();
+          dbOutput += output;
+          console.log(output.trim());
+        });
+
+        updateDbScript.stderr.on('data', (data: Buffer) => {
+          const error = data.toString();
+          dbError += error;
+          console.error(error.trim());
+        });
+
+        await new Promise<void>((resolve, reject) => {
+          updateDbScript.on('close', (code: number) => {
+            if (code === 0) {
+              console.log(`✅ Database MySQL aggiornato dopo reset`);
+              resolve();
+            } else {
+              console.error(`❌ Errore aggiornamento DB (exit code ${code}):`, dbError);
+              reject(new Error(`Script update_db_from_timeline.py failed with code ${code}`));
+            }
+          });
+        });
+      } catch (dbUpdateError: any) {
+        console.error(`⚠️ Errore durante aggiornamento DB:`, dbUpdateError);
+        // Non bloccare il reset anche se l'aggiornamento DB fallisce
+      }
+
+      res.json({ success: true, message: "Timeline resettata con successo e DB aggiornato" });
     } catch (error: any) {
       console.error("Errore nel reset della timeline:", error);
       res.status(500).json({ success: false, error: error.message });
