@@ -1583,14 +1583,24 @@ export default function TimelineView({
                         variant: "default",
                       });
 
+                      const controller = new AbortController();
+                      const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 secondi timeout
+
                       const response = await fetch('/api/transfer-to-adam', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
                           date: format(currentDate, 'yyyy-MM-dd'),
                           username: 'system'
-                        })
+                        }),
+                        signal: controller.signal
                       });
+
+                      clearTimeout(timeoutId);
+
+                      if (!response.ok) {
+                        throw new Error(`Server error: ${response.status} ${response.statusText}`);
+                      }
 
                       const result = await response.json();
 
@@ -1598,7 +1608,6 @@ export default function TimelineView({
                         toast({
                           title: "✅ Trasferimento completato",
                           description: result.message || `Task aggiornate sul database ADAM`,
-                          variant: "success",
                         });
                       } else {
                         toast({
@@ -1607,11 +1616,19 @@ export default function TimelineView({
                           variant: "destructive",
                         });
                       }
-                    } catch (error) {
+                    } catch (error: any) {
                       console.error('Errore trasferimento ADAM:', error);
+                      let errorMessage = "Impossibile comunicare con il server";
+                      
+                      if (error.name === 'AbortError') {
+                        errorMessage = "Timeout: il server impiega troppo tempo a rispondere";
+                      } else if (error.message) {
+                        errorMessage = error.message;
+                      }
+                      
                       toast({
-                        title: "❌ Errore",
-                        description: "Impossibile comunicare con il server",
+                        title: "❌ Errore connessione",
+                        description: errorMessage,
                         variant: "destructive",
                       });
                     }
