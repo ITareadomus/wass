@@ -132,9 +132,10 @@ def main():
     print(f"✅ Statistiche estratte: {task_stats}")
 
     # Crea output
+    from zoneinfo import ZoneInfo
     output = {
         "metadata": {
-            "last_updated": datetime.now().isoformat(),
+            "last_updated": datetime.now(ZoneInfo("Europe/Rome")).isoformat(),
             "date": selected_date
         },
         "task_stats": task_stats

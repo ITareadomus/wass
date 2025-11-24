@@ -1,10 +1,11 @@
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-from __future__ import annotations
 import json, math
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Tuple
 from pathlib import Path
 from datetime import datetime
+from zoneinfo import ZoneInfo
 from task_validation import can_cleaner_handle_task, can_cleaner_handle_apartment, can_cleaner_handle_priority
 from assign_utils import (
     NEARBY_TRAVEL_THRESHOLD, NEW_CLEANER_PENALTY_MIN, NEW_TRAINER_PENALTY_MIN,
@@ -508,7 +509,7 @@ def load_tasks() -> List[Task]:
         checkin_time = t.get("checkin_time")
         if checkin_date and checkin_time:
             try:
-                checkin_dt = datetime.strptime(f"{checkin_date} {checkin_time}", "%Y-%m-%d %H:%M")
+                checkin_dt = datetime.strptime(f"{checkin_date} {checkin_time}", "%Y-%m-%d %H:%M").replace(tzinfo=ZoneInfo("Europe/Rome"))
             except:
                 pass
 
@@ -516,7 +517,7 @@ def load_tasks() -> List[Task]:
         checkout_time = t.get("checkout_time")
         if checkout_date and checkout_time:
             try:
-                checkout_dt = datetime.strptime(f"{checkout_date} {checkout_time}", "%Y-%m-%d %H:%M")
+                checkout_dt = datetime.strptime(f"{checkout_date} {checkout_time}", "%Y-%m-%d %H:%M").replace(tzinfo=ZoneInfo("Europe/Rome"))
             except:
                 pass
 
@@ -911,7 +912,7 @@ def main():
     # Carica timeline esistente o crea nuova struttura
     timeline_data = {
         "metadata": {
-            "last_updated": dt.now().isoformat(),
+            "last_updated": dt.now(ZoneInfo("Europe/Rome")).isoformat(),
             "date": ref_date
         },
         "cleaners_assignments": [],
@@ -955,6 +956,7 @@ def main():
     total_assigned_tasks = sum(len(c["tasks"]) for c in timeline_data["cleaners_assignments"])
 
     # Salva timeline.json
+    timeline_data["metadata"]["last_updated"] = dt.now(ZoneInfo("Europe/Rome")).isoformat()
     timeline_data["meta"] = {
         "total_cleaners": total_available_cleaners,
         "used_cleaners": used_cleaners_count,
