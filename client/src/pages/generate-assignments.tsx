@@ -1039,9 +1039,7 @@ export default function GenerateAssignments() {
       if (result.success) {
         // CRITICAL: Marca modifiche dopo assegnazione automatica
         setHasUnsavedChanges(true);
-        if (onTaskMoved) {
-          onTaskMoved();
-        }
+        handleTaskMoved();
 
         toast({
           title: "Early Out Assegnati!",
@@ -1106,9 +1104,7 @@ export default function GenerateAssignments() {
       if (result.success) {
         // CRITICAL: Marca modifiche dopo assegnazione automatica
         setHasUnsavedChanges(true);
-        if (onTaskMoved) {
-          onTaskMoved();
-        }
+        handleTaskMoved();
 
         toast({
           title: "High Priority Assegnati!",
@@ -1177,9 +1173,7 @@ export default function GenerateAssignments() {
       if (result.success) {
         // CRITICAL: Marca modifiche dopo assegnazione automatica
         setHasUnsavedChanges(true);
-        if (onTaskMoved) {
-          onTaskMoved();
-        }
+        handleTaskMoved();
 
         toast({
           title: "Low Priority Assegnati!",
