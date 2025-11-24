@@ -1,51 +1,50 @@
 {
   "metadata": {
-    "last_updated": "2025-11-24T09:34:33.875718",
-    "date": "2025-11-24",
-    "created_by": "unknown",
+    "last_updated": "2025-11-24T09:44:42.877Z",
+    "date": "2025-11-25",
+    "created_by": "Admin",
     "modified_by": [
-      "Admin",
-      "system"
+      "Admin"
     ]
   },
   "cleaners_assignments": [
     {
       "cleaner": {
-        "id": 24,
-        "name": "HUSSAIN",
-        "lastname": "SYED SHUJIAHAT",
-        "role": "Standard",
+        "id": 626,
+        "name": "DORA PATRICIA",
+        "lastname": "JIMENEZ",
+        "role": "Formatore",
         "premium": false
       },
       "tasks": [
         {
-          "task_id": 219346,
-          "logistic_code": 1691,
-          "client_id": 123,
+          "task_id": 219235,
+          "logistic_code": 1645,
+          "client_id": null,
           "premium": false,
-          "address": "VIALE NAZARIO SAURO 5",
-          "lat": "45.491443",
-          "lng": "9.1965573",
-          "cleaning_time": 90,
-          "checkin_date": "2025-11-24",
-          "checkout_date": "2025-11-24",
-          "checkin_time": "15:00",
+          "address": "Via Scaldasole, 4",
+          "lat": "45.454291",
+          "lng": "9.1800519",
+          "cleaning_time": 60,
+          "checkin_date": "2025-11-25",
+          "checkout_date": "2025-11-25",
+          "checkin_time": null,
           "checkout_time": null,
-          "pax_in": 3,
-          "pax_out": 0,
+          "pax_in": 1,
+          "pax_out": 1,
           "small_equipment": false,
           "operation_id": 2,
-          "confirmed_operation": true,
+          "confirmed_operation": false,
           "straordinaria": false,
-          "type_apt": "B",
-          "alias": "YHST",
-          "customer_name": "YOUHOSTY",
+          "type_apt": "A",
+          "alias": "HCC",
+          "customer_name": "HACCA SRL",
           "reasons": [
             "manually_moved_to_timeline"
           ],
-          "priority": "high_priority",
+          "priority": "early_out",
           "start_time": "10:00",
-          "end_time": "11:30",
+          "end_time": "11:00",
           "followup": false,
           "sequence": 1,
           "travel_time": 0,
@@ -56,8 +55,8 @@
   ],
   "meta": {
     "total_cleaners": 1,
-    "used_cleaners": 1,
-    "assigned_tasks": 1,
+    "used_cleaners": 0,
+    "assigned_tasks": 0,
     "total_tasks": 1
   }
 }
