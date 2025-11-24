@@ -65,13 +65,26 @@ def transfer_to_adam(work_date: str, username: str = "system"):
     
     # Connessione al database
     try:
-        connection = mysql.connector.connect(**DB_CONFIG)
+        connection = mysql.connector.connect(
+            **DB_CONFIG,
+            connect_timeout=10,
+            autocommit=False
+        )
         cursor = connection.cursor()
-    except Exception as e:
-        print(f"❌ Errore connessione database: {e}")
+        print("✅ Connessione al database stabilita")
+    except mysql.connector.Error as e:
+        error_msg = f"Errore connessione database MySQL: {e}"
+        print(f"❌ {error_msg}")
         return {
             "success": False,
-            "message": f"Errore connessione database: {e}"
+            "message": error_msg
+        }
+    except Exception as e:
+        error_msg = f"Errore connessione database: {e}"
+        print(f"❌ {error_msg}")
+        return {
+            "success": False,
+            "message": error_msg
         }
     
     total_updated = 0
