@@ -10,6 +10,16 @@ import { format } from "date-fns";
 import { it } from "date-fns/locale";
 import { storageService } from "./services/storage-service";
 import * as workspaceFiles from "./services/workspace-files";
+import { drizzle } from "drizzle-orm/node-postgres";
+import { Pool } from "pg";
+import { housekeeping } from "../shared/schema";
+import { eq, and, isNull } from "drizzle-orm";
+
+// Inizializza connessione database
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+});
+const db = drizzle(pool);
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
