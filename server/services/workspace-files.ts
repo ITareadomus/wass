@@ -4,10 +4,10 @@ import { storageService } from './storage-service';
 
 /**
  * Workspace Files Helper
- * 
+ *
  * Centralizes read/write operations for timeline.json, containers.json, and selected_cleaners.json
  * Implements hybrid storage: filesystem (for local dev) + Object Storage (for production persistence)
- * 
+ *
  * Read strategy: Try filesystem first, fallback to Object Storage
  * Write strategy: Write to filesystem AND Object Storage (dual write for persistence)
  */
@@ -58,26 +58,46 @@ export async function loadTimeline(workDate: string): Promise<any | null> {
 
       console.log(`✅ Timeline loaded from filesystem for ${workDate}`);
       return parsed;
+    } else {
+        console.warn(`⚠️ Timeline from filesystem has invalid structure for ${workDate}, trying Object Storage.`);
     }
   } catch (err) {
     // Filesystem read failed, try Object Storage
+    console.log(`Timeline file not found or corrupted locally for ${workDate}, trying Object Storage.`);
   }
 
   // Fallback to Object Storage
   try {
     const storageData = await storageService.getWorkspaceTimeline(workDate);
     if (storageData) {
-      console.log(`✅ Timeline loaded from Object Storage for ${workDate}`);
-      // Write to filesystem for subsequent reads
-      await atomicWriteJson(PATHS.timeline, storageData);
-      return storageData;
+      // CRITICAL: Valida la struttura prima di restituire
+      if (storageData.metadata && Array.isArray(storageData.cleaners_assignments)) {
+        console.log(`✅ Timeline loaded from Object Storage for ${workDate}`);
+        // Write to filesystem for subsequent reads
+        await atomicWriteJson(PATHS.timeline, storageData);
+        return storageData;
+      } else {
+        console.warn(`⚠️ Timeline from Object Storage is corrupted for ${workDate}, trying filesystem (as fallback).`);
+      }
     }
   } catch (err) {
     console.error(`Error loading timeline from Object Storage:`, err);
   }
 
-  console.log(`ℹ️ No timeline found for ${workDate}`);
-  return null;
+  // If both failed or Object Storage was corrupted, attempt recovery from filesystem
+  try {
+    const data = await fs.readFile(PATHS.timeline, 'utf-8');
+     // CRITICAL: Verifica che sia JSON valido
+     if (!data.trim().startsWith('{')) {
+        throw new Error('File corrupted: not valid JSON');
+      }
+    const parsed = JSON.parse(data);
+    console.error(`❌ Timeline corrupted in filesystem, attempting to recover.`);
+    return createRecoveryTimeline(workDate);
+  } catch (err) {
+     console.log(`Timeline file not found or corrupted locally for ${workDate}, creating recovery version.`);
+     return createRecoveryTimeline(workDate);
+  }
 }
 
 /**
@@ -257,4 +277,26 @@ export async function saveSelectedCleaners(workDate: string, data: any): Promise
  */
 export function getFilePaths() {
   return { ...PATHS };
+}
+
+/**
+ * Creates a recovery timeline with default values.
+ */
+function createRecoveryTimeline(date: string): any {
+  console.log(`🔧 Creating recovery timeline for ${date}`);
+  return {
+    metadata: {
+      last_updated: new Date().toISOString(),
+      date: date,
+      created_by: 'system_recovery',
+      modified_by: ['system_recovery']
+    },
+    cleaners_assignments: [],
+    meta: {
+      total_cleaners: 0,
+      used_cleaners: 0,
+      assigned_tasks: 0,
+      total_tasks: 0
+    }
+  };
 }
