@@ -95,12 +95,12 @@ def main():
                     SET 
                         cleaned_by_us = %s,
                         sequence = %s,
-                        checkout_date = %s,
+                        checkout = %s,
                         checkout_time = %s,
-                        checkin_date = %s,
+                        checkin = %s,
                         checkin_time = %s,
                         cleaning_time = %s,
-                        pax_in = %s,
+                        checkin_pax = %s,
                         operation_id = %s,
                         updated_by = %s,
                         updated_at = %s
@@ -110,12 +110,12 @@ def main():
                 cursor.execute(query, (
                     cleaner_id,
                     sequence,
-                    task.get("checkout_date"),
+                    task.get("checkout_date"),  # Timeline usa checkout_date ma DB usa checkout
                     task.get("checkout_time"),
-                    task.get("checkin_date"),
+                    task.get("checkin_date"),   # Timeline usa checkin_date ma DB usa checkin
                     task.get("checkin_time"),
                     task.get("cleaning_time"),
-                    task.get("pax_in"),
+                    task.get("pax_in"),         # Timeline usa pax_in ma DB usa checkin_pax
                     task.get("operation_id"),
                     updated_by,
                     timestamp_roma,
