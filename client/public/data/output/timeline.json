@@ -1,7 +1,7 @@
 {
   "metadata": {
-    "last_updated": "2025-11-24T16:26:52.097456",
-    "date": "2025-11-25",
+    "last_updated": "2025-11-24T16:27:49.881Z",
+    "date": "2025-11-24",
     "created_by": "Admin",
     "modified_by": [
       "Admin",
@@ -735,9 +735,9 @@
           "lng": "9.2067142",
           "cleaning_time": 150,
           "checkin_date": "2025-11-25",
-          "checkout_date": "2025-11-25",
-          "checkin_time": null,
-          "checkout_time": null,
+          "checkout_date": "2025-11-24",
+          "checkin_time": "",
+          "checkout_time": "",
           "pax_in": 3,
           "pax_out": 2,
           "small_equipment": false,
