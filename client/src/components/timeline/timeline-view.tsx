@@ -1575,12 +1575,46 @@ export default function TimelineView({
                   </Button>
                 )}
                 <Button
-                  onClick={() => {
-                    toast({
-                      title: "Trasferimento ADAM",
-                      description: "Funzionalità in fase di implementazione",
-                      variant: "default",
-                    });
+                  onClick={async () => {
+                    try {
+                      toast({
+                        title: "Trasferimento in corso...",
+                        description: "Invio dati al database ADAM",
+                        variant: "default",
+                      });
+
+                      const response = await fetch('/api/transfer-to-adam', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                          date: format(currentDate, 'yyyy-MM-dd'),
+                          username: 'system'
+                        })
+                      });
+
+                      const result = await response.json();
+
+                      if (result.success) {
+                        toast({
+                          title: "✅ Trasferimento completato",
+                          description: result.message || `Task aggiornate sul database ADAM`,
+                          variant: "success",
+                        });
+                      } else {
+                        toast({
+                          title: "❌ Errore trasferimento",
+                          description: result.message || "Errore durante il trasferimento",
+                          variant: "destructive",
+                        });
+                      }
+                    } catch (error) {
+                      console.error('Errore trasferimento ADAM:', error);
+                      toast({
+                        title: "❌ Errore",
+                        description: "Impossibile comunicare con il server",
+                        variant: "destructive",
+                      });
+                    }
                   }}
                   size="sm"
                   variant="outline"
