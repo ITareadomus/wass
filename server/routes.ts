@@ -35,10 +35,10 @@ function buildKey(isoDate: string) {
   const d = new Date(isoDate);
   const day = String(d.getDate()).padStart(2, "0");
   const month = String(d.getMonth() + 1).padStart(2, "0");
-  const fullYear = String(d.getFullYear());
-  const year = fullYear.slice(-2);
-  const folder = `${day}-${month}-${fullYear}`;
-  const filename = `assignments_${day}${month}${year}.json`;
+  const year = String(d.getFullYear());
+  const shortYear = year.slice(-2);
+  const folder = `${day}-${month}-${year}`;
+  const filename = `assignments_${day}${month}${shortYear}.json`;
   return { key: `${folder}/${filename}`, d };
 }
 
