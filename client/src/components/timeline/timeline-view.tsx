@@ -547,16 +547,16 @@ export default function TimelineView({
             const tasksInfo = incompatibleTasks.map(task => {
               const taskType = task.straordinaria ? 'Straordinaria' : task.premium ? 'Premium' : 'Standard';
               const aptType = (task as any).apt_type || (task as any).aptType || (task as any).type_apt || '';
-              
+
               // Determina priorità
               const isEarlyOut = Boolean((task as any).early_out || (task as any).earlyOut || (task as any).is_early_out);
               const isHighPriority = Boolean((task as any).high_priority || (task as any).highPriority || (task as any).is_high_priority);
               const priority = isEarlyOut ? 'EO' : isHighPriority ? 'HP' : 'LP';
-              
+
               let fullType = taskType;
               if (aptType) fullType += ` (Tipo ${aptType})`;
               fullType += ` [${priority}]`;
-              
+
               return {
                 logisticCode: task.name,
                 taskType: fullType
@@ -1095,7 +1095,7 @@ export default function TimelineView({
 
     // Mostra toast SEMPRE per incompatibilità, resettando i toast mostrati ad ogni cambio
     shownToastsRef.current.clear();
-    
+
     if (incompatibleAssignments.length > 0) {
       incompatibleAssignments.forEach(assignment => {
         // Crea una chiave univoca per questo toast
@@ -1386,11 +1386,11 @@ export default function TimelineView({
                               // Ore dispari (11:00, 13:00, 15:00, 17:00, 19:00) = idx 1, 3, 5, 7, 9
                               const isEvenHour = idx % 2 === 0;
                               return (
-                                <div 
-                                  key={idx} 
+                                <div
+                                  key={idx}
                                   className={`border-r border-border ${
-                                    isEvenHour 
-                                      ? 'bg-blue-50/30 dark:bg-blue-950/10' 
+                                    isEvenHour
+                                      ? 'bg-blue-50/30 dark:bg-blue-950/10'
                                       : 'bg-sky-100/30 dark:bg-sky-900/10'
                                   }`}
                                 ></div>
@@ -1574,6 +1574,23 @@ export default function TimelineView({
                     📜 Sei in modalità storico
                   </Button>
                 )}
+                <Button
+                  onClick={() => {
+                    toast({
+                      title: "Trasferimento ADAM",
+                      description: "Funzionalità in fase di implementazione",
+                      variant: "default",
+                    });
+                  }}
+                  size="sm"
+                  variant="outline"
+                  className="ml-2 border-2 border-custom-blue"
+                >
+                  <svg className="mr-2 h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                  </svg>
+                  Trasferisci su ADAM
+                </Button>
               </div>
             </div>
           </div>
@@ -1654,7 +1671,7 @@ export default function TimelineView({
 
       {/* Alias Edit Dialog */}
       <Dialog open={aliasDialog.open} onOpenChange={(open) => !open && setAliasDialog({ open: false, cleanerId: null, cleanerName: '' })}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Pencil className="w-5 h-5 text-custom-blue" />
