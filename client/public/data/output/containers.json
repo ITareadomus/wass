@@ -1,6 +1,6 @@
 {
   "metadata": {
-    "last_updated": "2025-11-24T08:11:26.506219",
+    "last_updated": "2025-11-24T08:25:07.706482",
     "date": "2025-11-24"
   },
   "containers": {
@@ -9,75 +9,18 @@
       "count": 0
     },
     "high_priority": {
-      "tasks": [
-        {
-          "task_id": 219309,
-          "logistic_code": 298,
-          "client_id": 3,
-          "premium": true,
-          "address": "STRADA DELLA CARITA', 2",
-          "lat": "45.4493742",
-          "lng": "9.2075671",
-          "cleaning_time": 150,
-          "checkin_date": "2025-11-24",
-          "checkout_date": "2025-11-24",
-          "checkin_time": "10:00",
-          "checkout_time": null,
-          "pax_in": 4,
-          "pax_out": 4,
-          "small_equipment": false,
-          "operation_id": 2,
-          "confirmed_operation": true,
-          "straordinaria": false,
-          "type_apt": "C",
-          "alias": "TBR",
-          "customer_name": "THE BEST RENT S.r.l.",
-          "reasons": [
-            "premium"
-          ],
-          "priority": "high_priority"
-        }
-      ],
-      "count": 1
+      "tasks": [],
+      "count": 0
     },
     "low_priority": {
-      "tasks": [
-        {
-          "task_id": 219311,
-          "logistic_code": 546,
-          "client_id": 3,
-          "premium": false,
-          "address": "VIA LECCO, 7",
-          "lat": "45.4771138",
-          "lng": "9.2041637",
-          "cleaning_time": 120,
-          "checkin_date": "2025-11-28",
-          "checkout_date": "2025-11-24",
-          "checkin_time": "11:00",
-          "checkout_time": null,
-          "pax_in": 2,
-          "pax_out": 1,
-          "small_equipment": false,
-          "operation_id": 2,
-          "confirmed_operation": true,
-          "straordinaria": false,
-          "type_apt": "B",
-          "alias": "TBR",
-          "customer_name": "THE BEST RENT S.r.l.",
-          "priority": "low_priority",
-          "reasons": [
-            "not_eo",
-            "not_hp"
-          ]
-        }
-      ],
-      "count": 1
+      "tasks": [],
+      "count": 0
     }
   },
   "summary": {
-    "total_tasks": 2,
+    "total_tasks": 0,
     "early_out": 0,
-    "high_priority": 1,
-    "low_priority": 1
+    "high_priority": 0,
+    "low_priority": 0
   }
 }
