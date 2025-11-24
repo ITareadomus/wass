@@ -6,7 +6,6 @@ from datetime import datetime, date, timedelta
 from pathlib import Path
 import argparse
 import subprocess
-from zoneinfo import ZoneInfo
 
 # ---------- Config ----------
 BASE_DIR = Path(__file__).parent.parent / "data"
@@ -99,15 +98,19 @@ def get_operation_names(operation_ids):
     return operation_names
 
 def save_operations_to_file(operation_ids):
+    # Recupera i nomi delle operazioni
+    operation_names = get_operation_names(operation_ids)
+
     operations_data = {
         "timestamp": datetime.now().isoformat(),
-        "active_operations": operation_ids,
-        "total_operations": len(operation_ids)
+        "active_operation_ids": operation_ids,
+        "total_operations": len(operation_ids),
+        "operation_names": operation_names
     }
     ops_file = INPUT_DIR / "operations.json"
     with open(ops_file, "w", encoding="utf-8") as f:
         json.dump(operations_data, f, indent=4, ensure_ascii=False)
-    print(f"Salvati {len(operation_ids)} operation_id validi in {ops_file}")
+    print(f"Salvati {len(operation_ids)} operation_id validi con nomi in {ops_file}")
 
 # ---------- Estrazione task dal DB ----------
 def get_tasks_from_db(selected_date, assigned_task_ids=None):
@@ -518,7 +521,7 @@ def main():
 
         if updated_count > 0:
             # Salva timeline.json preservando metadata e struttura
-            timeline_data["metadata"]["last_updated"] = datetime.now(ZoneInfo("Europe/Rome")).isoformat()
+            timeline_data["metadata"]["last_updated"] = datetime.now().isoformat()
             # NON cambiare la data - mantieni quella della timeline
             timeline_path.write_text(json.dumps(timeline_data, ensure_ascii=False, indent=2), encoding="utf-8")
             print(f"✅ Aggiornate {updated_count} task in timeline.json (preservati campi timeline: start_time, end_time, travel_time, sequence)")
@@ -533,7 +536,7 @@ def main():
     # Crea output
     output = {
         "metadata": {
-            "last_updated": datetime.now(ZoneInfo("Europe/Rome")).isoformat(),
+            "last_updated": datetime.now().isoformat(),
             "date": target_date
         },
         "containers": {
