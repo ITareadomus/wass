@@ -386,19 +386,89 @@ export default function TaskCard({
     try {
       setIsSaving(true);
 
+      // ========== VALIDAZIONE CAMPI ==========
+
+      // 1. Validazione durata pulizia (range di valori)
+      const durationValue = parseInt(editedDuration) || 0;
+      if (durationValue <= 0 || durationValue > 480) {
+        toast({
+          title: "Errore validazione",
+          description: "La durata deve essere tra 1 e 480 minuti (8 ore)",
+          variant: "destructive",
+        });
+        setIsSaving(false);
+        return;
+      }
+
+      // 2. Validazione Pax-In (range di valori)
+      const paxInValue = parseInt(editedPaxIn) || 0;
+      if (paxInValue < 0 || paxInValue > 50) {
+        toast({
+          title: "Errore validazione",
+          description: "Il numero di ospiti deve essere tra 0 e 50",
+          variant: "destructive",
+        });
+        setIsSaving(false);
+        return;
+      }
+
+      // 3. VALIDAZIONE CRITICA: Coerenza temporale check-out/check-in
+      if (editedCheckoutDate && editedCheckoutTime && editedCheckinDate && editedCheckinTime) {
+        const checkoutDateTime = new Date(editedCheckoutDate + 'T' + editedCheckoutTime + ':00');
+        const checkinDateTime = new Date(editedCheckinDate + 'T' + editedCheckinTime + ':00');
+
+        if (isNaN(checkoutDateTime.getTime()) || isNaN(checkinDateTime.getTime())) {
+          toast({
+            title: "Errore validazione",
+            description: "Date o orari non validi",
+            variant: "destructive",
+          });
+          setIsSaving(false);
+          return;
+        }
+
+        if (checkoutDateTime >= checkinDateTime) {
+          toast({
+            title: "Errore validazione",
+            description: "Il check-out deve essere prima del check-in",
+            variant: "destructive",
+          });
+          setIsSaving(false);
+          return;
+        }
+      }
+
+      // 4. Validazione operation_id (se presente, deve essere valido)
+      let operationIdValue = null;
+      if (editedOperationId && editedOperationId.trim() !== "") {
+        operationIdValue = parseInt(editedOperationId);
+        const validOperationIds = availableOperations.map(op => op.id);
+        if (!validOperationIds.includes(operationIdValue)) {
+          toast({
+            title: "Errore validazione",
+            description: "Tipologia intervento non valida",
+            variant: "destructive",
+          });
+          setIsSaving(false);
+          return;
+        }
+      }
+
+      // ========== FINE VALIDAZIONE ==========
+
       const response = await fetch('/api/update-task-details', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           taskId: getTaskKey(displayTask),
           logisticCode: displayTask.name,
-          checkoutDate: editedCheckoutDate,
-          checkoutTime: editedCheckoutTime,
-          checkinDate: editedCheckinDate,
-          checkinTime: editedCheckinTime,
-          cleaningTime: parseInt(editedDuration),
-          paxIn: parseInt(editedPaxIn),
-          operationId: parseInt(editedOperationId) || null,
+          checkoutDate: editedCheckoutDate || null,
+          checkoutTime: editedCheckoutTime || null,
+          checkinDate: editedCheckinDate || null,
+          checkinTime: editedCheckinTime || null,
+          cleaningTime: durationValue,
+          paxIn: paxInValue,
+          operationId: operationIdValue,
         }),
       });
 
@@ -475,7 +545,7 @@ export default function TaskCard({
   const duration = task.duration || "0.0";
   const [hours, mins] = duration.split('.').map(Number);
   const totalMinutes = (hours || 0) * 60 + (mins || 0);
-  
+
   // CRITICAL: In timeline, mostra frecce SOLO se >= 1h
   // Nei container, mostra frecce SEMPRE (anche per < 1h)
   const shouldShowCheckInOutArrows = isInTimeline ? totalMinutes >= 60 : true;
