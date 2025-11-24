@@ -1,6 +1,6 @@
 {
   "metadata": {
-    "last_updated": "2025-11-24T10:40:12.976052",
+    "last_updated": "2025-11-24T10:57:02.551453",
     "date": "2025-11-25"
   },
   "containers": {
@@ -53,6 +53,33 @@
           "confirmed_operation": false,
           "straordinaria": false,
           "type_apt": "E",
+          "alias": "HCC",
+          "customer_name": "HACCA SRL",
+          "reasons": [
+            "client_forced_eo"
+          ],
+          "priority": "early_out"
+        },
+        {
+          "task_id": 219235,
+          "logistic_code": 1645,
+          "client_id": 87,
+          "premium": false,
+          "address": "Via Scaldasole, 4",
+          "lat": "45.454291",
+          "lng": "9.1800519",
+          "cleaning_time": 60,
+          "checkin_date": "2025-11-25",
+          "checkout_date": "2025-11-25",
+          "checkin_time": null,
+          "checkout_time": null,
+          "pax_in": 1,
+          "pax_out": 1,
+          "small_equipment": true,
+          "operation_id": 2,
+          "confirmed_operation": false,
+          "straordinaria": false,
+          "type_apt": "A",
           "alias": "HCC",
           "customer_name": "HACCA SRL",
           "reasons": [
@@ -223,7 +250,7 @@
           "priority": "early_out"
         }
       ],
-      "count": 8
+      "count": 9
     },
     "high_priority": {
       "tasks": [
@@ -541,8 +568,8 @@
     }
   },
   "summary": {
-    "total_tasks": 19,
-    "early_out": 8,
+    "total_tasks": 20,
+    "early_out": 9,
     "high_priority": 6,
     "low_priority": 5
   }
