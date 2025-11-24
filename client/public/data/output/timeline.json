@@ -1,6 +1,6 @@
 {
   "metadata": {
-    "last_updated": "2025-11-24T11:01:22.468Z",
+    "last_updated": "2025-11-24T11:15:58.835110",
     "date": "2025-11-25",
     "created_by": "unknown",
     "modified_by": [
@@ -31,7 +31,7 @@
         {
           "task_id": 219235,
           "logistic_code": 1645,
-          "client_id": null,
+          "client_id": 87,
           "premium": false,
           "address": "Via Scaldasole, 4",
           "lat": "45.454291",
@@ -43,7 +43,7 @@
           "checkout_time": null,
           "pax_in": 1,
           "pax_out": 1,
-          "small_equipment": false,
+          "small_equipment": true,
           "operation_id": 2,
           "confirmed_operation": false,
           "straordinaria": false,
@@ -55,8 +55,8 @@
             "manual_assignment"
           ],
           "priority": "early_out",
-          "start_time": "10:00",
-          "end_time": "11:00",
+          "start_time": "12:07",
+          "end_time": "13:07",
           "followup": false,
           "sequence": 1,
           "travel_time": 0,
