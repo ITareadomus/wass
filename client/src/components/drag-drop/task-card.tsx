@@ -499,8 +499,10 @@ export default function TaskCard({
           description: "I dettagli della task sono stati aggiornati con successo.",
         });
 
+        // NON chiudere il modale, permetti all'utente di vedere le modifiche salvate
+        // e di continuare a modificare altri campi se necessario
         setEditingField(null);
-        setIsModalOpen(false);
+        // NON fare setIsModalOpen(false) qui
 
         // CRITICAL: Marca la timeline come modificata (modifiche non salvate)
         if ((window as any).setHasUnsavedChanges) {
@@ -1202,6 +1204,19 @@ export default function TaskCard({
                   variant="outline"
                 >
                   Annulla
+                </Button>
+              </div>
+            )}
+
+            {/* Pulsante per chiudere il modale dopo aver visto le modifiche salvate */}
+            {!editingField && !isReadOnly && (
+              <div className="pt-4 border-t mt-4 flex gap-2">
+                <Button
+                  onClick={() => setIsModalOpen(false)}
+                  variant="outline"
+                  className="flex-1"
+                >
+                  Chiudi
                 </Button>
               </div>
             )}
