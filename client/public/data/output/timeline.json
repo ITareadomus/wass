@@ -1,6 +1,6 @@
 {
   "metadata": {
-    "last_updated": "2025-11-24T09:30:31.418Z",
+    "last_updated": "2025-11-24T09:34:33.875718",
     "date": "2025-11-24",
     "created_by": "unknown",
     "modified_by": [
@@ -30,7 +30,7 @@
           "checkin_date": "2025-11-24",
           "checkout_date": "2025-11-24",
           "checkin_time": "15:00",
-          "checkout_time": "07:30",
+          "checkout_time": null,
           "pax_in": 3,
           "pax_out": 0,
           "small_equipment": false,
