@@ -38,10 +38,7 @@ def main():
         sys.exit(1)
 
     cleaners_assignments = timeline_data.get("cleaners_assignments", [])
-    if not cleaners_assignments:
-        print("⚠️ Nessuna assegnazione trovata in timeline.json")
-        return
-
+    
     # Connessione al database
     print(f"🔌 Connessione al database MySQL...")
     try:
@@ -50,6 +47,44 @@ def main():
     except Exception as e:
         print(f"❌ Errore connessione database: {e}")
         sys.exit(1)
+
+    # CRITICAL: Se timeline è vuota (dopo reset), azzera solo cleaned_by_us e sequence
+    if not cleaners_assignments:
+        print("⚠️ Nessuna assegnazione trovata in timeline.json")
+        print("🔄 RESET: Azzeramento cleaned_by_us e sequence per tutte le task della data...")
+        
+        work_date = timeline_data.get("metadata", {}).get("date")
+        if work_date:
+            try:
+                reset_query = """
+                    UPDATE app_housekeeping
+                    SET 
+                        cleaned_by_us = NULL,
+                        sequence = NULL,
+                        updated_by = %s,
+                        updated_at = %s
+                    WHERE DATE(checkin) = %s AND deleted_at IS NULL
+                """
+                timestamp_roma = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                updated_by = timeline_data.get("metadata", {}).get("modified_by", ["E68"])
+                if isinstance(updated_by, list):
+                    updated_by = updated_by[-1] if updated_by else "E68"
+                
+                cursor.execute(reset_query, (updated_by, timestamp_roma, work_date))
+                rows_reset = cursor.rowcount
+                connection.commit()
+                print(f"✅ RESET completato: {rows_reset} task azzerate per la data {work_date}")
+            except Exception as e:
+                print(f"❌ Errore durante il reset: {e}")
+                connection.rollback()
+            finally:
+                cursor.close()
+                connection.close()
+        else:
+            print("⚠️ Data non trovata nei metadata, impossibile fare reset")
+            cursor.close()
+            connection.close()
+        return
 
     # Timestamp Roma per updated_at
     timestamp_roma = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
