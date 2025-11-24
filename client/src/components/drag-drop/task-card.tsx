@@ -405,72 +405,142 @@ export default function TaskCard({
     try {
       setIsSaving(true);
 
-      // ========== VALIDAZIONE CAMPI ==========
+      // ========== VALIDAZIONE E RACCOLTA CAMPI MODIFICATI ==========
+      const updates: any = {
+        taskId: getTaskKey(displayTask),
+        logisticCode: displayTask.name,
+      };
 
-      // 1. Validazione durata pulizia (range di valori)
-      const durationValue = parseInt(editedDuration) || 0;
-      if (durationValue <= 0 || durationValue > 480) {
+      // 1. Durata pulizia (se modificata)
+      const originalDuration = displayTask.duration || "0.0";
+      const [origHours, origMins] = originalDuration.split('.').map(Number);
+      const originalMinutes = (origHours || 0) * 60 + (origMins || 0);
+      const editedMinutes = parseInt(editedDuration) || 0;
+
+      if (editedMinutes !== originalMinutes) {
+        if (editedMinutes <= 0 || editedMinutes > 480) {
+          toast({
+            title: "Errore validazione",
+            description: "La durata deve essere tra 1 e 480 minuti (8 ore)",
+            variant: "destructive",
+          });
+          setIsSaving(false);
+          return;
+        }
+        updates.cleaningTime = editedMinutes;
+      }
+
+      // 2. Pax-In (se modificato)
+      const originalPaxIn = (displayTask as any).pax_in || 0;
+      const editedPaxInValue = parseInt(editedPaxIn) || 0;
+
+      if (editedPaxInValue !== originalPaxIn) {
+        if (editedPaxInValue < 0 || editedPaxInValue > 50) {
+          toast({
+            title: "Errore validazione",
+            description: "Il numero di ospiti deve essere tra 0 e 50",
+            variant: "destructive",
+          });
+          setIsSaving(false);
+          return;
+        }
+        updates.paxIn = editedPaxInValue;
+      }
+
+      // 3. Check-out date/time (se modificati)
+      const originalCheckoutDate = (displayTask as any).checkout_date || "";
+      const originalCheckoutTime = (displayTask as any).checkout_time || "";
+
+      if (editedCheckoutDate !== originalCheckoutDate) {
+        updates.checkoutDate = editedCheckoutDate || null;
+      }
+      if (editedCheckoutTime !== originalCheckoutTime) {
+        updates.checkoutTime = editedCheckoutTime || null;
+      }
+
+      // 4. Check-in date/time (se modificati)
+      const originalCheckinDate = (displayTask as any).checkin_date || "";
+      const originalCheckinTime = (displayTask as any).checkin_time || "";
+
+      if (editedCheckinDate !== originalCheckinDate) {
+        updates.checkinDate = editedCheckinDate || null;
+      }
+      if (editedCheckinTime !== originalCheckinTime) {
+        updates.checkinTime = editedCheckinTime || null;
+      }
+
+      // 5. Validazione coerenza temporale (solo se almeno uno dei campi data/ora è modificato)
+      const hasDateTimeChanges = updates.checkoutDate !== undefined || 
+                                  updates.checkoutTime !== undefined || 
+                                  updates.checkinDate !== undefined || 
+                                  updates.checkinTime !== undefined;
+
+      if (hasDateTimeChanges) {
+        const finalCheckoutDate = updates.checkoutDate !== undefined ? updates.checkoutDate : originalCheckoutDate;
+        const finalCheckoutTime = updates.checkoutTime !== undefined ? updates.checkoutTime : originalCheckoutTime;
+        const finalCheckinDate = updates.checkinDate !== undefined ? updates.checkinDate : originalCheckinDate;
+        const finalCheckinTime = updates.checkinTime !== undefined ? updates.checkinTime : originalCheckinTime;
+
+        if (finalCheckoutDate && finalCheckoutTime && finalCheckinDate && finalCheckinTime) {
+          const checkoutDateTime = new Date(finalCheckoutDate + 'T' + finalCheckoutTime + ':00');
+          const checkinDateTime = new Date(finalCheckinDate + 'T' + finalCheckinTime + ':00');
+
+          if (isNaN(checkoutDateTime.getTime()) || isNaN(checkinDateTime.getTime())) {
+            toast({
+              title: "Errore validazione",
+              description: "Date o orari non validi",
+              variant: "destructive",
+            });
+            setIsSaving(false);
+            return;
+          }
+
+          if (checkoutDateTime >= checkinDateTime) {
+            toast({
+              title: "Errore validazione",
+              description: "Il check-out deve essere prima del check-in",
+              variant: "destructive",
+            });
+            setIsSaving(false);
+            return;
+          }
+        }
+      }
+
+      // 6. Operation ID (se modificato)
+      const originalOperationId = String((displayTask as any).operation_id || "");
+
+      if (editedOperationId !== originalOperationId) {
+        if (editedOperationId && editedOperationId.trim() !== "") {
+          const operationIdValue = parseInt(editedOperationId);
+          const validOperationIds = availableOperations.map(op => op.id);
+          if (!validOperationIds.includes(operationIdValue)) {
+            toast({
+              title: "Errore validazione",
+              description: "Tipologia intervento non valida",
+              variant: "destructive",
+            });
+            setIsSaving(false);
+            return;
+          }
+          updates.operationId = operationIdValue;
+        } else {
+          updates.operationId = null;
+        }
+      }
+
+      // Controlla se ci sono effettivamente modifiche da salvare
+      const hasChanges = Object.keys(updates).length > 2; // > 2 perché taskId e logisticCode sono sempre presenti
+
+      if (!hasChanges) {
         toast({
-          title: "Errore validazione",
-          description: "La durata deve essere tra 1 e 480 minuti (8 ore)",
-          variant: "destructive",
+          title: "Nessuna modifica",
+          description: "Non ci sono modifiche da salvare",
+          variant: "default",
         });
         setIsSaving(false);
+        setEditingField(null);
         return;
-      }
-
-      // 2. Validazione Pax-In (range di valori)
-      const paxInValue = parseInt(editedPaxIn) || 0;
-      if (paxInValue < 0 || paxInValue > 50) {
-        toast({
-          title: "Errore validazione",
-          description: "Il numero di ospiti deve essere tra 0 e 50",
-          variant: "destructive",
-        });
-        setIsSaving(false);
-        return;
-      }
-
-      // 3. VALIDAZIONE CRITICA: Coerenza temporale check-out/check-in
-      if (editedCheckoutDate && editedCheckoutTime && editedCheckinDate && editedCheckinTime) {
-        const checkoutDateTime = new Date(editedCheckoutDate + 'T' + editedCheckoutTime + ':00');
-        const checkinDateTime = new Date(editedCheckinDate + 'T' + editedCheckinTime + ':00');
-
-        if (isNaN(checkoutDateTime.getTime()) || isNaN(checkinDateTime.getTime())) {
-          toast({
-            title: "Errore validazione",
-            description: "Date o orari non validi",
-            variant: "destructive",
-          });
-          setIsSaving(false);
-          return;
-        }
-
-        if (checkoutDateTime >= checkinDateTime) {
-          toast({
-            title: "Errore validazione",
-            description: "Il check-out deve essere prima del check-in",
-            variant: "destructive",
-          });
-          setIsSaving(false);
-          return;
-        }
-      }
-
-      // 4. Validazione operation_id (se presente, deve essere valido)
-      let operationIdValue = null;
-      if (editedOperationId && editedOperationId.trim() !== "") {
-        operationIdValue = parseInt(editedOperationId);
-        const validOperationIds = availableOperations.map(op => op.id);
-        if (!validOperationIds.includes(operationIdValue)) {
-          toast({
-            title: "Errore validazione",
-            description: "Tipologia intervento non valida",
-            variant: "destructive",
-          });
-          setIsSaving(false);
-          return;
-        }
       }
 
       // ========== FINE VALIDAZIONE ==========
@@ -478,17 +548,7 @@ export default function TaskCard({
       const response = await fetch('/api/update-task-details', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          taskId: getTaskKey(displayTask),
-          logisticCode: displayTask.name,
-          checkoutDate: editedCheckoutDate || null,
-          checkoutTime: editedCheckoutTime || null,
-          checkinDate: editedCheckinDate || null,
-          checkinTime: editedCheckinTime || null,
-          cleaningTime: durationValue,
-          paxIn: paxInValue,
-          operationId: operationIdValue,
-        }),
+        body: JSON.stringify(updates),
       });
 
       const result = await response.json();
