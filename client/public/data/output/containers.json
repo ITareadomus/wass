@@ -1,6 +1,6 @@
 {
   "metadata": {
-    "last_updated": "2025-11-24T15:12:17.940442",
+    "last_updated": "2025-11-24T15:17:12.239409",
     "date": "2025-11-24"
   },
   "containers": {
@@ -69,43 +69,15 @@
             "not_eo",
             "not_hp"
           ]
-        },
-        {
-          "task_id": 213006,
-          "logistic_code": 270,
-          "client_id": 2,
-          "premium": false,
-          "address": "VIA COL DI LANA 3",
-          "lat": "45.4522431",
-          "lng": "9.1825685",
-          "cleaning_time": 120,
-          "checkin_date": "2025-11-26",
-          "checkout_date": "2025-11-24",
-          "checkin_time": null,
-          "checkout_time": "11:00",
-          "pax_in": 3,
-          "pax_out": 4,
-          "small_equipment": false,
-          "operation_id": 2,
-          "confirmed_operation": true,
-          "straordinaria": false,
-          "type_apt": "C",
-          "alias": "ITW",
-          "customer_name": "ITALIANWAY SRL",
-          "priority": "low_priority",
-          "reasons": [
-            "not_eo",
-            "not_hp"
-          ]
         }
       ],
-      "count": 2
+      "count": 1
     }
   },
   "summary": {
-    "total_tasks": 3,
+    "total_tasks": 2,
     "early_out": 0,
     "high_priority": 1,
-    "low_priority": 2
+    "low_priority": 1
   }
 }
