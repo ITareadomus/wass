@@ -99,7 +99,6 @@ def main():
                         checkout_time = %s,
                         checkin = %s,
                         checkin_time = %s,
-                        cleaning_time = %s,
                         checkin_pax = %s,
                         operation_id = %s,
                         updated_by = %s,
@@ -114,7 +113,6 @@ def main():
                     task.get("checkout_time"),
                     task.get("checkin_date"),   # Timeline usa checkin_date ma DB usa checkin
                     task.get("checkin_time"),
-                    task.get("cleaning_time"),
                     task.get("pax_in"),         # Timeline usa pax_in ma DB usa checkin_pax
                     task.get("operation_id"),
                     updated_by,
