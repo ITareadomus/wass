@@ -10,18 +10,6 @@ import { format } from "date-fns";
 import { it } from "date-fns/locale";
 import { storageService } from "./services/storage-service";
 import * as workspaceFiles from "./services/workspace-files";
-import { drizzle } from "drizzle-orm/node-postgres";
-import pg from "pg";
-import { housekeeping } from "../shared/schema";
-import { eq, and, isNull } from "drizzle-orm";
-
-const { Pool } = pg;
-
-// Inizializza connessione database
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-});
-const db = drizzle(pool);
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -1117,43 +1105,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
-      // NUOVO: Aggiorna il database con le assegnazioni confermate
-      try {
-        const now = new Date();
-        const timestampRoma = format(now, "yyyy-MM-dd HH:mm:ss", { locale: it });
-        
-        for (const assignment of cleanersAssignments) {
-          const cleanerId = assignment.cleaner?.id;
-          if (!cleanerId || !assignment.tasks || assignment.tasks.length === 0) continue;
-
-          for (let i = 0; i < assignment.tasks.length; i++) {
-            const task = assignment.tasks[i];
-            const taskId = task.task_id || task.id;
-            
-            if (!taskId) continue;
-
-            // Aggiorna app_housekeeping con i nuovi campi
-            await db.update(housekeeping)
-              .set({
-                cleaned_by_us: cleanerId,
-                sequence: i + 1, // La priorità è l'indice + 1 (1-based)
-                updated_by: username || 'E68',
-                updated_at: timestampRoma
-              })
-              .where(
-                and(
-                  eq(housekeeping.id, taskId),
-                  isNull(housekeeping.deleted_at)
-                )
-              );
-          }
-        }
-        
-        console.log(`✅ Database aggiornato con ${cleanersAssignments.reduce((sum: number, a: any) => sum + (a.tasks?.length || 0), 0)} assegnazioni`);
-      } catch (dbError) {
-        console.error("Errore nell'aggiornamento del database:", dbError);
-        // Non bloccare il salvataggio su Object Storage anche se il DB fallisce
-      }
+      // Le assegnazioni vengono salvate solo nei file JSON
+      // L'aggiornamento del database MySQL avviene tramite gli script Python quando necessario
 
       // Carica timeline esistente per preservare created_by e modified_by
       let existingTimeline: any = null;
