@@ -1586,12 +1586,13 @@ export default function TimelineView({
                       const controller = new AbortController();
                       const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 secondi timeout
 
+                      const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
                       const response = await fetch('/api/transfer-to-adam', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
                           date: workDate,
-                          username: 'system'
+                          username: currentUser.username || 'system'
                         }),
                         signal: controller.signal
                       });
