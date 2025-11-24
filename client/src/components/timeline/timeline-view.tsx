@@ -1577,7 +1577,8 @@ export default function TimelineView({
                 <Button
                   onClick={async () => {
                     try {
-                      const dateStr = format(new Date(metadata?.date || new Date()), "yyyy-MM-dd");
+                      const currentDate = selectedDate || new Date();
+                      const dateStr = format(currentDate, "yyyy-MM-dd");
                       const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
                       
                       toast({
@@ -1619,7 +1620,7 @@ export default function TimelineView({
                   size="sm"
                   variant="outline"
                   className="ml-2 border-2 border-custom-blue hover:bg-custom-blue hover:text-white"
-                  disabled={!metadata?.date}
+                  disabled={!selectedDate}
                 >
                   <svg className="mr-2 h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
