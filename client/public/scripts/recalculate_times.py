@@ -182,19 +182,23 @@ def recalculate_cleaner_times(cleaner_data: Dict[str, Any]) -> Dict[str, Any]:
         # Il cleaner può iniziare solo DOPO che la proprietà è libera
         
         if i == 0:
-            # Prima task: parte da work_start_min OPPURE da checkout se successivo
+            # Prima task: calcola arrivo base (work_start + travel_time già aggiunto a current_time_min)
+            # CRITICAL: current_time_min già include travel_time se presente
+            arrival_min = current_time_min
+            
+            # Rispetta SEMPRE il checkout_time se presente
             if checkout_time_str:
                 try:
                     checkout_min = time_to_minutes(checkout_time_str)
-                    # Usa il MASSIMO tra work_start e checkout
-                    start_time_min = max(work_start_min, checkout_min)
+                    # Lo start_time è il MASSIMO tra arrivo e checkout
+                    start_time_min = max(arrival_min, checkout_min)
                 except (ValueError, AttributeError):
-                    # Se checkout_time non è valido, usa work_start
-                    start_time_min = work_start_min
+                    # Se checkout_time non è valido, usa l'arrivo
+                    start_time_min = arrival_min
             else:
-                start_time_min = work_start_min
+                start_time_min = arrival_min
             
-            # Aggiorna current_time_min
+            # Aggiorna current_time_min per la prossima iterazione
             current_time_min = start_time_min
         else:
             # Task successive: current_time_min già include travel_time
