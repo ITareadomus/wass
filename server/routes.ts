@@ -2260,13 +2260,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Endpoint per recuperare i nomi delle operazioni
   app.get("/api/get-operation-names", async (req, res) => {
     try {
-      // Carica operations.json che ora contiene anche i nomi
-      const operationsPath = path.join(process.cwd(), 'client/public/data/input/operations.json');
-      const operationsData = JSON.parse(await fs.readFile(operationsPath, 'utf8'));
+      // Mapping statico degli ID operazioni ai loro nomi
+      const operationNames: Record<number, string> = {
+        1: "FERMATA",
+        2: "PARTENZA",
+        3: "PULIZIA STRAORDINARIA",
+        4: "RIPASSO"
+      };
 
       res.json({
         success: true,
-        operationNames: operationsData.operation_names || {}
+        operationNames
       });
     } catch (error: any) {
       console.error("Errore durante il recupero dei nomi delle operazioni:", error);

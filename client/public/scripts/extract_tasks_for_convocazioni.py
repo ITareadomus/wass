@@ -56,33 +56,6 @@ def get_active_operations():
     connection.close()
     return [row['id'] for row in results]
 
-def get_operation_names(operation_ids):
-    """Recupera i nomi delle operazioni dalla tabella app_structure_operation_langs"""
-    if not operation_ids:
-        return {}
-    
-    connection = mysql.connector.connect(**DB_CONFIG)
-    cursor = connection.cursor(dictionary=True)
-    
-    placeholders = ','.join(['%s'] * len(operation_ids))
-    query = f"""
-        SELECT structure_operation_id, name
-        FROM app_structure_operation_langs
-        WHERE id_lang = 1 AND structure_operation_id IN ({placeholders})
-    """
-    
-    cursor.execute(query, operation_ids)
-    results = cursor.fetchall()
-    cursor.close()
-    connection.close()
-    
-    # Crea dizionario id -> nome
-    operation_names = {}
-    for row in results:
-        operation_names[row['structure_operation_id']] = row['name']
-    
-    return operation_names
-
 # ---------- Estrazione task dal DB ----------
 def get_tasks_stats_from_db(selected_date):
     print(f"Aggiorno la lista delle operazioni attive dal DB...")
