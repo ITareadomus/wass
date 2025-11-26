@@ -2126,7 +2126,7 @@ export default function TimelineView({
                     {!isReadOnly && <Pencil className="w-3 h-3 text-muted-foreground/60" />}
                   </p>
                   <p
-                    className={`text-sm p-2 rounded ${!isReadOnly ? 'cursor-pointer hover:bg-muted/50 border border-transparent hover:border-border' : ''}`}
+                    className={`text-sm p-2 rounded border ${!isReadOnly ? 'cursor-pointer hover:bg-muted/50 border-border hover:border-custom-blue' : 'border-border'}`}
                     onClick={(e) => {
                       e.stopPropagation();
                       if (!isReadOnly) handleOpenAliasDialog(selectedCleaner);
@@ -2159,7 +2159,7 @@ export default function TimelineView({
                     {!isReadOnly && <Pencil className="w-3 h-3 text-muted-foreground/60" />}
                   </p>
                   <p
-                    className={`text-sm p-2 rounded ${!isReadOnly ? 'cursor-pointer hover:bg-muted/50 border border-transparent hover:border-border' : ''}`}
+                    className={`text-sm p-2 rounded border ${!isReadOnly ? 'cursor-pointer hover:bg-muted/50 border-border hover:border-custom-blue' : 'border-border'}`}
                     onClick={(e) => {
                       e.stopPropagation();
                       if (!isReadOnly) {
