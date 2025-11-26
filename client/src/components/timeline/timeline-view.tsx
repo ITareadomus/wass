@@ -90,6 +90,7 @@ export default function TimelineView({
   const [incompatibleDialog, setIncompatibleDialog] = useState<{ open: boolean; cleanerId: number | null; tasks: Array<{ logisticCode: string; taskType: string }> }>({ open: false, cleanerId: null, tasks: [] });
   const [startTimeDialog, setStartTimeDialog] = useState<{ open: boolean; cleanerId: number | null; cleanerName: string; isAvailable: boolean }>({ open: false, cleanerId: null, cleanerName: '', isAvailable: true });
   const [pendingStartTime, setPendingStartTime] = useState<string>("10:00");
+  const [pendingCleaner, setPendingCleaner] = useState<any>(null); // Added to track pending cleaner ID
   const [showAdamTransferDialog, setShowAdamTransferDialog] = useState(false); // Stato per il dialog di trasferimento ADAM
 
   // Stato per tracciare acknowledge per coppie (task, cleaner)
@@ -704,6 +705,9 @@ export default function TimelineView({
     const cleaner = availableCleaners.find(c => c.id === cleanerId);
     const cleanerName = cleaner ? `${cleaner.name} ${cleaner.lastname}` : `ID ${cleanerId}`;
 
+    // Imposta il cleaner in pending
+    setPendingCleaner(cleaner);
+
     // Apri il dialog per richiedere lo start time
     setStartTimeDialog({
       open: true,
@@ -716,7 +720,7 @@ export default function TimelineView({
 
   // Handler per confermare start time e aggiungere cleaner
   const handleConfirmStartTimeAndAdd = async () => {
-    if (!pendingCleaner) return;
+    if (!pendingCleaner) return; // Ensure pendingCleaner is set
 
     try {
       // Salva lo start_time personalizzato per questo cleaner
@@ -783,6 +787,7 @@ export default function TimelineView({
     }
     setIsAddCleanerDialogOpen(false);
     setStartTimeDialog({ open: false, cleanerId: null, cleanerName: '', isAvailable: true }); // Chiudi il dialog dello start time
+    setPendingCleaner(null); // Clear pending cleaner
   };
 
 
@@ -849,6 +854,7 @@ export default function TimelineView({
         addCleanerMutation.mutate(confirmUnavailableDialog.cleanerId!);
       }
       setIsAddCleanerDialogOpen(false); // Chiudi anche il dialog di aggiunta
+      setPendingCleaner(null); // Clear pending cleaner
     }
   };
 
@@ -2092,6 +2098,7 @@ export default function TimelineView({
         if (!open) {
           setCleanerToReplace(null);
           setConfirmUnavailableDialog({ open: false, cleanerId: null }); // Chiudi anche il dialog di conferma
+          setPendingCleaner(null); // Clear pending cleaner when dialog is closed
         }
       }}>
         <DialogContent className="sm:max-w-2xl max-h-[80vh] overflow-y-auto">
@@ -2448,7 +2455,7 @@ export default function TimelineView({
 
       {/* Dialog di conferma per il trasferimento su ADAM */}
       <AlertDialog open={showAdamTransferDialog} onOpenChange={setShowAdamTransferDialog}>
-        <AlertDialogContent className="sm:max-w-md">
+        <AlertDialogContent className="sm:max-md">
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2 text-red-600 dark:text-red-400">
               <CheckCircle className="w-5 h-5" />
