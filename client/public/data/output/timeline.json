@@ -1,23 +1,36 @@
 {
   "metadata": {
-    "last_updated": "2025-11-26T10:09:14.032Z",
+    "last_updated": "2025-11-26T10:18:25.447Z",
     "date": "2025-11-26",
-    "created_by": "Admin"
+    "created_by": "Admin",
+    "modified_by": []
   },
   "cleaners_assignments": [
+    {
+      "cleaner": {
+        "id": 626,
+        "name": "DORA PATRICIA",
+        "lastname": "JIMENEZ",
+        "role": "Formatore",
+        "premium": false,
+        "start_time": "09:00"
+      },
+      "tasks": []
+    },
     {
       "cleaner": {
         "id": 132,
         "name": "JOHOISER ERNESTO",
         "lastname": "LOPEZ GIRON",
         "role": "Premium",
-        "premium": true
+        "premium": true,
+        "start_time": "09:00"
       },
       "tasks": []
     }
   ],
   "meta": {
-    "total_cleaners": 1,
+    "total_cleaners": 2,
     "used_cleaners": 0,
     "assigned_tasks": 0,
     "total_tasks": 0
