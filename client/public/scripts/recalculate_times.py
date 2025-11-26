@@ -133,7 +133,10 @@ def recalculate_cleaner_times(cleaner_data: Dict[str, Any]) -> Dict[str, Any]:
     if not tasks:
         return cleaner_data
 
-    work_start_min = time_to_minutes(WORK_START_TIME)
+    # Usa lo start_time del cleaner se disponibile, altrimenti default 10:00
+    cleaner_info = cleaner_data.get("cleaner", {})
+    cleaner_start_time = cleaner_info.get("start_time", WORK_START_TIME)
+    work_start_min = time_to_minutes(cleaner_start_time)
     work_end_min = time_to_minutes(WORK_END_TIME)
 
     current_time_min = work_start_min
@@ -181,22 +184,42 @@ def recalculate_cleaner_times(cleaner_data: Dict[str, Any]) -> Dict[str, Any]:
         # CRITICAL: Start time NON può MAI essere prima del checkout_time
         # Il cleaner può iniziare solo DOPO che la proprietà è libera
         
+        # Verifica se è una task straordinaria
+        is_straordinaria = task.get("straordinaria", False)
+        
         if i == 0:
             # Prima task: calcola arrivo base (work_start + travel_time già aggiunto a current_time_min)
             # CRITICAL: current_time_min già include travel_time se presente
             arrival_min = current_time_min
             
-            # Rispetta SEMPRE il checkout_time se presente
-            if checkout_time_str:
-                try:
-                    checkout_min = time_to_minutes(checkout_time_str)
-                    # Lo start_time è il MASSIMO tra arrivo e checkout
-                    start_time_min = max(arrival_min, checkout_min)
-                except (ValueError, AttributeError):
-                    # Se checkout_time non è valido, usa l'arrivo
+            if is_straordinaria:
+                # STRAORDINARIE: 3 casistiche
+                # 1. Orari non migrati (no checkout_time): inizia allo start_time del cleaner
+                # 2. Checkout PRIMA dello start_time cleaner: inizia allo start_time cleaner
+                # 3. Checkout DOPO lo start_time cleaner: inizia al checkout
+                if checkout_time_str:
+                    try:
+                        checkout_min = time_to_minutes(checkout_time_str)
+                        # Lo start_time è il MASSIMO tra arrivo cleaner e checkout
+                        start_time_min = max(arrival_min, checkout_min)
+                    except (ValueError, AttributeError):
+                        # Se checkout_time non è valido, usa l'arrivo (start_time cleaner)
+                        start_time_min = arrival_min
+                else:
+                    # Orari non migrati: inizia allo start_time del cleaner
                     start_time_min = arrival_min
             else:
-                start_time_min = arrival_min
+                # TASK NORMALI: rispetta SEMPRE il checkout_time se presente
+                if checkout_time_str:
+                    try:
+                        checkout_min = time_to_minutes(checkout_time_str)
+                        # Lo start_time è il MASSIMO tra arrivo e checkout
+                        start_time_min = max(arrival_min, checkout_min)
+                    except (ValueError, AttributeError):
+                        # Se checkout_time non è valido, usa l'arrivo
+                        start_time_min = arrival_min
+                else:
+                    start_time_min = arrival_min
             
             # Aggiorna current_time_min per la prossima iterazione
             current_time_min = start_time_min

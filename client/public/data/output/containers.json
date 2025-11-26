@@ -1,6 +1,6 @@
 {
   "metadata": {
-    "last_updated": "2025-11-26T14:32:47.535853",
+    "last_updated": "2025-11-26T14:47:30.098491",
     "date": "2025-11-26"
   },
   "containers": {
@@ -366,43 +366,14 @@
       "count": 2
     },
     "low_priority": {
-      "tasks": [
-        {
-          "task_id": 219412,
-          "logistic_code": 1693,
-          "client_id": 124,
-          "premium": false,
-          "address": "VIA TOLENTINO 1",
-          "lat": "45.4879867",
-          "lng": "9.1605552",
-          "cleaning_time": 300,
-          "checkin_date": "2025-11-26",
-          "checkout_date": "2025-11-26",
-          "checkin_time": "",
-          "checkout_time": "08:30",
-          "pax_in": 0,
-          "pax_out": 0,
-          "small_equipment": false,
-          "operation_id": 3,
-          "confirmed_operation": true,
-          "straordinaria": true,
-          "type_apt": "C",
-          "alias": "HMST",
-          "customer_name": "HOMING STAYS",
-          "priority": "low_priority",
-          "reasons": [
-            "not_eo",
-            "not_hp"
-          ]
-        }
-      ],
-      "count": 1
+      "tasks": [],
+      "count": 0
     }
   },
   "summary": {
-    "total_tasks": 14,
+    "total_tasks": 13,
     "early_out": 11,
     "high_priority": 2,
-    "low_priority": 1
+    "low_priority": 0
   }
 }
