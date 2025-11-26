@@ -2450,7 +2450,7 @@ export default function TimelineView({
       <AlertDialog open={showAdamTransferDialog} onOpenChange={setShowAdamTransferDialog}>
         <AlertDialogContent className="sm:max-w-md">
           <AlertDialogHeader>
-            <AlertDialogTitle className="flex items-center gap-2 text-yellow-600 dark:text-yellow-400">
+            <AlertDialogTitle className="flex items-center gap-2 text-red-600 dark:text-red-400">
               <CheckCircle className="w-5 h-5" />
               Conferma Trasferimento su ADAM
             </AlertDialogTitle>
@@ -2472,7 +2472,7 @@ export default function TimelineView({
             </AlertDialogCancel>
             <AlertDialogAction
               onClick={handleTransferToAdam}
-              className="bg-custom-blue hover:bg-custom-blue/90 text-white"
+              className="border-2 border-custom-blue bg-background hover:bg-accent hover:text-accent-foreground"
             >
               Ho capito
             </AlertDialogAction>
