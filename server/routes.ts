@@ -317,6 +317,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
       destEntry.tasks.splice(targetIndex, 0, taskToMove);
 
       // 4. Ricalcola tempi per il cleaner di origine e destinazione
+      // Prima assicurati che lo start_time sia aggiornato per entrambi i cleaner
+      const cleanersPath2 = path.join(process.cwd(), 'client/public/data/cleaners/selected_cleaners.json');
+      let cleanersDataForStartTime;
+      try {
+        cleanersDataForStartTime = JSON.parse(await fs.readFile(cleanersPath2, 'utf8'));
+      } catch (e) {
+        cleanersDataForStartTime = { cleaners: [] };
+      }
+      
+      // Aggiorna start_time per sourceEntry
+      if (sourceEntry) {
+        const srcCleanerInfo = cleanersDataForStartTime.cleaners.find((c: any) => c.id === sourceCleanerId);
+        if (srcCleanerInfo?.start_time) {
+          sourceEntry.cleaner.start_time = srcCleanerInfo.start_time;
+        } else if (!sourceEntry.cleaner.start_time) {
+          sourceEntry.cleaner.start_time = '10:00';
+        }
+      }
+      
+      // Aggiorna start_time per destEntry
+      const destCleanerInfo = cleanersDataForStartTime.cleaners.find((c: any) => c.id === destCleanerId);
+      if (destCleanerInfo?.start_time) {
+        destEntry.cleaner.start_time = destCleanerInfo.start_time;
+      } else if (!destEntry.cleaner.start_time) {
+        destEntry.cleaner.start_time = '10:00';
+      }
+
       try {
         // Ricalcola cleaner di origine (se ha ancora task)
         if (sourceEntry && sourceEntry.tasks.length > 0) {
@@ -695,37 +722,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const normalizedTaskId = String(taskId);
       const normalizedCleanerId = Number(cleanerId);
 
+      // Carica dati del cleaner da selected_cleaners.json (serve sia per nuovi che esistenti)
+      const cleanersPath = path.join(process.cwd(), 'client/public/data/cleaners/selected_cleaners.json');
+      let cleanersData;
+      try {
+        const cleanersRawData = await fs.readFile(cleanersPath, 'utf8');
+        cleanersData = JSON.parse(cleanersRawData);
+      } catch (error) {
+        console.error(`Failed to read ${cleanersPath}:`, error);
+        cleanersData = { cleaners: [] };
+      }
+      const cleanerInfo = cleanersData.cleaners.find((c: any) => c.id === normalizedCleanerId);
+
       // Trova o crea l'entry per questo cleaner
       let cleanerEntry = timelineData.cleaners_assignments.find(
         (c: any) => c.cleaner.id === normalizedCleanerId
       );
 
       if (!cleanerEntry) {
-        // Carica dati del cleaner da selected_cleaners.json
-        const cleanersPath = path.join(process.cwd(), 'client/public/data/cleaners/selected_cleaners.json');
-        let cleanersData;
-        try {
-          const cleanersRawData = await fs.readFile(cleanersPath, 'utf8');
-          cleanersData = JSON.parse(cleanersRawData);
-        } catch (error) {
-          console.error(`Failed to read ${cleanersPath}:`, error);
-          // Fallback to default cleaner info if file is missing
-          cleanersData = { cleaners: [] };
-        }
-
-        const cleanerInfo = cleanersData.cleaners.find((c: any) => c.id === normalizedCleanerId);
-
         cleanerEntry = {
           cleaner: {
             id: normalizedCleanerId,
             name: cleanerInfo?.name || 'Unknown',
             lastname: cleanerInfo?.lastname || '',
             role: cleanerInfo?.role || 'Standard',
-            premium: cleanerInfo?.premium || false
+            premium: cleanerInfo?.premium || false,
+            start_time: cleanerInfo?.start_time || '10:00'
           },
           tasks: []
         };
         timelineData.cleaners_assignments.push(cleanerEntry);
+      } else {
+        // Aggiorna start_time se mancante o diverso (per cleanerEntry esistenti)
+        if (!cleanerEntry.cleaner.start_time || cleanerEntry.cleaner.start_time !== cleanerInfo?.start_time) {
+          cleanerEntry.cleaner.start_time = cleanerInfo?.start_time || '10:00';
+        }
       }
 
       // Rimuovi il task se già presente (evita duplicazioni)
@@ -3575,7 +3606,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
               name: cleanerInfo.name,
               lastname: cleanerInfo.lastname,
               role: cleanerInfo.role,
-              premium: cleanerInfo.role === "Premium"
+              premium: cleanerInfo.role === "Premium",
+              start_time: cleanerInfo.start_time || '10:00'
             },
             tasks: []
           };
@@ -3604,6 +3636,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Aggiorna sequence nel cleaner destinazione
       dstEntry.tasks.forEach((t: any, i: number) => { t.sequence = i + 1; });
 
+      // Aggiorna start_time dei cleaner da selected_cleaners.json prima del ricalcolo
+      const cleanersPathCross = path.join(process.cwd(), 'client/public/data/cleaners/selected_cleaners.json');
+      try {
+        const cleanersDataCross = JSON.parse(await fs.readFile(cleanersPathCross, 'utf8'));
+        
+        // Aggiorna start_time per dstEntry
+        const dstCleanerInfo = cleanersDataCross.cleaners.find((c: any) => c.id === toCleanerId);
+        if (dstCleanerInfo?.start_time) {
+          dstEntry.cleaner.start_time = dstCleanerInfo.start_time;
+        } else if (!dstEntry.cleaner.start_time) {
+          dstEntry.cleaner.start_time = '10:00';
+        }
+      } catch (e) {
+        if (!dstEntry.cleaner.start_time) {
+          dstEntry.cleaner.start_time = '10:00';
+        }
+      }
+
       // Ricalcola tempi usando lo script Python per avere start_time/end_time coerenti con la sequenza
       try {
         const updatedDst = await recalculateCleanerTimes(dstEntry);
@@ -3614,6 +3664,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (typeof fromCleanerId === 'number' && fromCleanerId !== toCleanerId) {
           const srcEntry = getCleanerEntry(fromCleanerId);
           if (srcEntry && srcEntry.tasks.length > 0) {
+            // Aggiorna start_time per srcEntry
+            try {
+              const cleanersDataCrossSrc = JSON.parse(await fs.readFile(cleanersPathCross, 'utf8'));
+              const srcCleanerInfo = cleanersDataCrossSrc.cleaners.find((c: any) => c.id === fromCleanerId);
+              if (srcCleanerInfo?.start_time) {
+                srcEntry.cleaner.start_time = srcCleanerInfo.start_time;
+              } else if (!srcEntry.cleaner.start_time) {
+                srcEntry.cleaner.start_time = '10:00';
+              }
+            } catch (e) {
+              if (!srcEntry.cleaner.start_time) {
+                srcEntry.cleaner.start_time = '10:00';
+              }
+            }
             const updatedSrc = await recalculateCleanerTimes(srcEntry);
             srcEntry.tasks = updatedSrc.tasks;
             console.log(`✅ Tempi ricalcolati per cleaner ${fromCleanerId} dopo rimozione`);
@@ -3695,6 +3759,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Inserisci nella nuova posizione toIndex
       cleanerEntry.tasks.splice(toIndex, 0, task);
+
+      // Aggiorna start_time del cleaner da selected_cleaners.json prima del ricalcolo
+      const cleanersPathReorder = path.join(process.cwd(), 'client/public/data/cleaners/selected_cleaners.json');
+      try {
+        const cleanersDataReorder = JSON.parse(await fs.readFile(cleanersPathReorder, 'utf8'));
+        const cleanerInfoReorder = cleanersDataReorder.cleaners.find((c: any) => c.id === cleanerId);
+        if (cleanerInfoReorder?.start_time) {
+          cleanerEntry.cleaner.start_time = cleanerInfoReorder.start_time;
+        } else if (!cleanerEntry.cleaner.start_time) {
+          cleanerEntry.cleaner.start_time = '10:00';
+        }
+      } catch (e) {
+        if (!cleanerEntry.cleaner.start_time) {
+          cleanerEntry.cleaner.start_time = '10:00';
+        }
+      }
 
       // Ricalcola travel_time, start_time, end_time usando lo script Python
       try {
