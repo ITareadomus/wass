@@ -1,10 +1,22 @@
 {
-    "timestamp": "2025-11-26T07:54:15.270423",
+    "timestamp": "2025-11-26T09:26:37.954551",
     "active_operations": [
-        1,
-        2,
-        3,
-        4
+        {
+            "id": 1,
+            "name": "FERMATA"
+        },
+        {
+            "id": 2,
+            "name": "PARTENZA"
+        },
+        {
+            "id": 3,
+            "name": "PULIZIA STRAORDINARIA"
+        },
+        {
+            "id": 4,
+            "name": "RIPASSO"
+        }
     ],
     "total_operations": 4
 }
