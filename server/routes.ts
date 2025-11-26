@@ -1679,8 +1679,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Questo può venire da due fonti:
       // 1. selected_cleaners.json (se il cleaner era già stato aggiunto)
       // 2. Una chiamata precedente a /api/update-cleaner-start-time (dalla UI)
-      const selectedCleanersPath = path.join(process.cwd(), 'client/public/data/cleaners/selected_cleaners.json');
       try {
+        const selectedCleanersPath = path.join(process.cwd(), 'client/public/data/cleaners/selected_cleaners.json');
         const selectedData = JSON.parse(await fs.readFile(selectedCleanersPath, 'utf8'));
         const existingCleaner = selectedData.cleaners?.find((c: any) => c.id === cleanerId);
         if (existingCleaner?.start_time) {
