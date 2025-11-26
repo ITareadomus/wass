@@ -140,8 +140,8 @@ export default function TaskCard({
   const [assignmentTimes, setAssignmentTimes] = useState<{ start_time?: string; end_time?: string; travel_time?: number }>({});
   const { toast } = useToast();
 
-  // Stati per editing
-  const [editingField, setEditingField] = useState<'duration' | 'checkout' | 'checkin' | 'paxin' | 'operation' | null>(null);
+  // Stati per editing - ora un set di campi invece di uno solo
+  const [editingFields, setEditingFields] = useState<Set<'duration' | 'checkout' | 'checkin' | 'paxin' | 'operation'>>(new Set());
   const [editedCheckoutDate, setEditedCheckoutDate] = useState("");
   const [editedCheckoutTime, setEditedCheckoutTime] = useState("");
   const [editedCheckinDate, setEditedCheckinDate] = useState("");
@@ -230,17 +230,30 @@ export default function TaskCard({
     }
   };
 
-  // Reset editingField quando il modal si chiude o quando diventa readonly
+  // Reset editingFields quando il modal si chiude o quando diventa readonly
   useEffect(() => {
     if (!isModalOpen || isReadOnly) {
-      setEditingField(null);
+      setEditingFields(new Set());
     }
   }, [isModalOpen, isReadOnly]);
 
+  // Helper per toggleare un campo in editing
+  const toggleEditingField = (field: 'duration' | 'checkout' | 'checkin' | 'paxin' | 'operation') => {
+    setEditingFields(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(field)) {
+        newSet.delete(field);
+      } else {
+        newSet.add(field);
+      }
+      return newSet;
+    });
+  };
+
   // Inizializza i campi quando il modale si apre o quando displayTask cambia
-  // MA NON se l'utente sta già modificando un campo o se è readonly
+  // MA NON se l'utente sta già modificando campi o se è readonly
   useEffect(() => {
-    if (isModalOpen && !editingField && !isReadOnly) {
+    if (isModalOpen && editingFields.size === 0 && !isReadOnly) {
       console.log('🔓 Modale aperto per task:', {
         taskId: task.id,
         allTasksCount: allTasks?.length || 0,
@@ -270,7 +283,7 @@ export default function TaskCard({
       // Inizializza operation_id
       setEditedOperationId(String((displayTask as any).operation_id || ""));
     }
-  }, [isModalOpen, task.id, displayTask, allTasks, isInTimeline, currentContainer, editingField]);
+  }, [isModalOpen, task.id, displayTask, allTasks, isInTimeline, currentContainer, editingFields.size]);
 
   // DEBUG: verifica se displayTask è corretto
   useEffect(() => {
@@ -388,7 +401,7 @@ export default function TaskCard({
           description: "I dettagli della task sono stati aggiornati con successo.",
         });
 
-        setEditingField(null);
+        setEditingFields(new Set());
         setIsModalOpen(false);
 
         // Preserva lo stato acknowledged per il cleaner di destinazione
@@ -764,7 +777,7 @@ export default function TaskCard({
                   Durata pulizia
                   {!isReadOnly && <Pencil className="w-3 h-3 text-muted-foreground/60" />}
                 </p>
-                {editingField === 'duration' && !isReadOnly ? (
+                {editingFields.has('duration') && !isReadOnly ? (
                   <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
                     <Input
                       type="text"
@@ -780,7 +793,6 @@ export default function TaskCard({
                       onClick={(e) => e.stopPropagation()}
                       className="text-sm w-20 [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                       min="0"
-                      autoFocus
                     />
                     <span className="text-sm text-muted-foreground">minuti</span>
                   </div>
@@ -789,12 +801,8 @@ export default function TaskCard({
                     className={`text-sm p-1 rounded ${!isReadOnly ? 'cursor-pointer hover:bg-muted/50' : ''}`}
                     onClick={(e) => {
                       e.stopPropagation();
-                      console.log('🖱️ Click su Durata - isReadOnly:', isReadOnly, '!isReadOnly:', !isReadOnly);
                       if (!isReadOnly) {
-                        console.log('✅ Apertura campo edit per duration');
-                        setEditingField('duration');
-                      } else {
-                        console.log('❌ Campo bloccato perché isReadOnly è true');
+                        toggleEditingField('duration');
                       }
                     }}
                   >
@@ -811,7 +819,7 @@ export default function TaskCard({
                   Check-out
                   {!isReadOnly && <Pencil className="w-3 h-3 text-muted-foreground/60" />}
                 </p>
-                {editingField === 'checkout' && !isReadOnly ? (
+                {editingFields.has('checkout') && !isReadOnly ? (
                   <div className="space-y-2" onClick={(e) => e.stopPropagation()}>
                     <div className="relative">
                       <Input
@@ -826,7 +834,6 @@ export default function TaskCard({
                         onBlur={(e) => e.stopPropagation()}
                         onClick={(e) => e.stopPropagation()}
                         className="text-sm cursor-text"
-                        autoFocus
                       />
                     </div>
                     <div className="relative">
@@ -850,8 +857,7 @@ export default function TaskCard({
                     className={`text-sm p-1 rounded ${!isReadOnly ? 'cursor-pointer hover:bg-muted/50' : ''}`}
                     onClick={(e) => {
                       e.stopPropagation();
-                      console.log('🖱️ Click su Check-out - isReadOnly:', isReadOnly);
-                      if (!isReadOnly) setEditingField('checkout');
+                      if (!isReadOnly) toggleEditingField('checkout');
                     }}
                   >
                     {(displayTask as any).checkout_date
@@ -873,7 +879,7 @@ export default function TaskCard({
                   Check-in
                   {!isReadOnly && <Pencil className="w-3 h-3 text-muted-foreground/60" />}
                 </p>
-                {editingField === 'checkin' && !isReadOnly ? (
+                {editingFields.has('checkin') && !isReadOnly ? (
                   <div className="space-y-2" onClick={(e) => e.stopPropagation()}>
                     <div className="relative">
                       <Input
@@ -888,7 +894,6 @@ export default function TaskCard({
                         onBlur={(e) => e.stopPropagation()}
                         onClick={(e) => e.stopPropagation()}
                         className="text-sm cursor-text"
-                        autoFocus
                       />
                     </div>
                     <div className="relative">
@@ -912,8 +917,7 @@ export default function TaskCard({
                     className={`text-sm p-1 rounded ${!isReadOnly ? 'cursor-pointer hover:bg-muted/50' : ''}`}
                     onClick={(e) => {
                       e.stopPropagation();
-                      console.log('🖱️ Click su Check-in - isReadOnly:', isReadOnly);
-                      if (!isReadOnly) setEditingField('checkin');
+                      if (!isReadOnly) toggleEditingField('checkin');
                     }}
                   >
                     {(displayTask as any).checkin_date
@@ -945,7 +949,7 @@ export default function TaskCard({
                   Tipologia intervento
                   {!isReadOnly && <Pencil className="w-3 h-3 text-muted-foreground/60" />}
                 </p>
-                {editingField === 'operation' && !isReadOnly ? (
+                {editingFields.has('operation') && !isReadOnly ? (
                   <div onClick={(e) => e.stopPropagation()}>
                     <Select
                       value={editedOperationId}
@@ -967,7 +971,7 @@ export default function TaskCard({
                     className={`text-sm p-1 rounded ${!isReadOnly ? 'cursor-pointer hover:bg-muted/50' : ''}`}
                     onClick={(e) => {
                       e.stopPropagation();
-                      if (!isReadOnly) setEditingField('operation');
+                      if (!isReadOnly) toggleEditingField('operation');
                     }}
                   >
                     {!isConfirmedOperation
@@ -996,7 +1000,7 @@ export default function TaskCard({
                   Pax-In
                   {!isReadOnly && <Pencil className="w-3 h-3 text-muted-foreground/60" />}
                 </p>
-                {editingField === 'paxin' && !isReadOnly ? (
+                {editingFields.has('paxin') && !isReadOnly ? (
                   <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
                     <Input
                       type="text"
@@ -1012,7 +1016,6 @@ export default function TaskCard({
                       onClick={(e) => e.stopPropagation()}
                       className="text-sm w-20 [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                       min="0"
-                      autoFocus
                     />
                     <span className="text-sm text-muted-foreground">persone</span>
                   </div>
@@ -1021,8 +1024,7 @@ export default function TaskCard({
                     className={`text-sm p-1 rounded ${!isReadOnly ? 'cursor-pointer hover:bg-muted/50' : ''}`}
                     onClick={(e) => {
                       e.stopPropagation();
-                      console.log('🖱️ Click su Pax-in - isReadOnly:', isReadOnly);
-                      if (!isReadOnly) setEditingField('paxin');
+                      if (!isReadOnly) toggleEditingField('paxin');
                     }}
                   >
                     {(displayTask as any).pax_in ?? "non migrato"}
@@ -1066,7 +1068,7 @@ export default function TaskCard({
             </div>
 
             {/* Pulsante Salva Modifiche */}
-            {editingField && !isReadOnly && (
+            {editingFields.size > 0 && !isReadOnly && (
               <div className="pt-4 border-t mt-4 flex gap-2">
                 <Button
                   onClick={handleSaveChanges}
@@ -1078,7 +1080,7 @@ export default function TaskCard({
                 </Button>
                 <Button
                   onClick={() => {
-                    setEditingField(null);
+                    setEditingFields(new Set());
                     // Ripristina i valori originali
                     setEditedCheckoutDate((displayTask as any).checkout_date || "");
                     setEditedCheckoutTime((displayTask as any).checkout_time || "");
