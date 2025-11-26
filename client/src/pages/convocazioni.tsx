@@ -30,13 +30,6 @@ interface Cleaner {
   start_time: string | null;
 }
 
-interface StartTimeDialogState {
-  open: boolean;
-  cleanerId: number | null;
-  isAvailable: boolean;
-  currentStartTime: string;
-}
-
 interface TaskStats {
   total: number;
   premium: number;
@@ -71,12 +64,6 @@ export default function Convocazioni() {
     return new Date();
   });
   const [confirmDialog, setConfirmDialog] = useState<{ open: boolean; cleanerId: number | null }>({ open: false, cleanerId: null });
-  const [startTimeDialog, setStartTimeDialog] = useState<StartTimeDialogState>({ 
-    open: false, 
-    cleanerId: null, 
-    isAvailable: true,
-    currentStartTime: "10:00"
-  });
   const { toast } = useToast();
   const [, setLocation] = useLocation();
 
@@ -259,7 +246,7 @@ export default function Convocazioni() {
   };
 
   const toggleCleanerSelection = (cleanerId: number, isAvailable: boolean) => {
-    // Se il cleaner è già selezionato, lo deseleziona senza chiedere lo start time
+    // Se il cleaner è già selezionato, lo deseleziona
     if (selectedCleaners.has(cleanerId)) {
       setSelectedCleaners(prev => {
         const newSet = new Set(prev);
@@ -269,56 +256,18 @@ export default function Convocazioni() {
       return;
     }
 
-    // Se si sta selezionando un cleaner, richiedi SEMPRE lo start time
-    const cleaner = cleaners.find(c => c.id === cleanerId);
-    const currentStartTime = cleaner?.start_time || "10:00";
-    
-    setStartTimeDialog({ 
-      open: true, 
-      cleanerId, 
-      isAvailable,
-      currentStartTime
-    });
-  };
-
-  const handleConfirmStartTime = () => {
-    if (startTimeDialog.cleanerId !== null) {
-      const { cleanerId, isAvailable, currentStartTime } = startTimeDialog;
-      
-      // Valida il formato dell'orario
-      if (!/^\d{2}:\d{2}$/.test(currentStartTime)) {
-        toast({
-          variant: "destructive",
-          title: "⚠️ Formato orario non valido",
-          description: "Inserisci un orario nel formato HH:mm (es. 10:00)"
-        });
-        return;
-      }
-
-      // Aggiorna lo start_time del cleaner
-      setCleaners(prev => prev.map(c => 
-        c.id === cleanerId ? { ...c, start_time: currentStartTime } : c
-      ));
-      setFilteredCleaners(prev => prev.map(c => 
-        c.id === cleanerId ? { ...c, start_time: currentStartTime } : c
-      ));
-
-      // Se non è disponibile, mostra il dialog di conferma
-      if (!isAvailable) {
-        setStartTimeDialog({ open: false, cleanerId: null, isAvailable: true, currentStartTime: "10:00" });
-        setConfirmDialog({ open: true, cleanerId });
-        return;
-      }
-
-      // Seleziona il cleaner
-      setSelectedCleaners(prev => {
-        const newSet = new Set(prev);
-        newSet.add(cleanerId);
-        return newSet;
-      });
+    // Se non è disponibile, mostra il dialog di conferma
+    if (!isAvailable) {
+      setConfirmDialog({ open: true, cleanerId });
+      return;
     }
-    
-    setStartTimeDialog({ open: false, cleanerId: null, isAvailable: true, currentStartTime: "10:00" });
+
+    // Altrimenti seleziona direttamente il cleaner
+    setSelectedCleaners(prev => {
+      const newSet = new Set(prev);
+      newSet.add(cleanerId);
+      return newSet;
+    });
   };
 
   const handleConfirmUnavailable = () => {
@@ -704,41 +653,6 @@ export default function Convocazioni() {
               );
             })}
           </div>
-
-          <Dialog open={startTimeDialog.open} onOpenChange={(open) => !open && setStartTimeDialog({ open: false, cleanerId: null, isAvailable: true, currentStartTime: "10:00" })}>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Inserisci Start Time</DialogTitle>
-                <DialogDescription>
-                  Inserisci l'orario di inizio lavoro per questo cleaner (formato HH:mm)
-                </DialogDescription>
-              </DialogHeader>
-              <div className="py-4">
-                <label className="text-sm font-semibold mb-2 block">Orario di inizio</label>
-                <Input
-                  type="time"
-                  value={startTimeDialog.currentStartTime}
-                  onChange={(e) => setStartTimeDialog(prev => ({ ...prev, currentStartTime: e.target.value }))}
-                  className="w-full"
-                />
-              </div>
-              <DialogFooter>
-                <Button 
-                  variant="outline" 
-                  onClick={() => setStartTimeDialog({ open: false, cleanerId: null, isAvailable: true, currentStartTime: "10:00" })}
-                  className="border-2 border-custom-blue"
-                >
-                  Annulla
-                </Button>
-                <Button 
-                  onClick={handleConfirmStartTime}
-                  className="bg-background border-2 border-custom-blue text-black dark:text-white hover:opacity-80"
-                >
-                  Conferma
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
 
           <Dialog open={confirmDialog.open} onOpenChange={(open) => setConfirmDialog({ open, cleanerId: null })}>
             <DialogContent>
