@@ -310,10 +310,36 @@ export default function TimelineView({
     });
   };
 
-  const timeSlots = [
-    "10:00", "11:00", "12:00", "13:00", "14:00",
-    "15:00", "16:00", "17:00", "18:00", "19:00"
-  ];
+  // Genera time slots dinamici per un cleaner in base al suo start_time
+  const generateTimeSlotsForCleaner = (startTime: string) => {
+    const [startHour, startMin] = startTime.split(':').map(Number);
+    const endHour = 19; // Fine fissa alle 19:00
+    
+    const slots: string[] = [];
+    let currentHour = startHour;
+    let currentMin = startMin;
+    
+    // Genera slot ogni ora fino alle 19:00
+    while (currentHour < endHour || (currentHour === endHour && currentMin === 0)) {
+      slots.push(`${String(currentHour).padStart(2, '0')}:${String(currentMin).padStart(2, '0')}`);
+      currentHour++;
+    }
+    
+    // Aggiungi sempre 19:00 come ultimo slot
+    if (slots[slots.length - 1] !== "19:00") {
+      slots.push("19:00");
+    }
+    
+    return slots;
+  };
+  
+  // Calcola i minuti totali della timeline per un cleaner
+  const getTimelineMinutesForCleaner = (startTime: string) => {
+    const [startHour, startMin] = startTime.split(':').map(Number);
+    const startMinutes = startHour * 60 + startMin;
+    const endMinutes = 19 * 60; // 19:00
+    return endMinutes - startMinutes;
+  };
 
   // Palette di colori azzurri per i cleaners
   const cleanerColors = [
@@ -1495,20 +1521,15 @@ export default function TimelineView({
           </div>
         </div>
         <div className="p-4 overflow-x-auto">
-          {/* Header con orari */}
+          {/* Header con orari - mostra range generale */}
           <div className="flex mb-2 px-4">
             <div className="flex-shrink-0" style={{ width: `${cleanerColumnWidth}px` }}></div>
-            <div className="flex-1 grid grid-cols-10">
-              {timeSlots.map((slot, idx) => (
-                <div
-                  key={slot}
-                  className="text-center text-sm font-medium text-muted-foreground border-l border-border first:border-l-0 py-1"
-                >
-                  {slot}
-                </div>
-              ))}
+            <div className="flex-1 flex justify-between items-center px-2">
+              <span className="text-sm font-medium text-muted-foreground">
+                Timeline dinamica (start personalizzato - 19:00)
+              </span>
             </div>
-          </div>
+          </div></div>
 
           {/* Righe dei cleaners - mostra solo se ci sono cleaners selezionati */}
           <div className="flex-1 overflow-auto px-4 pb-4">
@@ -1562,6 +1583,11 @@ export default function TimelineView({
                       return !acknowledgedIncompatibleAssignments.has(key);
                     })
                   : false;
+
+                // Genera time slots dinamici per questo cleaner
+                const cleanerStartTime = cleaner.start_time || "10:00";
+                const timeSlots = generateTimeSlotsForCleaner(cleanerStartTime);
+                const totalTimelineMinutes = getTimelineMinutesForCleaner(cleanerStartTime);
 
                 return (
                   <div key={cleaner.id} className="flex mb-0.5">
@@ -1648,10 +1674,8 @@ export default function TimelineView({
                           }}
                         >
                           {/* Griglia oraria di sfondo (solo visiva) con alternanza colori */}
-                          <div className="absolute inset-0 grid grid-cols-10 pointer-events-none">
+                          <div className="absolute inset-0 pointer-events-none" style={{ display: 'grid', gridTemplateColumns: `repeat(${timeSlots.length}, 1fr)` }}>
                             {timeSlots.map((slot, idx) => {
-                              // Ore pari (10:00, 12:00, 14:00, 16:00, 18:00) = idx 0, 2, 4, 6, 8
-                              // Ore dispari (11:00, 13:00, 15:00, 17:00, 19:00) = idx 1, 3, 5, 7, 9
                               const isEvenHour = idx % 2 === 0;
                               return (
                                 <div
@@ -1661,6 +1685,7 @@ export default function TimelineView({
                                       ? 'bg-blue-50/30 dark:bg-blue-950/10'
                                       : 'bg-sky-100/30 dark:bg-sky-900/10'
                                   }`}
+                                  title={slot}
                                 ></div>
                               );
                             })}
@@ -1712,23 +1737,28 @@ export default function TimelineView({
                                   travelTime = 0;
                                 }
 
-                                // Calcola offset dinamico basato su start_time della task
+                                // Calcola offset dinamico basato su start_time della task rispetto allo start_time del cleaner
                                 let timeOffset = 0;
                                 if (idx === 0 && taskObj.start_time) {
-                                  // La timeline inizia alle 10:00 (= 0 minuti dall'inizio)
-                                  const [hours, minutes] = taskObj.start_time.split(':').map(Number);
-                                  const taskStartMinutes = (hours * 60 + minutes) - (10 * 60); // minuti dall'inizio timeline
-                                  if (taskStartMinutes > 0) {
-                                    timeOffset = taskStartMinutes; // offset in minuti
+                                  const [cleanerStartHour, cleanerStartMin] = cleanerStartTime.split(':').map(Number);
+                                  const cleanerStartMinutes = cleanerStartHour * 60 + cleanerStartMin;
+                                  
+                                  const [taskHours, taskMinutes] = taskObj.start_time.split(':').map(Number);
+                                  const taskStartMinutes = taskHours * 60 + taskMinutes;
+                                  
+                                  // Offset = differenza tra start della task e start del cleaner
+                                  const minutesDiff = taskStartMinutes - cleanerStartMinutes;
+                                  if (minutesDiff > 0) {
+                                    timeOffset = minutesDiff;
                                   }
                                 }
 
                                 // Calcola larghezza EFFETTIVA in base ai minuti reali di travel_time
-                                // La timeline copre 600 minuti (10:00-19:00)
+                                // La timeline copre totalTimelineMinutes (da start_time del cleaner alle 19:00)
                                 // Per idx=0 (prima task), non c'è travel time indicator
                                 // Per idx>0, mostra l'indicatore SOLO se c'è travel_time > 0
                                 const effectiveTravelMinutes = idx > 0 && travelTime > 0 ? travelTime : 0;
-                                const totalWidth = effectiveTravelMinutes > 0 ? (effectiveTravelMinutes / 600) * 100 : 0;
+                                const totalWidth = effectiveTravelMinutes > 0 ? (effectiveTravelMinutes / totalTimelineMinutes) * 100 : 0;
 
                                 // Usa task.id o task.task_id come chiave univoca (non logistic_code che può essere duplicato)
                                 const uniqueKey = taskObj.task_id || taskObj.id;
@@ -1751,7 +1781,7 @@ export default function TimelineView({
                                       <div
                                         key={`offset-${uniqueKey}`}
                                         className="flex-shrink-0"
-                                        style={{ width: `${(timeOffset / 600) * 100}%` }}
+                                        style={{ width: `${(timeOffset / totalTimelineMinutes) * 100}%` }}
                                       />
                                     )}
 
