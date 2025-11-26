@@ -708,6 +708,9 @@ export default function TimelineView({
     // Imposta il cleaner in pending
     setPendingCleaner(cleaner);
 
+    // Usa start_time esistente del cleaner o default a "10:00"
+    const defaultStartTime = cleaner?.start_time || "10:00";
+
     // Apri il dialog per richiedere lo start time
     setStartTimeDialog({
       open: true,
@@ -715,7 +718,8 @@ export default function TimelineView({
       cleanerName,
       isAvailable
     });
-    setPendingStartTime("10:00"); // Reset al valore di default
+    setPendingStartTime(defaultStartTime); // Usa start_time del cleaner se disponibile
+    setIsAddCleanerDialogOpen(false); // Chiudi il dialog di selezione cleaner
   };
 
   // Handler per confermare start time e aggiungere cleaner
@@ -2182,7 +2186,13 @@ export default function TimelineView({
       </Dialog>
 
       {/* Dialog per richiedere start time */}
-      <Dialog open={startTimeDialog.open} onOpenChange={(open) => !open && setStartTimeDialog({ open: false, cleanerId: null, cleanerName: '', isAvailable: true })}>
+      <Dialog open={startTimeDialog.open} onOpenChange={(open) => {
+        if (!open) {
+          setStartTimeDialog({ open: false, cleanerId: null, cleanerName: '', isAvailable: true });
+          // Riapri il dialog di selezione cleaner se l'utente annulla
+          setIsAddCleanerDialogOpen(true);
+        }
+      }}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Inserisci Start Time</DialogTitle>
@@ -2195,25 +2205,58 @@ export default function TimelineView({
               <label className="text-sm font-semibold text-muted-foreground mb-2 block">
                 Start Time
               </label>
-              <Input
-                type="time"
-                value={pendingStartTime}
-                onChange={(e) => setPendingStartTime(e.target.value)}
-                className="w-full"
-                autoFocus
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    handleConfirmStartTimeAndAdd();
-                  }
-                }}
-              />
+              <div className="flex items-center justify-center gap-1 bg-background border-2 border-custom-blue rounded-lg px-3 py-2">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 w-8 p-0 hover:bg-red-100 dark:hover:bg-red-900"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    const [hours, minutes] = pendingStartTime.split(':').map(Number);
+                    let totalMinutes = hours * 60 + minutes - 30;
+                    if (totalMinutes < 0) totalMinutes += 24 * 60;
+                    const newHours = Math.floor(totalMinutes / 60);
+                    const newMinutes = totalMinutes % 60;
+                    const newTime = `${String(newHours).padStart(2, '0')}:${String(newMinutes).padStart(2, '0')}`;
+                    setPendingStartTime(newTime);
+                  }}
+                >
+                  <span className="text-lg font-bold">−</span>
+                </Button>
+                <span className="text-lg font-mono font-bold min-w-[60px] text-center">
+                  {pendingStartTime}
+                </span>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 w-8 p-0 hover:bg-green-100 dark:hover:bg-green-900"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    const [hours, minutes] = pendingStartTime.split(':').map(Number);
+                    let totalMinutes = hours * 60 + minutes + 30;
+                    if (totalMinutes >= 24 * 60) totalMinutes -= 24 * 60;
+                    const newHours = Math.floor(totalMinutes / 60);
+                    const newMinutes = totalMinutes % 60;
+                    const newTime = `${String(newHours).padStart(2, '0')}:${String(newMinutes).padStart(2, '0')}`;
+                    setPendingStartTime(newTime);
+                  }}
+                >
+                  <span className="text-lg font-bold">+</span>
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground mt-2 text-center">
+                Usa i pulsanti + e − per regolare a intervalli di 30 minuti
+              </p>
             </div>
           </div>
           <div className="flex justify-end gap-2 mt-6">
             <Button
               variant="outline"
               size="sm"
-              onClick={() => setStartTimeDialog({ open: false, cleanerId: null, cleanerName: '', isAvailable: true })}
+              onClick={() => {
+                setStartTimeDialog({ open: false, cleanerId: null, cleanerName: '', isAvailable: true });
+                setIsAddCleanerDialogOpen(true);
+              }}
               className="border-2 border-custom-blue"
             >
               Annulla
@@ -2224,7 +2267,7 @@ export default function TimelineView({
               onClick={handleConfirmStartTimeAndAdd}
               className="border-2 border-custom-blue"
             >
-              Conferma
+              Conferma e Aggiungi
             </Button>
           </div>
         </DialogContent>
