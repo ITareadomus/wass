@@ -391,6 +391,11 @@ export default function TimelineView({
   const globalTimelineMinutes = getGlobalTimelineMinutes();
   const globalStartTime = getGlobalStartTime();
 
+  // Esponi globalTimelineMinutes come variabile globale per permettere a TaskCard di usarla
+  React.useEffect(() => {
+    (window as any).globalTimelineMinutes = globalTimelineMinutes;
+  }, [globalTimelineMinutes]);
+
   // Palette di colori azzurri per i cleaners
   const cleanerColors = [
     { bg: '#0EA5E9', text: '#FFFFFF' }, // Azzurro
