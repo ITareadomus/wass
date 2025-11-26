@@ -134,9 +134,35 @@
       "telegram_id": null,
       "start_time": null,
       "can_do_straordinaria": false
+    },
+    {
+      "id": 937,
+      "name": "LOVETH",
+      "lastname": "IGUDIA",
+      "role": "Premium",
+      "active": true,
+      "ranking": 0,
+      "counter_hours": 4.5,
+      "counter_days": 1,
+      "available": true,
+      "contract_type": "a chiamata",
+      "preferred_customers": [
+        3,
+        61,
+        72,
+        75,
+        84,
+        94,
+        113,
+        115,
+        121
+      ],
+      "telegram_id": 7573041558,
+      "start_time": "10:00",
+      "can_do_straordinaria": false
     }
   ],
-  "total_selected": 6,
+  "total_selected": 7,
   "metadata": {
     "date": "2025-11-26",
     "saved_at": "2025-11-26T07:48:04.781Z"
