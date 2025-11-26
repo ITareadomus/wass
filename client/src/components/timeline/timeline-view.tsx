@@ -703,42 +703,13 @@ export default function TimelineView({
     const cleanerId = startTimeDialog.cleanerId;
     const isAvailable = startTimeDialog.isAvailable;
 
-    // CRITICAL: Salva lo start time PRIMA di aggiungere il cleaner
-    try {
-      const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
-      const response = await fetch('/api/update-cleaner-start-time', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          cleanerId,
-          startTime: pendingStartTime,
-          date: workDate,
-          modified_by: currentUser.username || 'unknown'
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error('Errore nel salvataggio dello start time');
-      }
-
-      console.log(`✅ Start time ${pendingStartTime} salvato per cleaner ${cleanerId}`);
-
-      // Aggiorna lo stato locale
-      setAvailableCleaners(prev => prev.map(c => 
-        c.id === cleanerId ? { ...c, start_time: pendingStartTime } : c
-      ));
-    } catch (error) {
-      console.error("Errore nel salvataggio dello start time:", error);
-      toast({
-        title: "Errore",
-        description: "Impossibile salvare lo start time",
-        variant: "destructive",
-      });
-      return; // Non continuare se il salvataggio fallisce
-    }
-
     // Chiudi il dialog dello start time
     setStartTimeDialog({ open: false, cleanerId: null, cleanerName: '', isAvailable: true });
+
+    // Aggiorna lo stato locale SUBITO con il nuovo start time
+    setAvailableCleaners(prev => prev.map(c => 
+      c.id === cleanerId ? { ...c, start_time: pendingStartTime } : c
+    ));
 
     // Se non disponibile, chiedi ulteriore conferma
     if (!isAvailable) {
@@ -746,7 +717,7 @@ export default function TimelineView({
       return;
     }
 
-    // Altrimenti procedi con l'aggiunta
+    // Procedi con l'aggiunta del cleaner (che ora includerà lo start time)
     if ((window as any).setHasUnsavedChanges) {
       (window as any).setHasUnsavedChanges(true);
     }
