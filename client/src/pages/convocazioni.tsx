@@ -366,7 +366,8 @@ export default function Convocazioni() {
       }
 
       // Combina cleaners dall'UI con quelli dalla timeline (evita duplicati)
-      const cleanersFromUI = cleaners.filter(c => selectedCleaners.has(c.id));
+      // IMPORTANTE: usa l'oggetto completo del cleaner da cleaners/filteredCleaners
+      const cleanersFromUI = filteredCleaners.filter(c => selectedCleaners.has(c.id));
       const timelineCleanerIds = new Set(timelineCleaners.map(c => c.id));
       const uniqueCleanersFromUI = cleanersFromUI.filter(c => !timelineCleanerIds.has(c.id));
       const selectedCleanersData = [...timelineCleaners, ...uniqueCleanersFromUI];
@@ -444,7 +445,8 @@ export default function Convocazioni() {
       const currentCleaners = currentData.cleaners || [];
 
       // Combina cleaners dall'UI con quelli dalla timeline
-      const cleanersFromUI = cleaners.filter(c => selectedCleaners.has(c.id));
+      // IMPORTANTE: usa l'oggetto completo del cleaner da filteredCleaners
+      const cleanersFromUI = filteredCleaners.filter(c => selectedCleaners.has(c.id));
       const timelineCleanerIds = new Set(timelineCleaners.map(c => c.id));
       const uniqueCleanersFromUI = cleanersFromUI.filter(c => !timelineCleanerIds.has(c.id));
       const allSelectedCleaners = [...timelineCleaners, ...uniqueCleanersFromUI];
