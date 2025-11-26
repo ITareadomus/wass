@@ -703,10 +703,10 @@ export default function TimelineView({
     const cleanerId = startTimeDialog.cleanerId;
     const isAvailable = startTimeDialog.isAvailable;
 
-    // Prima salva lo start time aggiornato
+    // CRITICAL: Salva lo start time PRIMA di aggiungere il cleaner
     try {
       const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
-      await fetch('/api/update-cleaner-start-time', {
+      const response = await fetch('/api/update-cleaner-start-time', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -717,12 +717,24 @@ export default function TimelineView({
         }),
       });
 
+      if (!response.ok) {
+        throw new Error('Errore nel salvataggio dello start time');
+      }
+
+      console.log(`✅ Start time ${pendingStartTime} salvato per cleaner ${cleanerId}`);
+
       // Aggiorna lo stato locale
       setAvailableCleaners(prev => prev.map(c => 
         c.id === cleanerId ? { ...c, start_time: pendingStartTime } : c
       ));
     } catch (error) {
       console.error("Errore nel salvataggio dello start time:", error);
+      toast({
+        title: "Errore",
+        description: "Impossibile salvare lo start time",
+        variant: "destructive",
+      });
+      return; // Non continuare se il salvataggio fallisce
     }
 
     // Chiudi il dialog dello start time

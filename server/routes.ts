@@ -2070,8 +2070,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
+      const workDate = date;
+      const currentUsername = modified_by || getCurrentUsername(req);
+
       // Carica selected_cleaners.json
-      const selectedCleanersPath = path.join(DATA_DIR, 'cleaners', 'selected_cleaners.json');
+      const selectedCleanersPath = path.join(process.cwd(), 'client/public/data/cleaners/selected_cleaners.json');
       let selectedCleanersData: any;
       try {
         const data = await fs.readFile(selectedCleanersPath, 'utf-8');
@@ -2094,36 +2097,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       selectedCleanersData.cleaners[cleanerIndex].start_time = startTime;
 
-      // Salva il file aggiornato
-      await atomicWrite(selectedCleanersPath, JSON.stringify(selectedCleanersData, null, 2));
+      // Salva il file aggiornato con scrittura atomica
+      const tmpPath = `${selectedCleanersPath}.tmp`;
+      await fs.writeFile(tmpPath, JSON.stringify(selectedCleanersData, null, 2));
+      await fs.rename(tmpPath, selectedCleanersPath);
 
       // Aggiorna anche timeline.json se il cleaner è presente
-      const timelinePath = path.join(DATA_DIR, 'output', 'timeline.json');
-      let timelineData: any;
+      const timelinePath = path.join(process.cwd(), 'client/public/data/output/timeline.json');
       try {
-        const data = await fs.readFile(timelinePath, 'utf-8');
-        timelineData = JSON.parse(data);
+        const timelineData = JSON.parse(await fs.readFile(timelinePath, 'utf-8'));
 
         const cleanerAssignment = timelineData.cleaners_assignments?.find((ca: any) => ca.cleaner?.id === cleanerId);
         if (cleanerAssignment && cleanerAssignment.cleaner) {
           cleanerAssignment.cleaner.start_time = startTime;
           
           // Aggiorna i metadata
-          if (!timelineData.metadata) {
-            timelineData.metadata = {};
-          }
-          timelineData.metadata.last_modified_by = modified_by || 'unknown';
+          timelineData.metadata = timelineData.metadata || {};
           timelineData.metadata.last_updated = new Date().toISOString();
+          timelineData.metadata.date = workDate;
 
-          await atomicWrite(timelinePath, JSON.stringify(timelineData, null, 2));
-          
-          // Salva su Object Storage
-          await saveToObjectStorage(date, timelineData);
+          // Preserva created_by e aggiorna modified_by
+          if (!timelineData.metadata.created_by) {
+            timelineData.metadata.created_by = currentUsername;
+          }
+          timelineData.metadata.modified_by = timelineData.metadata.modified_by || [];
+          if (currentUsername && currentUsername !== 'system' && currentUsername !== 'unknown' && !timelineData.metadata.modified_by.includes(currentUsername)) {
+            timelineData.metadata.modified_by.push(currentUsername);
+          }
+
+          // Salva timeline usando workspace helper (dual-write)
+          await workspaceFiles.saveTimeline(workDate, timelineData);
         }
       } catch (error) {
         console.log('Timeline.json non trovato o non aggiornato');
       }
 
+      console.log(`✅ Start time aggiornato per cleaner ${cleanerId}: ${startTime}`);
       res.json({ 
         success: true, 
         message: "Start time aggiornato con successo" 
