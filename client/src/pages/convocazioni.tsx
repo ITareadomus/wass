@@ -605,9 +605,11 @@ export default function Convocazioni() {
                           e.stopPropagation();
                           const currentTime = cleaner.start_time || "10:00";
                           const [hours, minutes] = currentTime.split(':').map(Number);
-                          let newHours = hours - 1;
-                          if (newHours < 0) newHours = 23;
-                          const newTime = `${String(newHours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+                          let totalMinutes = hours * 60 + minutes - 30;
+                          if (totalMinutes < 0) totalMinutes += 24 * 60;
+                          const newHours = Math.floor(totalMinutes / 60);
+                          const newMinutes = totalMinutes % 60;
+                          const newTime = `${String(newHours).padStart(2, '0')}:${String(newMinutes).padStart(2, '0')}`;
                           setCleaners(prev => prev.map(c => 
                             c.id === cleaner.id ? { ...c, start_time: newTime } : c
                           ));
@@ -629,9 +631,11 @@ export default function Convocazioni() {
                           e.stopPropagation();
                           const currentTime = cleaner.start_time || "10:00";
                           const [hours, minutes] = currentTime.split(':').map(Number);
-                          let newHours = hours + 1;
-                          if (newHours > 23) newHours = 0;
-                          const newTime = `${String(newHours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+                          let totalMinutes = hours * 60 + minutes + 30;
+                          if (totalMinutes >= 24 * 60) totalMinutes -= 24 * 60;
+                          const newHours = Math.floor(totalMinutes / 60);
+                          const newMinutes = totalMinutes % 60;
+                          const newTime = `${String(newHours).padStart(2, '0')}:${String(newMinutes).padStart(2, '0')}`;
                           setCleaners(prev => prev.map(c => 
                             c.id === cleaner.id ? { ...c, start_time: newTime } : c
                           ));
