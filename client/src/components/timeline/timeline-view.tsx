@@ -353,25 +353,20 @@ export default function TimelineView({
     return minTime;
   };
 
-  // Genera time slots globali basati sullo start time minimo
+  // Genera time slots globali basati sullo start time minimo (solo orari interi)
   const generateGlobalTimeSlots = () => {
     const globalStartTime = getGlobalStartTime();
     const [startHour, startMin] = globalStartTime.split(':').map(Number);
+    
+    // Arrotonda all'ora intera precedente per iniziare sempre da un'ora intera
+    const startHourRounded = startMin > 0 ? startHour : startHour;
     const endHour = 19; // Fine fissa alle 19:00
 
     const slots: string[] = [];
-    let currentHour = startHour;
-    let currentMin = startMin;
-
-    // Genera slot ogni ora fino alle 19:00
-    while (currentHour < endHour || (currentHour === endHour && currentMin === 0)) {
-      slots.push(`${String(currentHour).padStart(2, '0')}:${String(currentMin).padStart(2, '0')}`);
-      currentHour++;
-    }
-
-    // Aggiungi sempre 19:00 come ultimo slot
-    if (slots[slots.length - 1] !== "19:00") {
-      slots.push("19:00");
+    
+    // Genera slot ogni ora fino alle 19:00 (solo orari interi)
+    for (let hour = startHourRounded; hour <= endHour; hour++) {
+      slots.push(`${String(hour).padStart(2, '0')}:00`);
     }
 
     return slots;
