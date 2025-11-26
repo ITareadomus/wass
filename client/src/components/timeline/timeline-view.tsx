@@ -78,6 +78,8 @@ export default function TimelineView({
   const [confirmUnavailableDialog, setConfirmUnavailableDialog] = useState<{ open: boolean; cleanerId: number | null }>({ open: false, cleanerId: null });
   const [confirmRemovalDialog, setConfirmRemovalDialog] = useState<{ open: boolean; cleanerId: number | null }>({ open: false, cleanerId: null });
   const [incompatibleDialog, setIncompatibleDialog] = useState<{ open: boolean; cleanerId: number | null; tasks: Array<{ logisticCode: string; taskType: string }> }>({ open: false, cleanerId: null, tasks: [] });
+  const [startTimeDialog, setStartTimeDialog] = useState<{ open: boolean; cleanerId: number | null; cleanerName: string; isAvailable: boolean }>({ open: false, cleanerId: null, cleanerName: '', isAvailable: true });
+  const [pendingStartTime, setPendingStartTime] = useState<string>("10:00");
 
   // Stato per tracciare acknowledge per coppie (task, cleaner)
   type IncompatibleKey = string; // chiave del tipo `${taskId}-${cleanerId}`
@@ -677,28 +679,52 @@ export default function TimelineView({
 
   // Handler per aggiungere/sostituire un cleaner
   const handleAddCleaner = (cleanerId: number, isAvailable: boolean) => {
+    // Trova il nome del cleaner per mostrarlo nel dialog
+    const cleaner = availableCleaners.find(c => c.id === cleanerId);
+    const cleanerName = cleaner ? `${cleaner.name} ${cleaner.lastname}` : `ID ${cleanerId}`;
+    
+    // Apri il dialog per richiedere lo start time
+    setStartTimeDialog({ 
+      open: true, 
+      cleanerId, 
+      cleanerName,
+      isAvailable 
+    });
+    setPendingStartTime("10:00"); // Reset al valore di default
+  };
+
+  // Handler per confermare start time e aggiungere cleaner
+  const handleConfirmStartTimeAndAdd = () => {
+    if (!startTimeDialog.cleanerId) return;
+
+    const cleanerId = startTimeDialog.cleanerId;
+    const isAvailable = startTimeDialog.isAvailable;
+
+    // Chiudi il dialog dello start time
+    setStartTimeDialog({ open: false, cleanerId: null, cleanerName: '', isAvailable: true });
+
+    // Se non disponibile, chiedi ulteriore conferma
     if (!isAvailable) {
-      // Se il cleaner non è disponibile, apri il dialog di conferma
-      setConfirmUnavailableDialog({ open: true, cleanerId: cleanerId });
-    } else {
-      // Altrimenti, procedi con l'aggiunta/sostituzione normale
-      if ((window as any).setHasUnsavedChanges) {
-        (window as any).setHasUnsavedChanges(true);
-      }
-      if (cleanerToReplace) {
-        // Sostituzione: prima rimuovi il vecchio, poi aggiungi il nuovo
-        removeCleanerMutation.mutate(cleanerToReplace, {
-          onSuccess: () => {
-            addCleanerMutation.mutate(cleanerId);
-            setCleanerToReplace(null);
-          }
-        });
-      } else {
-        // Aggiunta normale
-        addCleanerMutation.mutate(cleanerId);
-      }
-      setIsAddCleanerDialogOpen(false); // Chiudi il dialog di aggiunta
+      setConfirmUnavailableDialog({ open: true, cleanerId });
+      return;
     }
+
+    // Altrimenti procedi con l'aggiunta
+    if ((window as any).setHasUnsavedChanges) {
+      (window as any).setHasUnsavedChanges(true);
+    }
+    
+    if (cleanerToReplace) {
+      removeCleanerMutation.mutate(cleanerToReplace, {
+        onSuccess: () => {
+          addCleanerMutation.mutate(cleanerId);
+          setCleanerToReplace(null);
+        }
+      });
+    } else {
+      addCleanerMutation.mutate(cleanerId);
+    }
+    setIsAddCleanerDialogOpen(false);
   };
 
   // Handler per confermare l'aggiunta di un cleaner non disponibile
@@ -1903,6 +1929,55 @@ export default function TimelineView({
                 );
               })
             )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog per richiedere start time */}
+      <Dialog open={startTimeDialog.open} onOpenChange={(open) => !open && setStartTimeDialog({ open: false, cleanerId: null, cleanerName: '', isAvailable: true })}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Inserisci Start Time</DialogTitle>
+            <DialogDescription>
+              Inserisci l'orario di inizio per <strong>{startTimeDialog.cleanerName}</strong>
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 mt-4">
+            <div>
+              <label className="text-sm font-semibold text-muted-foreground mb-2 block">
+                Start Time
+              </label>
+              <Input
+                type="time"
+                value={pendingStartTime}
+                onChange={(e) => setPendingStartTime(e.target.value)}
+                className="w-full"
+                autoFocus
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    handleConfirmStartTimeAndAdd();
+                  }
+                }}
+              />
+            </div>
+          </div>
+          <div className="flex justify-end gap-2 mt-6">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setStartTimeDialog({ open: false, cleanerId: null, cleanerName: '', isAvailable: true })}
+              className="border-2 border-custom-blue"
+            >
+              Annulla
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleConfirmStartTimeAndAdd}
+              className="border-2 border-custom-blue"
+            >
+              Conferma
+            </Button>
           </div>
         </DialogContent>
       </Dialog>
