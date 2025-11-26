@@ -2472,7 +2472,7 @@ export default function TimelineView({
             </AlertDialogCancel>
             <AlertDialogAction
               onClick={handleTransferToAdam}
-              className="border-2 border-custom-blue bg-background hover:bg-accent hover:text-accent-foreground"
+              className="border-2 border-custom-blue bg-background text-foreground hover:bg-accent hover:text-accent-foreground"
             >
               Ho capito
             </AlertDialogAction>
