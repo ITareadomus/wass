@@ -131,6 +131,10 @@ export default function TimelineView({
   // Stato per memorizzare i dati della timeline (inclusi i metadata)
   const [timelineData, setTimelineData] = useState<any>(null);
 
+  // Carica anche i cleaner dalla timeline.json per mostrare quelli nascosti
+  // DEVE essere definito PRIMA di allCleanersToShow che lo usa
+  const [timelineCleaners, setTimelineCleaners] = useState<any[]>([]);
+
   // Normalizza la data da localStorage per coerenza ovunque
   const workDate = localStorage.getItem('selected_work_date') || (() => {
     const today = new Date();
@@ -1256,9 +1260,6 @@ export default function TimelineView({
   };
 
   const [lastSavedFilename, setLastSavedFilename] = useState<string | null>(null);
-
-  // Carica anche i cleaner dalla timeline.json per mostrare quelli nascosti
-  const [timelineCleaners, setTimelineCleaners] = useState<any[]>([]);
 
   const loadTimelineCleaners = async () => {
     try {
