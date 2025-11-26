@@ -2154,47 +2154,39 @@ export default function TimelineView({
                   <p className="text-sm">{selectedCleaner.counter_hours}</p>
                 </div>
                 <div>
+                  <p className="text-sm font-semibold text-muted-foreground mb-1 flex items-center gap-1">
+                    Start Time
+                    {!isReadOnly && <Pencil className="w-3 h-3 text-muted-foreground/60" />}
+                  </p>
+                  <p
+                    className={`text-sm p-2 rounded ${!isReadOnly ? 'cursor-pointer hover:bg-muted/50 border border-transparent hover:border-border' : ''}`}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (!isReadOnly) {
+                        const newTime = prompt('Inserisci il nuovo start time (formato HH:mm):', editingStartTime);
+                        if (newTime && /^\d{2}:\d{2}$/.test(newTime)) {
+                          setEditingStartTime(newTime);
+                          handleSaveStartTime();
+                        } else if (newTime) {
+                          toast({
+                            variant: "destructive",
+                            title: "⚠️ Formato orario non valido",
+                            description: "Inserisci un orario nel formato HH:mm (es. 10:00)"
+                          });
+                        }
+                      }
+                    }}
+                  >
+                    {selectedCleaner.start_time || "10:00"}
+                  </p>
+                </div>
+                <div>
                   <p className="text-sm font-semibold text-muted-foreground">Ore questa settimana</p>
                   <p className="text-sm">{selectedCleaner.weekly_hours?.toFixed(2) || '0.00'}</p>
                 </div>
                 <div>
                   <p className="text-sm font-semibold text-muted-foreground">Tipo contratto</p>
                   <p className="text-sm">{selectedCleaner.contract_type}</p>
-                </div>
-              </div>
-
-              {/* Sezione Start Time */}
-              <div className="border-t pt-4 mt-4">
-                <p className="text-sm font-semibold text-muted-foreground mb-3">
-                  Orario di Inizio
-                </p>
-                <div className="flex gap-3 items-end">
-                  <div className="flex-1">
-                    <label className="text-sm text-muted-foreground mb-2 block">
-                      Start Time
-                    </label>
-                    <Input
-                      type="time"
-                      value={editingStartTime}
-                      onChange={(e) => setEditingStartTime(e.target.value)}
-                      className="w-full"
-                      disabled={isReadOnly}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') {
-                          handleSaveStartTime();
-                        }
-                      }}
-                    />
-                  </div>
-                  <Button
-                    onClick={handleSaveStartTime}
-                    disabled={isReadOnly}
-                    variant="outline"
-                    className="border-2 border-custom-blue"
-                  >
-                    <Save className="h-4 w-4 mr-2" />
-                    Salva
-                  </Button>
                 </div>
               </div>
 
