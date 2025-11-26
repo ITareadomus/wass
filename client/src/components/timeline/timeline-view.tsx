@@ -313,7 +313,7 @@ export default function TimelineView({
   // Trova lo start time minimo tra tutti i cleaner
   const getGlobalStartTime = () => {
     if (allCleanersToShow.length === 0) return "10:00";
-    
+
     const startTimes = allCleanersToShow.map(c => c.start_time || "10:00");
     const minTime = startTimes.reduce((min, current) => {
       const [minH, minM] = min.split(':').map(Number);
@@ -322,7 +322,7 @@ export default function TimelineView({
       const curMinutes = curH * 60 + curM;
       return curMinutes < minMinutes ? current : min;
     });
-    
+
     return minTime;
   };
 
@@ -331,25 +331,25 @@ export default function TimelineView({
     const globalStartTime = getGlobalStartTime();
     const [startHour, startMin] = globalStartTime.split(':').map(Number);
     const endHour = 19; // Fine fissa alle 19:00
-    
+
     const slots: string[] = [];
     let currentHour = startHour;
     let currentMin = startMin;
-    
+
     // Genera slot ogni ora fino alle 19:00
     while (currentHour < endHour || (currentHour === endHour && currentMin === 0)) {
       slots.push(`${String(currentHour).padStart(2, '0')}:${String(currentMin).padStart(2, '0')}`);
       currentHour++;
     }
-    
+
     // Aggiungi sempre 19:00 come ultimo slot
     if (slots[slots.length - 1] !== "19:00") {
       slots.push("19:00");
     }
-    
+
     return slots;
   };
-  
+
   // Calcola i minuti totali della timeline globale
   const getGlobalTimelineMinutes = () => {
     const globalStartTime = getGlobalStartTime();
@@ -370,7 +370,6 @@ export default function TimelineView({
     { bg: '#38BDF8', text: '#FFFFFF' }, // Azzurro chiaro
     { bg: '#0284C7', text: '#FFFFFF' }, // Azzurro scuro
     { bg: '#7DD3FC', text: '#000000' }, // Azzurro molto chiaro
-    { bg: '#075985', text: '#FFFFFF' }, // Azzurro molto scuro
     { bg: '#06B6D4', text: '#FFFFFF' }, // Ciano
     { bg: '#22D3EE', text: '#000000' }, // Ciano chiaro
     { bg: '#0891B2', text: '#FFFFFF' }, // Ciano scuro
@@ -1765,21 +1764,21 @@ export default function TimelineView({
                                 if (idx === 0) {
                                   const [globalStartHour, globalStartMin] = globalStartTime.split(':').map(Number);
                                   const globalStartMinutes = globalStartHour * 60 + globalStartMin;
-                                  
+
                                   const [cleanerStartHour, cleanerStartMin] = cleanerStartTime.split(':').map(Number);
                                   const cleanerStartMinutes = cleanerStartHour * 60 + cleanerStartMin;
-                                  
+
                                   // Se il cleaner inizia dopo lo start globale, aggiungi offset
                                   const cleanerOffset = cleanerStartMinutes - globalStartMinutes;
                                   if (cleanerOffset > 0) {
                                     timeOffset = cleanerOffset;
                                   }
-                                  
+
                                   // Se la task ha un start_time specifico, aggiungi ulteriore offset
                                   if (taskObj.start_time) {
                                     const [taskHours, taskMinutes] = taskObj.start_time.split(':').map(Number);
                                     const taskStartMinutes = taskHours * 60 + taskMinutes;
-                                    
+
                                     const additionalOffset = taskStartMinutes - cleanerStartMinutes;
                                     if (additionalOffset > 0) {
                                       timeOffset += additionalOffset;
