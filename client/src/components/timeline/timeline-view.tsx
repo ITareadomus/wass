@@ -706,6 +706,26 @@ export default function TimelineView({
     // Chiudi il dialog dello start time
     setStartTimeDialog({ open: false, cleanerId: null, cleanerName: '', isAvailable: true });
 
+    // CRITICAL: Salva lo start time PRIMA di aggiungere il cleaner
+    // Questo garantisce che selected_cleaners.json abbia lo start time corretto
+    try {
+      const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
+      await fetch('/api/update-cleaner-start-time', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          cleanerId,
+          startTime: pendingStartTime,
+          date: workDate,
+          modified_by: currentUser.username || 'unknown'
+        }),
+      });
+
+      console.log(`✅ Start time ${pendingStartTime} pre-salvato per cleaner ${cleanerId}`);
+    } catch (error) {
+      console.error("Errore nel pre-salvataggio dello start time:", error);
+    }
+
     // Aggiorna lo stato locale SUBITO con il nuovo start time
     setAvailableCleaners(prev => prev.map(c => 
       c.id === cleanerId ? { ...c, start_time: pendingStartTime } : c
