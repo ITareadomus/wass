@@ -90,6 +90,8 @@ export default function TimelineView({
   const [pendingStartTime, setPendingStartTime] = useState<string>("10:00");
   const [pendingCleaner, setPendingCleaner] = useState<any>(null); // Added to track pending cleaner ID
   const [showAdamTransferDialog, setShowAdamTransferDialog] = useState(false); // Stato per il dialog di trasferimento ADAM
+  const [unsavedChanges, setUnsavedChanges] = useState(false); // Stato per tracciare modifiche non salvate
+  const [lastSavedTimestamp, setLastSavedTimestamp] = useState<string | null>(null); // Stato per l'ultimo timestamp di salvataggio
 
   // Stato per tracciare acknowledge per coppie (task, cleaner)
   type IncompatibleKey = string; // chiave del tipo `${taskId}-${cleanerId}`
@@ -353,13 +355,13 @@ export default function TimelineView({
   const generateGlobalTimeSlots = () => {
     const globalStartTime = getGlobalStartTime();
     const [startHour, startMin] = globalStartTime.split(':').map(Number);
-    
+
     // Arrotonda all'ora intera precedente per iniziare sempre da un'ora intera
     const startHourRounded = startMin > 0 ? startHour : startHour;
     const endHour = 19; // Fine fissa alle 19:00
 
     const slots: string[] = [];
-    
+
     // Genera slot ogni ora fino alle 19:00 (solo orari interi)
     for (let hour = startHourRounded; hour <= endHour; hour++) {
       slots.push(`${String(hour).padStart(2, '0')}:00`);
@@ -372,7 +374,7 @@ export default function TimelineView({
   const getGlobalTimelineMinutes = () => {
     const globalStartTime = getGlobalStartTime();
     const [startHour, startMin] = globalStartTime.split(':').map(Number);
-    
+
     // CRITICAL: Usa l'ora arrotondata (come la griglia visiva) per calcolare i minuti
     const startHourRounded = startMin > 0 ? startHour : startHour;
     const startMinutes = startHourRounded * 60; // Parte dall'ora intera
@@ -577,6 +579,11 @@ export default function TimelineView({
       }
       const data = await response.json();
       setTimelineData(data);
+      // Aggiorna timestamp e stato di salvataggio
+      if (data.metadata?.last_updated) {
+        setLastSavedTimestamp(new Date(data.metadata.last_updated).toLocaleString('it-IT'));
+        setUnsavedChanges(false); // Reset unsaved changes after loading
+      }
     } catch (error) {
       console.error("Errore nel caricamento dei dati della timeline:", error);
       setTimelineData(null);
@@ -912,6 +919,11 @@ export default function TimelineView({
 
       // Procedi con l'aggiunta/sostituzione come al solito
       // Salvataggio automatico - nessun flag necessario
+
+      // Imposta unsavedChanges a true dopo un'azione utente
+      setUnsavedChanges(true);
+      setLastSavedTimestamp(null);
+
       if (cleanerToReplace) {
         removeCleanerMutation.mutate(cleanerToReplace, {
           onSuccess: () => {
@@ -986,6 +998,10 @@ export default function TimelineView({
         variant: "success",
       });
 
+      // Imposta unsavedChanges a true dopo un'azione utente
+      setUnsavedChanges(true);
+      setLastSavedTimestamp(null);
+
       // Chiudi il dialog
       setAliasDialog({ open: false, cleanerId: null, cleanerName: '' });
 
@@ -1043,7 +1059,9 @@ export default function TimelineView({
         setSelectedCleaner({ ...selectedCleaner, start_time: editingStartTime });
       }
 
-      // Salvataggio automatico - nessun flag necessario
+      // Imposta unsavedChanges a true dopo un'azione utente
+      setUnsavedChanges(true);
+      setLastSavedTimestamp(null);
 
       toast({
         title: "Start Time salvato",
@@ -1180,6 +1198,9 @@ export default function TimelineView({
           description: "Timeline svuotata, task tornate nei containers",
           variant: "success",
         });
+        // Imposta unsavedChanges a true dopo un'azione utente
+        setUnsavedChanges(true);
+        setLastSavedTimestamp(null);
       } else {
         throw new Error('Errore nel ricaricamento dei file JSON');
       }
@@ -1330,6 +1351,9 @@ export default function TimelineView({
         description: "Task rimossa dalla timeline e salvata automaticamente",
         variant: "success",
       });
+      // Imposta unsavedChanges a true dopo un'azione utente
+      setUnsavedChanges(true);
+      setLastSavedTimestamp(null);
     },
     onError: (error: any) => {
       toast({
@@ -1379,6 +1403,9 @@ export default function TimelineView({
           title: "✅ Trasferimento completato",
           description: result.message || `Task aggiornate sul database ADAM`,
         });
+        // Dopo il trasferimento riuscito, considera le modifiche come salvate
+        setUnsavedChanges(false);
+        setLastSavedTimestamp(new Date().toLocaleString('it-IT'));
       } else {
         toast({
           title: "❌ Errore trasferimento",
@@ -1448,6 +1475,42 @@ export default function TimelineView({
                 Reset Assegnazioni
               </Button>
             </div>
+          </div>
+          {/* Header con status e pulsante ADAM */}
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            {!unsavedChanges && !isReadOnly ? (
+              <div className="flex items-center gap-2 text-green-600 dark:text-green-400 text-sm font-medium bg-green-50 dark:bg-green-900/30 px-3 py-2 rounded-md border border-green-200 dark:border-green-800">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+                Salvataggio automatico attivo
+              </div>
+            ) : unsavedChanges ? (
+              <div className="flex items-center gap-2 text-amber-600 dark:text-amber-400 text-sm font-medium bg-amber-50 dark:bg-amber-950/30 px-3 py-2 rounded-md border border-amber-200 dark:border-amber-800">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+                Modifiche non salvate
+              </div>
+            ) : (
+              // Se in readOnly e non ci sono modifiche non salvate, mostra messaggio placeholder o nulla
+              // In questo caso, manteniamo il pulsante ADAM visibile se non è readOnly
+              // Questo blocco è vuoto perché il pulsante ADAM è gestito sotto
+              null
+            )}
+            {!isReadOnly && (
+              <Button
+                onClick={() => setShowAdamTransferDialog(true)}
+                size="sm"
+                variant="outline"
+                className="w-full max-w-xs border-2 border-custom-blue"
+              >
+                <svg className="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                </svg>
+                Trasferisci su ADAM
+              </Button>
+            )}
           </div>
         </div>
         <div className="p-4 overflow-x-auto">
@@ -1803,17 +1866,6 @@ export default function TimelineView({
                     📜 Sei in modalità storico
                   </Button>
                 )}
-                <Button
-                  onClick={() => setShowAdamTransferDialog(true)}
-                  size="sm"
-                  variant="outline"
-                  className="ml-2 border-2 border-custom-blue"
-                >
-                  <svg className="mr-2 h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
-                  </svg>
-                  Trasferisci su ADAM
-                </Button>
               </div>
             </div>
           </div>
