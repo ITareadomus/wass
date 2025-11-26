@@ -1,6 +1,6 @@
 {
   "metadata": {
-    "last_updated": "2025-11-26T15:06:20.360039",
+    "last_updated": "2025-11-26T15:15:15.291337",
     "date": "2025-11-26"
   },
   "containers": {
@@ -44,8 +44,8 @@
           "cleaning_time": 180,
           "checkin_date": "2025-11-29",
           "checkout_date": "2025-11-26",
-          "checkin_time": "",
-          "checkout_time": "11:00",
+          "checkin_time": null,
+          "checkout_time": null,
           "pax_in": 4,
           "pax_out": 3,
           "small_equipment": false,
