@@ -1,6 +1,6 @@
 {
   "metadata": {
-    "last_updated": "2025-11-26T09:50:26.783Z",
+    "last_updated": "2025-11-26T09:53:52.038Z",
     "date": "2025-11-26",
     "created_by": "Admin",
     "modified_by": [
@@ -10,11 +10,22 @@
   "cleaners_assignments": [
     {
       "cleaner": {
+        "id": 249,
+        "name": "Ogbodo Chidi",
+        "lastname": "Igwe",
+        "role": "Premium",
+        "premium": true
+      },
+      "tasks": []
+    },
+    {
+      "cleaner": {
         "id": 626,
         "name": "DORA PATRICIA",
         "lastname": "JIMENEZ",
         "role": "Formatore",
-        "premium": false
+        "premium": false,
+        "start_time": "08:00"
       },
       "tasks": [
         {
@@ -40,7 +51,8 @@
           "alias": "NTM",
           "customer_name": "NOTA-MI",
           "reasons": [
-            "manually_moved_to_timeline"
+            "manually_moved_to_timeline",
+            "manual_assignment"
           ],
           "priority": "early_out",
           "start_time": "10:00",
@@ -51,31 +63,10 @@
           "modified_by": "Admin"
         }
       ]
-    },
-    {
-      "cleaner": {
-        "id": 249,
-        "name": "Ogbodo Chidi",
-        "lastname": "Igwe",
-        "role": "Premium",
-        "premium": true,
-        "start_time": "09:00"
-      },
-      "tasks": []
-    },
-    {
-      "cleaner": {
-        "id": 132,
-        "name": "JOHOISER ERNESTO",
-        "lastname": "LOPEZ GIRON",
-        "role": "Premium",
-        "premium": true
-      },
-      "tasks": []
     }
   ],
   "meta": {
-    "total_cleaners": 3,
+    "total_cleaners": 2,
     "used_cleaners": 0,
     "assigned_tasks": 0,
     "total_tasks": 1
