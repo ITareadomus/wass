@@ -502,9 +502,9 @@ export default function TaskCard({
     const effectiveMinutes = totalMinutes === 0 ? 30 : totalMinutes;
 
     if (forTimeline) {
-      // La timeline copre 10 ore (dalle 10:00 alle 19:00 = 600 minuti)
-      // Ogni ora occupa il 10% della larghezza totale
-      const widthPercentage = (effectiveMinutes / 600) * 100;
+      // Usa la durata effettiva della timeline globale (disponibile come global window var)
+      const globalTimelineMinutes = (window as any).globalTimelineMinutes || 540; // fallback 9 ore (10:00-19:00)
+      const widthPercentage = (effectiveMinutes / globalTimelineMinutes) * 100;
       return `${widthPercentage}%`;
     } else {
       // Per le colonne di priorità:
