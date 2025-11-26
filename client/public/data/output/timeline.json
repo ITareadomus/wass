@@ -1,54 +1,13 @@
 {
   "metadata": {
-    "last_updated": "2025-11-26T14:30:35.016657",
-    "date": "2025-11-26"
+    "last_updated": "2025-11-26T14:33:43.811Z",
+    "date": "2025-11-26",
+    "created_by": "system",
+    "modified_by": [
+      "Admin"
+    ]
   },
   "cleaners_assignments": [
-    {
-      "cleaner": {
-        "id": 249,
-        "name": "Ogbodo Chidi",
-        "lastname": "Igwe",
-        "role": "Premium",
-        "premium": true
-      },
-      "tasks": [
-        {
-          "task_id": 219412,
-          "logistic_code": 1693,
-          "client_id": 124,
-          "premium": false,
-          "address": "VIA TOLENTINO 1",
-          "lat": "45.4879867",
-          "lng": "9.1605552",
-          "cleaning_time": 300,
-          "checkin_date": "2025-11-26",
-          "checkout_date": "2025-11-26",
-          "checkin_time": "",
-          "checkout_time": "08:30",
-          "pax_in": 0,
-          "pax_out": 0,
-          "small_equipment": false,
-          "operation_id": 3,
-          "confirmed_operation": true,
-          "straordinaria": true,
-          "type_apt": "C",
-          "alias": "HMST",
-          "customer_name": "HOMING STAYS",
-          "priority": "low_priority",
-          "reasons": [
-            "not_eo",
-            "not_hp",
-            "automatic_assignment_lp"
-          ],
-          "start_time": "10:00",
-          "end_time": "15:00",
-          "followup": false,
-          "sequence": 1,
-          "travel_time": 0
-        }
-      ]
-    },
     {
       "cleaner": {
         "id": 596,
@@ -206,11 +165,55 @@
           "travel_time": 45
         }
       ]
+    },
+    {
+      "cleaner": {
+        "id": 249,
+        "name": "Ogbodo Chidi",
+        "lastname": "Igwe",
+        "role": "Premium",
+        "premium": false
+      },
+      "tasks": [
+        {
+          "task_id": 219412,
+          "logistic_code": 1693,
+          "client_id": null,
+          "premium": false,
+          "address": "VIA TOLENTINO 1",
+          "lat": "45.4879867",
+          "lng": "9.1605552",
+          "cleaning_time": 300,
+          "checkin_date": "2025-11-26",
+          "checkout_date": "2025-11-26",
+          "checkin_time": null,
+          "checkout_time": "11:30",
+          "pax_in": 0,
+          "pax_out": 0,
+          "small_equipment": false,
+          "operation_id": 3,
+          "confirmed_operation": true,
+          "straordinaria": true,
+          "type_apt": "C",
+          "alias": "HMST",
+          "customer_name": "HOMING STAYS",
+          "reasons": [
+            "manually_moved_to_timeline"
+          ],
+          "priority": "low_priority",
+          "start_time": "11:30",
+          "end_time": "16:30",
+          "followup": false,
+          "sequence": 1,
+          "travel_time": 0,
+          "modified_by": "Admin"
+        }
+      ]
     }
   ],
   "meta": {
     "total_cleaners": 3,
-    "total_tasks": 0,
+    "total_tasks": 5,
     "used_cleaners": 3,
     "assigned_tasks": 5
   }
