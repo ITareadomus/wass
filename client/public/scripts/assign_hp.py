@@ -296,10 +296,14 @@ def evaluate_route(cleaner: Cleaner, route: List[Task]) -> Tuple[bool, List[Tupl
     # NUOVA LOGICA: HP può iniziare prima delle 11:00 se:
     # 1. Il cleaner è libero (arrival < 11:00)
     # 2. Il checkout lo permette
+    # ECCEZIONE: Straordinarie possono iniziare senza vincoli orari
     hp_hard_earliest = datetime(arrival.year, arrival.month, arrival.day, HP_HARD_EARLIEST_H, HP_HARD_EARLIEST_M)
 
-    # Se il cleaner è libero prima delle 11:00, può iniziare prima (rispettando il checkout)
-    if first.checkout_dt:
+    if first.straordinaria:
+        # Straordinarie: rispetta SOLO il checkout, nessun vincolo HP hard earliest
+        if first.checkout_dt:
+            arrival = max(arrival, first.checkout_dt)
+    elif first.checkout_dt:
         # Rispetta il checkout, ma può iniziare prima delle 11:00 se libero
         arrival = max(arrival, first.checkout_dt)
     else:
@@ -666,6 +670,8 @@ def plan_day(
 ) -> Tuple[List[Cleaner], List[Task]]:
     """
     Assegna le task High-Priority con:
+    - STRAORDINARIE: possono iniziare prima delle 11:00, assegnate al cleaner
+      con start_time minore che ha can_do_straordinaria=True
     - HARD CLUSTER edificio/via o "stesso blocco" (same_building + is_nearby_same_block)
     - FAIRNESS: evita che un cleaner abbia molte più task degli altri,
       ignorando i cleaner vuoti
@@ -679,6 +685,33 @@ def plan_day(
         assigned_logistic_codes = set()
 
     unassigned: List[Task] = []
+
+    for task in tasks:
+        # STRAORDINARIE: logica dedicata
+        if task.straordinaria:
+            # Filtra solo cleaner che possono fare straordinarie
+            straordinaria_cleaners = [
+                c for c in cleaners
+                if c.can_do_straordinaria and can_cleaner_handle_apartment(c.role, task.apt_type)
+            ]
+            
+            if not straordinaria_cleaners:
+                unassigned.append(task)
+                continue
+            
+            # Trova cleaner con start_time minore (datetime)
+            earliest_cleaner = min(straordinaria_cleaners, key=lambda c: c.start_time)
+            
+            # Verifica se può prendere la task (pos 0)
+            result = find_best_position(earliest_cleaner, task)
+            if result is None:
+                unassigned.append(task)
+                continue
+            
+            pos, _ = result
+            earliest_cleaner.route.insert(pos, task)
+            assigned_logistic_codes.add(task.logistic_code)
+            continue
 
     for task in tasks:
         if task.logistic_code in assigned_logistic_codes:
