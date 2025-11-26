@@ -2317,6 +2317,61 @@ export async function registerRoutes(app: Express): Promise<Server> {
         workspaceFiles.saveTimeline(workDate, timelineData)
       ]);
 
+      // CRITICAL: Propaga le modifiche al database MySQL (wass_housekeeping)
+      if (taskId) {
+        try {
+          const mysql = await import('mysql2/promise');
+          const connection = await mysql.createConnection({
+            host: "139.59.132.41",
+            user: "admin",
+            password: "ed329a875c6c4ebdf4e87e2bbe53a15771b5844ef6606dde",
+            database: "adamdb",
+          });
+
+          // Costruisci query UPDATE dinamica (aggiorna solo i campi forniti)
+          const updates: string[] = [];
+          const values: any[] = [];
+
+          if (checkoutDate !== undefined) {
+            updates.push('checkout = ?');
+            values.push(checkoutDate);
+          }
+          if (checkoutTime !== undefined) {
+            updates.push('checkout_time = ?');
+            values.push(checkoutTime);
+          }
+          if (checkinDate !== undefined) {
+            updates.push('checkin = ?');
+            values.push(checkinDate);
+          }
+          if (checkinTime !== undefined) {
+            updates.push('checkin_time = ?');
+            values.push(checkinTime);
+          }
+          if (paxIn !== undefined) {
+            updates.push('checkin_pax = ?');
+            values.push(paxIn);
+          }
+          if (operationId !== undefined) {
+            updates.push('operation_id = ?');
+            values.push(operationId);
+          }
+
+          if (updates.length > 0) {
+            values.push(taskId); // WHERE id = ?
+            const query = `UPDATE wass_housekeeping SET ${updates.join(', ')} WHERE id = ?`;
+            
+            await connection.execute(query, values);
+            await connection.end();
+            
+            console.log(`✅ Task ${logisticCode} aggiornata anche su database MySQL`);
+          }
+        } catch (dbError: any) {
+          console.error('⚠️ Errore aggiornamento database MySQL:', dbError.message);
+          // Non bloccare la risposta, i file JSON sono comunque salvati
+        }
+      }
+
       console.log(`✅ Task ${logisticCode} aggiornata con successo`);
       res.json({ success: true, message: "Task aggiornata con successo" });
     } catch (error: any) {
