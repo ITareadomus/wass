@@ -2357,10 +2357,6 @@ export default function TimelineView({
                   </p>
                 </div>
                 <div>
-                  <p className="text-sm font-semibold text-muted-foreground">Ore questa settimana</p>
-                  <p className="text-sm">{selectedCleaner.weekly_hours?.toFixed(2) || '0.00'}</p>
-                </div>
-                <div>
                   <p className="text-sm font-semibold text-muted-foreground">Tipo contratto</p>
                   <p className="text-sm">{selectedCleaner.contract_type}</p>
                 </div>
