@@ -42,7 +42,6 @@ import {
 interface TimelineViewProps {
   personnel: Personnel[];
   tasks: Task[];
-  hasUnsavedChanges?: boolean; // Stato delle modifiche non salvate dal parent
   onTaskMoved?: () => void; // Callback quando una task viene spostata
   isReadOnly?: boolean; // Modalità read-only: disabilita tutte le modifiche
 }
@@ -68,7 +67,6 @@ interface Cleaner {
 export default function TimelineView({
   personnel,
   tasks,
-  hasUnsavedChanges = false,
   onTaskMoved,
   isReadOnly = false,
 }: TimelineViewProps) {
@@ -182,9 +180,7 @@ export default function TimelineView({
     },
     onSuccess: async (data) => {
       // CRITICAL: Marca modifiche SOLO dopo azioni utente
-      if ((window as any).setHasUnsavedChanges) {
-        (window as any).setHasUnsavedChanges(true);
-      }
+      // Salvataggio automatico - nessun flag necessario
       if (onTaskMoved) {
         onTaskMoved();
       }
@@ -850,10 +846,6 @@ export default function TimelineView({
     }
 
     // Procedi con l'aggiunta del cleaner (che ora includerà lo start time)
-    if ((window as any).setHasUnsavedChanges) {
-      (window as any).setHasUnsavedChanges(true);
-    }
-
     if (cleanerToReplace) {
       removeCleanerMutation.mutate(cleanerToReplace, {
         onSuccess: () => {
@@ -919,9 +911,7 @@ export default function TimelineView({
       setConfirmUnavailableDialog({ open: false, cleanerId: null });
 
       // Procedi con l'aggiunta/sostituzione come al solito
-      if ((window as any).setHasUnsavedChanges) {
-        (window as any).setHasUnsavedChanges(true);
-      }
+      // Salvataggio automatico - nessun flag necessario
       if (cleanerToReplace) {
         removeCleanerMutation.mutate(cleanerToReplace, {
           onSuccess: () => {
@@ -1053,9 +1043,7 @@ export default function TimelineView({
         setSelectedCleaner({ ...selectedCleaner, start_time: editingStartTime });
       }
 
-      if ((window as any).setHasUnsavedChanges) {
-        (window as any).setHasUnsavedChanges(true);
-      }
+      // Salvataggio automatico - nessun flag necessario
 
       toast({
         title: "Start Time salvato",
@@ -1161,11 +1149,7 @@ export default function TimelineView({
         throw new Error('Errore nel reset della timeline');
       }
 
-      // 2. CRITICAL: Resetta il lastSavedFilename per indicare che non ci sono salvataggi
-      setLastSavedFilename(null);
-      localStorage.removeItem('last_saved_assignment');
-
-      // 3. CRITICAL: Ricarica SOLO i file JSON locali senza chiamare extract-data
+      // 2. CRITICAL: Ricarica SOLO i file JSON locali senza chiamare extract-data
       // Il backend ha già resettato timeline.json e ricreato containers.json
       // Dobbiamo solo ricaricare il frontend con i nuovi dati
       const timestamp = Date.now();
@@ -1188,9 +1172,6 @@ export default function TimelineView({
           await (window as any).reloadAllTasks();
         }
 
-        if ((window as any).setHasUnsavedChanges) {
-          (window as any).setHasUnsavedChanges(true);
-        }
         // Aggiorna i dati della timeline per mostrare i metadata aggiornati
         await loadTimelineData();
 
@@ -1213,59 +1194,6 @@ export default function TimelineView({
   };
 
 
-  const handleConfirmAssignments = async () => {
-    try {
-      const dateStr = localStorage.getItem('selected_work_date') || (() => {
-        const today = new Date();
-        const year = today.getFullYear();
-        const month = String(today.getMonth() + 1).padStart(2, '0');
-        const day = String(today.getDate()).padStart(2, '0');
-        return `${year}-${month}-${day}`;
-      })();
-
-      toast({
-        title: "Conferma in corso...",
-        description: "Salvataggio delle assegnazioni in corso",
-      });
-
-      // Chiama l'API per salvare la copia immutabile
-      const response = await fetch('/api/confirm-assignments', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ date: dateStr }),
-      });
-
-      if (!response.ok) {
-        throw new Error('Errore nel salvataggio delle assegnazioni');
-      }
-
-      const result = await response.json();
-
-      setLastSavedFilename(result.formattedDateTime || result.filename);
-      localStorage.setItem('last_saved_assignment', result.formattedDateTime || result.filename);
-      if ((window as any).setHasUnsavedChanges) {
-        (window as any).setHasUnsavedChanges(false);
-      }
-
-      // Aggiorna i dati della timeline per mostrare i metadata aggiornati
-      await loadTimelineData();
-
-      toast({
-        title: "✅ Assegnazioni confermate!",
-        description: `Salvate il ${result.formattedDateTime}`,
-        variant: "success",
-      });
-    } catch (error) {
-      console.error('Errore nella conferma:', error);
-      toast({
-        title: "Errore",
-        description: "Errore durante la conferma delle assegnazioni",
-        variant: "destructive",
-      });
-    }
-  };
-
-  const [lastSavedFilename, setLastSavedFilename] = useState<string | null>(null);
 
   const loadTimelineCleaners = async () => {
     try {
@@ -1380,32 +1308,6 @@ export default function TimelineView({
     }
   }, [validationRules, allCleanersToShow, tasks, removedCleanerIds, toast]);
 
-  // Funzione per verificare SE esistono assegnazioni salvate (senza caricarle)
-  const checkSavedAssignmentExists = async () => {
-    try {
-      const response = await fetch('/api/check-saved-assignments', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ date: workDate })
-      });
-
-      if (response.ok) {
-        const result = await response.json();
-        if (result.found && result.formattedDateTime) {
-          setLastSavedFilename(result.formattedDateTime);
-          localStorage.setItem('last_saved_assignment', result.formattedDateTime);
-        } else {
-          setLastSavedFilename(null);
-          localStorage.removeItem('last_saved_assignment');
-        }
-      }
-    } catch (error) {
-      console.error("Errore nel controllo delle assegnazioni salvate:", error);
-    }
-  };
-
-  // Variabile per determinare se ci sono task assegnate (per mostrare/nascondere pulsante conferma)
-  const hasAssignedTasks = tasks.some(task => (task as any).assignedCleaner !== undefined);
 
   // Mutation per rimuovere task dalla timeline
   const removeTaskMutation = useMutation({
@@ -1421,12 +1323,11 @@ export default function TimelineView({
     },
     onSuccess: async (data) => {
       if (onTaskMoved) onTaskMoved();
-      if ((window as any).setHasUnsavedChanges) (window as any).setHasUnsavedChanges(true);
       await loadTimelineCleaners(); // Ricarica i cleaners della timeline
       await loadTimelineData(); // Aggiorna i metadata
       toast({
         title: "Task rimossa",
-        description: "Task rimossa dalla timeline",
+        description: "Task rimossa dalla timeline e salvata automaticamente",
         variant: "success",
       });
     },
@@ -1889,20 +1790,9 @@ export default function TimelineView({
               {/* Pulsanti nella riga finale */}
               <div className="flex-1 p-1 border-t border-border flex gap-2">
                 {!isReadOnly && (
-                  <Button
-                    onClick={handleConfirmAssignments}
-                    disabled={!hasUnsavedChanges}
-                    variant="outline"
-                    className={`flex-1 h-full border-2 border-custom-blue ${
-                      hasUnsavedChanges
-                        ? 'bg-green-600 hover:bg-green-700 text-white animate-pulse'
-                        : 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200 cursor-default'
-                    }`}
-                    data-testid="button-confirm-assignments"
-                  >
-                    <CheckCircle className="w-4 h-4 mr-2" />
-                    {hasUnsavedChanges ? 'Conferma Assegnazioni ⚠️' : '✅ Assegnazioni Confermate'}
-                  </Button>
+                  <div className="flex-1 h-full flex items-center justify-center text-sm text-green-700 dark:text-green-300 bg-green-50 dark:bg-green-900/20 rounded border border-green-200 dark:border-green-800">
+                    ✅ Salvataggio automatico attivo
+                  </div>
                 )}
                 {isReadOnly && (
                   <Button
@@ -1914,7 +1804,7 @@ export default function TimelineView({
                   </Button>
                 )}
                 <Button
-                  onClick={() => setShowAdamTransferDialog(true)} // Apri il dialog di conferma
+                  onClick={() => setShowAdamTransferDialog(true)}
                   size="sm"
                   variant="outline"
                   className="ml-2 border-2 border-custom-blue"
