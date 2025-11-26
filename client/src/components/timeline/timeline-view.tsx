@@ -2338,7 +2338,7 @@ export default function TimelineView({
                   <p className="text-sm">{selectedCleaner.counter_days}</p>
                 </div>
                 <div>
-                  <p className="text-sm font-semibold text-muted-foreground">Ore lavorate (totali)</p>
+                  <p className="text-sm font-semibold text-muted-foreground">Ore lavorate questa settimana</p>
                   <p className="text-sm">{selectedCleaner.counter_hours}</p>
                 </div>
                 <div>
