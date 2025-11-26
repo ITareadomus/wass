@@ -645,9 +645,9 @@ export default function Convocazioni() {
                       </div>
                     </div>
                   </div>
-                  <div className="flex items-center gap-3">
-                    <div className="flex items-center gap-1 bg-background border-2 border-custom-blue rounded-lg px-2 py-1">
-                      <span className="text-xs font-semibold text-foreground mr-1">Start:</span>
+                  <div className="flex items-center gap-6">
+                    <div className="flex items-center gap-1 bg-background border-2 border-custom-blue rounded-lg px-3 py-1">
+                      <span className="text-xs font-semibold text-foreground mr-2">Start Time:</span>
                       <Button
                         variant="ghost"
                         size="sm"
