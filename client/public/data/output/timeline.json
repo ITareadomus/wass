@@ -1,6 +1,6 @@
 {
   "metadata": {
-    "last_updated": "2025-11-26T07:54:39.875Z",
+    "last_updated": "2025-11-26T07:56:37.586Z",
     "date": "2025-11-26",
     "created_by": "Admin"
   },
@@ -24,10 +24,20 @@
         "premium": true
       },
       "tasks": []
+    },
+    {
+      "cleaner": {
+        "id": 937,
+        "name": "LOVETH",
+        "lastname": "IGUDIA",
+        "role": "Premium",
+        "premium": true
+      },
+      "tasks": []
     }
   ],
   "meta": {
-    "total_cleaners": 2,
+    "total_cleaners": 3,
     "used_cleaners": 0,
     "assigned_tasks": 0,
     "total_tasks": 0
