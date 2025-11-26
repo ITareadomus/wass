@@ -1793,9 +1793,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       await workspaceFiles.saveTimeline(workDate, timelineData);
 
       // Aggiungi il cleaner a selected_cleaners.json (se non già presente)
-      const isAlreadySelected = selectedCleanersData.cleaners.some((c: any) => c.id === cleanerId);
+      const existingCleanerIndex = selectedCleanersData.cleaners.findIndex((c: any) => c.id === cleanerId);
 
-      if (!isAlreadySelected) {
+      if (existingCleanerIndex === -1) {
+        // Cleaner non presente, aggiungilo con l'oggetto completo
         selectedCleanersData.cleaners.push(cleanerData);
         selectedCleanersData.total_selected = selectedCleanersData.cleaners.length;
         selectedCleanersData.metadata = selectedCleanersData.metadata || {};
@@ -1805,7 +1806,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const tmpSelectedPath = `${selectedCleanersPath}.tmp`;
         await fs.writeFile(tmpSelectedPath, JSON.stringify(selectedCleanersData, null, 2));
         await fs.rename(tmpSelectedPath, selectedCleanersPath);
-        console.log(`✅ Cleaner ${cleanerId} aggiunto a selected_cleaners.json`);
+        console.log(`✅ Cleaner ${cleanerId} aggiunto a selected_cleaners.json con oggetto completo`);
+      } else {
+        // Cleaner già presente, aggiorna i suoi dati con l'oggetto completo
+        selectedCleanersData.cleaners[existingCleanerIndex] = cleanerData;
+        selectedCleanersData.metadata = selectedCleanersData.metadata || {};
+        selectedCleanersData.metadata.date = workDate;
+
+        // Salva selected_cleaners.json
+        const tmpSelectedPath = `${selectedCleanersPath}.tmp`;
+        await fs.writeFile(tmpSelectedPath, JSON.stringify(selectedCleanersData, null, 2));
+        await fs.rename(tmpSelectedPath, selectedCleanersPath);
+        console.log(`✅ Cleaner ${cleanerId} aggiornato in selected_cleaners.json con oggetto completo`);
       }
 
       console.log(`✅ Operazione completata: cleaner ${cleanerId} ${replacedCleanerId ? `ha sostituito ${replacedCleanerId}` : 'aggiunto'}`);
