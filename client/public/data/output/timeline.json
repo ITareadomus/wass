@@ -1,13 +1,35 @@
 {
   "metadata": {
-    "last_updated": "2025-11-26T07:52:28.140Z",
+    "last_updated": "2025-11-26T07:54:39.875Z",
     "date": "2025-11-26",
-    "created_by": "unknown"
+    "created_by": "Admin"
   },
-  "cleaners_assignments": [],
+  "cleaners_assignments": [
+    {
+      "cleaner": {
+        "id": 1045,
+        "name": "ARACELY ROCIO",
+        "lastname": "MORLA ZAMBRANO",
+        "role": "Premium",
+        "premium": true
+      },
+      "tasks": []
+    },
+    {
+      "cleaner": {
+        "id": 1031,
+        "name": "YAH PRISCA LEA",
+        "lastname": "ADOU",
+        "role": "Premium",
+        "premium": true
+      },
+      "tasks": []
+    }
+  ],
   "meta": {
-    "total_cleaners": 0,
+    "total_cleaners": 2,
     "used_cleaners": 0,
-    "assigned_tasks": 0
+    "assigned_tasks": 0,
+    "total_tasks": 0
   }
 }

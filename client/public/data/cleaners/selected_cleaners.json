@@ -100,9 +100,43 @@
       "telegram_id": 1577716674,
       "start_time": "10:00",
       "can_do_straordinaria": true
+    },
+    {
+      "id": 1045,
+      "name": "ARACELY ROCIO",
+      "lastname": "MORLA ZAMBRANO",
+      "role": "Premium",
+      "active": true,
+      "ranking": 0,
+      "counter_hours": 7,
+      "counter_days": 2,
+      "available": true,
+      "contract_type": "a chiamata",
+      "preferred_customers": [],
+      "telegram_id": null,
+      "start_time": null,
+      "can_do_straordinaria": false
+    },
+    {
+      "id": 1031,
+      "name": "YAH PRISCA LEA",
+      "lastname": "ADOU",
+      "role": "Premium",
+      "active": true,
+      "ranking": 0,
+      "counter_hours": 5.5,
+      "counter_days": 0,
+      "available": true,
+      "contract_type": "a chiamata",
+      "preferred_customers": [
+        2
+      ],
+      "telegram_id": null,
+      "start_time": null,
+      "can_do_straordinaria": false
     }
   ],
-  "total_selected": 4,
+  "total_selected": 6,
   "metadata": {
     "date": "2025-11-26",
     "saved_at": "2025-11-26T07:48:04.781Z"
