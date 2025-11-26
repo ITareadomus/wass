@@ -1,75 +1,15 @@
 {
   "metadata": {
-    "last_updated": "2025-11-26T08:16:41.665Z",
+    "last_updated": "2025-11-26T08:21:07.436Z",
     "date": "2025-11-26",
     "created_by": "Admin"
   },
   "cleaners_assignments": [
     {
       "cleaner": {
-        "id": 1045,
-        "name": "ARACELY ROCIO",
-        "lastname": "MORLA ZAMBRANO",
-        "role": "Premium",
-        "premium": true
-      },
-      "tasks": []
-    },
-    {
-      "cleaner": {
-        "id": 1031,
-        "name": "YAH PRISCA LEA",
-        "lastname": "ADOU",
-        "role": "Premium",
-        "premium": true
-      },
-      "tasks": []
-    },
-    {
-      "cleaner": {
-        "id": 937,
-        "name": "LOVETH",
-        "lastname": "IGUDIA",
-        "role": "Premium",
-        "premium": true
-      },
-      "tasks": []
-    },
-    {
-      "cleaner": {
-        "id": 495,
-        "name": "EL HADJI",
-        "lastname": "BA",
-        "role": "Premium",
-        "premium": true
-      },
-      "tasks": []
-    },
-    {
-      "cleaner": {
-        "id": 596,
-        "name": "TRACY",
-        "lastname": "OKE",
-        "role": "Premium",
-        "premium": true
-      },
-      "tasks": []
-    },
-    {
-      "cleaner": {
-        "id": 829,
-        "name": "MUSTAPHA",
-        "lastname": "BAH",
-        "role": "Premium",
-        "premium": true
-      },
-      "tasks": []
-    },
-    {
-      "cleaner": {
-        "id": 785,
-        "name": "RACHEL",
-        "lastname": "OTSHINGA",
+        "id": 249,
+        "name": "Ogbodo Chidi",
+        "lastname": "Igwe",
         "role": "Premium",
         "premium": true
       },
@@ -77,7 +17,7 @@
     }
   ],
   "meta": {
-    "total_cleaners": 7,
+    "total_cleaners": 1,
     "used_cleaners": 0,
     "assigned_tasks": 0,
     "total_tasks": 0
