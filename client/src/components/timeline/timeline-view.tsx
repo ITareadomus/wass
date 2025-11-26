@@ -96,6 +96,7 @@ export default function TimelineView({
   const [editingAlias, setEditingAlias] = useState<string>("");
   const [isSavingAlias, setIsSavingAlias] = useState(false);
   const [aliasDialog, setAliasDialog] = useState<{ open: boolean; cleanerId: number | null; cleanerName: string }>({ open: false, cleanerId: null, cleanerName: '' });
+  const [editingStartTime, setEditingStartTime] = useState<string>("10:00");
 
   // Stato per le regole di validazione task-cleaner
   const [validationRules, setValidationRules] = useState<any>(null);
@@ -575,6 +576,8 @@ export default function TimelineView({
         // Inizializza l'alias dal cleanersAliases
         const currentAlias = cleanersAliases[cleaner.id]?.alias || "";
         setEditingAlias(currentAlias);
+        // Inizializza lo start time
+        setEditingStartTime(cleaner.start_time || "10:00");
         setIsModalOpen(true);
         setClickTimer(null);
       }, 250); // 250ms per distinguere singolo da doppio click
@@ -811,6 +814,63 @@ export default function TimelineView({
       });
     } finally {
       setIsSavingAlias(false);
+    }
+  };
+
+  // Salva lo start time modificato
+  const handleSaveStartTime = async () => {
+    if (!selectedCleaner) return;
+
+    // Valida il formato dell'orario
+    if (!/^\d{2}:\d{2}$/.test(editingStartTime)) {
+      toast({
+        variant: "destructive",
+        title: "⚠️ Formato orario non valido",
+        description: "Inserisci un orario nel formato HH:mm (es. 10:00)"
+      });
+      return;
+    }
+
+    try {
+      const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
+      const response = await fetch('/api/update-cleaner-start-time', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          cleanerId: selectedCleaner.id,
+          startTime: editingStartTime,
+          date: workDate,
+          modified_by: currentUser.username || 'unknown'
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Errore nel salvataggio dello start time');
+      }
+
+      // Aggiorna lo stato locale
+      setCleaners(prev => prev.map(c => 
+        c.id === selectedCleaner.id ? { ...c, start_time: editingStartTime } : c
+      ));
+      setSelectedCleaner({ ...selectedCleaner, start_time: editingStartTime });
+
+      if ((window as any).setHasUnsavedChanges) {
+        (window as any).setHasUnsavedChanges(true);
+      }
+
+      toast({
+        title: "Start Time salvato",
+        description: `Orario di inizio aggiornato a ${editingStartTime}`,
+        variant: "success",
+      });
+
+    } catch (error: any) {
+      console.error("Errore nel salvataggio dello start time:", error);
+      toast({
+        title: "Errore",
+        description: error.message || "Impossibile salvare lo start time",
+        variant: "destructive",
+      });
     }
   };
 
@@ -2100,6 +2160,41 @@ export default function TimelineView({
                 <div>
                   <p className="text-sm font-semibold text-muted-foreground">Tipo contratto</p>
                   <p className="text-sm">{selectedCleaner.contract_type}</p>
+                </div>
+              </div>
+
+              {/* Sezione Start Time */}
+              <div className="border-t pt-4 mt-4">
+                <p className="text-sm font-semibold text-muted-foreground mb-3">
+                  Orario di Inizio
+                </p>
+                <div className="flex gap-3 items-end">
+                  <div className="flex-1">
+                    <label className="text-sm text-muted-foreground mb-2 block">
+                      Start Time
+                    </label>
+                    <Input
+                      type="time"
+                      value={editingStartTime}
+                      onChange={(e) => setEditingStartTime(e.target.value)}
+                      className="w-full"
+                      disabled={isReadOnly}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          handleSaveStartTime();
+                        }
+                      }}
+                    />
+                  </div>
+                  <Button
+                    onClick={handleSaveStartTime}
+                    disabled={isReadOnly}
+                    variant="outline"
+                    className="border-2 border-custom-blue"
+                  >
+                    <Save className="h-4 w-4 mr-2" />
+                    Salva
+                  </Button>
                 </div>
               </div>
 
