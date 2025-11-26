@@ -1521,12 +1521,12 @@ export default function TimelineView({
           </div>
         </div>
         <div className="p-4 overflow-x-auto">
-          {/* Header con orari - mostra range generale */}
+          {/* Header con orari - ogni cleaner ha i suoi slot */}
           <div className="flex mb-2 px-4">
             <div className="flex-shrink-0" style={{ width: `${cleanerColumnWidth}px` }}></div>
-            <div className="flex-1 flex justify-between items-center px-2">
-              <span className="text-sm font-medium text-muted-foreground">
-                Timeline dinamica (start personalizzato - 19:00)
+            <div className="flex-1 flex">
+              <span className="text-sm font-medium text-muted-foreground px-2">
+                Timeline dinamica (ogni cleaner ha i suoi orari)
               </span>
             </div>
           </div>
@@ -1590,10 +1590,23 @@ export default function TimelineView({
                 const totalTimelineMinutes = getTimelineMinutesForCleaner(cleanerStartTime);
 
                 return (
-                  <div key={cleaner.id} className="flex mb-0.5">
-                    {/* Info cleaner */}
-                    <div
-                      className="flex-shrink-0 p-1 flex items-center border-2 border-custom-blue bg-custom-blue/10 cursor-pointer hover:opacity-90 transition-opacity"
+                  <React.Fragment key={cleaner.id}>
+                    {/* Header orari per questo cleaner */}
+                    <div className="flex mb-1">
+                      <div className="flex-shrink-0" style={{ width: `${cleanerColumnWidth}px` }}></div>
+                      <div className="flex-1" style={{ display: 'grid', gridTemplateColumns: `repeat(${timeSlots.length}, 1fr)` }}>
+                        {timeSlots.map((slot, idx) => (
+                          <div key={idx} className="text-center text-[10px] font-medium text-muted-foreground border-r border-border px-1">
+                            {slot}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                    
+                    <div className="flex mb-0.5">
+                      {/* Info cleaner */}
+                      <div
+                        className="flex-shrink-0 p-1 flex items-center border-2 border-custom-blue bg-custom-blue/10 cursor-pointer hover:opacity-90 transition-opacity"
                       style={{
                         width: `${cleanerColumnWidth}px`,
                         boxShadow: hasIncompatibleTasks && !isRemoved
@@ -1823,7 +1836,8 @@ export default function TimelineView({
                         </div>
                       )}
                     </Droppable>
-                  </div>
+                    </div>
+                  </React.Fragment>
                 );
               })
             )}
