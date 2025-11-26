@@ -133,6 +133,7 @@ for r in cur.fetchall():
 
 # --- CARICA START TIME CUSTOM DA selected_cleaners.json ----------------
 custom_start_times = {}
+target_date_str = target_date.strftime("%Y-%m-%d")
 try:
     selected_cleaners_path = Path(__file__).resolve().parents[1] / "data" / "cleaners" / "selected_cleaners.json"
     if selected_cleaners_path.exists():
@@ -189,7 +190,6 @@ for u in cleaners:
     cleaners_data.append(cleaner)
 
 # Struttura JSON identica a quella scritta dallo script originale
-target_date_str = target_date.strftime("%Y-%m-%d")
 fresh_data = {
     "metadata": {
         "last_updated": datetime.now().isoformat(),
