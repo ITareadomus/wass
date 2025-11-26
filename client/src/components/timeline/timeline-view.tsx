@@ -1302,9 +1302,7 @@ export default function TimelineView({
                         width: `${cleanerColumnWidth}px`,
                         boxShadow: hasIncompatibleTasks && !isRemoved
                           ? '0 0 0 3px #EAB308, 0 0 20px 5px rgba(234, 179, 8, 0.6), inset 0 0 15px rgba(234, 179, 8, 0.3)'
-                          : filteredCleanerId === cleaner.id
-                            ? '0 0 0 3px #3B82F6, 0 0 20px 5px rgba(59, 130, 246, 0.5)'
-                            : 'none',
+                          : filteredCleanerId === cleaner.id ? '0 0 0 3px #3B82F6, 0 0 20px 5px rgba(59, 130, 246, 0.5)' : 'none',
                         transform: filteredCleanerId === cleaner.id || hasIncompatibleTasks ? 'scale(1.05)' : 'none',
                         zIndex: filteredCleanerId === cleaner.id || hasIncompatibleTasks ? 20 : 'auto',
                         position: 'relative',
@@ -1620,13 +1618,13 @@ export default function TimelineView({
                     } catch (error: any) {
                       console.error('Errore trasferimento ADAM:', error);
                       let errorMessage = "Impossibile comunicare con il server";
-                      
+
                       if (error.name === 'AbortError') {
                         errorMessage = "Timeout: il server impiega troppo tempo a rispondere";
                       } else if (error.message) {
                         errorMessage = error.message;
                       }
-                      
+
                       toast({
                         title: "❌ Errore connessione",
                         description: errorMessage,
