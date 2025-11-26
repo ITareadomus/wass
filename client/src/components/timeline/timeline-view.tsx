@@ -391,10 +391,13 @@ export default function TimelineView({
   const globalTimelineMinutes = getGlobalTimelineMinutes();
   const globalStartTime = getGlobalStartTime();
 
-  // Esponi globalTimelineMinutes come variabile globale per permettere a TaskCard di usarla
+  // Esponi globalTimelineMinutes e globalTimeSlotsCount come variabili globali per permettere a TaskCard di usarle
+  // IMPORTANTE: La griglia usa N slot, ma rappresenta N-1 intervalli. Per far corrispondere
+  // la larghezza dei task alle colonne della griglia, usiamo N slot * 60 minuti come base.
   React.useEffect(() => {
     (window as any).globalTimelineMinutes = globalTimelineMinutes;
-  }, [globalTimelineMinutes]);
+    (window as any).globalTimeSlotsCount = globalTimeSlots.length;
+  }, [globalTimelineMinutes, globalTimeSlots.length]);
 
   // Palette di colori azzurri per i cleaners
   const cleanerColors = [
@@ -1793,9 +1796,10 @@ export default function TimelineView({
                                 }
 
                                 // Calcola larghezza EFFETTIVA in base ai minuti reali di travel_time
-                                // La timeline copre globalTimelineMinutes (da start globale alle 19:00)
+                                // Usa la stessa base di calcolo dei task (slot * 60 minuti virtuali)
                                 const effectiveTravelMinutes = idx > 0 && travelTime > 0 ? travelTime : 0;
-                                const totalWidth = effectiveTravelMinutes > 0 ? (effectiveTravelMinutes / globalTimelineMinutes) * 100 : 0;
+                                const virtualMinutes = globalTimeSlots.length * 60;
+                                const totalWidth = effectiveTravelMinutes > 0 ? (effectiveTravelMinutes / virtualMinutes) * 100 : 0;
 
                                 // Usa task.id o task.task_id come chiave univoca (non logistic_code che può essere duplicato)
                                 const uniqueKey = taskObj.task_id || taskObj.id;
@@ -1818,7 +1822,7 @@ export default function TimelineView({
                                       <div
                                         key={`offset-${uniqueKey}`}
                                         className="flex-shrink-0"
-                                        style={{ width: `${(timeOffset / globalTimelineMinutes) * 100}%` }}
+                                        style={{ width: `${(timeOffset / virtualMinutes) * 100}%` }}
                                       />
                                     )}
 
