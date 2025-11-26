@@ -2252,7 +2252,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Endpoint per aggiornare i dettagli di una task (checkout, checkin, durata)
   app.post("/api/update-task-details", async (req, res) => {
     try {
-      const { taskId, logisticCode, checkoutDate, checkoutTime, checkinDate, checkinTime, cleaningTime, date } = req.body;
+      const { taskId, logisticCode, checkoutDate, checkoutTime, checkinDate, checkinTime, cleaningTime, paxIn, operationId, date } = req.body;
 
       if (!taskId && !logisticCode) {
         return res.status(400).json({ success: false, error: "taskId o logisticCode richiesto" });
@@ -2271,14 +2271,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       let taskUpdated = false;
 
-      // Funzione helper per aggiornare una task
+      // Funzione helper per aggiornare una task - SOLO i campi forniti
       const updateTask = (task: any) => {
         if (String(task.task_id) === String(taskId) || String(task.logistic_code) === String(logisticCode)) {
-          task.checkout_date = checkoutDate;
-          task.checkout_time = checkoutTime;
-          task.checkin_date = checkinDate;
-          task.checkin_time = checkinTime;
-          task.cleaning_time = cleaningTime;
+          // Aggiorna SOLO i campi che sono definiti nella richiesta
+          if (checkoutDate !== undefined) task.checkout_date = checkoutDate;
+          if (checkoutTime !== undefined) task.checkout_time = checkoutTime;
+          if (checkinDate !== undefined) task.checkin_date = checkinDate;
+          if (checkinTime !== undefined) task.checkin_time = checkinTime;
+          if (cleaningTime !== undefined) task.cleaning_time = cleaningTime;
+          if (paxIn !== undefined) task.pax_in = paxIn;
+          if (operationId !== undefined) task.operation_id = operationId;
           taskUpdated = true;
           return true;
         }
