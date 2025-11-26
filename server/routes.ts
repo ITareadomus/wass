@@ -1675,18 +1675,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ success: false, error: "Cleaner non trovato in cleaners.json" });
       }
 
-      // CRITICAL: Carica lo start_time da availableCleaners se presente
-      // Questo permette di usare lo start_time impostato dall'utente nel dialog
-      const availableCleanersPath = path.join(process.cwd(), 'client/public/data/cleaners/selected_cleaners.json');
+      // CRITICAL: Verifica se esiste già uno start_time impostato dall'utente
+      // Questo può venire da due fonti:
+      // 1. selected_cleaners.json (se il cleaner era già stato aggiunto)
+      // 2. Una chiamata precedente a /api/update-cleaner-start-time (dalla UI)
+      const selectedCleanersPath = path.join(process.cwd(), 'client/public/data/cleaners/selected_cleaners.json');
       try {
-        const availableData = JSON.parse(await fs.readFile(availableCleanersPath, 'utf8'));
-        const availableCleaner = availableData.cleaners?.find((c: any) => c.id === cleanerId);
-        if (availableCleaner?.start_time) {
-          cleanerData.start_time = availableCleaner.start_time;
-          console.log(`✅ Usando start_time ${availableCleaner.start_time} da selected_cleaners per cleaner ${cleanerId}`);
+        const selectedData = JSON.parse(await fs.readFile(selectedCleanersPath, 'utf8'));
+        const existingCleaner = selectedData.cleaners?.find((c: any) => c.id === cleanerId);
+        if (existingCleaner?.start_time) {
+          cleanerData.start_time = existingCleaner.start_time;
+          console.log(`✅ Usando start_time ${existingCleaner.start_time} esistente da selected_cleaners per cleaner ${cleanerId}`);
         }
       } catch (e) {
-        // Ignora errori, usa il default da cleaners.json
+        // File non esiste ancora o cleaner non presente, usa il default da cleaners.json
+        console.log(`ℹ️ Nessun start_time pre-esistente, usando default ${cleanerData.start_time || '10:00'}`);
       }
 
       // Carica selected_cleaners.json
@@ -2094,22 +2097,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const data = await fs.readFile(selectedCleanersPath, 'utf-8');
         selectedCleanersData = JSON.parse(data);
       } catch (error) {
-        return res.status(404).json({ 
-          success: false, 
-          message: "File selected_cleaners.json non trovato" 
-        });
+        // Se il file non esiste, crealo con struttura vuota
+        selectedCleanersData = {
+          cleaners: [],
+          total_selected: 0,
+          metadata: { date: workDate }
+        };
       }
 
-      // Trova e aggiorna il cleaner
+      // Trova e aggiorna il cleaner se esiste
       const cleanerIndex = selectedCleanersData.cleaners.findIndex((c: any) => c.id === cleanerId);
-      if (cleanerIndex === -1) {
-        return res.status(404).json({ 
-          success: false, 
-          message: "Cleaner non trovato in selected_cleaners.json" 
-        });
-      }
+      if (cleanerIndex !== -1) {
+        selectedCleanersData.cleaners[cleanerIndex].start_time = startTime;
+      } else {
+        // CRITICAL: Se il cleaner non esiste ancora in selected_cleaners,
+        // caricalo da cleaners.json e aggiungilo con lo start_time
+        const cleanersPath = path.join(process.cwd(), 'client/public/data/cleaners/cleaners.json');
+        const cleanersData = JSON.parse(await fs.readFile(cleanersPath, 'utf8'));
+        
+        // Cerca il cleaner nella data corrente
+        const dateCleaners = cleanersData.dates?.[workDate]?.cleaners || [];
+        let cleanerData = dateCleaners.find((c: any) => c.id === cleanerId);
+        
+        if (!cleanerData) {
+          return res.status(404).json({ 
+            success: false, 
+            message: "Cleaner non trovato in cleaners.json" 
+          });
+        }
 
-      selectedCleanersData.cleaners[cleanerIndex].start_time = startTime;
+        // Aggiungi il cleaner con lo start_time
+        cleanerData.start_time = startTime;
+        selectedCleanersData.cleaners.push(cleanerData);
+        selectedCleanersData.total_selected = selectedCleanersData.cleaners.length;
+        console.log(`✅ Cleaner ${cleanerId} aggiunto a selected_cleaners.json con start_time ${startTime}`);
+      }
 
       // Salva il file aggiornato con scrittura atomica
       const tmpPath = `${selectedCleanersPath}.tmp`;
