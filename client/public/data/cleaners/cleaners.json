@@ -1,6 +1,6 @@
 {
     "metadata": {
-        "last_updated": "2025-11-26T14:30:12.158585",
+        "last_updated": "2025-11-26T14:32:44.347432",
         "db_config": {
             "host": "139.59.132.41",
             "user": "admin",
@@ -11,7 +11,7 @@
     },
     "dates": {
         "2025-11-26": {
-            "timestamp": "2025-11-26T14:30:12.158606",
+            "timestamp": "2025-11-26T14:32:44.347444",
             "cleaners": [
                 {
                     "id": 24,
@@ -306,7 +306,7 @@
                     "role": "Formatore",
                     "active": true,
                     "ranking": 0,
-                    "counter_hours": 13.25,
+                    "counter_hours": 18.75,
                     "counter_days": 2,
                     "available": true,
                     "contract_type": "B",
