@@ -1675,6 +1675,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ success: false, error: "Cleaner non trovato in cleaners.json" });
       }
 
+      // CRITICAL: Carica lo start_time da availableCleaners se presente
+      // Questo permette di usare lo start_time impostato dall'utente nel dialog
+      const availableCleanersPath = path.join(process.cwd(), 'client/public/data/cleaners/selected_cleaners.json');
+      try {
+        const availableData = JSON.parse(await fs.readFile(availableCleanersPath, 'utf8'));
+        const availableCleaner = availableData.cleaners?.find((c: any) => c.id === cleanerId);
+        if (availableCleaner?.start_time) {
+          cleanerData.start_time = availableCleaner.start_time;
+          console.log(`✅ Usando start_time ${availableCleaner.start_time} da selected_cleaners per cleaner ${cleanerId}`);
+        }
+      } catch (e) {
+        // Ignora errori, usa il default da cleaners.json
+      }
+
       // Carica selected_cleaners.json
       let selectedCleanersData: any;
       try {
