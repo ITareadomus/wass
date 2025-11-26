@@ -1888,6 +1888,7 @@ export default function TimelineView({
           </div>
         </div>
       </div>
+      </>
 
       {/* Incompatible Tasks Warning Dialog */}
       <Dialog open={incompatibleDialog.open} onOpenChange={(open) => !open && setIncompatibleDialog({ open: false, cleanerId: null, tasks: [] })}>
