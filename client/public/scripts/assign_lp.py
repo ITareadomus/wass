@@ -96,7 +96,8 @@ class Cleaner:
     role: str
     is_premium: bool
     can_do_straordinaria: bool = False
-    available_from: Optional[int] = None  # in minuti da mezzanotte
+    start_time: int = 600  # start_time originale in minuti da mezzanotte (default 10:00)
+    available_from: Optional[int] = None  # in minuti da mezzanotte (dopo task EO/HP)
     last_address: Optional[str] = None
     last_lat: Optional[float] = None
     last_lng: Optional[float] = None
@@ -278,8 +279,8 @@ def evaluate_route(cleaner: Cleaner, route: List[Task]) -> Tuple[bool, List[Tupl
 
     # Calcola l'arrivo al primo task
     # available_from è già in minuti da mezzanotte (non serve hhmm_to_min)
-    # Se None, usa 10:00 (600 minuti) come default
-    work_start_min = cleaner.available_from if cleaner.available_from is not None else 10 * 60
+    # Se None, usa lo start_time originale del cleaner
+    work_start_min = cleaner.available_from if cleaner.available_from is not None else cleaner.start_time
 
     # Viaggio da ultima posizione a LP
     if cleaner.last_lat is not None and cleaner.last_lng is not None:
@@ -641,6 +642,10 @@ def load_cleaners() -> List[Cleaner]:
         role = (c.get("role") or "").strip()
         is_premium = bool(c.get("premium", (role.lower() == "premium")))
         can_do_straordinaria = bool(c.get("can_do_straordinaria", False))
+        
+        # Leggi start_time del cleaner (default 10:00 se non specificato)
+        start_time_str = c.get("start_time", "10:00")
+        start_time_min = hhmm_to_min(start_time_str, "10:00")
 
         # NUOVO: Valida se il cleaner può gestire Low-Priority basandosi su settings.json
         if not can_cleaner_handle_priority(role, "low_priority"):
@@ -655,6 +660,7 @@ def load_cleaners() -> List[Cleaner]:
                 role=role or ("Premium" if is_premium else "Standard"),
                 is_premium=is_premium,
                 can_do_straordinaria=can_do_straordinaria,
+                start_time=start_time_min,
             ))
     return cleaners
 
@@ -805,8 +811,8 @@ def plan_day(
             def get_earliest_time(c):
                 if c.available_from is not None:
                     return c.available_from
-                # Fallback: usa start_time default (10:00 = 600 minuti)
-                return 600
+                # Fallback: usa start_time originale del cleaner
+                return c.start_time
 
             earliest_cleaner = min(straordinaria_cleaners, key=get_earliest_time)
 
