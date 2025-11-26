@@ -160,9 +160,44 @@
       "telegram_id": 7573041558,
       "start_time": "10:00",
       "can_do_straordinaria": false
+    },
+    {
+      "id": 495,
+      "name": "EL HADJI",
+      "lastname": "BA",
+      "role": "Premium",
+      "active": true,
+      "ranking": 0,
+      "counter_hours": 5,
+      "counter_days": 1,
+      "available": true,
+      "contract_type": "B",
+      "preferred_customers": [
+        2,
+        3,
+        9,
+        61,
+        64,
+        75,
+        84,
+        85,
+        87,
+        91,
+        94,
+        101,
+        113,
+        115,
+        118,
+        120,
+        121,
+        123
+      ],
+      "telegram_id": 8035270407,
+      "start_time": "10:00",
+      "can_do_straordinaria": true
     }
   ],
-  "total_selected": 7,
+  "total_selected": 8,
   "metadata": {
     "date": "2025-11-26",
     "saved_at": "2025-11-26T07:48:04.781Z"
