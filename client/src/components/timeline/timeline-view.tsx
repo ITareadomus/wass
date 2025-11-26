@@ -697,11 +697,33 @@ export default function TimelineView({
   };
 
   // Handler per confermare start time e aggiungere cleaner
-  const handleConfirmStartTimeAndAdd = () => {
+  const handleConfirmStartTimeAndAdd = async () => {
     if (!startTimeDialog.cleanerId) return;
 
     const cleanerId = startTimeDialog.cleanerId;
     const isAvailable = startTimeDialog.isAvailable;
+
+    // Prima salva lo start time aggiornato
+    try {
+      const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
+      await fetch('/api/update-cleaner-start-time', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          cleanerId,
+          startTime: pendingStartTime,
+          date: workDate,
+          modified_by: currentUser.username || 'unknown'
+        }),
+      });
+
+      // Aggiorna lo stato locale
+      setAvailableCleaners(prev => prev.map(c => 
+        c.id === cleanerId ? { ...c, start_time: pendingStartTime } : c
+      ));
+    } catch (error) {
+      console.error("Errore nel salvataggio dello start time:", error);
+    }
 
     // Chiudi il dialog dello start time
     setStartTimeDialog({ open: false, cleanerId: null, cleanerName: '', isAvailable: true });
@@ -731,8 +753,30 @@ export default function TimelineView({
   };
 
   // Handler per confermare l'aggiunta di un cleaner non disponibile
-  const handleConfirmAddUnavailableCleaner = () => {
+  const handleConfirmAddUnavailableCleaner = async () => {
     if (confirmUnavailableDialog.cleanerId) {
+      // Prima salva lo start time aggiornato
+      try {
+        const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
+        await fetch('/api/update-cleaner-start-time', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            cleanerId: confirmUnavailableDialog.cleanerId,
+            startTime: pendingStartTime,
+            date: workDate,
+            modified_by: currentUser.username || 'unknown'
+          }),
+        });
+
+        // Aggiorna lo stato locale
+        setAvailableCleaners(prev => prev.map(c => 
+          c.id === confirmUnavailableDialog.cleanerId ? { ...c, start_time: pendingStartTime } : c
+        ));
+      } catch (error) {
+        console.error("Errore nel salvataggio dello start time:", error);
+      }
+
       // Chiudi il dialog di conferma e procedi con l'aggiunta
       setConfirmUnavailableDialog({ open: false, cleanerId: null });
 
