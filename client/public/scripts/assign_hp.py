@@ -293,27 +293,35 @@ def evaluate_route(cleaner: Cleaner, route: List[Task]) -> Tuple[bool, List[Tupl
     # Orario massimo di fine task: 19:00
     max_end_time = datetime(arrival.year, arrival.month, arrival.day, 19, 0)
 
-    # NUOVA LOGICA: HP può iniziare prima delle 11:00 se:
-    # 1. Il cleaner è libero (arrival < 11:00)
-    # 2. Il checkout lo permette
-    # ECCEZIONE: Straordinarie possono iniziare senza vincoli orari
-    hp_hard_earliest = datetime(arrival.year, arrival.month, arrival.day, HP_HARD_EARLIEST_H, HP_HARD_EARLIEST_M)
-
+    # LOGICA STRAORDINARIE vs HP NORMALE:
+    # - STRAORDINARIE: ignora TUTTI i vincoli orari di default, rispetta SOLO:
+    #   1. checkout_dt dell'appartamento
+    #   2. start_time del cleaner (già in 'base')
+    #   Lo start_time è il MASSIMO tra arrivo cleaner e checkout appartamento
+    # 
+    # - HP NORMALE: applica vincolo HP hard earliest (11:00) se necessario
+    
     if first.straordinaria:
-        # Straordinarie: rispetta SOLO il checkout, nessun vincolo HP hard earliest
+        # STRAORDINARIE: nessun vincolo orario di default
+        # arrival = max(base, checkout_dt se presente)
         if first.checkout_dt:
             arrival = max(arrival, first.checkout_dt)
-    elif first.checkout_dt:
-        # Rispetta il checkout, ma può iniziare prima delle 11:00 se libero
-        arrival = max(arrival, first.checkout_dt)
+        # else: arrival rimane = base (start_time cleaner + travel se presente)
     else:
-        # Nessun checkout: applica vincolo HP hard earliest solo se non è libero prima
-        if arrival < hp_hard_earliest:
-            # Cleaner libero prima delle 11:00: può iniziare subito
-            arrival = arrival
+        # HP NORMALE: applica logica con HP hard earliest
+        hp_hard_earliest = datetime(arrival.year, arrival.month, arrival.day, HP_HARD_EARLIEST_H, HP_HARD_EARLIEST_M)
+        
+        if first.checkout_dt:
+            # Rispetta il checkout, ma può iniziare prima delle 11:00 se libero
+            arrival = max(arrival, first.checkout_dt)
         else:
-            # Cleaner non libero prima delle 11:00: applica vincolo
-            arrival = max(arrival, hp_hard_earliest)
+            # Nessun checkout: applica vincolo HP hard earliest solo se non è libero prima
+            if arrival < hp_hard_earliest:
+                # Cleaner libero prima delle 11:00: può iniziare subito
+                arrival = arrival
+            else:
+                # Cleaner non libero prima delle 11:00: applica vincolo
+                arrival = max(arrival, hp_hard_earliest)
 
     start = arrival
     finish = start + timedelta(minutes=first.cleaning_time)

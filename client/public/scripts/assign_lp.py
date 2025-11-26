@@ -299,15 +299,24 @@ def evaluate_route(cleaner: Cleaner, route: List[Task]) -> Tuple[bool, List[Tupl
             tt = 3.0 if same_street(cleaner.last_address, first.address) else 12.0
 
     arrival = work_start_min + tt
-    
-    # CRITICAL: Rispetta SEMPRE il checkout_time se presente
-    if hasattr(first, 'checkout_dt') and first.checkout_dt:
-        checkout_minutes = first.checkout_dt.hour * 60 + first.checkout_dt.minute
-        # Lo start_time è il MASSIMO tra arrivo e checkout
-        start = max(arrival, checkout_minutes)
+
+    # LOGICA STRAORDINARIE: ignora vincoli orari di default
+    # Rispetta SOLO checkout_time e start_time del cleaner
+    if first.straordinaria:
+        # STRAORDINARIE: start = max(arrival, checkout se presente)
+        if hasattr(first, 'checkout_dt') and first.checkout_dt:
+            checkout_minutes = first.checkout_dt.hour * 60 + first.checkout_dt.minute
+            start = max(arrival, checkout_minutes)
+        else:
+            start = arrival
     else:
-        start = arrival
-    
+        # LP NORMALE: rispetta checkout se presente
+        if hasattr(first, 'checkout_dt') and first.checkout_dt:
+            checkout_minutes = first.checkout_dt.hour * 60 + first.checkout_dt.minute
+            start = max(arrival, checkout_minutes)
+        else:
+            start = arrival
+
     finish = start + first.cleaning_time
 
     # NUOVO: Check-in strict - deve finire prima del check-in
@@ -783,26 +792,26 @@ def plan_day(
                 c for c in cleaners
                 if c.can_do_straordinaria and can_cleaner_handle_apartment(c.role, task.apt_type)
             ]
-            
+
             if not straordinaria_cleaners:
                 unassigned.append(task)
                 continue
-            
+
             # Trova cleaner con available_from minore (se disponibile) o start_time
             def get_earliest_time(c):
                 if c.available_from is not None:
                     return c.available_from
                 # Fallback: usa start_time default (10:00 = 600 minuti)
                 return 600
-            
+
             earliest_cleaner = min(straordinaria_cleaners, key=get_earliest_time)
-            
+
             # Verifica se può prendere la task (pos 0)
             result = find_best_position(earliest_cleaner, task)
             if result is None:
                 unassigned.append(task)
                 continue
-            
+
             pos, _ = result
             earliest_cleaner.route.insert(pos, task)
             assigned_logistic_codes.add(task.logistic_code)
