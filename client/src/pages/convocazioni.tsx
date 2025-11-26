@@ -765,23 +765,19 @@ export default function Convocazioni() {
               </DialogFooter>
             </DialogContent>
           </Dialog>
-          <div className="flex justify-between mt-4 pt-4 border-t">
+          <div className="flex justify-center mt-4 pt-4 border-t">
             <Button
-              onClick={handleSaveSelection}
+              onClick={async () => {
+                await handleSaveSelection();
+                setLocation('/');
+              }}
               size="lg"
               disabled={selectedCleaners.size === 0}
               className="flex items-center gap-2 bg-background border-2 border-custom-blue text-black dark:text-white hover:opacity-80"
             >
-              <Save className="w-4 h-4" />
-              Salva
-            </Button>
-            <Button
-              variant="outline"
-              onClick={() => setLocation('/')}
-              className="flex items-center gap-2 border-2 border-custom-blue"
-            >
-              <ArrowLeft className="w-4 h-4" />
-              Torna alla Home
+              <Save className="w-4 h-4 mr-1" />
+              Salva e Torna alla Home
+              <ArrowLeft className="w-4 h-4 ml-1" />
             </Button>
           </div>
         </Card>
