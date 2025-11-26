@@ -1,6 +1,6 @@
 {
   "metadata": {
-    "last_updated": "2025-11-26T14:48:15.715Z",
+    "last_updated": "2025-11-26T14:52:57.414515",
     "date": "2025-11-26"
   },
   "cleaners_assignments": [
@@ -16,7 +16,7 @@
         {
           "task_id": 219412,
           "logistic_code": 1693,
-          "client_id": null,
+          "client_id": 124,
           "premium": false,
           "address": "VIA TOLENTINO 1",
           "lat": "45.4879867",
@@ -35,13 +35,14 @@
           "type_apt": "C",
           "alias": "HMST",
           "customer_name": "HOMING STAYS",
+          "priority": "low_priority",
           "reasons": [
+            "not_eo",
+            "not_hp",
             "automatic_assignment_lp"
           ],
-          "priority": "low_priority",
-          "modified_by": "Admin",
-          "start_time": "10:00",
-          "end_time": "15:00",
+          "start_time": "09:00",
+          "end_time": "14:00",
           "followup": false,
           "sequence": 1,
           "travel_time": 0
@@ -119,8 +120,8 @@
             "not_hp",
             "automatic_assignment_lp"
           ],
-          "start_time": "11:51",
-          "end_time": "13:51",
+          "start_time": "11:50",
+          "end_time": "13:50",
           "followup": true,
           "sequence": 2,
           "travel_time": 21
@@ -198,11 +199,11 @@
             "not_hp",
             "automatic_assignment_lp"
           ],
-          "start_time": "11:20",
-          "end_time": "12:50",
+          "start_time": "11:15",
+          "end_time": "12:45",
           "followup": true,
           "sequence": 2,
-          "travel_time": 50
+          "travel_time": 45
         }
       ]
     }
