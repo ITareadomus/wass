@@ -1,8 +1,11 @@
 {
   "metadata": {
-    "last_updated": "2025-11-26T08:56:39.301Z",
+    "last_updated": "2025-11-26T09:10:50.943Z",
     "date": "2025-11-26",
-    "created_by": "Admin"
+    "created_by": "Admin",
+    "modified_by": [
+      "Admin"
+    ]
   },
   "cleaners_assignments": [
     {
@@ -23,13 +26,47 @@
         "role": "Formatore",
         "premium": false
       },
-      "tasks": []
+      "tasks": [
+        {
+          "task_id": 219301,
+          "logistic_code": 1578,
+          "client_id": null,
+          "premium": false,
+          "address": "VIA MOLINO DELLE ARMI, 13",
+          "lat": "45.456241",
+          "lng": "9.185713",
+          "cleaning_time": 90,
+          "checkin_date": "2025-11-26",
+          "checkout_date": "2025-11-26",
+          "checkin_time": "15:00",
+          "checkout_time": "11:00",
+          "pax_in": 4,
+          "pax_out": 2,
+          "small_equipment": false,
+          "operation_id": 2,
+          "confirmed_operation": true,
+          "straordinaria": false,
+          "type_apt": "B",
+          "alias": "ANLW",
+          "customer_name": "WU ANGELO",
+          "reasons": [
+            "manually_moved_to_timeline"
+          ],
+          "priority": "high_priority",
+          "start_time": "11:00",
+          "end_time": "12:30",
+          "followup": false,
+          "sequence": 1,
+          "travel_time": 0,
+          "modified_by": "Admin"
+        }
+      ]
     }
   ],
   "meta": {
     "total_cleaners": 2,
     "used_cleaners": 0,
     "assigned_tasks": 0,
-    "total_tasks": 0
+    "total_tasks": 1
   }
 }
