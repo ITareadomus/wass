@@ -131,6 +131,23 @@ for r in cur.fetchall():
     else:
         prefs_map[r["user_id"]] = []
 
+# --- CARICA START TIME CUSTOM DA selected_cleaners.json ----------------
+custom_start_times = {}
+try:
+    selected_cleaners_path = Path(__file__).resolve().parents[1] / "data" / "cleaners" / "selected_cleaners.json"
+    if selected_cleaners_path.exists():
+        with selected_cleaners_path.open("r", encoding="utf-8") as f:
+            selected_data = json.load(f)
+            # Verifica che sia per la stessa data target
+            if selected_data.get("metadata", {}).get("date") == target_date_str:
+                for sc in selected_data.get("cleaners", []):
+                    if sc.get("start_time"):
+                        custom_start_times[sc["id"]] = sc["start_time"]
+                if custom_start_times:
+                    print(f"✅ Trovati {len(custom_start_times)} start time custom da selected_cleaners.json")
+except Exception as e:
+    print(f"⚠️ Impossibile leggere start time custom: {e}")
+
 # --- COSTRUZIONE OUTPUT -------------------------------------------------
 cleaners_data = []
 contract_map = {1: "A", 2: "B", 3: "C", 4: "a chiamata"}
@@ -150,6 +167,9 @@ for u in cleaners:
     # Lopez (132), El Hadji (495), Henry (644), Chidi (249)
     straordinaria_authorized = {132, 495, 644, 249}
     
+    # Usa start time custom se disponibile, altrimenti usa tw_start dal DB
+    start_time = custom_start_times.get(uid) or u.get("tw_start")
+    
     cleaner = {
         "id": uid,
         "name": u.get("name"),
@@ -163,7 +183,7 @@ for u in cleaners:
         "contract_type": contract_map.get(u.get("contract_type_id"), u.get("contract_type_id")),
         "preferred_customers": prefs_map.get(uid, []),
         "telegram_id": u.get("telegram_id"),
-        "start_time": u.get("tw_start"),
+        "start_time": start_time,
         "can_do_straordinaria": uid in straordinaria_authorized,
     }
     cleaners_data.append(cleaner)
