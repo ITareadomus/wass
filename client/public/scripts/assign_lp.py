@@ -301,11 +301,13 @@ def evaluate_route(cleaner: Cleaner, route: List[Task]) -> Tuple[bool, List[Tupl
 
     arrival = work_start_min + tt
 
-    # LOGICA STRAORDINARIE: 3 casistiche
-    # 1. Orari non migrati (checkout_dt=None): inizia allo start_time del cleaner (arrival)
-    # 2. Checkout migrato PRIMA dello start_time: inizia allo start_time del cleaner (arrival)
-    # 3. Checkout migrato DOPO lo start_time: inizia al checkout
+    # REGOLA FONDAMENTALE:
+    # - Task STRAORDINARIE: possono iniziare prima delle 10:00 (usano start_time del cleaner)
+    # - Task NORMALI/PREMIUM: devono SEMPRE iniziare dalle 10:00 in poi
+    DEFAULT_START_MIN = 10 * 60  # 10:00 = 600 minuti
+    
     if first.straordinaria:
+        # STRAORDINARIE: possono iniziare prima delle 10:00
         if hasattr(first, 'checkout_dt') and first.checkout_dt:
             checkout_minutes = first.checkout_dt.hour * 60 + first.checkout_dt.minute
             # Checkout migrato: inizia al MAX tra checkout e arrival (start_time cleaner)
@@ -315,12 +317,15 @@ def evaluate_route(cleaner: Cleaner, route: List[Task]) -> Tuple[bool, List[Tupl
             # Orari non migrati: inizia allo start_time del cleaner
             start = arrival
     else:
-        # LP NORMALE: rispetta checkout se presente
+        # TASK NORMALI/PREMIUM: devono SEMPRE iniziare dalle 10:00 in poi
+        # Anche se il cleaner è straordinario e inizia prima, le task normali partono dalle 10:00
+        effective_start = max(arrival, DEFAULT_START_MIN)
+        
         if hasattr(first, 'checkout_dt') and first.checkout_dt:
             checkout_minutes = first.checkout_dt.hour * 60 + first.checkout_dt.minute
-            start = max(arrival, checkout_minutes)
+            start = max(effective_start, checkout_minutes)
         else:
-            start = arrival
+            start = effective_start
 
     finish = start + first.cleaning_time
 
@@ -353,6 +358,19 @@ def evaluate_route(cleaner: Cleaner, route: List[Task]) -> Tuple[bool, List[Tupl
         tt = travel_minutes(prev.lat, prev.lng, t.lat, t.lng, prev.address, t.address)
         cur += tt
         arrival = cur
+        
+        # REGOLA: Task normali/premium devono iniziare alle 10:00+
+        if not t.straordinaria:
+            if cur < DEFAULT_START_MIN:
+                cur = DEFAULT_START_MIN
+                arrival = cur
+        
+        # Rispetta checkout se presente
+        if hasattr(t, 'checkout_dt') and t.checkout_dt:
+            checkout_minutes = t.checkout_dt.hour * 60 + t.checkout_dt.minute
+            if cur < checkout_minutes:
+                cur = checkout_minutes
+        
         start = cur
         finish = start + t.cleaning_time
 

@@ -283,22 +283,22 @@ def evaluate_route(route: List[Task], cleaner: "Cleaner" = None) -> Tuple[bool, 
         cur += tt
         arrival = cur
 
-        # LOGICA STRAORDINARIE vs EO NORMALE:
-        # - STRAORDINARIE: 3 casistiche
-        #   1. Orari non migrati: inizia allo start_time del cleaner
-        #   2. Checkout migrato PRIMA dello start_time: inizia allo start_time del cleaner
-        #   3. Checkout migrato DOPO lo start_time: inizia al checkout
-        # - EO NORMALE: rispetta checkout_time come sempre
+        # REGOLA FONDAMENTALE:
+        # - Task STRAORDINARIE: possono iniziare prima delle 10:00 (usano start_time del cleaner)
+        # - Task NORMALI/PREMIUM: devono SEMPRE iniziare dalle 10:00 in poi
+        DEFAULT_START_MIN = 10 * 60  # 10:00 = 600 minuti
         
         if t.straordinaria:
             # STRAORDINARIE: checkout ha priorità se presente e maggiore di arrival
-            # altrimenti inizia quando arriva il cleaner
+            # altrimenti inizia quando arriva il cleaner (può essere prima delle 10:00)
             start = max(arrival, t.checkout_time)
             cur = start
         else:
-            # EO NORMALE: start_time NON può MAI essere prima del checkout_time
-            wait = max(0.0, t.checkout_time - arrival)
-            cur += wait
+            # TASK NORMALI/PREMIUM: devono SEMPRE iniziare dalle 10:00 in poi
+            # Anche se il cleaner è straordinario e inizia prima, le task normali partono dalle 10:00
+            effective_start = max(arrival, DEFAULT_START_MIN)
+            wait = max(0.0, t.checkout_time - effective_start)
+            cur = effective_start + wait
             start = cur
 
         finish = start + t.cleaning_time
