@@ -642,16 +642,64 @@ export default function Convocazioni() {
                         <span className="font-semibold">Giorni consecutivi:</span> {cleaner.counter_days}
                         <span className="mx-2">|</span>
                         <span className="font-semibold">Contratto:</span> {cleaner.contract_type}
-                        <span className="mx-2">|</span>
-                        <span className="font-semibold">Start Time:</span> {cleaner.start_time || "10:00"}
                       </div>
                     </div>
                   </div>
-                  <Switch
-                    checked={selectedCleaners.has(cleaner.id)}
-                    onCheckedChange={() => toggleCleanerSelection(cleaner.id, isAvailable)}
-                    className="scale-150 pointer-events-none"
-                  />
+                  <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-1 bg-background border-2 border-custom-blue rounded-lg px-2 py-1">
+                      <span className="text-xs font-semibold text-foreground mr-1">Start:</span>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 w-6 p-0 hover:bg-red-100 dark:hover:bg-red-900"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          const currentTime = cleaner.start_time || "10:00";
+                          const [hours, minutes] = currentTime.split(':').map(Number);
+                          let newHours = hours - 1;
+                          if (newHours < 0) newHours = 23;
+                          const newTime = `${String(newHours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+                          setCleaners(prev => prev.map(c => 
+                            c.id === cleaner.id ? { ...c, start_time: newTime } : c
+                          ));
+                          setFilteredCleaners(prev => prev.map(c => 
+                            c.id === cleaner.id ? { ...c, start_time: newTime } : c
+                          ));
+                        }}
+                      >
+                        <span className="text-base font-bold">−</span>
+                      </Button>
+                      <span className="text-sm font-mono font-bold min-w-[45px] text-center">
+                        {cleaner.start_time || "10:00"}
+                      </span>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 w-6 p-0 hover:bg-green-100 dark:hover:bg-green-900"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          const currentTime = cleaner.start_time || "10:00";
+                          const [hours, minutes] = currentTime.split(':').map(Number);
+                          let newHours = hours + 1;
+                          if (newHours > 23) newHours = 0;
+                          const newTime = `${String(newHours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+                          setCleaners(prev => prev.map(c => 
+                            c.id === cleaner.id ? { ...c, start_time: newTime } : c
+                          ));
+                          setFilteredCleaners(prev => prev.map(c => 
+                            c.id === cleaner.id ? { ...c, start_time: newTime } : c
+                          ));
+                        }}
+                      >
+                        <span className="text-base font-bold">+</span>
+                      </Button>
+                    </div>
+                    <Switch
+                      checked={selectedCleaners.has(cleaner.id)}
+                      onCheckedChange={() => toggleCleanerSelection(cleaner.id, isAvailable)}
+                      className="scale-150 pointer-events-none"
+                    />
+                  </div>
                 </div>
               );
             })}
