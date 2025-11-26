@@ -2058,6 +2058,85 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Endpoint per aggiornare lo start time di un cleaner
+  app.post("/api/update-cleaner-start-time", async (req, res) => {
+    try {
+      const { cleanerId, startTime, date, modified_by } = req.body;
+
+      if (!cleanerId || !startTime || !date) {
+        return res.status(400).json({ 
+          success: false, 
+          message: "cleanerId, startTime e date sono richiesti" 
+        });
+      }
+
+      // Carica selected_cleaners.json
+      const selectedCleanersPath = path.join(DATA_DIR, 'cleaners', 'selected_cleaners.json');
+      let selectedCleanersData: any;
+      try {
+        const data = await fs.readFile(selectedCleanersPath, 'utf-8');
+        selectedCleanersData = JSON.parse(data);
+      } catch (error) {
+        return res.status(404).json({ 
+          success: false, 
+          message: "File selected_cleaners.json non trovato" 
+        });
+      }
+
+      // Trova e aggiorna il cleaner
+      const cleanerIndex = selectedCleanersData.cleaners.findIndex((c: any) => c.id === cleanerId);
+      if (cleanerIndex === -1) {
+        return res.status(404).json({ 
+          success: false, 
+          message: "Cleaner non trovato in selected_cleaners.json" 
+        });
+      }
+
+      selectedCleanersData.cleaners[cleanerIndex].start_time = startTime;
+
+      // Salva il file aggiornato
+      await atomicWrite(selectedCleanersPath, JSON.stringify(selectedCleanersData, null, 2));
+
+      // Aggiorna anche timeline.json se il cleaner è presente
+      const timelinePath = path.join(DATA_DIR, 'output', 'timeline.json');
+      let timelineData: any;
+      try {
+        const data = await fs.readFile(timelinePath, 'utf-8');
+        timelineData = JSON.parse(data);
+
+        const cleanerAssignment = timelineData.cleaners_assignments?.find((ca: any) => ca.cleaner?.id === cleanerId);
+        if (cleanerAssignment && cleanerAssignment.cleaner) {
+          cleanerAssignment.cleaner.start_time = startTime;
+          
+          // Aggiorna i metadata
+          if (!timelineData.metadata) {
+            timelineData.metadata = {};
+          }
+          timelineData.metadata.last_modified_by = modified_by || 'unknown';
+          timelineData.metadata.last_updated = new Date().toISOString();
+
+          await atomicWrite(timelinePath, JSON.stringify(timelineData, null, 2));
+          
+          // Salva su Object Storage
+          await saveToObjectStorage(date, timelineData);
+        }
+      } catch (error) {
+        console.log('Timeline.json non trovato o non aggiornato');
+      }
+
+      res.json({ 
+        success: true, 
+        message: "Start time aggiornato con successo" 
+      });
+    } catch (error: any) {
+      console.error('Errore aggiornamento start time:', error);
+      res.status(500).json({ 
+        success: false, 
+        message: error.message || "Errore nel salvataggio dello start time" 
+      });
+    }
+  });
+
   // Endpoint per aggiornare l'alias di un cleaner
   app.post("/api/update-cleaner-alias", async (req, res) => {
     try {
