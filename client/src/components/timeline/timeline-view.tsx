@@ -1840,18 +1840,22 @@ export default function TimelineView({
               {/* Pulsanti nella riga finale */}
               <div className="flex-1 p-1 border-t border-border flex gap-2">
                 {!isReadOnly && (
-                  <div className="flex-1 h-full flex items-center justify-center text-sm text-green-700 dark:text-green-300 bg-green-50 dark:bg-green-900/20 rounded border border-green-200 dark:border-green-800">
-                    ✅ Salvataggio automatico attivo
-                  </div>
+                  <Button
+                    onClick={() => {
+                      // TODO: Implementare trasferimento su ADAM
+                      console.log("Trasferisci su ADAM clicked");
+                    }}
+                    variant="default"
+                    className="flex-1 h-full bg-green-600 hover:bg-green-700 text-white font-semibold"
+                    data-testid="button-transfer-adam"
+                  >
+                    Trasferisci su ADAM
+                  </Button>
                 )}
                 {isReadOnly && (
-                  <Button
-                    disabled
-                    variant="outline"
-                    className="flex-1 h-full border-2 border-custom-blue bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-200 cursor-default"
-                  >
-                    📜 Sei in modalità storico
-                  </Button>
+                  <div className="flex-1 h-full flex items-center justify-center text-sm text-yellow-700 dark:text-yellow-300 bg-yellow-50 dark:bg-yellow-900/20 rounded border border-yellow-200 dark:border-yellow-800 font-medium">
+                    Sei in modalità storico
+                  </div>
                 )}
               </div>
             </div>
