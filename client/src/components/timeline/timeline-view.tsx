@@ -372,11 +372,14 @@ export default function TimelineView({
     return slots;
   };
 
-  // Calcola i minuti totali della timeline globale
+  // Calcola i minuti totali della timeline globale (in base all'ora ARROTONDATA per match con la griglia)
   const getGlobalTimelineMinutes = () => {
     const globalStartTime = getGlobalStartTime();
     const [startHour, startMin] = globalStartTime.split(':').map(Number);
-    const startMinutes = startHour * 60 + startMin;
+    
+    // CRITICAL: Usa l'ora arrotondata (come la griglia visiva) per calcolare i minuti
+    const startHourRounded = startMin > 0 ? startHour : startHour;
+    const startMinutes = startHourRounded * 60; // Parte dall'ora intera
     const endMinutes = 19 * 60; // 19:00
     return endMinutes - startMinutes;
   };
@@ -1763,17 +1766,19 @@ export default function TimelineView({
                                   travelTime = 0;
                                 }
 
-                                // Calcola offset iniziale basato sulla differenza tra start time del cleaner e start time globale
+                                // Calcola offset iniziale basato sulla differenza tra start time del cleaner e start time ARROTONDATO della griglia
                                 let timeOffset = 0;
                                 if (idx === 0) {
+                                  // CRITICAL: Usa l'ora arrotondata (come la griglia) per calcolare l'offset
                                   const [globalStartHour, globalStartMin] = globalStartTime.split(':').map(Number);
-                                  const globalStartMinutes = globalStartHour * 60 + globalStartMin;
+                                  const globalStartHourRounded = globalStartMin > 0 ? globalStartHour : globalStartHour;
+                                  const gridStartMinutes = globalStartHourRounded * 60; // Ora intera della griglia
 
                                   const [cleanerStartHour, cleanerStartMin] = cleanerStartTime.split(':').map(Number);
                                   const cleanerStartMinutes = cleanerStartHour * 60 + cleanerStartMin;
 
-                                  // Se il cleaner inizia dopo lo start globale, aggiungi offset
-                                  const cleanerOffset = cleanerStartMinutes - globalStartMinutes;
+                                  // Se il cleaner inizia dopo l'ora arrotondata della griglia, aggiungi offset
+                                  const cleanerOffset = cleanerStartMinutes - gridStartMinutes;
                                   if (cleanerOffset > 0) {
                                     timeOffset = cleanerOffset;
                                   }
