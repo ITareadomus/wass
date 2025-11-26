@@ -191,6 +191,7 @@ def recalculate_cleaner_times(cleaner_data: Dict[str, Any]) -> Dict[str, Any]:
         # - Task STRAORDINARIE: possono iniziare prima delle 10:00 (usano start_time del cleaner)
         # - Task NORMALI/PREMIUM: devono SEMPRE iniziare dalle 10:00 in poi
         default_start_min = time_to_minutes(WORK_START_TIME)  # 10:00 = 600 minuti
+        straordinaria_default_min = 9 * 60  # 09:00 = 540 minuti (default per straordinarie senza checkout)
         
         if i == 0:
             # Prima task: calcola arrivo base
@@ -205,10 +206,11 @@ def recalculate_cleaner_times(cleaner_data: Dict[str, Any]) -> Dict[str, Any]:
                         # Lo start_time è il MASSIMO tra arrivo cleaner e checkout
                         start_time_min = max(arrival_min, checkout_min)
                     except (ValueError, AttributeError):
-                        start_time_min = arrival_min
+                        # Checkout non valido: usa default 09:00 se cleaner disponibile
+                        start_time_min = max(arrival_min, straordinaria_default_min)
                 else:
-                    # Orari non migrati: inizia allo start_time del cleaner
-                    start_time_min = arrival_min
+                    # Orari non migrati: default 09:00 (se cleaner disponibile prima)
+                    start_time_min = max(arrival_min, straordinaria_default_min)
             else:
                 # TASK NORMALI/PREMIUM: devono iniziare dalle 10:00 in poi
                 # Ignora lo start_time del cleaner, usa sempre 10:00 come minimo

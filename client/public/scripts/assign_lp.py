@@ -305,6 +305,7 @@ def evaluate_route(cleaner: Cleaner, route: List[Task]) -> Tuple[bool, List[Tupl
     # - Task STRAORDINARIE: possono iniziare prima delle 10:00 (usano start_time del cleaner)
     # - Task NORMALI/PREMIUM: devono SEMPRE iniziare dalle 10:00 in poi
     DEFAULT_START_MIN = 10 * 60  # 10:00 = 600 minuti
+    STRAORDINARIA_DEFAULT_MIN = 9 * 60  # 09:00 = 540 minuti (default per straordinarie senza checkout)
     
     if first.straordinaria:
         # STRAORDINARIE: possono iniziare prima delle 10:00
@@ -314,8 +315,9 @@ def evaluate_route(cleaner: Cleaner, route: List[Task]) -> Tuple[bool, List[Tupl
             start = max(arrival, checkout_minutes)
             arrival = start
         else:
-            # Orari non migrati: inizia allo start_time del cleaner
-            start = arrival
+            # Orari non migrati: default 09:00 (se cleaner disponibile prima)
+            start = max(arrival, STRAORDINARIA_DEFAULT_MIN)
+            arrival = start
     else:
         # TASK NORMALI/PREMIUM: devono SEMPRE iniziare dalle 10:00 in poi
         # Anche se il cleaner è straordinario e inizia prima, le task normali partono dalle 10:00
