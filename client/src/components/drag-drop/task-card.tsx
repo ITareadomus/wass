@@ -20,6 +20,13 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { HelpCircle, ChevronLeft, ChevronRight, Save, Pencil, Calendar } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 // Normalizza la chiave di una task indipendentemente dal campo usato
 const getTaskKey = (t: any) => String(t?.id ?? t?.task_id ?? t?.logistic_code ?? "");
@@ -939,24 +946,21 @@ export default function TaskCard({
                   {!isReadOnly && <Pencil className="w-3 h-3 text-muted-foreground/60" />}
                 </p>
                 {editingField === 'operation' && !isReadOnly ? (
-                  <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
-                    <Input
-                      type="text"
-                      inputMode="numeric"
-                      pattern="[0-9]*"
+                  <div onClick={(e) => e.stopPropagation()}>
+                    <Select
                       value={editedOperationId}
-                      onChange={(e) => {
-                        const value = e.target.value.replace(/\D/g, '');
-                        setEditedOperationId(value);
-                      }}
-                      onFocus={(e) => e.stopPropagation()}
-                      onBlur={(e) => e.stopPropagation()}
-                      onClick={(e) => e.stopPropagation()}
-                      className="text-sm w-20 [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                      min="0"
-                      autoFocus
-                    />
-                    <span className="text-sm text-muted-foreground">ID operazione</span>
+                      onValueChange={(value) => setEditedOperationId(value)}
+                    >
+                      <SelectTrigger className="text-sm">
+                        <SelectValue placeholder="Seleziona operazione" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="1">FERMATA</SelectItem>
+                        <SelectItem value="2">PARTENZA</SelectItem>
+                        <SelectItem value="3">PULIZIA STRAORDINARIA</SelectItem>
+                        <SelectItem value="4">RIPASSO</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
                 ) : (
                   <p
