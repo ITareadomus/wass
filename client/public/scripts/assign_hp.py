@@ -295,18 +295,22 @@ def evaluate_route(cleaner: Cleaner, route: List[Task]) -> Tuple[bool, List[Tupl
 
     # LOGICA STRAORDINARIE vs HP NORMALE:
     # - STRAORDINARIE: ignora TUTTI i vincoli orari di default, rispetta SOLO:
-    #   1. checkout_dt dell'appartamento
-    #   2. start_time del cleaner (già in 'base')
+    #   1. checkout_dt dell'appartamento (priorità assoluta)
+    #   2. arrival del cleaner (solo se arriva dopo il checkout)
     #   Lo start_time è il MASSIMO tra arrivo cleaner e checkout appartamento
     # 
     # - HP NORMALE: applica vincolo HP hard earliest (11:00) se necessario
     
     if first.straordinaria:
-        # STRAORDINARIE: nessun vincolo orario di default
-        # arrival = max(base, checkout_dt se presente)
+        # STRAORDINARIE: checkout_dt ha priorità assoluta
+        # Il cleaner può arrivare prima, ma la pulizia inizia al checkout
         if first.checkout_dt:
-            arrival = max(arrival, first.checkout_dt)
-        # else: arrival rimane = base (start_time cleaner + travel se presente)
+            # Start = max tra checkout e quando il cleaner può arrivare
+            start = max(arrival, first.checkout_dt)
+            arrival = start
+        else:
+            # Senza checkout, inizia quando arriva il cleaner
+            start = arrival
     else:
         # HP NORMALE: applica logica con HP hard earliest
         hp_hard_earliest = datetime(arrival.year, arrival.month, arrival.day, HP_HARD_EARLIEST_H, HP_HARD_EARLIEST_M)
@@ -323,7 +327,6 @@ def evaluate_route(cleaner: Cleaner, route: List[Task]) -> Tuple[bool, List[Tupl
                 # Cleaner non libero prima delle 11:00: applica vincolo
                 arrival = max(arrival, hp_hard_earliest)
 
-    start = arrival
     finish = start + timedelta(minutes=first.cleaning_time)
 
     # Check-in strict - INFRANGIBILE
