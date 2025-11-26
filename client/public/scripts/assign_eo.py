@@ -552,6 +552,8 @@ def plan_day(
 ) -> Tuple[List[Cleaner], List[Task]]:
     """
     Assegna le task Early-Out con:
+    - STRAORDINARIE: possono iniziare prima delle 10:00, assegnate al cleaner
+      con start_time minore che ha can_do_straordinaria=True
     - HARD CLUSTER edificio/via o "stesso blocco" (same_building + is_nearby_same_block)
     - FAIRNESS: evita che un cleaner abbia molte più task degli altri,
       ignorando i cleaner vuoti (non forziamo a usarli per forza)
@@ -568,6 +570,33 @@ def plan_day(
         assigned_logistic_codes = set()
 
     unassigned: List[Task] = []
+
+    for task in tasks:
+        # STRAORDINARIE: logica dedicata
+        if task.straordinaria:
+            # Filtra solo cleaner che possono fare straordinarie
+            straordinaria_cleaners = [
+                c for c in cleaners
+                if c.can_do_straordinaria and can_cleaner_handle_apartment(c.role, task.apt_type)
+            ]
+            
+            if not straordinaria_cleaners:
+                unassigned.append(task)
+                continue
+            
+            # Trova cleaner con start_time minore
+            earliest_cleaner = min(straordinaria_cleaners, key=lambda c: hhmm_to_min(getattr(c, 'start_time', '10:00') if isinstance(getattr(c, 'start_time', None), str) else '10:00'))
+            
+            # Verifica se può prendere la task (pos 0)
+            result = find_best_position(earliest_cleaner, task)
+            if result is None:
+                unassigned.append(task)
+                continue
+            
+            pos, _ = result
+            earliest_cleaner.route.insert(pos, task)
+            assigned_logistic_codes.add(task.logistic_code)
+            continue
 
     for task in tasks:
         # dedup su logistic_code cross-container
