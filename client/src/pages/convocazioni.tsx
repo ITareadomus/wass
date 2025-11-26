@@ -5,6 +5,7 @@ import { Card } from "@/components/ui/card";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 import { Users, CalendarIcon, ArrowLeft, Save, UserPlus } from "lucide-react";
 import { format } from "date-fns";
 import { it } from "date-fns/locale";
