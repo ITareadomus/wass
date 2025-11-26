@@ -625,10 +625,15 @@ export default function TimelineView({
 
       console.log(`✅ Cleaners trovati per ${workDate}:`, dateCleaners.length);
 
-      // Filtra solo i cleaners attivi e non già selezionati
+      // CRITICAL: Filtra cleaners già presenti in timeline (sia selezionati che rimossi)
+      // Questo previene di avere duplicati (cleaner rimosso + stesso cleaner aggiunto)
       const selectedCleanerIds = new Set(cleaners.map(c => c.id));
+      const timelineCleanerIds = new Set(timelineCleaners.map(tc => tc.cleaner?.id).filter(Boolean));
+      
       const available = dateCleaners.filter((c: any) =>
-        c.active === true && !selectedCleanerIds.has(c.id)
+        c.active === true && 
+        !selectedCleanerIds.has(c.id) &&
+        !timelineCleanerIds.has(c.id) // NUOVO: escludi anche quelli già in timeline
       );
 
       // Ordina per tipologia (Formatori → Straordinari → Premium → Standard)
