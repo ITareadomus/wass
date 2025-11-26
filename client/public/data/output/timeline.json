@@ -1,6 +1,6 @@
 {
   "metadata": {
-    "last_updated": "2025-11-26T14:33:43.811Z",
+    "last_updated": "2025-11-26T14:39:25.003Z",
     "date": "2025-11-26",
     "created_by": "system",
     "modified_by": [
@@ -79,8 +79,8 @@
             "not_hp",
             "automatic_assignment_lp"
           ],
-          "start_time": "11:50",
-          "end_time": "13:50",
+          "start_time": "11:51",
+          "end_time": "13:51",
           "followup": true,
           "sequence": 2,
           "travel_time": 21
@@ -186,8 +186,8 @@
           "cleaning_time": 300,
           "checkin_date": "2025-11-26",
           "checkout_date": "2025-11-26",
-          "checkin_time": null,
-          "checkout_time": "11:30",
+          "checkin_time": "",
+          "checkout_time": "08:30",
           "pax_in": 0,
           "pax_out": 0,
           "small_equipment": false,
@@ -201,8 +201,8 @@
             "manually_moved_to_timeline"
           ],
           "priority": "low_priority",
-          "start_time": "11:30",
-          "end_time": "16:30",
+          "start_time": "10:00",
+          "end_time": "15:00",
           "followup": false,
           "sequence": 1,
           "travel_time": 0,
