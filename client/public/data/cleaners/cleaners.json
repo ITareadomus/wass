@@ -1,6 +1,6 @@
 {
     "metadata": {
-        "last_updated": "2025-11-26T14:22:02.319252",
+        "last_updated": "2025-11-26T14:25:42.204453",
         "db_config": {
             "host": "139.59.132.41",
             "user": "admin",
@@ -11,7 +11,7 @@
     },
     "dates": {
         "2025-11-26": {
-            "timestamp": "2025-11-26T14:22:02.319265",
+            "timestamp": "2025-11-26T14:25:42.204465",
             "cleaners": [
                 {
                     "id": 24,
@@ -72,7 +72,7 @@
                         124
                     ],
                     "telegram_id": 1577716674,
-                    "start_time": "07:30",
+                    "start_time": "10:00",
                     "can_do_straordinaria": true
                 },
                 {
