@@ -720,53 +720,47 @@ export default function TimelineView({
 
   // Handler per confermare start time e aggiungere cleaner
   const handleConfirmStartTimeAndAdd = async () => {
-    if (!pendingCleaner) return; // Ensure pendingCleaner is set
+    if (!startTimeDialog.cleanerId) return; // Ensure we have a cleaner ID
+
+    const cleanerId = startTimeDialog.cleanerId;
 
     try {
-      // Salva lo start_time personalizzato per questo cleaner
-      const selectedCleanersPath = '/data/cleaners/selected_cleaners.json';
-      const selectedResponse = await fetch(`${selectedCleanersPath}?t=${Date.now()}`, {
-        cache: 'no-store',
-        headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' }
+      // Salva lo start_time usando l'API dedicata
+      const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
+      const response = await fetch('/api/update-cleaner-start-time', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          cleanerId: cleanerId,
+          startTime: pendingStartTime,
+          date: workDate,
+          modified_by: currentUser.username || 'unknown'
+        }),
       });
-      const selectedData = await selectedResponse.json();
 
-      const cleanerIndex = selectedData.cleaners.findIndex((c: Cleaner) => c.id === pendingCleaner.id);
-      const cleanerToUpdate = selectedData.cleaners[cleanerIndex];
-
-      if (cleanerIndex !== -1) {
-        // Aggiorna lo start_time del cleaner nel JSON locale
-        selectedData.cleaners[cleanerIndex] = {
-          ...cleanerToUpdate,
-          start_time: pendingStartTime,
-        };
-
-        // Invia la modifica al backend
-        await fetch('/api/update-cleaner-data', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            filePath: selectedCleanersPath,
-            data: selectedData,
-            date: workDate, // Invia la data corrente per coerenza
-            cleanerId: pendingCleaner.id
-          }),
-        });
+      if (!response.ok) {
+        throw new Error('Errore nel salvataggio dello start time');
       }
 
-      console.log(`✅ Start time ${pendingStartTime} pre-salvato per cleaner ${pendingCleaner.id}`);
+      console.log(`✅ Start time ${pendingStartTime} salvato per cleaner ${cleanerId}`);
     } catch (error) {
-      console.error("Errore nel pre-salvataggio dello start time:", error);
+      console.error("Errore nel salvataggio dello start time:", error);
+      toast({
+        title: "Errore",
+        description: "Impossibile salvare lo start time",
+        variant: "destructive",
+      });
+      return;
     }
 
     // Aggiorna lo stato locale SUBITO con il nuovo start time
     setAvailableCleaners(prev => prev.map(c =>
-      c.id === pendingCleaner.id ? { ...c, start_time: pendingStartTime } : c
+      c.id === cleanerId ? { ...c, start_time: pendingStartTime } : c
     ));
 
     // Se non disponibile, chiedi ulteriore conferma
     if (!startTimeDialog.isAvailable) {
-      setConfirmUnavailableDialog({ open: true, cleanerId: pendingCleaner.id });
+      setConfirmUnavailableDialog({ open: true, cleanerId: cleanerId });
       return;
     }
 
@@ -778,12 +772,12 @@ export default function TimelineView({
     if (cleanerToReplace) {
       removeCleanerMutation.mutate(cleanerToReplace, {
         onSuccess: () => {
-          addCleanerMutation.mutate(pendingCleaner.id);
+          addCleanerMutation.mutate(cleanerId);
           setCleanerToReplace(null);
         }
       });
     } else {
-      addCleanerMutation.mutate(pendingCleaner.id);
+      addCleanerMutation.mutate(cleanerId);
     }
     setIsAddCleanerDialogOpen(false);
     setStartTimeDialog({ open: false, cleanerId: null, cleanerName: '', isAvailable: true }); // Chiudi il dialog dello start time
