@@ -969,8 +969,16 @@ export default function TaskCard({
                     {!isConfirmedOperation
                       ? "non migrato"
                       : (displayTask as any).operation_id
-                        // Usa direttamente l'ID numerico, i nomi delle operazioni sono stati rimossi
-                        ? String((displayTask as any).operation_id)
+                        ? (() => {
+                            const opId = (displayTask as any).operation_id;
+                            const operationNames: Record<number, string> = {
+                              1: "FERMATA",
+                              2: "PARTENZA",
+                              3: "PULIZIA STRAORDINARIA",
+                              4: "RIPASSO"
+                            };
+                            return operationNames[opId] || `Operazione ${opId}`;
+                          })()
                         : "-"}
                   </p>
                 )}
