@@ -85,6 +85,7 @@ class Cleaner:
     lastname: str
     role: str
     is_premium: bool
+    start_time: int = 600  # start_time in minuti da mezzanotte (default 10:00)
     can_do_straordinaria: bool = False
     home_lat: Optional[float] = None
     home_lng: Optional[float] = None
@@ -257,10 +258,12 @@ def can_handle_premium(cleaner: Cleaner, task: Task) -> bool:
 
 
 # -------- Schedulazione / costo --------
-def evaluate_route(route: List[Task]) -> Tuple[bool, List[Tuple[int, int, int]]]:
+def evaluate_route(route: List[Task], cleaner: "Cleaner" = None) -> Tuple[bool, List[Tuple[int, int, int]]]:
     """
     Valuta se una route è fattibile e ritorna lo schedule.
     Ritorna: (is_feasible, schedule)
+    
+    Se cleaner è fornito, usa il suo start_time come orario di inizio.
     """
     if not route:
         return True, []
@@ -270,7 +273,10 @@ def evaluate_route(route: List[Task]) -> Tuple[bool, List[Tuple[int, int, int]]]
 
     schedule: List[Tuple[int, int, int]] = []
     prev: Optional[Task] = None
-    cur = 0.0
+    
+    # Usa lo start_time del cleaner se disponibile, altrimenti 0 (retrocompatibilità)
+    cleaner_start_time = cleaner.start_time if cleaner else 0
+    cur = float(cleaner_start_time)
 
     for i, t in enumerate(route):
         tt = travel_minutes(prev, t)
@@ -279,9 +285,9 @@ def evaluate_route(route: List[Task]) -> Tuple[bool, List[Tuple[int, int, int]]]
 
         # LOGICA STRAORDINARIE vs EO NORMALE:
         # - STRAORDINARIE: 3 casistiche
-        #   1. Orari non migrati: inizia quando arriva il cleaner (arrival)
-        #   2. Checkout migrato PRIMA dell'arrival: inizia all'arrival
-        #   3. Checkout migrato DOPO l'arrival: inizia al checkout
+        #   1. Orari non migrati: inizia allo start_time del cleaner
+        #   2. Checkout migrato PRIMA dello start_time: inizia allo start_time del cleaner
+        #   3. Checkout migrato DOPO lo start_time: inizia al checkout
         # - EO NORMALE: rispetta checkout_time come sempre
         
         if t.straordinaria:
@@ -402,7 +408,7 @@ def can_add_task(cleaner: Cleaner, task: Task) -> bool:
     # 3ª-5ª task: solo se fattibile temporalmente
     if current_count >= BASE_MAX_TASKS and current_count < ABSOLUTE_MAX_TASKS:
         test_route = cleaner.route + [task]
-        feasible, schedule = evaluate_route(test_route)
+        feasible, schedule = evaluate_route(test_route, cleaner)
         if feasible and schedule:
             last_finish = schedule[-1][2]  # finish time in minuti
             if current_count < ABSOLUTE_MAX_TASKS_IF_BEFORE_18 and last_finish <= 18 * 60:
@@ -429,7 +435,7 @@ def find_best_position(cleaner: Cleaner, task: Task) -> Optional[Tuple[int, floa
     # Straordinaria deve andare per forza in pos 0
     if task.straordinaria:
         test_route = [task] + cleaner.route
-        feasible, _ = evaluate_route(test_route)
+        feasible, _ = evaluate_route(test_route, cleaner)
         if feasible:
             return (0, 0.0)
         else:
@@ -438,7 +444,7 @@ def find_best_position(cleaner: Cleaner, task: Task) -> Optional[Tuple[int, floa
     # Prova tutte le posizioni possibili
     for pos in range(len(cleaner.route) + 1):
         test_route = cleaner.route[:pos] + [task] + cleaner.route[pos:]
-        feasible, _ = evaluate_route(test_route)
+        feasible, _ = evaluate_route(test_route, cleaner)
 
         if not feasible:
             continue
@@ -470,6 +476,10 @@ def load_cleaners() -> List[Cleaner]:
         role = (c.get("role") or "").strip()
         is_premium = bool(c.get("premium", (role.lower() == "premium")))
         can_do_straordinaria = bool(c.get("can_do_straordinaria", False))
+        
+        # Leggi start_time del cleaner (default 10:00 se non specificato)
+        start_time_str = c.get("start_time", "10:00")
+        start_time_min = hhmm_to_min(start_time_str, "10:00")
 
         # NUOVO: Valida se il cleaner può gestire Early-Out basandosi su settings.json
         if not can_cleaner_handle_priority(role, "early_out"):
@@ -482,6 +492,7 @@ def load_cleaners() -> List[Cleaner]:
                 lastname=c.get("lastname", ""),
                 role=role or ("Premium" if is_premium else "Standard"),
                 is_premium=is_premium,
+                start_time=start_time_min,
                 can_do_straordinaria=can_do_straordinaria,
                 home_lat=c.get("home_lat"),
                 home_lng=c.get("home_lng"),
@@ -762,7 +773,7 @@ def build_output(cleaners: List[Cleaner], unassigned: List[Task], original_tasks
         # Per Early-Out accettiamo anche 1 sola task (task urgenti)
         # Nessun vincolo minimo qui
 
-        feasible, schedule = evaluate_route(cl.route)
+        feasible, schedule = evaluate_route(cl.route, cl)
         if not feasible or not schedule:
             continue
 
