@@ -347,8 +347,29 @@ export default function Convocazioni() {
     }
 
     try {
-      const selectedCleanersData = cleaners.filter(c => selectedCleaners.has(c.id));
       const dateStr = format(selectedDate, "yyyy-MM-dd");
+
+      // Carica cleaners dalla timeline per includerli nel salvataggio
+      const timelineResponse = await fetch(`/data/output/timeline.json?t=${Date.now()}`);
+      let timelineCleaners: Cleaner[] = [];
+      if (timelineResponse.ok) {
+        try {
+          const timelineData = await timelineResponse.json();
+          if (timelineData.metadata?.date === dateStr && timelineData.cleaners_assignments) {
+            timelineCleaners = timelineData.cleaners_assignments
+              .map((ca: any) => ca.cleaner)
+              .filter((c: any) => c && selectedCleaners.has(c.id));
+          }
+        } catch (e) {
+          console.warn('⚠️ Errore caricamento timeline cleaners:', e);
+        }
+      }
+
+      // Combina cleaners dall'UI con quelli dalla timeline (evita duplicati)
+      const cleanersFromUI = cleaners.filter(c => selectedCleaners.has(c.id));
+      const timelineCleanerIds = new Set(timelineCleaners.map(c => c.id));
+      const uniqueCleanersFromUI = cleanersFromUI.filter(c => !timelineCleanerIds.has(c.id));
+      const selectedCleanersData = [...timelineCleaners, ...uniqueCleanersFromUI];
 
       const dataToSave = {
         cleaners: selectedCleanersData,
@@ -398,6 +419,22 @@ export default function Convocazioni() {
     try {
       const dateStr = format(selectedDate, "yyyy-MM-dd");
 
+      // Carica cleaners dalla timeline per includerli
+      const timelineResponse = await fetch(`/data/output/timeline.json?t=${Date.now()}`);
+      let timelineCleaners: Cleaner[] = [];
+      if (timelineResponse.ok) {
+        try {
+          const timelineData = await timelineResponse.json();
+          if (timelineData.metadata?.date === dateStr && timelineData.cleaners_assignments) {
+            timelineCleaners = timelineData.cleaners_assignments
+              .map((ca: any) => ca.cleaner)
+              .filter((c: any) => c && selectedCleaners.has(c.id));
+          }
+        } catch (e) {
+          console.warn('⚠️ Errore caricamento timeline cleaners:', e);
+        }
+      }
+
       // Carica la selezione attuale
       const currentResponse = await fetch(`/data/cleaners/selected_cleaners.json?t=${Date.now()}`, {
         cache: 'no-store',
@@ -406,10 +443,15 @@ export default function Convocazioni() {
       const currentData = await currentResponse.json();
       const currentCleaners = currentData.cleaners || [];
 
-      // Unisci i cleaners esistenti con i nuovi selezionati (evita duplicati)
+      // Combina cleaners dall'UI con quelli dalla timeline
+      const cleanersFromUI = cleaners.filter(c => selectedCleaners.has(c.id));
+      const timelineCleanerIds = new Set(timelineCleaners.map(c => c.id));
+      const uniqueCleanersFromUI = cleanersFromUI.filter(c => !timelineCleanerIds.has(c.id));
+      const allSelectedCleaners = [...timelineCleaners, ...uniqueCleanersFromUI];
+
+      // Unisci con cleaners esistenti (evita duplicati)
       const existingIds = new Set(currentCleaners.map((c: any) => c.id));
-      const newCleanersToFilter = cleaners.filter(c => selectedCleaners.has(c.id));
-      const newCleaners = newCleanersToFilter.filter(c => !existingIds.has(c.id));
+      const newCleaners = allSelectedCleaners.filter(c => !existingIds.has(c.id));
       const mergedCleaners = [...currentCleaners, ...newCleaners];
 
       const dataToSave = {
