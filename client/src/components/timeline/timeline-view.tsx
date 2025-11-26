@@ -97,6 +97,8 @@ export default function TimelineView({
   const [isSavingAlias, setIsSavingAlias] = useState(false);
   const [aliasDialog, setAliasDialog] = useState<{ open: boolean; cleanerId: number | null; cleanerName: string }>({ open: false, cleanerId: null, cleanerName: '' });
   const [editingStartTime, setEditingStartTime] = useState<string>("10:00");
+  const [startTimeEditDialog, setStartTimeEditDialog] = useState<{ open: boolean; cleanerId: number | null; cleanerName: string }>({ open: false, cleanerId: null, cleanerName: '' });
+  const [isSavingStartTime, setIsSavingStartTime] = useState(false);
 
   // Stato per le regole di validazione task-cleaner
   const [validationRules, setValidationRules] = useState<any>(null);
@@ -820,6 +822,17 @@ export default function TimelineView({
     });
   };
 
+  // Apri dialog modifica start time
+  const handleOpenStartTimeDialog = (cleaner: Cleaner) => {
+    const currentStartTime = cleaner.start_time || "10:00";
+    setEditingStartTime(currentStartTime);
+    setStartTimeEditDialog({
+      open: true,
+      cleanerId: cleaner.id,
+      cleanerName: `${cleaner.name} ${cleaner.lastname}`
+    });
+  };
+
   // Salva l'alias modificato
   const handleSaveAlias = async () => {
     if (!aliasDialog.cleanerId) return;
@@ -866,8 +879,8 @@ export default function TimelineView({
 
   // Salva lo start time modificato
   const handleSaveStartTime = async () => {
-    if (!selectedCleaner) return;
-
+    if (!startTimeEditDialog.cleanerId) return;
+    
     // Valida il formato dell'orario
     if (!/^\d{2}:\d{2}$/.test(editingStartTime)) {
       toast({
@@ -878,13 +891,14 @@ export default function TimelineView({
       return;
     }
 
+    setIsSavingStartTime(true);
     try {
       const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
       const response = await fetch('/api/update-cleaner-start-time', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          cleanerId: selectedCleaner.id,
+          cleanerId: startTimeEditDialog.cleanerId,
           startTime: editingStartTime,
           date: workDate,
           modified_by: currentUser.username || 'unknown'
@@ -897,9 +911,13 @@ export default function TimelineView({
 
       // Aggiorna lo stato locale
       setCleaners(prev => prev.map(c => 
-        c.id === selectedCleaner.id ? { ...c, start_time: editingStartTime } : c
+        c.id === startTimeEditDialog.cleanerId ? { ...c, start_time: editingStartTime } : c
       ));
-      setSelectedCleaner({ ...selectedCleaner, start_time: editingStartTime });
+      
+      // Aggiorna anche selectedCleaner se è lo stesso
+      if (selectedCleaner && selectedCleaner.id === startTimeEditDialog.cleanerId) {
+        setSelectedCleaner({ ...selectedCleaner, start_time: editingStartTime });
+      }
 
       if ((window as any).setHasUnsavedChanges) {
         (window as any).setHasUnsavedChanges(true);
@@ -911,6 +929,9 @@ export default function TimelineView({
         variant: "success",
       });
 
+      // Chiudi il dialog
+      setStartTimeEditDialog({ open: false, cleanerId: null, cleanerName: '' });
+
     } catch (error: any) {
       console.error("Errore nel salvataggio dello start time:", error);
       toast({
@@ -918,6 +939,8 @@ export default function TimelineView({
         description: error.message || "Impossibile salvare lo start time",
         variant: "destructive",
       });
+    } finally {
+      setIsSavingStartTime(false);
     }
   };
 
@@ -1916,6 +1939,71 @@ export default function TimelineView({
         </DialogContent>
       </Dialog>
 
+      {/* Start Time Edit Dialog */}
+      <Dialog open={startTimeEditDialog.open} onOpenChange={(open) => !open && setStartTimeEditDialog({ open: false, cleanerId: null, cleanerName: '' })}>
+        <DialogContent className="sm:max-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Pencil className="w-5 h-5 text-custom-blue" />
+              Modifica Start Time
+            </DialogTitle>
+            <DialogDescription>
+              Stai modificando l'orario di inizio di <strong>{startTimeEditDialog.cleanerName}</strong>
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 mt-4">
+            <div>
+              <label className="text-sm font-semibold text-muted-foreground mb-2 block">
+                Nuovo Start Time
+              </label>
+              <Input
+                type="time"
+                value={editingStartTime}
+                onChange={(e) => setEditingStartTime(e.target.value)}
+                placeholder="Inserisci orario (HH:mm)"
+                className="w-full"
+                autoFocus
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    handleSaveStartTime();
+                  }
+                }}
+              />
+            </div>
+          </div>
+          <div className="flex justify-end gap-2 mt-6">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setStartTimeEditDialog({ open: false, cleanerId: null, cleanerName: '' })}
+              disabled={isSavingStartTime}
+              className="border-2 border-custom-blue"
+            >
+              Annulla
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleSaveStartTime}
+              disabled={isSavingStartTime}
+              className="border-2 border-custom-blue"
+            >
+              {isSavingStartTime ? (
+                <>
+                  <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                  Salvataggio...
+                </>
+              ) : (
+                <>
+                  <Save className="w-4 h-4 mr-2" />
+                  Salva
+                </>
+              )}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {/* Confirmation Dialog for Cleaner Removal */}
       <Dialog open={confirmRemovalDialog.open} onOpenChange={(open) => setConfirmRemovalDialog({ open, cleanerId: null })}>
         <DialogContent className="sm:max-md">
@@ -2209,19 +2297,7 @@ export default function TimelineView({
                     className={`text-sm p-2 rounded border ${!isReadOnly ? 'cursor-pointer hover:bg-muted/50 border-border hover:border-custom-blue' : 'border-border'}`}
                     onClick={(e) => {
                       e.stopPropagation();
-                      if (!isReadOnly) {
-                        const newTime = prompt('Inserisci il nuovo start time (formato HH:mm):', editingStartTime);
-                        if (newTime && /^\d{2}:\d{2}$/.test(newTime)) {
-                          setEditingStartTime(newTime);
-                          handleSaveStartTime();
-                        } else if (newTime) {
-                          toast({
-                            variant: "destructive",
-                            title: "⚠️ Formato orario non valido",
-                            description: "Inserisci un orario nel formato HH:mm (es. 10:00)"
-                          });
-                        }
-                      }
+                      if (!isReadOnly) handleOpenStartTimeDialog(selectedCleaner);
                     }}
                   >
                     {selectedCleaner.start_time || "10:00"}
