@@ -1569,7 +1569,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         action: 'editing_cleaners'
       }));
 
-      // Carica cleaners.json per ottenere can_do_straordinaria
+      // Carica cleaners.json per ottenere l'oggetto COMPLETO di ogni cleaner
       const cleanersPath = path.join(process.cwd(), 'client/public/data/cleaners/cleaners.json');
       const cleanersContent = await fs.readFile(cleanersPath, 'utf8');
       const cleanersData = JSON.parse(cleanersContent);
@@ -1579,17 +1579,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const targetDate = dates.includes(workDate) ? workDate : dates.sort().reverse()[0];
       const allCleaners = cleanersData.dates[targetDate]?.cleaners || [];
 
-      // Crea mappa can_do_straordinaria per ID
-      const straordinariaMap = new Map();
+      // Crea mappa completa dei cleaners per ID
+      const cleanersMap = new Map();
       allCleaners.forEach((c: any) => {
-        straordinariaMap.set(c.id, c.can_do_straordinaria || false);
+        cleanersMap.set(c.id, c);
       });
 
-      // Aggiungi can_do_straordinaria ai cleaner selezionati
-      const enrichedCleaners = selectedCleaners.map((c: any) => ({
-        ...c,
-        can_do_straordinaria: straordinariaMap.get(c.id) || false
-      }));
+      // Sostituisci ogni cleaner selezionato con l'oggetto COMPLETO da cleaners.json
+      // Preserva solo lo start_time se è stato modificato dall'utente
+      const enrichedCleaners = selectedCleaners.map((c: any) => {
+        const fullCleaner = cleanersMap.get(c.id);
+        if (fullCleaner) {
+          // Usa l'oggetto completo, ma preserva start_time custom se presente
+          return {
+            ...fullCleaner,
+            start_time: c.start_time || fullCleaner.start_time
+          };
+        }
+        // Fallback: mantieni il cleaner così com'è se non trovato
+        return c;
+      });
 
       const selectedCleanersPath = path.join(
         process.cwd(),
