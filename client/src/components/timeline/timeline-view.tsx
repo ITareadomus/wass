@@ -28,6 +28,16 @@ import { format } from 'date-fns';
 import { loadValidationRules, canCleanerHandleTaskSync } from "@/lib/taskValidation";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 interface TimelineViewProps {
   personnel: Personnel[];
@@ -80,6 +90,7 @@ export default function TimelineView({
   const [incompatibleDialog, setIncompatibleDialog] = useState<{ open: boolean; cleanerId: number | null; tasks: Array<{ logisticCode: string; taskType: string }> }>({ open: false, cleanerId: null, tasks: [] });
   const [startTimeDialog, setStartTimeDialog] = useState<{ open: boolean; cleanerId: number | null; cleanerName: string; isAvailable: boolean }>({ open: false, cleanerId: null, cleanerName: '', isAvailable: true });
   const [pendingStartTime, setPendingStartTime] = useState<string>("10:00");
+  const [showAdamTransferDialog, setShowAdamTransferDialog] = useState(false); // Stato per il dialog di trasferimento ADAM
 
   // Stato per tracciare acknowledge per coppie (task, cleaner)
   type IncompatibleKey = string; // chiave del tipo `${taskId}-${cleanerId}`
@@ -629,9 +640,9 @@ export default function TimelineView({
       // Questo previene di avere duplicati (cleaner rimosso + stesso cleaner aggiunto)
       const selectedCleanerIds = new Set(cleaners.map(c => c.id));
       const timelineCleanerIds = new Set(timelineCleaners.map(tc => tc.cleaner?.id).filter(Boolean));
-      
+
       const available = dateCleaners.filter((c: any) =>
-        c.active === true && 
+        c.active === true &&
         !selectedCleanerIds.has(c.id) &&
         !timelineCleanerIds.has(c.id) // NUOVO: escludi anche quelli già in timeline
       );
@@ -692,55 +703,66 @@ export default function TimelineView({
     // Trova il nome del cleaner per mostrarlo nel dialog
     const cleaner = availableCleaners.find(c => c.id === cleanerId);
     const cleanerName = cleaner ? `${cleaner.name} ${cleaner.lastname}` : `ID ${cleanerId}`;
-    
+
     // Apri il dialog per richiedere lo start time
-    setStartTimeDialog({ 
-      open: true, 
-      cleanerId, 
+    setStartTimeDialog({
+      open: true,
+      cleanerId,
       cleanerName,
-      isAvailable 
+      isAvailable
     });
     setPendingStartTime("10:00"); // Reset al valore di default
   };
 
   // Handler per confermare start time e aggiungere cleaner
   const handleConfirmStartTimeAndAdd = async () => {
-    if (!startTimeDialog.cleanerId) return;
+    if (!pendingCleaner) return;
 
-    const cleanerId = startTimeDialog.cleanerId;
-    const isAvailable = startTimeDialog.isAvailable;
-
-    // Chiudi il dialog dello start time
-    setStartTimeDialog({ open: false, cleanerId: null, cleanerName: '', isAvailable: true });
-
-    // CRITICAL: Salva lo start time PRIMA di aggiungere il cleaner
-    // Questo garantisce che selected_cleaners.json abbia lo start time corretto
     try {
-      const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
-      await fetch('/api/update-cleaner-start-time', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          cleanerId,
-          startTime: pendingStartTime,
-          date: workDate,
-          modified_by: currentUser.username || 'unknown'
-        }),
+      // Salva lo start_time personalizzato per questo cleaner
+      const selectedCleanersPath = '/data/cleaners/selected_cleaners.json';
+      const selectedResponse = await fetch(`${selectedCleanersPath}?t=${Date.now()}`, {
+        cache: 'no-store',
+        headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' }
       });
+      const selectedData = await selectedResponse.json();
 
-      console.log(`✅ Start time ${pendingStartTime} pre-salvato per cleaner ${cleanerId}`);
+      const cleanerIndex = selectedData.cleaners.findIndex((c: Cleaner) => c.id === pendingCleaner.id);
+      const cleanerToUpdate = selectedData.cleaners[cleanerIndex];
+
+      if (cleanerIndex !== -1) {
+        // Aggiorna lo start_time del cleaner nel JSON locale
+        selectedData.cleaners[cleanerIndex] = {
+          ...cleanerToUpdate,
+          start_time: pendingStartTime,
+        };
+
+        // Invia la modifica al backend
+        await fetch('/api/update-cleaner-data', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            filePath: selectedCleanersPath,
+            data: selectedData,
+            date: workDate, // Invia la data corrente per coerenza
+            cleanerId: pendingCleaner.id
+          }),
+        });
+      }
+
+      console.log(`✅ Start time ${pendingStartTime} pre-salvato per cleaner ${pendingCleaner.id}`);
     } catch (error) {
       console.error("Errore nel pre-salvataggio dello start time:", error);
     }
 
     // Aggiorna lo stato locale SUBITO con il nuovo start time
-    setAvailableCleaners(prev => prev.map(c => 
-      c.id === cleanerId ? { ...c, start_time: pendingStartTime } : c
+    setAvailableCleaners(prev => prev.map(c =>
+      c.id === pendingCleaner.id ? { ...c, start_time: pendingStartTime } : c
     ));
 
     // Se non disponibile, chiedi ulteriore conferma
-    if (!isAvailable) {
-      setConfirmUnavailableDialog({ open: true, cleanerId });
+    if (!startTimeDialog.isAvailable) {
+      setConfirmUnavailableDialog({ open: true, cleanerId: pendingCleaner.id });
       return;
     }
 
@@ -748,44 +770,66 @@ export default function TimelineView({
     if ((window as any).setHasUnsavedChanges) {
       (window as any).setHasUnsavedChanges(true);
     }
-    
+
     if (cleanerToReplace) {
       removeCleanerMutation.mutate(cleanerToReplace, {
         onSuccess: () => {
-          addCleanerMutation.mutate(cleanerId);
+          addCleanerMutation.mutate(pendingCleaner.id);
           setCleanerToReplace(null);
         }
       });
     } else {
-      addCleanerMutation.mutate(cleanerId);
+      addCleanerMutation.mutate(pendingCleaner.id);
     }
     setIsAddCleanerDialogOpen(false);
+    setStartTimeDialog({ open: false, cleanerId: null, cleanerName: '', isAvailable: true }); // Chiudi il dialog dello start time
   };
+
 
   // Handler per confermare l'aggiunta di un cleaner non disponibile
   const handleConfirmAddUnavailableCleaner = async () => {
     if (confirmUnavailableDialog.cleanerId) {
       // Prima salva lo start time aggiornato
       try {
-        const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
-        await fetch('/api/update-cleaner-start-time', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            cleanerId: confirmUnavailableDialog.cleanerId,
-            startTime: pendingStartTime,
-            date: workDate,
-            modified_by: currentUser.username || 'unknown'
-          }),
+        const selectedCleanersPath = '/data/cleaners/selected_cleaners.json';
+        const selectedResponse = await fetch(`${selectedCleanersPath}?t=${Date.now()}`, {
+          cache: 'no-store',
+          headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' }
         });
+        const selectedData = await selectedResponse.json();
 
-        // Aggiorna lo stato locale
-        setAvailableCleaners(prev => prev.map(c => 
-          c.id === confirmUnavailableDialog.cleanerId ? { ...c, start_time: pendingStartTime } : c
-        ));
+        const cleanerIndex = selectedData.cleaners.findIndex((c: Cleaner) => c.id === confirmUnavailableDialog.cleanerId);
+        const cleanerToUpdate = selectedData.cleaners[cleanerIndex];
+
+        if (cleanerIndex !== -1) {
+          selectedData.cleaners[cleanerIndex] = {
+            ...cleanerToUpdate,
+            start_time: pendingStartTime,
+            available: true // Imposta come disponibile
+          };
+
+          // Invia la modifica al backend
+          await fetch('/api/update-cleaner-data', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              filePath: selectedCleanersPath,
+              data: selectedData,
+              date: workDate,
+              cleanerId: confirmUnavailableDialog.cleanerId
+            }),
+          });
+          console.log(`✅ Cleaner ${confirmUnavailableDialog.cleanerId} impostato come disponibile con start time ${pendingStartTime}`);
+        }
       } catch (error) {
-        console.error("Errore nel salvataggio dello start time:", error);
+        console.error("Errore nel salvataggio dello start time e disponibilità:", error);
       }
+
+      // Aggiorna lo stato locale per riflettere la modifica
+      setAvailableCleaners(prev => prev.map(c =>
+        c.id === confirmUnavailableDialog.cleanerId ? { ...c, start_time: pendingStartTime, available: true } : c
+      ));
+
 
       // Chiudi il dialog di conferma e procedi con l'aggiunta
       setConfirmUnavailableDialog({ open: false, cleanerId: null });
@@ -885,7 +929,7 @@ export default function TimelineView({
   // Salva lo start time modificato
   const handleSaveStartTime = async () => {
     if (!startTimeEditDialog.cleanerId) return;
-    
+
     // Valida il formato dell'orario
     if (!/^\d{2}:\d{2}$/.test(editingStartTime)) {
       toast({
@@ -915,10 +959,10 @@ export default function TimelineView({
       }
 
       // Aggiorna lo stato locale
-      setCleaners(prev => prev.map(c => 
+      setCleaners(prev => prev.map(c =>
         c.id === startTimeEditDialog.cleanerId ? { ...c, start_time: editingStartTime } : c
       ));
-      
+
       // Aggiorna anche selectedCleaner se è lo stesso
       if (selectedCleaner && selectedCleaner.id === startTimeEditDialog.cleanerId) {
         setSelectedCleaner({ ...selectedCleaner, start_time: editingStartTime });
@@ -1337,7 +1381,68 @@ export default function TimelineView({
   });
 
 
+  // Funzione per il trasferimento dei dati ad ADAM
+  const handleTransferToAdam = async () => {
+    try {
+      setShowAdamTransferDialog(false); // Chiudi il dialog di conferma
 
+      toast({
+        title: "Trasferimento in corso...",
+        description: "Invio dati al database ADAM",
+        variant: "default",
+      });
+
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 secondi timeout
+
+      const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
+      const response = await fetch('/api/transfer-to-adam', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          date: workDate,
+          username: currentUser.username || 'system'
+        }),
+        signal: controller.signal
+      });
+
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        throw new Error(`Server error: ${response.status} ${response.statusText}`);
+      }
+
+      const result = await response.json();
+
+      if (result.success) {
+        toast({
+          title: "✅ Trasferimento completato",
+          description: result.message || `Task aggiornate sul database ADAM`,
+        });
+      } else {
+        toast({
+          title: "❌ Errore trasferimento",
+          description: result.message || "Errore durante il trasferimento",
+          variant: "destructive",
+        });
+      }
+    } catch (error: any) {
+      console.error('Errore trasferimento ADAM:', error);
+      let errorMessage = "Impossibile comunicare con il server";
+
+      if (error.name === 'AbortError') {
+        errorMessage = "Timeout: il server impiega troppo tempo a rispondere";
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+
+      toast({
+        title: "❌ Errore connessione",
+        description: errorMessage,
+        variant: "destructive",
+      });
+    }
+  };
 
   return (
     <>
@@ -1734,65 +1839,7 @@ export default function TimelineView({
                   </Button>
                 )}
                 <Button
-                  onClick={async () => {
-                    try {
-                      toast({
-                        title: "Trasferimento in corso...",
-                        description: "Invio dati al database ADAM",
-                        variant: "default",
-                      });
-
-                      const controller = new AbortController();
-                      const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 secondi timeout
-
-                      const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
-                      const response = await fetch('/api/transfer-to-adam', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                          date: workDate,
-                          username: currentUser.username || 'system'
-                        }),
-                        signal: controller.signal
-                      });
-
-                      clearTimeout(timeoutId);
-
-                      if (!response.ok) {
-                        throw new Error(`Server error: ${response.status} ${response.statusText}`);
-                      }
-
-                      const result = await response.json();
-
-                      if (result.success) {
-                        toast({
-                          title: "✅ Trasferimento completato",
-                          description: result.message || `Task aggiornate sul database ADAM`,
-                        });
-                      } else {
-                        toast({
-                          title: "❌ Errore trasferimento",
-                          description: result.message || "Errore durante il trasferimento",
-                          variant: "destructive",
-                        });
-                      }
-                    } catch (error: any) {
-                      console.error('Errore trasferimento ADAM:', error);
-                      let errorMessage = "Impossibile comunicare con il server";
-
-                      if (error.name === 'AbortError') {
-                        errorMessage = "Timeout: il server impiega troppo tempo a rispondere";
-                      } else if (error.message) {
-                        errorMessage = error.message;
-                      }
-
-                      toast({
-                        title: "❌ Errore connessione",
-                        description: errorMessage,
-                        variant: "destructive",
-                      });
-                    }
-                  }}
+                  onClick={() => setShowAdamTransferDialog(true)} // Apri il dialog di conferma
                   size="sm"
                   variant="outline"
                   className="ml-2 border-2 border-custom-blue"
@@ -2398,6 +2445,40 @@ export default function TimelineView({
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Dialog di conferma per il trasferimento su ADAM */}
+      <AlertDialog open={showAdamTransferDialog} onOpenChange={setShowAdamTransferDialog}>
+        <AlertDialogContent className="sm:max-w-md">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2 text-yellow-600 dark:text-yellow-400">
+              <CheckCircle className="w-5 h-5" />
+              Conferma Trasferimento su ADAM
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              <p className="text-base text-foreground font-semibold mb-3">
+                Salvando su ADAM eventuali assegnazioni salvate precedentemente in questa data, VERRANNO SOVRASCRITTE!
+              </p>
+              <p className="text-sm text-muted-foreground">
+                Sei sicuro di voler procedere? Questa azione è irreversibile.
+              </p>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel
+              onClick={() => setShowAdamTransferDialog(false)}
+              className="border-2 border-custom-blue"
+            >
+              Annulla
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleTransferToAdam}
+              className="bg-custom-blue hover:bg-custom-blue/90 text-white"
+            >
+              Ho capito
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }
