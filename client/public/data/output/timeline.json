@@ -1,6 +1,6 @@
 {
   "metadata": {
-    "last_updated": "2025-11-26T08:04:36.292Z",
+    "last_updated": "2025-11-26T08:07:19.011Z",
     "date": "2025-11-26",
     "created_by": "Admin"
   },
@@ -54,10 +54,20 @@
         "premium": true
       },
       "tasks": []
+    },
+    {
+      "cleaner": {
+        "id": 829,
+        "name": "MUSTAPHA",
+        "lastname": "BAH",
+        "role": "Premium",
+        "premium": true
+      },
+      "tasks": []
     }
   ],
   "meta": {
-    "total_cleaners": 5,
+    "total_cleaners": 6,
     "used_cleaners": 0,
     "assigned_tasks": 0,
     "total_tasks": 0
