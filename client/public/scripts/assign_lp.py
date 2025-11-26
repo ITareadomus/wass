@@ -300,17 +300,18 @@ def evaluate_route(cleaner: Cleaner, route: List[Task]) -> Tuple[bool, List[Tupl
 
     arrival = work_start_min + tt
 
-    # LOGICA STRAORDINARIE: ignora vincoli orari di default
-    # Rispetta SOLO checkout_time (priorità assoluta)
+    # LOGICA STRAORDINARIE: 3 casistiche
+    # 1. Orari non migrati (checkout_dt=None): inizia allo start_time del cleaner (arrival)
+    # 2. Checkout migrato PRIMA dello start_time: inizia allo start_time del cleaner (arrival)
+    # 3. Checkout migrato DOPO lo start_time: inizia al checkout
     if first.straordinaria:
-        # STRAORDINARIE: checkout ha priorità assoluta
-        # Il cleaner può arrivare prima, ma la pulizia inizia al checkout
         if hasattr(first, 'checkout_dt') and first.checkout_dt:
             checkout_minutes = first.checkout_dt.hour * 60 + first.checkout_dt.minute
-            # Start = max tra checkout e quando il cleaner può arrivare
+            # Checkout migrato: inizia al MAX tra checkout e arrival (start_time cleaner)
             start = max(arrival, checkout_minutes)
             arrival = start
         else:
+            # Orari non migrati: inizia allo start_time del cleaner
             start = arrival
     else:
         # LP NORMALE: rispetta checkout se presente

@@ -278,13 +278,15 @@ def evaluate_route(route: List[Task]) -> Tuple[bool, List[Tuple[int, int, int]]]
         arrival = cur
 
         # LOGICA STRAORDINARIE vs EO NORMALE:
-        # - STRAORDINARIE: ignora vincoli orari di default (es. EO start time)
-        #   start = checkout_time (priorità assoluta), a meno che il cleaner arrivi dopo
+        # - STRAORDINARIE: 3 casistiche
+        #   1. Orari non migrati: inizia quando arriva il cleaner (arrival)
+        #   2. Checkout migrato PRIMA dell'arrival: inizia all'arrival
+        #   3. Checkout migrato DOPO l'arrival: inizia al checkout
         # - EO NORMALE: rispetta checkout_time come sempre
         
         if t.straordinaria:
-            # STRAORDINARIE: checkout_time ha priorità assoluta
-            # Il cleaner può arrivare prima, ma la pulizia inizia al checkout
+            # STRAORDINARIE: checkout ha priorità se presente e maggiore di arrival
+            # altrimenti inizia quando arriva il cleaner
             start = max(arrival, t.checkout_time)
             cur = start
         else:
