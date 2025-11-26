@@ -1,29 +1,13 @@
 {
   "cleaners": [
     {
-      "id": 626,
-      "name": "DORA PATRICIA",
-      "lastname": "JIMENEZ",
-      "role": "Formatore",
-      "active": true,
-      "ranking": 0,
-      "counter_hours": 13.25,
-      "counter_days": 2,
-      "available": true,
-      "contract_type": "B",
-      "preferred_customers": [],
-      "telegram_id": null,
-      "start_time": "10:00",
-      "can_do_straordinaria": false
-    },
-    {
       "id": 249,
       "name": "Ogbodo Chidi",
       "lastname": "Igwe",
       "role": "Premium",
       "active": true,
       "ranking": 0,
-      "counter_hours": 16,
+      "counter_hours": 17.5,
       "counter_days": 2,
       "available": true,
       "contract_type": "a chiamata",
@@ -43,13 +27,29 @@
         123
       ],
       "telegram_id": 6481457174,
-      "start_time": "08:00",
+      "start_time": "11:00",
       "can_do_straordinaria": true
+    },
+    {
+      "id": 626,
+      "name": "DORA PATRICIA",
+      "lastname": "JIMENEZ",
+      "role": "Formatore",
+      "active": true,
+      "ranking": 0,
+      "counter_hours": 13.25,
+      "counter_days": 2,
+      "available": true,
+      "contract_type": "B",
+      "preferred_customers": [],
+      "telegram_id": null,
+      "start_time": "11:00",
+      "can_do_straordinaria": false
     }
   ],
   "total_selected": 2,
   "metadata": {
     "date": "2025-11-26",
-    "saved_at": "2025-11-26T11:24:43.686Z"
+    "saved_at": "2025-11-26T13:21:02.924Z"
   }
 }
