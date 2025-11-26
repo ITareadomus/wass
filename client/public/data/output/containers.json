@@ -1,6 +1,6 @@
 {
   "metadata": {
-    "last_updated": "2025-11-26T15:15:15.291337",
+    "last_updated": "2025-11-26T15:19:34.307760",
     "date": "2025-11-26"
   },
   "containers": {
@@ -366,14 +366,155 @@
       "count": 2
     },
     "low_priority": {
-      "tasks": [],
-      "count": 0
+      "tasks": [
+        {
+          "task_id": 218467,
+          "logistic_code": 1096,
+          "client_id": 2,
+          "premium": false,
+          "address": "Corso Cristoforo Colombo 5",
+          "lat": "45.4547051",
+          "lng": "9.1721028",
+          "cleaning_time": 120,
+          "checkin_date": "2025-12-04",
+          "checkout_date": "2025-11-26",
+          "checkin_time": null,
+          "checkout_time": null,
+          "pax_in": 2,
+          "pax_out": 3,
+          "small_equipment": false,
+          "operation_id": 2,
+          "confirmed_operation": true,
+          "straordinaria": false,
+          "type_apt": "C",
+          "alias": "ITW",
+          "customer_name": "ITALIANWAY SRL",
+          "priority": "low_priority",
+          "reasons": [
+            "not_eo",
+            "not_hp"
+          ]
+        },
+        {
+          "task_id": 219260,
+          "logistic_code": 1576,
+          "client_id": 94,
+          "premium": false,
+          "address": "VIA SAVONA 127",
+          "lat": "45.4484989",
+          "lng": "9.1467488",
+          "cleaning_time": 90,
+          "checkin_date": "2025-11-28",
+          "checkout_date": "2025-11-26",
+          "checkin_time": "23:00",
+          "checkout_time": null,
+          "pax_in": 2,
+          "pax_out": 2,
+          "small_equipment": false,
+          "operation_id": 2,
+          "confirmed_operation": true,
+          "straordinaria": false,
+          "type_apt": "B",
+          "alias": "IHST",
+          "customer_name": "IHOST",
+          "priority": "low_priority",
+          "reasons": [
+            "not_eo",
+            "not_hp"
+          ]
+        },
+        {
+          "task_id": 219272,
+          "logistic_code": 1676,
+          "client_id": 123,
+          "premium": false,
+          "address": "Via Francesco Albani, 55",
+          "lat": "45.481653",
+          "lng": "9.1449777",
+          "cleaning_time": 90,
+          "checkin_date": "2025-11-29",
+          "checkout_date": "2025-11-26",
+          "checkin_time": "19:30",
+          "checkout_time": null,
+          "pax_in": 2,
+          "pax_out": 2,
+          "small_equipment": false,
+          "operation_id": 2,
+          "confirmed_operation": true,
+          "straordinaria": false,
+          "type_apt": "B",
+          "alias": "YHST",
+          "customer_name": "YOUHOSTY",
+          "priority": "low_priority",
+          "reasons": [
+            "not_eo",
+            "not_hp"
+          ]
+        },
+        {
+          "task_id": 219409,
+          "logistic_code": 537,
+          "client_id": 3,
+          "premium": false,
+          "address": "VIA SANGRO, 8",
+          "lat": "45.4934769",
+          "lng": "9.2350811",
+          "cleaning_time": 30,
+          "checkin_date": null,
+          "checkout_date": "2025-11-26",
+          "checkin_time": null,
+          "checkout_time": null,
+          "pax_in": 0,
+          "pax_out": 0,
+          "small_equipment": false,
+          "operation_id": 4,
+          "confirmed_operation": true,
+          "straordinaria": false,
+          "type_apt": "B",
+          "alias": "TBR",
+          "customer_name": "THE BEST RENT S.r.l.",
+          "priority": "low_priority",
+          "reasons": [
+            "not_eo",
+            "not_hp"
+          ]
+        },
+        {
+          "task_id": 219412,
+          "logistic_code": 1693,
+          "client_id": 124,
+          "premium": false,
+          "address": "VIA TOLENTINO 1",
+          "lat": "45.4879867",
+          "lng": "9.1605552",
+          "cleaning_time": 300,
+          "checkin_date": "2025-11-26",
+          "checkout_date": "2025-11-26",
+          "checkin_time": null,
+          "checkout_time": null,
+          "pax_in": 0,
+          "pax_out": 0,
+          "small_equipment": false,
+          "operation_id": 3,
+          "confirmed_operation": true,
+          "straordinaria": true,
+          "type_apt": "C",
+          "alias": "HMST",
+          "customer_name": "HOMING STAYS",
+          "priority": "low_priority",
+          "reasons": [
+            "not_eo",
+            "not_hp"
+          ]
+        }
+      ],
+      "count": 5
     }
   },
   "summary": {
-    "total_tasks": 13,
+    "total_tasks": 18,
     "early_out": 11,
     "high_priority": 2,
-    "low_priority": 0
+    "low_priority": 5
   }
 }
