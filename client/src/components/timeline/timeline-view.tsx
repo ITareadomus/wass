@@ -1476,29 +1476,6 @@ export default function TimelineView({
               </Button>
             </div>
           </div>
-          {/* Header con status */}
-          <div className="flex items-center justify-between flex-wrap gap-2">
-            {!isReadOnly ? (
-              <Button
-                onClick={() => setShowAdamTransferDialog(true)}
-                size="sm"
-                variant="outline"
-                className="w-full max-w-xs border-2 border-custom-blue"
-              >
-                <svg className="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
-                </svg>
-                Trasferisci su ADAM
-              </Button>
-            ) : unsavedChanges && (
-              <div className="flex items-center gap-2 text-amber-600 dark:text-amber-400 text-sm font-medium bg-amber-50 dark:bg-amber-950/30 px-3 py-2 rounded-md border border-amber-200 dark:border-amber-800">
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                </svg>
-                Modifiche non salvate
-              </div>
-            )}
-          </div>
         </div>
         <div className="p-4 overflow-x-auto">
           {/* Header con orari - unico per tutti i cleaner */}
@@ -1841,14 +1818,14 @@ export default function TimelineView({
               <div className="flex-1 p-1 border-t border-border flex gap-2">
                 {!isReadOnly && (
                   <Button
-                    onClick={() => {
-                      // TODO: Implementare trasferimento su ADAM
-                      console.log("Trasferisci su ADAM clicked");
-                    }}
+                    onClick={() => setShowAdamTransferDialog(true)}
                     variant="default"
                     className="flex-1 h-full bg-green-600 hover:bg-green-700 text-white font-semibold"
                     data-testid="button-transfer-adam"
                   >
+                    <svg className="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                    </svg>
                     Trasferisci su ADAM
                   </Button>
                 )}
