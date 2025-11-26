@@ -377,6 +377,65 @@ export default function TaskCard({
     try {
       setIsSaving(true);
 
+      // Validazione: verifica che i campi obbligatori siano compilati
+      if (editingFields.has('checkout') && (!editedCheckoutDate || !editedCheckoutTime)) {
+        toast({
+          title: "Errore di validazione",
+          description: "Devi inserire sia la data che l'orario del check-out",
+          variant: "destructive",
+        });
+        setIsSaving(false);
+        return;
+      }
+
+      if (editingFields.has('checkin') && (!editedCheckinDate || !editedCheckinTime)) {
+        toast({
+          title: "Errore di validazione",
+          description: "Devi inserire sia la data che l'orario del check-in",
+          variant: "destructive",
+        });
+        setIsSaving(false);
+        return;
+      }
+
+      // Validazione: il check-in non può essere precedente al check-out
+      if (editedCheckoutDate && editedCheckoutTime && editedCheckinDate && editedCheckinTime) {
+        const checkoutDateTime = new Date(`${editedCheckoutDate}T${editedCheckoutTime}:00`);
+        const checkinDateTime = new Date(`${editedCheckinDate}T${editedCheckinTime}:00`);
+
+        if (checkinDateTime < checkoutDateTime) {
+          toast({
+            title: "Errore di validazione",
+            description: "Il check-in non può essere precedente al check-out",
+            variant: "destructive",
+          });
+          setIsSaving(false);
+          return;
+        }
+      }
+
+      // Validazione: durata pulizia deve essere > 0
+      if (editingFields.has('duration') && parseInt(editedDuration) <= 0) {
+        toast({
+          title: "Errore di validazione",
+          description: "La durata della pulizia deve essere maggiore di 0 minuti",
+          variant: "destructive",
+        });
+        setIsSaving(false);
+        return;
+      }
+
+      // Validazione: pax-in deve essere >= 0
+      if (editingFields.has('paxin') && parseInt(editedPaxIn) < 0) {
+        toast({
+          title: "Errore di validazione",
+          description: "Il numero di ospiti non può essere negativo",
+          variant: "destructive",
+        });
+        setIsSaving(false);
+        return;
+      }
+
       const response = await fetch('/api/update-task-details', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
