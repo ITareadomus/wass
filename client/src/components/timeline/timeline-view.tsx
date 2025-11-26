@@ -1529,7 +1529,7 @@ export default function TimelineView({
                 Timeline dinamica (start personalizzato - 19:00)
               </span>
             </div>
-          </div></div>
+          </div>
 
           {/* Righe dei cleaners - mostra solo se ci sono cleaners selezionati */}
           <div className="flex-1 overflow-auto px-4 pb-4">
