@@ -187,36 +187,39 @@ def recalculate_cleaner_times(cleaner_data: Dict[str, Any]) -> Dict[str, Any]:
         # Verifica se è una task straordinaria
         is_straordinaria = task.get("straordinaria", False)
         
+        # REGOLA FONDAMENTALE:
+        # - Task STRAORDINARIE: possono iniziare prima delle 10:00 (usano start_time del cleaner)
+        # - Task NORMALI/PREMIUM: devono SEMPRE iniziare dalle 10:00 in poi
+        default_start_min = time_to_minutes(WORK_START_TIME)  # 10:00 = 600 minuti
+        
         if i == 0:
-            # Prima task: calcola arrivo base (work_start + travel_time già aggiunto a current_time_min)
-            # CRITICAL: current_time_min già include travel_time se presente
-            arrival_min = current_time_min
-            
+            # Prima task: calcola arrivo base
             if is_straordinaria:
-                # STRAORDINARIE: 3 casistiche
-                # 1. Orari non migrati (no checkout_time): inizia allo start_time del cleaner
-                # 2. Checkout PRIMA dello start_time cleaner: inizia allo start_time cleaner
-                # 3. Checkout DOPO lo start_time cleaner: inizia al checkout
+                # STRAORDINARIE: possono iniziare prima delle 10:00
+                # Usa lo start_time del cleaner (già in work_start_min)
+                arrival_min = current_time_min
+                
                 if checkout_time_str:
                     try:
                         checkout_min = time_to_minutes(checkout_time_str)
                         # Lo start_time è il MASSIMO tra arrivo cleaner e checkout
                         start_time_min = max(arrival_min, checkout_min)
                     except (ValueError, AttributeError):
-                        # Se checkout_time non è valido, usa l'arrivo (start_time cleaner)
                         start_time_min = arrival_min
                 else:
                     # Orari non migrati: inizia allo start_time del cleaner
                     start_time_min = arrival_min
             else:
-                # TASK NORMALI: rispetta SEMPRE il checkout_time se presente
+                # TASK NORMALI/PREMIUM: devono iniziare dalle 10:00 in poi
+                # Ignora lo start_time del cleaner, usa sempre 10:00 come minimo
+                arrival_min = max(current_time_min, default_start_min)
+                
                 if checkout_time_str:
                     try:
                         checkout_min = time_to_minutes(checkout_time_str)
-                        # Lo start_time è il MASSIMO tra arrivo e checkout
+                        # Lo start_time è il MASSIMO tra 10:00 e checkout
                         start_time_min = max(arrival_min, checkout_min)
                     except (ValueError, AttributeError):
-                        # Se checkout_time non è valido, usa l'arrivo
                         start_time_min = arrival_min
                 else:
                     start_time_min = arrival_min
@@ -227,6 +230,10 @@ def recalculate_cleaner_times(cleaner_data: Dict[str, Any]) -> Dict[str, Any]:
             # Task successive: current_time_min già include travel_time
             start_time_min = current_time_min
             
+            # REGOLA: Task normali/premium non possono mai iniziare prima delle 10:00
+            if not is_straordinaria:
+                start_time_min = max(start_time_min, default_start_min)
+            
             # Rispetta il checkout_time se presente
             if checkout_time_str:
                 try:
@@ -234,10 +241,11 @@ def recalculate_cleaner_times(cleaner_data: Dict[str, Any]) -> Dict[str, Any]:
                     # Se il tempo calcolato è prima del checkout, posticipa lo start
                     if start_time_min < checkout_min:
                         start_time_min = checkout_min
-                        current_time_min = checkout_min
                 except (ValueError, AttributeError):
                     # Se checkout_time non è valido, ignora il vincolo
                     pass
+            
+            current_time_min = start_time_min
 
         # End time: start + cleaning_time
         end_time_min = start_time_min + cleaning_time

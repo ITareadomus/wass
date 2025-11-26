@@ -293,16 +293,14 @@ def evaluate_route(cleaner: Cleaner, route: List[Task]) -> Tuple[bool, List[Tupl
     # Orario massimo di fine task: 19:00
     max_end_time = datetime(arrival.year, arrival.month, arrival.day, 19, 0)
 
-    # LOGICA STRAORDINARIE vs HP NORMALE:
-    # - STRAORDINARIE: 3 casistiche
-    #   1. Orari non migrati (checkout_dt=None): inizia allo start_time del cleaner
-    #   2. Checkout migrato PRIMA dello start_time: inizia allo start_time del cleaner
-    #   3. Checkout migrato DOPO lo start_time: inizia al checkout
-    # 
-    # - HP NORMALE: applica vincolo HP hard earliest (11:00) se necessario
+    # REGOLA FONDAMENTALE:
+    # - Task STRAORDINARIE: possono iniziare prima delle 10:00 (usano start_time del cleaner)
+    # - Task NORMALI/PREMIUM: devono SEMPRE iniziare dalle 10:00 in poi
+    # Orario minimo per task non-straordinarie
+    default_start = datetime(arrival.year, arrival.month, arrival.day, 10, 0)  # 10:00
     
     if first.straordinaria:
-        # STRAORDINARIE: logica basata su checkout_dt
+        # STRAORDINARIE: logica basata su checkout_dt, può iniziare prima delle 10:00
         if first.checkout_dt:
             # Checkout migrato: inizia al MAX tra checkout e arrival (start_time cleaner)
             start = max(arrival, first.checkout_dt)
@@ -311,20 +309,16 @@ def evaluate_route(cleaner: Cleaner, route: List[Task]) -> Tuple[bool, List[Tupl
             # Orari non migrati: inizia allo start_time del cleaner
             start = arrival
     else:
-        # HP NORMALE: applica logica con HP hard earliest
-        hp_hard_earliest = datetime(arrival.year, arrival.month, arrival.day, HP_HARD_EARLIEST_H, HP_HARD_EARLIEST_M)
+        # TASK NORMALI/PREMIUM: devono SEMPRE iniziare dalle 10:00 in poi
+        # Anche se il cleaner è straordinario e inizia prima, le task normali partono dalle 10:00
+        effective_start = max(arrival, default_start)
         
         if first.checkout_dt:
-            # Rispetta il checkout, ma può iniziare prima delle 11:00 se libero
-            arrival = max(arrival, first.checkout_dt)
+            # Rispetta il checkout, ma non prima delle 10:00
+            start = max(effective_start, first.checkout_dt)
         else:
-            # Nessun checkout: applica vincolo HP hard earliest solo se non è libero prima
-            if arrival < hp_hard_earliest:
-                # Cleaner libero prima delle 11:00: può iniziare subito
-                arrival = arrival
-            else:
-                # Cleaner non libero prima delle 11:00: applica vincolo
-                arrival = max(arrival, hp_hard_earliest)
+            start = effective_start
+        arrival = start
 
     finish = start + timedelta(minutes=first.cleaning_time)
 
@@ -353,6 +347,12 @@ def evaluate_route(cleaner: Cleaner, route: List[Task]) -> Tuple[bool, List[Tupl
         tt = travel_minutes(prev.lat, prev.lng, t.lat, t.lng, prev.address, t.address)
         cur += timedelta(minutes=tt)
         arrival = cur
+
+        # REGOLA: Task normali/premium devono iniziare alle 10:00+
+        if not t.straordinaria:
+            if cur < default_start:
+                cur = default_start
+                arrival = cur
 
         # Considera checkout se presente
         wait = timedelta(0)
