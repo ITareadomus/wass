@@ -1,7 +1,25 @@
 {
-  "cleaners": [],
-  "total_selected": 0,
+  "cleaners": [
+    {
+      "id": 1069,
+      "name": "CYRIL HARTUR",
+      "lastname": "ZONGMO KENTSA",
+      "role": "Standard",
+      "active": true,
+      "ranking": 0,
+      "counter_hours": 7.25,
+      "counter_days": 0,
+      "available": true,
+      "contract_type": "a chiamata",
+      "preferred_customers": [],
+      "telegram_id": null,
+      "start_time": null,
+      "can_do_straordinaria": false
+    }
+  ],
+  "total_selected": 1,
   "metadata": {
-    "date": "2025-11-27"
+    "date": "2025-11-28",
+    "saved_at": "2025-11-27T09:20:17.320Z"
   }
 }
