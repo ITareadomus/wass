@@ -1112,7 +1112,8 @@ def main():
         "assigned_tasks": total_assigned_tasks
     }
     # Salva timeline aggiornata
-    timeline_data['metadata']['last_updated'] = datetime.now().isoformat()
+    from datetime import datetime as dt
+    timeline_data['metadata']['last_updated'] = dt.now().isoformat()
 
     # CRITICAL: Ricalcola i tempi per TUTTI i cleaner che hanno ricevuto nuove task
     from assign_utils import recalculate_cleaner_times
