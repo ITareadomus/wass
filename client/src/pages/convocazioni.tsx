@@ -610,9 +610,7 @@ export default function Convocazioni() {
                           const newHours = Math.floor(totalMinutes / 60);
                           const newMinutes = totalMinutes % 60;
                           const newTime = `${String(newHours).padStart(2, '0')}:${String(newMinutes).padStart(2, '0')}`;
-                          setCleaners(prev => prev.map(c => 
-                            c.id === cleaner.id ? { ...c, start_time: newTime } : c
-                          ));
+                          // Aggiorna SOLO lo stato locale, NON salvare subito
                           setFilteredCleaners(prev => prev.map(c => 
                             c.id === cleaner.id ? { ...c, start_time: newTime } : c
                           ));
@@ -636,9 +634,7 @@ export default function Convocazioni() {
                           const newHours = Math.floor(totalMinutes / 60);
                           const newMinutes = totalMinutes % 60;
                           const newTime = `${String(newHours).padStart(2, '0')}:${String(newMinutes).padStart(2, '0')}`;
-                          setCleaners(prev => prev.map(c => 
-                            c.id === cleaner.id ? { ...c, start_time: newTime } : c
-                          ));
+                          // Aggiorna SOLO lo stato locale, NON salvare subito
                           setFilteredCleaners(prev => prev.map(c => 
                             c.id === cleaner.id ? { ...c, start_time: newTime } : c
                           ));
