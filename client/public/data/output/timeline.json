@@ -1,13 +1,21 @@
 {
-  "metadata": {
-    "last_updated": "2025-11-27T16:09:25.777Z",
-    "date": "2025-11-28",
-    "created_by": "unknown"
+  "selected_cleaners": [],
+  "timeline": {
+    "metadata": {
+      "date": "2025-11-28",
+      "last_updated": "2025-11-27T16:24:47.953Z",
+      "created_by": "system"
+    },
+    "cleaners_assignments": [],
+    "meta": {
+      "total_cleaners": 0,
+      "used_cleaners": 0,
+      "assigned_tasks": 0
+    }
   },
-  "cleaners_assignments": [],
-  "meta": {
-    "total_cleaners": 0,
-    "used_cleaners": 0,
-    "assigned_tasks": 0
+  "metadata": {
+    "date": "2025-11-28",
+    "last_updated": "2025-11-27T16:25:13.874Z",
+    "created_by": "loaded_from_storage"
   }
 }
