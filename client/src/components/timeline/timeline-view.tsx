@@ -92,6 +92,7 @@ export default function TimelineView({
   const [showAdamTransferDialog, setShowAdamTransferDialog] = useState(false); // Stato per il dialog di trasferimento ADAM
   const [unsavedChanges, setUnsavedChanges] = useState(false); // Stato per tracciare modifiche non salvate
   const [lastSavedTimestamp, setLastSavedTimestamp] = useState<string | null>(null); // Stato per l'ultimo timestamp di salvataggio
+  const [showResetDialog, setShowResetDialog] = useState(false); // Stato per dialog di conferma reset
 
   // Stato per tracciare acknowledge per coppie (task, cleaner)
   type IncompatibleKey = string; // chiave del tipo `${taskId}-${cleanerId}`
@@ -1433,6 +1434,36 @@ export default function TimelineView({
 
   return (
     <>
+      <AlertDialog open={showResetDialog} onOpenChange={setShowResetDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Conferma Reset Assegnazioni</AlertDialogTitle>
+            <AlertDialogDescription>
+              Sei sicuro di voler resettare tutte le assegnazioni?
+              <br /><br />
+              <strong>Questa azione:</strong>
+              <ul className="list-disc list-inside mt-2 space-y-1">
+                <li>Rimuoverà tutte le task dalla timeline</li>
+                <li>Riporterà tutte le task nei container (Early Out, High Priority, Low Priority)</li>
+                <li>Non può essere annullata</li>
+              </ul>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Annulla</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                setShowResetDialog(false);
+                handleResetAssignments();
+              }}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              Conferma Reset
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       <div
         ref={timelineRef}
         className={`bg-custom-blue-light rounded-lg border-2 border-custom-blue shadow-sm ${isFullscreen ? 'fixed inset-0 z-50 overflow-auto' : ''}`}
@@ -1465,7 +1496,7 @@ export default function TimelineView({
                 Convocazioni
               </Button>
               <Button
-                onClick={handleResetAssignments}
+                onClick={() => setShowResetDialog(true)}
                 variant="outline"
                 size="sm"
                 className="flex items-center gap-2 border-2 border-custom-blue"
