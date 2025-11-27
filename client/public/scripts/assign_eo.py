@@ -262,7 +262,7 @@ def evaluate_route(route: List[Task], cleaner: "Cleaner" = None) -> Tuple[bool, 
     """
     Valuta se una route è fattibile e ritorna lo schedule.
     Ritorna: (is_feasible, schedule)
-    
+
     Se cleaner è fornito, usa il suo start_time come orario di inizio.
     """
     if not route:
@@ -273,7 +273,7 @@ def evaluate_route(route: List[Task], cleaner: "Cleaner" = None) -> Tuple[bool, 
 
     schedule: List[Tuple[int, int, int]] = []
     prev: Optional[Task] = None
-    
+
     # Usa lo start_time del cleaner se disponibile, altrimenti 0 (retrocompatibilità)
     cleaner_start_time = cleaner.start_time if cleaner else 0
     cur = float(cleaner_start_time)
@@ -288,7 +288,7 @@ def evaluate_route(route: List[Task], cleaner: "Cleaner" = None) -> Tuple[bool, 
         # - Task NORMALI/PREMIUM: devono SEMPRE iniziare dalle 10:00 in poi
         DEFAULT_START_MIN = 10 * 60  # 10:00 = 600 minuti
         STRAORDINARIA_DEFAULT_MIN = 9 * 60  # 09:00 = 540 minuti (default per straordinarie senza checkout)
-        
+
         if t.straordinaria:
             # STRAORDINARIE: checkout ha priorità se presente e maggiore di arrival
             # Se checkout non migrato (0 o None), usa default 09:00
@@ -477,15 +477,15 @@ def find_best_position(cleaner: Cleaner, task: Task) -> Optional[Tuple[int, floa
 def load_cleaners() -> List[Cleaner]:
     data = json.loads(INPUT_CLEANERS.read_text(encoding="utf-8"))
     cleaners: List[Cleaner] = []
-    
+
     # CRITICAL: Early-Out richiede cleaner disponibili PRIMA delle 11:00
     EO_MAX_START_TIME = 11 * 60  # 11:00 = 660 minuti
-    
+
     for c in data.get("cleaners", []):
         role = (c.get("role") or "").strip()
         is_premium = bool(c.get("premium", (role.lower() == "premium")))
         can_do_straordinaria = bool(c.get("can_do_straordinaria", False))
-        
+
         # Leggi start_time del cleaner (default 10:00 se non specificato)
         start_time_str = c.get("start_time", "10:00")
         start_time_min = hhmm_to_min(start_time_str, "10:00")
@@ -615,20 +615,20 @@ def plan_day(
                 c for c in cleaners
                 if c.can_do_straordinaria and can_cleaner_handle_apartment(c.role, task.apt_type)
             ]
-            
+
             if not straordinaria_cleaners:
                 unassigned.append(task)
                 continue
-            
+
             # Trova cleaner con start_time minore
             earliest_cleaner = min(straordinaria_cleaners, key=lambda c: hhmm_to_min(getattr(c, 'start_time', '10:00') if isinstance(getattr(c, 'start_time', None), str) else '10:00'))
-            
+
             # Verifica se può prendere la task (pos 0)
             result = find_best_position(earliest_cleaner, task)
             if result is None:
                 unassigned.append(task)
                 continue
-            
+
             pos, _ = result
             earliest_cleaner.route.insert(pos, task)
             assigned_logistic_codes.add(task.logistic_code)
