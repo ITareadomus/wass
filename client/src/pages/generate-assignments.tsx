@@ -1758,7 +1758,8 @@ export default function GenerateAssignments() {
         description: "Errore nello spostamento della task",
         variant: "destructive",
       });
-      // Assicurati che il lock venga sempre rilasciato
+    } finally {
+      // CRITICAL: Assicurati che il lock venga SEMPRE rilasciato
       setIsDragging(false);
     }
   };
