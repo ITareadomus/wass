@@ -317,17 +317,15 @@ def evaluate_route(cleaner: Cleaner, route: List[Task]) -> Tuple[bool, List[Tupl
         if first.checkout_dt:
             # Rispetta il checkout, ma può iniziare prima delle 11:00 se libero
             arrival = max(arrival, first.checkout_dt)
+            start = arrival
         else:
             # Nessun checkout: applica vincolo HP hard earliest solo se non è libero prima
             if arrival < hp_hard_earliest:
                 # Cleaner libero prima delle 11:00: può iniziare subito
-                arrival = arrival
+                start = arrival
             else:
                 # Cleaner non libero prima delle 11:00: applica vincolo
-                arrival = max(arrival, hp_hard_earliest)
-
-            # IMPORTANTE: Imposta start per HP normale
-            start = arrival
+                start = max(arrival, hp_hard_earliest)
 
     finish = start + timedelta(minutes=first.cleaning_time)
 
