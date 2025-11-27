@@ -1407,6 +1407,11 @@ export default function TimelineView({
   // Variabile per determinare se ci sono task assegnate (per mostrare/nascondere pulsante conferma)
   const hasAssignedTasks = tasks.some(task => (task as any).assignedCleaner !== undefined);
 
+  // Verifica se la timeline ha task assegnate
+  const hasTasksInTimeline = timelineData?.cleaners_assignments?.some(
+    (ca: any) => ca.tasks && ca.tasks.length > 0
+  ) || false;
+
   // Mutation per rimuovere task dalla timeline
   const removeTaskMutation = useMutation({
     mutationFn: async ({ taskId, logisticCode }: { taskId: number | string; logisticCode: number | string }) => {
@@ -1918,6 +1923,8 @@ export default function TimelineView({
                   size="sm"
                   variant="outline"
                   className="ml-2 border-2 border-custom-blue"
+                  disabled={!hasTasksInTimeline}
+                  title={!hasTasksInTimeline ? "Nessuna task assegnata nella timeline" : "Trasferisci le assegnazioni sul database ADAM"}
                 >
                   <svg className="mr-2 h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
