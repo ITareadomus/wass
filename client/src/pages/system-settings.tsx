@@ -147,10 +147,23 @@ export default function SystemSettings() {
       });
 
       if (response.ok) {
+        // Invalida la cache delle regole di validazione
+        try {
+          const { invalidateValidationCache } = await import("@/lib/taskValidation");
+          invalidateValidationCache();
+        } catch (err) {
+          console.error("Errore invalidazione cache:", err);
+        }
+
         toast({
           title: "Impostazioni salvate",
-          description: "Le modifiche sono state salvate con successo",
+          description: "Le modifiche sono state salvate con successo. La pagina verrà ricaricata.",
         });
+
+        // Forza il reload della pagina dopo 1 secondo per applicare le nuove regole
+        setTimeout(() => {
+          window.location.reload();
+        }, 1000);
       } else {
         throw new Error();
       }
