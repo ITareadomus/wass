@@ -1105,17 +1105,42 @@ def main():
 
     # Aggiungi le nuove assegnazioni HP organizzate per cleaner
     for cleaner_entry in output["high_priority_tasks_assigned"]:
-        # CRITICAL: Rimuovi PRIMA eventuali entry duplicate/vuote dello stesso cleaner
-        timeline_data["cleaners_assignments"] = [
-            c for c in timeline_data["cleaners_assignments"]
-            if c["cleaner"]["id"] != cleaner_entry["cleaner"]["id"]
-        ]
+        # Cerca se esiste già un'entry per questo cleaner
+        existing_entry = None
+        for entry in timeline_data["cleaners_assignments"]:
+            if entry["cleaner"]["id"] == cleaner_entry["cleaner"]["id"]:
+                existing_entry = entry
+                break
 
-        # Aggiungi la nuova entry con le task HP
-        timeline_data["cleaners_assignments"].append({
-            "cleaner": cleaner_entry["cleaner"],
-            "tasks": cleaner_entry["tasks"]
-        })
+        if existing_entry:
+            # CRITICAL: NON rimuovere nulla, AGGIUNGI le nuove task HP
+            # Le task HP si inseriscono DOPO le EO ma PRIMA delle LP
+            existing_tasks = existing_entry["tasks"]
+            
+            # Separa task esistenti per tipo (usa i reasons)
+            eo_tasks = [t for t in existing_tasks if "automatic_assignment_eo" in t.get("reasons", [])]
+            hp_tasks_old = [t for t in existing_tasks if "automatic_assignment_hp" in t.get("reasons", [])]
+            lp_tasks = [t for t in existing_tasks if "automatic_assignment_lp" in t.get("reasons", [])]
+            manual_tasks = [t for t in existing_tasks if not any(
+                r in t.get("reasons", []) for r in ["automatic_assignment_eo", "automatic_assignment_hp", "automatic_assignment_lp"]
+            )]
+            
+            # Ricostruisci: EO + HP_vecchie + HP_nuove + LP + manuali
+            # (in realtà se ci sono HP vecchie da containers, le sostituiamo con le nuove)
+            existing_entry["tasks"] = eo_tasks + cleaner_entry["tasks"] + lp_tasks + manual_tasks
+            
+            # Ordina per start_time e ricalcola sequence
+            existing_entry["tasks"].sort(key=lambda t: t.get("start_time", "00:00"))
+            
+            # CRITICAL: Ricalcola sequence progressiva dopo il merge
+            for idx, task in enumerate(existing_entry["tasks"], start=1):
+                task["sequence"] = idx
+        else:
+            # Crea nuova entry
+            timeline_data["cleaners_assignments"].append({
+                "cleaner": cleaner_entry["cleaner"],
+                "tasks": cleaner_entry["tasks"]
+            })
 
     # Aggiorna meta
     # Conta i cleaners effettivamente usati (con almeno una task)

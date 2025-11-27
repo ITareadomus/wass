@@ -1300,15 +1300,28 @@ def main():
                 break
 
         if existing_entry:
-            # CRITICAL: Rimuovi eventuali task LP vecchie prima di aggiungere le nuove
-            existing_entry["tasks"] = [
-                t for t in existing_entry["tasks"]
-                if not (t.get("reasons") and "automatic_assignment_lp" in t.get("reasons", []))
-            ]
-            # Aggiungi le nuove task LP
-            existing_entry["tasks"].extend(cleaner_entry["tasks"])
-            # Ordina le task per orario di inizio (start_time)
+            # CRITICAL: NON rimuovere nulla, AGGIUNGI le nuove task LP
+            # Le task LP si inseriscono DOPO le EO+HP
+            existing_tasks = existing_entry["tasks"]
+            
+            # Separa task esistenti per tipo (usa i reasons)
+            eo_tasks = [t for t in existing_tasks if "automatic_assignment_eo" in t.get("reasons", [])]
+            hp_tasks = [t for t in existing_tasks if "automatic_assignment_hp" in t.get("reasons", [])]
+            lp_tasks_old = [t for t in existing_tasks if "automatic_assignment_lp" in t.get("reasons", [])]
+            manual_tasks = [t for t in existing_tasks if not any(
+                r in t.get("reasons", []) for r in ["automatic_assignment_eo", "automatic_assignment_hp", "automatic_assignment_lp"]
+            )]
+            
+            # Ricostruisci: EO + HP + LP_vecchie + LP_nuove + manuali
+            # (in realtà se ci sono LP vecchie da containers, le sostituiamo con le nuove)
+            existing_entry["tasks"] = eo_tasks + hp_tasks + cleaner_entry["tasks"] + manual_tasks
+            
+            # Ordina per start_time e ricalcola sequence
             existing_entry["tasks"].sort(key=lambda t: t.get("start_time", "00:00"))
+            
+            # CRITICAL: Ricalcola sequence progressiva dopo il merge
+            for idx, task in enumerate(existing_entry["tasks"], start=1):
+                task["sequence"] = idx
         else:
             # Crea nuova entry
             timeline_data["cleaners_assignments"].append({
