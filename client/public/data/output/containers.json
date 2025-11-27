@@ -1,6 +1,6 @@
 {
   "metadata": {
-    "last_updated": "2025-11-27T15:53:16.697813",
+    "last_updated": "2025-11-27T16:02:37.537936",
     "date": "2025-11-28"
   },
   "containers": {
@@ -1026,15 +1026,43 @@
             "not_eo",
             "not_hp"
           ]
+        },
+        {
+          "task_id": 219533,
+          "logistic_code": 1048,
+          "client_id": 3,
+          "premium": false,
+          "address": "Via Vigevano 9",
+          "lat": "45.4527254",
+          "lng": "9.1748049",
+          "cleaning_time": 210,
+          "checkin_date": "2025-11-29",
+          "checkout_date": "2025-11-28",
+          "checkin_time": "15:00",
+          "checkout_time": null,
+          "pax_in": 3,
+          "pax_out": 2,
+          "small_equipment": false,
+          "operation_id": 2,
+          "confirmed_operation": false,
+          "straordinaria": false,
+          "type_apt": "D",
+          "alias": "TBR",
+          "customer_name": "THE BEST RENT S.r.l.",
+          "priority": "low_priority",
+          "reasons": [
+            "not_eo",
+            "not_hp"
+          ]
         }
       ],
-      "count": 9
+      "count": 10
     }
   },
   "summary": {
-    "total_tasks": 37,
+    "total_tasks": 38,
     "early_out": 17,
     "high_priority": 11,
-    "low_priority": 9
+    "low_priority": 10
   }
 }
