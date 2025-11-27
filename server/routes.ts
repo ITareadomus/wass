@@ -1107,6 +1107,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Endpoint per verificare SE esistono assegnazioni salvate (senza caricarle)
+  // Ora salviamo direttamente nel percorso principale (DD-MM-YYYY/assignments_*.json)
   app.post("/api/check-saved-assignments", async (req, res) => {
     try {
       const { Client } = await import("@replit/object-storage");
@@ -1115,20 +1116,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const workDate = req.body?.date || format(new Date(), "yyyy-MM-dd");
       const { key, d } = buildKey(workDate);
 
-      const result = await client.downloadAsText(key, { bucket: BUCKET });
+      const result = await client.downloadAsText(key);
 
       if (result.ok) {
-        // File trovato - ritorna sempre come valido
-        // La data nel filename è quella che conta (costruita da buildKey)
+        const data = JSON.parse(result.value);
+        const lastUpdated = data.metadata?.last_updated;
+        const formattedDateTime = lastUpdated 
+          ? format(new Date(lastUpdated), "dd/MM/yyyy HH:mm", { locale: it })
+          : format(d, "dd/MM/yyyy", { locale: it });
+        
+        console.log(`✅ Found saved data for ${workDate}: ${key}`);
         return res.json({
           success: true,
           found: true,
           filename: key,
-          formattedDateTime: format(d, "dd/MM/yyyy", { locale: it })
+          formattedDateTime,
+          lastSavedTimestamp: lastUpdated
         });
       }
 
       // File non trovato
+      console.log(`ℹ️ No saved data found for ${workDate}`);
       return res.json({ success: true, found: false });
     } catch (error: any) {
       console.error("check-saved-assignments error:", error);
