@@ -2,6 +2,7 @@
 """
 Helper comuni per assign_eo.py, assign_hp.py, assign_lp.py
 """
+from typing import List
 
 # --- COSTANTI GLOBALI TUNABILI ---
 
