@@ -6,7 +6,7 @@ Helper comuni per assign_eo.py, assign_hp.py, assign_lp.py
 # --- COSTANTI GLOBALI TUNABILI ---
 
 NEARBY_TRAVEL_THRESHOLD = 7        # min: soglia per considerare due apt "stesso blocco"
-NEARBY_DISTANCE_KM = 0.25          # km: soglia per considerare due apt "molto vicini" (250m)
+NEARBY_DISTANCE_KM = 0.30          # km: soglia per considerare due apt "molto vicini" (300m, aumentato per catturare più cluster)
 
 NEW_CLEANER_PENALTY_MIN = 60       # costo di attivazione per cleaner vuoto
 NEW_TRAINER_PENALTY_MIN = 0        # il formatore non è penalizzato per il primo task
@@ -17,7 +17,7 @@ TRAINER_TARGET_MIN_LOAD_MIN = 240  # 4 ore = target specifico per il Formatore
 FAIRNESS_DELTA_HOURS = 1.0         # tolleranza di 1h tra cleaner per essere "fair"
 LOAD_WEIGHT = 10                   # peso delle ore nel punteggio
 SAME_BUILDING_BONUS = -5           # bonus per stessa via (include stesso edificio e blocco vicino)
-NEARBY_CLUSTER_BONUS = -8          # bonus moderato per appartamenti molto vicini geograficamente (ridotto da -20)
+NEARBY_CLUSTER_BONUS = -15         # bonus forte per appartamenti molto vicini geograficamente (aumentato per priorità clustering)
 
 ROLE_TRAINER_BONUS = -10           # bonus extra per il Formatore (prima -5)
 
