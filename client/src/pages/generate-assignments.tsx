@@ -1,4 +1,4 @@
-import { DragDropContext, DropResult } from "react-beautiful-dnd";
+import { DndContext, DragEndEvent, DragOverlay, closestCenter, PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
 import { TaskType as Task } from "@shared/schema";
 import PriorityColumn from "@/components/drag-drop/priority-column";
 import TimelineView from "@/components/timeline/timeline-view";
@@ -1340,7 +1340,7 @@ export default function GenerateAssignments() {
     return null;
   };
 
-  const onDragEnd = async (result: any) => {
+  const onDragEnd = async (result: DragEndEvent) => {
     const { destination, source, draggableId } = result;
 
     // niente destinazione => niente da fare
@@ -1853,7 +1853,11 @@ export default function GenerateAssignments() {
         </div>
 
         <MultiSelectContext.Provider value={multiSelectContextValue}>
-          <DragDropContext onDragEnd={onDragEnd}>
+          <DndContext
+            sensors={useSensors(useSensor(PointerSensor))}
+            collisionDetection={closestCenter}
+            onDragEnd={onDragEnd}
+          >
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6 w-full">
               <PriorityColumn
                 title="EARLY OUT"
@@ -1964,7 +1968,7 @@ export default function GenerateAssignments() {
               </div>
             </div>
           </div>
-        </DragDropContext>
+        </DndContext>
         </MultiSelectContext.Provider>
       </div>
     </div>
