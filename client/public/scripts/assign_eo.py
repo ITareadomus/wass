@@ -10,7 +10,7 @@ from assign_utils import (
     NEARBY_TRAVEL_THRESHOLD, NEW_CLEANER_PENALTY_MIN, NEW_TRAINER_PENALTY_MIN,
     TARGET_MIN_LOAD_MIN, FAIRNESS_DELTA_HOURS, LOAD_WEIGHT,
     SAME_BUILDING_BONUS, ROLE_TRAINER_BONUS,
-    cleaner_load_minutes, cleaner_load_hours
+    cleaner_load_minutes, cleaner_load_hours, get_cleaners_for_eo
 )
 
 # =============================
@@ -88,6 +88,7 @@ class Cleaner:
     can_do_straordinaria: bool = False
     home_lat: Optional[float] = None
     home_lng: Optional[float] = None
+    start_time: str = "10:00"
     route: List[Task] = field(default_factory=list)
 
 
@@ -465,7 +466,7 @@ def find_best_position(cleaner: Cleaner, task: Task) -> Optional[Tuple[int, floa
 # -------- Loader --------
 def load_cleaners() -> List[Cleaner]:
     data = json.loads(INPUT_CLEANERS.read_text(encoding="utf-8"))
-    cleaners: List[Cleaner] = []
+    all_cleaners: List[Cleaner] = []
     for c in data.get("cleaners", []):
         role = (c.get("role") or "").strip()
         is_premium = bool(c.get("premium", (role.lower() == "premium")))
@@ -475,17 +476,28 @@ def load_cleaners() -> List[Cleaner]:
         if not can_cleaner_handle_priority(role, "early_out"):
             print(f"   ⏭️  Cleaner {c.get('name')} ({role}) escluso da Early-Out (priority_types settings)")
             continue
-        cleaners.append(
-            Cleaner(
-                id=c.get("id"),
-                name=c.get("name") or str(c.get("id")),
-                lastname=c.get("lastname", ""),
-                role=role or ("Premium" if is_premium else "Standard"),
-                is_premium=is_premium,
-                can_do_straordinaria=can_do_straordinaria,
-                home_lat=c.get("home_lat"),
-                home_lng=c.get("home_lng"),
-            ))
+        
+        cleaner = Cleaner(
+            id=c.get("id"),
+            name=c.get("name") or str(c.get("id")),
+            lastname=c.get("lastname", ""),
+            role=role or ("Premium" if is_premium else "Standard"),
+            is_premium=is_premium,
+            can_do_straordinaria=can_do_straordinaria,
+            home_lat=c.get("home_lat"),
+            home_lng=c.get("home_lng"),
+        )
+        # Aggiungi start_time al cleaner per il filtro
+        cleaner.start_time = c.get("start_time", "10:00")
+        all_cleaners.append(cleaner)
+    
+    # Filtra usando get_cleaners_for_eo (esclude start_time >= 11:00)
+    cleaners = get_cleaners_for_eo(all_cleaners)
+    
+    excluded_count = len(all_cleaners) - len(cleaners)
+    if excluded_count > 0:
+        print(f"   ⏭️  {excluded_count} cleaner(s) esclusi da EO per start_time >= 11:00")
+    
     return cleaners
 
 
