@@ -13,7 +13,7 @@
       "contract_type": "a chiamata",
       "preferred_customers": [],
       "telegram_id": null,
-      "start_time": "09:30",
+      "start_time": "09:00",
       "can_do_straordinaria": false
     },
     {
@@ -324,22 +324,6 @@
       "can_do_straordinaria": false
     },
     {
-      "id": 626,
-      "name": "DORA PATRICIA",
-      "lastname": "JIMENEZ",
-      "role": "Formatore",
-      "active": true,
-      "ranking": 0,
-      "counter_hours": 25.5,
-      "counter_days": 3,
-      "available": true,
-      "contract_type": "B",
-      "preferred_customers": [],
-      "telegram_id": null,
-      "start_time": "10:00",
-      "can_do_straordinaria": false
-    },
-    {
       "id": 1069,
       "name": "CYRIL HARTUR",
       "lastname": "ZONGMO KENTSA",
@@ -354,11 +338,27 @@
       "telegram_id": null,
       "start_time": "10:00",
       "can_do_straordinaria": false
+    },
+    {
+      "id": 626,
+      "name": "DORA PATRICIA",
+      "lastname": "JIMENEZ",
+      "role": "Formatore",
+      "active": true,
+      "ranking": 0,
+      "counter_hours": 25.5,
+      "counter_days": 3,
+      "available": true,
+      "contract_type": "B",
+      "preferred_customers": [],
+      "telegram_id": null,
+      "start_time": "10:00",
+      "can_do_straordinaria": false
     }
   ],
   "total_selected": 14,
   "metadata": {
     "date": "2025-11-28",
-    "saved_at": "2025-11-27T16:50:12.475Z"
+    "saved_at": "2025-11-27T16:59:22.777Z"
   }
 }
