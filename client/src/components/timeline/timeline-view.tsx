@@ -1450,7 +1450,7 @@ export default function TimelineView({
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel className="border-gray-300 hover:bg-gray-100 dark:border-gray-600 dark:hover:bg-gray-800">
+            <AlertDialogCancel className="border-2 border-custom-blue">
               Annulla
             </AlertDialogCancel>
             <AlertDialogAction
@@ -1458,7 +1458,7 @@ export default function TimelineView({
                 setShowResetDialog(false);
                 handleResetAssignments();
               }}
-              className="bg-red-600 hover:bg-red-700 text-white dark:bg-red-600 dark:hover:bg-red-700"
+              className="border-2 border-custom-blue bg-background text-foreground hover:bg-accent hover:text-accent-foreground"
             >
               Conferma Reset
             </AlertDialogAction>
