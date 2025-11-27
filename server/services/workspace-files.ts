@@ -29,7 +29,7 @@ async function atomicWriteJson(filePath: string, data: any): Promise<void> {
 
 /**
  * Load timeline.json for a specific work date
- * Priority: filesystem → Object Storage → null
+ * Priority: filesystem (if matching date) → main Object Storage (DD-MM-YYYY/assignments_*.json) → null
  */
 export async function loadTimeline(workDate: string): Promise<any | null> {
   try {
@@ -37,25 +37,10 @@ export async function loadTimeline(workDate: string): Promise<any | null> {
     const data = await fs.readFile(PATHS.timeline, 'utf-8');
     const parsed = JSON.parse(data);
 
-    // Accept file from filesystem if:
-    // 1. It has matching metadata.date, OR
-    // 2. It has NO metadata (legacy format), OR
-    // 3. It has cleaners_assignments (valid timeline structure)
+    // Only accept file from filesystem if date matches
     const hasMatchingDate = parsed.metadata?.date === workDate;
-    const hasNoMetadata = !parsed.metadata;
-    const hasValidStructure = parsed.cleaners_assignments || parsed.assignments;
 
-    if (hasMatchingDate || hasNoMetadata || hasValidStructure) {
-      // Ensure metadata exists (migration for legacy files)
-      if (!parsed.metadata) {
-        parsed.metadata = {
-          date: workDate,
-          last_updated: new Date().toISOString()
-        };
-      } else if (!parsed.metadata.date) {
-        parsed.metadata.date = workDate;
-      }
-
+    if (hasMatchingDate) {
       console.log(`✅ Timeline loaded from filesystem for ${workDate}`);
       return parsed;
     }
@@ -63,11 +48,24 @@ export async function loadTimeline(workDate: string): Promise<any | null> {
     // Filesystem read failed, try Object Storage
   }
 
-  // Fallback to Object Storage
+  // Load from main Object Storage (DD-MM-YYYY/assignments_*.json)
   try {
-    const storageData = await storageService.getWorkspaceTimeline(workDate);
-    if (storageData) {
-      console.log(`✅ Timeline loaded from Object Storage for ${workDate}`);
+    const { Client } = await import("@replit/object-storage");
+    const client = new Client();
+    
+    const d = new Date(workDate);
+    const day = String(d.getDate()).padStart(2, "0");
+    const month = String(d.getMonth() + 1).padStart(2, "0");
+    const fullYear = String(d.getFullYear());
+    const year = fullYear.slice(-2);
+    const folder = `${day}-${month}-${fullYear}`;
+    const filename = `assignments_${day}${month}${year}.json`;
+    const key = `${folder}/${filename}`;
+    
+    const result = await client.downloadAsText(key);
+    if (result.ok) {
+      const storageData = JSON.parse(result.value);
+      console.log(`✅ Timeline loaded from Object Storage: ${key}`);
       // Write to filesystem for subsequent reads
       await atomicWriteJson(PATHS.timeline, storageData);
       return storageData;
@@ -82,7 +80,8 @@ export async function loadTimeline(workDate: string): Promise<any | null> {
 
 /**
  * Save timeline.json for a specific work date
- * Writes to BOTH filesystem and Object Storage
+ * Writes to filesystem AND directly to main Object Storage (DD-MM-YYYY/assignments_*.json)
+ * No more workspace intermediary - saves directly to the main storage location
  */
 export async function saveTimeline(workDate: string, data: any): Promise<boolean> {
   try {
@@ -95,13 +94,28 @@ export async function saveTimeline(workDate: string, data: any): Promise<boolean
     await atomicWriteJson(PATHS.timeline, data);
     console.log(`✅ Timeline saved to filesystem for ${workDate}`);
 
-    // Write to Object Storage (async, don't block on failure)
-    storageService.saveWorkspaceTimeline(workDate, data)
-      .then((success) => {
-        if (success) {
-          console.log(`✅ Timeline persisted to Object Storage for ${workDate}`);
+    // Write DIRECTLY to main Object Storage (DD-MM-YYYY/assignments_*.json)
+    // This replaces the old workspace intermediary
+    const d = new Date(workDate);
+    const day = String(d.getDate()).padStart(2, "0");
+    const month = String(d.getMonth() + 1).padStart(2, "0");
+    const fullYear = String(d.getFullYear());
+    const year = fullYear.slice(-2);
+    const folder = `${day}-${month}-${fullYear}`;
+    const filename = `assignments_${day}${month}${year}.json`;
+    const key = `${folder}/${filename}`;
+
+    // Import client and save directly
+    const { Client } = await import("@replit/object-storage");
+    const client = new Client();
+    
+    const jsonContent = JSON.stringify(data, null, 2);
+    client.uploadFromText(key, jsonContent)
+      .then((result) => {
+        if (result.ok) {
+          console.log(`✅ Timeline persisted to Object Storage: ${key}`);
         } else {
-          console.warn(`⚠️ Failed to persist timeline to Object Storage for ${workDate}`);
+          console.warn(`⚠️ Failed to persist timeline to Object Storage: ${result.error}`);
         }
       })
       .catch((err) => {
