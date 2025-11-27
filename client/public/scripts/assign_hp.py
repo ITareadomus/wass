@@ -817,7 +817,7 @@ def plan_day(
                      for ex in c.route),
                     default=float('inf')
                 )
-                if min_distance_meters <= 250:  # 250m = super-cluster
+                if min_distance_meters <= 400:  # 400m = super-cluster (aumentato per catturare più cluster)
                     super_cluster_candidates.append((c, p, t_travel, min_distance_meters))
 
         # HARD CLUSTER edificio/via/blocco
