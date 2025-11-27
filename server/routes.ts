@@ -2801,6 +2801,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
 
         console.log("assign_eo output:", stdoutData);
+        
+        // CRITICAL: Dopo che lo script Python ha salvato su filesystem,
+        // dobbiamo salvare anche su Object Storage per persistenza
+        try {
+          const updatedTimeline = JSON.parse(await fs.readFile(timelinePath, 'utf8'));
+          await workspaceFiles.saveTimeline(workDate, updatedTimeline);
+          console.log(`✅ Timeline EO salvata su Object Storage per ${workDate}`);
+        } catch (saveErr) {
+          console.error("Errore nel salvataggio su Object Storage:", saveErr);
+        }
+        
         res.json({
           success: true,
           message: "Early Out tasks assegnati con successo in timeline.json",
@@ -2877,6 +2888,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
 
         console.log("assign_hp output:", stdoutData);
+        
+        // CRITICAL: Salva su Object Storage dopo lo script Python
+        try {
+          const updatedTimeline = JSON.parse(await fs.readFile(timelinePath, 'utf8'));
+          await workspaceFiles.saveTimeline(workDate, updatedTimeline);
+          console.log(`✅ Timeline HP salvata su Object Storage per ${workDate}`);
+        } catch (saveErr) {
+          console.error("Errore nel salvataggio su Object Storage:", saveErr);
+        }
+        
         res.json({
           success: true,
           message: "High Priority tasks assegnati con successo in timeline.json",
@@ -2954,6 +2975,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
 
         console.log("assign_lp output:", stdoutData);
+        
+        // CRITICAL: Salva su Object Storage dopo lo script Python
+        try {
+          const updatedTimeline = JSON.parse(await fs.readFile(timelinePath, 'utf8'));
+          await workspaceFiles.saveTimeline(workDate, updatedTimeline);
+          console.log(`✅ Timeline LP salvata su Object Storage per ${workDate}`);
+        } catch (saveErr) {
+          console.error("Errore nel salvataggio su Object Storage:", saveErr);
+        }
+        
         res.json({
           success: true,
           message: "Low Priority tasks assegnati con successo in timeline.json",

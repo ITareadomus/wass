@@ -1,6 +1,6 @@
 {
     "metadata": {
-        "last_updated": "2025-11-27T15:52:53.275329",
+        "last_updated": "2025-11-27T16:02:34.134135",
         "db_config": {
             "host": "139.59.132.41",
             "user": "admin",
@@ -10,8 +10,8 @@
         "schema_version": "1.0"
     },
     "dates": {
-        "2025-11-28": {
-            "timestamp": "2025-11-27T15:52:53.275342",
+        "2025-11-27": {
+            "timestamp": "2025-11-27T16:02:34.134150",
             "cleaners": [
                 {
                     "id": 24,
@@ -735,7 +735,7 @@
                 }
             ],
             "total_cleaners": 30,
-            "date": "2025-11-28",
+            "date": "2025-11-27",
             "data_source": "database_query"
         }
     }
