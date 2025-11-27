@@ -5,8 +5,36 @@
   },
   "containers": {
     "early_out": {
-      "tasks": [],
-      "count": 0
+      "tasks": [
+        {
+          "task_id": 219351,
+          "logistic_code": 624,
+          "client_id": 61,
+          "premium": false,
+          "address": "VIALE MONTENERO 50",
+          "lat": "45.4583211",
+          "lng": "9.206311",
+          "cleaning_time": 60,
+          "checkin_date": "2025-11-29",
+          "checkout_date": "2025-11-28",
+          "checkin_time": "15:00",
+          "checkout_time": null,
+          "pax_in": 2,
+          "pax_out": 1,
+          "small_equipment": true,
+          "operation_id": 2,
+          "confirmed_operation": false,
+          "straordinaria": false,
+          "type_apt": "A",
+          "alias": "NTM",
+          "customer_name": "NOTA-MI",
+          "reasons": [
+            "client_forced_eo"
+          ],
+          "priority": "early_out"
+        }
+      ],
+      "count": 1
     },
     "high_priority": {
       "tasks": [
@@ -572,8 +600,8 @@
     }
   },
   "summary": {
-    "total_tasks": 20,
-    "early_out": 0,
+    "total_tasks": 21,
+    "early_out": 1,
     "high_priority": 11,
     "low_priority": 9
   }

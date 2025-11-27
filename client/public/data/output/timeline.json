@@ -1,7 +1,9 @@
 {
   "metadata": {
-    "last_updated": "2025-11-27T14:03:38.021987",
-    "date": "2025-11-28"
+    "last_updated": "2025-11-27T14:36:28.364Z",
+    "date": "2025-11-28",
+    "created_by": "system",
+    "modified_by": []
   },
   "cleaners_assignments": [
     {
@@ -45,39 +47,6 @@
           "followup": false,
           "sequence": 1,
           "travel_time": 0
-        },
-        {
-          "task_id": 219351,
-          "logistic_code": 624,
-          "client_id": 61,
-          "premium": false,
-          "address": "VIALE MONTENERO 50",
-          "lat": "45.4583211",
-          "lng": "9.206311",
-          "cleaning_time": 60,
-          "checkin_date": "2025-11-29",
-          "checkout_date": "2025-11-28",
-          "checkin_time": "15:00",
-          "checkout_time": null,
-          "pax_in": 2,
-          "pax_out": 1,
-          "small_equipment": true,
-          "operation_id": 2,
-          "confirmed_operation": false,
-          "straordinaria": false,
-          "type_apt": "A",
-          "alias": "NTM",
-          "customer_name": "NOTA-MI",
-          "reasons": [
-            "client_forced_eo",
-            "automatic_assignment_eo"
-          ],
-          "priority": "early_out",
-          "start_time": "11:21",
-          "end_time": "12:21",
-          "followup": true,
-          "sequence": 2,
-          "travel_time": 21
         }
       ]
     },
@@ -657,6 +626,7 @@
   "meta": {
     "total_cleaners": 8,
     "used_cleaners": 8,
-    "assigned_tasks": 17
+    "assigned_tasks": 17,
+    "total_tasks": 16
   }
 }
