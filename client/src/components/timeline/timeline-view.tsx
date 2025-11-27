@@ -42,6 +42,7 @@ import {
 interface TimelineViewProps {
   personnel: Personnel[];
   tasks: Task[];
+  hasUnsavedChanges?: boolean; // Stato delle modifiche non salvate dal parent
   onTaskMoved?: () => void; // Callback quando una task viene spostata
   isReadOnly?: boolean; // Modalità read-only: disabilita tutte le modifiche
 }
@@ -67,6 +68,7 @@ interface Cleaner {
 export default function TimelineView({
   personnel,
   tasks,
+  hasUnsavedChanges = false,
   onTaskMoved,
   isReadOnly = false,
 }: TimelineViewProps) {
@@ -90,9 +92,6 @@ export default function TimelineView({
   const [pendingStartTime, setPendingStartTime] = useState<string>("10:00");
   const [pendingCleaner, setPendingCleaner] = useState<any>(null); // Added to track pending cleaner ID
   const [showAdamTransferDialog, setShowAdamTransferDialog] = useState(false); // Stato per il dialog di trasferimento ADAM
-  const [unsavedChanges, setUnsavedChanges] = useState(false); // Stato per tracciare modifiche non salvate
-  const [lastSavedTimestamp, setLastSavedTimestamp] = useState<string | null>(null); // Stato per l'ultimo timestamp di salvataggio
-  const [showResetDialog, setShowResetDialog] = useState(false); // Stato per dialog di conferma reset
 
   // Stato per tracciare acknowledge per coppie (task, cleaner)
   type IncompatibleKey = string; // chiave del tipo `${taskId}-${cleanerId}`
@@ -154,17 +153,8 @@ export default function TimelineView({
       .filter(tc => !selectedCleanerIds.has(tc.cleaner?.id)) // Non già in selected_cleaners
       .map(tc => ({ ...tc.cleaner, isRemoved: true })); // Marca come rimosso
 
-    // Combina selected_cleaners + timeline cleaners con task
-    const combined = [...cleaners, ...timelineCleanersWithTasks];
-    
-    // Ordina per start_time crescente (dal più piccolo al più grande)
-    combined.sort((a, b) => {
-      const timeA = a.start_time || "10:00";
-      const timeB = b.start_time || "10:00";
-      return timeA.localeCompare(timeB);
-    });
-    
-    return combined;
+    // Combina selected_cleaners + timeline cleaners con task (quelli rimossi andranno in fondo)
+    return [...cleaners, ...timelineCleanersWithTasks];
   }, [cleaners, timelineCleaners]);
 
   // Crea Set di ID cleaner rimossi per facile lookup
@@ -192,7 +182,9 @@ export default function TimelineView({
     },
     onSuccess: async (data) => {
       // CRITICAL: Marca modifiche SOLO dopo azioni utente
-      // Salvataggio automatico - nessun flag necessario
+      if ((window as any).setHasUnsavedChanges) {
+        (window as any).setHasUnsavedChanges(true);
+      }
       if (onTaskMoved) {
         onTaskMoved();
       }
@@ -365,13 +357,13 @@ export default function TimelineView({
   const generateGlobalTimeSlots = () => {
     const globalStartTime = getGlobalStartTime();
     const [startHour, startMin] = globalStartTime.split(':').map(Number);
-
+    
     // Arrotonda all'ora intera precedente per iniziare sempre da un'ora intera
     const startHourRounded = startMin > 0 ? startHour : startHour;
     const endHour = 19; // Fine fissa alle 19:00
 
     const slots: string[] = [];
-
+    
     // Genera slot ogni ora fino alle 19:00 (solo orari interi)
     for (let hour = startHourRounded; hour <= endHour; hour++) {
       slots.push(`${String(hour).padStart(2, '0')}:00`);
@@ -384,7 +376,7 @@ export default function TimelineView({
   const getGlobalTimelineMinutes = () => {
     const globalStartTime = getGlobalStartTime();
     const [startHour, startMin] = globalStartTime.split(':').map(Number);
-
+    
     // CRITICAL: Usa l'ora arrotondata (come la griglia visiva) per calcolare i minuti
     const startHourRounded = startMin > 0 ? startHour : startHour;
     const startMinutes = startHourRounded * 60; // Parte dall'ora intera
@@ -589,11 +581,6 @@ export default function TimelineView({
       }
       const data = await response.json();
       setTimelineData(data);
-      // Aggiorna timestamp e stato di salvataggio
-      if (data.metadata?.last_updated) {
-        setLastSavedTimestamp(new Date(data.metadata.last_updated).toLocaleString('it-IT'));
-        setUnsavedChanges(false); // Reset unsaved changes after loading
-      }
     } catch (error) {
       console.error("Errore nel caricamento dei dati della timeline:", error);
       setTimelineData(null);
@@ -863,6 +850,10 @@ export default function TimelineView({
     }
 
     // Procedi con l'aggiunta del cleaner (che ora includerà lo start time)
+    if ((window as any).setHasUnsavedChanges) {
+      (window as any).setHasUnsavedChanges(true);
+    }
+
     if (cleanerToReplace) {
       removeCleanerMutation.mutate(cleanerToReplace, {
         onSuccess: () => {
@@ -928,12 +919,9 @@ export default function TimelineView({
       setConfirmUnavailableDialog({ open: false, cleanerId: null });
 
       // Procedi con l'aggiunta/sostituzione come al solito
-      // Salvataggio automatico - nessun flag necessario
-
-      // Imposta unsavedChanges a true dopo un'azione utente
-      setUnsavedChanges(true);
-      setLastSavedTimestamp(null);
-
+      if ((window as any).setHasUnsavedChanges) {
+        (window as any).setHasUnsavedChanges(true);
+      }
       if (cleanerToReplace) {
         removeCleanerMutation.mutate(cleanerToReplace, {
           onSuccess: () => {
@@ -1008,10 +996,6 @@ export default function TimelineView({
         variant: "success",
       });
 
-      // Imposta unsavedChanges a true dopo un'azione utente
-      setUnsavedChanges(true);
-      setLastSavedTimestamp(null);
-
       // Chiudi il dialog
       setAliasDialog({ open: false, cleanerId: null, cleanerName: '' });
 
@@ -1069,9 +1053,9 @@ export default function TimelineView({
         setSelectedCleaner({ ...selectedCleaner, start_time: editingStartTime });
       }
 
-      // Imposta unsavedChanges a true dopo un'azione utente
-      setUnsavedChanges(true);
-      setLastSavedTimestamp(null);
+      if ((window as any).setHasUnsavedChanges) {
+        (window as any).setHasUnsavedChanges(true);
+      }
 
       toast({
         title: "Start Time salvato",
@@ -1166,19 +1150,22 @@ export default function TimelineView({
         return `${year}-${month}-${day}`;
       })();
 
-      // 1. Reset timeline_assignments.json (file principale) - FORZATO perché è un reset esplicito
+      // 1. Reset timeline_assignments.json (file principale)
       const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
       const resetResponse = await apiRequest("POST", "/api/reset-timeline-assignments", {
         date: workDate,
-        modified_by: currentUser.username || 'unknown',
-        forceReset: true  // Reset esplicito dall'utente - svuota anche Object Storage
+        modified_by: currentUser.username || 'unknown'
       });
 
       if (!resetResponse.ok) {
         throw new Error('Errore nel reset della timeline');
       }
 
-      // 2. CRITICAL: Ricarica SOLO i file JSON locali senza chiamare extract-data
+      // 2. CRITICAL: Resetta il lastSavedFilename per indicare che non ci sono salvataggi
+      setLastSavedFilename(null);
+      localStorage.removeItem('last_saved_assignment');
+
+      // 3. CRITICAL: Ricarica SOLO i file JSON locali senza chiamare extract-data
       // Il backend ha già resettato timeline.json e ricreato containers.json
       // Dobbiamo solo ricaricare il frontend con i nuovi dati
       const timestamp = Date.now();
@@ -1201,6 +1188,9 @@ export default function TimelineView({
           await (window as any).reloadAllTasks();
         }
 
+        if ((window as any).setHasUnsavedChanges) {
+          (window as any).setHasUnsavedChanges(true);
+        }
         // Aggiorna i dati della timeline per mostrare i metadata aggiornati
         await loadTimelineData();
 
@@ -1209,9 +1199,6 @@ export default function TimelineView({
           description: "Timeline svuotata, task tornate nei containers",
           variant: "success",
         });
-        // Imposta unsavedChanges a true dopo un'azione utente
-        setUnsavedChanges(true);
-        setLastSavedTimestamp(null);
       } else {
         throw new Error('Errore nel ricaricamento dei file JSON');
       }
@@ -1226,6 +1213,59 @@ export default function TimelineView({
   };
 
 
+  const handleConfirmAssignments = async () => {
+    try {
+      const dateStr = localStorage.getItem('selected_work_date') || (() => {
+        const today = new Date();
+        const year = today.getFullYear();
+        const month = String(today.getMonth() + 1).padStart(2, '0');
+        const day = String(today.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+      })();
+
+      toast({
+        title: "Conferma in corso...",
+        description: "Salvataggio delle assegnazioni in corso",
+      });
+
+      // Chiama l'API per salvare la copia immutabile
+      const response = await fetch('/api/confirm-assignments', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ date: dateStr }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Errore nel salvataggio delle assegnazioni');
+      }
+
+      const result = await response.json();
+
+      setLastSavedFilename(result.formattedDateTime || result.filename);
+      localStorage.setItem('last_saved_assignment', result.formattedDateTime || result.filename);
+      if ((window as any).setHasUnsavedChanges) {
+        (window as any).setHasUnsavedChanges(false);
+      }
+
+      // Aggiorna i dati della timeline per mostrare i metadata aggiornati
+      await loadTimelineData();
+
+      toast({
+        title: "✅ Assegnazioni confermate!",
+        description: `Salvate il ${result.formattedDateTime}`,
+        variant: "success",
+      });
+    } catch (error) {
+      console.error('Errore nella conferma:', error);
+      toast({
+        title: "Errore",
+        description: "Errore durante la conferma delle assegnazioni",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const [lastSavedFilename, setLastSavedFilename] = useState<string | null>(null);
 
   const loadTimelineCleaners = async () => {
     try {
@@ -1340,6 +1380,32 @@ export default function TimelineView({
     }
   }, [validationRules, allCleanersToShow, tasks, removedCleanerIds, toast]);
 
+  // Funzione per verificare SE esistono assegnazioni salvate (senza caricarle)
+  const checkSavedAssignmentExists = async () => {
+    try {
+      const response = await fetch('/api/check-saved-assignments', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ date: workDate })
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        if (result.found && result.formattedDateTime) {
+          setLastSavedFilename(result.formattedDateTime);
+          localStorage.setItem('last_saved_assignment', result.formattedDateTime);
+        } else {
+          setLastSavedFilename(null);
+          localStorage.removeItem('last_saved_assignment');
+        }
+      }
+    } catch (error) {
+      console.error("Errore nel controllo delle assegnazioni salvate:", error);
+    }
+  };
+
+  // Variabile per determinare se ci sono task assegnate (per mostrare/nascondere pulsante conferma)
+  const hasAssignedTasks = tasks.some(task => (task as any).assignedCleaner !== undefined);
 
   // Mutation per rimuovere task dalla timeline
   const removeTaskMutation = useMutation({
@@ -1355,16 +1421,14 @@ export default function TimelineView({
     },
     onSuccess: async (data) => {
       if (onTaskMoved) onTaskMoved();
+      if ((window as any).setHasUnsavedChanges) (window as any).setHasUnsavedChanges(true);
       await loadTimelineCleaners(); // Ricarica i cleaners della timeline
       await loadTimelineData(); // Aggiorna i metadata
       toast({
         title: "Task rimossa",
-        description: "Task rimossa dalla timeline e salvata automaticamente",
+        description: "Task rimossa dalla timeline",
         variant: "success",
       });
-      // Imposta unsavedChanges a true dopo un'azione utente
-      setUnsavedChanges(true);
-      setLastSavedTimestamp(null);
     },
     onError: (error: any) => {
       toast({
@@ -1414,9 +1478,6 @@ export default function TimelineView({
           title: "✅ Trasferimento completato",
           description: result.message || `Task aggiornate sul database ADAM`,
         });
-        // Dopo il trasferimento riuscito, considera le modifiche come salvate
-        setUnsavedChanges(false);
-        setLastSavedTimestamp(new Date().toLocaleString('it-IT'));
       } else {
         toast({
           title: "❌ Errore trasferimento",
@@ -1444,38 +1505,6 @@ export default function TimelineView({
 
   return (
     <>
-      <AlertDialog open={showResetDialog} onOpenChange={setShowResetDialog}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle className="text-red-600 dark:text-red-500">Conferma Reset Assegnazioni</AlertDialogTitle>
-            <AlertDialogDescription>
-              Sei sicuro di voler resettare tutte le assegnazioni?
-              <br /><br />
-              <strong>Questa azione:</strong>
-              <ul className="list-disc list-inside mt-2 space-y-1">
-                <li>Rimuoverà tutte le task dalla timeline</li>
-                <li>Riporterà tutte le task nei container (Early Out, High Priority, Low Priority)</li>
-                <li>Non può essere annullata</li>
-              </ul>
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel className="border-2 border-custom-blue">
-              Annulla
-            </AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => {
-                setShowResetDialog(false);
-                handleResetAssignments();
-              }}
-              className="border-2 border-custom-blue bg-background text-foreground hover:bg-accent hover:text-accent-foreground"
-            >
-              Conferma Reset
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
       <div
         ref={timelineRef}
         className={`bg-custom-blue-light rounded-lg border-2 border-custom-blue shadow-sm ${isFullscreen ? 'fixed inset-0 z-50 overflow-auto' : ''}`}
@@ -1508,7 +1537,7 @@ export default function TimelineView({
                 Convocazioni
               </Button>
               <Button
-                onClick={() => setShowResetDialog(true)}
+                onClick={handleResetAssignments}
                 variant="outline"
                 size="sm"
                 className="flex items-center gap-2 border-2 border-custom-blue"
@@ -1861,22 +1890,40 @@ export default function TimelineView({
               <div className="flex-1 p-1 border-t border-border flex gap-2">
                 {!isReadOnly && (
                   <Button
-                    onClick={() => setShowAdamTransferDialog(true)}
-                    variant="default"
-                    className="flex-1 h-full bg-green-600 hover:bg-green-700 text-white font-semibold"
-                    data-testid="button-transfer-adam"
+                    onClick={handleConfirmAssignments}
+                    disabled={!hasUnsavedChanges}
+                    variant="outline"
+                    className={`flex-1 h-full border-2 border-custom-blue ${
+                      hasUnsavedChanges
+                        ? 'bg-green-600 hover:bg-green-700 text-white animate-pulse'
+                        : 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200 cursor-default'
+                    }`}
+                    data-testid="button-confirm-assignments"
                   >
-                    <svg className="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
-                    </svg>
-                    Trasferisci su ADAM
+                    <CheckCircle className="w-4 h-4 mr-2" />
+                    {hasUnsavedChanges ? 'Conferma Assegnazioni ⚠️' : '✅ Assegnazioni Confermate'}
                   </Button>
                 )}
                 {isReadOnly && (
-                  <div className="flex-1 h-full flex items-center justify-center text-sm text-yellow-700 dark:text-yellow-300 bg-yellow-50 dark:bg-yellow-900/20 rounded border border-yellow-200 dark:border-yellow-800 font-medium">
-                    Sei in modalità storico
-                  </div>
+                  <Button
+                    disabled
+                    variant="outline"
+                    className="flex-1 h-full border-2 border-custom-blue bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-200 cursor-default"
+                  >
+                    📜 Sei in modalità storico
+                  </Button>
                 )}
+                <Button
+                  onClick={() => setShowAdamTransferDialog(true)} // Apri il dialog di conferma
+                  size="sm"
+                  variant="outline"
+                  className="ml-2 border-2 border-custom-blue"
+                >
+                  <svg className="mr-2 h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                  </svg>
+                  Trasferisci su ADAM
+                </Button>
               </div>
             </div>
           </div>

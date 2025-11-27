@@ -30,15 +30,16 @@ function getCurrentUsername(req?: any): string {
   return req?.body?.created_by || req?.body?.modified_by || 'system';
 }
 
-// Utility: costruzione chiave file consistente (nuovo formato semplificato)
+// Utility: costruzione chiave file consistente
 function buildKey(isoDate: string) {
   const d = new Date(isoDate);
   const day = String(d.getDate()).padStart(2, "0");
   const month = String(d.getMonth() + 1).padStart(2, "0");
   const year = String(d.getFullYear());
+  const shortYear = year.slice(-2);
   const folder = `${day}-${month}-${year}`;
-  // Nuovo formato semplificato: assignments_data.json contiene tutto
-  return { key: `${folder}/assignments_data.json`, d };
+  const filename = `assignments_${day}${month}${shortYear}.json`;
+  return { key: `${folder}/${filename}`, d };
 }
 
 /**
@@ -181,28 +182,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Endpoint per resettare le assegnazioni della timeline
   app.post("/api/reset-timeline-assignments", async (req, res) => {
     try {
-      const { date, modified_by, forceReset } = req.body;
+      const { date, modified_by } = req.body;
       const workDate = date || format(new Date(), 'yyyy-MM-dd');
       const currentUsername = modified_by || getCurrentUsername(req);
+      const timelinePath = path.join(process.cwd(), 'client/public/data/output/timeline.json');
 
-      // Se NON è un reset forzato (es. cambio data automatico), controlla se esistono assegnazioni
-      if (!forceReset) {
-        const hasExisting = await storageService.hasAssignments(workDate);
-        if (hasExisting) {
-          console.log(`⚠️ Trovate assegnazioni esistenti per ${workDate} - skip reset, usa load-saved-assignments`);
-          return res.json({ 
-            success: true, 
-            message: "Timeline esistente trovata - carica con load-saved-assignments",
-            hasExistingAssignments: true
-          });
+      // Svuota il file timeline.json con struttura corretta
+      const emptyTimeline = {
+        metadata: {
+          last_updated: new Date().toISOString(),
+          date: workDate,
+          created_by: currentUsername
+        },
+        cleaners_assignments: [],
+        meta: {
+          total_cleaners: 0,
+          used_cleaners: 0,
+          assigned_tasks: 0
         }
-      } else {
-        console.log(`🔄 Reset FORZATO richiesto per ${workDate} - svuoto timeline (mantiene convocazioni)`);
-      }
+      };
 
-      // Reset timeline: svuota assegnazioni ma MANTIENE selected_cleaners
-      await workspaceFiles.resetTimeline(workDate);
-      console.log(`Timeline resettata: timeline.json + Object Storage (convocazioni preservate)`);
+      // Salva timeline (dual-write: filesystem + Object Storage)
+      await workspaceFiles.saveTimeline(workDate, emptyTimeline);
+      console.log(`Timeline resettata: timeline.json (struttura corretta)`);
 
       // FORZA la ricreazione di containers.json rieseguendo create_containers.py
       console.log(`Rieseguendo create_containers.py per ripristinare i containers...`);
@@ -224,11 +226,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // CRITICAL: Forza nuovamente il reset di timeline.json dopo create_containers
       // perché lo script Python potrebbe aver sovrascritto il file
       console.log(`🔄 Forzatura reset timeline.json dopo create_containers...`);
-      await workspaceFiles.resetTimeline(workDate);
-      console.log(`✅ Timeline resettata nuovamente dopo create_containers (convocazioni preservate)`);
+      await workspaceFiles.saveTimeline(workDate, emptyTimeline);
+      console.log(`✅ Timeline resettata nuovamente dopo create_containers`);
 
-      // === RESET: selected_cleaners.json rimane INVARIATO nell'Object Storage ===
-      console.log(`✅ Reset completato - convocazioni preservate in Object Storage`);
+      // CRITICAL: Elimina il flag di ultimo salvataggio per evitare ricaricamenti automatici
+      console.log(`🗑️ Reset flag ultimo salvataggio per data ${workDate}`);
+      // Il frontend gestirà la rimozione del localStorage
+
+      // === RESET: NON modificare selected_cleaners.json ===
+      // Durante il reset, selected_cleaners.json rimane INVARIATO
+      // Viene svuotato SOLO quando si cambia data (in /api/extract-data)
+      console.log(`✅ Reset completato - selected_cleaners.json NON modificato (rimane invariato)`);
+      // === END ===
 
       res.json({ success: true, message: "Timeline resettata con successo" });
     } catch (error: any) {
@@ -308,33 +317,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       destEntry.tasks.splice(targetIndex, 0, taskToMove);
 
       // 4. Ricalcola tempi per il cleaner di origine e destinazione
-      // Prima assicurati che lo start_time sia aggiornato per entrambi i cleaner
-      const cleanersPath2 = path.join(process.cwd(), 'client/public/data/cleaners/selected_cleaners.json');
-      let cleanersDataForStartTime;
-      try {
-        cleanersDataForStartTime = JSON.parse(await fs.readFile(cleanersPath2, 'utf8'));
-      } catch (e) {
-        cleanersDataForStartTime = { cleaners: [] };
-      }
-      
-      // Aggiorna start_time per sourceEntry
-      if (sourceEntry) {
-        const srcCleanerInfo = cleanersDataForStartTime.cleaners.find((c: any) => c.id === sourceCleanerId);
-        if (srcCleanerInfo?.start_time) {
-          sourceEntry.cleaner.start_time = srcCleanerInfo.start_time;
-        } else if (!sourceEntry.cleaner.start_time) {
-          sourceEntry.cleaner.start_time = '10:00';
-        }
-      }
-      
-      // Aggiorna start_time per destEntry
-      const destCleanerInfo = cleanersDataForStartTime.cleaners.find((c: any) => c.id === destCleanerId);
-      if (destCleanerInfo?.start_time) {
-        destEntry.cleaner.start_time = destCleanerInfo.start_time;
-      } else if (!destEntry.cleaner.start_time) {
-        destEntry.cleaner.start_time = '10:00';
-      }
-
       try {
         // Ricalcola cleaner di origine (se ha ancora task)
         if (sourceEntry && sourceEntry.tasks.length > 0) {
@@ -713,41 +695,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const normalizedTaskId = String(taskId);
       const normalizedCleanerId = Number(cleanerId);
 
-      // Carica dati del cleaner da selected_cleaners.json (serve sia per nuovi che esistenti)
-      const cleanersPath = path.join(process.cwd(), 'client/public/data/cleaners/selected_cleaners.json');
-      let cleanersData;
-      try {
-        const cleanersRawData = await fs.readFile(cleanersPath, 'utf8');
-        cleanersData = JSON.parse(cleanersRawData);
-      } catch (error) {
-        console.error(`Failed to read ${cleanersPath}:`, error);
-        cleanersData = { cleaners: [] };
-      }
-      const cleanerInfo = cleanersData.cleaners.find((c: any) => c.id === normalizedCleanerId);
-
       // Trova o crea l'entry per questo cleaner
       let cleanerEntry = timelineData.cleaners_assignments.find(
         (c: any) => c.cleaner.id === normalizedCleanerId
       );
 
       if (!cleanerEntry) {
+        // Carica dati del cleaner da selected_cleaners.json
+        const cleanersPath = path.join(process.cwd(), 'client/public/data/cleaners/selected_cleaners.json');
+        let cleanersData;
+        try {
+          const cleanersRawData = await fs.readFile(cleanersPath, 'utf8');
+          cleanersData = JSON.parse(cleanersRawData);
+        } catch (error) {
+          console.error(`Failed to read ${cleanersPath}:`, error);
+          // Fallback to default cleaner info if file is missing
+          cleanersData = { cleaners: [] };
+        }
+
+        const cleanerInfo = cleanersData.cleaners.find((c: any) => c.id === normalizedCleanerId);
+
         cleanerEntry = {
           cleaner: {
             id: normalizedCleanerId,
             name: cleanerInfo?.name || 'Unknown',
             lastname: cleanerInfo?.lastname || '',
             role: cleanerInfo?.role || 'Standard',
-            premium: cleanerInfo?.premium || false,
-            start_time: cleanerInfo?.start_time || '10:00'
+            premium: cleanerInfo?.premium || false
           },
           tasks: []
         };
         timelineData.cleaners_assignments.push(cleanerEntry);
-      } else {
-        // Aggiorna start_time se mancante o diverso (per cleanerEntry esistenti)
-        if (!cleanerEntry.cleaner.start_time || cleanerEntry.cleaner.start_time !== cleanerInfo?.start_time) {
-          cleanerEntry.cleaner.start_time = cleanerInfo?.start_time || '10:00';
-        }
       }
 
       // Rimuovi il task se già presente (evita duplicazioni)
@@ -830,32 +808,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Ricalcola travel_time, start_time, end_time usando lo script Python
       try {
-        // Aggiungi informazioni sull'ultima task del cleaner (se esiste)
-        const firstTask = cleanerEntry.tasks[0];
-        if (firstTask && firstTask.sequence && firstTask.sequence > 1) {
-          // Il cleaner ha task precedenti, trova l'ultima prima di questa lista
-          // Cerca in tutte le entries del cleaner per trovare l'ultima task
-          let lastPrevTask = null;
-          let maxSeq = 0;
-          
-          for (const entry of timelineData.cleaners_assignments) {
-            if (entry.cleaner.id === normalizedCleanerId) {
-              for (const t of entry.tasks) {
-                if (t.sequence && t.sequence < firstTask.sequence && t.sequence > maxSeq) {
-                  maxSeq = t.sequence;
-                  lastPrevTask = t;
-                }
-              }
-            }
-          }
-          
-          if (lastPrevTask) {
-            cleanerEntry.cleaner.last_task_lat = lastPrevTask.lat;
-            cleanerEntry.cleaner.last_task_lng = lastPrevTask.lng;
-            cleanerEntry.cleaner.last_task_address = lastPrevTask.address;
-          }
-        }
-        
         const updatedCleanerData = await recalculateCleanerTimes(cleanerEntry);
         cleanerEntry.tasks = updatedCleanerData.tasks;
         console.log(`✅ Tempi ricalcolati per cleaner ${normalizedCleanerId}`);
@@ -1098,7 +1050,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Endpoint per verificare SE esistono assegnazioni salvate (senza caricarle)
-  // Ora salviamo direttamente nel percorso principale (DD-MM-YYYY/assignments_*.json)
   app.post("/api/check-saved-assignments", async (req, res) => {
     try {
       const { Client } = await import("@replit/object-storage");
@@ -1107,27 +1058,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const workDate = req.body?.date || format(new Date(), "yyyy-MM-dd");
       const { key, d } = buildKey(workDate);
 
-      const result = await client.downloadAsText(key);
+      const result = await client.downloadAsText(key, { bucket: BUCKET });
 
       if (result.ok) {
-        const data = JSON.parse(result.value);
-        const lastUpdated = data.metadata?.last_updated;
-        const formattedDateTime = lastUpdated 
-          ? format(new Date(lastUpdated), "dd/MM/yyyy HH:mm", { locale: it })
-          : format(d, "dd/MM/yyyy", { locale: it });
-        
-        console.log(`✅ Found saved data for ${workDate}: ${key}`);
+        // File trovato - ritorna sempre come valido
+        // La data nel filename è quella che conta (costruita da buildKey)
         return res.json({
           success: true,
           found: true,
           filename: key,
-          formattedDateTime,
-          lastSavedTimestamp: lastUpdated
+          formattedDateTime: format(d, "dd/MM/yyyy", { locale: it })
         });
       }
 
       // File non trovato
-      console.log(`ℹ️ No saved data found for ${workDate}`);
       return res.json({ success: true, found: false });
     } catch (error: any) {
       console.error("check-saved-assignments error:", error);
@@ -1268,16 +1212,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Endpoint per caricare assegnazioni salvate da Object Storage
-  // NUOVO FORMATO: assignments_data.json contiene { selected_cleaners, timeline }
   app.post("/api/load-saved-assignments", async (req, res) => {
     try {
+      const { Client } = await import("@replit/object-storage");
+      const client = new Client();
+
       const workDate = req.body?.date || format(new Date(), "yyyy-MM-dd");
+      const { key } = buildKey(workDate);
 
-      // Usa storageService per caricare i dati unificati
-      const savedData = await storageService.getData(workDate);
+      console.log(`Tentativo di caricamento file: ${key}`);
 
-      if (!savedData) {
-        console.log(`Nessuna assegnazione salvata trovata per ${workDate}`);
+      const result = await client.downloadAsText(key, { bucket: BUCKET });
+
+      if (!result.ok) {
+        console.log(`Nessuna assegnazione salvata trovata per ${workDate} (${key})`);
         return res.json({
           success: true,
           found: false,
@@ -1285,92 +1233,148 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      // Estrai timeline e selected_cleaners dal formato unificato
-      const timelineData = savedData.timeline || {
-        metadata: { date: workDate, last_updated: new Date().toISOString() },
-        cleaners_assignments: [],
-        meta: { total_cleaners: 0, used_cleaners: 0, assigned_tasks: 0 }
-      };
-      const selectedCleanersArray = savedData.selected_cleaners || [];
+      const savedData = JSON.parse(result.value);
 
-      // Aggiorna metadata timeline
-      timelineData.metadata = timelineData.metadata || {};
-      timelineData.metadata.date = workDate;
-      timelineData.metadata.last_updated = new Date().toISOString();
+      // CRITICAL: Aggiorna SEMPRE la data nei metadata con la data richiesta
+      // Questo permette di caricare file salvati anche se la data interna non corrisponde
+      savedData.metadata = savedData.metadata || {};
+      savedData.metadata.date = workDate;
+      savedData.metadata.last_updated = new Date().toISOString();
 
-      // Salva timeline su filesystem (per Python scripts)
-      const timelinePath = path.join(process.cwd(), 'client/public/data/output/timeline.json');
-      await fs.writeFile(timelinePath, JSON.stringify(timelineData, null, 2));
-      console.log(`✅ Timeline caricata da Object Storage per ${workDate}`);
+      // Preserva created_by se esiste, altrimenti usa 'loaded_from_storage'
+      if (!savedData.metadata.created_by) {
+        savedData.metadata.created_by = 'loaded_from_storage';
+      }
 
-      // === Ripristina selected_cleaners ===
+      // Salva i dati caricati in timeline.json (dual-write: filesystem + Object Storage)
+      await workspaceFiles.saveTimeline(workDate, savedData);
+
+      // CRITICAL: Attendi che il file sia effettivamente scritto
+      await new Promise(resolve => setTimeout(resolve, 200));
+
+      // === Scarica e ripristina selected_cleaners per la stessa data ===
+      // CRITICAL: Verifica se l'utente sta modificando i cleaners
       const flagPath = path.join(process.cwd(), 'client/public/data/cleaners/.editing_cleaners');
       let isEditingCleaners = false;
       try {
         const flagData = JSON.parse(await fs.readFile(flagPath, 'utf8'));
+        // Considera il flag valido solo se recente (ultimi 10 secondi)
         isEditingCleaners = (Date.now() - flagData.timestamp) < 10000 && flagData.date === workDate;
         if (isEditingCleaners) {
-          console.log(`🔒 Utente sta modificando cleaners - SKIP ripristino`);
+          console.log(`🔒 Utente sta modificando cleaners - SKIP ripristino da Object Storage`);
         }
       } catch (e) {
-        // Flag non esiste
+        // Flag non esiste, procedi normally
       }
+
+      const dateObj = new Date(workDate);
+      const day = String(dateObj.getDate()).padStart(2, '0');
+      const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+      const fullYear = String(dateObj.getFullYear());
+      const year = fullYear.slice(-2);
+      const folderPath = `${day}-${month}-${fullYear}`;
+      const scKey = `${folderPath}/selected_cleaners_${day}${month}${year}.json`;
 
       let selectedCleanersBackup: any = null;
 
-      if (!isEditingCleaners && selectedCleanersArray.length > 0) {
-        const selectedCleanersPath = path.join(process.cwd(), 'client/public/data/cleaners/selected_cleaners.json');
-        const scData = {
-          cleaners: selectedCleanersArray,
-          total_selected: selectedCleanersArray.length,
-          metadata: { date: workDate, loaded_at: new Date().toISOString() }
-        };
+      // SKIP ripristino se utente sta modificando
+      if (!isEditingCleaners) {
+        try {
+          const scResult = await client.downloadAsText(scKey, { bucket: BUCKET });
+          const selectedCleanersPath = path.join(
+            process.cwd(),
+            'client/public/data/cleaners/selected_cleaners.json'
+          );
 
-        selectedCleanersBackup = scData;
-        await fs.writeFile(selectedCleanersPath, JSON.stringify(scData, null, 2));
-        console.log(`✅ Selected cleaners ripristinati: ${selectedCleanersArray.length} cleaners`);
-      } else if (!isEditingCleaners) {
-        const selectedCleanersPath = path.join(process.cwd(), 'client/public/data/cleaners/selected_cleaners.json');
-        const emptySelected = {
-          cleaners: [],
-          total_selected: 0,
-          metadata: { date: workDate, reset_at: new Date().toISOString() }
-        };
-        await fs.writeFile(selectedCleanersPath, JSON.stringify(emptySelected, null, 2));
-        console.log(`ℹ️ Nessun selected_cleaners salvato per ${workDate} - creato vuoto`);
+          if (scResult.ok) {
+            const scData = JSON.parse(scResult.value);
+
+            scData.metadata = scData.metadata || {};
+            scData.metadata.date = workDate;
+            scData.metadata.loaded_at = new Date().toISOString();
+
+            // Salva backup in memoria per ripristino post-create_containers
+            selectedCleanersBackup = scData;
+
+            const tmpScPath = `${selectedCleanersPath}.tmp`;
+            await fs.writeFile(tmpScPath, JSON.stringify(scData, null, 2));
+            await fs.rename(tmpScPath, selectedCleanersPath);
+
+            console.log(`✅ Selected cleaners ripristinati da Object Storage: ${scKey}`);
+          } else {
+            const emptySelected = {
+              cleaners: [],
+              total_selected: 0,
+              metadata: { date: workDate, reset_at: new Date().toISOString() }
+            };
+
+            const tmpScPath = `${selectedCleanersPath}.tmp`;
+            await fs.writeFile(tmpScPath, JSON.stringify(emptySelected, null, 2));
+            await fs.rename(tmpScPath, selectedCleanersPath);
+
+            console.log(`ℹ️ Nessun selected_cleaners salvato per ${workDate} - creato vuoto`);
+          }
+        } catch (e) {
+          console.warn(`⚠️ Impossibile caricare ${scKey}:`, e);
+        }
+      } else {
+        console.log(`⏭️ Skip ripristino selected_cleaners - utente in modalità editing`);
       }
+      // === END ===
 
       // Rigenera containers.json per la data caricata
+      // CRITICAL: Aggiorna timeline.json con la data corretta DOPO create_containers
       console.log(`🔄 Rigenerazione containers.json per data ${workDate}...`);
       const createContainersPath = path.join(process.cwd(), 'client/public/scripts/create_containers.py');
-      await new Promise<string>((resolve, reject) => {
+      const createContainersResult = await new Promise<string>((resolve, reject) => {
+        // Usa --skip-extract per evitare di sovrascrivere selected_cleaners.json
         exec(`python3 "${createContainersPath}" --date "${workDate}" --skip-extract`, (error, stdout, stderr) => {
           if (error) {
             console.error(`❌ Errore create_containers: ${error.message}`);
             reject(new Error(stderr || error.message));
           } else {
+            if (stderr) {
+              console.error(`create_containers stderr: ${stderr}`);
+            }
             console.log(`create_containers output: ${stdout}`);
             resolve(stdout);
           }
         });
       });
-      console.log(`✅ Containers rigenerati (${selectedCleanersBackup?.cleaners?.length || 0} cleaners)`);
+      console.log(`✅ Containers rigenerati preservando i cleaners salvati (${selectedCleanersBackup?.cleaners?.length || 0} cleaners)`);
 
-      // Ripristina selected_cleaners dopo create_containers
+
+      // CRITICAL: Ripristina selected_cleaners.json DOPO create_containers
+      // perché lo script Python potrebbe averlo sovrascritto
       if (selectedCleanersBackup) {
-        const selectedCleanersPath = path.join(process.cwd(), 'client/public/data/cleaners/selected_cleaners.json');
-        await fs.writeFile(selectedCleanersPath, JSON.stringify(selectedCleanersBackup, null, 2));
-        console.log(`✅ Selected cleaners ri-ripristinati dopo create_containers`);
+        try {
+          const selectedCleanersPath = path.join(
+            process.cwd(),
+            'client/public/data/cleaners/selected_cleaners.json'
+          );
+
+          const tmpScPath = `${selectedCleanersPath}.tmp`;
+          await fs.writeFile(tmpScPath, JSON.stringify(selectedCleanersBackup, null, 2));
+          await fs.rename(tmpScPath, selectedCleanersPath);
+
+          console.log(`✅ Selected cleaners ri-ripristinati dopo create_containers (${selectedCleanersBackup.cleaners?.length || 0} cleaners)`);
+        } catch (e) {
+          console.warn(`⚠️ Errore nel ri-ripristino selected_cleaners:`, e);
+        }
       }
 
-      // Sincronizza containers: rimuovi task già assegnate
+      // CRITICAL: NON rieseguire create_containers dopo aver caricato da Object Storage
+      // Invece, rimuovi dai containers.json le task già assegnate in timeline.json
       const containersPath = path.join(process.cwd(), 'client/public/data/output/containers.json');
+
       try {
+        // Carica containers esistenti (generati da extract-data precedente)
         const containersData = JSON.parse(await fs.readFile(containersPath, 'utf8'));
 
+        // Estrai tutti i task_id assegnati dalla timeline
         const assignedTaskIds = new Set<number>();
-        if (timelineData.cleaners_assignments) {
-          for (const cleanerEntry of timelineData.cleaners_assignments) {
+        if (savedData.cleaners_assignments) {
+          for (const cleanerEntry of savedData.cleaners_assignments) {
             for (const task of cleanerEntry.tasks || []) {
               assignedTaskIds.add(task.task_id);
             }
@@ -1379,6 +1383,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         console.log(`🔍 Task assegnate trovate in timeline: ${assignedTaskIds.size}`);
 
+        // Rimuovi dai containers le task già assegnate
         let removedCount = 0;
         for (const containerType of ['early_out', 'high_priority', 'low_priority']) {
           const container = containersData.containers?.[containerType];
@@ -1390,6 +1395,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
         }
 
+        // Aggiorna summary
         if (containersData.summary) {
           containersData.summary.early_out = containersData.containers.early_out?.count || 0;
           containersData.summary.high_priority = containersData.containers.high_priority?.count || 0;
@@ -1400,27 +1406,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
             containersData.summary.low_priority;
         }
 
+        // Salva containers.json sincronizzato (dual-write: filesystem + Object Storage)
+        const workDate = req.body.date || format(new Date(), 'yyyy-MM-dd');
         await workspaceFiles.saveContainers(workDate, containersData);
+
         console.log(`✅ Containers sincronizzati: rimosse ${removedCount} task già assegnate`);
       } catch (err) {
         console.warn('⚠️ Impossibile sincronizzare containers:', err);
       }
 
-      // Formatta data/ora per risposta
-      const now = new Date();
-      const dateObj = new Date(workDate);
-      const day = String(dateObj.getDate()).padStart(2, '0');
-      const month = String(dateObj.getMonth() + 1).padStart(2, '0');
-      const year = String(dateObj.getFullYear()).slice(-2);
-      const hours = String(now.getHours()).padStart(2, '0');
-      const minutes = String(now.getMinutes()).padStart(2, '0');
-      const formattedDateTime = `${day}/${month}/${year} alle ${hours}:${minutes}`;
+      // Estrai il timestamp dal filename (formato: assignments_DDMMYY.json)
+      const dateMatch = key.match(/assignments_(\d{6})\.json/);
+      const lastSavedTimestamp = dateMatch ? dateMatch[1] : null;
 
-      const { key } = buildKey(workDate);
+      // Usa la data corrente con la data dal filename
+      let formattedDateTime = null;
+      if (lastSavedTimestamp) {
+        const now = new Date();
+        const hours = String(now.getHours()).padStart(2, '0');
+        const minutes = String(now.getMinutes()).padStart(2, '0');
+        const day = lastSavedTimestamp.slice(0, 2);
+        const month = lastSavedTimestamp.slice(2, 4);
+        const year = lastSavedTimestamp.slice(4, 6);
+        formattedDateTime = `${day}/${month}/${year} alle ${hours}:${minutes}`;
+      }
+
       res.json({
         success: true,
         found: true,
         filename: key,
+        lastSavedTimestamp,
         formattedDateTime,
         data: savedData,
         message: `Assegnazioni caricate da: ${key}`
@@ -2695,17 +2710,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
 
         console.log("assign_eo output:", stdoutData);
-        
-        // CRITICAL: Dopo che lo script Python ha salvato su filesystem,
-        // dobbiamo salvare anche su Object Storage per persistenza
-        try {
-          const updatedTimeline = JSON.parse(await fs.readFile(timelinePath, 'utf8'));
-          await workspaceFiles.saveTimeline(workDate, updatedTimeline);
-          console.log(`✅ Timeline EO salvata su Object Storage per ${workDate}`);
-        } catch (saveErr) {
-          console.error("Errore nel salvataggio su Object Storage:", saveErr);
-        }
-        
         res.json({
           success: true,
           message: "Early Out tasks assegnati con successo in timeline.json",
@@ -2782,16 +2786,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
 
         console.log("assign_hp output:", stdoutData);
-        
-        // CRITICAL: Salva su Object Storage dopo lo script Python
-        try {
-          const updatedTimeline = JSON.parse(await fs.readFile(timelinePath, 'utf8'));
-          await workspaceFiles.saveTimeline(workDate, updatedTimeline);
-          console.log(`✅ Timeline HP salvata su Object Storage per ${workDate}`);
-        } catch (saveErr) {
-          console.error("Errore nel salvataggio su Object Storage:", saveErr);
-        }
-        
         res.json({
           success: true,
           message: "High Priority tasks assegnati con successo in timeline.json",
@@ -2869,16 +2863,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
 
         console.log("assign_lp output:", stdoutData);
-        
-        // CRITICAL: Salva su Object Storage dopo lo script Python
-        try {
-          const updatedTimeline = JSON.parse(await fs.readFile(timelinePath, 'utf8'));
-          await workspaceFiles.saveTimeline(workDate, updatedTimeline);
-          console.log(`✅ Timeline LP salvata su Object Storage per ${workDate}`);
-        } catch (saveErr) {
-          console.error("Errore nel salvataggio su Object Storage:", saveErr);
-        }
-        
         res.json({
           success: true,
           message: "Low Priority tasks assegnati con successo in timeline.json",
@@ -3242,30 +3226,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const settingsData = req.body;
       const settingsPath = path.join(process.cwd(), "client/public/data/input/settings.json");
 
-      console.log(`📝 Salvataggio settings.json in: ${settingsPath}`);
-      console.log(`📊 Dati ricevuti:`, JSON.stringify(settingsData, null, 2).slice(0, 200) + '...');
-
-      // Scrittura atomica per evitare corruzioni
-      const tmpPath = `${settingsPath}.tmp`;
       await fs.writeFile(
-        tmpPath,
+        settingsPath,
         JSON.stringify(settingsData, null, 2),
         "utf-8"
       );
-      await fs.rename(tmpPath, settingsPath);
-
-      // Verifica che il file sia stato scritto correttamente
-      const savedContent = await fs.readFile(settingsPath, 'utf-8');
-      const savedData = JSON.parse(savedContent);
-      
-      console.log(`✅ Settings salvato correttamente. Verificato ${Object.keys(savedData).length} chiavi principali`);
 
       res.json({
         success: true,
         message: "Impostazioni salvate con successo",
       });
     } catch (error: any) {
-      console.error("❌ Errore nel salvataggio delle impostazioni:", error);
+      console.error("Errore nel salvataggio delle impostazioni:", error);
       res.status(500).json({ success: false, error: error.message });
     }
   });
@@ -3603,8 +3575,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               name: cleanerInfo.name,
               lastname: cleanerInfo.lastname,
               role: cleanerInfo.role,
-              premium: cleanerInfo.role === "Premium",
-              start_time: cleanerInfo.start_time || '10:00'
+              premium: cleanerInfo.role === "Premium"
             },
             tasks: []
           };
@@ -3633,24 +3604,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Aggiorna sequence nel cleaner destinazione
       dstEntry.tasks.forEach((t: any, i: number) => { t.sequence = i + 1; });
 
-      // Aggiorna start_time dei cleaner da selected_cleaners.json prima del ricalcolo
-      const cleanersPathCross = path.join(process.cwd(), 'client/public/data/cleaners/selected_cleaners.json');
-      try {
-        const cleanersDataCross = JSON.parse(await fs.readFile(cleanersPathCross, 'utf8'));
-        
-        // Aggiorna start_time per dstEntry
-        const dstCleanerInfo = cleanersDataCross.cleaners.find((c: any) => c.id === toCleanerId);
-        if (dstCleanerInfo?.start_time) {
-          dstEntry.cleaner.start_time = dstCleanerInfo.start_time;
-        } else if (!dstEntry.cleaner.start_time) {
-          dstEntry.cleaner.start_time = '10:00';
-        }
-      } catch (e) {
-        if (!dstEntry.cleaner.start_time) {
-          dstEntry.cleaner.start_time = '10:00';
-        }
-      }
-
       // Ricalcola tempi usando lo script Python per avere start_time/end_time coerenti con la sequenza
       try {
         const updatedDst = await recalculateCleanerTimes(dstEntry);
@@ -3661,20 +3614,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (typeof fromCleanerId === 'number' && fromCleanerId !== toCleanerId) {
           const srcEntry = getCleanerEntry(fromCleanerId);
           if (srcEntry && srcEntry.tasks.length > 0) {
-            // Aggiorna start_time per srcEntry
-            try {
-              const cleanersDataCrossSrc = JSON.parse(await fs.readFile(cleanersPathCross, 'utf8'));
-              const srcCleanerInfo = cleanersDataCrossSrc.cleaners.find((c: any) => c.id === fromCleanerId);
-              if (srcCleanerInfo?.start_time) {
-                srcEntry.cleaner.start_time = srcCleanerInfo.start_time;
-              } else if (!srcEntry.cleaner.start_time) {
-                srcEntry.cleaner.start_time = '10:00';
-              }
-            } catch (e) {
-              if (!srcEntry.cleaner.start_time) {
-                srcEntry.cleaner.start_time = '10:00';
-              }
-            }
             const updatedSrc = await recalculateCleanerTimes(srcEntry);
             srcEntry.tasks = updatedSrc.tasks;
             console.log(`✅ Tempi ricalcolati per cleaner ${fromCleanerId} dopo rimozione`);
@@ -3756,22 +3695,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Inserisci nella nuova posizione toIndex
       cleanerEntry.tasks.splice(toIndex, 0, task);
-
-      // Aggiorna start_time del cleaner da selected_cleaners.json prima del ricalcolo
-      const cleanersPathReorder = path.join(process.cwd(), 'client/public/data/cleaners/selected_cleaners.json');
-      try {
-        const cleanersDataReorder = JSON.parse(await fs.readFile(cleanersPathReorder, 'utf8'));
-        const cleanerInfoReorder = cleanersDataReorder.cleaners.find((c: any) => c.id === cleanerId);
-        if (cleanerInfoReorder?.start_time) {
-          cleanerEntry.cleaner.start_time = cleanerInfoReorder.start_time;
-        } else if (!cleanerEntry.cleaner.start_time) {
-          cleanerEntry.cleaner.start_time = '10:00';
-        }
-      } catch (e) {
-        if (!cleanerEntry.cleaner.start_time) {
-          cleanerEntry.cleaner.start_time = '10:00';
-        }
-      }
 
       // Ricalcola travel_time, start_time, end_time usando lo script Python
       try {
@@ -4025,18 +3948,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // API per gestione dati salvati - Lista date con assegnazioni
+  // API per gestione workspace - Cancella file workspace non salvati
   app.get("/api/workspace/list", async (req, res) => {
     try {
-      const dates = await storageService.listDates();
+      const dates = await storageService.listWorkspaceDates();
       res.json({ success: true, dates });
     } catch (error: any) {
-      console.error("Errore nel listing date:", error);
+      console.error("Errore nel listing workspace:", error);
       res.status(500).json({ success: false, error: error.message });
     }
   });
 
-  // Cancella dati per una specifica data
   app.delete("/api/workspace/:workDate", async (req, res) => {
     try {
       const { workDate } = req.params;
@@ -4048,16 +3970,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      const success = await storageService.deleteData(workDate);
+      const result = await storageService.deleteWorkspaceFiles(workDate);
 
       res.json({
-        success,
-        message: success
-          ? `Dati cancellati per ${workDate}`
-          : `Errore durante la cancellazione per ${workDate}`
+        success: result.success,
+        deletedFiles: result.deletedFiles,
+        errors: result.errors,
+        message: result.success
+          ? `File workspace cancellati per ${workDate}`
+          : `Errori durante la cancellazione: ${result.errors.join(', ')}`
       });
     } catch (error: any) {
-      console.error("Errore nella cancellazione dati:", error);
+      console.error("Errore nella cancellazione workspace:", error);
       res.status(500).json({ success: false, error: error.message });
     }
   });

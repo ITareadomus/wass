@@ -1,12 +1,21 @@
 import { Client } from "@replit/object-storage";
 
+const BUCKET = "wass_assignments";
+
+export interface WorkspaceFile {
+  timeline?: any;
+  containers?: any;
+  selectedCleaners?: any;
+}
+
 /**
- * StorageService - Simplified storage using single assignments_data.json
+ * StorageService - Wraps Replit Object Storage for workspace and confirmed assignments
  * 
  * Directory structure:
- * - DD-MM-YYYY/assignments_data.json - Contains { selected_cleaners: [...], timeline: {...} }
- * 
- * Every modification saves immediately to Object Storage.
+ * - workspace/YYYY-MM-DD/timeline.json - Current work in progress
+ * - workspace/YYYY-MM-DD/containers.json - Unassigned tasks
+ * - workspace/YYYY-MM-DD/selected_cleaners.json - Selected cleaners for the day
+ * - confirmed/DD-MM-YYYY/assignments_DDMMYY.json - Confirmed assignments (existing)
  */
 export class StorageService {
   private client: Client;
@@ -16,171 +25,198 @@ export class StorageService {
   }
 
   /**
-   * Build key for a given date: DD-MM-YYYY/assignments_data.json
+   * Build workspace key for a given date and file type
+   * @param workDate ISO date string (YYYY-MM-DD)
+   * @param fileType timeline | containers | selected_cleaners
    */
-  private buildKey(workDate: string): string {
+  private buildWorkspaceKey(workDate: string, fileType: 'timeline' | 'containers' | 'selected_cleaners'): string {
+    return `workspace/${workDate}/${fileType}.json`;
+  }
+
+  /**
+   * Build confirmed key (backward compatible with existing structure)
+   * @param workDate ISO date string (YYYY-MM-DD)
+   */
+  private buildConfirmedKey(workDate: string): string {
     const d = new Date(workDate);
     const day = String(d.getDate()).padStart(2, "0");
     const month = String(d.getMonth() + 1).padStart(2, "0");
     const fullYear = String(d.getFullYear());
+    const year = fullYear.slice(-2);
     const folder = `${day}-${month}-${fullYear}`;
-    return `${folder}/assignments_data.json`;
+    const filename = `assignments_${day}${month}${year}.json`;
+    return `${folder}/${filename}`;
   }
 
   /**
-   * Get complete data for a specific date
+   * Get workspace timeline for a specific date
    */
-  async getData(workDate: string): Promise<{ selected_cleaners: any[], timeline: any } | null> {
+  async getWorkspaceTimeline(workDate: string): Promise<any | null> {
     try {
-      const key = this.buildKey(workDate);
+      const key = this.buildWorkspaceKey(workDate, 'timeline');
       const result = await this.client.downloadAsText(key);
       
       if (!result.ok) {
-        console.log(`ℹ️ No data found for ${workDate} at ${key}`);
         return null;
       }
 
-      const data = JSON.parse(result.value);
-      console.log(`✅ Data loaded from Object Storage: ${key}`);
-      return data;
+      return JSON.parse(result.value);
     } catch (error) {
-      console.error(`Error getting data for ${workDate}:`, error);
+      console.error(`Error getting workspace timeline for ${workDate}:`, error);
       return null;
     }
   }
 
   /**
-   * Save complete data for a specific date
+   * Save workspace timeline for a specific date
    */
-  async saveData(workDate: string, data: { selected_cleaners: any[], timeline: any }): Promise<boolean> {
+  async saveWorkspaceTimeline(workDate: string, data: any): Promise<boolean> {
     try {
-      const key = this.buildKey(workDate);
-      
-      // Add metadata
-      data.timeline = data.timeline || {};
-      data.timeline.metadata = data.timeline.metadata || {};
-      data.timeline.metadata.date = workDate;
-      data.timeline.metadata.last_updated = new Date().toISOString();
-      
+      const key = this.buildWorkspaceKey(workDate, 'timeline');
       const jsonContent = JSON.stringify(data, null, 2);
       const result = await this.client.uploadFromText(key, jsonContent);
       
       if (!result.ok) {
-        console.error(`Failed to save data: ${result.error}`);
+        console.error(`Failed to save workspace timeline: ${result.error}`);
         return false;
       }
 
-      console.log(`✅ Data saved to Object Storage: ${key}`);
       return true;
     } catch (error) {
-      console.error(`Error saving data for ${workDate}:`, error);
+      console.error(`Error saving workspace timeline for ${workDate}:`, error);
       return false;
     }
   }
 
   /**
-   * Get only selected_cleaners for a specific date
+   * Get workspace containers for a specific date
    */
-  async getSelectedCleaners(workDate: string): Promise<any[] | null> {
-    const data = await this.getData(workDate);
-    return data?.selected_cleaners || null;
-  }
-
-  /**
-   * Save selected_cleaners - merges with existing timeline
-   */
-  async saveSelectedCleaners(workDate: string, selectedCleaners: any[]): Promise<boolean> {
-    const existing = await this.getData(workDate);
-    const data = {
-      selected_cleaners: selectedCleaners,
-      timeline: existing?.timeline || {
-        metadata: { date: workDate, last_updated: new Date().toISOString() },
-        cleaners_assignments: [],
-        meta: { total_cleaners: 0, used_cleaners: 0, assigned_tasks: 0 }
-      }
-    };
-    return this.saveData(workDate, data);
-  }
-
-  /**
-   * Get only timeline for a specific date
-   */
-  async getTimeline(workDate: string): Promise<any | null> {
-    const data = await this.getData(workDate);
-    return data?.timeline || null;
-  }
-
-  /**
-   * Save timeline - merges with existing selected_cleaners
-   */
-  async saveTimeline(workDate: string, timeline: any): Promise<boolean> {
-    const existing = await this.getData(workDate);
-    const data = {
-      selected_cleaners: existing?.selected_cleaners || [],
-      timeline: timeline
-    };
-    return this.saveData(workDate, data);
-  }
-
-  /**
-   * Reset timeline only (keep selected_cleaners)
-   */
-  async resetTimeline(workDate: string): Promise<boolean> {
-    const existing = await this.getData(workDate);
-    const emptyTimeline = {
-      metadata: { date: workDate, last_updated: new Date().toISOString(), created_by: 'system' },
-      cleaners_assignments: [],
-      meta: { total_cleaners: 0, used_cleaners: 0, assigned_tasks: 0 }
-    };
-    const data = {
-      selected_cleaners: existing?.selected_cleaners || [],
-      timeline: emptyTimeline
-    };
-    return this.saveData(workDate, data);
-  }
-
-  /**
-   * Check if any data exists for a date
-   */
-  async hasData(workDate: string): Promise<boolean> {
-    const data = await this.getData(workDate);
-    return data !== null;
-  }
-
-  /**
-   * Check if timeline has assignments
-   */
-  async hasAssignments(workDate: string): Promise<boolean> {
-    const data = await this.getData(workDate);
-    if (!data?.timeline?.cleaners_assignments) return false;
-    return data.timeline.cleaners_assignments.some((c: any) => c.tasks && c.tasks.length > 0);
-  }
-
-  /**
-   * Delete all data for a specific date
-   */
-  async deleteData(workDate: string): Promise<boolean> {
+  async getWorkspaceContainers(workDate: string): Promise<any | null> {
     try {
-      const key = this.buildKey(workDate);
-      const result = await this.client.delete(key);
+      const key = this.buildWorkspaceKey(workDate, 'containers');
+      const result = await this.client.downloadAsText(key);
       
-      if (result.ok) {
-        console.log(`✅ Data deleted: ${key}`);
-        return true;
+      if (!result.ok) {
+        return null;
       }
+
+      return JSON.parse(result.value);
+    } catch (error) {
+      console.error(`Error getting workspace containers for ${workDate}:`, error);
+      return null;
+    }
+  }
+
+  /**
+   * Save workspace containers for a specific date
+   */
+  async saveWorkspaceContainers(workDate: string, data: any): Promise<boolean> {
+    try {
+      const key = this.buildWorkspaceKey(workDate, 'containers');
+      const jsonContent = JSON.stringify(data, null, 2);
+      const result = await this.client.uploadFromText(key, jsonContent);
       
-      console.log(`ℹ️ Data not found or already deleted: ${key}`);
+      if (!result.ok) {
+        console.error(`Failed to save workspace containers: ${result.error}`);
+        return false;
+      }
+
       return true;
     } catch (error) {
-      console.error(`Error deleting data for ${workDate}:`, error);
+      console.error(`Error saving workspace containers for ${workDate}:`, error);
       return false;
     }
   }
 
   /**
-   * List all dates that have data
+   * Get selected cleaners for a specific date
    */
-  async listDates(): Promise<string[]> {
+  async getWorkspaceSelectedCleaners(workDate: string): Promise<any | null> {
+    try {
+      const key = this.buildWorkspaceKey(workDate, 'selected_cleaners');
+      const result = await this.client.downloadAsText(key);
+      
+      if (!result.ok) {
+        return null;
+      }
+
+      return JSON.parse(result.value);
+    } catch (error) {
+      console.error(`Error getting workspace selected cleaners for ${workDate}:`, error);
+      return null;
+    }
+  }
+
+  /**
+   * Save selected cleaners for a specific date
+   */
+  async saveWorkspaceSelectedCleaners(workDate: string, data: any): Promise<boolean> {
+    try {
+      const key = this.buildWorkspaceKey(workDate, 'selected_cleaners');
+      const jsonContent = JSON.stringify(data, null, 2);
+      const result = await this.client.uploadFromText(key, jsonContent);
+      
+      if (!result.ok) {
+        console.error(`Failed to save workspace selected cleaners: ${result.error}`);
+        return false;
+      }
+
+      return true;
+    } catch (error) {
+      console.error(`Error saving workspace selected cleaners for ${workDate}:`, error);
+      return false;
+    }
+  }
+
+  /**
+   * Check if confirmed assignments exist for a date
+   */
+  async hasConfirmedAssignments(workDate: string): Promise<boolean> {
+    try {
+      const key = this.buildConfirmedKey(workDate);
+      const result = await this.client.downloadAsText(key);
+      return result.ok;
+    } catch (error) {
+      return false;
+    }
+  }
+
+  /**
+   * Delete all workspace files for a specific date
+   */
+  async deleteWorkspaceFiles(workDate: string): Promise<{success: boolean, deletedFiles: string[], errors: string[]}> {
+    const deletedFiles: string[] = [];
+    const errors: string[] = [];
+    
+    const filesToDelete = ['timeline', 'containers', 'selected_cleaners'] as const;
+    
+    for (const fileType of filesToDelete) {
+      try {
+        const key = this.buildWorkspaceKey(workDate, fileType);
+        const result = await this.client.delete(key);
+        
+        if (result.ok) {
+          deletedFiles.push(`${fileType}.json`);
+        } else {
+          // File might not exist, which is ok
+          console.log(`File ${key} not found or already deleted`);
+        }
+      } catch (error: any) {
+        errors.push(`${fileType}: ${error.message}`);
+      }
+    }
+    
+    return {
+      success: errors.length === 0,
+      deletedFiles,
+      errors
+    };
+  }
+
+  /**
+   * List all workspace dates that have files
+   */
+  async listWorkspaceDates(): Promise<string[]> {
     try {
       const result = await this.client.list();
       
@@ -190,19 +226,72 @@ export class StorageService {
       
       const dates = new Set<string>();
       for (const key of result.value) {
-        // Extract date from DD-MM-YYYY/assignments_data.json
-        const match = key.match(/^(\d{2})-(\d{2})-(\d{4})\/assignments_data\.json$/);
+        // Extract date from workspace/YYYY-MM-DD/filename.json
+        const match = key.match(/^workspace\/(\d{4}-\d{2}-\d{2})\//);
         if (match) {
-          // Convert DD-MM-YYYY to YYYY-MM-DD
-          const isoDate = `${match[3]}-${match[2]}-${match[1]}`;
-          dates.add(isoDate);
+          dates.add(match[1]);
         }
       }
       
       return Array.from(dates).sort();
     } catch (error) {
-      console.error('Error listing dates:', error);
+      console.error('Error listing workspace dates:', error);
       return [];
+    }
+  }
+
+  /**
+   * Get confirmed assignments (backward compatible)
+   */
+  async getConfirmedAssignments(workDate: string): Promise<any | null> {
+    try {
+      const key = this.buildConfirmedKey(workDate);
+      const result = await this.client.downloadAsText(key);
+      
+      if (!result.ok) {
+        return null;
+      }
+
+      return JSON.parse(result.value);
+    } catch (error) {
+      console.error(`Error getting confirmed assignments for ${workDate}:`, error);
+      return null;
+    }
+  }
+
+  /**
+   * Save confirmed assignments (backward compatible)
+   */
+  async saveConfirmedAssignments(workDate: string, timelineData: any, selectedCleanersData: any): Promise<{success: boolean, key?: string, error?: string}> {
+    try {
+      const key = this.buildConfirmedKey(workDate);
+      const jsonContent = JSON.stringify(timelineData, null, 2);
+      const result = await this.client.uploadFromText(key, jsonContent);
+      
+      if (!result.ok) {
+        return { success: false, error: String(result.error || 'Unknown error') };
+      }
+
+      // Also save selected_cleaners for the same date
+      const d = new Date(workDate);
+      const day = String(d.getDate()).padStart(2, "0");
+      const month = String(d.getMonth() + 1).padStart(2, "0");
+      const fullYear = String(d.getFullYear());
+      const year = fullYear.slice(-2);
+      const folderPath = `${day}-${month}-${fullYear}`;
+      const scKey = `${folderPath}/selected_cleaners_${day}${month}${year}.json`;
+
+      const scJson = JSON.stringify(selectedCleanersData, null, 2);
+      const scResult = await this.client.uploadFromText(scKey, scJson);
+      
+      if (!scResult.ok) {
+        return { success: false, error: String(scResult.error || 'Error saving selected_cleaners') };
+      }
+
+      return { success: true, key };
+    } catch (error: any) {
+      console.error(`Error saving confirmed assignments for ${workDate}:`, error);
+      return { success: false, error: error.message };
     }
   }
 }
