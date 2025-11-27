@@ -795,8 +795,28 @@ def load_tasks() -> List[Task]:
                 straordinaria=bool(t.get("straordinaria", False)),
             ))
 
-    # Ordina: straordinarie first, poi premium
-    tasks.sort(key=lambda x: (not x.straordinaria, not x.is_premium))
+    # NUOVO: Calcola densità geografica per ogni task (quante task vicine ha)
+    def count_nearby_density(task: Task, all_tasks: List[Task]) -> int:
+        """Conta quante altre task sono entro 300m da questa"""
+        count = 0
+        for other in all_tasks:
+            if other.task_id == task.task_id:
+                continue
+            try:
+                km = haversine_km(task.lat, task.lng, other.lat, other.lng)
+                if km <= 0.30:  # 300m
+                    count += 1
+            except:
+                pass
+        return count
+
+    # Ordina: straordinarie first, poi premium, poi per DENSITÀ GEOGRAFICA
+    # Task con molte vicine vengono processate prima per formare cluster, task isolate processate dopo per aggregarsi
+    tasks.sort(key=lambda x: (
+        not x.straordinaria,
+        not x.is_premium,
+        -count_nearby_density(x, tasks),  # Negativo = più densità = prima
+    ))
     return tasks
 
 
