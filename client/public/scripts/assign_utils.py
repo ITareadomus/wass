@@ -1,4 +1,3 @@
-
 # -*- coding: utf-8 -*-
 """
 Helper comuni per assign_eo.py, assign_hp.py, assign_lp.py
@@ -37,3 +36,41 @@ def cleaner_load_minutes(cleaner) -> int:
 
 def cleaner_load_hours(cleaner) -> float:
     return cleaner_load_minutes(cleaner) / 60.0
+
+
+def get_cleaners_for_eo(all_cleaners: List[Cleaner]) -> List[Cleaner]:
+    """
+    Filtra i cleaners adatti per le task Early-Out:
+    - Devono essere formatori O premium (inclusi straordinari marcati come premium)
+    - Escludi cleaners esplicitamente 'Standard'
+    - Escludi cleaners con start_time >= 11:00
+    - Ritorna ordinati per (straordinari, premium, ore lavorate DESC)
+    """
+    suitable = []
+    for c in all_cleaners:
+        # CRITICAL: Escludi cleaners con start_time >= 11:00
+        if c.start_time and c.start_time >= "11:00":
+            continue
+
+        role = c.role.strip().lower()
+        # Formatore: sempre incluso
+        if "formatore" in role or "trainer" in role:
+            suitable.append(c)
+            continue
+        # Premium o Straordinario: includi
+        if "premium" in role or "straordinario" in role or c.can_do_straordinaria:
+            suitable.append(c)
+            continue
+        # Standard: escludi da EO
+        if "standard" in role:
+            continue
+
+    # Ordina: straordinari > premium > ore lavorate DESC
+    suitable.sort(
+        key=lambda x: (
+            not x.can_do_straordinaria,  # Straordinari per primi
+            "premium" not in x.role.lower(),
+            -x.counter_hours
+        )
+    )
+    return suitable
