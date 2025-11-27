@@ -10,7 +10,8 @@ from assign_utils import (
     NEARBY_TRAVEL_THRESHOLD, NEW_CLEANER_PENALTY_MIN, NEW_TRAINER_PENALTY_MIN,
     TARGET_MIN_LOAD_MIN, FAIRNESS_DELTA_HOURS, LOAD_WEIGHT,
     SAME_BUILDING_BONUS, ROLE_TRAINER_BONUS,
-    cleaner_load_minutes, cleaner_load_hours
+    cleaner_load_minutes, cleaner_load_hours,
+    is_nearby_cluster,
 )
 
 # =============================
@@ -145,7 +146,9 @@ def is_nearby_same_block(t1: Task, t2: Task) -> bool:
     True se:
     - stesso edificio/via (same_building)
     OPPURE
-    - stesso cliente/alias e travel_minutes <= NEARBY_TRAVEL_THRESHOLD
+    - stesso cliente/alias e:
+        * distanza geografica molto piccola (is_nearby_cluster)
+        * OPPURE travel_minutes <= NEARBY_TRAVEL_THRESHOLD
 
     Serve per clusterizzare casi tipo 618/619 (EXP) o 1537/1236 (TBR).
     """
@@ -161,6 +164,14 @@ def is_nearby_same_block(t1: Task, t2: Task) -> bool:
     )
     if not same_client:
         return False
+
+    # molto vicini in termini geografici (es. Via Voghera 4 e Via Tortona 10)
+    try:
+        if is_nearby_cluster(t1, t2):
+            return True
+    except Exception:
+        # in caso di dati incompleti, fallback al solo travel_minutes
+        pass
 
     # vicini in termini di viaggio
     if travel_minutes(t1, t2) <= NEARBY_TRAVEL_THRESHOLD:
