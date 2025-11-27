@@ -170,7 +170,13 @@ export default function GenerateAssignments() {
   const [isDragging, setIsDragging] = useState<boolean>(false);
 
   // dnd-kit sensors - DEVONO essere chiamati al livello superiore del componente
-  const sensors = useSensors(useSensor(PointerSensor));
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 5, // Richiede 5px di movimento per iniziare il drag
+      },
+    })
+  );
 
   // Stati per selezione multipla INDIPENDENTE per container (ma selezione CROSS-CONTAINER)
   const [multiSelectModes, setMultiSelectModes] = useState<{
