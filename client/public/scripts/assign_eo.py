@@ -724,10 +724,13 @@ def plan_day(
             pool = low_load_candidates
 
         # -------------------------------------------------------------
-        # 5) Scelta finale con ore + penalità attivazione
+        # 5) Scelta finale con ore + penalità attivazione + priorità start_time
         # -------------------------------------------------------------
         best_choice: Optional[Tuple[Cleaner, int, float]] = None
         best_score: Optional[float] = None
+
+        # Soglia per EO: 11:00 = 660 minuti da mezzanotte
+        EO_PREFERRED_START_TIME = 11 * 60  # 11:00
 
         for c, p, t_travel in pool:
             load_h = cleaner_load_hours(c)
@@ -746,11 +749,20 @@ def plan_day(
             else:
                 activation_penalty = 0
 
+            # NUOVO: Bonus per cleaner con start_time < 11:00 (ottimale per EO)
+            start_time_bonus = 0
+            if c.start_time < EO_PREFERRED_START_TIME:
+                # Bonus maggiore per chi inizia prima (es: chi inizia alle 9:00 ha bonus maggiore di chi inizia alle 10:30)
+                minutes_before_11 = EO_PREFERRED_START_TIME - c.start_time
+                # Converti in bonus: max 60 minuti di anticipo = -30 punti di bonus
+                start_time_bonus = -min(minutes_before_11 / 2, 30)
+
             score = (
                 t_travel
                 + effective_load_weight * load_h
                 + sb_bonus
                 + activation_penalty
+                + start_time_bonus  # Aggiungi il bonus start_time
             )
 
             if best_score is None or score < best_score:
@@ -901,7 +913,8 @@ def build_output(cleaners: List[Cleaner], unassigned: List[Task], original_tasks
                 "6. Premium task solo a premium cleaner",
                 "7. Check-in strict: deve finire prima del check-in time (INFRANGIBILE)",
                 "8. Vincolo orario: nessuna task deve finire dopo le 19:00",
-                "9. CROSS-CONTAINER: Favorisce vicinanza geografica anche tra container diversi"
+                "9. CROSS-CONTAINER: Favorisce vicinanza geografica anche tra container diversi",
+                "10. PRIORITÀ START_TIME: Cleaner con start_time < 11:00 hanno priorità per EO (bonus progressivo)"
             ]
         }
     }
