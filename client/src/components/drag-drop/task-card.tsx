@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from "react";
 import {
-  useSortable,
   DndContext,
   closestCenter,
   KeyboardSensor,
@@ -9,7 +8,7 @@ import {
   useSensors,
   DragOverlay,
 } from "@dnd-kit/core";
-import { arrayMove, SortableContext, rectSortingStrategy } from "@dnd-kit/sortable";
+import { arrayMove, SortableContext, rectSortingStrategy, useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { TaskType as Task } from "@shared/schema";
 import {
@@ -83,7 +82,7 @@ function TaskCard({
   isDuplicate = false,
   isDragDisabled = false,
   isReadOnly = false,
-  multiSelectContext = null,
+  multiSelectContext = undefined,
   isIncompatible = false,
 }: TaskCardProps) {
   console.log('🔧 TaskCard render - isReadOnly:', isReadOnly, 'for task:', task.name);
@@ -631,7 +630,6 @@ function TaskCard({
           <TooltipTrigger asChild>
             <div
               ref={setNodeRef}
-              style={style}
               {...attributes}
               {...listeners}
               className={`
