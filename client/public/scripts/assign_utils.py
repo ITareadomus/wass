@@ -2,7 +2,6 @@
 """
 Helper comuni per assign_eo.py, assign_hp.py, assign_lp.py
 """
-from typing import List
 
 # --- COSTANTI GLOBALI TUNABILI ---
 
@@ -39,7 +38,7 @@ def cleaner_load_hours(cleaner) -> float:
     return cleaner_load_minutes(cleaner) / 60.0
 
 
-def get_cleaners_for_eo(all_cleaners: List[Cleaner]) -> List[Cleaner]:
+def get_cleaners_for_eo(all_cleaners):
     """
     Filtra i cleaners adatti per le task Early-Out:
     - Devono essere formatori O premium (inclusi straordinari marcati come premium)
@@ -50,7 +49,8 @@ def get_cleaners_for_eo(all_cleaners: List[Cleaner]) -> List[Cleaner]:
     suitable = []
     for c in all_cleaners:
         # CRITICAL: Escludi cleaners con start_time >= 11:00
-        if c.start_time and c.start_time >= "11:00":
+        start_time = getattr(c, 'start_time', None)
+        if start_time and start_time >= "11:00":
             continue
 
         role = c.role.strip().lower()
@@ -71,7 +71,7 @@ def get_cleaners_for_eo(all_cleaners: List[Cleaner]) -> List[Cleaner]:
         key=lambda x: (
             not x.can_do_straordinaria,  # Straordinari per primi
             "premium" not in x.role.lower(),
-            -x.counter_hours
+            -getattr(x, 'counter_hours', 0)
         )
     )
     return suitable
