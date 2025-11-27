@@ -187,6 +187,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const currentUsername = modified_by || getCurrentUsername(req);
       const timelinePath = path.join(process.cwd(), 'client/public/data/output/timeline.json');
 
+      // PRIMA: Controlla se esistono già assegnazioni in Object Storage
+      // Se esistono, NON resettare - le caricheremo con load-saved-assignments
+      const { Client } = await import("@replit/object-storage");
+      const client = new Client();
+      const { key } = buildKey(workDate);
+      
+      const existingResult = await client.downloadAsText(key);
+      if (existingResult.ok) {
+        const existingData = JSON.parse(existingResult.value);
+        const hasAssignments = existingData.cleaners_assignments?.some(
+          (c: any) => c.tasks && c.tasks.length > 0
+        );
+        
+        if (hasAssignments) {
+          console.log(`⚠️ Trovate assegnazioni esistenti per ${workDate} - skip reset, usa load-saved-assignments`);
+          return res.json({ 
+            success: true, 
+            message: "Timeline esistente trovata - carica con load-saved-assignments",
+            hasExistingAssignments: true
+          });
+        }
+      }
+
       // Svuota il file timeline.json con struttura corretta
       const emptyTimeline = {
         metadata: {
@@ -202,9 +225,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       };
 
-      // Salva timeline (dual-write: filesystem + Object Storage)
-      await workspaceFiles.saveTimeline(workDate, emptyTimeline);
-      console.log(`Timeline resettata: timeline.json (struttura corretta)`);
+      // Salva timeline SOLO sul filesystem, NON su Object Storage
+      // Object Storage viene aggiornato solo quando ci sono assegnazioni reali
+      const fsPath = path.join(process.cwd(), 'client/public/data/output/timeline.json');
+      await fs.writeFile(fsPath, JSON.stringify(emptyTimeline, null, 2));
+      console.log(`Timeline resettata: timeline.json (solo filesystem)`);
 
       // FORZA la ricreazione di containers.json rieseguendo create_containers.py
       console.log(`Rieseguendo create_containers.py per ripristinare i containers...`);
@@ -225,9 +250,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // CRITICAL: Forza nuovamente il reset di timeline.json dopo create_containers
       // perché lo script Python potrebbe aver sovrascritto il file
+      // MA salviamo SOLO su filesystem, NON su Object Storage
       console.log(`🔄 Forzatura reset timeline.json dopo create_containers...`);
-      await workspaceFiles.saveTimeline(workDate, emptyTimeline);
-      console.log(`✅ Timeline resettata nuovamente dopo create_containers`);
+      await fs.writeFile(fsPath, JSON.stringify(emptyTimeline, null, 2));
+      console.log(`✅ Timeline resettata nuovamente dopo create_containers (solo filesystem)`);
 
       // CRITICAL: Elimina il flag di ultimo salvataggio per evitare ricaricamenti automatici
       console.log(`🗑️ Reset flag ultimo salvataggio per data ${workDate}`);
