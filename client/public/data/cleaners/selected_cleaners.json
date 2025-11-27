@@ -13,7 +13,7 @@
       "contract_type": "a chiamata",
       "preferred_customers": [],
       "telegram_id": null,
-      "start_time": "09:00",
+      "start_time": "10:00",
       "can_do_straordinaria": false
     },
     {
@@ -359,6 +359,6 @@
   "total_selected": 14,
   "metadata": {
     "date": "2025-11-28",
-    "saved_at": "2025-11-27T16:59:22.777Z"
+    "saved_at": "2025-11-27T17:06:24.252Z"
   }
 }
