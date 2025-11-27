@@ -17,7 +17,7 @@ TRAINER_TARGET_MIN_LOAD_MIN = 240  # 4 ore = target specifico per il Formatore
 FAIRNESS_DELTA_HOURS = 1.0         # tolleranza di 1h tra cleaner per essere "fair"
 LOAD_WEIGHT = 10                   # peso delle ore nel punteggio
 SAME_BUILDING_BONUS = -5           # bonus per stessa via (include stesso edificio e blocco vicino)
-NEARBY_CLUSTER_BONUS = -20         # bonus maggiore per appartamenti molto vicini geograficamente
+NEARBY_CLUSTER_BONUS = -8          # bonus moderato per appartamenti molto vicini geograficamente (ridotto da -20)
 
 ROLE_TRAINER_BONUS = -10           # bonus extra per il Formatore (prima -5)
 
