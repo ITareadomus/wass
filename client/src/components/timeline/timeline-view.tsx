@@ -1437,7 +1437,7 @@ export default function TimelineView({
       <AlertDialog open={showResetDialog} onOpenChange={setShowResetDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Conferma Reset Assegnazioni</AlertDialogTitle>
+            <AlertDialogTitle className="text-red-600 dark:text-red-500">Conferma Reset Assegnazioni</AlertDialogTitle>
             <AlertDialogDescription>
               Sei sicuro di voler resettare tutte le assegnazioni?
               <br /><br />
@@ -1450,13 +1450,15 @@ export default function TimelineView({
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Annulla</AlertDialogCancel>
+            <AlertDialogCancel className="border-gray-300 hover:bg-gray-100 dark:border-gray-600 dark:hover:bg-gray-800">
+              Annulla
+            </AlertDialogCancel>
             <AlertDialogAction
               onClick={() => {
                 setShowResetDialog(false);
                 handleResetAssignments();
               }}
-              className="bg-red-600 hover:bg-red-700"
+              className="bg-red-600 hover:bg-red-700 text-white dark:bg-red-600 dark:hover:bg-red-700"
             >
               Conferma Reset
             </AlertDialogAction>
