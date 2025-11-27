@@ -1,0 +1,77 @@
+{
+      "cleaner": {
+        "id": 249,
+        "name": "Ogbodo Chidi",
+        "lastname": "Igwe",
+        "role": "Premium",
+        "premium": true
+      },
+      "tasks": [
+        {
+          "task_id": 219355,
+          "logistic_code": 1652,
+          "client_id": 123,
+          "premium": false,
+          "address": "VIA NINO BIXIO 33",
+          "lat": "45.4725999",
+          "lng": "9.2118362",
+          "cleaning_time": 90,
+          "checkin_date": "2025-11-28",
+          "checkout_date": "2025-11-28",
+          "checkin_time": "15:00",
+          "checkout_time": null,
+          "pax_in": 4,
+          "pax_out": 4,
+          "small_equipment": false,
+          "operation_id": 2,
+          "confirmed_operation": false,
+          "straordinaria": false,
+          "type_apt": "B",
+          "alias": "YHST",
+          "customer_name": "YOUHOSTY",
+          "reasons": [
+            "same_day_checkin_between_hp_start_hp_end",
+            "automatic_assignment_hp"
+          ],
+          "priority": "high_priority",
+          "start_time": "13:08",
+          "end_time": "14:38",
+          "followup": false,
+          "sequence": 2,
+          "travel_time": 9
+        },
+        {
+          "task_id": 219358,
+          "logistic_code": 1602,
+          "client_id": 123,
+          "premium": true,
+          "address": "VIA BRERA 17",
+          "lat": "45.47152",
+          "lng": "9.186657",
+          "cleaning_time": 180,
+          "checkin_date": "2025-12-01",
+          "checkout_date": "2025-11-28",
+          "checkin_time": "15:00",
+          "checkout_time": null,
+          "pax_in": 4,
+          "pax_out": 5,
+          "small_equipment": false,
+          "operation_id": 2,
+          "confirmed_operation": false,
+          "straordinaria": false,
+          "type_apt": "E",
+          "alias": "YHST",
+          "customer_name": "YOUHOSTY",
+          "reasons": [
+            "premium",
+            "automatic_assignment_hp"
+          ],
+          "priority": "high_priority",
+          "start_time": "14:58",
+          "end_time": "17:58",
+          "followup": true,
+          "sequence": 3,
+          "travel_time": 20
+        }
+      ]
+    },
