@@ -2,7 +2,8 @@ import { Personnel, TaskType as Task } from "@shared/schema";
 import { Calendar as CalendarIcon, RotateCcw, Users, RefreshCw, UserPlus, Maximize2, Minimize2, Check, CheckCircle, Save, Pencil, ChevronLeft, ChevronRight } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import * as React from "react";
-import { Droppable, Draggable } from "react-beautiful-dnd";
+import { useDroppable } from "@dnd-kit/core";
+import { SortableContext, horizontalListSortingStrategy } from "@dnd-kit/sortable";
 import { useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -111,6 +112,44 @@ export default function TimelineView({
   const [aliasDialog, setAliasDialog] = useState<{ open: boolean; cleanerId: number | null; cleanerName: string }>({ open: false, cleanerId: null, cleanerName: '' });
   const [editingStartTime, setEditingStartTime] = useState<string>("10:00");
   const [startTimeEditDialog, setStartTimeEditDialog] = useState<{ open: boolean; cleanerId: number | null; cleanerName: string }>({ open: false, cleanerId: null, cleanerName: '' });
+
+// Component wrapper per la timeline droppable
+function TimelineDropZone({
+  cleanerId,
+  isReadOnly,
+  filteredCleanerId,
+  hasIncompatibleTasks,
+  children,
+}: {
+  cleanerId: number;
+  isReadOnly: boolean;
+  filteredCleanerId: number | null;
+  hasIncompatibleTasks: boolean;
+  children: React.ReactNode;
+}) {
+  const { setNodeRef, isOver } = useDroppable({
+    id: `timeline-${cleanerId}`,
+    disabled: isReadOnly,
+  });
+
+  return (
+    <div
+      ref={setNodeRef}
+      data-testid={`timeline-cleaner-${cleanerId}`}
+      data-cleaner-id={cleanerId}
+      className={`relative min-h-[45px] flex-1 border-l border-border ${
+        isOver && !isReadOnly ? 'bg-primary/20 ring-2 ring-primary' : 'bg-background'
+      }`}
+      style={{
+        zIndex: filteredCleanerId === cleanerId || hasIncompatibleTasks ? 15 : 'auto'
+      }}
+    >
+      {children}
+    </div>
+  );
+}
+
+
   const [isSavingStartTime, setIsSavingStartTime] = useState(false);
 
   // Stato per le regole di validazione task-cleaner
@@ -1649,20 +1688,12 @@ export default function TimelineView({
                       </div>
                     </div>
                     {/* Timeline per questo cleaner - area unica droppable */}
-                    <Droppable droppableId={`timeline-${cleaner.id}`} direction="horizontal" isDropDisabled={isReadOnly}>
-                      {(provided, snapshot) => (
-                        <div
-                          ref={provided.innerRef}
-                          {...provided.droppableProps}
-                          data-testid={`timeline-cleaner-${cleaner.id}`}
-                          data-cleaner-id={cleaner.id}
-                          className={`relative min-h-[45px] flex-1 border-l border-border ${
-                            snapshot.isDraggingOver && !isReadOnly ? 'bg-primary/20 ring-2 ring-primary' : 'bg-background'
-                          }`}
-                          style={{
-                            zIndex: filteredCleanerId === cleaner.id || hasIncompatibleTasks ? 15 : 'auto'
-                          }}
-                        >
+                    <TimelineDropZone
+                      cleanerId={cleaner.id}
+                      isReadOnly={isReadOnly}
+                      filteredCleanerId={filteredCleanerId}
+                      hasIncompatibleTasks={hasIncompatibleTasks}
+                    >
                           {/* Griglia oraria di sfondo (solo visiva) con alternanza colori */}
                           <div className="absolute inset-0 pointer-events-none" style={{ display: 'grid', gridTemplateColumns: `repeat(${globalTimeSlots.length}, 1fr)` }}>
                             {globalTimeSlots.map((slot, idx) => {
@@ -1820,11 +1851,9 @@ export default function TimelineView({
                                 );
                               });
                             })()}
-                            {provided.placeholder}
-                          </div>
+                            </div>
                         </div>
-                      )}
-                    </Droppable>
+                    </TimelineDropZone>
                   </div>
                 );
               })
