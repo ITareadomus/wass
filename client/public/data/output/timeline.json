@@ -1,6 +1,6 @@
 {
   "metadata": {
-    "last_updated": "2025-11-27T10:43:04.719Z",
+    "last_updated": "2025-11-27T10:46:52.808162",
     "date": "2025-11-28"
   },
   "cleaners_assignments": [
@@ -241,8 +241,7 @@
         "name": "MUSTAPHA",
         "lastname": "BAH",
         "role": "Premium",
-        "premium": true,
-        "start_time": "10:00"
+        "premium": true
       },
       "tasks": [
         {
@@ -305,11 +304,11 @@
             "automatic_assignment_eo"
           ],
           "priority": "early_out",
-          "start_time": "11:55",
-          "end_time": "12:55",
+          "start_time": "11:56",
+          "end_time": "12:56",
           "followup": true,
           "sequence": 2,
-          "travel_time": 25
+          "travel_time": 26
         },
         {
           "task_id": 219504,
@@ -338,11 +337,11 @@
             "automatic_assignment_eo"
           ],
           "priority": "early_out",
-          "start_time": "13:10",
-          "end_time": "13:40",
+          "start_time": "13:12",
+          "end_time": "13:42",
           "followup": true,
           "sequence": 3,
-          "travel_time": 15
+          "travel_time": 16
         },
         {
           "task_id": 219505,
@@ -371,44 +370,11 @@
             "automatic_assignment_eo"
           ],
           "priority": "early_out",
-          "start_time": "13:43",
-          "end_time": "14:13",
+          "start_time": "13:45",
+          "end_time": "14:15",
           "followup": true,
           "sequence": 4,
           "travel_time": 3
-        },
-        {
-          "task_id": 219506,
-          "logistic_code": 619,
-          "client_id": 67,
-          "premium": false,
-          "address": "VIA TORTONA, 10",
-          "lat": "45.4542397",
-          "lng": "9.1686792",
-          "cleaning_time": 40,
-          "checkin_date": "2025-11-28",
-          "checkout_date": "2025-11-28",
-          "checkin_time": null,
-          "checkout_time": "09:30",
-          "pax_in": 2,
-          "pax_out": 0,
-          "small_equipment": false,
-          "operation_id": 2,
-          "confirmed_operation": true,
-          "straordinaria": false,
-          "type_apt": "B",
-          "alias": "EXP",
-          "customer_name": "EXPERIENCE DESIGN BED & SHOW",
-          "reasons": [
-            "checkout_time_eo_window_or_before_start",
-            "automatic_assignment_eo"
-          ],
-          "priority": "early_out",
-          "start_time": "14:18",
-          "end_time": "14:58",
-          "followup": true,
-          "sequence": 5,
-          "travel_time": 5
         }
       ]
     },
@@ -495,8 +461,7 @@
         "name": "EL HADJI",
         "lastname": "BA",
         "role": "Premium",
-        "premium": true,
-        "start_time": "10:30"
+        "premium": true
       },
       "tasks": [
         {
@@ -533,6 +498,39 @@
           "travel_time": 0
         },
         {
+          "task_id": 219506,
+          "logistic_code": 619,
+          "client_id": 67,
+          "premium": false,
+          "address": "VIA TORTONA, 10",
+          "lat": "45.4542397",
+          "lng": "9.1686792",
+          "cleaning_time": 40,
+          "checkin_date": "2025-11-28",
+          "checkout_date": "2025-11-28",
+          "checkin_time": null,
+          "checkout_time": "09:30",
+          "pax_in": 2,
+          "pax_out": 0,
+          "small_equipment": false,
+          "operation_id": 2,
+          "confirmed_operation": true,
+          "straordinaria": false,
+          "type_apt": "B",
+          "alias": "EXP",
+          "customer_name": "EXPERIENCE DESIGN BED & SHOW",
+          "reasons": [
+            "checkout_time_eo_window_or_before_start",
+            "automatic_assignment_eo"
+          ],
+          "priority": "early_out",
+          "start_time": "11:13",
+          "end_time": "11:53",
+          "followup": true,
+          "sequence": 2,
+          "travel_time": 3
+        },
+        {
           "task_id": 219478,
           "logistic_code": 1645,
           "client_id": 87,
@@ -559,11 +557,11 @@
             "automatic_assignment_eo"
           ],
           "priority": "early_out",
-          "start_time": "11:28",
-          "end_time": "12:28",
+          "start_time": "12:12",
+          "end_time": "13:12",
           "followup": true,
-          "sequence": 2,
-          "travel_time": 18
+          "sequence": 3,
+          "travel_time": 19
         },
         {
           "task_id": 219362,
@@ -592,11 +590,11 @@
             "automatic_assignment_eo"
           ],
           "priority": "early_out",
-          "start_time": "12:58",
-          "end_time": "13:58",
+          "start_time": "13:43",
+          "end_time": "14:43",
           "followup": true,
-          "sequence": 3,
-          "travel_time": 30
+          "sequence": 4,
+          "travel_time": 31
         }
       ]
     },
