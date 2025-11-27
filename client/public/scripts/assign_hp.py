@@ -671,6 +671,30 @@ def load_tasks() -> Tuple[List[Task], str]:
                 is_hp_soft=is_hp_soft,
             ))
 
+    # NUOVO: Calcola densità geografica per ogni task (quante task vicine ha)
+    def count_nearby_density(task: Task, all_tasks: List[Task]) -> int:
+        """Conta quante altre task sono entro 300m da questa"""
+        count = 0
+        for other in all_tasks:
+            if other.task_id == task.task_id:
+                continue
+            try:
+                km = haversine_km(task.lat, task.lng, other.lat, other.lng)
+                if km <= 0.30:  # 300m
+                    count += 1
+            except:
+                pass
+        return count
+
+    # Ordina: straordinarie first, poi premium, poi per DENSITÀ GEOGRAFICA, poi checkout
+    # Task con molte vicine vengono processate prima per formare cluster
+    tasks.sort(key=lambda x: (
+        not x.straordinaria,
+        not x.is_premium,
+        -count_nearby_density(x, tasks),  # Negativo = più densità = prima
+        x.checkout_dt or datetime.max  # Task senza checkout vanno dopo
+    ))
+
     # Determina ref_date dal primo task
     ref_date = None
     for t in tasks: # Iterate over the loaded tasks
