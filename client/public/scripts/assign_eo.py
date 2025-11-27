@@ -752,6 +752,11 @@ def plan_day(
             ):
                 sb_bonus = SAME_BUILDING_BONUS
 
+            # NUOVO: Bonus per clustering geografico (es: Via Tortona + Via Voghera)
+            from assign_utils import is_nearby_cluster, count_nearby_tasks, NEARBY_CLUSTER_BONUS
+            nearby_count = count_nearby_tasks(c, task)
+            nearby_bonus = nearby_count * NEARBY_CLUSTER_BONUS  # -8 per ogni task vicina
+
             # penalità di attivazione per cleaner vuoti
             if len(c.route) == 0:
                 activation_penalty = NEW_CLEANER_PENALTY_MIN
@@ -770,8 +775,9 @@ def plan_day(
                 t_travel
                 + effective_load_weight * load_h
                 + sb_bonus
+                + nearby_bonus  # Aggiungi il bonus clustering geografico
                 + activation_penalty
-                + start_time_bonus  # Aggiungi il bonus start_time
+                + start_time_bonus
             )
 
             if best_score is None or score < best_score:
