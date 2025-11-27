@@ -1,6 +1,6 @@
 {
   "metadata": {
-    "last_updated": "2025-11-26T10:54:38.429Z",
+    "last_updated": "2025-11-27T09:29:51.563491",
     "description": "Alias personalizzati per i cleaners da visualizzare sulla timeline"
   },
   "aliases": {
@@ -18,11 +18,6 @@
       "name": "Ogbodo Chidi",
       "lastname": "Igwe",
       "alias": "CHIDI"
-    },
-    "287": {
-      "name": "BAH",
-      "lastname": "ISMAILA",
-      "alias": "ISMAILA"
     },
     "326": {
       "name": "FESTUS OSARO",
@@ -58,11 +53,6 @@
       "name": "DORA PATRICIA",
       "lastname": "JIMENEZ",
       "alias": "PATRICIA"
-    },
-    "644": {
-      "name": "HENRY",
-      "lastname": "CHIDUBEM",
-      "alias": "HENRY"
     },
     "722": {
       "name": "KONE LASSINE",
@@ -119,40 +109,15 @@
       "lastname": "EDIAGBANYA",
       "alias": "JOY"
     },
-    "1053": {
-      "name": "JACQUELINE ESTEFANI",
-      "lastname": "BONILLA GALVEZ",
-      "alias": ""
-    },
-    "1054": {
-      "name": "TOUDO",
-      "lastname": "BARADJI",
-      "alias": ""
-    },
-    "1055": {
-      "name": "BEAUTY",
-      "lastname": "OMOREGIE",
-      "alias": "BEAUTY"
-    },
     "1058": {
       "name": "MONDAY",
       "lastname": "SIMEON",
       "alias": "MONDAY"
     },
-    "1059": {
-      "name": "MUHAMMED LAMIN",
-      "lastname": "CEESAY",
-      "alias": ""
-    },
     "1060": {
       "name": "NELLY GABRIELLE",
       "lastname": "TENKAM",
       "alias": "GABRIELLE"
-    },
-    "1061": {
-      "name": "GODSTIME",
-      "lastname": "EDIAE",
-      "alias": ""
     },
     "1062": {
       "name": "BRIAN ALEXIS",
@@ -169,20 +134,25 @@
       "lastname": "VIGO OSORIO",
       "alias": ""
     },
-    "1065": {
-      "name": "ANDREW",
-      "lastname": "OGUNKANMI",
-      "alias": "ANDREW"
-    },
     "1066": {
       "name": "MICHEL",
       "lastname": "QUEZADA GONZALEZ",
       "alias": "MICHEL"
     },
+    "1069": {
+      "name": "CYRIL HARTUR",
+      "lastname": "ZONGMO KENTSA",
+      "alias": "HARTUR"
+    },
     "1070": {
       "name": "ABUBACAR",
       "lastname": "DIAMMEH",
       "alias": "ABUBACAR"
+    },
+    "1072": {
+      "name": "SADIO",
+      "lastname": "BERETE",
+      "alias": ""
     }
   }
 }
