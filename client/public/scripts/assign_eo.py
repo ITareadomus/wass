@@ -1022,18 +1022,47 @@ def main():
             print(f"⚠️ Errore nel caricamento della timeline esistente: {e}")
 
     # Aggiungi le nuove assegnazioni EO organizzate per cleaner
-    # CRITICAL: Rimuovi PRIMA eventuali entry duplicate/vuote dello stesso cleaner
     for cleaner_entry in output["early_out_tasks_assigned"]:
-        # Rimuovi entry precedenti dello stesso cleaner (anche quelle vuote)
-        timeline_data["cleaners_assignments"] = [
-            c for c in timeline_data["cleaners_assignments"]
-            if c["cleaner"]["id"] != cleaner_entry["cleaner"]["id"]
-        ]
-        # Aggiungi la nuova entry
-        timeline_data["cleaners_assignments"].append({
-            "cleaner": cleaner_entry["cleaner"],
-            "tasks": cleaner_entry["tasks"]
-        })
+        # Cerca se esiste già un'entry per questo cleaner
+        existing_entry = None
+        for entry in timeline_data["cleaners_assignments"]:
+            if entry["cleaner"]["id"] == cleaner_entry["cleaner"]["id"]:
+                existing_entry = entry
+                break
+
+        if existing_entry:
+            # CRITICAL: NON rimuovere nulla, AGGIUNGI le nuove task EO
+            existing_tasks = existing_entry["tasks"]
+            
+            # Separa task esistenti per tipo (usa i reasons)
+            eo_tasks_old = [t for t in existing_tasks if "automatic_assignment_eo" in t.get("reasons", [])]
+            hp_tasks = [t for t in existing_tasks if "automatic_assignment_hp" in t.get("reasons", [])]
+            lp_tasks = [t for t in existing_tasks if "automatic_assignment_lp" in t.get("reasons", [])]
+            manual_tasks = [t for t in existing_tasks if not any(
+                r in t.get("reasons", []) for r in ["automatic_assignment_eo", "automatic_assignment_hp", "automatic_assignment_lp"]
+            )]
+            
+            # Crea set di task_id delle nuove task EO per evitare duplicati
+            new_eo_task_ids = set(t.get("task_id") for t in cleaner_entry["tasks"])
+            
+            # Filtra EO vecchie: rimuovi SOLO quelle che sono duplicate (stesso task_id) con le nuove
+            eo_tasks_to_keep = [t for t in eo_tasks_old if t.get("task_id") not in new_eo_task_ids]
+            
+            # Ricostruisci: EO_vecchie_non_duplicate + EO_nuove + HP + LP + manuali
+            existing_entry["tasks"] = eo_tasks_to_keep + cleaner_entry["tasks"] + hp_tasks + lp_tasks + manual_tasks
+            
+            # Ordina per start_time e ricalcola sequence
+            existing_entry["tasks"].sort(key=lambda t: t.get("start_time", "00:00"))
+            
+            # CRITICAL: Ricalcola sequence progressiva dopo il merge
+            for idx, task in enumerate(existing_entry["tasks"], start=1):
+                task["sequence"] = idx
+        else:
+            # Crea nuova entry
+            timeline_data["cleaners_assignments"].append({
+                "cleaner": cleaner_entry["cleaner"],
+                "tasks": cleaner_entry["tasks"]
+            })
 
     # Aggiorna meta
     # Conta i cleaner totali disponibili
