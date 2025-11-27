@@ -2,20 +2,163 @@
   "selected_cleaners": [],
   "timeline": {
     "metadata": {
-      "date": "2025-11-28",
-      "last_updated": "2025-11-27T16:24:47.953Z",
-      "created_by": "system"
+      "last_updated": "2025-11-27T16:30:15.756Z",
+      "date": "2025-11-28"
     },
-    "cleaners_assignments": [],
+    "cleaners_assignments": [
+      {
+        "cleaner": {
+          "id": 1063,
+          "name": "ALEXANDER DENNYS",
+          "lastname": "CARDENAS OLAYA",
+          "role": "Standard",
+          "premium": false
+        },
+        "tasks": [
+          {
+            "task_id": 219356,
+            "logistic_code": 930,
+            "client_id": 61,
+            "premium": false,
+            "address": "VIA LARIO, 17",
+            "lat": "45.4928447",
+            "lng": "9.1902343",
+            "cleaning_time": 60,
+            "checkin_date": "2025-11-28",
+            "checkout_date": "2025-11-28",
+            "checkin_time": "18:00",
+            "checkout_time": null,
+            "pax_in": 2,
+            "pax_out": 1,
+            "small_equipment": true,
+            "operation_id": 2,
+            "confirmed_operation": false,
+            "straordinaria": false,
+            "type_apt": "A",
+            "alias": "NTM",
+            "customer_name": "NOTA-MI",
+            "reasons": [
+              "client_forced_eo",
+              "automatic_assignment_eo"
+            ],
+            "priority": "early_out",
+            "start_time": "10:00",
+            "end_time": "11:00",
+            "followup": false,
+            "sequence": 1,
+            "travel_time": 0
+          },
+          {
+            "task_id": 219352,
+            "logistic_code": 1382,
+            "client_id": 61,
+            "premium": false,
+            "address": "VIA PONTE SEVESO 40",
+            "lat": "45.4901211",
+            "lng": "9.2057682",
+            "cleaning_time": 90,
+            "checkin_date": "2025-11-28",
+            "checkout_date": "2025-11-28",
+            "checkin_time": "15:00",
+            "checkout_time": null,
+            "pax_in": 4,
+            "pax_out": 4,
+            "small_equipment": false,
+            "operation_id": 2,
+            "confirmed_operation": false,
+            "straordinaria": false,
+            "type_apt": "B",
+            "alias": "NTM",
+            "customer_name": "NOTA-MI",
+            "reasons": [
+              "client_forced_eo",
+              "automatic_assignment_eo"
+            ],
+            "priority": "early_out",
+            "start_time": "11:24",
+            "end_time": "12:54",
+            "followup": true,
+            "sequence": 2,
+            "travel_time": 24
+          },
+          {
+            "task_id": 219351,
+            "logistic_code": 624,
+            "client_id": 61,
+            "premium": false,
+            "address": "VIALE MONTENERO 50",
+            "lat": "45.4583211",
+            "lng": "9.206311",
+            "cleaning_time": 60,
+            "checkin_date": "2025-11-29",
+            "checkout_date": "2025-11-28",
+            "checkin_time": "15:00",
+            "checkout_time": null,
+            "pax_in": 2,
+            "pax_out": 1,
+            "small_equipment": true,
+            "operation_id": 2,
+            "confirmed_operation": false,
+            "straordinaria": false,
+            "type_apt": "A",
+            "alias": "NTM",
+            "customer_name": "NOTA-MI",
+            "reasons": [
+              "client_forced_eo",
+              "automatic_assignment_eo"
+            ],
+            "priority": "early_out",
+            "start_time": "13:26",
+            "end_time": "14:26",
+            "followup": true,
+            "sequence": 3,
+            "travel_time": 32
+          },
+          {
+            "task_id": 219363,
+            "logistic_code": 1091,
+            "client_id": 61,
+            "premium": false,
+            "address": "VIA GONIN, 5",
+            "lat": "45.4438637",
+            "lng": "9.1281044",
+            "cleaning_time": 90,
+            "checkin_date": "2025-12-05",
+            "checkout_date": "2025-11-28",
+            "checkin_time": null,
+            "checkout_time": null,
+            "pax_in": 4,
+            "pax_out": 2,
+            "small_equipment": false,
+            "operation_id": 2,
+            "confirmed_operation": false,
+            "straordinaria": false,
+            "type_apt": "B",
+            "alias": "NTM",
+            "customer_name": "NOTA-MI",
+            "reasons": [
+              "client_forced_eo",
+              "automatic_assignment_eo"
+            ],
+            "priority": "early_out",
+            "start_time": "15:16",
+            "end_time": "16:46",
+            "followup": true,
+            "sequence": 4,
+            "travel_time": 50
+          }
+        ]
+      }
+    ],
     "meta": {
-      "total_cleaners": 0,
-      "used_cleaners": 0,
-      "assigned_tasks": 0
+      "total_cleaners": 1,
+      "used_cleaners": 1,
+      "assigned_tasks": 4
     }
   },
   "metadata": {
     "date": "2025-11-28",
-    "last_updated": "2025-11-27T16:25:13.874Z",
+    "last_updated": "2025-11-27T16:30:54.810Z",
     "created_by": "loaded_from_storage"
   }
 }
