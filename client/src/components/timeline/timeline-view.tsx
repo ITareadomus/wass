@@ -1851,8 +1851,7 @@ function TimelineDropZone({
                                 );
                               });
                             })()}
-                            </div>
-                        </div>
+                          </div>
                     </TimelineDropZone>
                   </div>
                 );
