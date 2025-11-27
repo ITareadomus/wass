@@ -910,18 +910,18 @@ def plan_day(
 
         # SUPER-CLUSTER geografico (distanza in METRI)
         from assign_utils import haversine_meters
-        
+
         super_cluster_candidates: List[Tuple[Cleaner, int, float, float]] = []
         for c, p, t_travel in candidates:
             if c.route:
                 min_distance_meters = min(
-                    (haversine_meters(ex.lat, ex.lng, task.lat, task.lng) 
+                    (haversine_meters(ex.lat, ex.lng, task.lat, task.lng)
                      for ex in c.route),
                     default=float('inf')
                 )
                 if min_distance_meters <= 250:  # 250m = super-cluster
                     super_cluster_candidates.append((c, p, t_travel, min_distance_meters))
-        
+
         # HARD CLUSTER edificio/via/blocco
         building_candidates: List[Tuple[Cleaner, int, float]] = []
         for c, p, t_travel in candidates:
@@ -1306,15 +1306,11 @@ def main():
     if timeline_path.exists():
         try:
             existing = json.loads(timeline_path.read_text(encoding="utf-8"))
-            # Mantieni le assegnazioni esistenti non-LP (rimuovi quelle con task LP)
+            # CRITICAL FIX: Mantieni TUTTI i cleaner così come sono;
+            # il filtraggio delle vecchie LP lo facciamo dentro il blocco existing_entry più sotto.
+            # NON eliminare i cleaner, altrimenti perdi EO/HP/manuali!
             if "cleaners_assignments" in existing:
-                # Crea un set di cleaner_id che avranno nuove assegnazioni LP
-                new_lp_cleaner_ids = set(c["cleaner"]["id"] for c in output["low_priority_tasks_assigned"])
-                timeline_data["cleaners_assignments"] = [
-                    c for c in existing.get("cleaners_assignments", [])
-                    if c["cleaner"]["id"] not in new_lp_cleaner_ids or
-                       not any(t.get("reasons") and "automatic_assignment_lp" in t.get("reasons", []) for t in c.get("tasks", []))
-                ]
+                timeline_data["cleaners_assignments"] = existing.get("cleaners_assignments", [])
         except Exception as e:
             print(f"Errore nel caricare la timeline esistente: {e}")
             pass
@@ -1332,7 +1328,7 @@ def main():
         if existing_entry:
             # CRITICAL: NON rimuovere nulla, AGGIUNGI le nuove task LP
             existing_tasks = existing_entry["tasks"]
-            
+
             # Separa task esistenti per tipo (usa i reasons)
             eo_tasks = [t for t in existing_tasks if "automatic_assignment_eo" in t.get("reasons", [])]
             hp_tasks = [t for t in existing_tasks if "automatic_assignment_hp" in t.get("reasons", [])]
@@ -1340,19 +1336,19 @@ def main():
             manual_tasks = [t for t in existing_tasks if not any(
                 r in t.get("reasons", []) for r in ["automatic_assignment_eo", "automatic_assignment_hp", "automatic_assignment_lp"]
             )]
-            
+
             # Crea set di task_id delle nuove task LP per evitare duplicati
             new_lp_task_ids = set(t.get("task_id") for t in cleaner_entry["tasks"])
-            
+
             # Filtra LP vecchie: rimuovi SOLO quelle che sono duplicate (stesso task_id) con le nuove
             lp_tasks_to_keep = [t for t in lp_tasks_old if t.get("task_id") not in new_lp_task_ids]
-            
+
             # Ricostruisci: EO + HP + LP_vecchie_non_duplicate + LP_nuove + manuali
             existing_entry["tasks"] = eo_tasks + hp_tasks + lp_tasks_to_keep + cleaner_entry["tasks"] + manual_tasks
-            
+
             # Ordina per start_time e ricalcola sequence
             existing_entry["tasks"].sort(key=lambda t: t.get("start_time", "00:00"))
-            
+
             # CRITICAL: Ricalcola sequence progressiva dopo il merge
             for idx, task in enumerate(existing_entry["tasks"], start=1):
                 task["sequence"] = idx

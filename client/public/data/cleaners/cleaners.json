@@ -1,6 +1,6 @@
 {
     "metadata": {
-        "last_updated": "2025-11-27T13:27:25.765672",
+        "last_updated": "2025-11-27T13:54:56.372259",
         "db_config": {
             "host": "139.59.132.41",
             "user": "admin",
@@ -11,7 +11,7 @@
     },
     "dates": {
         "2025-11-27": {
-            "timestamp": "2025-11-27T13:27:25.765681",
+            "timestamp": "2025-11-27T13:54:56.372273",
             "cleaners": [
                 {
                     "id": 24,
@@ -644,7 +644,7 @@
                     "role": "Standard",
                     "active": true,
                     "ranking": 0,
-                    "counter_hours": 19.5,
+                    "counter_hours": 26.0,
                     "counter_days": 3,
                     "available": true,
                     "contract_type": "a chiamata",
