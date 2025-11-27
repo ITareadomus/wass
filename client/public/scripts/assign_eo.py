@@ -702,7 +702,18 @@ def plan_day(
             ):
                 building_candidates.append((c, p, t_travel))
 
-        if building_candidates:
+        # SUPER-CLUSTER: coordinate identiche o quasi (es: 619 e 723 stesso indirizzo)
+        # Priorità MASSIMA: se un cleaner ha già una task con coordinate vicinissime (entro 250m)
+        super_cluster_candidates: List[Tuple[Cleaner, int, float]] = []
+        for c, p, t_travel in candidates:
+            if c.route and any(is_nearby_cluster(ex, task) for ex in c.route):
+                super_cluster_candidates.append((c, p, t_travel))
+
+        # Priorità: super-cluster > building > fairness
+        if super_cluster_candidates:
+            pool = super_cluster_candidates
+            effective_load_weight = max(LOAD_WEIGHT - 5, 1)  # super-cluster: carico pesa ancora meno
+        elif building_candidates:
             pool = building_candidates
             effective_load_weight = max(LOAD_WEIGHT - 3, 1)  # cluster: carico pesa un po' meno
         else:
