@@ -297,10 +297,10 @@ def evaluate_route(cleaner: Cleaner, route: List[Task]) -> Tuple[bool, List[Tupl
     # - STRAORDINARIE: 3 casistiche
     #   1. Orari non migrati (checkout_dt=None): inizia allo start_time del cleaner
     #   2. Checkout migrato PRIMA dello start_time: inizia allo start_time del cleaner
-    #   3. Checkout migrato DOPO lo start_time: inizia al checkout
-    # 
+    #   3. Checkout migrato DOPO dello start_time: inizia al checkout
+    #
     # - HP NORMALE: applica vincolo HP hard earliest (11:00) se necessario
-    
+
     if first.straordinaria:
         # STRAORDINARIE: logica basata su checkout_dt
         if first.checkout_dt:
@@ -313,7 +313,7 @@ def evaluate_route(cleaner: Cleaner, route: List[Task]) -> Tuple[bool, List[Tupl
     else:
         # HP NORMALE: applica logica con HP hard earliest
         hp_hard_earliest = datetime(arrival.year, arrival.month, arrival.day, HP_HARD_EARLIEST_H, HP_HARD_EARLIEST_M)
-        
+
         if first.checkout_dt:
             # Rispetta il checkout, ma può iniziare prima delle 11:00 se libero
             arrival = max(arrival, first.checkout_dt)
@@ -325,6 +325,9 @@ def evaluate_route(cleaner: Cleaner, route: List[Task]) -> Tuple[bool, List[Tupl
             else:
                 # Cleaner non libero prima delle 11:00: applica vincolo
                 arrival = max(arrival, hp_hard_earliest)
+
+            # IMPORTANTE: Imposta start per HP normale
+            start = arrival
 
     finish = start + timedelta(minutes=first.cleaning_time)
 
@@ -704,20 +707,20 @@ def plan_day(
                 c for c in cleaners
                 if c.can_do_straordinaria and can_cleaner_handle_apartment(c.role, task.apt_type)
             ]
-            
+
             if not straordinaria_cleaners:
                 unassigned.append(task)
                 continue
-            
+
             # Trova cleaner con start_time minore (datetime)
             earliest_cleaner = min(straordinaria_cleaners, key=lambda c: c.start_time)
-            
+
             # Verifica se può prendere la task (pos 0)
             result = find_best_position(earliest_cleaner, task)
             if result is None:
                 unassigned.append(task)
                 continue
-            
+
             pos, _ = result
             earliest_cleaner.route.insert(pos, task)
             assigned_logistic_codes.add(task.logistic_code)
