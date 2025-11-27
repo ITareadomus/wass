@@ -56,10 +56,27 @@ def haversine_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
     return R * c
 
 
+def haversine_meters(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
+    """
+    Calcola la distanza in METRI tra due coordinate usando la formula di Haversine.
+    Più preciso di haversine_km per distanze brevi (< 1 km).
+    """
+    import math
+    R = 6371000.0  # Raggio della Terra in METRI
+    phi1, phi2 = math.radians(lat1), math.radians(lat2)
+    dphi = math.radians(lat2 - lat1)
+    dl = math.radians(lon2 - lon1)
+    a = math.sin(dphi / 2)**2 + math.cos(phi1) * math.cos(phi2) * math.sin(dl / 2)**2
+    c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+    return R * c
+
+
 def is_nearby_cluster(task1, task2) -> bool:
     """
     Verifica se due task sono "molto vicine" geograficamente.
     Ritorna True se la distanza è <= NEARBY_DISTANCE_KM (es: Via Tortona e Via Voghera).
+
+    Usa calcolo in METRI per massima precisione su distanze brevi.
 
     Args:
         task1, task2: Task object con attributi lat, lng
@@ -78,8 +95,11 @@ def is_nearby_cluster(task1, task2) -> bool:
         lat2 = float(task2.lat)
         lng2 = float(task2.lng)
 
-        distance_km = haversine_km(lat1, lng1, lat2, lng2)
-        return distance_km <= NEARBY_DISTANCE_KM
+        # Usa calcolo in METRI per massima precisione
+        distance_meters = haversine_meters(lat1, lng1, lat2, lng2)
+        threshold_meters = NEARBY_DISTANCE_KM * 1000  # Converti km in metri
+        
+        return distance_meters <= threshold_meters
     except (ValueError, TypeError, AttributeError):
         return False
 

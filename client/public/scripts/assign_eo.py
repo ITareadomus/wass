@@ -704,14 +704,27 @@ def plan_day(
 
         # SUPER-CLUSTER: coordinate identiche o quasi (es: 619 e 723 stesso indirizzo)
         # Priorità MASSIMA: se un cleaner ha già una task con coordinate vicinissime (entro 250m)
-        super_cluster_candidates: List[Tuple[Cleaner, int, float]] = []
+        # Usa METRI per massima precisione
+        from assign_utils import haversine_meters
+        
+        super_cluster_candidates: List[Tuple[Cleaner, int, float, float]] = []  # Aggiungi distanza
         for c, p, t_travel in candidates:
-            if c.route and any(is_nearby_cluster(ex, task) for ex in c.route):
-                super_cluster_candidates.append((c, p, t_travel))
-
-        # Priorità: super-cluster > building > fairness
+            if c.route:
+                # Trova la distanza minima in METRI tra la nuova task e le task esistenti
+                min_distance_meters = min(
+                    (haversine_meters(ex.lat, ex.lng, task.lat, task.lng) 
+                     for ex in c.route),
+                    default=float('inf')
+                )
+                
+                # Super-cluster: entro 250m
+                if min_distance_meters <= 250:
+                    super_cluster_candidates.append((c, p, t_travel, min_distance_meters))
+        
+        # Ordina i super-cluster per distanza (il più vicino vince)
         if super_cluster_candidates:
-            pool = super_cluster_candidates
+            super_cluster_candidates.sort(key=lambda x: x[3])  # Ordina per distanza in metri
+            pool = [(c, p, t_travel) for c, p, t_travel, _ in super_cluster_candidates]
             effective_load_weight = max(LOAD_WEIGHT - 5, 1)  # super-cluster: carico pesa ancora meno
         elif building_candidates:
             pool = building_candidates
