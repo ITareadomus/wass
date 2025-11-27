@@ -1340,17 +1340,41 @@ export default function GenerateAssignments() {
     return null;
   };
 
-  const onDragEnd = async (result: DragEndEvent) => {
-    const { destination, source, draggableId } = result;
+  const onDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event;
 
     // niente destinazione => niente da fare
-    if (!destination) return;
+    if (!over) return;
 
-    // se posizione identica, esci
-    if (
-      destination.droppableId === source.droppableId &&
-      destination.index === source.index
-    ) {
+    // Estrai ID della task trascinata e della destinazione
+    const taskId = String(active.id);
+    const destinationId = String(over.id);
+
+    // Trova la task per ottenere info sull'origine
+    const task = allTasksWithAssignments.find(t => String(t.id) === String(taskId));
+    const logisticCode = task?.name; // name contiene il logistic_code
+
+    // Determina l'origine in base allo stato della task
+    const taskAny = task as any;
+    const currentCleanerId = taskAny?.assignedCleaner;
+    const currentPriority = task?.priority;
+
+    // Costruisci sourceId simile a droppableId per compatibilità
+    let sourceId: string;
+    if (currentCleanerId) {
+      sourceId = `timeline-${currentCleanerId}`;
+    } else if (currentPriority === 'early-out') {
+      sourceId = 'early-out';
+    } else if (currentPriority === 'high') {
+      sourceId = 'high';
+    } else if (currentPriority === 'low') {
+      sourceId = 'low';
+    } else {
+      sourceId = 'unknown';
+    }
+
+    // Se stessa posizione, esci (task droppata su sé stessa o stessa area)
+    if (destinationId === sourceId || destinationId === taskId) {
       return;
     }
 
@@ -1360,16 +1384,10 @@ export default function GenerateAssignments() {
       toast({
         title: "Operazione in corso",
         description: "Attendi il completamento del movimento precedente",
-        variant: "warning",
         duration: 2000,
       });
       return;
     }
-
-    // draggableId è sempre l'id univoco della task
-    const taskId = draggableId;
-    const task = allTasksWithAssignments.find(t => String(t.id) === String(taskId));
-    const logisticCode = task?.name; // name contiene il logistic_code
 
     // Se la timeline è read-only, non permettere modifiche
     if (isTimelineReadOnly) {
@@ -1377,9 +1395,7 @@ export default function GenerateAssignments() {
       toast({
         title: "Operazione non permessa",
         description: "La timeline è in sola visualizzazione per questa data.",
-        variant: "warning",
       });
-      // Opzionale: annulla visivamente il drag (anche se react-beautiful-dnd potrebbe gestirlo)
       return;
     }
 
@@ -1388,12 +1404,12 @@ export default function GenerateAssignments() {
 
     try {
       // 🔹 Ramo TIMELINE (drag tra cleaners o riordino nello stesso cleaner)
-      const fromCleanerId = parseCleanerId(source.droppableId);
-      const toCleanerId = parseCleanerId(destination.droppableId);
+      const fromCleanerId = parseCleanerId(sourceId);
+      const toCleanerId = parseCleanerId(destinationId);
 
       // ✅ NUOVO CASO: da container (early/high/low) → timeline di un cleaner
-      const fromContainer = parseContainerKey(source.droppableId);
-      const toContainer = parseContainerKey(destination.droppableId);
+      const fromContainer = parseContainerKey(sourceId);
+      const toContainer = parseContainerKey(destinationId);
 
       // 🔸 BATCH MOVE: Se multi-select è attivo, ci sono task selezionate, E la task trascinata è tra quelle selezionate
       const isDraggedTaskSelected = selectedTasks.some(st => st.taskId === taskId);
@@ -1414,8 +1430,8 @@ export default function GenerateAssignments() {
           // Ordina le task selezionate per ordine di selezione
           const sortedTasks = [...selectedTasks].sort((a, b) => a.order - b.order);
 
-          // Sposta ciascuna task in sequenza alla destinazione
-          let currentIndex = destination.index;
+          // Sposta ciascuna task in sequenza alla destinazione (aggiungi in fondo)
+          let currentIndex = -1; // -1 = aggiungi alla fine
           for (const selectedTask of sortedTasks) {
             const task = allTasksWithAssignments.find(t => String(t.id) === selectedTask.taskId);
             if (task) {
@@ -1471,7 +1487,7 @@ export default function GenerateAssignments() {
           const cleanerName = cleaner ? `${cleaner.name} ${cleaner.lastname}` : `ID ${toCleanerId}`;
 
           // Salva in timeline.json (rimuove automaticamente da containers.json)
-          await saveTaskAssignment(taskId, toCleanerId, logisticCode, destination.index);
+          await saveTaskAssignment(taskId, toCleanerId, logisticCode, -1); // -1 = aggiungi alla fine
 
           // CRITICAL: Marca modifiche dopo drag-and-drop da container
           // Salvataggio automatico attivo
@@ -1504,7 +1520,7 @@ export default function GenerateAssignments() {
       }
 
       if (fromCleanerId !== null && toCleanerId !== null) {
-        console.log(`🔄 Spostamento tra cleaners: task ${logisticCode} da cleaner ${fromCleanerId} (idx ${source.index}) a cleaner ${toCleanerId} (idx ${destination.index})`);
+        console.log(`🔄 Spostamento tra cleaners: task ${logisticCode} da cleaner ${fromCleanerId} a cleaner ${toCleanerId}`);
 
         try {
           // Carica i dati dei cleaner per mostrare nome e cognome
@@ -1524,9 +1540,9 @@ export default function GenerateAssignments() {
             logisticCode,
             fromCleanerId,
             toCleanerId,
-            sourceIndex: source.index,
-            destIndex: destination.index,
-            insertAt: destination.index
+            sourceIndex: 0, // dnd-kit non fornisce indici nativi
+            destIndex: -1, // -1 = aggiungi alla fine
+            insertAt: -1
           };
 
           console.log('Payload inviato:', payload);
@@ -1605,8 +1621,8 @@ export default function GenerateAssignments() {
         'low': 'low_priority'
       };
 
-      const fromContainerJson = containerToJsonName[source.droppableId] || null;
-      const toContainerJson = containerToJsonName[destination.droppableId] || null;
+      const fromContainerJson = containerToJsonName[sourceId] || null;
+      const toContainerJson = containerToJsonName[destinationId] || null;
 
       // Caso: spostamento tra containers di priorità
       if (fromContainerJson && toContainerJson) {
@@ -1614,11 +1630,11 @@ export default function GenerateAssignments() {
 
         try {
           const payload = {
-            taskId: draggableId,
+            taskId: taskId,
             fromContainer: fromContainerJson,
             toContainer: toContainerJson,
-            sourceIndex: source.index,
-            destIndex: destination.index,
+            sourceIndex: 0, // dnd-kit non fornisce indici nativi
+            destIndex: -1, // -1 = aggiungi alla fine
           };
 
           const resp = await fetch('/api/update-task-json', {
@@ -1682,7 +1698,7 @@ export default function GenerateAssignments() {
           const cleanerName = cleaner ? `${cleaner.name} ${cleaner.lastname}` : `ID ${toCleanerId}`;
 
           // Salva in timeline.json (rimuove automaticamente da containers.json)
-          await saveTaskAssignment(taskId, toCleanerId, logisticCode, destination.index);
+          await saveTaskAssignment(taskId, toCleanerId, logisticCode, -1); // -1 = aggiungi alla fine
           await refreshAssignments("manual");
 
           // CRITICAL: Marca modifiche dopo assegnazione
