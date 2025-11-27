@@ -1294,7 +1294,12 @@ def main():
                 break
 
         if existing_entry:
-            # Aggiungi le task LP alle task esistenti
+            # CRITICAL: Rimuovi eventuali task LP vecchie prima di aggiungere le nuove
+            existing_entry["tasks"] = [
+                t for t in existing_entry["tasks"]
+                if not (t.get("reasons") and "automatic_assignment_lp" in t.get("reasons", []))
+            ]
+            # Aggiungi le nuove task LP
             existing_entry["tasks"].extend(cleaner_entry["tasks"])
             # Ordina le task per orario di inizio (start_time)
             existing_entry["tasks"].sort(key=lambda t: t.get("start_time", "00:00"))
