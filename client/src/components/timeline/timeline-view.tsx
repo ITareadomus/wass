@@ -65,6 +65,42 @@ interface Cleaner {
   can_do_straordinaria?: boolean;
 }
 
+// Component wrapper per la timeline droppable - DEVE essere fuori da TimelineView
+function TimelineDropZone({
+  cleanerId,
+  isReadOnly,
+  filteredCleanerId,
+  hasIncompatibleTasks,
+  children,
+}: {
+  cleanerId: number;
+  isReadOnly: boolean;
+  filteredCleanerId: number | null;
+  hasIncompatibleTasks: boolean;
+  children: React.ReactNode;
+}) {
+  const { setNodeRef, isOver } = useDroppable({
+    id: `timeline-${cleanerId}`,
+    disabled: isReadOnly,
+  });
+
+  return (
+    <div
+      ref={setNodeRef}
+      data-testid={`timeline-cleaner-${cleanerId}`}
+      data-cleaner-id={cleanerId}
+      className={`relative min-h-[45px] flex-1 border-l border-border ${
+        isOver && !isReadOnly ? 'bg-primary/20 ring-2 ring-primary' : 'bg-background'
+      }`}
+      style={{
+        zIndex: filteredCleanerId === cleanerId || hasIncompatibleTasks ? 15 : 'auto'
+      }}
+    >
+      {children}
+    </div>
+  );
+}
+
 export default function TimelineView({
   personnel,
   tasks,
@@ -112,44 +148,6 @@ export default function TimelineView({
   const [aliasDialog, setAliasDialog] = useState<{ open: boolean; cleanerId: number | null; cleanerName: string }>({ open: false, cleanerId: null, cleanerName: '' });
   const [editingStartTime, setEditingStartTime] = useState<string>("10:00");
   const [startTimeEditDialog, setStartTimeEditDialog] = useState<{ open: boolean; cleanerId: number | null; cleanerName: string }>({ open: false, cleanerId: null, cleanerName: '' });
-
-// Component wrapper per la timeline droppable
-function TimelineDropZone({
-  cleanerId,
-  isReadOnly,
-  filteredCleanerId,
-  hasIncompatibleTasks,
-  children,
-}: {
-  cleanerId: number;
-  isReadOnly: boolean;
-  filteredCleanerId: number | null;
-  hasIncompatibleTasks: boolean;
-  children: React.ReactNode;
-}) {
-  const { setNodeRef, isOver } = useDroppable({
-    id: `timeline-${cleanerId}`,
-    disabled: isReadOnly,
-  });
-
-  return (
-    <div
-      ref={setNodeRef}
-      data-testid={`timeline-cleaner-${cleanerId}`}
-      data-cleaner-id={cleanerId}
-      className={`relative min-h-[45px] flex-1 border-l border-border ${
-        isOver && !isReadOnly ? 'bg-primary/20 ring-2 ring-primary' : 'bg-background'
-      }`}
-      style={{
-        zIndex: filteredCleanerId === cleanerId || hasIncompatibleTasks ? 15 : 'auto'
-      }}
-    >
-      {children}
-    </div>
-  );
-}
-
-
   const [isSavingStartTime, setIsSavingStartTime] = useState(false);
 
   // Stato per le regole di validazione task-cleaner
