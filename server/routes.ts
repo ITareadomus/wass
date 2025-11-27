@@ -3257,18 +3257,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const settingsData = req.body;
       const settingsPath = path.join(process.cwd(), "client/public/data/input/settings.json");
 
+      console.log(`📝 Salvataggio settings.json in: ${settingsPath}`);
+      console.log(`📊 Dati ricevuti:`, JSON.stringify(settingsData, null, 2).slice(0, 200) + '...');
+
+      // Scrittura atomica per evitare corruzioni
+      const tmpPath = `${settingsPath}.tmp`;
       await fs.writeFile(
-        settingsPath,
+        tmpPath,
         JSON.stringify(settingsData, null, 2),
         "utf-8"
       );
+      await fs.rename(tmpPath, settingsPath);
+
+      // Verifica che il file sia stato scritto correttamente
+      const savedContent = await fs.readFile(settingsPath, 'utf-8');
+      const savedData = JSON.parse(savedContent);
+      
+      console.log(`✅ Settings salvato correttamente. Verificato ${Object.keys(savedData).length} chiavi principali`);
 
       res.json({
         success: true,
         message: "Impostazioni salvate con successo",
       });
     } catch (error: any) {
-      console.error("Errore nel salvataggio delle impostazioni:", error);
+      console.error("❌ Errore nel salvataggio delle impostazioni:", error);
       res.status(500).json({ success: false, error: error.message });
     }
   });
