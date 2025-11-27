@@ -1,4 +1,4 @@
-import { DndContext, DragEndEvent, DragOverlay, closestCenter, MouseSensor, TouchSensor, useSensor, useSensors } from "@dnd-kit/core";
+import { DragDropContext, DropResult } from "react-beautiful-dnd";
 import { TaskType as Task } from "@shared/schema";
 import PriorityColumn from "@/components/drag-drop/priority-column";
 import TimelineView from "@/components/timeline/timeline-view";
@@ -168,20 +168,6 @@ export default function GenerateAssignments() {
 
   // Stato per tracciare se è in corso un'operazione di drag-and-drop
   const [isDragging, setIsDragging] = useState<boolean>(false);
-
-  // dnd-kit sensors - DEVONO essere chiamati al livello superiore del componente
-  const mouseSensor = useSensor(MouseSensor, {
-    activationConstraint: {
-      distance: 5, // Richiede 5px di movimento per iniziare il drag
-    },
-  });
-  const touchSensor = useSensor(TouchSensor, {
-    activationConstraint: {
-      delay: 250,
-      tolerance: 5,
-    },
-  });
-  const sensors = useSensors(mouseSensor, touchSensor);
 
   // Stati per selezione multipla INDIPENDENTE per container (ma selezione CROSS-CONTAINER)
   const [multiSelectModes, setMultiSelectModes] = useState<{
@@ -1354,41 +1340,17 @@ export default function GenerateAssignments() {
     return null;
   };
 
-  const onDragEnd = async (event: DragEndEvent) => {
-    const { active, over } = event;
+  const onDragEnd = async (result: any) => {
+    const { destination, source, draggableId } = result;
 
     // niente destinazione => niente da fare
-    if (!over) return;
+    if (!destination) return;
 
-    // Estrai ID della task trascinata e della destinazione
-    const taskId = String(active.id);
-    const destinationId = String(over.id);
-
-    // Trova la task per ottenere info sull'origine
-    const task = allTasksWithAssignments.find(t => String(t.id) === String(taskId));
-    const logisticCode = task?.name; // name contiene il logistic_code
-
-    // Determina l'origine in base allo stato della task
-    const taskAny = task as any;
-    const currentCleanerId = taskAny?.assignedCleaner;
-    const currentPriority = task?.priority;
-
-    // Costruisci sourceId simile a droppableId per compatibilità
-    let sourceId: string;
-    if (currentCleanerId) {
-      sourceId = `timeline-${currentCleanerId}`;
-    } else if (currentPriority === 'early-out') {
-      sourceId = 'early-out';
-    } else if (currentPriority === 'high') {
-      sourceId = 'high';
-    } else if (currentPriority === 'low') {
-      sourceId = 'low';
-    } else {
-      sourceId = 'unknown';
-    }
-
-    // Se stessa posizione, esci (task droppata su sé stessa o stessa area)
-    if (destinationId === sourceId || destinationId === taskId) {
+    // se posizione identica, esci
+    if (
+      destination.droppableId === source.droppableId &&
+      destination.index === source.index
+    ) {
       return;
     }
 
@@ -1398,10 +1360,16 @@ export default function GenerateAssignments() {
       toast({
         title: "Operazione in corso",
         description: "Attendi il completamento del movimento precedente",
+        variant: "warning",
         duration: 2000,
       });
       return;
     }
+
+    // draggableId è sempre l'id univoco della task
+    const taskId = draggableId;
+    const task = allTasksWithAssignments.find(t => String(t.id) === String(taskId));
+    const logisticCode = task?.name; // name contiene il logistic_code
 
     // Se la timeline è read-only, non permettere modifiche
     if (isTimelineReadOnly) {
@@ -1409,7 +1377,9 @@ export default function GenerateAssignments() {
       toast({
         title: "Operazione non permessa",
         description: "La timeline è in sola visualizzazione per questa data.",
+        variant: "warning",
       });
+      // Opzionale: annulla visivamente il drag (anche se react-beautiful-dnd potrebbe gestirlo)
       return;
     }
 
@@ -1418,12 +1388,12 @@ export default function GenerateAssignments() {
 
     try {
       // 🔹 Ramo TIMELINE (drag tra cleaners o riordino nello stesso cleaner)
-      const fromCleanerId = parseCleanerId(sourceId);
-      const toCleanerId = parseCleanerId(destinationId);
+      const fromCleanerId = parseCleanerId(source.droppableId);
+      const toCleanerId = parseCleanerId(destination.droppableId);
 
       // ✅ NUOVO CASO: da container (early/high/low) → timeline di un cleaner
-      const fromContainer = parseContainerKey(sourceId);
-      const toContainer = parseContainerKey(destinationId);
+      const fromContainer = parseContainerKey(source.droppableId);
+      const toContainer = parseContainerKey(destination.droppableId);
 
       // 🔸 BATCH MOVE: Se multi-select è attivo, ci sono task selezionate, E la task trascinata è tra quelle selezionate
       const isDraggedTaskSelected = selectedTasks.some(st => st.taskId === taskId);
@@ -1444,8 +1414,8 @@ export default function GenerateAssignments() {
           // Ordina le task selezionate per ordine di selezione
           const sortedTasks = [...selectedTasks].sort((a, b) => a.order - b.order);
 
-          // Sposta ciascuna task in sequenza alla destinazione (aggiungi in fondo)
-          let currentIndex = -1; // -1 = aggiungi alla fine
+          // Sposta ciascuna task in sequenza alla destinazione
+          let currentIndex = destination.index;
           for (const selectedTask of sortedTasks) {
             const task = allTasksWithAssignments.find(t => String(t.id) === selectedTask.taskId);
             if (task) {
@@ -1501,7 +1471,7 @@ export default function GenerateAssignments() {
           const cleanerName = cleaner ? `${cleaner.name} ${cleaner.lastname}` : `ID ${toCleanerId}`;
 
           // Salva in timeline.json (rimuove automaticamente da containers.json)
-          await saveTaskAssignment(taskId, toCleanerId, logisticCode, -1); // -1 = aggiungi alla fine
+          await saveTaskAssignment(taskId, toCleanerId, logisticCode, destination.index);
 
           // CRITICAL: Marca modifiche dopo drag-and-drop da container
           // Salvataggio automatico attivo
@@ -1534,7 +1504,7 @@ export default function GenerateAssignments() {
       }
 
       if (fromCleanerId !== null && toCleanerId !== null) {
-        console.log(`🔄 Spostamento tra cleaners: task ${logisticCode} da cleaner ${fromCleanerId} a cleaner ${toCleanerId}`);
+        console.log(`🔄 Spostamento tra cleaners: task ${logisticCode} da cleaner ${fromCleanerId} (idx ${source.index}) a cleaner ${toCleanerId} (idx ${destination.index})`);
 
         try {
           // Carica i dati dei cleaner per mostrare nome e cognome
@@ -1554,9 +1524,9 @@ export default function GenerateAssignments() {
             logisticCode,
             fromCleanerId,
             toCleanerId,
-            sourceIndex: 0, // dnd-kit non fornisce indici nativi
-            destIndex: -1, // -1 = aggiungi alla fine
-            insertAt: -1
+            sourceIndex: source.index,
+            destIndex: destination.index,
+            insertAt: destination.index
           };
 
           console.log('Payload inviato:', payload);
@@ -1635,8 +1605,8 @@ export default function GenerateAssignments() {
         'low': 'low_priority'
       };
 
-      const fromContainerJson = containerToJsonName[sourceId] || null;
-      const toContainerJson = containerToJsonName[destinationId] || null;
+      const fromContainerJson = containerToJsonName[source.droppableId] || null;
+      const toContainerJson = containerToJsonName[destination.droppableId] || null;
 
       // Caso: spostamento tra containers di priorità
       if (fromContainerJson && toContainerJson) {
@@ -1644,11 +1614,11 @@ export default function GenerateAssignments() {
 
         try {
           const payload = {
-            taskId: taskId,
+            taskId: draggableId,
             fromContainer: fromContainerJson,
             toContainer: toContainerJson,
-            sourceIndex: 0, // dnd-kit non fornisce indici nativi
-            destIndex: -1, // -1 = aggiungi alla fine
+            sourceIndex: source.index,
+            destIndex: destination.index,
           };
 
           const resp = await fetch('/api/update-task-json', {
@@ -1712,7 +1682,7 @@ export default function GenerateAssignments() {
           const cleanerName = cleaner ? `${cleaner.name} ${cleaner.lastname}` : `ID ${toCleanerId}`;
 
           // Salva in timeline.json (rimuove automaticamente da containers.json)
-          await saveTaskAssignment(taskId, toCleanerId, logisticCode, -1); // -1 = aggiungi alla fine
+          await saveTaskAssignment(taskId, toCleanerId, logisticCode, destination.index);
           await refreshAssignments("manual");
 
           // CRITICAL: Marca modifiche dopo assegnazione
@@ -1763,8 +1733,7 @@ export default function GenerateAssignments() {
         description: "Errore nello spostamento della task",
         variant: "destructive",
       });
-    } finally {
-      // CRITICAL: Assicurati che il lock venga SEMPRE rilasciato
+      // Assicurati che il lock venga sempre rilasciato
       setIsDragging(false);
     }
   };
@@ -1884,11 +1853,7 @@ export default function GenerateAssignments() {
         </div>
 
         <MultiSelectContext.Provider value={multiSelectContextValue}>
-          <DndContext
-            sensors={sensors}
-            collisionDetection={closestCenter}
-            onDragEnd={onDragEnd}
-          >
+          <DragDropContext onDragEnd={onDragEnd}>
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6 w-full">
               <PriorityColumn
                 title="EARLY OUT"
@@ -1999,7 +1964,7 @@ export default function GenerateAssignments() {
               </div>
             </div>
           </div>
-        </DndContext>
+        </DragDropContext>
         </MultiSelectContext.Provider>
       </div>
     </div>

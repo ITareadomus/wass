@@ -1,15 +1,5 @@
 import React, { useState, useEffect } from "react";
-import {
-  DndContext,
-  closestCenter,
-  KeyboardSensor,
-  PointerSensor,
-  useSensor,
-  useSensors,
-  DragOverlay,
-} from "@dnd-kit/core";
-import { arrayMove, SortableContext, rectSortingStrategy, useSortable } from "@dnd-kit/sortable";
-import { CSS } from "@dnd-kit/utilities";
+import { Draggable } from "react-beautiful-dnd";
 import { TaskType as Task } from "@shared/schema";
 import {
   Dialog,
@@ -72,8 +62,7 @@ interface AssignedTask {
   travel_time?: number;
 }
 
-// Componente TaskCard personalizzato per dnd-kit
-function TaskCard({
+export default function TaskCard({
   task,
   index,
   isInTimeline = false,
@@ -82,7 +71,7 @@ function TaskCard({
   isDuplicate = false,
   isDragDisabled = false,
   isReadOnly = false,
-  multiSelectContext = undefined,
+  multiSelectContext = null,
   isIncompatible = false,
 }: TaskCardProps) {
   console.log('🔧 TaskCard render - isReadOnly:', isReadOnly, 'for task:', task.name);
@@ -373,10 +362,10 @@ function TaskCard({
 
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "ArrowLeft" && canGoPrev) {
-        handlePrevTask();
+        handlePrevTask(new MouseEvent('click') as any);
       }
       if (e.key === "ArrowRight" && canGoNext) {
-        handleNextTask();
+        handleNextTask(new MouseEvent('click') as any);
       }
     };
 
@@ -603,163 +592,154 @@ function TaskCard({
   // Determina se il drag è disabilitato in base alla data e se la task è già salvata
   const shouldDisableDrag = isDragDisabled || (displayTask as any).checkin_date;
 
-  // dnd-kit hook
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-    isDragging,
-  } = useSortable({
-    id: getTaskKey(task),
-    disabled: shouldDisableDrag,
-  });
-
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-  };
-
-  const cardWidth = calculateWidth(task.duration, isInTimeline);
-
   return (
     <>
-      <TooltipProvider delayDuration={300}>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <div
-              ref={setNodeRef}
-              {...attributes}
-              {...listeners}
-              className={`
-                ${cardColorClass}
-                rounded-sm px-2 py-1 shadow-sm transition-all duration-200 border
-                ${isDragging ? "shadow-lg scale-105" : ""}
-                ${isOverdue && isInTimeline ? "animate-blink" : ""}
-                ${isDuplicate && !isInTimeline ? "animate-blink-yellow" : ""}
-                hover:shadow-md cursor-pointer
-                flex-shrink-0 relative
-              `}
-              style={{
-                ...style,
-                width: cardWidth,
-                minHeight: "40px",
-                ...(isMapFiltered ? {
-                  boxShadow: '0 0 0 3px #3B82F6, 0 0 20px 5px rgba(59, 130, 246, 0.5)',
-                  transform: 'scale(1.05)',
-                  zIndex: 10,
-                } : {})
-              }}
-              data-testid={`task-card-${getTaskKey(task)}`}
-              onClick={(e) => {
-                if (!isDragging) {
-                  handleCardClick(e);
-                }
-              }}
-            >
-              {/* Checkbox overlay per multi-select (solo container) */}
-              {isMultiSelectMode && !isInTimeline && (
-                <div className="absolute top-0.5 left-0.5 z-50">
-                  <Checkbox
-                    checked={isSelected}
-                    onCheckedChange={() => multiSelectContext?.toggleTask(String(task.id), currentContainer)}
-                    className="w-4 h-4 bg-white border-2 border-sky-600"
-                    data-testid={`checkbox-task-${task.id}`}
-                  />
-                </div>
-              )}
+      <Draggable
+        draggableId={getTaskKey(task)}
+        index={index}
+        isDragDisabled={shouldDisableDrag} // Usa la prop per disabilitare il drag
+      >
+        {(provided, snapshot) => {
+          const cardWidth = calculateWidth(task.duration, isInTimeline);
 
-              {/* Badge ordine selezione (solo se selezionata) */}
-              {isSelected && selectionOrder && !isInTimeline && (
-                <div className="absolute top-0.5 right-0.5 z-50">
-                  <div className="bg-sky-600 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs font-bold">
-                    {selectionOrder}
-                  </div>
-                </div>
-              )}
-
-              {!isConfirmedOperation && !isSelected && (
-                <div className="absolute top-0.5 right-0.5 z-50">
-                  <HelpCircle
-                    className="w-3 h-3 text-gray-900"
-                    strokeWidth={2.5}
-                  />
-                </div>
-              )}
-
-              {/* Frecce check-in e check-out con orari - solo per task >= 1 ora */}
-              {shouldShowCheckInOutArrows && ((task as any).checkout_time || (task as any).checkin_time || isFutureCheckin) && (
-                <div className="absolute right-1 top-1/2 -translate-y-1/2 flex flex-col gap-0.5 z-40">
-                  {(task as any).checkout_time && (
-                    <div className="flex items-center gap-0.5">
-                      <span className="font-black text-[15px] text-[#257537]">↑</span>
-                      <span className="text-[11px] text-[#137537] font-bold">{(task as any).checkout_time}</span>
-                    </div>
-                  )}
-                  {((task as any).checkin_time || isFutureCheckin) && (
-                    <div className={`flex items-center ${(task as any).checkin_time ? 'gap-0.5' : 'gap-0'}`}>
-                      {(task as any).checkin_time && !isFutureCheckin && (
-                        <>
-                          <span className="text-red-600 font-black text-[15px]">↓</span>
-                          <span className="text-red-600 text-[11px] font-bold">{(task as any).checkin_time}</span>
-                        </>
-                      )}
-                      {isFutureCheckin && (
-                        <>
-                          <Calendar className="w-3.5 h-3.5 text-red-600" strokeWidth={2.5} />
-                          {(task as any).checkin_time && (
-                            <span className="text-red-600 text-[11px] font-bold">{(task as any).checkin_time}</span>
-                          )}
-                        </>
-                      )}
-                    </div>
-                  )}
-                </div>
-              )}
-              <div
-                className="flex flex-col items-start justify-start h-full gap-0 p-[0.5px] pl-0"
-              >
-                <div className="flex items-center gap-1">
-                  <span
-                    className="text-[#ff0000] font-extrabold text-[13px]"
-                    data-testid={`task-name-${getTaskKey(task)}`}
+          return (
+            <TooltipProvider delayDuration={300}>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div
+                    ref={provided.innerRef}
+                    {...provided.draggableProps}
+                    {...provided.dragHandleProps}
+                    className={`
+                      ${cardColorClass}
+                      rounded-sm px-2 py-1 shadow-sm transition-all duration-200 border
+                      ${snapshot.isDragging ? "shadow-lg scale-105" : ""}
+                      ${isOverdue && isInTimeline ? "animate-blink" : ""}
+                      ${isDuplicate && !isInTimeline ? "animate-blink-yellow" : ""}
+                      hover:shadow-md cursor-pointer
+                      flex-shrink-0 relative
+                    `}
+                    style={{
+                      ...provided.draggableProps.style,
+                      width: cardWidth,
+                      minHeight: "40px",
+                      ...(isMapFiltered ? {
+                        boxShadow: '0 0 0 3px #3B82F6, 0 0 20px 5px rgba(59, 130, 246, 0.5)',
+                        transform: 'scale(1.05)',
+                        zIndex: 10,
+                      } : {})
+                    }}
+                    data-testid={`task-card-${getTaskKey(task)}`}
+                    onClick={(e) => {
+                      if (!snapshot.isDragging) {
+                        handleCardClick(e);
+                      }
+                    }}
                   >
-                    {task.name}
-                  </span>
-                </div>
-                {task.alias && (
-                  <span className="opacity-70 leading-none mt-0.5 text-[#000000] font-bold text-[11px]">
-                    {task.alias}{(task as any).type_apt ? ` (${(task as any).type_apt})` : ''}
-                  </span>
-                )}
-              </div>
-            </div>
-          </TooltipTrigger>
-          <TooltipContent side="top" className="max-w-xs text-base px-3 py-2">
-            <div className="flex flex-col items-center gap-2">
-              <p className="font-semibold">{displayTask.address?.toUpperCase() || "INDIRIZZO NON DISPONIBILE"}</p>
-              {shouldShowTooltipTimes && ((displayTask as any).checkout_time || (displayTask as any).checkin_time) && (
-                <div className="flex items-center gap-3 text-sm">
-                  {(displayTask as any).checkout_time && (
-                    <div className="flex items-center gap-1">
-                      <span className="text-green-500">↑</span>
-                      <span>{(displayTask as any).checkout_time}</span>
-                    </div>
-                  )}
-                  {(displayTask as any).checkin_time && (
-                    <div className="flex items-center gap-1">
-                      <span className="text-red-500">↓</span>
-                      <span>{(displayTask as any).checkin_time}</span>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          </TooltipContent>
-        </Tooltip>
-      </TooltipProvider>
+                    {/* Checkbox overlay per multi-select (solo container) */}
+                    {isMultiSelectMode && !isInTimeline && (
+                      <div className="absolute top-0.5 left-0.5 z-50">
+                        <Checkbox
+                          checked={isSelected}
+                          onCheckedChange={() => multiSelectContext?.toggleTask(String(task.id), currentContainer)}
+                          className="w-4 h-4 bg-white border-2 border-sky-600"
+                          data-testid={`checkbox-task-${task.id}`}
+                        />
+                      </div>
+                    )}
 
+                    {/* Badge ordine selezione (solo se selezionata) */}
+                    {isSelected && selectionOrder && !isInTimeline && (
+                      <div className="absolute top-0.5 right-0.5 z-50">
+                        <div className="bg-sky-600 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs font-bold">
+                          {selectionOrder}
+                        </div>
+                      </div>
+                    )}
+
+                    {!isConfirmedOperation && !isSelected && (
+                      <div className="absolute top-0.5 right-0.5 z-50">
+                        <HelpCircle
+                          className="w-3 h-3 text-gray-900"
+                          strokeWidth={2.5}
+                        />
+                      </div>
+                    )}
+
+                    {/* Frecce check-in e check-out con orari - solo per task >= 1 ora */}
+                    {shouldShowCheckInOutArrows && ((task as any).checkout_time || (task as any).checkin_time || isFutureCheckin) && (
+                      <div className="absolute right-1 top-1/2 -translate-y-1/2 flex flex-col gap-0.5 z-40">
+                        {(task as any).checkout_time && (
+                          <div className="flex items-center gap-0.5">
+                            <span className="font-black text-[15px] text-[#257537]">↑</span>
+                            <span className="text-[11px] text-[#137537] font-bold">{(task as any).checkout_time}</span>
+                          </div>
+                        )}
+                        {((task as any).checkin_time || isFutureCheckin) && (
+                          <div className={`flex items-center ${(task as any).checkin_time ? 'gap-0.5' : 'gap-0'}`}>
+                            {(task as any).checkin_time && !isFutureCheckin && (
+                              <>
+                                <span className="text-red-600 font-black text-[15px]">↓</span>
+                                <span className="text-red-600 text-[11px] font-bold">{(task as any).checkin_time}</span>
+                              </>
+                            )}
+                            {isFutureCheckin && (
+                              <>
+                                <Calendar className="w-3.5 h-3.5 text-red-600" strokeWidth={2.5} />
+                                {(task as any).checkin_time && (
+                                  <span className="text-red-600 text-[11px] font-bold">{(task as any).checkin_time}</span>
+                                )}
+                              </>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                    <div
+                      className="flex flex-col items-start justify-start h-full gap-0 p-[0.5px] pl-0"
+                    >
+                      <div className="flex items-center gap-1">
+                        <span
+                          className="text-[#ff0000] font-extrabold text-[13px]"
+                          data-testid={`task-name-${getTaskKey(task)}`}
+                        >
+                          {task.name}
+                        </span>
+                      </div>
+                      {task.alias && (
+                        <span className="opacity-70 leading-none mt-0.5 text-[#000000] font-bold text-[11px]">
+                          {task.alias}{(task as any).type_apt ? ` (${(task as any).type_apt})` : ''}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent side="top" className="max-w-xs text-base px-3 py-2">
+                  <div className="flex flex-col items-center gap-2">
+                    <p className="font-semibold">{displayTask.address?.toUpperCase() || "INDIRIZZO NON DISPONIBILE"}</p>
+                    {shouldShowTooltipTimes && ((displayTask as any).checkout_time || (displayTask as any).checkin_time) && (
+                      <div className="flex items-center gap-3 text-sm">
+                        {(displayTask as any).checkout_time && (
+                          <div className="flex items-center gap-1">
+                            <span className="text-green-500">↑</span>
+                            <span>{(displayTask as any).checkout_time}</span>
+                          </div>
+                        )}
+                        {(displayTask as any).checkin_time && (
+                          <div className="flex items-center gap-1">
+                            <span className="text-red-500">↓</span>
+                            <span>{(displayTask as any).checkin_time}</span>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          );
+          }}
+      </Draggable>
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
         <DialogContent className="sm:max-w-2xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
@@ -1188,5 +1168,3 @@ function TaskCard({
     </>
   );
 }
-
-export default TaskCard;
