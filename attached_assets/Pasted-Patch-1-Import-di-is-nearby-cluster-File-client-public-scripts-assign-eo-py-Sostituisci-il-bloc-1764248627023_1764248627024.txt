@@ -1,0 +1,113 @@
+Patch 1 – Import di is_nearby_cluster
+
+File: client/public/scripts/assign_eo.py
+
+Sostituisci il blocco import da assign_utils con questo (o aggiungi solo la parte mancante se preferisci):
+
+-from assign_utils import (
+-    NEARBY_TRAVEL_THRESHOLD, NEW_CLEANER_PENALTY_MIN, NEW_TRAINER_PENALTY_MIN,
+-    TARGET_MIN_LOAD_MIN, FAIRNESS_DELTA_HOURS, LOAD_WEIGHT,
+-    SAME_BUILDING_BONUS, ROLE_TRAINER_BONUS,
+-    cleaner_load_minutes, cleaner_load_hours
+-)
++from assign_utils import (
++    NEARBY_TRAVEL_THRESHOLD, NEW_CLEANER_PENALTY_MIN, NEW_TRAINER_PENALTY_MIN,
++    TARGET_MIN_LOAD_MIN, FAIRNESS_DELTA_HOURS, LOAD_WEIGHT,
++    SAME_BUILDING_BONUS, ROLE_TRAINER_BONUS,
++    cleaner_load_minutes, cleaner_load_hours,
++    is_nearby_cluster,
++)
+
+Patch 2 – Rafforzare il concetto di “stesso blocco”
+
+Sempre in client/public/scripts/assign_eo.py, trova la funzione:
+
+def is_nearby_same_block(t1: Task, t2: Task) -> bool:
+    """
+    True se:
+    - stesso edificio/via (same_building)
+    OPPURE
+    - stesso cliente/alias e travel_minutes <= NEARBY_TRAVEL_THRESHOLD
+
+    Serve per clusterizzare casi tipo 618/619 (EXP) o 1537/1236 (TBR).
+    """
+    # stesso edificio/via
+    if same_building(t1.address, t2.address):
+        return True
+
+    # stesso cliente (vari modi)
+    same_client = (
+        getattr(t1, 'client_id', None) == getattr(t2, 'client_id', None)
+        or getattr(t1, 'customer_name', None) == getattr(t2, 'customer_name', None)
+        or getattr(t1, 'alias', None) == getattr(t2, 'alias', None)
+    )
+    if not same_client:
+        return False
+
+    # vicini in termini di viaggio
+    if travel_minutes(t1, t2) <= NEARBY_TRAVEL_THRESHOLD:
+        return True
+
+    return False
+
+
+e sostituiscila con questa versione:
+
+ def is_nearby_same_block(t1: Task, t2: Task) -> bool:
+     """
+     True se:
+     - stesso edificio/via (same_building)
+-    OPPURE
+-    - stesso cliente/alias e travel_minutes <= NEARBY_TRAVEL_THRESHOLD
++    OPPURE
++    - stesso cliente/alias e:
++        * distanza geografica molto piccola (is_nearby_cluster)
++        * OPPURE travel_minutes <= NEARBY_TRAVEL_THRESHOLD
+ 
+     Serve per clusterizzare casi tipo 618/619 (EXP) o 1537/1236 (TBR).
+     """
+     # stesso edificio/via
+     if same_building(t1.address, t2.address):
+         return True
+ 
+     # stesso cliente (vari modi)
+     same_client = (
+         getattr(t1, 'client_id', None) == getattr(t2, 'client_id', None)
+         or getattr(t1, 'customer_name', None) == getattr(t2, 'customer_name', None)
+         or getattr(t1, 'alias', None) == getattr(t2, 'alias', None)
+     )
+     if not same_client:
+         return False
+ 
+-    # vicini in termini di viaggio
+-    if travel_minutes(t1, t2) <= NEARBY_TRAVEL_THRESHOLD:
+-        return True
++    # molto vicini in termini geografici (es. Via Voghera 4 e Via Tortona 10)
++    try:
++        if is_nearby_cluster(t1, t2):
++            return True
++    except Exception:
++        # in caso di dati incompleti, fallback al solo travel_minutes
++        pass
++
++    # vicini in termini di viaggio
++    if travel_minutes(t1, t2) <= NEARBY_TRAVEL_THRESHOLD:
++        return True
+ 
+     return False
+
+Effetto pratico
+
+Per le task:
+
+617 e 618 → VIA VOGHERA 4 (client 67, alias EXP)
+
+619 e 723 → VIA TORTONA 10 (client 67, alias EXP)
+
+la distanza geografica è molto inferiore a NEARBY_DISTANCE_KM (0.25 km) già definito in assign_utils, quindi:
+
+is_nearby_cluster(617, 619) → True
+
+is_nearby_same_block(...) → True anche se travel_minutes con small_equipment supera leggermente i 7 minuti.
+
+Questo fa sì che l’algoritmo li veda come un unico blocco EXP e, grazie alla logica dei building_candidates, sia molto più propenso a metterli tutti sullo stesso cleaner invece di spezzarli tra El Hadji e Mustapha.
