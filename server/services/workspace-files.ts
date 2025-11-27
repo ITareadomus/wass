@@ -6,10 +6,12 @@ import { storageService } from './storage-service';
  * Workspace Files Helper
  * 
  * Centralizes read/write operations for timeline.json, containers.json, and selected_cleaners.json
- * Implements hybrid storage: filesystem (for local dev) + Object Storage (for production persistence)
  * 
- * Read strategy: Try filesystem first, fallback to Object Storage
- * Write strategy: Write to filesystem AND Object Storage (dual write for persistence)
+ * Storage architecture:
+ * - Filesystem: Used for local dev and Python scripts compatibility
+ * - Object Storage: Single file DD-MM-YYYY/assignments_data.json containing { selected_cleaners, timeline }
+ * 
+ * Every save writes to BOTH filesystem AND Object Storage synchronously.
  */
 
 const PATHS = {
@@ -29,49 +31,31 @@ async function atomicWriteJson(filePath: string, data: any): Promise<void> {
 
 /**
  * Load timeline.json for a specific work date
- * Priority: filesystem (if matching date) → main Object Storage (DD-MM-YYYY/assignments_*.json) → null
+ * Priority: Object Storage → filesystem fallback
  */
 export async function loadTimeline(workDate: string): Promise<any | null> {
+  // First try Object Storage (source of truth)
   try {
-    // Try filesystem first
+    const timeline = await storageService.getTimeline(workDate);
+    if (timeline) {
+      // Write to filesystem for Python scripts compatibility
+      await atomicWriteJson(PATHS.timeline, timeline);
+      return timeline;
+    }
+  } catch (err) {
+    console.error(`Error loading timeline from Object Storage:`, err);
+  }
+
+  // Fallback to filesystem if date matches
+  try {
     const data = await fs.readFile(PATHS.timeline, 'utf-8');
     const parsed = JSON.parse(data);
-
-    // Only accept file from filesystem if date matches
-    const hasMatchingDate = parsed.metadata?.date === workDate;
-
-    if (hasMatchingDate) {
+    if (parsed.metadata?.date === workDate) {
       console.log(`✅ Timeline loaded from filesystem for ${workDate}`);
       return parsed;
     }
   } catch (err) {
-    // Filesystem read failed, try Object Storage
-  }
-
-  // Load from main Object Storage (DD-MM-YYYY/assignments_*.json)
-  try {
-    const { Client } = await import("@replit/object-storage");
-    const client = new Client();
-    
-    const d = new Date(workDate);
-    const day = String(d.getDate()).padStart(2, "0");
-    const month = String(d.getMonth() + 1).padStart(2, "0");
-    const fullYear = String(d.getFullYear());
-    const year = fullYear.slice(-2);
-    const folder = `${day}-${month}-${fullYear}`;
-    const filename = `assignments_${day}${month}${year}.json`;
-    const key = `${folder}/${filename}`;
-    
-    const result = await client.downloadAsText(key);
-    if (result.ok) {
-      const storageData = JSON.parse(result.value);
-      console.log(`✅ Timeline loaded from Object Storage: ${key}`);
-      // Write to filesystem for subsequent reads
-      await atomicWriteJson(PATHS.timeline, storageData);
-      return storageData;
-    }
-  } catch (err) {
-    console.error(`Error loading timeline from Object Storage:`, err);
+    // File doesn't exist
   }
 
   console.log(`ℹ️ No timeline found for ${workDate}`);
@@ -80,8 +64,7 @@ export async function loadTimeline(workDate: string): Promise<any | null> {
 
 /**
  * Save timeline.json for a specific work date
- * Writes to filesystem AND directly to main Object Storage (DD-MM-YYYY/assignments_*.json)
- * No more workspace intermediary - saves directly to the main storage location
+ * Writes to filesystem AND Object Storage synchronously
  */
 export async function saveTimeline(workDate: string, data: any): Promise<boolean> {
   try {
@@ -90,32 +73,14 @@ export async function saveTimeline(workDate: string, data: any): Promise<boolean
     data.metadata.date = workDate;
     data.metadata.last_updated = new Date().toISOString();
 
-    // Write to filesystem (synchronous for API compatibility)
+    // Write to filesystem (for Python scripts)
     await atomicWriteJson(PATHS.timeline, data);
     console.log(`✅ Timeline saved to filesystem for ${workDate}`);
 
-    // Write DIRECTLY to main Object Storage (DD-MM-YYYY/assignments_*.json)
-    // This replaces the old workspace intermediary
-    const d = new Date(workDate);
-    const day = String(d.getDate()).padStart(2, "0");
-    const month = String(d.getMonth() + 1).padStart(2, "0");
-    const fullYear = String(d.getFullYear());
-    const year = fullYear.slice(-2);
-    const folder = `${day}-${month}-${fullYear}`;
-    const filename = `assignments_${day}${month}${year}.json`;
-    const key = `${folder}/${filename}`;
-
-    // Import client and save directly - SINCRONO per garantire persistenza
-    const { Client } = await import("@replit/object-storage");
-    const client = new Client();
-    
-    const jsonContent = JSON.stringify(data, null, 2);
-    const result = await client.uploadFromText(key, jsonContent);
-    
-    if (result.ok) {
-      console.log(`✅ Timeline persisted to Object Storage: ${key}`);
-    } else {
-      console.warn(`⚠️ Failed to persist timeline to Object Storage: ${result.error}`);
+    // Write to Object Storage (synchronously - wait for completion)
+    const success = await storageService.saveTimeline(workDate, data);
+    if (!success) {
+      console.warn(`⚠️ Failed to persist timeline to Object Storage for ${workDate}`);
     }
 
     return true;
@@ -127,34 +92,18 @@ export async function saveTimeline(workDate: string, data: any): Promise<boolean
 
 /**
  * Load containers.json for a specific work date
- * Priority: filesystem → Object Storage → null
+ * Containers are local only (regenerated by Python scripts)
  */
 export async function loadContainers(workDate: string): Promise<any | null> {
   try {
-    // Try filesystem first
     const data = await fs.readFile(PATHS.containers, 'utf-8');
     const parsed = JSON.parse(data);
-
-    // Containers might not have metadata date, so just return if valid
     if (parsed.containers) {
       console.log(`✅ Containers loaded from filesystem for ${workDate}`);
       return parsed;
     }
   } catch (err) {
-    // Filesystem read failed, try Object Storage
-  }
-
-  // Fallback to Object Storage
-  try {
-    const storageData = await storageService.getWorkspaceContainers(workDate);
-    if (storageData) {
-      console.log(`✅ Containers loaded from Object Storage for ${workDate}`);
-      // Write to filesystem for subsequent reads
-      await atomicWriteJson(PATHS.containers, storageData);
-      return storageData;
-    }
-  } catch (err) {
-    console.error(`Error loading containers from Object Storage:`, err);
+    // File doesn't exist
   }
 
   console.log(`ℹ️ No containers found for ${workDate}`);
@@ -163,27 +112,12 @@ export async function loadContainers(workDate: string): Promise<any | null> {
 
 /**
  * Save containers.json for a specific work date
- * Writes to BOTH filesystem and Object Storage
+ * Containers are local only (not persisted to Object Storage)
  */
 export async function saveContainers(workDate: string, data: any): Promise<boolean> {
   try {
-    // Write to filesystem (synchronous for API compatibility)
     await atomicWriteJson(PATHS.containers, data);
     console.log(`✅ Containers saved to filesystem for ${workDate}`);
-
-    // Write to Object Storage (async, don't block on failure)
-    storageService.saveWorkspaceContainers(workDate, data)
-      .then((success) => {
-        if (success) {
-          console.log(`✅ Containers persisted to Object Storage for ${workDate}`);
-        } else {
-          console.warn(`⚠️ Failed to persist containers to Object Storage for ${workDate}`);
-        }
-      })
-      .catch((err) => {
-        console.error(`❌ Error persisting containers to Object Storage:`, err);
-      });
-
     return true;
   } catch (err) {
     console.error(`Error saving containers for ${workDate}:`, err);
@@ -193,34 +127,37 @@ export async function saveContainers(workDate: string, data: any): Promise<boole
 
 /**
  * Load selected_cleaners.json for a specific work date
- * Priority: filesystem → Object Storage → null
+ * Priority: Object Storage → filesystem fallback
  */
 export async function loadSelectedCleaners(workDate: string): Promise<any | null> {
+  // First try Object Storage (source of truth)
   try {
-    // Try filesystem first
+    const cleaners = await storageService.getSelectedCleaners(workDate);
+    if (cleaners && cleaners.length > 0) {
+      console.log(`✅ Selected cleaners loaded from Object Storage for ${workDate}`);
+      // Create structure expected by frontend
+      const data = {
+        metadata: { date: workDate, last_updated: new Date().toISOString() },
+        cleaners: cleaners
+      };
+      // Write to filesystem for Python scripts compatibility
+      await atomicWriteJson(PATHS.selectedCleaners, data);
+      return data;
+    }
+  } catch (err) {
+    console.error(`Error loading selected cleaners from Object Storage:`, err);
+  }
+
+  // Fallback to filesystem
+  try {
     const data = await fs.readFile(PATHS.selectedCleaners, 'utf-8');
     const parsed = JSON.parse(data);
-
-    // Verify the date matches if metadata exists
     if (!parsed.metadata?.date || parsed.metadata.date === workDate) {
       console.log(`✅ Selected cleaners loaded from filesystem for ${workDate}`);
       return parsed;
     }
   } catch (err) {
-    // Filesystem read failed, try Object Storage
-  }
-
-  // Fallback to Object Storage
-  try {
-    const storageData = await storageService.getWorkspaceSelectedCleaners(workDate);
-    if (storageData) {
-      console.log(`✅ Selected cleaners loaded from Object Storage for ${workDate}`);
-      // Write to filesystem for subsequent reads
-      await atomicWriteJson(PATHS.selectedCleaners, storageData);
-      return storageData;
-    }
-  } catch (err) {
-    console.error(`Error loading selected cleaners from Object Storage:`, err);
+    // File doesn't exist
   }
 
   console.log(`ℹ️ No selected cleaners found for ${workDate}`);
@@ -229,7 +166,7 @@ export async function loadSelectedCleaners(workDate: string): Promise<any | null
 
 /**
  * Save selected_cleaners.json for a specific work date
- * Writes to BOTH filesystem and Object Storage
+ * Writes to filesystem AND Object Storage synchronously
  */
 export async function saveSelectedCleaners(workDate: string, data: any): Promise<boolean> {
   try {
@@ -238,28 +175,54 @@ export async function saveSelectedCleaners(workDate: string, data: any): Promise
     data.metadata.date = workDate;
     data.metadata.last_updated = new Date().toISOString();
 
-    // Write to filesystem (synchronous for API compatibility)
+    // Write to filesystem (for Python scripts)
     await atomicWriteJson(PATHS.selectedCleaners, data);
     console.log(`✅ Selected cleaners saved to filesystem for ${workDate}`);
 
-    // Write to Object Storage (async, don't block on failure)
-    storageService.saveWorkspaceSelectedCleaners(workDate, data)
-      .then((success) => {
-        if (success) {
-          console.log(`✅ Selected cleaners persisted to Object Storage for ${workDate}`);
-        } else {
-          console.warn(`⚠️ Failed to persist selected cleaners to Object Storage for ${workDate}`);
-        }
-      })
-      .catch((err) => {
-        console.error(`❌ Error persisting selected cleaners to Object Storage:`, err);
-      });
+    // Extract cleaners array and save to Object Storage (synchronously)
+    const cleanersArray = data.cleaners || data.selected_cleaners || [];
+    const success = await storageService.saveSelectedCleaners(workDate, cleanersArray);
+    if (!success) {
+      console.warn(`⚠️ Failed to persist selected cleaners to Object Storage for ${workDate}`);
+    }
 
     return true;
   } catch (err) {
     console.error(`Error saving selected cleaners for ${workDate}:`, err);
     return false;
   }
+}
+
+/**
+ * Reset timeline for a specific date (clear assignments, keep selected_cleaners)
+ */
+export async function resetTimeline(workDate: string): Promise<boolean> {
+  const emptyTimeline = {
+    metadata: {
+      last_updated: new Date().toISOString(),
+      date: workDate,
+      created_by: 'system'
+    },
+    cleaners_assignments: [],
+    meta: {
+      total_cleaners: 0,
+      used_cleaners: 0,
+      assigned_tasks: 0
+    }
+  };
+
+  // Save to filesystem
+  await atomicWriteJson(PATHS.timeline, emptyTimeline);
+  
+  // Reset on Object Storage (preserves selected_cleaners)
+  return storageService.resetTimeline(workDate);
+}
+
+/**
+ * Check if saved assignments exist for a date
+ */
+export async function hasAssignments(workDate: string): Promise<boolean> {
+  return storageService.hasAssignments(workDate);
 }
 
 /**
