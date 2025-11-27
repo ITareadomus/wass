@@ -1852,8 +1852,6 @@ function TimelineDropZone({
                               });
                             })()}
                           </div>
-                        </div>
-                      </SortableContext>
                     </TimelineDropZone>
                   </div>
                 );
