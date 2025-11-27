@@ -1,4 +1,3 @@
-
 # -*- coding: utf-8 -*-
 """
 Helper comuni per assign_eo.py, assign_hp.py, assign_lp.py
@@ -17,8 +16,8 @@ TRAINER_TARGET_MIN_LOAD_MIN = 240  # 4 ore = target specifico per il Formatore
 
 FAIRNESS_DELTA_HOURS = 1.0         # tolleranza di 1h tra cleaner per essere "fair"
 LOAD_WEIGHT = 10                   # peso delle ore nel punteggio
-SAME_BUILDING_BONUS = -5           # bonus per cluster edificio/blocco
-NEARBY_CLUSTER_BONUS = -8          # bonus maggiore per appartamenti molto vicini (es: Via Tortona/Voghera)
+SAME_BUILDING_BONUS = -5           # bonus per stessa via (include stesso edificio e blocco vicino)
+NEARBY_CLUSTER_BONUS = -20         # bonus maggiore per appartamenti molto vicini geograficamente
 
 ROLE_TRAINER_BONUS = -10           # bonus extra per il Formatore (prima -5)
 
@@ -61,10 +60,10 @@ def is_nearby_cluster(task1, task2) -> bool:
     """
     Verifica se due task sono "molto vicine" geograficamente.
     Ritorna True se la distanza è <= NEARBY_DISTANCE_KM (es: Via Tortona e Via Voghera).
-    
+
     Args:
         task1, task2: Task object con attributi lat, lng
-    
+
     Returns:
         True se task molto vicine (entro 250m), False altrimenti
     """
@@ -73,12 +72,12 @@ def is_nearby_cluster(task1, task2) -> bool:
             return False
         if not hasattr(task1, 'lng') or not hasattr(task2, 'lng'):
             return False
-            
+
         lat1 = float(task1.lat)
         lng1 = float(task1.lng)
         lat2 = float(task2.lat)
         lng2 = float(task2.lng)
-        
+
         distance_km = haversine_km(lat1, lng1, lat2, lng2)
         return distance_km <= NEARBY_DISTANCE_KM
     except (ValueError, TypeError, AttributeError):
@@ -89,11 +88,11 @@ def count_nearby_tasks(cleaner, new_task) -> int:
     """
     Conta quante task esistenti nel route del cleaner sono "molto vicine" alla nuova task.
     Utile per dare priorità ai cleaner che hanno già task nella stessa zona.
-    
+
     Args:
         cleaner: Cleaner object con attributo route (lista di task)
         new_task: Task object da confrontare
-    
+
     Returns:
         Numero di task vicine (entro NEARBY_DISTANCE_KM)
     """

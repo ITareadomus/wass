@@ -299,7 +299,7 @@ def evaluate_route(cleaner: Cleaner, route: List[Task]) -> Tuple[bool, List[Tupl
     # Orario minimo per task non-straordinarie
     default_start = datetime(arrival.year, arrival.month, arrival.day, 10, 0)  # 10:00
     straordinaria_default = datetime(arrival.year, arrival.month, arrival.day, 9, 0)  # 09:00 default
-    
+
     if first.straordinaria:
         # STRAORDINARIE: logica basata su checkout_dt, può iniziare prima delle 10:00
         if first.checkout_dt:
@@ -314,7 +314,7 @@ def evaluate_route(cleaner: Cleaner, route: List[Task]) -> Tuple[bool, List[Tupl
         # TASK NORMALI/PREMIUM: devono SEMPRE iniziare dalle 10:00 in poi
         # Anche se il cleaner è straordinario e inizia prima, le task normali partono dalle 10:00
         effective_start = max(arrival, default_start)
-        
+
         if first.checkout_dt:
             # Rispetta il checkout, ma non prima delle 10:00
             start = max(effective_start, first.checkout_dt)
@@ -706,20 +706,20 @@ def plan_day(
                 c for c in cleaners
                 if c.can_do_straordinaria and can_cleaner_handle_apartment(c.role, task.apt_type)
             ]
-            
+
             if not straordinaria_cleaners:
                 unassigned.append(task)
                 continue
-            
+
             # Trova cleaner con start_time minore (datetime)
             earliest_cleaner = min(straordinaria_cleaners, key=lambda c: c.start_time)
-            
+
             # Verifica se può prendere la task (pos 0)
             result = find_best_position(earliest_cleaner, task)
             if result is None:
                 unassigned.append(task)
                 continue
-            
+
             pos, _ = result
             earliest_cleaner.route.insert(pos, task)
             assigned_logistic_codes.add(task.logistic_code)
@@ -1110,7 +1110,7 @@ def main():
             c for c in timeline_data["cleaners_assignments"]
             if c["cleaner"]["id"] != cleaner_entry["cleaner"]["id"]
         ]
-        
+
         # Aggiungi la nuova entry con le task HP
         timeline_data["cleaners_assignments"].append({
             "cleaner": cleaner_entry["cleaner"],

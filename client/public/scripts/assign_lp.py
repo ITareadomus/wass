@@ -306,7 +306,7 @@ def evaluate_route(cleaner: Cleaner, route: List[Task]) -> Tuple[bool, List[Tupl
     # - Task NORMALI/PREMIUM: devono SEMPRE iniziare dalle 10:00 in poi
     DEFAULT_START_MIN = 10 * 60  # 10:00 = 600 minuti
     STRAORDINARIA_DEFAULT_MIN = 9 * 60  # 09:00 = 540 minuti (default per straordinarie senza checkout)
-    
+
     if first.straordinaria:
         # STRAORDINARIE: possono iniziare prima delle 10:00
         if hasattr(first, 'checkout_dt') and first.checkout_dt:
@@ -322,7 +322,7 @@ def evaluate_route(cleaner: Cleaner, route: List[Task]) -> Tuple[bool, List[Tupl
         # TASK NORMALI/PREMIUM: devono SEMPRE iniziare dalle 10:00 in poi
         # Anche se il cleaner è straordinario e inizia prima, le task normali partono dalle 10:00
         effective_start = max(arrival, DEFAULT_START_MIN)
-        
+
         if hasattr(first, 'checkout_dt') and first.checkout_dt:
             checkout_minutes = first.checkout_dt.hour * 60 + first.checkout_dt.minute
             start = max(effective_start, checkout_minutes)
@@ -360,19 +360,19 @@ def evaluate_route(cleaner: Cleaner, route: List[Task]) -> Tuple[bool, List[Tupl
         tt = travel_minutes(prev.lat, prev.lng, t.lat, t.lng, prev.address, t.address)
         cur += tt
         arrival = cur
-        
+
         # REGOLA: Task normali/premium devono iniziare alle 10:00+
         if not t.straordinaria:
             if cur < DEFAULT_START_MIN:
                 cur = DEFAULT_START_MIN
                 arrival = cur
-        
+
         # Rispetta checkout se presente
         if hasattr(t, 'checkout_dt') and t.checkout_dt:
             checkout_minutes = t.checkout_dt.hour * 60 + t.checkout_dt.minute
             if cur < checkout_minutes:
                 cur = checkout_minutes
-        
+
         start = cur
         finish = start + t.cleaning_time
 
@@ -662,7 +662,7 @@ def load_cleaners() -> List[Cleaner]:
         role = (c.get("role") or "").strip()
         is_premium = bool(c.get("premium", (role.lower() == "premium")))
         can_do_straordinaria = bool(c.get("can_do_straordinaria", False))
-        
+
         # Leggi start_time del cleaner (default 10:00 se non specificato)
         start_time_str = c.get("start_time", "10:00")
         start_time_min = hhmm_to_min(start_time_str, "10:00")
