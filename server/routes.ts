@@ -839,32 +839,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Ricalcola travel_time, start_time, end_time usando lo script Python
       try {
-        // Aggiungi informazioni sull'ultima task del cleaner (se esiste)
-        const firstTask = cleanerEntry.tasks[0];
-        if (firstTask && firstTask.sequence && firstTask.sequence > 1) {
-          // Il cleaner ha task precedenti, trova l'ultima prima di questa lista
-          // Cerca in tutte le entries del cleaner per trovare l'ultima task
-          let lastPrevTask = null;
-          let maxSeq = 0;
-          
-          for (const entry of timelineData.cleaners_assignments) {
-            if (entry.cleaner.id === normalizedCleanerId) {
-              for (const t of entry.tasks) {
-                if (t.sequence && t.sequence < firstTask.sequence && t.sequence > maxSeq) {
-                  maxSeq = t.sequence;
-                  lastPrevTask = t;
-                }
-              }
-            }
-          }
-          
-          if (lastPrevTask) {
-            cleanerEntry.cleaner.last_task_lat = lastPrevTask.lat;
-            cleanerEntry.cleaner.last_task_lng = lastPrevTask.lng;
-            cleanerEntry.cleaner.last_task_address = lastPrevTask.address;
-          }
-        }
-        
         const updatedCleanerData = await recalculateCleanerTimes(cleanerEntry);
         cleanerEntry.tasks = updatedCleanerData.tasks;
         console.log(`✅ Tempi ricalcolati per cleaner ${normalizedCleanerId}`);
