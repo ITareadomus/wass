@@ -1166,11 +1166,12 @@ export default function TimelineView({
         return `${year}-${month}-${day}`;
       })();
 
-      // 1. Reset timeline_assignments.json (file principale)
+      // 1. Reset timeline_assignments.json (file principale) - FORZATO perché è un reset esplicito
       const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
       const resetResponse = await apiRequest("POST", "/api/reset-timeline-assignments", {
         date: workDate,
-        modified_by: currentUser.username || 'unknown'
+        modified_by: currentUser.username || 'unknown',
+        forceReset: true  // Reset esplicito dall'utente - svuota anche Object Storage
       });
 
       if (!resetResponse.ok) {
