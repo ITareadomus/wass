@@ -297,6 +297,35 @@ export default function Convocazioni() {
 
     try {
       const dateStr = format(selectedDate, "yyyy-MM-dd");
+      const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
+
+      // CRITICAL: Salva prima gli start time modificati per tutti i cleaners selezionati
+      const cleanersWithModifiedStartTime = filteredCleaners.filter(c => 
+        selectedCleaners.has(c.id) && c.start_time
+      );
+
+      for (const cleaner of cleanersWithModifiedStartTime) {
+        try {
+          const response = await fetch('/api/update-cleaner-start-time', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              cleanerId: cleaner.id,
+              startTime: cleaner.start_time,
+              date: dateStr,
+              modified_by: currentUser.username || 'unknown'
+            }),
+          });
+
+          if (!response.ok) {
+            console.warn(`⚠️ Impossibile salvare start time per cleaner ${cleaner.id}`);
+          } else {
+            console.log(`✅ Start time ${cleaner.start_time} salvato per cleaner ${cleaner.id}`);
+          }
+        } catch (error) {
+          console.warn(`⚠️ Errore salvataggio start time per cleaner ${cleaner.id}:`, error);
+        }
+      }
 
       // Carica cleaners dalla timeline per includerli nel salvataggio
       const timelineResponse = await fetch(`/data/output/timeline.json?t=${Date.now()}`);
