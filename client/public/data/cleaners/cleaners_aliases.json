@@ -1,6 +1,6 @@
 {
   "metadata": {
-    "last_updated": "2025-11-26T10:54:38.429Z",
+    "last_updated": "2025-11-27T16:45:06.136Z",
     "description": "Alias personalizzati per i cleaners da visualizzare sulla timeline"
   },
   "aliases": {
@@ -178,6 +178,11 @@
       "name": "MICHEL",
       "lastname": "QUEZADA GONZALEZ",
       "alias": "MICHEL"
+    },
+    "1069": {
+      "name": "CYRIL HARTUR",
+      "lastname": "ZONGMO KENTSA",
+      "alias": "HARTUR"
     },
     "1070": {
       "name": "ABUBACAR",

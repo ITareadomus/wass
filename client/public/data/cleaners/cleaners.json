@@ -1,6 +1,6 @@
 {
     "metadata": {
-        "last_updated": "2025-11-27T16:39:33.682275",
+        "last_updated": "2025-11-27T16:50:06.135716",
         "db_config": {
             "host": "139.59.132.41",
             "user": "admin",
@@ -11,7 +11,7 @@
     },
     "dates": {
         "2025-11-28": {
-            "timestamp": "2025-11-27T16:39:33.682288",
+            "timestamp": "2025-11-27T16:50:06.135730",
             "cleaners": [
                 {
                     "id": 24,
@@ -650,7 +650,7 @@
                     "contract_type": "a chiamata",
                     "preferred_customers": [],
                     "telegram_id": null,
-                    "start_time": null,
+                    "start_time": "10:00",
                     "can_do_straordinaria": false
                 },
                 {
@@ -698,7 +698,7 @@
                     "contract_type": "a chiamata",
                     "preferred_customers": [],
                     "telegram_id": null,
-                    "start_time": null,
+                    "start_time": "10:00",
                     "can_do_straordinaria": false
                 },
                 {
