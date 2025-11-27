@@ -1,6 +1,4 @@
-
-import { useDroppable } from "@dnd-kit/core";
-import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
+import { Droppable } from "react-beautiful-dnd";
 import { TaskType as Task } from "@shared/schema";
 import TaskCard from "./task-card";
 import { Inbox } from "lucide-react";
@@ -13,12 +11,6 @@ interface UnassignedTasksProps {
 }
 
 export default function UnassignedTasks({ tasks, hasAssigned = false, isDragDisabled = false, isReadOnly = false }: UnassignedTasksProps) {
-  const { setNodeRef, isOver } = useDroppable({
-    id: "unassigned",
-  });
-
-  const taskIds = tasks.map(t => String(t.id));
-
   return (
     <div className="bg-muted rounded-lg p-4">
       <h3 className="font-semibold mb-4 text-foreground flex items-center">
@@ -32,20 +24,24 @@ export default function UnassignedTasks({ tasks, hasAssigned = false, isDragDisa
         </span>
       </h3>
 
-      <SortableContext items={taskIds} strategy={verticalListSortingStrategy}>
-        <div
-          ref={setNodeRef}
-          className={`
-            space-y-2 min-h-48 transition-colors duration-200
-            ${isOver ? "drop-zone-active" : ""}
-          `}
-          data-testid="unassigned-tasks-container"
-        >
-          {tasks.map((task, index) => (
-            <TaskCard key={task.id} task={task} index={index} isDragDisabled={isDragDisabled} isReadOnly={isReadOnly} />
-          ))}
-        </div>
-      </SortableContext>
+      <Droppable droppableId="unassigned">
+        {(provided, snapshot) => (
+          <div
+            ref={provided.innerRef}
+            {...provided.droppableProps}
+            className={`
+              space-y-2 min-h-48 transition-colors duration-200
+              ${snapshot.isDraggingOver ? "drop-zone-active" : ""}
+            `}
+            data-testid="unassigned-tasks-container"
+          >
+            {tasks.map((task, index) => (
+              <TaskCard key={task.id} task={task} index={index} isDragDisabled={isDragDisabled} isReadOnly={isReadOnly} />
+            ))}
+            {provided.placeholder}
+          </div>
+        )}
+      </Droppable>
     </div>
   );
 }
