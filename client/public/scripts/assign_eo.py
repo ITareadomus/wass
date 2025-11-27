@@ -1007,7 +1007,14 @@ def main():
             print(f"⚠️ Errore nel caricamento della timeline esistente: {e}")
 
     # Aggiungi le nuove assegnazioni EO organizzate per cleaner
+    # CRITICAL: Rimuovi PRIMA eventuali entry duplicate/vuote dello stesso cleaner
     for cleaner_entry in output["early_out_tasks_assigned"]:
+        # Rimuovi entry precedenti dello stesso cleaner (anche quelle vuote)
+        timeline_data["cleaners_assignments"] = [
+            c for c in timeline_data["cleaners_assignments"]
+            if c["cleaner"]["id"] != cleaner_entry["cleaner"]["id"]
+        ]
+        # Aggiungi la nuova entry
         timeline_data["cleaners_assignments"].append({
             "cleaner": cleaner_entry["cleaner"],
             "tasks": cleaner_entry["tasks"]

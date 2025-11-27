@@ -1099,24 +1099,17 @@ def main():
 
     # Aggiungi le nuove assegnazioni HP organizzate per cleaner
     for cleaner_entry in output["high_priority_tasks_assigned"]:
-        # Cerca se esiste già un'entry per questo cleaner
-        existing_entry = None
-        for entry in timeline_data["cleaners_assignments"]:
-            if entry["cleaner"]["id"] == cleaner_entry["cleaner"]["id"]:
-                existing_entry = entry
-                break
-
-        if existing_entry:
-            # Aggiungi le task HP alle task esistenti
-            existing_entry["tasks"].extend(cleaner_entry["tasks"])
-            # Ordina le task per orario di inizio (start_time)
-            existing_entry["tasks"].sort(key=lambda t: t.get("start_time", "00:00"))
-        else:
-            # Crea nuova entry
-            timeline_data["cleaners_assignments"].append({
-                "cleaner": cleaner_entry["cleaner"],
-                "tasks": cleaner_entry["tasks"]
-            })
+        # CRITICAL: Rimuovi PRIMA eventuali entry duplicate/vuote dello stesso cleaner
+        timeline_data["cleaners_assignments"] = [
+            c for c in timeline_data["cleaners_assignments"]
+            if c["cleaner"]["id"] != cleaner_entry["cleaner"]["id"]
+        ]
+        
+        # Aggiungi la nuova entry con le task HP
+        timeline_data["cleaners_assignments"].append({
+            "cleaner": cleaner_entry["cleaner"],
+            "tasks": cleaner_entry["tasks"]
+        })
 
     # Aggiorna meta
     # Conta i cleaners effettivamente usati (con almeno una task)
