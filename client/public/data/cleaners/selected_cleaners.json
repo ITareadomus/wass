@@ -13,7 +13,7 @@
       "contract_type": "a chiamata",
       "preferred_customers": [],
       "telegram_id": null,
-      "start_time": "10:00",
+      "start_time": "09:00",
       "can_do_straordinaria": false
     },
     {
@@ -314,7 +314,7 @@
       "role": "Standard",
       "active": true,
       "ranking": 0,
-      "counter_hours": 7.5,
+      "counter_hours": 8.5,
       "counter_days": 0,
       "available": true,
       "contract_type": "a chiamata",
@@ -359,6 +359,6 @@
   "total_selected": 14,
   "metadata": {
     "date": "2025-11-28",
-    "saved_at": "2025-11-27T17:06:24.252Z"
+    "saved_at": "2025-11-27T17:09:01.603Z"
   }
 }
