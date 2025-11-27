@@ -1,6 +1,6 @@
 {
   "metadata": {
-    "last_updated": "2025-11-27T13:58:42.566980",
+    "last_updated": "2025-11-27T13:27:47.546741",
     "date": "2025-11-28"
   },
   "cleaners_assignments": [
@@ -78,14 +78,47 @@
           "followup": true,
           "sequence": 2,
           "travel_time": 21
+        },
+        {
+          "task_id": 219478,
+          "logistic_code": 1645,
+          "client_id": 87,
+          "premium": false,
+          "address": "Via Scaldasole, 4",
+          "lat": "45.454291",
+          "lng": "9.1800519",
+          "cleaning_time": 60,
+          "checkin_date": "2025-11-29",
+          "checkout_date": "2025-11-28",
+          "checkin_time": "15:00",
+          "checkout_time": null,
+          "pax_in": 3,
+          "pax_out": 2,
+          "small_equipment": true,
+          "operation_id": 2,
+          "confirmed_operation": false,
+          "straordinaria": false,
+          "type_apt": "A",
+          "alias": "HCC",
+          "customer_name": "HACCA SRL",
+          "reasons": [
+            "client_forced_eo",
+            "automatic_assignment_eo"
+          ],
+          "priority": "early_out",
+          "start_time": "12:43",
+          "end_time": "13:43",
+          "followup": true,
+          "sequence": 3,
+          "travel_time": 22
         }
       ]
     },
     {
       "cleaner": {
-        "id": 132,
-        "name": "JOHOISER ERNESTO",
-        "lastname": "LOPEZ GIRON",
+        "id": 249,
+        "name": "Ogbodo Chidi",
+        "lastname": "Igwe",
         "role": "Premium",
         "premium": true
       },
@@ -127,9 +160,9 @@
     },
     {
       "cleaner": {
-        "id": 596,
-        "name": "TRACY",
-        "lastname": "OKE",
+        "id": 132,
+        "name": "JOHOISER ERNESTO",
+        "lastname": "LOPEZ GIRON",
         "role": "Premium",
         "premium": true
       },
@@ -171,9 +204,9 @@
     },
     {
       "cleaner": {
-        "id": 1045,
-        "name": "ARACELY ROCIO",
-        "lastname": "MORLA ZAMBRANO",
+        "id": 596,
+        "name": "TRACY",
+        "lastname": "OKE",
         "role": "Premium",
         "premium": true
       },
@@ -238,85 +271,85 @@
             "automatic_assignment_eo"
           ],
           "priority": "early_out",
-          "start_time": "10:45",
-          "end_time": "11:45",
+          "start_time": "10:46",
+          "end_time": "11:46",
           "followup": true,
           "sequence": 2,
-          "travel_time": 15
+          "travel_time": 16
         },
         {
-          "task_id": 219364,
-          "logistic_code": 1648,
-          "client_id": 87,
+          "task_id": 219505,
+          "logistic_code": 617,
+          "client_id": 67,
           "premium": false,
-          "address": "via Isabella d'Aragona 2",
-          "lat": "45.451552",
-          "lng": "9.1901083",
-          "cleaning_time": 60,
-          "checkin_date": "2025-11-29",
+          "address": "VIA VOGHERA, 4",
+          "lat": "45.454632",
+          "lng": "9.168536",
+          "cleaning_time": 30,
+          "checkin_date": "2025-11-28",
           "checkout_date": "2025-11-28",
-          "checkin_time": "15:00",
-          "checkout_time": null,
+          "checkin_time": null,
+          "checkout_time": "09:30",
           "pax_in": 1,
-          "pax_out": 1,
+          "pax_out": 0,
           "small_equipment": true,
           "operation_id": 2,
-          "confirmed_operation": false,
+          "confirmed_operation": true,
           "straordinaria": false,
           "type_apt": "A",
-          "alias": "HCC",
-          "customer_name": "HACCA SRL",
+          "alias": "EXP",
+          "customer_name": "EXPERIENCE DESIGN BED & SHOW",
           "reasons": [
-            "client_forced_eo",
+            "checkout_time_eo_window_or_before_start",
             "automatic_assignment_eo"
           ],
           "priority": "early_out",
-          "start_time": "12:07",
-          "end_time": "13:07",
+          "start_time": "12:02",
+          "end_time": "12:32",
           "followup": true,
           "sequence": 3,
-          "travel_time": 22
+          "travel_time": 16
         },
         {
-          "task_id": 219478,
-          "logistic_code": 1645,
-          "client_id": 87,
+          "task_id": 219506,
+          "logistic_code": 619,
+          "client_id": 67,
           "premium": false,
-          "address": "Via Scaldasole, 4",
-          "lat": "45.454291",
-          "lng": "9.1800519",
-          "cleaning_time": 60,
-          "checkin_date": "2025-11-29",
+          "address": "VIA TORTONA, 10",
+          "lat": "45.4542397",
+          "lng": "9.1686792",
+          "cleaning_time": 40,
+          "checkin_date": "2025-11-28",
           "checkout_date": "2025-11-28",
-          "checkin_time": "15:00",
-          "checkout_time": null,
-          "pax_in": 3,
-          "pax_out": 2,
-          "small_equipment": true,
+          "checkin_time": null,
+          "checkout_time": "09:30",
+          "pax_in": 2,
+          "pax_out": 0,
+          "small_equipment": false,
           "operation_id": 2,
-          "confirmed_operation": false,
+          "confirmed_operation": true,
           "straordinaria": false,
-          "type_apt": "A",
-          "alias": "HCC",
-          "customer_name": "HACCA SRL",
+          "type_apt": "B",
+          "alias": "EXP",
+          "customer_name": "EXPERIENCE DESIGN BED & SHOW",
           "reasons": [
-            "client_forced_eo",
+            "checkout_time_eo_window_or_before_start",
             "automatic_assignment_eo"
           ],
           "priority": "early_out",
-          "start_time": "13:25",
-          "end_time": "14:25",
+          "start_time": "12:39",
+          "end_time": "13:19",
           "followup": true,
           "sequence": 4,
-          "travel_time": 18
+          "travel_time": 7
         }
       ]
     },
     {
       "cleaner": {
-        "id": 829,
-        "name": "MUSTAPHA",
-        "lastname": "BAH",
+        "id": 1045,
+        "name": "ARACELY ROCIO",
+        "lastname": "MORLA ZAMBRANO",
         "role": "Premium",
         "premium": true
       },
@@ -381,19 +414,19 @@
             "automatic_assignment_eo"
           ],
           "priority": "early_out",
-          "start_time": "11:29",
-          "end_time": "12:29",
+          "start_time": "11:30",
+          "end_time": "12:30",
           "followup": true,
           "sequence": 2,
-          "travel_time": 29
+          "travel_time": 30
         }
       ]
     },
     {
       "cleaner": {
-        "id": 495,
-        "name": "EL HADJI",
-        "lastname": "BA",
+        "id": 829,
+        "name": "MUSTAPHA",
+        "lastname": "BAH",
         "role": "Premium",
         "premium": true
       },
@@ -435,88 +468,11 @@
     },
     {
       "cleaner": {
-        "id": 722,
-        "name": "LACINE",
-        "lastname": "KONE",
+        "id": 495,
+        "name": "EL HADJI",
+        "lastname": "BA",
         "role": "Premium",
         "premium": true
-      },
-      "tasks": [
-        {
-          "task_id": 219365,
-          "logistic_code": 1196,
-          "client_id": 61,
-          "premium": false,
-          "address": "VIALE CASSALA 75",
-          "lat": "45.4443236",
-          "lng": "9.1669147",
-          "cleaning_time": 120,
-          "checkin_date": "2025-11-28",
-          "checkout_date": "2025-11-28",
-          "checkin_time": null,
-          "checkout_time": null,
-          "pax_in": 1,
-          "pax_out": 1,
-          "small_equipment": false,
-          "operation_id": 2,
-          "confirmed_operation": false,
-          "straordinaria": false,
-          "type_apt": "C",
-          "alias": "NTM",
-          "customer_name": "NOTA-MI",
-          "reasons": [
-            "client_forced_eo",
-            "automatic_assignment_eo"
-          ],
-          "priority": "early_out",
-          "start_time": "10:00",
-          "end_time": "12:00",
-          "followup": false,
-          "sequence": 1,
-          "travel_time": 0
-        },
-        {
-          "task_id": 219362,
-          "logistic_code": 1646,
-          "client_id": 87,
-          "premium": false,
-          "address": "Via Matteo Bandello 4/1",
-          "lat": "45.465877",
-          "lng": "9.1667974",
-          "cleaning_time": 60,
-          "checkin_date": "2025-11-28",
-          "checkout_date": "2025-11-28",
-          "checkin_time": "15:00",
-          "checkout_time": null,
-          "pax_in": 2,
-          "pax_out": 2,
-          "small_equipment": true,
-          "operation_id": 2,
-          "confirmed_operation": false,
-          "straordinaria": false,
-          "type_apt": "A",
-          "alias": "HCC",
-          "customer_name": "HACCA SRL",
-          "reasons": [
-            "client_forced_eo",
-            "automatic_assignment_eo"
-          ],
-          "priority": "early_out",
-          "start_time": "12:23",
-          "end_time": "13:23",
-          "followup": true,
-          "sequence": 2,
-          "travel_time": 23
-        }
-      ]
-    },
-    {
-      "cleaner": {
-        "id": 1066,
-        "name": "MICHEL",
-        "lastname": "QUEZADA GONZALEZ",
-        "role": "Standard",
-        "premium": false
       },
       "tasks": [
         {
@@ -553,71 +509,49 @@
           "travel_time": 0
         },
         {
-          "task_id": 219506,
-          "logistic_code": 619,
-          "client_id": 67,
+          "task_id": 219362,
+          "logistic_code": 1646,
+          "client_id": 87,
           "premium": false,
-          "address": "VIA TORTONA, 10",
-          "lat": "45.4542397",
-          "lng": "9.1686792",
-          "cleaning_time": 40,
+          "address": "Via Matteo Bandello 4/1",
+          "lat": "45.465877",
+          "lng": "9.1667974",
+          "cleaning_time": 60,
           "checkin_date": "2025-11-28",
           "checkout_date": "2025-11-28",
-          "checkin_time": null,
-          "checkout_time": "09:30",
+          "checkin_time": "15:00",
+          "checkout_time": null,
           "pax_in": 2,
-          "pax_out": 0,
-          "small_equipment": false,
-          "operation_id": 2,
-          "confirmed_operation": true,
-          "straordinaria": false,
-          "type_apt": "B",
-          "alias": "EXP",
-          "customer_name": "EXPERIENCE DESIGN BED & SHOW",
-          "reasons": [
-            "checkout_time_eo_window_or_before_start",
-            "automatic_assignment_eo"
-          ],
-          "priority": "early_out",
-          "start_time": "10:43",
-          "end_time": "11:23",
-          "followup": true,
-          "sequence": 2,
-          "travel_time": 3
-        },
-        {
-          "task_id": 219505,
-          "logistic_code": 617,
-          "client_id": 67,
-          "premium": false,
-          "address": "VIA VOGHERA, 4",
-          "lat": "45.454632",
-          "lng": "9.168536",
-          "cleaning_time": 30,
-          "checkin_date": "2025-11-28",
-          "checkout_date": "2025-11-28",
-          "checkin_time": null,
-          "checkout_time": "09:30",
-          "pax_in": 1,
-          "pax_out": 0,
+          "pax_out": 2,
           "small_equipment": true,
           "operation_id": 2,
-          "confirmed_operation": true,
+          "confirmed_operation": false,
           "straordinaria": false,
           "type_apt": "A",
-          "alias": "EXP",
-          "customer_name": "EXPERIENCE DESIGN BED & SHOW",
+          "alias": "HCC",
+          "customer_name": "HACCA SRL",
           "reasons": [
-            "checkout_time_eo_window_or_before_start",
+            "client_forced_eo",
             "automatic_assignment_eo"
           ],
           "priority": "early_out",
-          "start_time": "11:28",
-          "end_time": "11:58",
+          "start_time": "11:05",
+          "end_time": "12:05",
           "followup": true,
-          "sequence": 3,
-          "travel_time": 5
-        },
+          "sequence": 2,
+          "travel_time": 25
+        }
+      ]
+    },
+    {
+      "cleaner": {
+        "id": 722,
+        "name": "LACINE",
+        "lastname": "KONE",
+        "role": "Premium",
+        "premium": true
+      },
+      "tasks": [
         {
           "task_id": 219363,
           "logistic_code": 1091,
@@ -645,18 +579,95 @@
             "automatic_assignment_eo"
           ],
           "priority": "early_out",
-          "start_time": "12:28",
-          "end_time": "13:58",
+          "start_time": "10:00",
+          "end_time": "11:30",
+          "followup": false,
+          "sequence": 1,
+          "travel_time": 0
+        }
+      ]
+    },
+    {
+      "cleaner": {
+        "id": 1066,
+        "name": "MICHEL",
+        "lastname": "QUEZADA GONZALEZ",
+        "role": "Standard",
+        "premium": false
+      },
+      "tasks": [
+        {
+          "task_id": 219365,
+          "logistic_code": 1196,
+          "client_id": 61,
+          "premium": false,
+          "address": "VIALE CASSALA 75",
+          "lat": "45.4443236",
+          "lng": "9.1669147",
+          "cleaning_time": 120,
+          "checkin_date": "2025-11-28",
+          "checkout_date": "2025-11-28",
+          "checkin_time": null,
+          "checkout_time": null,
+          "pax_in": 1,
+          "pax_out": 1,
+          "small_equipment": false,
+          "operation_id": 2,
+          "confirmed_operation": false,
+          "straordinaria": false,
+          "type_apt": "C",
+          "alias": "NTM",
+          "customer_name": "NOTA-MI",
+          "reasons": [
+            "client_forced_eo",
+            "automatic_assignment_eo"
+          ],
+          "priority": "early_out",
+          "start_time": "10:00",
+          "end_time": "12:00",
+          "followup": false,
+          "sequence": 1,
+          "travel_time": 0
+        },
+        {
+          "task_id": 219364,
+          "logistic_code": 1648,
+          "client_id": 87,
+          "premium": false,
+          "address": "via Isabella d'Aragona 2",
+          "lat": "45.451552",
+          "lng": "9.1901083",
+          "cleaning_time": 60,
+          "checkin_date": "2025-11-29",
+          "checkout_date": "2025-11-28",
+          "checkin_time": "15:00",
+          "checkout_time": null,
+          "pax_in": 1,
+          "pax_out": 1,
+          "small_equipment": true,
+          "operation_id": 2,
+          "confirmed_operation": false,
+          "straordinaria": false,
+          "type_apt": "A",
+          "alias": "HCC",
+          "customer_name": "HACCA SRL",
+          "reasons": [
+            "client_forced_eo",
+            "automatic_assignment_eo"
+          ],
+          "priority": "early_out",
+          "start_time": "12:20",
+          "end_time": "13:20",
           "followup": true,
-          "sequence": 4,
-          "travel_time": 30
+          "sequence": 2,
+          "travel_time": 20
         }
       ]
     }
   ],
   "meta": {
-    "total_cleaners": 8,
-    "used_cleaners": 8,
+    "total_cleaners": 9,
+    "used_cleaners": 9,
     "assigned_tasks": 17
   }
 }
