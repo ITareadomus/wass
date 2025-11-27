@@ -908,6 +908,20 @@ def plan_day(
             unassigned.append(task)
             continue
 
+        # SUPER-CLUSTER geografico (distanza in METRI)
+        from assign_utils import haversine_meters
+        
+        super_cluster_candidates: List[Tuple[Cleaner, int, float, float]] = []
+        for c, p, t_travel in candidates:
+            if c.route:
+                min_distance_meters = min(
+                    (haversine_meters(ex.lat, ex.lng, task.lat, task.lng) 
+                     for ex in c.route),
+                    default=float('inf')
+                )
+                if min_distance_meters <= 250:  # 250m = super-cluster
+                    super_cluster_candidates.append((c, p, t_travel, min_distance_meters))
+        
         # HARD CLUSTER edificio/via/blocco
         building_candidates: List[Tuple[Cleaner, int, float]] = []
         for c, p, t_travel in candidates:
@@ -917,7 +931,12 @@ def plan_day(
             ):
                 building_candidates.append((c, p, t_travel))
 
-        if building_candidates:
+        # Priorità: super-cluster > building > fairness
+        if super_cluster_candidates:
+            super_cluster_candidates.sort(key=lambda x: x[3])
+            pool = [(c, p, t_travel) for c, p, t_travel, _ in super_cluster_candidates]
+            effective_load_weight = max(LOAD_WEIGHT - 5, 1)
+        elif building_candidates:
             pool = building_candidates
             effective_load_weight = max(LOAD_WEIGHT - 3, 1)
         else:
