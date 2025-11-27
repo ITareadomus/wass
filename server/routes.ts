@@ -30,16 +30,15 @@ function getCurrentUsername(req?: any): string {
   return req?.body?.created_by || req?.body?.modified_by || 'system';
 }
 
-// Utility: costruzione chiave file consistente
+// Utility: costruzione chiave file consistente (nuovo formato semplificato)
 function buildKey(isoDate: string) {
   const d = new Date(isoDate);
   const day = String(d.getDate()).padStart(2, "0");
   const month = String(d.getMonth() + 1).padStart(2, "0");
   const year = String(d.getFullYear());
-  const shortYear = year.slice(-2);
   const folder = `${day}-${month}-${year}`;
-  const filename = `assignments_${day}${month}${shortYear}.json`;
-  return { key: `${folder}/${filename}`, d };
+  // Nuovo formato semplificato: assignments_data.json contiene tutto
+  return { key: `${folder}/assignments_data.json`, d };
 }
 
 /**
@@ -185,52 +184,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { date, modified_by, forceReset } = req.body;
       const workDate = date || format(new Date(), 'yyyy-MM-dd');
       const currentUsername = modified_by || getCurrentUsername(req);
-      const timelinePath = path.join(process.cwd(), 'client/public/data/output/timeline.json');
 
       // Se NON è un reset forzato (es. cambio data automatico), controlla se esistono assegnazioni
       if (!forceReset) {
-        const { Client } = await import("@replit/object-storage");
-        const client = new Client();
-        const { key } = buildKey(workDate);
-        
-        const existingResult = await client.downloadAsText(key);
-        if (existingResult.ok) {
-          const existingData = JSON.parse(existingResult.value);
-          const hasAssignments = existingData.cleaners_assignments?.some(
-            (c: any) => c.tasks && c.tasks.length > 0
-          );
-          
-          if (hasAssignments) {
-            console.log(`⚠️ Trovate assegnazioni esistenti per ${workDate} - skip reset, usa load-saved-assignments`);
-            return res.json({ 
-              success: true, 
-              message: "Timeline esistente trovata - carica con load-saved-assignments",
-              hasExistingAssignments: true
-            });
-          }
+        const hasExisting = await storageService.hasAssignments(workDate);
+        if (hasExisting) {
+          console.log(`⚠️ Trovate assegnazioni esistenti per ${workDate} - skip reset, usa load-saved-assignments`);
+          return res.json({ 
+            success: true, 
+            message: "Timeline esistente trovata - carica con load-saved-assignments",
+            hasExistingAssignments: true
+          });
         }
       } else {
-        console.log(`🔄 Reset FORZATO richiesto per ${workDate} - svuoto timeline e Object Storage`);
+        console.log(`🔄 Reset FORZATO richiesto per ${workDate} - svuoto timeline (mantiene convocazioni)`);
       }
 
-      // Svuota il file timeline.json con struttura corretta
-      const emptyTimeline = {
-        metadata: {
-          last_updated: new Date().toISOString(),
-          date: workDate,
-          created_by: currentUsername
-        },
-        cleaners_assignments: [],
-        meta: {
-          total_cleaners: 0,
-          used_cleaners: 0,
-          assigned_tasks: 0
-        }
-      };
-
-      // Salva timeline su filesystem E su Object Storage (per reset completo)
-      await workspaceFiles.saveTimeline(workDate, emptyTimeline);
-      console.log(`Timeline resettata: timeline.json + Object Storage`);
+      // Reset timeline: svuota assegnazioni ma MANTIENE selected_cleaners
+      await workspaceFiles.resetTimeline(workDate);
+      console.log(`Timeline resettata: timeline.json + Object Storage (convocazioni preservate)`);
 
       // FORZA la ricreazione di containers.json rieseguendo create_containers.py
       console.log(`Rieseguendo create_containers.py per ripristinare i containers...`);
@@ -252,18 +224,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // CRITICAL: Forza nuovamente il reset di timeline.json dopo create_containers
       // perché lo script Python potrebbe aver sovrascritto il file
       console.log(`🔄 Forzatura reset timeline.json dopo create_containers...`);
-      await workspaceFiles.saveTimeline(workDate, emptyTimeline);
-      console.log(`✅ Timeline resettata nuovamente dopo create_containers`);
+      await workspaceFiles.resetTimeline(workDate);
+      console.log(`✅ Timeline resettata nuovamente dopo create_containers (convocazioni preservate)`);
 
-      // CRITICAL: Elimina il flag di ultimo salvataggio per evitare ricaricamenti automatici
-      console.log(`🗑️ Reset flag ultimo salvataggio per data ${workDate}`);
-      // Il frontend gestirà la rimozione del localStorage
-
-      // === RESET: NON modificare selected_cleaners.json ===
-      // Durante il reset, selected_cleaners.json rimane INVARIATO
-      // Viene svuotato SOLO quando si cambia data (in /api/extract-data)
-      console.log(`✅ Reset completato - selected_cleaners.json NON modificato (rimane invariato)`);
-      // === END ===
+      // === RESET: selected_cleaners.json rimane INVARIATO nell'Object Storage ===
+      console.log(`✅ Reset completato - convocazioni preservate in Object Storage`);
 
       res.json({ success: true, message: "Timeline resettata con successo" });
     } catch (error: any) {
@@ -4131,17 +4096,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // API per gestione workspace - Cancella file workspace non salvati
+  // API per gestione dati salvati - Lista date con assegnazioni
   app.get("/api/workspace/list", async (req, res) => {
     try {
-      const dates = await storageService.listWorkspaceDates();
+      const dates = await storageService.listDates();
       res.json({ success: true, dates });
     } catch (error: any) {
-      console.error("Errore nel listing workspace:", error);
+      console.error("Errore nel listing date:", error);
       res.status(500).json({ success: false, error: error.message });
     }
   });
 
+  // Cancella dati per una specifica data
   app.delete("/api/workspace/:workDate", async (req, res) => {
     try {
       const { workDate } = req.params;
@@ -4153,18 +4119,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      const result = await storageService.deleteWorkspaceFiles(workDate);
+      const success = await storageService.deleteData(workDate);
 
       res.json({
-        success: result.success,
-        deletedFiles: result.deletedFiles,
-        errors: result.errors,
-        message: result.success
-          ? `File workspace cancellati per ${workDate}`
-          : `Errori durante la cancellazione: ${result.errors.join(', ')}`
+        success,
+        message: success
+          ? `Dati cancellati per ${workDate}`
+          : `Errore durante la cancellazione per ${workDate}`
       });
     } catch (error: any) {
-      console.error("Errore nella cancellazione workspace:", error);
+      console.error("Errore nella cancellazione dati:", error);
       res.status(500).json({ success: false, error: error.message });
     }
   });
