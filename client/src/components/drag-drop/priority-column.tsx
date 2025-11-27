@@ -1,10 +1,11 @@
-import { Droppable } from "react-beautiful-dnd";
+
+import { useDroppable } from "@dnd-kit/core";
+import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { TaskType as Task } from "@shared/schema";
 import TaskCard from "./task-card";
 import { Clock, AlertCircle, ArrowDown, Calendar, CheckSquare } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import { format } from "date-fns";
 import { useState, useEffect, useMemo } from "react";
 
 interface ContainerMultiSelectState {
@@ -43,7 +44,10 @@ export default function PriorityColumn({
   const { toast } = useToast();
   const [hasAssigned, setHasAssigned] = useState(false);
   
-  // Usa lo stato passato dal parent
+  const { setNodeRef, isOver } = useDroppable({
+    id: droppableId,
+  });
+  
   const isMultiSelectMode = containerMultiSelectState?.isActive ?? false;
   const selectedTasks = containerMultiSelectState?.selectedTasks ?? [];
   const toggleMode = containerMultiSelectState?.toggleMode ?? (() => {});
@@ -52,7 +56,6 @@ export default function PriorityColumn({
   const isTaskSelected = containerMultiSelectState?.isTaskSelected ?? (() => false);
   const getTaskOrder = containerMultiSelectState?.getTaskOrder ?? (() => undefined);
   
-  // Context per passare ai TaskCard
   const multiSelectCtx = useMemo(() => ({
     isMultiSelectMode,
     selectedTasks,
@@ -62,10 +65,7 @@ export default function PriorityColumn({
     isTaskSelected,
     getTaskOrder,
   }), [isMultiSelectMode, selectedTasks, toggleMode, toggleTask, clearSelection, isTaskSelected, getTaskOrder]);
-  
-  console.log('[DEBUG PriorityColumn]', priority, 'isMultiSelectMode:', isMultiSelectMode, 'selectedTasks:', selectedTasks.length);
 
-  // Verifica se la data selezionata è nel passato
   useEffect(() => {
     const checkIfDateInPast = () => {
       const savedDate = localStorage.getItem('selected_work_date');
@@ -84,8 +84,6 @@ export default function PriorityColumn({
     };
 
     checkIfDateInPast();
-
-    // Ricontrolla quando cambia la data
     const interval = setInterval(checkIfDateInPast, 1000);
     return () => clearInterval(interval);
   }, []);
@@ -96,9 +94,8 @@ export default function PriorityColumn({
     "arrow-down": <ArrowDown className="w-5 h-5 mr-2 text-muted-foreground" />,
   };
 
-  // Identifica task duplicate basandosi sul logistic_code
   const logisticCodeCounts = tasks.reduce((acc, task) => {
-    const code = task.name; // name contiene il logistic_code
+    const code = task.name;
     acc[code] = (acc[code] || 0) + 1;
     return acc;
   }, {} as Record<string, number>);
@@ -107,38 +104,21 @@ export default function PriorityColumn({
     return logisticCodeCounts[task.name] > 1;
   };
 
-  // Funzione modificata per usare hasAssigned
   const handleAssign = async () => {
     if (assignAction) {
       await assignAction();
-      setHasAssigned(true); // Imposta hasAssigned a true dopo l'assegnazione
+      setHasAssigned(true);
     }
   };
-
 
   const getColumnClass = (priority: string, tasks: Task[]) => {
     switch (priority) {
       case "early-out":
-        return "bg-custom-blue-light border-custom-blue";
       case "high":
-        return "bg-custom-blue-light border-custom-blue";
       case "low":
         return "bg-custom-blue-light border-custom-blue";
       default:
         return "bg-gray-50 border-gray-300";
-    }
-  };
-
-  const getHeaderClass = (priority: string) => {
-    switch (priority) {
-      case "early-out":
-        return "text-custom-blue";
-      case "high":
-        return "text-custom-blue";
-      case "low":
-        return "text-custom-blue";
-      default:
-        return "text-foreground";
     }
   };
 
@@ -166,7 +146,6 @@ export default function PriorityColumn({
         setIsAssigning(false);
         return;
       }
-      // La data è già nel formato corretto yyyy-MM-dd, non serve più lo split
       const dateStr = savedDate;
 
       let endpoint = '';
@@ -189,7 +168,6 @@ export default function PriorityColumn({
           throw new Error('Tipo di container non supportato');
       }
 
-      console.log(`🔄 Esecuzione assegnazione ${priority} per data: ${dateStr}`);
       const response = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -201,7 +179,6 @@ export default function PriorityColumn({
       }
 
       const result = await response.json();
-      console.log(`Assegnazione ${priority} completata:`, result);
 
       toast({
         variant: "success",
@@ -209,14 +186,10 @@ export default function PriorityColumn({
         description: successMessage,
       });
 
-      // Ricarica i task per riflettere le nuove assegnazioni
       if ((window as any).reloadAllTasks) {
-        console.log('🔄 Ricaricamento task dopo assegnazione...');
         await (window as any).reloadAllTasks();
-        console.log('✅ Task ricaricati con successo');
       }
     } catch (error: any) {
-      console.error(`Errore nell'assegnazione ${priority}:`, error);
       toast({
         title: "Errore",
         description: `${title} non assegnati, errore!`,
@@ -226,6 +199,8 @@ export default function PriorityColumn({
       setIsAssigning(false);
     }
   };
+
+  const taskIds = tasks.map(t => String(t.id));
 
   return (
     <div className={`${getColumnClass(priority, tasks)} rounded-lg p-4 border-2`}>
@@ -270,7 +245,7 @@ export default function PriorityColumn({
           <Button
             variant="outline"
             size="sm"
-            onClick={handleAssign} // Utilizza handleAssign
+            onClick={handleAssign}
             disabled={isAssigning || tasks.length === 0 || isDateInPast}
             className="text-xs px-2 py-1 h-7 border-2 border-custom-blue"
             title={isDateInPast ? "Non puoi assegnare task per date passate" : ""}
@@ -290,42 +265,37 @@ export default function PriorityColumn({
           </Button>
         </div>
       </div>
-      <Droppable droppableId={droppableId}>
-        {(provided, snapshot) => (
-          <div
-            ref={provided.innerRef}
-            {...provided.droppableProps}
-            className={`
-              flex flex-wrap gap-2 min-h-[120px] transition-colors duration-200 content-start p-2
-              ${snapshot.isDraggingOver ? "drop-zone-active" : ""}
-            `}
-            data-testid={`priority-column-${droppableId}`}
-          >
-            {tasks.map((task, index) => {
-              // Verifica se è duplicata (stesso logistic_code ma id diverso)
-              const isDuplicate = hasAssigned && tasks.some(
-                t => t.name === task.name && t.id !== task.id
-              );
-              
-              return (
-                <TaskCard
-                  key={task.id}
-                  task={task}
-                  index={index}
-                  isInTimeline={false}
-                  allTasks={tasks}
-                  currentContainer={droppableId}
-                  isDuplicate={isDuplicate}
-                  isDragDisabled={isDragDisabled || isDateInPast}
-                  isReadOnly={isDateInPast}
-                  multiSelectContext={multiSelectCtx}
-                />
-              );
-            })}
-            {provided.placeholder}
-          </div>
-        )}
-      </Droppable>
+      <SortableContext items={taskIds} strategy={verticalListSortingStrategy}>
+        <div
+          ref={setNodeRef}
+          className={`
+            flex flex-wrap gap-2 min-h-[120px] transition-colors duration-200 content-start p-2
+            ${isOver ? "drop-zone-active" : ""}
+          `}
+          data-testid={`priority-column-${droppableId}`}
+        >
+          {tasks.map((task, index) => {
+            const isDuplicate = hasAssigned && tasks.some(
+              t => t.name === task.name && t.id !== task.id
+            );
+            
+            return (
+              <TaskCard
+                key={task.id}
+                task={task}
+                index={index}
+                isInTimeline={false}
+                allTasks={tasks}
+                currentContainer={droppableId}
+                isDuplicate={isDuplicate}
+                isDragDisabled={isDragDisabled || isDateInPast}
+                isReadOnly={isDateInPast}
+                multiSelectContext={multiSelectCtx}
+              />
+            );
+          })}
+        </div>
+      </SortableContext>
     </div>
   );
 }
