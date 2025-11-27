@@ -1,0 +1,20 @@
+chunk-RPCDYKBN.js?v=6dc01d57:521 Warning: Connect(Droppable): Support for defaultProps will be removed from memo components in a future major release. Use JavaScript default parameters instead.
+    at div
+    at PriorityColumn (https://965a6a9a-cac5-4b93-ae2c-e0bb23d6e4e3-00-yfpq5bxeq2p0.riker.replit.dev/src/components/drag-drop/priority-column.tsx:25:3)
+    at div
+    at Provider (https://965a6a9a-cac5-4b93-ae2c-e0bb23d6e4e3-00-yfpq5bxeq2p0.riker.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/react-beautiful-dnd.js?v=6dc01d57:1738:20)
+    at App (https://965a6a9a-cac5-4b93-ae2c-e0bb23d6e4e3-00-yfpq5bxeq2p0.riker.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/react-beautiful-dnd.js?v=6dc01d57:8281:25)
+    at ErrorBoundary2 (https://965a6a9a-cac5-4b93-ae2c-e0bb23d6e4e3-00-yfpq5bxeq2p0.riker.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/react-beautiful-dnd.js?v=6dc01d57:2778:35)
+    at DragDropContext (https://965a6a9a-cac5-4b93-ae2c-e0bb23d6e4e3-00-yfpq5bxeq2p0.riker.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/react-beautiful-dnd.js?v=6dc01d57:8401:19)
+    at div
+    at div
+    at GenerateAssignments (https://965a6a9a-cac5-4b93-ae2c-e0bb23d6e4e3-00-yfpq5bxeq2p0.riker.replit.dev/src/pages/generate-assignments.tsx:98:43)
+    at ProtectedRoute (https://965a6a9a-cac5-4b93-ae2c-e0bb23d6e4e3-00-yfpq5bxeq2p0.riker.replit.dev/src/App.tsx?v=F0TzvXb2ErkDei4SWGU7E:31:38)
+    at Route (https://965a6a9a-cac5-4b93-ae2c-e0bb23d6e4e3-00-yfpq5bxeq2p0.riker.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/wouter.js?v=6dc01d57:323:16)
+    at Switch (https://965a6a9a-cac5-4b93-ae2c-e0bb23d6e4e3-00-yfpq5bxeq2p0.riker.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/wouter.js?v=6dc01d57:379:17)
+    at Router
+    at Provider (https://965a6a9a-cac5-4b93-ae2c-e0bb23d6e4e3-00-yfpq5bxeq2p0.riker.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-E7IAXTU4.js?v=6dc01d57:38:15)
+    at TooltipProvider (https://965a6a9a-cac5-4b93-ae2c-e0bb23d6e4e3-00-yfpq5bxeq2p0.riker.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/@radix-ui_react-tooltip.js?v=6dc01d57:63:5)
+    at QueryClientProvider (https://965a6a9a-cac5-4b93-ae2c-e0bb23d6e4e3-00-yfpq5bxeq2p0.riker.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/@tanstack_react-query.js?v=6dc01d57:2805:3)
+    at App
+printWarning @ chunk-RPCDYKBN.js?v=6dc01d57:521
