@@ -10,8 +10,7 @@ from assign_utils import (
     NEARBY_TRAVEL_THRESHOLD, NEW_CLEANER_PENALTY_MIN, NEW_TRAINER_PENALTY_MIN,
     TARGET_MIN_LOAD_MIN, FAIRNESS_DELTA_HOURS, LOAD_WEIGHT,
     SAME_BUILDING_BONUS, ROLE_TRAINER_BONUS,
-    cleaner_load_minutes, cleaner_load_hours,
-    is_nearby_cluster,
+    cleaner_load_minutes, cleaner_load_hours
 )
 
 # =============================
@@ -86,7 +85,6 @@ class Cleaner:
     lastname: str
     role: str
     is_premium: bool
-    start_time: int = 600  # start_time in minuti da mezzanotte (default 10:00)
     can_do_straordinaria: bool = False
     home_lat: Optional[float] = None
     home_lng: Optional[float] = None
@@ -146,9 +144,7 @@ def is_nearby_same_block(t1: Task, t2: Task) -> bool:
     True se:
     - stesso edificio/via (same_building)
     OPPURE
-    - stesso cliente/alias e:
-        * distanza geografica molto piccola (is_nearby_cluster)
-        * OPPURE travel_minutes <= NEARBY_TRAVEL_THRESHOLD
+    - stesso cliente/alias e travel_minutes <= NEARBY_TRAVEL_THRESHOLD
 
     Serve per clusterizzare casi tipo 618/619 (EXP) o 1537/1236 (TBR).
     """
@@ -164,14 +160,6 @@ def is_nearby_same_block(t1: Task, t2: Task) -> bool:
     )
     if not same_client:
         return False
-
-    # molto vicini in termini geografici (es. Via Voghera 4 e Via Tortona 10)
-    try:
-        if is_nearby_cluster(t1, t2):
-            return True
-    except Exception:
-        # in caso di dati incompleti, fallback al solo travel_minutes
-        pass
 
     # vicini in termini di viaggio
     if travel_minutes(t1, t2) <= NEARBY_TRAVEL_THRESHOLD:
@@ -269,12 +257,10 @@ def can_handle_premium(cleaner: Cleaner, task: Task) -> bool:
 
 
 # -------- Schedulazione / costo --------
-def evaluate_route(route: List[Task], cleaner: "Cleaner" = None) -> Tuple[bool, List[Tuple[int, int, int]]]:
+def evaluate_route(route: List[Task]) -> Tuple[bool, List[Tuple[int, int, int]]]:
     """
     Valuta se una route è fattibile e ritorna lo schedule.
     Ritorna: (is_feasible, schedule)
-
-    Se cleaner è fornito, usa il suo start_time come orario di inizio.
     """
     if not route:
         return True, []
@@ -284,37 +270,29 @@ def evaluate_route(route: List[Task], cleaner: "Cleaner" = None) -> Tuple[bool, 
 
     schedule: List[Tuple[int, int, int]] = []
     prev: Optional[Task] = None
-
-    # Usa lo start_time del cleaner se disponibile, altrimenti 0 (retrocompatibilità)
-    cleaner_start_time = cleaner.start_time if cleaner else 0
-    cur = float(cleaner_start_time)
+    cur = 0.0
 
     for i, t in enumerate(route):
         tt = travel_minutes(prev, t)
         cur += tt
         arrival = cur
 
-        # REGOLA FONDAMENTALE:
-        # - Task STRAORDINARIE: possono iniziare prima delle 10:00 (usano start_time del cleaner)
-        # - Task NORMALI/PREMIUM: devono SEMPRE iniziare dalle 10:00 in poi
-        DEFAULT_START_MIN = 10 * 60  # 10:00 = 600 minuti
-        STRAORDINARIA_DEFAULT_MIN = 9 * 60  # 09:00 = 540 minuti (default per straordinarie senza checkout)
-
+        # LOGICA STRAORDINARIE vs EO NORMALE:
+        # - STRAORDINARIE: 3 casistiche
+        #   1. Orari non migrati: inizia quando arriva il cleaner (arrival)
+        #   2. Checkout migrato PRIMA dell'arrival: inizia all'arrival
+        #   3. Checkout migrato DOPO l'arrival: inizia al checkout
+        # - EO NORMALE: rispetta checkout_time come sempre
+        
         if t.straordinaria:
             # STRAORDINARIE: checkout ha priorità se presente e maggiore di arrival
-            # Se checkout non migrato (0 o None), usa default 09:00
-            if t.checkout_time and t.checkout_time > 0:
-                start = max(arrival, t.checkout_time)
-            else:
-                # Checkout non migrato: default 09:00 (se cleaner disponibile prima)
-                start = max(arrival, STRAORDINARIA_DEFAULT_MIN)
+            # altrimenti inizia quando arriva il cleaner
+            start = max(arrival, t.checkout_time)
             cur = start
         else:
-            # TASK NORMALI/PREMIUM: devono SEMPRE iniziare dalle 10:00 in poi
-            # Anche se il cleaner è straordinario e inizia prima, le task normali partono dalle 10:00
-            effective_start = max(arrival, DEFAULT_START_MIN)
-            wait = max(0.0, t.checkout_time - effective_start)
-            cur = effective_start + wait
+            # EO NORMALE: start_time NON può MAI essere prima del checkout_time
+            wait = max(0.0, t.checkout_time - arrival)
+            cur += wait
             start = cur
 
         finish = start + t.cleaning_time
@@ -424,7 +402,7 @@ def can_add_task(cleaner: Cleaner, task: Task) -> bool:
     # 3ª-5ª task: solo se fattibile temporalmente
     if current_count >= BASE_MAX_TASKS and current_count < ABSOLUTE_MAX_TASKS:
         test_route = cleaner.route + [task]
-        feasible, schedule = evaluate_route(test_route, cleaner)
+        feasible, schedule = evaluate_route(test_route)
         if feasible and schedule:
             last_finish = schedule[-1][2]  # finish time in minuti
             if current_count < ABSOLUTE_MAX_TASKS_IF_BEFORE_18 and last_finish <= 18 * 60:
@@ -451,7 +429,7 @@ def find_best_position(cleaner: Cleaner, task: Task) -> Optional[Tuple[int, floa
     # Straordinaria deve andare per forza in pos 0
     if task.straordinaria:
         test_route = [task] + cleaner.route
-        feasible, _ = evaluate_route(test_route, cleaner)
+        feasible, _ = evaluate_route(test_route)
         if feasible:
             return (0, 0.0)
         else:
@@ -460,7 +438,7 @@ def find_best_position(cleaner: Cleaner, task: Task) -> Optional[Tuple[int, floa
     # Prova tutte le posizioni possibili
     for pos in range(len(cleaner.route) + 1):
         test_route = cleaner.route[:pos] + [task] + cleaner.route[pos:]
-        feasible, _ = evaluate_route(test_route, cleaner)
+        feasible, _ = evaluate_route(test_route)
 
         if not feasible:
             continue
@@ -488,23 +466,10 @@ def find_best_position(cleaner: Cleaner, task: Task) -> Optional[Tuple[int, floa
 def load_cleaners() -> List[Cleaner]:
     data = json.loads(INPUT_CLEANERS.read_text(encoding="utf-8"))
     cleaners: List[Cleaner] = []
-
-    # CRITICAL: Early-Out richiede cleaner disponibili PRIMA delle 11:00
-    EO_MAX_START_TIME = 11 * 60  # 11:00 = 660 minuti
-
     for c in data.get("cleaners", []):
         role = (c.get("role") or "").strip()
         is_premium = bool(c.get("premium", (role.lower() == "premium")))
         can_do_straordinaria = bool(c.get("can_do_straordinaria", False))
-
-        # Leggi start_time del cleaner (default 10:00 se non specificato)
-        start_time_str = c.get("start_time", "10:00")
-        start_time_min = hhmm_to_min(start_time_str, "10:00")
-
-        # CRITICAL: Escludi cleaner che iniziano alle 11:00 o dopo
-        if start_time_min >= EO_MAX_START_TIME:
-            print(f"   ⏭️  Cleaner {c.get('name')} ({role}) escluso da Early-Out (start_time {start_time_str} >= 11:00)")
-            continue
 
         # NUOVO: Valida se il cleaner può gestire Early-Out basandosi su settings.json
         if not can_cleaner_handle_priority(role, "early_out"):
@@ -517,7 +482,6 @@ def load_cleaners() -> List[Cleaner]:
                 lastname=c.get("lastname", ""),
                 role=role or ("Premium" if is_premium else "Standard"),
                 is_premium=is_premium,
-                start_time=start_time_min,
                 can_do_straordinaria=can_do_straordinaria,
                 home_lat=c.get("home_lat"),
                 home_lng=c.get("home_lng"),
@@ -586,29 +550,8 @@ def load_tasks() -> List[Task]:
                 straordinaria=bool(t.get("straordinaria", False)),
             ))
 
-    # NUOVO: Calcola densità geografica per ogni task (quante task vicine ha)
-    def count_nearby_density(task: Task, all_tasks: List[Task]) -> int:
-        """Conta quante altre task sono entro 300m da questa"""
-        count = 0
-        for other in all_tasks:
-            if other.task_id == task.task_id:
-                continue
-            try:
-                km = haversine_km(task.lat, task.lng, other.lat, other.lng)
-                if km <= 0.30:  # 300m
-                    count += 1
-            except:
-                pass
-        return count
-
-    # Ordina: straordinarie first, poi premium, poi per DENSITÀ GEOGRAFICA (più cluster = priorità), poi checkout
-    # Task con molte vicine vengono processate prima per formare cluster, task isolate processate dopo per aggregarsi
-    tasks.sort(key=lambda x: (
-        not x.straordinaria,
-        not x.is_premium,
-        -count_nearby_density(x, tasks),  # Negativo = più densità = prima (617-618-619-723 prima di 519)
-        x.checkout_time
-    ))
+    # Ordina: straordinarie first, poi premium, poi per checkout
+    tasks.sort(key=lambda x: (not x.straordinaria, not x.is_premium, x.checkout_time))
     return tasks
 
 
@@ -622,7 +565,7 @@ def plan_day(
     Assegna le task Early-Out con:
     - STRAORDINARIE: possono iniziare prima delle 10:00, assegnate al cleaner
       con start_time minore che ha can_do_straordinaria=True
-    - HARD CLUSTER edificio/via/blocco: stesso edificio o vicino + stesso cliente
+    - HARD CLUSTER edificio/via o "stesso blocco" (same_building + is_nearby_same_block)
     - FAIRNESS: evita che un cleaner abbia molte più task degli altri,
       ignorando i cleaner vuoti (non forziamo a usarli per forza)
     - TARGET MINIMO 3 TASK: se possibile, favorisce cleaner con 1–2 task
@@ -647,20 +590,20 @@ def plan_day(
                 c for c in cleaners
                 if c.can_do_straordinaria and can_cleaner_handle_apartment(c.role, task.apt_type)
             ]
-
+            
             if not straordinaria_cleaners:
                 unassigned.append(task)
                 continue
-
+            
             # Trova cleaner con start_time minore
             earliest_cleaner = min(straordinaria_cleaners, key=lambda c: hhmm_to_min(getattr(c, 'start_time', '10:00') if isinstance(getattr(c, 'start_time', None), str) else '10:00'))
-
+            
             # Verifica se può prendere la task (pos 0)
             result = find_best_position(earliest_cleaner, task)
             if result is None:
                 unassigned.append(task)
                 continue
-
+            
             pos, _ = result
             earliest_cleaner.route.insert(pos, task)
             assigned_logistic_codes.add(task.logistic_code)
@@ -723,31 +666,7 @@ def plan_day(
             ):
                 building_candidates.append((c, p, t_travel))
 
-        # SUPER-CLUSTER: coordinate identiche o quasi (es: 619 e 723 stesso indirizzo)
-        # Priorità MASSIMA: se un cleaner ha già una task con coordinate vicinissime (entro 250m)
-        # Usa METRI per massima precisione
-        from assign_utils import haversine_meters
-
-        super_cluster_candidates: List[Tuple[Cleaner, int, float, float]] = []  # Aggiungi distanza
-        for c, p, t_travel in candidates:
-            if c.route:
-                # Trova la distanza minima in METRI tra la nuova task e le task esistenti
-                min_distance_meters = min(
-                    (haversine_meters(ex.lat, ex.lng, task.lat, task.lng)
-                     for ex in c.route),
-                    default=float('inf')
-                )
-
-                # Super-cluster: entro 250m
-                if min_distance_meters <= 250:
-                    super_cluster_candidates.append((c, p, t_travel, min_distance_meters))
-
-        # Ordina i super-cluster per distanza (il più vicino vince)
-        if super_cluster_candidates:
-            super_cluster_candidates.sort(key=lambda x: x[3])  # Ordina per distanza in metri
-            pool = [(c, p, t_travel) for c, p, t_travel, _ in super_cluster_candidates]
-            effective_load_weight = max(LOAD_WEIGHT - 5, 1)  # super-cluster: carico pesa ancora meno
-        elif building_candidates:
+        if building_candidates:
             pool = building_candidates
             effective_load_weight = max(LOAD_WEIGHT - 3, 1)  # cluster: carico pesa un po' meno
         else:
@@ -789,13 +708,10 @@ def plan_day(
             pool = low_load_candidates
 
         # -------------------------------------------------------------
-        # 5) Scelta finale con ore + penalità attivazione + priorità start_time
+        # 5) Scelta finale con ore + penalità attivazione
         # -------------------------------------------------------------
         best_choice: Optional[Tuple[Cleaner, int, float]] = None
         best_score: Optional[float] = None
-
-        # Soglia per EO: 11:00 = 660 minuti da mezzanotte
-        EO_PREFERRED_START_TIME = 11 * 60  # 11:00
 
         for c, p, t_travel in pool:
             load_h = cleaner_load_hours(c)
@@ -808,32 +724,17 @@ def plan_day(
             ):
                 sb_bonus = SAME_BUILDING_BONUS
 
-            # NUOVO: Bonus per clustering geografico (es: Via Tortona + Via Voghera)
-            from assign_utils import is_nearby_cluster, count_nearby_tasks, NEARBY_CLUSTER_BONUS
-            nearby_count = count_nearby_tasks(c, task)
-            nearby_bonus = nearby_count * NEARBY_CLUSTER_BONUS  # -8 per ogni task vicina
-
             # penalità di attivazione per cleaner vuoti
             if len(c.route) == 0:
                 activation_penalty = NEW_CLEANER_PENALTY_MIN
             else:
                 activation_penalty = 0
 
-            # NUOVO: Bonus per cleaner con start_time < 11:00 (ottimale per EO)
-            start_time_bonus = 0
-            if c.start_time < EO_PREFERRED_START_TIME:
-                # Bonus maggiore per chi inizia prima (es: chi inizia alle 9:00 ha bonus maggiore di chi inizia alle 10:30)
-                minutes_before_11 = EO_PREFERRED_START_TIME - c.start_time
-                # Converti in bonus: max 60 minuti di anticipo = -30 punti di bonus
-                start_time_bonus = -min(minutes_before_11 / 2, 30)
-
             score = (
                 t_travel
                 + effective_load_weight * load_h
                 + sb_bonus
-                + nearby_bonus  # Aggiungi il bonus clustering geografico
                 + activation_penalty
-                + start_time_bonus
             )
 
             if best_score is None or score < best_score:
@@ -861,7 +762,7 @@ def build_output(cleaners: List[Cleaner], unassigned: List[Task], original_tasks
         # Per Early-Out accettiamo anche 1 sola task (task urgenti)
         # Nessun vincolo minimo qui
 
-        feasible, schedule = evaluate_route(cl.route, cl)
+        feasible, schedule = evaluate_route(cl.route)
         if not feasible or not schedule:
             continue
 
@@ -984,8 +885,7 @@ def build_output(cleaners: List[Cleaner], unassigned: List[Task], original_tasks
                 "6. Premium task solo a premium cleaner",
                 "7. Check-in strict: deve finire prima del check-in time (INFRANGIBILE)",
                 "8. Vincolo orario: nessuna task deve finire dopo le 19:00",
-                "9. CROSS-CONTAINER: Favorisce vicinanza geografica anche tra container diversi",
-                "10. PRIORITÀ START_TIME: Cleaner con start_time < 11:00 hanno priorità per EO (bonus progressivo)"
+                "9. CROSS-CONTAINER: Favorisce vicinanza geografica anche tra container diversi"
             ]
         }
     }
@@ -1036,13 +936,13 @@ def main():
     # Usa la data passata come argomento da riga di comando
     import sys
     if len(sys.argv) > 1:
-        work_date = sys.argv[1]
-        print(f"📅 Usando data da argomento: {work_date}")
+        ref_date = sys.argv[1]
+        print(f"📅 Usando data da argomento: {ref_date}")
     else:
         # Fallback: usa la data corrente
         from datetime import datetime
-        work_date = datetime.now().strftime("%Y-%m-%d")
-        print(f"📅 Nessuna data specificata, usando: {work_date}")
+        ref_date = datetime.now().strftime("%Y-%m-%d")
+        print(f"📅 Nessuna data specificata, usando: {ref_date}")
 
     # Update timeline.json con struttura organizzata per cleaner
     from datetime import datetime as dt
@@ -1052,7 +952,7 @@ def main():
     timeline_data = {
         "metadata": {
             "last_updated": dt.now().isoformat(),
-            "date": work_date
+            "date": ref_date
         },
         "cleaners_assignments": [],
         "meta": {
@@ -1065,56 +965,24 @@ def main():
     if timeline_path.exists():
         try:
             existing = json.loads(timeline_path.read_text(encoding="utf-8"))
-            # CRITICAL FIX: Mantieni TUTTI i cleaner così come sono;
-            # il filtraggio delle vecchie EO lo facciamo dentro il blocco existing_entry più sotto.
-            # NON eliminare i cleaner, altrimenti perdi HP/LP/manuali!
+            # Mantieni le assegnazioni esistenti non-EO (rimuovi quelle con task EO)
             if "cleaners_assignments" in existing:
-                timeline_data["cleaners_assignments"] = existing.get("cleaners_assignments", [])
+                # Crea un set di cleaner_id che avranno nuove assegnazioni EO
+                new_eo_cleaner_ids = set(c["cleaner"]["id"] for c in output["early_out_tasks_assigned"])
+                timeline_data["cleaners_assignments"] = [
+                    c for c in existing.get("cleaners_assignments", [])
+                    if c["cleaner"]["id"] not in new_eo_cleaner_ids or
+                       not any(t.get("reasons") and "automatic_assignment_eo" in t.get("reasons", []) for t in c.get("tasks", []))
+                ]
         except Exception as e:
             print(f"⚠️ Errore nel caricamento della timeline esistente: {e}")
 
     # Aggiungi le nuove assegnazioni EO organizzate per cleaner
     for cleaner_entry in output["early_out_tasks_assigned"]:
-        # Cerca se esiste già un'entry per questo cleaner
-        existing_entry = None
-        for entry in timeline_data["cleaners_assignments"]:
-            if entry["cleaner"]["id"] == cleaner_entry["cleaner"]["id"]:
-                existing_entry = entry
-                break
-
-        if existing_entry:
-            # CRITICAL: NON rimuovere nulla, AGGIUNGI le nuove task EO
-            existing_tasks = existing_entry["tasks"]
-
-            # Separa task esistenti per tipo (usa i reasons)
-            eo_tasks_old = [t for t in existing_tasks if "automatic_assignment_eo" in t.get("reasons", [])]
-            hp_tasks = [t for t in existing_tasks if "automatic_assignment_hp" in t.get("reasons", [])]
-            lp_tasks = [t for t in existing_tasks if "automatic_assignment_lp" in t.get("reasons", [])]
-            manual_tasks = [t for t in existing_tasks if not any(
-                r in t.get("reasons", []) for r in ["automatic_assignment_eo", "automatic_assignment_hp", "automatic_assignment_lp"]
-            )]
-
-            # Crea set di task_id delle nuove task EO per evitare duplicati
-            new_eo_task_ids = set(t.get("task_id") for t in cleaner_entry["tasks"])
-
-            # Filtra EO vecchie: rimuovi SOLO quelle che sono duplicate (stesso task_id) con le nuove
-            eo_tasks_to_keep = [t for t in eo_tasks_old if t.get("task_id") not in new_eo_task_ids]
-
-            # Ricostruisci: EO_vecchie_non_duplicate + EO_nuove + HP + LP + manuali
-            existing_entry["tasks"] = eo_tasks_to_keep + cleaner_entry["tasks"] + hp_tasks + lp_tasks + manual_tasks
-
-            # Ordina per start_time e ricalcola sequence
-            existing_entry["tasks"].sort(key=lambda t: t.get("start_time", "00:00"))
-
-            # CRITICAL: Ricalcola sequence progressiva dopo il merge
-            for idx, task in enumerate(existing_entry["tasks"], start=1):
-                task["sequence"] = idx
-        else:
-            # Crea nuova entry
-            timeline_data["cleaners_assignments"].append({
-                "cleaner": cleaner_entry["cleaner"],
-                "tasks": cleaner_entry["tasks"]
-            })
+        timeline_data["cleaners_assignments"].append({
+            "cleaner": cleaner_entry["cleaner"],
+            "tasks": cleaner_entry["tasks"]
+        })
 
     # Aggiorna meta
     # Conta i cleaner totali disponibili
@@ -1132,30 +1000,7 @@ def main():
         "used_cleaners": used_cleaners_count,
         "assigned_tasks": total_assigned_tasks
     }
-    # Salva timeline aggiornata
-    from datetime import datetime as dt
-    timeline_data['metadata']['last_updated'] = dt.now().isoformat()
-
-    # CRITICAL: Ricalcola i tempi per TUTTI i cleaner che hanno ricevuto nuove task
-    from assign_utils import recalculate_cleaner_times
-
-    for cleaner_entry in timeline_data['cleaners_assignments']:
-        if cleaner_entry['tasks']:
-            try:
-                cleaner_entry['tasks'] = recalculate_cleaner_times(
-                    cleaner_entry['cleaner'],
-                    cleaner_entry['tasks']
-                )
-            except Exception as e:
-                print(f"⚠️ Errore ricalcolo tempi per cleaner {cleaner_entry['cleaner']['id']}: {e}")
-                # Fallback: ricalcola solo sequence
-                for i, t in enumerate(cleaner_entry['tasks']):
-                    t['sequence'] = i + 1
-                    t['followup'] = i > 0
-
-    with open(timeline_path, 'w') as f:
-        json.dump(timeline_data, f, indent=2)
-
+    timeline_path.write_text(json.dumps(timeline_data, ensure_ascii=False, indent=2), encoding="utf-8")
     print(f"✅ Timeline aggiornata: {timeline_path}")
 
     # Conta i cleaner con task di ogni tipo basandosi sui reasons

@@ -213,49 +213,7 @@ output_path.parent.mkdir(parents=True, exist_ok=True)
 with output_path.open("w", encoding="utf-8") as f:
     json.dump(fresh_data, f, indent=4)
 
-# --- AGGIORNAMENTO cleaners_aliases.json ---
-# Carica gli alias esistenti
-aliases_path = Path(__file__).resolve().parents[1] / "data" / "cleaners" / "cleaners_aliases.json"
-existing_aliases = {}
-if aliases_path.exists():
-    try:
-        with aliases_path.open("r", encoding="utf-8") as f:
-            aliases_data = json.load(f)
-            existing_aliases = aliases_data.get("aliases", {})
-    except Exception as e:
-        print(f"⚠️ Impossibile leggere cleaners_aliases.json esistente: {e}")
-
-# Aggiorna gli alias: mantieni quelli dei cleaner attivi, rimuovi gli altri
-active_cleaner_ids = {str(c["id"]) for c in cleaners_data}
-updated_aliases = {}
-
-for cleaner in cleaners_data:
-    cleaner_id_str = str(cleaner["id"])
-    # Mantieni l'alias esistente se presente, altrimenti usa stringa vuota
-    if cleaner_id_str in existing_aliases:
-        updated_aliases[cleaner_id_str] = existing_aliases[cleaner_id_str]
-    else:
-        # Nuovo cleaner: crea entry con alias vuoto
-        updated_aliases[cleaner_id_str] = {
-            "name": cleaner["name"],
-            "lastname": cleaner["lastname"],
-            "alias": ""
-        }
-
-# Salva cleaners_aliases.json aggiornato
-aliases_output = {
-    "metadata": {
-        "last_updated": datetime.now().isoformat(),
-        "description": "Alias personalizzati per i cleaners da visualizzare sulla timeline"
-    },
-    "aliases": updated_aliases
-}
-
-with aliases_path.open("w", encoding="utf-8") as f:
-    json.dump(aliases_output, f, indent=2)
-
 print(f"✅ File cleaners.json COMPLETAMENTE RESETTATO e aggiornato")
-print(f"✅ File cleaners_aliases.json sincronizzato: {len(updated_aliases)} alias attivi")
 print(f"📅 DATA NEL JSON: {target_date_str}")
 print(f"👥 CLEANERS TROVATI: {len(cleaners_data)}")
 print(f"🔄 RESET COMPLETATO - Il file contiene SOLO i dati per {target_date_str}")

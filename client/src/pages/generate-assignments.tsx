@@ -281,6 +281,9 @@ export default function GenerateAssignments() {
   // Stato per tracciare tutte le task con le loro assegnazioni
   const [allTasksWithAssignments, setAllTasksWithAssignments] = useState<Task[]>([]);
 
+  // Stato per tracciare modifiche non salvate
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+
   // Stati di caricamento
   const [isExtracting, setIsExtracting] = useState(true);
   const [extractionStep, setExtractionStep] = useState<string>("Inizializzazione...");
@@ -293,9 +296,9 @@ export default function GenerateAssignments() {
   // Nuova variabile di stato per gestire il caricamento generale
   const [isLoading, setIsLoading] = useState(false);
 
-  // Callback per notificare modifiche dopo movimenti task (salvataggio automatico)
+  // Callback per notificare modifiche dopo movimenti task
   const handleTaskMoved = useCallback(() => {
-    // Salvataggio automatico - nessun flag necessario
+    setHasUnsavedChanges(true);
   }, []);
 
   // Funzione per caricare assegnazioni salvate da Object Storage
@@ -326,7 +329,7 @@ export default function GenerateAssignments() {
         setLastSavedTimestamp(displayDateTime);
 
         // CRITICAL: Quando carichiamo assegnazioni salvate, NON ci sono modifiche
-        // Salvataggio automatico attivo
+        setHasUnsavedChanges(false);
 
         // CRITICAL: Verifica e aggiorna la data in timeline.json dopo il caricamento
         const timelineResponse = await fetch(`/data/output/timeline.json?t=${Date.now()}`, {
@@ -494,7 +497,7 @@ export default function GenerateAssignments() {
           }
 
           // CRITICAL: Dopo aver caricato assegnazioni salvate, NON ci sono modifiche
-          // Salvataggio automatico attivo
+          setHasUnsavedChanges(false);
 
           setExtractionStep("Assegnazioni caricate!");
           await new Promise(resolve => setTimeout(resolve, 100));
@@ -601,7 +604,9 @@ export default function GenerateAssignments() {
       setExtractionStep("Task caricati!");
       await new Promise(resolve => setTimeout(resolve, 100));
 
-      // Salvataggio automatico attivo
+      // CRITICAL: Dopo estrazione nuovi dati, NON ci sono modifiche da salvare
+      setHasUnsavedChanges(false);
+
       setIsExtracting(false);
     } catch (error) {
       console.error("Errore nell'estrazione:", error);
@@ -1033,7 +1038,7 @@ export default function GenerateAssignments() {
 
       if (result.success) {
         // CRITICAL: Marca modifiche dopo assegnazione automatica
-        // Salvataggio automatico attivo
+        setHasUnsavedChanges(true);
         handleTaskMoved();
 
         toast({
@@ -1098,7 +1103,7 @@ export default function GenerateAssignments() {
 
       if (result.success) {
         // CRITICAL: Marca modifiche dopo assegnazione automatica
-        // Salvataggio automatico attivo
+        setHasUnsavedChanges(true);
         handleTaskMoved();
 
         toast({
@@ -1167,7 +1172,7 @@ export default function GenerateAssignments() {
 
       if (result.success) {
         // CRITICAL: Marca modifiche dopo assegnazione automatica
-        // Salvataggio automatico attivo
+        setHasUnsavedChanges(true);
         handleTaskMoved();
 
         toast({
@@ -1201,6 +1206,7 @@ export default function GenerateAssignments() {
   (window as any).assignEarlyOutToTimeline = assignEarlyOutToTimeline;
   (window as any).assignHighPriorityToTimeline = assignHighPriorityToTimeline;
   (window as any).assignLowPriorityToTimeline = assignLowPriorityToTimeline;
+  (window as any).setHasUnsavedChanges = setHasUnsavedChanges;
 
 
   const saveTaskAssignments = async (tasks: Task[]) => {
@@ -1428,7 +1434,7 @@ export default function GenerateAssignments() {
           setSelectedTasks([]);
 
           // Marca modifiche
-          // Salvataggio automatico attivo
+          setHasUnsavedChanges(true);
           if (handleTaskMoved) {
             handleTaskMoved();
           }
@@ -1474,7 +1480,7 @@ export default function GenerateAssignments() {
           await saveTaskAssignment(taskId, toCleanerId, logisticCode, destination.index);
 
           // CRITICAL: Marca modifiche dopo drag-and-drop da container
-          // Salvataggio automatico attivo
+          setHasUnsavedChanges(true);
           if (handleTaskMoved) {
             handleTaskMoved();
           }
@@ -1562,7 +1568,7 @@ export default function GenerateAssignments() {
             }
 
             // CRITICAL: Marca modifiche dopo spostamento tra cleaners
-            // Salvataggio automatico attivo
+            setHasUnsavedChanges(true);
             if (handleTaskMoved) {
               handleTaskMoved();
             }
@@ -1639,7 +1645,7 @@ export default function GenerateAssignments() {
           }
 
           // CRITICAL: Marca modifiche dopo spostamento tra containers
-          // Salvataggio automatico attivo
+          setHasUnsavedChanges(true);
           if (handleTaskMoved) {
             handleTaskMoved();
           }
@@ -1686,7 +1692,7 @@ export default function GenerateAssignments() {
           await refreshAssignments("manual");
 
           // CRITICAL: Marca modifiche dopo assegnazione
-          // Salvataggio automatico attivo
+          setHasUnsavedChanges(true);
           if (handleTaskMoved) {
             handleTaskMoved();
           }
@@ -1713,7 +1719,7 @@ export default function GenerateAssignments() {
         await removeTimelineAssignment(taskId, logisticCode);
 
         // CRITICAL: Marca modifiche dopo rimozione da timeline
-        // Salvataggio automatico attivo
+        setHasUnsavedChanges(true);
         if (handleTaskMoved) {
           handleTaskMoved();
         }
@@ -1891,8 +1897,9 @@ export default function GenerateAssignments() {
                 <TimelineView
                   personnel={[]}
                   tasks={allTasksWithAssignments}
+                  hasUnsavedChanges={hasUnsavedChanges}
                   onTaskMoved={handleTaskMoved}
-                  isReadOnly={isTimelineReadOnly}
+                  isReadOnly={isTimelineReadOnly} // Passa lo stato read-only
                 />
               </div>
             </div>
