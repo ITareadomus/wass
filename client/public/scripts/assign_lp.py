@@ -910,18 +910,18 @@ def plan_day(
 
         # SUPER-CLUSTER geografico (distanza in METRI)
         from assign_utils import haversine_meters
-        
+
         super_cluster_candidates: List[Tuple[Cleaner, int, float, float]] = []
         for c, p, t_travel in candidates:
             if c.route:
                 min_distance_meters = min(
-                    (haversine_meters(ex.lat, ex.lng, task.lat, task.lng) 
+                    (haversine_meters(ex.lat, ex.lng, task.lat, task.lng)
                      for ex in c.route),
                     default=float('inf')
                 )
                 if min_distance_meters <= 250:  # 250m = super-cluster
                     super_cluster_candidates.append((c, p, t_travel, min_distance_meters))
-        
+
         # HARD CLUSTER edificio/via/blocco
         building_candidates: List[Tuple[Cleaner, int, float]] = []
         for c, p, t_travel in candidates:
@@ -1328,7 +1328,7 @@ def main():
         if existing_entry:
             # CRITICAL: NON rimuovere nulla, AGGIUNGI le nuove task LP
             existing_tasks = existing_entry["tasks"]
-            
+
             # Separa task esistenti per tipo (usa i reasons)
             eo_tasks = [t for t in existing_tasks if "automatic_assignment_eo" in t.get("reasons", [])]
             hp_tasks = [t for t in existing_tasks if "automatic_assignment_hp" in t.get("reasons", [])]
@@ -1336,19 +1336,19 @@ def main():
             manual_tasks = [t for t in existing_tasks if not any(
                 r in t.get("reasons", []) for r in ["automatic_assignment_eo", "automatic_assignment_hp", "automatic_assignment_lp"]
             )]
-            
+
             # Crea set di task_id delle nuove task LP per evitare duplicati
             new_lp_task_ids = set(t.get("task_id") for t in cleaner_entry["tasks"])
-            
+
             # Filtra LP vecchie: rimuovi SOLO quelle che sono duplicate (stesso task_id) con le nuove
             lp_tasks_to_keep = [t for t in lp_tasks_old if t.get("task_id") not in new_lp_task_ids]
-            
+
             # Ricostruisci: EO + HP + LP_vecchie_non_duplicate + LP_nuove + manuali
             existing_entry["tasks"] = eo_tasks + hp_tasks + lp_tasks_to_keep + cleaner_entry["tasks"] + manual_tasks
-            
+
             # Ordina per start_time e ricalcola sequence
             existing_entry["tasks"].sort(key=lambda t: t.get("start_time", "00:00"))
-            
+
             # CRITICAL: Ricalcola sequence progressiva dopo il merge
             for idx, task in enumerate(existing_entry["tasks"], start=1):
                 task["sequence"] = idx
