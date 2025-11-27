@@ -477,6 +477,10 @@ def find_best_position(cleaner: Cleaner, task: Task) -> Optional[Tuple[int, floa
 def load_cleaners() -> List[Cleaner]:
     data = json.loads(INPUT_CLEANERS.read_text(encoding="utf-8"))
     cleaners: List[Cleaner] = []
+    
+    # CRITICAL: Early-Out richiede cleaner disponibili PRIMA delle 11:00
+    EO_MAX_START_TIME = 11 * 60  # 11:00 = 660 minuti
+    
     for c in data.get("cleaners", []):
         role = (c.get("role") or "").strip()
         is_premium = bool(c.get("premium", (role.lower() == "premium")))
@@ -485,6 +489,11 @@ def load_cleaners() -> List[Cleaner]:
         # Leggi start_time del cleaner (default 10:00 se non specificato)
         start_time_str = c.get("start_time", "10:00")
         start_time_min = hhmm_to_min(start_time_str, "10:00")
+
+        # CRITICAL: Escludi cleaner che iniziano alle 11:00 o dopo
+        if start_time_min >= EO_MAX_START_TIME:
+            print(f"   ⏭️  Cleaner {c.get('name')} ({role}) escluso da Early-Out (start_time {start_time_str} >= 11:00)")
+            continue
 
         # NUOVO: Valida se il cleaner può gestire Early-Out basandosi su settings.json
         if not can_cleaner_handle_priority(role, "early_out"):
