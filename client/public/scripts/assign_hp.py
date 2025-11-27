@@ -1114,7 +1114,6 @@ def main():
 
         if existing_entry:
             # CRITICAL: NON rimuovere nulla, AGGIUNGI le nuove task HP
-            # Le task HP si inseriscono DOPO le EO ma PRIMA delle LP
             existing_tasks = existing_entry["tasks"]
             
             # Separa task esistenti per tipo (usa i reasons)
@@ -1125,9 +1124,14 @@ def main():
                 r in t.get("reasons", []) for r in ["automatic_assignment_eo", "automatic_assignment_hp", "automatic_assignment_lp"]
             )]
             
-            # Ricostruisci: EO + HP_vecchie + HP_nuove + LP + manuali
-            # (in realtà se ci sono HP vecchie da containers, le sostituiamo con le nuove)
-            existing_entry["tasks"] = eo_tasks + cleaner_entry["tasks"] + lp_tasks + manual_tasks
+            # Crea set di task_id delle nuove task HP per evitare duplicati
+            new_hp_task_ids = set(t.get("task_id") for t in cleaner_entry["tasks"])
+            
+            # Filtra HP vecchie: rimuovi SOLO quelle che sono duplicate (stesso task_id) con le nuove
+            hp_tasks_to_keep = [t for t in hp_tasks_old if t.get("task_id") not in new_hp_task_ids]
+            
+            # Ricostruisci: EO + HP_vecchie_non_duplicate + HP_nuove + LP + manuali
+            existing_entry["tasks"] = eo_tasks + hp_tasks_to_keep + cleaner_entry["tasks"] + lp_tasks + manual_tasks
             
             # Ordina per start_time e ricalcola sequence
             existing_entry["tasks"].sort(key=lambda t: t.get("start_time", "00:00"))
