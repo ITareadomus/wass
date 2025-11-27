@@ -169,6 +169,9 @@ export default function GenerateAssignments() {
   // Stato per tracciare se è in corso un'operazione di drag-and-drop
   const [isDragging, setIsDragging] = useState<boolean>(false);
 
+  // dnd-kit sensors - DEVONO essere chiamati al livello superiore del componente
+  const sensors = useSensors(useSensor(PointerSensor));
+
   // Stati per selezione multipla INDIPENDENTE per container (ma selezione CROSS-CONTAINER)
   const [multiSelectModes, setMultiSelectModes] = useState<{
     early_out: boolean;
@@ -1870,7 +1873,7 @@ export default function GenerateAssignments() {
 
         <MultiSelectContext.Provider value={multiSelectContextValue}>
           <DndContext
-            sensors={useSensors(useSensor(PointerSensor))}
+            sensors={sensors}
             collisionDetection={closestCenter}
             onDragEnd={onDragEnd}
           >
