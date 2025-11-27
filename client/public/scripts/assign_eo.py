@@ -1044,15 +1044,11 @@ def main():
     if timeline_path.exists():
         try:
             existing = json.loads(timeline_path.read_text(encoding="utf-8"))
-            # Mantieni le assegnazioni esistenti non-EO (rimuovi quelle con task EO)
+            # CRITICAL FIX: Mantieni TUTTI i cleaner così come sono;
+            # il filtraggio delle vecchie EO lo facciamo dentro il blocco existing_entry più sotto.
+            # NON eliminare i cleaner, altrimenti perdi HP/LP/manuali!
             if "cleaners_assignments" in existing:
-                # Crea un set di cleaner_id che avranno nuove assegnazioni EO
-                new_eo_cleaner_ids = set(c["cleaner"]["id"] for c in output["early_out_tasks_assigned"])
-                timeline_data["cleaners_assignments"] = [
-                    c for c in existing.get("cleaners_assignments", [])
-                    if c["cleaner"]["id"] not in new_eo_cleaner_ids or
-                       not any(t.get("reasons") and "automatic_assignment_eo" in t.get("reasons", []) for t in c.get("tasks", []))
-                ]
+                timeline_data["cleaners_assignments"] = existing.get("cleaners_assignments", [])
         except Exception as e:
             print(f"⚠️ Errore nel caricamento della timeline esistente: {e}")
 
