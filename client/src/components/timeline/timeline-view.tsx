@@ -153,8 +153,17 @@ export default function TimelineView({
       .filter(tc => !selectedCleanerIds.has(tc.cleaner?.id)) // Non già in selected_cleaners
       .map(tc => ({ ...tc.cleaner, isRemoved: true })); // Marca come rimosso
 
-    // Combina selected_cleaners + timeline cleaners con task (quelli rimossi andranno in fondo)
-    return [...cleaners, ...timelineCleanersWithTasks];
+    // Combina selected_cleaners + timeline cleaners con task
+    const combined = [...cleaners, ...timelineCleanersWithTasks];
+    
+    // Ordina per start_time crescente (dal minore al maggiore)
+    combined.sort((a, b) => {
+      const timeA = a.start_time || "10:00";
+      const timeB = b.start_time || "10:00";
+      return timeA.localeCompare(timeB);
+    });
+    
+    return combined;
   }, [cleaners, timelineCleaners]);
 
   // Crea Set di ID cleaner rimossi per facile lookup
