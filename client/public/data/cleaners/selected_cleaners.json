@@ -1,7 +1,71 @@
 {
-  "cleaners": [],
-  "total_selected": 0,
+  "cleaners": [
+    {
+      "id": 1063,
+      "name": "ALEXANDER DENNYS",
+      "lastname": "CARDENAS OLAYA",
+      "role": "Standard",
+      "active": true,
+      "ranking": 0,
+      "counter_hours": 26,
+      "counter_days": 3,
+      "available": true,
+      "contract_type": "a chiamata",
+      "preferred_customers": [],
+      "telegram_id": null,
+      "start_time": null,
+      "can_do_straordinaria": false
+    },
+    {
+      "id": 249,
+      "name": "Ogbodo Chidi",
+      "lastname": "Igwe",
+      "role": "Premium",
+      "active": true,
+      "ranking": 0,
+      "counter_hours": 22.5,
+      "counter_days": 3,
+      "available": true,
+      "contract_type": "a chiamata",
+      "preferred_customers": [
+        2,
+        3,
+        61,
+        64,
+        72,
+        80,
+        84,
+        94,
+        113,
+        115,
+        118,
+        120,
+        123
+      ],
+      "telegram_id": 6481457174,
+      "start_time": "10:00",
+      "can_do_straordinaria": true
+    },
+    {
+      "id": 626,
+      "name": "DORA PATRICIA",
+      "lastname": "JIMENEZ",
+      "role": "Formatore",
+      "active": true,
+      "ranking": 0,
+      "counter_hours": 18.75,
+      "counter_days": 3,
+      "available": true,
+      "contract_type": "B",
+      "preferred_customers": [],
+      "telegram_id": null,
+      "start_time": "10:00",
+      "can_do_straordinaria": false
+    }
+  ],
+  "total_selected": 3,
   "metadata": {
-    "date": "2025-11-28"
+    "date": "2025-11-28",
+    "saved_at": "2025-11-27T16:04:12.389Z"
   }
 }

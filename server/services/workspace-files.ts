@@ -105,22 +105,18 @@ export async function saveTimeline(workDate: string, data: any): Promise<boolean
     const filename = `assignments_${day}${month}${year}.json`;
     const key = `${folder}/${filename}`;
 
-    // Import client and save directly
+    // Import client and save directly - SINCRONO per garantire persistenza
     const { Client } = await import("@replit/object-storage");
     const client = new Client();
     
     const jsonContent = JSON.stringify(data, null, 2);
-    client.uploadFromText(key, jsonContent)
-      .then((result) => {
-        if (result.ok) {
-          console.log(`✅ Timeline persisted to Object Storage: ${key}`);
-        } else {
-          console.warn(`⚠️ Failed to persist timeline to Object Storage: ${result.error}`);
-        }
-      })
-      .catch((err) => {
-        console.error(`❌ Error persisting timeline to Object Storage:`, err);
-      });
+    const result = await client.uploadFromText(key, jsonContent);
+    
+    if (result.ok) {
+      console.log(`✅ Timeline persisted to Object Storage: ${key}`);
+    } else {
+      console.warn(`⚠️ Failed to persist timeline to Object Storage: ${result.error}`);
+    }
 
     return true;
   } catch (err) {
