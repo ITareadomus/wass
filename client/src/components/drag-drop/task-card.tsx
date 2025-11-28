@@ -436,6 +436,10 @@ export default function TaskCard({
         return;
       }
 
+      // Recupera data di lavoro e utente corrente per il tracking
+      const workDate = localStorage.getItem('selected_work_date') || new Date().toISOString().split('T')[0];
+      const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
+      
       const response = await fetch('/api/update-task-details', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -448,7 +452,10 @@ export default function TaskCard({
           checkinTime: editedCheckinTime,
           cleaningTime: parseInt(editedDuration),
           paxIn: parseInt(editedPaxIn),
+          paxOut: displayTask.paxOut, // Passa anche paxOut per coerenza
           operationId: parseInt(editedOperationId) || null,
+          date: workDate,
+          modified_by: currentUser.username || 'unknown',
         }),
       });
 
