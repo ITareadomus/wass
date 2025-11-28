@@ -1,13 +1,16 @@
 {
-  "metadata": {
-    "last_updated": "2025-11-28 16:36:01",
-    "date": "2025-11-28",
-    "created_by": "unknown"
-  },
-  "cleaners_assignments": [],
   "meta": {
-    "total_cleaners": 0,
+    "total_tasks": 0,
     "used_cleaners": 0,
-    "assigned_tasks": 0
-  }
+    "assigned_tasks": 0,
+    "total_cleaners": 0
+  },
+  "metadata": {
+    "date": "2025-11-28",
+    "loaded_at": "2025-11-28 15:41:50",
+    "created_by": "unknown",
+    "last_updated": "2025-11-28 16:40:48",
+    "loaded_from_mysql": true
+  },
+  "cleaners_assignments": []
 }
