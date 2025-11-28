@@ -5,6 +5,7 @@ export interface DailyAssignmentCurrent {
   work_date: string;
   timeline: any;
   selected_cleaners: any;
+  containers: any;
   last_revision: number;
   updated_at: Date;
 }
@@ -15,6 +16,7 @@ export interface DailyAssignmentRevision {
   revision: number;
   selected_cleaners: any;
   timeline: any;
+  containers: any;
   created_at: Date;
   created_by?: string;
 }
@@ -49,6 +51,9 @@ export class DailyAssignmentRevisionsService {
         selected_cleaners: typeof row.selected_cleaners === 'string' 
           ? JSON.parse(row.selected_cleaners) 
           : row.selected_cleaners,
+        containers: typeof row.containers === 'string' 
+          ? JSON.parse(row.containers) 
+          : row.containers,
         last_revision: row.last_revision,
         updated_at: row.updated_at
       };
@@ -71,6 +76,7 @@ export class DailyAssignmentRevisionsService {
       revision: current.last_revision,
       timeline: current.timeline,
       selected_cleaners: current.selected_cleaners,
+      containers: current.containers,
       created_at: current.updated_at
     };
   }
@@ -97,6 +103,9 @@ export class DailyAssignmentRevisionsService {
         timeline: typeof row.timeline === 'string' 
           ? JSON.parse(row.timeline) 
           : row.timeline,
+        containers: typeof row.containers === 'string' 
+          ? JSON.parse(row.containers) 
+          : row.containers,
         created_at: row.created_at,
         created_by: row.created_by
       }));
@@ -132,6 +141,9 @@ export class DailyAssignmentRevisionsService {
         timeline: typeof row.timeline === 'string' 
           ? JSON.parse(row.timeline) 
           : row.timeline,
+        containers: typeof row.containers === 'string' 
+          ? JSON.parse(row.containers) 
+          : row.containers,
         created_at: row.created_at,
         created_by: row.created_by
       };
@@ -149,11 +161,13 @@ export class DailyAssignmentRevisionsService {
     workDate: string, 
     timeline: any, 
     selectedCleaners: any,
+    containers: any = null,
     createdBy: string = 'system'
   ): Promise<number> {
     try {
       const timelineJson = JSON.stringify(timeline || {});
       const selectedCleanersJson = JSON.stringify(selectedCleaners || []);
+      const containersJson = containers ? JSON.stringify(containers) : null;
 
       // Get current revision number
       const current = await this.getCurrent(workDate);
@@ -162,25 +176,26 @@ export class DailyAssignmentRevisionsService {
       // Update current table (UPSERT)
       await mysqlDb.execute(
         `INSERT INTO daily_assignments_current 
-         (work_date, timeline, selected_cleaners, last_revision) 
-         VALUES (?, ?, ?, ?)
+         (work_date, timeline, selected_cleaners, containers, last_revision) 
+         VALUES (?, ?, ?, ?, ?)
          ON DUPLICATE KEY UPDATE 
            timeline = VALUES(timeline),
            selected_cleaners = VALUES(selected_cleaners),
+           containers = VALUES(containers),
            last_revision = VALUES(last_revision),
            updated_at = CURRENT_TIMESTAMP`,
-        [workDate, timelineJson, selectedCleanersJson, nextRevision]
+        [workDate, timelineJson, selectedCleanersJson, containersJson, nextRevision]
       );
 
       // Insert into history table
       await mysqlDb.execute(
         `INSERT INTO daily_assignments_history 
-         (work_date, revision, timeline, selected_cleaners, created_by) 
-         VALUES (?, ?, ?, ?, ?)`,
-        [workDate, nextRevision, timelineJson, selectedCleanersJson, createdBy]
+         (work_date, revision, timeline, selected_cleaners, containers, created_by) 
+         VALUES (?, ?, ?, ?, ?, ?)`,
+        [workDate, nextRevision, timelineJson, selectedCleanersJson, containersJson, createdBy]
       );
 
-      console.log(`✅ Saved revision ${nextRevision} for ${workDate} (current + history)`);
+      console.log(`✅ Saved revision ${nextRevision} for ${workDate} (current + history, containers: ${containersJson ? 'yes' : 'no'})`);
       return nextRevision;
     } catch (error) {
       console.error("Error creating revision:", error);
@@ -261,6 +276,7 @@ export class DailyAssignmentRevisionsService {
         workDate, 
         revision.timeline, 
         revision.selected_cleaners,
+        revision.containers,
         `rollback_to_${revisionNumber}`
       );
 
