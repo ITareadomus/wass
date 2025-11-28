@@ -21,6 +21,7 @@ export interface DailyAssignmentRevision {
   created_at: Date;          // 6
   created_by?: string;       // 7
   modified_by?: string;      // 8
+  modification_type?: string; // 9
 }
 
 /**
@@ -111,7 +112,8 @@ export class DailyAssignmentRevisionsService {
           : row.containers,
         created_at: row.created_at,
         created_by: row.created_by,
-        modified_by: row.modified_by
+        modified_by: row.modified_by,
+        modification_type: row.modification_type
       }));
     } catch (error) {
       console.error("Error getting all revisions:", error);
@@ -150,7 +152,8 @@ export class DailyAssignmentRevisionsService {
           : row.containers,
         created_at: row.created_at,
         created_by: row.created_by,
-        modified_by: row.modified_by
+        modified_by: row.modified_by,
+        modification_type: row.modification_type
       };
     } catch (error) {
       console.error("Error getting revision by number:", error);
@@ -167,7 +170,8 @@ export class DailyAssignmentRevisionsService {
     timeline: any, 
     selectedCleaners: any,
     containers: any = null,
-    createdBy: string = 'system'
+    createdBy: string = 'system',
+    modificationType: string = 'manual'
   ): Promise<number> {
     try {
       const timelineJson = JSON.stringify(timeline || {});
@@ -192,12 +196,12 @@ export class DailyAssignmentRevisionsService {
         [workDate, timelineJson, selectedCleanersJson, containersJson, nextRevision, createdBy]
       );
 
-      // Insert into history table - ordine: work_date, revision, timeline, selected_cleaners, containers, created_by, modified_by
+      // Insert into history table - ordine: work_date, revision, timeline, selected_cleaners, containers, created_by, modified_by, modification_type
       await mysqlDb.execute(
         `INSERT INTO daily_assignments_history 
-         (work_date, revision, timeline, selected_cleaners, containers, created_by, modified_by) 
-         VALUES (?, ?, ?, ?, ?, ?, ?)`,
-        [workDate, nextRevision, timelineJson, selectedCleanersJson, containersJson, createdBy, createdBy]
+         (work_date, revision, timeline, selected_cleaners, containers, created_by, modified_by, modification_type) 
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        [workDate, nextRevision, timelineJson, selectedCleanersJson, containersJson, createdBy, createdBy, modificationType]
       );
 
       console.log(`✅ Saved revision ${nextRevision} for ${workDate} (current + history, containers: ${containersJson ? 'yes' : 'no'})`);
