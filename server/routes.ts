@@ -203,7 +203,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       };
 
       // Salva timeline (dual-write: filesystem + Object Storage)
-      await workspaceFiles.saveTimeline(workDate, emptyTimeline);
+      await workspaceFiles.saveTimeline(workDate, emptyTimeline, false, currentUsername);
       console.log(`Timeline resettata: timeline.json (struttura corretta)`);
 
       // FORZA la ricreazione di containers.json rieseguendo create_containers.py
@@ -226,7 +226,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // CRITICAL: Forza nuovamente il reset di timeline.json dopo create_containers
       // perché lo script Python potrebbe aver sovrascritto il file
       console.log(`🔄 Forzatura reset timeline.json dopo create_containers...`);
-      await workspaceFiles.saveTimeline(workDate, emptyTimeline);
+      await workspaceFiles.saveTimeline(workDate, emptyTimeline, false, currentUsername);
       console.log(`✅ Timeline resettata nuovamente dopo create_containers`);
 
       // CRITICAL: Elimina il flag di ultimo salvataggio per evitare ricaricamenti automatici
@@ -373,7 +373,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       );
 
       // Salva timeline (dual-write: filesystem + Object Storage)
-      await workspaceFiles.saveTimeline(workDate, timelineData);
+      await workspaceFiles.saveTimeline(workDate, timelineData, false, modifyingUser);
 
       console.log(`✅ Task ${logisticCode} spostata da cleaner ${sourceCleanerId} a cleaner ${destCleanerId}`);
       res.json({ success: true, message: "Task spostata con successo tra cleaners" });
@@ -545,7 +545,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       );
 
       // Salva timeline (dual-write: filesystem + Object Storage)
-      await workspaceFiles.saveTimeline(workDate, timelineData);
+      await workspaceFiles.saveTimeline(workDate, timelineData, false, modifyingUser);
 
       console.log(`✅ Task scambiate tra cleaner ${sourceCleanerId} e cleaner ${destCleanerId}`);
       res.json({
@@ -852,7 +852,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       );
 
       // Salva timeline usando workspace helper (scrive su filesystem + Object Storage)
-      await workspaceFiles.saveTimeline(workDate, timelineData);
+      await workspaceFiles.saveTimeline(workDate, timelineData, false, modifyingUserFromRequest);
 
       // RIMUOVI SEMPRE la task da containers.json quando salvata in timeline
       if (containersData && containersData.containers) {
@@ -892,7 +892,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             }
 
             // Salva containers.json aggiornato usando workspace helper (filesystem + Object Storage)
-            await workspaceFiles.saveContainers(workDate, containersData);
+            await workspaceFiles.saveContainers(workDate, containersData, modifyingUserFromRequest);
             console.log(`✅ Containers.json aggiornato e sincronizzato con timeline`);
           }
         } catch (containerError) {
@@ -983,7 +983,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       );
 
       // Salva timeline usando workspace helper (filesystem + Object Storage)
-      await workspaceFiles.saveTimeline(workDate, assignmentsData);
+      await workspaceFiles.saveTimeline(workDate, assignmentsData, false, modifyingUser);
 
       // RIPORTA la task nel container corretto
       if (removedTask) {
@@ -1037,7 +1037,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
 
           // Salva containers.json usando workspace helper (filesystem + Object Storage)
-          await workspaceFiles.saveContainers(workDate, containersData);
+          await workspaceFiles.saveContainers(workDate, containersData, modifyingUser);
           console.log(`✅ Task ${logisticCode} riportata nel container ${containerType}`);
         } catch (containerError) {
           console.warn('Errore nel ripristino del container:', containerError);
@@ -1278,8 +1278,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       selectedData.metadata = selectedData.metadata || {};
       selectedData.metadata.date = workDate;
 
+      // Get username from request
+      const currentUsername = req.body.modified_by || getCurrentUsername(req);
+      
       // Salva selected_cleaners usando workspace helper (dual-write: filesystem + MySQL)
-      await workspaceFiles.saveSelectedCleaners(workDate, selectedData);
+      await workspaceFiles.saveSelectedCleaners(workDate, selectedData, false, currentUsername);
 
       let message = "";
 
@@ -1301,7 +1304,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         );
 
         // Salva timeline.json (dual-write: filesystem + Object Storage)
-        await workspaceFiles.saveTimeline(workDate, timelineData);
+        await workspaceFiles.saveTimeline(workDate, timelineData, false, currentUsername);
 
         console.log(`✅ Cleaner ${cleanerId} rimosso completamente (nessuna task)`);
         console.log(`   - Rimosso da selected_cleaners.json (${cleanersBefore} -> ${selectedData.cleaners.length})`);
@@ -1392,10 +1395,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       };
 
+      // Get username from request
+      const currentUsername = req.body.modified_by || req.body.created_by || getCurrentUsername(req);
+      
       // Usa workspaceFiles.saveSelectedCleaners per dual-write (filesystem + MySQL)
-      await workspaceFiles.saveSelectedCleaners(workDate, dataToSave);
+      await workspaceFiles.saveSelectedCleaners(workDate, dataToSave, false, currentUsername);
 
-      console.log(`✅ Salvati ${enrichedCleaners.length} cleaners in selected_cleaners.json per ${workDate} (con can_do_straordinaria e metadata)`);
+      console.log(`✅ Salvati ${enrichedCleaners.length} cleaners in selected_cleaners.json per ${workDate} (con can_do_straordinaria e metadata) by ${currentUsername}`);
 
       // Rimuovi il flag di editing dopo un breve delay
       setTimeout(async () => {
@@ -1574,8 +1580,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         0
       );
 
+      // Get username from request
+      const currentUsername = req.body.modified_by || getCurrentUsername(req);
+      
       // Salva timeline (dual-write: filesystem + Object Storage)
-      await workspaceFiles.saveTimeline(workDate, timelineData);
+      await workspaceFiles.saveTimeline(workDate, timelineData, false, currentUsername);
 
       // Aggiungi il cleaner a selected_cleaners.json (se non già presente)
       const existingCleanerIndex = selectedCleanersData.cleaners.findIndex((c: any) => c.id === cleanerId);
@@ -1596,7 +1605,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Salva selected_cleaners usando workspace helper (dual-write: filesystem + MySQL)
-      await workspaceFiles.saveSelectedCleaners(workDate, selectedCleanersData);
+      await workspaceFiles.saveSelectedCleaners(workDate, selectedCleanersData, false, currentUsername);
 
       console.log(`✅ Operazione completata: cleaner ${cleanerId} ${replacedCleanerId ? `ha sostituito ${replacedCleanerId}` : 'aggiunto'}`);
 
@@ -1930,7 +1939,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Aggiorna anche timeline.json se il cleaner è presente
       const timelinePath = path.join(process.cwd(), 'client/public/data/output/timeline.json');
       try {
-        const timelineData = JSON.parse(await fs.readFile(timelinePath, 'utf-utf8'));
+        const timelineData = JSON.parse(await fs.readFile(timelinePath, 'utf8'));
 
         const cleanerAssignment = timelineData.cleaners_assignments?.find((ca: any) => ca.cleaner?.id === cleanerId);
         if (cleanerAssignment && cleanerAssignment.cleaner) {
@@ -3078,7 +3087,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const clientWindowsData = req.body;
       const clientWindowsPath = path.join(process.cwd(), "client/public/data/input/client_windows.json");
 
-      await fs.promises.writeFile(
+      await fs.writeFile(
         clientWindowsPath,
         JSON.stringify(clientWindowsData, null, 2),
         "utf-8"
@@ -3295,7 +3304,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (typeof sourceIndex === 'number' && sourceIndex >= 0 && sourceIndex < srcEntry.tasks.length) {
           takeIdx = sourceIndex;
         } else {
-          const idx = findTaskIndex(srcEntry.tasks, taskKey);
+          const idx = findTaskIndex(srcEntry.tasks);
           takeIdx = idx >= 0 ? idx : null;
         }
 
@@ -3303,7 +3312,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           // FIX: fallback globale prima di dare 404
           let foundCleaner: any = null, foundIdx = -1;
           for (const ca of cleaners) {
-            const i = findTaskIndex(ca.tasks || [], taskKey);
+            const i = findTaskIndex(ca.tasks || []);
             if (i !== -1) { foundCleaner = ca; foundIdx = i; break; }
           }
           if (foundIdx !== -1 && foundCleaner) {
@@ -3323,7 +3332,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // === Caso B: provengo da CONTAINER ===
       if (!moved && fromContainer && containersData?.containers?.[fromContainer]?.tasks) {
         const srcArr = containersData.containers[fromContainer].tasks as any[];
-        let idx = findTaskIndex(srcArr, taskKey);
+        let idx = findTaskIndex(srcArr);
         if (idx === -1 && typeof sourceIndex === 'number' && srcArr[sourceIndex]) idx = sourceIndex;
         if (idx === -1) {
           return res.status(404).json({ success: false, message: 'Task non trovata nel container sorgente' });
@@ -3334,7 +3343,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // === Caso C: Riordino interno (se non spostato da altro) ===
       if (!moved) {
-        const idx = findTaskIndex(cleaners.find((c: any) => c?.cleaner?.id === toCleanerId)?.tasks || [], taskKey);
+        const idx = findTaskIndex(cleaners.find((c: any) => c?.cleaner?.id === toCleanerId)?.tasks || []);
         if (idx === -1) {
           return res.status(404).json({ success: false, message: 'Task non trovata' });
         }
@@ -3665,7 +3674,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/accounts/update", async (req, res) => {
     try {
       const accountsPath = path.join(process.cwd(), "client/public/data/accounts.json");
-      const accountsData = JSON.parse(await fs.readFile(accountsPath, "utf--8"));
+      const accountsData = JSON.parse(await fs.readFile(accountsPath, "utf-8"));
 
       const index = accountsData.users.findIndex((u: any) => u.id === req.body.id);
       if (index !== -1) {
