@@ -1098,7 +1098,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Carica timeline, selected_cleaners E CONTAINERS da MySQL via workspace-files
       const timelineData = await workspaceFiles.loadTimeline(workDate);
       const selectedCleanersData = await workspaceFiles.loadSelectedCleaners(workDate);
-      const containersData = await workspaceFiles.loadContainers(workDate);
+      let containersData = await workspaceFiles.loadContainers(workDate);
 
       // CRITICAL: Considera found=true anche se abbiamo solo containers (per date passate)
       if (!timelineData && !selectedCleanersData && !containersData) {
@@ -1110,11 +1110,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      // Se abbiamo containers salvati in MySQL, usali (non rigenerare da database remoto)
-      // Questo è cruciale per le date passate dove le task potrebbero non essere più nel DB ADAM
-      if (containersData && containersData.containers) {
-        console.log(`✅ Containers caricati da MySQL per ${workDate}`);
-        
+      // SEMPRE rigenera containers dal DB ADAM (per avere le task aggiornate)
+      console.log(`🔄 Rigenerazione containers dal DB ADAM per ${workDate}...`);
+      const createContainersPath = path.join(process.cwd(), 'client/public/scripts/create_containers.py');
+      try {
+        await new Promise<string>((resolve, reject) => {
+          exec(`python3 "${createContainersPath}" --date "${workDate}" --skip-extract`, (error, stdout, stderr) => {
+            if (error) {
+              console.error(`❌ Errore create_containers: ${error.message}`);
+              reject(new Error(stderr || error.message));
+            } else {
+              console.log(`create_containers output: ${stdout}`);
+              resolve(stdout);
+            }
+          });
+        });
+
+        // Carica i containers appena rigenerati
+        const containersPath = path.join(process.cwd(), 'client/public/data/output/containers.json');
+        containersData = JSON.parse(await fs.readFile(containersPath, 'utf8'));
+        console.log(`✅ Containers rigenerati dal DB ADAM per ${workDate}`);
+
         // Sincronizza: rimuovi task già assegnate dai containers
         const assignedTaskIds = new Set<number>();
         if (timelineData?.cleaners_assignments) {
@@ -1149,64 +1165,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
 
         // Scrivi i containers sincronizzati su filesystem (per Python scripts)
-        const containersPath = path.join(process.cwd(), 'client/public/data/output/containers.json');
         await fs.writeFile(containersPath, JSON.stringify(containersData, null, 2));
-        console.log(`✅ Containers sincronizzati da MySQL: rimosse ${removedCount} task già assegnate`);
-      } else {
-        // Fallback: rigenera containers.json dal database remoto (solo se non ci sono containers in MySQL)
-        console.log(`⚠️ Nessun container salvato in MySQL per ${workDate}, rigenerazione da DB remoto...`);
-        const createContainersPath = path.join(process.cwd(), 'client/public/scripts/create_containers.py');
-        try {
-          await new Promise<string>((resolve, reject) => {
-            exec(`python3 "${createContainersPath}" --date "${workDate}" --skip-extract`, (error, stdout, stderr) => {
-              if (error) {
-                console.error(`❌ Errore create_containers: ${error.message}`);
-                reject(new Error(stderr || error.message));
-              } else {
-                console.log(`create_containers output: ${stdout}`);
-                resolve(stdout);
-              }
-            });
-          });
-
-          // Sincronizza containers rigenerati
-          const containersPath = path.join(process.cwd(), 'client/public/data/output/containers.json');
-          const newContainersData = JSON.parse(await fs.readFile(containersPath, 'utf8'));
-
-          const assignedTaskIds = new Set<number>();
-          if (timelineData?.cleaners_assignments) {
-            for (const cleanerEntry of timelineData.cleaners_assignments) {
-              for (const task of cleanerEntry.tasks || []) {
-                assignedTaskIds.add(task.task_id);
-              }
-            }
-          }
-
-          let removedCount = 0;
-          for (const containerType of ['early_out', 'high_priority', 'low_priority']) {
-            const container = newContainersData.containers?.[containerType];
-            if (container?.tasks) {
-              const originalCount = container.tasks.length;
-              container.tasks = container.tasks.filter((t: any) => !assignedTaskIds.has(t.task_id));
-              container.count = container.tasks.length;
-              removedCount += (originalCount - container.tasks.length);
-            }
-          }
-
-          if (newContainersData.summary) {
-            newContainersData.summary.early_out = newContainersData.containers.early_out?.count || 0;
-            newContainersData.summary.high_priority = newContainersData.containers.high_priority?.count || 0;
-            newContainersData.summary.low_priority = newContainersData.containers.low_priority?.count || 0;
-            newContainersData.summary.total_tasks =
-              newContainersData.summary.early_out +
-              newContainersData.summary.high_priority +
-              newContainersData.summary.low_priority;
-          }
-
-          await workspaceFiles.saveContainers(workDate, newContainersData);
-          console.log(`✅ Containers rigenerati e sincronizzati: rimosse ${removedCount} task già assegnate`);
-        } catch (err) {
-          console.warn('⚠️ Impossibile rigenerare containers:', err);
+        console.log(`✅ Containers sincronizzati: rimosse ${removedCount} task già assegnate`);
+      } catch (err) {
+        console.error('❌ Errore nella rigenerazione containers:', err);
+        // Fallback: se c'è un errore, usa i containers salvati in MySQL se disponibili
+        if (!containersData) {
+          console.warn('⚠️ Impossibile rigenerare containers e nessun dato in MySQL');
         }
       }
 
