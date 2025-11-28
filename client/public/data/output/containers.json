@@ -1,6 +1,6 @@
 {
   "metadata": {
-    "last_updated": "2025-11-28T11:34:32.970045",
+    "last_updated": "2025-11-28T13:20:57.889151",
     "date": "2025-11-30"
   },
   "containers": {
@@ -258,11 +258,11 @@
           "lat": "45.489404",
           "lng": "9.1685018",
           "cleaning_time": 90,
-          "checkin_date": null,
+          "checkin_date": "2025-11-30",
           "checkout_date": "2025-11-30",
           "checkin_time": null,
           "checkout_time": null,
-          "pax_in": 0,
+          "pax_in": 1,
           "pax_out": 1,
           "small_equipment": false,
           "operation_id": 2,
@@ -906,7 +906,7 @@
           "cleaning_time": 150,
           "checkin_date": "2025-12-01",
           "checkout_date": "2025-11-30",
-          "checkin_time": "16:00",
+          "checkin_time": "17:00",
           "checkout_time": null,
           "pax_in": 2,
           "pax_out": 5,
@@ -1146,15 +1146,43 @@
             "not_eo",
             "not_hp"
           ]
+        },
+        {
+          "task_id": 219576,
+          "logistic_code": 1655,
+          "client_id": 123,
+          "premium": false,
+          "address": "VIA NINO BIXIO 33",
+          "lat": "45.4725999",
+          "lng": "9.2118362",
+          "cleaning_time": 90,
+          "checkin_date": "2025-12-07",
+          "checkout_date": "2025-11-30",
+          "checkin_time": null,
+          "checkout_time": null,
+          "pax_in": 3,
+          "pax_out": 3,
+          "small_equipment": false,
+          "operation_id": 2,
+          "confirmed_operation": false,
+          "straordinaria": false,
+          "type_apt": "B",
+          "alias": "YHST",
+          "customer_name": "YOUHOSTY",
+          "priority": "low_priority",
+          "reasons": [
+            "not_eo",
+            "not_hp"
+          ]
         }
       ],
-      "count": 18
+      "count": 19
     }
   },
   "summary": {
-    "total_tasks": 41,
+    "total_tasks": 42,
     "early_out": 12,
     "high_priority": 11,
-    "low_priority": 18
+    "low_priority": 19
   }
 }

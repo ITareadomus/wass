@@ -11,7 +11,7 @@
     "modified_by": [
       "Admin"
     ],
-    "last_updated": "2025-11-28T11:34:32.963119"
+    "last_updated": "2025-11-28T13:20:57.883417"
   },
   "cleaners_assignments": [
     {
@@ -45,7 +45,7 @@
           "start_time": "10:00",
           "travel_time": 0,
           "checkin_date": "2025-12-07",
-          "checkin_time": null,
+          "checkin_time": "15:00",
           "operation_id": 2,
           "checkout_date": "2025-11-30",
           "checkout_time": null,
