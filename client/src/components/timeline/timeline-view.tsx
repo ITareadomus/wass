@@ -1825,6 +1825,13 @@ export default function TimelineView({
                                 );
                               });
                             })()}
+                            {/* Zona extra per permettere drop alla fine della lista */}
+                            <div 
+                              className={`flex-shrink-0 min-w-[60px] h-full ${
+                                snapshot.isDraggingOver ? 'bg-primary/10' : ''
+                              }`}
+                              style={{ minHeight: '45px' }}
+                            />
                             {provided.placeholder}
                           </div>
                         </div>
