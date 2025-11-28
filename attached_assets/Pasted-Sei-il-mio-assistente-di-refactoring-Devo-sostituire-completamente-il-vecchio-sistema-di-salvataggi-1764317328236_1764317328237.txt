@@ -1,0 +1,273 @@
+Sei il mio assistente di refactoring. Devo sostituire completamente il vecchio sistema di salvataggio basato su file JSON e Replit Object Storage, con un nuovo sistema basato su MySQL + Drizzle e revisioni automatiche.
+
+ATTENZIONE: esegui TUTTE le seguenti modifiche in modo esatto.
+
+────────────────────────────────────────
+🚀 OBIETTIVO DEL REFACRORING
+────────────────────────────────────────
+Implementare un sistema di salvataggio in MySQL con revisioni multiple per ogni giorno (work_date).  
+Ogni modifica della timeline o dei selected_cleaners deve creare una NUOVA revisione in DB.
+
+Cancellare completamente:
+- salvataggi su JSON locali come fonte dati
+- salvataggi su Replit Object Storage
+- endpoint /api/confirm-assignments (non serve più)
+- bottone “Conferma Assegnazioni” nel frontend
+- logica hasUnsavedChanges basata sul vecchio modello
+
+────────────────────────────────────────
+🗄️ 1. INSTALLAZIONE E CONFIGURAZIONE DRIZZLE
+────────────────────────────────────────
+Assicurati che i pacchetti siano presenti nel progetto:
+
+npm install drizzle-orm mysql2
+npm install -D drizzle-kit
+
+Crea o sovrascrivi il file drizzle.config.ts alla root del progetto con:
+
+-------------------------------------
+drizzle.config.ts
+-------------------------------------
+import { defineConfig } from "drizzle-kit";
+
+export default defineConfig({
+  schema: "./shared/schema.ts",
+  out: "./drizzle",
+  dialect: "mysql",
+  dbCredentials: {
+    host: process.env.DB_HOST!,
+    user: process.env.DB_USER!,
+    password: process.env.DB_PASSWORD!,
+    database: process.env.DB_NAME!,
+    port: Number(process.env.DB_PORT ?? 3306),
+  },
+});
+-------------------------------------
+
+────────────────────────────────────────
+🗂️ 2. AGGIUNGERE TABELLA daily_assignment_revisions
+────────────────────────────────────────
+Nel file shared/schema.ts aggiungi IN FONDO (non alterare il resto):
+
+-------------------------------------
+import {
+  mysqlTable,
+  serial,
+  date,
+  int,
+  json,
+  timestamp
+} from "drizzle-orm/mysql-core";
+
+export const dailyAssignmentRevisions = mysqlTable(
+  "daily_assignment_revisions",
+  {
+    id: serial("id").primaryKey(),
+    workDate: date("work_date").notNull(),
+    revision: int("revision").notNull(),
+    selectedCleaners: json("selected_cleaners").notNull(),
+    timeline: json("timeline").notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  }
+);
+
+export type DailyAssignmentRevision =
+  typeof dailyAssignmentRevisions.$inferSelect;
+export type NewDailyAssignmentRevision =
+  typeof dailyAssignmentRevisions.$inferInsert;
+-------------------------------------
+
+────────────────────────────────────────
+🛢️ 3. CREARE shared/db.ts (NUOVO FILE)
+────────────────────────────────────────
+Crea il file shared/db.ts con:
+
+-------------------------------------
+import mysql from "mysql2/promise";
+import { drizzle } from "drizzle-orm/mysql2";
+import * as schema from "./schema";
+
+const pool = mysql.createPool({
+  host: process.env.DB_HOST!,
+  user: process.env.DB_USER!,
+  password: process.env.DB_PASSWORD!,
+  database: process.env.DB_NAME!,
+  port: Number(process.env.DB_PORT ?? 3306),
+});
+
+export const db = drizzle(pool, { schema });
+-------------------------------------
+
+────────────────────────────────────────
+🛠️ 4. SERVICE NUOVO: daily-assignment-revisions-service.ts
+────────────────────────────────────────
+Crea file server/services/daily-assignment-revisions-service.ts:
+
+-------------------------------------
+import { db } from "../../shared/db";
+import { dailyAssignmentRevisions } from "../../shared/schema";
+import { desc, eq } from "drizzle-orm";
+
+export class DailyAssignmentRevisionsService {
+  async getLatestRevision(workDate: string) {
+    const [row] = await db
+      .select()
+      .from(dailyAssignmentRevisions)
+      .where(eq(dailyAssignmentRevisions.workDate, workDate))
+      .orderBy(desc(dailyAssignmentRevisions.revision))
+      .limit(1);
+
+    return row ?? null;
+  }
+
+  async createRevision(workDate: string, timeline: any, selectedCleaners: any) {
+    const latest = await this.getLatestRevision(workDate);
+    const nextRevision = latest ? latest.revision + 1 : 1;
+
+    await db.insert(dailyAssignmentRevisions).values({
+      workDate,
+      revision: nextRevision,
+      timeline,
+      selectedCleaners,
+    });
+  }
+}
+
+export const dailyAssignmentRevisionsService =
+  new DailyAssignmentRevisionsService();
+-------------------------------------
+
+────────────────────────────────────────
+📦 5. MODIFICARE server/services/workspace-files.ts
+────────────────────────────────────────
+ELIMINARE TUTTE LE IMPORTAZIONI E LE CHIAMATE a:
+- storageService
+- saveWorkspaceTimeline
+- saveWorkspaceSelectedCleaners
+- tutte le letture da Replit Object Storage
+
+Aggiungere:
+import { dailyAssignmentRevisionsService } from "./daily-assignment-revisions-service";
+
+SOSTITUIRE INTERAMENTE queste funzioni:
+
+-------------------------------------
+export async function loadTimeline(workDate: string) {
+  try {
+    const rev = await dailyAssignmentRevisionsService.getLatestRevision(workDate);
+    if (rev?.timeline) return rev.timeline;
+
+    // fallback solo per primo avvio
+    const data = await fs.readFile(PATHS.timeline, "utf-8");
+    const parsed = JSON.parse(data);
+    return parsed.metadata?.date === workDate ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+-------------------------------------
+
+-------------------------------------
+export async function loadSelectedCleaners(workDate: string) {
+  const rev = await dailyAssignmentRevisionsService.getLatestRevision(workDate);
+  if (rev?.selectedCleaners) return rev.selectedCleaners;
+
+  try {
+    const raw = await fs.readFile(PATHS.selectedCleaners, "utf-8");
+    return JSON.parse(raw);
+  } catch {
+    return {};
+  }
+}
+-------------------------------------
+
+-------------------------------------
+export async function saveTimeline(workDate: string, data: any) {
+  try {
+    data.metadata = data.metadata || {};
+    data.metadata.date = workDate;
+    data.metadata.last_updated = new Date().toISOString();
+
+    await atomicWriteJson(PATHS.timeline, data);
+
+    const selected = await loadSelectedCleaners(workDate);
+
+    await dailyAssignmentRevisionsService.createRevision(
+      workDate,
+      data,
+      selected
+    );
+
+    return true;
+  } catch {
+    return false;
+  }
+}
+-------------------------------------
+
+-------------------------------------
+export async function saveSelectedCleaners(workDate: string, data: any) {
+  try {
+    await atomicWriteJson(PATHS.selectedCleaners, data);
+
+    const timeline = await loadTimeline(workDate);
+
+    await dailyAssignmentRevisionsService.createRevision(
+      workDate,
+      timeline ?? {},
+      data
+    );
+
+    return true;
+  } catch {
+    return false;
+  }
+}
+-------------------------------------
+
+────────────────────────────────────────
+🧹 6. DISABILITARE storage-service.ts
+────────────────────────────────────────
+Nel file server/services/storage-service.ts:
+- COMMENTARE TUTTO oppure lasciare funzioni vuote che non fanno nulla.
+
+────────────────────────────────────────
+🔌 7. MODIFICARE server/routes.ts
+────────────────────────────────────────
+Rimuovere completamente l’endpoint:
+
+POST /api/confirm-assignments
+
+oppure sostituirlo con:
+
+-------------------------------------
+router.post("/confirm-assignments", (req, res) => {
+  return res.json({ ok: true });
+});
+-------------------------------------
+
+────────────────────────────────────────
+🎨 8. FRONTEND — RIMUOVERE BOTTONE “CONFERMA ASSEGNAZIONI”
+────────────────────────────────────────
+Nel file client/src/components/timeline/timeline-view.tsx:
+
+- Rimuovere completamente:
+  - il bottone “Conferma Assegnazioni”
+  - funzione handleConfirmAssignments
+  - variabili hasUnsavedChanges basate sul vecchio metodo
+
+Il frontend deve ora affidarsi solo all’autosave (che chiamerà le nuove API).
+
+────────────────────────────────────────
+🎉 9. RISULTATO FINALE
+────────────────────────────────────────
+Dopo tutte queste modifiche:
+
+- Ogni cambiamento di timeline/selected_cleaners genera una nuova revisione in MySQL.
+- Caricare una data carica SEMPRE l’ultima revisione.
+- Nessun JSON viene più usato come sorgente dati.
+- Nessun Replit Storage viene più utilizzato.
+- Il pulsante “Conferma Assegnazioni” viene eliminato.
+- Il sistema è pronto per una futura feature di “undo”.
+
+Esegui tutte le modifiche richieste in modo preciso ed esatto.
