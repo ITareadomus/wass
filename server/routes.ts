@@ -1256,11 +1256,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const cleanersBefore = selectedData.cleaners.length;
       selectedData.cleaners = selectedData.cleaners.filter((c: any) => c.id !== cleanerId);
       selectedData.total_selected = selectedData.cleaners.length;
+      selectedData.metadata = selectedData.metadata || {};
+      selectedData.metadata.date = workDate;
 
-      // Salva selected_cleaners.json
-      const tmpPath = `${selectedCleanersPath}.tmp`;
-      await fs.writeFile(tmpPath, JSON.stringify(selectedData, null, 2));
-      await fs.rename(tmpPath, selectedCleanersPath);
+      // Salva selected_cleaners usando workspace helper (dual-write: filesystem + MySQL)
+      await workspaceFiles.saveSelectedCleaners(workDate, selectedData);
 
       let message = "";
 
@@ -1567,24 +1567,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         selectedCleanersData.total_selected = selectedCleanersData.cleaners.length;
         selectedCleanersData.metadata = selectedCleanersData.metadata || {};
         selectedCleanersData.metadata.date = workDate;
-
-        // Salva selected_cleaners.json
-        const tmpSelectedPath = `${selectedCleanersPath}.tmp`;
-        await fs.writeFile(tmpSelectedPath, JSON.stringify(selectedCleanersData, null, 2));
-        await fs.rename(tmpSelectedPath, selectedCleanersPath);
         console.log(`✅ Cleaner ${cleanerId} aggiunto a selected_cleaners.json con oggetto completo`);
       } else {
         // Cleaner già presente, aggiorna i suoi dati con l'oggetto completo
         selectedCleanersData.cleaners[existingCleanerIndex] = cleanerData;
         selectedCleanersData.metadata = selectedCleanersData.metadata || {};
         selectedCleanersData.metadata.date = workDate;
-
-        // Salva selected_cleaners.json
-        const tmpSelectedPath = `${selectedCleanersPath}.tmp`;
-        await fs.writeFile(tmpSelectedPath, JSON.stringify(selectedCleanersData, null, 2));
-        await fs.rename(tmpSelectedPath, selectedCleanersPath);
         console.log(`✅ Cleaner ${cleanerId} aggiornato in selected_cleaners.json con oggetto completo`);
       }
+
+      // Salva selected_cleaners usando workspace helper (dual-write: filesystem + MySQL)
+      await workspaceFiles.saveSelectedCleaners(workDate, selectedCleanersData);
 
       console.log(`✅ Operazione completata: cleaner ${cleanerId} ${replacedCleanerId ? `ha sostituito ${replacedCleanerId}` : 'aggiunto'}`);
 
@@ -1911,10 +1904,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.log(`✅ Cleaner ${cleanerId} aggiunto a selected_cleaners.json con start_time ${startTime}`);
       }
 
-      // Salva il file aggiornato con scrittura atomica
-      const tmpPath = `${selectedCleanersPath}.tmp`;
-      await fs.writeFile(tmpPath, JSON.stringify(selectedCleanersData, null, 2));
-      await fs.rename(tmpPath, selectedCleanersPath);
+      // Salva selected_cleaners usando workspace helper (dual-write: filesystem + MySQL)
+      await workspaceFiles.saveSelectedCleaners(workDate, selectedCleanersData);
 
       // Aggiorna anche timeline.json se il cleaner è presente
       const timelinePath = path.join(process.cwd(), 'client/public/data/output/timeline.json');
