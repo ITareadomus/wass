@@ -1,13 +1,60 @@
 {
   "metadata": {
-    "last_updated": "2025-11-27T17:30:00.616Z",
+    "last_updated": "2025-11-28T08:21:24.883Z",
     "date": "2025-11-28",
-    "created_by": "Admin"
+    "created_by": "Admin",
+    "modified_by": []
   },
-  "cleaners_assignments": [],
+  "cleaners_assignments": [
+    {
+      "cleaner": {
+        "id": null,
+        "name": "Unknown",
+        "lastname": "",
+        "role": "Standard",
+        "premium": false
+      },
+      "tasks": [
+        {
+          "task_id": 99999,
+          "logistic_code": null,
+          "client_id": null,
+          "premium": false,
+          "address": null,
+          "lat": null,
+          "lng": null,
+          "cleaning_time": 60,
+          "checkin_date": null,
+          "checkout_date": null,
+          "checkin_time": null,
+          "checkout_time": null,
+          "pax_in": 0,
+          "pax_out": 0,
+          "small_equipment": false,
+          "operation_id": 2,
+          "confirmed_operation": true,
+          "straordinaria": false,
+          "type_apt": null,
+          "alias": null,
+          "customer_name": null,
+          "reasons": [
+            "manually_moved_to_timeline"
+          ],
+          "priority": "low_priority",
+          "start_time": "10:00",
+          "end_time": "11:00",
+          "followup": false,
+          "sequence": 1,
+          "travel_time": 0,
+          "modified_by": null
+        }
+      ]
+    }
+  ],
   "meta": {
-    "total_cleaners": 0,
+    "total_cleaners": 1,
     "used_cleaners": 0,
-    "assigned_tasks": 0
+    "assigned_tasks": 0,
+    "total_tasks": 1
   }
 }
