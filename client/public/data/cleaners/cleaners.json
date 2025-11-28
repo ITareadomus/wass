@@ -1,6 +1,6 @@
 {
     "metadata": {
-        "last_updated": "2025-11-28T14:32:13.358345",
+        "last_updated": "2025-11-28T14:48:24.982722",
         "db_config": {
             "host": "139.59.132.41",
             "user": "admin",
@@ -11,7 +11,7 @@
     },
     "dates": {
         "2025-11-28": {
-            "timestamp": "2025-11-28T14:32:13.358355",
+            "timestamp": "2025-11-28T14:48:24.982737",
             "cleaners": [
                 {
                     "id": 24,
@@ -33,7 +33,7 @@
                         115
                     ],
                     "telegram_id": null,
-                    "start_time": "10:00",
+                    "start_time": "11:00",
                     "can_do_straordinaria": false
                 },
                 {
@@ -267,7 +267,7 @@
                     "role": "Premium",
                     "active": true,
                     "ranking": 0,
-                    "counter_hours": 17.5,
+                    "counter_hours": 20.5,
                     "counter_days": 1,
                     "available": true,
                     "contract_type": "B",
@@ -348,7 +348,7 @@
                         124
                     ],
                     "telegram_id": null,
-                    "start_time": "10:00",
+                    "start_time": "09:00",
                     "can_do_straordinaria": false
                 },
                 {
@@ -407,7 +407,7 @@
                         124
                     ],
                     "telegram_id": null,
-                    "start_time": "10:00",
+                    "start_time": "09:00",
                     "can_do_straordinaria": false
                 },
                 {
@@ -650,7 +650,7 @@
                     "contract_type": "a chiamata",
                     "preferred_customers": [],
                     "telegram_id": null,
-                    "start_time": null,
+                    "start_time": "11:00",
                     "can_do_straordinaria": false
                 },
                 {
@@ -666,7 +666,7 @@
                     "contract_type": "a chiamata",
                     "preferred_customers": [],
                     "telegram_id": null,
-                    "start_time": null,
+                    "start_time": "09:00",
                     "can_do_straordinaria": false
                 },
                 {
