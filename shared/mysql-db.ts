@@ -43,11 +43,23 @@ export async function initMySQLDatabase() {
           work_date DATE PRIMARY KEY,
           timeline JSON,
           selected_cleaners JSON,
+          containers JSON,
           last_revision INT DEFAULT 0,
           updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
         )
       `);
       console.log("✅ Created table: daily_assignments_current");
+    } else {
+      // Add containers column if it doesn't exist
+      const [columns] = await connection.execute(`
+        SELECT COLUMN_NAME FROM information_schema.columns 
+        WHERE table_schema = ? AND table_name = 'daily_assignments_current' AND column_name = 'containers'
+      `, [process.env.DB_NAME]);
+      
+      if ((columns as any[]).length === 0) {
+        await connection.execute(`ALTER TABLE daily_assignments_current ADD COLUMN containers JSON`);
+        console.log("✅ Added containers column to daily_assignments_current");
+      }
     }
     
     // Create history table if not exists
@@ -59,12 +71,24 @@ export async function initMySQLDatabase() {
           revision INT NOT NULL,
           timeline JSON,
           selected_cleaners JSON,
+          containers JSON,
           created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
           created_by VARCHAR(100) DEFAULT 'system',
           INDEX idx_work_date_revision (work_date, revision DESC)
         )
       `);
       console.log("✅ Created table: daily_assignments_history");
+    } else {
+      // Add containers column if it doesn't exist
+      const [columns] = await connection.execute(`
+        SELECT COLUMN_NAME FROM information_schema.columns 
+        WHERE table_schema = ? AND table_name = 'daily_assignments_history' AND column_name = 'containers'
+      `, [process.env.DB_NAME]);
+      
+      if ((columns as any[]).length === 0) {
+        await connection.execute(`ALTER TABLE daily_assignments_history ADD COLUMN containers JSON`);
+        console.log("✅ Added containers column to daily_assignments_history");
+      }
     }
     
     // Migrate data from old table if exists
