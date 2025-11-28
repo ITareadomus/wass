@@ -203,13 +203,19 @@ export async function loadTimeline(workDate: string): Promise<any | null> {
  *                       Use this for intermediate saves to avoid multiple revisions for a single user action
  * @param createdBy - Username of the user making the change (default: 'system')
  * @param modificationType - Type of modification (e.g., 'manual', 'reset', 'dnd', 'task_assigned', 'task_removed', etc.)
+ * @param editOptions - Optional edit tracking info (editedField, oldValue, newValue)
  */
 export async function saveTimeline(
   workDate: string,
   data: any, 
   skipRevision: boolean = false,
   createdBy: string = 'system',
-  modificationType: string = 'manual'
+  modificationType: string = 'manual',
+  editOptions?: {
+    editedField?: string;
+    oldValue?: string;
+    newValue?: string;
+  }
 ): Promise<boolean> {
   try {
     // Check if this is a past date
@@ -252,7 +258,7 @@ export async function saveTimeline(
     // ALWAYS create revision in MySQL - even for empty states
     // This ensures removals/deletions are properly persisted
     // Empty state IS valid data that should be saved
-    await dailyAssignmentRevisionsService.createRevision(workDate, normalizedData, cleanersArray, containers, createdBy, modificationType);
+    await dailyAssignmentRevisionsService.createRevision(workDate, normalizedData, cleanersArray, containers, createdBy, modificationType, editOptions);
     console.log(`✅ Timeline revision created in MySQL for ${workDate} by ${createdBy} (type: ${modificationType})`);
 
     return true;

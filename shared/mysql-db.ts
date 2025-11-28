@@ -88,6 +88,9 @@ export async function initMySQLDatabase() {
           created_by VARCHAR(100) DEFAULT 'system',
           modified_by VARCHAR(100) DEFAULT 'system',
           modification_type VARCHAR(50) DEFAULT 'manual',
+          edited_field VARCHAR(100) DEFAULT NULL,
+          old_value TEXT DEFAULT NULL,
+          new_value TEXT DEFAULT NULL,
           INDEX idx_work_date_revision (work_date, revision DESC)
         )
       `);
@@ -124,6 +127,39 @@ export async function initMySQLDatabase() {
       if ((modificationTypeCol as any[]).length === 0) {
         await connection.execute(`ALTER TABLE daily_assignments_history ADD COLUMN modification_type VARCHAR(50) DEFAULT 'manual'`);
         console.log("✅ Added modification_type column to daily_assignments_history");
+      }
+
+      // Add edited_field column if it doesn't exist
+      const [editedFieldCol] = await connection.execute(`
+        SELECT COLUMN_NAME FROM information_schema.columns 
+        WHERE table_schema = ? AND table_name = 'daily_assignments_history' AND column_name = 'edited_field'
+      `, [process.env.DB_NAME]);
+      
+      if ((editedFieldCol as any[]).length === 0) {
+        await connection.execute(`ALTER TABLE daily_assignments_history ADD COLUMN edited_field VARCHAR(100) DEFAULT NULL`);
+        console.log("✅ Added edited_field column to daily_assignments_history");
+      }
+
+      // Add old_value column if it doesn't exist
+      const [oldValueCol] = await connection.execute(`
+        SELECT COLUMN_NAME FROM information_schema.columns 
+        WHERE table_schema = ? AND table_name = 'daily_assignments_history' AND column_name = 'old_value'
+      `, [process.env.DB_NAME]);
+      
+      if ((oldValueCol as any[]).length === 0) {
+        await connection.execute(`ALTER TABLE daily_assignments_history ADD COLUMN old_value TEXT DEFAULT NULL`);
+        console.log("✅ Added old_value column to daily_assignments_history");
+      }
+
+      // Add new_value column if it doesn't exist
+      const [newValueCol] = await connection.execute(`
+        SELECT COLUMN_NAME FROM information_schema.columns 
+        WHERE table_schema = ? AND table_name = 'daily_assignments_history' AND column_name = 'new_value'
+      `, [process.env.DB_NAME]);
+      
+      if ((newValueCol as any[]).length === 0) {
+        await connection.execute(`ALTER TABLE daily_assignments_history ADD COLUMN new_value TEXT DEFAULT NULL`);
+        console.log("✅ Added new_value column to daily_assignments_history");
       }
     }
     

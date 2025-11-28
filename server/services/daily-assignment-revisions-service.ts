@@ -164,6 +164,9 @@ export class DailyAssignmentRevisionsService {
   /**
    * Save current state and create new revision
    * Updates current table + inserts into history table
+   * @param options.editedField - Field that was edited (e.g., 'pax_in')
+   * @param options.oldValue - Previous value before edit
+   * @param options.newValue - New value after edit
    */
   async createRevision(
     workDate: string, 
@@ -171,7 +174,12 @@ export class DailyAssignmentRevisionsService {
     selectedCleaners: any,
     containers: any = null,
     createdBy: string = 'system',
-    modificationType: string = 'manual'
+    modificationType: string = 'manual',
+    options?: {
+      editedField?: string;
+      oldValue?: string;
+      newValue?: string;
+    }
   ): Promise<number> {
     try {
       const timelineJson = JSON.stringify(timeline || {});
@@ -196,15 +204,28 @@ export class DailyAssignmentRevisionsService {
         [workDate, timelineJson, selectedCleanersJson, containersJson, nextRevision, createdBy]
       );
 
-      // Insert into history table - ordine: work_date, revision, timeline, selected_cleaners, containers, created_by, modified_by, modification_type
+      // Insert into history table with edit tracking fields
       await mysqlDb.execute(
         `INSERT INTO daily_assignments_history 
-         (work_date, revision, timeline, selected_cleaners, containers, created_by, modified_by, modification_type) 
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-        [workDate, nextRevision, timelineJson, selectedCleanersJson, containersJson, createdBy, createdBy, modificationType]
+         (work_date, revision, timeline, selected_cleaners, containers, created_by, modified_by, modification_type, edited_field, old_value, new_value) 
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          workDate, 
+          nextRevision, 
+          timelineJson, 
+          selectedCleanersJson, 
+          containersJson, 
+          createdBy, 
+          createdBy, 
+          modificationType,
+          options?.editedField || null,
+          options?.oldValue || null,
+          options?.newValue || null
+        ]
       );
 
-      console.log(`✅ Saved revision ${nextRevision} for ${workDate} (current + history, containers: ${containersJson ? 'yes' : 'no'})`);
+      const editInfo = options?.editedField ? ` [${options.editedField}: ${options.oldValue} → ${options.newValue}]` : '';
+      console.log(`✅ Saved revision ${nextRevision} for ${workDate} (${modificationType})${editInfo}`);
       return nextRevision;
     } catch (error) {
       console.error("Error creating revision:", error);
