@@ -2462,13 +2462,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         console.log("assign_eo output:", stdoutData);
 
-        // CRITICAL: Salva su MySQL dopo assegnazione automatica
+        // CRITICAL: Leggi timeline dal FILESYSTEM (dove Python ha scritto) e salva su MySQL
         try {
-          const timelineData = await workspaceFiles.loadTimeline(workDate);
-          if (timelineData) {
-            console.log(`💾 Salvataggio automatico su MySQL dopo assign_eo per ${workDate}...`);
-            // Il salvataggio su MySQL avviene automaticamente tramite workspace-files
-            console.log(`✅ Timeline salvata su MySQL (revision auto-incrementata)`);
+          const timelinePath = path.join(process.cwd(), 'client/public/data/output/timeline.json');
+          const timelineContent = await fs.readFile(timelinePath, 'utf8');
+          const timelineData = JSON.parse(timelineContent);
+          
+          if (timelineData && timelineData.metadata?.date === workDate) {
+            console.log(`💾 Salvataggio timeline da filesystem a MySQL per ${workDate}...`);
+            await workspaceFiles.saveTimeline(workDate, timelineData);
+            console.log(`✅ Timeline sincronizzata su MySQL dopo assign_eo`);
+          } else {
+            console.warn(`⚠️ Timeline dal filesystem ha data diversa: ${timelineData?.metadata?.date} vs ${workDate}`);
           }
         } catch (err) {
           console.warn(`⚠️ Errore salvataggio MySQL dopo assign_eo:`, err);
@@ -2545,13 +2550,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         console.log("assign_hp output:", stdoutData);
 
-        // CRITICAL: Salva su MySQL dopo assegnazione automatica
+        // CRITICAL: Leggi timeline dal FILESYSTEM (dove Python ha scritto) e salva su MySQL
         try {
-          const timelineData = await workspaceFiles.loadTimeline(workDate);
-          if (timelineData) {
-            console.log(`💾 Salvataggio automatico su MySQL dopo assign_hp per ${workDate}...`);
-            // Il salvataggio su MySQL avviene automaticamente tramite workspace-files
-            console.log(`✅ Timeline salvata su MySQL (revision auto-incrementata)`);
+          const timelinePath = path.join(process.cwd(), 'client/public/data/output/timeline.json');
+          const timelineContent = await fs.readFile(timelinePath, 'utf8');
+          const timelineData = JSON.parse(timelineContent);
+          
+          if (timelineData && timelineData.metadata?.date === workDate) {
+            console.log(`💾 Salvataggio timeline da filesystem a MySQL per ${workDate}...`);
+            await workspaceFiles.saveTimeline(workDate, timelineData);
+            console.log(`✅ Timeline sincronizzata su MySQL dopo assign_hp`);
+          } else {
+            console.warn(`⚠️ Timeline dal filesystem ha data diversa: ${timelineData?.metadata?.date} vs ${workDate}`);
           }
         } catch (err) {
           console.warn(`⚠️ Errore salvataggio MySQL dopo assign_hp:`, err);
@@ -2629,13 +2639,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         console.log("assign_lp output:", stdoutData);
 
-        // CRITICAL: Salva su MySQL dopo assegnazione automatica
+        // CRITICAL: Leggi timeline dal FILESYSTEM (dove Python ha scritto) e salva su MySQL
         try {
-          const timelineData = await workspaceFiles.loadTimeline(workDate);
-          if (timelineData) {
-            console.log(`💾 Salvataggio automatico su MySQL dopo assign_lp per ${workDate}...`);
-            // Il salvataggio su MySQL avviene automaticamente tramite workspace-files
-            console.log(`✅ Timeline salvata su MySQL (revision auto-incrementata)`);
+          const timelinePath = path.join(process.cwd(), 'client/public/data/output/timeline.json');
+          const timelineContent = await fs.readFile(timelinePath, 'utf8');
+          const timelineData = JSON.parse(timelineContent);
+          
+          if (timelineData && timelineData.metadata?.date === workDate) {
+            console.log(`💾 Salvataggio timeline da filesystem a MySQL per ${workDate}...`);
+            await workspaceFiles.saveTimeline(workDate, timelineData);
+            console.log(`✅ Timeline sincronizzata su MySQL dopo assign_lp`);
+          } else {
+            console.warn(`⚠️ Timeline dal filesystem ha data diversa: ${timelineData?.metadata?.date} vs ${workDate}`);
           }
         } catch (err) {
           console.warn(`⚠️ Errore salvataggio MySQL dopo assign_lp:`, err);
