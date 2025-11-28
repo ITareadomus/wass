@@ -11,7 +11,7 @@
     "modified_by": [
       "Admin"
     ],
-    "last_updated": "2025-11-28T13:25:41.387314"
+    "last_updated": "2025-11-28T13:27:07.518401"
   },
   "cleaners_assignments": [
     {
@@ -20,7 +20,8 @@
         "name": "Ogbodo Chidi",
         "lastname": "Igwe",
         "role": "Premium",
-        "premium": true
+        "premium": true,
+        "start_time": "10:00"
       },
       "tasks": [
         {
@@ -163,7 +164,8 @@
         "name": "ALEXANDER DENNYS",
         "lastname": "CARDENAS OLAYA",
         "role": "Standard",
-        "premium": false
+        "premium": false,
+        "start_time": "10:00"
       },
       "tasks": [
         {
