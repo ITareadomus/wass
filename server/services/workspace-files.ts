@@ -1,6 +1,8 @@
 import * as fs from 'fs/promises';
 import path from 'path';
 import { dailyAssignmentRevisionsService } from './daily-assignment-revisions-service';
+import { format } from 'date-fns';
+import { utcToZonedTime } from 'date-fns-tz';
 
 /**
  * Workspace Files Helper
@@ -17,6 +19,16 @@ const PATHS = {
   containers: path.join(process.cwd(), 'client/public/data/output/containers.json'),
   selectedCleaners: path.join(process.cwd(), 'client/public/data/cleaners/selected_cleaners.json'),
 };
+
+const TIMEZONE = 'Europe/Rome';
+
+// Helper per ottenere timestamp nel timezone di Roma
+function getRomeTimestamp(): string {
+  const now = new Date();
+  const romeTime = utcToZonedTime(now, TIMEZONE);
+  return format(romeTime, "yyyy-MM-dd HH:mm:ss");
+}
+
 
 /**
  * Atomically write JSON to file using tmp + rename pattern
@@ -49,7 +61,7 @@ export async function loadTimeline(workDate: string): Promise<any | null> {
   try {
     const data = await fs.readFile(PATHS.timeline, 'utf-8');
     const parsed = JSON.parse(data);
-    
+
     if (parsed.metadata?.date === workDate || parsed.cleaners_assignments) {
       console.log(`✅ Timeline loaded from filesystem for ${workDate}`);
       return parsed;
@@ -71,7 +83,7 @@ export async function saveTimeline(workDate: string, data: any): Promise<boolean
     // Ensure metadata contains the correct date
     data.metadata = data.metadata || {};
     data.metadata.date = workDate;
-    data.metadata.last_updated = new Date().toISOString();
+    data.metadata.last_updated = getRomeTimestamp();
 
     // Write to filesystem (for Python scripts compatibility)
     await atomicWriteJson(PATHS.timeline, data);
@@ -149,7 +161,7 @@ export async function loadSelectedCleaners(workDate: string): Promise<any | null
       const scData = {
         cleaners: Array.isArray(rev.selected_cleaners) ? rev.selected_cleaners : [],
         total_selected: Array.isArray(rev.selected_cleaners) ? rev.selected_cleaners.length : 0,
-        metadata: { date: workDate, loaded_at: new Date().toISOString() }
+        metadata: { date: workDate, loaded_at: getRomeTimestamp() }
       };
       console.log(`✅ Selected cleaners loaded from MySQL for ${workDate} (revision ${rev.revision})`);
       // Sync to filesystem
@@ -186,7 +198,7 @@ export async function saveSelectedCleaners(workDate: string, data: any): Promise
     // Ensure metadata contains the correct date
     data.metadata = data.metadata || {};
     data.metadata.date = workDate;
-    data.metadata.last_updated = new Date().toISOString();
+    data.metadata.last_updated = getRomeTimestamp();
 
     // Write to filesystem
     await atomicWriteJson(PATHS.selectedCleaners, data);
@@ -220,7 +232,7 @@ export async function resetTimeline(workDate: string): Promise<boolean> {
     const emptyTimeline = {
       metadata: {
         date: workDate,
-        last_updated: new Date().toISOString(),
+        last_updated: getRomeTimestamp(),
         created_by: 'reset'
       },
       cleaners_assignments: [],
