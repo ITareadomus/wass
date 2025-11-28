@@ -1217,28 +1217,25 @@ export default function GenerateAssignments() {
 
       // Trova il task completo usando l'id univoco
       const task = allTasksWithAssignments.find(t => String(t.id) === String(taskId));
+      
+      if (!task) {
+        console.error(`Task ${taskId} non trovata in allTasksWithAssignments`);
+        return;
+      }
 
       // Determina la priorità originale della task usando l'id
       let priority = 'low_priority'; // default
+      let modificationType = 'dnd_from_low_priority';
+      
       if (earlyOutTasks.find(t => String(t.id) === String(taskId))) {
         priority = 'early_out';
+        modificationType = 'dnd_from_early_out';
       } else if (highPriorityTasks.find(t => String(t.id) === String(taskId))) {
         priority = 'high_priority';
+        modificationType = 'dnd_from_high_priority';
       }
 
       const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
-      
-      // Determina modificationType in base al contesto del drag
-      let modificationType = 'task_assigned';
-      if (fromContainerJson) {
-        if (fromContainerJson === 'early-out') {
-          modificationType = 'dnd_from_early_out';
-        } else if (fromContainerJson === 'high') {
-          modificationType = 'dnd_from_high_priority';
-        } else if (fromContainerJson === 'low') {
-          modificationType = 'dnd_from_low_priority';
-        }
-      }
       
       const response = await fetch("/api/save-timeline-assignment", {
         method: "POST",

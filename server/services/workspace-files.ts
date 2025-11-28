@@ -27,23 +27,37 @@ function getRomeTimestamp(): string {
 }
 
 /**
- * Normalizes cleaners_assignments to have 'cleaner' before 'tasks'
- * This ensures consistent JSON structure matching Python scripts output
+ * Deep clone and normalize timeline data to ensure 'cleaner' comes before 'tasks'
+ * This is critical because JSON.stringify respects insertion order, so we must
+ * rebuild each object with the correct key order.
+ * 
+ * Returns a NEW object (deep clone) - does not modify the original
  */
-function normalizeCleanersAssignments(timelineData: any): any {
-  if (!timelineData?.cleaners_assignments || !Array.isArray(timelineData.cleaners_assignments)) {
-    return timelineData;
+function getNormalizedTimeline(timelineData: any): any {
+  if (!timelineData) return timelineData;
+  
+  // Deep clone to avoid modifying original
+  const cloned = JSON.parse(JSON.stringify(timelineData));
+  
+  if (!cloned.cleaners_assignments || !Array.isArray(cloned.cleaners_assignments)) {
+    return cloned;
   }
 
-  timelineData.cleaners_assignments = timelineData.cleaners_assignments.map((entry: any) => {
-    // Rebuild object with cleaner first, then tasks
-    return {
-      cleaner: entry.cleaner,
-      tasks: entry.tasks || []
-    };
+  // Rebuild each entry with correct key order: cleaner FIRST, then tasks
+  cloned.cleaners_assignments = cloned.cleaners_assignments.map((entry: any) => {
+    // Create brand new object with explicit key ordering
+    const normalized: any = {};
+    
+    // 1. Add cleaner first
+    normalized.cleaner = entry.cleaner || null;
+    
+    // 2. Add tasks second  
+    normalized.tasks = entry.tasks || [];
+    
+    return normalized;
   });
 
-  return timelineData;
+  return cloned;
 }
 
 
@@ -66,9 +80,11 @@ export async function loadTimeline(workDate: string): Promise<any | null> {
     const rev = await dailyAssignmentRevisionsService.getLatestRevision(workDate);
     if (rev?.timeline) {
       console.log(`✅ Timeline loaded from MySQL for ${workDate} (revision ${rev.revision})`);
+      // CRITICAL: Normalize before writing to filesystem to ensure correct key order
+      const normalizedTimeline = getNormalizedTimeline(rev.timeline);
       // Sync to filesystem for Python scripts
-      await atomicWriteJson(PATHS.timeline, rev.timeline);
-      return rev.timeline;
+      await atomicWriteJson(PATHS.timeline, normalizedTimeline);
+      return normalizedTimeline;
     }
   } catch (err) {
     console.error(`Error loading timeline from MySQL:`, err);
@@ -81,7 +97,10 @@ export async function loadTimeline(workDate: string): Promise<any | null> {
 
     if (parsed.metadata?.date === workDate || parsed.cleaners_assignments) {
       console.log(`✅ Timeline loaded from filesystem for ${workDate}`);
-      return parsed;
+      // Normalize and re-save to ensure correct key order
+      const normalized = getNormalizedTimeline(parsed);
+      await atomicWriteJson(PATHS.timeline, normalized);
+      return normalized;
     }
   } catch (err) {
     // Filesystem read failed
@@ -117,16 +136,17 @@ export async function saveTimeline(
     targetDate.setHours(0, 0, 0, 0);
     const isPastDate = targetDate < today;
 
-    // Normalize cleaners_assignments to have 'cleaner' before 'tasks'
-    normalizeCleanersAssignments(data);
+    // CRITICAL: Get a deep-cloned, normalized copy with correct key order
+    // This ensures 'cleaner' comes before 'tasks' in the JSON output
+    const normalizedData = getNormalizedTimeline(data);
 
     // Ensure metadata contains the correct date
-    data.metadata = data.metadata || {};
-    data.metadata.date = workDate;
-    data.metadata.last_updated = getRomeTimestamp();
+    normalizedData.metadata = normalizedData.metadata || {};
+    normalizedData.metadata.date = workDate;
+    normalizedData.metadata.last_updated = getRomeTimestamp();
 
     // ALWAYS write to filesystem (for Python scripts compatibility)
-    await atomicWriteJson(PATHS.timeline, data);
+    await atomicWriteJson(PATHS.timeline, normalizedData);
     console.log(`✅ Timeline saved to filesystem for ${workDate}`);
 
     // For past dates: skip MySQL write but return success
@@ -147,7 +167,7 @@ export async function saveTimeline(
     const containers = await loadContainersFromFile(workDate);
 
     // CRITICAL: Non creare revisione se timeline E cleaners sono vuoti
-    const hasAssignments = data.cleaners_assignments && data.cleaners_assignments.length > 0;
+    const hasAssignments = normalizedData.cleaners_assignments && normalizedData.cleaners_assignments.length > 0;
     const hasCleaners = cleanersArray.length > 0;
 
     if (!hasAssignments && !hasCleaners) {
@@ -155,8 +175,8 @@ export async function saveTimeline(
       return true;
     }
 
-    // Create new revision in MySQL (include containers)
-    await dailyAssignmentRevisionsService.createRevision(workDate, data, cleanersArray, containers, createdBy, modificationType);
+    // Create new revision in MySQL (include containers) - use normalized data
+    await dailyAssignmentRevisionsService.createRevision(workDate, normalizedData, cleanersArray, containers, createdBy, modificationType);
     console.log(`✅ Timeline revision created in MySQL for ${workDate} by ${createdBy} (type: ${modificationType})`);
 
     return true;

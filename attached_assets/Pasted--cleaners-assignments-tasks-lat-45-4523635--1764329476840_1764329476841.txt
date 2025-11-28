@@ -1,27 +1,5 @@
-{
-  "meta": {
-    "total_tasks": 5,
-    "used_cleaners": 1,
-    "assigned_tasks": 4,
-    "total_cleaners": 2
-  },
-  "metadata": {
-    "date": "2025-11-30",
-    "created_by": "Admin",
-    "modified_by": [
-      "Admin"
-    ],
-    "last_updated": "2025-11-28T11:34:32.963119"
-  },
-  "cleaners_assignments": [
+"cleaners_assignments": [
     {
-      "cleaner": {
-        "id": 249,
-        "name": "Ogbodo Chidi",
-        "role": "Premium",
-        "premium": true,
-        "lastname": "Igwe"
-      },
       "tasks": [
         {
           "lat": "45.4523635",
@@ -155,51 +133,12 @@
           "small_equipment": false,
           "confirmed_operation": false
         }
-      ]
-    },
-    {
+      ],
       "cleaner": {
-        "id": 1063,
-        "name": "ALEXANDER DENNYS",
-        "role": "Standard",
-        "premium": false,
-        "lastname": "CARDENAS OLAYA"
-      },
-      "tasks": [
-        {
-          "lat": "45.454499",
-          "lng": "9.169332",
-          "alias": "EXP",
-          "pax_in": 1,
-          "address": "VIA TORTONA, 10",
-          "pax_out": 0,
-          "premium": false,
-          "reasons": [
-            "manually_moved_to_timeline"
-          ],
-          "task_id": 219511,
-          "end_time": "10:40",
-          "followup": false,
-          "priority": "early_out",
-          "sequence": 1,
-          "type_apt": "B",
-          "client_id": 67,
-          "start_time": "10:00",
-          "modified_by": "Admin",
-          "travel_time": 0,
-          "checkin_date": "2025-11-30",
-          "checkin_time": null,
-          "operation_id": 2,
-          "checkout_date": "2025-11-30",
-          "checkout_time": "09:30",
-          "cleaning_time": 40,
-          "customer_name": "EXPERIENCE DESIGN BED & SHOW",
-          "logistic_code": 1677,
-          "straordinaria": false,
-          "small_equipment": false,
-          "confirmed_operation": true
-        }
-      ]
-    }
-  ]
-}
+        "id": 249,
+        "name": "Ogbodo Chidi",
+        "role": "Premium",
+        "premium": true,
+        "lastname": "Igwe"
+      }
+    },
