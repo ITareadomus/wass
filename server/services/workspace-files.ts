@@ -77,6 +77,17 @@ export async function loadTimeline(workDate: string): Promise<any | null> {
  */
 export async function saveTimeline(workDate: string, data: any): Promise<boolean> {
   try {
+    // CRITICAL: Blocca salvataggio per date passate
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const targetDate = new Date(workDate);
+    targetDate.setHours(0, 0, 0, 0);
+    
+    if (targetDate < today) {
+      console.log(`🚫 Tentativo di salvare timeline per data passata ${workDate} - BLOCCATO`);
+      return false;
+    }
+
     // Ensure metadata contains the correct date
     data.metadata = data.metadata || {};
     data.metadata.date = workDate;
@@ -204,6 +215,17 @@ export async function loadSelectedCleaners(workDate: string): Promise<any | null
  */
 export async function saveSelectedCleaners(workDate: string, data: any): Promise<boolean> {
   try {
+    // CRITICAL: Blocca salvataggio per date passate
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const targetDate = new Date(workDate);
+    targetDate.setHours(0, 0, 0, 0);
+    
+    if (targetDate < today) {
+      console.log(`🚫 Tentativo di salvare selected_cleaners per data passata ${workDate} - BLOCCATO`);
+      return false;
+    }
+
     // Ensure metadata contains the correct date
     data.metadata = data.metadata || {};
     data.metadata.date = workDate;
