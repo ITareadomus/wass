@@ -71,7 +71,7 @@ export default function MapSection({ tasks }: MapSectionProps) {
     return () => clearInterval(checkFilterUpdates);
   }, [filteredCleanerId, filteredTaskId]);
 
-  // Funzione per ottenere il colore del cleaner
+  // Funzione per ottenere il colore del cleaner (basato su ID, non su indice)
   const getCleanerColor = (cleanerId: number) => {
     const colors = [
       "#EF4444", "#3B82F6", "#22C55E", "#D946EF", "#F59E0B",
@@ -82,8 +82,7 @@ export default function MapSection({ tasks }: MapSectionProps) {
       "#DB2777", "#4F46E5", "#65A30D", "#059669", "#9333EA",
       "#D97706", "#E11D48", "#0284C7", "#15803D", "#0D9488"
     ];
-    const cleanerIndex = cleaners.findIndex(c => c.id === cleanerId);
-    return cleanerIndex >= 0 ? colors[cleanerIndex % colors.length] : '#6B7280';
+    return colors[cleanerId % colors.length];
   };
 
   // Carica Google Maps API
