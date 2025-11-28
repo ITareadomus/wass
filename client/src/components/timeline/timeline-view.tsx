@@ -407,59 +407,18 @@ export default function TimelineView({
     (window as any).globalTimeSlotsCount = globalTimeSlots.length;
   }, [globalTimelineMinutes, globalTimeSlots.length]);
 
-  // Palette di colori azzurri per i cleaners
-  const cleanerColors = [
-    { bg: '#0EA5E9', text: '#FFFFFF' }, // Azzurro
-    { bg: '#38BDF8', text: '#FFFFFF' }, // Azzurro chiaro
-    { bg: '#0284C7', text: '#FFFFFF' }, // Azzurro scuro
-    { bg: '#7DD3FC', text: '#000000' }, // Azzurro molto chiaro
-    { bg: '#06B6D4', text: '#FFFFFF' }, // Ciano
-    { bg: '#22D3EE', text: '#000000' }, // Ciano chiaro
-    { bg: '#0891B2', text: '#FFFFFF' }, // Ciano scuro
-    { bg: '#67E8F9', text: '#000000' }, // Ciano molto chiaro
-    { bg: '#164E63', text: '#FFFFFF' }, // Ciano molto scuro
-  ];
-
-  const getCleanerColor = (index: number) => {
-    // Colori distribuiti per massimo contrasto visivo tra consecutivi
+  const getCleanerColor = (cleanerId: number) => {
+    // Colori distribuiti per massimo contrasto visivo
     const colors = [
-      { bg: "#EF4444", text: "#FFFFFF" }, // rosso
-      { bg: "#3B82F6", text: "#FFFFFF" }, // blu
-      { bg: "#22C55E", text: "#000000" }, // verde
-      { bg: "#D946EF", text: "#FFFFFF" }, // fucsia
-      { bg: "#F59E0B", text: "#000000" }, // ambra
-      { bg: "#8B5CF6", text: "#FFFFFF" }, // viola
-      { bg: "#14B8A6", text: "#000000" }, // teal
-      { bg: "#F97316", text: "#FFFFFF" }, // arancione
-      { bg: "#6366F1", text: "#FFFFFF" }, // indaco
-      { bg: "#84CC16", text: "#000000" }, // lime
-      { bg: "#EC4899", text: "#FFFFFF" }, // rosa
-      { bg: "#0EA5E9", text: "#FFFFFF" }, // sky
-      { bg: "#DC2626", text: "#FFFFFF" }, // rosso scuro
-      { bg: "#10B981", text: "#000000" }, // smeraldo
-      { bg: "#A855F7", text: "#FFFFFF" }, // viola chiaro
-      { bg: "#EAB308", text: "#000000" }, // giallo
-      { bg: "#06B6D4", text: "#000000" }, // ciano
-      { bg: "#F43F5E", text: "#FFFFFF" }, // rose
-      { bg: "#2563EB", text: "#FFFFFF" }, // blu scuro
-      { bg: "#16A34A", text: "#FFFFFF" }, // verde scuro
-      { bg: "#C026D3", text: "#FFFFFF" }, // fucsia scuro
-      { bg: "#EA580C", text: "#FFFFFF" }, // arancione scuro
-      { bg: "#7C3AED", text: "#FFFFFF" }, // viola medio
-      { bg: "#0891B2", text: "#FFFFFF" }, // ciano scuro
-      { bg: "#CA8A04", text: "#000000" }, // giallo scuro
-      { bg: "#DB2777", text: "#FFFFFF" }, // rosa scuro
-      { bg: "#4F46E5", text: "#FFFFFF" }, // indaco scuro
-      { bg: "#65A30D", text: "#FFFFFF" }, // lime scuro
-      { bg: "#059669", text: "#FFFFFF" }, // smeraldo scuro
-      { bg: "#9333EA", text: "#FFFFFF" }, // viola profondo
-      { bg: "#D97706", text: "#FFFFFF" }, // ambra scuro
-      { bg: "#E11D48", text: "#FFFFFF" }, // rose scuro
-      { bg: "#0284C7", text: "#FFFFFF" }, // sky scuro
-      { bg: "#15803D", text: "#FFFFFF" }, // verde molto scuro
-      { bg: "#0D9488", text: "#FFFFFF" }, // teal scuro
+      "#EF4444", "#3B82F6", "#22C55E", "#D946EF", "#F59E0B",
+      "#8B5CF6", "#14B8A6", "#F97316", "#6366F1", "#84CC16",
+      "#EC4899", "#0EA5E9", "#DC2626", "#10B981", "#A855F7",
+      "#EAB308", "#06B6D4", "#F43F5E", "#2563EB", "#16A34A",
+      "#C026D3", "#EA580C", "#7C3AED", "#0891B2", "#CA8A04",
+      "#DB2777", "#4F46E5", "#65A30D", "#059669", "#9333EA",
+      "#D97706", "#E11D48", "#0284C7", "#15803D", "#0D9488"
     ];
-    return colors[index % colors.length];
+    return colors[cleanerId % colors.length];
   };
 
   // Funzione per caricare i cleaner da selected_cleaners.json
@@ -1556,7 +1515,7 @@ export default function TimelineView({
               </div>
             ) : (
               allCleanersToShow.map((cleaner, index) => {
-                const color = getCleanerColor(index);
+                const color = getCleanerColor(cleaner.id);
                 const droppableId = `cleaner-${cleaner.id}`;
 
                 // Trova tutte le task assegnate a questo cleaner
@@ -1620,7 +1579,7 @@ export default function TimelineView({
                         {!isRemoved && (
                           <div
                             className="flex-shrink-0 w-3 h-3 rounded-full"
-                            style={{ backgroundColor: color.bg }}
+                            style={{ backgroundColor: color }}
                           />
                         )}
                         <div className="break-words font-bold text-[13px] flex-1">
