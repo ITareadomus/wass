@@ -1222,57 +1222,7 @@ export default function TimelineView({
   };
 
 
-  const handleConfirmAssignments = async () => {
-    try {
-      const dateStr = localStorage.getItem('selected_work_date') || (() => {
-        const today = new Date();
-        const year = today.getFullYear();
-        const month = String(today.getMonth() + 1).padStart(2, '0');
-        const day = String(today.getDate()).padStart(2, '0');
-        return `${year}-${month}-${day}`;
-      })();
-
-      toast({
-        title: "Conferma in corso...",
-        description: "Salvataggio delle assegnazioni in corso",
-      });
-
-      // Chiama l'API per salvare la copia immutabile
-      const response = await fetch('/api/confirm-assignments', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ date: dateStr }),
-      });
-
-      if (!response.ok) {
-        throw new Error('Errore nel salvataggio delle assegnazioni');
-      }
-
-      const result = await response.json();
-
-      setLastSavedFilename(result.formattedDateTime || result.filename);
-      localStorage.setItem('last_saved_assignment', result.formattedDateTime || result.filename);
-      if ((window as any).setHasUnsavedChanges) {
-        (window as any).setHasUnsavedChanges(false);
-      }
-
-      // Aggiorna i dati della timeline per mostrare i metadata aggiornati
-      await loadTimelineData();
-
-      toast({
-        title: "✅ Assegnazioni confermate!",
-        description: `Salvate il ${result.formattedDateTime}`,
-        variant: "success",
-      });
-    } catch (error) {
-      console.error('Errore nella conferma:', error);
-      toast({
-        title: "Errore",
-        description: "Errore durante la conferma delle assegnazioni",
-        variant: "destructive",
-      });
-    }
-  };
+  // [DEPRECATED] handleConfirmAssignments rimosso - salvataggio automatico su MySQL
 
   const [lastSavedFilename, setLastSavedFilename] = useState<string | null>(null);
 
@@ -1903,20 +1853,13 @@ export default function TimelineView({
               {/* Pulsanti nella riga finale */}
               <div className="flex-1 p-1 border-t border-border flex gap-2">
                 {!isReadOnly && (
-                  <Button
-                    onClick={handleConfirmAssignments}
-                    disabled={!hasUnsavedChanges}
-                    variant="outline"
-                    className={`flex-1 h-full border-2 border-custom-blue ${
-                      hasUnsavedChanges
-                        ? 'bg-green-600 hover:bg-green-700 text-white animate-pulse'
-                        : 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200 cursor-default'
-                    }`}
-                    data-testid="button-confirm-assignments"
+                  <div 
+                    className="flex-1 h-full flex items-center justify-center gap-2 px-4 py-2 rounded-md border-2 border-custom-blue bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200"
+                    data-testid="indicator-autosave"
                   >
-                    <CheckCircle className="w-4 h-4 mr-2" />
-                    {hasUnsavedChanges ? 'Conferma Assegnazioni ⚠️' : '✅ Assegnazioni Confermate'}
-                  </Button>
+                    <CheckCircle className="w-4 h-4" />
+                    <span className="text-sm font-medium">Salvataggio automatico attivo</span>
+                  </div>
                 )}
                 {isReadOnly && (
                   <Button
