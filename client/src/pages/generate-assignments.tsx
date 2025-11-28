@@ -1030,32 +1030,10 @@ export default function GenerateAssignments() {
   // Funzione per assegnare le task Early Out alla timeline
   const assignEarlyOutToTimeline = async () => {
     try {
-      // Format date in local timezone to avoid UTC shift
       const year = selectedDate.getFullYear();
       const month = String(selectedDate.getMonth() + 1).padStart(2, '0');
       const day = String(selectedDate.getDate()).padStart(2, '0');
       const dateStr = `${year}-${month}-${day}`;
-
-      // VALIDAZIONE: Verifica che ci siano cleaner convocati
-      const selectedCleanersResponse = await fetch(`/data/cleaners/selected_cleaners.json?t=${Date.now()}`, {
-        cache: 'no-store',
-        headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' }
-      });
-      const selectedCleanersData = await selectedCleanersResponse.json();
-
-      if (!selectedCleanersData.cleaners || selectedCleanersData.cleaners.length === 0) {
-        toast({
-          title: "Errore: Nessun cleaner convocato",
-          description: "Devi prima convocare almeno un cleaner nella sezione Convocazioni",
-          variant: "destructive",
-          duration: 5000,
-        });
-        return;
-      }
-
-      console.log(`📅 Assegnazione EO per data: ${dateStr}`);
-      console.log(`📅 selectedDate oggetto:`, selectedDate);
-      console.log(`📅 Invio data al backend:`, dateStr);
 
       const response = await fetch('/api/assign-early-out-to-timeline', {
         method: 'POST',
@@ -1066,20 +1044,20 @@ export default function GenerateAssignments() {
       const result = await response.json();
 
       if (result.success) {
-        // CRITICAL: Marca modifiche dopo assegnazione automatica
-        setHasUnsavedChanges(true);
-        handleTaskMoved();
-
         toast({
           title: "Early Out Assegnati!",
           description: result.message,
           duration: 3000,
         });
 
-        // Ricarica i task per mostrare le assegnazioni nella timeline
         await refreshAssignments("manual");
       } else {
-        throw new Error(result.message || 'Errore sconosciuto');
+        toast({
+          title: "Errore",
+          description: result.message || "Errore durante l'assegnazione",
+          variant: "destructive",
+          duration: 3000,
+        });
       }
     } catch (error: any) {
       console.error("Errore nell'assegnazione Early Out:", error);
@@ -1095,32 +1073,10 @@ export default function GenerateAssignments() {
   // Funzione per assegnare le task High Priority alla timeline
   const assignHighPriorityToTimeline = async () => {
     try {
-      // Format date in local timezone to avoid UTC shift
       const year = selectedDate.getFullYear();
       const month = String(selectedDate.getMonth() + 1).padStart(2, '0');
       const day = String(selectedDate.getDate()).padStart(2, '0');
       const dateStr = `${year}-${month}-${day}`;
-
-      // VALIDAZIONE: Verifica che ci siano cleaner convocati
-      const selectedCleanersResponse = await fetch(`/data/cleaners/selected_cleaners.json?t=${Date.now()}`, {
-        cache: 'no-store',
-        headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' }
-      });
-      const selectedCleanersData = await selectedCleanersResponse.json();
-
-      if (!selectedCleanersData.cleaners || selectedCleanersData.cleaners.length === 0) {
-        toast({
-          title: "Errore: Nessun cleaner convocato",
-          description: "Devi prima convocare almeno un cleaner nella sezione Convocazioni",
-          variant: "destructive",
-          duration: 5000,
-        });
-        return;
-      }
-
-      console.log(`📅 Assegnazione HP per data: ${dateStr}`);
-      console.log(`📅 selectedDate oggetto:`, selectedDate);
-      console.log(`📅 Invio data al backend:`, dateStr);
 
       const response = await fetch('/api/assign-high-priority-to-timeline', {
         method: 'POST',
@@ -1131,24 +1087,20 @@ export default function GenerateAssignments() {
       const result = await response.json();
 
       if (result.success) {
-        // CRITICAL: Marca modifiche dopo assegnazione automatica
-        setHasUnsavedChanges(true);
-        handleTaskMoved();
-
         toast({
           title: "High Priority Assegnati!",
           description: result.message,
           duration: 3000,
         });
 
-        // Ricarica i task per riflettere le nuove assegnazioni
-        if ((window as any).reloadAllTasks) {
-          console.log('🔄 Ricaricamento task dopo assegnazione HP...');
-          await (window as any).reloadAllTasks();
-          console.log('✅ Task ricaricati con successo');
-        }
+        await refreshAssignments("manual");
       } else {
-        throw new Error(result.message || 'Errore sconosciuto');
+        toast({
+          title: "Errore",
+          description: result.message || "Errore durante l'assegnazione",
+          variant: "destructive",
+          duration: 3000,
+        });
       }
     } catch (error: any) {
       console.error("Errore nell'assegnazione High Priority:", error);
@@ -1164,32 +1116,10 @@ export default function GenerateAssignments() {
   // Funzione per assegnare le task Low Priority alla timeline
   const assignLowPriorityToTimeline = async () => {
     try {
-      // Format date in local timezone to avoid UTC shift
       const year = selectedDate.getFullYear();
       const month = String(selectedDate.getMonth() + 1).padStart(2, '0');
       const day = String(selectedDate.getDate()).padStart(2, '0');
       const dateStr = `${year}-${month}-${day}`;
-
-      // VALIDAZIONE: Verifica che ci siano cleaner convocati
-      const selectedCleanersResponse = await fetch(`/data/cleaners/selected_cleaners.json?t=${Date.now()}`, {
-        cache: 'no-store',
-        headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' }
-      });
-      const selectedCleanersData = await selectedCleanersResponse.json();
-
-      if (!selectedCleanersData.cleaners || selectedCleanersData.cleaners.length === 0) {
-        toast({
-          title: "Errore: Nessun cleaner convocato",
-          description: "Devi prima convocare almeno un cleaner nella sezione Convocazioni",
-          variant: "destructive",
-          duration: 5000,
-        });
-        return;
-      }
-
-      console.log(`📅 Assegnazione LP per data: ${dateStr}`);
-      console.log(`📅 selectedDate oggetto:`, selectedDate);
-      console.log(`📅 Invio data al backend:`, dateStr);
 
       const response = await fetch('/api/assign-low-priority-to-timeline', {
         method: 'POST',
@@ -1200,24 +1130,20 @@ export default function GenerateAssignments() {
       const result = await response.json();
 
       if (result.success) {
-        // CRITICAL: Marca modifiche dopo assegnazione automatica
-        setHasUnsavedChanges(true);
-        handleTaskMoved();
-
         toast({
           title: "Low Priority Assegnati!",
           description: result.message,
           duration: 3000,
         });
 
-        // Ricarica i task per riflettere le nuove assegnazioni
-        if ((window as any).reloadAllTasks) {
-          console.log('🔄 Ricaricamento task dopo assegnazione LP...');
-          await (window as any).reloadAllTasks();
-          console.log('✅ Task ricaricati con successo');
-        }
+        await refreshAssignments("manual");
       } else {
-        throw new Error(result.message || 'Errore sconosciuto');
+        toast({
+          title: "Errore",
+          description: result.message || "Errore durante l'assegnazione",
+          variant: "destructive",
+          duration: 3000,
+        });
       }
     } catch (error: any) {
       console.error("Errore nell'assegnazione Low Priority:", error);

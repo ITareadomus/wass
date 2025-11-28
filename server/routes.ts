@@ -1053,7 +1053,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/check-saved-assignments", async (req, res) => {
     try {
       const { dailyAssignmentRevisionsService } = await import("./services/daily-assignment-revisions-service");
-      
+
       const workDate = req.body?.date || format(new Date(), "yyyy-MM-dd");
 
       const revision = await dailyAssignmentRevisionsService.getLatestRevision(workDate);
@@ -1892,11 +1892,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // caricalo da cleaners.json e aggiungilo con lo start_time
         const cleanersPath = path.join(process.cwd(), 'client/public/data/cleaners/cleaners.json');
         const cleanersData = JSON.parse(await fs.readFile(cleanersPath, 'utf8'));
-        
+
         // Cerca il cleaner nella data corrente
         const dateCleaners = cleanersData.dates?.[workDate]?.cleaners || [];
         let cleanerData = dateCleaners.find((c: any) => c.id === cleanerId);
-        
+
         if (!cleanerData) {
           return res.status(404).json({ 
             success: false, 
@@ -1923,7 +1923,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const cleanerAssignment = timelineData.cleaners_assignments?.find((ca: any) => ca.cleaner?.id === cleanerId);
         if (cleanerAssignment && cleanerAssignment.cleaner) {
           cleanerAssignment.cleaner.start_time = startTime;
-          
+
           // Aggiorna i metadata
           timelineData.metadata = timelineData.metadata || {};
           timelineData.metadata.last_updated = new Date().toISOString();
@@ -2138,10 +2138,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           if (updates.length > 0) {
             values.push(taskId); // WHERE id = ?
             const query = `UPDATE wass_housekeeping SET ${updates.join(', ')} WHERE id = ?`;
-            
+
             await connection.execute(query, values);
             await connection.end();
-            
+
             console.log(`✅ Task ${logisticCode} aggiornata anche su database MySQL`);
           }
         } catch (dbError: any) {
@@ -2410,13 +2410,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/assign-early-out-to-timeline", async (req, res) => {
     try {
       const { date } = req.body;
-      if (!date) {
-        return res.status(400).json({
-          success: false,
-          message: "Data mancante nella richiesta"
-        });
-      }
-      const workDate = date;
+      const workDate = date || format(new Date(), 'yyyy-MM-dd');
 
       console.log(`📅 EO Assignment - Ricevuta data dal frontend: ${workDate}`);
       console.log(`▶ Eseguendo assign_eo.py per data: ${workDate}`);
@@ -2487,13 +2481,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/assign-high-priority-to-timeline", async (req, res) => {
     try {
       const { date } = req.body;
-      if (!date) {
-        return res.status(400).json({
-          success: false,
-          message: "Data mancante nella richiesta"
-        });
-      }
-      const workDate = date;
+      const workDate = date || format(new Date(), 'yyyy-MM-dd');
 
       console.log(`📅 HP Assignment - Ricevuta data dal frontend: ${workDate}`);
       console.log(`▶ Eseguendo assign_hp.py per data: ${workDate}`);
@@ -2563,13 +2551,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/assign-low-priority-to-timeline", async (req, res) => {
     try {
       const { date } = req.body;
-      if (!date) {
-        return res.status(400).json({
-          success: false,
-          message: "Data mancante nella richiesta"
-        });
-      }
-      const workDate = date;
+      const workDate = date || format(new Date(), 'yyyy-MM-dd');
 
       console.log(`📅 LP Assignment - Ricevuta data dal frontend: ${workDate}`);
       console.log(`▶ Eseguendo assign_lp.py per data: ${workDate}`);
