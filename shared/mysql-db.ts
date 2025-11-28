@@ -87,6 +87,7 @@ export async function initMySQLDatabase() {
           created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
           created_by VARCHAR(100) DEFAULT 'system',
           modified_by VARCHAR(100) DEFAULT 'system',
+          modification_type VARCHAR(50) DEFAULT 'manual',
           INDEX idx_work_date_revision (work_date, revision DESC)
         )
       `);
@@ -112,6 +113,17 @@ export async function initMySQLDatabase() {
       if ((modifiedByCol as any[]).length === 0) {
         await connection.execute(`ALTER TABLE daily_assignments_history ADD COLUMN modified_by VARCHAR(100) DEFAULT 'system'`);
         console.log("✅ Added modified_by column to daily_assignments_history");
+      }
+
+      // Add modification_type column if it doesn't exist
+      const [modificationTypeCol] = await connection.execute(`
+        SELECT COLUMN_NAME FROM information_schema.columns 
+        WHERE table_schema = ? AND table_name = 'daily_assignments_history' AND column_name = 'modification_type'
+      `, [process.env.DB_NAME]);
+      
+      if ((modificationTypeCol as any[]).length === 0) {
+        await connection.execute(`ALTER TABLE daily_assignments_history ADD COLUMN modification_type VARCHAR(50) DEFAULT 'manual'`);
+        console.log("✅ Added modification_type column to daily_assignments_history");
       }
     }
     

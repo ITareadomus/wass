@@ -1280,7 +1280,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Get username from request
       const currentUsername = req.body.modified_by || getCurrentUsername(req);
-      
+
       // Salva selected_cleaners usando workspace helper (dual-write: filesystem + MySQL)
       await workspaceFiles.saveSelectedCleaners(workDate, selectedData, false, currentUsername);
 
@@ -1397,7 +1397,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Get username from request
       const currentUsername = req.body.modified_by || req.body.created_by || getCurrentUsername(req);
-      
+
       // Usa workspaceFiles.saveSelectedCleaners per dual-write (filesystem + MySQL)
       await workspaceFiles.saveSelectedCleaners(workDate, dataToSave, false, currentUsername);
 
@@ -1582,7 +1582,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Get username from request
       const currentUsername = req.body.modified_by || getCurrentUsername(req);
-      
+
       // Salva timeline (dual-write: filesystem + Object Storage)
       await workspaceFiles.saveTimeline(workDate, timelineData, false, currentUsername);
 
@@ -3444,8 +3444,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const workDate = req.body.date || format(new Date(), 'yyyy-MM-dd'); // Usa la data della richiesta
       timelineData.metadata.date = workDate;
 
-      // Salva file (dual-write: filesystem + Object Storage)
-      await workspaceFiles.saveTimeline(workDate, timelineData);
+      // Save the updated timeline
+      const saved = await workspaceFiles.saveTimeline(workDate, timelineData, false, req.body.currentUser?.username || 'unknown');
 
       if (containersData) {
         await workspaceFiles.saveContainers(workDate, containersData);

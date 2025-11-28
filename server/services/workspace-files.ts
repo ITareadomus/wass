@@ -78,8 +78,15 @@ export async function loadTimeline(workDate: string): Promise<any | null> {
  * @param skipRevision - If true, only saves to filesystem without creating a MySQL revision
  *                       Use this for intermediate saves to avoid multiple revisions for a single user action
  * @param createdBy - Username of the user making the change (default: 'system')
+ * @param modificationType - Type of modification (e.g., 'manual', 'reset', 'dnd')
  */
-export async function saveTimeline(workDate: string, data: any, skipRevision: boolean = false, createdBy: string = 'system'): Promise<boolean> {
+export async function saveTimeline(
+  data: any, 
+  workDate: string, 
+  skipRevision: boolean = false,
+  createdBy: string = 'system',
+  modificationType: string = 'manual'
+): Promise<boolean> {
   try {
     // Check if this is a past date
     const today = new Date();
@@ -113,19 +120,19 @@ export async function saveTimeline(workDate: string, data: any, skipRevision: bo
     const selected = await loadSelectedCleanersFromFile(workDate);
     const cleanersArray = selected?.cleaners || [];
     const containers = await loadContainersFromFile(workDate);
-    
+
     // CRITICAL: Non creare revisione se timeline E cleaners sono vuoti
     const hasAssignments = data.cleaners_assignments && data.cleaners_assignments.length > 0;
     const hasCleaners = cleanersArray.length > 0;
-    
+
     if (!hasAssignments && !hasCleaners) {
       console.log(`⏭️ Saltata creazione revisione MySQL per ${workDate} (nessun dato significativo)`);
       return true;
     }
 
     // Create new revision in MySQL (include containers)
-    await dailyAssignmentRevisionsService.createRevision(workDate, data, cleanersArray, containers, createdBy);
-    console.log(`✅ Timeline revision created in MySQL for ${workDate} by ${createdBy}`);
+    await dailyAssignmentRevisionsService.createRevision(workDate, data, cleanersArray, containers, createdBy, modificationType);
+    console.log(`✅ Timeline revision created in MySQL for ${workDate} by ${createdBy} (type: ${modificationType})`);
 
     return true;
   } catch (err) {
@@ -210,7 +217,7 @@ export async function saveContainers(workDate: string, data: any, createdBy: str
     // Get current timeline and selected_cleaners
     let timeline = null;
     let cleanersArray: any[] = [];
-    
+
     try {
       const timelineData = await fs.readFile(PATHS.timeline, 'utf-8');
       timeline = JSON.parse(timelineData);
@@ -250,14 +257,14 @@ async function loadSelectedCleanersFromFile(workDate: string): Promise<any | nul
   try {
     const data = await fs.readFile(PATHS.selectedCleaners, 'utf-8');
     const parsed = JSON.parse(data);
-    
+
     // CRITICAL: Verifica che la data corrisponda
     const fileDate = parsed?.metadata?.date;
     if (fileDate && fileDate !== workDate) {
       console.log(`⚠️ loadSelectedCleanersFromFile: file ha data ${fileDate}, richiesta ${workDate} - ignorato`);
       return null;
     }
-    
+
     return parsed;
   } catch (err) {
     return null;
@@ -346,7 +353,7 @@ export async function saveSelectedCleaners(workDate: string, data: any, skipRevi
     // Get current timeline and containers
     let timeline = null;
     let containers = null;
-    
+
     try {
       const timelineData = await fs.readFile(PATHS.timeline, 'utf-8');
       timeline = JSON.parse(timelineData);
@@ -361,11 +368,11 @@ export async function saveSelectedCleaners(workDate: string, data: any, skipRevi
     }
 
     const cleanersArray = data.cleaners || [];
-    
+
     // CRITICAL: Non creare revisione se cleaners E timeline sono vuoti
     const hasCleaners = cleanersArray.length > 0;
     const hasAssignments = timeline?.cleaners_assignments && timeline.cleaners_assignments.length > 0;
-    
+
     if (!hasCleaners && !hasAssignments) {
       console.log(`⏭️ Saltata creazione revisione MySQL per ${workDate} (nessun dato significativo)`);
       return true;
@@ -393,7 +400,7 @@ export async function resetTimeline(workDate: string, createdBy: string = 'syste
     today.setHours(0, 0, 0, 0);
     const targetDate = new Date(workDate);
     targetDate.setHours(0, 0, 0, 0);
-    
+
     if (targetDate < today) {
       console.log(`🚫 Tentativo di reset timeline per data passata ${workDate} - BLOCCATO`);
       return false;
@@ -420,13 +427,13 @@ export async function resetTimeline(workDate: string, createdBy: string = 'syste
     // Create new revision in MySQL with empty timeline but preserving selected_cleaners and containers
     const selected = await loadSelectedCleanersFromFile(workDate);
     const containers = await loadContainersFromFile(workDate);
-    
+
     // CRITICAL: Non creare revisione se non ci sono cleaner
     if (!selected?.cleaners || selected.cleaners.length === 0) {
       console.log(`⏭️ Saltata creazione revisione MySQL per reset ${workDate} (nessun cleaner selezionato)`);
       return true;
     }
-    
+
     await dailyAssignmentRevisionsService.createRevision(workDate, emptyTimeline, selected.cleaners, containers, createdBy);
     console.log(`✅ Timeline reset revision created in MySQL for ${workDate} by ${createdBy}`);
 
