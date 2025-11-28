@@ -1,8 +1,15 @@
 {
+  "meta": {
+    "used_cleaners": 11,
+    "assigned_tasks": 16,
+    "total_cleaners": 10
+  },
   "metadata": {
-    "last_updated": "2025-11-28 16:20:31",
     "date": "2025-11-28",
-    "modification_type": "auto_assign_early_out"
+    "last_updated": "2025-11-28 16:20:31",
+    "modification_type": "auto_assign_early_out",
+    "loaded_from_mysql": true,
+    "loaded_at": "2025-11-28 15:24:21"
   },
   "cleaners_assignments": [
     {
@@ -665,10 +672,5 @@
         }
       ]
     }
-  ],
-  "meta": {
-    "total_cleaners": 10,
-    "used_cleaners": 11,
-    "assigned_tasks": 16
-  }
+  ]
 }
