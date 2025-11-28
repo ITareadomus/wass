@@ -1083,15 +1083,10 @@ def main():
     if timeline_path.exists():
         try:
             existing = json.loads(timeline_path.read_text(encoding="utf-8"))
-            # Mantieni le assegnazioni esistenti non-HP (rimuovi quelle con task HP)
+            # MANTIENI TUTTI i cleaner esistenti;
+            # il filtraggio delle vecchie HP lo facciamo dentro il blocco existing_entry
             if "cleaners_assignments" in existing:
-                # Crea un set di cleaner_id che avranno nuove assegnazioni HP
-                new_hp_cleaner_ids = set(c["cleaner"]["id"] for c in output["high_priority_tasks_assigned"])
-                timeline_data["cleaners_assignments"] = [
-                    c for c in existing.get("cleaners_assignments", [])
-                    if c["cleaner"]["id"] not in new_hp_cleaner_ids or
-                       not any(t.get("reasons") and "automatic_assignment_hp" in t.get("reasons", []) for t in c.get("tasks", []))
-                ]
+                timeline_data["cleaners_assignments"] = existing.get("cleaners_assignments", [])
         except Exception as e:
             print(f"⚠️ Errore nel leggere la timeline esistente: {e}")
             timeline_data["cleaners_assignments"] = [] # Reset assignments on error
