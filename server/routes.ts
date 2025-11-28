@@ -787,10 +787,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         end_time: null,
         followup: false,
         sequence: 0,
-        travel_time: 0,
-
-        // Aggiungi il campo modified_by
-        modified_by: modified_by || null
+        travel_time: 0
+        // Note: modified_by is tracked in timeline.metadata, not per-task
       };
 
       console.log('📝 Task salvato in timeline:', {

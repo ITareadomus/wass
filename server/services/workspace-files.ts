@@ -27,7 +27,71 @@ function getRomeTimestamp(): string {
 }
 
 /**
- * Deep clone and normalize timeline data to ensure 'cleaner' comes before 'tasks'
+ * Normalize a single task object with correct field ordering
+ * Also removes the modified_by field as it's tracked in metadata
+ */
+function getNormalizedTask(task: any): any {
+  if (!task) return task;
+  
+  // Define the exact field order for tasks
+  const normalizedTask: any = {};
+  
+  // Core identification
+  if (task.task_id !== undefined) normalizedTask.task_id = task.task_id;
+  if (task.logistic_code !== undefined) normalizedTask.logistic_code = task.logistic_code;
+  if (task.client_id !== undefined) normalizedTask.client_id = task.client_id;
+  if (task.premium !== undefined) normalizedTask.premium = task.premium;
+  
+  // Location
+  if (task.address !== undefined) normalizedTask.address = task.address;
+  if (task.lat !== undefined) normalizedTask.lat = task.lat;
+  if (task.lng !== undefined) normalizedTask.lng = task.lng;
+  
+  // Cleaning details
+  if (task.cleaning_time !== undefined) normalizedTask.cleaning_time = task.cleaning_time;
+  
+  // Dates and times
+  if (task.checkin_date !== undefined) normalizedTask.checkin_date = task.checkin_date;
+  if (task.checkout_date !== undefined) normalizedTask.checkout_date = task.checkout_date;
+  if (task.checkin_time !== undefined) normalizedTask.checkin_time = task.checkin_time;
+  if (task.checkout_time !== undefined) normalizedTask.checkout_time = task.checkout_time;
+  
+  // Guest info
+  if (task.pax_in !== undefined) normalizedTask.pax_in = task.pax_in;
+  if (task.pax_out !== undefined) normalizedTask.pax_out = task.pax_out;
+  
+  // Equipment and operation
+  if (task.small_equipment !== undefined) normalizedTask.small_equipment = task.small_equipment;
+  if (task.operation_id !== undefined) normalizedTask.operation_id = task.operation_id;
+  if (task.confirmed_operation !== undefined) normalizedTask.confirmed_operation = task.confirmed_operation;
+  if (task.straordinaria !== undefined) normalizedTask.straordinaria = task.straordinaria;
+  
+  // Property info
+  if (task.type_apt !== undefined) normalizedTask.type_apt = task.type_apt;
+  if (task.alias !== undefined) normalizedTask.alias = task.alias;
+  if (task.customer_name !== undefined) normalizedTask.customer_name = task.customer_name;
+  
+  // Assignment info
+  if (task.reasons !== undefined) normalizedTask.reasons = task.reasons;
+  if (task.priority !== undefined) normalizedTask.priority = task.priority;
+  
+  // Timeline-specific fields
+  if (task.start_time !== undefined) normalizedTask.start_time = task.start_time;
+  if (task.end_time !== undefined) normalizedTask.end_time = task.end_time;
+  if (task.followup !== undefined) normalizedTask.followup = task.followup;
+  if (task.sequence !== undefined) normalizedTask.sequence = task.sequence;
+  if (task.travel_time !== undefined) normalizedTask.travel_time = task.travel_time;
+  
+  // Note: modified_by is intentionally excluded - tracked in timeline metadata instead
+  
+  return normalizedTask;
+}
+
+/**
+ * Deep clone and normalize timeline data to ensure:
+ * 1. 'cleaner' comes before 'tasks' in each assignment
+ * 2. Task fields are in the correct order
+ * 
  * This is critical because JSON.stringify respects insertion order, so we must
  * rebuild each object with the correct key order.
  * 
@@ -51,8 +115,8 @@ function getNormalizedTimeline(timelineData: any): any {
     // 1. Add cleaner first
     normalized.cleaner = entry.cleaner || null;
     
-    // 2. Add tasks second  
-    normalized.tasks = entry.tasks || [];
+    // 2. Add tasks second with normalized field order
+    normalized.tasks = (entry.tasks || []).map((task: any) => getNormalizedTask(task));
     
     return normalized;
   });
