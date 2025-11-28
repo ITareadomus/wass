@@ -73,29 +73,32 @@ export async function loadTimeline(workDate: string): Promise<any | null> {
 
 /**
  * Save timeline for a specific work date
- * Writes to MySQL AND filesystem
+ * Writes to filesystem always (for Python scripts)
+ * Writes to MySQL only for today/future dates
  */
 export async function saveTimeline(workDate: string, data: any): Promise<boolean> {
   try {
-    // CRITICAL: Blocca salvataggio per date passate
+    // Check if this is a past date
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const targetDate = new Date(workDate);
     targetDate.setHours(0, 0, 0, 0);
-    
-    if (targetDate < today) {
-      console.log(`🚫 Tentativo di salvare timeline per data passata ${workDate} - BLOCCATO`);
-      return false;
-    }
+    const isPastDate = targetDate < today;
 
     // Ensure metadata contains the correct date
     data.metadata = data.metadata || {};
     data.metadata.date = workDate;
     data.metadata.last_updated = getRomeTimestamp();
 
-    // Write to filesystem (for Python scripts compatibility)
+    // ALWAYS write to filesystem (for Python scripts compatibility)
     await atomicWriteJson(PATHS.timeline, data);
     console.log(`✅ Timeline saved to filesystem for ${workDate}`);
+
+    // For past dates: skip MySQL write but return success
+    if (isPastDate) {
+      console.log(`📜 Data passata ${workDate} - file JSON aggiornato, MySQL non modificato`);
+      return true;
+    }
 
     // Get current selected_cleaners
     const selected = await loadSelectedCleanersFromFile(workDate);
@@ -211,29 +214,32 @@ export async function loadSelectedCleaners(workDate: string): Promise<any | null
 
 /**
  * Save selected_cleaners for a specific work date
- * Writes to MySQL AND filesystem
+ * Writes to filesystem always (for Python scripts)
+ * Writes to MySQL only for today/future dates
  */
 export async function saveSelectedCleaners(workDate: string, data: any): Promise<boolean> {
   try {
-    // CRITICAL: Blocca salvataggio per date passate
+    // Check if this is a past date
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const targetDate = new Date(workDate);
     targetDate.setHours(0, 0, 0, 0);
-    
-    if (targetDate < today) {
-      console.log(`🚫 Tentativo di salvare selected_cleaners per data passata ${workDate} - BLOCCATO`);
-      return false;
-    }
+    const isPastDate = targetDate < today;
 
     // Ensure metadata contains the correct date
     data.metadata = data.metadata || {};
     data.metadata.date = workDate;
     data.metadata.last_updated = getRomeTimestamp();
 
-    // Write to filesystem
+    // ALWAYS write to filesystem
     await atomicWriteJson(PATHS.selectedCleaners, data);
     console.log(`✅ Selected cleaners saved to filesystem for ${workDate}`);
+
+    // For past dates: skip MySQL write but return success
+    if (isPastDate) {
+      console.log(`📜 Data passata ${workDate} - file JSON aggiornato, MySQL non modificato`);
+      return true;
+    }
 
     // Get current timeline
     let timeline = null;
