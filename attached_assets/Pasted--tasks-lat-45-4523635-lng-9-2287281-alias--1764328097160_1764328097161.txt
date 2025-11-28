@@ -1,21 +1,4 @@
-{
-  "meta": {
-    "total_tasks": 4,
-    "used_cleaners": 1,
-    "assigned_tasks": 4,
-    "total_cleaners": 1
-  },
-  "metadata": {
-    "date": "2025-11-30",
-    "created_by": "Admin",
-    "modified_by": [
-      "Admin"
-    ],
-    "last_updated": "2025-11-28T11:06:12.632536"
-  },
-  "cleaners_assignments": [
-    {
-      "tasks": [
+"tasks": [
         {
           "lat": "45.4523635",
           "lng": "9.2287281",
@@ -157,5 +140,3 @@
         "lastname": "Igwe"
       }
     }
-  ]
-}
