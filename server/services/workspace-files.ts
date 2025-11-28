@@ -75,8 +75,10 @@ export async function loadTimeline(workDate: string): Promise<any | null> {
  * Save timeline for a specific work date
  * Writes to filesystem always (for Python scripts)
  * Writes to MySQL only for today/future dates
+ * @param skipRevision - If true, only saves to filesystem without creating a MySQL revision
+ *                       Use this for intermediate saves to avoid multiple revisions for a single user action
  */
-export async function saveTimeline(workDate: string, data: any): Promise<boolean> {
+export async function saveTimeline(workDate: string, data: any, skipRevision: boolean = false): Promise<boolean> {
   try {
     // Check if this is a past date
     const today = new Date();
@@ -97,6 +99,12 @@ export async function saveTimeline(workDate: string, data: any): Promise<boolean
     // For past dates: skip MySQL write but return success
     if (isPastDate) {
       console.log(`📜 Data passata ${workDate} - file JSON aggiornato, MySQL non modificato`);
+      return true;
+    }
+
+    // Skip MySQL revision if requested (for intermediate saves)
+    if (skipRevision) {
+      console.log(`⏭️ Saltata revisione MySQL per ${workDate} (skipRevision=true)`);
       return true;
     }
 
@@ -288,8 +296,11 @@ export async function loadSelectedCleaners(workDate: string): Promise<any | null
  * Save selected_cleaners for a specific work date
  * Writes to filesystem always (for Python scripts)
  * Writes to MySQL only for today/future dates
+ * @param skipRevision - If true, only saves to filesystem without creating a MySQL revision
+ *                       Use this for intermediate saves (e.g., update-cleaner-start-time)
+ *                       to avoid creating multiple revisions for a single user action
  */
-export async function saveSelectedCleaners(workDate: string, data: any): Promise<boolean> {
+export async function saveSelectedCleaners(workDate: string, data: any, skipRevision: boolean = false): Promise<boolean> {
   try {
     // Check if this is a past date
     const today = new Date();
@@ -310,6 +321,12 @@ export async function saveSelectedCleaners(workDate: string, data: any): Promise
     // For past dates: skip MySQL write but return success
     if (isPastDate) {
       console.log(`📜 Data passata ${workDate} - file JSON aggiornato, MySQL non modificato`);
+      return true;
+    }
+
+    // Skip MySQL revision if requested (for intermediate saves)
+    if (skipRevision) {
+      console.log(`⏭️ Saltata revisione MySQL per ${workDate} (skipRevision=true)`);
       return true;
     }
 

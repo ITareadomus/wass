@@ -1911,8 +1911,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.log(`✅ Cleaner ${cleanerId} aggiunto a selected_cleaners.json con start_time ${startTime}`);
       }
 
-      // Salva selected_cleaners usando workspace helper (dual-write: filesystem + MySQL)
-      await workspaceFiles.saveSelectedCleaners(workDate, selectedCleanersData);
+      // Salva selected_cleaners SOLO su filesystem (skipRevision=true)
+      // La revisione MySQL viene creata da /api/save-selected-cleaners al termine della selezione
+      await workspaceFiles.saveSelectedCleaners(workDate, selectedCleanersData, true);
 
       // Aggiorna anche timeline.json se il cleaner è presente
       const timelinePath = path.join(process.cwd(), 'client/public/data/output/timeline.json');
@@ -1937,8 +1938,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
             timelineData.metadata.modified_by.push(currentUsername);
           }
 
-          // Salva timeline usando workspace helper (dual-write)
-          await workspaceFiles.saveTimeline(workDate, timelineData);
+          // Salva timeline SOLO su filesystem (skipRevision=true)
+          // La revisione MySQL viene creata da /api/save-selected-cleaners al termine
+          await workspaceFiles.saveTimeline(workDate, timelineData, true);
         }
       } catch (error) {
         console.log('Timeline.json non trovato o non aggiornato');
