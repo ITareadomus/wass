@@ -1123,11 +1123,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       });
 
-      // Ripristina selected_cleaners dopo create_containers (potrebbe essere stato sovrascritto)
-      if (selectedCleanersData) {
-        const selectedCleanersPath = path.join(process.cwd(), 'client/public/data/cleaners/selected_cleaners.json');
-        await fs.writeFile(selectedCleanersPath, JSON.stringify(selectedCleanersData, null, 2));
-        console.log(`✅ Selected cleaners ripristinati dopo create_containers`);
+      // IMPORTANTE: NON sovrascrivere i selected_cleaners dal filesystem con quelli di MySQL
+      // I selected_cleaners del filesystem sono la fonte di verità (appena salvati dalla pagina convocazioni)
+      // MySQL serve solo per le revisioni storiche, non per sovrascrivere lo stato corrente
+      const selectedCleanersPath = path.join(process.cwd(), 'client/public/data/cleaners/selected_cleaners.json');
+      try {
+        const currentSelectedCleaners = JSON.parse(await fs.readFile(selectedCleanersPath, 'utf8'));
+        const currentCleanerCount = currentSelectedCleaners?.cleaners?.length || 0;
+        console.log(`✅ Mantenuti ${currentCleanerCount} selected_cleaners dal filesystem (non sovrascritti da MySQL)`);
+      } catch (err) {
+        // Se il file non esiste, usa quelli di MySQL come fallback
+        if (selectedCleanersData) {
+          await fs.writeFile(selectedCleanersPath, JSON.stringify(selectedCleanersData, null, 2));
+          console.log(`✅ Selected cleaners ripristinati da MySQL (fallback)`);
+        }
       }
 
       // Sincronizza containers: rimuovi task già assegnate
