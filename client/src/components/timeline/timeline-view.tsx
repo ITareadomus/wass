@@ -92,6 +92,7 @@ export default function TimelineView({
   const [pendingStartTime, setPendingStartTime] = useState<string>("10:00");
   const [pendingCleaner, setPendingCleaner] = useState<any>(null); // Added to track pending cleaner ID
   const [showAdamTransferDialog, setShowAdamTransferDialog] = useState(false); // Stato per il dialog di trasferimento ADAM
+  const [showResetDialog, setShowResetDialog] = useState(false); // Stato per il dialog di reset assegnazioniM
 
   // Stato per tracciare acknowledge per coppie (task, cleaner)
   type IncompatibleKey = string; // chiave del tipo `${taskId}-${cleanerId}`
@@ -1501,11 +1502,12 @@ export default function TimelineView({
                 Convocazioni
               </Button>
               <Button
-                onClick={handleResetAssignments}
+                onClick={() => setShowResetDialog(true)}
                 variant="outline"
                 size="sm"
                 className="flex items-center gap-2 border-2 border-custom-blue"
-                disabled={isReadOnly}
+                disabled={isReadOnly || !hasTasksInTimeline}
+                title={!hasTasksInTimeline ? "Nessuna task assegnata nella timeline" : "Reset delle assegnazioni"}
               >
                 <RotateCcw className="w-4 h-4" />
                 Reset Assegnazioni
@@ -2543,6 +2545,43 @@ export default function TimelineView({
             </AlertDialogCancel>
             <AlertDialogAction
               onClick={handleTransferToAdam}
+              className="border-2 border-custom-blue bg-background text-foreground hover:bg-accent hover:text-accent-foreground"
+            >
+              Conferma Trasferimento
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Dialog di conferma per il reset assegnazioni */}
+      <AlertDialog open={showResetDialog} onOpenChange={setShowResetDialog}>
+        <AlertDialogContent className="sm:max-md">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2 text-red-600 dark:text-red-400">
+              <RotateCcw className="w-5 h-5" />
+              Conferma Reset Assegnazioni
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              <p className="text-base text-foreground font-semibold mb-3">
+                Tutte le task assegnate nella timeline verranno riportate nei containers originali (Early Out, High Priority, Low Priority).
+              </p>
+              <p className="text-sm text-muted-foreground">
+                Sei sicuro di voler procedere? Questa azione cancellerà tutte le assegnazioni correnti.
+              </p>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel
+              onClick={() => setShowResetDialog(false)}
+              className="border-2 border-custom-blue"
+            >
+              Annulla
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                setShowResetDialog(false);
+                handleResetAssignments();
+              }}
               className="border-2 border-custom-blue bg-background text-foreground hover:bg-accent hover:text-accent-foreground"
             >
               Ho capito
