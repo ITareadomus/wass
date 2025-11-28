@@ -78,10 +78,10 @@ export async function loadTimeline(workDate: string): Promise<any | null> {
  * @param skipRevision - If true, only saves to filesystem without creating a MySQL revision
  *                       Use this for intermediate saves to avoid multiple revisions for a single user action
  * @param createdBy - Username of the user making the change (default: 'system')
- * @param modificationType - Type of modification (e.g., 'manual', 'reset', 'dnd')
+ * @param modificationType - Type of modification (e.g., 'manual', 'reset', 'dnd', 'task_assigned', 'task_removed', etc.)
  */
 export async function saveTimeline(
-  data: any, 
+  data: any,
   workDate: string, 
   skipRevision: boolean = false,
   createdBy: string = 'system',
@@ -194,8 +194,9 @@ export async function loadContainers(workDate: string): Promise<any | null> {
  * Writes to filesystem always (for Python scripts)
  * Writes to MySQL only for today/future dates (for historical viewing)
  * @param createdBy - Username of the user making the change (default: 'system')
+ * @param modificationType - Type of modification (default: 'manual')
  */
-export async function saveContainers(workDate: string, data: any, createdBy: string = 'system'): Promise<boolean> {
+export async function saveContainers(workDate: string, data: any, createdBy: string = 'system', modificationType: string = 'manual'): Promise<boolean> {
   try {
     // ALWAYS write to filesystem (for Python scripts compatibility)
     await atomicWriteJson(PATHS.containers, data);
@@ -238,8 +239,8 @@ export async function saveContainers(workDate: string, data: any, createdBy: str
     const hasCleaners = cleanersArray.length > 0;
 
     if (hasContainers || hasAssignments || hasCleaners) {
-      await dailyAssignmentRevisionsService.createRevision(workDate, timeline, cleanersArray, data, createdBy);
-      console.log(`✅ Containers revision created in MySQL for ${workDate} by ${createdBy}`);
+      await dailyAssignmentRevisionsService.createRevision(workDate, timeline, cleanersArray, data, createdBy, modificationType);
+      console.log(`✅ Containers revision created in MySQL for ${workDate} by ${createdBy} (type: ${modificationType})`);
     }
 
     return true;
@@ -319,8 +320,9 @@ export async function loadSelectedCleaners(workDate: string): Promise<any | null
  *                       Use this for intermediate saves (e.g., update-cleaner-start-time)
  *                       to avoid creating multiple revisions for a single user action
  * @param createdBy - Username of the user making the change (default: 'system')
+ * @param modificationType - Type of modification (e.g., 'convocazioni_save', 'cleaner_removed', 'start_time_updated', etc.)
  */
-export async function saveSelectedCleaners(workDate: string, data: any, skipRevision: boolean = false, createdBy: string = 'system'): Promise<boolean> {
+export async function saveSelectedCleaners(workDate: string, data: any, skipRevision: boolean = false, createdBy: string = 'system', modificationType: string = 'manual'): Promise<boolean> {
   try {
     // Check if this is a past date
     const today = new Date();
@@ -379,8 +381,8 @@ export async function saveSelectedCleaners(workDate: string, data: any, skipRevi
     }
 
     // Create new revision in MySQL (include containers)
-    await dailyAssignmentRevisionsService.createRevision(workDate, timeline, cleanersArray, containers, createdBy);
-    console.log(`✅ Selected cleaners revision created in MySQL for ${workDate} by ${createdBy}`);
+    await dailyAssignmentRevisionsService.createRevision(workDate, timeline, cleanersArray, containers, createdBy, modificationType);
+    console.log(`✅ Selected cleaners revision created in MySQL for ${workDate} by ${createdBy} (type: ${modificationType})`);
 
     return true;
   } catch (err) {
@@ -393,7 +395,7 @@ export async function saveSelectedCleaners(workDate: string, data: any, skipRevi
  * Reset timeline: svuota assegnazioni ma preserva selected_cleaners
  * @param createdBy - Username of the user making the reset (default: 'system')
  */
-export async function resetTimeline(workDate: string, createdBy: string = 'system'): Promise<boolean> {
+export async function resetTimeline(workDate: string, createdBy: string = 'system', modificationType: string = 'reset'): Promise<boolean> {
   try {
     // CRITICAL: Blocca reset per date passate
     const today = new Date();
@@ -434,8 +436,8 @@ export async function resetTimeline(workDate: string, createdBy: string = 'syste
       return true;
     }
 
-    await dailyAssignmentRevisionsService.createRevision(workDate, emptyTimeline, selected.cleaners, containers, createdBy);
-    console.log(`✅ Timeline reset revision created in MySQL for ${workDate} by ${createdBy}`);
+    await dailyAssignmentRevisionsService.createRevision(workDate, emptyTimeline, selected.cleaners, containers, createdBy, modificationType);
+    console.log(`✅ Timeline reset revision created in MySQL for ${workDate} by ${createdBy} (type: ${modificationType})`);
 
     return true;
   } catch (err) {
