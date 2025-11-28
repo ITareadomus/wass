@@ -1,6 +1,6 @@
 {
     "metadata": {
-        "last_updated": "2025-11-28T13:28:41.798980",
+        "last_updated": "2025-11-28T13:57:35.422715",
         "db_config": {
             "host": "139.59.132.41",
             "user": "admin",
@@ -11,7 +11,7 @@
     },
     "dates": {
         "2025-11-28": {
-            "timestamp": "2025-11-28T13:28:41.798990",
+            "timestamp": "2025-11-28T13:57:35.422727",
             "cleaners": [
                 {
                     "id": 24,
@@ -322,7 +322,7 @@
                     "role": "Premium",
                     "active": true,
                     "ranking": 0,
-                    "counter_hours": 13.0,
+                    "counter_hours": 15.5,
                     "counter_days": 2,
                     "available": true,
                     "contract_type": "B",
@@ -358,7 +358,7 @@
                     "role": "Premium",
                     "active": true,
                     "ranking": 0,
-                    "counter_hours": 1.5,
+                    "counter_hours": 3.0,
                     "counter_days": 0,
                     "available": true,
                     "contract_type": "a chiamata",
@@ -564,7 +564,7 @@
                     "role": "Premium",
                     "active": true,
                     "ranking": 0,
-                    "counter_hours": 14.5,
+                    "counter_hours": 17.0,
                     "counter_days": 4,
                     "available": true,
                     "contract_type": "a chiamata",
