@@ -1181,7 +1181,6 @@ def main():
         print(f"📅 Usando data da argomento: {ref_date}")
     else:
         # Fallback: usa la data corrente
-        from datetime import datetime
         ref_date = datetime.now().strftime("%Y-%m-%d")
         print(f"📅 Nessuna data specificata, usando: {ref_date}")
 
