@@ -1516,6 +1516,43 @@ export default function GenerateAssignments() {
       }
 
       if (fromCleanerId !== null && toCleanerId !== null) {
+        // CASO SPECIALE: Riordino all'interno dello STESSO cleaner
+        if (fromCleanerId === toCleanerId) {
+          console.log(`🔄 Riordino task ${logisticCode} nello stesso cleaner ${fromCleanerId}: da posizione ${source.index} a ${destination.index}`);
+          
+          try {
+            await reorderTimelineAssignment(taskId, fromCleanerId, logisticCode || '', source.index, destination.index);
+            
+            // CRITICAL: Marca modifiche dopo riordino
+            setHasUnsavedChanges(true);
+            if (handleTaskMoved) {
+              handleTaskMoved();
+            }
+
+            toast({
+              title: "Task riordinata",
+              description: `Task ${logisticCode} spostata alla posizione ${destination.index + 1}`,
+              variant: "success",
+            });
+
+            // Rilascia lock PRIMA del reload
+            setIsDragging(false);
+
+            // Reload in background
+            await refreshAssignments("manual");
+          } catch (err) {
+            console.error("Errore nel riordino:", err);
+            toast({
+              title: "Errore",
+              description: "Impossibile riordinare la task.",
+              variant: "destructive",
+            });
+            setIsDragging(false);
+          }
+          return;
+        }
+
+        // CASO NORMALE: Spostamento tra cleaners DIVERSI
         console.log(`🔄 Spostamento tra cleaners: task ${logisticCode} da cleaner ${fromCleanerId} (idx ${source.index}) a cleaner ${toCleanerId} (idx ${destination.index})`);
 
         try {
