@@ -26,6 +26,26 @@ function getRomeTimestamp(): string {
   return formatInTimeZone(new Date(), TIMEZONE, "yyyy-MM-dd HH:mm:ss");
 }
 
+/**
+ * Normalizes cleaners_assignments to have 'cleaner' before 'tasks'
+ * This ensures consistent JSON structure matching Python scripts output
+ */
+function normalizeCleanersAssignments(timelineData: any): any {
+  if (!timelineData?.cleaners_assignments || !Array.isArray(timelineData.cleaners_assignments)) {
+    return timelineData;
+  }
+
+  timelineData.cleaners_assignments = timelineData.cleaners_assignments.map((entry: any) => {
+    // Rebuild object with cleaner first, then tasks
+    return {
+      cleaner: entry.cleaner,
+      tasks: entry.tasks || []
+    };
+  });
+
+  return timelineData;
+}
+
 
 /**
  * Atomically write JSON to file using tmp + rename pattern
@@ -94,6 +114,9 @@ export async function saveTimeline(
     const targetDate = new Date(workDate);
     targetDate.setHours(0, 0, 0, 0);
     const isPastDate = targetDate < today;
+
+    // Normalize cleaners_assignments to have 'cleaner' before 'tasks'
+    normalizeCleanersAssignments(data);
 
     // Ensure metadata contains the correct date
     data.metadata = data.metadata || {};
