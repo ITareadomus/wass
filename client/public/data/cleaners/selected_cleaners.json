@@ -132,7 +132,7 @@
       "ranking": 0,
       "lastname": "MORLA ZAMBRANO",
       "available": true,
-      "start_time": null,
+      "start_time": "09:00",
       "telegram_id": null,
       "counter_days": 4,
       "contract_type": "a chiamata",
@@ -306,11 +306,35 @@
       "counter_hours": 9.75,
       "preferred_customers": [],
       "can_do_straordinaria": false
+    },
+    {
+      "id": 771,
+      "name": "PRECIOUS",
+      "role": "Premium",
+      "active": true,
+      "ranking": 0,
+      "lastname": "GYABAAH",
+      "available": true,
+      "start_time": "10:00",
+      "telegram_id": 5775694043,
+      "counter_days": 0,
+      "contract_type": "a chiamata",
+      "counter_hours": 3,
+      "preferred_customers": [
+        3,
+        61,
+        72,
+        75,
+        84,
+        94,
+        115
+      ],
+      "can_do_straordinaria": false
     }
   ],
-  "total_selected": 12,
+  "total_selected": 13,
   "metadata": {
     "date": "2025-11-28",
-    "loaded_at": "2025-11-28 15:11:08"
+    "loaded_at": "2025-11-28 15:17:02"
   }
 }
