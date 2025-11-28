@@ -271,6 +271,17 @@ export async function saveSelectedCleaners(workDate: string, data: any): Promise
  */
 export async function resetTimeline(workDate: string): Promise<boolean> {
   try {
+    // CRITICAL: Blocca reset per date passate
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const targetDate = new Date(workDate);
+    targetDate.setHours(0, 0, 0, 0);
+    
+    if (targetDate < today) {
+      console.log(`🚫 Tentativo di reset timeline per data passata ${workDate} - BLOCCATO`);
+      return false;
+    }
+
     const emptyTimeline = {
       metadata: {
         date: workDate,
@@ -291,7 +302,14 @@ export async function resetTimeline(workDate: string): Promise<boolean> {
 
     // Create new revision in MySQL with empty timeline but preserving selected_cleaners
     const selected = await loadSelectedCleanersFromFile(workDate);
-    await dailyAssignmentRevisionsService.createRevision(workDate, emptyTimeline, selected?.cleaners || []);
+    
+    // CRITICAL: Non creare revisione se non ci sono cleaner
+    if (!selected?.cleaners || selected.cleaners.length === 0) {
+      console.log(`⏭️ Saltata creazione revisione MySQL per reset ${workDate} (nessun cleaner selezionato)`);
+      return true;
+    }
+    
+    await dailyAssignmentRevisionsService.createRevision(workDate, emptyTimeline, selected.cleaners);
     console.log(`✅ Timeline reset revision created in MySQL for ${workDate}`);
 
     return true;

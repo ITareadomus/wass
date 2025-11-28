@@ -3745,6 +3745,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Endpoint per eliminare revisioni MySQL per una data specifica (pulizia dati errati)
+  app.delete("/api/mysql-revisions/:workDate", async (req, res) => {
+    try {
+      const { workDate } = req.params;
+      const { dailyAssignmentRevisionsService } = await import("./services/daily-assignment-revisions-service");
+
+      if (!workDate || !/^\d{4}-\d{2}-\d{2}$/.test(workDate)) {
+        return res.status(400).json({
+          success: false,
+          error: "Data non valida. Formato richiesto: YYYY-MM-DD"
+        });
+      }
+
+      const deletedCount = await dailyAssignmentRevisionsService.deleteAllRevisionsForDate(workDate);
+
+      res.json({
+        success: true,
+        deletedCount,
+        message: `Eliminate ${deletedCount} revisioni MySQL per ${workDate}`
+      });
+    } catch (error: any) {
+      console.error("Errore nella cancellazione revisioni MySQL:", error);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
 
   const httpServer = createServer(app);
   return httpServer;

@@ -155,6 +155,26 @@ export class DailyAssignmentRevisionsService {
       return 0;
     }
   }
+
+  /**
+   * Delete ALL revisions for a specific work_date
+   * Used to clean up erroneous revisions for past dates
+   */
+  async deleteAllRevisionsForDate(workDate: string): Promise<number> {
+    try {
+      const [result] = await mysqlDb.execute<any>(
+        `DELETE FROM daily_assignment_revisions WHERE work_date = ?`,
+        [workDate]
+      );
+
+      const deletedCount = result.affectedRows || 0;
+      console.log(`🗑️ Deleted ALL ${deletedCount} revisions for ${workDate}`);
+      return deletedCount;
+    } catch (error) {
+      console.error("Error deleting all revisions for date:", error);
+      return 0;
+    }
+  }
 }
 
 export const dailyAssignmentRevisionsService = new DailyAssignmentRevisionsService();
