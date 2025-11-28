@@ -2,23 +2,23 @@ import { mysqlDb } from "../../shared/mysql-db";
 import { RowDataPacket } from "mysql2";
 
 export interface DailyAssignmentCurrent {
-  work_date: string;
-  timeline: any;
-  selected_cleaners: any;
-  containers: any;
-  last_revision: number;
-  updated_at: Date;
+  work_date: string;         // 1
+  timeline: any;             // 2
+  selected_cleaners: any;    // 3
+  containers: any;           // 4
+  last_revision: number;     // 5
+  updated_at: Date;          // 6
 }
 
 export interface DailyAssignmentRevision {
-  id: number;
-  work_date: string;
-  revision: number;
-  selected_cleaners: any;
-  timeline: any;
-  containers: any;
-  created_at: Date;
-  created_by?: string;
+  id: number;                // auto_increment PK
+  work_date: string;         // 1
+  revision: number;          // 2
+  timeline: any;             // 3
+  selected_cleaners: any;    // 4
+  containers: any;           // 5
+  created_at: Date;          // 6
+  created_by?: string;       // 7
 }
 
 /**
@@ -173,7 +173,7 @@ export class DailyAssignmentRevisionsService {
       const current = await this.getCurrent(workDate);
       const nextRevision = current ? current.last_revision + 1 : 1;
 
-      // Update current table (UPSERT)
+      // Update current table (UPSERT) - ordine colonne: work_date, timeline, selected_cleaners, containers, last_revision
       await mysqlDb.execute(
         `INSERT INTO daily_assignments_current 
          (work_date, timeline, selected_cleaners, containers, last_revision) 
@@ -187,7 +187,7 @@ export class DailyAssignmentRevisionsService {
         [workDate, timelineJson, selectedCleanersJson, containersJson, nextRevision]
       );
 
-      // Insert into history table
+      // Insert into history table - ordine: work_date, revision, timeline, selected_cleaners, containers, created_by
       await mysqlDb.execute(
         `INSERT INTO daily_assignments_history 
          (work_date, revision, timeline, selected_cleaners, containers, created_by) 
