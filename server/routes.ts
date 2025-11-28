@@ -2185,7 +2185,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Salva containers (filesystem + MySQL)
       await workspaceFiles.saveContainers(workDate, containersData);
-      
+
       // Salva timeline con tracking delle modifiche (skipRevision=false per creare revision in MySQL)
       await workspaceFiles.saveTimeline(workDate, timelineData, false, currentUsername, 'task_edit', editOptions);
 
@@ -3082,7 +3082,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Endpoint per salvare le finestre temporali clienti
+  // Endpoint per salvare i finestre temporali clienti
   app.post("/api/save-client-timewindows", async (req, res) => {
     try {
       const clientTimeWindowsData = req.body;
@@ -3679,7 +3679,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         };
       }
 
-      // Carica i dati del cleaner da cleaners.json per ottenere name e lastname
+      // Carica i dati del cleaner da cleaners.json per ottenere nome e lastname
       const cleanersPath = path.join(process.cwd(), "client/public/data/cleaners/cleaners.json");
       const cleanersData = JSON.parse(await fs.readFile(cleanersPath, 'utf8'));
 
