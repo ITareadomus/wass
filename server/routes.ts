@@ -203,7 +203,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       };
 
       // Salva timeline (dual-write: filesystem + Object Storage)
-      await workspaceFiles.saveTimeline(emptyTimeline, workDate, false, currentUsername, 'reset');
+      await workspaceFiles.saveTimeline(workDate, emptyTimeline, false, currentUsername, 'reset');
       console.log(`Timeline resettata: timeline.json (struttura corretta)`);
 
       // FORZA la ricreazione di containers.json rieseguendo create_containers.py
@@ -226,7 +226,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // CRITICAL: Forza nuovamente il reset di timeline.json dopo create_containers
       // perché lo script Python potrebbe aver sovrascritto il file
       console.log(`🔄 Forzatura reset timeline.json dopo create_containers...`);
-      await workspaceFiles.saveTimeline(emptyTimeline, workDate, false, currentUsername, 'reset');
+      await workspaceFiles.saveTimeline(workDate, emptyTimeline, false, currentUsername, 'reset');
       console.log(`✅ Timeline resettata nuovamente dopo create_containers`);
 
       // CRITICAL: Elimina il flag di ultimo salvataggio per evitare ricaricamenti automatici
@@ -1428,8 +1428,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Endpoint per aggiungere un cleaner alla timeline (sostituisce cleaner rimossi da selected_cleaners)
   app.post("/api/add-cleaner-to-timeline", async (req, res) => {
     try {
-      const { cleanerId, date } = req.body;
+      const { cleanerId, date, modified_by, created_by } = req.body;
       const workDate = date || format(new Date(), 'yyyy-MM-dd');
+      const currentUsername = modified_by || created_by || getCurrentUsername(req);
       const timelinePath = path.join(process.cwd(), 'client/public/data/output/timeline.json');
       const cleanersPath = path.join(process.cwd(), 'client/public/data/cleaners/cleaners.json');
       const selectedCleanersPath = path.join(process.cwd(), 'client/public/data/cleaners/selected_cleaners.json');
@@ -1890,7 +1891,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const selectedCleanersPath = path.join(process.cwd(), 'client/public/data/cleaners/selected_cleaners.json');
       let selectedCleanersData: any;
       try {
-        const data = await fs.readFile(selectedCleanersPath, 'utf-utf8');
+        const data = await fs.readFile(selectedCleanersPath, 'utf-8');
         selectedCleanersData = JSON.parse(data);
       } catch (error) {
         // Se il file non esiste, crealo con struttura vuota
