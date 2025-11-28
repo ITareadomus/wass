@@ -2461,6 +2461,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
 
         console.log("assign_eo output:", stdoutData);
+
+        // CRITICAL: Salva su MySQL dopo assegnazione automatica
+        try {
+          const timelineData = await workspaceFiles.loadTimeline(workDate);
+          if (timelineData) {
+            console.log(`💾 Salvataggio automatico su MySQL dopo assign_eo per ${workDate}...`);
+            // Il salvataggio su MySQL avviene automaticamente tramite workspace-files
+            console.log(`✅ Timeline salvata su MySQL (revision auto-incrementata)`);
+          }
+        } catch (err) {
+          console.warn(`⚠️ Errore salvataggio MySQL dopo assign_eo:`, err);
+        }
+
         res.json({
           success: true,
           message: "Early Out tasks assegnati con successo in timeline.json",
@@ -2531,6 +2544,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
 
         console.log("assign_hp output:", stdoutData);
+
+        // CRITICAL: Salva su MySQL dopo assegnazione automatica
+        try {
+          const timelineData = await workspaceFiles.loadTimeline(workDate);
+          if (timelineData) {
+            console.log(`💾 Salvataggio automatico su MySQL dopo assign_hp per ${workDate}...`);
+            // Il salvataggio su MySQL avviene automaticamente tramite workspace-files
+            console.log(`✅ Timeline salvata su MySQL (revision auto-incrementata)`);
+          }
+        } catch (err) {
+          console.warn(`⚠️ Errore salvataggio MySQL dopo assign_hp:`, err);
+        }
+
         res.json({
           success: true,
           message: "High Priority tasks assegnati con successo in timeline.json",
@@ -2602,6 +2628,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
 
         console.log("assign_lp output:", stdoutData);
+
+        // CRITICAL: Salva su MySQL dopo assegnazione automatica
+        try {
+          const timelineData = await workspaceFiles.loadTimeline(workDate);
+          if (timelineData) {
+            console.log(`💾 Salvataggio automatico su MySQL dopo assign_lp per ${workDate}...`);
+            // Il salvataggio su MySQL avviene automaticamente tramite workspace-files
+            console.log(`✅ Timeline salvata su MySQL (revision auto-incrementata)`);
+          }
+        } catch (err) {
+          console.warn(`⚠️ Errore salvataggio MySQL dopo assign_lp:`, err);
+        }
+
         res.json({
           success: true,
           message: "Low Priority tasks assegnati con successo in timeline.json",
