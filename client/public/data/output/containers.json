@@ -1,6 +1,6 @@
 {
   "metadata": {
-    "last_updated": "2025-11-28T14:33:40.819413",
+    "last_updated": "2025-11-28T14:48:28.277870",
     "date": "2025-11-28"
   },
   "containers": {
@@ -410,9 +410,36 @@
             "checkout_time_eo_window_or_before_start"
           ],
           "priority": "early_out"
+        },
+        {
+          "task_id": 219507,
+          "logistic_code": 723,
+          "client_id": 67,
+          "premium": false,
+          "address": "VIA TORTONA, 10",
+          "lat": "45.4542397",
+          "lng": "9.1686792",
+          "cleaning_time": 40,
+          "checkin_date": "2025-11-28",
+          "checkout_date": "2025-11-28",
+          "checkin_time": null,
+          "checkout_time": "09:30",
+          "pax_in": 2,
+          "pax_out": 0,
+          "small_equipment": false,
+          "operation_id": 2,
+          "confirmed_operation": true,
+          "straordinaria": false,
+          "type_apt": "B",
+          "alias": "EXP",
+          "customer_name": "EXPERIENCE DESIGN BED & SHOW",
+          "reasons": [
+            "checkout_time_eo_window_or_before_start"
+          ],
+          "priority": "early_out"
         }
       ],
-      "count": 15
+      "count": 16
     },
     "high_priority": {
       "tasks": [
@@ -979,8 +1006,8 @@
     }
   },
   "summary": {
-    "total_tasks": 35,
-    "early_out": 15,
+    "total_tasks": 36,
+    "early_out": 16,
     "high_priority": 10,
     "low_priority": 10
   }
