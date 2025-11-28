@@ -166,16 +166,9 @@ export async function saveTimeline(
     const cleanersArray = selected?.cleaners || [];
     const containers = await loadContainersFromFile(workDate);
 
-    // CRITICAL: Non creare revisione se timeline E cleaners sono vuoti
-    const hasAssignments = normalizedData.cleaners_assignments && normalizedData.cleaners_assignments.length > 0;
-    const hasCleaners = cleanersArray.length > 0;
-
-    if (!hasAssignments && !hasCleaners) {
-      console.log(`⏭️ Saltata creazione revisione MySQL per ${workDate} (nessun dato significativo)`);
-      return true;
-    }
-
-    // Create new revision in MySQL (include containers) - use normalized data
+    // ALWAYS create revision in MySQL - even for empty states
+    // This ensures removals/deletions are properly persisted
+    // Empty state IS valid data that should be saved
     await dailyAssignmentRevisionsService.createRevision(workDate, normalizedData, cleanersArray, containers, createdBy, modificationType);
     console.log(`✅ Timeline revision created in MySQL for ${workDate} by ${createdBy} (type: ${modificationType})`);
 
@@ -416,16 +409,9 @@ export async function saveSelectedCleaners(workDate: string, data: any, skipRevi
 
     const cleanersArray = data.cleaners || [];
 
-    // CRITICAL: Non creare revisione se cleaners E timeline sono vuoti
-    const hasCleaners = cleanersArray.length > 0;
-    const hasAssignments = timeline?.cleaners_assignments && timeline.cleaners_assignments.length > 0;
-
-    if (!hasCleaners && !hasAssignments) {
-      console.log(`⏭️ Saltata creazione revisione MySQL per ${workDate} (nessun dato significativo)`);
-      return true;
-    }
-
-    // Create new revision in MySQL (include containers)
+    // ALWAYS create revision in MySQL - even for empty states
+    // This ensures removals/deletions are properly persisted
+    // Empty state IS valid data that should be saved
     await dailyAssignmentRevisionsService.createRevision(workDate, timeline, cleanersArray, containers, createdBy, modificationType);
     console.log(`✅ Selected cleaners revision created in MySQL for ${workDate} by ${createdBy} (type: ${modificationType})`);
 
