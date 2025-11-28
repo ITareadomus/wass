@@ -1373,10 +1373,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       };
 
-      // Scrittura atomica
-      const tmpPath = `${selectedCleanersPath}.tmp`;
-      await fs.writeFile(tmpPath, JSON.stringify(dataToSave, null, 2));
-      await fs.rename(tmpPath, selectedCleanersPath);
+      // Usa workspaceFiles.saveSelectedCleaners per dual-write (filesystem + MySQL)
+      await workspaceFiles.saveSelectedCleaners(workDate, dataToSave);
 
       console.log(`✅ Salvati ${enrichedCleaners.length} cleaners in selected_cleaners.json per ${workDate} (con can_do_straordinaria e metadata)`);
 
