@@ -547,7 +547,7 @@ export default function GenerateAssignments() {
         if (isPastDate) {
           console.log("🔒 Data passata senza assegnazioni salvate - NESSUNA ESTRAZIONE");
           setIsTimelineReadOnly(true);
-          
+
           // NON estrarre dati per date passate - mostra solo messaggio
           toast({
             title: "Nessun dato disponibile",
@@ -555,7 +555,7 @@ export default function GenerateAssignments() {
             variant: "default",
             duration: 5000,
           });
-          
+
           // Imposta stati vuoti
           setEarlyOutTasks([]);
           setHighPriorityTasks([]);
@@ -571,13 +571,13 @@ export default function GenerateAssignments() {
       }
     } catch (error) {
       console.error("Errore nella verifica assegnazioni salvate:", error);
-      
+
       // Fallback SOLO per date NON passate
       const today = new Date();
       today.setHours(0, 0, 0, 0);
       const targetDate = new Date(date);
       targetDate.setHours(0, 0, 0, 0);
-      
+
       if (targetDate >= today) {
         console.log("Fallback: estrazione per data presente/futura");
         await extractData(date);
@@ -591,14 +591,15 @@ export default function GenerateAssignments() {
 
 
   // Funzione per estrarre i dati dal database (quando NON esistono assegnazioni salvate)
-  const extractData = async (date: Date) => {
+  const extractData = async (date?: Date) => {
     try {
       setIsExtracting(true);
       setExtractionStep("Estrazione dati dal database...");
 
-      const year = date.getFullYear();
-      const month = String(date.getMonth() + 1).padStart(2, '0');
-      const day = String(date.getDate()).padStart(2, '0');
+      const dateToProcess = date || selectedDate;
+      const year = dateToProcess.getFullYear();
+      const month = String(dateToProcess.getMonth() + 1).padStart(2, '0');
+      const day = String(dateToProcess.getDate()).padStart(2, '0');
       const dateStr = `${year}-${month}-${day}`;
 
       console.log("Estrazione dati per data:", dateStr);
@@ -607,11 +608,16 @@ export default function GenerateAssignments() {
       const currentUsername = getCurrentUsername();
 
       // Resetta la timeline
-      await fetch('/api/reset-timeline-assignments', {
+      const resetResponse = await fetch('/api/reset-timeline-assignments', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ date: dateStr, created_by: currentUsername })
       });
+      if (!resetResponse.ok) {
+        console.error("Errore nel reset della timeline prima dell'estrazione:", await resetResponse.text());
+        // Continua comunque, potremmo avere dati parziali ma è meglio che niente
+      }
+
 
       const response = await fetch('/api/extract-data', {
         method: 'POST',
@@ -1035,10 +1041,18 @@ export default function GenerateAssignments() {
       const day = String(selectedDate.getDate()).padStart(2, '0');
       const dateStr = `${year}-${month}-${day}`;
 
-      const response = await fetch('/api/assign-early-out-to-timeline', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ date: dateStr })
+      // Get current user from localStorage
+      const userStr = localStorage.getItem('user');
+      const currentUser = userStr ? JSON.parse(userStr) : null;
+      const username = currentUser?.username || 'unknown';
+
+      const response = await fetch("/api/assign-early-out-to-timeline", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          date: dateStr,
+          created_by: username
+        }),
       });
 
       const result = await response.json();
@@ -1078,10 +1092,18 @@ export default function GenerateAssignments() {
       const day = String(selectedDate.getDate()).padStart(2, '0');
       const dateStr = `${year}-${month}-${day}`;
 
-      const response = await fetch('/api/assign-high-priority-to-timeline', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ date: dateStr })
+      // Get current user from localStorage
+      const userStr = localStorage.getItem('user');
+      const currentUser = userStr ? JSON.parse(userStr) : null;
+      const username = currentUser?.username || 'unknown';
+
+      const response = await fetch("/api/assign-high-priority-to-timeline", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          date: dateStr,
+          created_by: username
+        }),
       });
 
       const result = await response.json();
@@ -1121,10 +1143,18 @@ export default function GenerateAssignments() {
       const day = String(selectedDate.getDate()).padStart(2, '0');
       const dateStr = `${year}-${month}-${day}`;
 
-      const response = await fetch('/api/assign-low-priority-to-timeline', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ date: dateStr })
+      // Get current user from localStorage
+      const userStr = localStorage.getItem('user');
+      const currentUser = userStr ? JSON.parse(userStr) : null;
+      const username = currentUser?.username || 'unknown';
+
+      const response = await fetch("/api/assign-low-priority-to-timeline", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          date: dateStr,
+          created_by: username
+        }),
       });
 
       const result = await response.json();
