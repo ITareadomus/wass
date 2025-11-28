@@ -2247,7 +2247,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
           if (updates.length > 0) {
             values.push(taskId); // WHERE id = ?
-            const query = `UPDATE wass_housekeeping SET ${updates.join(', ')} WHERE id = ?`;
+            const query = `UPDATE app_housekeeping SET ${updates.join(', ')} WHERE id = ?`;
 
             await connection.execute(query, values);
             await connection.end();
