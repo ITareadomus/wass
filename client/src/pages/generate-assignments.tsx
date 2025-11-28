@@ -1217,7 +1217,7 @@ export default function GenerateAssignments() {
 
       // Trova il task completo usando l'id univoco
       const task = allTasksWithAssignments.find(t => String(t.id) === String(taskId));
-      
+
       if (!task) {
         console.error(`Task ${taskId} non trovata in allTasksWithAssignments`);
         return;
@@ -1226,7 +1226,7 @@ export default function GenerateAssignments() {
       // Determina la priorità originale della task usando l'id
       let priority = 'low_priority'; // default
       let modificationType = 'dnd_from_low_priority';
-      
+
       if (earlyOutTasks.find(t => String(t.id) === String(taskId))) {
         priority = 'early_out';
         modificationType = 'dnd_from_early_out';
@@ -1236,7 +1236,7 @@ export default function GenerateAssignments() {
       }
 
       const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
-      
+
       const response = await fetch("/api/save-timeline-assignment", {
         method: "POST",
         headers: { "Content-Type": "application/json" },

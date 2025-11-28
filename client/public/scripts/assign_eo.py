@@ -284,7 +284,7 @@ def evaluate_route(route: List[Task]) -> Tuple[bool, List[Tuple[int, int, int]]]
         #   2. Checkout migrato PRIMA dell'arrival: inizia all'arrival
         #   3. Checkout migrato DOPO l'arrival: inizia al checkout
         # - EO NORMALE: rispetta checkout_time come sempre
-        
+
         if t.straordinaria:
             # STRAORDINARIE: checkout ha priorità se presente e maggiore di arrival
             # altrimenti inizia quando arriva il cleaner
@@ -476,7 +476,7 @@ def load_cleaners() -> List[Cleaner]:
         if not can_cleaner_handle_priority(role, "early_out"):
             print(f"   ⏭️  Cleaner {c.get('name')} ({role}) escluso da Early-Out (priority_types settings)")
             continue
-        
+
         cleaner = Cleaner(
             id=c.get("id"),
             name=c.get("name") or str(c.get("id")),
@@ -490,14 +490,14 @@ def load_cleaners() -> List[Cleaner]:
         # Aggiungi start_time al cleaner per il filtro
         cleaner.start_time = c.get("start_time", "10:00")
         all_cleaners.append(cleaner)
-    
+
     # Filtra usando get_cleaners_for_eo (esclude start_time >= 11:00)
     cleaners = get_cleaners_for_eo(all_cleaners)
-    
+
     excluded_count = len(all_cleaners) - len(cleaners)
     if excluded_count > 0:
         print(f"   ⏭️  {excluded_count} cleaner(s) esclusi da EO per start_time >= 11:00")
-    
+
     return cleaners
 
 
@@ -602,20 +602,20 @@ def plan_day(
                 c for c in cleaners
                 if c.can_do_straordinaria and can_cleaner_handle_apartment(c.role, task.apt_type)
             ]
-            
+
             if not straordinaria_cleaners:
                 unassigned.append(task)
                 continue
-            
+
             # Trova cleaner con start_time minore
             earliest_cleaner = min(straordinaria_cleaners, key=lambda c: hhmm_to_min(getattr(c, 'start_time', '10:00') if isinstance(getattr(c, 'start_time', None), str) else '10:00'))
-            
+
             # Verifica se può prendere la task (pos 0)
             result = find_best_position(earliest_cleaner, task)
             if result is None:
                 unassigned.append(task)
                 continue
-            
+
             pos, _ = result
             earliest_cleaner.route.insert(pos, task)
             assigned_logistic_codes.add(task.logistic_code)
@@ -956,15 +956,19 @@ def main():
         ref_date = datetime.now().strftime("%Y-%m-%d")
         print(f"📅 Nessuna data specificata, usando: {ref_date}")
 
-    # Update timeline.json con struttura organizzata per cleaner
-    from datetime import datetime as dt
-    timeline_path = OUTPUT_ASSIGN.parent / "timeline.json"
+    # UPDATE: Aggiungi modification_type al metadata della timeline
+    # Aggiorna metadata
+    timeline_data["metadata"]["last_updated"] = datetime.now().isoformat()
+    timeline_data["metadata"]["date"] = ref_date
+    timeline_data["metadata"]["modification_type"] = "auto_assign_early_out"
+
 
     # Carica timeline esistente o crea nuova struttura
-    timeline_data = {
+    timeline_data_output = {
         "metadata": {
-            "last_updated": dt.now().isoformat(),
-            "date": ref_date
+            "last_updated": datetime.now().isoformat(),
+            "date": ref_date,
+            "modification_type": "auto_assign_early_out" # <-- Aggiornato qui
         },
         "cleaners_assignments": [],
         "meta": {
@@ -981,7 +985,7 @@ def main():
             if "cleaners_assignments" in existing:
                 # Crea un set di cleaner_id che avranno nuove assegnazioni EO
                 new_eo_cleaner_ids = set(c["cleaner"]["id"] for c in output["early_out_tasks_assigned"])
-                timeline_data["cleaners_assignments"] = [
+                timeline_data_output["cleaners_assignments"] = [
                     c for c in existing.get("cleaners_assignments", [])
                     if c["cleaner"]["id"] not in new_eo_cleaner_ids or
                        not any(t.get("reasons") and "automatic_assignment_eo" in t.get("reasons", []) for t in c.get("tasks", []))
@@ -991,7 +995,7 @@ def main():
 
     # Aggiungi le nuove assegnazioni EO organizzate per cleaner
     for cleaner_entry in output["early_out_tasks_assigned"]:
-        timeline_data["cleaners_assignments"].append({
+        timeline_data_output["cleaners_assignments"].append({
             "cleaner": cleaner_entry["cleaner"],
             "tasks": cleaner_entry["tasks"]
         })
@@ -1001,32 +1005,32 @@ def main():
     total_available_cleaners = len(cleaners)
 
     # Conta i cleaner effettivamente usati (con almeno una task)
-    used_cleaners_count = len([c for c in timeline_data["cleaners_assignments"] if len(c.get("tasks", [])) > 0])
+    used_cleaners_count = len([c for c in timeline_data_output["cleaners_assignments"] if len(c.get("tasks", [])) > 0])
 
     # Conta le task totali assegnate
-    total_assigned_tasks = sum(len(c["tasks"]) for c in timeline_data["cleaners_assignments"])
+    total_assigned_tasks = sum(len(c["tasks"]) for c in timeline_data_output["cleaners_assignments"])
 
     # Salva timeline.json
-    timeline_data["meta"] = {
+    timeline_data_output["meta"] = {
         "total_cleaners": total_available_cleaners,
         "used_cleaners": used_cleaners_count,
         "assigned_tasks": total_assigned_tasks
     }
-    timeline_path.write_text(json.dumps(timeline_data, ensure_ascii=False, indent=2), encoding="utf-8")
+    timeline_path.write_text(json.dumps(timeline_data_output, ensure_ascii=False, indent=2), encoding="utf-8")
     print(f"✅ Timeline aggiornata: {timeline_path}")
 
     # Conta i cleaner con task di ogni tipo basandosi sui reasons
-    eo_count = len([c for c in timeline_data["cleaners_assignments"]
+    eo_count = len([c for c in timeline_data_output["cleaners_assignments"]
                    if any(t.get("reasons") and "automatic_assignment_eo" in t.get("reasons", []) for t in c.get("tasks", []))])
-    hp_count = len([c for c in timeline_data["cleaners_assignments"]
+    hp_count = len([c for c in timeline_data_output["cleaners_assignments"]
                    if any(t.get("reasons") and "automatic_assignment_hp" in t.get("reasons", []) for t in c.get("tasks", []))])
-    lp_count = len([c for c in timeline_data["cleaners_assignments"]
+    lp_count = len([c for c in timeline_data_output["cleaners_assignments"]
                    if any(t.get("reasons") and "automatic_assignment_lp" in t.get("reasons", []) for t in c.get("tasks", []))])
 
     print(f"   - Cleaner con assegnazioni EO: {eo_count}")
     print(f"   - Cleaner con assegnazioni HP: {hp_count}")
     print(f"   - Cleaner con assegnazioni LP: {lp_count}")
-    print(f"   - Totale task assegnate: {timeline_data['meta']['assigned_tasks']}")
+    print(f"   - Totale task assegnate: {timeline_data_output['meta']['assigned_tasks']}")
 
     # SPOSTAMENTO: Rimuovi le task assegnate da containers.json
     containers_path = INPUT_CONTAINERS

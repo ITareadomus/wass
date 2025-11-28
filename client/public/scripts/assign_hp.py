@@ -1117,7 +1117,12 @@ def main():
                 "tasks": cleaner_entry["tasks"]
             })
 
-    # Aggiorna meta
+    # Aggiorna metadata
+    # Aggiorna metadata
+    timeline_data["metadata"]["last_updated"] = dt.now().isoformat()
+    timeline_data["metadata"]["date"] = ref_date
+    timeline_data["metadata"]["modification_type"] = "auto_assign_high_priority"
+
     # Conta i cleaners effettivamente usati (con almeno una task)
     used_cleaners = len([c for c in timeline_data["cleaners_assignments"] if len(c.get("tasks", [])) > 0])
 
