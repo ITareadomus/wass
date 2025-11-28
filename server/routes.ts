@@ -892,7 +892,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             }
 
             // Salva containers.json aggiornato usando workspace helper (filesystem + Object Storage)
-            await workspaceFiles.saveContainers(workDate, containersData, modifyingUserFromRequest);
+            await workspaceFiles.saveContainers(workDate, containersData);
             console.log(`✅ Containers.json aggiornato e sincronizzato con timeline`);
           }
         } catch (containerError) {
@@ -1037,7 +1037,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
 
           // Salva containers.json usando workspace helper (filesystem + Object Storage)
-          await workspaceFiles.saveContainers(workDate, containersData, modifyingUser);
+          await workspaceFiles.saveContainers(workDate, containersData);
           console.log(`✅ Task ${logisticCode} riportata nel container ${containerType}`);
         } catch (containerError) {
           console.warn('Errore nel ripristino del container:', containerError);
@@ -1890,7 +1890,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const selectedCleanersPath = path.join(process.cwd(), 'client/public/data/cleaners/selected_cleaners.json');
       let selectedCleanersData: any;
       try {
-        const data = await fs.readFile(selectedCleanersPath, 'utf-8');
+        const data = await fs.readFile(selectedCleanersPath, 'utf-utf8');
         selectedCleanersData = JSON.parse(data);
       } catch (error) {
         // Se il file non esiste, crealo con struttura vuota
