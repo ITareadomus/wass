@@ -32,14 +32,20 @@ Preferred communication style: Simple, everyday language.
 - **Dual-Write Pattern**: Timeline and selected_cleaners saved to both filesystem (for Python scripts) and MySQL (for versioning)
 - **Auto-Save**: All assignment changes are automatically persisted to MySQL with revision tracking
 
-## MySQL Storage Architecture (November 2025)
-- **Table**: `daily_assignment_revisions` with JSON columns for `timeline` and `selected_cleaners`
-- **Versioning**: Automatic revision numbering (revision 1, 2, 3...) per work_date
+## MySQL Storage Architecture (November 2025) - Two-Table Design
+- **Two-Table Architecture**:
+  - `daily_assignments_current`: Current state (1 row per work_date, fast queries)
+  - `daily_assignments_history`: All revisions for audit/rollback
+- **Current Table Schema**: `work_date` (PK), `timeline` (JSON), `selected_cleaners` (JSON), `last_revision` (INT), `updated_at`
+- **History Table Schema**: `id` (PK), `work_date`, `revision`, `timeline` (JSON), `selected_cleaners` (JSON), `created_at`, `created_by`
+- **Performance**: Reading current state is O(1) - no ORDER BY or LIMIT needed
+- **Versioning**: Automatic revision numbering per work_date, stored in both tables
 - **Connection**: Pooled connections via mysql2/promise with environment variables (DB_HOST, DB_USER, DB_PASSWORD, DB_NAME, DB_PORT)
 - **Files**:
-  - `shared/mysql-db.ts`: Connection pool and initialization
-  - `server/services/daily-assignment-revisions-service.ts`: CRUD operations for revisions
+  - `shared/mysql-db.ts`: Connection pool, table initialization, and auto-migration from old schema
+  - `server/services/daily-assignment-revisions-service.ts`: CRUD operations with dual-table writes
   - `server/services/workspace-files.ts`: Dual-write logic (filesystem + MySQL)
+- **Date Guards**: Writes blocked for past dates to prevent data contamination
 - **Deprecated**: Object Storage (`@replit/object-storage`) removed, manual "Conferma Assegnazioni" button removed
 
 ## Authentication & Authorization
