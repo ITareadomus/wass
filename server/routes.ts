@@ -1200,6 +1200,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.log(`✅ Inizializzato selected_cleaners vuoto per ${workDate} (nessun dato MySQL)`);
       }
 
+      // CRITICAL: Sincronizza timeline.json da MySQL a filesystem
+      // Questo è necessario perché il frontend legge da timeline.json
+      const timelinePath = path.join(process.cwd(), 'client/public/data/output/timeline.json');
+      if (timelineData) {
+        // Aggiorna metadata con la data corretta
+        timelineData.metadata = timelineData.metadata || {};
+        timelineData.metadata.date = workDate;
+        timelineData.metadata.loaded_from_mysql = true;
+        timelineData.metadata.loaded_at = new Date().toISOString().replace('T', ' ').slice(0, 19);
+
+        await fs.writeFile(timelinePath, JSON.stringify(timelineData, null, 2));
+        const taskCount = timelineData.cleaners_assignments?.reduce((sum: number, c: any) => sum + (c.tasks?.length || 0), 0) || 0;
+        console.log(`✅ Timeline sincronizzata da MySQL per ${workDate} (${taskCount} task)`);
+      } else {
+        // Nessun dato timeline in MySQL - crea file vuoto con struttura corretta
+        const emptyTimeline = {
+          metadata: { date: workDate, saved_at: new Date().toISOString() },
+          cleaners_assignments: []
+        };
+        await fs.writeFile(timelinePath, JSON.stringify(emptyTimeline, null, 2));
+        console.log(`✅ Inizializzato timeline vuota per ${workDate} (nessun dato MySQL)`);
+      }
+
       // Formatta data/ora per risposta
       const now = new Date();
       const dateObj = new Date(workDate);
