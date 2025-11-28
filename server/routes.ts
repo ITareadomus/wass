@@ -1175,17 +1175,47 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
-      // Gestione selected_cleaners (mantieni logica esistente)
+      // Gestione selected_cleaners - CRITICAL: verifica che la data corrisponda!
       const selectedCleanersPath = path.join(process.cwd(), 'client/public/data/cleaners/selected_cleaners.json');
       try {
         const currentSelectedCleaners = JSON.parse(await fs.readFile(selectedCleanersPath, 'utf8'));
+        const filesystemDate = currentSelectedCleaners?.metadata?.date;
         const currentCleanerCount = currentSelectedCleaners?.cleaners?.length || 0;
-        console.log(`✅ Mantenuti ${currentCleanerCount} selected_cleaners dal filesystem (non sovrascritti da MySQL)`);
+        
+        // CRITICAL: Se la data del filesystem NON corrisponde, usa MySQL
+        if (filesystemDate !== workDate) {
+          console.log(`⚠️ Filesystem ha cleaners per ${filesystemDate}, ma richiesto ${workDate}`);
+          if (selectedCleanersData) {
+            await fs.writeFile(selectedCleanersPath, JSON.stringify(selectedCleanersData, null, 2));
+            const mysqlCleanerCount = selectedCleanersData?.cleaners?.length || 0;
+            console.log(`✅ Selected cleaners aggiornati da MySQL per ${workDate} (${mysqlCleanerCount} cleaners)`);
+          } else {
+            // Nessun dato in MySQL per questa data - crea file vuoto con data corretta
+            const emptyCleaners = {
+              cleaners: [],
+              total_selected: 0,
+              metadata: { date: workDate, saved_at: new Date().toISOString() }
+            };
+            await fs.writeFile(selectedCleanersPath, JSON.stringify(emptyCleaners, null, 2));
+            console.log(`✅ Inizializzato selected_cleaners vuoto per ${workDate} (nuova data)`);
+          }
+        } else {
+          console.log(`✅ Mantenuti ${currentCleanerCount} selected_cleaners dal filesystem per ${workDate}`);
+        }
       } catch (err) {
         // Se il file non esiste, usa quelli di MySQL come fallback
         if (selectedCleanersData) {
           await fs.writeFile(selectedCleanersPath, JSON.stringify(selectedCleanersData, null, 2));
           console.log(`✅ Selected cleaners ripristinati da MySQL (fallback)`);
+        } else {
+          // Crea file vuoto con data corretta
+          const emptyCleaners = {
+            cleaners: [],
+            total_selected: 0,
+            metadata: { date: workDate, saved_at: new Date().toISOString() }
+          };
+          await fs.writeFile(selectedCleanersPath, JSON.stringify(emptyCleaners, null, 2));
+          console.log(`✅ Inizializzato selected_cleaners vuoto per ${workDate}`);
         }
       }
 
