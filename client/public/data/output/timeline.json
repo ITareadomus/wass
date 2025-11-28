@@ -11,10 +11,17 @@
     "modified_by": [
       "Admin"
     ],
-    "last_updated": "2025-11-28T11:06:12.632536"
+    "last_updated": "2025-11-28T11:11:43.751211"
   },
   "cleaners_assignments": [
     {
+      "cleaner": {
+        "id": 249,
+        "name": "Ogbodo Chidi",
+        "role": "Premium",
+        "premium": true,
+        "lastname": "Igwe"
+      },
       "tasks": [
         {
           "lat": "45.4523635",
@@ -148,14 +155,7 @@
           "small_equipment": false,
           "confirmed_operation": false
         }
-      ],
-      "cleaner": {
-        "id": 249,
-        "name": "Ogbodo Chidi",
-        "role": "Premium",
-        "premium": true,
-        "lastname": "Igwe"
-      }
+      ]
     }
   ]
 }
