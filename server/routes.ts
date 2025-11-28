@@ -203,7 +203,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       };
 
       // Salva timeline (dual-write: filesystem + Object Storage)
-      await workspaceFiles.saveTimeline(workDate, emptyTimeline, false, currentUsername);
+      await workspaceFiles.saveTimeline(emptyTimeline, workDate, false, currentUsername, 'reset');
       console.log(`Timeline resettata: timeline.json (struttura corretta)`);
 
       // FORZA la ricreazione di containers.json rieseguendo create_containers.py
@@ -226,7 +226,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // CRITICAL: Forza nuovamente il reset di timeline.json dopo create_containers
       // perché lo script Python potrebbe aver sovrascritto il file
       console.log(`🔄 Forzatura reset timeline.json dopo create_containers...`);
-      await workspaceFiles.saveTimeline(workDate, emptyTimeline, false, currentUsername);
+      await workspaceFiles.saveTimeline(emptyTimeline, workDate, false, currentUsername, 'reset');
       console.log(`✅ Timeline resettata nuovamente dopo create_containers`);
 
       // CRITICAL: Elimina il flag di ultimo salvataggio per evitare ricaricamenti automatici
@@ -1579,9 +1579,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         (sum: number, c: any) => sum + (c.tasks?.length || 0),
         0
       );
-
-      // Get username from request
-      const currentUsername = req.body.modified_by || getCurrentUsername(req);
 
       // Salva timeline (dual-write: filesystem + Object Storage)
       await workspaceFiles.saveTimeline(workDate, timelineData, false, currentUsername);
