@@ -44,10 +44,26 @@ function buildKey(isoDate: string) {
 
 /**
  * Helper function to recalculate travel_time, start_time, end_time for a cleaner's tasks
+ * CRITICAL: Ensures cleaner's start_time is loaded from selected_cleaners.json before recalculation
  */
 async function recalculateCleanerTimes(cleanerData: any): Promise<any> {
   try {
     const { spawn } = await import('child_process');
+
+    // CRITICAL: Load start_time from selected_cleaners.json to ensure it's up-to-date
+    const selectedCleanersPath = path.join(process.cwd(), 'client/public/data/cleaners/selected_cleaners.json');
+    try {
+      const selectedData = JSON.parse(await fs.readFile(selectedCleanersPath, 'utf8'));
+      const selectedCleaner = selectedData.cleaners?.find((c: any) => c.id === cleanerData.cleaner.id);
+      
+      if (selectedCleaner?.start_time) {
+        // Use start_time from selected_cleaners (source of truth)
+        cleanerData.cleaner.start_time = selectedCleaner.start_time;
+        console.log(`✅ Loaded start_time ${selectedCleaner.start_time} from selected_cleaners for cleaner ${cleanerData.cleaner.id}`);
+      }
+    } catch (err) {
+      console.warn(`⚠️ Could not load start_time from selected_cleaners for cleaner ${cleanerData.cleaner.id}, using default`);
+    }
 
     return new Promise((resolve, reject) => {
       const scriptPath = path.join(process.cwd(), 'client/public/scripts/recalculate_times.py');
