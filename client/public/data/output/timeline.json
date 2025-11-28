@@ -8,46 +8,46 @@
   "metadata": {
     "date": "2025-11-28",
     "created_by": "unknown",
-    "last_updated": "2025-11-28 09:41:11",
     "modified_by": [
       "Admin"
-    ]
+    ],
+    "last_updated": "2025-11-28T08:46:07.785865"
   },
   "cleaners_assignments": [
     {
       "tasks": [
         {
-          "task_id": 219536,
-          "logistic_code": 109,
-          "client_id": null,
-          "premium": true,
-          "address": "VIALE MONTENERO 59",
           "lat": "45.45962",
           "lng": "9.2067142",
-          "cleaning_time": 150,
-          "checkin_date": "2025-11-28",
-          "checkout_date": "2025-11-28",
-          "checkin_time": "23:00",
-          "checkout_time": null,
-          "pax_in": 3,
-          "pax_out": 3,
-          "small_equipment": false,
-          "operation_id": 2,
-          "confirmed_operation": true,
-          "straordinaria": false,
-          "type_apt": "C",
           "alias": "TBR",
-          "customer_name": "THE BEST RENT S.r.l.",
+          "pax_in": 3,
+          "address": "VIALE MONTENERO 59",
+          "pax_out": 3,
+          "premium": true,
           "reasons": [
             "manually_moved_to_timeline"
           ],
-          "priority": "high_priority",
-          "start_time": "10:00",
+          "task_id": 219536,
           "end_time": "12:30",
           "followup": false,
+          "priority": "high_priority",
           "sequence": 1,
+          "type_apt": "C",
+          "client_id": 3,
+          "start_time": "10:00",
+          "modified_by": "Admin",
           "travel_time": 0,
-          "modified_by": "Admin"
+          "checkin_date": "2025-11-28",
+          "checkin_time": "23:00",
+          "operation_id": 2,
+          "checkout_date": "2025-11-28",
+          "checkout_time": null,
+          "cleaning_time": 150,
+          "customer_name": "THE BEST RENT S.r.l.",
+          "logistic_code": 109,
+          "straordinaria": false,
+          "small_equipment": false,
+          "confirmed_operation": true
         }
       ],
       "cleaner": {
