@@ -20,6 +20,7 @@ export interface DailyAssignmentRevision {
   containers: any;           // 5
   created_at: Date;          // 6
   created_by?: string;       // 7
+  modified_by?: string;      // 8
 }
 
 /**
@@ -109,7 +110,8 @@ export class DailyAssignmentRevisionsService {
           ? JSON.parse(row.containers) 
           : row.containers,
         created_at: row.created_at,
-        created_by: row.created_by
+        created_by: row.created_by,
+        modified_by: row.modified_by
       }));
     } catch (error) {
       console.error("Error getting all revisions:", error);
@@ -147,7 +149,8 @@ export class DailyAssignmentRevisionsService {
           ? JSON.parse(row.containers) 
           : row.containers,
         created_at: row.created_at,
-        created_by: row.created_by
+        created_by: row.created_by,
+        modified_by: row.modified_by
       };
     } catch (error) {
       console.error("Error getting revision by number:", error);
@@ -189,12 +192,12 @@ export class DailyAssignmentRevisionsService {
         [workDate, timelineJson, selectedCleanersJson, containersJson, nextRevision, createdBy]
       );
 
-      // Insert into history table - ordine: work_date, revision, timeline, selected_cleaners, containers, created_by
+      // Insert into history table - ordine: work_date, revision, timeline, selected_cleaners, containers, created_by, modified_by
       await mysqlDb.execute(
         `INSERT INTO daily_assignments_history 
-         (work_date, revision, timeline, selected_cleaners, containers, created_by) 
-         VALUES (?, ?, ?, ?, ?, ?)`,
-        [workDate, nextRevision, timelineJson, selectedCleanersJson, containersJson, createdBy]
+         (work_date, revision, timeline, selected_cleaners, containers, created_by, modified_by) 
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        [workDate, nextRevision, timelineJson, selectedCleanersJson, containersJson, createdBy, createdBy]
       );
 
       console.log(`✅ Saved revision ${nextRevision} for ${workDate} (current + history, containers: ${containersJson ? 'yes' : 'no'})`);

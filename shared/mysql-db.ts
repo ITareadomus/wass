@@ -86,20 +86,32 @@ export async function initMySQLDatabase() {
           containers JSON,
           created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
           created_by VARCHAR(100) DEFAULT 'system',
+          modified_by VARCHAR(100) DEFAULT 'system',
           INDEX idx_work_date_revision (work_date, revision DESC)
         )
       `);
       console.log("✅ Created table: daily_assignments_history");
     } else {
       // Add containers column if it doesn't exist
-      const [columns] = await connection.execute(`
+      const [containersCol] = await connection.execute(`
         SELECT COLUMN_NAME FROM information_schema.columns 
         WHERE table_schema = ? AND table_name = 'daily_assignments_history' AND column_name = 'containers'
       `, [process.env.DB_NAME]);
       
-      if ((columns as any[]).length === 0) {
+      if ((containersCol as any[]).length === 0) {
         await connection.execute(`ALTER TABLE daily_assignments_history ADD COLUMN containers JSON`);
         console.log("✅ Added containers column to daily_assignments_history");
+      }
+
+      // Add modified_by column if it doesn't exist
+      const [modifiedByCol] = await connection.execute(`
+        SELECT COLUMN_NAME FROM information_schema.columns 
+        WHERE table_schema = ? AND table_name = 'daily_assignments_history' AND column_name = 'modified_by'
+      `, [process.env.DB_NAME]);
+      
+      if ((modifiedByCol as any[]).length === 0) {
+        await connection.execute(`ALTER TABLE daily_assignments_history ADD COLUMN modified_by VARCHAR(100) DEFAULT 'system'`);
+        console.log("✅ Added modified_by column to daily_assignments_history");
       }
     }
     
