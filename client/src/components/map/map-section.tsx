@@ -71,8 +71,9 @@ export default function MapSection({ tasks }: MapSectionProps) {
     return () => clearInterval(checkFilterUpdates);
   }, [filteredCleanerId, filteredTaskId]);
 
-  // Funzione per ottenere il colore del cleaner (basato su ID, non su indice)
+  // Funzione per ottenere il colore del cleaner (IDENTICA a timeline-view.tsx)
   const getCleanerColor = (cleanerId: number) => {
+    // CRITICAL: Stessa palette e stessa logica della timeline per consistenza visiva
     const colors = [
       "#EF4444", "#3B82F6", "#22C55E", "#D946EF", "#F59E0B",
       "#8B5CF6", "#14B8A6", "#F97316", "#6366F1", "#84CC16",
