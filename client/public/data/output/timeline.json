@@ -1,6 +1,6 @@
 {
   "metadata": {
-    "last_updated": "2025-11-28 16:18:59",
+    "last_updated": "2025-11-28 16:20:31",
     "date": "2025-11-28",
     "modification_type": "auto_assign_early_out"
   },
@@ -248,39 +248,6 @@
           "followup": true,
           "sequence": 3,
           "travel_time": 16
-        },
-        {
-          "task_id": 219506,
-          "logistic_code": 619,
-          "client_id": 67,
-          "premium": false,
-          "address": "VIA TORTONA, 10",
-          "lat": "45.4542397",
-          "lng": "9.1686792",
-          "cleaning_time": 40,
-          "checkin_date": "2025-11-28",
-          "checkout_date": "2025-11-28",
-          "checkin_time": null,
-          "checkout_time": "09:30",
-          "pax_in": 2,
-          "pax_out": 0,
-          "small_equipment": false,
-          "operation_id": 2,
-          "confirmed_operation": true,
-          "straordinaria": false,
-          "type_apt": "B",
-          "alias": "EXP",
-          "customer_name": "EXPERIENCE DESIGN BED & SHOW",
-          "reasons": [
-            "checkout_time_eo_window_or_before_start",
-            "automatic_assignment_eo"
-          ],
-          "priority": "early_out",
-          "start_time": "12:39",
-          "end_time": "13:19",
-          "followup": true,
-          "sequence": 4,
-          "travel_time": 7
         }
       ]
     },
@@ -652,11 +619,56 @@
           "travel_time": 0
         }
       ]
+    },
+    {
+      "cleaner": {
+        "id": 249,
+        "name": "Ogbodo Chidi",
+        "lastname": "Igwe",
+        "role": "Premium",
+        "premium": true,
+        "start_time": "10:00"
+      },
+      "tasks": [
+        {
+          "task_id": 219506,
+          "logistic_code": 619,
+          "client_id": 67,
+          "premium": false,
+          "address": "VIA TORTONA, 10",
+          "lat": "45.4542397",
+          "lng": "9.1686792",
+          "cleaning_time": 40,
+          "checkin_date": "2025-11-28",
+          "checkout_date": "2025-11-28",
+          "checkin_time": null,
+          "checkout_time": "09:30",
+          "pax_in": 2,
+          "pax_out": 0,
+          "small_equipment": false,
+          "operation_id": 2,
+          "confirmed_operation": true,
+          "straordinaria": false,
+          "type_apt": "B",
+          "alias": "EXP",
+          "customer_name": "EXPERIENCE DESIGN BED & SHOW",
+          "reasons": [
+            "checkout_time_eo_window_or_before_start",
+            "automatic_assignment_eo"
+          ],
+          "priority": "early_out",
+          "start_time": "10:00",
+          "end_time": "10:40",
+          "followup": false,
+          "sequence": 1,
+          "travel_time": 0
+        }
+      ]
     }
   ],
   "meta": {
     "total_cleaners": 10,
-    "used_cleaners": 10,
+    "used_cleaners": 11,
     "assigned_tasks": 16
   }
 }
