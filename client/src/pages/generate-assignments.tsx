@@ -545,18 +545,47 @@ export default function GenerateAssignments() {
 
         // SOLO date STRETTAMENTE passate sono read-only
         if (isPastDate) {
-          console.log("🔒 Data passata senza assegnazioni - modalità READ-ONLY");
+          console.log("🔒 Data passata senza assegnazioni salvate - NESSUNA ESTRAZIONE");
           setIsTimelineReadOnly(true);
+          
+          // NON estrarre dati per date passate - mostra solo messaggio
+          toast({
+            title: "Nessun dato disponibile",
+            description: `Non ci sono assegnazioni salvate per il ${format(date, "dd/MM/yyyy", { locale: it })}`,
+            variant: "default",
+            duration: 5000,
+          });
+          
+          // Imposta stati vuoti
+          setEarlyOutTasks([]);
+          setHighPriorityTasks([]);
+          setLowPriorityTasks([]);
+          setAllTasksWithAssignments([]);
+          setExtractionStep("Nessun dato per questa data");
+          setIsExtracting(false);
         } else {
-          console.log("✏️ Data presente/futura - modalità EDITABILE");
+          console.log("✏️ Data presente/futura - modalità EDITABILE, estrazione dati...");
           setIsTimelineReadOnly(false);
+          await extractData(date);
         }
-        await extractData(date);
       }
     } catch (error) {
       console.error("Errore nella verifica assegnazioni salvate:", error);
-      // Fallback: procedi con estrazione normale
-      await extractData(date);
+      
+      // Fallback SOLO per date NON passate
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const targetDate = new Date(date);
+      targetDate.setHours(0, 0, 0, 0);
+      
+      if (targetDate >= today) {
+        console.log("Fallback: estrazione per data presente/futura");
+        await extractData(date);
+      } else {
+        console.log("Fallback: data passata, nessuna estrazione");
+        setIsTimelineReadOnly(true);
+        setIsExtracting(false);
+      }
     }
   };
 
