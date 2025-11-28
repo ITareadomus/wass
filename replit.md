@@ -24,11 +24,23 @@ Preferred communication style: Simple, everyday language.
 - **Build System**: ESBuild for production bundling with platform-specific optimizations
 
 ## Data Storage
-- **Database**: PostgreSQL with Neon serverless database integration
+- **Primary Database**: MySQL with mysql2 library for assignment revision storage
+- **Secondary Database**: PostgreSQL with Neon serverless integration (legacy)
 - **ORM**: Drizzle ORM for type-safe database operations and migrations
 - **Schema Design**: Three main entities (tasks, personnel, assignments) with foreign key relationships
 - **Data Validation**: Zod schemas for runtime type checking and API request validation
-- **Memory Storage**: In-memory fallback storage implementation with sample data initialization
+- **Dual-Write Pattern**: Timeline and selected_cleaners saved to both filesystem (for Python scripts) and MySQL (for versioning)
+- **Auto-Save**: All assignment changes are automatically persisted to MySQL with revision tracking
+
+## MySQL Storage Architecture (November 2025)
+- **Table**: `daily_assignment_revisions` with JSON columns for `timeline` and `selected_cleaners`
+- **Versioning**: Automatic revision numbering (revision 1, 2, 3...) per work_date
+- **Connection**: Pooled connections via mysql2/promise with environment variables (DB_HOST, DB_USER, DB_PASSWORD, DB_NAME, DB_PORT)
+- **Files**:
+  - `shared/mysql-db.ts`: Connection pool and initialization
+  - `server/services/daily-assignment-revisions-service.ts`: CRUD operations for revisions
+  - `server/services/workspace-files.ts`: Dual-write logic (filesystem + MySQL)
+- **Deprecated**: Object Storage (`@replit/object-storage`) removed, manual "Conferma Assegnazioni" button removed
 
 ## Authentication & Authorization
 - **Current State**: No authentication system implemented
