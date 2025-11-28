@@ -11,7 +11,7 @@
     "modified_by": [
       "Admin"
     ],
-    "last_updated": "2025-11-28 09:41:11"
+    "last_updated": "2025-11-28T08:55:42.355294"
   },
   "cleaners_assignments": [
     {
@@ -33,7 +33,7 @@
           "priority": "high_priority",
           "sequence": 1,
           "type_apt": "C",
-          "client_id": null,
+          "client_id": 3,
           "start_time": "10:00",
           "modified_by": "Admin",
           "travel_time": 0,
