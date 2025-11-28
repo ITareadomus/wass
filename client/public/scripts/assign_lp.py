@@ -303,7 +303,7 @@ def evaluate_route(cleaner: Cleaner, route: List[Task]) -> Tuple[bool, List[Tupl
     # LOGICA STRAORDINARIE: 3 casistiche
     # 1. Orari non migrati (checkout_dt=None): inizia allo start_time del cleaner (arrival)
     # 2. Checkout migrato PRIMA dello start_time: inizia allo start_time del cleaner (arrival)
-    # 3. Checkout migrato DOPO lo start_time: inizia al checkout
+    # 3. Checkout migrato DOPO dello start_time: inizia al checkout
     if first.straordinaria:
         if hasattr(first, 'checkout_dt') and first.checkout_dt:
             checkout_minutes = first.checkout_dt.hour * 60 + first.checkout_dt.minute
@@ -1288,6 +1288,10 @@ def main():
 
     timeline_data["metadata"]["last_updated"] = dt.now().isoformat()
     timeline_data["metadata"]["date"] = ref_date
+    # Aggiorna metadata
+    timeline_data["metadata"]["last_updated"] = datetime.now().isoformat()
+    timeline_data["metadata"]["date"] = ref_date
+    timeline_data["metadata"]["modification_type"] = "auto_assign_low_priority"
     timeline_data["meta"]["total_cleaners"] = total_available_cleaners
     timeline_data["meta"]["used_cleaners"] = used_cleaners
     timeline_data["meta"]["assigned_tasks"] = sum(

@@ -203,7 +203,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       };
 
       // Salva timeline (dual-write: filesystem + Object Storage)
-      await workspaceFiles.saveTimeline(workDate, emptyTimeline, false, currentUsername, 'reset');
+      await workspaceFiles.saveTimeline(workDate, emptyTimeline, false, currentUsername, 'timeline_reset');
       console.log(`Timeline resettata: timeline.json (struttura corretta)`);
 
       // FORZA la ricreazione di containers.json rieseguendo create_containers.py
@@ -226,7 +226,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // CRITICAL: Forza nuovamente il reset di timeline.json dopo create_containers
       // perché lo script Python potrebbe aver sovrascritto il file
       console.log(`🔄 Forzatura reset timeline.json dopo create_containers...`);
-      await workspaceFiles.saveTimeline(workDate, emptyTimeline, false, currentUsername, 'reset');
+      await workspaceFiles.saveTimeline(workDate, emptyTimeline, false, currentUsername, 'timeline_reset_after_containers');
       console.log(`✅ Timeline resettata nuovamente dopo create_containers`);
 
       // CRITICAL: Elimina il flag di ultimo salvataggio per evitare ricaricamenti automatici
@@ -373,7 +373,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       );
 
       // Salva timeline (dual-write: filesystem + Object Storage)
-      await workspaceFiles.saveTimeline(workDate, timelineData, false, modifyingUser);
+      await workspaceFiles.saveTimeline(workDate, timelineData, false, modifyingUser, 'dnd_between_cleaners');
 
       console.log(`✅ Task ${logisticCode} spostata da cleaner ${sourceCleanerId} a cleaner ${destCleanerId}`);
       res.json({ success: true, message: "Task spostata con successo tra cleaners" });
@@ -545,7 +545,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       );
 
       // Salva timeline (dual-write: filesystem + Object Storage)
-      await workspaceFiles.saveTimeline(workDate, timelineData, false, modifyingUser);
+      await workspaceFiles.saveTimeline(workDate, timelineData, false, modifyingUser, 'swap_cleaners_tasks');
 
       console.log(`✅ Task scambiate tra cleaner ${sourceCleanerId} e cleaner ${destCleanerId}`);
       res.json({
@@ -568,7 +568,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { taskId, cleanerId, logisticCode, date, dropIndex, taskData, priority, modified_by, insertAt, modification_type } = req.body;
       const workDate = date || format(new Date(), 'yyyy-MM-dd');
       const currentUsername = modified_by || getCurrentUsername(req);
-      const modificationType = modification_type || 'task_assigned';
+      const modificationType = modification_type || 'task_assigned_manually';
       const timelinePath = path.join(process.cwd(), 'client/public/data/output/timeline.json');
       const containersPath = path.join(process.cwd(), 'client/public/data/output/containers.json');
 
@@ -982,7 +982,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       );
 
       // Salva timeline usando workspace helper (filesystem + Object Storage)
-      await workspaceFiles.saveTimeline(workDate, assignmentsData, false, modifyingUser);
+      await workspaceFiles.saveTimeline(workDate, assignmentsData, false, modifyingUser, 'task_removed_from_timeline');
 
       // RIPORTA la task nel container corretto
       if (removedTask) {
@@ -1303,7 +1303,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         );
 
         // Salva timeline.json (dual-write: filesystem + Object Storage)
-        await workspaceFiles.saveTimeline(workDate, timelineData, false, currentUsername);
+        await workspaceFiles.saveTimeline(workDate, timelineData, false, currentUsername, 'cleaner_removed_from_selection');
 
         console.log(`✅ Cleaner ${cleanerId} rimosso completamente (nessuna task)`);
         console.log(`   - Rimosso da selected_cleaners.json (${cleanersBefore} -> ${selectedData.cleaners.length})`);
@@ -1581,7 +1581,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       );
 
       // Salva timeline (dual-write: filesystem + Object Storage)
-      await workspaceFiles.saveTimeline(workDate, timelineData, false, currentUsername);
+      await workspaceFiles.saveTimeline(workDate, timelineData, false, currentUsername, replacedCleanerId ? 'cleaner_replaced' : 'cleaner_added_to_timeline');
 
       // Aggiungi il cleaner a selected_cleaners.json (se non già presente)
       const existingCleanerIndex = selectedCleanersData.cleaners.findIndex((c: any) => c.id === cleanerId);
@@ -3441,8 +3441,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const workDate = req.body.date || format(new Date(), 'yyyy-MM-dd'); // Usa la data della richiesta
       timelineData.metadata.date = workDate;
 
+      // Determina modification_type in base alla sorgente e destinazione
+      let modificationType = 'task_moved';
+      if (fromContainer && typeof fromCleanerId !== 'number') {
+        modificationType = `dnd_from_${fromContainer}`;
+      } else if (fromCleanerId === toCleanerId) {
+        modificationType = 'task_reordered_same_cleaner';
+      } else if (typeof fromCleanerId === 'number') {
+        modificationType = 'dnd_between_cleaners';
+      }
+
       // Save the updated timeline
-      const saved = await workspaceFiles.saveTimeline(workDate, timelineData, false, req.body.currentUser?.username || 'unknown');
+      const saved = await workspaceFiles.saveTimeline(workDate, timelineData, false, req.body.currentUser?.username || 'unknown', modificationType);
 
       if (containersData) {
         await workspaceFiles.saveContainers(workDate, containersData);
@@ -3552,7 +3562,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       timelineData.meta.total_cleaners = timelineData.cleaners_assignments.length;
 
       // Salva timeline (dual-write: filesystem + Object Storage)
-      await workspaceFiles.saveTimeline(workDate, timelineData);
+      await workspaceFiles.saveTimeline(workDate, timelineData, false, modifyingUser, 'task_reordered_same_cleaner');
 
       console.log(`✅ Task ${logisticCode} riordinata da posizione ${fromIndex} a ${toIndex} per cleaner ${cleanerId}`);
       console.log(`   Nuova sequenza delle task: ${cleanerEntry.tasks.map((t: any) => `${t.logistic_code}(${t.sequence})`).join(', ')}`);
