@@ -1132,7 +1132,6 @@ def build_output(cleaners: List[Cleaner], unassigned: List[Task], original_tasks
     if len(sys.argv) > 1:
         current_ref_date = sys.argv[1]
     else:
-        from datetime import datetime
         current_ref_date = datetime.now().strftime("%Y-%m-%d")
 
     return {
@@ -1286,8 +1285,6 @@ def main():
     # Conta i cleaners effettivamente usati (con almeno una task)
     used_cleaners = len([c for c in timeline_data["cleaners_assignments"] if len(c.get("tasks", [])) > 0])
 
-    timeline_data["metadata"]["last_updated"] = dt.now().isoformat()
-    timeline_data["metadata"]["date"] = ref_date
     # Aggiorna metadata
     timeline_data["metadata"]["last_updated"] = datetime.now().isoformat()
     timeline_data["metadata"]["date"] = ref_date

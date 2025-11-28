@@ -949,24 +949,19 @@ def main():
     import sys
     if len(sys.argv) > 1:
         ref_date = sys.argv[1]
-        print(f"📅 Usando data da argomento: {ref_date}")
     else:
-        # Fallback: usa la data corrente
         from datetime import datetime
         ref_date = datetime.now().strftime("%Y-%m-%d")
         print(f"📅 Nessuna data specificata, usando: {ref_date}")
 
-    # UPDATE: Aggiungi modification_type al metadata della timeline
-    # Aggiorna metadata
-    timeline_data["metadata"]["last_updated"] = datetime.now().isoformat()
-    timeline_data["metadata"]["date"] = ref_date
-    timeline_data["metadata"]["modification_type"] = "auto_assign_early_out"
-
+    # Update timeline.json con struttura organizzata per cleaner
+    from datetime import datetime as dt
+    timeline_path = OUTPUT_ASSIGN.parent / "timeline.json"
 
     # Carica timeline esistente o crea nuova struttura
     timeline_data_output = {
         "metadata": {
-            "last_updated": datetime.now().isoformat(),
+            "last_updated": dt.now().isoformat(),
             "date": ref_date,
             "modification_type": "auto_assign_early_out" # <-- Aggiornato qui
         },
