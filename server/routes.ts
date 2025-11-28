@@ -2048,13 +2048,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Endpoint per aggiornare i dettagli di una task (checkout, checkin, durata)
   app.post("/api/update-task-details", async (req, res) => {
     try {
-      const { taskId, logisticCode, checkoutDate, checkoutTime, checkinDate, checkinTime, cleaningTime, paxIn, operationId, date } = req.body;
+      const { taskId, logisticCode, checkoutDate, checkoutTime, checkinDate, checkinTime, cleaningTime, paxIn, paxOut, operationId, date, modified_by } = req.body;
 
       if (!taskId && !logisticCode) {
         return res.status(400).json({ success: false, error: "taskId o logisticCode richiesto" });
       }
 
       const workDate = date || format(new Date(), 'yyyy-MM-dd');
+      const currentUsername = modified_by || getCurrentUsername(req);
 
       const containersPath = path.join(process.cwd(), 'client/public/data/output/containers.json');
       const timelinePath = path.join(process.cwd(), 'client/public/data/output/timeline.json');
@@ -2066,18 +2067,63 @@ export async function registerRoutes(app: Express): Promise<Server> {
       ]);
 
       let taskUpdated = false;
+      let editedFields: string[] = [];
+      let oldValues: string[] = [];
+      let newValues: string[] = [];
 
       // Funzione helper per aggiornare una task - SOLO i campi forniti
+      // Traccia anche le modifiche per la history
       const updateTask = (task: any) => {
         if (String(task.task_id) === String(taskId) || String(task.logistic_code) === String(logisticCode)) {
-          // Aggiorna SOLO i campi che sono definiti nella richiesta
-          if (checkoutDate !== undefined) task.checkout_date = checkoutDate;
-          if (checkoutTime !== undefined) task.checkout_time = checkoutTime;
-          if (checkinDate !== undefined) task.checkin_date = checkinDate;
-          if (checkinTime !== undefined) task.checkin_time = checkinTime;
-          if (cleaningTime !== undefined) task.cleaning_time = cleaningTime;
-          if (paxIn !== undefined) task.pax_in = paxIn;
-          if (operationId !== undefined) task.operation_id = operationId;
+          // Traccia le modifiche prima di applicarle
+          if (checkoutDate !== undefined && task.checkout_date !== checkoutDate) {
+            editedFields.push('checkout_date');
+            oldValues.push(String(task.checkout_date ?? 'null'));
+            newValues.push(String(checkoutDate));
+            task.checkout_date = checkoutDate;
+          }
+          if (checkoutTime !== undefined && task.checkout_time !== checkoutTime) {
+            editedFields.push('checkout_time');
+            oldValues.push(String(task.checkout_time ?? 'null'));
+            newValues.push(String(checkoutTime));
+            task.checkout_time = checkoutTime;
+          }
+          if (checkinDate !== undefined && task.checkin_date !== checkinDate) {
+            editedFields.push('checkin_date');
+            oldValues.push(String(task.checkin_date ?? 'null'));
+            newValues.push(String(checkinDate));
+            task.checkin_date = checkinDate;
+          }
+          if (checkinTime !== undefined && task.checkin_time !== checkinTime) {
+            editedFields.push('checkin_time');
+            oldValues.push(String(task.checkin_time ?? 'null'));
+            newValues.push(String(checkinTime));
+            task.checkin_time = checkinTime;
+          }
+          if (cleaningTime !== undefined && task.cleaning_time !== cleaningTime) {
+            editedFields.push('cleaning_time');
+            oldValues.push(String(task.cleaning_time ?? 'null'));
+            newValues.push(String(cleaningTime));
+            task.cleaning_time = cleaningTime;
+          }
+          if (paxIn !== undefined && task.pax_in !== paxIn) {
+            editedFields.push('pax_in');
+            oldValues.push(String(task.pax_in ?? 'null'));
+            newValues.push(String(paxIn));
+            task.pax_in = paxIn;
+          }
+          if (paxOut !== undefined && task.pax_out !== paxOut) {
+            editedFields.push('pax_out');
+            oldValues.push(String(task.pax_out ?? 'null'));
+            newValues.push(String(paxOut));
+            task.pax_out = paxOut;
+          }
+          if (operationId !== undefined && task.operation_id !== operationId) {
+            editedFields.push('operation_id');
+            oldValues.push(String(task.operation_id ?? 'null'));
+            newValues.push(String(operationId));
+            task.operation_id = operationId;
+          }
           taskUpdated = true;
           return true;
         }
@@ -2107,11 +2153,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ success: false, error: "Task non trovata" });
       }
 
-      // Salva entrambi i file (dual-write: filesystem + Object Storage)
-      await Promise.all([
-        workspaceFiles.saveContainers(workDate, containersData),
-        workspaceFiles.saveTimeline(workDate, timelineData)
-      ]);
+      // Prepara opzioni di tracking per MySQL history
+      const editOptions = editedFields.length > 0 ? {
+        editedField: editedFields.join(', '),
+        oldValue: oldValues.join(', '),
+        newValue: newValues.join(', ')
+      } : undefined;
+
+      // Salva containers (filesystem + MySQL)
+      await workspaceFiles.saveContainers(workDate, containersData);
+      
+      // Salva timeline con tracking delle modifiche (skipRevision=false per creare revision in MySQL)
+      await workspaceFiles.saveTimeline(workDate, timelineData, false, currentUsername, 'task_edit', editOptions);
 
       // CRITICAL: Propaga le modifiche al database MySQL (wass_housekeeping)
       if (taskId) {
