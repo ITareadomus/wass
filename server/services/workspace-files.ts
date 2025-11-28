@@ -242,11 +242,21 @@ export async function saveContainers(workDate: string, data: any): Promise<boole
 
 /**
  * Load selected_cleaners from filesystem only (helper)
+ * CRITICAL: Verifica che la data nel file corrisponda a workDate
  */
 async function loadSelectedCleanersFromFile(workDate: string): Promise<any | null> {
   try {
     const data = await fs.readFile(PATHS.selectedCleaners, 'utf-8');
-    return JSON.parse(data);
+    const parsed = JSON.parse(data);
+    
+    // CRITICAL: Verifica che la data corrisponda
+    const fileDate = parsed?.metadata?.date;
+    if (fileDate && fileDate !== workDate) {
+      console.log(`⚠️ loadSelectedCleanersFromFile: file ha data ${fileDate}, richiesta ${workDate} - ignorato`);
+      return null;
+    }
+    
+    return parsed;
   } catch (err) {
     return null;
   }
