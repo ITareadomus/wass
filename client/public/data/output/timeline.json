@@ -1,13 +1,62 @@
 {
-  "metadata": {
-    "last_updated": "2025-11-28 10:00:53",
-    "date": "2025-11-30",
-    "created_by": "Admin"
-  },
-  "cleaners_assignments": [],
   "meta": {
-    "total_cleaners": 0,
+    "total_tasks": 1,
     "used_cleaners": 0,
-    "assigned_tasks": 0
-  }
+    "assigned_tasks": 0,
+    "total_cleaners": 1
+  },
+  "metadata": {
+    "date": "2025-11-28",
+    "created_by": "unknown",
+    "modified_by": [
+      "Admin"
+    ],
+    "last_updated": "2025-11-28T09:01:19.228095"
+  },
+  "cleaners_assignments": [
+    {
+      "tasks": [
+        {
+          "lat": "45.45962",
+          "lng": "9.2067142",
+          "alias": "TBR",
+          "pax_in": 3,
+          "address": "VIALE MONTENERO 59",
+          "pax_out": 3,
+          "premium": true,
+          "reasons": [
+            "manually_moved_to_timeline"
+          ],
+          "task_id": 219536,
+          "end_time": "12:30",
+          "followup": false,
+          "priority": "high_priority",
+          "sequence": 1,
+          "type_apt": "C",
+          "client_id": 3,
+          "start_time": "10:00",
+          "modified_by": "Admin",
+          "travel_time": 0,
+          "checkin_date": "2025-11-28",
+          "checkin_time": "23:00",
+          "operation_id": 2,
+          "checkout_date": "2025-11-28",
+          "checkout_time": null,
+          "cleaning_time": 150,
+          "customer_name": "THE BEST RENT S.r.l.",
+          "logistic_code": 109,
+          "straordinaria": false,
+          "small_equipment": false,
+          "confirmed_operation": true
+        }
+      ],
+      "cleaner": {
+        "id": 626,
+        "name": "DORA PATRICIA",
+        "role": "Formatore",
+        "premium": false,
+        "lastname": "JIMENEZ"
+      }
+    }
+  ]
 }
