@@ -1227,6 +1227,19 @@ export default function GenerateAssignments() {
       }
 
       const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+      
+      // Determina modificationType in base al contesto del drag
+      let modificationType = 'task_assigned';
+      if (fromContainerJson) {
+        if (fromContainerJson === 'early-out') {
+          modificationType = 'dnd_from_early_out';
+        } else if (fromContainerJson === 'high') {
+          modificationType = 'dnd_from_high_priority';
+        } else if (fromContainerJson === 'low') {
+          modificationType = 'dnd_from_low_priority';
+        }
+      }
+      
       const response = await fetch("/api/save-timeline-assignment", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -1238,7 +1251,8 @@ export default function GenerateAssignments() {
           taskData: task,
           priority: priority,
           date: dateStr,
-          modified_by: currentUser.username || 'unknown'
+          modified_by: currentUser.username || 'unknown',
+          modification_type: modificationType
         }),
       });
       if (!response.ok) {
@@ -1254,10 +1268,20 @@ export default function GenerateAssignments() {
   const reorderTimelineAssignment = async (taskId: string, cleanerId: number, logisticCode: string, fromIndex: number, toIndex: number) => {
     try {
       const dateStr = format(selectedDate, "yyyy-MM-dd");
+      const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
       const response = await fetch('/api/reorder-timeline', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ date: dateStr, cleanerId, taskId, logisticCode, fromIndex, toIndex }),
+        body: JSON.stringify({ 
+          date: dateStr, 
+          cleanerId, 
+          taskId, 
+          logisticCode, 
+          fromIndex, 
+          toIndex,
+          modified_by: currentUser.username || 'unknown',
+          modification_type: 'dnd_reorder_same_cleaner'
+        }),
       });
       if (!response.ok) {
         const errorData = await response.json();
@@ -1663,6 +1687,16 @@ export default function GenerateAssignments() {
         console.log(`🔄 Spostamento da container ${fromContainerJson} a cleaner ${toCleanerId}`);
 
         try {
+          // Determina il tipo di modifica in base al container di origine
+          let modificationType = 'dnd_from_container';
+          if (fromContainerJson === 'early-out') {
+            modificationType = 'dnd_from_early_out';
+          } else if (fromContainerJson === 'high') {
+            modificationType = 'dnd_from_high_priority';
+          } else if (fromContainerJson === 'low') {
+            modificationType = 'dnd_from_low_priority';
+          }
+
           // Carica i dati del cleaner per mostrare nome e cognome
           const cleanersResponse = await fetch(`/data/cleaners/selected_cleaners.json?t=${Date.now()}`, {
             cache: 'no-store',
