@@ -95,14 +95,16 @@ export async function loadTimeline(workDate: string): Promise<any | null> {
  * Save timeline for a specific work date
  * Writes to filesystem always (for Python scripts)
  * Writes to MySQL only for today/future dates
+ * @param workDate - The work date (YYYY-MM-DD)
+ * @param data - Timeline data object
  * @param skipRevision - If true, only saves to filesystem without creating a MySQL revision
  *                       Use this for intermediate saves to avoid multiple revisions for a single user action
  * @param createdBy - Username of the user making the change (default: 'system')
  * @param modificationType - Type of modification (e.g., 'manual', 'reset', 'dnd', 'task_assigned', 'task_removed', etc.)
  */
 export async function saveTimeline(
-  data: any,
-  workDate: string, 
+  workDate: string,
+  data: any, 
   skipRevision: boolean = false,
   createdBy: string = 'system',
   modificationType: string = 'manual'
