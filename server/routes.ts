@@ -565,9 +565,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Endpoint per salvare un'assegnazione nella timeline
   app.post("/api/save-timeline-assignment", async (req, res) => {
     try {
-      const { taskId, cleanerId, logisticCode, date, dropIndex, taskData, priority, modified_by, insertAt } = req.body;
+      const { taskId, cleanerId, logisticCode, date, dropIndex, taskData, priority, modified_by, insertAt, modification_type } = req.body;
       const workDate = date || format(new Date(), 'yyyy-MM-dd');
       const currentUsername = modified_by || getCurrentUsername(req);
+      const modificationType = modification_type || 'task_assigned';
       const timelinePath = path.join(process.cwd(), 'client/public/data/output/timeline.json');
       const containersPath = path.join(process.cwd(), 'client/public/data/output/containers.json');
 
@@ -852,7 +853,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       );
 
       // Salva timeline usando workspace helper (scrive su filesystem + Object Storage)
-      await workspaceFiles.saveTimeline(workDate, timelineData, false, modifyingUserFromRequest);
+      await workspaceFiles.saveTimeline(workDate, timelineData, false, modifyingUserFromRequest, modificationType);
 
       // RIMUOVI SEMPRE la task da containers.json quando salvata in timeline
       if (containersData && containersData.containers) {
