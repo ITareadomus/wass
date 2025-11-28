@@ -38,7 +38,7 @@
       "ranking": 0,
       "lastname": "CARDENAS OLAYA",
       "available": true,
-      "start_time": null,
+      "start_time": "09:00",
       "telegram_id": null,
       "counter_days": 4,
       "contract_type": "a chiamata",
@@ -66,6 +66,7 @@
   "total_selected": 3,
   "metadata": {
     "date": "2025-11-30",
-    "loaded_at": "2025-11-28 13:27:07"
+    "loaded_at": "2025-11-28 13:28:00",
+    "last_updated": "2025-11-28 14:28:08"
   }
 }

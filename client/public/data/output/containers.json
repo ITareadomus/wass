@@ -1,11 +1,65 @@
 {
   "metadata": {
-    "last_updated": "2025-11-28T13:27:07.523395",
+    "last_updated": "2025-11-28T13:28:45.183249",
     "date": "2025-11-30"
   },
   "containers": {
     "early_out": {
       "tasks": [
+        {
+          "task_id": 219438,
+          "logistic_code": 1640,
+          "client_id": 87,
+          "premium": false,
+          "address": "VIA EUGENIO MONTALE 12",
+          "lat": "45.488914",
+          "lng": "9.1167004",
+          "cleaning_time": 150,
+          "checkin_date": "2025-12-07",
+          "checkout_date": "2025-11-30",
+          "checkin_time": "15:00",
+          "checkout_time": null,
+          "pax_in": 6,
+          "pax_out": 5,
+          "small_equipment": false,
+          "operation_id": 2,
+          "confirmed_operation": false,
+          "straordinaria": false,
+          "type_apt": "D",
+          "alias": "HCC",
+          "customer_name": "HACCA SRL",
+          "reasons": [
+            "client_forced_eo"
+          ],
+          "priority": "early_out"
+        },
+        {
+          "task_id": 219443,
+          "logistic_code": 1622,
+          "client_id": 61,
+          "premium": false,
+          "address": "Viale Certosa 61",
+          "lat": "45.491214",
+          "lng": "9.1485422",
+          "cleaning_time": 90,
+          "checkin_date": "2025-12-06",
+          "checkout_date": "2025-11-30",
+          "checkin_time": null,
+          "checkout_time": null,
+          "pax_in": 2,
+          "pax_out": 1,
+          "small_equipment": false,
+          "operation_id": 2,
+          "confirmed_operation": false,
+          "straordinaria": false,
+          "type_apt": "B",
+          "alias": "NTM",
+          "customer_name": "NOTA-MI",
+          "reasons": [
+            "client_forced_eo"
+          ],
+          "priority": "early_out"
+        },
         {
           "task_id": 219451,
           "logistic_code": 1381,
@@ -26,6 +80,60 @@
           "confirmed_operation": false,
           "straordinaria": false,
           "type_apt": "B",
+          "alias": "NTM",
+          "customer_name": "NOTA-MI",
+          "reasons": [
+            "client_forced_eo"
+          ],
+          "priority": "early_out"
+        },
+        {
+          "task_id": 219452,
+          "logistic_code": 1649,
+          "client_id": 87,
+          "premium": true,
+          "address": "PIAZZA GRAMSCI 10",
+          "lat": "45.4822754",
+          "lng": "9.1688625",
+          "cleaning_time": 120,
+          "checkin_date": "2025-12-07",
+          "checkout_date": "2025-11-30",
+          "checkin_time": null,
+          "checkout_time": null,
+          "pax_in": 2,
+          "pax_out": 4,
+          "small_equipment": false,
+          "operation_id": 2,
+          "confirmed_operation": false,
+          "straordinaria": false,
+          "type_apt": "C",
+          "alias": "HCC",
+          "customer_name": "HACCA SRL",
+          "reasons": [
+            "client_forced_eo"
+          ],
+          "priority": "early_out"
+        },
+        {
+          "task_id": 219457,
+          "logistic_code": 584,
+          "client_id": 61,
+          "premium": false,
+          "address": "VIA DEL TURCHINO 25",
+          "lat": "45.4523635",
+          "lng": "9.2287281",
+          "cleaning_time": 60,
+          "checkin_date": "2025-12-07",
+          "checkout_date": "2025-11-30",
+          "checkin_time": "15:00",
+          "checkout_time": null,
+          "pax_in": 1,
+          "pax_out": 2,
+          "small_equipment": true,
+          "operation_id": 2,
+          "confirmed_operation": false,
+          "straordinaria": false,
+          "type_apt": "A",
           "alias": "NTM",
           "customer_name": "NOTA-MI",
           "reasons": [
@@ -329,9 +437,36 @@
             "checkout_time_eo_window_or_before_start"
           ],
           "priority": "early_out"
+        },
+        {
+          "task_id": 219511,
+          "logistic_code": 1677,
+          "client_id": 67,
+          "premium": false,
+          "address": "VIA TORTONA, 10",
+          "lat": "45.454499",
+          "lng": "9.169332",
+          "cleaning_time": 40,
+          "checkin_date": "2025-11-30",
+          "checkout_date": "2025-11-30",
+          "checkin_time": null,
+          "checkout_time": "09:30",
+          "pax_in": 1,
+          "pax_out": 0,
+          "small_equipment": false,
+          "operation_id": 2,
+          "confirmed_operation": true,
+          "straordinaria": false,
+          "type_apt": "B",
+          "alias": "EXP",
+          "customer_name": "EXPERIENCE DESIGN BED & SHOW",
+          "reasons": [
+            "checkout_time_eo_window_or_before_start"
+          ],
+          "priority": "early_out"
         }
       ],
-      "count": 12
+      "count": 17
     },
     "high_priority": {
       "tasks": [
@@ -1180,8 +1315,8 @@
     }
   },
   "summary": {
-    "total_tasks": 42,
-    "early_out": 12,
+    "total_tasks": 47,
+    "early_out": 17,
     "high_priority": 11,
     "low_priority": 19
   }
