@@ -7,7 +7,8 @@ export interface DailyAssignmentCurrent {
   selected_cleaners: any;    // 3
   containers: any;           // 4
   last_revision: number;     // 5
-  updated_at: Date;          // 6
+  created_by?: string;       // 6
+  updated_at: Date;          // 7
 }
 
 export interface DailyAssignmentRevision {
@@ -55,6 +56,7 @@ export class DailyAssignmentRevisionsService {
           ? JSON.parse(row.containers) 
           : row.containers,
         last_revision: row.last_revision,
+        created_by: row.created_by,
         updated_at: row.updated_at
       };
     } catch (error) {
@@ -173,18 +175,18 @@ export class DailyAssignmentRevisionsService {
       const current = await this.getCurrent(workDate);
       const nextRevision = current ? current.last_revision + 1 : 1;
 
-      // Update current table (UPSERT) - ordine colonne: work_date, timeline, selected_cleaners, containers, last_revision
+      // Update current table (UPSERT) - ordine colonne: work_date, timeline, selected_cleaners, containers, last_revision, created_by
       await mysqlDb.execute(
         `INSERT INTO daily_assignments_current 
-         (work_date, timeline, selected_cleaners, containers, last_revision) 
-         VALUES (?, ?, ?, ?, ?)
+         (work_date, timeline, selected_cleaners, containers, last_revision, created_by) 
+         VALUES (?, ?, ?, ?, ?, ?)
          ON DUPLICATE KEY UPDATE 
            timeline = VALUES(timeline),
            selected_cleaners = VALUES(selected_cleaners),
            containers = VALUES(containers),
            last_revision = VALUES(last_revision),
            updated_at = CURRENT_TIMESTAMP`,
-        [workDate, timelineJson, selectedCleanersJson, containersJson, nextRevision]
+        [workDate, timelineJson, selectedCleanersJson, containersJson, nextRevision, createdBy]
       );
 
       // Insert into history table - ordine: work_date, revision, timeline, selected_cleaners, containers, created_by

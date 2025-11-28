@@ -45,20 +45,32 @@ export async function initMySQLDatabase() {
           selected_cleaners JSON,
           containers JSON,
           last_revision INT DEFAULT 0,
+          created_by VARCHAR(100) DEFAULT 'system',
           updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
         )
       `);
       console.log("✅ Created table: daily_assignments_current");
     } else {
       // Add containers column if it doesn't exist
-      const [columns] = await connection.execute(`
+      const [containersCol] = await connection.execute(`
         SELECT COLUMN_NAME FROM information_schema.columns 
         WHERE table_schema = ? AND table_name = 'daily_assignments_current' AND column_name = 'containers'
       `, [process.env.DB_NAME]);
       
-      if ((columns as any[]).length === 0) {
+      if ((containersCol as any[]).length === 0) {
         await connection.execute(`ALTER TABLE daily_assignments_current ADD COLUMN containers JSON`);
         console.log("✅ Added containers column to daily_assignments_current");
+      }
+
+      // Add created_by column if it doesn't exist
+      const [createdByCol] = await connection.execute(`
+        SELECT COLUMN_NAME FROM information_schema.columns 
+        WHERE table_schema = ? AND table_name = 'daily_assignments_current' AND column_name = 'created_by'
+      `, [process.env.DB_NAME]);
+      
+      if ((createdByCol as any[]).length === 0) {
+        await connection.execute(`ALTER TABLE daily_assignments_current ADD COLUMN created_by VARCHAR(100) DEFAULT 'system'`);
+        console.log("✅ Added created_by column to daily_assignments_current");
       }
     }
     
