@@ -2,7 +2,7 @@ import * as fs from 'fs/promises';
 import path from 'path';
 import { dailyAssignmentRevisionsService } from './daily-assignment-revisions-service';
 import { format } from 'date-fns';
-import { utcToZonedTime } from 'date-fns-tz';
+import { toZonedTime } from 'date-fns-tz';
 
 /**
  * Workspace Files Helper
@@ -25,7 +25,7 @@ const TIMEZONE = 'Europe/Rome';
 // Helper per ottenere timestamp nel timezone di Roma
 function getRomeTimestamp(): string {
   const now = new Date();
-  const romeTime = utcToZonedTime(now, TIMEZONE);
+  const romeTime = toZonedTime(now, TIMEZONE);
   return format(romeTime, "yyyy-MM-dd HH:mm:ss");
 }
 
