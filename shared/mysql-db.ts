@@ -17,22 +17,21 @@ export async function initMySQLDatabase() {
   try {
     const connection = await pool.getConnection();
     
-    await connection.execute(`
-      CREATE TABLE IF NOT EXISTS daily_assignment_revisions (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        work_date DATE NOT NULL,
-        revision INT NOT NULL,
-        selected_cleaners JSON NOT NULL,
-        timeline JSON NOT NULL,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        INDEX idx_work_date (work_date),
-        INDEX idx_work_date_revision (work_date, revision)
-      )
-    `);
+    // Verifica che la tabella esista (è già stata creata dall'utente)
+    const [rows] = await connection.execute(`
+      SELECT COUNT(*) as count FROM information_schema.tables 
+      WHERE table_schema = ? AND table_name = 'daily_assignment_revisions'
+    `, [process.env.DB_NAME]);
     
     connection.release();
-    console.log("✅ MySQL database initialized - daily_assignment_revisions table ready");
-    return true;
+    
+    const tableExists = (rows as any)[0].count > 0;
+    if (tableExists) {
+      console.log("✅ MySQL connected - daily_assignment_revisions table found");
+    } else {
+      console.warn("⚠️ Table daily_assignment_revisions not found - please create it manually");
+    }
+    return tableExists;
   } catch (error) {
     console.error("❌ MySQL initialization error:", error);
     return false;
