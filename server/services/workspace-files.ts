@@ -1,8 +1,7 @@
 import * as fs from 'fs/promises';
 import path from 'path';
 import { dailyAssignmentRevisionsService } from './daily-assignment-revisions-service';
-import { format } from 'date-fns';
-import { toZonedTime } from 'date-fns-tz';
+import { formatInTimeZone } from 'date-fns-tz';
 
 /**
  * Workspace Files Helper
@@ -24,9 +23,7 @@ const TIMEZONE = 'Europe/Rome';
 
 // Helper per ottenere timestamp nel timezone di Roma
 function getRomeTimestamp(): string {
-  const now = new Date();
-  const romeTime = toZonedTime(now, TIMEZONE);
-  return format(romeTime, "yyyy-MM-dd HH:mm:ss");
+  return formatInTimeZone(new Date(), TIMEZONE, "yyyy-MM-dd HH:mm:ss");
 }
 
 
@@ -89,9 +86,21 @@ export async function saveTimeline(workDate: string, data: any): Promise<boolean
     await atomicWriteJson(PATHS.timeline, data);
     console.log(`✅ Timeline saved to filesystem for ${workDate}`);
 
-    // Get current selected_cleaners and create new revision in MySQL
+    // Get current selected_cleaners
     const selected = await loadSelectedCleanersFromFile(workDate);
-    await dailyAssignmentRevisionsService.createRevision(workDate, data, selected?.cleaners || []);
+    const cleanersArray = selected?.cleaners || [];
+    
+    // CRITICAL: Non creare revisione se timeline E cleaners sono vuoti
+    const hasAssignments = data.cleaners_assignments && data.cleaners_assignments.length > 0;
+    const hasCleaners = cleanersArray.length > 0;
+    
+    if (!hasAssignments && !hasCleaners) {
+      console.log(`⏭️ Saltata creazione revisione MySQL per ${workDate} (nessun dato significativo)`);
+      return true;
+    }
+
+    // Create new revision in MySQL
+    await dailyAssignmentRevisionsService.createRevision(workDate, data, cleanersArray);
     console.log(`✅ Timeline revision created in MySQL for ${workDate}`);
 
     return true;
@@ -204,7 +213,7 @@ export async function saveSelectedCleaners(workDate: string, data: any): Promise
     await atomicWriteJson(PATHS.selectedCleaners, data);
     console.log(`✅ Selected cleaners saved to filesystem for ${workDate}`);
 
-    // Get current timeline and create new revision in MySQL
+    // Get current timeline
     let timeline = null;
     try {
       const timelineData = await fs.readFile(PATHS.timeline, 'utf-8');
@@ -214,6 +223,17 @@ export async function saveSelectedCleaners(workDate: string, data: any): Promise
     }
 
     const cleanersArray = data.cleaners || [];
+    
+    // CRITICAL: Non creare revisione se cleaners E timeline sono vuoti
+    const hasCleaners = cleanersArray.length > 0;
+    const hasAssignments = timeline?.cleaners_assignments && timeline.cleaners_assignments.length > 0;
+    
+    if (!hasCleaners && !hasAssignments) {
+      console.log(`⏭️ Saltata creazione revisione MySQL per ${workDate} (nessun dato significativo)`);
+      return true;
+    }
+
+    // Create new revision in MySQL
     await dailyAssignmentRevisionsService.createRevision(workDate, timeline, cleanersArray);
     console.log(`✅ Selected cleaners revision created in MySQL for ${workDate}`);
 
