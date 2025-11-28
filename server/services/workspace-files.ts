@@ -27,6 +27,24 @@ function getRomeTimestamp(): string {
 }
 
 /**
+ * Normalize a cleaner object with correct field ordering
+ */
+function getNormalizedCleaner(cleaner: any): any {
+  if (!cleaner) return cleaner;
+  
+  const normalizedCleaner: any = {};
+  
+  if (cleaner.id !== undefined) normalizedCleaner.id = cleaner.id;
+  if (cleaner.name !== undefined) normalizedCleaner.name = cleaner.name;
+  if (cleaner.lastname !== undefined) normalizedCleaner.lastname = cleaner.lastname;
+  if (cleaner.role !== undefined) normalizedCleaner.role = cleaner.role;
+  if (cleaner.premium !== undefined) normalizedCleaner.premium = cleaner.premium;
+  if (cleaner.start_time !== undefined) normalizedCleaner.start_time = cleaner.start_time;
+  
+  return normalizedCleaner;
+}
+
+/**
  * Normalize a single task object with correct field ordering
  * Also removes the modified_by field as it's tracked in metadata
  */
@@ -112,10 +130,10 @@ function getNormalizedTimeline(timelineData: any): any {
     // Create brand new object with explicit key ordering
     const normalized: any = {};
     
-    // 1. Add cleaner first
-    normalized.cleaner = entry.cleaner || null;
+    // 1. Add cleaner first (with normalized field order)
+    normalized.cleaner = getNormalizedCleaner(entry.cleaner);
     
-    // 2. Add tasks second with normalized field order
+    // 2. Add tasks second (with normalized field order)
     normalized.tasks = (entry.tasks || []).map((task: any) => getNormalizedTask(task));
     
     return normalized;
