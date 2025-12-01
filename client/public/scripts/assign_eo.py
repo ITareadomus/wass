@@ -1104,15 +1104,43 @@ def main():
                     "address": last_existing.get("address")
                 }
             
+            # Ottieni lo start_time del cleaner in minuti
+            cleaner_start = (
+                (existing_entry.get("cleaner") or {}).get("start_time")
+                or cleaner_entry["cleaner"].get("start_time")
+                or "10:00"
+            )
+            cleaner_start_min = hhmm_to_min(cleaner_start, default="10:00")
+            
             for idx, t in enumerate(new_tasks_sorted):
                 seq += 1
 
-                # Evita sovrapposizioni: non puoi iniziare prima della fine della precedente
-                proposed_start = t.get("start_time") or "00:00"
-                start_min = max(
-                    last_end_min,
-                    hhmm_to_min(proposed_start, default="00:00"),
-                )
+                # STRAORDINARIE: possono iniziare dallo start_time del cleaner
+                # Rispettano checkout_time se maggiore
+                is_straordinaria = t.get("straordinaria", False)
+                
+                if is_straordinaria:
+                    # Straordinaria: parte dallo start_time del cleaner (o dalla fine della precedente)
+                    # Rispetta checkout_time se presente e maggiore
+                    checkout_str = t.get("checkout_time")
+                    if checkout_str:
+                        checkout_min = hhmm_to_min(checkout_str, default="00:00")
+                        # Può iniziare PRIMA delle 10:00 se il cleaner ha start_time < 10:00
+                        start_min = max(cleaner_start_min, checkout_min)
+                    else:
+                        # Nessun checkout: usa lo start_time del cleaner
+                        start_min = cleaner_start_min
+                    
+                    # Se c'è una task precedente che finisce dopo, aspetta
+                    if last_end_min > start_min:
+                        start_min = last_end_min
+                else:
+                    # Task normale: rispetta vincoli EO
+                    proposed_start = t.get("start_time") or "00:00"
+                    start_min = max(
+                        last_end_min,
+                        hhmm_to_min(proposed_start, default="00:00"),
+                    )
                 end_min = start_min + int(t.get("cleaning_time") or 0)
 
                 # CRITICAL: Rispetta vincolo di check-in PRIMA di salvare gli orari
