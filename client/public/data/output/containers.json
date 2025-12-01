@@ -1,6 +1,6 @@
 {
   "metadata": {
-    "last_updated": "2025-12-01T14:05:20.578390",
+    "last_updated": "2025-12-01T14:09:48.408957",
     "date": "2025-12-01"
   },
   "containers": {
@@ -149,34 +149,6 @@
           "priority": "high_priority"
         },
         {
-          "task_id": 219589,
-          "logistic_code": 1656,
-          "client_id": 101,
-          "premium": true,
-          "address": "VIA LARGO GALLARATI SCOTTI 1",
-          "lat": "45.4595833",
-          "lng": "9.182798",
-          "cleaning_time": 300,
-          "checkin_date": "2025-12-01",
-          "checkout_date": "2025-12-01",
-          "checkin_time": "15:00",
-          "checkout_time": "12:00",
-          "pax_in": 4,
-          "pax_out": 2,
-          "small_equipment": false,
-          "operation_id": 3,
-          "confirmed_operation": true,
-          "straordinaria": true,
-          "type_apt": "C",
-          "alias": "CO99",
-          "customer_name": "CO99",
-          "reasons": [
-            "same_day_checkin_between_hp_start_hp_end",
-            "premium"
-          ],
-          "priority": "high_priority"
-        },
-        {
           "task_id": 219637,
           "logistic_code": 628,
           "client_id": 3,
@@ -250,33 +222,6 @@
           "confirmed_operation": true,
           "straordinaria": false,
           "type_apt": "B",
-          "alias": "TBR",
-          "customer_name": "THE BEST RENT S.r.l.",
-          "reasons": [
-            "premium"
-          ],
-          "priority": "high_priority"
-        },
-        {
-          "task_id": 219640,
-          "logistic_code": 1537,
-          "client_id": 3,
-          "premium": true,
-          "address": "Via dei Piatti, 4 20123 (MI)",
-          "lat": "45.460795",
-          "lng": "9.1850985",
-          "cleaning_time": 150,
-          "checkin_date": "2025-12-01",
-          "checkout_date": "2025-12-01",
-          "checkin_time": "16:00",
-          "checkout_time": null,
-          "pax_in": 2,
-          "pax_out": 2,
-          "small_equipment": false,
-          "operation_id": 2,
-          "confirmed_operation": true,
-          "straordinaria": false,
-          "type_apt": "C",
           "alias": "TBR",
           "customer_name": "THE BEST RENT S.r.l.",
           "reasons": [
@@ -420,7 +365,7 @@
           "priority": "high_priority"
         }
       ],
-      "count": 15
+      "count": 13
     },
     "low_priority": {
       "tasks": [
@@ -877,9 +822,9 @@
     }
   },
   "summary": {
-    "total_tasks": 31,
+    "total_tasks": 29,
     "early_out": 0,
-    "high_priority": 15,
+    "high_priority": 13,
     "low_priority": 16
   }
 }
