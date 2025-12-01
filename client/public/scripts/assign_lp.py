@@ -102,7 +102,7 @@ class Cleaner:
     last_lng: Optional[float] = None
     last_sequence: int = 0
     route: List[Task] = field(default_factory=list)
-    total_daily_tasks: int = 0  # Totale task giornaliere (EO + HP)
+    total_daily_tasks: int = 0  # Totale task giornaliere (EO + HP + LP)
 
 
 # -------- Utils --------
@@ -323,7 +323,7 @@ def evaluate_route(cleaner: Cleaner, route: List[Task]) -> Tuple[bool, List[Tupl
 
     finish = start + first.cleaning_time
 
-    # CRITICAL: Check-in strict - deve finire prima del check-in
+    # NUOVO: Check-in strict - deve finire prima del check-in
     # SOLO se il check-in è OGGI (stesso giorno del checkout)
     if hasattr(first, 'checkin_dt') and first.checkin_dt:
         # Calcola la data di oggi dalla route
@@ -355,7 +355,7 @@ def evaluate_route(cleaner: Cleaner, route: List[Task]) -> Tuple[bool, List[Tupl
         start = cur
         finish = start + t.cleaning_time
 
-        # CRITICAL: Check-in strict - deve finire prima del check-in
+        # NUOVO: Check-in strict - deve finire prima del check-in
         # SOLO se il check-in è OGGI (stesso giorno del checkout)
         if hasattr(t, 'checkin_dt') and t.checkin_dt:
             # Calcola se check-in è stesso giorno del checkout
@@ -1048,11 +1048,9 @@ def build_output(cleaners: List[Cleaner], unassigned: List[Task], original_tasks
             # Cerca la task nei containers
             for container_type in ['early_out', 'high_priority', 'low_priority']:
                 container = containers_data.get('containers', {}).get(container_type, {})
-                for task_json in container.get('tasks', []):
-                    # Confronta sia task_id che logistic_code per trovare la corrispondenza
-                    if (str(task_json.get('task_id')) == str(t.task_id) or
-                            str(task_json.get('logistic_code')) == str(t.logistic_code)):
-                        original_task_data = task_json
+                for task in container.get('tasks', []):
+                    if str(task.get('task_id')) == str(t.task_id) or str(task.get('logistic_code')) == str(t.logistic_code):
+                        original_task_data = task
                         break
                 if original_task_data:
                     break
@@ -1087,19 +1085,7 @@ def build_output(cleaners: List[Cleaner], unassigned: List[Task], original_tasks
                 ]
             }
 
-            # Verifica se la task è già presente nella timeline (es. da assegnazioni manuali)
-            # e aggiorna i campi se necessario
-            is_already_in_timeline = False
-            if 'tasks' in existing and existing['tasks']:
-                for existing_task in existing.get('tasks', []):
-                    if str(existing_task.get('task_id')) == str(t.task_id):
-                        # Aggiorna i campi della task esistente con quelli calcolati
-                        existing_task.update(task_for_timeline)
-                        tasks_list.append(existing_task)
-                        is_already_in_timeline = True
-                        break
-            if not is_already_in_timeline:
-                tasks_list.append(task_for_timeline)
+            tasks_list.append(task_for_timeline)
 
 
         cleaners_with_tasks.append({
@@ -1226,10 +1212,10 @@ def main():
 
     # CRITICAL: Filtra le task già in timeline PRIMA di passarle a plan_day
     tasks = [t for t in tasks if int(t.task_id) not in assigned_task_ids]
-
+    
     if len(assigned_task_ids) > 0:
         print(f"   ⏭️  Saltate {len(assigned_task_ids)} task già in timeline (trascinate manualmente)")
-
+    
     # Leggi i logistic_code già assegnati per evitare duplicati cross-container
     assigned_logistic_codes = set()
     if timeline_path.exists():
@@ -1300,7 +1286,7 @@ def main():
         if existing_entry:
             # CRITICAL: Unifica task precedenti + LP e ricalcola TUTTO
             all_tasks = existing_entry.get("tasks", []) + cleaner_entry.get("tasks", [])
-
+            
             # Deduplica per task_id
             seen_task_ids = set()
             unique_tasks = []
@@ -1309,14 +1295,14 @@ def main():
                 if tid not in seen_task_ids:
                     seen_task_ids.add(tid)
                     unique_tasks.append(t)
-
+            
             # Ordina per start_time (usa checkout se start_time non valido)
             unique_tasks.sort(key=lambda t: t.get("start_time") or t.get("checkout_time") or "00:00")
-
+            
             # RICALCOLA sequence, travel_time, start_time, end_time per TUTTE le task
             current_time_min = hhmm_to_min(cleaner_entry["cleaner"].get("start_time", "10:00"))
             prev_task = None
-
+            
             for idx, task in enumerate(unique_tasks):
                 # Calcola travel_time dalla task precedente
                 if prev_task:
@@ -1327,26 +1313,26 @@ def main():
                         curr_lng = float(task.get("lng", 0))
                         prev_addr = prev_task.get("address")
                         curr_addr = task.get("address")
-
+                        
                         # Usa la funzione di calcolo travel
                         import math
                         km = haversine_km(prev_lat, prev_lng, curr_lat, curr_lng)
                         dist_reale = km * 1.5
-
+                        
                         if dist_reale < 0.8:
                             travel_time = dist_reale * 6.0
                         elif dist_reale < 2.5:
                             travel_time = dist_reale * 10.0
                         else:
                             travel_time = dist_reale * 5.0
-
+                        
                         travel_time = max(2.0, min(45.0, 5.0 + travel_time))
-
+                        
                         if same_building(prev_addr, curr_addr):
                             travel_time = 3.0
                         elif same_street(prev_addr, curr_addr) and km < 0.10:
                             travel_time = max(travel_time - 2.0, 2.0)
-
+                        
                         task["travel_time"] = int(round(travel_time))
                         current_time_min += travel_time
                     except Exception:
@@ -1354,40 +1340,40 @@ def main():
                         current_time_min += 12
                 else:
                     task["travel_time"] = 0
-
+                
                 # Rispetta checkout_time se presente
                 checkout_str = task.get("checkout_time")
                 if checkout_str:
                     checkout_min = hhmm_to_min(checkout_str)
                     current_time_min = max(current_time_min, checkout_min)
-
+                
                 # Calcola start e end
                 start_min = int(current_time_min)
                 end_min = start_min + int(task.get("cleaning_time", 60))
-
+                
                 # CRITICAL: Verifica check-in PRIMA di salvare gli orari
                 checkin_str = task.get("checkin_time")
                 checkin_date_str = task.get("checkin_date")
                 checkout_date_str = task.get("checkout_date", ref_date)
-
+                
                 if checkin_str and checkin_date_str and checkout_date_str:
                     # Verifica solo se check-in è lo stesso giorno del checkout
                     if checkin_date_str == checkout_date_str:
-                        checkin_limit = hhmm_to_min(checkin_str)
-                        if end_min > checkin_limit:
+                        checkin_min = hhmm_to_min(checkin_str)
+                        if end_min > checkin_min:
                             # Task non fattibile: salta e rimuovi dalla lista
                             print(f"   ⚠️  Task LP {task.get('task_id')} scartata per cleaner {cleaner_entry['cleaner']['id']}: "
                                   f"finirebbe alle {min_to_hhmm(end_min)} oltre il check-in {checkin_str}")
                             continue
-
+                
                 task["start_time"] = min_to_hhmm(start_min)
                 task["end_time"] = min_to_hhmm(end_min)
                 task["sequence"] = idx + 1
                 task["followup"] = idx > 0
-
+                
                 current_time_min = end_min
                 prev_task = task
-
+            
             existing_entry["tasks"] = unique_tasks
         else:
             # Crea nuova entry
