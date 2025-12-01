@@ -6,10 +6,10 @@
   },
   "metadata": {
     "date": "2025-12-01",
-    "last_updated": "2025-12-01 10:25:15",
-    "modification_type": "auto_assign_early_out",
+    "loaded_at": "2025-12-01 09:28:09",
+    "last_updated": "2025-12-01 10:28:33",
     "loaded_from_mysql": true,
-    "loaded_at": "2025-12-01 09:24:49"
+    "modification_type": "auto_assign_early_out"
   },
   "cleaners_assignments": [
     {
