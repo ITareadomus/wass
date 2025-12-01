@@ -38,6 +38,9 @@ MAX_TASKS_PER_PRIORITY = 2  # Max 2 task Early-Out per cleaner (base, infrangibi
 
 PREFERRED_TRAVEL = 20.0  # Preferenza per percorsi < 20'
 
+# STRAORDINARIA: orario di inizio fisso alle 09:00 quando è la prima task
+STRAORDINARIA_START_TIME_MIN = 9 * 60  # 09:00 in minuti
+
 # Travel model (min)
 SHORT_RANGE_KM = 0.30
 SHORT_BASE_MIN = 3.5
@@ -276,8 +279,10 @@ def evaluate_route(route: List[Task], cleaner_start_time_min: Optional[int] = No
     schedule: List[Tuple[int, int, int]] = []
     prev: Optional[Task] = None
 
-    # Per straordinarie: usa lo start_time del cleaner come base
-    if cleaner_start_time_min is not None and route and route[0].straordinaria:
+    # Per straordinarie come prima task: iniziano SEMPRE alle 09:00
+    if route and route[0].straordinaria:
+        cur = float(STRAORDINARIA_START_TIME_MIN)
+    elif cleaner_start_time_min is not None:
         cur = float(cleaner_start_time_min)
     else:
         cur = 0.0
@@ -288,13 +293,17 @@ def evaluate_route(route: List[Task], cleaner_start_time_min: Optional[int] = No
         arrival = cur
 
         # LOGICA STRAORDINARIE vs EO NORMALE:
-        # - STRAORDINARIE: iniziano allo start_time del cleaner (se fornito)
-        #   oppure al checkout_time se successivo
+        # - STRAORDINARIE (prima task): iniziano alle 09:00 o checkout_time se maggiore
+        # - STRAORDINARIE (task successive): rispettano checkout_time se successivo
         # - EO NORMALE: rispetta vincolo eo_start_time (10:00) e checkout_time
 
-        if t.straordinaria:
-            # STRAORDINARIE: iniziano allo start_time del cleaner
-            # ma rispettano il checkout_time se successivo
+        if t.straordinaria and i == 0:
+            # STRAORDINARIE come prima task: base alle 09:00
+            # ma rispettano checkout_time se è successivo alle 09:00
+            start = max(STRAORDINARIA_START_TIME_MIN, t.checkout_time)
+            cur = start
+        elif t.straordinaria:
+            # STRAORDINARIE come task successive: rispettano checkout_time
             start = max(arrival, t.checkout_time)
             cur = start
         else:
