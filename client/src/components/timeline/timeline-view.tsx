@@ -421,19 +421,17 @@ export default function TimelineView({
     return colors[cleanerId % colors.length];
   };
 
-  // Funzione per caricare i cleaner da selected_cleaners.json
+  // Funzione per caricare i cleaner da selected_cleaners.json e timeline da DB
   const loadCleaners = async (skipLoadSaved = false) => {
     try {
-      // Carica sia selected_cleaners.json che timeline.json per verificare la sincronizzazione
+      // Carica selected_cleaners.json e timeline da DB via /api/timeline
       const [selectedResponse, timelineResponse] = await Promise.all([
         fetch(`/data/cleaners/selected_cleaners.json?t=${Date.now()}`, {
           cache: 'no-store',
           headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' }
         }),
-        fetch(`/data/output/timeline.json?t=${Date.now()}`, {
-          cache: 'no-store',
-          headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' }
-        })
+        // CRITICAL: Usa /api/timeline che legge da DB e sincronizza il file
+        fetch(`/api/timeline?date=${workDate}`)
       ]);
 
       // Verifica selected_cleaners.json
@@ -462,26 +460,20 @@ export default function TimelineView({
       const selectedData = JSON.parse(selectedText);
       console.log("Cleaners caricati da selected_cleaners.json:", selectedData);
 
-      // Verifica se timeline.json esiste e ha cleaners
+      // Estrai cleaners dalla timeline (da DB via /api/timeline)
       let timelineCleaners: any[] = [];
       if (timelineResponse.ok) {
         try {
-          const timelineText = await timelineResponse.text();
-
-          // Verifica che il contenuto sia JSON valido
-          if (!timelineText.trim().startsWith('{') && !timelineText.trim().startsWith('[')) {
-            console.warn('Timeline.json corrotto, non è JSON:', timelineText.substring(0, 100));
-          } else {
-            const timelineData = JSON.parse(timelineText);
-            timelineCleaners = timelineData.cleaners_assignments?.map((c: any) => ({
-              id: c.cleaner?.id,
-              name: c.cleaner?.name,
-              lastname: c.cleaner?.lastname,
-              role: c.cleaner?.role,
-            })).filter((c: any) => c.id) || [];
-          }
+          const timelineData = await timelineResponse.json();
+          timelineCleaners = timelineData.cleaners_assignments?.map((c: any) => ({
+            id: c.cleaner?.id,
+            name: c.cleaner?.name,
+            lastname: c.cleaner?.lastname,
+            role: c.cleaner?.role,
+          })).filter((c: any) => c.id) || [];
+          console.log(`✅ Cleaners dalla timeline DB: ${timelineCleaners.length}`);
         } catch (e) {
-          console.warn('Errore parsing timeline.json:', e);
+          console.warn('Errore parsing timeline da DB:', e);
         }
       }
 
@@ -530,26 +522,19 @@ export default function TimelineView({
     }
   };
 
-  // Funzione per caricare i dati della timeline (inclusi i metadata)
+  // Funzione per caricare i dati della timeline (inclusi i metadata) da DB
   const loadTimelineData = async () => {
     try {
-      const response = await fetch(`/data/output/timeline.json?t=${Date.now()}`, {
-        cache: 'no-store',
-        headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' }
-      });
+      // CRITICAL: Usa /api/timeline che legge da DB e sincronizza il file
+      const response = await fetch(`/api/timeline?date=${workDate}`);
       if (!response.ok) {
-        console.warn(`Timeline file not found (${response.status}), using empty data`);
-        setTimelineData(null); // Resetta i dati se il file non esiste o c'è un errore
-        return;
-      }
-      const contentType = response.headers.get('content-type');
-      if (!contentType || !contentType.includes('application/json')) {
-        console.warn('Timeline file is not JSON, using empty data');
+        console.warn(`Timeline non trovata per ${workDate} (${response.status}), using empty data`);
         setTimelineData(null);
         return;
       }
       const data = await response.json();
       setTimelineData(data);
+      console.log(`✅ Timeline data caricata da DB per ${workDate}`);
     } catch (error) {
       console.error("Errore nel caricamento dei dati della timeline:", error);
       setTimelineData(null);
@@ -1134,9 +1119,8 @@ export default function TimelineView({
       setLastSavedFilename(null);
       localStorage.removeItem('last_saved_assignment');
 
-      // 3. CRITICAL: Ricarica SOLO i file JSON locali senza chiamare extract-data
-      // Il backend ha già resettato timeline.json e ricreato containers.json
-      // Dobbiamo solo ricaricare il frontend con i nuovi dati
+      // 3. CRITICAL: Ricarica containers da file e timeline da DB
+      // Il backend ha già resettato i dati
       const timestamp = Date.now();
 
       // Ricarica containers.json (che ora contiene tutte le task)
@@ -1145,11 +1129,8 @@ export default function TimelineView({
         headers: { 'Cache-Control': 'no-cache' }
       });
 
-      // Ricarica timeline.json (che ora è vuota)
-      const timelineResponse = await fetch(`/data/output/timeline.json?t=${timestamp}`, {
-        cache: 'no-store',
-        headers: { 'Cache-Control': 'no-cache' }
-      });
+      // Ricarica timeline da DB via /api/timeline
+      const timelineResponse = await fetch(`/api/timeline?date=${workDate}`);
 
       if (containersResponse.ok && timelineResponse.ok) {
         // Triggera il reload dei containers nella pagina principale
@@ -1188,16 +1169,10 @@ export default function TimelineView({
 
   const loadTimelineCleaners = async () => {
     try {
-      const response = await fetch(`/data/output/timeline.json?t=${Date.now()}`);
+      // CRITICAL: Usa /api/timeline che legge da DB e sincronizza il file
+      const response = await fetch(`/api/timeline?date=${workDate}`);
       if (!response.ok) {
-        console.warn(`Timeline file not found (${response.status}), using empty timeline`);
-        setTimelineCleaners([]);
-        return;
-      }
-
-      const contentType = response.headers.get('content-type');
-      if (!contentType || !contentType.includes('application/json')) {
-        console.warn('Timeline file is not JSON, using empty timeline');
+        console.warn(`Timeline non trovata per ${workDate} (${response.status}), using empty timeline`);
         setTimelineCleaners([]);
         return;
       }
@@ -1205,6 +1180,7 @@ export default function TimelineView({
       const timelineData = await response.json();
       const timelineCleanersList = timelineData.cleaners_assignments || [];
       setTimelineCleaners(timelineCleanersList);
+      console.log(`✅ Timeline cleaners caricati da DB: ${timelineCleanersList.length}`);
     } catch (error) {
       console.error("Errore nel caricamento timeline cleaners:", error);
       setTimelineCleaners([]);
