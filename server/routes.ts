@@ -582,6 +582,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Endpoint per leggere la timeline corrente da DB (daily_assignments_current)
   // Il frontend deve usare questo invece di leggere direttamente timeline.json
+  // CRITICAL: Questo endpoint è la fonte di verità per il frontend - elimina race condition
   app.get("/api/timeline", async (req, res) => {
     try {
       const dateParam = (req.query.date as string) || format(new Date(), "yyyy-MM-dd");
@@ -589,19 +590,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       console.log(`📖 GET /api/timeline - Caricamento timeline per ${workDate}`);
 
-      // Carica la timeline da MySQL (con fallback su filesystem) 
-      // e sincronizza timeline.json come cache per gli script Python
+      // Carica la timeline da MySQL (source of truth), con fallback su filesystem se la data corrisponde
+      // ALWAYS returns a timeline object (empty if no data exists)
+      // Also syncs timeline.json as cache for Python scripts
       const timeline = await workspaceFiles.loadTimeline(workDate);
 
-      if (!timeline) {
-        console.log(`⚠️ Nessuna timeline trovata per ${workDate}`);
-        return res.status(404).json({
-          success: false,
-          error: `Nessuna timeline trovata per la data ${workDate}`,
-        });
-      }
-
-      console.log(`✅ Timeline caricata per ${workDate}: ${timeline.cleaners_assignments?.length || 0} cleaners, ${timeline.meta?.total_tasks || 0} task`);
+      console.log(`✅ Timeline caricata per ${workDate}: ${timeline.cleaners_assignments?.length || 0} cleaners`);
       res.json(timeline);
     } catch (error: any) {
       console.error("Errore nel load della timeline:", error);
