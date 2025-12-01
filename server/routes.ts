@@ -52,10 +52,12 @@ async function recalculateCleanerTimes(cleanerData: any): Promise<any> {
 
     // CRITICAL: Load start_time from selected_cleaners.json to ensure it's up-to-date
     const selectedCleanersPath = path.join(process.cwd(), 'client/public/data/cleaners/selected_cleaners.json');
+    let selectedCleanersData: any = null;
     try {
       const selectedData = JSON.parse(await fs.readFile(selectedCleanersPath, 'utf8'));
+      selectedCleanersData = selectedData; // Assign to outer scope variable
       const selectedCleaner = selectedData.cleaners?.find((c: any) => c.id === cleanerData.cleaner.id);
-      
+
       if (selectedCleaner?.start_time) {
         // Use start_time from selected_cleaners (source of truth)
         cleanerData.cleaner.start_time = selectedCleaner.start_time;
@@ -917,7 +919,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       console.log(`✅ Salvato assignment per cleaner ${normalizedCleanerId} in posizione ${targetIndex}`);
-      res.json({ success: true });
+      res.json({ success: true, message: "Task salvata con successo" });
     } catch (error: any) {
       console.error("Errore nel salvataggio dell'assegnazione nella timeline:", error);
       res.status(500).json({ success: false, error: error.message });
@@ -2201,7 +2203,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Salva containers (filesystem + MySQL)
       await workspaceFiles.saveContainers(workDate, containersData);
-      
+
       // Salva timeline con tracking delle modifiche (skipRevision=false per creare revision in MySQL)
       await workspaceFiles.saveTimeline(workDate, timelineData, false, currentUsername, 'task_edit', editOptions);
 
