@@ -1182,7 +1182,7 @@ def main():
                 start_time = current_time
                 end_time = start_time + timedelta(minutes=int(task.get("cleaning_time", 60)))
                 
-                # CRITICAL: Rispetta vincolo di check-in PRIMA di salvare gli orari
+                # CRITICAL: Verifica check-in PRIMA di salvare gli orari
                 checkin_str = task.get("checkin_time")
                 checkin_date_str = task.get("checkin_date")
                 checkout_date_str = task.get("checkout_date", ref_date)
@@ -1194,10 +1194,8 @@ def main():
                             checkin_dt = parse_dt(checkin_date_str, checkin_str)
                             if checkin_dt and end_time > checkin_dt:
                                 # Task non fattibile: salta e rimuovi dalla lista
-                                print(
-                                    f"   ⚠️  Task HP {task.get('task_id')} scartata per cleaner {cleaner_entry['cleaner']['id']}: "
-                                    f"finirebbe alle {fmt_hhmm(end_time)} oltre il check-in {checkin_str}"
-                                )
+                                print(f"   ⚠️  Task HP {task.get('task_id')} scartata per cleaner {cleaner_entry['cleaner']['id']}: "
+                                      f"finirebbe alle {fmt_hhmm(end_time)} oltre il check-in {checkin_str}")
                                 continue
                         except Exception:
                             pass
