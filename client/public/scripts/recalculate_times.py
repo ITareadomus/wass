@@ -133,7 +133,11 @@ def recalculate_cleaner_times(cleaner_data: Dict[str, Any]) -> Dict[str, Any]:
     if not tasks:
         return cleaner_data
 
-    work_start_min = time_to_minutes(WORK_START_TIME)
+    # CRITICAL: Usa lo start_time del cleaner, fallback a WORK_START_TIME solo se mancante
+    cleaner_info = cleaner_data.get("cleaner", {})
+    cleaner_start_time = cleaner_info.get("start_time", WORK_START_TIME)
+    
+    work_start_min = time_to_minutes(cleaner_start_time)
     work_end_min = time_to_minutes(WORK_END_TIME)
 
     current_time_min = work_start_min
