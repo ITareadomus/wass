@@ -208,7 +208,7 @@ export default function MapSection({ tasks }: MapSectionProps) {
       const baseLat = parseFloat(task.lat || '0');
       const baseLng = parseFloat(task.lng || '0');
 
-      if (isNaN(baseLat) || isNaN(baseBaseLng) || baseLat === 0 || baseLng === 0) return;
+      if (isNaN(baseLat) || isNaN(baseLng) || baseLat === 0 || baseLng === 0) return;
 
       // Chiave per identificare coordinate duplicate
       const coordKey = `${baseLat.toFixed(6)},${baseLng.toFixed(6)}`;
