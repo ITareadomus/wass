@@ -90,14 +90,16 @@ export default function TaskCard({
   useEffect(() => {
     const checkMapFilter = setInterval(() => {
       const currentFilteredTaskId = (window as any).mapFilteredTaskId;
-      const shouldBeFiltered = currentFilteredTaskId === task.name;
+      // CRITICAL: Usa task.id (univoco) per il confronto
+      const uniqueTaskId = String((task as any).task_id || task.id);
+      const shouldBeFiltered = currentFilteredTaskId === uniqueTaskId;
       if (shouldBeFiltered !== isMapFiltered) {
         setIsMapFiltered(shouldBeFiltered);
       }
     }, 100);
 
     return () => clearInterval(checkMapFilter);
-  }, [task.name, isMapFiltered]);
+  }, [task, isMapFiltered]);
 
   // Gestisce il click sulla card: se multi-select toggle selezione, altrimenti apri modale
   const handleCardClick = (e: React.MouseEvent) => {
@@ -115,14 +117,16 @@ export default function TaskCard({
       clearTimeout(clickTimer);
       setClickTimer(null);
 
-      // Toggle filtro mappa per questa task (attiva/disattiva animazione) - usa task.id univoco
+      // Toggle filtro mappa per questa task (attiva/disattiva animazione)
+      // CRITICAL: Usa task.id univoco (task_id o id)
       const currentFilteredTaskId = (window as any).mapFilteredTaskId;
-      if (currentFilteredTaskId === task.id) {
+      const uniqueTaskId = String((task as any).task_id || task.id);
+      if (currentFilteredTaskId === uniqueTaskId) {
         // Spegni animazione
         (window as any).mapFilteredTaskId = null;
       } else {
         // Accendi animazione
-        (window as any).mapFilteredTaskId = task.id;
+        (window as any).mapFilteredTaskId = uniqueTaskId;
       }
     } else {
       // Primo click: avvia timer

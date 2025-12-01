@@ -300,13 +300,15 @@ export default function MapSection({ tasks }: MapSectionProps) {
                 clickTimer = null;
 
                 // Toggle filtro (attiva/disattiva animazione)
+                // CRITICAL: Usa task.id (univoco) non task.name (logistic_code che può essere duplicato)
                 const currentFilteredTaskId = (window as any).mapFilteredTaskId;
-                if (currentFilteredTaskId === taskId) {
+                const uniqueTaskId = String((task as any).task_id || task.id);
+                if (currentFilteredTaskId === uniqueTaskId) {
                   // Spegni animazione
                   (window as any).mapFilteredTaskId = null;
                 } else {
                   // Accendi animazione
-                  (window as any).mapFilteredTaskId = taskId;
+                  (window as any).mapFilteredTaskId = uniqueTaskId;
                 }
               } else {
                 // Primo click: apri dettagli
@@ -370,13 +372,15 @@ export default function MapSection({ tasks }: MapSectionProps) {
             clickTimer = null;
 
             // Toggle filtro (attiva/disattiva animazione)
+            // CRITICAL: Usa task.id (univoco) non task.name (logistic_code che può essere duplicato)
             const currentFilteredTaskId = (window as any).mapFilteredTaskId;
-            if (currentFilteredTaskId === taskId) {
+            const uniqueTaskId = String((task as any).task_id || task.id);
+            if (currentFilteredTaskId === uniqueTaskId) {
               // Spegni animazione
               (window as any).mapFilteredTaskId = null;
             } else {
               // Accendi animazione
-              (window as any).mapFilteredTaskId = taskId;
+              (window as any).mapFilteredTaskId = uniqueTaskId;
             }
           } else {
             // Primo click: apri dettagli
