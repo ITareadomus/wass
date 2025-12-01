@@ -1,6 +1,6 @@
 {
   "metadata": {
-    "last_updated": "2025-12-01 11:20:57",
+    "last_updated": "2025-12-01 11:26:42",
     "date": "2025-12-01",
     "modification_type": "auto_assign_early_out"
   },
@@ -11,42 +11,10 @@
         "name": "JOHOISER ERNESTO",
         "lastname": "LOPEZ GIRON",
         "role": "Premium",
-        "premium": false,
-        "start_time": "09:00"
+        "premium": true,
+        "start_time": "10:00"
       },
       "tasks": [
-        {
-          "task_id": 219553,
-          "logistic_code": 1091,
-          "client_id": null,
-          "premium": false,
-          "address": "VIA GONIN, 5",
-          "lat": "45.4438637",
-          "lng": "9.1281044",
-          "cleaning_time": 240,
-          "checkin_date": "2025-12-05",
-          "checkout_date": "2025-12-01",
-          "checkin_time": null,
-          "checkout_time": null,
-          "pax_in": 4,
-          "pax_out": 4,
-          "small_equipment": false,
-          "operation_id": 3,
-          "confirmed_operation": true,
-          "straordinaria": true,
-          "type_apt": "B",
-          "alias": "NTM",
-          "customer_name": "NOTA-MI",
-          "reasons": [
-            "manually_moved_to_timeline"
-          ],
-          "priority": "early_out",
-          "start_time": "09:00",
-          "end_time": "13:00",
-          "followup": false,
-          "sequence": 1,
-          "travel_time": 0
-        },
         {
           "task_id": 219558,
           "logistic_code": 1541,
@@ -74,11 +42,44 @@
             "automatic_assignment_eo"
           ],
           "priority": "early_out",
-          "start_time": "13:00",
-          "end_time": "14:30",
+          "start_time": "10:15",
+          "end_time": "11:45",
           "followup": false,
-          "sequence": 2,
+          "sequence": 1,
           "travel_time": 0
+        },
+        {
+          "task_id": 219553,
+          "logistic_code": 1091,
+          "client_id": 61,
+          "premium": false,
+          "address": "VIA GONIN, 5",
+          "lat": "45.4438637",
+          "lng": "9.1281044",
+          "cleaning_time": 240,
+          "checkin_date": "2025-12-05",
+          "checkout_date": "2025-12-01",
+          "checkin_time": null,
+          "checkout_time": null,
+          "pax_in": 4,
+          "pax_out": 4,
+          "small_equipment": false,
+          "operation_id": 3,
+          "confirmed_operation": true,
+          "straordinaria": true,
+          "type_apt": "B",
+          "alias": "NTM",
+          "customer_name": "NOTA-MI",
+          "reasons": [
+            "client_forced_eo",
+            "automatic_assignment_eo"
+          ],
+          "priority": "early_out",
+          "start_time": "12:00",
+          "end_time": "16:00",
+          "followup": true,
+          "sequence": 2,
+          "travel_time": 15
         }
       ]
     },
