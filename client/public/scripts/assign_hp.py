@@ -1145,6 +1145,9 @@ def main():
             current_time = hhmm_to_dt(ref_date, cleaner_start_time)
             prev_task = None
             
+            # Lista temporanea per task valide (esclude quelle che violano check-in)
+            valid_tasks = []
+            
             for idx, task in enumerate(unique_tasks):
                 # Calcola travel_time dalla task precedente
                 if prev_task:
@@ -1202,13 +1205,19 @@ def main():
                 
                 task["start_time"] = fmt_hhmm(start_time)
                 task["end_time"] = fmt_hhmm(end_time)
-                task["sequence"] = idx + 1
                 task["followup"] = idx > 0
+                
+                # Aggiungi alla lista delle task valide
+                valid_tasks.append(task)
                 
                 current_time = end_time
                 prev_task = task
             
-            existing_entry["tasks"] = unique_tasks
+            # CRITICAL: Ricalcola sequence DOPO aver filtrato le task valide
+            for seq_idx, task in enumerate(valid_tasks):
+                task["sequence"] = seq_idx + 1
+            
+            existing_entry["tasks"] = valid_tasks
         else:
             # Crea nuova entry
             timeline_data["cleaners_assignments"].append({
