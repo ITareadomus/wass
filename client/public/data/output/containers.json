@@ -1,6 +1,6 @@
 {
   "metadata": {
-    "last_updated": "2025-12-01T13:17:52.677602",
+    "last_updated": "2025-12-01T13:27:07.238288",
     "date": "2025-12-01"
   },
   "containers": {
@@ -529,6 +529,33 @@
           "priority": "high_priority"
         },
         {
+          "task_id": 219638,
+          "logistic_code": 1101,
+          "client_id": 3,
+          "premium": true,
+          "address": "Via Paolo Sarpi, 26, 20154 (MI)",
+          "lat": "45.481556",
+          "lng": "9.1767745",
+          "cleaning_time": 270,
+          "checkin_date": "2025-12-05",
+          "checkout_date": "2025-12-01",
+          "checkin_time": null,
+          "checkout_time": null,
+          "pax_in": 6,
+          "pax_out": 5,
+          "small_equipment": false,
+          "operation_id": 2,
+          "confirmed_operation": true,
+          "straordinaria": false,
+          "type_apt": "E",
+          "alias": "TBR",
+          "customer_name": "THE BEST RENT S.r.l.",
+          "reasons": [
+            "premium"
+          ],
+          "priority": "high_priority"
+        },
+        {
           "task_id": 219639,
           "logistic_code": 1384,
           "client_id": 3,
@@ -635,9 +662,90 @@
             "same_day_checkin_between_hp_start_hp_end"
           ],
           "priority": "high_priority"
+        },
+        {
+          "task_id": 219651,
+          "logistic_code": 1700,
+          "client_id": 132,
+          "premium": false,
+          "address": "VIA BORGONUOVO 4",
+          "lat": "45.4708098",
+          "lng": "9.1915904",
+          "cleaning_time": 90,
+          "checkin_date": "2025-12-01",
+          "checkout_date": "2025-12-01",
+          "checkin_time": "14:00",
+          "checkout_time": "11:00",
+          "pax_in": 2,
+          "pax_out": 0,
+          "small_equipment": false,
+          "operation_id": 2,
+          "confirmed_operation": true,
+          "straordinaria": false,
+          "type_apt": "B",
+          "alias": "SNPD",
+          "customer_name": "serendipity",
+          "reasons": [
+            "same_day_checkin_between_hp_start_hp_end"
+          ],
+          "priority": "high_priority"
+        },
+        {
+          "task_id": 219664,
+          "logistic_code": 1695,
+          "client_id": 123,
+          "premium": false,
+          "address": "Via Salasco, 5",
+          "lat": "45.450193",
+          "lng": "9.1922539",
+          "cleaning_time": 60,
+          "checkin_date": "2025-12-01",
+          "checkout_date": "2025-12-01",
+          "checkin_time": "15:00",
+          "checkout_time": "11:00",
+          "pax_in": 3,
+          "pax_out": 0,
+          "small_equipment": true,
+          "operation_id": 2,
+          "confirmed_operation": true,
+          "straordinaria": false,
+          "type_apt": "A",
+          "alias": "YHST",
+          "customer_name": "YOUHOSTY",
+          "reasons": [
+            "same_day_checkin_between_hp_start_hp_end"
+          ],
+          "priority": "high_priority"
+        },
+        {
+          "task_id": 219665,
+          "logistic_code": 1691,
+          "client_id": 123,
+          "premium": false,
+          "address": "VIALE NAZARIO SAURO 5",
+          "lat": "45.491443",
+          "lng": "9.1965573",
+          "cleaning_time": 90,
+          "checkin_date": "2025-12-01",
+          "checkout_date": "2025-12-01",
+          "checkin_time": "15:00",
+          "checkout_time": "11:00",
+          "pax_in": 4,
+          "pax_out": 0,
+          "small_equipment": false,
+          "operation_id": 2,
+          "confirmed_operation": true,
+          "straordinaria": false,
+          "type_apt": "B",
+          "alias": "YHST",
+          "customer_name": "YOUHOSTY",
+          "reasons": [
+            "same_day_checkin_between_hp_start_hp_end"
+          ],
+          "priority": "high_priority"
         }
       ],
-      "count": 11
+      "count": 15
     },
     "low_priority": {
       "tasks": [
@@ -1094,9 +1202,9 @@
     }
   },
   "summary": {
-    "total_tasks": 39,
+    "total_tasks": 43,
     "early_out": 12,
-    "high_priority": 11,
+    "high_priority": 15,
     "low_priority": 16
   }
 }
