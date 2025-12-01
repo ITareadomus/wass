@@ -353,11 +353,27 @@
         123
       ],
       "can_do_straordinaria": true
+    },
+    {
+      "id": 1070,
+      "name": "ABUBACAR",
+      "role": "Premium",
+      "active": true,
+      "ranking": 0,
+      "lastname": "DIAMMEH",
+      "available": true,
+      "start_time": "10:00",
+      "telegram_id": null,
+      "counter_days": 3,
+      "contract_type": "a chiamata",
+      "counter_hours": 3.5,
+      "preferred_customers": [],
+      "can_do_straordinaria": false
     }
   ],
-  "total_selected": 12,
+  "total_selected": 13,
   "metadata": {
     "date": "2025-12-01",
-    "loaded_at": "2025-12-01 14:44:31"
+    "loaded_at": "2025-12-01 14:57:14"
   }
 }

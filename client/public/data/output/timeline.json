@@ -1,13 +1,13 @@
 {
   "meta": {
-    "total_tasks": 0,
+    "total_tasks": 40,
     "used_cleaners": 12,
-    "assigned_tasks": 32,
-    "total_cleaners": 12
+    "assigned_tasks": 40,
+    "total_cleaners": 13
   },
   "metadata": {
     "date": "2025-12-01",
-    "last_updated": "2025-12-01 15:31:33",
+    "last_updated": "2025-12-01 15:46:47",
     "modification_type": "auto_assign_low_priority"
   },
   "cleaners_assignments": [
@@ -21,6 +21,39 @@
         "start_time": "10:00"
       },
       "tasks": [
+        {
+          "task_id": 219558,
+          "logistic_code": 1541,
+          "client_id": 118,
+          "premium": false,
+          "address": "VIA GONIN, 58",
+          "lat": "45.4423379",
+          "lng": "9.1195717",
+          "cleaning_time": 90,
+          "checkin_date": "2025-12-01",
+          "checkout_date": "2025-12-01",
+          "checkin_time": "15:00",
+          "checkout_time": "10:15",
+          "pax_in": 4,
+          "pax_out": 4,
+          "small_equipment": false,
+          "operation_id": 2,
+          "confirmed_operation": true,
+          "straordinaria": false,
+          "type_apt": "B",
+          "alias": "CLTR",
+          "customer_name": "CALLATRONI ELENA",
+          "reasons": [
+            "checkout_time_eo_window_or_before_start",
+            "automatic_assignment_eo"
+          ],
+          "priority": "early_out",
+          "start_time": "10:15",
+          "end_time": "11:45",
+          "followup": false,
+          "sequence": 1,
+          "travel_time": 0
+        },
         {
           "task_id": 219553,
           "logistic_code": 1091,
@@ -48,45 +81,11 @@
             "automatic_assignment_eo"
           ],
           "priority": "early_out",
-          "start_time": "16:18",
-          "end_time": "20:18",
-          "followup": true,
-          "sequence": 1,
-          "travel_time": 3
-        },
-        {
-          "task_id": 219662,
-          "logistic_code": 111,
-          "client_id": 3,
-          "premium": false,
-          "address": "VIA WHASHINGTON 102",
-          "lat": "45.4553247",
-          "lng": "9.1543019",
-          "cleaning_time": 30,
-          "checkin_date": "2025-12-01",
-          "checkout_date": "2025-12-01",
-          "checkin_time": null,
-          "checkout_time": "11:00",
-          "pax_in": 0,
-          "pax_out": 0,
-          "small_equipment": true,
-          "operation_id": 4,
-          "confirmed_operation": true,
-          "straordinaria": false,
-          "type_apt": "A",
-          "alias": "TBR",
-          "customer_name": "THE BEST RENT S.r.l.",
-          "reasons": [
-            "not_eo",
-            "not_hp",
-            "automatic_assignment_lp"
-          ],
-          "priority": "low_priority",
-          "start_time": "20:41",
-          "end_time": "21:11",
+          "start_time": "12:00",
+          "end_time": "16:00",
           "followup": true,
           "sequence": 2,
-          "travel_time": 23
+          "travel_time": 15
         },
         {
           "task_id": 219563,
@@ -116,10 +115,44 @@
             "automatic_assignment_lp"
           ],
           "priority": "low_priority",
-          "start_time": "21:39",
-          "end_time": "22:39",
+          "start_time": "16:15",
+          "end_time": "17:15",
           "followup": true,
           "sequence": 3,
+          "travel_time": 15
+        },
+        {
+          "task_id": 219662,
+          "logistic_code": 111,
+          "client_id": 3,
+          "premium": false,
+          "address": "VIA WHASHINGTON 102",
+          "lat": "45.4553247",
+          "lng": "9.1543019",
+          "cleaning_time": 30,
+          "checkin_date": "2025-12-01",
+          "checkout_date": "2025-12-01",
+          "checkin_time": null,
+          "checkout_time": "11:00",
+          "pax_in": 0,
+          "pax_out": 0,
+          "small_equipment": true,
+          "operation_id": 4,
+          "confirmed_operation": true,
+          "straordinaria": false,
+          "type_apt": "A",
+          "alias": "TBR",
+          "customer_name": "THE BEST RENT S.r.l.",
+          "reasons": [
+            "not_eo",
+            "not_hp",
+            "automatic_assignment_lp"
+          ],
+          "priority": "low_priority",
+          "start_time": "17:43",
+          "end_time": "18:13",
+          "followup": true,
+          "sequence": 4,
           "travel_time": 28
         }
       ]
@@ -461,11 +494,11 @@
             "automatic_assignment_eo"
           ],
           "priority": "early_out",
-          "start_time": "12:03",
-          "end_time": "14:03",
+          "start_time": "10:00",
+          "end_time": "12:00",
           "followup": false,
           "sequence": 1,
-          "travel_time": 3
+          "travel_time": 0
         },
         {
           "task_id": 219526,
@@ -495,8 +528,8 @@
             "automatic_assignment_lp"
           ],
           "priority": "low_priority",
-          "start_time": "14:22",
-          "end_time": "15:52",
+          "start_time": "12:19",
+          "end_time": "13:49",
           "followup": true,
           "sequence": 2,
           "travel_time": 20
@@ -529,8 +562,8 @@
             "automatic_assignment_lp"
           ],
           "priority": "low_priority",
-          "start_time": "16:08",
-          "end_time": "18:08",
+          "start_time": "14:05",
+          "end_time": "16:05",
           "followup": true,
           "sequence": 3,
           "travel_time": 17
@@ -574,11 +607,77 @@
             "automatic_assignment_eo"
           ],
           "priority": "early_out",
-          "start_time": "15:32",
-          "end_time": "16:32",
+          "start_time": "10:00",
+          "end_time": "11:00",
           "followup": false,
           "sequence": 1,
-          "travel_time": 17
+          "travel_time": 0
+        },
+        {
+          "task_id": 219649,
+          "logistic_code": 1699,
+          "client_id": 132,
+          "premium": false,
+          "address": "VIA LAMARMORA 2/A",
+          "lat": "45.4561539",
+          "lng": "9.1966606",
+          "cleaning_time": 60,
+          "checkin_date": "2025-12-01",
+          "checkout_date": "2025-12-01",
+          "checkin_time": "14:00",
+          "checkout_time": "11:00",
+          "pax_in": 2,
+          "pax_out": 0,
+          "small_equipment": true,
+          "operation_id": 2,
+          "confirmed_operation": true,
+          "straordinaria": false,
+          "type_apt": "A",
+          "alias": "SNPD",
+          "customer_name": "serendipity",
+          "reasons": [
+            "same_day_checkin_between_hp_start_hp_end",
+            "automatic_assignment_hp"
+          ],
+          "priority": "high_priority",
+          "start_time": "11:24",
+          "end_time": "12:24",
+          "followup": true,
+          "sequence": 2,
+          "travel_time": 25
+        },
+        {
+          "task_id": 219640,
+          "logistic_code": 1537,
+          "client_id": 3,
+          "premium": true,
+          "address": "Via dei Piatti, 4 20123 (MI)",
+          "lat": "45.460795",
+          "lng": "9.1850985",
+          "cleaning_time": 150,
+          "checkin_date": "2025-12-01",
+          "checkout_date": "2025-12-01",
+          "checkin_time": "16:00",
+          "checkout_time": null,
+          "pax_in": 2,
+          "pax_out": 2,
+          "small_equipment": false,
+          "operation_id": 2,
+          "confirmed_operation": true,
+          "straordinaria": false,
+          "type_apt": "C",
+          "alias": "TBR",
+          "customer_name": "THE BEST RENT S.r.l.",
+          "reasons": [
+            "premium",
+            "automatic_assignment_hp"
+          ],
+          "priority": "high_priority",
+          "start_time": "12:45",
+          "end_time": "15:15",
+          "followup": true,
+          "sequence": 3,
+          "travel_time": 21
         },
         {
           "task_id": 218656,
@@ -608,11 +707,11 @@
             "automatic_assignment_lp"
           ],
           "priority": "low_priority",
-          "start_time": "17:37",
-          "end_time": "20:37",
+          "start_time": "15:33",
+          "end_time": "18:33",
           "followup": true,
-          "sequence": 2,
-          "travel_time": 24
+          "sequence": 4,
+          "travel_time": 19
         }
       ]
     },
@@ -797,11 +896,11 @@
             "automatic_assignment_eo"
           ],
           "priority": "early_out",
-          "start_time": "11:03",
-          "end_time": "12:03",
+          "start_time": "10:00",
+          "end_time": "11:00",
           "followup": false,
           "sequence": 1,
-          "travel_time": 3
+          "travel_time": 0
         },
         {
           "task_id": 219519,
@@ -831,8 +930,8 @@
             "automatic_assignment_lp"
           ],
           "priority": "low_priority",
-          "start_time": "12:35",
-          "end_time": "13:35",
+          "start_time": "11:32",
+          "end_time": "12:32",
           "followup": true,
           "sequence": 2,
           "travel_time": 32
@@ -865,8 +964,8 @@
             "automatic_assignment_lp"
           ],
           "priority": "low_priority",
-          "start_time": "13:54",
-          "end_time": "14:54",
+          "start_time": "12:51",
+          "end_time": "13:51",
           "followup": true,
           "sequence": 3,
           "travel_time": 20
@@ -899,8 +998,8 @@
             "automatic_assignment_lp"
           ],
           "priority": "low_priority",
-          "start_time": "15:27",
-          "end_time": "17:27",
+          "start_time": "14:24",
+          "end_time": "16:24",
           "followup": true,
           "sequence": 4,
           "travel_time": 33
@@ -917,6 +1016,73 @@
         "start_time": "10:00"
       },
       "tasks": [
+        {
+          "task_id": 219546,
+          "logistic_code": 1127,
+          "client_id": 64,
+          "premium": false,
+          "address": "VIA TAVAZZANO, 10",
+          "lat": "45.4929921",
+          "lng": "9.1483855",
+          "cleaning_time": 60,
+          "checkin_date": "2025-12-01",
+          "checkout_date": "2025-12-01",
+          "checkin_time": "14:00",
+          "checkout_time": "11:00",
+          "pax_in": 2,
+          "pax_out": 2,
+          "small_equipment": true,
+          "operation_id": 2,
+          "confirmed_operation": true,
+          "straordinaria": false,
+          "type_apt": "A",
+          "alias": "RLST",
+          "customer_name": "RELSTAY - FERRARA GIULIA",
+          "reasons": [
+            "same_day_checkin_between_hp_start_hp_end",
+            "client_forced_hp",
+            "automatic_assignment_hp"
+          ],
+          "priority": "high_priority",
+          "start_time": "11:00",
+          "end_time": "12:00",
+          "followup": false,
+          "sequence": 1,
+          "travel_time": 0
+        },
+        {
+          "task_id": 219339,
+          "logistic_code": 1671,
+          "client_id": 124,
+          "premium": false,
+          "address": "VIA MARCELLO PRESTINARI 15",
+          "lat": "45.5014741",
+          "lng": "9.1679818",
+          "cleaning_time": 90,
+          "checkin_date": "2025-12-01",
+          "checkout_date": "2025-12-01",
+          "checkin_time": "14:30",
+          "checkout_time": "11:00",
+          "pax_in": 2,
+          "pax_out": 2,
+          "small_equipment": false,
+          "operation_id": 2,
+          "confirmed_operation": true,
+          "straordinaria": false,
+          "type_apt": "B",
+          "alias": "HMST",
+          "customer_name": "HOMING STAYS",
+          "reasons": [
+            "same_day_checkin_between_hp_start_hp_end",
+            "automatic_assignment_hp"
+          ],
+          "priority": "high_priority",
+          "start_time": "12:18",
+          "end_time": "13:48",
+          "followup": true,
+          "sequence": 2,
+          "travel_time": 18
+        },
         {
           "task_id": 219534,
           "logistic_code": 1676,
@@ -945,10 +1111,10 @@
             "automatic_assignment_lp"
           ],
           "priority": "low_priority",
-          "start_time": "14:35",
-          "end_time": "16:05",
+          "start_time": "14:14",
+          "end_time": "15:44",
           "followup": true,
-          "sequence": 1,
+          "sequence": 3,
           "travel_time": 26
         },
         {
@@ -979,10 +1145,10 @@
             "automatic_assignment_lp"
           ],
           "priority": "low_priority",
-          "start_time": "16:25",
-          "end_time": "17:55",
+          "start_time": "16:04",
+          "end_time": "17:34",
           "followup": true,
-          "sequence": 2,
+          "sequence": 4,
           "travel_time": 21
         }
       ]
@@ -997,6 +1163,106 @@
         "start_time": "10:00"
       },
       "tasks": [
+        {
+          "task_id": 219650,
+          "logistic_code": 1698,
+          "client_id": 132,
+          "premium": false,
+          "address": "CORSO ITALIA 38",
+          "lat": "45.4564702",
+          "lng": "9.1872326",
+          "cleaning_time": 60,
+          "checkin_date": "2025-12-01",
+          "checkout_date": "2025-12-01",
+          "checkin_time": "14:00",
+          "checkout_time": "11:00",
+          "pax_in": 1,
+          "pax_out": 0,
+          "small_equipment": true,
+          "operation_id": 2,
+          "confirmed_operation": true,
+          "straordinaria": false,
+          "type_apt": "A",
+          "alias": "SNPD",
+          "customer_name": "serendipity",
+          "reasons": [
+            "same_day_checkin_between_hp_start_hp_end",
+            "automatic_assignment_hp"
+          ],
+          "priority": "high_priority",
+          "start_time": "11:00",
+          "end_time": "12:00",
+          "followup": false,
+          "sequence": 1,
+          "travel_time": 0
+        },
+        {
+          "task_id": 219547,
+          "logistic_code": 986,
+          "client_id": 64,
+          "premium": false,
+          "address": "VIA WASHINGTON, 54",
+          "lat": "45.4623642",
+          "lng": "9.1543891",
+          "cleaning_time": 60,
+          "checkin_date": "2025-12-01",
+          "checkout_date": "2025-12-01",
+          "checkin_time": "14:00",
+          "checkout_time": "11:00",
+          "pax_in": 2,
+          "pax_out": 2,
+          "small_equipment": true,
+          "operation_id": 2,
+          "confirmed_operation": true,
+          "straordinaria": false,
+          "type_apt": "A",
+          "alias": "RLST",
+          "customer_name": "RELSTAY - FERRARA GIULIA",
+          "reasons": [
+            "same_day_checkin_between_hp_start_hp_end",
+            "client_forced_hp",
+            "automatic_assignment_hp"
+          ],
+          "priority": "high_priority",
+          "start_time": "12:24",
+          "end_time": "13:24",
+          "followup": true,
+          "sequence": 2,
+          "travel_time": 25
+        },
+        {
+          "task_id": 219664,
+          "logistic_code": 1695,
+          "client_id": 123,
+          "premium": false,
+          "address": "Via Salasco, 5",
+          "lat": "45.450193",
+          "lng": "9.1922539",
+          "cleaning_time": 60,
+          "checkin_date": "2025-12-01",
+          "checkout_date": "2025-12-01",
+          "checkin_time": "15:00",
+          "checkout_time": "11:00",
+          "pax_in": 3,
+          "pax_out": 0,
+          "small_equipment": true,
+          "operation_id": 2,
+          "confirmed_operation": true,
+          "straordinaria": false,
+          "type_apt": "A",
+          "alias": "YHST",
+          "customer_name": "YOUHOSTY",
+          "reasons": [
+            "same_day_checkin_between_hp_start_hp_end",
+            "automatic_assignment_hp"
+          ],
+          "priority": "high_priority",
+          "start_time": "13:54",
+          "end_time": "14:54",
+          "followup": true,
+          "sequence": 3,
+          "travel_time": 29
+        },
         {
           "task_id": 218628,
           "logistic_code": 229,
@@ -1025,10 +1291,10 @@
             "automatic_assignment_lp"
           ],
           "priority": "low_priority",
-          "start_time": "15:49",
-          "end_time": "16:49",
+          "start_time": "15:00",
+          "end_time": "16:00",
           "followup": true,
-          "sequence": 1,
+          "sequence": 4,
           "travel_time": 6
         }
       ]
@@ -1225,6 +1491,17 @@
           "travel_time": 8
         }
       ]
+    },
+    {
+      "cleaner": {
+        "id": 1070,
+        "name": "ABUBACAR",
+        "lastname": "DIAMMEH",
+        "role": "Premium",
+        "premium": true,
+        "start_time": "10:00"
+      },
+      "tasks": []
     }
   ]
 }

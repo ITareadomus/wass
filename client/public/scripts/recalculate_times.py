@@ -9,6 +9,7 @@ import json
 from datetime import datetime, timedelta
 from typing import List, Dict, Any, Tuple, Optional
 from math import radians, cos, sin, asin, sqrt
+from sequence_utils import normalize_sequences
 
 
 WORK_START_TIME = "10:00"
@@ -132,6 +133,13 @@ def recalculate_cleaner_times(cleaner_data: Dict[str, Any]) -> Dict[str, Any]:
     tasks = cleaner_data.get("tasks", [])
     if not tasks:
         return cleaner_data
+
+    # CRITICAL: Riordina le task mettendo le straordinarie PRIMA
+    # Questo deve avvenire PRIMA del calcolo degli orari
+    straordinarie = [t for t in tasks if t.get("straordinaria")]
+    altre_task = [t for t in tasks if not t.get("straordinaria")]
+    tasks = straordinarie + altre_task
+    cleaner_data["tasks"] = tasks
 
     # CRITICAL: Usa lo start_time del cleaner, fallback a WORK_START_TIME solo se mancante
     cleaner_info = cleaner_data.get("cleaner", {})
@@ -258,14 +266,15 @@ def recalculate_cleaner_times(cleaner_data: Dict[str, Any]) -> Dict[str, Any]:
         task["travel_time"] = travel_time
         task["start_time"] = minutes_to_time(start_time_min)
         task["end_time"] = minutes_to_time(end_time_min)
-        task["sequence"] = i + 1
-        task["followup"] = i > 0
 
         # Aggiorna per prossima iterazione
         current_time_min = end_time_min
         prev_lat = lat
         prev_lng = lng
         prev_addr = addr
+
+    # CRITICAL: Normalizza sequence - straordinarie SEMPRE prime
+    cleaner_data["tasks"] = normalize_sequences(cleaner_data.get("tasks", []))
 
     return cleaner_data
 
