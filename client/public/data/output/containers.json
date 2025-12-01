@@ -1,12 +1,38 @@
 {
   "metadata": {
-    "last_updated": "2025-12-01T09:28:09.293063",
+    "last_updated": "2025-12-01T09:32:23.328224",
     "date": "2025-12-01"
   },
   "containers": {
     "early_out": {
-      "tasks": [],
-      "count": 0
+      "tasks": [
+        {
+          "task_id": 219553,
+          "logistic_code": 1091,
+          "client_id": null,
+          "premium": false,
+          "address": "VIA GONIN, 5",
+          "lat": "45.4438637",
+          "lng": "9.1281044",
+          "cleaning_time": 240,
+          "checkin_date": "2025-12-05",
+          "checkout_date": "2025-12-01",
+          "checkin_time": null,
+          "checkout_time": null,
+          "pax_in": 4,
+          "pax_out": 4,
+          "small_equipment": false,
+          "operation_id": 3,
+          "confirmed_operation": true,
+          "straordinaria": true,
+          "type_apt": "B",
+          "alias": "NTM",
+          "customer_name": "NOTA-MI",
+          "reasons": [],
+          "priority": "early_out"
+        }
+      ],
+      "count": 1
     },
     "high_priority": {
       "tasks": [
@@ -877,8 +903,8 @@
     }
   },
   "summary": {
-    "total_tasks": 31,
-    "early_out": 0,
+    "total_tasks": 32,
+    "early_out": 1,
     "high_priority": 15,
     "low_priority": 16
   }

@@ -1,62 +1,22 @@
 {
   "meta": {
+    "total_tasks": 12,
     "used_cleaners": 10,
     "assigned_tasks": 12,
-    "total_cleaners": 8
+    "total_cleaners": 10
   },
   "metadata": {
     "date": "2025-12-01",
     "loaded_at": "2025-12-01 09:28:09",
-    "last_updated": "2025-12-01 10:28:33",
+    "created_by": "system",
+    "modified_by": [
+      "Admin"
+    ],
+    "last_updated": "2025-12-01 10:32:34",
     "loaded_from_mysql": true,
     "modification_type": "auto_assign_early_out"
   },
   "cleaners_assignments": [
-    {
-      "cleaner": {
-        "id": 132,
-        "name": "JOHOISER ERNESTO",
-        "lastname": "LOPEZ GIRON",
-        "role": "Premium",
-        "premium": false,
-        "start_time": "09:00"
-      },
-      "tasks": [
-        {
-          "task_id": 219553,
-          "logistic_code": 1091,
-          "client_id": 61,
-          "premium": false,
-          "address": "VIA GONIN, 5",
-          "lat": "45.4438637",
-          "lng": "9.1281044",
-          "cleaning_time": 240,
-          "checkin_date": "2025-12-05",
-          "checkout_date": "2025-12-01",
-          "checkin_time": null,
-          "checkout_time": null,
-          "pax_in": 4,
-          "pax_out": 4,
-          "small_equipment": false,
-          "operation_id": 3,
-          "confirmed_operation": true,
-          "straordinaria": true,
-          "type_apt": "B",
-          "alias": "NTM",
-          "customer_name": "NOTA-MI",
-          "reasons": [
-            "client_forced_eo",
-            "automatic_assignment_eo"
-          ],
-          "priority": "early_out",
-          "start_time": "10:00",
-          "end_time": "14:00",
-          "followup": false,
-          "sequence": 1,
-          "travel_time": 0
-        }
-      ]
-    },
     {
       "cleaner": {
         "id": 1069,
@@ -100,17 +60,6 @@
           "travel_time": 0
         }
       ]
-    },
-    {
-      "cleaner": {
-        "id": 132,
-        "name": "JOHOISER ERNESTO",
-        "lastname": "LOPEZ GIRON",
-        "role": "Premium",
-        "premium": true,
-        "start_time": "10:00"
-      },
-      "tasks": []
     },
     {
       "cleaner": {
@@ -495,17 +444,6 @@
     },
     {
       "cleaner": {
-        "id": 404,
-        "name": "RASEL",
-        "lastname": "MOLLA",
-        "role": "Standard",
-        "premium": false,
-        "start_time": "10:00"
-      },
-      "tasks": []
-    },
-    {
-      "cleaner": {
         "id": 469,
         "name": "LAMIN",
         "lastname": "SOLY",
@@ -542,6 +480,50 @@
           "priority": "early_out",
           "start_time": "10:00",
           "end_time": "11:30",
+          "followup": false,
+          "sequence": 1,
+          "travel_time": 0
+        }
+      ]
+    },
+    {
+      "cleaner": {
+        "id": 132,
+        "name": "JOHOISER ERNESTO",
+        "lastname": "LOPEZ GIRON",
+        "role": "Premium",
+        "premium": false,
+        "start_time": "09:00"
+      },
+      "tasks": [
+        {
+          "task_id": 219553,
+          "logistic_code": 1091,
+          "client_id": null,
+          "premium": false,
+          "address": "VIA GONIN, 5",
+          "lat": "45.4438637",
+          "lng": "9.1281044",
+          "cleaning_time": 240,
+          "checkin_date": "2025-12-05",
+          "checkout_date": "2025-12-01",
+          "checkin_time": null,
+          "checkout_time": null,
+          "pax_in": 4,
+          "pax_out": 4,
+          "small_equipment": false,
+          "operation_id": 3,
+          "confirmed_operation": true,
+          "straordinaria": true,
+          "type_apt": "B",
+          "alias": "NTM",
+          "customer_name": "NOTA-MI",
+          "reasons": [
+            "manually_moved_to_timeline"
+          ],
+          "priority": "early_out",
+          "start_time": "10:00",
+          "end_time": "14:00",
           "followup": false,
           "sequence": 1,
           "travel_time": 0
