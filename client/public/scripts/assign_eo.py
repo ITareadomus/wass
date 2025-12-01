@@ -1011,10 +1011,24 @@ def main():
                 continue
 
         if existing_entry:
-            # DEDUPLICA: filtra le nuove task che non sono già presenti (usando task_id)
+            # CRITICAL: Separa task manuali (senza reason "automatic_assignment_eo") da task EO esistenti
+            manual_tasks = []
+            old_eo_tasks = []
+            
+            for t in existing_entry.get("tasks", []):
+                reasons = t.get("reasons", [])
+                # Se NON ha "automatic_assignment_eo" nei reasons, è una task manuale
+                if "automatic_assignment_eo" not in reasons:
+                    manual_tasks.append(t)
+                else:
+                    old_eo_tasks.append(t)
+            
+            print(f"   🔍 Cleaner {cleaner_entry['cleaner']['id']} ha {len(manual_tasks)} task manuali + {len(old_eo_tasks)} task EO esistenti")
+
+            # DEDUPLICA: filtra le nuove task EO che non sono già presenti (usando task_id)
             existing_task_ids = {
                 int(t.get("task_id"))
-                for t in existing_entry.get("tasks", [])
+                for t in old_eo_tasks
                 if t.get("task_id") is not None
             }
             new_tasks_filtered = [
@@ -1025,10 +1039,14 @@ def main():
 
             # Se non ci sono nuove task da aggiungere, passa oltre
             if not new_tasks_filtered:
+                print(f"   ⏭️  Nessuna nuova task EO da aggiungere per cleaner {cleaner_entry['cleaner']['id']}")
                 continue
 
-            # Task già presenti per questo cleaner (manuali + EO esistenti)
-            existing_entry_tasks = existing_entry.get("tasks", [])
+            print(f"   ➕ Aggiungendo {len(new_tasks_filtered)} nuove task EO per cleaner {cleaner_entry['cleaner']['id']}")
+
+            # CRITICAL: Ricostruisci la lista delle task preservando le manuali
+            # Ordine: task manuali PRIMA (nell'ordine originale), poi nuove EO
+            existing_entry_tasks = manual_tasks.copy()
 
             # --- 1) Trova l'ultimo orario di fine reale --------------------
             if existing_entry_tasks:

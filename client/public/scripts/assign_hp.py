@@ -1054,10 +1054,10 @@ def main():
 
     # CRITICAL: Filtra le task già in timeline PRIMA di passarle a plan_day
     tasks = [t for t in tasks if int(t.task_id) not in assigned_task_ids]
-    
+
     if len(assigned_task_ids) > 0:
         print(f"   ⏭️  Saltate {len(assigned_task_ids)} task già in timeline (trascinate manualmente)")
-    
+
     # Leggi i logistic_code già assegnati per evitare duplicati cross-container
     assigned_logistic_codes = set()
     if timeline_path.exists():
@@ -1091,7 +1091,7 @@ def main():
     timeline_path = OUTPUT_ASSIGN.parent / "timeline.json"
 
     # Carica timeline esistente o crea nuova struttura
-    timeline_data = {
+    timeline_data_output = {
         "metadata": {
             "last_updated": dt.now().isoformat(),
             "date": ref_date
@@ -1109,25 +1109,63 @@ def main():
             # MANTIENI TUTTI i cleaner esistenti;
             # il filtraggio delle vecchie HP lo facciamo dentro il blocco existing_entry
             if "cleaners_assignments" in existing:
-                timeline_data["cleaners_assignments"] = existing.get("cleaners_assignments", [])
+                timeline_data_output["cleaners_assignments"] = existing.get("cleaners_assignments", [])
         except Exception as e:
             print(f"⚠️ Errore nel leggere la timeline esistente: {e}")
-            timeline_data["cleaners_assignments"] = [] # Reset assignments on error
+            timeline_data_output["cleaners_assignments"] = [] # Reset assignments on error
 
     # Aggiungi le nuove assegnazioni HP organizzate per cleaner
     for cleaner_entry in output["high_priority_tasks_assigned"]:
-        # Cerca se esiste già un'entry per questo cleaner
         existing_entry = None
-        for entry in timeline_data["cleaners_assignments"]:
-            if entry["cleaner"]["id"] == cleaner_entry["cleaner"]["id"]:
-                existing_entry = entry
-                break
+        for entry in timeline_data_output["cleaners_assignments"]:
+            try:
+                if int(entry.get("cleaner", {}).get("id")) == int(cleaner_entry["cleaner"]["id"]):
+                    existing_entry = entry
+                    break
+            except Exception:
+                continue
 
         if existing_entry:
-            # CRITICAL: Unifica task manuali + automatiche e ricalcola TUTTO
-            all_tasks = existing_entry.get("tasks", []) + cleaner_entry.get("tasks", [])
-            
-            # Deduplica per task_id
+            # CRITICAL: Separa task manuali da task HP automatiche
+            manual_tasks = []
+            old_hp_tasks = []
+
+            for t in existing_entry.get("tasks", []):
+                reasons = t.get("reasons", [])
+                if "automatic_assignment_hp" not in reasons:
+                    manual_tasks.append(t)
+                else:
+                    old_hp_tasks.append(t)
+
+            print(f"   🔍 Cleaner {cleaner_entry['cleaner']['id']} ha {len(manual_tasks)} task manuali + {len(old_hp_tasks)} task HP esistenti")
+
+            # DEDUPLICA: filtra le nuove task HP che non sono già presenti
+            existing_task_ids = {
+                int(t.get("task_id"))
+                for t in old_hp_tasks
+                if t.get("task_id") is not None
+            }
+            new_tasks_filtered = [
+                t for t in cleaner_entry.get("tasks", [])
+                if t.get("task_id") is not None
+                and int(t.get("task_id")) not in existing_task_ids
+            ]
+
+            if not new_tasks_filtered:
+                print(f"   ⏭️  Nessuna nuova task HP da aggiungere per cleaner {cleaner_entry['cleaner']['id']}")
+                continue
+
+            print(f"   ➕ Aggiungendo {len(new_tasks_filtered)} nuove task HP per cleaner {cleaner_entry['cleaner']['id']}")
+
+            # CRITICAL: Preserva task manuali
+            existing_entry_tasks = manual_tasks.copy()
+            # Aggiungi le nuove task HP filtrate alla lista delle task esistenti (manuali + vecchie HP)
+            existing_entry_tasks.extend(new_tasks_filtered)
+
+            # Riorganizza la lista delle task per questo cleaner, mescolando manuali e HP
+            all_tasks = existing_entry_tasks
+
+            # Deduplica per task_id (importante se una task manuale è stata anche assegnata automaticamente)
             seen_task_ids = set()
             unique_tasks = []
             for t in all_tasks:
@@ -1135,19 +1173,19 @@ def main():
                 if tid not in seen_task_ids:
                     seen_task_ids.add(tid)
                     unique_tasks.append(t)
-            
+
             # Ordina per start_time (usa checkout se start_time non valido)
             unique_tasks.sort(key=lambda t: t.get("start_time") or t.get("checkout_time") or "00:00")
-            
+
             # RICALCOLA sequence, travel_time, start_time, end_time per TUTTE le task
             # Usa datetime invece di minuti in HP
             cleaner_start_time = cleaner_entry["cleaner"].get("start_time", "10:00")
             current_time = hhmm_to_dt(ref_date, cleaner_start_time)
             prev_task = None
-            
+
             # Lista temporanea per task valide (esclude quelle che violano check-in)
             valid_tasks = []
-            
+
             for idx, task in enumerate(unique_tasks):
                 # Calcola travel_time dalla task precedente
                 if prev_task:
@@ -1158,7 +1196,7 @@ def main():
                         curr_lng = float(task.get("lng", 0))
                         prev_addr = prev_task.get("address")
                         curr_addr = task.get("address")
-                        
+
                         # Calcola travel time
                         travel_time = travel_minutes(prev_lat, prev_lng, curr_lat, curr_lng, prev_addr, curr_addr)
                         task["travel_time"] = int(round(travel_time))
@@ -1168,7 +1206,7 @@ def main():
                         current_time += timedelta(minutes=12)
                 else:
                     task["travel_time"] = 0
-                
+
                 # Rispetta checkout_time se presente
                 checkout_str = task.get("checkout_time")
                 if checkout_str:
@@ -1180,16 +1218,16 @@ def main():
                             current_time = checkout_dt
                     except Exception:
                         pass
-                
+
                 # Calcola start e end
                 start_time = current_time
                 end_time = start_time + timedelta(minutes=int(task.get("cleaning_time", 60)))
-                
+
                 # CRITICAL: Verifica check-in PRIMA di salvare gli orari
                 checkin_str = task.get("checkin_time")
                 checkin_date_str = task.get("checkin_date")
                 checkout_date_str = task.get("checkout_date", ref_date)
-                
+
                 if checkin_str and checkin_date_str and checkout_date_str:
                     # Verifica solo se check-in è lo stesso giorno del checkout
                     if checkin_date_str == checkout_date_str:
@@ -1202,58 +1240,58 @@ def main():
                                 continue
                         except Exception:
                             pass
-                
+
                 task["start_time"] = fmt_hhmm(start_time)
                 task["end_time"] = fmt_hhmm(end_time)
                 task["followup"] = idx > 0
-                
+
                 # Aggiungi alla lista delle task valide
                 valid_tasks.append(task)
-                
+
                 current_time = end_time
                 prev_task = task
-            
+
             # CRITICAL: Ricalcola sequence DOPO aver filtrato le task valide
             for seq_idx, task in enumerate(valid_tasks):
                 task["sequence"] = seq_idx + 1
-            
+
             existing_entry["tasks"] = valid_tasks
         else:
             # Crea nuova entry
-            timeline_data["cleaners_assignments"].append({
+            timeline_data_output["cleaners_assignments"].append({
                 "cleaner": cleaner_entry["cleaner"],
                 "tasks": cleaner_entry["tasks"]
             })
 
     # Aggiorna metadata
     # Aggiorna metadata
-    timeline_data["metadata"]["last_updated"] = dt.now().isoformat()
-    timeline_data["metadata"]["date"] = ref_date
-    timeline_data["metadata"]["modification_type"] = "auto_assign_high_priority"
+    timeline_data_output["metadata"]["last_updated"] = dt.now().isoformat()
+    timeline_data_output["metadata"]["date"] = ref_date
+    timeline_data_output["metadata"]["modification_type"] = "auto_assign_high_priority"
 
     # Conta i cleaners effettivamente usati (con almeno una task)
-    used_cleaners = len([c for c in timeline_data["cleaners_assignments"] if len(c.get("tasks", [])) > 0])
+    used_cleaners = len([c for c in timeline_data_output["cleaners_assignments"] if len(c.get("tasks", [])) > 0])
 
-    timeline_data["metadata"]["last_updated"] = dt.now().isoformat()
-    timeline_data["metadata"]["date"] = ref_date
-    timeline_data["meta"]["total_cleaners"] = len(cleaners)  # Tutti i cleaners disponibili
-    timeline_data["meta"]["used_cleaners"] = used_cleaners  # Cleaners effettivamente usati
-    timeline_data["meta"]["assigned_tasks"] = sum(
-        len(c.get("tasks", [])) for c in timeline_data["cleaners_assignments"]
+    timeline_data_output["metadata"]["last_updated"] = dt.now().isoformat()
+    timeline_data_output["metadata"]["date"] = ref_date
+    timeline_data_output["meta"]["total_cleaners"] = len(cleaners)  # Tutti i cleaners disponibili
+    timeline_data_output["meta"]["used_cleaners"] = used_cleaners  # Cleaners effettivamente usati
+    timeline_data_output["meta"]["assigned_tasks"] = sum(
+        len(c.get("tasks", [])) for c in timeline_data_output["cleaners_assignments"]
     )
 
     # Scrivi il file timeline.json
     try:
-        timeline_path.write_text(json.dumps(timeline_data, ensure_ascii=False, indent=2), encoding="utf-8")
+        timeline_path.write_text(json.dumps(timeline_data_output, ensure_ascii=False, indent=2), encoding="utf-8")
         print(f"✅ Aggiornato {timeline_path}")
     except Exception as e:
         print(f"❌ Errore nella scrittura di {timeline_path}: {e}")
 
 
-    hp_count = len([c for c in timeline_data["cleaners_assignments"]
+    hp_count = len([c for c in timeline_data_output["cleaners_assignments"]
                    if any(t.get("reasons") and "automatic_assignment_hp" in t.get("reasons", []) for t in c.get("tasks", []))])
     print(f"   - Cleaner con assegnazioni HP: {hp_count}")
-    print(f"   - Totale task assegnate: {timeline_data['meta']['assigned_tasks']}")
+    print(f"   - Totale task assegnate: {timeline_data_output['meta']['assigned_tasks']}")
 
     # SPOSTAMENTO: Rimuovi le task assegnate da containers.json
     containers_path = INPUT_CONTAINERS
