@@ -79,28 +79,6 @@
       "can_do_straordinaria": true
     },
     {
-      "id": 326,
-      "name": "FESTUS OSARO",
-      "role": "Premium",
-      "active": true,
-      "ranking": 0,
-      "lastname": "AIHIVBERE",
-      "available": true,
-      "start_time": "10:00",
-      "telegram_id": 7895288780,
-      "counter_days": 1,
-      "contract_type": "B",
-      "counter_hours": 0,
-      "preferred_customers": [
-        2,
-        3,
-        75,
-        94,
-        115
-      ],
-      "can_do_straordinaria": false
-    },
-    {
       "id": 404,
       "name": "RASEL",
       "role": "Standard",
@@ -355,26 +333,35 @@
       "can_do_straordinaria": true
     },
     {
-      "id": 1070,
-      "name": "ABUBACAR",
+      "id": 937,
+      "name": "LOVETH",
       "role": "Premium",
       "active": true,
       "ranking": 0,
-      "lastname": "DIAMMEH",
+      "lastname": "IGUDIA",
       "available": true,
       "start_time": "10:00",
-      "telegram_id": null,
-      "counter_days": 3,
+      "telegram_id": 7573041558,
+      "counter_days": 1,
       "contract_type": "a chiamata",
-      "counter_hours": 3.5,
-      "preferred_customers": [],
+      "counter_hours": 3,
+      "preferred_customers": [
+        3,
+        61,
+        72,
+        75,
+        84,
+        94,
+        113,
+        115,
+        121
+      ],
       "can_do_straordinaria": false
     }
   ],
-  "total_selected": 13,
+  "total_selected": 12,
   "metadata": {
     "date": "2025-12-01",
-    "loaded_at": "2025-12-01 14:58:56",
-    "last_updated": "2025-12-01 16:01:22"
+    "loaded_at": "2025-12-01 15:12:49"
   }
 }
