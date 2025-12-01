@@ -331,18 +331,12 @@ export default function GenerateAssignments() {
         // CRITICAL: Quando carichiamo assegnazioni salvate, NON ci sono modifiche
         setHasUnsavedChanges(false);
 
-        // CRITICAL: Verifica e aggiorna la data in timeline.json dopo il caricamento
-        const timelineResponse = await fetch(`/data/output/timeline.json?t=${Date.now()}`, {
-          cache: 'no-store',
-          headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' }
-        });
+        // Verifica timeline via endpoint /api/timeline (legge da DB, sincronizza file)
+        const timelineResponse = await fetch(`/api/timeline?date=${dateStr}`);
 
         if (timelineResponse.ok) {
           const timelineData = await timelineResponse.json();
-          if (timelineData.metadata?.date !== dateStr) {
-            console.log(`🔄 Aggiornamento data in timeline.json da ${timelineData.metadata?.date} a ${dateStr}`);
-            // La data verrà aggiornata dal backend al prossimo salvataggio
-          }
+          console.log(`✅ Timeline verificata da DB per ${dateStr}: ${timelineData.cleaners_assignments?.length || 0} cleaners`);
         }
 
         // CRITICAL: Forza il refresh della timeline per mostrare i cleaners con task
@@ -441,50 +435,8 @@ export default function GenerateAssignments() {
           console.log(`✅ Assegnazioni salvate caricate automaticamente per ${dateStr}`);
           setLastSavedTimestamp(checkResult.formattedDateTime || null);
 
-          // CRITICAL: Verifica timeline.json con retry - potrebbe essere in fase di scrittura (race condition)
-          let timelineValid = false;
-          const maxRetries = 5;
-          const retryDelay = 500; // ms
-          
-          for (let attempt = 1; attempt <= maxRetries; attempt++) {
-            try {
-              const retryTimestamp = Date.now() + Math.random();
-              const retryResponse = await fetch(`/data/output/timeline.json?t=${retryTimestamp}`, {
-                cache: 'no-store',
-                headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' }
-              });
-              
-              if (retryResponse.ok) {
-                const timelineText = await retryResponse.text();
-                if (timelineText.trim().startsWith('{') || timelineText.trim().startsWith('[')) {
-                  timelineValid = true;
-                  console.log(`✅ timeline.json valido (tentativo ${attempt}/${maxRetries})`);
-                  break;
-                } else {
-                  console.warn(`⏳ timeline.json non ancora pronto (tentativo ${attempt}/${maxRetries}) - attendo ${retryDelay}ms...`);
-                }
-              }
-            } catch (fetchErr) {
-              console.warn(`⏳ Errore fetch timeline.json (tentativo ${attempt}/${maxRetries}):`, fetchErr);
-            }
-            
-            if (attempt < maxRetries) {
-              await new Promise(resolve => setTimeout(resolve, retryDelay));
-            }
-          }
-          
-          if (!timelineValid) {
-            console.error("❌ timeline.json non valido dopo tutti i tentativi");
-            toast({
-              title: "Attenzione",
-              description: "Caricamento in corso... riprova tra qualche secondo",
-              variant: "default",
-              duration: 3000
-            });
-            // Non bloccare - procedi comunque con loadTasks
-          }
-
           // Ricarica i task per mostrare i dati aggiornati
+          // loadTasks() ora usa /api/timeline che legge da DB e sincronizza il file
           await loadTasks(true);
 
           // SOLO date passate sono READ-ONLY, tutte le altre (corrente e future) sono EDITABILI
@@ -538,19 +490,16 @@ export default function GenerateAssignments() {
         // NON esistono assegnazioni salvate in MySQL
         console.log("ℹ️ Nessuna assegnazione salvata in MySQL per", dateStr);
 
-        // Verifica se esiste timeline.json locale (non salvata)
+        // Verifica se esiste timeline con assegnazioni via endpoint /api/timeline
         try {
-          const timelineResponse = await fetch(`/data/output/timeline.json?t=${Date.now()}`, {
-            cache: 'no-store',
-            headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' }
-          });
+          const timelineResponse = await fetch(`/api/timeline?date=${dateStr}`);
 
           if (timelineResponse.ok) {
             const timelineData = await timelineResponse.json();
-            const hasLocalAssignments = timelineData.cleaners_assignments?.length > 0;
+            const hasAssignments = timelineData.cleaners_assignments?.length > 0;
 
-            if (hasLocalAssignments && timelineData.metadata?.date === dateStr) {
-              console.log("✅ Timeline.json locale esistente con assegnazioni - mantieni senza resettare");
+            if (hasAssignments && timelineData.metadata?.date === dateStr) {
+              console.log("✅ Timeline esistente con assegnazioni per questa data - mantieni senza resettare");
 
               // Carica solo i task senza estrarre
               await loadTasks(true);
@@ -561,7 +510,7 @@ export default function GenerateAssignments() {
             }
           }
         } catch (err) {
-          console.log("Timeline.json locale non trovata o vuota, procedo con estrazione");
+          console.log("Timeline non trovata o vuota, procedo con estrazione");
         }
 
         // SOLO date STRETTAMENTE passate sono read-only
@@ -741,7 +690,7 @@ export default function GenerateAssignments() {
     };
   };
 
-  // Carica i task dai file JSON (SENZA rieseguire extract-data)
+  // Carica i task da containers.json (file) e timeline da DB via /api/timeline
   const loadTasks = async (skipExtraction: boolean = false) => {
     try {
       setIsLoadingTasks(true);
@@ -749,20 +698,19 @@ export default function GenerateAssignments() {
 
       const dateStr = format(selectedDate, "yyyy-MM-dd");
 
-      // Aggiungi timestamp UNIVOCO per evitare QUALSIASI cache
+      // Aggiungi timestamp UNIVOCO per evitare cache sul file containers.json
       const timestamp = Date.now() + Math.random();
 
-      console.log("🔄 Caricamento task dai file JSON (timestamp: ${timestamp})...");
+      console.log(`🔄 Caricamento task - containers da file, timeline da DB (${dateStr})...`);
 
+      // Carica containers da file e timeline da endpoint DB in parallelo
       const [containersResponse, timelineResponse] = await Promise.all([
         fetch(`/data/output/containers.json?t=${timestamp}`, {
           cache: 'no-store',
           headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' }
         }),
-        fetch(`/data/output/timeline.json?t=${timestamp}`, {
-          cache: 'no-store',
-          headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' }
-        })
+        // CRITICAL: Usa /api/timeline che legge da DB e sincronizza il file
+        fetch(`/api/timeline?date=${dateStr}`)
       ]);
 
       if (!containersResponse.ok) {
@@ -779,8 +727,8 @@ export default function GenerateAssignments() {
 
       const containersData = JSON.parse(containersText);
 
-      // Carica da timeline.json con gestione errori robusta
-      let timelineAssignmentsData = {
+      // Carica timeline da endpoint /api/timeline (DB è la fonte di verità)
+      let timelineAssignmentsData: any = {
         assignments: [],
         metadata: { date: dateStr },
         cleaners_assignments: []
@@ -788,30 +736,17 @@ export default function GenerateAssignments() {
 
       if (timelineResponse.ok) {
         try {
-          const contentType = timelineResponse.headers.get('content-type');
-          if (contentType && contentType.includes('application/json')) {
-            const timelineText = await timelineResponse.text();
-
-            // Verifica che il contenuto sia JSON valido
-            if (!timelineText.trim().startsWith('{') && !timelineText.trim().startsWith('[')) {
-              console.warn('Timeline.json corrotto, non è JSON:', timelineText.substring(0, 100));
-              timelineAssignmentsData = { metadata: {}, cleaners_assignments: [] };
-            } else {
-              timelineAssignmentsData = JSON.parse(timelineText);
-              console.log("Timeline assignments data:", timelineAssignmentsData);
-              console.log("Cleaners assignments count:", timelineAssignmentsData.cleaners_assignments?.length || 0);
-              console.log("Total tasks in timeline:", timelineAssignmentsData.cleaners_assignments?.reduce((sum: number, c: any) => sum + (c.tasks?.length || 0), 0) || 0);
-            }
-          } else {
-            console.warn('Timeline file is not JSON, using empty timeline');
-          }
+          timelineAssignmentsData = await timelineResponse.json();
+          console.log("✅ Timeline caricata da DB:", {
+            cleaners: timelineAssignmentsData.cleaners_assignments?.length || 0,
+            tasks: timelineAssignmentsData.cleaners_assignments?.reduce((sum: number, c: any) => sum + (c.tasks?.length || 0), 0) || 0
+          });
         } catch (e) {
-          console.error('Errore parsing timeline.json:', e);
-          // In caso di errore, usa timeline vuota
+          console.error('Errore parsing risposta timeline:', e);
           timelineAssignmentsData = { metadata: {}, cleaners_assignments: [] };
         }
       } else {
-        console.warn(`Timeline file not found (${timelineResponse.status}), using empty timeline`);
+        console.warn(`Timeline non trovata per ${dateStr} (${timelineResponse.status}), usando timeline vuota`);
       }
 
       console.log("Containers data:", containersData);
