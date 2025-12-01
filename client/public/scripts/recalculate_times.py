@@ -138,6 +138,11 @@ def recalculate_cleaner_times(cleaner_data: Dict[str, Any]) -> Dict[str, Any]:
     # Questo deve avvenire PRIMA del calcolo degli orari
     straordinarie = [t for t in tasks if t.get("straordinaria")]
     altre_task = [t for t in tasks if not t.get("straordinaria")]
+    
+    # NUOVO: Ordina le altre task per checkout_time (dal più presto al più tardi)
+    # Questo garantisce che una modifica al checkout riposizioni correttamente la task
+    altre_task.sort(key=lambda t: t.get("checkout_time", "00:00"))
+    
     tasks = straordinarie + altre_task
     cleaner_data["tasks"] = tasks
 
