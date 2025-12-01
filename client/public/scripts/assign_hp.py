@@ -1140,14 +1140,15 @@ def main():
             unique_tasks.sort(key=lambda t: t.get("start_time") or t.get("checkout_time") or "00:00")
             
             # RICALCOLA sequence, travel_time, start_time, end_time per TUTTE le task
-            current_time_min = hhmm_to_min(cleaner_entry["cleaner"].get("start_time", "10:00"))
+            # Usa datetime invece di minuti in HP
+            cleaner_start_time = cleaner_entry["cleaner"].get("start_time", "10:00")
+            current_time = hhmm_to_dt(ref_date, cleaner_start_time)
             prev_task = None
             
             for idx, task in enumerate(unique_tasks):
                 # Calcola travel_time dalla task precedente
                 if prev_task:
                     try:
-                        from datetime import datetime
                         prev_lat = float(prev_task.get("lat", 0))
                         prev_lng = float(prev_task.get("lng", 0))
                         curr_lat = float(task.get("lat", 0))
@@ -1155,49 +1156,38 @@ def main():
                         prev_addr = prev_task.get("address")
                         curr_addr = task.get("address")
                         
-                        # Usa la funzione di calcolo travel
-                        import math
-                        km = haversine_km(prev_lat, prev_lng, curr_lat, curr_lng)
-                        dist_reale = km * 1.5
-                        
-                        if dist_reale < 0.8:
-                            travel_time = dist_reale * 6.0
-                        elif dist_reale < 2.5:
-                            travel_time = dist_reale * 10.0
-                        else:
-                            travel_time = dist_reale * 5.0
-                        
-                        travel_time = max(2.0, min(45.0, 5.0 + travel_time))
-                        
-                        if same_building(prev_addr, curr_addr):
-                            travel_time = 3.0
-                        elif same_street(prev_addr, curr_addr) and km < 0.10:
-                            travel_time = max(travel_time - 2.0, 2.0)
-                        
+                        # Calcola travel time
+                        travel_time = travel_minutes(prev_lat, prev_lng, curr_lat, curr_lng, prev_addr, curr_addr)
                         task["travel_time"] = int(round(travel_time))
-                        current_time_min += travel_time
+                        current_time += timedelta(minutes=travel_time)
                     except Exception:
                         task["travel_time"] = 12
-                        current_time_min += 12
+                        current_time += timedelta(minutes=12)
                 else:
                     task["travel_time"] = 0
                 
                 # Rispetta checkout_time se presente
                 checkout_str = task.get("checkout_time")
                 if checkout_str:
-                    checkout_min = hhmm_to_min(checkout_str)
-                    current_time_min = max(current_time_min, checkout_min)
+                    try:
+                        checkout_time_str = task.get("checkout_time")
+                        checkout_date_str = task.get("checkout_date", ref_date)
+                        checkout_dt = parse_dt(checkout_date_str, checkout_time_str)
+                        if checkout_dt and current_time < checkout_dt:
+                            current_time = checkout_dt
+                    except Exception:
+                        pass
                 
                 # Calcola start e end
-                start_min = int(current_time_min)
-                end_min = start_min + int(task.get("cleaning_time", 60))
+                start_time = current_time
+                end_time = start_time + timedelta(minutes=int(task.get("cleaning_time", 60)))
                 
-                task["start_time"] = min_to_hhmm(start_min)
-                task["end_time"] = min_to_hhmm(end_min)
+                task["start_time"] = fmt_hhmm(start_time)
+                task["end_time"] = fmt_hhmm(end_time)
                 task["sequence"] = idx + 1
                 task["followup"] = idx > 0
                 
-                current_time_min = end_min
+                current_time = end_time
                 prev_task = task
             
             existing_entry["tasks"] = unique_tasks
