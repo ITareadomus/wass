@@ -115,7 +115,12 @@ export default function MapSection({ tasks }: MapSectionProps) {
       '#4682B4',  // Acciaio blu
       '#00BFFF'   // Azzurro intenso
     ];
-    return colors[cleanerId % colors.length];
+    
+    // Trova l'indice del cleaner nella lista ordinata
+    const cleanerIndex = cleaners.findIndex(c => c.id === cleanerId);
+    // Se trovato, usa l'indice sequenziale, altrimenti fallback all'ID
+    const colorIndex = cleanerIndex >= 0 ? cleanerIndex : cleanerId;
+    return colors[colorIndex % colors.length];
   };
 
   // Carica Google Maps API
