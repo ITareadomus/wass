@@ -35,14 +35,14 @@ export default function MapSection({ tasks }: MapSectionProps) {
         });
         if (!response.ok) return;
         const data = await response.json();
-        
+
         // CRITICAL: Ordina per start_time ESATTAMENTE come nella timeline
         const sortedCleaners = (data.cleaners || []).sort((a: any, b: any) => {
           const timeA = a.start_time || "10:00";
           const timeB = b.start_time || "10:00";
           return timeA.localeCompare(timeB);
         });
-        
+
         setCleaners(sortedCleaners);
       } catch (error) {
         console.error('Errore caricamento cleaners:', error);
@@ -199,7 +199,7 @@ export default function MapSection({ tasks }: MapSectionProps) {
       tasksWithCoordinates.forEach(task => {
         if ((task as any).assignedCleaner === filteredCleanerId) {
           const taskId = (task as any).task_id || task.id || task.name;
-          highlightedTaskIds.add(taskId);
+          highlightedTaskIds.add(String(taskId));
         }
       });
     }
@@ -249,8 +249,8 @@ export default function MapSection({ tasks }: MapSectionProps) {
       const sequence = (task as any).sequence;
 
       // Verifica se questa task è evidenziata
-      // Usa la stessa logica per la chiave univoca usata sopra
-      const taskId = (task as any).task_id || task.id || task.name;
+      // Usa la stessa logica per la chiave univoca usata sopra (normalizza a stringa)
+      const taskId = String((task as any).task_id || task.id || task.name);
       const isHighlighted = highlightedTaskIds.has(taskId);
       const markerScale = 12; // Dimensione costante per tutti i marker
       const strokeWeight = isHighlighted ? 2 : 2; // Bordo più sottile anche se evidenziata
@@ -401,8 +401,8 @@ export default function MapSection({ tasks }: MapSectionProps) {
       if (highlightedTaskIds.size > 0 && highlightedTaskIds.size < tasksWithCoordinates.length) {
         const highlightedBounds = new window.google.maps.LatLngBounds();
         tasksWithCoordinates.forEach(task => {
-          // Usa la stessa logica per la chiave univoca
-          const taskId = (task as any).task_id || task.id || task.name;
+          // Usa la stessa logica per la chiave univoca (normalizza a stringa)
+          const taskId = String((task as any).task_id || task.id || task.name);
           if (highlightedTaskIds.has(taskId)) {
             const lat = parseFloat(task.lat || '0');
             const lng = parseFloat(task.lng || '0');
