@@ -327,14 +327,16 @@
     {
       "id": 249,
       "name": "Ogbodo Chidi",
-      "lastname": "Igwe",
       "role": "Premium",
       "active": true,
       "ranking": 0,
-      "counter_hours": 0,
-      "counter_days": 7,
+      "lastname": "Igwe",
       "available": true,
+      "start_time": "10:00",
+      "telegram_id": 6481457174,
+      "counter_days": 7,
       "contract_type": "a chiamata",
+      "counter_hours": 0,
       "preferred_customers": [
         2,
         3,
@@ -350,15 +352,12 @@
         120,
         123
       ],
-      "telegram_id": 6481457174,
-      "start_time": "10:00",
       "can_do_straordinaria": true
     }
   ],
   "total_selected": 12,
   "metadata": {
     "date": "2025-12-01",
-    "loaded_at": "2025-12-01 11:25:57",
-    "last_updated": "2025-12-01 12:31:12"
+    "loaded_at": "2025-12-01 14:13:03"
   }
 }
