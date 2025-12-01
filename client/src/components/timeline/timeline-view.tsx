@@ -451,7 +451,12 @@ export default function TimelineView({
       '#4682B4',  // Acciaio blu
       '#00BFFF'   // Azzurro intenso
     ];
-    return colors[cleanerId % colors.length];
+    
+    // Trova l'indice del cleaner nella lista ordinata
+    const cleanerIndex = allCleanersToShow.findIndex(c => c.id === cleanerId);
+    // Se trovato, usa l'indice sequenziale, altrimenti fallback all'ID
+    const colorIndex = cleanerIndex >= 0 ? cleanerIndex : cleanerId;
+    return colors[colorIndex % colors.length];
   };
 
   // Funzione per caricare i cleaner da selected_cleaners.json e timeline da DB
