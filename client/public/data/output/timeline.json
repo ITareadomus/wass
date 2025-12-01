@@ -1,9 +1,9 @@
 {
   "meta": {
-    "total_tasks": 4,
+    "total_tasks": 5,
     "used_cleaners": 0,
     "assigned_tasks": 0,
-    "total_cleaners": 4
+    "total_cleaners": 5
   },
   "metadata": {
     "date": "2025-12-01",
@@ -11,7 +11,7 @@
     "modified_by": [
       "Admin"
     ],
-    "last_updated": "2025-12-01 14:13:44"
+    "last_updated": "2025-12-01 14:19:40"
   },
   "cleaners_assignments": [
     {
@@ -184,6 +184,50 @@
           "priority": "high_priority",
           "start_time": "11:00",
           "end_time": "12:30",
+          "followup": false,
+          "sequence": 1,
+          "travel_time": 0
+        }
+      ]
+    },
+    {
+      "cleaner": {
+        "id": 404,
+        "name": "RASEL",
+        "lastname": "MOLLA",
+        "role": "Standard",
+        "premium": false,
+        "start_time": "10:00"
+      },
+      "tasks": [
+        {
+          "task_id": 219649,
+          "logistic_code": 1699,
+          "client_id": null,
+          "premium": false,
+          "address": "VIA LAMARMORA 2/A",
+          "lat": "45.4561539",
+          "lng": "9.1966606",
+          "cleaning_time": 60,
+          "checkin_date": "2025-12-01",
+          "checkout_date": "2025-12-01",
+          "checkin_time": "14:00",
+          "checkout_time": "11:00",
+          "pax_in": 2,
+          "pax_out": 0,
+          "small_equipment": false,
+          "operation_id": 2,
+          "confirmed_operation": true,
+          "straordinaria": false,
+          "type_apt": "A",
+          "alias": "SNPD",
+          "customer_name": "serendipity",
+          "reasons": [
+            "manually_moved_to_timeline"
+          ],
+          "priority": "high_priority",
+          "start_time": "11:00",
+          "end_time": "12:00",
           "followup": false,
           "sequence": 1,
           "travel_time": 0
