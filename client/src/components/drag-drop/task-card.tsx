@@ -115,14 +115,14 @@ export default function TaskCard({
       clearTimeout(clickTimer);
       setClickTimer(null);
 
-      // Toggle filtro mappa per questa task (attiva/disattiva animazione)
+      // Toggle filtro mappa per questa task (attiva/disattiva animazione) - usa task.id univoco
       const currentFilteredTaskId = (window as any).mapFilteredTaskId;
-      if (currentFilteredTaskId === task.name) {
+      if (currentFilteredTaskId === task.id) {
         // Spegni animazione
         (window as any).mapFilteredTaskId = null;
       } else {
         // Accendi animazione
-        (window as any).mapFilteredTaskId = task.name;
+        (window as any).mapFilteredTaskId = task.id;
       }
     } else {
       // Primo click: avvia timer
