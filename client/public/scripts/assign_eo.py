@@ -1008,12 +1008,24 @@ def main():
                 continue
 
         if existing_entry:
-            # Accoda le nuove task EO alle task esistenti del cleaner
+            # DEDUPLICA: filtra le nuove task che non sono già presenti (usando task_id)
+            existing_task_ids = {int(t.get("task_id")) for t in existing_entry.get("tasks", []) if t.get("task_id")}
+            new_tasks_filtered = [
+                t for t in cleaner_entry.get("tasks", [])
+                if int(t.get("task_id")) not in existing_task_ids
+            ]
+            
+            # Accoda solo le task non duplicate
             existing_entry_tasks = existing_entry.get("tasks", [])
-            existing_entry_tasks.extend(cleaner_entry.get("tasks", []))
+            existing_entry_tasks.extend(new_tasks_filtered)
             # Ordina sempre per orario di inizio così timeline e travel_time restano coerenti
             existing_entry_tasks.sort(key=lambda t: t.get("start_time", "00:00"))
             existing_entry["tasks"] = existing_entry_tasks
+            
+            # Log per debug
+            if len(cleaner_entry.get("tasks", [])) > len(new_tasks_filtered):
+                skipped = len(cleaner_entry.get("tasks", [])) - len(new_tasks_filtered)
+                print(f"   ⏭️  Saltate {skipped} task duplicate per cleaner {cleaner_entry['cleaner']['id']}")
         else:
             # Nessuna entry per questo cleaner: crea un nuovo blocco
             timeline_data_output["cleaners_assignments"].append({
