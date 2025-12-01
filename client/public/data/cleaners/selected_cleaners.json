@@ -206,7 +206,7 @@
       "ranking": 0,
       "lastname": "BA",
       "available": true,
-      "start_time": "10:00",
+      "start_time": "09:00",
       "telegram_id": 8035270407,
       "counter_days": 6,
       "contract_type": "B",
@@ -374,6 +374,7 @@
   "total_selected": 13,
   "metadata": {
     "date": "2025-12-01",
-    "loaded_at": "2025-12-01 14:57:14"
+    "loaded_at": "2025-12-01 14:58:56",
+    "last_updated": "2025-12-01 16:01:22"
   }
 }

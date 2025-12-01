@@ -1,19 +1,47 @@
 {
   "metadata": {
-    "last_updated": "2025-12-01T14:57:14.657546",
+    "last_updated": "2025-12-01T14:59:07.682937",
     "date": "2025-12-01"
   },
   "containers": {
     "early_out": {
-      "tasks": [],
-      "count": 0
+      "tasks": [
+        {
+          "task_id": 219553,
+          "logistic_code": 1091,
+          "client_id": 61,
+          "premium": false,
+          "address": "VIA GONIN, 5",
+          "lat": "45.4438637",
+          "lng": "9.1281044",
+          "cleaning_time": 240,
+          "checkin_date": "2025-12-05",
+          "checkout_date": "2025-12-01",
+          "checkin_time": null,
+          "checkout_time": null,
+          "pax_in": 4,
+          "pax_out": 4,
+          "small_equipment": false,
+          "operation_id": 3,
+          "confirmed_operation": true,
+          "straordinaria": true,
+          "type_apt": "B",
+          "alias": "NTM",
+          "customer_name": "NOTA-MI",
+          "reasons": [
+            "client_forced_eo"
+          ],
+          "priority": "early_out"
+        }
+      ],
+      "count": 1
     },
     "high_priority": {
       "tasks": [
         {
           "task_id": 219589,
           "logistic_code": 1656,
-          "client_id": 101,
+          "client_id": null,
           "premium": true,
           "address": "VIA LARGO GALLARATI SCOTTI 1",
           "lat": "45.4595833",
@@ -22,7 +50,7 @@
           "checkin_date": "2025-12-01",
           "checkout_date": "2025-12-01",
           "checkin_time": "15:00",
-          "checkout_time": "12:00",
+          "checkout_time": "09:00",
           "pax_in": 4,
           "pax_out": 2,
           "small_equipment": false,
@@ -32,10 +60,7 @@
           "type_apt": "C",
           "alias": "CO99",
           "customer_name": "CO99",
-          "reasons": [
-            "same_day_checkin_between_hp_start_hp_end",
-            "premium"
-          ],
+          "reasons": [],
           "priority": "high_priority"
         }
       ],
@@ -104,8 +129,8 @@
     }
   },
   "summary": {
-    "total_tasks": 3,
-    "early_out": 0,
+    "total_tasks": 4,
+    "early_out": 1,
     "high_priority": 1,
     "low_priority": 2
   }
