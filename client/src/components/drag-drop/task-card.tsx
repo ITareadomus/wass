@@ -439,51 +439,98 @@ export default function TaskCard({
       // Recupera data di lavoro e utente corrente per il tracking
       const workDate = localStorage.getItem('selected_work_date') || new Date().toISOString().split('T')[0];
       const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
-      
-      const response = await fetch('/api/update-task-details', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          taskId: getTaskKey(displayTask),
-          logisticCode: displayTask.name,
-          checkoutDate: editedCheckoutDate,
-          checkoutTime: editedCheckoutTime,
-          checkinDate: editedCheckinDate,
-          checkinTime: editedCheckinTime,
-          cleaningTime: parseInt(editedDuration),
-          paxIn: parseInt(editedPaxIn),
-          paxOut: displayTask.paxOut, // Passa anche paxOut per coerenza
-          operationId: parseInt(editedOperationId) || null,
-          date: workDate,
-          modified_by: currentUser.username || 'unknown',
-        }),
+
+      // Funzione helper per aggiornare un singolo campo (per durata, pax, operation)
+      const updateSingleField = async (field: string, value: any) => {
+        await fetch('/api/update-task-field', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            taskId: getTaskKey(displayTask),
+            logisticCode: displayTask.name,
+            field: field,
+            value: value,
+            date: workDate,
+            modified_by: currentUser.username || 'unknown',
+          }),
+        });
+      };
+
+      // Aggiorna tutti i campi modificati
+      for (const field of editingFields) {
+        switch (field) {
+          case 'duration':
+            await updateSingleField('cleaningTime', parseInt(editedDuration));
+            break;
+          case 'paxin':
+            await updateSingleField('paxIn', parseInt(editedPaxIn));
+            break;
+          case 'operation':
+            await updateSingleField('operationId', parseInt(editedOperationId) || null);
+            break;
+          case 'checkout': {
+            const dateField = 'checkout_date';
+            const timeField = 'checkout_time';
+
+            await fetch('/api/update-task-field', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                taskId: getTaskKey(displayTask),
+                logisticCode: displayTask.name,
+                date: workDate,
+                [dateField]: editedCheckoutDate || (displayTask as any)[dateField],
+                [timeField]: editedCheckoutTime || (displayTask as any)[timeField],
+                modified_by: currentUser.username || 'unknown',
+              }),
+            });
+            break;
+          }
+          case 'checkin': {
+            const dateField = 'checkin_date';
+            const timeField = 'checkin_time';
+
+            await fetch('/api/update-task-field', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                taskId: getTaskKey(displayTask),
+                logisticCode: displayTask.name,
+                date: workDate,
+                [dateField]: editedCheckinDate || (displayTask as any)[dateField],
+                [timeField]: editedCheckinTime || (displayTask as any)[timeField],
+                modified_by: currentUser.username || 'unknown',
+              }),
+            });
+            // CRITICAL: Dopo modifica checkout/checkin, ricarica SUBITO la timeline
+            // per mostrare il nuovo posizionamento della task
+            if ((window as any).reloadAllTasks) {
+              await (window as any).reloadAllTasks(true);
+            }
+            break;
+          }
+        }
+      }
+
+      toast({
+        title: "Modifiche salvate!",
+        description: "I dettagli della task sono stati aggiornati con successo.",
       });
 
-      const result = await response.json();
+      setEditingFields(new Set());
+      setIsModalOpen(false);
 
-      if (result.success) {
-        toast({
-          title: "Modifiche salvate!",
-          description: "I dettagli della task sono stati aggiornati con successo.",
-        });
+      // Preserva lo stato acknowledged per il cleaner di destinazione
+      if ((window as any).preserveAcknowledgedIncompatibleCleaners && (displayTask as any).assignedCleaner) {
+        (window as any).preserveAcknowledgedIncompatibleCleaners((displayTask as any).assignedCleaner);
+      }
 
-        setEditingFields(new Set());
-        setIsModalOpen(false);
-
-        // Preserva lo stato acknowledged per il cleaner di destinazione
-        if ((window as any).preserveAcknowledgedIncompatibleCleaners && (displayTask as any).assignedCleaner) {
-          (window as any).preserveAcknowledgedIncompatibleCleaners((displayTask as any).assignedCleaner);
-        }
-
-        // Ricarica i task per mostrare le modifiche
-        if ((window as any).reloadAllTasks) {
-          await (window as any).reloadAllTasks();
-        }
-        if ((window as any).loadTimelineCleaners) {
-          await (window as any).loadTimelineCleaners();
-        }
-      } else {
-        throw new Error(result.error || 'Errore nel salvataggio');
+      // Ricarica i task per mostrare le modifiche
+      if ((window as any).reloadAllTasks) {
+        await (window as any).reloadAllTasks();
+      }
+      if ((window as any).loadTimelineCleaners) {
+        await (window as any).loadTimelineCleaners();
       }
     } catch (error: any) {
       console.error("Errore nel salvataggio:", error);
