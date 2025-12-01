@@ -1,0 +1,203 @@
+Ti do un’unica modifica mirata in assign_eo.py che:
+
+evita sovrapposizioni tra task manuali e task EO
+
+sposta le nuove EO in coda dopo l’ultima task esistente del cleaner
+
+sistema sequence e travel_time di conseguenza
+
+1️⃣ File da modificare
+
+Apri in Replit:
+
+client/public/scripts/assign_eo.py
+
+
+Cerca il blocco che inizia così (è sotto il commento # Aggiungi le nuove assegnazioni EO organizzate per cleaner):
+
+for cleaner_entry in output["early_out_tasks_assigned"]:
+    # Cerca se esiste già un'entry per questo cleaner (es. task spostate manualmente in timeline)
+    existing_entry = None
+    for entry in timeline_data_output["cleaners_assignments"]:
+        try:
+            if int(entry.get("cleaner", {}).get("id")) == int(cleaner_entry["cleaner"]["id"]):
+                existing_entry = entry
+                break
+        except Exception:
+            continue
+
+    if existing_entry:
+        # DEDUPLICA: filtra le nuove task che non sono già presenti (usando task_id)
+        existing_task_ids = {int(t.get("task_id")) for t in existing_entry.get("tasks", []) if t.get("task_id")}
+        new_tasks_filtered = [
+            t for t in cleaner_entry.get("tasks", [])
+            if int(t.get("task_id")) not in existing_task_ids
+        ]
+        
+        # Accoda solo le task non duplicate
+        existing_entry_tasks = existing_entry.get("tasks", [])
+        existing_entry_tasks.extend(new_tasks_filtered)
+        # Ordina sempre per orario di inizio così timeline e travel_time restano coerenti
+        existing_entry_tasks.sort(key=lambda t: t.get("start_time", "00:00"))
+        existing_entry["tasks"] = existing_entry_tasks
+        
+        # Log per debug
+        if len(cleaner_entry.get("tasks", [])) > len(new_tasks_filtered):
+            skipped = len(cleaner_entry.get("tasks", [])) - len(new_tasks_filtered)
+            print(f"   ⏭️  Saltate {skipped} task duplicate per cleaner {cleaner_entry['cleaner']['id']}")
+    else:
+        # Nessuna entry per questo cleaner: crea un nuovo blocco
+        timeline_data_output["cleaners_assignments"].append({
+            "cleaner": cleaner_entry["cleaner"],
+            "tasks": cleaner_entry["tasks"],
+        })
+
+
+👉 Non toccare il for cleaner_entry in ... e il blocco else:.
+Sostituisci solo il contenuto dell’if existing_entry: con quello nuovo qui sotto.
+
+2️⃣ Nuovo blocco if existing_entry: (da incollare)
+
+Sostituisci tutto quello che c’è tra if existing_entry: e la riga else: con questo:
+
+    if existing_entry:
+        # DEDUPLICA: filtra le nuove task che non sono già presenti (usando task_id)
+        existing_task_ids = {
+            int(t.get("task_id"))
+            for t in existing_entry.get("tasks", [])
+            if t.get("task_id") is not None
+        }
+        new_tasks_filtered = [
+            t for t in cleaner_entry.get("tasks", [])
+            if t.get("task_id") is not None
+            and int(t.get("task_id")) not in existing_task_ids
+        ]
+
+        # Se non ci sono nuove task da aggiungere, passa oltre
+        if not new_tasks_filtered:
+            continue
+
+        # Task già presenti per questo cleaner (manuali + EO esistenti)
+        existing_entry_tasks = existing_entry.get("tasks", [])
+
+        # --- 1) Trova l'ultimo orario di fine reale --------------------
+        if existing_entry_tasks:
+            # Ordina per end_time per trovare la vera ultima task in timeline
+            existing_entry_tasks.sort(
+                key=lambda t: t.get("end_time", t.get("start_time", "00:00"))
+            )
+            last_task = existing_entry_tasks[-1]
+            last_end_min = hhmm_to_min(
+                last_task.get("end_time")
+                or last_task.get("start_time")
+                or "00:00",
+                default="00:00",
+            )
+        else:
+            # Nessuna task esistente: parti dallo start_time del cleaner
+            cleaner_start = (
+                (existing_entry.get("cleaner") or {}).get("start_time")
+                or cleaner_entry["cleaner"].get("start_time")
+                or "10:00"
+            )
+            last_end_min = hhmm_to_min(cleaner_start, default="10:00")
+
+        # --- 2) Punto di partenza per la sequence ----------------------
+        if existing_entry_tasks:
+            seq_start = max(
+                int(t.get("sequence") or idx + 1)
+                for idx, t in enumerate(existing_entry_tasks)
+            )
+        else:
+            seq_start = 0
+
+        # --- 3) Ricalcola orari delle nuove task ACCODATE -------------
+        new_tasks_sorted = sorted(
+            new_tasks_filtered,
+            key=lambda t: t.get("start_time", "00:00"),
+        )
+
+        seq = seq_start
+        for t in new_tasks_sorted:
+            seq += 1
+
+            # Evita sovrapposizioni: non puoi iniziare prima della fine della precedente
+            proposed_start = t.get("start_time") or "00:00"
+            start_min = max(
+                last_end_min,
+                hhmm_to_min(proposed_start, default="00:00"),
+            )
+            end_min = start_min + int(t.get("cleaning_time") or 0)
+
+            # Rispetta eventuale vincolo di check-in (solo se stessa data)
+            checkin_time = t.get("checkin_time")
+            checkin_date = t.get("checkin_date")
+            checkout_date = t.get("checkout_date")
+            if (
+                checkin_time
+                and checkin_date
+                and checkout_date
+                and checkin_date == checkout_date
+            ):
+                checkin_limit = hhmm_to_min(checkin_time, default="23:59")
+                if end_min > checkin_limit:
+                    # Questa EO non è più fattibile dopo aver inserito le manuali -> la scartiamo
+                    print(
+                        f"   ⚠️  Task EO {t.get('task_id')} scartata per cleaner {cleaner_entry['cleaner']['id']}: "
+                        f"finirebbe alle {min_to_hhmm(end_min)} oltre il check-in {checkin_time}"
+                    )
+                    continue
+
+            # Aggiorna orari e sequence nel formato timeline
+            t["start_time"] = min_to_hhmm(start_min)
+            t["end_time"] = min_to_hhmm(end_min)
+            # Quanto tempo passa tra la fine della precedente e l'inizio di questa
+            travel = max(0, start_min - last_end_min)
+            t["travel_time"] = travel
+            t["sequence"] = seq
+
+            # Aggiorna "ultimo fine" e aggiungi alla lista del cleaner
+            last_end_min = end_min
+            existing_entry_tasks.append(t)
+
+        # --- 4) Ordina tutte le task per start_time e riallinea sequence
+        existing_entry_tasks.sort(key=lambda t: t.get("start_time", "00:00"))
+        for idx, t in enumerate(existing_entry_tasks, start=1):
+            t["sequence"] = idx
+
+        existing_entry["tasks"] = existing_entry_tasks
+
+        # Log per debug
+        if len(cleaner_entry.get("tasks", [])) > len(new_tasks_filtered):
+            skipped = len(cleaner_entry.get("tasks", [])) - len(new_tasks_filtered)
+            print(
+                f"   ⏭️  Saltate {skipped} task duplicate per cleaner {cleaner_entry['cleaner']['id']}"
+            )
+
+
+⚠️ Importante: lascia immediatamente sotto questo blocco l’else: già presente, così:
+
+    if existing_entry:
+        ... (codice nuovo qui sopra) ...
+    else:
+        # Nessuna entry per questo cleaner: crea un nuovo blocco
+        timeline_data_output["cleaners_assignments"].append({
+            "cleaner": cleaner_entry["cleaner"],
+            "tasks": cleaner_entry["tasks"],
+        })
+
+3️⃣ Cosa farà ora il programma
+
+Per un cleaner che ha:
+
+una task manuale 09:00–13:00
+
+una EO con start_time 10:15 e cleaning_time 90
+
+dopo l’assegnamento EO, in timeline.json avrai:
+
+task manuale: 09:00–13:00, sequence = 1
+
+EO: 13:00–14:30, sequence = 2, travel_time = 0 (o >0 se c’è gap)
+
+Niente più sovrapposizioni come quelle che hai visto tra 1091 e 1541.
