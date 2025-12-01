@@ -258,10 +258,14 @@ def can_handle_premium(cleaner: Cleaner, task: Task) -> bool:
 
 
 # -------- Schedulazione / costo --------
-def evaluate_route(route: List[Task]) -> Tuple[bool, List[Tuple[int, int, int]]]:
+def evaluate_route(route: List[Task], cleaner_start_time_min: Optional[int] = None) -> Tuple[bool, List[Tuple[int, int, int]]]:
     """
     Valuta se una route è fattibile e ritorna lo schedule.
     Ritorna: (is_feasible, schedule)
+    
+    Args:
+        route: Lista di task da valutare
+        cleaner_start_time_min: Start time del cleaner in minuti (per straordinarie)
     """
     if not route:
         return True, []
@@ -271,7 +275,12 @@ def evaluate_route(route: List[Task]) -> Tuple[bool, List[Tuple[int, int, int]]]
 
     schedule: List[Tuple[int, int, int]] = []
     prev: Optional[Task] = None
-    cur = 0.0
+    
+    # Per straordinarie: usa lo start_time del cleaner come base
+    if cleaner_start_time_min is not None and route and route[0].straordinaria:
+        cur = float(cleaner_start_time_min)
+    else:
+        cur = 0.0
 
     for i, t in enumerate(route):
         tt = travel_minutes(prev, t)
@@ -279,14 +288,13 @@ def evaluate_route(route: List[Task]) -> Tuple[bool, List[Tuple[int, int, int]]]
         arrival = cur
 
         # LOGICA STRAORDINARIE vs EO NORMALE:
-        # - STRAORDINARIE: possono iniziare prima delle 10:00
-        #   Usano il checkout_time effettivo senza vincoli minimi
-        #   Iniziano al MAX tra arrival e checkout
+        # - STRAORDINARIE: iniziano allo start_time del cleaner (se fornito)
+        #   oppure al checkout_time se successivo
         # - EO NORMALE: rispetta vincolo eo_start_time (10:00) e checkout_time
 
         if t.straordinaria:
-            # STRAORDINARIE: possono iniziare prima delle 10:00
-            # Iniziano quando il cleaner arriva O al checkout (se dopo arrival)
+            # STRAORDINARIE: iniziano allo start_time del cleaner
+            # ma rispettano il checkout_time se successivo
             start = max(arrival, t.checkout_time)
             cur = start
         else:
@@ -402,7 +410,8 @@ def can_add_task(cleaner: Cleaner, task: Task) -> bool:
     # 3ª-5ª task: solo se fattibile temporalmente
     if current_count >= BASE_MAX_TASKS and current_count < ABSOLUTE_MAX_TASKS:
         test_route = cleaner.route + [task]
-        feasible, schedule = evaluate_route(test_route)
+        cleaner_start_min = hhmm_to_min(cleaner.start_time) if hasattr(cleaner, 'start_time') and cleaner.start_time else None
+        feasible, schedule = evaluate_route(test_route, cleaner_start_min)
         if feasible and schedule:
             last_finish = schedule[-1][2]  # finish time in minuti
             if current_count < ABSOLUTE_MAX_TASKS_IF_BEFORE_18 and last_finish <= 18 * 60:
@@ -426,10 +435,13 @@ def find_best_position(cleaner: Cleaner, task: Task) -> Optional[Tuple[int, floa
     best_pos = None
     best_travel = float('inf')
 
+    # Ottieni lo start_time del cleaner in minuti
+    cleaner_start_min = hhmm_to_min(cleaner.start_time) if hasattr(cleaner, 'start_time') and cleaner.start_time else None
+    
     # Straordinaria deve andare per forza in pos 0
     if task.straordinaria:
         test_route = [task] + cleaner.route
-        feasible, _ = evaluate_route(test_route)
+        feasible, _ = evaluate_route(test_route, cleaner_start_min)
         if feasible:
             return (0, 0.0)
         else:
@@ -438,7 +450,7 @@ def find_best_position(cleaner: Cleaner, task: Task) -> Optional[Tuple[int, floa
     # Prova tutte le posizioni possibili
     for pos in range(len(cleaner.route) + 1):
         test_route = cleaner.route[:pos] + [task] + cleaner.route[pos:]
-        feasible, _ = evaluate_route(test_route)
+        feasible, _ = evaluate_route(test_route, cleaner_start_min)
 
         if not feasible:
             continue
@@ -773,7 +785,8 @@ def build_output(cleaners: List[Cleaner], unassigned: List[Task], original_tasks
         # Per Early-Out accettiamo anche 1 sola task (task urgenti)
         # Nessun vincolo minimo qui
 
-        feasible, schedule = evaluate_route(cl.route)
+        cleaner_start_min = hhmm_to_min(cl.start_time) if hasattr(cl, 'start_time') and cl.start_time else None
+        feasible, schedule = evaluate_route(cl.route, cleaner_start_min)
         if not feasible or not schedule:
             continue
 
