@@ -606,23 +606,24 @@ def seed_cleaners_from_eo(cleaners: List[Cleaner], ref_date: str):
         if not tasks:
             continue
 
-        # Filtra solo task EO (con priority="early_out" o reasons che include "automatic_assignment_eo")
-        eo_tasks = [t for t in tasks if
-                    t.get("priority") == "early_out" or
-                    ("automatic_assignment_eo" in t.get("reasons", []))]
+        # Filtra TUTTE le task non-HP (EO + task manuali)
+        # Escludi solo task HP già assegnate
+        non_hp_tasks = [t for t in tasks if
+                        t.get("priority") != "high_priority" and
+                        "automatic_assignment_hp" not in t.get("reasons", [])]
 
-        if not eo_tasks:
+        if not non_hp_tasks:
             continue
 
-        # Ordina per end_time per trovare l'ultima
-        eo_tasks.sort(key=lambda t: t.get("end_time", "00:00"))
-        last = eo_tasks[-1]
+        # Ordina per end_time per trovare l'ultima posizione reale
+        non_hp_tasks.sort(key=lambda t: t.get("end_time", "00:00"))
+        last = non_hp_tasks[-1]
 
         end_time = last.get("end_time")  # "HH:MM"
         last_addr = last.get("address")
         last_lat = last.get("lat")
         last_lng = last.get("lng")
-        last_seq = last.get("sequence") or len(eo_tasks)
+        last_seq = last.get("sequence") or len(non_hp_tasks)
         for cl in cleaners:
             if cl.id == cid:
                 cl.available_from = hhmm_to_dt(ref_date, end_time)
