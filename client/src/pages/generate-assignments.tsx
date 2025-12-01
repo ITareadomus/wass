@@ -301,7 +301,7 @@ export default function GenerateAssignments() {
     setHasUnsavedChanges(true);
   }, []);
 
-  // Funzione per caricare assegnazioni salvate da Object Storage
+  // Funzione per caricare assegnazioni salvate da MySQL
   const loadSavedAssignments = async (date: Date) => {
     try {
       const year = date.getFullYear();
@@ -441,26 +441,47 @@ export default function GenerateAssignments() {
           console.log(`✅ Assegnazioni salvate caricate automaticamente per ${dateStr}`);
           setLastSavedTimestamp(checkResult.formattedDateTime || null);
 
-          // CRITICAL: Verifica che timeline.json sia valido prima di caricare
-          const timestamp = Date.now() + Math.random();
-          const timelineCheckResponse = await fetch(`/data/output/timeline.json?t=${timestamp}`, {
-            cache: 'no-store',
-            headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' }
-          });
-
-          if (timelineCheckResponse.ok) {
-            const timelineText = await timelineCheckResponse.text();
-            if (!timelineText.trim().startsWith('{') && !timelineText.trim().startsWith('[')) {
-              console.error("❌ timeline.json corrotto dopo caricamento da Object Storage");
-              toast({
-                title: "Errore",
-                description: "File timeline corrotto, riprova tra qualche secondo",
-                variant: "destructive",
-                duration: 5000
+          // CRITICAL: Verifica timeline.json con retry - potrebbe essere in fase di scrittura (race condition)
+          let timelineValid = false;
+          const maxRetries = 5;
+          const retryDelay = 500; // ms
+          
+          for (let attempt = 1; attempt <= maxRetries; attempt++) {
+            try {
+              const retryTimestamp = Date.now() + Math.random();
+              const retryResponse = await fetch(`/data/output/timeline.json?t=${retryTimestamp}`, {
+                cache: 'no-store',
+                headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' }
               });
-              setIsExtracting(false);
-              return;
+              
+              if (retryResponse.ok) {
+                const timelineText = await retryResponse.text();
+                if (timelineText.trim().startsWith('{') || timelineText.trim().startsWith('[')) {
+                  timelineValid = true;
+                  console.log(`✅ timeline.json valido (tentativo ${attempt}/${maxRetries})`);
+                  break;
+                } else {
+                  console.warn(`⏳ timeline.json non ancora pronto (tentativo ${attempt}/${maxRetries}) - attendo ${retryDelay}ms...`);
+                }
+              }
+            } catch (fetchErr) {
+              console.warn(`⏳ Errore fetch timeline.json (tentativo ${attempt}/${maxRetries}):`, fetchErr);
             }
+            
+            if (attempt < maxRetries) {
+              await new Promise(resolve => setTimeout(resolve, retryDelay));
+            }
+          }
+          
+          if (!timelineValid) {
+            console.error("❌ timeline.json non valido dopo tutti i tentativi");
+            toast({
+              title: "Attenzione",
+              description: "Caricamento in corso... riprova tra qualche secondo",
+              variant: "default",
+              duration: 3000
+            });
+            // Non bloccare - procedi comunque con loadTasks
           }
 
           // Ricarica i task per mostrare i dati aggiornati
@@ -514,8 +535,8 @@ export default function GenerateAssignments() {
           await extractData(date);
         }
       } else {
-        // NON esistono assegnazioni salvate in Object Storage
-        console.log("ℹ️ Nessuna assegnazione salvata in Object Storage per", dateStr);
+        // NON esistono assegnazioni salvate in MySQL
+        console.log("ℹ️ Nessuna assegnazione salvata in MySQL per", dateStr);
 
         // Verifica se esiste timeline.json locale (non salvata)
         try {

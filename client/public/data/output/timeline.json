@@ -7,9 +7,7 @@
   "metadata": {
     "date": "2025-12-01",
     "last_updated": "2025-12-01 11:11:14",
-    "modification_type": "auto_assign_early_out",
-    "loaded_from_mysql": true,
-    "loaded_at": "2025-12-01 10:13:18"
+    "modification_type": "auto_assign_early_out"
   },
   "cleaners_assignments": [
     {
