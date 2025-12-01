@@ -1287,12 +1287,20 @@ def main():
 
         if existing_entry:
             # CRITICAL: Separa task manuali da task LP automatiche
+            # Le task LP si identificano per:
+            # 1. priority == "low_priority" OPPURE
+            # 2. reasons contiene "automatic_assignment_lp"
             manual_tasks = []
             old_lp_tasks = []
 
             for t in existing_entry.get("tasks", []):
                 reasons = t.get("reasons", [])
-                if "automatic_assignment_lp" not in reasons:
+                priority = t.get("priority", "")
+                is_lp = (
+                    "automatic_assignment_lp" in reasons or
+                    priority == "low_priority"
+                )
+                if not is_lp:
                     manual_tasks.append(t)
                 else:
                     old_lp_tasks.append(t)
@@ -1317,24 +1325,42 @@ def main():
 
             print(f"   ➕ Aggiungendo {len(new_tasks_filtered)} nuove task LP per cleaner {cleaner_entry['cleaner']['id']}")
 
-            # CRITICAL: Preserva task manuali
-            existing_entry_tasks = manual_tasks.copy()
+            # CRITICAL: Preserva task manuali SENZA ricalcolare i loro orari
+            # Le task manuali (EO, HP, drag-and-drop) mantengono i loro start_time originali
 
-            # Unifica task precedenti (manuali) + nuove LP e ricalcola TUTTO
-            all_tasks = existing_entry_tasks + new_tasks_filtered
+            # Ordina task manuali per start_time esistente
+            manual_tasks.sort(key=lambda t: t.get("start_time") or "00:00")
 
-            # Ordina per start_time (usa checkout se start_time non valido)
-            all_tasks.sort(key=lambda t: t.get("start_time") or t.get("checkout_time") or "00:00")
+            # Ordina nuove task LP per checkout_time (per inserirle nell'ordine corretto)
+            new_tasks_filtered.sort(key=lambda t: t.get("checkout_time") or "00:00")
 
-            # RICALCOLA sequence, travel_time, start_time, end_time per TUTTE le task
-            # Usa l'orario di fine dell'ultima task manuale come punto di partenza per le LP
-            current_time_min = hhmm_to_min(manual_tasks[-1].get("end_time")) if manual_tasks else hhmm_to_min(cleaner_entry["cleaner"].get("start_time", "10:00"))
-            prev_task = manual_tasks[-1] if manual_tasks else None
+            # Lista finale: inizia con le task manuali (preservate)
+            valid_tasks = manual_tasks.copy()
 
-            # Lista temporanea per task valide (esclude quelle che violano check-in)
-            valid_tasks = []
+            # Punto di partenza per le nuove task LP
+            if valid_tasks:
+                # Usa l'end_time dell'ultima task manuale
+                last_manual = valid_tasks[-1]
+                current_time_min = hhmm_to_min(last_manual.get("end_time", "10:00"))
+                prev_task = last_manual
+            else:
+                # Nessuna task manuale: usa lo start_time del cleaner o della prima LP
+                cleaner_start_str = (
+                    existing_entry.get("cleaner", {}).get("start_time") or
+                    cleaner_entry["cleaner"].get("start_time") or
+                    "10:00"
+                )
+                cleaner_start_min = hhmm_to_min(cleaner_start_str)
 
-            for idx, task in enumerate(all_tasks):
+                # Se la prima LP ha già un start_time calcolato da evaluate_route, usa quello
+                if new_tasks_filtered and new_tasks_filtered[0].get("start_time"):
+                    current_time_min = hhmm_to_min(new_tasks_filtered[0].get("start_time"))
+                else:
+                    current_time_min = cleaner_start_min
+                prev_task = None
+
+            # Processa SOLO le nuove task LP (le manuali sono già preservate)
+            for idx, task in enumerate(new_tasks_filtered):
                 # Calcola travel_time dalla task precedente
                 if prev_task:
                     try:
@@ -1345,7 +1371,6 @@ def main():
                         prev_addr = prev_task.get("address")
                         curr_addr = task.get("address")
 
-                        # Usa la funzione di calcolo travel
                         km = haversine_km(prev_lat, prev_lng, curr_lat, curr_lng)
                         dist_reale = km * 1.5
 
@@ -1369,11 +1394,10 @@ def main():
                         task["travel_time"] = 12
                         current_time_min += 12
                 else:
-                    # Caso prima task (manuale o LP)
+                    # Prima task LP senza predecessori
                     task["travel_time"] = 0
 
-
-                # Rispetta checkout_time se presente
+                # Rispetta checkout_time se presente e maggiore del tempo corrente
                 checkout_str = task.get("checkout_time")
                 if checkout_str:
                     checkout_min = hhmm_to_min(checkout_str)
@@ -1386,31 +1410,28 @@ def main():
                 # CRITICAL: Verifica check-in PRIMA di salvare gli orari
                 checkin_str = task.get("checkin_time")
                 checkin_date_str = task.get("checkin_date")
-                checkout_date_str = task.get("checkout_date", ref_date) # Usa ref_date se checkout_date non presente
+                checkout_date_str = task.get("checkout_date", ref_date)
 
                 if checkin_str and checkin_date_str and checkout_date_str:
-                    # Verifica solo se check-in è lo stesso giorno del checkout
                     if checkin_date_str == checkout_date_str:
                         checkin_min = hhmm_to_min(checkin_str)
                         if end_min > checkin_min:
-                            # Task non fattibile: salta e rimuovi dalla lista
                             print(f"   ⚠️  Task LP {task.get('task_id')} scartata per cleaner {cleaner_entry['cleaner']['id']}: "
                                   f"finirebbe alle {min_to_hhmm(end_min)} oltre il check-in {checkin_str}")
-                            continue # Salta questa task
+                            continue
 
                 task["start_time"] = min_to_hhmm(start_min)
                 task["end_time"] = min_to_hhmm(end_min)
-                task["followup"] = idx > 0
+                task["followup"] = True  # LP sono sempre followup se dopo manuali
 
-                # Aggiungi alla lista delle task valide
                 valid_tasks.append(task)
-
                 current_time_min = end_min
                 prev_task = task
 
-            # CRITICAL: Ricalcola sequence DOPO aver filtrato le task valide
+            # CRITICAL: Ricalcola sequence per TUTTE le task (manuali + LP)
             for seq_idx, task in enumerate(valid_tasks):
                 task["sequence"] = seq_idx + 1
+                task["followup"] = seq_idx > 0
 
             existing_entry["tasks"] = valid_tasks
         else:
