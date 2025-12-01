@@ -35,7 +35,15 @@ export default function MapSection({ tasks }: MapSectionProps) {
         });
         if (!response.ok) return;
         const data = await response.json();
-        setCleaners(data.cleaners || []);
+        
+        // CRITICAL: Ordina per start_time ESATTAMENTE come nella timeline
+        const sortedCleaners = (data.cleaners || []).sort((a: any, b: any) => {
+          const timeA = a.start_time || "10:00";
+          const timeB = b.start_time || "10:00";
+          return timeA.localeCompare(timeB);
+        });
+        
+        setCleaners(sortedCleaners);
       } catch (error) {
         console.error('Errore caricamento cleaners:', error);
       }
