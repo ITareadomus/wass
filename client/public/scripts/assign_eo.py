@@ -6,6 +6,7 @@ from typing import Any, Dict, List, Optional, Tuple
 from pathlib import Path
 from datetime import datetime
 from task_validation import can_cleaner_handle_task, can_cleaner_handle_apartment, can_cleaner_handle_priority
+from sequence_utils import normalize_sequences
 from assign_utils import (
     NEARBY_TRAVEL_THRESHOLD, NEW_CLEANER_PENALTY_MIN, NEW_TRAINER_PENALTY_MIN,
     TARGET_MIN_LOAD_MIN, FAIRNESS_DELTA_HOURS, LOAD_WEIGHT,
@@ -1182,30 +1183,21 @@ def main():
                 last_end_min = end_min
                 existing_entry_tasks.append(t)
 
-            # --- 4) Ordina tutte le task per start_time e riallinea sequence
-            # CRITICO: Se c'è una straordinaria, DEVE rimanere in posizione 0
-            has_straordinaria = any(t.get("straordinaria") for t in existing_entry_tasks)
+            # --- 4) Ordina e assegna sequence: straordinarie SEMPRE prime
+            # Separa straordinaria dalle altre
+            straordinaria_tasks = [t for t in existing_entry_tasks if t.get("straordinaria")]
+            other_tasks = [t for t in existing_entry_tasks if not t.get("straordinaria")]
             
-            # Lista temporanea per task valide dopo ordinamento
-            valid_ordered_tasks = []
+            # Ordina solo le altre task per start_time
+            other_tasks.sort(key=lambda t: t.get("start_time", "00:00"))
             
-            if has_straordinaria:
-                # Separa straordinaria dalle altre
-                straordinaria_tasks = [t for t in existing_entry_tasks if t.get("straordinaria")]
-                other_tasks = [t for t in existing_entry_tasks if not t.get("straordinaria")]
-                
-                # Ordina solo le altre task
-                other_tasks.sort(key=lambda t: t.get("start_time", "00:00"))
-                
-                # Ricomponi: straordinarie SEMPRE per prime
-                valid_ordered_tasks = straordinaria_tasks + other_tasks
-            else:
-                # Nessuna straordinaria: ordina normalmente
-                valid_ordered_tasks = sorted(existing_entry_tasks, key=lambda t: t.get("start_time", "00:00"))
+            # Ricomponi: straordinarie SEMPRE per prime
+            valid_ordered_tasks = straordinaria_tasks + other_tasks
             
-            # CRITICAL: Ricalcola sequence DOPO ordinamento
-            for idx, t in enumerate(valid_ordered_tasks, start=1):
-                t["sequence"] = idx
+            # Assegna sequence e followup
+            for idx, t in enumerate(valid_ordered_tasks):
+                t["sequence"] = idx + 1
+                t["followup"] = idx > 0
 
             existing_entry["tasks"] = valid_ordered_tasks
 

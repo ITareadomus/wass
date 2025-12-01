@@ -6,6 +6,7 @@ from typing import Any, Dict, List, Optional, Tuple
 from pathlib import Path
 from datetime import datetime, timedelta
 from task_validation import can_cleaner_handle_task, can_cleaner_handle_apartment, can_cleaner_handle_priority
+from sequence_utils import normalize_sequences
 from assign_utils import (
     NEARBY_TRAVEL_THRESHOLD, NEW_CLEANER_PENALTY_MIN, NEW_TRAINER_PENALTY_MIN,
     TARGET_MIN_LOAD_MIN, FAIRNESS_DELTA_HOURS, LOAD_WEIGHT,
@@ -1251,9 +1252,18 @@ def main():
                 current_time = end_time
                 prev_task = task
 
-            # CRITICAL: Ricalcola sequence DOPO aver filtrato le task valide
-            for seq_idx, task in enumerate(valid_tasks):
-                task["sequence"] = seq_idx + 1
+            # CRITICAL: Ordina e assegna sequence - straordinarie SEMPRE prime
+            # Separa straordinaria dalle altre (preservando ordine)
+            straordinaria_tasks = [t for t in valid_tasks if t.get("straordinaria")]
+            other_tasks = [t for t in valid_tasks if not t.get("straordinaria")]
+            
+            # Ricomponi: straordinarie SEMPRE per prime, altre nell'ordine calcolato
+            valid_tasks = straordinaria_tasks + other_tasks
+            
+            # Assegna sequence e followup
+            for idx, task in enumerate(valid_tasks):
+                task["sequence"] = idx + 1
+                task["followup"] = idx > 0
 
             existing_entry["tasks"] = valid_tasks
         else:

@@ -7,6 +7,7 @@ from pathlib import Path
 import sys
 from datetime import datetime
 from task_validation import can_cleaner_handle_task, can_cleaner_handle_apartment, can_cleaner_handle_priority
+from sequence_utils import normalize_sequences
 from assign_utils import (
     NEARBY_TRAVEL_THRESHOLD, NEW_CLEANER_PENALTY_MIN, NEW_TRAINER_PENALTY_MIN,
     TARGET_MIN_LOAD_MIN, TRAINER_TARGET_MIN_LOAD_MIN, FAIRNESS_DELTA_HOURS, LOAD_WEIGHT,
@@ -1325,39 +1326,101 @@ def main():
 
             print(f"   ➕ Aggiungendo {len(new_tasks_filtered)} nuove task LP per cleaner {cleaner_entry['cleaner']['id']}")
 
-            # CRITICAL: Preserva task manuali SENZA ricalcolare i loro orari
-            # Le task manuali (EO, HP, drag-and-drop) mantengono i loro start_time originali
+            # CRITICAL: Separa straordinarie dalle altre task manuali
+            # Le straordinarie devono SEMPRE essere sequence=1
+            straordinaria_tasks = [t for t in manual_tasks if t.get("straordinaria")]
+            other_manual_tasks = [t for t in manual_tasks if not t.get("straordinaria")]
 
-            # Ordina task manuali per start_time esistente
-            manual_tasks.sort(key=lambda t: t.get("start_time") or "00:00")
+            # Ordina le altre task manuali per start_time esistente
+            other_manual_tasks.sort(key=lambda t: t.get("start_time") or "00:00")
 
-            # Ordina nuove task LP per checkout_time (per inserirle nell'ordine corretto)
+            # Ordina nuove task LP per checkout_time
             new_tasks_filtered.sort(key=lambda t: t.get("checkout_time") or "00:00")
 
-            # Lista finale: inizia con le task manuali (preservate)
-            valid_tasks = manual_tasks.copy()
+            # Ottieni lo start_time del cleaner
+            cleaner_start_str = (
+                existing_entry.get("cleaner", {}).get("start_time") or
+                cleaner_entry["cleaner"].get("start_time") or
+                "10:00"
+            )
+            cleaner_start_min = hhmm_to_min(cleaner_start_str)
 
-            # Punto di partenza per le nuove task LP
-            if valid_tasks:
-                # Usa l'end_time dell'ultima task manuale
-                last_manual = valid_tasks[-1]
-                current_time_min = hhmm_to_min(last_manual.get("end_time", "10:00"))
-                prev_task = last_manual
-            else:
-                # Nessuna task manuale: usa lo start_time del cleaner o della prima LP
-                cleaner_start_str = (
-                    existing_entry.get("cleaner", {}).get("start_time") or
-                    cleaner_entry["cleaner"].get("start_time") or
-                    "10:00"
-                )
-                cleaner_start_min = hhmm_to_min(cleaner_start_str)
+            # Lista finale: STRAORDINARIA prima, poi altre manuali
+            valid_tasks = []
 
-                # Se la prima LP ha già un start_time calcolato da evaluate_route, usa quello
-                if new_tasks_filtered and new_tasks_filtered[0].get("start_time"):
-                    current_time_min = hhmm_to_min(new_tasks_filtered[0].get("start_time"))
+            # STEP 1: Processa la straordinaria (se presente) - deve essere sequence=1
+            if straordinaria_tasks:
+                strao = straordinaria_tasks[0]  # Solo una straordinaria per cleaner
+                # Ricalcola start_time della straordinaria
+                checkout_str = strao.get("checkout_time")
+                if checkout_str:
+                    strao_start = max(cleaner_start_min, hhmm_to_min(checkout_str))
                 else:
-                    current_time_min = cleaner_start_min
+                    strao_start = cleaner_start_min
+                strao_end = strao_start + int(strao.get("cleaning_time", 60))
+
+                strao["start_time"] = min_to_hhmm(strao_start)
+                strao["end_time"] = min_to_hhmm(strao_end)
+                strao["sequence"] = 1
+                strao["followup"] = False
+                strao["travel_time"] = 0
+                valid_tasks.append(strao)
+
+                current_time_min = strao_end
+                prev_task = strao
+            else:
+                current_time_min = cleaner_start_min
                 prev_task = None
+
+            # STEP 2: Processa le altre task manuali (EO/HP non straordinarie)
+            for task in other_manual_tasks:
+                # Calcola travel_time
+                if prev_task:
+                    try:
+                        prev_lat = float(prev_task.get("lat", 0))
+                        prev_lng = float(prev_task.get("lng", 0))
+                        curr_lat = float(task.get("lat", 0))
+                        curr_lng = float(task.get("lng", 0))
+                        prev_addr = prev_task.get("address")
+                        curr_addr = task.get("address")
+
+                        km = haversine_km(prev_lat, prev_lng, curr_lat, curr_lng)
+                        dist_reale = km * 1.5
+                        if dist_reale < 0.8:
+                            travel_time = dist_reale * 6.0
+                        elif dist_reale < 2.5:
+                            travel_time = dist_reale * 10.0
+                        else:
+                            travel_time = dist_reale * 5.0
+                        travel_time = max(2.0, min(45.0, 5.0 + travel_time))
+                        if same_building(prev_addr, curr_addr):
+                            travel_time = 3.0
+                        elif same_street(prev_addr, curr_addr) and km < 0.10:
+                            travel_time = max(travel_time - 2.0, 2.0)
+                        task["travel_time"] = int(round(travel_time))
+                        current_time_min += travel_time
+                    except Exception:
+                        task["travel_time"] = 12
+                        current_time_min += 12
+                else:
+                    task["travel_time"] = 0
+
+                # Rispetta checkout_time
+                checkout_str = task.get("checkout_time")
+                if checkout_str:
+                    checkout_min = hhmm_to_min(checkout_str)
+                    current_time_min = max(current_time_min, checkout_min)
+
+                start_min = int(current_time_min)
+                end_min = start_min + int(task.get("cleaning_time", 60))
+
+                task["start_time"] = min_to_hhmm(start_min)
+                task["end_time"] = min_to_hhmm(end_min)
+                task["followup"] = len(valid_tasks) > 0
+
+                valid_tasks.append(task)
+                current_time_min = end_min
+                prev_task = task
 
             # Processa SOLO le nuove task LP (le manuali sono già preservate)
             for idx, task in enumerate(new_tasks_filtered):
@@ -1428,10 +1491,11 @@ def main():
                 current_time_min = end_min
                 prev_task = task
 
-            # CRITICAL: Ricalcola sequence per TUTTE le task (manuali + LP)
-            for seq_idx, task in enumerate(valid_tasks):
-                task["sequence"] = seq_idx + 1
-                task["followup"] = seq_idx > 0
+            # CRITICAL: Assegna sequence - straordinarie già processate per prime
+            # L'ordine è già corretto: straordinaria -> altre manuali -> LP
+            for idx, task in enumerate(valid_tasks):
+                task["sequence"] = idx + 1
+                task["followup"] = idx > 0
 
             existing_entry["tasks"] = valid_tasks
         else:
