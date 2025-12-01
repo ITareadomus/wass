@@ -1090,24 +1090,22 @@ def main():
                 )
                 end_min = start_min + int(t.get("cleaning_time") or 0)
 
-                # Rispetta eventuale vincolo di check-in (solo se stessa data)
+                # CRITICAL: Rispetta vincolo di check-in PRIMA di salvare gli orari
                 checkin_time = t.get("checkin_time")
                 checkin_date = t.get("checkin_date")
                 checkout_date = t.get("checkout_date")
-                if (
-                    checkin_time
-                    and checkin_date
-                    and checkout_date
-                    and checkin_date == checkout_date
-                ):
-                    checkin_limit = hhmm_to_min(checkin_time, default="23:59")
-                    if end_min > checkin_limit:
-                        # Questa EO non è più fattibile dopo aver inserito le manuali -> la scartiamo
-                        print(
-                            f"   ⚠️  Task EO {t.get('task_id')} scartata per cleaner {cleaner_entry['cleaner']['id']}: "
-                            f"finirebbe alle {min_to_hhmm(end_min)} oltre il check-in {checkin_time}"
-                        )
-                        continue
+                
+                if checkin_time and checkin_date and checkout_date:
+                    # Verifica solo se check-in è lo stesso giorno del checkout
+                    if checkin_date == checkout_date:
+                        checkin_limit = hhmm_to_min(checkin_time, default="23:59")
+                        if end_min > checkin_limit:
+                            # Task non fattibile: salta e rimuovi dalla lista
+                            print(
+                                f"   ⚠️  Task EO {t.get('task_id')} scartata per cleaner {cleaner_entry['cleaner']['id']}: "
+                                f"finirebbe alle {min_to_hhmm(end_min)} oltre il check-in {checkin_time}"
+                            )
+                            continue
 
                 # Calcola travel_time dalla task precedente (esistente o nuova accodata)
                 if idx == 0 and prev_task_data:
