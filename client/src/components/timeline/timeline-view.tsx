@@ -408,43 +408,58 @@ export default function TimelineView({
   }, [globalTimelineMinutes, globalTimeSlots.length]);
 
   const getCleanerColor = (cleanerId: number) => {
-    // Palette ad ALTO CONTRASTO: ogni colore è nettamente distinguibile
+    // Palette di 50 colori distinti
     const colors = [
-      "#FF0000", // Rosso puro
-      "#0000FF", // Blu puro
-      "#00FF00", // Verde puro
-      "#FF00FF", // Magenta brillante
-      "#FFFF00", // Giallo puro
-      "#00FFFF", // Cyan brillante
-      "#FF6600", // Arancione intenso
-      "#9900FF", // Viola elettrico
-      "#00FF99", // Verde acqua brillante
-      "#FF0099", // Rosa shocking
-      "#FF9900", // Arancio dorato
-      "#0099FF", // Azzurro brillante
-      "#99FF00", // Verde lime
-      "#FF0066", // Rosa fucsia
-      "#6600FF", // Viola indigo
-      "#00FF66", // Verde menta
-      "#FF6699", // Rosa salmone
-      "#66FF00", // Verde chartreuse
-      "#FF3300", // Rosso arancio
-      "#3300FF", // Blu violetto
-      "#00FF33", // Verde primavera
-      "#FF33CC", // Rosa orchidea
-      "#FFCC00", // Oro brillante
-      "#00CCFF", // Turchese chiaro
-      "#CC00FF", // Magenta viola
-      "#FF9933", // Arancio pesca
-      "#3366FF", // Blu cobalto
-      "#66FF99", // Verde acquamarina
-      "#FF6633", // Corallo
-      "#9933FF", // Viola ametista
-      "#33FF66", // Verde giada
-      "#FF3399", // Rosa lampone
-      "#FFFF66", // Giallo limone
-      "#66FFFF", // Celeste
-      "#FF66FF"  // Lavanda brillante
+      "#FF0000", // Rosso
+      "#00FF00", // Verde lime
+      "#0000FF", // Blu
+      "#FFFF00", // Giallo
+      "#FF00FF", // Magenta
+      "#00FFFF", // Ciano
+      "#800000", // Rosso scuro
+      "#008000", // Verde scuro
+      "#000080", // Blu scuro
+      "#808000", // Olive
+      "#800080", // Viola
+      "#008080", // Teal
+      "#FFA500", // Arancione
+      "#A52A2A", // Marrone
+      "#5F9EA0", // Cadetto
+      "#7FFF00", // Chartreuse
+      "#D2691E", // Cioccolato
+      "#6495ED", // Cornflower
+      "#DC143C", // Cremisi
+      "#00CED1", // Turchese scuro
+      "#ADFF2F", // Green Yellow
+      "#4B0082", // Indigo
+      "#F08080", // Light Coral
+      "#20B2AA", // Light Sea Green
+      "#87CEFA", // Light Sky Blue
+      "#FF1493", // Deep Pink
+      "#32CD32", // Lime Green
+      "#1E90FF", // Dodger Blue
+      "#9370DB", // Medium Purple
+      "#3CB371", // Medium Sea Green
+      "#FF4500", // Orange Red
+      "#6A5ACD", // Slate Blue
+      "#2E8B57", // Sea Green
+      "#BA55D3", // Medium Orchid
+      "#66CDAA", // Medium Aquamarine
+      "#4169E1", // Royal Blue
+      "#C71585", // Medium Violet Red
+      "#48D1CC", // Medium Turquoise
+      "#7B68EE", // Medium Slate Blue
+      "#00FA9A", // Medium Spring Green
+      "#B22222", // Firebrick
+      "#FFD700", // Gold
+      "#228B22", // Forest Green
+      "#FF8C00", // Dark Orange
+      "#9932CC", // Dark Orchid
+      "#8B0000", // Dark Red
+      "#006400", // Dark Green
+      "#8A2BE2", // Blue Violet
+      "#00BFFF", // Deep Sky Blue
+      "#F0E68C"  // Khaki
     ];
     return colors[cleanerId % colors.length];
   };
