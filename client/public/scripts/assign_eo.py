@@ -1065,7 +1065,18 @@ def main():
             )
 
             seq = seq_start
-            for t in new_tasks_sorted:
+            prev_task_data = None
+            
+            # Se ci sono task esistenti, prendi l'ultima come riferimento per il travel time
+            if existing_entry_tasks:
+                last_existing = existing_entry_tasks[-1]
+                prev_task_data = {
+                    "lat": last_existing.get("lat"),
+                    "lng": last_existing.get("lng"),
+                    "address": last_existing.get("address")
+                }
+            
+            for idx, t in enumerate(new_tasks_sorted):
                 seq += 1
 
                 # Evita sovrapposizioni: non puoi iniziare prima della fine della precedente
@@ -1095,11 +1106,50 @@ def main():
                         )
                         continue
 
+                # Calcola travel_time dalla task precedente (esistente o nuova accodata)
+                if idx == 0 and prev_task_data:
+                    # Prima task accodata: calcola travel dalla ultima task esistente
+                    try:
+                        prev_lat = float(prev_task_data.get("lat", 0))
+                        prev_lng = float(prev_task_data.get("lng", 0))
+                        curr_lat = float(t.get("lat", 0))
+                        curr_lng = float(t.get("lng", 0))
+                        prev_addr = prev_task_data.get("address")
+                        curr_addr = t.get("address")
+                        
+                        # Usa le funzioni di calcolo travel_time
+                        travel = int(round(haversine_km(prev_lat, prev_lng, curr_lat, curr_lng) * 12))  # Approssimazione
+                        if same_building(prev_addr, curr_addr):
+                            travel = 3
+                        elif same_street(prev_addr, curr_addr):
+                            travel = max(travel - 2, 2)
+                    except Exception:
+                        travel = max(0, start_min - last_end_min)
+                elif idx > 0:
+                    # Task successive: calcola dalla task accodata precedente
+                    try:
+                        prev_new_task = new_tasks_sorted[idx - 1]
+                        prev_lat = float(prev_new_task.get("lat", 0))
+                        prev_lng = float(prev_new_task.get("lng", 0))
+                        curr_lat = float(t.get("lat", 0))
+                        curr_lng = float(t.get("lng", 0))
+                        prev_addr = prev_new_task.get("address")
+                        curr_addr = t.get("address")
+                        
+                        travel = int(round(haversine_km(prev_lat, prev_lng, curr_lat, curr_lng) * 12))
+                        if same_building(prev_addr, curr_addr):
+                            travel = 3
+                        elif same_street(prev_addr, curr_addr):
+                            travel = max(travel - 2, 2)
+                    except Exception:
+                        travel = max(0, start_min - last_end_min)
+                else:
+                    # Nessuna task precedente
+                    travel = 0
+
                 # Aggiorna orari e sequence nel formato timeline
                 t["start_time"] = min_to_hhmm(start_min)
                 t["end_time"] = min_to_hhmm(end_min)
-                # Quanto tempo passa tra la fine della precedente e l'inizio di questa
-                travel = max(0, start_min - last_end_min)
                 t["travel_time"] = travel
                 t["sequence"] = seq
 
