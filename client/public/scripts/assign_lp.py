@@ -661,7 +661,7 @@ def load_cleaners() -> List[Cleaner]:
 
 def seed_cleaners_from_assignments(cleaners: List[Cleaner]):
     """
-    Seed cleaners con informazioni da timeline.json (EO e HP assignments)
+    Seed cleaners con informazioni da timeline.json (EO, HP e task manuali)
     Conta anche il totale task giornaliere per applicare il limite di 5
     """
     # Leggi dalla timeline.json invece che dai file individuali
@@ -687,15 +687,16 @@ def seed_cleaners_from_assignments(cleaners: List[Cleaner]):
         if not tasks:
             continue
 
-        # Filtra solo task NON-LP (EO e HP)
+        # Filtra TUTTE le task non-LP (EO + HP + task manuali)
+        # Escludi solo task LP già assegnate
         non_lp_tasks = [t for t in tasks if
-                        t.get("priority") in ["early_out", "high_priority"] or
-                        ("automatic_assignment_lp" not in t.get("reasons", []))]
+                        t.get("priority") != "low_priority" and
+                        "automatic_assignment_lp" not in t.get("reasons", [])]
 
         if not non_lp_tasks:
             continue
 
-        # Ordina per end_time per trovare l'ultima (gestisci None)
+        # Ordina per end_time per trovare l'ultima posizione reale
         non_lp_tasks.sort(key=lambda t: t.get("end_time") or "00:00")
         last = non_lp_tasks[-1]
 
@@ -712,7 +713,7 @@ def seed_cleaners_from_assignments(cleaners: List[Cleaner]):
                 cl.last_lat = float(last_lat) if last_lat is not None else None
                 cl.last_lng = float(last_lng) if last_lng is not None else None
                 cl.last_sequence = int(last_seq)
-                # NUOVO: Conta il totale task giornaliere (EO + HP)
+                # NUOVO: Conta il totale task giornaliere (EO + HP + manuali)
                 cl.total_daily_tasks = len(non_lp_tasks)
                 break
 
