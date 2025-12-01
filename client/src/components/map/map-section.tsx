@@ -72,58 +72,48 @@ export default function MapSection({ tasks }: MapSectionProps) {
 
   // Funzione per ottenere il colore del cleaner (STESSA PALETTE della timeline)
   const getCleanerColor = (cleanerId: number) => {
-    // Palette di 50 colori distinti
+    // Palette di 40 colori distinti in ordine
     const colors = [
-      "#FF0000", // Rosso
-      "#00FF00", // Verde lime
-      "#0000FF", // Blu
-      "#FFFF00", // Giallo
-      "#FF00FF", // Magenta
-      "#00FFFF", // Ciano
-      "#800000", // Rosso scuro
-      "#008000", // Verde scuro
-      "#000080", // Blu scuro
-      "#808000", // Olive
-      "#800080", // Viola
-      "#008080", // Teal
-      "#FFA500", // Arancione
-      "#A52A2A", // Marrone
-      "#5F9EA0", // Cadetto
-      "#7FFF00", // Chartreuse
-      "#D2691E", // Cioccolato
-      "#6495ED", // Cornflower
-      "#DC143C", // Cremisi
-      "#00CED1", // Turchese scuro
-      "#ADFF2F", // Green Yellow
-      "#4B0082", // Indigo
-      "#F08080", // Light Coral
-      "#20B2AA", // Light Sea Green
-      "#87CEFA", // Light Sky Blue
-      "#FF1493", // Deep Pink
-      "#32CD32", // Lime Green
-      "#1E90FF", // Dodger Blue
-      "#9370DB", // Medium Purple
-      "#3CB371", // Medium Sea Green
-      "#FF4500", // Orange Red
-      "#6A5ACD", // Slate Blue
-      "#2E8B57", // Sea Green
-      "#BA55D3", // Medium Orchid
-      "#66CDAA", // Medium Aquamarine
-      "#4169E1", // Royal Blue
-      "#C71585", // Medium Violet Red
-      "#48D1CC", // Medium Turquoise
-      "#7B68EE", // Medium Slate Blue
-      "#00FA9A", // Medium Spring Green
-      "#B22222", // Firebrick
-      "#FFD700", // Gold
-      "#228B22", // Forest Green
-      "#FF8C00", // Dark Orange
-      "#9932CC", // Dark Orchid
-      "#8B0000", // Dark Red
-      "#006400", // Dark Green
-      "#8A2BE2", // Blue Violet
-      "#00BFFF", // Deep Sky Blue
-      "#F0E68C"  // Khaki
+      '#FF0000',  // Rosso
+      '#00A86B',  // Verde smeraldo
+      '#0000FF',  // Blu forte
+      '#FFD700',  // Giallo oro
+      '#8A2BE2',  // Viola acceso
+      '#FF8C00',  // Arancione scuro
+      '#000000',  // Nero
+      '#DC143C',  // Cremisi
+      '#40E0D0',  // Turchese
+      '#A0522D',  // Marrone scuro
+      '#C71585',  // Rosa violetto
+      '#228B22',  // Verde foresta
+      '#DA70D6',  // Orchidea
+      '#FF1493',  // Rosa profundo
+      '#ADFF2F',  // Verde giallastro
+      '#FF4500',  // Rosso-arancio
+      '#D2691E',  // Cioccolato
+      '#3CB371',  // Verde medio
+      '#DEB887',  // Beige scuro
+      '#B22222',  // Rosso mattone
+      '#9932CC',  // Viola scuro
+      '#CD5C5C',  // Rosso indiano
+      '#F4A460',  // Sabbia
+      '#87CEEB',  // Azzurro chiaro
+      '#FFA07A',  // Salmone chiaro
+      '#20B2AA',  // Verde acqua
+      '#FF69B4',  // Rosa caldo
+      '#00CED1',  // Turchese scuro
+      '#9370DB',  // Viola medio
+      '#8B4513',  // Marrone sella
+      '#D3D3D3',  // Grigio chiaro
+      '#A9A9A9',  // Grigio scuro
+      '#708090',  // Grigio ardesia
+      '#6A5ACD',  // Indigo medio (blu-viola)
+      '#4169E1',  // Blu reale
+      '#5F9EA0',  // Blu cadetto
+      '#7B68EE',  // Blu ardesia medio
+      '#6495ED',  // Blu fiordaliso
+      '#4682B4',  // Acciaio blu
+      '#00BFFF'   // Azzurro intenso
     ];
     return colors[cleanerId % colors.length];
   };
