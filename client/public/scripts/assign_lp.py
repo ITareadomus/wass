@@ -1351,6 +1351,21 @@ def main():
                 start_min = int(current_time_min)
                 end_min = start_min + int(task.get("cleaning_time", 60))
                 
+                # CRITICAL: Verifica check-in PRIMA di salvare gli orari
+                checkin_str = task.get("checkin_time")
+                checkin_date_str = task.get("checkin_date")
+                checkout_date_str = task.get("checkout_date", ref_date)
+                
+                if checkin_str and checkin_date_str and checkout_date_str:
+                    # Verifica solo se check-in è lo stesso giorno del checkout
+                    if checkin_date_str == checkout_date_str:
+                        checkin_min = hhmm_to_min(checkin_str)
+                        if end_min > checkin_min:
+                            # Task non fattibile: salta e rimuovi dalla lista
+                            print(f"   ⚠️  Task LP {task.get('task_id')} scartata per cleaner {cleaner_entry['cleaner']['id']}: "
+                                  f"finirebbe alle {min_to_hhmm(end_min)} oltre il check-in {checkin_str}")
+                            continue
+                
                 task["start_time"] = min_to_hhmm(start_min)
                 task["end_time"] = min_to_hhmm(end_min)
                 task["sequence"] = idx + 1
