@@ -1148,6 +1148,23 @@ def main():
                     # Nessuna task precedente
                     travel = 0
 
+                # CRITICAL: Verifica check-in PRIMA di salvare gli orari
+                checkin_time = t.get("checkin_time")
+                checkin_date = t.get("checkin_date")
+                checkout_date = t.get("checkout_date")
+                
+                if checkin_time and checkin_date and checkout_date:
+                    # Verifica solo se check-in è lo stesso giorno del checkout
+                    if checkin_date == checkout_date:
+                        checkin_limit = hhmm_to_min(checkin_time, default="23:59")
+                        if end_min > checkin_limit:
+                            # Task non fattibile: salta e rimuovi dalla lista
+                            print(
+                                f"   ⚠️  Task EO {t.get('task_id')} scartata per cleaner {cleaner_entry['cleaner']['id']}: "
+                                f"finirebbe alle {min_to_hhmm(end_min)} oltre il check-in {checkin_time}"
+                            )
+                            continue
+
                 # Aggiorna orari e sequence nel formato timeline
                 t["start_time"] = min_to_hhmm(start_min)
                 t["end_time"] = min_to_hhmm(end_min)
