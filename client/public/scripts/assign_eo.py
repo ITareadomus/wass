@@ -997,10 +997,29 @@ def main():
 
     # Aggiungi le nuove assegnazioni EO organizzate per cleaner
     for cleaner_entry in output["early_out_tasks_assigned"]:
-        timeline_data_output["cleaners_assignments"].append({
-            "cleaner": cleaner_entry["cleaner"],
-            "tasks": cleaner_entry["tasks"]
-        })
+        # Cerca se esiste già un'entry per questo cleaner (es. task spostate manualmente in timeline)
+        existing_entry = None
+        for entry in timeline_data_output["cleaners_assignments"]:
+            try:
+                if int(entry.get("cleaner", {}).get("id")) == int(cleaner_entry["cleaner"]["id"]):
+                    existing_entry = entry
+                    break
+            except Exception:
+                continue
+
+        if existing_entry:
+            # Accoda le nuove task EO alle task esistenti del cleaner
+            existing_entry_tasks = existing_entry.get("tasks", [])
+            existing_entry_tasks.extend(cleaner_entry.get("tasks", []))
+            # Ordina sempre per orario di inizio così timeline e travel_time restano coerenti
+            existing_entry_tasks.sort(key=lambda t: t.get("start_time", "00:00"))
+            existing_entry["tasks"] = existing_entry_tasks
+        else:
+            # Nessuna entry per questo cleaner: crea un nuovo blocco
+            timeline_data_output["cleaners_assignments"].append({
+                "cleaner": cleaner_entry["cleaner"],
+                "tasks": cleaner_entry["tasks"],
+            })
 
     # Aggiorna meta
     # Conta i cleaner totali disponibili
