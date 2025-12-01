@@ -408,68 +408,32 @@ export default function TimelineView({
   }, [globalTimelineMinutes, globalTimeSlots.length]);
 
   const getCleanerColor = (cleanerId: number) => {
-    // Palette di 40 colori distinti in ordine
+    // Colori distribuiti per massimo contrasto visivo
     const colors = [
-      '#FF0000',  // Rosso
-      '#00A86B',  // Verde smeraldo
-      '#0000FF',  // Blu forte
-      '#FFD700',  // Giallo oro
-      '#8A2BE2',  // Viola acceso
-      '#FF8C00',  // Arancione scuro
-      '#000000',  // Nero
-      '#DC143C',  // Cremisi
-      '#40E0D0',  // Turchese
-      '#A0522D',  // Marrone scuro
-      '#C71585',  // Rosa violetto
-      '#228B22',  // Verde foresta
-      '#DA70D6',  // Orchidea
-      '#FF1493',  // Rosa profundo
-      '#ADFF2F',  // Verde giallastro
-      '#FF4500',  // Rosso-arancio
-      '#D2691E',  // Cioccolato
-      '#3CB371',  // Verde medio
-      '#DEB887',  // Beige scuro
-      '#B22222',  // Rosso mattone
-      '#9932CC',  // Viola scuro
-      '#CD5C5C',  // Rosso indiano
-      '#F4A460',  // Sabbia
-      '#87CEEB',  // Azzurro chiaro
-      '#FFA07A',  // Salmone chiaro
-      '#20B2AA',  // Verde acqua
-      '#FF69B4',  // Rosa caldo
-      '#00CED1',  // Turchese scuro
-      '#9370DB',  // Viola medio
-      '#8B4513',  // Marrone sella
-      '#D3D3D3',  // Grigio chiaro
-      '#A9A9A9',  // Grigio scuro
-      '#708090',  // Grigio ardesia
-      '#6A5ACD',  // Indigo medio (blu-viola)
-      '#4169E1',  // Blu reale
-      '#5F9EA0',  // Blu cadetto
-      '#7B68EE',  // Blu ardesia medio
-      '#6495ED',  // Blu fiordaliso
-      '#4682B4',  // Acciaio blu
-      '#00BFFF'   // Azzurro intenso
+      "#EF4444", "#3B82F6", "#22C55E", "#D946EF", "#F59E0B",
+      "#8B5CF6", "#14B8A6", "#F97316", "#6366F1", "#84CC16",
+      "#EC4899", "#0EA5E9", "#DC2626", "#10B981", "#A855F7",
+      "#EAB308", "#06B6D4", "#F43F5E", "#2563EB", "#16A34A",
+      "#C026D3", "#EA580C", "#7C3AED", "#0891B2", "#CA8A04",
+      "#DB2777", "#4F46E5", "#65A30D", "#059669", "#9333EA",
+      "#D97706", "#E11D48", "#0284C7", "#15803D", "#0D9488"
     ];
-    
-    // Trova l'indice del cleaner nella lista ordinata
-    const cleanerIndex = allCleanersToShow.findIndex(c => c.id === cleanerId);
-    // Se trovato, usa l'indice sequenziale, altrimenti fallback all'ID
-    const colorIndex = cleanerIndex >= 0 ? cleanerIndex : cleanerId;
-    return colors[colorIndex % colors.length];
+    return colors[cleanerId % colors.length];
   };
 
-  // Funzione per caricare i cleaner da selected_cleaners.json e timeline da DB
+  // Funzione per caricare i cleaner da selected_cleaners.json
   const loadCleaners = async (skipLoadSaved = false) => {
     try {
-      // Carica selected_cleaners.json e timeline da DB via /api/timeline
+      // Carica sia selected_cleaners.json che timeline.json per verificare la sincronizzazione
       const [selectedResponse, timelineResponse] = await Promise.all([
         fetch(`/data/cleaners/selected_cleaners.json?t=${Date.now()}`, {
           cache: 'no-store',
           headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' }
         }),
-        // CRITICAL: Usa /api/timeline che legge da DB e sincronizza il file
-        fetch(`/api/timeline?date=${workDate}`)
+        fetch(`/data/output/timeline.json?t=${Date.now()}`, {
+          cache: 'no-store',
+          headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' }
+        })
       ]);
 
       // Verifica selected_cleaners.json
@@ -498,20 +462,26 @@ export default function TimelineView({
       const selectedData = JSON.parse(selectedText);
       console.log("Cleaners caricati da selected_cleaners.json:", selectedData);
 
-      // Estrai cleaners dalla timeline (da DB via /api/timeline)
+      // Verifica se timeline.json esiste e ha cleaners
       let timelineCleaners: any[] = [];
       if (timelineResponse.ok) {
         try {
-          const timelineData = await timelineResponse.json();
-          timelineCleaners = timelineData.cleaners_assignments?.map((c: any) => ({
-            id: c.cleaner?.id,
-            name: c.cleaner?.name,
-            lastname: c.cleaner?.lastname,
-            role: c.cleaner?.role,
-          })).filter((c: any) => c.id) || [];
-          console.log(`✅ Cleaners dalla timeline DB: ${timelineCleaners.length}`);
+          const timelineText = await timelineResponse.text();
+
+          // Verifica che il contenuto sia JSON valido
+          if (!timelineText.trim().startsWith('{') && !timelineText.trim().startsWith('[')) {
+            console.warn('Timeline.json corrotto, non è JSON:', timelineText.substring(0, 100));
+          } else {
+            const timelineData = JSON.parse(timelineText);
+            timelineCleaners = timelineData.cleaners_assignments?.map((c: any) => ({
+              id: c.cleaner?.id,
+              name: c.cleaner?.name,
+              lastname: c.cleaner?.lastname,
+              role: c.cleaner?.role,
+            })).filter((c: any) => c.id) || [];
+          }
         } catch (e) {
-          console.warn('Errore parsing timeline da DB:', e);
+          console.warn('Errore parsing timeline.json:', e);
         }
       }
 
@@ -560,19 +530,26 @@ export default function TimelineView({
     }
   };
 
-  // Funzione per caricare i dati della timeline (inclusi i metadata) da DB
+  // Funzione per caricare i dati della timeline (inclusi i metadata)
   const loadTimelineData = async () => {
     try {
-      // CRITICAL: Usa /api/timeline che legge da DB e sincronizza il file
-      const response = await fetch(`/api/timeline?date=${workDate}`);
+      const response = await fetch(`/data/output/timeline.json?t=${Date.now()}`, {
+        cache: 'no-store',
+        headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' }
+      });
       if (!response.ok) {
-        console.warn(`Timeline non trovata per ${workDate} (${response.status}), using empty data`);
+        console.warn(`Timeline file not found (${response.status}), using empty data`);
+        setTimelineData(null); // Resetta i dati se il file non esiste o c'è un errore
+        return;
+      }
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        console.warn('Timeline file is not JSON, using empty data');
         setTimelineData(null);
         return;
       }
       const data = await response.json();
       setTimelineData(data);
-      console.log(`✅ Timeline data caricata da DB per ${workDate}`);
     } catch (error) {
       console.error("Errore nel caricamento dei dati della timeline:", error);
       setTimelineData(null);
@@ -1157,8 +1134,9 @@ export default function TimelineView({
       setLastSavedFilename(null);
       localStorage.removeItem('last_saved_assignment');
 
-      // 3. CRITICAL: Ricarica containers da file e timeline da DB
-      // Il backend ha già resettato i dati
+      // 3. CRITICAL: Ricarica SOLO i file JSON locali senza chiamare extract-data
+      // Il backend ha già resettato timeline.json e ricreato containers.json
+      // Dobbiamo solo ricaricare il frontend con i nuovi dati
       const timestamp = Date.now();
 
       // Ricarica containers.json (che ora contiene tutte le task)
@@ -1167,8 +1145,11 @@ export default function TimelineView({
         headers: { 'Cache-Control': 'no-cache' }
       });
 
-      // Ricarica timeline da DB via /api/timeline
-      const timelineResponse = await fetch(`/api/timeline?date=${workDate}`);
+      // Ricarica timeline.json (che ora è vuota)
+      const timelineResponse = await fetch(`/data/output/timeline.json?t=${timestamp}`, {
+        cache: 'no-store',
+        headers: { 'Cache-Control': 'no-cache' }
+      });
 
       if (containersResponse.ok && timelineResponse.ok) {
         // Triggera il reload dei containers nella pagina principale
@@ -1207,10 +1188,16 @@ export default function TimelineView({
 
   const loadTimelineCleaners = async () => {
     try {
-      // CRITICAL: Usa /api/timeline che legge da DB e sincronizza il file
-      const response = await fetch(`/api/timeline?date=${workDate}`);
+      const response = await fetch(`/data/output/timeline.json?t=${Date.now()}`);
       if (!response.ok) {
-        console.warn(`Timeline non trovata per ${workDate} (${response.status}), using empty timeline`);
+        console.warn(`Timeline file not found (${response.status}), using empty timeline`);
+        setTimelineCleaners([]);
+        return;
+      }
+
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        console.warn('Timeline file is not JSON, using empty timeline');
         setTimelineCleaners([]);
         return;
       }
@@ -1218,7 +1205,6 @@ export default function TimelineView({
       const timelineData = await response.json();
       const timelineCleanersList = timelineData.cleaners_assignments || [];
       setTimelineCleaners(timelineCleanersList);
-      console.log(`✅ Timeline cleaners caricati da DB: ${timelineCleanersList.length}`);
     } catch (error) {
       console.error("Errore nel caricamento timeline cleaners:", error);
       setTimelineCleaners([]);

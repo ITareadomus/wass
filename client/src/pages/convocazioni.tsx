@@ -146,8 +146,8 @@ export default function Convocazioni() {
           console.log(`ℹ️ selected_cleaners.json non trovato, mostro TUTTI i cleaners`);
         }
 
-        // Carica cleaners dalla timeline via /api/timeline (DB) per pre-selezionarli
-        const timelineResponse = await fetch(`/api/timeline?date=${dateStr}`);
+        // NUOVO: Carica anche cleaners dalla timeline.json per pre-selezionarli
+        const timelineResponse = await fetch(`/data/output/timeline.json?t=${Date.now()}`);
         if (timelineResponse.ok) {
           try {
             const timelineData = await timelineResponse.json();
@@ -158,13 +158,14 @@ export default function Convocazioni() {
               for (const cleanerEntry of timelineData.cleaners_assignments) {
                 if (cleanerEntry.cleaner?.id) {
                   const cleanerId = cleanerEntry.cleaner.id;
+                  // Pre-seleziona visivamente (NON aggiungere ad alreadySelectedIds per renderlo visibile)
                   preselectedIds.add(cleanerId);
-                  console.log(`✅ Cleaner ${cleanerId} trovato nella timeline DB - pre-selezionato visivamente`);
+                  console.log(`✅ Cleaner ${cleanerId} trovato nella timeline - pre-selezionato visivamente`);
                 }
               }
             }
           } catch (e) {
-            console.warn('⚠️ Errore parsing timeline da DB:', e);
+            console.warn('⚠️ Errore parsing timeline.json:', e);
           }
         }
 
@@ -297,8 +298,8 @@ export default function Convocazioni() {
     try {
       const dateStr = format(selectedDate, "yyyy-MM-dd");
 
-      // Carica cleaners dalla timeline via /api/timeline (DB) per includerli nel salvataggio
-      const timelineResponse = await fetch(`/api/timeline?date=${dateStr}`);
+      // Carica cleaners dalla timeline per includerli nel salvataggio
+      const timelineResponse = await fetch(`/data/output/timeline.json?t=${Date.now()}`);
       let timelineCleaners: Cleaner[] = [];
       if (timelineResponse.ok) {
         try {
@@ -309,7 +310,7 @@ export default function Convocazioni() {
               .filter((c: any) => c && selectedCleaners.has(c.id));
           }
         } catch (e) {
-          console.warn('⚠️ Errore caricamento timeline cleaners da DB:', e);
+          console.warn('⚠️ Errore caricamento timeline cleaners:', e);
         }
       }
 
@@ -368,8 +369,8 @@ export default function Convocazioni() {
     try {
       const dateStr = format(selectedDate, "yyyy-MM-dd");
 
-      // Carica cleaners dalla timeline via /api/timeline (DB) per includerli
-      const timelineResponse = await fetch(`/api/timeline?date=${dateStr}`);
+      // Carica cleaners dalla timeline per includerli
+      const timelineResponse = await fetch(`/data/output/timeline.json?t=${Date.now()}`);
       let timelineCleaners: Cleaner[] = [];
       if (timelineResponse.ok) {
         try {
@@ -380,7 +381,7 @@ export default function Convocazioni() {
               .filter((c: any) => c && selectedCleaners.has(c.id));
           }
         } catch (e) {
-          console.warn('⚠️ Errore caricamento timeline cleaners da DB:', e);
+          console.warn('⚠️ Errore caricamento timeline cleaners:', e);
         }
       }
 
