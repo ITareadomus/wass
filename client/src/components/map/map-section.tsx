@@ -1,3 +1,4 @@
+
 import { useEffect, useRef, useState } from "react";
 import { TaskType as Task } from "@shared/schema";
 import TaskCard from "@/components/drag-drop/task-card";
@@ -35,15 +36,7 @@ export default function MapSection({ tasks }: MapSectionProps) {
         });
         if (!response.ok) return;
         const data = await response.json();
-
-        // CRITICAL: Ordina per start_time ESATTAMENTE come nella timeline
-        const sortedCleaners = (data.cleaners || []).sort((a: any, b: any) => {
-          const timeA = a.start_time || "10:00";
-          const timeB = b.start_time || "10:00";
-          return timeA.localeCompare(timeB);
-        });
-
-        setCleaners(sortedCleaners);
+        setCleaners(data.cleaners || []);
       } catch (error) {
         console.error('Errore caricamento cleaners:', error);
       }
@@ -55,7 +48,7 @@ export default function MapSection({ tasks }: MapSectionProps) {
     const checkFilterUpdates = setInterval(() => {
       const newFilterCleanerId = (window as any).mapFilteredCleanerId;
       const newFilterTaskId = (window as any).mapFilteredTaskId;
-
+      
       // Se è stato impostato un nuovo filtro cleaner, cancella il filtro task
       if (newFilterCleanerId !== filteredCleanerId && newFilterCleanerId !== null && newFilterCleanerId !== undefined) {
         setFilteredCleanerId(newFilterCleanerId);
@@ -78,57 +71,18 @@ export default function MapSection({ tasks }: MapSectionProps) {
     return () => clearInterval(checkFilterUpdates);
   }, [filteredCleanerId, filteredTaskId]);
 
-  // Funzione per ottenere il colore del cleaner (STESSA PALETTE della timeline)
+  // Funzione per ottenere il colore del cleaner (basato su ID, non su indice)
   const getCleanerColor = (cleanerId: number) => {
-    // Palette di 40 colori distinti in ordine
     const colors = [
-      '#FF0000',  // Rosso
-      '#00A86B',  // Verde smeraldo
-      '#0000FF',  // Blu forte
-      '#FFD700',  // Giallo oro
-      '#8A2BE2',  // Viola acceso
-      '#FF8C00',  // Arancione scuro
-      '#000000',  // Nero
-      '#DC143C',  // Cremisi
-      '#40E0D0',  // Turchese
-      '#A0522D',  // Marrone scuro
-      '#C71585',  // Rosa violetto
-      '#228B22',  // Verde foresta
-      '#DA70D6',  // Orchidea
-      '#FF1493',  // Rosa profundo
-      '#ADFF2F',  // Verde giallastro
-      '#FF4500',  // Rosso-arancio
-      '#D2691E',  // Cioccolato
-      '#3CB371',  // Verde medio
-      '#DEB887',  // Beige scuro
-      '#B22222',  // Rosso mattone
-      '#9932CC',  // Viola scuro
-      '#CD5C5C',  // Rosso indiano
-      '#F4A460',  // Sabbia
-      '#87CEEB',  // Azzurro chiaro
-      '#FFA07A',  // Salmone chiaro
-      '#20B2AA',  // Verde acqua
-      '#FF69B4',  // Rosa caldo
-      '#00CED1',  // Turchese scuro
-      '#9370DB',  // Viola medio
-      '#8B4513',  // Marrone sella
-      '#D3D3D3',  // Grigio chiaro
-      '#A9A9A9',  // Grigio scuro
-      '#708090',  // Grigio ardesia
-      '#6A5ACD',  // Indigo medio (blu-viola)
-      '#4169E1',  // Blu reale
-      '#5F9EA0',  // Blu cadetto
-      '#7B68EE',  // Blu ardesia medio
-      '#6495ED',  // Blu fiordaliso
-      '#4682B4',  // Acciaio blu
-      '#00BFFF'   // Azzurro intenso
+      "#EF4444", "#3B82F6", "#22C55E", "#D946EF", "#F59E0B",
+      "#8B5CF6", "#14B8A6", "#F97316", "#6366F1", "#84CC16",
+      "#EC4899", "#0EA5E9", "#DC2626", "#10B981", "#A855F7",
+      "#EAB308", "#06B6D4", "#F43F5E", "#2563EB", "#16A34A",
+      "#C026D3", "#EA580C", "#7C3AED", "#0891B2", "#CA8A04",
+      "#DB2777", "#4F46E5", "#65A30D", "#059669", "#9333EA",
+      "#D97706", "#E11D48", "#0284C7", "#15803D", "#0D9488"
     ];
-
-    // Trova l'indice del cleaner nella lista ordinata
-    const cleanerIndex = cleaners.findIndex(c => c.id === cleanerId);
-    // Se trovato, usa l'indice sequenziale, altrimenti fallback all'ID
-    const colorIndex = cleanerIndex >= 0 ? cleanerIndex : cleanerId;
-    return colors[colorIndex % colors.length];
+    return colors[cleanerId % colors.length];
   };
 
   // Carica Google Maps API
@@ -189,7 +143,7 @@ export default function MapSection({ tasks }: MapSectionProps) {
 
     // Determina quali task evidenziare (non nascondere le altre)
     const highlightedTaskIds = new Set<string>();
-
+    
     // Se c'è un filtro per task ID (doppio click su task card)
     if (filteredTaskId !== null && filteredTaskId !== undefined) {
       highlightedTaskIds.add(filteredTaskId);
@@ -198,8 +152,7 @@ export default function MapSection({ tasks }: MapSectionProps) {
     else if (filteredCleanerId !== null && filteredCleanerId !== undefined && filteredCleanerId !== 0) {
       tasksWithCoordinates.forEach(task => {
         if ((task as any).assignedCleaner === filteredCleanerId) {
-          const taskId = (task as any).task_id || task.id || task.name;
-          highlightedTaskIds.add(String(taskId));
+          highlightedTaskIds.add(task.name);
         }
       });
     }
@@ -242,16 +195,14 @@ export default function MapSection({ tasks }: MapSectionProps) {
       const lng = baseLng + (offset * Math.sin(angle));
 
       const position = { lat, lng };
-
+      
       // Ottieni il colore in base al cleaner assegnato
       const assignedCleaner = (task as any).assignedCleaner;
       const markerColor = assignedCleaner ? getCleanerColor(assignedCleaner) : '#6B7280';
       const sequence = (task as any).sequence;
-
+      
       // Verifica se questa task è evidenziata
-      // Usa la stessa logica per la chiave univoca usata sopra (normalizza a stringa)
-      const taskId = String((task as any).task_id || task.id || task.name);
-      const isHighlighted = highlightedTaskIds.has(taskId);
+      const isHighlighted = highlightedTaskIds.has(task.name);
       const markerScale = 12; // Dimensione costante per tutti i marker
       const strokeWeight = isHighlighted ? 2 : 2; // Bordo più sottile anche se evidenziata
       const strokeColor = isHighlighted ? '#FFD700' : '#ffffff'; // Bordo dorato se evidenziata
@@ -262,12 +213,12 @@ export default function MapSection({ tasks }: MapSectionProps) {
         class CustomMarker extends window.google.maps.OverlayView {
           position: any;
           div: HTMLDivElement | null = null;
-
+          
           constructor(position: any) {
             super();
             this.position = position;
           }
-
+          
           onAdd() {
             const div = document.createElement('div');
             div.style.position = 'absolute';
@@ -286,29 +237,27 @@ export default function MapSection({ tasks }: MapSectionProps) {
             div.style.zIndex = isHighlighted ? '1000' : String(index);
             div.textContent = String(sequence);
             div.title = `${task.name} - ${task.type} (Seq: ${sequence})`;
-
+            
             // Aggiungi animazione bounce se evidenziato
             if (isHighlighted) {
               div.style.animation = 'bounce 0.5s ease infinite alternate';
             }
-
+            
             let clickTimer: NodeJS.Timeout | null = null;
             div.addEventListener('click', () => {
               if (clickTimer) {
                 // Doppio click rilevato
                 clearTimeout(clickTimer);
                 clickTimer = null;
-
+                
                 // Toggle filtro (attiva/disattiva animazione)
-                // CRITICAL: Usa task.id (univoco) non task.name (logistic_code che può essere duplicato)
                 const currentFilteredTaskId = (window as any).mapFilteredTaskId;
-                const uniqueTaskId = String((task as any).task_id || task.id);
-                if (currentFilteredTaskId === uniqueTaskId) {
+                if (currentFilteredTaskId === task.name) {
                   // Spegni animazione
                   (window as any).mapFilteredTaskId = null;
                 } else {
                   // Accendi animazione
-                  (window as any).mapFilteredTaskId = uniqueTaskId;
+                  (window as any).mapFilteredTaskId = task.name;
                 }
               } else {
                 // Primo click: apri dettagli
@@ -318,12 +267,12 @@ export default function MapSection({ tasks }: MapSectionProps) {
                 }, 250);
               }
             });
-
+            
             this.div = div;
             const panes = this.getPanes();
             panes.overlayMouseTarget.appendChild(div);
           }
-
+          
           draw() {
             if (!this.div) return;
             const overlayProjection = this.getProjection();
@@ -333,7 +282,7 @@ export default function MapSection({ tasks }: MapSectionProps) {
               this.div.style.top = `${pos.y - markerScale}px`;
             }
           }
-
+          
           onRemove() {
             if (this.div && this.div.parentNode) {
               this.div.parentNode.removeChild(this.div);
@@ -341,7 +290,7 @@ export default function MapSection({ tasks }: MapSectionProps) {
             }
           }
         }
-
+        
         const customMarker = new CustomMarker(position);
         customMarker.setMap(googleMapRef.current);
         markersRef.current.push(customMarker);
@@ -370,17 +319,15 @@ export default function MapSection({ tasks }: MapSectionProps) {
             // Doppio click rilevato
             clearTimeout(clickTimer);
             clickTimer = null;
-
+            
             // Toggle filtro (attiva/disattiva animazione)
-            // CRITICAL: Usa task.id (univoco) non task.name (logistic_code che può essere duplicato)
             const currentFilteredTaskId = (window as any).mapFilteredTaskId;
-            const uniqueTaskId = String((task as any).task_id || task.id);
-            if (currentFilteredTaskId === uniqueTaskId) {
+            if (currentFilteredTaskId === task.name) {
               // Spegni animazione
               (window as any).mapFilteredTaskId = null;
             } else {
               // Accendi animazione
-              (window as any).mapFilteredTaskId = uniqueTaskId;
+              (window as any).mapFilteredTaskId = task.name;
             }
           } else {
             // Primo click: apri dettagli
@@ -400,14 +347,12 @@ export default function MapSection({ tasks }: MapSectionProps) {
     // Adatta la vista per mostrare tutti i marker
     if (tasksWithCoordinates.length > 0) {
       googleMapRef.current.fitBounds(bounds);
-
+      
       // Se ci sono task evidenziate, centra sulla loro area
       if (highlightedTaskIds.size > 0 && highlightedTaskIds.size < tasksWithCoordinates.length) {
         const highlightedBounds = new window.google.maps.LatLngBounds();
         tasksWithCoordinates.forEach(task => {
-          // Usa la stessa logica per la chiave univoca (normalizza a stringa)
-          const taskId = String((task as any).task_id || task.id || task.name);
-          if (highlightedTaskIds.has(taskId)) {
+          if (highlightedTaskIds.has(task.name)) {
             const lat = parseFloat(task.lat || '0');
             const lng = parseFloat(task.lng || '0');
             if (!isNaN(lat) && !isNaN(lng) && lat !== 0 && lng !== 0) {
@@ -415,7 +360,7 @@ export default function MapSection({ tasks }: MapSectionProps) {
             }
           }
         });
-
+        
         setTimeout(() => {
           googleMapRef.current.fitBounds(highlightedBounds);
           const currentZoom = googleMapRef.current.getZoom();
@@ -431,31 +376,31 @@ export default function MapSection({ tasks }: MapSectionProps) {
     <div className="bg-card rounded-lg border shadow-sm">
       <div className="p-4 border-b border-border">
         <h3 className="font-semibold text-foreground flex items-center">
-          <svg
-            className="w-5 h-5 mr-2 text-custom-blue"
-            fill="none"
-            stroke="currentColor"
+          <svg 
+            className="w-5 h-5 mr-2 text-custom-blue" 
+            fill="none" 
+            stroke="currentColor" 
             viewBox="0 0 24 24"
           >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"
+            <path 
+              strokeLinecap="round" 
+              strokeLinejoin="round" 
+              strokeWidth={2} 
+              d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" 
             />
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"
+            <path 
+              strokeLinecap="round" 
+              strokeLinejoin="round" 
+              strokeWidth={2} 
+              d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" 
             />
           </svg>
           Mappa Appartamenti
         </h3>
       </div>
       <div className="p-4 relative">
-        <div
-          ref={mapRef}
+        <div 
+          ref={mapRef} 
           className="w-full h-[400px] rounded-lg bg-muted"
           style={{ minHeight: '400px' }}
         >

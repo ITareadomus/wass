@@ -155,63 +155,42 @@ async function atomicWriteJson(filePath: string, data: any): Promise<void> {
 
 /**
  * Load timeline for a specific work date
- * Priority: MySQL → filesystem (only if date matches) → empty timeline
- * CRITICAL: 
- * - Always returns a timeline object (never null) to ensure frontend consistency
- * - Does NOT write to filesystem during read - only saveTimeline() writes
- * - This prevents erasing valid filesystem data that Python scripts may be using
+ * Priority: MySQL → filesystem → null
  */
-export async function loadTimeline(workDate: string): Promise<any> {
-  // Default empty timeline structure for the requested date
-  const emptyTimeline = {
-    meta: { used_cleaners: 0, assigned_tasks: 0, total_cleaners: 0 },
-    metadata: { date: workDate, created_by: 'system', last_updated: getRomeTimestamp() },
-    cleaners_assignments: []
-  };
-
+export async function loadTimeline(workDate: string): Promise<any | null> {
   try {
-    // Try MySQL first (source of truth)
+    // Try MySQL first
     const rev = await dailyAssignmentRevisionsService.getLatestRevision(workDate);
     if (rev?.timeline) {
       console.log(`✅ Timeline loaded from MySQL for ${workDate} (revision ${rev.revision})`);
       // CRITICAL: Normalize before writing to filesystem to ensure correct key order
       const normalizedTimeline = getNormalizedTimeline(rev.timeline);
-      // Sync to filesystem for Python scripts ONLY when we have real data from DB
-      try {
-        await atomicWriteJson(PATHS.timeline, normalizedTimeline);
-      } catch (writeErr) {
-        console.error(`⚠️ Failed to sync timeline.json from DB:`, writeErr);
-        // Don't fail the read - we still have the data from DB
-      }
+      // Sync to filesystem for Python scripts
+      await atomicWriteJson(PATHS.timeline, normalizedTimeline);
       return normalizedTimeline;
     }
   } catch (err) {
     console.error(`Error loading timeline from MySQL:`, err);
   }
 
-  // Fallback to filesystem ONLY if date matches exactly
-  // CRITICAL: Do NOT write to filesystem during read operations
+  // Fallback to filesystem (first-time or migration)
   try {
     const data = await fs.readFile(PATHS.timeline, 'utf-8');
     const parsed = JSON.parse(data);
 
-    // CRITICAL: Only use filesystem data if date matches exactly
-    if (parsed.metadata?.date === workDate) {
+    if (parsed.metadata?.date === workDate || parsed.cleaners_assignments) {
       console.log(`✅ Timeline loaded from filesystem for ${workDate}`);
-      // Just normalize and return - do NOT write back to file during read
-      return getNormalizedTimeline(parsed);
-    } else {
-      console.log(`⚠️ Filesystem timeline is for ${parsed.metadata?.date}, not ${workDate} - returning empty timeline`);
+      // Normalize and re-save to ensure correct key order
+      const normalized = getNormalizedTimeline(parsed);
+      await atomicWriteJson(PATHS.timeline, normalized);
+      return normalized;
     }
   } catch (err) {
-    // Filesystem read failed - this is fine, we'll return empty timeline
-    console.log(`ℹ️ Filesystem read failed for timeline, returning empty timeline`);
+    // Filesystem read failed
   }
 
-  console.log(`ℹ️ No timeline found for ${workDate} - returning empty timeline`);
-  // CRITICAL: Do NOT write empty timeline to filesystem
-  // This prevents erasing valid data that Python scripts may be using
-  return emptyTimeline;
+  console.log(`ℹ️ No timeline found for ${workDate}`);
+  return null;
 }
 
 /**

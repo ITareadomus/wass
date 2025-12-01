@@ -7,7 +7,6 @@ from pathlib import Path
 import sys
 from datetime import datetime
 from task_validation import can_cleaner_handle_task, can_cleaner_handle_apartment, can_cleaner_handle_priority
-from sequence_utils import normalize_sequences
 from assign_utils import (
     NEARBY_TRAVEL_THRESHOLD, NEW_CLEANER_PENALTY_MIN, NEW_TRAINER_PENALTY_MIN,
     TARGET_MIN_LOAD_MIN, TRAINER_TARGET_MIN_LOAD_MIN, FAIRNESS_DELTA_HOURS, LOAD_WEIGHT,
@@ -662,7 +661,7 @@ def load_cleaners() -> List[Cleaner]:
 
 def seed_cleaners_from_assignments(cleaners: List[Cleaner]):
     """
-    Seed cleaners con informazioni da timeline.json (EO, HP e task manuali)
+    Seed cleaners con informazioni da timeline.json (EO e HP assignments)
     Conta anche il totale task giornaliere per applicare il limite di 5
     """
     # Leggi dalla timeline.json invece che dai file individuali
@@ -688,16 +687,15 @@ def seed_cleaners_from_assignments(cleaners: List[Cleaner]):
         if not tasks:
             continue
 
-        # Filtra TUTTE le task non-LP (EO + HP + task manuali)
-        # Escludi solo task LP già assegnate
+        # Filtra solo task NON-LP (EO e HP)
         non_lp_tasks = [t for t in tasks if
-                        t.get("priority") != "low_priority" and
-                        "automatic_assignment_lp" not in t.get("reasons", [])]
+                        t.get("priority") in ["early_out", "high_priority"] or
+                        ("automatic_assignment_lp" not in t.get("reasons", []))]
 
         if not non_lp_tasks:
             continue
 
-        # Ordina per end_time per trovare l'ultima posizione reale
+        # Ordina per end_time per trovare l'ultima (gestisci None)
         non_lp_tasks.sort(key=lambda t: t.get("end_time") or "00:00")
         last = non_lp_tasks[-1]
 
@@ -714,7 +712,7 @@ def seed_cleaners_from_assignments(cleaners: List[Cleaner]):
                 cl.last_lat = float(last_lat) if last_lat is not None else None
                 cl.last_lng = float(last_lng) if last_lng is not None else None
                 cl.last_sequence = int(last_seq)
-                # NUOVO: Conta il totale task giornaliere (EO + HP + manuali)
+                # NUOVO: Conta il totale task giornaliere (EO + HP)
                 cl.total_daily_tasks = len(non_lp_tasks)
                 break
 
@@ -1194,31 +1192,9 @@ def main():
     print(f"   - Cleaner disponibili: {len(cleaners)}")
     print(f"   - Task Low-Priority da assegnare: {len(tasks)}")
 
-    # CRITICAL: Leggi i task_id già assegnati dalla timeline (non logistic_code)
-    # per evitare di riassegnare task trascinate manualmente
-    assigned_task_ids = set()
-    timeline_path = OUTPUT_ASSIGN.parent / "timeline.json"
-    if timeline_path.exists():
-        try:
-            timeline_data = json.loads(timeline_path.read_text(encoding="utf-8"))
-            for cleaner_entry in timeline_data.get("cleaners_assignments", []):
-                for task in cleaner_entry.get("tasks", []):
-                    task_id = task.get("task_id")
-                    if task_id:
-                        assigned_task_ids.add(int(task_id))
-            if assigned_task_ids:
-                print(f"📌 Task già assegnate in timeline (task_id): {len(assigned_task_ids)}")
-        except Exception as e:
-            print(f"⚠️ Errore lettura timeline per deduplica: {e}")
-
-    # CRITICAL: Filtra le task già in timeline PRIMA di passarle a plan_day
-    tasks = [t for t in tasks if int(t.task_id) not in assigned_task_ids]
-
-    if len(assigned_task_ids) > 0:
-        print(f"   ⏭️  Saltate {len(assigned_task_ids)} task già in timeline (trascinate manualmente)")
-
-    # Leggi i logistic_code già assegnati per evitare duplicati cross-container
+    # Leggi i logistic_code già assegnati dalla timeline
     assigned_logistic_codes = set()
+    timeline_path = OUTPUT_ASSIGN.parent / "timeline.json"
     if timeline_path.exists():
         try:
             timeline_data = json.loads(timeline_path.read_text(encoding="utf-8"))
@@ -1250,7 +1226,7 @@ def main():
     timeline_path = OUTPUT_ASSIGN.parent / "timeline.json"
 
     # Carica timeline esistente o crea nuova struttura
-    timeline_data_output = {
+    timeline_data = {
         "metadata": {
             "last_updated": dt.now().isoformat(),
             "date": ref_date
@@ -1269,7 +1245,7 @@ def main():
             # MANTIENI TUTTI i cleaner esistenti;
             # il filtraggio delle vecchie LP lo facciamo dentro il blocco existing_entry
             if "cleaners_assignments" in existing:
-                timeline_data_output["cleaners_assignments"] = existing.get("cleaners_assignments", [])
+                timeline_data["cleaners_assignments"] = existing.get("cleaners_assignments", [])
         except Exception as e:
             print(f"Errore nel caricare la timeline esistente: {e}")
             pass
@@ -1277,230 +1253,21 @@ def main():
 
     # Aggiungi le nuove assegnazioni LP organizzate per cleaner
     for cleaner_entry in output["low_priority_tasks_assigned"]:
+        # Cerca se esiste già un'entry per questo cleaner
         existing_entry = None
-        for entry in timeline_data_output["cleaners_assignments"]:
-            try:
-                if int(entry.get("cleaner", {}).get("id")) == int(cleaner_entry["cleaner"]["id"]):
-                    existing_entry = entry
-                    break
-            except Exception:
-                continue
+        for entry in timeline_data["cleaners_assignments"]:
+            if entry["cleaner"]["id"] == cleaner_entry["cleaner"]["id"]:
+                existing_entry = entry
+                break
 
         if existing_entry:
-            # CRITICAL: Separa task manuali da task LP automatiche
-            # Le task LP si identificano per:
-            # 1. priority == "low_priority" OPPURE
-            # 2. reasons contiene "automatic_assignment_lp"
-            manual_tasks = []
-            old_lp_tasks = []
-
-            for t in existing_entry.get("tasks", []):
-                reasons = t.get("reasons", [])
-                priority = t.get("priority", "")
-                is_lp = (
-                    "automatic_assignment_lp" in reasons or
-                    priority == "low_priority"
-                )
-                if not is_lp:
-                    manual_tasks.append(t)
-                else:
-                    old_lp_tasks.append(t)
-
-            print(f"   🔍 Cleaner {cleaner_entry['cleaner']['id']} ha {len(manual_tasks)} task manuali + {len(old_lp_tasks)} task LP esistenti")
-
-            # DEDUPLICA: filtra le nuove task LP che non sono già presenti
-            existing_task_ids = {
-                int(t.get("task_id"))
-                for t in old_lp_tasks
-                if t.get("task_id") is not None
-            }
-            new_tasks_filtered = [
-                t for t in cleaner_entry.get("tasks", [])
-                if t.get("task_id") is not None
-                and int(t.get("task_id")) not in existing_task_ids
-            ]
-
-            if not new_tasks_filtered:
-                print(f"   ⏭️  Nessuna nuova task LP da aggiungere per cleaner {cleaner_entry['cleaner']['id']}")
-                continue
-
-            print(f"   ➕ Aggiungendo {len(new_tasks_filtered)} nuove task LP per cleaner {cleaner_entry['cleaner']['id']}")
-
-            # CRITICAL: Separa straordinarie dalle altre task manuali
-            # Le straordinarie devono SEMPRE essere sequence=1
-            straordinaria_tasks = [t for t in manual_tasks if t.get("straordinaria")]
-            other_manual_tasks = [t for t in manual_tasks if not t.get("straordinaria")]
-
-            # Ordina le altre task manuali per start_time esistente
-            other_manual_tasks.sort(key=lambda t: t.get("start_time") or "00:00")
-
-            # Ordina nuove task LP per checkout_time
-            new_tasks_filtered.sort(key=lambda t: t.get("checkout_time") or "00:00")
-
-            # Ottieni lo start_time del cleaner
-            cleaner_start_str = (
-                existing_entry.get("cleaner", {}).get("start_time") or
-                cleaner_entry["cleaner"].get("start_time") or
-                "10:00"
-            )
-            cleaner_start_min = hhmm_to_min(cleaner_start_str)
-
-            # Lista finale: STRAORDINARIA prima, poi altre manuali
-            valid_tasks = []
-
-            # STEP 1: Processa la straordinaria (se presente) - deve essere sequence=1
-            if straordinaria_tasks:
-                strao = straordinaria_tasks[0]  # Solo una straordinaria per cleaner
-                # Ricalcola start_time della straordinaria
-                checkout_str = strao.get("checkout_time")
-                if checkout_str:
-                    strao_start = max(cleaner_start_min, hhmm_to_min(checkout_str))
-                else:
-                    strao_start = cleaner_start_min
-                strao_end = strao_start + int(strao.get("cleaning_time", 60))
-
-                strao["start_time"] = min_to_hhmm(strao_start)
-                strao["end_time"] = min_to_hhmm(strao_end)
-                strao["sequence"] = 1
-                strao["followup"] = False
-                strao["travel_time"] = 0
-                valid_tasks.append(strao)
-
-                current_time_min = strao_end
-                prev_task = strao
-            else:
-                current_time_min = cleaner_start_min
-                prev_task = None
-
-            # STEP 2: Processa le altre task manuali (EO/HP non straordinarie)
-            for task in other_manual_tasks:
-                # Calcola travel_time
-                if prev_task:
-                    try:
-                        prev_lat = float(prev_task.get("lat", 0))
-                        prev_lng = float(prev_task.get("lng", 0))
-                        curr_lat = float(task.get("lat", 0))
-                        curr_lng = float(task.get("lng", 0))
-                        prev_addr = prev_task.get("address")
-                        curr_addr = task.get("address")
-
-                        km = haversine_km(prev_lat, prev_lng, curr_lat, curr_lng)
-                        dist_reale = km * 1.5
-                        if dist_reale < 0.8:
-                            travel_time = dist_reale * 6.0
-                        elif dist_reale < 2.5:
-                            travel_time = dist_reale * 10.0
-                        else:
-                            travel_time = dist_reale * 5.0
-                        travel_time = max(2.0, min(45.0, 5.0 + travel_time))
-                        if same_building(prev_addr, curr_addr):
-                            travel_time = 3.0
-                        elif same_street(prev_addr, curr_addr) and km < 0.10:
-                            travel_time = max(travel_time - 2.0, 2.0)
-                        task["travel_time"] = int(round(travel_time))
-                        current_time_min += travel_time
-                    except Exception:
-                        task["travel_time"] = 12
-                        current_time_min += 12
-                else:
-                    task["travel_time"] = 0
-
-                # Rispetta checkout_time
-                checkout_str = task.get("checkout_time")
-                if checkout_str:
-                    checkout_min = hhmm_to_min(checkout_str)
-                    current_time_min = max(current_time_min, checkout_min)
-
-                start_min = int(current_time_min)
-                end_min = start_min + int(task.get("cleaning_time", 60))
-
-                task["start_time"] = min_to_hhmm(start_min)
-                task["end_time"] = min_to_hhmm(end_min)
-                task["followup"] = len(valid_tasks) > 0
-
-                valid_tasks.append(task)
-                current_time_min = end_min
-                prev_task = task
-
-            # Processa SOLO le nuove task LP (le manuali sono già preservate)
-            for idx, task in enumerate(new_tasks_filtered):
-                # Calcola travel_time dalla task precedente
-                if prev_task:
-                    try:
-                        prev_lat = float(prev_task.get("lat", 0))
-                        prev_lng = float(prev_task.get("lng", 0))
-                        curr_lat = float(task.get("lat", 0))
-                        curr_lng = float(task.get("lng", 0))
-                        prev_addr = prev_task.get("address")
-                        curr_addr = task.get("address")
-
-                        km = haversine_km(prev_lat, prev_lng, curr_lat, curr_lng)
-                        dist_reale = km * 1.5
-
-                        if dist_reale < 0.8:
-                            travel_time = dist_reale * 6.0
-                        elif dist_reale < 2.5:
-                            travel_time = dist_reale * 10.0
-                        else:
-                            travel_time = dist_reale * 5.0
-
-                        travel_time = max(2.0, min(45.0, 5.0 + travel_time))
-
-                        if same_building(prev_addr, curr_addr):
-                            travel_time = 3.0
-                        elif same_street(prev_addr, curr_addr) and km < 0.10:
-                            travel_time = max(travel_time - 2.0, 2.0)
-
-                        task["travel_time"] = int(round(travel_time))
-                        current_time_min += travel_time
-                    except Exception:
-                        task["travel_time"] = 12
-                        current_time_min += 12
-                else:
-                    # Prima task LP senza predecessori
-                    task["travel_time"] = 0
-
-                # Rispetta checkout_time se presente e maggiore del tempo corrente
-                checkout_str = task.get("checkout_time")
-                if checkout_str:
-                    checkout_min = hhmm_to_min(checkout_str)
-                    current_time_min = max(current_time_min, checkout_min)
-
-                # Calcola start e end
-                start_min = int(current_time_min)
-                end_min = start_min + int(task.get("cleaning_time", 60))
-
-                # CRITICAL: Verifica check-in PRIMA di salvare gli orari
-                checkin_str = task.get("checkin_time")
-                checkin_date_str = task.get("checkin_date")
-                checkout_date_str = task.get("checkout_date", ref_date)
-
-                if checkin_str and checkin_date_str and checkout_date_str:
-                    if checkin_date_str == checkout_date_str:
-                        checkin_min = hhmm_to_min(checkin_str)
-                        if end_min > checkin_min:
-                            print(f"   ⚠️  Task LP {task.get('task_id')} scartata per cleaner {cleaner_entry['cleaner']['id']}: "
-                                  f"finirebbe alle {min_to_hhmm(end_min)} oltre il check-in {checkin_str}")
-                            continue
-
-                task["start_time"] = min_to_hhmm(start_min)
-                task["end_time"] = min_to_hhmm(end_min)
-                task["followup"] = True  # LP sono sempre followup se dopo manuali
-
-                valid_tasks.append(task)
-                current_time_min = end_min
-                prev_task = task
-
-            # CRITICAL: Assegna sequence - straordinarie già processate per prime
-            # L'ordine è già corretto: straordinaria -> altre manuali -> LP
-            for idx, task in enumerate(valid_tasks):
-                task["sequence"] = idx + 1
-                task["followup"] = idx > 0
-
-            existing_entry["tasks"] = valid_tasks
+            # Aggiungi le task LP alle task esistenti
+            existing_entry["tasks"].extend(cleaner_entry["tasks"])
+            # Ordina le task per orario di inizio (start_time)
+            existing_entry["tasks"].sort(key=lambda t: t.get("start_time", "00:00"))
         else:
             # Crea nuova entry
-            timeline_data_output["cleaners_assignments"].append({
+            timeline_data["cleaners_assignments"].append({
                 "cleaner": cleaner_entry["cleaner"],
                 "tasks": cleaner_entry["tasks"]
             })
@@ -1510,25 +1277,25 @@ def main():
     total_available_cleaners = len(cleaners)
 
     # Conta i cleaners effettivamente usati (con almeno una task)
-    used_cleaners = len([c for c in timeline_data_output["cleaners_assignments"] if len(c.get("tasks", [])) > 0])
+    used_cleaners = len([c for c in timeline_data["cleaners_assignments"] if len(c.get("tasks", [])) > 0])
 
     # Aggiorna metadata
-    timeline_data_output["metadata"]["last_updated"] = datetime.now().isoformat()
-    timeline_data_output["metadata"]["date"] = ref_date
-    timeline_data_output["metadata"]["modification_type"] = "auto_assign_low_priority"
-    timeline_data_output["meta"]["total_cleaners"] = total_available_cleaners
-    timeline_data_output["meta"]["used_cleaners"] = used_cleaners
-    timeline_data_output["meta"]["assigned_tasks"] = sum(
-        len(c.get("tasks", [])) for c in timeline_data_output["cleaners_assignments"]
+    timeline_data["metadata"]["last_updated"] = datetime.now().isoformat()
+    timeline_data["metadata"]["date"] = ref_date
+    timeline_data["metadata"]["modification_type"] = "auto_assign_low_priority"
+    timeline_data["meta"]["total_cleaners"] = total_available_cleaners
+    timeline_data["meta"]["used_cleaners"] = used_cleaners
+    timeline_data["meta"]["assigned_tasks"] = sum(
+        len(c.get("tasks", [])) for c in timeline_data["cleaners_assignments"]
     )
 
     # Scrivi il file timeline.json
-    timeline_path.write_text(json.dumps(timeline_data_output, ensure_ascii=False, indent=2), encoding="utf-8")
-    lp_count = sum(1 for c in timeline_data_output["cleaners_assignments"]
+    timeline_path.write_text(json.dumps(timeline_data, ensure_ascii=False, indent=2), encoding="utf-8")
+    lp_count = sum(1 for c in timeline_data["cleaners_assignments"]
                    if any(t.get("reasons") and "automatic_assignment_lp" in t.get("reasons", []) for t in c.get("tasks", [])))
     print(f"✅ Aggiornato {timeline_path}")
     print(f"   - Cleaner con assegnazioni LP: {lp_count}")
-    print(f"   - Totale task: {timeline_data_output['meta']['assigned_tasks']}")
+    print(f"   - Totale task: {timeline_data['meta']['assigned_tasks']}")
 
     # SPOSTAMENTO: Rimuovi le task assegnate da containers.json
     containers_path = INPUT_CONTAINERS

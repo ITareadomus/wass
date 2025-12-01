@@ -52,12 +52,10 @@ async function recalculateCleanerTimes(cleanerData: any): Promise<any> {
 
     // CRITICAL: Load start_time from selected_cleaners.json to ensure it's up-to-date
     const selectedCleanersPath = path.join(process.cwd(), 'client/public/data/cleaners/selected_cleaners.json');
-    let selectedCleanersData: any = null;
     try {
       const selectedData = JSON.parse(await fs.readFile(selectedCleanersPath, 'utf8'));
-      selectedCleanersData = selectedData; // Assign to outer scope variable
       const selectedCleaner = selectedData.cleaners?.find((c: any) => c.id === cleanerData.cleaner.id);
-
+      
       if (selectedCleaner?.start_time) {
         // Use start_time from selected_cleaners (source of truth)
         cleanerData.cleaner.start_time = selectedCleaner.start_time;
@@ -580,32 +578,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Endpoint per leggere la timeline corrente da DB (daily_assignments_current)
-  // Il frontend deve usare questo invece di leggere direttamente timeline.json
-  // CRITICAL: Questo endpoint è la fonte di verità per il frontend - elimina race condition
-  app.get("/api/timeline", async (req, res) => {
-    try {
-      const dateParam = (req.query.date as string) || format(new Date(), "yyyy-MM-dd");
-      const workDate = dateParam;
-
-      console.log(`📖 GET /api/timeline - Caricamento timeline per ${workDate}`);
-
-      // Carica la timeline da MySQL (source of truth), con fallback su filesystem se la data corrisponde
-      // ALWAYS returns a timeline object (empty if no data exists)
-      // Also syncs timeline.json as cache for Python scripts
-      const timeline = await workspaceFiles.loadTimeline(workDate);
-
-      console.log(`✅ Timeline caricata per ${workDate}: ${timeline.cleaners_assignments?.length || 0} cleaners`);
-      res.json(timeline);
-    } catch (error: any) {
-      console.error("Errore nel load della timeline:", error);
-      res.status(500).json({
-        success: false,
-        error: error.message,
-      });
-    }
-  });
-
   // Endpoint per salvare un'assegnazione nella timeline
   app.post("/api/save-timeline-assignment", async (req, res) => {
     try {
@@ -945,7 +917,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       console.log(`✅ Salvato assignment per cleaner ${normalizedCleanerId} in posizione ${targetIndex}`);
-      res.json({ success: true, message: "Task salvata con successo" });
+      res.json({ success: true });
     } catch (error: any) {
       console.error("Errore nel salvataggio dell'assegnazione nella timeline:", error);
       res.status(500).json({ success: false, error: error.message });
@@ -2220,63 +2192,79 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ success: false, error: "Task non trovata" });
       }
 
-      // CRITICAL: Se sono stati modificati checkout_time o checkin_time, ricalcola i tempi del cleaner
-      const needsRecalculation = editedFields.some(field => 
-        field === 'checkout_time' || field === 'checkin_time'
-      );
+      // Prepara opzioni di tracking per MySQL history
+      const editOptions = editedFields.length > 0 ? {
+        editedField: editedFields.join(', '),
+        oldValue: oldValues.join(', '),
+        newValue: newValues.join(', ')
+      } : undefined;
 
-      if (needsRecalculation && taskUpdated) {
-        console.log(`🔄 Ricalcolo tempi per cleaner dopo modifica checkout/checkin...`);
+      // Salva containers (filesystem + MySQL)
+      await workspaceFiles.saveContainers(workDate, containersData);
+      
+      // Salva timeline con tracking delle modifiche (skipRevision=false per creare revision in MySQL)
+      await workspaceFiles.saveTimeline(workDate, timelineData, false, currentUsername, 'task_edit', editOptions);
 
-        // Trova il cleaner che ha questa task
-        for (const cleanerEntry of timelineData.cleaners_assignments || []) {
-          const hasTask = cleanerEntry.tasks?.some((t: any) => 
-            String(t.task_id) === String(taskId) || String(t.logistic_code) === String(logisticCode)
-          );
+      // CRITICAL: Propaga le modifiche al database MySQL (wass_housekeeping)
+      if (taskId) {
+        try {
+          const mysql = await import('mysql2/promise');
+          const connection = await mysql.createConnection({
+            host: "139.59.132.41",
+            user: "admin",
+            password: "ed329a875c6c4ebdf4e87e2bbe53a15771b5844ef6606dde",
+            database: "adamdb",
+          });
 
-          if (hasTask && cleanerEntry.tasks && cleanerEntry.tasks.length > 0) {
-            try {
-              const updatedCleanerData = await recalculateCleanerTimes(cleanerEntry);
-              cleanerEntry.tasks = updatedCleanerData.tasks;
-              console.log(`✅ Tempi ricalcolati per cleaner ${cleanerEntry.cleaner?.id}`);
-            } catch (pythonError: any) {
-              console.error(`⚠️ Errore nel ricalcolo dei tempi per cleaner ${cleanerEntry.cleaner?.id}:`, pythonError.message);
-              // Fallback: mantieni i task nell'ordine attuale
-            }
-            break; // Task trovata, esci dal loop
+          // Costruisci query UPDATE dinamica (aggiorna solo i campi forniti)
+          const updates: string[] = [];
+          const values: any[] = [];
+
+          if (checkoutDate !== undefined) {
+            updates.push('checkout = ?');
+            values.push(checkoutDate);
           }
+          if (checkoutTime !== undefined) {
+            updates.push('checkout_time = ?');
+            values.push(checkoutTime);
+          }
+          if (checkinDate !== undefined) {
+            updates.push('checkin = ?');
+            values.push(checkinDate);
+          }
+          if (checkinTime !== undefined) {
+            updates.push('checkin_time = ?');
+            values.push(checkinTime);
+          }
+          if (paxIn !== undefined) {
+            updates.push('checkin_pax = ?');
+            values.push(paxIn);
+          }
+          if (operationId !== undefined) {
+            updates.push('operation_id = ?');
+            values.push(operationId);
+          }
+
+          if (updates.length > 0) {
+            values.push(taskId); // WHERE id = ?
+            const query = `UPDATE app_housekeeping SET ${updates.join(', ')} WHERE id = ?`;
+
+            await connection.execute(query, values);
+            await connection.end();
+
+            console.log(`✅ Task ${logisticCode} aggiornata anche su database MySQL`);
+          }
+        } catch (dbError: any) {
+          console.error('⚠️ Errore aggiornamento database MySQL:', dbError.message);
+          // Non bloccare la risposta, i file JSON sono comunque salvati
         }
       }
 
-      // Aggiorna metadata (preserva created_by, aggiorna modified_by)
-      const modifyingUser = modified_by || getCurrentUsername(req);
-
-      timelineData.metadata = timelineData.metadata || {};
-      timelineData.metadata.last_updated = new Date().toISOString();
-      timelineData.metadata.last_modified_by = modifyingUser;
-      if (!timelineData.metadata.created_by) {
-        timelineData.metadata.created_by = modifyingUser;
-      }
-
-      // Salva in DB con tipo "task_field_edit"
-      await workspaceFiles.saveTimeline(workDate, timelineData, modifyingUser, 'task_field_edit');
-
-      console.log(`✅ Campo task modificato per task_id=${taskId}, logistic_code=${logisticCode}`);
-      console.log(`   📝 Campi modificati: ${editedFields.join(', ')}`);
-
-      res.json({
-        success: true,
-        message: "Task modificata con successo",
-        editedFields,
-        oldValues,
-        newValues
-      });
+      console.log(`✅ Task ${logisticCode} aggiornata con successo`);
+      res.json({ success: true, message: "Task aggiornata con successo" });
     } catch (error: any) {
-      console.error("Errore nella modifica della task:", error);
-      res.status(500).json({
-        success: false,
-        error: error.message
-      });
+      console.error("Errore nell'aggiornamento della task:", error);
+      res.status(500).json({ success: false, error: error.message });
     }
   });
 
@@ -3726,7 +3714,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Aggiorna o crea l'alias
-      aliasesData.aliases = aliasesData.aliases || {};
       aliasesData.aliases[cleanerId] = {
         name: cleanerInfo.name,
         lastname: cleanerInfo.lastname,
@@ -3874,7 +3861,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // API per workspace - Cancella file workspace non salvati
+  // API per gestione workspace - Cancella file workspace non salvati
   app.get("/api/workspace/list", async (req, res) => {
     try {
       const dates = await storageService.listWorkspaceDates();

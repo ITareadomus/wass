@@ -9,7 +9,6 @@ import json
 from datetime import datetime, timedelta
 from typing import List, Dict, Any, Tuple, Optional
 from math import radians, cos, sin, asin, sqrt
-from sequence_utils import normalize_sequences
 
 
 WORK_START_TIME = "10:00"
@@ -134,23 +133,7 @@ def recalculate_cleaner_times(cleaner_data: Dict[str, Any]) -> Dict[str, Any]:
     if not tasks:
         return cleaner_data
 
-    # CRITICAL: Riordina le task mettendo le straordinarie PRIMA
-    # Questo deve avvenire PRIMA del calcolo degli orari
-    straordinarie = [t for t in tasks if t.get("straordinaria")]
-    altre_task = [t for t in tasks if not t.get("straordinaria")]
-    
-    # NUOVO: Ordina le altre task per checkout_time (dal più presto al più tardi)
-    # Questo garantisce che una modifica al checkout riposizioni correttamente la task
-    altre_task.sort(key=lambda t: t.get("checkout_time", "00:00"))
-    
-    tasks = straordinarie + altre_task
-    cleaner_data["tasks"] = tasks
-
-    # CRITICAL: Usa lo start_time del cleaner, fallback a WORK_START_TIME solo se mancante
-    cleaner_info = cleaner_data.get("cleaner", {})
-    cleaner_start_time = cleaner_info.get("start_time", WORK_START_TIME)
-    
-    work_start_min = time_to_minutes(cleaner_start_time)
+    work_start_min = time_to_minutes(WORK_START_TIME)
     work_end_min = time_to_minutes(WORK_END_TIME)
 
     current_time_min = work_start_min
@@ -203,27 +186,8 @@ def recalculate_cleaner_times(cleaner_data: Dict[str, Any]) -> Dict[str, Any]:
             # CRITICAL: current_time_min già include travel_time se presente
             arrival_min = current_time_min
             
-            # STRAORDINARIA FIX: La straordinaria rispetta lo start_time del cleaner
-            # L'unica differenza è che NON viene forzata alle 10:00 se il cleaner inizia prima
-            # Quindi usa direttamente lo start_time del cleaner (che può essere < 10:00)
-            is_straordinaria = task.get("straordinaria", False)
-            
-            if is_straordinaria:
-                # Straordinaria con sequence=1: usa lo start_time del cleaner
-                # (già calcolato come arrival_min = work_start_min dal cleaner)
-                # Rispetta checkout_time se maggiore
-                if checkout_time_str:
-                    try:
-                        checkout_min = time_to_minutes(checkout_time_str)
-                        # Lo start_time è il MASSIMO tra arrivo cleaner e checkout
-                        start_time_min = max(arrival_min, checkout_min)
-                    except (ValueError, AttributeError):
-                        start_time_min = arrival_min
-                else:
-                    # Nessun vincolo checkout: usa lo start_time del cleaner
-                    start_time_min = arrival_min
-            elif checkout_time_str:
-                # Task normale: rispetta il checkout_time
+            # Rispetta SEMPRE il checkout_time se presente
+            if checkout_time_str:
                 try:
                     checkout_min = time_to_minutes(checkout_time_str)
                     # Lo start_time è il MASSIMO tra arrivo e checkout
@@ -271,15 +235,14 @@ def recalculate_cleaner_times(cleaner_data: Dict[str, Any]) -> Dict[str, Any]:
         task["travel_time"] = travel_time
         task["start_time"] = minutes_to_time(start_time_min)
         task["end_time"] = minutes_to_time(end_time_min)
+        task["sequence"] = i + 1
+        task["followup"] = i > 0
 
         # Aggiorna per prossima iterazione
         current_time_min = end_time_min
         prev_lat = lat
         prev_lng = lng
         prev_addr = addr
-
-    # CRITICAL: Normalizza sequence - straordinarie SEMPRE prime
-    cleaner_data["tasks"] = normalize_sequences(cleaner_data.get("tasks", []))
 
     return cleaner_data
 

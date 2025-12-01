@@ -6,7 +6,6 @@ from typing import Any, Dict, List, Optional, Tuple
 from pathlib import Path
 from datetime import datetime
 from task_validation import can_cleaner_handle_task, can_cleaner_handle_apartment, can_cleaner_handle_priority
-from sequence_utils import normalize_sequences
 from assign_utils import (
     NEARBY_TRAVEL_THRESHOLD, NEW_CLEANER_PENALTY_MIN, NEW_TRAINER_PENALTY_MIN,
     TARGET_MIN_LOAD_MIN, FAIRNESS_DELTA_HOURS, LOAD_WEIGHT,
@@ -259,14 +258,10 @@ def can_handle_premium(cleaner: Cleaner, task: Task) -> bool:
 
 
 # -------- Schedulazione / costo --------
-def evaluate_route(route: List[Task], cleaner_start_time_min: Optional[int] = None) -> Tuple[bool, List[Tuple[int, int, int]]]:
+def evaluate_route(route: List[Task]) -> Tuple[bool, List[Tuple[int, int, int]]]:
     """
     Valuta se una route è fattibile e ritorna lo schedule.
     Ritorna: (is_feasible, schedule)
-
-    Args:
-        route: Lista di task da valutare
-        cleaner_start_time_min: Start time del cleaner in minuti (per straordinarie)
     """
     if not route:
         return True, []
@@ -276,12 +271,7 @@ def evaluate_route(route: List[Task], cleaner_start_time_min: Optional[int] = No
 
     schedule: List[Tuple[int, int, int]] = []
     prev: Optional[Task] = None
-
-    # Inizializza cur con lo start_time del cleaner se fornito
-    if cleaner_start_time_min is not None:
-        cur = float(cleaner_start_time_min)
-    else:
-        cur = 0.0
+    cur = 0.0
 
     for i, t in enumerate(route):
         tt = travel_minutes(prev, t)
@@ -289,19 +279,15 @@ def evaluate_route(route: List[Task], cleaner_start_time_min: Optional[int] = No
         arrival = cur
 
         # LOGICA STRAORDINARIE vs EO NORMALE:
-        # - STRAORDINARIE (prima task): usano lo start_time del cleaner (che può essere < 10:00)
-        #   rispettano checkout_time se maggiore
-        # - STRAORDINARIE (task successive): rispettano checkout_time se successivo
-        # - EO NORMALE: rispetta vincolo eo_start_time (10:00) e checkout_time
+        # - STRAORDINARIE: 3 casistiche
+        #   1. Orari non migrati: inizia quando arriva il cleaner (arrival)
+        #   2. Checkout migrato PRIMA dell'arrival: inizia all'arrival
+        #   3. Checkout migrato DOPO l'arrival: inizia al checkout
+        # - EO NORMALE: rispetta checkout_time come sempre
 
-        if t.straordinaria and i == 0:
-            # STRAORDINARIE come prima task: usano lo start_time del cleaner
-            # Il cleaner può iniziare prima delle 10:00 per le straordinarie
-            # Rispetta checkout_time se maggiore
-            start = max(arrival, t.checkout_time)
-            cur = start
-        elif t.straordinaria:
-            # STRAORDINARIE come task successive: rispettano checkout_time
+        if t.straordinaria:
+            # STRAORDINARIE: checkout ha priorità se presente e maggiore di arrival
+            # altrimenti inizia quando arriva il cleaner
             start = max(arrival, t.checkout_time)
             cur = start
         else:
@@ -417,8 +403,7 @@ def can_add_task(cleaner: Cleaner, task: Task) -> bool:
     # 3ª-5ª task: solo se fattibile temporalmente
     if current_count >= BASE_MAX_TASKS and current_count < ABSOLUTE_MAX_TASKS:
         test_route = cleaner.route + [task]
-        cleaner_start_min = hhmm_to_min(cleaner.start_time) if hasattr(cleaner, 'start_time') and cleaner.start_time else None
-        feasible, schedule = evaluate_route(test_route, cleaner_start_min)
+        feasible, schedule = evaluate_route(test_route)
         if feasible and schedule:
             last_finish = schedule[-1][2]  # finish time in minuti
             if current_count < ABSOLUTE_MAX_TASKS_IF_BEFORE_18 and last_finish <= 18 * 60:
@@ -442,13 +427,10 @@ def find_best_position(cleaner: Cleaner, task: Task) -> Optional[Tuple[int, floa
     best_pos = None
     best_travel = float('inf')
 
-    # Ottieni lo start_time del cleaner in minuti
-    cleaner_start_min = hhmm_to_min(cleaner.start_time) if hasattr(cleaner, 'start_time') and cleaner.start_time else None
-
     # Straordinaria deve andare per forza in pos 0
     if task.straordinaria:
         test_route = [task] + cleaner.route
-        feasible, _ = evaluate_route(test_route, cleaner_start_min)
+        feasible, _ = evaluate_route(test_route)
         if feasible:
             return (0, 0.0)
         else:
@@ -457,7 +439,7 @@ def find_best_position(cleaner: Cleaner, task: Task) -> Optional[Tuple[int, floa
     # Prova tutte le posizioni possibili
     for pos in range(len(cleaner.route) + 1):
         test_route = cleaner.route[:pos] + [task] + cleaner.route[pos:]
-        feasible, _ = evaluate_route(test_route, cleaner_start_min)
+        feasible, _ = evaluate_route(test_route)
 
         if not feasible:
             continue
@@ -628,18 +610,15 @@ def plan_day(
             # Trova cleaner con start_time minore
             earliest_cleaner = min(straordinaria_cleaners, key=lambda c: hhmm_to_min(getattr(c, 'start_time', '10:00') if isinstance(getattr(c, 'start_time', None), str) else '10:00'))
 
-            # Verifica se può prendere la task (pos 0 FORZATO)
+            # Verifica se può prendere la task (pos 0)
             result = find_best_position(earliest_cleaner, task)
             if result is None:
                 unassigned.append(task)
                 continue
 
-            # STRAORDINARIA: SEMPRE in posizione 0, ignora result[0]
-            earliest_cleaner.route.insert(0, task)
+            pos, _ = result
+            earliest_cleaner.route.insert(pos, task)
             assigned_logistic_codes.add(task.logistic_code)
-            
-            # CRITICO: Marca la straordinaria per preservare la posizione
-            task._is_straordinaria_first = True
             continue
 
     for task in tasks:
@@ -795,8 +774,7 @@ def build_output(cleaners: List[Cleaner], unassigned: List[Task], original_tasks
         # Per Early-Out accettiamo anche 1 sola task (task urgenti)
         # Nessun vincolo minimo qui
 
-        cleaner_start_min = hhmm_to_min(cl.start_time) if hasattr(cl, 'start_time') and cl.start_time else None
-        feasible, schedule = evaluate_route(cl.route, cleaner_start_min)
+        feasible, schedule = evaluate_route(cl.route)
         if not feasible or not schedule:
             continue
 
@@ -1007,240 +985,10 @@ def main():
 
     # Aggiungi le nuove assegnazioni EO organizzate per cleaner
     for cleaner_entry in output["early_out_tasks_assigned"]:
-        # Cerca se esiste già un'entry per questo cleaner (es. task spostate manualmente in timeline)
-        existing_entry = None
-        for entry in timeline_data_output["cleaners_assignments"]:
-            try:
-                if int(entry.get("cleaner", {}).get("id")) == int(cleaner_entry["cleaner"]["id"]):
-                    existing_entry = entry
-                    break
-            except Exception:
-                continue
-
-        if existing_entry:
-            # CRITICAL: Separa task manuali (senza reason "automatic_assignment_eo") da task EO esistenti
-            manual_tasks = []
-            old_eo_tasks = []
-            
-            for t in existing_entry.get("tasks", []):
-                reasons = t.get("reasons", [])
-                # Se NON ha "automatic_assignment_eo" nei reasons, è una task manuale
-                if "automatic_assignment_eo" not in reasons:
-                    manual_tasks.append(t)
-                else:
-                    old_eo_tasks.append(t)
-            
-            print(f"   🔍 Cleaner {cleaner_entry['cleaner']['id']} ha {len(manual_tasks)} task manuali + {len(old_eo_tasks)} task EO esistenti")
-
-            # DEDUPLICA: filtra le nuove task EO che non sono già presenti (usando task_id)
-            existing_task_ids = {
-                int(t.get("task_id"))
-                for t in old_eo_tasks
-                if t.get("task_id") is not None
-            }
-            new_tasks_filtered = [
-                t for t in cleaner_entry.get("tasks", [])
-                if t.get("task_id") is not None
-                and int(t.get("task_id")) not in existing_task_ids
-            ]
-
-            # Se non ci sono nuove task da aggiungere, passa oltre
-            if not new_tasks_filtered:
-                print(f"   ⏭️  Nessuna nuova task EO da aggiungere per cleaner {cleaner_entry['cleaner']['id']}")
-                continue
-
-            print(f"   ➕ Aggiungendo {len(new_tasks_filtered)} nuove task EO per cleaner {cleaner_entry['cleaner']['id']}")
-
-            # CRITICAL: Ricostruisci la lista delle task preservando le manuali
-            # Ordine: task manuali PRIMA (nell'ordine originale), poi nuove EO
-            existing_entry_tasks = manual_tasks.copy()
-
-            # --- 1) Trova l'ultimo orario di fine reale --------------------
-            if existing_entry_tasks:
-                # Ordina per end_time per trovare la vera ultima task in timeline
-                existing_entry_tasks.sort(
-                    key=lambda t: t.get("end_time", t.get("start_time", "00:00"))
-                )
-                last_task = existing_entry_tasks[-1]
-                last_end_min = hhmm_to_min(
-                    last_task.get("end_time")
-                    or last_task.get("start_time")
-                    or "00:00",
-                    default="00:00",
-                )
-            else:
-                # Nessuna task esistente: parti dallo start_time del cleaner
-                cleaner_start = (
-                    (existing_entry.get("cleaner") or {}).get("start_time")
-                    or cleaner_entry["cleaner"].get("start_time")
-                    or "10:00"
-                )
-                last_end_min = hhmm_to_min(cleaner_start, default="10:00")
-
-            # --- 2) Punto di partenza per la sequence ----------------------
-            if existing_entry_tasks:
-                seq_start = max(
-                    int(t.get("sequence") or idx + 1)
-                    for idx, t in enumerate(existing_entry_tasks)
-                )
-            else:
-                seq_start = 0
-
-            # --- 3) Ricalcola orari delle nuove task ACCODATE -------------
-            new_tasks_sorted = sorted(
-                new_tasks_filtered,
-                key=lambda t: t.get("start_time", "00:00"),
-            )
-
-            seq = seq_start
-            prev_task_data = None
-            
-            # Se ci sono task esistenti, prendi l'ultima come riferimento per il travel time
-            if existing_entry_tasks:
-                last_existing = existing_entry_tasks[-1]
-                prev_task_data = {
-                    "lat": last_existing.get("lat"),
-                    "lng": last_existing.get("lng"),
-                    "address": last_existing.get("address")
-                }
-            
-            # Ottieni lo start_time del cleaner in minuti
-            cleaner_start = (
-                (existing_entry.get("cleaner") or {}).get("start_time")
-                or cleaner_entry["cleaner"].get("start_time")
-                or "10:00"
-            )
-            cleaner_start_min = hhmm_to_min(cleaner_start, default="10:00")
-            
-            for idx, t in enumerate(new_tasks_sorted):
-                seq += 1
-
-                # STRAORDINARIE: possono iniziare dallo start_time del cleaner
-                # Rispettano checkout_time se maggiore
-                is_straordinaria = t.get("straordinaria", False)
-                
-                if is_straordinaria:
-                    # Straordinaria: parte dallo start_time del cleaner (o dalla fine della precedente)
-                    # Rispetta checkout_time se presente e maggiore
-                    checkout_str = t.get("checkout_time")
-                    if checkout_str:
-                        checkout_min = hhmm_to_min(checkout_str, default="00:00")
-                        # Può iniziare PRIMA delle 10:00 se il cleaner ha start_time < 10:00
-                        start_min = max(cleaner_start_min, checkout_min)
-                    else:
-                        # Nessun checkout: usa lo start_time del cleaner
-                        start_min = cleaner_start_min
-                    
-                    # Se c'è una task precedente che finisce dopo, aspetta
-                    if last_end_min > start_min:
-                        start_min = last_end_min
-                else:
-                    # Task normale: rispetta vincoli EO
-                    proposed_start = t.get("start_time") or "00:00"
-                    start_min = max(
-                        last_end_min,
-                        hhmm_to_min(proposed_start, default="00:00"),
-                    )
-                end_min = start_min + int(t.get("cleaning_time") or 0)
-
-                # CRITICAL: Rispetta vincolo di check-in PRIMA di salvare gli orari
-                checkin_time = t.get("checkin_time")
-                checkin_date = t.get("checkin_date")
-                checkout_date = t.get("checkout_date")
-                
-                if checkin_time and checkin_date and checkout_date:
-                    # Verifica solo se check-in è lo stesso giorno del checkout
-                    if checkin_date == checkout_date:
-                        checkin_limit = hhmm_to_min(checkin_time, default="23:59")
-                        if end_min > checkin_limit:
-                            # Task non fattibile: salta e rimuovi dalla lista
-                            print(
-                                f"   ⚠️  Task EO {t.get('task_id')} scartata per cleaner {cleaner_entry['cleaner']['id']}: "
-                                f"finirebbe alle {min_to_hhmm(end_min)} oltre il check-in {checkin_time}"
-                            )
-                            continue
-
-                # Calcola travel_time dalla task precedente (esistente o nuova accodata)
-                if idx == 0 and prev_task_data:
-                    # Prima task accodata: calcola travel dalla ultima task esistente
-                    try:
-                        prev_lat = float(prev_task_data.get("lat", 0))
-                        prev_lng = float(prev_task_data.get("lng", 0))
-                        curr_lat = float(t.get("lat", 0))
-                        curr_lng = float(t.get("lng", 0))
-                        prev_addr = prev_task_data.get("address")
-                        curr_addr = t.get("address")
-                        
-                        # Usa le funzioni di calcolo travel_time
-                        travel = int(round(haversine_km(prev_lat, prev_lng, curr_lat, curr_lng) * 12))  # Approssimazione
-                        if same_building(prev_addr, curr_addr):
-                            travel = 3
-                        elif same_street(prev_addr, curr_addr):
-                            travel = max(travel - 2, 2)
-                    except Exception:
-                        travel = max(0, start_min - last_end_min)
-                elif idx > 0:
-                    # Task successive: calcola dalla task accodata precedente
-                    try:
-                        prev_new_task = new_tasks_sorted[idx - 1]
-                        prev_lat = float(prev_new_task.get("lat", 0))
-                        prev_lng = float(prev_new_task.get("lng", 0))
-                        curr_lat = float(t.get("lat", 0))
-                        curr_lng = float(t.get("lng", 0))
-                        prev_addr = prev_new_task.get("address")
-                        curr_addr = t.get("address")
-                        
-                        travel = int(round(haversine_km(prev_lat, prev_lng, curr_lat, curr_lng) * 12))
-                        if same_building(prev_addr, curr_addr):
-                            travel = 3
-                        elif same_street(prev_addr, curr_addr):
-                            travel = max(travel - 2, 2)
-                    except Exception:
-                        travel = max(0, start_min - last_end_min)
-                else:
-                    # Nessuna task precedente
-                    travel = 0
-
-                # Aggiorna orari e sequence nel formato timeline
-                t["start_time"] = min_to_hhmm(start_min)
-                t["end_time"] = min_to_hhmm(end_min)
-                t["travel_time"] = travel
-                t["sequence"] = seq
-
-                # Aggiorna "ultimo fine" e aggiungi alla lista del cleaner
-                last_end_min = end_min
-                existing_entry_tasks.append(t)
-
-            # --- 4) Ordina e assegna sequence: straordinarie SEMPRE prime
-            # Separa straordinaria dalle altre
-            straordinaria_tasks = [t for t in existing_entry_tasks if t.get("straordinaria")]
-            other_tasks = [t for t in existing_entry_tasks if not t.get("straordinaria")]
-            
-            # Ordina solo le altre task per start_time
-            other_tasks.sort(key=lambda t: t.get("start_time", "00:00"))
-            
-            # Ricomponi: straordinarie SEMPRE per prime
-            valid_ordered_tasks = straordinaria_tasks + other_tasks
-            
-            # Assegna sequence e followup
-            for idx, t in enumerate(valid_ordered_tasks):
-                t["sequence"] = idx + 1
-                t["followup"] = idx > 0
-
-            existing_entry["tasks"] = valid_ordered_tasks
-
-            # Log per debug
-            if len(cleaner_entry.get("tasks", [])) > len(new_tasks_filtered):
-                skipped = len(cleaner_entry.get("tasks", [])) - len(new_tasks_filtered)
-                print(
-                    f"   ⏭️  Saltate {skipped} task duplicate per cleaner {cleaner_entry['cleaner']['id']}"
-                )
-        else:
-            # Nessuna entry per questo cleaner: crea un nuovo blocco
-            timeline_data_output["cleaners_assignments"].append({
-                "cleaner": cleaner_entry["cleaner"],
-                "tasks": cleaner_entry["tasks"],
-            })
+        timeline_data_output["cleaners_assignments"].append({
+            "cleaner": cleaner_entry["cleaner"],
+            "tasks": cleaner_entry["tasks"]
+        })
 
     # Aggiorna meta
     # Conta i cleaner totali disponibili
