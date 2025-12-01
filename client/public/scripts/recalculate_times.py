@@ -14,6 +14,7 @@ from math import radians, cos, sin, asin, sqrt
 WORK_START_TIME = "10:00"
 WORK_END_TIME = "19:00"
 MAX_DISTANCE_KM = 50.0
+STRAORDINARIA_START_TIME = "09:00"  # Straordinaria tasks start at 9:00 when first
 
 
 def haversine_km(lat1: float, lng1: float, lat2: float, lng2: float) -> float:
@@ -190,8 +191,25 @@ def recalculate_cleaner_times(cleaner_data: Dict[str, Any]) -> Dict[str, Any]:
             # CRITICAL: current_time_min già include travel_time se presente
             arrival_min = current_time_min
             
-            # Rispetta SEMPRE il checkout_time se presente
-            if checkout_time_str:
+            # STRAORDINARIA FIX: Se la prima task è una straordinaria, inizia alle 09:00
+            # ma rispetta il checkout_time se è successivo alle 09:00
+            is_straordinaria = task.get("straordinaria", False)
+            
+            if is_straordinaria:
+                # Straordinaria con sequence=1: base alle 09:00, ma rispetta checkout_time se maggiore
+                straordinaria_start_min = time_to_minutes(STRAORDINARIA_START_TIME)
+                
+                if checkout_time_str:
+                    try:
+                        checkout_min = time_to_minutes(checkout_time_str)
+                        # Lo start_time è il MASSIMO tra 09:00 e checkout
+                        start_time_min = max(straordinaria_start_min, checkout_min)
+                    except (ValueError, AttributeError):
+                        start_time_min = straordinaria_start_min
+                else:
+                    start_time_min = straordinaria_start_min
+            elif checkout_time_str:
+                # Task normale: rispetta il checkout_time
                 try:
                     checkout_min = time_to_minutes(checkout_time_str)
                     # Lo start_time è il MASSIMO tra arrivo e checkout
