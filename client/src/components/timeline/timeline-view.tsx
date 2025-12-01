@@ -408,15 +408,43 @@ export default function TimelineView({
   }, [globalTimelineMinutes, globalTimeSlots.length]);
 
   const getCleanerColor = (cleanerId: number) => {
-    // Colori distribuiti per massimo contrasto visivo
+    // Palette ottimizzata: colori ben distinti per massima leggibilità
     const colors = [
-      "#EF4444", "#3B82F6", "#22C55E", "#D946EF", "#F59E0B",
-      "#8B5CF6", "#14B8A6", "#F97316", "#6366F1", "#84CC16",
-      "#EC4899", "#0EA5E9", "#DC2626", "#10B981", "#A855F7",
-      "#EAB308", "#06B6D4", "#F43F5E", "#2563EB", "#16A34A",
-      "#C026D3", "#EA580C", "#7C3AED", "#0891B2", "#CA8A04",
-      "#DB2777", "#4F46E5", "#65A30D", "#059669", "#9333EA",
-      "#D97706", "#E11D48", "#0284C7", "#15803D", "#0D9488"
+      "#EF4444", // Rosso brillante
+      "#3B82F6", // Blu elettrico
+      "#22C55E", // Verde acceso
+      "#F59E0B", // Arancione oro
+      "#EC4899", // Rosa magenta
+      "#14B8A6", // Teal
+      "#8B5CF6", // Viola indaco
+      "#EAB308", // Giallo senape
+      "#06B6D4", // Cyan
+      "#F97316", // Arancione bruciato
+      "#A855F7", // Viola orchidea
+      "#10B981", // Verde smeraldo
+      "#E11D48", // Rosso cremisi
+      "#0EA5E9", // Sky blue
+      "#84CC16", // Lime verde
+      "#DC2626", // Rosso scuro
+      "#6366F1", // Indaco
+      "#D97706", // Ambra scuro
+      "#DB2777", // Rosa fucsia
+      "#16A34A", // Verde foresta
+      "#0891B2", // Turchese
+      "#C026D3", // Magenta scuro
+      "#65A30D", // Oliva verde
+      "#2563EB", // Blu royal
+      "#EA580C", // Arancione terracotta
+      "#059669", // Verde acqua
+      "#CA8A04", // Oro antico
+      "#4F46E5", // Blu notte
+      "#15803D", // Verde pino
+      "#7C3AED", // Viola profondo
+      "#0D9488", // Verde oceano
+      "#9333EA", // Viola elettrico
+      "#F43F5E", // Rosa corallo
+      "#0284C7", // Blu pacifico
+      "#78350F"  // Marrone cioccolato
     ];
     return colors[cleanerId % colors.length];
   };
