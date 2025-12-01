@@ -1,6 +1,6 @@
 {
     "metadata": {
-        "last_updated": "2025-12-01T15:27:55.568940",
+        "last_updated": "2025-12-01T15:28:04.849008",
         "db_config": {
             "host": "139.59.132.41",
             "user": "admin",
@@ -11,7 +11,7 @@
     },
     "dates": {
         "2025-12-01": {
-            "timestamp": "2025-12-01T15:27:55.568950",
+            "timestamp": "2025-12-01T15:28:04.849022",
             "cleaners": [
                 {
                     "id": 24,
@@ -72,7 +72,7 @@
                         124
                     ],
                     "telegram_id": 1577716674,
-                    "start_time": "09:00",
+                    "start_time": "10:00",
                     "can_do_straordinaria": true
                 },
                 {
@@ -257,7 +257,7 @@
                         123
                     ],
                     "telegram_id": 8035270407,
-                    "start_time": "09:00",
+                    "start_time": "10:00",
                     "can_do_straordinaria": true
                 },
                 {
