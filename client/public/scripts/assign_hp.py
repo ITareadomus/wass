@@ -1035,9 +1035,31 @@ def main():
     print(f"   - Cleaner disponibili: {len(cleaners)}")
     print(f"   - Task High-Priority da assegnare: {len(tasks)}")
 
-    # Leggi i logistic_code già assegnati dalla timeline
-    assigned_logistic_codes = set()
+    # CRITICAL: Leggi i task_id già assegnati dalla timeline (non logistic_code)
+    # per evitare di riassegnare task trascinate manualmente
+    assigned_task_ids = set()
     timeline_path = OUTPUT_ASSIGN.parent / "timeline.json"
+    if timeline_path.exists():
+        try:
+            timeline_data = json.loads(timeline_path.read_text(encoding="utf-8"))
+            for cleaner_entry in timeline_data.get("cleaners_assignments", []):
+                for task in cleaner_entry.get("tasks", []):
+                    task_id = task.get("task_id")
+                    if task_id:
+                        assigned_task_ids.add(int(task_id))
+            if assigned_task_ids:
+                print(f"📌 Task già assegnate in timeline (task_id): {len(assigned_task_ids)}")
+        except Exception as e:
+            print(f"⚠️ Errore lettura timeline per deduplica: {e}")
+
+    # CRITICAL: Filtra le task già in timeline PRIMA di passarle a plan_day
+    tasks = [t for t in tasks if int(t.task_id) not in assigned_task_ids]
+    
+    if len(assigned_task_ids) > 0:
+        print(f"   ⏭️  Saltate {len(assigned_task_ids)} task già in timeline (trascinate manualmente)")
+    
+    # Leggi i logistic_code già assegnati per evitare duplicati cross-container
+    assigned_logistic_codes = set()
     if timeline_path.exists():
         try:
             timeline_data = json.loads(timeline_path.read_text(encoding="utf-8"))
