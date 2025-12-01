@@ -38,9 +38,6 @@ MAX_TASKS_PER_PRIORITY = 2  # Max 2 task Early-Out per cleaner (base, infrangibi
 
 PREFERRED_TRAVEL = 20.0  # Preferenza per percorsi < 20'
 
-# STRAORDINARIA: orario di inizio fisso alle 09:00 quando è la prima task
-STRAORDINARIA_START_TIME_MIN = 9 * 60  # 09:00 in minuti
-
 # Travel model (min)
 SHORT_RANGE_KM = 0.30
 SHORT_BASE_MIN = 3.5
@@ -279,10 +276,8 @@ def evaluate_route(route: List[Task], cleaner_start_time_min: Optional[int] = No
     schedule: List[Tuple[int, int, int]] = []
     prev: Optional[Task] = None
 
-    # Per straordinarie come prima task: iniziano SEMPRE alle 09:00
-    if route and route[0].straordinaria:
-        cur = float(STRAORDINARIA_START_TIME_MIN)
-    elif cleaner_start_time_min is not None:
+    # Inizializza cur con lo start_time del cleaner se fornito
+    if cleaner_start_time_min is not None:
         cur = float(cleaner_start_time_min)
     else:
         cur = 0.0
@@ -293,14 +288,16 @@ def evaluate_route(route: List[Task], cleaner_start_time_min: Optional[int] = No
         arrival = cur
 
         # LOGICA STRAORDINARIE vs EO NORMALE:
-        # - STRAORDINARIE (prima task): iniziano alle 09:00 o checkout_time se maggiore
+        # - STRAORDINARIE (prima task): usano lo start_time del cleaner (che può essere < 10:00)
+        #   rispettano checkout_time se maggiore
         # - STRAORDINARIE (task successive): rispettano checkout_time se successivo
         # - EO NORMALE: rispetta vincolo eo_start_time (10:00) e checkout_time
 
         if t.straordinaria and i == 0:
-            # STRAORDINARIE come prima task: base alle 09:00
-            # ma rispettano checkout_time se è successivo alle 09:00
-            start = max(STRAORDINARIA_START_TIME_MIN, t.checkout_time)
+            # STRAORDINARIE come prima task: usano lo start_time del cleaner
+            # Il cleaner può iniziare prima delle 10:00 per le straordinarie
+            # Rispetta checkout_time se maggiore
+            start = max(arrival, t.checkout_time)
             cur = start
         elif t.straordinaria:
             # STRAORDINARIE come task successive: rispettano checkout_time
