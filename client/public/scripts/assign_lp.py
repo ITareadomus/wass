@@ -1284,10 +1284,82 @@ def main():
                 break
 
         if existing_entry:
-            # Aggiungi le task LP alle task esistenti
-            existing_entry["tasks"].extend(cleaner_entry["tasks"])
-            # Ordina le task per orario di inizio (start_time)
-            existing_entry["tasks"].sort(key=lambda t: t.get("start_time", "00:00"))
+            # CRITICAL: Unifica task precedenti + LP e ricalcola TUTTO
+            all_tasks = existing_entry.get("tasks", []) + cleaner_entry.get("tasks", [])
+            
+            # Deduplica per task_id
+            seen_task_ids = set()
+            unique_tasks = []
+            for t in all_tasks:
+                tid = int(t.get("task_id", 0))
+                if tid not in seen_task_ids:
+                    seen_task_ids.add(tid)
+                    unique_tasks.append(t)
+            
+            # Ordina per start_time (usa checkout se start_time non valido)
+            unique_tasks.sort(key=lambda t: t.get("start_time") or t.get("checkout_time") or "00:00")
+            
+            # RICALCOLA sequence, travel_time, start_time, end_time per TUTTE le task
+            current_time_min = hhmm_to_min(cleaner_entry["cleaner"].get("start_time", "10:00"))
+            prev_task = None
+            
+            for idx, task in enumerate(unique_tasks):
+                # Calcola travel_time dalla task precedente
+                if prev_task:
+                    try:
+                        prev_lat = float(prev_task.get("lat", 0))
+                        prev_lng = float(prev_task.get("lng", 0))
+                        curr_lat = float(task.get("lat", 0))
+                        curr_lng = float(task.get("lng", 0))
+                        prev_addr = prev_task.get("address")
+                        curr_addr = task.get("address")
+                        
+                        # Usa la funzione di calcolo travel
+                        import math
+                        km = haversine_km(prev_lat, prev_lng, curr_lat, curr_lng)
+                        dist_reale = km * 1.5
+                        
+                        if dist_reale < 0.8:
+                            travel_time = dist_reale * 6.0
+                        elif dist_reale < 2.5:
+                            travel_time = dist_reale * 10.0
+                        else:
+                            travel_time = dist_reale * 5.0
+                        
+                        travel_time = max(2.0, min(45.0, 5.0 + travel_time))
+                        
+                        if same_building(prev_addr, curr_addr):
+                            travel_time = 3.0
+                        elif same_street(prev_addr, curr_addr) and km < 0.10:
+                            travel_time = max(travel_time - 2.0, 2.0)
+                        
+                        task["travel_time"] = int(round(travel_time))
+                        current_time_min += travel_time
+                    except Exception:
+                        task["travel_time"] = 12
+                        current_time_min += 12
+                else:
+                    task["travel_time"] = 0
+                
+                # Rispetta checkout_time se presente
+                checkout_str = task.get("checkout_time")
+                if checkout_str:
+                    checkout_min = hhmm_to_min(checkout_str)
+                    current_time_min = max(current_time_min, checkout_min)
+                
+                # Calcola start e end
+                start_min = int(current_time_min)
+                end_min = start_min + int(task.get("cleaning_time", 60))
+                
+                task["start_time"] = min_to_hhmm(start_min)
+                task["end_time"] = min_to_hhmm(end_min)
+                task["sequence"] = idx + 1
+                task["followup"] = idx > 0
+                
+                current_time_min = end_min
+                prev_task = task
+            
+            existing_entry["tasks"] = unique_tasks
         else:
             # Crea nuova entry
             timeline_data["cleaners_assignments"].append({
