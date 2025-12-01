@@ -1,8 +1,12 @@
 {
   "metadata": {
-    "last_updated": "2025-12-01 12:00:01",
+    "last_updated": "2025-12-01 12:01:47",
     "date": "2025-12-01",
-    "modification_type": "auto_assign_early_out"
+    "modification_type": "auto_assign_early_out",
+    "created_by": "Admin",
+    "modified_by": [
+      "Admin"
+    ]
   },
   "cleaners_assignments": [
     {
@@ -171,38 +175,6 @@
       },
       "tasks": [
         {
-          "task_id": 219589,
-          "logistic_code": 1656,
-          "client_id": null,
-          "premium": true,
-          "address": "VIA LARGO GALLARATI SCOTTI 1",
-          "lat": "45.4595833",
-          "lng": "9.182798",
-          "cleaning_time": 300,
-          "checkin_date": "2025-12-01",
-          "checkout_date": "2025-12-01",
-          "checkin_time": "15:00",
-          "checkout_time": "12:00",
-          "pax_in": 4,
-          "pax_out": 2,
-          "small_equipment": false,
-          "operation_id": 3,
-          "confirmed_operation": true,
-          "straordinaria": true,
-          "type_apt": "C",
-          "alias": "CO99",
-          "customer_name": "CO99",
-          "reasons": [
-            "manually_moved_to_timeline"
-          ],
-          "priority": "high_priority",
-          "start_time": "12:37",
-          "end_time": "17:37",
-          "followup": true,
-          "sequence": 1,
-          "travel_time": 7
-        },
-        {
           "task_id": 219640,
           "logistic_code": 1537,
           "client_id": null,
@@ -231,8 +203,40 @@
           "start_time": "10:00",
           "end_time": "12:30",
           "followup": false,
-          "sequence": 2,
+          "sequence": 1,
           "travel_time": 0
+        },
+        {
+          "task_id": 219589,
+          "logistic_code": 1656,
+          "client_id": null,
+          "premium": true,
+          "address": "VIA LARGO GALLARATI SCOTTI 1",
+          "lat": "45.4595833",
+          "lng": "9.182798",
+          "cleaning_time": 300,
+          "checkin_date": "2025-12-01",
+          "checkout_date": "2025-12-01",
+          "checkin_time": "15:00",
+          "checkout_time": "12:00",
+          "pax_in": 4,
+          "pax_out": 2,
+          "small_equipment": false,
+          "operation_id": 3,
+          "confirmed_operation": true,
+          "straordinaria": true,
+          "type_apt": "C",
+          "alias": "CO99",
+          "customer_name": "CO99",
+          "reasons": [
+            "manually_moved_to_timeline"
+          ],
+          "priority": "high_priority",
+          "start_time": "12:37",
+          "end_time": "17:37",
+          "followup": true,
+          "sequence": 2,
+          "travel_time": 7
         },
         {
           "task_id": 219515,
@@ -261,11 +265,11 @@
             "automatic_assignment_eo"
           ],
           "priority": "early_out",
-          "start_time": "17:37",
-          "end_time": "19:07",
+          "start_time": "18:06",
+          "end_time": "19:36",
           "followup": true,
           "sequence": 3,
-          "travel_time": 22
+          "travel_time": 29
         }
       ]
     },
@@ -531,6 +535,7 @@
   "meta": {
     "total_cleaners": 8,
     "used_cleaners": 8,
-    "assigned_tasks": 13
+    "assigned_tasks": 13,
+    "total_tasks": 13
   }
 }
