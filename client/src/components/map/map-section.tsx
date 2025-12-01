@@ -115,7 +115,7 @@ export default function MapSection({ tasks }: MapSectionProps) {
       '#4682B4',  // Acciaio blu
       '#00BFFF'   // Azzurro intenso
     ];
-    
+
     // Trova l'indice del cleaner nella lista ordinata
     const cleanerIndex = cleaners.findIndex(c => c.id === cleanerId);
     // Se trovato, usa l'indice sequenziale, altrimenti fallback all'ID
@@ -190,7 +190,8 @@ export default function MapSection({ tasks }: MapSectionProps) {
     else if (filteredCleanerId !== null && filteredCleanerId !== undefined && filteredCleanerId !== 0) {
       tasksWithCoordinates.forEach(task => {
         if ((task as any).assignedCleaner === filteredCleanerId) {
-          highlightedTaskIds.add(task.name);
+          const taskId = (task as any).task_id || task.id || task.name;
+          highlightedTaskIds.add(taskId);
         }
       });
     }
@@ -240,7 +241,9 @@ export default function MapSection({ tasks }: MapSectionProps) {
       const sequence = (task as any).sequence;
 
       // Verifica se questa task è evidenziata
-      const isHighlighted = highlightedTaskIds.has(task.id);
+      // Usa la stessa logica per la chiave univoca usata sopra
+      const taskId = (task as any).task_id || task.id || task.name;
+      const isHighlighted = highlightedTaskIds.has(taskId);
       const markerScale = 12; // Dimensione costante per tutti i marker
       const strokeWeight = isHighlighted ? 2 : 2; // Bordo più sottile anche se evidenziata
       const strokeColor = isHighlighted ? '#FFD700' : '#ffffff'; // Bordo dorato se evidenziata
@@ -290,12 +293,12 @@ export default function MapSection({ tasks }: MapSectionProps) {
 
                 // Toggle filtro (attiva/disattiva animazione)
                 const currentFilteredTaskId = (window as any).mapFilteredTaskId;
-                if (currentFilteredTaskId === task.id) {
+                if (currentFilteredTaskId === taskId) {
                   // Spegni animazione
                   (window as any).mapFilteredTaskId = null;
                 } else {
                   // Accendi animazione
-                  (window as any).mapFilteredTaskId = task.id;
+                  (window as any).mapFilteredTaskId = taskId;
                 }
               } else {
                 // Primo click: apri dettagli
@@ -360,12 +363,12 @@ export default function MapSection({ tasks }: MapSectionProps) {
 
             // Toggle filtro (attiva/disattiva animazione)
             const currentFilteredTaskId = (window as any).mapFilteredTaskId;
-            if (currentFilteredTaskId === task.id) {
+            if (currentFilteredTaskId === taskId) {
               // Spegni animazione
               (window as any).mapFilteredTaskId = null;
             } else {
               // Accendi animazione
-              (window as any).mapFilteredTaskId = task.id;
+              (window as any).mapFilteredTaskId = taskId;
             }
           } else {
             // Primo click: apri dettagli
@@ -390,7 +393,9 @@ export default function MapSection({ tasks }: MapSectionProps) {
       if (highlightedTaskIds.size > 0 && highlightedTaskIds.size < tasksWithCoordinates.length) {
         const highlightedBounds = new window.google.maps.LatLngBounds();
         tasksWithCoordinates.forEach(task => {
-          if (highlightedTaskIds.has(task.id)) {
+          // Usa la stessa logica per la chiave univoca
+          const taskId = (task as any).task_id || task.id || task.name;
+          if (highlightedTaskIds.has(taskId)) {
             const lat = parseFloat(task.lat || '0');
             const lng = parseFloat(task.lng || '0');
             if (!isNaN(lat) && !isNaN(lng) && lat !== 0 && lng !== 0) {
