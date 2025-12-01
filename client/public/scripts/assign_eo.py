@@ -1162,6 +1162,9 @@ def main():
             # CRITICO: Se c'è una straordinaria, DEVE rimanere in posizione 0
             has_straordinaria = any(t.get("straordinaria") for t in existing_entry_tasks)
             
+            # Lista temporanea per task valide dopo ordinamento
+            valid_ordered_tasks = []
+            
             if has_straordinaria:
                 # Separa straordinaria dalle altre
                 straordinaria_tasks = [t for t in existing_entry_tasks if t.get("straordinaria")]
@@ -1171,16 +1174,16 @@ def main():
                 other_tasks.sort(key=lambda t: t.get("start_time", "00:00"))
                 
                 # Ricomponi: straordinarie SEMPRE per prime
-                existing_entry_tasks = straordinaria_tasks + other_tasks
+                valid_ordered_tasks = straordinaria_tasks + other_tasks
             else:
                 # Nessuna straordinaria: ordina normalmente
-                existing_entry_tasks.sort(key=lambda t: t.get("start_time", "00:00"))
+                valid_ordered_tasks = sorted(existing_entry_tasks, key=lambda t: t.get("start_time", "00:00"))
             
-            # Riallinea sequence
-            for idx, t in enumerate(existing_entry_tasks, start=1):
+            # CRITICAL: Ricalcola sequence DOPO ordinamento
+            for idx, t in enumerate(valid_ordered_tasks, start=1):
                 t["sequence"] = idx
 
-            existing_entry["tasks"] = existing_entry_tasks
+            existing_entry["tasks"] = valid_ordered_tasks
 
             # Log per debug
             if len(cleaner_entry.get("tasks", [])) > len(new_tasks_filtered):
