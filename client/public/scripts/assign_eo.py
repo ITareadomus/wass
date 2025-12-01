@@ -630,6 +630,9 @@ def plan_day(
             # STRAORDINARIA: SEMPRE in posizione 0, ignora result[0]
             earliest_cleaner.route.insert(0, task)
             assigned_logistic_codes.add(task.logistic_code)
+            
+            # CRITICO: Marca la straordinaria per preservare la posizione
+            task._is_straordinaria_first = True
             continue
 
     for task in tasks:
@@ -1158,7 +1161,24 @@ def main():
                 existing_entry_tasks.append(t)
 
             # --- 4) Ordina tutte le task per start_time e riallinea sequence
-            existing_entry_tasks.sort(key=lambda t: t.get("start_time", "00:00"))
+            # CRITICO: Se c'è una straordinaria, DEVE rimanere in posizione 0
+            has_straordinaria = any(t.get("straordinaria") for t in existing_entry_tasks)
+            
+            if has_straordinaria:
+                # Separa straordinaria dalle altre
+                straordinaria_tasks = [t for t in existing_entry_tasks if t.get("straordinaria")]
+                other_tasks = [t for t in existing_entry_tasks if not t.get("straordinaria")]
+                
+                # Ordina solo le altre task
+                other_tasks.sort(key=lambda t: t.get("start_time", "00:00"))
+                
+                # Ricomponi: straordinarie SEMPRE per prime
+                existing_entry_tasks = straordinaria_tasks + other_tasks
+            else:
+                # Nessuna straordinaria: ordina normalmente
+                existing_entry_tasks.sort(key=lambda t: t.get("start_time", "00:00"))
+            
+            # Riallinea sequence
             for idx, t in enumerate(existing_entry_tasks, start=1):
                 t["sequence"] = idx
 
