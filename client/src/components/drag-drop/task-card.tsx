@@ -620,7 +620,7 @@ export default function TaskCard({
                     className={`
                       ${cardColorClass}
                       rounded-sm px-2 py-1 shadow-sm transition-all duration-200 border
-                      ${snapshot.isDragging ? "shadow-lg scale-105" : ""}
+                      ${snapshot.isDragging ? "shadow-lg" : ""}
                       ${isOverdue && isInTimeline ? "animate-blink" : ""}
                       ${isDuplicate && !isInTimeline ? "animate-blink-yellow" : ""}
                       hover:shadow-md cursor-pointer
@@ -630,7 +630,8 @@ export default function TaskCard({
                       ...provided.draggableProps.style,
                       width: cardWidth,
                       minHeight: "40px",
-                      ...(isMapFiltered ? {
+                      // evidenziamo sulla mappa ma SENZA deformare la hitbox durante il drag
+                      ...(isMapFiltered && !snapshot.isDragging ? {
                         boxShadow: '0 0 0 3px #3B82F6, 0 0 20px 5px rgba(59, 130, 246, 0.5)',
                         transform: 'scale(1.05)',
                         zIndex: 10,
