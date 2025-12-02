@@ -48,6 +48,14 @@ Preferred communication style: Simple, everyday language.
 - **Date Guards**: Writes blocked for past dates to prevent data contamination
 - **Deprecated**: Object Storage (`@replit/object-storage`) removed, manual "Conferma Assegnazioni" button removed
 
+## Timeline Data Flow (December 2025)
+- **Source of Truth**: MySQL `daily_assignments_current` table is the authoritative source for timeline data
+- **Frontend Reads**: All frontend components read timeline via `GET /api/timeline?date=YYYY-MM-DD` endpoint
+  - `generate-assignments.tsx`: loadTasks(), loadSavedAssignments(), checkAndAutoLoadSavedAssignments()
+  - `convocazioni.tsx`: cleaner preselection, handleSaveSelection(), handleAddCleaners()
+- **Write-Only Cache**: `timeline.json` file is written for Python script compatibility but NOT read by frontend
+- **Endpoint**: `GET /api/timeline` calls `workspaceFiles.loadTimeline()` which reads from MySQL with filesystem fallback
+
 ## Authentication & Authorization
 - **Current State**: No authentication system implemented
 - **Session Management**: Basic session infrastructure prepared with connect-pg-simple for PostgreSQL session storage
