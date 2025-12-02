@@ -1,0 +1,182 @@
+1. Task che si ingrandisce spostandola tra cleaner
+
+Questo di solito succede perché, durante il drag, react-beautiful-dnd gioca un po’ con width e il layout orizzontale, e noi non stiamo “bloccando” bene la larghezza del componente.
+
+Patch: blocchiamo la larghezza della card e togliamo ogni scale durante il drag
+
+File: client/src/components/drag-drop/task-card.tsx
+
+Dentro al Draggable, trova il <div con:
+
+className={`
+  ${cardColorClass}
+  rounded-sm px-2 py-1 shadow-sm transition-all duration-200 border
+  ${snapshot.isDragging ? "shadow-lg scale-105" : ""}
+  ${isOverdue && isInTimeline ? "animate-blink" : ""}
+  ${isDuplicate && !isInTimeline ? "animate-blink-yellow" : ""}
+  hover:shadow-md cursor-pointer
+  flex-shrink-0 relative
+`}
+style={{
+  ...provided.draggableProps.style,
+  width: cardWidth,
+  minHeight: "40px",
+  ...(isMapFiltered ? {
+    boxShadow: '0 0 0 3px #3B82F6, 0 0 20px 5px rgba(59, 130, 246, 0.5)',
+    transform: 'scale(1.05)',
+    zIndex: 10,
+  } : {})
+}}
+
+
+Sostituiscilo con questo:
+
+className={`
+  ${cardColorClass}
+  rounded-sm px-2 py-1 shadow-sm transition-all duration-200 border
+  ${snapshot.isDragging ? "shadow-lg" : ""}
+  ${isOverdue && isInTimeline ? "animate-blink" : ""}
+  ${isDuplicate && !isInTimeline ? "animate-blink-yellow" : ""}
+  hover:shadow-md cursor-pointer
+  flex-shrink-0 relative
+`}
+style={{
+  // manteniamo comunque le transform di react-beautiful-dnd (translate)
+  ...provided.draggableProps.style,
+
+  // ma la larghezza viene completamente “bloccata”
+  width: cardWidth,
+  minWidth: cardWidth,
+  maxWidth: cardWidth,
+  minHeight: "40px",
+
+  // evidenziamo sulla mappa SOLO quando non stai trascinando,
+  // per non alterare la hitbox durante il drag
+  ...(isMapFiltered && !snapshot.isDragging ? {
+    boxShadow: '0 0 0 3px #3B82F6, 0 0 20px 5px rgba(59, 130, 246, 0.5)',
+    transform: 'scale(1.05)',
+    zIndex: 10,
+  } : {})
+}}
+
+
+Effetto:
+
+Niente più scale-105 durante il drag → la task non “esplode”.
+
+width / minWidth / maxWidth tutte uguali → la larghezza resta identica anche quando passi da un cleaner all’altro.
+
+L’evidenziazione per il filtro mappa non va a toccare la card mentre la stai trascinando.
+
+2. Zona di drop visibile nella timeline (non più la colonna intera)
+
+L’idea è:
+
+Non colorare più tutta la riga quando snapshot.isDraggingOver.
+
+Usare la placeholder di react-beautiful-dnd e dargli uno stile visivo chiaro (un rettangolo blu chiaro dove la task cadrebbe).
+
+2.1. Droppable della timeline: niente più highlight di tutta la riga
+
+File: client/src/components/timeline/timeline-view.tsx
+
+Cerca il Droppable della timeline del cleaner (lo hai così):
+
+<Droppable droppableId={`timeline-${cleaner.id}`} direction="horizontal" isDropDisabled={isReadOnly}>
+  {(provided, snapshot) => (
+    <div
+      ref={provided.innerRef}
+      {...provided.droppableProps}
+      data-testid={`timeline-cleaner-${cleaner.id}`}
+      data-cleaner-id={cleaner.id}
+      className={`relative min-h-[45px] flex-1 border-l border-border ${
+        snapshot.isDraggingOver && !isReadOnly ? 'bg-primary/20 ring-2 ring-primary' : 'bg-background'
+      }`}
+      style={{
+        zIndex: filteredCleanerId === cleaner.id || hasIncompatibleTasks ? 15 : 'auto'
+      }}
+    >
+
+
+Sostituisci solo la className con:
+
+      className="relative min-h-[45px] flex-1 border-l border-border bg-background"
+
+
+Così la riga non cambia più colore “a tappeto” quando sei in drag.
+
+2.2. “Zona extra” a fine riga: togliamo l’highlight qui
+
+Qualche riga più in basso, verso la fine della riga di timeline, hai:
+
+{/* Zona extra per permettere drop alla fine della lista */}
+<div 
+  className={`flex-shrink-0 min-w-[60px] h-full ${
+    snapshot.isDraggingOver ? 'bg-primary/10' : ''
+  }`}
+  style={{ minHeight: '45px' }}
+/>
+{provided.placeholder}
+
+
+Sostituisci il blocco con:
+
+{/* Zona extra per permettere drop alla fine della lista (neutra, niente highlight) */}
+<div 
+  className="flex-shrink-0 min-w-[60px] h-full"
+  style={{ minHeight: '45px' }}
+/>
+{provided.placeholder}
+
+
+Così non hai più una “barra blu” fissa in fondo: l’unica cosa che si colora sarà la placeholder esattamente nella posizione dove finirebbe la task.
+
+2.3. Stile della placeholder = vera “zona di drop”
+
+Ora di default la placeholder è invisibile. Le diamo uno stile globale.
+
+File: client/src/index.css
+
+Prima del blocco @media print { ... } (quindi poco sopra dove inizia quella sezione), aggiungi:
+
+/* Evidenziazione precisa della zona di drop nella timeline */
+[data-testid^="timeline-cleaner-"] .react-beautiful-dnd-placeholder {
+  background-color: rgba(59, 130, 246, 0.25); /* blu soft */
+  border-radius: 4px;
+  pointer-events: none;
+}
+
+
+Risultato:
+
+Quando trascini una task sopra la timeline di un cleaner:
+
+non si colora l’intera riga;
+
+vedrai invece un rettangolo blu chiaro della stessa larghezza della task, esattamente nel punto in cui verrebbe inserita (fra le altre task).
+
+Ricap veloce
+
+Task che si ingrandisce → in task-card.tsx:
+
+rimuovi scale-105 dal snapshot.isDragging.
+
+blocca width / minWidth / maxWidth = cardWidth.
+
+evita il transform: scale(...) del filtro mappa durante il drag.
+
+Zona di drop visibile → in timeline-view.tsx:
+
+droppable della timeline con className="... bg-background" (niente condizione su snapshot.isDraggingOver).
+
+“zona extra” finale senza snapshot.isDraggingOver ? 'bg-primary/10' : ''.
+
+Highlight preciso → in index.css:
+
+stile sulla .react-beautiful-dnd-placeholder dentro [data-testid^="timeline-cleaner-"].
+
+Dopo queste patch dovresti vedere:
+
+la task che mantiene sempre la stessa dimensione anche quando passi da un cleaner all’altro;
+
+una zona di drop chiara e precisa nella timeline, invece della riga intera colorata.

@@ -629,8 +629,9 @@ export default function TaskCard({
                     style={{
                       ...provided.draggableProps.style,
                       width: cardWidth,
+                      minWidth: cardWidth,
+                      maxWidth: cardWidth,
                       minHeight: "40px",
-                      // evidenziamo sulla mappa ma SENZA deformare la hitbox durante il drag
                       ...(isMapFiltered && !snapshot.isDragging ? {
                         boxShadow: '0 0 0 3px #3B82F6, 0 0 20px 5px rgba(59, 130, 246, 0.5)',
                         transform: 'scale(1.05)',
