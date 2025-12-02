@@ -428,3 +428,10 @@
     gap: 0.15rem !important;
   }
 }
+
+/* Evidenziazione precisa della zona di drop nella timeline */
+[data-testid^="timeline-cleaner-"] .react-beautiful-dnd-placeholder {
+  background-color: hsl(221.2 83.2% 53.3% / 0.25); /* primary con opacità */
+  border-radius: 4px;
+  pointer-events: none;
+}
