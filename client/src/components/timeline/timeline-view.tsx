@@ -1620,9 +1620,7 @@ export default function TimelineView({
                           {...provided.droppableProps}
                           data-testid={`timeline-cleaner-${cleaner.id}`}
                           data-cleaner-id={cleaner.id}
-                          className={`relative min-h-[45px] flex-1 border-l border-border ${
-                            snapshot.isDraggingOver && !isReadOnly ? 'bg-primary/20 ring-2 ring-primary' : 'bg-background'
-                          }`}
+                          className="relative min-h-[45px] flex-1 border-l border-border bg-background"
                           style={{
                             zIndex: filteredCleanerId === cleaner.id || hasIncompatibleTasks ? 15 : 'auto'
                           }}
