@@ -1782,11 +1782,9 @@ export default function TimelineView({
                                 );
                               });
                             })()}
-                            {/* Zona extra per permettere drop alla fine della lista */}
+                            {/* Zona extra per permettere drop alla fine della lista (neutra, niente highlight) */}
                             <div 
-                              className={`flex-shrink-0 min-w-[60px] h-full ${
-                                snapshot.isDraggingOver ? 'bg-primary/10' : ''
-                              }`}
+                              className="flex-shrink-0 min-w-[60px] h-full"
                               style={{ minHeight: '45px' }}
                             />
                             {provided.placeholder}

@@ -315,34 +315,6 @@
     "low_priority": {
       "tasks": [
         {
-          "task_id": 219616,
-          "logistic_code": 571,
-          "client_id": 2,
-          "premium": false,
-          "address": "VIA FORCELLA 15",
-          "lat": "45.452359",
-          "lng": "9.1668683",
-          "cleaning_time": 90,
-          "checkin_date": "2025-12-03",
-          "checkout_date": "2025-12-03",
-          "checkin_time": null,
-          "checkout_time": null,
-          "pax_in": 2,
-          "pax_out": 1,
-          "small_equipment": false,
-          "operation_id": 2,
-          "confirmed_operation": true,
-          "straordinaria": false,
-          "type_apt": "B",
-          "alias": "ITW",
-          "customer_name": "ITALIANWAY SRL",
-          "priority": "low_priority",
-          "reasons": [
-            "not_eo",
-            "not_hp"
-          ]
-        },
-        {
           "task_id": 219621,
           "logistic_code": 1674,
           "client_id": 123,
@@ -420,6 +392,34 @@
           "type_apt": "B",
           "alias": "IHST",
           "customer_name": "IHOST",
+          "priority": "low_priority",
+          "reasons": [
+            "not_eo",
+            "not_hp"
+          ]
+        },
+        {
+          "task_id": 219616,
+          "logistic_code": 571,
+          "client_id": 2,
+          "premium": false,
+          "address": "VIA FORCELLA 15",
+          "lat": "45.452359",
+          "lng": "9.1668683",
+          "cleaning_time": 90,
+          "checkin_date": "2025-12-03",
+          "checkout_date": "2025-12-03",
+          "checkin_time": null,
+          "checkout_time": null,
+          "pax_in": 2,
+          "pax_out": 1,
+          "small_equipment": false,
+          "operation_id": 2,
+          "confirmed_operation": true,
+          "straordinaria": false,
+          "type_apt": "B",
+          "alias": "ITW",
+          "customer_name": "ITALIANWAY SRL",
           "priority": "low_priority",
           "reasons": [
             "not_eo",
