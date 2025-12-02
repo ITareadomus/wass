@@ -169,6 +169,9 @@ export default function GenerateAssignments() {
   // Stato per tracciare se è in corso un'operazione di drag-and-drop
   const [isDragging, setIsDragging] = useState<boolean>(false);
 
+  // Preview della posizione di sequenza mentre trascini
+  const [dragSequencePreview, setDragSequencePreview] = useState<{ sequenceIndex: number } | null>(null);
+
   // Stati per selezione multipla INDIPENDENTE per container (ma selezione CROSS-CONTAINER)
   const [multiSelectModes, setMultiSelectModes] = useState<{
     early_out: boolean;
@@ -371,7 +374,16 @@ export default function GenerateAssignments() {
     date: Date = selectedDate
   ) => {
     console.log(`🔄 refreshAssignments chiamato con trigger: "${trigger}"`);
-    setIsLoading(true);
+
+    // Mostra il loader globale solo quando serve davvero
+    const shouldShowGlobalLoader =
+      trigger === "initial" ||
+      trigger === "date-change" ||
+      trigger === "manual-refresh";
+
+    if (shouldShowGlobalLoader) {
+      setIsLoading(true);
+    }
 
     try {
       if (trigger === "manual" || trigger === "manual-refresh") {
@@ -386,7 +398,9 @@ export default function GenerateAssignments() {
     } catch (error) {
       console.error("Errore durante refreshAssignments:", error);
     } finally {
-      setIsLoading(false);
+      if (shouldShowGlobalLoader) {
+        setIsLoading(false);
+      }
     }
   };
 
@@ -1348,7 +1362,31 @@ export default function GenerateAssignments() {
     return null;
   };
 
+  const onDragUpdate = (update: any) => {
+    const { destination } = update;
+
+    if (!destination) {
+      setDragSequencePreview(null);
+      return;
+    }
+
+    const toCleanerId = parseCleanerId(destination.droppableId);
+
+    // Mostriamo il numero di sequenza solo quando siamo sulla timeline di un cleaner
+    if (toCleanerId === null) {
+      setDragSequencePreview(null);
+      return;
+    }
+
+    setDragSequencePreview({
+      // index è 0-based, mostrato come 1-based
+      sequenceIndex: destination.index + 1,
+    });
+  };
+
   const onDragEnd = async (result: any) => {
+    setDragSequencePreview(null);
+
     const { destination, source, draggableId } = result;
 
     // niente destinazione => niente da fare
@@ -1908,7 +1946,10 @@ export default function GenerateAssignments() {
         </div>
 
         <MultiSelectContext.Provider value={multiSelectContextValue}>
-          <DragDropContext onDragEnd={onDragEnd}>
+          <DragDropContext
+            onDragEnd={onDragEnd}
+            onDragUpdate={onDragUpdate}
+          >
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6 w-full">
               <PriorityColumn
                 title="EARLY OUT"
@@ -2020,6 +2061,14 @@ export default function GenerateAssignments() {
               </div>
             </div>
           </div>
+          {dragSequencePreview && (
+            <div className="fixed bottom-4 right-4 z-[9999] bg-slate-900 text-white text-xs px-3 py-2 rounded shadow-lg pointer-events-none">
+              <span className="opacity-80 mr-1">Posizione nella sequenza:</span>
+              <span className="font-semibold">
+                {dragSequencePreview.sequenceIndex}
+              </span>
+            </div>
+          )}
         </DragDropContext>
         </MultiSelectContext.Provider>
       </div>
