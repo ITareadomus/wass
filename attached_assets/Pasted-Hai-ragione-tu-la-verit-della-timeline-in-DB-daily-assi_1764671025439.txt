@@ -1,0 +1,235 @@
+Hai ragione tu: la “verità” della timeline è in DB (daily_assignments_current), e il file timeline.json dovrebbe essere solo una cache tecnica per gli script Python, non la fonte da cui il frontend “vede” la timeline.
+
+Ti faccio un riassunto di com’è messo il progetto adesso e cosa cambiare.
+
+1. Com’è oggi (riassunto veloce)
+DB: tabella daily_assignments_current
+
+Nel backend hai già il servizio:
+
+server/services/daily-assignment-revisions-service.ts
+
+Lì c’è:
+
+export interface DailyAssignmentCurrent {
+  work_date: string;
+  timeline: any;
+  selected_cleaners: any;
+  containers: any;
+  last_revision: number;
+  ...
+}
+
+
+e le funzioni che leggono/scrivono la riga per una certa work_date usando MySQL.
+
+Helper centrale: workspace-files.ts
+
+In server/services/workspace-files.ts hai il cuore della logica:
+
+loadTimeline(workDate):
+
+prova a leggere da MySQL (daily_assignments_current / history)
+
+se trova, normalizza e poi scrive su PATHS.timeline (cioè client/public/data/output/timeline.json)
+
+se non trova, fa fallback sul file
+
+saveTimeline(workDate, data, ...):
+
+normalizza
+
+scrive sempre su timeline.json (filesystem, per gli script Python)
+
+e per date non passate, aggiorna la riga in daily_assignments_current
+
+Quindi: DB è la fonte, timeline.json è solo cache + compat Python.
+
+Frontend però…
+
+Nel frontend in alcuni punti stai ancora leggendo direttamente il file:
+
+client/src/pages/generate-assignments.tsx:
+
+const timelineResponse = await fetch(`/data/output/timeline.json?t=${Date.now()}`, { ... });
+
+
+client/src/pages/convocazioni.tsx:
+
+const timelineResponse = await fetch(`/data/output/timeline.json?t=${Date.now()}`);
+
+
+👉 Questo significa che se timeline.json è corrotto / non aggiornato rispetto al DB,
+il frontend vede il file rotto, non lo stato reale in daily_assignments_current.
+
+2. Cosa “dovremmo” fare: leggere sempre dal DB
+
+Visto che hai già tutta la logica pronta, la mossa giusta è:
+
+Esporre un endpoint HTTP che usa workspaceFiles.loadTimeline()
+
+Far sì che il frontend non chiami più /data/output/timeline.json, ma quell’endpoint.
+
+Così:
+
+la timeline corrente viene letta da daily_assignments_current
+
+timeline.json viene riscritto da loadTimeline() (cache pulita per Python)
+
+anche se il file è corrotto, la prossima loadTimeline() lo sovrascrive con JSON valido.
+
+3. Patch da dare a Replit
+3.1. Aggiungi endpoint GET /api/timeline (server)
+
+Nel file:
+
+server/routes.ts
+
+
+sopra agli endpoint che usano la timeline (ad esempio sopra /api/save-timeline-assignment va benissimo), aggiungi:
+
+import * as workspaceFiles from "./services/workspace-files";
+import { format } from "date-fns";
+// ... (questo c’è già in alto)
+
+  // Endpoint per leggere la timeline corrente da DB (daily_assignments_current)
+  app.get("/api/timeline", async (req, res) => {
+    try {
+      const dateParam = (req.query.date as string) || format(new Date(), "yyyy-MM-dd");
+      const workDate = dateParam;
+
+      // Carica la timeline da MySQL (con fallback su filesystem) 
+      // e sincronizza timeline.json come cache per gli script Python
+      const timeline = await workspaceFiles.loadTimeline(workDate);
+
+      if (!timeline) {
+        return res.status(404).json({
+          success: false,
+          error: `Nessuna timeline trovata per la data ${workDate}`,
+        });
+      }
+
+      res.json(timeline);
+    } catch (error: any) {
+      console.error("Errore nel load della timeline:", error);
+      res.status(500).json({
+        success: false,
+        error: error.message,
+      });
+    }
+  });
+
+
+Questo endpoint:
+
+legge da daily_assignments_current (tramite dailyAssignmentRevisionsService → workspaceFiles.loadTimeline)
+
+riscrive client/public/data/output/timeline.json in modo normalizzato
+
+restituisce al client lo JSON pulito.
+
+3.2. Cambia il fetch nel frontend (generate-assignments)
+
+Nel file:
+
+client/src/pages/generate-assignments.tsx
+
+
+cerca il pezzo dove fai fetch di timeline.json (più o meno questo):
+
+// timeline.json dopo il caricamento
+const timelineResponse = await fetch(`/data/output/timeline.json?t=${Date.now()}`, {
+  cache: 'no-store',
+  headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' }
+});
+
+
+Sostituiscilo con qualcosa del genere (usando la data che usi per le assegnazioni):
+
+const workDate = selectedDate || new Date(); // o la tua variabile data già calcolata
+const dateStr = typeof workDate === 'string'
+  ? workDate
+  : workDate.toISOString().slice(0, 10);
+
+const timelineResponse = await fetch(`/api/timeline?date=${dateStr}`, {
+  cache: 'no-store',
+  headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' },
+});
+
+if (!timelineResponse.ok) {
+  console.error("Errore nel caricamento timeline da /api/timeline");
+  // gestisci errore
+}
+
+const timelineData = await timelineResponse.json();
+// ... usa timelineData normalmente
+
+
+L’importante è:
+
+non usare più /data/output/timeline.json diretto
+
+usare /api/timeline?date=YYYY-MM-DD che passa da DB.
+
+3.3. Cambia anche il fetch in convocazioni.tsx
+
+Nel file:
+
+client/src/pages/convocazioni.tsx
+
+
+hai:
+
+const timelineResponse = await fetch(`/data/output/timeline.json?t=${Date.now()}`);
+if (timelineResponse.ok) {
+  const timelineData = await timelineResponse.json();
+  ...
+}
+
+
+Sostituisci con:
+
+const workDateStr = selectedDate || new Date().toISOString().slice(0, 10);
+
+const timelineResponse = await fetch(`/api/timeline?date=${workDateStr}`);
+if (timelineResponse.ok) {
+  const timelineData = await timelineResponse.json();
+  // ... usa timelineData
+} else {
+  console.warn(`Impossibile caricare timeline per ${workDateStr}`);
+}
+
+4. Cosa succede dopo queste modifiche
+
+La vista timeline del frontend:
+
+non dipende più dal file timeline.json
+
+legge sempre dallo stato corrente in daily_assignments_current
+
+Ogni volta che chiami /api/timeline:
+
+workspaceFiles.loadTimeline:
+
+legge dal DB
+
+normalizza
+
+riscrive timeline.json come cache per gli script Python
+(quindi se il file è corrotto, viene “guarito”)
+
+Gli endpoint tipo /api/assign-early-out-to-timeline continuano a:
+
+far girare assign_eo.py leggendo/scrivendo il file
+
+poi salvare il risultato in MySQL con workspaceFiles.saveTimeline(workDate, timelineData)
+
+Quindi il flusso diventa:
+
+UI legge stato da DB via /api/timeline
+
+Python lavora sul timeline.json che è una cache coerente con DB
+
+Server salva il risultato Python di nuovo in DB
+
+UI rilegge da DB → sempre pulito.

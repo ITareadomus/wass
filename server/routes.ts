@@ -578,6 +578,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Endpoint per leggere la timeline corrente da DB (daily_assignments_current)
+  // Il frontend dovrebbe usare questo endpoint invece di leggere direttamente timeline.json
+  app.get("/api/timeline", async (req, res) => {
+    try {
+      const dateParam = (req.query.date as string) || format(new Date(), "yyyy-MM-dd");
+      const workDate = dateParam;
+
+      console.log(`📖 GET /api/timeline - Caricamento timeline per ${workDate}`);
+
+      // Carica la timeline da MySQL (con fallback su filesystem)
+      // e sincronizza timeline.json come cache per gli script Python
+      const timeline = await workspaceFiles.loadTimeline(workDate);
+
+      if (!timeline) {
+        return res.status(404).json({
+          success: false,
+          error: `Nessuna timeline trovata per la data ${workDate}`,
+        });
+      }
+
+      console.log(`✅ Timeline caricata per ${workDate}: ${timeline.cleaners_assignments?.length || 0} cleaners`);
+      res.json(timeline);
+    } catch (error: any) {
+      console.error("Errore nel load della timeline:", error);
+      res.status(500).json({
+        success: false,
+        error: error.message,
+      });
+    }
+  });
+
   // Endpoint per salvare un'assegnazione nella timeline
   app.post("/api/save-timeline-assignment", async (req, res) => {
     try {
