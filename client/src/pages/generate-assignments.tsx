@@ -754,7 +754,7 @@ export default function GenerateAssignments() {
 
       const containersData = JSON.parse(containersText);
 
-      // Carica da timeline.json con gestione errori robusta
+      // Carica da /api/timeline (DB source) con gestione errori robusta
       let timelineAssignmentsData = {
         assignments: [],
         metadata: { date: dateStr },
@@ -769,7 +769,7 @@ export default function GenerateAssignments() {
 
             // Verifica che il contenuto sia JSON valido
             if (!timelineText.trim().startsWith('{') && !timelineText.trim().startsWith('[')) {
-              console.warn('Timeline.json corrotto, non è JSON:', timelineText.substring(0, 100));
+              console.warn('Timeline corrotta, non è JSON:', timelineText.substring(0, 100));
               timelineAssignmentsData = { metadata: {}, cleaners_assignments: [] };
             } else {
               timelineAssignmentsData = JSON.parse(timelineText);
@@ -781,12 +781,12 @@ export default function GenerateAssignments() {
             console.warn('Timeline file is not JSON, using empty timeline');
           }
         } catch (e) {
-          console.error('Errore parsing timeline.json:', e);
+          console.error('Errore parsing timeline:', e);
           // In caso di errore, usa timeline vuota
           timelineAssignmentsData = { metadata: {}, cleaners_assignments: [] };
         }
       } else {
-        console.warn(`Timeline file not found (${timelineResponse.status}), using empty timeline`);
+        console.warn(`Timeline not found (${timelineResponse.status}), using empty timeline`);
       }
 
       console.log("Containers data:", containersData);
