@@ -331,8 +331,8 @@ export default function GenerateAssignments() {
         // CRITICAL: Quando carichiamo assegnazioni salvate, NON ci sono modifiche
         setHasUnsavedChanges(false);
 
-        // CRITICAL: Verifica e aggiorna la data in timeline.json dopo il caricamento
-        const timelineResponse = await fetch(`/data/output/timeline.json?t=${Date.now()}`, {
+        // CRITICAL: Verifica e aggiorna la data nella timeline dopo il caricamento
+        const timelineResponse = await fetch(`/api/timeline?date=${dateStr}`, {
           cache: 'no-store',
           headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' }
         });
@@ -340,7 +340,7 @@ export default function GenerateAssignments() {
         if (timelineResponse.ok) {
           const timelineData = await timelineResponse.json();
           if (timelineData.metadata?.date !== dateStr) {
-            console.log(`🔄 Aggiornamento data in timeline.json da ${timelineData.metadata?.date} a ${dateStr}`);
+            console.log(`🔄 Aggiornamento data in timeline da ${timelineData.metadata?.date} a ${dateStr}`);
             // La data verrà aggiornata dal backend al prossimo salvataggio
           }
         }
@@ -441,26 +441,22 @@ export default function GenerateAssignments() {
           console.log(`✅ Assegnazioni salvate caricate automaticamente per ${dateStr}`);
           setLastSavedTimestamp(checkResult.formattedDateTime || null);
 
-          // CRITICAL: Verifica che timeline.json sia valido prima di caricare
-          const timestamp = Date.now() + Math.random();
-          const timelineCheckResponse = await fetch(`/data/output/timeline.json?t=${timestamp}`, {
+          // CRITICAL: Verifica che la timeline sia valida prima di caricare
+          const timelineCheckResponse = await fetch(`/api/timeline?date=${dateStr}`, {
             cache: 'no-store',
             headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' }
           });
 
-          if (timelineCheckResponse.ok) {
-            const timelineText = await timelineCheckResponse.text();
-            if (!timelineText.trim().startsWith('{') && !timelineText.trim().startsWith('[')) {
-              console.error("❌ timeline.json corrotto dopo caricamento da Object Storage");
-              toast({
-                title: "Errore",
-                description: "File timeline corrotto, riprova tra qualche secondo",
-                variant: "destructive",
-                duration: 5000
-              });
-              setIsExtracting(false);
-              return;
-            }
+          if (!timelineCheckResponse.ok) {
+            console.error("❌ Errore nel caricamento della timeline da /api/timeline");
+            toast({
+              title: "Errore",
+              description: "Impossibile caricare la timeline, riprova tra qualche secondo",
+              variant: "destructive",
+              duration: 5000
+            });
+            setIsExtracting(false);
+            return;
           }
 
           // Ricarica i task per mostrare i dati aggiornati
@@ -517,9 +513,9 @@ export default function GenerateAssignments() {
         // NON esistono assegnazioni salvate in Object Storage
         console.log("ℹ️ Nessuna assegnazione salvata in Object Storage per", dateStr);
 
-        // Verifica se esiste timeline.json locale (non salvata)
+        // Verifica se esiste timeline locale (da DB)
         try {
-          const timelineResponse = await fetch(`/data/output/timeline.json?t=${Date.now()}`, {
+          const timelineResponse = await fetch(`/api/timeline?date=${dateStr}`, {
             cache: 'no-store',
             headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' }
           });
@@ -529,7 +525,7 @@ export default function GenerateAssignments() {
             const hasLocalAssignments = timelineData.cleaners_assignments?.length > 0;
 
             if (hasLocalAssignments && timelineData.metadata?.date === dateStr) {
-              console.log("✅ Timeline.json locale esistente con assegnazioni - mantieni senza resettare");
+              console.log("✅ Timeline esistente con assegnazioni - mantieni senza resettare");
 
               // Carica solo i task senza estrarre
               await loadTasks(true);
@@ -540,7 +536,7 @@ export default function GenerateAssignments() {
             }
           }
         } catch (err) {
-          console.log("Timeline.json locale non trovata o vuota, procedo con estrazione");
+          console.log("Timeline non trovata o vuota, procedo con estrazione");
         }
 
         // SOLO date STRETTAMENTE passate sono read-only
@@ -738,7 +734,7 @@ export default function GenerateAssignments() {
           cache: 'no-store',
           headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' }
         }),
-        fetch(`/data/output/timeline.json?t=${timestamp}`, {
+        fetch(`/api/timeline?date=${dateStr}`, {
           cache: 'no-store',
           headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' }
         })
