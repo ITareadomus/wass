@@ -1,17 +1,13 @@
 {
   "meta": {
-    "total_tasks": 13,
     "used_cleaners": 7,
-    "assigned_tasks": 12,
+    "assigned_tasks": 11,
     "total_cleaners": 7
   },
   "metadata": {
     "date": "2025-12-03",
     "created_by": "unknown",
-    "modified_by": [
-      "Admin"
-    ],
-    "last_updated": "2025-12-03 11:34:25"
+    "last_updated": "2025-12-03 12:11:33"
   },
   "cleaners_assignments": [
     {
@@ -20,42 +16,10 @@
         "name": "EL HADJI",
         "lastname": "BA",
         "role": "Premium",
-        "premium": false,
+        "premium": true,
         "start_time": "10:00"
       },
       "tasks": [
-        {
-          "task_id": 219608,
-          "logistic_code": 566,
-          "client_id": null,
-          "premium": false,
-          "address": "CORSO PLEBISCITI, 9",
-          "lat": "45.468696",
-          "lng": "9.2192168",
-          "cleaning_time": 180,
-          "checkin_date": null,
-          "checkout_date": "2025-12-03",
-          "checkin_time": null,
-          "checkout_time": null,
-          "pax_in": 4,
-          "pax_out": 3,
-          "small_equipment": false,
-          "operation_id": 3,
-          "confirmed_operation": true,
-          "straordinaria": true,
-          "type_apt": "A",
-          "alias": "TBR",
-          "customer_name": "THE BEST RENT S.r.l.",
-          "reasons": [
-            "manually_moved_to_timeline"
-          ],
-          "priority": "low_priority",
-          "start_time": "10:00",
-          "end_time": "13:00",
-          "followup": false,
-          "sequence": 1,
-          "travel_time": 0
-        },
         {
           "task_id": 219629,
           "logistic_code": 1621,
@@ -83,11 +47,11 @@
             "automatic_assignment_eo"
           ],
           "priority": "early_out",
-          "start_time": "13:25",
-          "end_time": "14:25",
-          "followup": true,
-          "sequence": 2,
-          "travel_time": 25
+          "start_time": "10:00",
+          "end_time": "11:00",
+          "followup": false,
+          "sequence": 1,
+          "travel_time": 0
         },
         {
           "task_id": 219620,
@@ -116,10 +80,10 @@
             "automatic_assignment_eo"
           ],
           "priority": "early_out",
-          "start_time": "14:32",
-          "end_time": "16:32",
+          "start_time": "11:07",
+          "end_time": "13:07",
           "followup": true,
-          "sequence": 3,
+          "sequence": 2,
           "travel_time": 7
         }
       ]
@@ -166,38 +130,6 @@
           "followup": false,
           "sequence": 1,
           "travel_time": 0
-        },
-        {
-          "task_id": 219761,
-          "logistic_code": 1672,
-          "client_id": null,
-          "premium": false,
-          "address": "VIA TORTONA 19",
-          "lat": "45.4530068",
-          "lng": "9.1668178",
-          "cleaning_time": 240,
-          "checkin_date": "2025-12-03",
-          "checkout_date": "2025-12-03",
-          "checkin_time": null,
-          "checkout_time": "13:00",
-          "pax_in": 2,
-          "pax_out": 0,
-          "small_equipment": false,
-          "operation_id": 3,
-          "confirmed_operation": true,
-          "straordinaria": true,
-          "type_apt": "B",
-          "alias": "HMST",
-          "customer_name": "HOMING STAYS",
-          "reasons": [
-            "manually_moved_to_timeline"
-          ],
-          "priority": "low_priority",
-          "start_time": "13:00",
-          "end_time": "17:00",
-          "followup": true,
-          "sequence": 2,
-          "travel_time": 41
         }
       ]
     },
