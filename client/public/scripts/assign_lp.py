@@ -1256,7 +1256,7 @@ def main():
         # Cerca se esiste già un'entry per questo cleaner
         existing_entry = None
         for entry in timeline_data["cleaners_assignments"]:
-            if entry["cleaner"]["id"] == cleaner_entry["cleaner"]["id"]:
+            if entry.get("cleaner", {}).get("id") == cleaner_entry["cleaner"]["id"]:
                 existing_entry = entry
                 break
 
