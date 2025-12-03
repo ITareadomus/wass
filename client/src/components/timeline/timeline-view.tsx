@@ -1644,7 +1644,7 @@ export default function TimelineView({
                           </div>
 
                           {/* Task posizionate in sequenza con indicatori di travel time */}
-                          <div className="relative z-10 flex items-center h-full">
+                          <div className="relative z-10 flex items-center h-full" style={{ minHeight: '45px' }}>
                             {(() => {
                               // Calcola l'array delle task per questo cleaner una sola volta
                               const cleanerTasks = tasks
@@ -1782,11 +1782,6 @@ export default function TimelineView({
                                 );
                               });
                             })()}
-                            {/* Zona extra per permettere drop alla fine della lista (neutra, niente highlight) */}
-                            <div 
-                              className="flex-shrink-0 min-w-[60px] h-full"
-                              style={{ minHeight: '45px' }}
-                            />
                             {provided.placeholder}
                           </div>
                         </div>
