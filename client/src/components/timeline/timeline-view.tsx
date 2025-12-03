@@ -1064,10 +1064,10 @@ export default function TimelineView({
   };
 
   // Calcola la larghezza dinamica della colonna cleaners in base all'alias più lungo
-  const calculateCleanerColumnWidth = React.useMemo(() => {
-    if (allCleanersToShow.length === 0) return 96; // default 24 (w-24 = 96px)
+  const calculateCleanerColumnWidth = () => {
+    if (cleaners.length === 0) return 96; // default 24 (w-24 = 96px)
 
-    const maxLength = allCleanersToShow.reduce((max, cleaner) => {
+    const maxLength = cleaners.reduce((max, cleaner) => {
       const alias = cleanersAliases[cleaner.id]?.alias ||
                     `${cleaner.name} ${cleaner.lastname}`;
       return Math.max(max, alias.length);
@@ -1080,9 +1080,9 @@ export default function TimelineView({
     const badgeSpace = 30; // spazio per il badge P/F
 
     return Math.max(96, baseWidth + (maxLength * charWidth) + badgeSpace);
-  }, [allCleanersToShow, cleanersAliases]);
+  };
 
-  const cleanerColumnWidth = calculateCleanerColumnWidth;
+  const cleanerColumnWidth = calculateCleanerColumnWidth();
 
   // Gestione fullscreen
   const toggleFullscreen = async () => {
