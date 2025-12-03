@@ -118,9 +118,9 @@ def transfer_to_adam(work_date: str, username: str = "system"):
                         "updated_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                     }
                     
-                    # Query di update sulla tabella app_housekeeping
+                    # Query di update sulla tabella wass_housekeeping
                     query = """
-                        UPDATE app_housekeeping 
+                        UPDATE wass_housekeeping 
                         SET 
                           checkout = %s,
                           checkout_time = %s,
