@@ -509,10 +509,10 @@ export default function TaskCard({
     const effectiveMinutes = totalMinutes === 0 ? 30 : totalMinutes;
 
     if (forTimeline) {
-      // CRITICAL: Usa globalTimelineMinutes (minuti totali della timeline) come base
-      // Questo assicura che il calcolo corrisponda alla griglia visiva
-      const timelineMinutes = (window as any).globalTimelineMinutes || 540; // fallback 9 ore (10:00-19:00)
-      const widthPercentage = (effectiveMinutes / timelineMinutes) * 100;
+      // La griglia usa N slot (es: 10 slot per 10:00-19:00), ciascuno con larghezza 1/N
+      const slotsCount = (window as any).globalTimeSlotsCount || 10;
+      const virtualMinutes = slotsCount * 60; // Minuti virtuali basati su slot
+      const widthPercentage = (effectiveMinutes / virtualMinutes) * 100;
       return `${widthPercentage}%`;
     } else {
       // Per le colonne di priorità:
