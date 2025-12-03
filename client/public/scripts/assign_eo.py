@@ -1061,6 +1061,19 @@ def main():
             cleaner_entry_existing["tasks"].extend(cleaner_entry["tasks"])
             print(f"   ✅ Usando cleaner entry esistente per {cleaner_entry['cleaner']['name']} {cleaner_entry['cleaner']['lastname']} (aggiunte {len(cleaner_entry['tasks'])} task)")
 
+    # CRITICAL FIX: Ricalcola le sequenze per tutti i cleaner dopo il merge
+    # Questo assicura che le task manuali già presenti vengano considerate
+    for entry in timeline_data_output["cleaners_assignments"]:
+        tasks = entry.get("tasks", [])
+        if len(tasks) > 1:
+            # Ordina per start_time per mantenere l'ordine cronologico
+            tasks.sort(key=lambda t: t.get("start_time") or "00:00")
+            # Ricalcola sequence per tutte le task
+            for idx, task in enumerate(tasks):
+                task["sequence"] = idx + 1
+                task["followup"] = idx > 0
+            print(f"   🔄 Ricalcolate sequenze per cleaner {entry['cleaner']['name']} {entry['cleaner']['lastname']}: {len(tasks)} task")
+
 
     # Aggiorna meta
     # Conta i cleaner totali disponibili
