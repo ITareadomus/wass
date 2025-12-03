@@ -1115,17 +1115,18 @@ def main():
                 "tasks": cleaner_entry["tasks"]
             })
 
-    # CRITICAL FIX: Ricalcola le sequenze per tutti i cleaner dopo il merge
-    # Questo assicura che le task manuali già presenti vengano considerate
+    # CRITICAL FIX: Ricalcola sequenze E travel_time per tutti i cleaner dopo il merge
+    # Importa la funzione di ricalcolo da recalculate_times.py
+    from recalculate_times import recalculate_cleaner_times
+    
     for entry in timeline_data["cleaners_assignments"]:
         tasks = entry.get("tasks", [])
-        if len(tasks) > 0:
-            # Le task sono già ordinate per start_time
+        if len(tasks) > 1:
+            # Ordina per start_time per mantenere l'ordine cronologico
             tasks.sort(key=lambda t: t.get("start_time") or "00:00")
-            # Ricalcola sequence per tutte le task
-            for idx, task in enumerate(tasks):
-                task["sequence"] = idx + 1
-                task["followup"] = idx > 0
+            # Usa recalculate_cleaner_times per ricalcolare sequence, travel_time, start_time, end_time
+            updated_entry = recalculate_cleaner_times(entry)
+            entry["tasks"] = updated_entry["tasks"]
 
     # Aggiorna metadata
     # Aggiorna metadata
