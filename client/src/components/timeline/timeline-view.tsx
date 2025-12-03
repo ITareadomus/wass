@@ -1214,29 +1214,22 @@ export default function TimelineView({
 
   const loadTimelineCleaners = async () => {
     try {
-      // CRITICAL: Usa l'API invece del file per avere dati sincronizzati con MySQL
-      const dateStr = workDate || localStorage.getItem('selected_work_date') || new Date().toISOString().split('T')[0];
-      const response = await fetch(`/api/timeline?date=${dateStr}&t=${Date.now()}`, {
-        cache: 'no-store',
-        headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' }
-      });
-      
+      const response = await fetch(`/data/output/timeline.json?t=${Date.now()}`);
       if (!response.ok) {
-        console.warn(`Timeline API not found (${response.status}), using empty timeline`);
+        console.warn(`Timeline file not found (${response.status}), using empty timeline`);
         setTimelineCleaners([]);
         return;
       }
 
       const contentType = response.headers.get('content-type');
       if (!contentType || !contentType.includes('application/json')) {
-        console.warn('Timeline API response is not JSON, using empty timeline');
+        console.warn('Timeline file is not JSON, using empty timeline');
         setTimelineCleaners([]);
         return;
       }
 
       const timelineData = await response.json();
       const timelineCleanersList = timelineData.cleaners_assignments || [];
-      console.log(`📋 Timeline cleaners loaded from API: ${timelineCleanersList.length} cleaners, ${timelineCleanersList.reduce((sum: number, c: any) => sum + (c.tasks?.length || 0), 0)} tasks`);
       setTimelineCleaners(timelineCleanersList);
     } catch (error) {
       console.error("Errore nel caricamento timeline cleaners:", error);
@@ -1556,17 +1549,9 @@ export default function TimelineView({
                 const droppableId = `cleaner-${cleaner.id}`;
 
                 // Trova tutte le task assegnate a questo cleaner
-                // CRITICAL: Usa String() per evitare mismatch numero/stringa
                 const cleanerTasks = tasks.filter(task =>
-                  String((task as any).assignedCleaner) === String(cleaner.id)
+                  (task as any).assignedCleaner === cleaner.id
                 ).map(normalizeTask); // Applica la normalizzazione qui
-                
-                // Debug: log per cleaners che dovrebbero avere task ma non le mostrano
-                if (cleanerTasks.length === 0 && timelineCleaners.some(tc => tc.cleaner?.id === cleaner.id && tc.tasks?.length > 0)) {
-                  const timelineCleaner = timelineCleaners.find(tc => tc.cleaner?.id === cleaner.id);
-                  console.warn(`⚠️ Cleaner ${cleaner.id} (${cleaner.name}) ha ${timelineCleaner?.tasks?.length || 0} task in timelineCleaners ma 0 in props.tasks`);
-                  console.log(`   Tasks passate:`, tasks.filter(t => String((t as any).assignedCleaner) === String(cleaner.id)));
-                }
 
                 const isRemoved = removedCleanerIds.has(cleaner.id);
 
