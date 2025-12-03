@@ -643,16 +643,16 @@ export default function TaskCard({
                 zIndex: snapshot.isDragging ? 9999 : 'auto',
               }}
             >
-              {/* Offset spacer per prima task - dentro il Draggable */}
-              {isInTimeline && index === 0 && timeOffset > 0 && offsetWidthPx > 0 && (
+              {/* Offset spacer per prima task - dentro il Draggable - nascosto durante drag */}
+              {isInTimeline && index === 0 && timeOffset > 0 && offsetWidthPx > 0 && !snapshot.isDragging && (
                 <div
                   className="flex-shrink-0"
                   style={{ width: `${offsetWidthPx}px` }}
                 />
               )}
 
-              {/* Travel time marker - dentro il Draggable */}
-              {isInTimeline && index > 0 && travelTime > 0 && travelWidthPx > 0 && (
+              {/* Travel time marker - dentro il Draggable - nascosto durante drag */}
+              {isInTimeline && index > 0 && travelTime > 0 && travelWidthPx > 0 && !snapshot.isDragging && (
                 <div
                   className="flex items-center justify-center flex-shrink-0 py-3"
                   style={{ width: `${travelWidthPx}px`, minHeight: '50px' }}
