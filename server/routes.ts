@@ -618,6 +618,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const modificationType = modification_type || 'task_assigned_manually';
       const timelinePath = path.join(process.cwd(), 'client/public/data/output/timeline.json');
       const containersPath = path.join(process.cwd(), 'client/public/data/output/containers.json');
+      const cleanersPath = path.join(process.cwd(), 'client/public/data/cleaners/selected_cleaners.json');
 
       // Carica containers per ottenere i dati completi del task
       let fullTaskData: any = null;
@@ -851,6 +852,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
         : cleanerEntry.tasks.length;
 
       cleanerEntry.tasks.splice(targetIndex, 0, taskForTimeline);
+
+      // CRITICAL: Carica start_time aggiornato da selected_cleaners.json PRIMA di ricalcolare
+      try {
+        const cleanersData = JSON.parse(await fs.readFile(cleanersPath, 'utf8'));
+        const selectedCleaner = cleanersData.cleaners?.find((c: any) => c.id === normalizedCleanerId);
+        
+        if (selectedCleaner?.start_time) {
+          cleanerEntry.cleaner.start_time = selectedCleaner.start_time;
+          console.log(`✅ Loaded start_time ${selectedCleaner.start_time} from selected_cleaners for cleaner ${normalizedCleanerId}`);
+        } else {
+          console.warn(`⚠️ No start_time found for cleaner ${normalizedCleanerId}, using default 10:00`);
+          cleanerEntry.cleaner.start_time = "10:00";
+        }
+      } catch (err) {
+        console.warn(`⚠️ Could not load start_time from selected_cleaners for cleaner ${normalizedCleanerId}, using default`);
+        cleanerEntry.cleaner.start_time = "10:00";
+      }
 
       // Ricalcola travel_time, start_time, end_time usando lo script Python
       try {
