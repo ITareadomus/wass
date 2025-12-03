@@ -1279,12 +1279,12 @@ export default function GenerateAssignments() {
       const response = await fetch('/api/reorder-timeline', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          date: dateStr, 
-          cleanerId, 
-          taskId, 
-          logisticCode, 
-          fromIndex, 
+        body: JSON.stringify({
+          date: dateStr,
+          cleanerId,
+          taskId,
+          logisticCode,
+          fromIndex,
           toIndex,
           modified_by: currentUser.username || 'unknown',
           modification_type: 'dnd_reorder_same_cleaner'
@@ -1503,183 +1503,11 @@ export default function GenerateAssignments() {
         return;
       }
 
-      if (!fromCleanerId && fromContainer && toCleanerId !== null && !toContainer) {
-        console.log(`🔄 Spostamento da container ${fromContainer} a cleaner ${toCleanerId}`);
-
-        try {
-          // Carica i dati del cleaner per mostrare nome e cognome
-          const cleanersResponse = await fetch(`/data/cleaners/selected_cleaners.json?t=${Date.now()}`, {
-            cache: 'no-store',
-            headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' }
-          });
-          const cleanersData = await cleanersResponse.json();
-          const cleaner = cleanersData.cleaners.find((c: any) => c.id === toCleanerId);
-          const cleanerName = cleaner ? `${cleaner.name} ${cleaner.lastname}` : `ID ${toCleanerId}`;
-
-          // Salva in timeline.json (rimuove automaticamente da containers.json)
-          await saveTaskAssignment(taskId, toCleanerId, logisticCode, destination.index);
-
-          // CRITICAL: Marca modifiche dopo drag-and-drop da container
-          setHasUnsavedChanges(true);
-          if (handleTaskMoved) {
-            handleTaskMoved();
-          }
-
-          toast({
-            title: "Task assegnata",
-            description: `Task ${logisticCode} assegnata a ${cleanerName}`,
-            variant: "success",
-          });
-
-          // Rilascia lock PRIMA del reload
-          setIsDragging(false);
-
-          // Reload in background
-          await refreshAssignments("manual");
-        } catch (err) {
-          console.error("Errore nel salvataggio in timeline:", err);
-          toast({
-            title: "Errore",
-            description: "Impossibile assegnare la task alla timeline.",
-            variant: "destructive",
-          });
-          // Rilascia lock anche in caso di errore
-          setIsDragging(false);
-        }
-        return;
-      }
-
-      if (fromCleanerId !== null && toCleanerId !== null) {
-        // CASO SPECIALE: Riordino all'interno dello STESSO cleaner
-        if (fromCleanerId === toCleanerId) {
-          console.log(`🔄 Riordino task ${logisticCode} nello stesso cleaner ${fromCleanerId}: da posizione ${source.index} a ${destination.index}`);
-          
-          try {
-            await reorderTimelineAssignment(taskId, fromCleanerId, logisticCode || '', source.index, destination.index);
-            
-            // CRITICAL: Marca modifiche dopo riordino
-            setHasUnsavedChanges(true);
-            if (handleTaskMoved) {
-              handleTaskMoved();
-            }
-
-            toast({
-              title: "Task riordinata",
-              description: `Task ${logisticCode} spostata alla posizione ${destination.index + 1}`,
-              variant: "success",
-            });
-
-            // Rilascia lock PRIMA del reload
-            setIsDragging(false);
-
-            // Reload in background
-            await refreshAssignments("manual");
-          } catch (err) {
-            console.error("Errore nel riordino:", err);
-            toast({
-              title: "Errore",
-              description: "Impossibile riordinare la task.",
-              variant: "destructive",
-            });
-            setIsDragging(false);
-          }
-          return;
-        }
-
-        // CASO NORMALE: Spostamento tra cleaners DIVERSI
-        console.log(`🔄 Spostamento tra cleaners: task ${logisticCode} da cleaner ${fromCleanerId} (idx ${source.index}) a cleaner ${toCleanerId} (idx ${destination.index})`);
-
-        try {
-          // Carica i dati dei cleaner per mostrare nome e cognome
-          const cleanersResponse = await fetch(`/data/cleaners/selected_cleaners.json?t=${Date.now()}`, {
-            cache: 'no-store',
-            headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' }
-          });
-          const cleanersData = await cleanersResponse.json();
-          const fromCleaner = cleanersData.cleaners.find((c: any) => c.id === fromCleanerId);
-          const toCleaner = cleanersData.cleaners.find((c: any) => c.id === toCleanerId);
-          const fromCleanerName = fromCleaner ? `${fromCleaner.name} ${fromCleaner.lastname}` : `ID ${fromCleanerId}`;
-          const toCleanerName = toCleaner ? `${toCleaner.name} ${toCleaner.lastname}` : `ID ${toCleanerId}`;
-
-          const payload = {
-            date: format(selectedDate, "yyyy-MM-dd"),
-            taskId,
-            logisticCode,
-            fromCleanerId,
-            toCleanerId,
-            sourceIndex: source.index,
-            destIndex: destination.index,
-            insertAt: destination.index
-          };
-
-          console.log('Payload inviato:', payload);
-
-          const response = await fetch('/api/timeline/move-task', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload),
-          });
-
-          console.log('✅ Response ricevuta, status:', response.status, 'ok:', response.ok);
-
-          const data = await response.json();
-          console.log('✅ JSON parseato con successo:', data);
-
-          if (!response.ok || !data?.success) {
-            console.error('❌ Errore timeline/move-task - response.ok:', response.ok, 'data.success:', data?.success);
-            toast({
-              title: "Errore",
-              description: data.message || "Impossibile spostare la task",
-              variant: "destructive"
-            });
-            // Ricarica per sincronizzare solo in caso di errore
-            await refreshAssignments("manual");
-          } else {
-            console.log('✅ Movimento completato - response.ok:', response.ok, 'data.success:', data.success);
-            console.log('✅ Movimento salvato automaticamente in timeline.json');
-
-            // CRITICAL: Invalida l'acknowledged state per vedere nuove incompatibilità dopo lo spostamento
-            if ((window as any).invalidateAcknowledgedIncompatibleCleaners) {
-              (window as any).invalidateAcknowledgedIncompatibleCleaners(fromCleanerId);
-              (window as any).invalidateAcknowledgedIncompatibleCleaners(toCleanerId);
-            }
-
-            // CRITICAL: Marca modifiche dopo spostamento tra cleaners
-            setHasUnsavedChanges(true);
-            if (handleTaskMoved) {
-              handleTaskMoved();
-            }
-
-            // Mostra toast SUBITO (non aspettare il reload)
-            if (fromCleanerId !== toCleanerId) {
-              toast({
-                title: "Task spostata",
-                description: `Task ${logisticCode} spostata da ${fromCleanerName} a ${toCleanerName}`,
-                variant: "success",
-              });
-            }
-
-            // CRITICAL: Rilascia il lock PRIMA del reload asincrono
-            setIsDragging(false);
-
-            // Reload in background (non blocca e non genera errori se fallisce)
-            refreshAssignments("manual").catch(err => {
-              console.warn('⚠️ Reload fallito dopo movimento (movimento già salvato):', err);
-            });
-          }
-        } catch (error) {
-          console.error('Errore nella chiamata API:', error);
-          toast({
-            title: "Errore di rete",
-            description: "Impossibile spostare la task. Verifica la connessione.",
-            variant: "destructive"
-          });
-        } finally {
-          // Assicura che il lock sia sempre rilasciato
-          setIsDragging(false);
-        }
-        return;
-      }
+      // 🔁 [RIMOSSO] Caso duplicato da container → timeline
+      // Questo blocco è stato rimosso perché lo stesso scenario
+      // è già gestito nel ramo CONTAINERS più sotto per evitare
+      // doppia chiamata a saveTaskAssignment che causava il bug
+      // di "allungamento" della timeline.
 
       // 🔹 Ramo CONTAINERS (Early-Out / High / Low)
       const containerToJsonName: Record<string, string> = {
