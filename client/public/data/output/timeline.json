@@ -11,7 +11,7 @@
     "modified_by": [
       "Admin"
     ],
-    "last_updated": "2025-12-03 10:29:41"
+    "last_updated": "2025-12-03 10:32:38"
   },
   "cleaners_assignments": [
     {
@@ -55,7 +55,30 @@
           "followup": false,
           "sequence": 1,
           "travel_time": 0
-        },
+        }
+      ]
+    },
+    {
+      "cleaner": {
+        "id": 495,
+        "name": "EL HADJI",
+        "lastname": "BA",
+        "role": "Premium",
+        "premium": true,
+        "start_time": "10:00"
+      },
+      "tasks": []
+    },
+    {
+      "cleaner": {
+        "id": 132,
+        "name": "JOHOISER ERNESTO",
+        "lastname": "LOPEZ GIRON",
+        "role": "Premium",
+        "premium": true,
+        "start_time": "10:00"
+      },
+      "tasks": [
         {
           "task_id": 219740,
           "logistic_code": 716,
@@ -82,35 +105,12 @@
             "manually_moved_to_timeline"
           ],
           "priority": "high_priority",
-          "start_time": "12:20",
-          "end_time": "14:20",
-          "followup": true,
-          "sequence": 2,
-          "travel_time": 20
-        }
-      ]
-    },
-    {
-      "cleaner": {
-        "id": 495,
-        "name": "EL HADJI",
-        "lastname": "BA",
-        "role": "Premium",
-        "premium": true,
-        "start_time": "10:00"
-      },
-      "tasks": []
-    },
-    {
-      "cleaner": {
-        "id": 132,
-        "name": "JOHOISER ERNESTO",
-        "lastname": "LOPEZ GIRON",
-        "role": "Premium",
-        "premium": true,
-        "start_time": "10:00"
-      },
-      "tasks": [
+          "start_time": "10:00",
+          "end_time": "12:00",
+          "followup": false,
+          "sequence": 1,
+          "travel_time": 0
+        },
         {
           "task_id": 219750,
           "logistic_code": 1577,
@@ -137,11 +137,11 @@
             "manually_moved_to_timeline"
           ],
           "priority": "high_priority",
-          "start_time": "10:00",
-          "end_time": "14:30",
-          "followup": false,
-          "sequence": 1,
-          "travel_time": 0
+          "start_time": "12:15",
+          "end_time": "16:45",
+          "followup": true,
+          "sequence": 2,
+          "travel_time": 15
         }
       ]
     }
