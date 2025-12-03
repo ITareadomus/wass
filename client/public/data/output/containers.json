@@ -1,12 +1,310 @@
 {
   "metadata": {
-    "last_updated": "2025-12-03T10:37:20.456305",
+    "last_updated": "2025-12-03T10:39:02.067480",
     "date": "2025-12-03"
   },
   "containers": {
     "early_out": {
-      "tasks": [],
-      "count": 0
+      "tasks": [
+        {
+          "task_id": 219620,
+          "logistic_code": 1650,
+          "client_id": 87,
+          "premium": false,
+          "address": "VIA VIGNOLA 4",
+          "lat": "45.449398",
+          "lng": "9.196514",
+          "cleaning_time": 120,
+          "checkin_date": "2025-12-04",
+          "checkout_date": "2025-12-03",
+          "checkin_time": null,
+          "checkout_time": null,
+          "pax_in": 5,
+          "pax_out": 4,
+          "small_equipment": false,
+          "operation_id": 2,
+          "confirmed_operation": true,
+          "straordinaria": false,
+          "type_apt": "C",
+          "alias": "HCC",
+          "customer_name": "HACCA SRL",
+          "reasons": [
+            "client_forced_eo"
+          ],
+          "priority": "early_out"
+        },
+        {
+          "task_id": 219623,
+          "logistic_code": 609,
+          "client_id": 61,
+          "premium": false,
+          "address": "VIALE STELVIO 53",
+          "lat": "45.494052",
+          "lng": "9.186503",
+          "cleaning_time": 60,
+          "checkin_date": "2025-12-05",
+          "checkout_date": "2025-12-03",
+          "checkin_time": "16:00",
+          "checkout_time": null,
+          "pax_in": 2,
+          "pax_out": 2,
+          "small_equipment": true,
+          "operation_id": 2,
+          "confirmed_operation": true,
+          "straordinaria": false,
+          "type_apt": "A",
+          "alias": "NTM",
+          "customer_name": "NOTA-MI",
+          "reasons": [
+            "client_forced_eo"
+          ],
+          "priority": "early_out"
+        },
+        {
+          "task_id": 219625,
+          "logistic_code": 624,
+          "client_id": 61,
+          "premium": false,
+          "address": "VIALE MONTENERO 50",
+          "lat": "45.4583211",
+          "lng": "9.206311",
+          "cleaning_time": 60,
+          "checkin_date": "2025-12-04",
+          "checkout_date": "2025-12-03",
+          "checkin_time": "11:00",
+          "checkout_time": null,
+          "pax_in": 1,
+          "pax_out": 2,
+          "small_equipment": true,
+          "operation_id": 2,
+          "confirmed_operation": true,
+          "straordinaria": false,
+          "type_apt": "A",
+          "alias": "NTM",
+          "customer_name": "NOTA-MI",
+          "reasons": [
+            "client_forced_eo"
+          ],
+          "priority": "early_out"
+        },
+        {
+          "task_id": 219626,
+          "logistic_code": 1382,
+          "client_id": 61,
+          "premium": false,
+          "address": "VIA PONTE SEVESO 40",
+          "lat": "45.4901211",
+          "lng": "9.2057682",
+          "cleaning_time": 90,
+          "checkin_date": "2025-12-10",
+          "checkout_date": "2025-12-03",
+          "checkin_time": null,
+          "checkout_time": null,
+          "pax_in": 3,
+          "pax_out": 4,
+          "small_equipment": false,
+          "operation_id": 2,
+          "confirmed_operation": true,
+          "straordinaria": false,
+          "type_apt": "B",
+          "alias": "NTM",
+          "customer_name": "NOTA-MI",
+          "reasons": [
+            "client_forced_eo"
+          ],
+          "priority": "early_out"
+        },
+        {
+          "task_id": 219627,
+          "logistic_code": 840,
+          "client_id": 61,
+          "premium": false,
+          "address": "VIA TULIPANI, 19",
+          "lat": "45.4498056",
+          "lng": "9.1372543",
+          "cleaning_time": 60,
+          "checkin_date": "2025-12-06",
+          "checkout_date": "2025-12-03",
+          "checkin_time": "18:00",
+          "checkout_time": null,
+          "pax_in": 2,
+          "pax_out": 2,
+          "small_equipment": true,
+          "operation_id": 2,
+          "confirmed_operation": true,
+          "straordinaria": false,
+          "type_apt": "A",
+          "alias": "NTM",
+          "customer_name": "NOTA-MI",
+          "reasons": [
+            "client_forced_eo"
+          ],
+          "priority": "early_out"
+        },
+        {
+          "task_id": 219628,
+          "logistic_code": 839,
+          "client_id": 61,
+          "premium": false,
+          "address": "Via dei Biancospini 13",
+          "lat": "45.4494831",
+          "lng": "9.1400384",
+          "cleaning_time": 60,
+          "checkin_date": "2025-12-06",
+          "checkout_date": "2025-12-03",
+          "checkin_time": null,
+          "checkout_time": null,
+          "pax_in": 2,
+          "pax_out": 2,
+          "small_equipment": true,
+          "operation_id": 2,
+          "confirmed_operation": true,
+          "straordinaria": false,
+          "type_apt": "A",
+          "alias": "NTM",
+          "customer_name": "NOTA-MI",
+          "reasons": [
+            "client_forced_eo"
+          ],
+          "priority": "early_out"
+        },
+        {
+          "task_id": 219629,
+          "logistic_code": 1621,
+          "client_id": 61,
+          "premium": false,
+          "address": "viale Bligny 60",
+          "lat": "45.450866",
+          "lng": "9.1954106",
+          "cleaning_time": 60,
+          "checkin_date": "2025-12-03",
+          "checkout_date": "2025-12-03",
+          "checkin_time": "15:00",
+          "checkout_time": null,
+          "pax_in": 1,
+          "pax_out": 1,
+          "small_equipment": true,
+          "operation_id": 2,
+          "confirmed_operation": true,
+          "straordinaria": false,
+          "type_apt": "A",
+          "alias": "NTM",
+          "customer_name": "NOTA-MI",
+          "reasons": [
+            "client_forced_eo"
+          ],
+          "priority": "early_out"
+        },
+        {
+          "task_id": 219683,
+          "logistic_code": 617,
+          "client_id": 67,
+          "premium": false,
+          "address": "VIA VOGHERA, 4",
+          "lat": "45.454632",
+          "lng": "9.168536",
+          "cleaning_time": 30,
+          "checkin_date": "2025-12-03",
+          "checkout_date": "2025-12-03",
+          "checkin_time": null,
+          "checkout_time": "09:30",
+          "pax_in": 1,
+          "pax_out": 0,
+          "small_equipment": true,
+          "operation_id": 2,
+          "confirmed_operation": true,
+          "straordinaria": false,
+          "type_apt": "A",
+          "alias": "EXP",
+          "customer_name": "EXPERIENCE DESIGN BED & SHOW",
+          "reasons": [
+            "checkout_time_eo_window_or_before_start"
+          ],
+          "priority": "early_out"
+        },
+        {
+          "task_id": 219684,
+          "logistic_code": 618,
+          "client_id": 67,
+          "premium": false,
+          "address": "VIA VOGHERA, 4",
+          "lat": "45.454632",
+          "lng": "9.168536",
+          "cleaning_time": 30,
+          "checkin_date": "2025-12-03",
+          "checkout_date": "2025-12-03",
+          "checkin_time": null,
+          "checkout_time": "09:30",
+          "pax_in": 2,
+          "pax_out": 0,
+          "small_equipment": true,
+          "operation_id": 2,
+          "confirmed_operation": true,
+          "straordinaria": false,
+          "type_apt": "A",
+          "alias": "EXP",
+          "customer_name": "EXPERIENCE DESIGN BED & SHOW",
+          "reasons": [
+            "checkout_time_eo_window_or_before_start"
+          ],
+          "priority": "early_out"
+        },
+        {
+          "task_id": 219741,
+          "logistic_code": 623,
+          "client_id": 61,
+          "premium": false,
+          "address": "RIPA DI PORTA TICINESE 49",
+          "lat": "45.4518038",
+          "lng": "9.1768031",
+          "cleaning_time": 60,
+          "checkin_date": "2025-12-05",
+          "checkout_date": "2025-12-03",
+          "checkin_time": "15:00",
+          "checkout_time": null,
+          "pax_in": 2,
+          "pax_out": 2,
+          "small_equipment": true,
+          "operation_id": 2,
+          "confirmed_operation": true,
+          "straordinaria": false,
+          "type_apt": "A",
+          "alias": "NTM",
+          "customer_name": "NOTA-MI",
+          "reasons": [
+            "client_forced_eo"
+          ],
+          "priority": "early_out"
+        },
+        {
+          "task_id": 219760,
+          "logistic_code": 619,
+          "client_id": 67,
+          "premium": false,
+          "address": "VIA TORTONA, 10",
+          "lat": "45.4542397",
+          "lng": "9.1686792",
+          "cleaning_time": 15,
+          "checkin_date": "2025-12-03",
+          "checkout_date": "2025-12-03",
+          "checkin_time": null,
+          "checkout_time": "09:30",
+          "pax_in": 0,
+          "pax_out": 0,
+          "small_equipment": false,
+          "operation_id": 4,
+          "confirmed_operation": true,
+          "straordinaria": false,
+          "type_apt": "B",
+          "alias": "EXP",
+          "customer_name": "EXPERIENCE DESIGN BED & SHOW",
+          "reasons": [
+            "checkout_time_eo_window_or_before_start"
+          ],
+          "priority": "early_out"
+        }
+      ],
+      "count": 11
     },
     "high_priority": {
       "tasks": [
@@ -208,6 +506,34 @@
     "low_priority": {
       "tasks": [
         {
+          "task_id": 219608,
+          "logistic_code": 566,
+          "client_id": 3,
+          "premium": false,
+          "address": "CORSO PLEBISCITI, 9",
+          "lat": "45.468696",
+          "lng": "9.2192168",
+          "cleaning_time": 180,
+          "checkin_date": null,
+          "checkout_date": "2025-12-03",
+          "checkin_time": null,
+          "checkout_time": null,
+          "pax_in": 4,
+          "pax_out": 3,
+          "small_equipment": true,
+          "operation_id": 3,
+          "confirmed_operation": true,
+          "straordinaria": true,
+          "type_apt": "A",
+          "alias": "TBR",
+          "customer_name": "THE BEST RENT S.r.l.",
+          "priority": "low_priority",
+          "reasons": [
+            "not_eo",
+            "not_hp"
+          ]
+        },
+        {
           "task_id": 219616,
           "logistic_code": 571,
           "client_id": 2,
@@ -376,6 +702,34 @@
           ]
         },
         {
+          "task_id": 219761,
+          "logistic_code": 1672,
+          "client_id": 124,
+          "premium": false,
+          "address": "VIA TORTONA 19",
+          "lat": "45.4530068",
+          "lng": "9.1668178",
+          "cleaning_time": 240,
+          "checkin_date": "2025-12-03",
+          "checkout_date": "2025-12-03",
+          "checkin_time": null,
+          "checkout_time": "13:00",
+          "pax_in": 2,
+          "pax_out": 0,
+          "small_equipment": false,
+          "operation_id": 3,
+          "confirmed_operation": true,
+          "straordinaria": true,
+          "type_apt": "B",
+          "alias": "HMST",
+          "customer_name": "HOMING STAYS",
+          "priority": "low_priority",
+          "reasons": [
+            "not_eo",
+            "not_hp"
+          ]
+        },
+        {
           "task_id": 219762,
           "logistic_code": 229,
           "client_id": 2,
@@ -404,13 +758,13 @@
           ]
         }
       ],
-      "count": 7
+      "count": 9
     }
   },
   "summary": {
-    "total_tasks": 14,
-    "early_out": 0,
+    "total_tasks": 27,
+    "early_out": 11,
     "high_priority": 7,
-    "low_priority": 7
+    "low_priority": 9
   }
 }
