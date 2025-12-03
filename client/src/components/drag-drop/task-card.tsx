@@ -633,6 +633,7 @@ export default function TaskCard({
         {(provided, snapshot) => {
           // Nascondi offset e travel time SOLO durante il drag
           const showOffsetAndTravel = !snapshot.isDragging;
+          const cardWidth = calculateWidth(task.duration, isInTimeline);
 
           return (
             <>
@@ -662,9 +663,6 @@ export default function TaskCard({
                   </svg>
                 </div>
               )}
-          const cardWidth = calculateWidth(task.duration, isInTimeline);
-
-          return (
             <div
               ref={provided.innerRef}
               {...provided.draggableProps}
