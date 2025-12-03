@@ -1665,6 +1665,9 @@ export default function TimelineView({
                                   return timeA.localeCompare(timeB);
                                 });
 
+                              // CRITICAL: React-beautiful-dnd usa l'ordine del DOM per il placeholder
+                              // Quindi dobbiamo renderizzare le task nell'ordine di SEQUENZA (già sorted)
+                              // ma con posizionamento ASSOLUTO per mantenere l'offset visivo corretto
                               return cleanerTasks.map((task, idx) => {
                                 const taskObj = task as any;
 
@@ -1738,17 +1741,69 @@ export default function TimelineView({
                                   : false;
 
 
-                                return (
-                                  <React.Fragment key={`task-fragment-${uniqueKey}`}>
-                                    {/* Spazio vuoto per prima task con offset dal tempo globale */}
-                                    {idx === 0 && timeOffset > 0 && (
-                                      <div
-                                        key={`offset-${uniqueKey}`}
-                                        className="flex-shrink-0"
-                                        style={{ width: `${(timeOffset / virtualMinutes) * 100}%` }}
-                                      />
-                                    )}
+                                // CRITICAL: Calcola posizione assoluta LEFT per questa task
+                                // basata su offset iniziale + somma dei travel time precedenti
+                                let absoluteLeft = 0;
+                                
+                                // Prima task: offset dal cleaner start time
+                                if (idx === 0) {
+                                  absoluteLeft = timeOffset > 0 ? (timeOffset / virtualMinutes) * 100 : 0;
+                                } else {
+                                  // Task successive: somma di tutte le larghezze precedenti
+                                  // (offset iniziale + task precedenti + travel time precedenti)
+                                  let cumulativeOffset = timeOffset > 0 ? timeOffset : 0;
+                                  
+                                  for (let i = 0; i < idx; i++) {
+                                    const prevTask = cleanerTasks[i] as any;
+                                    
+                                    // Larghezza task precedente
+                                    const prevDuration = prevTask.duration || "0.0";
+                                    const [prevHours, prevMins] = prevDuration.split('.').map(Number);
+                                    const prevTotalMinutes = (prevHours || 0) * 60 + (prevMins || 0);
+                                    const prevEffectiveMinutes = prevTotalMinutes === 0 ? 30 : prevTotalMinutes;
+                                    cumulativeOffset += prevEffectiveMinutes;
+                                    
+                                    // Travel time dopo la task precedente (se esiste)
+                                    if (i > 0) {
+                                      let prevTravelTime = 0;
+                                      if (prevTask.travel_time !== undefined && prevTask.travel_time !== null) {
+                                        prevTravelTime = typeof prevTask.travel_time === 'number'
+                                          ? prevTask.travel_time
+                                          : parseInt(String(prevTask.travel_time), 10);
+                                      } else if (prevTask.travelTime !== undefined && prevTask.travelTime !== null) {
+                                        prevTravelTime = typeof prevTask.travelTime === 'number'
+                                          ? prevTask.travelTime
+                                          : parseInt(String(prevTask.travelTime), 10);
+                                      }
+                                      if (!isNaN(prevTravelTime) && prevTravelTime > 0) {
+                                        cumulativeOffset += prevTravelTime;
+                                      }
+                                    }
+                                  }
+                                  
+                                  absoluteLeft = (cumulativeOffset / virtualMinutes) * 100;
+                                }
 
+                                // Calcola larghezza task corrente
+                                const currentDuration = task.duration || "0.0";
+                                const [currentHours, currentMins] = currentDuration.split('.').map(Number);
+                                const currentTotalMinutes = (currentHours || 0) * 60 + (currentMins || 0);
+                                const currentEffectiveMinutes = currentTotalMinutes === 0 ? 30 : currentTotalMinutes;
+                                const taskWidth = (currentEffectiveMinutes / virtualMinutes) * 100;
+
+                                return (
+                                  <div
+                                    key={`wrapper-${uniqueKey}`}
+                                    style={{
+                                      position: 'absolute',
+                                      left: `${absoluteLeft}%`,
+                                      top: 0,
+                                      height: '100%',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      gap: '0',
+                                    }}
+                                  >
                                     {/* Indicatore di travel time: solo se idx > 0 E travel_time > 0 */}
                                     {idx > 0 && travelTime > 0 && (
                                       <div
@@ -1778,7 +1833,7 @@ export default function TimelineView({
                                       isDragDisabled={isReadOnly}
                                       isReadOnly={isReadOnly}
                                     />
-                                  </React.Fragment>
+                                  </div>
                                 );
                               });
                             })()}
