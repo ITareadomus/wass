@@ -1,6 +1,6 @@
 {
   "meta": {
-    "total_tasks": 3,
+    "total_tasks": 5,
     "used_cleaners": 0,
     "assigned_tasks": 0,
     "total_cleaners": 3
@@ -11,7 +11,7 @@
     "modified_by": [
       "Admin"
     ],
-    "last_updated": "2025-12-03 11:44:15"
+    "last_updated": "2025-12-03 11:50:51"
   },
   "cleaners_assignments": [
     {
@@ -143,6 +143,70 @@
           "followup": false,
           "sequence": 1,
           "travel_time": 0
+        },
+        {
+          "task_id": 219760,
+          "logistic_code": 619,
+          "client_id": null,
+          "premium": false,
+          "address": "VIA TORTONA, 10",
+          "lat": "45.4542397",
+          "lng": "9.1686792",
+          "cleaning_time": 15,
+          "checkin_date": "2025-12-03",
+          "checkout_date": "2025-12-03",
+          "checkin_time": null,
+          "checkout_time": "09:30",
+          "pax_in": 0,
+          "pax_out": 0,
+          "small_equipment": false,
+          "operation_id": 4,
+          "confirmed_operation": true,
+          "straordinaria": false,
+          "type_apt": "B",
+          "alias": "EXP",
+          "customer_name": "EXPERIENCE DESIGN BED & SHOW",
+          "reasons": [
+            "manually_moved_to_timeline"
+          ],
+          "priority": "early_out",
+          "start_time": "12:26",
+          "end_time": "12:41",
+          "followup": true,
+          "sequence": 2,
+          "travel_time": 26
+        },
+        {
+          "task_id": 219741,
+          "logistic_code": 623,
+          "client_id": null,
+          "premium": false,
+          "address": "RIPA DI PORTA TICINESE 49",
+          "lat": "45.4518038",
+          "lng": "9.1768031",
+          "cleaning_time": 60,
+          "checkin_date": "2025-12-05",
+          "checkout_date": "2025-12-03",
+          "checkin_time": "15:00",
+          "checkout_time": null,
+          "pax_in": 2,
+          "pax_out": 2,
+          "small_equipment": false,
+          "operation_id": 2,
+          "confirmed_operation": true,
+          "straordinaria": false,
+          "type_apt": "A",
+          "alias": "NTM",
+          "customer_name": "NOTA-MI",
+          "reasons": [
+            "manually_moved_to_timeline"
+          ],
+          "priority": "early_out",
+          "start_time": "12:56",
+          "end_time": "13:56",
+          "followup": true,
+          "sequence": 3,
+          "travel_time": 15
         }
       ]
     }
