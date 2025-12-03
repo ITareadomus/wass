@@ -1104,8 +1104,14 @@ def main():
                 break
 
         if existing_entry:
-            # Aggiungi le task HP alle task esistenti
-            existing_entry["tasks"].extend(cleaner_entry["tasks"])
+            # CRITICAL FIX: Verifica duplicati per task_id prima di aggiungere
+            existing_task_ids = {t.get("task_id") for t in existing_entry["tasks"]}
+            new_tasks = [t for t in cleaner_entry["tasks"] if t.get("task_id") not in existing_task_ids]
+            if len(new_tasks) < len(cleaner_entry["tasks"]):
+                skipped = len(cleaner_entry["tasks"]) - len(new_tasks)
+                print(f"   ⚠️ Skipped {skipped} task duplicate per cleaner {cleaner_entry['cleaner']['name']}")
+            # Aggiungi solo le task NON duplicate
+            existing_entry["tasks"].extend(new_tasks)
             # Ordina le task per orario di inizio (start_time)
             existing_entry["tasks"].sort(key=lambda t: t.get("start_time", "00:00"))
         else:

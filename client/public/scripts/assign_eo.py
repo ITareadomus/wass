@@ -1030,10 +1030,12 @@ def main():
             continue
 
         if cleaner_id in seen_cleaner_ids:
-            # Cleaner duplicato: merge delle task
+            # Cleaner duplicato: merge delle task (con deduplicazione per task_id)
             existing_entry = seen_cleaner_ids[cleaner_id]
-            existing_entry["tasks"].extend(entry.get("tasks", []))
-            print(f"   🔧 Merged duplicato cleaner ID {cleaner_id}: +{len(entry.get('tasks', []))} task")
+            existing_task_ids = {t.get("task_id") for t in existing_entry["tasks"]}
+            new_tasks = [t for t in entry.get("tasks", []) if t.get("task_id") not in existing_task_ids]
+            existing_entry["tasks"].extend(new_tasks)
+            print(f"   🔧 Merged duplicato cleaner ID {cleaner_id}: +{len(new_tasks)} task (skipped {len(entry.get('tasks', [])) - len(new_tasks)} duplicati)")
         else:
             # Primo incontro con questo cleaner
             seen_cleaner_ids[cleaner_id] = entry
@@ -1057,9 +1059,15 @@ def main():
             timeline_data_output["cleaners_assignments"].append(cleaner_entry)
             print(f"   ➕ Creato nuovo cleaner entry per {cleaner_entry['cleaner']['name']} {cleaner_entry['cleaner']['lastname']}")
         else:
-            # Aggiungi le task esistenti
-            cleaner_entry_existing["tasks"].extend(cleaner_entry["tasks"])
-            print(f"   ✅ Usando cleaner entry esistente per {cleaner_entry['cleaner']['name']} {cleaner_entry['cleaner']['lastname']} (aggiunte {len(cleaner_entry['tasks'])} task)")
+            # CRITICAL FIX: Verifica duplicati per task_id prima di aggiungere
+            existing_task_ids = {t.get("task_id") for t in cleaner_entry_existing["tasks"]}
+            new_tasks = [t for t in cleaner_entry["tasks"] if t.get("task_id") not in existing_task_ids]
+            if len(new_tasks) < len(cleaner_entry["tasks"]):
+                skipped = len(cleaner_entry["tasks"]) - len(new_tasks)
+                print(f"   ⚠️ Skipped {skipped} task duplicate per cleaner {cleaner_entry['cleaner']['name']}")
+            # Aggiungi solo le task NON duplicate
+            cleaner_entry_existing["tasks"].extend(new_tasks)
+            print(f"   ✅ Usando cleaner entry esistente per {cleaner_entry['cleaner']['name']} {cleaner_entry['cleaner']['lastname']} (aggiunte {len(new_tasks)} task)")
 
     # CRITICAL FIX: Ricalcola sequenze E travel_time per tutti i cleaner dopo il merge
     # Importa la funzione di ricalcolo da recalculate_times.py
