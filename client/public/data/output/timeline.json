@@ -11,7 +11,7 @@
     "modified_by": [
       "Admin"
     ],
-    "last_updated": "2025-12-03 10:47:28"
+    "last_updated": "2025-12-03 10:55:51"
   },
   "cleaners_assignments": [
     {
@@ -32,114 +32,6 @@
         "lastname": "LOPEZ GIRON",
         "role": "Premium",
         "premium": true,
-        "start_time": "10:00"
-      },
-      "tasks": [
-        {
-          "task_id": 219760,
-          "logistic_code": 619,
-          "client_id": null,
-          "premium": false,
-          "address": "VIA TORTONA, 10",
-          "lat": "45.4542397",
-          "lng": "9.1686792",
-          "cleaning_time": 15,
-          "checkin_date": "2025-12-03",
-          "checkout_date": "2025-12-03",
-          "checkin_time": null,
-          "checkout_time": "09:30",
-          "pax_in": 0,
-          "pax_out": 0,
-          "small_equipment": false,
-          "operation_id": 4,
-          "confirmed_operation": true,
-          "straordinaria": false,
-          "type_apt": "B",
-          "alias": "EXP",
-          "customer_name": "EXPERIENCE DESIGN BED & SHOW",
-          "reasons": [
-            "manually_moved_to_timeline"
-          ],
-          "priority": "early_out",
-          "start_time": "10:00",
-          "end_time": "10:15",
-          "followup": false,
-          "sequence": 1,
-          "travel_time": 0
-        },
-        {
-          "task_id": 219741,
-          "logistic_code": 623,
-          "client_id": null,
-          "premium": false,
-          "address": "RIPA DI PORTA TICINESE 49",
-          "lat": "45.4518038",
-          "lng": "9.1768031",
-          "cleaning_time": 60,
-          "checkin_date": "2025-12-05",
-          "checkout_date": "2025-12-03",
-          "checkin_time": "15:00",
-          "checkout_time": null,
-          "pax_in": 2,
-          "pax_out": 2,
-          "small_equipment": false,
-          "operation_id": 2,
-          "confirmed_operation": true,
-          "straordinaria": false,
-          "type_apt": "A",
-          "alias": "NTM",
-          "customer_name": "NOTA-MI",
-          "reasons": [
-            "manually_moved_to_timeline"
-          ],
-          "priority": "early_out",
-          "start_time": "10:30",
-          "end_time": "11:30",
-          "followup": true,
-          "sequence": 2,
-          "travel_time": 15
-        },
-        {
-          "task_id": 219777,
-          "logistic_code": 1032,
-          "client_id": null,
-          "premium": false,
-          "address": "VIA PIETRO MASCAGNI, 2",
-          "lat": "45.4662468",
-          "lng": "9.2045849",
-          "cleaning_time": 60,
-          "checkin_date": "2025-12-03",
-          "checkout_date": "2025-12-03",
-          "checkin_time": "14:30",
-          "checkout_time": "13:00",
-          "pax_in": 0,
-          "pax_out": 0,
-          "small_equipment": false,
-          "operation_id": 1,
-          "confirmed_operation": true,
-          "straordinaria": false,
-          "type_apt": "A",
-          "alias": "RLST",
-          "customer_name": "RELSTAY - FERRARA GIULIA",
-          "reasons": [
-            "manually_moved_to_timeline"
-          ],
-          "priority": "high_priority",
-          "start_time": "13:00",
-          "end_time": "14:00",
-          "followup": true,
-          "sequence": 3,
-          "travel_time": 25
-        }
-      ]
-    },
-    {
-      "cleaner": {
-        "id": 495,
-        "name": "EL HADJI",
-        "lastname": "BA",
-        "role": "Premium",
-        "premium": false,
         "start_time": "10:00"
       },
       "tasks": [
@@ -174,8 +66,115 @@
           "followup": false,
           "sequence": 1,
           "travel_time": 0
+        },
+        {
+          "task_id": 219760,
+          "logistic_code": 619,
+          "client_id": null,
+          "premium": false,
+          "address": "VIA TORTONA, 10",
+          "lat": "45.4542397",
+          "lng": "9.1686792",
+          "cleaning_time": 15,
+          "checkin_date": "2025-12-03",
+          "checkout_date": "2025-12-03",
+          "checkin_time": null,
+          "checkout_time": "09:30",
+          "pax_in": 0,
+          "pax_out": 0,
+          "small_equipment": false,
+          "operation_id": 4,
+          "confirmed_operation": true,
+          "straordinaria": false,
+          "type_apt": "B",
+          "alias": "EXP",
+          "customer_name": "EXPERIENCE DESIGN BED & SHOW",
+          "reasons": [
+            "manually_moved_to_timeline"
+          ],
+          "priority": "early_out",
+          "start_time": "14:54",
+          "end_time": "15:09",
+          "followup": true,
+          "sequence": 2,
+          "travel_time": 24
+        },
+        {
+          "task_id": 219741,
+          "logistic_code": 623,
+          "client_id": null,
+          "premium": false,
+          "address": "RIPA DI PORTA TICINESE 49",
+          "lat": "45.4518038",
+          "lng": "9.1768031",
+          "cleaning_time": 60,
+          "checkin_date": "2025-12-05",
+          "checkout_date": "2025-12-03",
+          "checkin_time": "15:00",
+          "checkout_time": null,
+          "pax_in": 2,
+          "pax_out": 2,
+          "small_equipment": false,
+          "operation_id": 2,
+          "confirmed_operation": true,
+          "straordinaria": false,
+          "type_apt": "A",
+          "alias": "NTM",
+          "customer_name": "NOTA-MI",
+          "reasons": [
+            "manually_moved_to_timeline"
+          ],
+          "priority": "early_out",
+          "start_time": "15:24",
+          "end_time": "16:24",
+          "followup": true,
+          "sequence": 3,
+          "travel_time": 15
+        },
+        {
+          "task_id": 219777,
+          "logistic_code": 1032,
+          "client_id": null,
+          "premium": false,
+          "address": "VIA PIETRO MASCAGNI, 2",
+          "lat": "45.4662468",
+          "lng": "9.2045849",
+          "cleaning_time": 60,
+          "checkin_date": "2025-12-03",
+          "checkout_date": "2025-12-03",
+          "checkin_time": "14:30",
+          "checkout_time": "13:00",
+          "pax_in": 0,
+          "pax_out": 0,
+          "small_equipment": false,
+          "operation_id": 1,
+          "confirmed_operation": true,
+          "straordinaria": false,
+          "type_apt": "A",
+          "alias": "RLST",
+          "customer_name": "RELSTAY - FERRARA GIULIA",
+          "reasons": [
+            "manually_moved_to_timeline"
+          ],
+          "priority": "high_priority",
+          "start_time": "16:49",
+          "end_time": "17:49",
+          "followup": true,
+          "sequence": 4,
+          "travel_time": 25
         }
       ]
+    },
+    {
+      "cleaner": {
+        "id": 495,
+        "name": "EL HADJI",
+        "lastname": "BA",
+        "role": "Premium",
+        "premium": false,
+        "start_time": "10:00"
+      },
+      "tasks": []
     }
   ]
 }
