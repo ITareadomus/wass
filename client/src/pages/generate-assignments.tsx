@@ -166,8 +166,9 @@ export default function GenerateAssignments() {
   // Stato per tracciare se la timeline è in modalità di sola visualizzazione
   const [isTimelineReadOnly, setIsTimelineReadOnly] = useState<boolean>(false);
 
-  // Stato per tracciare se è in corso un'operazione di drag-and-drop
-  const [isDragging, setIsDragging] = useState<boolean>(false);
+  // Ref per tracciare se è in corso un'operazione di drag-and-drop (useRef per sincronizzazione immediata)
+  const isDraggingRef = useRef<boolean>(false);
+  const dragTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Preview della posizione di sequenza mentre trascini
   const [dragSequencePreview, setDragSequencePreview] = useState<{ sequenceIndex: number } | null>(null);
@@ -1400,8 +1401,8 @@ export default function GenerateAssignments() {
       return;
     }
 
-    // CRITICAL: Blocca drag simultanei
-    if (isDragging) {
+    // CRITICAL: Blocca drag simultanei (con timeout di sicurezza di 10 secondi)
+    if (isDraggingRef.current) {
       console.log("⚠️ Drag già in corso, operazione annullata per prevenire conflitti");
       toast({
         title: "Operazione in corso",
@@ -1425,12 +1426,18 @@ export default function GenerateAssignments() {
         description: "La timeline è in sola visualizzazione per questa data.",
         variant: "warning",
       });
-      // Opzionale: annulla visivamente il drag (anche se react-beautiful-dnd potrebbe gestirlo)
       return;
     }
 
-    // Imposta lock
-    setIsDragging(true);
+    // Imposta lock con timeout di sicurezza (10 secondi)
+    isDraggingRef.current = true;
+    if (dragTimeoutRef.current) {
+      clearTimeout(dragTimeoutRef.current);
+    }
+    dragTimeoutRef.current = setTimeout(() => {
+      console.log("⏰ Timeout sicurezza: rilascio lock drag forzato");
+      isDraggingRef.current = false;
+    }, 10000);
 
     try {
       // 🔹 Ramo TIMELINE (drag tra cleaners o riordino nello stesso cleaner)
@@ -1486,7 +1493,8 @@ export default function GenerateAssignments() {
           });
 
           // Rilascia lock PRIMA del reload
-          setIsDragging(false);
+          isDraggingRef.current = false;
+          if (dragTimeoutRef.current) clearTimeout(dragTimeoutRef.current);
 
           // Reload in background
           await refreshAssignments("manual");
@@ -1498,7 +1506,8 @@ export default function GenerateAssignments() {
             variant: "destructive",
           });
           // Rilascia lock anche in caso di errore
-          setIsDragging(false);
+          isDraggingRef.current = false;
+          if (dragTimeoutRef.current) clearTimeout(dragTimeoutRef.current);
         }
         return;
       }
@@ -1547,7 +1556,8 @@ export default function GenerateAssignments() {
               variant: "destructive"
             });
             // CRITICAL: Rilascia lock prima di uscire
-            setIsDragging(false);
+            isDraggingRef.current = false;
+            if (dragTimeoutRef.current) clearTimeout(dragTimeoutRef.current);
             return;
           }
 
@@ -1563,7 +1573,8 @@ export default function GenerateAssignments() {
           });
 
           // Rilascia lock PRIMA del reload
-          setIsDragging(false);
+          isDraggingRef.current = false;
+          if (dragTimeoutRef.current) clearTimeout(dragTimeoutRef.current);
 
           // Ricarica i task dai containers aggiornati in background
           await refreshAssignments("manual");
@@ -1575,7 +1586,8 @@ export default function GenerateAssignments() {
             variant: "destructive"
           });
           // Rilascia lock anche in caso di errore
-          setIsDragging(false);
+          isDraggingRef.current = false;
+          if (dragTimeoutRef.current) clearTimeout(dragTimeoutRef.current);
         }
         return;
       }
@@ -1623,7 +1635,8 @@ export default function GenerateAssignments() {
           console.error("Errore nell'assegnazione:", err);
         } finally {
           // Rilascia lock indipendentemente dall'esito
-          setIsDragging(false);
+          isDraggingRef.current = false;
+          if (dragTimeoutRef.current) clearTimeout(dragTimeoutRef.current);
         }
         return;
       }
@@ -1642,7 +1655,8 @@ export default function GenerateAssignments() {
         }
 
         // Rilascia lock PRIMA del reload
-        setIsDragging(false);
+        isDraggingRef.current = false;
+        if (dragTimeoutRef.current) clearTimeout(dragTimeoutRef.current);
 
         // Reload in background
         await refreshAssignments("manual");
@@ -1657,7 +1671,8 @@ export default function GenerateAssignments() {
         variant: "destructive",
       });
       // Assicurati che il lock venga sempre rilasciato
-      setIsDragging(false);
+      isDraggingRef.current = false;
+      if (dragTimeoutRef.current) clearTimeout(dragTimeoutRef.current);
     }
   };
 
