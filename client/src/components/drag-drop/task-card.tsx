@@ -515,11 +515,20 @@ export default function TaskCard({
     const effectiveMinutes = totalMinutes === 0 ? 30 : totalMinutes;
 
     if (forTimeline) {
-      // La griglia usa N slot (es: 10 slot per 10:00-19:00), ciascuno con larghezza 1/N
+      // Usa la larghezza della timeline in pixel se disponibile
+      const timelineWidth = (window as any).timelineWidthPx || 0;
       const slotsCount = (window as any).globalTimeSlotsCount || 10;
       const virtualMinutes = slotsCount * 60; // Minuti virtuali basati su slot
-      const widthPercentage = (effectiveMinutes / virtualMinutes) * 100;
-      return `${widthPercentage}%`;
+      
+      if (timelineWidth > 0) {
+        // Calcola in pixel assoluti
+        const widthPx = (effectiveMinutes / virtualMinutes) * timelineWidth;
+        return `${widthPx}px`;
+      } else {
+        // Fallback a percentuale se larghezza non disponibile
+        const widthPercentage = (effectiveMinutes / virtualMinutes) * 100;
+        return `${widthPercentage}%`;
+      }
     } else {
       // Per le colonne di priorità:
       // Se la task è < 60 minuti, usa sempre 60 minuti (larghezza di 1 ora)
@@ -612,9 +621,16 @@ export default function TaskCard({
       >
         {(provided, snapshot) => {
           const cardWidth = calculateWidth(task.duration, isInTimeline);
+          const timelineWidth = (window as any).timelineWidthPx || 0;
           const virtualMinutes = globalTimeSlots * 60;
-          const offsetWidth = timeOffset > 0 && virtualMinutes > 0 ? (timeOffset / virtualMinutes) * 100 : 0;
-          const travelWidth = travelTime > 0 && virtualMinutes > 0 ? (travelTime / virtualMinutes) * 100 : 0;
+          
+          // Calcola offset e travel in pixel
+          const offsetWidthPx = timeOffset > 0 && virtualMinutes > 0 && timelineWidth > 0 
+            ? (timeOffset / virtualMinutes) * timelineWidth 
+            : 0;
+          const travelWidthPx = travelTime > 0 && virtualMinutes > 0 && timelineWidth > 0 
+            ? (travelTime / virtualMinutes) * timelineWidth 
+            : 0;
 
           return (
             <div
@@ -628,18 +644,18 @@ export default function TaskCard({
               }}
             >
               {/* Offset spacer per prima task - dentro il Draggable */}
-              {isInTimeline && index === 0 && timeOffset > 0 && (
+              {isInTimeline && index === 0 && timeOffset > 0 && offsetWidthPx > 0 && (
                 <div
                   className="flex-shrink-0"
-                  style={{ width: `${offsetWidth}%` }}
+                  style={{ width: `${offsetWidthPx}px` }}
                 />
               )}
 
               {/* Travel time marker - dentro il Draggable */}
-              {isInTimeline && index > 0 && travelTime > 0 && (
+              {isInTimeline && index > 0 && travelTime > 0 && travelWidthPx > 0 && (
                 <div
                   className="flex items-center justify-center flex-shrink-0 py-3"
-                  style={{ width: `${travelWidth}%`, minHeight: '50px' }}
+                  style={{ width: `${travelWidthPx}px`, minHeight: '50px' }}
                   title={`${travelTime} min`}
                 >
                   <svg
