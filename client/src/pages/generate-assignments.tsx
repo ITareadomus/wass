@@ -1528,197 +1528,151 @@ export default function GenerateAssignments() {
       const fromContainerJson = containerToJsonName[source.droppableId] || null;
       const toContainerJson = containerToJsonName[destination.droppableId] || null;
 
-      // Caso: spostamento tra containers di priorità (OPTIMISTIC UPDATE)
+      // Caso: spostamento tra containers di priorità
       if (fromContainerJson && toContainerJson) {
         console.log(`📦 Spostamento tra containers: ${fromContainer} → ${toContainer}`);
 
-        // OPTIMISTIC UPDATE: Sposta subito la task localmente
-        const movedTask = [...earlyOutTasks, ...highPriorityTasks, ...lowPriorityTasks]
-          .find(t => String(t.id) === String(taskId));
+        try {
+          const payload = {
+            taskId: draggableId,
+            fromContainer: fromContainerJson,
+            toContainer: toContainerJson,
+            sourceIndex: source.index,
+            destIndex: destination.index,
+          };
 
-        if (movedTask) {
-          // Rimuovi dal container di origine
-          if (fromContainerJson === 'early_out') {
-            setEarlyOutTasks(prev => prev.filter(t => String(t.id) !== String(taskId)));
-          } else if (fromContainerJson === 'high_priority') {
-            setHighPriorityTasks(prev => prev.filter(t => String(t.id) !== String(taskId)));
-          } else if (fromContainerJson === 'low_priority') {
-            setLowPriorityTasks(prev => prev.filter(t => String(t.id) !== String(taskId)));
-          }
-
-          // Aggiungi al container di destinazione
-          if (toContainerJson === 'early_out') {
-            setEarlyOutTasks(prev => [...prev.slice(0, destination.index), movedTask, ...prev.slice(destination.index)]);
-          } else if (toContainerJson === 'high_priority') {
-            setHighPriorityTasks(prev => [...prev.slice(0, destination.index), movedTask, ...prev.slice(destination.index)]);
-          } else if (toContainerJson === 'low_priority') {
-            setLowPriorityTasks(prev => [...prev.slice(0, destination.index), movedTask, ...prev.slice(destination.index)]);
-          }
-        }
-
-        // Rilascia lock immediatamente
-        isDraggingRef.current = false;
-        if (dragTimeoutRef.current) clearTimeout(dragTimeoutRef.current);
-
-        // CRITICAL: Marca modifiche
-        setHasUnsavedChanges(true);
-        if (handleTaskMoved) {
-          handleTaskMoved();
-        }
-
-        // Salva in background
-        const payload = {
-          taskId: draggableId,
-          fromContainer: fromContainerJson,
-          toContainer: toContainerJson,
-          sourceIndex: source.index,
-          destIndex: destination.index,
-        };
-
-        fetch('/api/update-task-json', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
-        })
-          .then(resp => resp.json())
-          .then(json => {
-            if (!json?.success) {
-              console.error('update-task-json error', json);
-              toast({
-                title: "Errore",
-                description: json?.message || "Errore nel salvataggio",
-                variant: "destructive"
-              });
-            } else {
-              console.log(`✅ Task spostata tra containers salvata`);
-            }
-          })
-          .catch(err => {
-            console.error('update-task-json fetch failed', err);
-            toast({
-              title: "Errore",
-              description: "Errore di rete nel salvataggio",
-              variant: "destructive"
-            });
+          const resp = await fetch('/api/update-task-json', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
           });
 
+          const json = await resp.json();
+          if (!resp.ok || !json?.success) {
+            console.error('update-task-json error', json);
+            toast({
+              title: "Errore",
+              description: json?.message || "Errore nello spostamento tra containers",
+              variant: "destructive"
+            });
+            // CRITICAL: Rilascia lock prima di uscire
+            isDraggingRef.current = false;
+            if (dragTimeoutRef.current) clearTimeout(dragTimeoutRef.current);
+            return;
+          }
+
+          // CRITICAL: Marca modifiche dopo spostamento tra containers
+          setHasUnsavedChanges(true);
+          if (handleTaskMoved) {
+            handleTaskMoved();
+          }
+
+          toast({
+            title: "Task spostata",
+            description: `Task spostata tra containers`,
+          });
+
+          // Rilascia lock PRIMA del reload
+          isDraggingRef.current = false;
+          if (dragTimeoutRef.current) clearTimeout(dragTimeoutRef.current);
+
+          // Ricarica i task dai containers aggiornati in background
+          await refreshAssignments("manual");
+        } catch (err) {
+          console.error('update-task-json fetch failed', err);
+          toast({
+            title: "Errore",
+            description: "Errore di rete nello spostamento",
+            variant: "destructive"
+          });
+          // Rilascia lock anche in caso di errore
+          isDraggingRef.current = false;
+          if (dragTimeoutRef.current) clearTimeout(dragTimeoutRef.current);
+        }
         return;
       }
 
-      // Caso: Da container a timeline (OPTIMISTIC UPDATE)
+      // Caso: Da container a timeline
       if (fromContainerJson && toCleanerId !== null) {
         console.log(`🔄 Spostamento da container ${fromContainerJson} a cleaner ${toCleanerId}`);
 
-        // OPTIMISTIC UPDATE: Rimuovi subito dal container locale
-        if (fromContainerJson === 'early_out') {
-          setEarlyOutTasks(prev => prev.filter(t => String(t.id) !== String(taskId)));
-        } else if (fromContainerJson === 'high_priority') {
-          setHighPriorityTasks(prev => prev.filter(t => String(t.id) !== String(taskId)));
-        } else if (fromContainerJson === 'low_priority') {
-          setLowPriorityTasks(prev => prev.filter(t => String(t.id) !== String(taskId)));
-        }
+        try {
+          // Determina il tipo di modifica in base al container di origine
+          let modificationType = 'dnd_from_container';
+          if (fromContainerJson === 'early-out') {
+            modificationType = 'dnd_from_early_out';
+          } else if (fromContainerJson === 'high') {
+            modificationType = 'dnd_from_high_priority';
+          } else if (fromContainerJson === 'low') {
+            modificationType = 'dnd_from_low_priority';
+          }
 
-        // Rilascia lock immediatamente
-        isDraggingRef.current = false;
-        if (dragTimeoutRef.current) clearTimeout(dragTimeoutRef.current);
-
-        // CRITICAL: Marca modifiche
-        setHasUnsavedChanges(true);
-        if (handleTaskMoved) {
-          handleTaskMoved();
-        }
-
-        // Salva in background (non blocca l'UI)
-        saveTaskAssignment(taskId, toCleanerId, logisticCode, destination.index)
-          .then(() => {
-            console.log(`✅ Task ${logisticCode} salvata in background`);
-            // Refresh in background per sincronizzare lo stato
-            refreshAssignments("manual");
-          })
-          .catch(err => {
-            console.error("Errore nel salvataggio:", err);
-            toast({
-              title: "Errore salvataggio",
-              description: "Errore nel salvataggio, ricarica la pagina",
-              variant: "destructive",
-            });
+          // Carica i dati del cleaner per mostrare nome e cognome
+          const cleanersResponse = await fetch(`/data/cleaners/selected_cleaners.json?t=${Date.now()}`, {
+            cache: 'no-store',
+            headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' }
           });
+          const cleanersData = await cleanersResponse.json();
+          const cleaner = cleanersData.cleaners.find((c: any) => c.id === toCleanerId);
+          const cleanerName = cleaner ? `${cleaner.name} ${cleaner.lastname}` : `ID ${toCleanerId}`;
 
+          // Salva in timeline.json (rimuove automaticamente da containers.json)
+          await saveTaskAssignment(taskId, toCleanerId, logisticCode, destination.index);
+          await refreshAssignments("manual");
+
+          // CRITICAL: Marca modifiche dopo assegnazione
+          setHasUnsavedChanges(true);
+          if (handleTaskMoved) {
+            handleTaskMoved();
+          }
+
+          toast({
+            title: "Task assegnata",
+            description: `Task ${logisticCode} assegnata a ${cleanerName}`,
+            variant: "success",
+          });
+        } catch (err) {
+          console.error("Errore nell'assegnazione:", err);
+        } finally {
+          // Rilascia lock indipendentemente dall'esito
+          isDraggingRef.current = false;
+          if (dragTimeoutRef.current) clearTimeout(dragTimeoutRef.current);
+        }
         return;
       }
 
-      // Caso: Da timeline a container (OPTIMISTIC UPDATE)
+      // Caso: Da timeline a container
       if (fromCleanerId !== null && toContainerJson) {
         console.log(`🔄 Spostamento da cleaner ${fromCleanerId} a container ${toContainerJson}`);
 
-        // CRITICAL: Marca modifiche
+        // Rimuovi da timeline.json
+        await removeTimelineAssignment(taskId, logisticCode);
+
+        // CRITICAL: Marca modifiche dopo rimozione da timeline
         setHasUnsavedChanges(true);
         if (handleTaskMoved) {
           handleTaskMoved();
         }
 
-        // Rimuovi da timeline in background
-        removeTimelineAssignment(taskId, logisticCode)
-          .then(() => {
-            console.log(`✅ Task ${logisticCode} rimossa in background`);
-            refreshAssignments("manual");
-          })
-          .catch(err => {
-            console.error("Errore nella rimozione:", err);
-            toast({
-              title: "Errore rimozione",
-              description: "Errore nella rimozione, ricarica la pagina",
-              variant: "destructive",
-            });
-          });
+        // Rilascia lock PRIMA del reload
+        isDraggingRef.current = false;
+        if (dragTimeoutRef.current) clearTimeout(dragTimeoutRef.current);
 
-        // Lock verrà rilasciato dal finally
-        return;
-      }
-
-      // CRITICAL: Movimento tra cleaners (era nascosto da early return sopra)
-      if (fromCleanerId !== null && toCleanerId !== null) {
-        console.log(`🔄 Spostamento da cleaner ${fromCleanerId} a cleaner ${toCleanerId}`);
-
-        // Salva in background
-        saveTaskAssignment(taskId, toCleanerId, logisticCode, destination.index)
-          .then(() => {
-            console.log(`✅ Task ${logisticCode} spostata tra cleaners in background`);
-            refreshAssignments("manual");
-          })
-          .catch(err => {
-            console.error("Errore nello spostamento:", err);
-            toast({
-              title: "Errore spostamento",
-              description: "Errore nello spostamento, ricarica la pagina",
-              variant: "destructive",
-            });
-          });
-
-        // CRITICAL: Marca modifiche
-        setHasUnsavedChanges(true);
-        if (handleTaskMoved) {
-          handleTaskMoved();
-        }
-
-        // Lock verrà rilasciato dal finally
+        // Reload in background
+        await refreshAssignments("manual");
         return;
       }
 
     } catch (error) {
-      console.error('Errore durante il drag-drop:', error);
+      console.error('Errore nello spostamento:', error);
       toast({
         title: "Errore",
-        description: "Si è verificato un errore durante lo spostamento della task",
+        description: "Errore nello spostamento della task",
         variant: "destructive",
       });
-    } finally {
-      // CRITICAL: Rilascia SEMPRE il lock, anche in caso di errore
+      // Assicurati che il lock venga sempre rilasciato
       isDraggingRef.current = false;
-      if (dragTimeoutRef.current) {
-        clearTimeout(dragTimeoutRef.current);
-        dragTimeoutRef.current = null;
-      }
+      if (dragTimeoutRef.current) clearTimeout(dragTimeoutRef.current);
     }
   };
 
