@@ -630,10 +630,11 @@ export default function TaskCard({
                       minWidth: cardWidth,
                       maxWidth: cardWidth,
                       minHeight: "40px",
+                      // CRITICAL: Durante il drag, usa z-index molto alto per non essere coperta
+                      zIndex: snapshot.isDragging ? 9999 : (isMapFiltered ? 10 : 'auto'),
                       ...(isMapFiltered && !snapshot.isDragging ? {
                         boxShadow: '0 0 0 3px #3B82F6, 0 0 20px 5px rgba(59, 130, 246, 0.5)',
                         transform: 'scale(1.05)',
-                        zIndex: 10,
                       } : {})
                     }}
                     data-testid={`task-card-${getTaskKey(task)}`}
