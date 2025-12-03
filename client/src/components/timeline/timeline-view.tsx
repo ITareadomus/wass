@@ -1549,9 +1549,17 @@ export default function TimelineView({
                 const droppableId = `cleaner-${cleaner.id}`;
 
                 // Trova tutte le task assegnate a questo cleaner
+                // CRITICAL: Usa String() per evitare mismatch numero/stringa
                 const cleanerTasks = tasks.filter(task =>
-                  (task as any).assignedCleaner === cleaner.id
+                  String((task as any).assignedCleaner) === String(cleaner.id)
                 ).map(normalizeTask); // Applica la normalizzazione qui
+                
+                // Debug: log per cleaners che dovrebbero avere task ma non le mostrano
+                if (cleanerTasks.length === 0 && timelineCleaners.some(tc => tc.cleaner?.id === cleaner.id && tc.tasks?.length > 0)) {
+                  const timelineCleaner = timelineCleaners.find(tc => tc.cleaner?.id === cleaner.id);
+                  console.warn(`⚠️ Cleaner ${cleaner.id} (${cleaner.name}) ha ${timelineCleaner?.tasks?.length || 0} task in timelineCleaners ma 0 in props.tasks`);
+                  console.log(`   Tasks passate:`, tasks.filter(t => String((t as any).assignedCleaner) === String(cleaner.id)));
+                }
 
                 const isRemoved = removedCleanerIds.has(cleaner.id);
 
