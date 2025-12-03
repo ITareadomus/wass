@@ -1574,7 +1574,7 @@ export default function TimelineView({
                 const cleanerStartTime = cleaner.start_time || "10:00";
 
                 return (
-                  <div key={cleaner.id} className="flex mb-0.5" style={{ position: 'relative', zIndex: 1 }}>
+                  <div key={cleaner.id} className="flex mb-0.5">
                     {/* Info cleaner */}
                     <div
                       className="flex-shrink-0 p-1 flex items-center border-2 border-custom-blue bg-custom-blue/10 cursor-pointer hover:opacity-90 transition-opacity"
@@ -1584,7 +1584,7 @@ export default function TimelineView({
                           ? '0 0 0 3px #EAB308, 0 0 20px 5px rgba(234, 179, 8, 0.6), inset 0 0 15px rgba(234, 179, 8, 0.3)'
                           : filteredCleanerId === cleaner.id ? '0 0 0 3px #3B82F6, 0 0 20px 5px rgba(59, 130, 246, 0.5)' : 'none',
                         transform: filteredCleanerId === cleaner.id || hasIncompatibleTasks ? 'scale(1.05)' : 'none',
-                        zIndex: filteredCleanerId === cleaner.id || hasIncompatibleTasks ? 20 : 10,
+                        zIndex: filteredCleanerId === cleaner.id || hasIncompatibleTasks ? 20 : 'auto',
                         position: 'relative',
                         userSelect: 'none',
                         opacity: isRemoved ? 0.7 : 1,
@@ -1652,7 +1652,7 @@ export default function TimelineView({
                           data-cleaner-id={cleaner.id}
                           className="relative min-h-[45px] flex-1 border-l border-border bg-background"
                           style={{
-                            zIndex: filteredCleanerId === cleaner.id || hasIncompatibleTasks ? 15 : 5
+                            zIndex: filteredCleanerId === cleaner.id || hasIncompatibleTasks ? 15 : 'auto'
                           }}
                         >
                           {/* Griglia oraria di sfondo (solo visiva) con alternanza colori */}
