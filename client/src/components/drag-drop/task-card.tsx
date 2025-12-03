@@ -196,7 +196,7 @@ export default function TaskCard({
 
     // Se ancora non trovato, usa 0 come fallback
     const safeIdx = currIdx >= 0 ? currIdx : 0;
-    const effId = currIdx >= 0 ? (navigableTasks[currIdx] as any).__key : normalizedTaskId;
+    const effId = currIdx >= 0 ? (navigableTasks[safeIdx] as any).__key : normalizedTaskId;
     const curr = navigableTasks[safeIdx];
     const disp = curr || task;
 
@@ -519,7 +519,7 @@ export default function TaskCard({
       const timelineWidth = (window as any).timelineWidthPx || 0;
       const slotsCount = (window as any).globalTimeSlotsCount || 10;
       const virtualMinutes = slotsCount * 60; // Minuti virtuali basati su slot
-      
+
       if (timelineWidth > 0) {
         // Calcola in pixel assoluti
         const widthPx = (effectiveMinutes / virtualMinutes) * timelineWidth;
@@ -615,12 +615,12 @@ export default function TaskCard({
   // Calcola offset e travel in pixel FUORI dal Draggable
   const timelineWidth = (window as any).timelineWidthPx || 0;
   const virtualMinutes = globalTimeSlots * 60;
-  
-  const offsetWidthPx = timeOffset > 0 && virtualMinutes > 0 && timelineWidth > 0 
-    ? (timeOffset / virtualMinutes) * timelineWidth 
+
+  const offsetWidthPx = timeOffset > 0 && virtualMinutes > 0 && timelineWidth > 0
+    ? (timeOffset / virtualMinutes) * timelineWidth
     : 0;
-  const travelWidthPx = travelTime > 0 && virtualMinutes > 0 && timelineWidth > 0 
-    ? (travelTime / virtualMinutes) * timelineWidth 
+  const travelWidthPx = travelTime > 0 && virtualMinutes > 0 && timelineWidth > 0
+    ? (travelTime / virtualMinutes) * timelineWidth
     : 0;
 
   return (
@@ -665,9 +665,11 @@ export default function TaskCard({
               ref={provided.innerRef}
               {...provided.draggableProps}
               {...provided.dragHandleProps}
+              className="flex items-center"
               style={{
                 ...provided.draggableProps.style,
-                zIndex: snapshot.isDragging ? 9999 : 'auto',
+                zIndex: snapshot.isDragging ? 9999 : 10,
+                position: 'relative',
               }}
             >
               {/* Task card effettiva */}
