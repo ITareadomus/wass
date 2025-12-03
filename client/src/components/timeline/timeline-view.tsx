@@ -1068,22 +1068,6 @@ export default function TimelineView({
 
   const cleanerColumnWidth = calculateCleanerColumnWidth();
 
-  // Esponi la larghezza effettiva della timeline (escludendo la colonna nomi) per drag preciso
-  React.useEffect(() => {
-    const updateTimelineWidth = () => {
-      if (timelineRef.current) {
-        const containerWidth = timelineRef.current.offsetWidth;
-        // Sottraiamo la colonna dei nomi (cleanerColumnWidth) + padding
-        const timelineAreaWidth = containerWidth - cleanerColumnWidth - 40; // 40 = padding
-        (window as any).globalTimelineWidth = Math.max(timelineAreaWidth, 400);
-      }
-    };
-
-    updateTimelineWidth();
-    window.addEventListener('resize', updateTimelineWidth);
-    return () => window.removeEventListener('resize', updateTimelineWidth);
-  }, [cleanerColumnWidth]);
-
   // Gestione fullscreen
   const toggleFullscreen = async () => {
     if (!timelineRef.current) return;
