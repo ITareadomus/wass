@@ -612,64 +612,64 @@ export default function TaskCard({
   // Determina se il drag è disabilitato in base alla data e se la task è già salvata
   const shouldDisableDrag = isDragDisabled || (displayTask as any).checkin_date;
 
+  // Calcola offset e travel in pixel FUORI dal Draggable
+  const timelineWidth = (window as any).timelineWidthPx || 0;
+  const virtualMinutes = globalTimeSlots * 60;
+  
+  const offsetWidthPx = timeOffset > 0 && virtualMinutes > 0 && timelineWidth > 0 
+    ? (timeOffset / virtualMinutes) * timelineWidth 
+    : 0;
+  const travelWidthPx = travelTime > 0 && virtualMinutes > 0 && timelineWidth > 0 
+    ? (travelTime / virtualMinutes) * timelineWidth 
+    : 0;
+
   return (
     <>
+      {/* Offset spacer per prima task - FUORI dal Draggable */}
+      {isInTimeline && index === 0 && timeOffset > 0 && offsetWidthPx > 0 && (
+        <div
+          className="flex-shrink-0"
+          style={{ width: `${offsetWidthPx}px` }}
+        />
+      )}
+
+      {/* Travel time marker - FUORI dal Draggable */}
+      {isInTimeline && index > 0 && travelTime > 0 && travelWidthPx > 0 && (
+        <div
+          className="flex items-center justify-center flex-shrink-0 py-3"
+          style={{ width: `${travelWidthPx}px`, minHeight: '50px' }}
+          title={`${travelTime} min`}
+        >
+          <svg
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            fill="currentColor"
+            className="text-custom-blue flex-shrink-0"
+          >
+            <path d="M13.5 5.5c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zM9.8 8.9L7 23h2.1l1.8-8 2.1 2v6h2v-7.5l-2.1-2 .6-3C14.8 12 16.8 13 19 13v-2c-1.9 0-3.5-1-4.3-2.4l-1-1.6c-.4-.6-1-1-1.7-1-.3 0-.5.1-.8.1L6 8.3V13h2V9.6l1.8-.7"/>
+          </svg>
+        </div>
+      )}
+
       <Draggable
         draggableId={getTaskKey(task)}
         index={index}
-        isDragDisabled={shouldDisableDrag} // Usa la prop per disabilitare il drag
+        isDragDisabled={shouldDisableDrag}
       >
         {(provided, snapshot) => {
           const cardWidth = calculateWidth(task.duration, isInTimeline);
-          const timelineWidth = (window as any).timelineWidthPx || 0;
-          const virtualMinutes = globalTimeSlots * 60;
-          
-          // Calcola offset e travel in pixel
-          const offsetWidthPx = timeOffset > 0 && virtualMinutes > 0 && timelineWidth > 0 
-            ? (timeOffset / virtualMinutes) * timelineWidth 
-            : 0;
-          const travelWidthPx = travelTime > 0 && virtualMinutes > 0 && timelineWidth > 0 
-            ? (travelTime / virtualMinutes) * timelineWidth 
-            : 0;
 
           return (
             <div
               ref={provided.innerRef}
               {...provided.draggableProps}
               {...provided.dragHandleProps}
-              className="flex items-center"
               style={{
                 ...provided.draggableProps.style,
                 zIndex: snapshot.isDragging ? 9999 : 'auto',
               }}
             >
-              {/* Offset spacer per prima task - dentro il Draggable - nascosto durante drag */}
-              {!snapshot.isDragging && isInTimeline && index === 0 && timeOffset > 0 && offsetWidthPx > 0 && (
-                <div
-                  className="flex-shrink-0"
-                  style={{ width: `${offsetWidthPx}px` }}
-                />
-              )}
-
-              {/* Travel time marker - dentro il Draggable - nascosto durante drag */}
-              {!snapshot.isDragging && isInTimeline && index > 0 && travelTime > 0 && travelWidthPx > 0 && (
-                <div
-                  className="flex items-center justify-center flex-shrink-0 py-3"
-                  style={{ width: `${travelWidthPx}px`, minHeight: '50px' }}
-                  title={`${travelTime} min`}
-                >
-                  <svg
-                    width="20"
-                    height="20"
-                    viewBox="0 0 24 24"
-                    fill="currentColor"
-                    className="text-custom-blue flex-shrink-0"
-                  >
-                    <path d="M13.5 5.5c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zM9.8 8.9L7 23h2.1l1.8-8 2.1 2v6h2v-7.5l-2.1-2 .6-3C14.8 12 16.8 13 19 13v-2c-1.9 0-3.5-1-4.3-2.4l-1-1.6c-.4-.6-1-1-1.7-1-.3 0-.5.1-.8.1L6 8.3V13h2V9.6l1.8-.7"/>
-                  </svg>
-                </div>
-              )}
-
               {/* Task card effettiva */}
               <TooltipProvider delayDuration={300}>
                 <Tooltip>
@@ -803,9 +803,8 @@ export default function TaskCard({
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>
-            </div>
           );
-          }}
+        }}
       </Draggable>
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
         <DialogContent className="sm:max-w-2xl max-h-[80vh] overflow-y-auto">
