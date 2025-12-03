@@ -1214,22 +1214,29 @@ export default function TimelineView({
 
   const loadTimelineCleaners = async () => {
     try {
-      const response = await fetch(`/data/output/timeline.json?t=${Date.now()}`);
+      // CRITICAL: Usa l'API invece del file per avere dati sincronizzati con MySQL
+      const dateStr = workDate || localStorage.getItem('selected_work_date') || new Date().toISOString().split('T')[0];
+      const response = await fetch(`/api/timeline?date=${dateStr}&t=${Date.now()}`, {
+        cache: 'no-store',
+        headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' }
+      });
+      
       if (!response.ok) {
-        console.warn(`Timeline file not found (${response.status}), using empty timeline`);
+        console.warn(`Timeline API not found (${response.status}), using empty timeline`);
         setTimelineCleaners([]);
         return;
       }
 
       const contentType = response.headers.get('content-type');
       if (!contentType || !contentType.includes('application/json')) {
-        console.warn('Timeline file is not JSON, using empty timeline');
+        console.warn('Timeline API response is not JSON, using empty timeline');
         setTimelineCleaners([]);
         return;
       }
 
       const timelineData = await response.json();
       const timelineCleanersList = timelineData.cleaners_assignments || [];
+      console.log(`📋 Timeline cleaners loaded from API: ${timelineCleanersList.length} cleaners, ${timelineCleanersList.reduce((sum: number, c: any) => sum + (c.tasks?.length || 0), 0)} tasks`);
       setTimelineCleaners(timelineCleanersList);
     } catch (error) {
       console.error("Errore nel caricamento timeline cleaners:", error);

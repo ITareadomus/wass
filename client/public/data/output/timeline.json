@@ -1,6 +1,6 @@
 {
   "meta": {
-    "total_tasks": 30,
+    "total_tasks": 31,
     "used_cleaners": 10,
     "assigned_tasks": 26,
     "total_cleaners": 10
@@ -11,10 +11,8 @@
     "modified_by": [
       "Admin"
     ],
-    "last_updated": "2025-12-03 12:00:55",
-    "modification_type": "auto_assign_low_priority",
-    "loaded_from_mysql": true,
-    "loaded_at": "2025-12-03 11:05:20"
+    "last_updated": "2025-12-03 12:06:27",
+    "modification_type": "auto_assign_low_priority"
   },
   "cleaners_assignments": [
     {
@@ -492,6 +490,38 @@
           "followup": true,
           "sequence": 2,
           "travel_time": 28
+        },
+        {
+          "task_id": 219743,
+          "logistic_code": 754,
+          "client_id": null,
+          "premium": false,
+          "address": "VIA STRADIVARI, 4",
+          "lat": "45.4842098",
+          "lng": "9.2155099",
+          "cleaning_time": 120,
+          "checkin_date": "2025-12-05",
+          "checkout_date": "2025-12-03",
+          "checkin_time": "19:00",
+          "checkout_time": null,
+          "pax_in": 4,
+          "pax_out": 1,
+          "small_equipment": false,
+          "operation_id": 2,
+          "confirmed_operation": true,
+          "straordinaria": false,
+          "type_apt": "B",
+          "alias": "TBR",
+          "customer_name": "THE BEST RENT S.r.l.",
+          "reasons": [
+            "manually_moved_to_timeline"
+          ],
+          "priority": "low_priority",
+          "start_time": "13:22",
+          "end_time": "15:22",
+          "followup": true,
+          "sequence": 3,
+          "travel_time": 24
         }
       ]
     },
