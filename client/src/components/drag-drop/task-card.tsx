@@ -439,7 +439,7 @@ export default function TaskCard({
       // Recupera data di lavoro e utente corrente per il tracking
       const workDate = localStorage.getItem('selected_work_date') || new Date().toISOString().split('T')[0];
       const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
-      
+
       const response = await fetch('/api/update-task-details', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -559,7 +559,7 @@ export default function TaskCard({
 
     // Caso 2: start_time è prima di checkout_time (task inizia prima che proprietà sia libera)
     if (startTime && checkoutTime && checkoutDate) {
-      const taskStartDateTime = new Date(checkoutDate + 'T' + startTime + ':00');
+      const taskStartDateTime= new Date(checkoutDate + 'T' + startTime + ':00');
       const checkoutDateTime = new Date(checkoutDate + 'T' + checkoutTime + ':00');
       if (taskStartDateTime < checkoutDateTime) return true;
     }
@@ -628,10 +628,17 @@ export default function TaskCard({
                     `}
                     style={{
                       ...provided.draggableProps.style,
-                      width: cardWidth,
-                      minWidth: cardWidth,
-                      maxWidth: cardWidth,
+                      // CRITICAL: Forza dimensioni fisse anche durante il drag
+                      width: snapshot.isDragging ? cardWidth : cardWidth,
+                      minWidth: snapshot.isDragging ? cardWidth : cardWidth,
+                      maxWidth: snapshot.isDragging ? cardWidth : cardWidth,
                       minHeight: "40px",
+                      // Durante il drag, mantieni le dimensioni originali
+                      ...(snapshot.isDragging ? {
+                        boxSizing: 'border-box',
+                        flexShrink: 0,
+                        flexGrow: 0,
+                      } : {}),
                       ...(isMapFiltered && !snapshot.isDragging ? {
                         boxShadow: '0 0 0 3px #3B82F6, 0 0 20px 5px rgba(59, 130, 246, 0.5)',
                         transform: 'scale(1.05)',
