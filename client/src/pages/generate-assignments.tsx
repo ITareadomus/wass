@@ -1651,10 +1651,6 @@ export default function GenerateAssignments() {
       if (fromCleanerId !== null && toContainerJson) {
         console.log(`🔄 Spostamento da cleaner ${fromCleanerId} a container ${toContainerJson}`);
 
-        // Rilascia lock immediatamente
-        isDraggingRef.current = false;
-        if (dragTimeoutRef.current) clearTimeout(dragTimeoutRef.current);
-
         // CRITICAL: Marca modifiche
         setHasUnsavedChanges(true);
         if (handleTaskMoved) {
@@ -1676,6 +1672,36 @@ export default function GenerateAssignments() {
             });
           });
 
+        // Lock verrà rilasciato dal finally
+        return;
+      }
+
+      // CRITICAL: Movimento tra cleaners (era nascosto da early return sopra)
+      if (fromCleanerId !== null && toCleanerId !== null) {
+        console.log(`🔄 Spostamento da cleaner ${fromCleanerId} a cleaner ${toCleanerId}`);
+
+        // Salva in background
+        saveTaskAssignment(taskId, toCleanerId, logisticCode, destination.index)
+          .then(() => {
+            console.log(`✅ Task ${logisticCode} spostata tra cleaners in background`);
+            refreshAssignments("manual");
+          })
+          .catch(err => {
+            console.error("Errore nello spostamento:", err);
+            toast({
+              title: "Errore spostamento",
+              description: "Errore nello spostamento, ricarica la pagina",
+              variant: "destructive",
+            });
+          });
+
+        // CRITICAL: Marca modifiche
+        setHasUnsavedChanges(true);
+        if (handleTaskMoved) {
+          handleTaskMoved();
+        }
+
+        // Lock verrà rilasciato dal finally
         return;
       }
 
