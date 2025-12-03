@@ -1489,7 +1489,26 @@ export default function GenerateAssignments() {
         console.log(`🔄 Spostamento task ${taskId} da cleaner ${fromCleanerId} a cleaner ${toCleanerId}`);
 
         try {
-          await reorderTimelineAssignment(taskId, logisticCode, toCleanerId, source.index, destination.index); // Utilizza reorderTimelineAssignment per spostare tra cleaners
+          // Usa l'endpoint corretto per spostare tra cleaners
+          const dateStr = format(selectedDate, "yyyy-MM-dd");
+          const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+          const response = await fetch('/api/move-task-between-cleaners', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              taskId,
+              logisticCode,
+              sourceCleanerId: fromCleanerId,
+              destCleanerId: toCleanerId,
+              destIndex: destination.index,
+              date: dateStr,
+              modified_by: currentUser.username || 'unknown'
+            }),
+          });
+
+          if (!response.ok) {
+            throw new Error('Errore nello spostamento tra cleaners');
+          }
 
           // CRITICAL: Marca modifiche dopo spostamento
           setHasUnsavedChanges(true);
