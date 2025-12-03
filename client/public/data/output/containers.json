@@ -1,6 +1,6 @@
 {
   "metadata": {
-    "last_updated": "2025-12-03T10:39:02.067480",
+    "last_updated": "2025-12-03T10:46:43.942294",
     "date": "2025-12-03"
   },
   "containers": {
@@ -443,96 +443,12 @@
             "same_day_checkin_between_hp_start_hp_end"
           ],
           "priority": "high_priority"
-        },
-        {
-          "task_id": 219764,
-          "logistic_code": 771,
-          "client_id": 64,
-          "premium": false,
-          "address": "VIA PIERLOMBARDO, 3",
-          "lat": "45.4549994",
-          "lng": "9.2049206",
-          "cleaning_time": 60,
-          "checkin_date": "2025-12-03",
-          "checkout_date": "2025-12-03",
-          "checkin_time": "14:00",
-          "checkout_time": "11:00",
-          "pax_in": 2,
-          "pax_out": 2,
-          "small_equipment": true,
-          "operation_id": 2,
-          "confirmed_operation": true,
-          "straordinaria": false,
-          "type_apt": "A",
-          "alias": "RLST",
-          "customer_name": "RELSTAY - FERRARA GIULIA",
-          "reasons": [
-            "same_day_checkin_between_hp_start_hp_end",
-            "client_forced_hp"
-          ],
-          "priority": "high_priority"
-        },
-        {
-          "task_id": 219777,
-          "logistic_code": 1032,
-          "client_id": 64,
-          "premium": false,
-          "address": "VIA PIETRO MASCAGNI, 2",
-          "lat": "45.4662468",
-          "lng": "9.2045849",
-          "cleaning_time": 60,
-          "checkin_date": "2025-12-03",
-          "checkout_date": "2025-12-03",
-          "checkin_time": "14:30",
-          "checkout_time": "13:00",
-          "pax_in": 0,
-          "pax_out": 0,
-          "small_equipment": true,
-          "operation_id": 1,
-          "confirmed_operation": true,
-          "straordinaria": false,
-          "type_apt": "A",
-          "alias": "RLST",
-          "customer_name": "RELSTAY - FERRARA GIULIA",
-          "reasons": [
-            "same_day_checkin_between_hp_start_hp_end",
-            "client_forced_hp"
-          ],
-          "priority": "high_priority"
         }
       ],
-      "count": 7
+      "count": 5
     },
     "low_priority": {
       "tasks": [
-        {
-          "task_id": 219608,
-          "logistic_code": 566,
-          "client_id": 3,
-          "premium": false,
-          "address": "CORSO PLEBISCITI, 9",
-          "lat": "45.468696",
-          "lng": "9.2192168",
-          "cleaning_time": 180,
-          "checkin_date": null,
-          "checkout_date": "2025-12-03",
-          "checkin_time": null,
-          "checkout_time": null,
-          "pax_in": 4,
-          "pax_out": 3,
-          "small_equipment": true,
-          "operation_id": 3,
-          "confirmed_operation": true,
-          "straordinaria": true,
-          "type_apt": "A",
-          "alias": "TBR",
-          "customer_name": "THE BEST RENT S.r.l.",
-          "priority": "low_priority",
-          "reasons": [
-            "not_eo",
-            "not_hp"
-          ]
-        },
         {
           "task_id": 219616,
           "logistic_code": 571,
@@ -758,13 +674,13 @@
           ]
         }
       ],
-      "count": 9
+      "count": 8
     }
   },
   "summary": {
-    "total_tasks": 27,
+    "total_tasks": 24,
     "early_out": 11,
-    "high_priority": 7,
-    "low_priority": 9
+    "high_priority": 5,
+    "low_priority": 8
   }
 }
