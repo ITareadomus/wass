@@ -1,6 +1,6 @@
 {
   "metadata": {
-    "last_updated": "2025-12-03T09:37:11.255007",
+    "last_updated": "2025-12-03T09:40:34.936586",
     "date": "2025-12-03"
   },
   "containers": {
@@ -424,34 +424,6 @@
     "low_priority": {
       "tasks": [
         {
-          "task_id": 219608,
-          "logistic_code": 566,
-          "client_id": 3,
-          "premium": false,
-          "address": "CORSO PLEBISCITI, 9",
-          "lat": "45.468696",
-          "lng": "9.2192168",
-          "cleaning_time": 180,
-          "checkin_date": null,
-          "checkout_date": "2025-12-03",
-          "checkin_time": null,
-          "checkout_time": null,
-          "pax_in": 4,
-          "pax_out": 3,
-          "small_equipment": true,
-          "operation_id": 3,
-          "confirmed_operation": true,
-          "straordinaria": true,
-          "type_apt": "A",
-          "alias": "TBR",
-          "customer_name": "THE BEST RENT S.r.l.",
-          "priority": "low_priority",
-          "reasons": [
-            "not_eo",
-            "not_hp"
-          ]
-        },
-        {
           "task_id": 219616,
           "logistic_code": 571,
           "client_id": 2,
@@ -676,13 +648,13 @@
           ]
         }
       ],
-      "count": 9
+      "count": 8
     }
   },
   "summary": {
-    "total_tasks": 24,
+    "total_tasks": 23,
     "early_out": 11,
     "high_priority": 4,
-    "low_priority": 9
+    "low_priority": 8
   }
 }
