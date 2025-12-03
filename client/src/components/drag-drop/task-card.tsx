@@ -196,7 +196,7 @@ export default function TaskCard({
 
     // Se ancora non trovato, usa 0 come fallback
     const safeIdx = currIdx >= 0 ? currIdx : 0;
-    const effId = currIdx >= 0 ? (navigableTasks[safeIdx] as any).__key : normalizedTaskId;
+    const effId = currIdx >= 0 ? (navigableTasks[currIdx] as any).__key : normalizedTaskId;
     const curr = navigableTasks[safeIdx];
     const disp = curr || task;
 
@@ -519,7 +519,7 @@ export default function TaskCard({
       const timelineWidth = (window as any).timelineWidthPx || 0;
       const slotsCount = (window as any).globalTimeSlotsCount || 10;
       const virtualMinutes = slotsCount * 60; // Minuti virtuali basati su slot
-
+      
       if (timelineWidth > 0) {
         // Calcola in pixel assoluti
         const widthPx = (effectiveMinutes / virtualMinutes) * timelineWidth;
@@ -615,63 +615,59 @@ export default function TaskCard({
   // Calcola offset e travel in pixel FUORI dal Draggable
   const timelineWidth = (window as any).timelineWidthPx || 0;
   const virtualMinutes = globalTimeSlots * 60;
-
-  const offsetWidthPx = timeOffset > 0 && virtualMinutes > 0 && timelineWidth > 0
-    ? (timeOffset / virtualMinutes) * timelineWidth
+  
+  const offsetWidthPx = timeOffset > 0 && virtualMinutes > 0 && timelineWidth > 0 
+    ? (timeOffset / virtualMinutes) * timelineWidth 
     : 0;
-  const travelWidthPx = travelTime > 0 && virtualMinutes > 0 && timelineWidth > 0
-    ? (travelTime / virtualMinutes) * timelineWidth
+  const travelWidthPx = travelTime > 0 && virtualMinutes > 0 && timelineWidth > 0 
+    ? (travelTime / virtualMinutes) * timelineWidth 
     : 0;
 
   return (
     <>
+      {/* Offset spacer per prima task - FUORI dal Draggable */}
+      {isInTimeline && index === 0 && timeOffset > 0 && offsetWidthPx > 0 && (
+        <div
+          className="flex-shrink-0"
+          style={{ width: `${offsetWidthPx}px` }}
+        />
+      )}
+
+      {/* Travel time marker - FUORI dal Draggable */}
+      {isInTimeline && index > 0 && travelTime > 0 && travelWidthPx > 0 && (
+        <div
+          className="flex items-center justify-center flex-shrink-0 py-3"
+          style={{ width: `${travelWidthPx}px`, minHeight: '50px' }}
+          title={`${travelTime} min`}
+        >
+          <svg
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            fill="currentColor"
+            className="text-custom-blue flex-shrink-0"
+          >
+            <path d="M13.5 5.5c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zM9.8 8.9L7 23h2.1l1.8-8 2.1 2v6h2v-7.5l-2.1-2 .6-3C14.8 12 16.8 13 19 13v-2c-1.9 0-3.5-1-4.3-2.4l-1-1.6c-.4-.6-1-1-1.7-1-.3 0-.5.1-.8.1L6 8.3V13h2V9.6l1.8-.7"/>
+          </svg>
+        </div>
+      )}
+
       <Draggable
         draggableId={getTaskKey(task)}
         index={index}
         isDragDisabled={shouldDisableDrag}
       >
         {(provided, snapshot) => {
-          // Nascondi offset e travel time SOLO durante il drag
-          const showOffsetAndTravel = !snapshot.isDragging;
           const cardWidth = calculateWidth(task.duration, isInTimeline);
 
           return (
-            <>
-              {/* Offset spacer per prima task - FUORI dal Draggable - nascosto durante drag */}
-              {showOffsetAndTravel && isInTimeline && index === 0 && timeOffset > 0 && offsetWidthPx > 0 && (
-                <div
-                  className="flex-shrink-0"
-                  style={{ width: `${offsetWidthPx}px` }}
-                />
-              )}
-
-              {/* Travel time marker - FUORI dal Draggable - nascosto durante drag */}
-              {showOffsetAndTravel && isInTimeline && index > 0 && travelTime > 0 && travelWidthPx > 0 && (
-                <div
-                  className="flex items-center justify-center flex-shrink-0 py-3"
-                  style={{ width: `${travelWidthPx}px`, minHeight: '50px' }}
-                  title={`${travelTime} min`}
-                >
-                  <svg
-                    width="20"
-                    height="20"
-                    viewBox="0 0 24 24"
-                    fill="currentColor"
-                    className="text-custom-blue flex-shrink-0"
-                  >
-                    <path d="M13.5 5.5c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zM9.8 8.9L7 23h2.1l1.8-8 2.1 2v6h2v-7.5l-2.1-2 .6-3C14.8 12 16.8 13 19 13v-2c-1.9 0-3.5-1-4.3-2.4l-1-1.6c-.4-.6-1-1-1.7-1-.3 0-.5.1-.8.1L6 8.3V13h2V9.6l1.8-.7"/>
-                  </svg>
-                </div>
-              )}
             <div
               ref={provided.innerRef}
               {...provided.draggableProps}
               {...provided.dragHandleProps}
-              className="flex items-center"
               style={{
                 ...provided.draggableProps.style,
-                zIndex: snapshot.isDragging ? 9999 : 10,
-                position: 'relative',
+                zIndex: snapshot.isDragging ? 9999 : 'auto',
               }}
             >
               {/* Task card effettiva */}
@@ -807,8 +803,7 @@ export default function TaskCard({
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>
-              </div>
-            </>
+            </div>
           );
         }}
       </Draggable>

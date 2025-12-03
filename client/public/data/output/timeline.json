@@ -3,7 +3,7 @@
     "total_tasks": 5,
     "used_cleaners": 0,
     "assigned_tasks": 0,
-    "total_cleaners": 5
+    "total_cleaners": 4
   },
   "metadata": {
     "date": "2025-12-03",
@@ -11,7 +11,7 @@
     "modified_by": [
       "Admin"
     ],
-    "last_updated": "2025-12-03 15:05:09"
+    "last_updated": "2025-12-03 14:51:09"
   },
   "cleaners_assignments": [
     {
@@ -132,40 +132,17 @@
         "premium": false,
         "start_time": "10:00"
       },
+      "tasks": []
+    },
+    {
+      "cleaner": {
+        "id": 24,
+        "name": "HUSSAIN",
+        "lastname": "SYED SHUJIAHAT",
+        "role": "Premium",
+        "start_time": "10:00"
+      },
       "tasks": [
-        {
-          "task_id": 219741,
-          "logistic_code": 623,
-          "client_id": null,
-          "premium": false,
-          "address": "RIPA DI PORTA TICINESE 49",
-          "lat": "45.4518038",
-          "lng": "9.1768031",
-          "cleaning_time": 60,
-          "checkin_date": "2025-12-05",
-          "checkout_date": "2025-12-03",
-          "checkin_time": "15:00",
-          "checkout_time": null,
-          "pax_in": 2,
-          "pax_out": 2,
-          "small_equipment": false,
-          "operation_id": 2,
-          "confirmed_operation": true,
-          "straordinaria": false,
-          "type_apt": "A",
-          "alias": "NTM",
-          "customer_name": "NOTA-MI",
-          "reasons": [
-            "manually_moved_to_timeline",
-            "manual_assignment"
-          ],
-          "priority": "early_out",
-          "start_time": "10:00",
-          "end_time": "11:00",
-          "followup": false,
-          "sequence": 1,
-          "travel_time": 0
-        },
         {
           "task_id": 219777,
           "logistic_code": 1032,
@@ -195,6 +172,39 @@
           "priority": "high_priority",
           "start_time": "13:00",
           "end_time": "14:00",
+          "followup": false,
+          "sequence": 1,
+          "travel_time": 0
+        },
+        {
+          "task_id": 219741,
+          "logistic_code": 623,
+          "client_id": null,
+          "premium": false,
+          "address": "RIPA DI PORTA TICINESE 49",
+          "lat": "45.4518038",
+          "lng": "9.1768031",
+          "cleaning_time": 60,
+          "checkin_date": "2025-12-05",
+          "checkout_date": "2025-12-03",
+          "checkin_time": "15:00",
+          "checkout_time": null,
+          "pax_in": 2,
+          "pax_out": 2,
+          "small_equipment": false,
+          "operation_id": 2,
+          "confirmed_operation": true,
+          "straordinaria": false,
+          "type_apt": "A",
+          "alias": "NTM",
+          "customer_name": "NOTA-MI",
+          "reasons": [
+            "manually_moved_to_timeline",
+            "manual_assignment"
+          ],
+          "priority": "early_out",
+          "start_time": "14:25",
+          "end_time": "15:25",
           "followup": true,
           "sequence": 2,
           "travel_time": 25
@@ -203,30 +213,10 @@
     },
     {
       "cleaner": {
-        "id": 24,
-        "name": "HUSSAIN",
-        "lastname": "SYED SHUJIAHAT",
-        "role": "Premium",
-        "start_time": "10:00"
-      },
-      "tasks": []
-    },
-    {
-      "cleaner": {
         "id": 1063,
         "name": "ALEXANDER DENNYS",
         "lastname": "CARDENAS OLAYA",
         "role": "Standard",
-        "start_time": "10:00"
-      },
-      "tasks": []
-    },
-    {
-      "cleaner": {
-        "id": 789,
-        "name": "LAFORTUNE",
-        "lastname": "DJOUKOUO NGUEMTHE",
-        "role": "Premium",
         "start_time": "10:00"
       },
       "tasks": []
