@@ -1,0 +1,177 @@
+Il bug non è nel TaskCard, ma nella funzione di drag&drop principale:
+
+client/src/pages/generate-assignments.tsx → funzione onDragEnd
+
+Quando trascini una task da un container (early-out / high / low) alla timeline, il tuo codice fa la stessa operazione due volte.
+Risultato: la stessa task viene riassegnata due volte sul backend / timeline, e questo può far “allungare” la sequenza o creare effetti strani sulla barra in timeline dopo ogni drag.
+
+🔍 Dov’è il doppio lavoro
+
+Dentro onDragEnd hai:
+
+Ramo TIMELINE (gestisce drag tra cleaners, reorder, ecc.)
+
+Ramo CONTAINERS (gestisce spostamenti tra early-out / high / low / timeline)
+
+Nel ramo TIMELINE c’è questo pezzo (semplifico):
+
+// dentro onDragEnd, ramo TIMELINE
+const fromCleanerId = parseCleanerId(source.droppableId);
+const toCleanerId = parseCleanerId(destination.droppableId);
+
+const fromContainer = parseContainerKey(source.droppableId);
+const toContainer = parseContainerKey(destination.droppableId);
+
+// ...
+
+// 🔴 CASO container → timeline (PRIMO giro)
+if (!fromCleanerId && fromContainer && toCleanerId !== null && !toContainer) {
+  console.log(`🔄 Spostamento da container ${fromContainer} a cleaner ${toCleanerId}`);
+
+  // Carica cleaner
+  // ...
+
+  // Salva assegnazione in timeline
+  await saveTaskAssignment(taskId, toCleanerId, logisticCode, destination.index);
+
+  // setHasUnsavedChanges, toast, ecc.
+  // ...
+
+  return;
+}
+
+
+Più in basso, nel ramo CONTAINERS, hai un altro caso identico concettualmente:
+
+// 🔹 Ramo CONTAINERS (Early-Out / High / Low)
+const containerToJsonName: Record<string, string> = {
+  'early-out': 'early_out',
+  'high': 'high_priority',
+  'low': 'low_priority'
+};
+
+const fromContainerJson = containerToJsonName[source.droppableId] || null;
+const toContainerJson = containerToJsonName[destination.droppableId] || null;
+
+// ...
+
+// 🔴 STESSO CASO container → timeline (SECONDO giro)
+if (fromContainerJson && toCleanerId !== null) {
+  console.log(`🔄 Spostamento da container ${fromContainerJson} a cleaner ${toCleanerId}`);
+
+  // Carica cleaner
+  // ...
+
+  // Salva di nuovo in timeline
+  await saveTaskAssignment(taskId, toCleanerId, logisticCode, destination.index);
+  await refreshAssignments("manual");
+
+  // setHasUnsavedChanges, toast, ecc.
+  // ...
+}
+
+
+Quando trascini da early-out / high / low → timeline-XX:
+
+fromCleanerId è null
+
+fromContainer è valorizzato
+
+toCleanerId è valorizzato
+
+toContainer è null
+
+fromContainerJson è valorizzato
+
+➡ Entrano ENTRAMBI gli if
+➡ saveTaskAssignment(...) viene chiamato due volte
+➡ La task viene rielaborata due volte → dopo i vari refresh/ricalcoli, ti ritrovi con la “lunghezza” della timeline/assegnazione che cambia ogni volta che trascini.
+
+✅ Fix consigliato
+
+La soluzione più pulita è:
+👉 lasciare gestire container → timeline solo nel ramo CONTAINERS
+👉 rimuovere il caso duplicato nel ramo TIMELINE.
+
+1. Apri il file
+
+client/src/pages/generate-assignments.tsx
+
+2. Cerca questo blocco (intorno alla riga ~1505)
+if (!fromCleanerId && fromContainer && toCleanerId !== null && !toContainer) {
+  console.log(`🔄 Spostamento da container ${fromContainer} a cleaner ${toCleanerId}`);
+
+  try {
+    const cleanersResponse = await fetch(`/data/cleaners/selected_cleaners.json?t=${Date.now()}`, {
+      cache: 'no-store',
+      headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' }
+    });
+    const cleanersData = await cleanersResponse.json();
+    const cleaner = cleanersData.cleaners.find((c: any) => c.id === toCleanerId);
+    const cleanerName = cleaner ? `${cleaner.name} ${cleaner.lastname}` : `ID ${toCleanerId}`;
+
+    // Salva in timeline.json (rimuove automaticamente da containers.json)
+    await saveTaskAssignment(taskId, toCleanerId, logisticCode, destination.index);
+
+    // CRITICAL: Marca modifiche dopo drag-and-drop da container
+    setHasUnsavedChanges(true);
+    if (handleTaskMoved) {
+      handleTaskMoved();
+    }
+
+    toast({
+      title: "Task assegnata",
+      description: `Task ${logisticCode} assegnata a ${cleanerName}`,
+      variant: "success",
+    });
+
+    // Rilascia lock PRIMA del reload
+    setIsDragging(false);
+
+    // Reload in background
+    await refreshAssignments("manual");
+  } catch (err) {
+    console.error("Errore nell'assegnazione:", err);
+    toast({
+      title: "Errore",
+      description: "Impossibile assegnare la task.",
+      variant: "destructive",
+    });
+    setIsDragging(false);
+  }
+  return;
+}
+
+3. Commentalo o rimuovilo
+
+Puoi semplicemente eliminarlo oppure commentarlo:
+
+// 🔁 [RIMOSSO] caso duplicato da container → timeline
+// Questo blocco è stato rimosso perché lo stesso scenario
+// è già gestito nel ramo CONTAINERS più sotto.
+// if (!fromCleanerId && fromContainer && toCleanerId !== null && !toContainer) {
+//   ...
+// }
+
+
+Non toccare il resto del ramo TIMELINE (riordino, spostamento tra cleaners) né il ramo CONTAINERS:
+il caso “Da container a timeline” continuerà ad essere gestito da:
+
+if (fromContainerJson && toCleanerId !== null) {
+  // ...
+  await saveTaskAssignment(...);
+  await refreshAssignments("manual");
+  // ...
+}
+
+🔄 Dopo la modifica
+
+Dopo questo fix:
+
+ogni trascinamento da early-out / high / low → timeline:
+
+viene elaborato una sola volta
+
+saveTaskAssignment non viene più chiamato doppio
+
+la timeline non si “allunga” più progressivamente ad ogni drag per via del doppio salvataggio/ricarico.
