@@ -637,14 +637,14 @@ export default function TaskCard({
               ref={provided.innerRef}
               {...provided.draggableProps}
               {...provided.dragHandleProps}
-              className="flex items-center flex-shrink-0"
+              className="flex items-center"
               style={{
                 ...provided.draggableProps.style,
                 zIndex: snapshot.isDragging ? 9999 : 'auto',
               }}
             >
               {/* Offset spacer per prima task - dentro il Draggable - nascosto durante drag */}
-              {isInTimeline && index === 0 && timeOffset > 0 && offsetWidthPx > 0 && !snapshot.isDragging && (
+              {!snapshot.isDragging && isInTimeline && index === 0 && timeOffset > 0 && offsetWidthPx > 0 && (
                 <div
                   className="flex-shrink-0"
                   style={{ width: `${offsetWidthPx}px` }}
@@ -652,7 +652,7 @@ export default function TaskCard({
               )}
 
               {/* Travel time marker - dentro il Draggable - nascosto durante drag */}
-              {isInTimeline && index > 0 && travelTime > 0 && travelWidthPx > 0 && !snapshot.isDragging && (
+              {!snapshot.isDragging && isInTimeline && index > 0 && travelTime > 0 && travelWidthPx > 0 && (
                 <div
                   className="flex items-center justify-center flex-shrink-0 py-3"
                   style={{ width: `${travelWidthPx}px`, minHeight: '50px' }}
