@@ -1,6 +1,6 @@
 {
   "metadata": {
-    "last_updated": "2025-12-03T09:11:40.704950",
+    "last_updated": "2025-12-03T09:17:22.887020",
     "date": "2025-12-03"
   },
   "containers": {
@@ -337,33 +337,6 @@
           "priority": "high_priority"
         },
         {
-          "task_id": 219740,
-          "logistic_code": 716,
-          "client_id": 3,
-          "premium": true,
-          "address": "PIAZZA MENTANA, 8",
-          "lat": "45.4623463",
-          "lng": "9.1819616",
-          "cleaning_time": 120,
-          "checkin_date": "2025-12-04",
-          "checkout_date": "2025-12-03",
-          "checkin_time": "21:00",
-          "checkout_time": null,
-          "pax_in": 2,
-          "pax_out": 4,
-          "small_equipment": false,
-          "operation_id": 2,
-          "confirmed_operation": true,
-          "straordinaria": false,
-          "type_apt": "B",
-          "alias": "TBR",
-          "customer_name": "THE BEST RENT S.r.l.",
-          "reasons": [
-            "premium"
-          ],
-          "priority": "high_priority"
-        },
-        {
           "task_id": 219744,
           "logistic_code": 1393,
           "client_id": 3,
@@ -418,34 +391,6 @@
           "priority": "high_priority"
         },
         {
-          "task_id": 219764,
-          "logistic_code": 771,
-          "client_id": 64,
-          "premium": false,
-          "address": "VIA PIERLOMBARDO, 3",
-          "lat": "45.4549994",
-          "lng": "9.2049206",
-          "cleaning_time": 60,
-          "checkin_date": "2025-12-03",
-          "checkout_date": "2025-12-03",
-          "checkin_time": "14:00",
-          "checkout_time": "11:00",
-          "pax_in": 2,
-          "pax_out": 2,
-          "small_equipment": true,
-          "operation_id": 2,
-          "confirmed_operation": true,
-          "straordinaria": false,
-          "type_apt": "A",
-          "alias": "RLST",
-          "customer_name": "RELSTAY - FERRARA GIULIA",
-          "reasons": [
-            "same_day_checkin_between_hp_start_hp_end",
-            "client_forced_hp"
-          ],
-          "priority": "high_priority"
-        },
-        {
           "task_id": 219777,
           "logistic_code": 1032,
           "client_id": 64,
@@ -474,7 +419,7 @@
           "priority": "high_priority"
         }
       ],
-      "count": 6
+      "count": 4
     },
     "low_priority": {
       "tasks": [
@@ -675,34 +620,6 @@
           ]
         },
         {
-          "task_id": 219762,
-          "logistic_code": 229,
-          "client_id": 2,
-          "premium": false,
-          "address": "Viale Bligny 19",
-          "lat": "45.4510472",
-          "lng": "9.1910628",
-          "cleaning_time": 30,
-          "checkin_date": "2025-12-05",
-          "checkout_date": "2025-12-03",
-          "checkin_time": null,
-          "checkout_time": null,
-          "pax_in": 2,
-          "pax_out": 0,
-          "small_equipment": true,
-          "operation_id": 4,
-          "confirmed_operation": true,
-          "straordinaria": false,
-          "type_apt": "A",
-          "alias": "ITW",
-          "customer_name": "ITALIANWAY SRL",
-          "priority": "low_priority",
-          "reasons": [
-            "not_eo",
-            "not_hp"
-          ]
-        },
-        {
           "task_id": 219761,
           "logistic_code": 1672,
           "client_id": 124,
@@ -729,15 +646,43 @@
             "not_eo",
             "not_hp"
           ]
+        },
+        {
+          "task_id": 219762,
+          "logistic_code": 229,
+          "client_id": 2,
+          "premium": false,
+          "address": "Viale Bligny 19",
+          "lat": "45.4510472",
+          "lng": "9.1910628",
+          "cleaning_time": 30,
+          "checkin_date": "2025-12-05",
+          "checkout_date": "2025-12-03",
+          "checkin_time": null,
+          "checkout_time": null,
+          "pax_in": 2,
+          "pax_out": 0,
+          "small_equipment": true,
+          "operation_id": 4,
+          "confirmed_operation": true,
+          "straordinaria": false,
+          "type_apt": "A",
+          "alias": "ITW",
+          "customer_name": "ITALIANWAY SRL",
+          "priority": "low_priority",
+          "reasons": [
+            "not_eo",
+            "not_hp"
+          ]
         }
       ],
       "count": 9
     }
   },
   "summary": {
-    "total_tasks": 26,
+    "total_tasks": 24,
     "early_out": 11,
-    "high_priority": 6,
+    "high_priority": 4,
     "low_priority": 9
   }
 }
