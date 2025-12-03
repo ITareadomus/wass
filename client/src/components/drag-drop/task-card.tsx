@@ -803,6 +803,7 @@ export default function TaskCard({
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>
+            </div>
           );
         }}
       </Draggable>
