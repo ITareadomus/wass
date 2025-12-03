@@ -577,7 +577,7 @@ def plan_day(
     Assegna le task Early-Out con:
     - STRAORDINARIE: possono iniziare prima delle 10:00, assegnate al cleaner
       con start_time minore che ha can_do_straordinaria=True
-    - HARD CLUSTER edificio/via o "stesso blocco" (same_building + is_nearby_same_block)
+    - HARD CLUSTER edificio/via/blocco: stesso edificio o vicino + stesso cliente
     - FAIRNESS: evita che un cleaner abbia molte più task degli altri,
       ignorando i cleaner vuoti (non forziamo a usarli per forza)
     - TARGET MINIMO 3 TASK: se possibile, favorisce cleaner con 1–2 task
@@ -903,11 +903,79 @@ def build_output(cleaners: List[Cleaner], unassigned: List[Task], original_tasks
     }
 
 
+def load_timeline(work_date: str) -> Dict[str, Any]:
+    """
+    Carica la timeline.json esistente o crea una struttura vuota.
+    """
+    timeline_path = OUTPUT_ASSIGN.parent / "timeline.json"
+    if timeline_path.exists():
+        try:
+            data = json.loads(timeline_path.read_text(encoding="utf-8"))
+            # Assicura che la data sia corretta, altrimenti resetta
+            if data.get("metadata", {}).get("date") != work_date:
+                print(f"   ⚠️ Timeline data mismatch: Expected {work_date}, found {data.get('metadata', {}).get('date')}. Resetting.")
+                return {
+                    "metadata": {
+                        "last_updated": datetime.now().isoformat(),
+                        "date": work_date,
+                        "modification_type": "auto_assign_early_out"
+                    },
+                    "cleaners_assignments": [],
+                    "meta": {"total_cleaners": 0, "used_cleaners": 0, "assigned_tasks": 0}
+                }
+            return data
+        except json.JSONDecodeError:
+            print(f"   ⚠️ Errore nel decodificare {timeline_path}. Creazione di una nuova timeline.")
+            return {
+                "metadata": {
+                    "last_updated": datetime.now().isoformat(),
+                    "date": work_date,
+                    "modification_type": "auto_assign_early_out"
+                },
+                "cleaners_assignments": [],
+                "meta": {"total_cleaners": 0, "used_cleaners": 0, "assigned_tasks": 0}
+            }
+        except Exception as e:
+            print(f"   ⚠️ Errore inatteso nel caricamento {timeline_path}: {e}. Creazione di una nuova timeline.")
+            return {
+                "metadata": {
+                    "last_updated": datetime.now().isoformat(),
+                    "date": work_date,
+                    "modification_type": "auto_assign_early_out"
+                },
+                "cleaners_assignments": [],
+                "meta": {"total_cleaners": 0, "used_cleaners": 0, "assigned_tasks": 0}
+            }
+    else:
+        # Crea la directory se non esiste
+        OUTPUT_ASSIGN.parent.mkdir(parents=True, exist_ok=True)
+        return {
+            "metadata": {
+                "last_updated": datetime.now().isoformat(),
+                "date": work_date,
+                "modification_type": "auto_assign_early_out"
+            },
+            "cleaners_assignments": [],
+            "meta": {"total_cleaners": 0, "used_cleaners": 0, "assigned_tasks": 0}
+        }
+
+
 def main():
     if not INPUT_CONTAINERS.exists():
         raise SystemExit(f"Missing input file: {INPUT_CONTAINERS}")
     if not INPUT_CLEANERS.exists():
         raise SystemExit(f"Missing input file: {INPUT_CLEANERS}")
+
+    # Usa la data passata come argomento da riga di comando
+    import sys
+    if len(sys.argv) > 1:
+        ref_date = sys.argv[1]
+        print(f"📅 Usando data specificata: {ref_date}")
+    else:
+        from datetime import datetime
+        ref_date = datetime.now().strftime("%Y-%m-%d")
+        print(f"📅 Nessuna data specificata, usando: {ref_date}")
+
 
     cleaners = load_cleaners()
     tasks = load_tasks()
@@ -945,50 +1013,54 @@ def main():
     print(f"   - Task non assegnati: {output['meta']['unassigned']}")
     print()
 
-    # Usa la data passata come argomento da riga di comando
-    import sys
-    if len(sys.argv) > 1:
-        ref_date = sys.argv[1]
-    else:
-        from datetime import datetime
-        ref_date = datetime.now().strftime("%Y-%m-%d")
-        print(f"📅 Nessuna data specificata, usando: {ref_date}")
-
     # Update timeline.json con struttura organizzata per cleaner
     from datetime import datetime as dt
     timeline_path = OUTPUT_ASSIGN.parent / "timeline.json"
 
     # Carica timeline esistente o crea nuova struttura
-    timeline_data_output = {
-        "metadata": {
-            "last_updated": dt.now().isoformat(),
-            "date": ref_date,
-            "modification_type": "auto_assign_early_out" # <-- Aggiornato qui
-        },
-        "cleaners_assignments": [],
-        "meta": {
-            "total_cleaners": 0,
-            "used_cleaners": 0,
-            "assigned_tasks": 0
-        }
-    }
+    timeline_data_output = load_timeline(ref_date)
 
-    if timeline_path.exists():
-        try:
-            existing = json.loads(timeline_path.read_text(encoding="utf-8"))
-            # MANTIENI TUTTI i cleaner esistenti;
-            # il filtraggio delle vecchie EO lo facciamo dentro il blocco existing_entry
-            if "cleaners_assignments" in existing:
-                timeline_data_output["cleaners_assignments"] = existing.get("cleaners_assignments", [])
-        except Exception as e:
-            print(f"⚠️ Errore nel caricamento della timeline esistente: {e}")
+    # CRITICAL: Rimuovi eventuali duplicati cleaner (merge delle task)
+    seen_cleaner_ids = {}
+    merged_assignments = []
+
+    for entry in timeline_data_output.get("cleaners_assignments", []):
+        cleaner_id = entry.get("cleaner", {}).get("id")
+        if cleaner_id is None:
+            continue
+
+        if cleaner_id in seen_cleaner_ids:
+            # Cleaner duplicato: merge delle task
+            existing_entry = seen_cleaner_ids[cleaner_id]
+            existing_entry["tasks"].extend(entry.get("tasks", []))
+            print(f"   🔧 Merged duplicato cleaner ID {cleaner_id}: +{len(entry.get('tasks', []))} task")
+        else:
+            # Primo incontro con questo cleaner
+            seen_cleaner_ids[cleaner_id] = entry
+            merged_assignments.append(entry)
+
+    if len(merged_assignments) < len(timeline_data_output.get("cleaners_assignments", [])):
+        print(f"   ✅ Rimossi {len(timeline_data_output.get('cleaners_assignments', [])) - len(merged_assignments)} cleaner duplicati")
+        timeline_data_output["cleaners_assignments"] = merged_assignments
 
     # Aggiungi le nuove assegnazioni EO organizzate per cleaner
     for cleaner_entry in output["early_out_tasks_assigned"]:
-        timeline_data_output["cleaners_assignments"].append({
-            "cleaner": cleaner_entry["cleaner"],
-            "tasks": cleaner_entry["tasks"]
-        })
+        # CRITICAL: Cerca il cleaner esistente usando solo l'ID (più robusto)
+        cleaner_entry_existing = None
+        for entry in timeline_data_output["cleaners_assignments"]:
+            if entry.get("cleaner", {}).get("id") == cleaner_entry["cleaner"]["id"]:
+                cleaner_entry_existing = entry
+                break
+
+        if not cleaner_entry_existing:
+            # Crea nuova entry per questo cleaner SOLO se non esiste
+            timeline_data_output["cleaners_assignments"].append(cleaner_entry)
+            print(f"   ➕ Creato nuovo cleaner entry per {cleaner_entry['cleaner']['name']} {cleaner_entry['cleaner']['lastname']}")
+        else:
+            # Aggiungi le task esistenti
+            cleaner_entry_existing["tasks"].extend(cleaner_entry["tasks"])
+            print(f"   ✅ Usando cleaner entry esistente per {cleaner_entry['cleaner']['name']} {cleaner_entry['cleaner']['lastname']} (aggiunte {len(cleaner_entry['tasks'])} task)")
+
 
     # Aggiorna meta
     # Conta i cleaner totali disponibili
@@ -1001,6 +1073,7 @@ def main():
     total_assigned_tasks = sum(len(c["tasks"]) for c in timeline_data_output["cleaners_assignments"])
 
     # Salva timeline.json
+    timeline_data_output["metadata"]["last_updated"] = dt.now().isoformat()
     timeline_data_output["meta"] = {
         "total_cleaners": total_available_cleaners,
         "used_cleaners": used_cleaners_count,
