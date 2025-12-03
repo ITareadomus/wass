@@ -3629,31 +3629,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ success: false, message: "Cleaner non trovato" });
       }
 
-      // Verifica che gli indici siano validi
-      if (fromIndex < 0 || fromIndex >= cleanerEntry.tasks.length) {
-        return res.status(400).json({ success: false, message: "Indice fromIndex non valido" });
+      // CRITICAL: Cerca la task per taskId invece di fidarsi di fromIndex
+      const actualFromIndex = cleanerEntry.tasks.findIndex((t: any) =>
+        String(t.task_id) === String(taskId) || String(t.logistic_code) === String(logisticCode)
+      );
+
+      if (actualFromIndex === -1) {
+        console.error(`Task ${taskId}/${logisticCode} non trovata nel cleaner ${cleanerId}`);
+        return res.status(404).json({
+          success: false,
+          message: "Task non trovata nel cleaner specificato"
+        });
       }
 
+      // Verifica che toIndex sia valido
       if (toIndex < 0 || toIndex > cleanerEntry.tasks.length) {
         return res.status(400).json({ success: false, message: "Indice toIndex non valido" });
       }
 
-      // Verifica che la task a fromIndex corrisponda al taskId/logisticCode fornito
-      const taskAtFromIndex = cleanerEntry.tasks[fromIndex];
-      const taskMatches =
-        String(taskAtFromIndex.task_id) === String(taskId) ||
-        String(taskAtFromIndex.logistic_code) === String(logisticCode);
-
-      if (!taskMatches) {
-        console.error(`Task mismatch: expected task ${taskId}/${logisticCode} at index ${fromIndex}, found ${taskAtFromIndex.task_id}/${taskAtFromIndex.logistic_code}`);
-        return res.status(400).json({
-          success: false,
-          message: "La task all'indice specificato non corrisponde all'ID fornito. Ricarica la pagina."
-        });
-      }
-
-      // Rimuovi la task dalla posizione fromIndex
-      const [task] = cleanerEntry.tasks.splice(fromIndex, 1);
+      // Rimuovi la task dalla posizione effettiva (actualFromIndex)
+      const [task] = cleanerEntry.tasks.splice(actualFromIndex, 1);
 
       // Inserisci nella nuova posizione toIndex
       cleanerEntry.tasks.splice(toIndex, 0, task);
