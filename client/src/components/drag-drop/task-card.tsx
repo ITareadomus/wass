@@ -52,6 +52,9 @@ interface TaskCardProps {
   isReadOnly?: boolean;
   multiSelectContext?: MultiSelectContextType;
   isIncompatible?: boolean;
+  timeOffset?: number;
+  travelTime?: number;
+  globalTimeSlots?: number;
 }
 
 interface AssignedTask {
@@ -73,6 +76,9 @@ export default function TaskCard({
   isReadOnly = false,
   multiSelectContext = null,
   isIncompatible = false,
+  timeOffset = 0,
+  travelTime = 0,
+  globalTimeSlots = 0,
 }: TaskCardProps) {
   console.log('🔧 TaskCard render - isReadOnly:', isReadOnly, 'for task:', task.name);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -606,44 +612,80 @@ export default function TaskCard({
       >
         {(provided, snapshot) => {
           const cardWidth = calculateWidth(task.duration, isInTimeline);
+          const virtualMinutes = globalTimeSlots * 60;
+          const offsetWidth = timeOffset > 0 && virtualMinutes > 0 ? (timeOffset / virtualMinutes) * 100 : 0;
+          const travelWidth = travelTime > 0 && virtualMinutes > 0 ? (travelTime / virtualMinutes) * 100 : 0;
 
           return (
-            <TooltipProvider delayDuration={300}>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <div
-                    ref={provided.innerRef}
-                    {...provided.draggableProps}
-                    {...provided.dragHandleProps}
-                    className={`
-                      ${cardColorClass}
-                      rounded-sm px-2 py-1 shadow-sm transition-all duration-200 border
-                      ${snapshot.isDragging ? "shadow-lg" : ""}
-                      ${isOverdue && isInTimeline ? "animate-blink" : ""}
-                      ${isDuplicate && !isInTimeline ? "animate-blink-yellow" : ""}
-                      hover:shadow-md cursor-pointer
-                      flex-shrink-0 relative
-                    `}
-                    style={{
-                      ...provided.draggableProps.style,
-                      width: cardWidth,
-                      minWidth: cardWidth,
-                      maxWidth: cardWidth,
-                      minHeight: "40px",
-                      // CRITICAL: Durante il drag, usa z-index molto alto per non essere coperta
-                      zIndex: snapshot.isDragging ? 9999 : (isMapFiltered ? 10 : 'auto'),
-                      ...(isMapFiltered && !snapshot.isDragging ? {
-                        boxShadow: '0 0 0 3px #3B82F6, 0 0 20px 5px rgba(59, 130, 246, 0.5)',
-                        transform: 'scale(1.05)',
-                      } : {})
-                    }}
-                    data-testid={`task-card-${getTaskKey(task)}`}
-                    onClick={(e) => {
-                      if (!snapshot.isDragging) {
-                        handleCardClick(e);
-                      }
-                    }}
+            <div
+              ref={provided.innerRef}
+              {...provided.draggableProps}
+              {...provided.dragHandleProps}
+              className="flex items-center flex-shrink-0"
+              style={{
+                ...provided.draggableProps.style,
+                zIndex: snapshot.isDragging ? 9999 : 'auto',
+              }}
+            >
+              {/* Offset spacer per prima task - dentro il Draggable */}
+              {isInTimeline && index === 0 && timeOffset > 0 && (
+                <div
+                  className="flex-shrink-0"
+                  style={{ width: `${offsetWidth}%` }}
+                />
+              )}
+
+              {/* Travel time marker - dentro il Draggable */}
+              {isInTimeline && index > 0 && travelTime > 0 && (
+                <div
+                  className="flex items-center justify-center flex-shrink-0 py-3"
+                  style={{ width: `${travelWidth}%`, minHeight: '50px' }}
+                  title={`${travelTime} min`}
+                >
+                  <svg
+                    width="20"
+                    height="20"
+                    viewBox="0 0 24 24"
+                    fill="currentColor"
+                    className="text-custom-blue flex-shrink-0"
                   >
+                    <path d="M13.5 5.5c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zM9.8 8.9L7 23h2.1l1.8-8 2.1 2v6h2v-7.5l-2.1-2 .6-3C14.8 12 16.8 13 19 13v-2c-1.9 0-3.5-1-4.3-2.4l-1-1.6c-.4-.6-1-1-1.7-1-.3 0-.5.1-.8.1L6 8.3V13h2V9.6l1.8-.7"/>
+                  </svg>
+                </div>
+              )}
+
+              {/* Task card effettiva */}
+              <TooltipProvider delayDuration={300}>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <div
+                      className={`
+                        ${cardColorClass}
+                        rounded-sm px-2 py-1 shadow-sm transition-all duration-200 border
+                        ${snapshot.isDragging ? "shadow-lg" : ""}
+                        ${isOverdue && isInTimeline ? "animate-blink" : ""}
+                        ${isDuplicate && !isInTimeline ? "animate-blink-yellow" : ""}
+                        hover:shadow-md cursor-pointer
+                        flex-shrink-0 relative
+                      `}
+                      style={{
+                        width: cardWidth,
+                        minWidth: cardWidth,
+                        maxWidth: cardWidth,
+                        minHeight: "40px",
+                        zIndex: isMapFiltered ? 10 : 'auto',
+                        ...(isMapFiltered && !snapshot.isDragging ? {
+                          boxShadow: '0 0 0 3px #3B82F6, 0 0 20px 5px rgba(59, 130, 246, 0.5)',
+                          transform: 'scale(1.05)',
+                        } : {})
+                      }}
+                      data-testid={`task-card-${getTaskKey(task)}`}
+                      onClick={(e) => {
+                        if (!snapshot.isDragging) {
+                          handleCardClick(e);
+                        }
+                      }}
+                    >
                     {/* Checkbox overlay per multi-select (solo container) */}
                     {isMultiSelectMode && !isInTimeline && (
                       <div className="absolute top-0.5 left-0.5 z-50">
@@ -745,6 +787,7 @@ export default function TaskCard({
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>
+            </div>
           );
           }}
       </Draggable>
