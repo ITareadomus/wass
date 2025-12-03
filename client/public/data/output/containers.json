@@ -1,11 +1,38 @@
 {
   "metadata": {
-    "last_updated": "2025-12-03T09:06:40.536305",
+    "last_updated": "2025-12-03T09:11:40.704950",
     "date": "2025-12-03"
   },
   "containers": {
     "early_out": {
       "tasks": [
+        {
+          "task_id": 219620,
+          "logistic_code": 1650,
+          "client_id": 87,
+          "premium": false,
+          "address": "VIA VIGNOLA 4",
+          "lat": "45.449398",
+          "lng": "9.196514",
+          "cleaning_time": 120,
+          "checkin_date": "2025-12-04",
+          "checkout_date": "2025-12-03",
+          "checkin_time": null,
+          "checkout_time": null,
+          "pax_in": 5,
+          "pax_out": 4,
+          "small_equipment": false,
+          "operation_id": 2,
+          "confirmed_operation": true,
+          "straordinaria": false,
+          "type_apt": "C",
+          "alias": "HCC",
+          "customer_name": "HACCA SRL",
+          "reasons": [
+            "client_forced_eo"
+          ],
+          "priority": "early_out"
+        },
         {
           "task_id": 219623,
           "logistic_code": 609,
@@ -169,6 +196,60 @@
           "priority": "early_out"
         },
         {
+          "task_id": 219683,
+          "logistic_code": 617,
+          "client_id": 67,
+          "premium": false,
+          "address": "VIA VOGHERA, 4",
+          "lat": "45.454632",
+          "lng": "9.168536",
+          "cleaning_time": 30,
+          "checkin_date": "2025-12-03",
+          "checkout_date": "2025-12-03",
+          "checkin_time": null,
+          "checkout_time": "09:30",
+          "pax_in": 1,
+          "pax_out": 0,
+          "small_equipment": true,
+          "operation_id": 2,
+          "confirmed_operation": true,
+          "straordinaria": false,
+          "type_apt": "A",
+          "alias": "EXP",
+          "customer_name": "EXPERIENCE DESIGN BED & SHOW",
+          "reasons": [
+            "checkout_time_eo_window_or_before_start"
+          ],
+          "priority": "early_out"
+        },
+        {
+          "task_id": 219684,
+          "logistic_code": 618,
+          "client_id": 67,
+          "premium": false,
+          "address": "VIA VOGHERA, 4",
+          "lat": "45.454632",
+          "lng": "9.168536",
+          "cleaning_time": 30,
+          "checkin_date": "2025-12-03",
+          "checkout_date": "2025-12-03",
+          "checkin_time": null,
+          "checkout_time": "09:30",
+          "pax_in": 2,
+          "pax_out": 0,
+          "small_equipment": true,
+          "operation_id": 2,
+          "confirmed_operation": true,
+          "straordinaria": false,
+          "type_apt": "A",
+          "alias": "EXP",
+          "customer_name": "EXPERIENCE DESIGN BED & SHOW",
+          "reasons": [
+            "checkout_time_eo_window_or_before_start"
+          ],
+          "priority": "early_out"
+        },
+        {
           "task_id": 219741,
           "logistic_code": 623,
           "client_id": 61,
@@ -223,10 +304,38 @@
           "priority": "early_out"
         }
       ],
-      "count": 8
+      "count": 11
     },
     "high_priority": {
       "tasks": [
+        {
+          "task_id": 219646,
+          "logistic_code": 751,
+          "client_id": 64,
+          "premium": false,
+          "address": "Via L. Cagnola, 12",
+          "lat": "45.4776",
+          "lng": "9.17287",
+          "cleaning_time": 60,
+          "checkin_date": "2025-12-03",
+          "checkout_date": "2025-12-03",
+          "checkin_time": "14:00",
+          "checkout_time": "11:00",
+          "pax_in": 2,
+          "pax_out": 2,
+          "small_equipment": true,
+          "operation_id": 2,
+          "confirmed_operation": true,
+          "straordinaria": false,
+          "type_apt": "A",
+          "alias": "RLST",
+          "customer_name": "RELSTAY - FERRARA GIULIA",
+          "reasons": [
+            "same_day_checkin_between_hp_start_hp_end",
+            "client_forced_hp"
+          ],
+          "priority": "high_priority"
+        },
         {
           "task_id": 219740,
           "logistic_code": 716,
@@ -365,7 +474,7 @@
           "priority": "high_priority"
         }
       ],
-      "count": 5
+      "count": 6
     },
     "low_priority": {
       "tasks": [
@@ -566,34 +675,6 @@
           ]
         },
         {
-          "task_id": 219761,
-          "logistic_code": 1672,
-          "client_id": 124,
-          "premium": false,
-          "address": "VIA TORTONA 19",
-          "lat": "45.4530068",
-          "lng": "9.1668178",
-          "cleaning_time": 240,
-          "checkin_date": "2025-12-03",
-          "checkout_date": "2025-12-03",
-          "checkin_time": null,
-          "checkout_time": "13:00",
-          "pax_in": 2,
-          "pax_out": 0,
-          "small_equipment": false,
-          "operation_id": 3,
-          "confirmed_operation": true,
-          "straordinaria": true,
-          "type_apt": "B",
-          "alias": "HMST",
-          "customer_name": "HOMING STAYS",
-          "priority": "low_priority",
-          "reasons": [
-            "not_eo",
-            "not_hp"
-          ]
-        },
-        {
           "task_id": 219762,
           "logistic_code": 229,
           "client_id": 2,
@@ -620,15 +701,43 @@
             "not_eo",
             "not_hp"
           ]
+        },
+        {
+          "task_id": 219761,
+          "logistic_code": 1672,
+          "client_id": 124,
+          "premium": false,
+          "address": "VIA TORTONA 19",
+          "lat": "45.4530068",
+          "lng": "9.1668178",
+          "cleaning_time": 240,
+          "checkin_date": "2025-12-03",
+          "checkout_date": "2025-12-03",
+          "checkin_time": null,
+          "checkout_time": "13:00",
+          "pax_in": 2,
+          "pax_out": 0,
+          "small_equipment": false,
+          "operation_id": 3,
+          "confirmed_operation": true,
+          "straordinaria": true,
+          "type_apt": "B",
+          "alias": "HMST",
+          "customer_name": "HOMING STAYS",
+          "priority": "low_priority",
+          "reasons": [
+            "not_eo",
+            "not_hp"
+          ]
         }
       ],
       "count": 9
     }
   },
   "summary": {
-    "total_tasks": 22,
-    "early_out": 8,
-    "high_priority": 5,
+    "total_tasks": 26,
+    "early_out": 11,
+    "high_priority": 6,
     "low_priority": 9
   }
 }
