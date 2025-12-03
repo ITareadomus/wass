@@ -1546,6 +1546,8 @@ export default function GenerateAssignments() {
               description: json?.message || "Errore nello spostamento tra containers",
               variant: "destructive"
             });
+            // CRITICAL: Rilascia lock prima di uscire
+            setIsDragging(false);
             return;
           }
 
