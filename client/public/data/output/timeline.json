@@ -1,17 +1,17 @@
 {
   "meta": {
-    "total_tasks": 2,
+    "total_tasks": 3,
     "used_cleaners": 0,
     "assigned_tasks": 0,
-    "total_cleaners": 2
+    "total_cleaners": 1
   },
   "metadata": {
     "date": "2025-12-03",
-    "created_by": "Admin",
+    "created_by": "unknown",
     "modified_by": [
       "Admin"
     ],
-    "last_updated": "2025-12-03 10:07:29"
+    "last_updated": "2025-12-03 10:13:40"
   },
   "cleaners_assignments": [
     {
@@ -24,38 +24,6 @@
         "start_time": "10:00"
       },
       "tasks": [
-        {
-          "task_id": 219760,
-          "logistic_code": 619,
-          "client_id": null,
-          "premium": false,
-          "address": "VIA TORTONA, 10",
-          "lat": "45.4542397",
-          "lng": "9.1686792",
-          "cleaning_time": 15,
-          "checkin_date": "2025-12-03",
-          "checkout_date": "2025-12-03",
-          "checkin_time": null,
-          "checkout_time": "09:30",
-          "pax_in": 0,
-          "pax_out": 0,
-          "small_equipment": false,
-          "operation_id": 4,
-          "confirmed_operation": true,
-          "straordinaria": false,
-          "type_apt": "B",
-          "alias": "EXP",
-          "customer_name": "EXPERIENCE DESIGN BED & SHOW",
-          "reasons": [
-            "manually_moved_to_timeline"
-          ],
-          "priority": "early_out",
-          "start_time": "10:00",
-          "end_time": "10:15",
-          "followup": false,
-          "sequence": 1,
-          "travel_time": 0
-        },
         {
           "task_id": 219740,
           "logistic_code": 716,
@@ -82,11 +50,43 @@
             "manually_moved_to_timeline"
           ],
           "priority": "high_priority",
-          "start_time": "10:41",
-          "end_time": "12:41",
+          "start_time": "10:00",
+          "end_time": "12:00",
+          "followup": false,
+          "sequence": 1,
+          "travel_time": 0
+        },
+        {
+          "task_id": 219764,
+          "logistic_code": 771,
+          "client_id": null,
+          "premium": false,
+          "address": "VIA PIERLOMBARDO, 3",
+          "lat": "45.4549994",
+          "lng": "9.2049206",
+          "cleaning_time": 60,
+          "checkin_date": "2025-12-03",
+          "checkout_date": "2025-12-03",
+          "checkin_time": "14:00",
+          "checkout_time": "11:00",
+          "pax_in": 2,
+          "pax_out": 2,
+          "small_equipment": false,
+          "operation_id": 2,
+          "confirmed_operation": true,
+          "straordinaria": false,
+          "type_apt": "A",
+          "alias": "RLST",
+          "customer_name": "RELSTAY - FERRARA GIULIA",
+          "reasons": [
+            "manually_moved_to_timeline"
+          ],
+          "priority": "high_priority",
+          "start_time": "12:20",
+          "end_time": "13:20",
           "followup": true,
           "sequence": 2,
-          "travel_time": 26
+          "travel_time": 20
         }
       ]
     },
@@ -99,7 +99,40 @@
         "premium": true,
         "start_time": "10:00"
       },
-      "tasks": []
+      "tasks": [
+        {
+          "task_id": 219750,
+          "logistic_code": 1577,
+          "client_id": null,
+          "premium": true,
+          "address": "VIA CROCEFISSO, 25",
+          "lat": "45.4570059",
+          "lng": "9.1848347",
+          "cleaning_time": 270,
+          "checkin_date": "2025-12-04",
+          "checkout_date": "2025-12-03",
+          "checkin_time": null,
+          "checkout_time": null,
+          "pax_in": 4,
+          "pax_out": 5,
+          "small_equipment": false,
+          "operation_id": 2,
+          "confirmed_operation": true,
+          "straordinaria": false,
+          "type_apt": "E",
+          "alias": "TBR",
+          "customer_name": "THE BEST RENT S.r.l.",
+          "reasons": [
+            "manually_moved_to_timeline"
+          ],
+          "priority": "high_priority",
+          "start_time": "10:00",
+          "end_time": "14:30",
+          "followup": false,
+          "sequence": 1,
+          "travel_time": 0
+        }
+      ]
     }
   ]
 }

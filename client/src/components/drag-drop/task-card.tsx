@@ -498,7 +498,8 @@ export default function TaskCard({
   };
 
   // Calcola la larghezza in base alla durata
-  const calculateWidth = (duration: string | undefined, forTimeline: boolean) => {
+  // isDragging: quando true, forza pixel fissi per evitare che la % venga interpretata male
+  const calculateWidth = (duration: string | undefined, forTimeline: boolean, isDragging: boolean = false) => {
     const safeDuration = duration || "0.0";
     const parts = safeDuration.split(".");
     const hours = parseInt(parts[0] || "0");
@@ -510,10 +511,17 @@ export default function TaskCard({
 
     if (forTimeline) {
       // La griglia usa N slot (es: 10 slot per 10:00-19:00), ciascuno con larghezza 1/N
-      // Per far corrispondere la larghezza del task alle colonne della griglia,
-      // usiamo N * 60 minuti come base (trattando ogni slot come 1 ora visiva)
       const slotsCount = (window as any).globalTimeSlotsCount || 10;
       const virtualMinutes = slotsCount * 60; // Minuti virtuali basati su slot
+
+      if (isDragging) {
+        // Durante il drag, convertiamo in pixel fissi per evitare deformazioni
+        // Stimiamo la larghezza della timeline come ~70% del viewport (escludendo sidebar)
+        const timelineWidth = (window as any).globalTimelineWidth || (window.innerWidth * 0.65);
+        const widthPixels = (effectiveMinutes / virtualMinutes) * timelineWidth;
+        return `${Math.round(widthPixels)}px`;
+      }
+
       const widthPercentage = (effectiveMinutes / virtualMinutes) * 100;
       return `${widthPercentage}%`;
     } else {
@@ -607,7 +615,8 @@ export default function TaskCard({
         isDragDisabled={shouldDisableDrag} // Usa la prop per disabilitare il drag
       >
         {(provided, snapshot) => {
-          const cardWidth = calculateWidth(task.duration, isInTimeline);
+          // Quando trascini, usa pixel fissi per evitare che % venga interpretata male
+          const cardWidth = calculateWidth(task.duration, isInTimeline, snapshot.isDragging);
 
           return (
             <TooltipProvider delayDuration={300}>
@@ -628,17 +637,10 @@ export default function TaskCard({
                     `}
                     style={{
                       ...provided.draggableProps.style,
-                      // CRITICAL: Forza dimensioni fisse anche durante il drag
-                      width: snapshot.isDragging ? cardWidth : cardWidth,
-                      minWidth: snapshot.isDragging ? cardWidth : cardWidth,
-                      maxWidth: snapshot.isDragging ? cardWidth : cardWidth,
+                      width: cardWidth,
+                      minWidth: cardWidth,
+                      maxWidth: cardWidth,
                       minHeight: "40px",
-                      // Durante il drag, mantieni le dimensioni originali
-                      ...(snapshot.isDragging ? {
-                        boxSizing: 'border-box',
-                        flexShrink: 0,
-                        flexGrow: 0,
-                      } : {}),
                       ...(isMapFiltered && !snapshot.isDragging ? {
                         boxShadow: '0 0 0 3px #3B82F6, 0 0 20px 5px rgba(59, 130, 246, 0.5)',
                         transform: 'scale(1.05)',
