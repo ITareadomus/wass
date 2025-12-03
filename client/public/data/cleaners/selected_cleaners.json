@@ -3,30 +3,32 @@
     {
       "id": 626,
       "name": "DORA PATRICIA",
-      "lastname": "JIMENEZ",
       "role": "Formatore",
       "active": true,
       "ranking": 0,
-      "counter_hours": 4.75,
-      "counter_days": 1,
+      "lastname": "JIMENEZ",
       "available": true,
-      "contract_type": "B",
-      "preferred_customers": [],
-      "telegram_id": null,
       "start_time": "10:00",
+      "telegram_id": null,
+      "counter_days": 1,
+      "contract_type": "B",
+      "counter_hours": 4.75,
+      "preferred_customers": [],
       "can_do_straordinaria": false
     },
     {
       "id": 495,
       "name": "EL HADJI",
-      "lastname": "BA",
       "role": "Premium",
       "active": true,
       "ranking": 0,
-      "counter_hours": 7.5,
-      "counter_days": 7,
+      "lastname": "BA",
       "available": true,
+      "start_time": "10:00",
+      "telegram_id": 8035270407,
+      "counter_days": 7,
       "contract_type": "B",
+      "counter_hours": 7.5,
       "preferred_customers": [
         2,
         3,
@@ -47,15 +49,12 @@
         121,
         123
       ],
-      "telegram_id": 8035270407,
-      "start_time": "10:00",
       "can_do_straordinaria": true
     }
   ],
   "total_selected": 2,
   "metadata": {
     "date": "2025-12-03",
-    "loaded_at": "2025-12-02 11:17:09",
-    "last_updated": "2025-12-02 13:46:38"
+    "loaded_at": "2025-12-03 09:06:39"
   }
 }

@@ -1,17 +1,17 @@
 {
   "meta": {
-    "total_tasks": 5,
+    "total_tasks": 2,
     "used_cleaners": 0,
     "assigned_tasks": 0,
     "total_cleaners": 2
   },
   "metadata": {
     "date": "2025-12-03",
-    "created_by": "unknown",
+    "created_by": "Admin",
     "modified_by": [
       "Admin"
     ],
-    "last_updated": "2025-12-02 13:50:18"
+    "last_updated": "2025-12-03 10:07:29"
   },
   "cleaners_assignments": [
     {
@@ -25,36 +25,68 @@
       },
       "tasks": [
         {
-          "task_id": 219620,
-          "logistic_code": 1650,
+          "task_id": 219760,
+          "logistic_code": 619,
           "client_id": null,
           "premium": false,
-          "address": "VIA VIGNOLA 4",
-          "lat": "45.449398",
-          "lng": "9.196514",
-          "cleaning_time": 120,
-          "checkin_date": "2025-12-04",
+          "address": "VIA TORTONA, 10",
+          "lat": "45.4542397",
+          "lng": "9.1686792",
+          "cleaning_time": 15,
+          "checkin_date": "2025-12-03",
           "checkout_date": "2025-12-03",
           "checkin_time": null,
-          "checkout_time": null,
-          "pax_in": 5,
-          "pax_out": 4,
+          "checkout_time": "09:30",
+          "pax_in": 0,
+          "pax_out": 0,
           "small_equipment": false,
-          "operation_id": 2,
-          "confirmed_operation": false,
+          "operation_id": 4,
+          "confirmed_operation": true,
           "straordinaria": false,
-          "type_apt": "C",
-          "alias": "HCC",
-          "customer_name": "HACCA SRL",
+          "type_apt": "B",
+          "alias": "EXP",
+          "customer_name": "EXPERIENCE DESIGN BED & SHOW",
           "reasons": [
             "manually_moved_to_timeline"
           ],
           "priority": "early_out",
           "start_time": "10:00",
-          "end_time": "12:00",
+          "end_time": "10:15",
           "followup": false,
           "sequence": 1,
           "travel_time": 0
+        },
+        {
+          "task_id": 219740,
+          "logistic_code": 716,
+          "client_id": null,
+          "premium": true,
+          "address": "PIAZZA MENTANA, 8",
+          "lat": "45.4623463",
+          "lng": "9.1819616",
+          "cleaning_time": 120,
+          "checkin_date": "2025-12-04",
+          "checkout_date": "2025-12-03",
+          "checkin_time": "21:00",
+          "checkout_time": null,
+          "pax_in": 2,
+          "pax_out": 4,
+          "small_equipment": false,
+          "operation_id": 2,
+          "confirmed_operation": true,
+          "straordinaria": false,
+          "type_apt": "B",
+          "alias": "TBR",
+          "customer_name": "THE BEST RENT S.r.l.",
+          "reasons": [
+            "manually_moved_to_timeline"
+          ],
+          "priority": "high_priority",
+          "start_time": "10:41",
+          "end_time": "12:41",
+          "followup": true,
+          "sequence": 2,
+          "travel_time": 26
         }
       ]
     },
@@ -67,136 +99,7 @@
         "premium": true,
         "start_time": "10:00"
       },
-      "tasks": [
-        {
-          "task_id": 219646,
-          "logistic_code": 751,
-          "client_id": null,
-          "premium": false,
-          "address": "Via L. Cagnola, 12",
-          "lat": "45.4776",
-          "lng": "9.17287",
-          "cleaning_time": 60,
-          "checkin_date": "2025-12-03",
-          "checkout_date": "2025-12-03",
-          "checkin_time": "14:00",
-          "checkout_time": "11:00",
-          "pax_in": 2,
-          "pax_out": 2,
-          "small_equipment": false,
-          "operation_id": 2,
-          "confirmed_operation": true,
-          "straordinaria": false,
-          "type_apt": "A",
-          "alias": "RLST",
-          "customer_name": "RELSTAY - FERRARA GIULIA",
-          "reasons": [
-            "manually_moved_to_timeline"
-          ],
-          "priority": "high_priority",
-          "start_time": "11:00",
-          "end_time": "12:00",
-          "followup": false,
-          "sequence": 1,
-          "travel_time": 0
-        },
-        {
-          "task_id": 219684,
-          "logistic_code": 618,
-          "client_id": null,
-          "premium": false,
-          "address": "VIA VOGHERA, 4",
-          "lat": "45.454632",
-          "lng": "9.168536",
-          "cleaning_time": 30,
-          "checkin_date": "2025-12-03",
-          "checkout_date": "2025-12-03",
-          "checkin_time": null,
-          "checkout_time": "09:30",
-          "pax_in": 2,
-          "pax_out": 0,
-          "small_equipment": false,
-          "operation_id": 2,
-          "confirmed_operation": true,
-          "straordinaria": false,
-          "type_apt": "A",
-          "alias": "EXP",
-          "customer_name": "EXPERIENCE DESIGN BED & SHOW",
-          "reasons": [
-            "manually_moved_to_timeline"
-          ],
-          "priority": "early_out",
-          "start_time": "12:24",
-          "end_time": "12:54",
-          "followup": true,
-          "sequence": 2,
-          "travel_time": 24
-        },
-        {
-          "task_id": 219683,
-          "logistic_code": 617,
-          "client_id": null,
-          "premium": false,
-          "address": "VIA VOGHERA, 4",
-          "lat": "45.454632",
-          "lng": "9.168536",
-          "cleaning_time": 30,
-          "checkin_date": "2025-12-03",
-          "checkout_date": "2025-12-03",
-          "checkin_time": null,
-          "checkout_time": "09:30",
-          "pax_in": 1,
-          "pax_out": 0,
-          "small_equipment": false,
-          "operation_id": 2,
-          "confirmed_operation": true,
-          "straordinaria": false,
-          "type_apt": "A",
-          "alias": "EXP",
-          "customer_name": "EXPERIENCE DESIGN BED & SHOW",
-          "reasons": [
-            "manually_moved_to_timeline"
-          ],
-          "priority": "early_out",
-          "start_time": "12:57",
-          "end_time": "13:27",
-          "followup": true,
-          "sequence": 3,
-          "travel_time": 3
-        },
-        {
-          "task_id": 219624,
-          "logistic_code": 1647,
-          "client_id": null,
-          "premium": true,
-          "address": "Viale Piave 35",
-          "lat": "45.472932",
-          "lng": "9.2062841",
-          "cleaning_time": 180,
-          "checkin_date": "2025-12-06",
-          "checkout_date": "2025-12-03",
-          "checkin_time": "20:00",
-          "checkout_time": null,
-          "pax_in": 5,
-          "pax_out": 4,
-          "small_equipment": false,
-          "operation_id": 2,
-          "confirmed_operation": false,
-          "straordinaria": false,
-          "type_apt": "E",
-          "alias": "HCC",
-          "customer_name": "HACCA SRL",
-          "reasons": [
-            "manually_moved_to_timeline"
-          ],
-          "priority": "early_out",
-          "start_time": "13:59",
-          "end_time": "16:59",
-          "followup": true,
-          "sequence": 4,
-          "travel_time": 32
-        }
-      ]
+      "tasks": []
     }
   ]
 }
