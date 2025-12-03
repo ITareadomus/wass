@@ -10,7 +10,7 @@
     "modified_by": [
       "Admin"
     ],
-    "last_updated": "2025-12-03 11:22:30"
+    "last_updated": "2025-12-03 11:26:27"
   },
   "cleaners_assignments": [
     {
@@ -82,11 +82,11 @@
             "automatic_assignment_eo"
           ],
           "priority": "early_out",
-          "start_time": "10:00",
-          "end_time": "11:00",
+          "start_time": "13:25",
+          "end_time": "14:25",
           "followup": true,
           "sequence": 2,
-          "travel_time": 0
+          "travel_time": 25
         },
         {
           "task_id": 219620,
@@ -115,11 +115,11 @@
             "automatic_assignment_eo"
           ],
           "priority": "early_out",
-          "start_time": "11:08",
-          "end_time": "13:08",
+          "start_time": "14:32",
+          "end_time": "16:32",
           "followup": true,
           "sequence": 3,
-          "travel_time": 8
+          "travel_time": 7
         }
       ]
     },
@@ -328,11 +328,11 @@
             "automatic_assignment_eo"
           ],
           "priority": "early_out",
-          "start_time": "11:08",
-          "end_time": "12:08",
+          "start_time": "11:07",
+          "end_time": "12:07",
           "followup": true,
           "sequence": 2,
-          "travel_time": 8
+          "travel_time": 7
         }
       ]
     },
@@ -406,11 +406,11 @@
             "automatic_assignment_eo"
           ],
           "priority": "early_out",
-          "start_time": "10:22",
-          "end_time": "10:52",
+          "start_time": "10:20",
+          "end_time": "10:50",
           "followup": true,
           "sequence": 2,
-          "travel_time": 7
+          "travel_time": 5
         },
         {
           "task_id": 219683,
@@ -439,8 +439,8 @@
             "automatic_assignment_eo"
           ],
           "priority": "early_out",
-          "start_time": "10:55",
-          "end_time": "11:25",
+          "start_time": "10:53",
+          "end_time": "11:23",
           "followup": true,
           "sequence": 3,
           "travel_time": 3
