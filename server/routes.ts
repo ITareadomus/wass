@@ -998,6 +998,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       let removedCount = 0;
       let removedTask: any = null;
+      const cleanersToRecalculate: any[] = [];
 
       // Rimuovi l'assegnazione per questo task da tutti i cleaner
       assignmentsData.cleaners_assignments = assignmentsData.cleaners_assignments.map((cleanerEntry: any) => {
@@ -1012,9 +1013,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
             return !matchCode && !matchId;
           }
         );
-        removedCount += (initialTaskCountForCleaner - (cleanerEntry.tasks?.length || 0));
+        const tasksRemoved = initialTaskCountForCleaner - (cleanerEntry.tasks?.length || 0);
+        if (tasksRemoved > 0) {
+          removedCount += tasksRemoved;
+          // Marca questo cleaner per ricalcolo tempi
+          if (cleanerEntry.tasks.length > 0) {
+            cleanersToRecalculate.push(cleanerEntry);
+          }
+        }
         return cleanerEntry;
       }).filter((c: any) => c.tasks.length > 0); // Rimuovi cleaner vuoti
+
+      // CRITICAL: Ricalcola tempi per i cleaner da cui sono state rimosse task
+      for (const cleanerEntry of cleanersToRecalculate) {
+        try {
+          console.log(`🔄 Ricalcolo tempi per cleaner ${cleanerEntry.cleaner?.id} dopo rimozione task`);
+          const recalculatedData = await recalculateCleanerTimes({
+            cleaner: cleanerEntry.cleaner,
+            tasks: cleanerEntry.tasks
+          });
+          // Aggiorna le task con i nuovi tempi
+          cleanerEntry.tasks = recalculatedData.tasks;
+          console.log(`✅ Tempi ricalcolati per cleaner ${cleanerEntry.cleaner?.id}`);
+        } catch (recalcError) {
+          console.error(`❌ Errore ricalcolo tempi per cleaner ${cleanerEntry.cleaner?.id}:`, recalcError);
+        }
+      }
 
       console.log(`Rimosse ${removedCount} assegnazioni`);
 
