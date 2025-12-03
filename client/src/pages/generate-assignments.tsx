@@ -1680,15 +1680,19 @@ export default function GenerateAssignments() {
       }
 
     } catch (error) {
-      console.error('Errore nello spostamento:', error);
+      console.error('Errore durante il drag-drop:', error);
       toast({
         title: "Errore",
-        description: "Errore nello spostamento della task",
+        description: "Si è verificato un errore durante lo spostamento della task",
         variant: "destructive",
       });
-      // Assicurati che il lock venga sempre rilasciato
+    } finally {
+      // CRITICAL: Rilascia SEMPRE il lock, anche in caso di errore
       isDraggingRef.current = false;
-      if (dragTimeoutRef.current) clearTimeout(dragTimeoutRef.current);
+      if (dragTimeoutRef.current) {
+        clearTimeout(dragTimeoutRef.current);
+        dragTimeoutRef.current = null;
+      }
     }
   };
 
