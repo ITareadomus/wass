@@ -687,23 +687,23 @@ def seed_cleaners_from_assignments(cleaners: List[Cleaner]):
         if not tasks:
             continue
 
-        # Filtra solo task NON-LP (EO e HP)
-        non_lp_tasks = [t for t in tasks if
-                        t.get("priority") in ["early_out", "high_priority"] or
-                        ("automatic_assignment_lp" not in t.get("reasons", []))]
+        # CRITICAL FIX: trova la sequenza massima tra TUTTE le task esistenti,
+        # incluse quelle trascinate manualmente
+        all_sequences = [int(t.get("sequence", 0)) for t in tasks if t.get("sequence")]
+        max_sequence = max(all_sequences) if all_sequences else 0
 
-        if not non_lp_tasks:
+        # Per available_from, last_address, ecc., usa l'ultima task (per end_time)
+        # tra TUTTE le task, non solo quelle non-LP
+        all_tasks_sorted = sorted(tasks, key=lambda t: t.get("end_time") or "00:00")
+        last = all_tasks_sorted[-1] if all_tasks_sorted else None
+
+        if not last:
             continue
-
-        # Ordina per end_time per trovare l'ultima (gestisci None)
-        non_lp_tasks.sort(key=lambda t: t.get("end_time") or "00:00")
-        last = non_lp_tasks[-1]
 
         end_time = hhmm_to_min(last.get("end_time"))
         last_addr = last.get("address")
         last_lat = last.get("lat")
         last_lng = last.get("lng")
-        last_seq = last.get("sequence") or len(non_lp_tasks)
 
         for cl in cleaners:
             if cl.id == cid:
@@ -711,9 +711,9 @@ def seed_cleaners_from_assignments(cleaners: List[Cleaner]):
                 cl.last_address = last_addr
                 cl.last_lat = float(last_lat) if last_lat is not None else None
                 cl.last_lng = float(last_lng) if last_lng is not None else None
-                cl.last_sequence = int(last_seq)
-                # NUOVO: Conta il totale task giornaliere (EO + HP)
-                cl.total_daily_tasks = len(non_lp_tasks)
+                cl.last_sequence = max_sequence  # Usa la sequenza massima tra TUTTE le task
+                # Conta il totale task giornaliere
+                cl.total_daily_tasks = len(tasks)
                 break
 
 
@@ -1271,6 +1271,18 @@ def main():
                 "cleaner": cleaner_entry["cleaner"],
                 "tasks": cleaner_entry["tasks"]
             })
+
+    # CRITICAL FIX: Ricalcola le sequenze per tutti i cleaner dopo il merge
+    # Questo assicura che le task manuali già presenti vengano considerate
+    for entry in timeline_data["cleaners_assignments"]:
+        tasks = entry.get("tasks", [])
+        if len(tasks) > 0:
+            # Le task sono già ordinate per start_time
+            tasks.sort(key=lambda t: t.get("start_time") or "00:00")
+            # Ricalcola sequence per tutte le task
+            for idx, task in enumerate(tasks):
+                task["sequence"] = idx + 1
+                task["followup"] = idx > 0
 
     # Aggiorna meta
     # Conta i cleaners totali disponibili

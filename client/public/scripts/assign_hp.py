@@ -606,31 +606,34 @@ def seed_cleaners_from_eo(cleaners: List[Cleaner], ref_date: str):
         if not tasks:
             continue
 
-        # Filtra solo task EO (con priority="early_out" o reasons che include "automatic_assignment_eo")
+        # Filtra task EO per determinare available_from e last_eo_address
         eo_tasks = [t for t in tasks if
                     t.get("priority") == "early_out" or
                     ("automatic_assignment_eo" in t.get("reasons", []))]
 
-        if not eo_tasks:
-            continue
+        # CRITICAL FIX: trova la sequenza massima tra TUTTE le task esistenti,
+        # non solo quelle EO. Questo include task trascinate manualmente.
+        all_sequences = [int(t.get("sequence", 0)) for t in tasks if t.get("sequence")]
+        max_sequence = max(all_sequences) if all_sequences else 0
 
-        # Ordina per end_time per trovare l'ultima
-        eo_tasks.sort(key=lambda t: t.get("end_time", "00:00"))
-        last = eo_tasks[-1]
+        # Per available_from e last_eo_address, usa l'ultima task (per end_time)
+        # tra TUTTE le task, non solo EO
+        all_tasks_sorted = sorted(tasks, key=lambda t: t.get("end_time", "00:00"))
+        last = all_tasks_sorted[-1] if all_tasks_sorted else None
 
-        end_time = last.get("end_time")  # "HH:MM"
-        last_addr = last.get("address")
-        last_lat = last.get("lat")
-        last_lng = last.get("lng")
-        last_seq = last.get("sequence") or len(eo_tasks)
-        for cl in cleaners:
-            if cl.id == cid:
-                cl.available_from = hhmm_to_dt(ref_date, end_time)
-                cl.last_eo_address = last_addr
-                cl.last_eo_lat = float(last_lat) if last_lat is not None else None
-                cl.last_eo_lng = float(last_lng) if last_lng is not None else None
-                cl.eo_last_sequence = int(last_seq)
-                break
+        if last:
+            end_time = last.get("end_time")  # "HH:MM"
+            last_addr = last.get("address")
+            last_lat = last.get("lat")
+            last_lng = last.get("lng")
+            for cl in cleaners:
+                if cl.id == cid:
+                    cl.available_from = hhmm_to_dt(ref_date, end_time)
+                    cl.last_eo_address = last_addr
+                    cl.last_eo_lat = float(last_lat) if last_lat is not None else None
+                    cl.last_eo_lng = float(last_lng) if last_lng is not None else None
+                    cl.eo_last_sequence = max_sequence  # Usa la sequenza massima tra TUTTE le task
+                    break
 
 
 def load_tasks() -> Tuple[List[Task], str]:
@@ -1111,6 +1114,18 @@ def main():
                 "cleaner": cleaner_entry["cleaner"],
                 "tasks": cleaner_entry["tasks"]
             })
+
+    # CRITICAL FIX: Ricalcola le sequenze per tutti i cleaner dopo il merge
+    # Questo assicura che le task manuali già presenti vengano considerate
+    for entry in timeline_data["cleaners_assignments"]:
+        tasks = entry.get("tasks", [])
+        if len(tasks) > 0:
+            # Le task sono già ordinate per start_time
+            tasks.sort(key=lambda t: t.get("start_time") or "00:00")
+            # Ricalcola sequence per tutte le task
+            for idx, task in enumerate(tasks):
+                task["sequence"] = idx + 1
+                task["followup"] = idx > 0
 
     # Aggiorna metadata
     # Aggiorna metadata
