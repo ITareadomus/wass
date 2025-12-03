@@ -1,6 +1,6 @@
 {
   "meta": {
-    "total_tasks": 28,
+    "total_tasks": 30,
     "used_cleaners": 10,
     "assigned_tasks": 26,
     "total_cleaners": 10
@@ -11,8 +11,10 @@
     "modified_by": [
       "Admin"
     ],
-    "last_updated": "2025-12-03 11:57:51",
-    "modification_type": "auto_assign_low_priority"
+    "last_updated": "2025-12-03 12:00:55",
+    "modification_type": "auto_assign_low_priority",
+    "loaded_from_mysql": true,
+    "loaded_at": "2025-12-03 11:05:20"
   },
   "cleaners_assignments": [
     {
@@ -568,6 +570,38 @@
           "followup": true,
           "sequence": 2,
           "travel_time": 7
+        },
+        {
+          "task_id": 219764,
+          "logistic_code": 771,
+          "client_id": null,
+          "premium": false,
+          "address": "VIA PIERLOMBARDO, 3",
+          "lat": "45.4549994",
+          "lng": "9.2049206",
+          "cleaning_time": 60,
+          "checkin_date": "2025-12-03",
+          "checkout_date": "2025-12-03",
+          "checkin_time": "14:00",
+          "checkout_time": "11:00",
+          "pax_in": 2,
+          "pax_out": 2,
+          "small_equipment": false,
+          "operation_id": 2,
+          "confirmed_operation": true,
+          "straordinaria": false,
+          "type_apt": "A",
+          "alias": "RLST",
+          "customer_name": "RELSTAY - FERRARA GIULIA",
+          "reasons": [
+            "manually_moved_to_timeline"
+          ],
+          "priority": "low_priority",
+          "start_time": "12:52",
+          "end_time": "13:52",
+          "followup": true,
+          "sequence": 3,
+          "travel_time": 45
         }
       ]
     },
@@ -724,6 +758,38 @@
           "followup": false,
           "sequence": 1,
           "travel_time": 0
+        },
+        {
+          "task_id": 219608,
+          "logistic_code": 566,
+          "client_id": null,
+          "premium": false,
+          "address": "CORSO PLEBISCITI, 9",
+          "lat": "45.468696",
+          "lng": "9.2192168",
+          "cleaning_time": 180,
+          "checkin_date": null,
+          "checkout_date": "2025-12-03",
+          "checkin_time": null,
+          "checkout_time": null,
+          "pax_in": 4,
+          "pax_out": 3,
+          "small_equipment": false,
+          "operation_id": 3,
+          "confirmed_operation": true,
+          "straordinaria": true,
+          "type_apt": "A",
+          "alias": "TBR",
+          "customer_name": "THE BEST RENT S.r.l.",
+          "reasons": [
+            "manually_moved_to_timeline"
+          ],
+          "priority": "low_priority",
+          "start_time": "11:34",
+          "end_time": "14:34",
+          "followup": true,
+          "sequence": 2,
+          "travel_time": 34
         }
       ]
     },
