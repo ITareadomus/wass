@@ -1,6 +1,6 @@
 {
   "metadata": {
-    "last_updated": "2025-12-03T10:37:20.456305",
+    "last_updated": "2025-12-03T11:16:34.889627",
     "date": "2025-12-03"
   },
   "containers": {
@@ -208,6 +208,34 @@
     "low_priority": {
       "tasks": [
         {
+          "task_id": 219608,
+          "logistic_code": 566,
+          "client_id": 3,
+          "premium": false,
+          "address": "CORSO PLEBISCITI, 9",
+          "lat": "45.468696",
+          "lng": "9.2192168",
+          "cleaning_time": 180,
+          "checkin_date": null,
+          "checkout_date": "2025-12-03",
+          "checkin_time": null,
+          "checkout_time": null,
+          "pax_in": 4,
+          "pax_out": 3,
+          "small_equipment": true,
+          "operation_id": 3,
+          "confirmed_operation": true,
+          "straordinaria": true,
+          "type_apt": "A",
+          "alias": "TBR",
+          "customer_name": "THE BEST RENT S.r.l.",
+          "priority": "low_priority",
+          "reasons": [
+            "not_eo",
+            "not_hp"
+          ]
+        },
+        {
           "task_id": 219616,
           "logistic_code": 571,
           "client_id": 2,
@@ -376,6 +404,34 @@
           ]
         },
         {
+          "task_id": 219761,
+          "logistic_code": 1672,
+          "client_id": 124,
+          "premium": false,
+          "address": "VIA TORTONA 19",
+          "lat": "45.4530068",
+          "lng": "9.1668178",
+          "cleaning_time": 240,
+          "checkin_date": "2025-12-03",
+          "checkout_date": "2025-12-03",
+          "checkin_time": null,
+          "checkout_time": "13:00",
+          "pax_in": 2,
+          "pax_out": 0,
+          "small_equipment": false,
+          "operation_id": 3,
+          "confirmed_operation": true,
+          "straordinaria": true,
+          "type_apt": "B",
+          "alias": "HMST",
+          "customer_name": "HOMING STAYS",
+          "priority": "low_priority",
+          "reasons": [
+            "not_eo",
+            "not_hp"
+          ]
+        },
+        {
           "task_id": 219762,
           "logistic_code": 229,
           "client_id": 2,
@@ -404,13 +460,13 @@
           ]
         }
       ],
-      "count": 7
+      "count": 9
     }
   },
   "summary": {
-    "total_tasks": 14,
+    "total_tasks": 16,
     "early_out": 0,
     "high_priority": 7,
-    "low_priority": 7
+    "low_priority": 9
   }
 }
