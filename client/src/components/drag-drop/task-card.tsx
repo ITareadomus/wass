@@ -498,8 +498,7 @@ export default function TaskCard({
   };
 
   // Calcola la larghezza in base alla durata
-  // isDragging: quando true, forza pixel fissi per evitare che la % venga interpretata male
-  const calculateWidth = (duration: string | undefined, forTimeline: boolean, isDragging: boolean = false) => {
+  const calculateWidth = (duration: string | undefined, forTimeline: boolean) => {
     const safeDuration = duration || "0.0";
     const parts = safeDuration.split(".");
     const hours = parseInt(parts[0] || "0");
@@ -513,15 +512,6 @@ export default function TaskCard({
       // La griglia usa N slot (es: 10 slot per 10:00-19:00), ciascuno con larghezza 1/N
       const slotsCount = (window as any).globalTimeSlotsCount || 10;
       const virtualMinutes = slotsCount * 60; // Minuti virtuali basati su slot
-
-      if (isDragging) {
-        // Durante il drag, convertiamo in pixel fissi per evitare deformazioni
-        // Stimiamo la larghezza della timeline come ~70% del viewport (escludendo sidebar)
-        const timelineWidth = (window as any).globalTimelineWidth || (window.innerWidth * 0.65);
-        const widthPixels = (effectiveMinutes / virtualMinutes) * timelineWidth;
-        return `${Math.round(widthPixels)}px`;
-      }
-
       const widthPercentage = (effectiveMinutes / virtualMinutes) * 100;
       return `${widthPercentage}%`;
     } else {
@@ -615,8 +605,7 @@ export default function TaskCard({
         isDragDisabled={shouldDisableDrag} // Usa la prop per disabilitare il drag
       >
         {(provided, snapshot) => {
-          // Quando trascini, usa pixel fissi per evitare che % venga interpretata male
-          const cardWidth = calculateWidth(task.duration, isInTimeline, snapshot.isDragging);
+          const cardWidth = calculateWidth(task.duration, isInTimeline);
 
           return (
             <TooltipProvider delayDuration={300}>
