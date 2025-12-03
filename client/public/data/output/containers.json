@@ -1,6 +1,6 @@
 {
   "metadata": {
-    "last_updated": "2025-12-03T09:46:30.786050",
+    "last_updated": "2025-12-03T09:51:15.671194",
     "date": "2025-12-03"
   },
   "containers": {
@@ -248,63 +248,9 @@
             "checkout_time_eo_window_or_before_start"
           ],
           "priority": "early_out"
-        },
-        {
-          "task_id": 219741,
-          "logistic_code": 623,
-          "client_id": 61,
-          "premium": false,
-          "address": "RIPA DI PORTA TICINESE 49",
-          "lat": "45.4518038",
-          "lng": "9.1768031",
-          "cleaning_time": 60,
-          "checkin_date": "2025-12-05",
-          "checkout_date": "2025-12-03",
-          "checkin_time": "15:00",
-          "checkout_time": null,
-          "pax_in": 2,
-          "pax_out": 2,
-          "small_equipment": true,
-          "operation_id": 2,
-          "confirmed_operation": true,
-          "straordinaria": false,
-          "type_apt": "A",
-          "alias": "NTM",
-          "customer_name": "NOTA-MI",
-          "reasons": [
-            "client_forced_eo"
-          ],
-          "priority": "early_out"
-        },
-        {
-          "task_id": 219760,
-          "logistic_code": 619,
-          "client_id": 67,
-          "premium": false,
-          "address": "VIA TORTONA, 10",
-          "lat": "45.4542397",
-          "lng": "9.1686792",
-          "cleaning_time": 15,
-          "checkin_date": "2025-12-03",
-          "checkout_date": "2025-12-03",
-          "checkin_time": null,
-          "checkout_time": "09:30",
-          "pax_in": 0,
-          "pax_out": 0,
-          "small_equipment": false,
-          "operation_id": 4,
-          "confirmed_operation": true,
-          "straordinaria": false,
-          "type_apt": "B",
-          "alias": "EXP",
-          "customer_name": "EXPERIENCE DESIGN BED & SHOW",
-          "reasons": [
-            "checkout_time_eo_window_or_before_start"
-          ],
-          "priority": "early_out"
         }
       ],
-      "count": 11
+      "count": 9
     },
     "high_priority": {
       "tasks": [
@@ -391,33 +337,6 @@
           "priority": "high_priority"
         },
         {
-          "task_id": 219750,
-          "logistic_code": 1577,
-          "client_id": 3,
-          "premium": true,
-          "address": "VIA CROCEFISSO, 25",
-          "lat": "45.4570059",
-          "lng": "9.1848347",
-          "cleaning_time": 270,
-          "checkin_date": "2025-12-04",
-          "checkout_date": "2025-12-03",
-          "checkin_time": null,
-          "checkout_time": null,
-          "pax_in": 4,
-          "pax_out": 5,
-          "small_equipment": false,
-          "operation_id": 2,
-          "confirmed_operation": true,
-          "straordinaria": false,
-          "type_apt": "E",
-          "alias": "TBR",
-          "customer_name": "THE BEST RENT S.r.l.",
-          "reasons": [
-            "premium"
-          ],
-          "priority": "high_priority"
-        },
-        {
           "task_id": 219758,
           "logistic_code": 1698,
           "client_id": 132,
@@ -471,37 +390,9 @@
             "client_forced_hp"
           ],
           "priority": "high_priority"
-        },
-        {
-          "task_id": 219777,
-          "logistic_code": 1032,
-          "client_id": 64,
-          "premium": false,
-          "address": "VIA PIETRO MASCAGNI, 2",
-          "lat": "45.4662468",
-          "lng": "9.2045849",
-          "cleaning_time": 60,
-          "checkin_date": "2025-12-03",
-          "checkout_date": "2025-12-03",
-          "checkin_time": "14:30",
-          "checkout_time": "13:00",
-          "pax_in": 0,
-          "pax_out": 0,
-          "small_equipment": true,
-          "operation_id": 1,
-          "confirmed_operation": true,
-          "straordinaria": false,
-          "type_apt": "A",
-          "alias": "RLST",
-          "customer_name": "RELSTAY - FERRARA GIULIA",
-          "reasons": [
-            "same_day_checkin_between_hp_start_hp_end",
-            "client_forced_hp"
-          ],
-          "priority": "high_priority"
         }
       ],
-      "count": 7
+      "count": 5
     },
     "low_priority": {
       "tasks": [
@@ -762,9 +653,9 @@
     }
   },
   "summary": {
-    "total_tasks": 27,
-    "early_out": 11,
-    "high_priority": 7,
+    "total_tasks": 23,
+    "early_out": 9,
+    "high_priority": 5,
     "low_priority": 9
   }
 }

@@ -131,6 +131,10 @@ export default function TimelineView({
 
   // Stato per memorizzare i dati della timeline (inclusi i metadata)
   const [timelineData, setTimelineData] = useState<any>(null);
+  
+  // Larghezza della timeline in pixel per calcolo larghezze task
+  const [timelineWidthPx, setTimelineWidthPx] = useState<number>(0);
+  const timelineRowRef = useRef<HTMLDivElement>(null);
 
   // Carica anche i cleaner dalla timeline.json per mostrare quelli nascosti
   // DEVE essere definito PRIMA di allCleanersToShow che lo usa
@@ -406,6 +410,28 @@ export default function TimelineView({
     (window as any).globalTimelineMinutes = globalTimelineMinutes;
     (window as any).globalTimeSlotsCount = globalTimeSlots.length;
   }, [globalTimelineMinutes, globalTimeSlots.length]);
+
+  // Misura la larghezza della timeline row e esponila su window per TaskCard
+  React.useEffect(() => {
+    const measureWidth = () => {
+      if (timelineRowRef.current) {
+        const width = timelineRowRef.current.offsetWidth;
+        setTimelineWidthPx(width);
+        (window as any).timelineWidthPx = width;
+      }
+    };
+    
+    measureWidth();
+    window.addEventListener('resize', measureWidth);
+    
+    // Rimisura dopo un breve delay per catturare layout post-render
+    const timer = setTimeout(measureWidth, 100);
+    
+    return () => {
+      window.removeEventListener('resize', measureWidth);
+      clearTimeout(timer);
+    };
+  }, [cleaners, isFullscreen]);
 
   const getCleanerColor = (cleanerId: number) => {
     // Colori distribuiti per massimo contrasto visivo
@@ -1478,7 +1504,11 @@ export default function TimelineView({
           {/* Header con orari - unico per tutti i cleaner */}
           <div className="flex mb-2 px-4">
             <div className="flex-shrink-0" style={{ width: `${cleanerColumnWidth}px` }}></div>
-            <div className="flex-1" style={{ display: 'grid', gridTemplateColumns: `repeat(${globalTimeSlots.length}, 1fr)` }}>
+            <div 
+              ref={timelineRowRef}
+              className="flex-1" 
+              style={{ display: 'grid', gridTemplateColumns: `repeat(${globalTimeSlots.length}, 1fr)` }}
+            >
               {globalTimeSlots.map((slot, idx) => (
                 <div key={idx} className="text-center text-xs font-semibold text-foreground border-r border-border px-1">
                   {slot}
