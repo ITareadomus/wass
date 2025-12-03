@@ -2254,7 +2254,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Salva timeline con tracking delle modifiche (skipRevision=false per creare revision in MySQL)
       await workspaceFiles.saveTimeline(workDate, timelineData, false, currentUsername, 'task_edit', editOptions);
 
-      // CRITICAL: Propaga le modifiche al database MySQL (wass_housekeeping)
+      // CRITICAL: Propaga le modifiche al database MySQL (app_housekeeping E wass_housekeeping)
       if (taskId) {
         try {
           const mysql = await import('mysql2/promise');
@@ -2296,12 +2296,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
           if (updates.length > 0) {
             values.push(taskId); // WHERE id = ?
-            const query = `UPDATE app_housekeeping SET ${updates.join(', ')} WHERE id = ?`;
+            
+            // Aggiorna app_housekeeping
+            const queryApp = `UPDATE app_housekeeping SET ${updates.join(', ')} WHERE id = ?`;
+            await connection.execute(queryApp, values);
+            console.log(`✅ Task ${logisticCode} aggiornata su app_housekeeping`);
 
-            await connection.execute(query, values);
+            // Aggiorna wass_housekeeping
+            const queryWass = `UPDATE wass_housekeeping SET ${updates.join(', ')} WHERE id = ?`;
+            await connection.execute(queryWass, values);
+            console.log(`✅ Task ${logisticCode} aggiornata su wass_housekeeping`);
+
             await connection.end();
-
-            console.log(`✅ Task ${logisticCode} aggiornata anche su database MySQL`);
           }
         } catch (dbError: any) {
           console.error('⚠️ Errore aggiornamento database MySQL:', dbError.message);
