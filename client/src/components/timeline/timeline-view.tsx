@@ -1754,6 +1754,29 @@ export default function TimelineView({
                                 const virtualMinutes = globalTimeSlots.length * 60;
                                 const totalWidth = effectiveTravelMinutes > 0 ? (effectiveTravelMinutes / virtualMinutes) * 100 : 0;
 
+                                // CRITICAL FIX: Calcola il "waitingGap" per task successive (idx > 0)
+                                // Questo gap rappresenta l'attesa tra la fine della task precedente e l'inizio effettivo di questa task
+                                // (es. quando c'è un checkout constraint che ritarda lo start_time)
+                                let waitingGap = 0;
+                                if (idx > 0 && taskObj.start_time) {
+                                  const prevTask = cleanerTasks[idx - 1] as any;
+                                  if (prevTask && prevTask.end_time) {
+                                    // Calcola la fine prevista: end_time della task precedente + travel_time
+                                    const [prevEndH, prevEndM] = prevTask.end_time.split(':').map(Number);
+                                    const prevEndMinutes = prevEndH * 60 + prevEndM;
+                                    const expectedStartMinutes = prevEndMinutes + travelTime;
+                                    
+                                    // Calcola lo start effettivo di questa task
+                                    const [taskStartH, taskStartM] = taskObj.start_time.split(':').map(Number);
+                                    const actualStartMinutes = taskStartH * 60 + taskStartM;
+                                    
+                                    // Se lo start effettivo è DOPO quello previsto, c'è un gap (attesa)
+                                    if (actualStartMinutes > expectedStartMinutes) {
+                                      waitingGap = actualStartMinutes - expectedStartMinutes;
+                                    }
+                                  }
+                                }
+
                                 // Usa task.id o task.task_id come chiave univoca (non logistic_code che può essere duplicato)
                                 const uniqueKey = taskObj.task_id || taskObj.id;
 
@@ -1779,6 +1802,7 @@ export default function TimelineView({
                                       isReadOnly={isReadOnly}
                                       timeOffset={idx === 0 ? timeOffset : 0}
                                       travelTime={idx > 0 ? travelTime : 0}
+                                      waitingGap={waitingGap}
                                       globalTimeSlots={globalTimeSlots.length}
                                     />
                                 );
