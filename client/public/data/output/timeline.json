@@ -1,13 +1,12 @@
 {
   "meta": {
-    "total_tasks": 0,
     "used_cleaners": 3,
-    "assigned_tasks": 8,
-    "total_cleaners": 3
+    "assigned_tasks": 12,
+    "total_cleaners": 1
   },
   "metadata": {
     "date": "2025-12-05",
-    "last_updated": "2025-12-04 10:46:25",
+    "last_updated": "2025-12-04 10:47:45",
     "modification_type": "auto_assign_high_priority"
   },
   "cleaners_assignments": [
@@ -55,6 +54,39 @@
           "travel_time": 0
         },
         {
+          "task_id": 219706,
+          "logistic_code": 1472,
+          "client_id": 61,
+          "premium": false,
+          "address": "via Voghera 9/A",
+          "lat": "45.4540455",
+          "lng": "9.1676391",
+          "cleaning_time": 120,
+          "checkin_date": "2025-12-05",
+          "checkout_date": "2025-12-05",
+          "checkin_time": null,
+          "checkout_time": null,
+          "pax_in": 3,
+          "pax_out": 2,
+          "small_equipment": false,
+          "operation_id": 2,
+          "confirmed_operation": false,
+          "straordinaria": false,
+          "type_apt": "C",
+          "alias": "NTM",
+          "customer_name": "NOTA-MI",
+          "reasons": [
+            "client_forced_eo",
+            "automatic_assignment_eo"
+          ],
+          "priority": "early_out",
+          "start_time": "12:20",
+          "end_time": "14:20",
+          "followup": true,
+          "sequence": 2,
+          "travel_time": 50
+        },
+        {
           "task_id": 219692,
           "logistic_code": 1009,
           "client_id": 61,
@@ -81,11 +113,44 @@
             "automatic_assignment_eo"
           ],
           "priority": "early_out",
-          "start_time": "12:20",
-          "end_time": "13:20",
+          "start_time": "15:00",
+          "end_time": "16:00",
           "followup": true,
-          "sequence": 2,
-          "travel_time": 50
+          "sequence": 3,
+          "travel_time": 40
+        },
+        {
+          "task_id": 219705,
+          "logistic_code": 1153,
+          "client_id": 61,
+          "premium": false,
+          "address": "VIA CELESTINO IV, 9",
+          "lat": "45.4596054",
+          "lng": "9.1821442",
+          "cleaning_time": 120,
+          "checkin_date": "2025-12-05",
+          "checkout_date": "2025-12-05",
+          "checkin_time": "15:00",
+          "checkout_time": null,
+          "pax_in": 1,
+          "pax_out": 1,
+          "small_equipment": false,
+          "operation_id": 2,
+          "confirmed_operation": false,
+          "straordinaria": false,
+          "type_apt": "C",
+          "alias": "NTM",
+          "customer_name": "NOTA-MI",
+          "reasons": [
+            "client_forced_eo",
+            "automatic_assignment_eo"
+          ],
+          "priority": "early_out",
+          "start_time": "16:32",
+          "end_time": "18:32",
+          "followup": true,
+          "sequence": 4,
+          "travel_time": 32
         },
         {
           "task_id": 219702,
@@ -114,11 +179,77 @@
             "automatic_assignment_eo"
           ],
           "priority": "early_out",
-          "start_time": "13:40",
-          "end_time": "16:40",
+          "start_time": "18:53",
+          "end_time": "21:53",
           "followup": true,
-          "sequence": 3,
-          "travel_time": 20
+          "sequence": 5,
+          "travel_time": 21
+        },
+        {
+          "task_id": 219707,
+          "logistic_code": 1623,
+          "client_id": 61,
+          "premium": false,
+          "address": "via Principe Eugenio 15",
+          "lat": "45.48931",
+          "lng": "9.1635183",
+          "cleaning_time": 60,
+          "checkin_date": "2026-01-07",
+          "checkout_date": "2025-12-05",
+          "checkin_time": null,
+          "checkout_time": null,
+          "pax_in": 1,
+          "pax_out": 1,
+          "small_equipment": true,
+          "operation_id": 2,
+          "confirmed_operation": false,
+          "straordinaria": false,
+          "type_apt": "A",
+          "alias": "NTM",
+          "customer_name": "NOTA-MI",
+          "reasons": [
+            "client_forced_eo",
+            "automatic_assignment_eo"
+          ],
+          "priority": "early_out",
+          "start_time": "22:27",
+          "end_time": "23:27",
+          "followup": true,
+          "sequence": 6,
+          "travel_time": 34
+        },
+        {
+          "task_id": 219708,
+          "logistic_code": 1624,
+          "client_id": 61,
+          "premium": false,
+          "address": "Via Gran San Bernardo, 11",
+          "lat": "45.489404",
+          "lng": "9.1685018",
+          "cleaning_time": 90,
+          "checkin_date": null,
+          "checkout_date": "2025-12-05",
+          "checkin_time": null,
+          "checkout_time": null,
+          "pax_in": 0,
+          "pax_out": 1,
+          "small_equipment": false,
+          "operation_id": 2,
+          "confirmed_operation": false,
+          "straordinaria": false,
+          "type_apt": "B",
+          "alias": "NTM",
+          "customer_name": "NOTA-MI",
+          "reasons": [
+            "client_forced_eo",
+            "automatic_assignment_eo"
+          ],
+          "priority": "early_out",
+          "start_time": "23:35",
+          "end_time": "25:05",
+          "followup": true,
+          "sequence": 7,
+          "travel_time": 8
         },
         {
           "task_id": 219703,
@@ -147,11 +278,11 @@
             "automatic_assignment_eo"
           ],
           "priority": "early_out",
-          "start_time": "17:11",
-          "end_time": "18:11",
+          "start_time": "25:39",
+          "end_time": "26:39",
           "followup": true,
-          "sequence": 4,
-          "travel_time": 31
+          "sequence": 8,
+          "travel_time": 34
         }
       ]
     },
@@ -312,6 +443,17 @@
           "travel_time": 27
         }
       ]
+    },
+    {
+      "cleaner": {
+        "id": 626,
+        "name": "DORA PATRICIA",
+        "lastname": "JIMENEZ",
+        "role": "Formatore",
+        "premium": false,
+        "start_time": "10:00"
+      },
+      "tasks": []
     }
   ]
 }
