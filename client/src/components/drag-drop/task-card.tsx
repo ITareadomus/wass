@@ -563,18 +563,18 @@ export default function TaskCard({
 
     if (!isInTimeline) return false;
 
-    // Caso 1: end_time sfora checkin_time
+    // CRITICAL: Caso 1 - start_time PRIMA di checkout_time (cleaner arriva prima che proprietà sia libera)
+    if (startTime && checkoutTime && checkoutDate) {
+      const taskStartDateTime = new Date(checkoutDate + 'T' + startTime + ':00');
+      const checkoutDateTime = new Date(checkoutDate + 'T' + checkoutTime + ':00');
+      if (taskStartDateTime < checkoutDateTime) return true;
+    }
+
+    // Caso 2: end_time sfora checkin_time
     if (endTime && checkinTime && checkoutDate && checkinDate) {
       const checkoutDateTime = new Date(checkoutDate + 'T' + endTime + ':00');
       const checkinDateTime = new Date(checkinDate + 'T' + checkinTime + ':00');
       if (checkoutDateTime > checkinDateTime) return true;
-    }
-
-    // Caso 2: start_time è prima di checkout_time (task inizia prima che proprietà sia libera)
-    if (startTime && checkoutTime && checkoutDate) {
-      const taskStartDateTime= new Date(checkoutDate + 'T' + startTime + ':00');
-      const checkoutDateTime = new Date(checkoutDate + 'T' + checkoutTime + ':00');
-      if (taskStartDateTime < checkoutDateTime) return true;
     }
 
     // Caso 3: start_time è dopo o uguale a checkin_time (task inizia quando ospiti sono già arrivati)

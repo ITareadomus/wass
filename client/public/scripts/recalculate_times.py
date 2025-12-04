@@ -185,11 +185,10 @@ def recalculate_cleaner_times(cleaner_data: Dict[str, Any]) -> Dict[str, Any]:
         checkin_time_str = task.get("checkin_time")
 
         # CRITICAL: Start time NON può MAI essere prima del checkout_time
-        # Il cleaner può iniziare solo DOPO che la proprietà è libera
+        # Il cleaner può iniziare solo DOPO che la proprietà sia libera
         
         if i == 0:
             # Prima task: calcola arrivo base (work_start + travel_time già aggiunto a current_time_min)
-            # CRITICAL: current_time_min già include travel_time se presente
             arrival_min = current_time_min
             
             # Rispetta SEMPRE il checkout_time se presente
@@ -210,7 +209,7 @@ def recalculate_cleaner_times(cleaner_data: Dict[str, Any]) -> Dict[str, Any]:
             # Task successive: current_time_min già include travel_time
             start_time_min = current_time_min
             
-            # Rispetta il checkout_time se presente
+            # CRITICAL: Rispetta SEMPRE il checkout_time se presente (anche per task successive)
             if checkout_time_str:
                 try:
                     checkout_min = time_to_minutes(checkout_time_str)
@@ -220,6 +219,7 @@ def recalculate_cleaner_times(cleaner_data: Dict[str, Any]) -> Dict[str, Any]:
                         current_time_min = checkout_min
                 except (ValueError, AttributeError):
                     # Se checkout_time non è valido, ignora il vincolo
+                    pass
                     pass
 
         # End time: start + cleaning_time
