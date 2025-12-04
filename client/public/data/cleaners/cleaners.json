@@ -1,6 +1,6 @@
 {
     "metadata": {
-        "last_updated": "2025-12-03T14:49:38.908087",
+        "last_updated": "2025-12-03T16:12:18.925077",
         "db_config": {
             "host": "139.59.132.41",
             "user": "admin",
@@ -10,8 +10,8 @@
         "schema_version": "1.0"
     },
     "dates": {
-        "2025-12-03": {
-            "timestamp": "2025-12-03T14:49:38.908102",
+        "2025-12-04": {
+            "timestamp": "2025-12-03T16:12:18.925092",
             "cleaners": [
                 {
                     "id": 24,
@@ -82,7 +82,7 @@
                     "role": "Premium",
                     "active": true,
                     "ranking": 0,
-                    "counter_hours": 3.0,
+                    "counter_hours": 6.0,
                     "counter_days": 1,
                     "available": true,
                     "contract_type": "a chiamata",
@@ -194,7 +194,7 @@
                     "role": "Standard",
                     "active": true,
                     "ranking": 0,
-                    "counter_hours": 12.0,
+                    "counter_hours": 13.5,
                     "counter_days": 2,
                     "available": true,
                     "contract_type": "B",
@@ -306,7 +306,7 @@
                     "role": "Formatore",
                     "active": true,
                     "ranking": 0,
-                    "counter_hours": 10.5,
+                    "counter_hours": 16.25,
                     "counter_days": 2,
                     "available": true,
                     "contract_type": "B",
@@ -382,7 +382,7 @@
                     "role": "Premium",
                     "active": true,
                     "ranking": 0,
-                    "counter_hours": 11.0,
+                    "counter_hours": 12.5,
                     "counter_days": 3,
                     "available": true,
                     "contract_type": "B",
@@ -417,7 +417,7 @@
                     "role": "Premium",
                     "active": true,
                     "ranking": 0,
-                    "counter_hours": 13.0,
+                    "counter_hours": 15.0,
                     "counter_days": 3,
                     "available": true,
                     "contract_type": "B",
@@ -735,7 +735,7 @@
                 }
             ],
             "total_cleaners": 30,
-            "date": "2025-12-03",
+            "date": "2025-12-04",
             "data_source": "database_query"
         }
     }
