@@ -34,114 +34,6 @@
           "priority": "early_out"
         },
         {
-          "task_id": 219705,
-          "logistic_code": 1153,
-          "client_id": 61,
-          "premium": false,
-          "address": "VIA CELESTINO IV, 9",
-          "lat": "45.4596054",
-          "lng": "9.1821442",
-          "cleaning_time": 120,
-          "checkin_date": "2025-12-05",
-          "checkout_date": "2025-12-05",
-          "checkin_time": "15:00",
-          "checkout_time": null,
-          "pax_in": 1,
-          "pax_out": 1,
-          "small_equipment": false,
-          "operation_id": 2,
-          "confirmed_operation": false,
-          "straordinaria": false,
-          "type_apt": "C",
-          "alias": "NTM",
-          "customer_name": "NOTA-MI",
-          "reasons": [
-            "client_forced_eo"
-          ],
-          "priority": "early_out"
-        },
-        {
-          "task_id": 219706,
-          "logistic_code": 1472,
-          "client_id": 61,
-          "premium": false,
-          "address": "via Voghera 9/A",
-          "lat": "45.4540455",
-          "lng": "9.1676391",
-          "cleaning_time": 120,
-          "checkin_date": "2025-12-05",
-          "checkout_date": "2025-12-05",
-          "checkin_time": null,
-          "checkout_time": null,
-          "pax_in": 3,
-          "pax_out": 2,
-          "small_equipment": false,
-          "operation_id": 2,
-          "confirmed_operation": false,
-          "straordinaria": false,
-          "type_apt": "C",
-          "alias": "NTM",
-          "customer_name": "NOTA-MI",
-          "reasons": [
-            "client_forced_eo"
-          ],
-          "priority": "early_out"
-        },
-        {
-          "task_id": 219707,
-          "logistic_code": 1623,
-          "client_id": 61,
-          "premium": false,
-          "address": "via Principe Eugenio 15",
-          "lat": "45.48931",
-          "lng": "9.1635183",
-          "cleaning_time": 60,
-          "checkin_date": "2026-01-07",
-          "checkout_date": "2025-12-05",
-          "checkin_time": null,
-          "checkout_time": null,
-          "pax_in": 1,
-          "pax_out": 1,
-          "small_equipment": true,
-          "operation_id": 2,
-          "confirmed_operation": false,
-          "straordinaria": false,
-          "type_apt": "A",
-          "alias": "NTM",
-          "customer_name": "NOTA-MI",
-          "reasons": [
-            "client_forced_eo"
-          ],
-          "priority": "early_out"
-        },
-        {
-          "task_id": 219708,
-          "logistic_code": 1624,
-          "client_id": 61,
-          "premium": false,
-          "address": "Via Gran San Bernardo, 11",
-          "lat": "45.489404",
-          "lng": "9.1685018",
-          "cleaning_time": 90,
-          "checkin_date": null,
-          "checkout_date": "2025-12-05",
-          "checkin_time": null,
-          "checkout_time": null,
-          "pax_in": 0,
-          "pax_out": 1,
-          "small_equipment": false,
-          "operation_id": 2,
-          "confirmed_operation": false,
-          "straordinaria": false,
-          "type_apt": "B",
-          "alias": "NTM",
-          "customer_name": "NOTA-MI",
-          "reasons": [
-            "client_forced_eo"
-          ],
-          "priority": "early_out"
-        },
-        {
           "task_id": 219709,
           "logistic_code": 1571,
           "client_id": 61,
@@ -223,7 +115,7 @@
           "priority": "early_out"
         }
       ],
-      "count": 8
+      "count": 4
     },
     "high_priority": {
       "tasks": [
@@ -822,8 +714,8 @@
     }
   },
   "summary": {
-    "total_tasks": 29,
-    "early_out": 8,
+    "total_tasks": 25,
+    "early_out": 4,
     "high_priority": 6,
     "low_priority": 15
   }

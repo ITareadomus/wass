@@ -88,12 +88,28 @@
       "telegram_id": null,
       "start_time": "10:00",
       "can_do_straordinaria": false
+    },
+    {
+      "id": 626,
+      "name": "DORA PATRICIA",
+      "lastname": "JIMENEZ",
+      "role": "Formatore",
+      "active": true,
+      "ranking": 0,
+      "counter_hours": 16.25,
+      "counter_days": 3,
+      "available": true,
+      "contract_type": "B",
+      "preferred_customers": [],
+      "telegram_id": null,
+      "start_time": "10:00",
+      "can_do_straordinaria": false
     }
   ],
-  "total_selected": 3,
+  "total_selected": 4,
   "metadata": {
     "date": "2025-12-05",
     "loaded_at": "2025-12-04 09:45:32",
-    "last_updated": "2025-12-04 10:45:43"
+    "last_updated": "2025-12-04 10:47:42"
   }
 }
