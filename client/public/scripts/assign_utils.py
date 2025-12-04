@@ -41,9 +41,8 @@ def cleaner_load_hours(cleaner) -> float:
 def get_cleaners_for_eo(all_cleaners):
     """
     Filtra i cleaners adatti per le task Early-Out:
-    - Devono essere formatori O premium (inclusi straordinari marcati come premium)
-    - Escludi cleaners esplicitamente 'Standard'
-    - Escludi cleaners con start_time >= 11:00
+    - Escludi SOLO cleaners con start_time >= 11:00
+    - Include TUTTI gli altri cleaners (Formatori, Premium, Standard)
     - Ritorna ordinati per (straordinari, premium, ore lavorate DESC)
     """
     suitable = []
@@ -53,24 +52,15 @@ def get_cleaners_for_eo(all_cleaners):
         if start_time and start_time >= "11:00":
             continue
 
-        role = c.role.strip().lower()
-        # Formatore: sempre incluso
-        if "formatore" in role or "trainer" in role:
-            suitable.append(c)
-            continue
-        # Premium o Straordinario: includi
-        if "premium" in role or "straordinario" in role or c.can_do_straordinaria:
-            suitable.append(c)
-            continue
-        # Standard: escludi da EO
-        if "standard" in role:
-            continue
+        # Include TUTTI i cleaners con start_time < 11:00
+        suitable.append(c)
 
-    # Ordina: straordinari > premium > ore lavorate DESC
+    # Ordina: straordinari > premium > standard > ore lavorate DESC
     suitable.sort(
         key=lambda x: (
             not x.can_do_straordinaria,  # Straordinari per primi
-            "premium" not in x.role.lower(),
+            "premium" not in x.role.lower(),  # Premium dopo straordinari
+            "standard" in x.role.lower(),  # Standard per ultimi
             -getattr(x, 'counter_hours', 0)
         )
     )
