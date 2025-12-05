@@ -538,7 +538,7 @@ export class PgDailyAssignmentsService {
   async loadContainers(workDate: string): Promise<any | null> {
     try {
       const result = await query(
-        'SELECT * FROM daily_containers WHERE work_date = $1 ORDER BY priority, bucket_rank',
+        'SELECT * FROM daily_containers WHERE work_date = $1 ORDER BY priority, task_id',
         [workDate]
       );
       
@@ -618,33 +618,31 @@ export class PgDailyAssignmentsService {
       for (const priority of ['early_out', 'high', 'low']) {
         const tasks = containers[priority] || [];
         
-        for (let i = 0; i < tasks.length; i++) {
-          const task = tasks[i];
+        for (const task of tasks) {
           if (!task.task_id) continue;
           
           await client.query(`
             INSERT INTO daily_containers (
-              work_date, priority, bucket_rank,
+              work_date, priority,
               task_id, logistic_code, client_id, premium, address, lat, lng,
               cleaning_time, checkin_date, checkout_date, checkin_time, checkout_time,
               pax_in, pax_out, small_equipment, operation_id, confirmed_operation,
               straordinaria, type_apt, alias, customer_name, reasons
             ) VALUES (
-              $1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
-              $11, $12, $13, $14, $15, $16, $17, $18, $19, $20,
-              $21, $22, $23, $24, $25
+              $1, $2, $3, $4, $5, $6, $7, $8, $9,
+              $10, $11, $12, $13, $14, $15, $16, $17, $18, $19,
+              $20, $21, $22, $23, $24
             )
           `, [
             workDate,
             priority,
-            i,
             task.task_id,
             task.logistic_code || 0,
             task.client_id || null,
             task.premium || false,
             task.address || null,
-            task.lat ? parseFloat(String(task.lat)) : null,
-            task.lng ? parseFloat(String(task.lng)) : null,
+            task.lat || null,
+            task.lng || null,
             task.cleaning_time || 0,
             task.checkin_date || null,
             task.checkout_date || null,
@@ -697,37 +695,29 @@ export class PgDailyAssignmentsService {
    */
   async moveTaskToContainer(workDate: string, task: any, priority: string): Promise<boolean> {
     try {
-      // Get current max bucket_rank for this priority
-      const rankResult = await query(
-        'SELECT COALESCE(MAX(bucket_rank), -1) + 1 as next_rank FROM daily_containers WHERE work_date = $1 AND priority = $2',
-        [workDate, priority]
-      );
-      const bucketRank = rankResult.rows[0]?.next_rank || 0;
-      
       await query(`
         INSERT INTO daily_containers (
-          work_date, priority, bucket_rank,
+          work_date, priority,
           task_id, logistic_code, client_id, premium, address, lat, lng,
           cleaning_time, checkin_date, checkout_date, checkin_time, checkout_time,
           pax_in, pax_out, small_equipment, operation_id, confirmed_operation,
           straordinaria, type_apt, alias, customer_name, reasons
         ) VALUES (
-          $1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
-          $11, $12, $13, $14, $15, $16, $17, $18, $19, $20,
-          $21, $22, $23, $24, $25
+          $1, $2, $3, $4, $5, $6, $7, $8, $9,
+          $10, $11, $12, $13, $14, $15, $16, $17, $18, $19,
+          $20, $21, $22, $23, $24
         )
         ON CONFLICT (work_date, task_id) DO NOTHING
       `, [
         workDate,
         priority,
-        bucketRank,
         task.task_id,
         task.logistic_code || 0,
         task.client_id || null,
         task.premium || false,
         task.address || null,
-        task.lat ? parseFloat(String(task.lat)) : null,
-        task.lng ? parseFloat(String(task.lng)) : null,
+        task.lat || null,
+        task.lng || null,
         task.cleaning_time || 0,
         task.checkin_date || null,
         task.checkout_date || null,

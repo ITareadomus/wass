@@ -15,16 +15,15 @@ async function createContainersTable() {
         id SERIAL PRIMARY KEY,
         work_date DATE NOT NULL,
         priority VARCHAR(20) NOT NULL,
-        bucket_rank INTEGER DEFAULT 0,
         
-        -- Task fields (same as daily_assignments_current)
+        -- Task fields
         task_id INTEGER NOT NULL,
         logistic_code INTEGER NOT NULL,
         client_id INTEGER,
         premium BOOLEAN DEFAULT FALSE,
         address TEXT,
-        lat NUMERIC(10,7),
-        lng NUMERIC(10,7),
+        lat VARCHAR(20),
+        lng VARCHAR(20),
         cleaning_time INTEGER DEFAULT 0,
         checkin_date DATE,
         checkout_date DATE,
@@ -50,7 +49,7 @@ async function createContainersTable() {
     
     await client.query(`
       CREATE INDEX IF NOT EXISTS idx_containers_work_date_priority 
-      ON daily_containers(work_date, priority, bucket_rank);
+      ON daily_containers(work_date, priority);
     `);
     
     await client.query(`
