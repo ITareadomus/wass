@@ -1,0 +1,66 @@
+CREATE TABLE daily_assignments_current (
+    id                   BIGSERIAL PRIMARY KEY,
+
+    -- giorno a cui si riferisce la timeline
+    work_date            DATE        NOT NULL,
+
+    -- riferimento al cleaner
+    cleaner_id           INTEGER     NOT NULL,  -- FK verso tabella cleaners
+
+    -- tutti i campi della TASK (copiati 1:1 dal JSON)
+
+    task_id              BIGINT      NOT NULL,
+    logistic_code        BIGINT      NOT NULL,
+    client_id            BIGINT,               -- può essere NULL
+
+    premium              BOOLEAN     NOT NULL, -- premium della task
+
+    address              TEXT        NOT NULL,
+    lat                  NUMERIC(9,6),         -- "45.4965754"
+    lng                  NUMERIC(9,6),         -- "9.2201698"
+
+    cleaning_time        INTEGER     NOT NULL, -- minuti
+
+    checkin_date         DATE,
+    checkout_date        DATE,
+    checkin_time         TIME,
+    checkout_time        TIME,
+
+    pax_in               INTEGER,
+    pax_out              INTEGER,
+
+    small_equipment      BOOLEAN,
+    operation_id         INTEGER,
+    confirmed_operation  BOOLEAN,
+    straordinaria        BOOLEAN,
+
+    type_apt             TEXT,                -- "A", "B", ecc.
+    alias                TEXT,                -- es. "SFST", "NTM"
+    customer_name        TEXT,                -- "SEFORA SARTORE", "NOTA-MI"
+
+    -- reasons è un array di stringhe nel JSON
+    -- niente JSON: qui uso un ARRAY postgres (colonna singola, valori multipli)
+    reasons              TEXT[]       NOT NULL DEFAULT '{}',
+
+    priority             TEXT,                -- "early_out", ecc.
+
+    start_time           TIME,
+    end_time             TIME,
+    followup             BOOLEAN,
+    sequence             INTEGER      NOT NULL,
+    travel_time          INTEGER      NOT NULL,  -- minuti
+
+    -- meta / audit
+    created_at           TIMESTAMPTZ  NOT NULL DEFAULT now(),
+    updated_at           TIMESTAMPTZ  NOT NULL DEFAULT now()
+);
+
+-- Indici utili
+CREATE INDEX idx_daily_assignments_current_work_date
+    ON daily_assignments_current (work_date);
+
+CREATE INDEX idx_daily_assignments_current_cleaner_date
+    ON daily_assignments_current (cleaner_id, work_date);
+
+CREATE INDEX idx_daily_assignments_current_task
+    ON daily_assignments_current (task_id);
