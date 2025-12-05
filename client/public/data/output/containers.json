@@ -1,6 +1,6 @@
 {
   "metadata": {
-    "last_updated": "2025-12-05T14:01:30.405223",
+    "last_updated": "2025-12-05T14:30:39.453463",
     "date": "2025-12-08"
   },
   "containers": {
@@ -223,33 +223,6 @@
           "priority": "early_out"
         },
         {
-          "task_id": 219862,
-          "logistic_code": 1063,
-          "client_id": 61,
-          "premium": false,
-          "address": "VIA ORESTE SALOMONE, 51",
-          "lat": "45.45289",
-          "lng": "9.24228",
-          "cleaning_time": 60,
-          "checkin_date": "2025-12-14",
-          "checkout_date": "2025-12-08",
-          "checkin_time": null,
-          "checkout_time": null,
-          "pax_in": 1,
-          "pax_out": 3,
-          "small_equipment": true,
-          "operation_id": 2,
-          "confirmed_operation": false,
-          "straordinaria": false,
-          "type_apt": "A",
-          "alias": "NTM",
-          "customer_name": "NOTA-MI",
-          "reasons": [
-            "client_forced_eo"
-          ],
-          "priority": "early_out"
-        },
-        {
           "task_id": 219863,
           "logistic_code": 1091,
           "client_id": 61,
@@ -277,60 +250,6 @@
           "priority": "early_out"
         },
         {
-          "task_id": 219864,
-          "logistic_code": 1153,
-          "client_id": 61,
-          "premium": false,
-          "address": "VIA CELESTINO IV, 9",
-          "lat": "45.4596054",
-          "lng": "9.1821442",
-          "cleaning_time": 120,
-          "checkin_date": "2025-12-10",
-          "checkout_date": "2025-12-08",
-          "checkin_time": null,
-          "checkout_time": null,
-          "pax_in": 1,
-          "pax_out": 1,
-          "small_equipment": false,
-          "operation_id": 2,
-          "confirmed_operation": false,
-          "straordinaria": false,
-          "type_apt": "C",
-          "alias": "NTM",
-          "customer_name": "NOTA-MI",
-          "reasons": [
-            "client_forced_eo"
-          ],
-          "priority": "early_out"
-        },
-        {
-          "task_id": 219865,
-          "logistic_code": 1472,
-          "client_id": 61,
-          "premium": false,
-          "address": "via Voghera 9/A",
-          "lat": "45.4540455",
-          "lng": "9.1676391",
-          "cleaning_time": 120,
-          "checkin_date": "2025-12-09",
-          "checkout_date": "2025-12-08",
-          "checkin_time": "15:00",
-          "checkout_time": null,
-          "pax_in": 2,
-          "pax_out": 3,
-          "small_equipment": false,
-          "operation_id": 2,
-          "confirmed_operation": false,
-          "straordinaria": false,
-          "type_apt": "C",
-          "alias": "NTM",
-          "customer_name": "NOTA-MI",
-          "reasons": [
-            "client_forced_eo"
-          ],
-          "priority": "early_out"
-        },
-        {
           "task_id": 219866,
           "logistic_code": 1487,
           "client_id": 61,
@@ -341,36 +260,9 @@
           "cleaning_time": 60,
           "checkin_date": "2025-12-08",
           "checkout_date": "2025-12-08",
-          "checkin_time": null,
+          "checkin_time": "19:30",
           "checkout_time": null,
           "pax_in": 1,
-          "pax_out": 1,
-          "small_equipment": true,
-          "operation_id": 2,
-          "confirmed_operation": false,
-          "straordinaria": false,
-          "type_apt": "A",
-          "alias": "NTM",
-          "customer_name": "NOTA-MI",
-          "reasons": [
-            "client_forced_eo"
-          ],
-          "priority": "early_out"
-        },
-        {
-          "task_id": 219867,
-          "logistic_code": 1625,
-          "client_id": 61,
-          "premium": false,
-          "address": "via Goffredo Mameli 9",
-          "lat": "45.466406",
-          "lng": "9.2134926",
-          "cleaning_time": 60,
-          "checkin_date": "2025-12-12",
-          "checkout_date": "2025-12-08",
-          "checkin_time": null,
-          "checkout_time": null,
-          "pax_in": 3,
           "pax_out": 1,
           "small_equipment": true,
           "operation_id": 2,
@@ -385,7 +277,7 @@
           "priority": "early_out"
         }
       ],
-      "count": 14
+      "count": 10
     },
     "high_priority": {
       "tasks": [
@@ -818,8 +710,8 @@
     }
   },
   "summary": {
-    "total_tasks": 29,
-    "early_out": 14,
+    "total_tasks": 25,
+    "early_out": 10,
     "high_priority": 4,
     "low_priority": 11
   }

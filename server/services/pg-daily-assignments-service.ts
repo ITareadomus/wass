@@ -527,6 +527,272 @@ export class PgDailyAssignmentsService {
       return [];
     }
   }
+
+  // ==================== CONTAINERS (FLAT STRUCTURE) ====================
+
+  /**
+   * Load containers for a work_date
+   * Reconstructs JSON structure from flat PostgreSQL rows
+   * Returns: { containers: { early_out: [...], high: [...], low: [...] } }
+   */
+  async loadContainers(workDate: string): Promise<any | null> {
+    try {
+      const result = await query(
+        'SELECT * FROM daily_containers WHERE work_date = $1 ORDER BY priority, bucket_rank',
+        [workDate]
+      );
+      
+      if (result.rows.length === 0) {
+        console.log(`📖 PG: Nessun container trovato per ${workDate}`);
+        return null;
+      }
+
+      // Group rows by priority
+      const containers: { [key: string]: any[] } = {
+        early_out: [],
+        high: [],
+        low: []
+      };
+
+      for (const row of result.rows) {
+        const task: any = {
+          task_id: row.task_id,
+          logistic_code: row.logistic_code,
+          priority: row.priority
+        };
+        
+        // Add optional fields
+        if (row.client_id) task.client_id = row.client_id;
+        if (row.premium !== null) task.premium = row.premium;
+        if (row.address) task.address = row.address;
+        if (row.lat !== null) task.lat = parseFloat(String(row.lat));
+        if (row.lng !== null) task.lng = parseFloat(String(row.lng));
+        if (row.cleaning_time) task.cleaning_time = row.cleaning_time;
+        if (row.checkin_date) task.checkin_date = row.checkin_date;
+        if (row.checkout_date) task.checkout_date = row.checkout_date;
+        if (row.checkin_time) task.checkin_time = row.checkin_time;
+        if (row.checkout_time) task.checkout_time = row.checkout_time;
+        if (row.pax_in !== null) task.pax_in = row.pax_in;
+        if (row.pax_out !== null) task.pax_out = row.pax_out;
+        if (row.small_equipment !== null) task.small_equipment = row.small_equipment;
+        if (row.operation_id !== null) task.operation_id = row.operation_id;
+        if (row.confirmed_operation !== null) task.confirmed_operation = row.confirmed_operation;
+        if (row.straordinaria !== null) task.straordinaria = row.straordinaria;
+        if (row.type_apt) task.type_apt = row.type_apt;
+        if (row.alias) task.alias = row.alias;
+        if (row.customer_name) task.customer_name = row.customer_name;
+        if (row.reasons && row.reasons.length > 0) task.reasons = row.reasons;
+
+        // Add to appropriate priority bucket
+        const priority = row.priority || 'low';
+        if (!containers[priority]) containers[priority] = [];
+        containers[priority].push(task);
+      }
+
+      console.log(`✅ PG: Containers caricati per ${workDate} (${result.rows.length} task)`);
+      return { containers };
+    } catch (error) {
+      console.error('❌ PG: Errore nel caricamento containers:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Save containers for a work_date
+   * Converts JSON structure to flat PostgreSQL rows
+   * Input: { containers: { early_out: [...], high: [...], low: [...] } }
+   */
+  async saveContainers(workDate: string, containersData: any): Promise<boolean> {
+    const client = await pool.connect();
+    
+    try {
+      await client.query('BEGIN');
+      
+      // Delete existing containers for this date
+      await client.query('DELETE FROM daily_containers WHERE work_date = $1', [workDate]);
+      
+      const containers = containersData?.containers || {};
+      let totalInserted = 0;
+      
+      // Insert tasks for each priority
+      for (const priority of ['early_out', 'high', 'low']) {
+        const tasks = containers[priority] || [];
+        
+        for (let i = 0; i < tasks.length; i++) {
+          const task = tasks[i];
+          if (!task.task_id) continue;
+          
+          await client.query(`
+            INSERT INTO daily_containers (
+              work_date, priority, bucket_rank,
+              task_id, logistic_code, client_id, premium, address, lat, lng,
+              cleaning_time, checkin_date, checkout_date, checkin_time, checkout_time,
+              pax_in, pax_out, small_equipment, operation_id, confirmed_operation,
+              straordinaria, type_apt, alias, customer_name, reasons
+            ) VALUES (
+              $1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
+              $11, $12, $13, $14, $15, $16, $17, $18, $19, $20,
+              $21, $22, $23, $24, $25
+            )
+          `, [
+            workDate,
+            priority,
+            i,
+            task.task_id,
+            task.logistic_code || 0,
+            task.client_id || null,
+            task.premium || false,
+            task.address || null,
+            task.lat ? parseFloat(String(task.lat)) : null,
+            task.lng ? parseFloat(String(task.lng)) : null,
+            task.cleaning_time || 0,
+            task.checkin_date || null,
+            task.checkout_date || null,
+            task.checkin_time || null,
+            task.checkout_time || null,
+            task.pax_in ?? null,
+            task.pax_out ?? null,
+            task.small_equipment || false,
+            task.operation_id ?? null,
+            task.confirmed_operation || false,
+            task.straordinaria || false,
+            task.type_apt || null,
+            task.alias || null,
+            task.customer_name || null,
+            task.reasons || []
+          ]);
+          
+          totalInserted++;
+        }
+      }
+      
+      await client.query('COMMIT');
+      console.log(`✅ PG: Containers salvati per ${workDate} (${totalInserted} task)`);
+      return true;
+    } catch (error) {
+      await client.query('ROLLBACK');
+      console.error('❌ PG: Errore nel salvataggio containers:', error);
+      return false;
+    } finally {
+      client.release();
+    }
+  }
+
+  /**
+   * Move a task from containers to assignments (when assigned to a cleaner)
+   */
+  async moveTaskToAssignment(workDate: string, taskId: number): Promise<boolean> {
+    try {
+      await query('DELETE FROM daily_containers WHERE work_date = $1 AND task_id = $2', [workDate, taskId]);
+      console.log(`✅ PG: Task ${taskId} rimosso dai containers per ${workDate}`);
+      return true;
+    } catch (error) {
+      console.error('❌ PG: Errore nella rimozione task da containers:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Move a task from assignments back to containers (when unassigned)
+   */
+  async moveTaskToContainer(workDate: string, task: any, priority: string): Promise<boolean> {
+    try {
+      // Get current max bucket_rank for this priority
+      const rankResult = await query(
+        'SELECT COALESCE(MAX(bucket_rank), -1) + 1 as next_rank FROM daily_containers WHERE work_date = $1 AND priority = $2',
+        [workDate, priority]
+      );
+      const bucketRank = rankResult.rows[0]?.next_rank || 0;
+      
+      await query(`
+        INSERT INTO daily_containers (
+          work_date, priority, bucket_rank,
+          task_id, logistic_code, client_id, premium, address, lat, lng,
+          cleaning_time, checkin_date, checkout_date, checkin_time, checkout_time,
+          pax_in, pax_out, small_equipment, operation_id, confirmed_operation,
+          straordinaria, type_apt, alias, customer_name, reasons
+        ) VALUES (
+          $1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
+          $11, $12, $13, $14, $15, $16, $17, $18, $19, $20,
+          $21, $22, $23, $24, $25
+        )
+        ON CONFLICT (work_date, task_id) DO NOTHING
+      `, [
+        workDate,
+        priority,
+        bucketRank,
+        task.task_id,
+        task.logistic_code || 0,
+        task.client_id || null,
+        task.premium || false,
+        task.address || null,
+        task.lat ? parseFloat(String(task.lat)) : null,
+        task.lng ? parseFloat(String(task.lng)) : null,
+        task.cleaning_time || 0,
+        task.checkin_date || null,
+        task.checkout_date || null,
+        task.checkin_time || null,
+        task.checkout_time || null,
+        task.pax_in ?? null,
+        task.pax_out ?? null,
+        task.small_equipment || false,
+        task.operation_id ?? null,
+        task.confirmed_operation || false,
+        task.straordinaria || false,
+        task.type_apt || null,
+        task.alias || null,
+        task.customer_name || null,
+        task.reasons || []
+      ]);
+      
+      console.log(`✅ PG: Task ${task.task_id} aggiunto ai containers (${priority}) per ${workDate}`);
+      return true;
+    } catch (error) {
+      console.error('❌ PG: Errore nell\'aggiunta task a containers:', error);
+      return false;
+    }
+  }
+
+  // ==================== SELECTED CLEANERS ====================
+
+  /**
+   * Load selected cleaners for a work_date
+   */
+  async loadSelectedCleaners(workDate: string): Promise<any[] | null> {
+    try {
+      const result = await query(
+        'SELECT cleaners FROM daily_selected_cleaners WHERE work_date = $1',
+        [workDate]
+      );
+      if (result.rows.length > 0 && result.rows[0].cleaners) {
+        console.log(`✅ PG: Selected cleaners caricati per ${workDate}`);
+        return result.rows[0].cleaners;
+      }
+      return null;
+    } catch (error) {
+      console.error('❌ PG: Errore nel caricamento selected cleaners:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Save selected cleaners for a work_date (upsert)
+   */
+  async saveSelectedCleaners(workDate: string, cleaners: any[]): Promise<boolean> {
+    try {
+      await query(`
+        INSERT INTO daily_selected_cleaners (work_date, cleaners, updated_at)
+        VALUES ($1, $2, NOW())
+        ON CONFLICT (work_date) 
+        DO UPDATE SET cleaners = $2, updated_at = NOW()
+      `, [workDate, JSON.stringify(cleaners)]);
+      console.log(`✅ PG: Selected cleaners salvati per ${workDate}`);
+      return true;
+    } catch (error) {
+      console.error('❌ PG: Errore nel salvataggio selected cleaners:', error);
+      return false;
+    }
+  }
 }
 
 export const pgDailyAssignmentsService = new PgDailyAssignmentsService();

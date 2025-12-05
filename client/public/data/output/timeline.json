@@ -1,18 +1,4 @@
 {
-  "meta": {
-    "total_tasks": 4,
-    "used_cleaners": 0,
-    "assigned_tasks": 0,
-    "total_cleaners": 3
-  },
-  "metadata": {
-    "date": "2025-12-08",
-    "created_by": "unknown",
-    "modified_by": [
-      "Admin"
-    ],
-    "last_updated": "2025-12-05 15:15:32"
-  },
   "cleaners_assignments": [
     {
       "cleaner": {
@@ -25,18 +11,16 @@
       },
       "tasks": [
         {
-          "task_id": 219865,
-          "logistic_code": 1472,
-          "client_id": null,
+          "task_id": "219865",
+          "logistic_code": "1472",
           "premium": false,
           "address": "via Voghera 9/A",
-          "lat": "45.4540455",
-          "lng": "9.1676391",
+          "lat": 45.454046,
+          "lng": 9.167639,
           "cleaning_time": 120,
-          "checkin_date": "2025-12-09",
-          "checkout_date": "2025-12-08",
-          "checkin_time": "15:00",
-          "checkout_time": null,
+          "checkin_date": "2025-12-09T00:00:00.000Z",
+          "checkout_date": "2025-12-08T00:00:00.000Z",
+          "checkin_time": "15:00:00",
           "pax_in": 2,
           "pax_out": 3,
           "small_equipment": false,
@@ -51,25 +35,22 @@
             "manual_assignment"
           ],
           "priority": "early_out",
-          "start_time": "10:00",
-          "end_time": "12:00",
+          "start_time": "10:00:00",
+          "end_time": "12:00:00",
           "followup": false,
           "sequence": 1,
           "travel_time": 0
         },
         {
-          "task_id": 219867,
-          "logistic_code": 1625,
-          "client_id": null,
+          "task_id": "219867",
+          "logistic_code": "1625",
           "premium": false,
           "address": "via Goffredo Mameli 9",
-          "lat": "45.466406",
-          "lng": "9.2134926",
+          "lat": 45.466406,
+          "lng": 9.213493,
           "cleaning_time": 60,
-          "checkin_date": "2025-12-12",
-          "checkout_date": "2025-12-08",
-          "checkin_time": null,
-          "checkout_time": null,
+          "checkin_date": "2025-12-12T00:00:00.000Z",
+          "checkout_date": "2025-12-08T00:00:00.000Z",
           "pax_in": 3,
           "pax_out": 1,
           "small_equipment": false,
@@ -84,24 +65,13 @@
             "manual_assignment"
           ],
           "priority": "early_out",
-          "start_time": "12:34",
-          "end_time": "13:34",
+          "start_time": "12:34:00",
+          "end_time": "13:34:00",
           "followup": true,
           "sequence": 2,
           "travel_time": 34
         }
       ]
-    },
-    {
-      "cleaner": {
-        "id": 495,
-        "name": "EL HADJI",
-        "lastname": "BA",
-        "role": "Premium",
-        "premium": true,
-        "start_time": "10:00"
-      },
-      "tasks": []
     },
     {
       "cleaner": {
@@ -114,18 +84,15 @@
       },
       "tasks": [
         {
-          "task_id": 219862,
-          "logistic_code": 1063,
-          "client_id": null,
+          "task_id": "219862",
+          "logistic_code": "1063",
           "premium": false,
           "address": "VIA ORESTE SALOMONE, 51",
-          "lat": "45.45289",
-          "lng": "9.24228",
+          "lat": 45.45289,
+          "lng": 9.24228,
           "cleaning_time": 60,
-          "checkin_date": "2025-12-14",
-          "checkout_date": "2025-12-08",
-          "checkin_time": null,
-          "checkout_time": null,
+          "checkin_date": "2025-12-14T00:00:00.000Z",
+          "checkout_date": "2025-12-08T00:00:00.000Z",
           "pax_in": 1,
           "pax_out": 3,
           "small_equipment": false,
@@ -140,25 +107,22 @@
             "manual_assignment"
           ],
           "priority": "early_out",
-          "start_time": "10:00",
-          "end_time": "11:00",
+          "start_time": "10:00:00",
+          "end_time": "11:00:00",
           "followup": false,
           "sequence": 1,
           "travel_time": 0
         },
         {
-          "task_id": 219864,
-          "logistic_code": 1153,
-          "client_id": null,
+          "task_id": "219864",
+          "logistic_code": "1153",
           "premium": false,
           "address": "VIA CELESTINO IV, 9",
-          "lat": "45.4596054",
-          "lng": "9.1821442",
+          "lat": 45.459605,
+          "lng": 9.182144,
           "cleaning_time": 120,
-          "checkin_date": "2025-12-10",
-          "checkout_date": "2025-12-08",
-          "checkin_time": null,
-          "checkout_time": null,
+          "checkin_date": "2025-12-10T00:00:00.000Z",
+          "checkout_date": "2025-12-08T00:00:00.000Z",
           "pax_in": 1,
           "pax_out": 1,
           "small_equipment": false,
@@ -173,13 +137,18 @@
             "manual_assignment"
           ],
           "priority": "early_out",
-          "start_time": "11:41",
-          "end_time": "13:41",
+          "start_time": "11:41:00",
+          "end_time": "13:41:00",
           "followup": true,
           "sequence": 2,
           "travel_time": 41
         }
       ]
     }
-  ]
+  ],
+  "metadata": {
+    "date": "2025-12-08",
+    "last_updated": "2025-12-05T14:30:40.075Z",
+    "source": "postgresql"
+  }
 }
