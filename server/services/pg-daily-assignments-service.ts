@@ -4,6 +4,11 @@ export interface PgDailyAssignmentRow {
   id?: number;
   work_date: string;
   cleaner_id: number;
+  cleaner_name?: string | null;
+  cleaner_lastname?: string | null;
+  cleaner_role?: string | null;
+  cleaner_premium?: boolean | null;
+  cleaner_start_time?: string | null;
   task_id: number;
   logistic_code: number;
   client_id?: number | null;
@@ -40,6 +45,7 @@ export class PgDailyAssignmentsService {
 
   /**
    * Convert timeline JSON to flat rows for PostgreSQL
+   * Each row includes both cleaner and task data for complete reconstruction
    */
   private timelineToRows(workDate: string, timeline: any): PgDailyAssignmentRow[] {
     const rows: PgDailyAssignmentRow[] = [];
@@ -58,7 +64,14 @@ export class PgDailyAssignmentsService {
 
         const row: PgDailyAssignmentRow = {
           work_date: workDate,
+          // Cleaner data (repeated for each task, enables full reconstruction)
           cleaner_id: Number(cleaner.id),
+          cleaner_name: cleaner.name || null,
+          cleaner_lastname: cleaner.lastname || null,
+          cleaner_role: cleaner.role || null,
+          cleaner_premium: cleaner.premium != null ? Boolean(cleaner.premium) : null,
+          cleaner_start_time: cleaner.start_time || '10:00',
+          // Task data
           task_id: Number(task.task_id),
           logistic_code: Number(task.logistic_code || 0),
           client_id: task.client_id ? Number(task.client_id) : null,
@@ -121,27 +134,34 @@ export class PgDailyAssignmentsService {
         return 0;
       }
 
-      // Insert new rows
+      // Insert new rows (includes cleaner data for full reconstruction)
       for (const row of rows) {
         await client.query(`
           INSERT INTO daily_assignments_current (
-            work_date, cleaner_id, task_id, logistic_code, client_id,
+            work_date, cleaner_id, cleaner_name, cleaner_lastname, cleaner_role, cleaner_premium, cleaner_start_time,
+            task_id, logistic_code, client_id,
             premium, address, lat, lng, cleaning_time,
             checkin_date, checkout_date, checkin_time, checkout_time,
             pax_in, pax_out, small_equipment, operation_id, confirmed_operation, straordinaria,
             type_apt, alias, customer_name, reasons, priority,
             start_time, end_time, followup, sequence, travel_time
           ) VALUES (
-            $1, $2, $3, $4, $5,
-            $6, $7, $8, $9, $10,
-            $11, $12, $13, $14,
-            $15, $16, $17, $18, $19, $20,
-            $21, $22, $23, $24, $25,
-            $26, $27, $28, $29, $30
+            $1, $2, $3, $4, $5, $6, $7,
+            $8, $9, $10,
+            $11, $12, $13, $14, $15,
+            $16, $17, $18, $19,
+            $20, $21, $22, $23, $24, $25,
+            $26, $27, $28, $29, $30,
+            $31, $32, $33, $34, $35
           )
         `, [
           row.work_date,
           row.cleaner_id,
+          row.cleaner_name,
+          row.cleaner_lastname,
+          row.cleaner_role,
+          row.cleaner_premium,
+          row.cleaner_start_time,
           row.task_id,
           row.logistic_code,
           row.client_id,
@@ -187,7 +207,7 @@ export class PgDailyAssignmentsService {
   }
 
   /**
-   * Get all assignments for a work_date
+   * Get all assignments for a work_date (flat rows)
    */
   async getAssignments(workDate: string): Promise<PgDailyAssignmentRow[]> {
     try {
@@ -199,6 +219,107 @@ export class PgDailyAssignmentsService {
     } catch (error) {
       console.error('❌ PG: Errore nel caricamento:', error);
       return [];
+    }
+  }
+
+  /**
+   * Load timeline from PostgreSQL flat records and reconstruct JSON structure
+   * This is the inverse of timelineToRows - converts flat DB rows back to timeline format
+   * 
+   * Returns the same structure as timeline.json:
+   * {
+   *   cleaners_assignments: [
+   *     { cleaner: {...}, tasks: [...] },
+   *     ...
+   *   ],
+   *   metadata: { date, last_updated }
+   * }
+   */
+  async loadTimeline(workDate: string): Promise<any | null> {
+    try {
+      const rows = await this.getAssignments(workDate);
+      
+      if (rows.length === 0) {
+        console.log(`📖 PG: Nessuna assegnazione trovata per ${workDate}`);
+        return null;
+      }
+
+      // Group rows by cleaner_id
+      const cleanerMap = new Map<number, { cleaner: any; tasks: any[] }>();
+
+      for (const row of rows) {
+        if (!cleanerMap.has(row.cleaner_id)) {
+          // Build cleaner object from stored data
+          const cleaner: any = { id: row.cleaner_id };
+          if (row.cleaner_name) cleaner.name = row.cleaner_name;
+          if (row.cleaner_lastname) cleaner.lastname = row.cleaner_lastname;
+          if (row.cleaner_role) cleaner.role = row.cleaner_role;
+          if (row.cleaner_premium !== null) cleaner.premium = row.cleaner_premium;
+          cleaner.start_time = row.cleaner_start_time || '10:00';
+          
+          cleanerMap.set(row.cleaner_id, {
+            cleaner,
+            tasks: []
+          });
+        }
+
+        const task: any = {
+          task_id: row.task_id,
+          logistic_code: row.logistic_code,
+        };
+        
+        // Add optional fields only if they have values
+        if (row.client_id) task.client_id = row.client_id;
+        if (row.premium !== null) task.premium = row.premium;
+        if (row.address) task.address = row.address;
+        if (row.lat !== null) task.lat = parseFloat(String(row.lat));
+        if (row.lng !== null) task.lng = parseFloat(String(row.lng));
+        if (row.cleaning_time) task.cleaning_time = row.cleaning_time;
+        if (row.checkin_date) task.checkin_date = row.checkin_date;
+        if (row.checkout_date) task.checkout_date = row.checkout_date;
+        if (row.checkin_time) task.checkin_time = row.checkin_time;
+        if (row.checkout_time) task.checkout_time = row.checkout_time;
+        if (row.pax_in !== null) task.pax_in = row.pax_in;
+        if (row.pax_out !== null) task.pax_out = row.pax_out;
+        if (row.small_equipment !== null) task.small_equipment = row.small_equipment;
+        if (row.operation_id !== null) task.operation_id = row.operation_id;
+        if (row.confirmed_operation !== null) task.confirmed_operation = row.confirmed_operation;
+        if (row.straordinaria !== null) task.straordinaria = row.straordinaria;
+        if (row.type_apt) task.type_apt = row.type_apt;
+        if (row.alias) task.alias = row.alias;
+        if (row.customer_name) task.customer_name = row.customer_name;
+        if (row.reasons && row.reasons.length > 0) task.reasons = row.reasons;
+        if (row.priority) task.priority = row.priority;
+        if (row.start_time) task.start_time = row.start_time;
+        if (row.end_time) task.end_time = row.end_time;
+        if (row.followup !== null) task.followup = row.followup;
+        if (row.sequence !== null) task.sequence = row.sequence;
+        if (row.travel_time !== null) task.travel_time = row.travel_time;
+
+        cleanerMap.get(row.cleaner_id)!.tasks.push(task);
+      }
+
+      // Convert map to array and sort tasks by sequence
+      const cleaners_assignments = Array.from(cleanerMap.values()).map(ca => ({
+        ...ca,
+        tasks: ca.tasks.sort((a, b) => (a.sequence || 0) - (b.sequence || 0))
+      }));
+
+      const timeline = {
+        cleaners_assignments,
+        metadata: {
+          date: workDate,
+          last_updated: new Date().toISOString(),
+          source: 'postgresql'
+        }
+      };
+
+      console.log(`✅ PG: Timeline ricostruita per ${workDate} (${rows.length} task, ${cleaners_assignments.length} cleaners)`);
+      return timeline;
+
+    } catch (error) {
+      console.error('❌ PG: Errore nel caricamento timeline:', error);
+      return null;
     }
   }
 
@@ -255,9 +376,16 @@ export class PgDailyAssignmentsService {
       
       await client.query('BEGIN');
 
-      // Get next revision number with lock (inside transaction for atomicity)
+      // Lock the revisions table for this work_date to prevent race conditions
+      // Use a separate SELECT FOR UPDATE on the table itself, then calculate MAX
+      await client.query(
+        'SELECT 1 FROM daily_assignments_revisions WHERE work_date = $1 FOR UPDATE',
+        [workDate]
+      );
+      
+      // Now safely get the next revision number
       const revResult = await client.query(
-        'SELECT COALESCE(MAX(revision), 0) + 1 as next_revision FROM daily_assignments_revisions WHERE work_date = $1 FOR UPDATE',
+        'SELECT COALESCE(MAX(revision), 0) + 1 as next_revision FROM daily_assignments_revisions WHERE work_date = $1',
         [workDate]
       );
       const revision = parseInt(revResult.rows[0]?.next_revision || '1');
@@ -271,28 +399,35 @@ export class PgDailyAssignmentsService {
         VALUES ($1, $2, $3, $4, $5)
       `, [workDate, revision, rows.length, createdBy, modificationType]);
 
-      // Insert task rows if any
+      // Insert task rows if any (includes cleaner data for full reconstruction)
       for (const row of rows) {
         await client.query(`
           INSERT INTO daily_assignments_history (
-            work_date, revision, cleaner_id, task_id, logistic_code, client_id,
+            work_date, revision, cleaner_id, cleaner_name, cleaner_lastname, cleaner_role, cleaner_premium, cleaner_start_time,
+            task_id, logistic_code, client_id,
             premium, address, lat, lng, cleaning_time,
             checkin_date, checkout_date, checkin_time, checkout_time,
             pax_in, pax_out, small_equipment, operation_id, confirmed_operation, straordinaria,
             type_apt, alias, customer_name, reasons, priority,
             start_time, end_time, followup, sequence, travel_time, created_by
           ) VALUES (
-            $1, $2, $3, $4, $5, $6,
-            $7, $8, $9, $10, $11,
-            $12, $13, $14, $15,
-            $16, $17, $18, $19, $20, $21,
-            $22, $23, $24, $25, $26,
-            $27, $28, $29, $30, $31, $32
+            $1, $2, $3, $4, $5, $6, $7, $8,
+            $9, $10, $11,
+            $12, $13, $14, $15, $16,
+            $17, $18, $19, $20,
+            $21, $22, $23, $24, $25, $26,
+            $27, $28, $29, $30, $31,
+            $32, $33, $34, $35, $36, $37
           )
         `, [
           row.work_date,
           revision,
           row.cleaner_id,
+          row.cleaner_name,
+          row.cleaner_lastname,
+          row.cleaner_role,
+          row.cleaner_premium,
+          row.cleaner_start_time,
           row.task_id,
           row.logistic_code,
           row.client_id,
