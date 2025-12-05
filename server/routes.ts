@@ -635,6 +635,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Endpoint per verificare la history su PostgreSQL
+  app.get("/api/pg-history", async (req, res) => {
+    try {
+      const { pgDailyAssignmentsService } = await import("./services/pg-daily-assignments-service");
+      const dateParam = (req.query.date as string) || format(new Date(), "yyyy-MM-dd");
+      const revisionParam = req.query.revision ? parseInt(req.query.revision as string) : null;
+      
+      if (revisionParam) {
+        // Get specific revision
+        const assignments = await pgDailyAssignmentsService.getHistoryByRevision(dateParam, revisionParam);
+        res.json({
+          success: true,
+          date: dateParam,
+          revision: revisionParam,
+          count: assignments.length,
+          assignments
+        });
+      } else {
+        // Get list of revisions
+        const revisions = await pgDailyAssignmentsService.getHistoryRevisions(dateParam);
+        console.log(`📜 PG History: ${revisions.length} revisioni trovate per ${dateParam}`);
+        
+        res.json({
+          success: true,
+          date: dateParam,
+          revisions
+        });
+      }
+    } catch (error: any) {
+      console.error("Errore nel caricamento history da PostgreSQL:", error);
+      res.status(500).json({
+        success: false,
+        error: error.message,
+      });
+    }
+  });
+
   // Endpoint per salvare un'assegnazione nella timeline
   app.post("/api/save-timeline-assignment", async (req, res) => {
     try {

@@ -1,13 +1,17 @@
 {
   "meta": {
+    "total_tasks": 0,
     "used_cleaners": 0,
     "assigned_tasks": 0,
     "total_cleaners": 0
   },
   "metadata": {
-    "date": "2025-12-08",
-    "created_by": "Admin",
-    "last_updated": "2025-12-05 11:20:27"
+    "date": "2025-12-05",
+    "created_by": "unknown",
+    "modified_by": [
+      "Admin"
+    ],
+    "last_updated": "2025-12-04 12:25:27"
   },
   "cleaners_assignments": []
 }

@@ -262,9 +262,15 @@ export async function saveTimeline(
     console.log(`✅ Timeline revision created in MySQL for ${workDate} by ${createdBy} (type: ${modificationType})`);
 
     // DUAL-WRITE: Also save to PostgreSQL (DigitalOcean) in flat format
+    // Direct from memory - no JSON intermediate
     try {
       const { pgDailyAssignmentsService } = await import('./pg-daily-assignments-service');
+      
+      // Save current state (replaces existing)
       await pgDailyAssignmentsService.saveTimeline(workDate, normalizedData);
+      
+      // Save to history (audit/rollback) - also direct from memory
+      await pgDailyAssignmentsService.saveToHistory(workDate, normalizedData, createdBy);
     } catch (pgError) {
       // Log but don't fail - PostgreSQL is secondary for now
       console.error(`⚠️ PG: Errore nel salvataggio (non bloccante):`, pgError);

@@ -234,6 +234,144 @@ export class PgDailyAssignmentsService {
       return 0;
     }
   }
+
+  /**
+   * Get the next revision number for a work_date
+   */
+  async getNextRevision(workDate: string): Promise<number> {
+    try {
+      const result = await query(
+        'SELECT COALESCE(MAX(revision), 0) + 1 as next_revision FROM daily_assignments_history WHERE work_date = $1',
+        [workDate]
+      );
+      return parseInt(result.rows[0]?.next_revision || '1');
+    } catch (error) {
+      console.error('❌ PG: Errore nel calcolo revisione:', error);
+      return 1;
+    }
+  }
+
+  /**
+   * Save timeline to history (audit/rollback purposes)
+   * Direct write from memory - no JSON intermediate
+   */
+  async saveToHistory(workDate: string, timeline: any, createdBy: string = 'system'): Promise<number> {
+    const client = await pool.connect();
+    
+    try {
+      const rows = this.timelineToRows(workDate, timeline);
+      const revision = await this.getNextRevision(workDate);
+      
+      console.log(`📜 PG History: Salvando revisione ${revision} con ${rows.length} righe per ${workDate}...`);
+
+      await client.query('BEGIN');
+
+      if (rows.length === 0) {
+        await client.query('COMMIT');
+        console.log(`✅ PG History: Nessuna assegnazione da salvare per ${workDate} (rev ${revision})`);
+        return revision;
+      }
+
+      for (const row of rows) {
+        await client.query(`
+          INSERT INTO daily_assignments_history (
+            work_date, revision, cleaner_id, task_id, logistic_code, client_id,
+            premium, address, lat, lng, cleaning_time,
+            checkin_date, checkout_date, checkin_time, checkout_time,
+            pax_in, pax_out, small_equipment, operation_id, confirmed_operation, straordinaria,
+            type_apt, alias, customer_name, reasons, priority,
+            start_time, end_time, followup, sequence, travel_time, created_by
+          ) VALUES (
+            $1, $2, $3, $4, $5, $6,
+            $7, $8, $9, $10, $11,
+            $12, $13, $14, $15,
+            $16, $17, $18, $19, $20, $21,
+            $22, $23, $24, $25, $26,
+            $27, $28, $29, $30, $31, $32
+          )
+        `, [
+          row.work_date,
+          revision,
+          row.cleaner_id,
+          row.task_id,
+          row.logistic_code,
+          row.client_id,
+          row.premium,
+          row.address,
+          row.lat,
+          row.lng,
+          row.cleaning_time,
+          row.checkin_date,
+          row.checkout_date,
+          row.checkin_time,
+          row.checkout_time,
+          row.pax_in,
+          row.pax_out,
+          row.small_equipment,
+          row.operation_id,
+          row.confirmed_operation,
+          row.straordinaria,
+          row.type_apt,
+          row.alias,
+          row.customer_name,
+          row.reasons,
+          row.priority,
+          row.start_time,
+          row.end_time,
+          row.followup,
+          row.sequence,
+          row.travel_time,
+          createdBy,
+        ]);
+      }
+
+      await client.query('COMMIT');
+      console.log(`✅ PG History: Salvata revisione ${revision} con ${rows.length} assegnazioni per ${workDate}`);
+      return revision;
+
+    } catch (error) {
+      await client.query('ROLLBACK');
+      console.error('❌ PG History: Errore nel salvataggio:', error);
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  /**
+   * Get history revisions for a work_date
+   */
+  async getHistoryRevisions(workDate: string): Promise<{ revision: number; created_at: Date; created_by: string; task_count: number }[]> {
+    try {
+      const result = await query(`
+        SELECT revision, MIN(created_at) as created_at, MIN(created_by) as created_by, COUNT(*) as task_count
+        FROM daily_assignments_history 
+        WHERE work_date = $1
+        GROUP BY revision
+        ORDER BY revision DESC
+      `, [workDate]);
+      return result.rows;
+    } catch (error) {
+      console.error('❌ PG History: Errore nel caricamento revisioni:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Get assignments for a specific revision
+   */
+  async getHistoryByRevision(workDate: string, revision: number): Promise<PgDailyAssignmentRow[]> {
+    try {
+      const result = await query(
+        'SELECT * FROM daily_assignments_history WHERE work_date = $1 AND revision = $2 ORDER BY cleaner_id, sequence',
+        [workDate, revision]
+      );
+      return result.rows;
+    } catch (error) {
+      console.error('❌ PG History: Errore nel caricamento revisione:', error);
+      return [];
+    }
+  }
 }
 
 export const pgDailyAssignmentsService = new PgDailyAssignmentsService();
