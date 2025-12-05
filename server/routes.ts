@@ -201,9 +201,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { date, modified_by } = req.body;
       const workDate = date || format(new Date(), 'yyyy-MM-dd');
       const currentUsername = modified_by || getCurrentUsername(req);
-      const timelinePath = path.join(process.cwd(), 'client/public/data/output/timeline.json');
 
-      // Svuota il file timeline.json con struttura corretta
+      // Svuota la timeline con struttura corretta
       const emptyTimeline = {
         metadata: {
           last_updated: new Date().toISOString(),
@@ -218,11 +217,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       };
 
-      // Salva timeline (dual-write: filesystem + Object Storage)
+      // Salva timeline su PostgreSQL
       await workspaceFiles.saveTimeline(workDate, emptyTimeline, false, currentUsername, 'timeline_reset');
-      console.log(`Timeline resettata: timeline.json (struttura corretta)`);
+      console.log(`Timeline resettata su PostgreSQL (struttura corretta)`);
 
-      // FORZA la ricreazione di containers.json rieseguendo create_containers.py
+      // FORZA la ricreazione dei containers rieseguendo create_containers.py
       console.log(`Rieseguendo create_containers.py per ripristinare i containers...`);
       const containersResult = await new Promise<string>((resolve, reject) => {
         exec(
@@ -239,30 +238,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
       console.log("create_containers output:", containersResult);
 
-      // Salva containers su PostgreSQL dopo averli creati
+      // Leggi containers dal filesystem (dove Python ha scritto) e salva su PostgreSQL
       try {
-        const containersPath = path.join(process.cwd(), 'client/public/data/output/containers.json');
+        const containersPath = path.join(DATA_OUTPUT_DIR, 'containers.json');
         const containersJson = await fs.readFile(containersPath, 'utf-8');
         const containersData = JSON.parse(containersJson);
         
-        const pgContainersData = {
-          containers: {
-            early_out: { tasks: containersData.containers?.early_out?.tasks || [] },
-            high_priority: { tasks: containersData.containers?.high_priority?.tasks || [] },
-            low_priority: { tasks: containersData.containers?.low_priority?.tasks || [] }
-          }
-        };
-        
-        const { pgDailyAssignmentsService } = await import('./services/pg-daily-assignments-service');
-        await pgDailyAssignmentsService.saveContainers(workDate, pgContainersData);
+        await workspaceFiles.saveContainers(workDate, containersData, currentUsername, 'containers_reset');
         console.log(`✅ Containers salvati su PostgreSQL per ${workDate}`);
       } catch (pgError) {
         console.error(`⚠️ Errore nel salvataggio containers su PG (non bloccante):`, pgError);
       }
 
-      // CRITICAL: Forza nuovamente il reset di timeline.json dopo create_containers
+      // CRITICAL: Forza nuovamente il reset della timeline dopo create_containers
       // perché lo script Python potrebbe aver sovrascritto il file
-      console.log(`🔄 Forzatura reset timeline.json dopo create_containers...`);
+      console.log(`🔄 Forzatura reset timeline dopo create_containers...`);
       await workspaceFiles.saveTimeline(workDate, emptyTimeline, false, currentUsername, 'timeline_reset_after_containers');
       console.log(`✅ Timeline resettata nuovamente dopo create_containers`);
 
@@ -288,10 +278,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { taskId, logisticCode, sourceCleanerId, destCleanerId, destIndex, date } = req.body;
       const workDate = date || format(new Date(), 'yyyy-MM-dd');
-      const timelinePath = path.join(process.cwd(), 'client/public/data/output/timeline.json');
 
-      // Carica timeline.json
-      let timelineData: any = JSON.parse(await fs.readFile(timelinePath, 'utf8'));
+      // Carica timeline da PostgreSQL
+      let timelineData: any = await workspaceFiles.loadTimeline(workDate);
+      if (!timelineData) {
+        timelineData = { cleaners_assignments: [], metadata: { date: workDate }, meta: {} };
+      }
 
       let taskToMove: any = null;
 
@@ -440,10 +432,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const workDate = date || format(new Date(), 'yyyy-MM-dd');
-      const timelinePath = path.join(process.cwd(), 'client/public/data/output/timeline.json');
 
-      // Carica timeline.json
-      let timelineData: any = JSON.parse(await fs.readFile(timelinePath, 'utf8'));
+      // Carica timeline da PostgreSQL
+      let timelineData: any = await workspaceFiles.loadTimeline(workDate);
+      if (!timelineData) {
+        timelineData = { cleaners_assignments: [], metadata: { date: workDate }, meta: {} };
+      }
 
       // Trova entrambi i cleaners (creali se non esistono)
       let sourceEntry = timelineData.cleaners_assignments.find((c: any) => c.cleaner.id === sourceCleanerId);
@@ -608,14 +602,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       console.log(`📖 GET /api/timeline - Caricamento timeline per ${workDate}`);
 
-      // Carica la timeline da MySQL (con fallback su filesystem)
-      // e sincronizza timeline.json come cache per gli script Python
+      // Carica la timeline da PostgreSQL (con fallback su MySQL e filesystem)
       const timeline = await workspaceFiles.loadTimeline(workDate);
 
       if (!timeline) {
-        return res.status(404).json({
-          success: false,
-          error: `Nessuna timeline trovata per la data ${workDate}`,
+        // Restituisci struttura vuota invece di 404 per compatibilità frontend
+        return res.json({
+          metadata: { date: workDate },
+          cleaners_assignments: []
         });
       }
 
@@ -623,6 +617,75 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(timeline);
     } catch (error: any) {
       console.error("Errore nel load della timeline:", error);
+      res.status(500).json({
+        success: false,
+        error: error.message,
+      });
+    }
+  });
+
+  // Endpoint per leggere i containers correnti da PostgreSQL
+  // Il frontend dovrebbe usare questo endpoint invece di leggere direttamente containers.json
+  app.get("/api/containers", async (req, res) => {
+    try {
+      const dateParam = (req.query.date as string) || format(new Date(), "yyyy-MM-dd");
+      const workDate = dateParam;
+
+      console.log(`📖 GET /api/containers - Caricamento containers per ${workDate}`);
+
+      const containers = await workspaceFiles.loadContainers(workDate);
+
+      if (!containers) {
+        return res.json({
+          containers: {
+            early_out: { tasks: [], count: 0 },
+            high_priority: { tasks: [], count: 0 },
+            low_priority: { tasks: [], count: 0 }
+          },
+          summary: {
+            early_out: 0,
+            high_priority: 0,
+            low_priority: 0,
+            total_tasks: 0
+          },
+          metadata: { date: workDate }
+        });
+      }
+
+      console.log(`✅ Containers caricati per ${workDate}: ${containers.summary?.total_tasks || 0} task totali`);
+      res.json(containers);
+    } catch (error: any) {
+      console.error("Errore nel load dei containers:", error);
+      res.status(500).json({
+        success: false,
+        error: error.message,
+      });
+    }
+  });
+
+  // Endpoint per leggere i cleaners selezionati da PostgreSQL/MySQL
+  // Il frontend dovrebbe usare questo endpoint invece di leggere direttamente selected_cleaners.json
+  app.get("/api/selected-cleaners", async (req, res) => {
+    try {
+      const dateParam = (req.query.date as string) || format(new Date(), "yyyy-MM-dd");
+      const workDate = dateParam;
+
+      console.log(`📖 GET /api/selected-cleaners - Caricamento cleaners selezionati per ${workDate}`);
+
+      const selectedCleaners = await workspaceFiles.loadSelectedCleaners(workDate);
+
+      if (!selectedCleaners) {
+        return res.json({
+          cleaners: [],
+          total_selected: 0,
+          metadata: { date: workDate }
+        });
+      }
+
+      console.log(`✅ Selected cleaners caricati per ${workDate}: ${selectedCleaners.cleaners?.length || 0} cleaners`);
+      res.json(selectedCleaners);
+    } catch (error: any) {
+      console.error("Errore nel load dei selected cleaners:", error);
       res.status(500).json({
         success: false,
         error: error.message,
@@ -700,20 +763,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const workDate = date || format(new Date(), 'yyyy-MM-dd');
       const currentUsername = modified_by || getCurrentUsername(req);
       const modificationType = modification_type || 'task_assigned_manually';
-      const timelinePath = path.join(process.cwd(), 'client/public/data/output/timeline.json');
-      const containersPath = path.join(process.cwd(), 'client/public/data/output/containers.json');
       const cleanersPath = path.join(process.cwd(), 'client/public/data/cleaners/selected_cleaners.json');
 
       // Carica containers per ottenere i dati completi del task
       let fullTaskData: any = null;
       let sourceContainerType: string | null = null; // To track where the task came from
 
-      // SEMPRE carica i containers - necessario per salvare la history e rimuovere la task
+      // SEMPRE carica i containers da PostgreSQL - necessario per salvare la history e rimuovere la task
       let containersData = null;
       try {
-        containersData = JSON.parse(await fs.readFile(containersPath, 'utf8'));
+        containersData = await workspaceFiles.loadContainers(workDate);
       } catch (error) {
-        console.error(`Failed to read ${containersPath}:`, error);
+        console.error(`Failed to load containers:`, error);
         // Continue without containers data
       }
 
@@ -1073,8 +1134,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { taskId, logisticCode, date, modified_by } = req.body;
       const workDate = date || format(new Date(), 'yyyy-MM-dd');
       const currentUsername = modified_by || getCurrentUsername(req);
-      const timelinePath = path.join(process.cwd(), 'client/public/data/output/timeline.json');
-      const containersPath = path.join(process.cwd(), 'client/public/data/output/containers.json');
 
       console.log(`Rimozione assegnazione timeline - taskId: ${taskId}, logisticCode: ${logisticCode}, date: ${workDate}`);
 
@@ -1155,7 +1214,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             console.warn(`⚠️ Could not save containers history (non-blocking):`, historyError);
           }
           
-          const containersData = JSON.parse(await fs.readFile(containersPath, 'utf8'));
+          const containersData = await workspaceFiles.loadContainers(workDate) || { containers: { early_out: { tasks: [] }, high_priority: { tasks: [] }, low_priority: { tasks: [] } }, summary: {} };
 
           // Determina il container corretto in base alla priority della task
           const priority = removedTask.priority || 'low_priority';
@@ -1333,26 +1392,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
             containersData.summary.low_priority;
         }
 
-        // Scrivi i containers sincronizzati su filesystem (per Python scripts)
-        await fs.writeFile(containersPath, JSON.stringify(containersData, null, 2));
-        console.log(`✅ Containers sincronizzati: rimosse ${removedCount} task già assegnate`);
-
-        // Salva containers sincronizzati su PostgreSQL
-        try {
-          const pgContainersData = {
-            containers: {
-              early_out: { tasks: containersData.containers?.early_out?.tasks || [] },
-              high_priority: { tasks: containersData.containers?.high_priority?.tasks || [] },
-              low_priority: { tasks: containersData.containers?.low_priority?.tasks || [] }
-            }
-          };
-          
-          const { pgDailyAssignmentsService } = await import('./services/pg-daily-assignments-service');
-          await pgDailyAssignmentsService.saveContainers(workDate, pgContainersData);
-          console.log(`✅ Containers sincronizzati salvati su PostgreSQL per ${workDate}`);
-        } catch (pgError) {
-          console.error(`⚠️ Errore nel salvataggio containers su PG (non bloccante):`, pgError);
-        }
+        // Salva containers sincronizzati su PostgreSQL (e filesystem come cache per Python scripts)
+        await workspaceFiles.saveContainers(workDate, containersData, 'system', 'containers_synced_from_adam');
+        console.log(`✅ Containers sincronizzati: rimosse ${removedCount} task già assegnate, salvati su PostgreSQL`);
       } catch (err) {
         console.error('❌ Errore nella rigenerazione containers:', err);
         // Fallback: se c'è un errore, usa i containers salvati in MySQL se disponibili
@@ -1385,27 +1427,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.log(`✅ Inizializzato selected_cleaners vuoto per ${workDate} (nessun dato MySQL)`);
       }
 
-      // CRITICAL: Sincronizza timeline.json da MySQL a filesystem
-      // Questo è necessario perché il frontend legge da timeline.json
-      const timelinePath = path.join(process.cwd(), 'client/public/data/output/timeline.json');
+      // CRITICAL: Sincronizza timeline da database a filesystem per Python scripts
       if (timelineData) {
         // Aggiorna metadata con la data corretta
         timelineData.metadata = timelineData.metadata || {};
         timelineData.metadata.date = workDate;
-        timelineData.metadata.loaded_from_mysql = true;
+        timelineData.metadata.loaded_from_database = true;
         timelineData.metadata.loaded_at = new Date().toISOString().replace('T', ' ').slice(0, 19);
 
-        await fs.writeFile(timelinePath, JSON.stringify(timelineData, null, 2));
+        // Salva timeline su PostgreSQL (e filesystem come cache per Python scripts)
+        await workspaceFiles.saveTimeline(workDate, timelineData, true, 'system', 'timeline_loaded_from_db');
         const taskCount = timelineData.cleaners_assignments?.reduce((sum: number, c: any) => sum + (c.tasks?.length || 0), 0) || 0;
-        console.log(`✅ Timeline sincronizzata da MySQL per ${workDate} (${taskCount} task)`);
+        console.log(`✅ Timeline sincronizzata da database per ${workDate} (${taskCount} task)`);
       } else {
-        // Nessun dato timeline in MySQL - crea file vuoto con struttura corretta
+        // Nessun dato timeline in database - crea struttura vuota
         const emptyTimeline = {
           metadata: { date: workDate, saved_at: new Date().toISOString() },
           cleaners_assignments: []
         };
-        await fs.writeFile(timelinePath, JSON.stringify(emptyTimeline, null, 2));
-        console.log(`✅ Inizializzato timeline vuota per ${workDate} (nessun dato MySQL)`);
+        await workspaceFiles.saveTimeline(workDate, emptyTimeline, true, 'system', 'timeline_initialized_empty');
+        console.log(`✅ Inizializzato timeline vuota per ${workDate} (nessun dato in database)`);
       }
 
       // Formatta data/ora per risposta
@@ -1448,12 +1489,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         process.cwd(),
         'client/public/data/cleaners/selected_cleaners.json'
       );
-      const timelinePath = path.join(
-        process.cwd(),
-        'client/public/data/output/timeline.json'
-      );
 
-      // Carica i cleaners selezionati
+      // Carica i cleaners selezionati da filesystem (selected_cleaners rimane su filesystem)
       let selectedData: any;
       try {
         const content = await fs.readFile(selectedCleanersPath, 'utf8');
@@ -1462,14 +1499,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         selectedData = { cleaners: [], total_selected: 0 };
       }
 
-      // Carica timeline per verificare se il cleaner ha task
+      // Carica timeline da PostgreSQL per verificare se il cleaner ha task
       let timelineData: any;
       let hasTasks = false;
       try {
-        const timelineContent = await fs.readFile(timelinePath, 'utf8');
-        timelineData = JSON.parse(timelineContent);
+        timelineData = await workspaceFiles.loadTimeline(workDate);
 
-        const cleanerEntry = timelineData.cleaners_assignments?.find(
+        const cleanerEntry = timelineData?.cleaners_assignments?.find(
           (c: any) => c.cleaner?.id === cleanerId
         );
         hasTasks = cleanerEntry && cleanerEntry.tasks && cleanerEntry.tasks.length > 0;
@@ -1638,7 +1674,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { cleanerId, date, modified_by, created_by } = req.body;
       const workDate = date || format(new Date(), 'yyyy-MM-dd');
       const currentUsername = modified_by || created_by || getCurrentUsername(req);
-      const timelinePath = path.join(process.cwd(), 'client/public/data/output/timeline.json');
       const cleanersPath = path.join(process.cwd(), 'client/public/data/cleaners/cleaners.json');
       const selectedCleanersPath = path.join(process.cwd(), 'client/public/data/cleaners/selected_cleaners.json');
 
@@ -1702,19 +1737,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const selectedCleanerIds = new Set(selectedCleanersData.cleaners.map((c: any) => c.id));
 
-      // Carica timeline
-      let timelineData: any = {
-        cleaners_assignments: [],
-        current_date: workDate,
-        meta: { total_cleaners: 0, total_tasks: 0, last_updated: new Date().toISOString() },
-        metadata: { last_updated: new Date().toISOString(), date: workDate }
-      };
-
-      try {
-        const existingData = await fs.readFile(timelinePath, 'utf8');
-        timelineData = JSON.parse(existingData);
-      } catch (error) {
-        console.log("Timeline file non trovato, creazione nuovo file");
+      // Carica timeline da PostgreSQL
+      let timelineData: any = await workspaceFiles.loadTimeline(workDate);
+      
+      if (!timelineData) {
+        console.log("Timeline non trovata, creazione nuova struttura");
+        timelineData = {
+          cleaners_assignments: [],
+          current_date: workDate,
+          meta: { total_cleaners: 0, total_tasks: 0, last_updated: new Date().toISOString() },
+          metadata: { last_updated: new Date().toISOString(), date: workDate }
+        };
       }
 
       // CRITICAL: Cerca un cleaner in timeline CHE NON sia in selected_cleaners
@@ -1958,14 +1991,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ success: false, message: 'fromContainer e toContainer sono obbligatori' });
       }
 
-      // Carica containers.json
-      const containersPath = path.join(process.cwd(), 'client/public/data/output/containers.json');
-      const raw = await fs.readFile(containersPath, 'utf8');
-      const containersData: any = JSON.parse(raw);
+      // Carica containers da PostgreSQL
+      const containersData: any = await workspaceFiles.loadContainers(workDate);
 
       const containers = containersData?.containers;
       if (!containers) {
-        return res.status(500).json({ success: false, message: 'Struttura containers mancante in containers.json' });
+        return res.status(500).json({ success: false, message: 'Struttura containers mancante' });
       }
 
       const recalc = () => {
@@ -2141,35 +2172,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // La revisione MySQL viene creata da /api/save-selected-cleaners al termine della selezione
       await workspaceFiles.saveSelectedCleaners(workDate, selectedCleanersData, true);
 
-      // Aggiorna anche timeline.json se il cleaner è presente
-      const timelinePath = path.join(process.cwd(), 'client/public/data/output/timeline.json');
+      // Aggiorna anche la timeline se il cleaner è presente
       try {
-        const timelineData = JSON.parse(await fs.readFile(timelinePath, 'utf8'));
+        const timelineData = await workspaceFiles.loadTimeline(workDate);
+        if (timelineData) {
+          const cleanerAssignment = timelineData.cleaners_assignments?.find((ca: any) => ca.cleaner?.id === cleanerId);
+          if (cleanerAssignment && cleanerAssignment.cleaner) {
+            cleanerAssignment.cleaner.start_time = startTime;
 
-        const cleanerAssignment = timelineData.cleaners_assignments?.find((ca: any) => ca.cleaner?.id === cleanerId);
-        if (cleanerAssignment && cleanerAssignment.cleaner) {
-          cleanerAssignment.cleaner.start_time = startTime;
+            // Aggiorna i metadata
+            timelineData.metadata = timelineData.metadata || {};
+            timelineData.metadata.last_updated = new Date().toISOString();
+            timelineData.metadata.date = workDate;
 
-          // Aggiorna i metadata
-          timelineData.metadata = timelineData.metadata || {};
-          timelineData.metadata.last_updated = new Date().toISOString();
-          timelineData.metadata.date = workDate;
+            // Preserva created_by e aggiorna modified_by
+            if (!timelineData.metadata.created_by) {
+              timelineData.metadata.created_by = currentUsername;
+            }
+            timelineData.metadata.modified_by = timelineData.metadata.modified_by || [];
+            if (currentUsername && currentUsername !== 'system' && currentUsername !== 'unknown' && !timelineData.metadata.modified_by.includes(currentUsername)) {
+              timelineData.metadata.modified_by.push(currentUsername);
+            }
 
-          // Preserva created_by e aggiorna modified_by
-          if (!timelineData.metadata.created_by) {
-            timelineData.metadata.created_by = currentUsername;
+            // Salva timeline su PostgreSQL (skipRevision=true)
+            // La revisione MySQL viene creata da /api/save-selected-cleaners al termine
+            await workspaceFiles.saveTimeline(workDate, timelineData, true);
           }
-          timelineData.metadata.modified_by = timelineData.metadata.modified_by || [];
-          if (currentUsername && currentUsername !== 'system' && currentUsername !== 'unknown' && !timelineData.metadata.modified_by.includes(currentUsername)) {
-            timelineData.metadata.modified_by.push(currentUsername);
-          }
-
-          // Salva timeline SOLO su filesystem (skipRevision=true)
-          // La revisione MySQL viene creata da /api/save-selected-cleaners al termine
-          await workspaceFiles.saveTimeline(workDate, timelineData, true);
         }
       } catch (error) {
-        console.log('Timeline.json non trovato o non aggiornato');
+        console.log('Timeline non trovata o non aggiornata');
       }
 
       console.log(`✅ Start time aggiornato per cleaner ${cleanerId}: ${startTime}`);
@@ -2265,13 +2296,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const workDate = date || format(new Date(), 'yyyy-MM-dd');
       const currentUsername = modified_by || getCurrentUsername(req);
 
-      const containersPath = path.join(process.cwd(), 'client/public/data/output/containers.json');
-      const timelinePath = path.join(process.cwd(), 'client/public/data/output/timeline.json');
-
-      // Carica entrambi i file
+      // Carica entrambi da PostgreSQL
       const [containersData, timelineData] = await Promise.all([
-        fs.readFile(containersPath, 'utf8').then(JSON.parse).catch(() => ({ containers: {} })),
-        fs.readFile(timelinePath, 'utf8').then(JSON.parse).catch(() => ({ cleaners_assignments: [] }))
+        workspaceFiles.loadContainers(workDate).then(d => d || { containers: {} }),
+        workspaceFiles.loadTimeline(workDate).then(d => d || { cleaners_assignments: [] })
       ]);
 
       let taskUpdated = false;
@@ -2695,19 +2723,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log(`📅 EO Assignment - Ricevuta data dal frontend: ${workDate}`);
       console.log(`▶ Eseguendo assign_eo.py per data: ${workDate}`);
 
-      // CRITICO: Prima di eseguire lo script, assicurati che timeline.json abbia la data corretta
-      const timelinePath = path.join(process.cwd(), 'client/public/data/output/timeline.json');
+      // CRITICO: Prima di eseguire lo script, assicurati che la timeline abbia la data corretta
       try {
-        const timelineData = JSON.parse(await fs.readFile(timelinePath, 'utf8'));
-        if (timelineData.metadata?.date !== workDate) {
-          console.log(`⚠️ ATTENZIONE: timeline.json ha data ${timelineData.metadata?.date}, dovrebbe essere ${workDate}`);
-          console.log(`🔄 Aggiornamento data in timeline.json...`);
+        const timelineData = await workspaceFiles.loadTimeline(workDate);
+        if (timelineData && timelineData.metadata?.date !== workDate) {
+          console.log(`⚠️ ATTENZIONE: timeline ha data ${timelineData.metadata?.date}, dovrebbe essere ${workDate}`);
+          console.log(`🔄 Aggiornamento data in timeline...`);
           timelineData.metadata = timelineData.metadata || {};
           timelineData.metadata.date = workDate;
           await workspaceFiles.saveTimeline(workDate, timelineData);
         }
       } catch (err) {
-        console.warn("Impossibile verificare/aggiornare timeline.json:", err);
+        console.warn("Impossibile verificare/aggiornare timeline:", err);
       }
 
       const { spawn } = await import('child_process');
@@ -2784,18 +2811,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log(`📅 HP Assignment - Ricevuta data dal frontend: ${workDate}`);
       console.log(`▶ Eseguendo assign_hp.py per data: ${workDate}`);
 
-      // Verifica che timeline.json abbia la data corretta
-      const timelinePath = path.join(process.cwd(), 'client/public/data/output/timeline.json');
+      // Verifica che la timeline abbia la data corretta
       try {
-        const timelineData = JSON.parse(await fs.readFile(timelinePath, 'utf8'));
-        if (timelineData.metadata?.date !== workDate) {
-          console.log(`⚠️ ATTENZIONE: timeline.json ha data ${timelineData.metadata?.date}, dovrebbe essere ${workDate}`);
+        const timelineData = await workspaceFiles.loadTimeline(workDate);
+        if (timelineData && timelineData.metadata?.date !== workDate) {
+          console.log(`⚠️ ATTENZIONE: timeline ha data ${timelineData.metadata?.date}, dovrebbe essere ${workDate}`);
           timelineData.metadata = timelineData.metadata || {};
           timelineData.metadata.date = workDate;
           await workspaceFiles.saveTimeline(workDate, timelineData);
         }
       } catch (err) {
-        console.warn("Impossibile verificare timeline.json:", err);
+        console.warn("Impossibile verificare timeline:", err);
       }
 
       const { spawn } = await import('child_process');
@@ -2872,19 +2898,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log(`📅 LP Assignment - Ricevuta data dal frontend: ${workDate}`);
       console.log(`▶ Eseguendo assign_lp.py per data: ${workDate}`);
 
-      const timelinePath = path.join(DATA_OUTPUT_DIR, 'timeline.json'); // Corretto qui
-
-      // Verifica che la timeline esista prima di procedere
+      // Verifica che la timeline esista e abbia la data corretta prima di procedere
       try {
-        const timelineData = JSON.parse(await fs.readFile(timelinePath, 'utf8'));
-        if (timelineData.metadata?.date !== workDate) {
-          console.log(`⚠️ ATTENZIONE: timeline.json ha data ${timelineData.metadata?.date}, dovrebbe essere ${workDate}`);
+        const timelineData = await workspaceFiles.loadTimeline(workDate);
+        if (timelineData && timelineData.metadata?.date !== workDate) {
+          console.log(`⚠️ ATTENZIONE: timeline ha data ${timelineData.metadata?.date}, dovrebbe essere ${workDate}`);
           timelineData.metadata = timelineData.metadata || {};
           timelineData.metadata.date = workDate;
           await workspaceFiles.saveTimeline(workDate, timelineData);
         }
       } catch (err) {
-        console.warn("Impossibile verificare timeline.json:", err);
+        console.warn("Impossibile verificare timeline:", err);
       }
 
       const { spawn } = await import('child_process');
@@ -3072,7 +3096,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { date, created_by } = req.body;
       const createdBy = created_by || 'unknown';
-      const timelinePath = path.join(process.cwd(), 'client/public/data/output/timeline.json');
       const assignedDir = path.join(process.cwd(), 'client/public/data/assigned');
 
       // CRITICAL: Esegui SEMPRE extract_cleaners_optimized.py per avere i cleaners aggiornati
@@ -3092,38 +3115,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
       console.log("extract_cleaners_optimized output:", extractCleanersResult);
 
-      // CRITICAL: NON resettare timeline.json - preservalo sempre
+      // CRITICAL: NON resettare timeline - preservala sempre
       // Anche se la data cambia, mantieni le assegnazioni esistenti
       // create_containers.py aggiornerà i dati delle task esistenti
       let timelineExists = false;
       try {
-        await fs.access(timelinePath);
-        const fileContent = await fs.readFile(timelinePath, 'utf8');
+        const existingTimeline = await workspaceFiles.loadTimeline(date);
 
-        // Verifica che il contenuto sia JSON valido
-        if (!fileContent.trim().startsWith('{')) {
-          throw new Error('timeline.json non contiene JSON valido');
-        }
+        if (existingTimeline) {
+          timelineExists = true;
 
-        const existingTimeline = JSON.parse(fileContent);
-        timelineExists = true;
-
-        // Aggiorna SOLO la metadata.date se è cambiata
-        if (existingTimeline.metadata?.date !== date) {
-          console.log(`🔄 Timeline esiste per data ${existingTimeline.metadata?.date}, aggiorno metadata.date a ${date}`);
-          existingTimeline.metadata.date = date;
-          existingTimeline.metadata.last_updated = new Date().toISOString();
-          // Mantieni created_by se esiste
-          if (!existingTimeline.metadata.created_by) {
-            existingTimeline.metadata.created_by = createdBy;
+          // Aggiorna SOLO la metadata.date se è cambiata
+          if (existingTimeline.metadata?.date !== date) {
+            console.log(`🔄 Timeline esiste per data ${existingTimeline.metadata?.date}, aggiorno metadata.date a ${date}`);
+            existingTimeline.metadata.date = date;
+            existingTimeline.metadata.last_updated = new Date().toISOString();
+            // Mantieni created_by se esiste
+            if (!existingTimeline.metadata.created_by) {
+              existingTimeline.metadata.created_by = createdBy;
+            }
+            await workspaceFiles.saveTimeline(date, existingTimeline);
+          } else {
+            console.log(`✅ Timeline già presente per ${date}, mantieni assegnazioni esistenti`);
           }
-          await workspaceFiles.saveTimeline(date, existingTimeline);
         } else {
-          console.log(`✅ Timeline.json già presente per ${date}, mantieni assegnazioni esistenti`);
+          throw new Error('Timeline non trovata');
         }
       } catch (err) {
-        // File non esiste o è corrotto - crealo vuoto
-        console.log(`📝 Timeline.json non esiste o corrotto, creazione nuova per ${date}`);
+        // Timeline non esiste - creala vuota
+        console.log(`📝 Timeline non esiste, creazione nuova per ${date}`);
         const emptyTimeline = {
           metadata: {
             last_updated: new Date().toISOString(),
@@ -3155,10 +3175,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let hasExistingTimeline = false;
       let timelineDataForCheck: any = null; // Store timelineData if loaded
       try {
-        const timelineContent = await fs.readFile(timelinePath, 'utf8');
-        timelineDataForCheck = JSON.parse(timelineContent); // Parse it here
-        hasExistingTimeline = timelineDataForCheck.metadata?.date === date &&
-                             timelineDataForCheck.cleaners_assignments?.length > 0;
+        timelineDataForCheck = await workspaceFiles.loadTimeline(date);
+        hasExistingTimeline = timelineDataForCheck?.metadata?.date === date &&
+                             timelineDataForCheck?.cleaners_assignments?.length > 0;
       } catch (err) {
         hasExistingTimeline = false;
       }
@@ -3212,23 +3231,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
       console.log("create_containers output:", containersResult);
 
-      // Salva containers su PostgreSQL dopo averli creati
+      // Leggi containers dal filesystem (dove Python ha scritto) e salva su PostgreSQL
       try {
-        const containersPath = path.join(process.cwd(), 'client/public/data/output/containers.json');
+        const containersPath = path.join(DATA_OUTPUT_DIR, 'containers.json');
         const containersJson = await fs.readFile(containersPath, 'utf-8');
         const containersData = JSON.parse(containersJson);
         
-        // Converti formato create_containers.py -> formato PostgreSQL
-        const pgContainersData = {
-          containers: {
-            early_out: { tasks: containersData.containers?.early_out?.tasks || [] },
-            high_priority: { tasks: containersData.containers?.high_priority?.tasks || [] },
-            low_priority: { tasks: containersData.containers?.low_priority?.tasks || [] }
-          }
-        };
-        
-        const { pgDailyAssignmentsService } = await import('./services/pg-daily-assignments-service');
-        await pgDailyAssignmentsService.saveContainers(date, pgContainersData);
+        await workspaceFiles.saveContainers(date, containersData, createdBy, 'containers_extracted');
         console.log(`✅ Containers salvati su PostgreSQL per ${date}`);
       } catch (pgError) {
         console.error(`⚠️ Errore nel salvataggio containers su PG (non bloccante):`, pgError);
@@ -3531,25 +3540,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const taskKey = String(typeof taskId !== 'undefined' ? taskId : logisticCode);
-
-      const timelinePath = path.join(process.cwd(), 'client/public/data/output/timeline.json');
-      const containersPath = path.join(process.cwd(), 'client/public/data/output/containers.json');
+      const workDate = req.body.date || format(new Date(), 'yyyy-MM-dd');
 
       let timelineData: any = { metadata: {}, cleaners_assignments: [] };
       let containersData: any = null;
 
       try {
-        const timelineText = await fs.readFile(timelinePath, 'utf8');
-        timelineData = JSON.parse(timelineText);
+        timelineData = await workspaceFiles.loadTimeline(workDate);
+        if (!timelineData) {
+          timelineData = { metadata: { date: workDate }, cleaners_assignments: [] };
+        }
       } catch (err) {
-        console.error('Errore caricamento timeline.json:', err);
+        console.error('Errore caricamento timeline:', err);
       }
 
       try {
-        const containersText = await fs.readFile(containersPath, 'utf8');
-        containersData = JSON.parse(containersText);
+        containersData = await workspaceFiles.loadContainers(workDate);
       } catch (err) {
-        console.error('Errore caricamento containers.json:', err);
+        console.error('Errore caricamento containers:', err);
       }
 
       const cleaners = timelineData.cleaners_assignments || [];
@@ -3722,7 +3730,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Aggiorna metadata
       timelineData.metadata = timelineData.metadata || {};
       timelineData.metadata.last_updated = new Date().toISOString();
-      const workDate = req.body.date || format(new Date(), 'yyyy-MM-dd'); // Usa la data della richiesta
       timelineData.metadata.date = workDate;
 
       // Determina modification_type in base alla sorgente e destinazione
@@ -3760,10 +3767,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { date, cleanerId, taskId, logisticCode, fromIndex, toIndex } = req.body;
       const workDate = date || format(new Date(), 'yyyy-MM-dd');
-      const timelinePath = path.join(process.cwd(), 'client/public/data/output/timeline.json');
 
-      // Carica timeline.json
-      let timelineData: any = JSON.parse(await fs.readFile(timelinePath, 'utf8'));
+      // Carica timeline da PostgreSQL
+      let timelineData: any = await workspaceFiles.loadTimeline(workDate);
+      if (!timelineData) {
+        return res.status(404).json({ success: false, message: "Timeline non trovata per questa data" });
+      }
 
       // Trova il cleaner
       const cleanerEntry = timelineData.cleaners_assignments.find((c: any) => c.cleaner.id === cleanerId);
