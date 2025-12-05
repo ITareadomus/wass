@@ -1,6 +1,6 @@
 {
   "metadata": {
-    "last_updated": "2025-12-05T14:52:22.318900",
+    "last_updated": "2025-12-05T15:01:40.813797",
     "date": "2025-12-08"
   },
   "containers": {
@@ -248,36 +248,9 @@
             "client_forced_eo"
           ],
           "priority": "early_out"
-        },
-        {
-          "task_id": 219866,
-          "logistic_code": 1487,
-          "client_id": 61,
-          "premium": false,
-          "address": "viale monteceneri 58",
-          "lat": "45.4920654",
-          "lng": "9.1541396",
-          "cleaning_time": 60,
-          "checkin_date": "2025-12-08",
-          "checkout_date": "2025-12-08",
-          "checkin_time": "19:30",
-          "checkout_time": null,
-          "pax_in": 1,
-          "pax_out": 1,
-          "small_equipment": true,
-          "operation_id": 2,
-          "confirmed_operation": false,
-          "straordinaria": false,
-          "type_apt": "A",
-          "alias": "NTM",
-          "customer_name": "NOTA-MI",
-          "reasons": [
-            "client_forced_eo"
-          ],
-          "priority": "early_out"
         }
       ],
-      "count": 10
+      "count": 9
     },
     "high_priority": {
       "tasks": [
@@ -710,8 +683,8 @@
     }
   },
   "summary": {
-    "total_tasks": 25,
-    "early_out": 10,
+    "total_tasks": 24,
+    "early_out": 9,
     "high_priority": 4,
     "low_priority": 11
   }

@@ -239,6 +239,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
       console.log("create_containers output:", containersResult);
 
+      // Salva containers su PostgreSQL dopo averli creati
+      try {
+        const containersPath = path.join(process.cwd(), 'client/public/data/output/containers.json');
+        const containersJson = await fs.readFile(containersPath, 'utf-8');
+        const containersData = JSON.parse(containersJson);
+        
+        const pgContainersData = {
+          containers: {
+            early_out: { tasks: containersData.containers?.early_out?.tasks || [] },
+            high_priority: { tasks: containersData.containers?.high_priority?.tasks || [] },
+            low_priority: { tasks: containersData.containers?.low_priority?.tasks || [] }
+          }
+        };
+        
+        const { pgDailyAssignmentsService } = await import('./services/pg-daily-assignments-service');
+        await pgDailyAssignmentsService.saveContainers(workDate, pgContainersData);
+        console.log(`✅ Containers salvati su PostgreSQL per ${workDate}`);
+      } catch (pgError) {
+        console.error(`⚠️ Errore nel salvataggio containers su PG (non bloccante):`, pgError);
+      }
+
       // CRITICAL: Forza nuovamente il reset di timeline.json dopo create_containers
       // perché lo script Python potrebbe aver sovrascritto il file
       console.log(`🔄 Forzatura reset timeline.json dopo create_containers...`);
@@ -1299,6 +1320,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Scrivi i containers sincronizzati su filesystem (per Python scripts)
         await fs.writeFile(containersPath, JSON.stringify(containersData, null, 2));
         console.log(`✅ Containers sincronizzati: rimosse ${removedCount} task già assegnate`);
+
+        // Salva containers sincronizzati su PostgreSQL
+        try {
+          const pgContainersData = {
+            containers: {
+              early_out: { tasks: containersData.containers?.early_out?.tasks || [] },
+              high_priority: { tasks: containersData.containers?.high_priority?.tasks || [] },
+              low_priority: { tasks: containersData.containers?.low_priority?.tasks || [] }
+            }
+          };
+          
+          const { pgDailyAssignmentsService } = await import('./services/pg-daily-assignments-service');
+          await pgDailyAssignmentsService.saveContainers(workDate, pgContainersData);
+          console.log(`✅ Containers sincronizzati salvati su PostgreSQL per ${workDate}`);
+        } catch (pgError) {
+          console.error(`⚠️ Errore nel salvataggio containers su PG (non bloccante):`, pgError);
+        }
       } catch (err) {
         console.error('❌ Errore nella rigenerazione containers:', err);
         // Fallback: se c'è un errore, usa i containers salvati in MySQL se disponibili
@@ -3157,6 +3195,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
         );
       });
       console.log("create_containers output:", containersResult);
+
+      // Salva containers su PostgreSQL dopo averli creati
+      try {
+        const containersPath = path.join(process.cwd(), 'client/public/data/output/containers.json');
+        const containersJson = await fs.readFile(containersPath, 'utf-8');
+        const containersData = JSON.parse(containersJson);
+        
+        // Converti formato create_containers.py -> formato PostgreSQL
+        const pgContainersData = {
+          containers: {
+            early_out: { tasks: containersData.containers?.early_out?.tasks || [] },
+            high_priority: { tasks: containersData.containers?.high_priority?.tasks || [] },
+            low_priority: { tasks: containersData.containers?.low_priority?.tasks || [] }
+          }
+        };
+        
+        const { pgDailyAssignmentsService } = await import('./services/pg-daily-assignments-service');
+        await pgDailyAssignmentsService.saveContainers(date, pgContainersData);
+        console.log(`✅ Containers salvati su PostgreSQL per ${date}`);
+      } catch (pgError) {
+        console.error(`⚠️ Errore nel salvataggio containers su PG (non bloccante):`, pgError);
+      }
 
       res.json({
         success: true,

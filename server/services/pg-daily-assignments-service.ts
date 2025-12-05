@@ -533,7 +533,8 @@ export class PgDailyAssignmentsService {
   /**
    * Load containers for a work_date
    * Reconstructs JSON structure from flat PostgreSQL rows
-   * Returns: { containers: { early_out: [...], high: [...], low: [...] } }
+   * Returns same structure as create_containers.py:
+   * { containers: { early_out: { tasks: [...], count: N }, high_priority: {...}, low_priority: {...} } }
    */
   async loadContainers(workDate: string): Promise<any | null> {
     try {
@@ -547,11 +548,20 @@ export class PgDailyAssignmentsService {
         return null;
       }
 
-      // Group rows by priority
-      const containers: { [key: string]: any[] } = {
+      // Group rows by priority (using frontend naming: high_priority, low_priority)
+      const tasksByPriority: { [key: string]: any[] } = {
         early_out: [],
-        high: [],
-        low: []
+        high_priority: [],
+        low_priority: []
+      };
+
+      // Map DB priority names to frontend names
+      const priorityMap: { [key: string]: string } = {
+        'early_out': 'early_out',
+        'high': 'high_priority',
+        'high_priority': 'high_priority',
+        'low': 'low_priority',
+        'low_priority': 'low_priority'
       };
 
       for (const row of result.rows) {
@@ -565,8 +575,8 @@ export class PgDailyAssignmentsService {
         if (row.client_id) task.client_id = row.client_id;
         if (row.premium !== null) task.premium = row.premium;
         if (row.address) task.address = row.address;
-        if (row.lat !== null) task.lat = parseFloat(String(row.lat));
-        if (row.lng !== null) task.lng = parseFloat(String(row.lng));
+        if (row.lat !== null) task.lat = String(row.lat);
+        if (row.lng !== null) task.lng = String(row.lng);
         if (row.cleaning_time) task.cleaning_time = row.cleaning_time;
         if (row.checkin_date) task.checkin_date = row.checkin_date;
         if (row.checkout_date) task.checkout_date = row.checkout_date;
@@ -583,14 +593,40 @@ export class PgDailyAssignmentsService {
         if (row.customer_name) task.customer_name = row.customer_name;
         if (row.reasons && row.reasons.length > 0) task.reasons = row.reasons;
 
-        // Add to appropriate priority bucket
-        const priority = row.priority || 'low';
-        if (!containers[priority]) containers[priority] = [];
-        containers[priority].push(task);
+        // Add to appropriate priority bucket (map DB names to frontend names)
+        const dbPriority = row.priority || 'low';
+        const frontendPriority = priorityMap[dbPriority] || 'low_priority';
+        tasksByPriority[frontendPriority].push(task);
       }
 
-      console.log(`✅ PG: Containers caricati per ${workDate} (${result.rows.length} task)`);
-      return { containers };
+      // Build structure matching create_containers.py format
+      const containers = {
+        early_out: {
+          tasks: tasksByPriority.early_out,
+          count: tasksByPriority.early_out.length
+        },
+        high_priority: {
+          tasks: tasksByPriority.high_priority,
+          count: tasksByPriority.high_priority.length
+        },
+        low_priority: {
+          tasks: tasksByPriority.low_priority,
+          count: tasksByPriority.low_priority.length
+        }
+      };
+
+      const totalTasks = containers.early_out.count + containers.high_priority.count + containers.low_priority.count;
+      console.log(`✅ PG: Containers caricati per ${workDate} (${totalTasks} task)`);
+      
+      return { 
+        containers,
+        summary: {
+          total_tasks: totalTasks,
+          early_out: containers.early_out.count,
+          high_priority: containers.high_priority.count,
+          low_priority: containers.low_priority.count
+        }
+      };
     } catch (error) {
       console.error('❌ PG: Errore nel caricamento containers:', error);
       return null;
@@ -600,7 +636,9 @@ export class PgDailyAssignmentsService {
   /**
    * Save containers for a work_date
    * Converts JSON structure to flat PostgreSQL rows
-   * Input: { containers: { early_out: [...], high: [...], low: [...] } }
+   * Accepts both formats:
+   * - create_containers.py: { containers: { early_out: { tasks: [...] }, high_priority: {...}, low_priority: {...} } }
+   * - simplified: { containers: { early_out: [...], high: [...], low: [...] } }
    */
   async saveContainers(workDate: string, containersData: any): Promise<boolean> {
     const client = await pool.connect();
@@ -614,9 +652,24 @@ export class PgDailyAssignmentsService {
       const containers = containersData?.containers || {};
       let totalInserted = 0;
       
-      // Insert tasks for each priority
-      for (const priority of ['early_out', 'high', 'low']) {
-        const tasks = containers[priority] || [];
+      // Define priority mappings (support both naming conventions)
+      const priorityConfigs = [
+        { dbName: 'early_out', keys: ['early_out'] },
+        { dbName: 'high_priority', keys: ['high_priority', 'high'] },
+        { dbName: 'low_priority', keys: ['low_priority', 'low'] }
+      ];
+      
+      for (const config of priorityConfigs) {
+        // Find tasks for this priority (check all possible keys)
+        let tasks: any[] = [];
+        for (const key of config.keys) {
+          const containerData = containers[key];
+          if (containerData) {
+            // Handle both formats: { tasks: [...] } or direct array
+            tasks = Array.isArray(containerData) ? containerData : (containerData.tasks || []);
+            break;
+          }
+        }
         
         for (const task of tasks) {
           if (!task.task_id) continue;
@@ -635,7 +688,7 @@ export class PgDailyAssignmentsService {
             )
           `, [
             workDate,
-            priority,
+            config.dbName,
             task.task_id,
             task.logistic_code || 0,
             task.client_id || null,
