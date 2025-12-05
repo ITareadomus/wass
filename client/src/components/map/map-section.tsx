@@ -30,7 +30,8 @@ export default function MapSection({ tasks }: MapSectionProps) {
   useEffect(() => {
     const loadCleaners = async () => {
       try {
-        const response = await fetch(`/data/cleaners/selected_cleaners.json?t=${Date.now()}`, {
+        const dateStr = localStorage.getItem('selected_work_date') || new Date().toISOString().split('T')[0];
+        const response = await fetch(`/api/selected-cleaners?date=${dateStr}`, {
           cache: 'no-store',
           headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' }
         });

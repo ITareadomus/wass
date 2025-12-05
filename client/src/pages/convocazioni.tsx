@@ -119,8 +119,8 @@ export default function Convocazioni() {
 
         console.log(`📅 Cleaners totali per ${dateStr}:`, dateCleaners.length);
 
-        // Carica selected_cleaners.json per gestire la persistenza delle selezioni
-        const selectedResponse = await fetch(`/data/cleaners/selected_cleaners.json?t=${Date.now()}`, {
+        // Carica selected_cleaners da API per gestire la persistenza delle selezioni
+        const selectedResponse = await fetch(`/api/selected-cleaners?date=${dateStr}`, {
           cache: 'no-store',
           headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' }
         });
@@ -131,7 +131,7 @@ export default function Convocazioni() {
           const selectedData = await selectedResponse.json();
           // Verifica che la data in selected_cleaners corrisponda
           const selectedDateFromFile = selectedData.metadata?.date;
-          console.log(`🔍 Data in selected_cleaners.json: ${selectedDateFromFile}, data richiesta: ${dateStr}`);
+          console.log(`🔍 Data in selected_cleaners API: ${selectedDateFromFile}, data richiesta: ${dateStr}`);
 
           // Filtra solo se la data corrisponde
           if (selectedDateFromFile === dateStr) {
@@ -140,10 +140,10 @@ export default function Convocazioni() {
             preselectedIds = new Set(selectedCleanerIds); // Mantieni la selezione visiva
             console.log(`✅ Cleaners già selezionati per ${dateStr}:`, Array.from(alreadySelectedIds));
           } else {
-            console.log(`⚠️ Data non corrispondente (file: ${selectedDateFromFile}, richiesta: ${dateStr}), mostro TUTTI i cleaners`);
+            console.log(`⚠️ Data non corrispondente (API: ${selectedDateFromFile}, richiesta: ${dateStr}), mostro TUTTI i cleaners`);
           }
         } else {
-          console.log(`ℹ️ selected_cleaners.json non trovato, mostro TUTTI i cleaners`);
+          console.log(`ℹ️ selected_cleaners API vuoto, mostro TUTTI i cleaners`);
         }
 
         // NUOVO: Carica anche cleaners dalla timeline (DB) per pre-selezionarli
@@ -174,7 +174,7 @@ export default function Convocazioni() {
 
         console.log(`📊 Risultato filtro cleaners:`);
         console.log(`   - Totali per ${dateStr}: ${dateCleaners.length}`);
-        console.log(`   - Già in selected_cleaners.json: ${alreadySelectedIds.size}`);
+        console.log(`   - Già in selected_cleaners: ${alreadySelectedIds.size}`);
         console.log(`   - Pre-selezionati dalla timeline: ${preselectedIds.size}`);
         console.log(`   - Disponibili da mostrare: ${availableCleaners.length}`);
 
@@ -184,7 +184,7 @@ export default function Convocazioni() {
         setCleaners(availableCleaners);
         setFilteredCleaners(availableCleaners);
 
-        // Unisci TUTTI i cleaners pre-selezionati (da selected_cleaners.json E dalla timeline)
+        // Unisci TUTTI i cleaners pre-selezionati (da selected_cleaners API E dalla timeline)
         const allPreselectedIds = new Set([...alreadySelectedIds, ...preselectedIds]);
         setSelectedCleaners(allPreselectedIds);
 
@@ -385,8 +385,8 @@ export default function Convocazioni() {
         }
       }
 
-      // Carica la selezione attuale
-      const currentResponse = await fetch(`/data/cleaners/selected_cleaners.json?t=${Date.now()}`, {
+      // Carica la selezione attuale da API
+      const currentResponse = await fetch(`/api/selected-cleaners?date=${dateStr}`, {
         cache: 'no-store',
         headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' }
       });

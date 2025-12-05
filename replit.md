@@ -63,13 +63,18 @@ Preferred communication style: Simple, everyday language.
 - **Date Guards**: Writes blocked for past dates to prevent data contamination
 - **Deprecated**: Object Storage (`@replit/object-storage`) removed, manual "Conferma Assegnazioni" button removed
 
-## Timeline Data Flow (December 2025)
-- **Source of Truth**: MySQL `daily_assignments_current` table is the authoritative source for timeline data
-- **Frontend Reads**: All frontend components read timeline via `GET /api/timeline?date=YYYY-MM-DD` endpoint
-  - `generate-assignments.tsx`: loadTasks(), loadSavedAssignments(), checkAndAutoLoadSavedAssignments()
-  - `convocazioni.tsx`: cleaner preselection, handleSaveSelection(), handleAddCleaners()
-- **Write-Only Cache**: `timeline.json` file is written for Python script compatibility but NOT read by frontend
-- **Endpoint**: `GET /api/timeline` calls `workspaceFiles.loadTimeline()` which reads from MySQL with filesystem fallback
+## Timeline Data Flow (December 2025) - PostgreSQL Only
+- **Source of Truth**: PostgreSQL is the ONLY source of truth for timeline, containers, and selected_cleaners data
+- **Frontend Reads**: All frontend components read via API endpoints:
+  - `GET /api/timeline?date=YYYY-MM-DD` - Timeline data from PostgreSQL
+  - `GET /api/containers?date=YYYY-MM-DD` - Containers data from PostgreSQL
+  - `GET /api/selected-cleaners?date=YYYY-MM-DD` - Selected cleaners from PostgreSQL/MySQL
+  - `generate-assignments.tsx`: loadTasks() uses /api/containers and /api/timeline
+  - `timeline-view.tsx`: loadTimelineData(), loadTimelineCleaners(), loadCleaners() use API endpoints
+  - `convocazioni.tsx`: Uses /api/selected-cleaners and /api/timeline for cleaner preselection
+  - `map-section.tsx`: Uses /api/selected-cleaners for cleaner colors
+- **JSON Files Deprecated**: `timeline.json`, `containers.json`, and `selected_cleaners.json` are no longer read by frontend
+- **Python Script Compatibility**: JSON files still written for legacy Python scripts (to be migrated)
 
 ## Authentication & Authorization
 - **Current State**: No authentication system implemented

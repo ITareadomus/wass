@@ -739,13 +739,10 @@ export default function GenerateAssignments() {
 
       const dateStr = format(selectedDate, "yyyy-MM-dd");
 
-      // Aggiungi timestamp UNIVOCO per evitare QUALSIASI cache
-      const timestamp = Date.now() + Math.random();
-
-      console.log("🔄 Caricamento task dai file JSON (timestamp: ${timestamp})...");
+      console.log("🔄 Caricamento task da PostgreSQL...");
 
       const [containersResponse, timelineResponse] = await Promise.all([
-        fetch(`/data/output/containers.json?t=${timestamp}`, {
+        fetch(`/api/containers?date=${dateStr}`, {
           cache: 'no-store',
           headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' }
         }),
@@ -756,18 +753,10 @@ export default function GenerateAssignments() {
       ]);
 
       if (!containersResponse.ok) {
-        throw new Error('Errore nel caricamento del file containers.json');
+        throw new Error('Errore nel caricamento dei containers');
       }
 
-      const containersText = await containersResponse.text();
-
-      // Verifica che il contenuto sia JSON valido
-      if (!containersText.trim().startsWith('{') && !containersText.trim().startsWith('[')) {
-        console.error('❌ containers.json corrotto, non è JSON:', containersText.substring(0, 100));
-        throw new Error('containers.json corrotto - riprova tra qualche secondo');
-      }
-
-      const containersData = JSON.parse(containersText);
+      const containersData = await containersResponse.json();
 
       // Carica da /api/timeline (DB source) con gestione errori robusta
       let timelineAssignmentsData = {
@@ -1516,7 +1505,7 @@ export default function GenerateAssignments() {
             handleTaskMoved();
           }
 
-          const cleanersResponse = await fetch(`/data/cleaners/selected_cleaners.json?t=${Date.now()}`, {
+          const cleanersResponse = await fetch(`/api/selected-cleaners?date=${dateStr}`, {
             cache: 'no-store',
             headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' }
           });
@@ -1560,7 +1549,8 @@ export default function GenerateAssignments() {
 
         try {
           // Carica i dati del cleaner
-          const cleanersResponse = await fetch(`/data/cleaners/selected_cleaners.json?t=${Date.now()}`, {
+          const dateStr = format(selectedDate, "yyyy-MM-dd");
+          const cleanersResponse = await fetch(`/api/selected-cleaners?date=${dateStr}`, {
             cache: 'no-store',
             headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' }
           });
@@ -1625,7 +1615,8 @@ export default function GenerateAssignments() {
         console.log(`🔄 Spostamento da container ${fromContainer} a cleaner ${toCleanerId}`);
 
         try {
-          const cleanersResponse = await fetch(`/data/cleaners/selected_cleaners.json?t=${Date.now()}`, {
+          const dateStr = format(selectedDate, "yyyy-MM-dd");
+          const cleanersResponse = await fetch(`/api/selected-cleaners?date=${dateStr}`, {
             cache: 'no-store',
             headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' }
           });

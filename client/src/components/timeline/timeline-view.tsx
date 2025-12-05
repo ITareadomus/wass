@@ -149,7 +149,7 @@ export default function TimelineView({
     return `${year}-${month}-${day}`;
   })();
 
-  // Mostra cleaners da selected_cleaners.json + cleaners che hanno task in timeline.json
+  // Mostra cleaners da selected_cleaners API + cleaners che hanno task in timeline
   // DEVE essere definito PRIMA di getGlobalStartTime() che lo usa
   const allCleanersToShow = React.useMemo(() => {
     const selectedCleanerIds = new Set(cleaners.map(c => c.id));
@@ -183,7 +183,7 @@ export default function TimelineView({
 
 
 
-  // Mutation per rimuovere un cleaner da selected_cleaners.json
+  // Mutation per rimuovere un cleaner da selected_cleaners
   const removeCleanerMutation = useMutation({
     mutationFn: async (cleanerId: number) => {
       const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
@@ -263,12 +263,13 @@ export default function TimelineView({
         await (window as any).reloadAllTasks(true);
       }
 
-      // IMPORTANTE: ricarica timeline.json PRIMA di ricalcolare gli available
+      // IMPORTANTE: ricarica timeline PRIMA di ricalcolare gli available
       // Questo previene race conditions tra cache e stato locale
-      await new Promise(resolve => setTimeout(resolve, 100)); // Small delay per file system sync
+      await new Promise(resolve => setTimeout(resolve, 100)); // Small delay per sync
 
       // Trova il cleaner appena aggiunto per mostrare nome e cognome
-      const cleanersResponse = await fetch(`/data/cleaners/selected_cleaners.json?t=${Date.now()}`, {
+      const dateStr = format(selectedDate, 'yyyy-MM-dd');
+      const cleanersResponse = await fetch(`/api/selected-cleaners?date=${dateStr}`, {
         cache: 'no-store',
         headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' }
       });
@@ -447,75 +448,54 @@ export default function TimelineView({
     return colors[cleanerId % colors.length];
   };
 
-  // Funzione per caricare i cleaner da selected_cleaners.json
+  // Funzione per caricare i cleaner da API (PostgreSQL/MySQL)
   const loadCleaners = async (skipLoadSaved = false) => {
     try {
-      // Carica sia selected_cleaners.json che timeline.json per verificare la sincronizzazione
+      const dateStr = format(selectedDate, 'yyyy-MM-dd');
+      
+      // Carica sia selected_cleaners che timeline da API per verificare la sincronizzazione
       const [selectedResponse, timelineResponse] = await Promise.all([
-        fetch(`/data/cleaners/selected_cleaners.json?t=${Date.now()}`, {
+        fetch(`/api/selected-cleaners?date=${dateStr}`, {
           cache: 'no-store',
           headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' }
         }),
-        fetch(`/data/output/timeline.json?t=${Date.now()}`, {
+        fetch(`/api/timeline?date=${dateStr}`, {
           cache: 'no-store',
           headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' }
         })
       ]);
 
-      // Verifica selected_cleaners.json
+      // Verifica selected_cleaners API
       if (!selectedResponse.ok) {
         console.warn(`HTTP error loading cleaners! status: ${selectedResponse.status}`);
         setCleaners([]);
         return;
       }
 
-      const contentType = selectedResponse.headers.get('content-type');
-      if (!contentType || !contentType.includes('application/json')) {
-        console.error('Risposta non JSON:', contentType);
-        setCleaners([]);
-        return;
-      }
+      const selectedData = await selectedResponse.json();
+      console.log("Cleaners caricati da API:", selectedData);
 
-      const selectedText = await selectedResponse.text();
-
-      // Verifica che il contenuto sia JSON valido
-      if (!selectedText.trim().startsWith('{') && !selectedText.trim().startsWith('[')) {
-        console.error('File corrotto, non è JSON:', selectedText.substring(0, 100));
-        setCleaners([]);
-        return;
-      }
-
-      const selectedData = JSON.parse(selectedText);
-      console.log("Cleaners caricati da selected_cleaners.json:", selectedData);
-
-      // Verifica se timeline.json esiste e ha cleaners
+      // Verifica se la timeline esiste e ha cleaners
       let timelineCleaners: any[] = [];
       if (timelineResponse.ok) {
         try {
-          const timelineText = await timelineResponse.text();
-
-          // Verifica che il contenuto sia JSON valido
-          if (!timelineText.trim().startsWith('{') && !timelineText.trim().startsWith('[')) {
-            console.warn('Timeline.json corrotto, non è JSON:', timelineText.substring(0, 100));
-          } else {
-            const timelineData = JSON.parse(timelineText);
-            timelineCleaners = timelineData.cleaners_assignments?.map((c: any) => ({
-              id: c.cleaner?.id,
-              name: c.cleaner?.name,
-              lastname: c.cleaner?.lastname,
-              role: c.cleaner?.role,
-            })).filter((c: any) => c.id) || [];
-          }
+          const timelineData = await timelineResponse.json();
+          timelineCleaners = timelineData.cleaners_assignments?.map((c: any) => ({
+            id: c.cleaner?.id,
+            name: c.cleaner?.name,
+            lastname: c.cleaner?.lastname,
+            role: c.cleaner?.role,
+          })).filter((c: any) => c.id) || [];
         } catch (e) {
-          console.warn('Errore parsing timeline.json:', e);
+          console.warn('Errore parsing timeline:', e);
         }
       }
 
-      // Se selected_cleaners.json è vuoto MA timeline.json ha cleaners,
+      // Se selected_cleaners è vuoto MA la timeline ha cleaners,
       // usa quelli dalla timeline (caso di ritorno a data precedente)
       let cleanersList = selectedData.cleaners || [];
       if (cleanersList.length === 0 && timelineCleaners.length > 0) {
-        console.log(`⚠️ selected_cleaners.json vuoto ma timeline.json ha ${timelineCleaners.length} cleaners`);
+        console.log(`⚠️ selected_cleaners vuoto ma timeline ha ${timelineCleaners.length} cleaners`);
         console.log('🔄 Caricamento cleaners dalla timeline per visualizzazione');
 
         // Carica i dati completi dei cleaners da cleaners.json
@@ -559,18 +539,13 @@ export default function TimelineView({
   // Funzione per caricare i dati della timeline (inclusi i metadata)
   const loadTimelineData = async () => {
     try {
-      const response = await fetch(`/data/output/timeline.json?t=${Date.now()}`, {
+      const dateStr = format(selectedDate, 'yyyy-MM-dd');
+      const response = await fetch(`/api/timeline?date=${dateStr}`, {
         cache: 'no-store',
         headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' }
       });
       if (!response.ok) {
-        console.warn(`Timeline file not found (${response.status}), using empty data`);
-        setTimelineData(null); // Resetta i dati se il file non esiste o c'è un errore
-        return;
-      }
-      const contentType = response.headers.get('content-type');
-      if (!contentType || !contentType.includes('application/json')) {
-        console.warn('Timeline file is not JSON, using empty data');
+        console.warn(`Timeline not found (${response.status}), using empty data`);
         setTimelineData(null);
         return;
       }
@@ -870,8 +845,8 @@ export default function TimelineView({
     if (confirmUnavailableDialog.cleanerId) {
       // Prima salva lo start time aggiornato
       try {
-        const selectedCleanersPath = '/data/cleaners/selected_cleaners.json';
-        const selectedResponse = await fetch(`${selectedCleanersPath}?t=${Date.now()}`, {
+        const dateStr = format(selectedDate, 'yyyy-MM-dd');
+        const selectedResponse = await fetch(`/api/selected-cleaners?date=${dateStr}`, {
           cache: 'no-store',
           headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' }
         });
@@ -892,7 +867,6 @@ export default function TimelineView({
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              filePath: selectedCleanersPath,
               data: selectedData,
               date: workDate,
               cleanerId: confirmUnavailableDialog.cleanerId
@@ -1160,19 +1134,18 @@ export default function TimelineView({
       setLastSavedFilename(null);
       localStorage.removeItem('last_saved_assignment');
 
-      // 3. CRITICAL: Ricarica SOLO i file JSON locali senza chiamare extract-data
-      // Il backend ha già resettato timeline.json e ricreato containers.json
+      // 3. CRITICAL: Ricarica i dati da PostgreSQL
+      // Il backend ha già resettato la timeline e ricreato i containers
       // Dobbiamo solo ricaricare il frontend con i nuovi dati
-      const timestamp = Date.now();
 
-      // Ricarica containers.json (che ora contiene tutte le task)
-      const containersResponse = await fetch(`/data/output/containers.json?t=${timestamp}`, {
+      // Ricarica containers da PostgreSQL (contengono tutte le task)
+      const containersResponse = await fetch(`/api/containers?date=${workDate}`, {
         cache: 'no-store',
         headers: { 'Cache-Control': 'no-cache' }
       });
 
-      // Ricarica timeline.json (che ora è vuota)
-      const timelineResponse = await fetch(`/data/output/timeline.json?t=${timestamp}`, {
+      // Ricarica timeline da PostgreSQL (ora è vuota)
+      const timelineResponse = await fetch(`/api/timeline?date=${workDate}`, {
         cache: 'no-store',
         headers: { 'Cache-Control': 'no-cache' }
       });
@@ -1214,16 +1187,10 @@ export default function TimelineView({
 
   const loadTimelineCleaners = async () => {
     try {
-      const response = await fetch(`/data/output/timeline.json?t=${Date.now()}`);
+      const dateStr = format(selectedDate, 'yyyy-MM-dd');
+      const response = await fetch(`/api/timeline?date=${dateStr}`);
       if (!response.ok) {
-        console.warn(`Timeline file not found (${response.status}), using empty timeline`);
-        setTimelineCleaners([]);
-        return;
-      }
-
-      const contentType = response.headers.get('content-type');
-      if (!contentType || !contentType.includes('application/json')) {
-        console.warn('Timeline file is not JSON, using empty timeline');
+        console.warn(`Timeline not found (${response.status}), using empty timeline`);
         setTimelineCleaners([]);
         return;
       }
