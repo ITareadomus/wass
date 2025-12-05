@@ -954,6 +954,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       timelineData.metadata.last_updated = new Date().toISOString();
       timelineData.metadata.date = workDate;
 
+      // Inizializza meta se non esiste (può accadere con dati da PostgreSQL)
+      timelineData.meta = timelineData.meta || {};
+
       // Ottieni username corretto dalla richiesta
       const modifyingUserFromRequest = req.body.modified_by || req.body.created_by || currentUsername;
 
