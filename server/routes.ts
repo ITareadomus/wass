@@ -609,6 +609,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Endpoint per verificare i dati su PostgreSQL (DigitalOcean)
+  app.get("/api/pg-assignments", async (req, res) => {
+    try {
+      const { pgDailyAssignmentsService } = await import("./services/pg-daily-assignments-service");
+      const dateParam = (req.query.date as string) || format(new Date(), "yyyy-MM-dd");
+      
+      const assignments = await pgDailyAssignmentsService.getAssignments(dateParam);
+      const count = assignments.length;
+      
+      console.log(`📊 PG: ${count} assegnazioni trovate per ${dateParam}`);
+      
+      res.json({
+        success: true,
+        date: dateParam,
+        count,
+        assignments
+      });
+    } catch (error: any) {
+      console.error("Errore nel caricamento da PostgreSQL:", error);
+      res.status(500).json({
+        success: false,
+        error: error.message,
+      });
+    }
+  });
+
   // Endpoint per salvare un'assegnazione nella timeline
   app.post("/api/save-timeline-assignment", async (req, res) => {
     try {
