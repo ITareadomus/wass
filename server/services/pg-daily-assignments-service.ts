@@ -236,42 +236,42 @@ export class PgDailyAssignmentsService {
   }
 
   /**
-   * Get the next revision number for a work_date
-   */
-  async getNextRevision(workDate: string): Promise<number> {
-    try {
-      const result = await query(
-        'SELECT COALESCE(MAX(revision), 0) + 1 as next_revision FROM daily_assignments_history WHERE work_date = $1',
-        [workDate]
-      );
-      return parseInt(result.rows[0]?.next_revision || '1');
-    } catch (error) {
-      console.error('❌ PG: Errore nel calcolo revisione:', error);
-      return 1;
-    }
-  }
-
-  /**
    * Save timeline to history (audit/rollback purposes)
    * Direct write from memory - no JSON intermediate
+   * 
+   * Uses daily_assignments_revisions table to track revision numbers reliably.
+   * Each save creates a new revision entry (even for empty timelines).
    */
-  async saveToHistory(workDate: string, timeline: any, createdBy: string = 'system'): Promise<number> {
+  async saveToHistory(
+    workDate: string, 
+    timeline: any, 
+    createdBy: string = 'system',
+    modificationType: string = 'manual'
+  ): Promise<number> {
     const client = await pool.connect();
     
     try {
       const rows = this.timelineToRows(workDate, timeline);
-      const revision = await this.getNextRevision(workDate);
+      
+      await client.query('BEGIN');
+
+      // Get next revision number with lock (inside transaction for atomicity)
+      const revResult = await client.query(
+        'SELECT COALESCE(MAX(revision), 0) + 1 as next_revision FROM daily_assignments_revisions WHERE work_date = $1 FOR UPDATE',
+        [workDate]
+      );
+      const revision = parseInt(revResult.rows[0]?.next_revision || '1');
       
       console.log(`📜 PG History: Salvando revisione ${revision} con ${rows.length} righe per ${workDate}...`);
 
-      await client.query('BEGIN');
+      // ALWAYS create revision metadata entry (even for empty timelines)
+      // This ensures revision numbers advance reliably
+      await client.query(`
+        INSERT INTO daily_assignments_revisions (work_date, revision, task_count, created_by, modification_type)
+        VALUES ($1, $2, $3, $4, $5)
+      `, [workDate, revision, rows.length, createdBy, modificationType]);
 
-      if (rows.length === 0) {
-        await client.query('COMMIT');
-        console.log(`✅ PG History: Nessuna assegnazione da salvare per ${workDate} (rev ${revision})`);
-        return revision;
-      }
-
+      // Insert task rows if any
       for (const row of rows) {
         await client.query(`
           INSERT INTO daily_assignments_history (
@@ -340,14 +340,14 @@ export class PgDailyAssignmentsService {
 
   /**
    * Get history revisions for a work_date
+   * Uses the revisions metadata table for reliable revision tracking
    */
-  async getHistoryRevisions(workDate: string): Promise<{ revision: number; created_at: Date; created_by: string; task_count: number }[]> {
+  async getHistoryRevisions(workDate: string): Promise<{ revision: number; created_at: Date; created_by: string; task_count: number; modification_type: string }[]> {
     try {
       const result = await query(`
-        SELECT revision, MIN(created_at) as created_at, MIN(created_by) as created_by, COUNT(*) as task_count
-        FROM daily_assignments_history 
+        SELECT revision, created_at, created_by, task_count, modification_type
+        FROM daily_assignments_revisions 
         WHERE work_date = $1
-        GROUP BY revision
         ORDER BY revision DESC
       `, [workDate]);
       return result.rows;

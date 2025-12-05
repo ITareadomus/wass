@@ -270,7 +270,7 @@ export async function saveTimeline(
       await pgDailyAssignmentsService.saveTimeline(workDate, normalizedData);
       
       // Save to history (audit/rollback) - also direct from memory
-      await pgDailyAssignmentsService.saveToHistory(workDate, normalizedData, createdBy);
+      await pgDailyAssignmentsService.saveToHistory(workDate, normalizedData, createdBy, modificationType);
     } catch (pgError) {
       // Log but don't fail - PostgreSQL is secondary for now
       console.error(`⚠️ PG: Errore nel salvataggio (non bloccante):`, pgError);
