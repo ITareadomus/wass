@@ -203,7 +203,9 @@ export async function loadTimeline(workDate: string): Promise<any | null> {
  *                       Use this for intermediate saves to avoid multiple revisions for a single user action
  * @param createdBy - Username of the user making the change (default: 'system')
  * @param modificationType - Type of modification (e.g., 'manual', 'reset', 'dnd', 'task_assigned', 'task_removed', etc.)
- * @param editOptions - Optional edit tracking info (editedField, oldValue, newValue)
+ * @param editOptions - Optional edit tracking info
+ *   - editedField/oldValue/newValue: legacy single-field tracking (string)
+ *   - editedFields/oldValues/newValues: new multi-field tracking (string arrays)
  */
 export async function saveTimeline(
   workDate: string,
@@ -215,6 +217,9 @@ export async function saveTimeline(
     editedField?: string;
     oldValue?: string;
     newValue?: string;
+    editedFields?: string[];
+    oldValues?: string[];
+    newValues?: string[];
   }
 ): Promise<boolean> {
   try {
@@ -269,8 +274,36 @@ export async function saveTimeline(
       // Save current state (replaces existing)
       await pgDailyAssignmentsService.saveTimeline(workDate, normalizedData);
       
-      // Save to history (audit/rollback) - also direct from memory
-      await pgDailyAssignmentsService.saveToHistory(workDate, normalizedData, createdBy, modificationType);
+      // Prepare change tracking arrays for PostgreSQL
+      // Support both legacy single-field and new multi-field formats
+      let editedFields: string[] = [];
+      let oldValues: string[] = [];
+      let newValues: string[] = [];
+      
+      if (editOptions) {
+        if (editOptions.editedFields && editOptions.editedFields.length > 0) {
+          // New multi-field format
+          editedFields = editOptions.editedFields;
+          oldValues = editOptions.oldValues || [];
+          newValues = editOptions.newValues || [];
+        } else if (editOptions.editedField) {
+          // Legacy single-field format - convert to arrays
+          editedFields = [editOptions.editedField];
+          oldValues = editOptions.oldValue ? [editOptions.oldValue] : [];
+          newValues = editOptions.newValue ? [editOptions.newValue] : [];
+        }
+      }
+      
+      // Save to history (audit/rollback) with change tracking
+      await pgDailyAssignmentsService.saveToHistory(
+        workDate, 
+        normalizedData, 
+        createdBy, 
+        modificationType,
+        editedFields,
+        oldValues,
+        newValues
+      );
     } catch (pgError) {
       // Log but don't fail - PostgreSQL is secondary for now
       console.error(`⚠️ PG: Errore nel salvataggio (non bloccante):`, pgError);
