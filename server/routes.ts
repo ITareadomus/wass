@@ -708,15 +708,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let fullTaskData: any = null;
       let sourceContainerType: string | null = null; // To track where the task came from
 
-      // Load containers data only if taskData is not provided or incomplete
+      // SEMPRE carica i containers - necessario per salvare la history e rimuovere la task
       let containersData = null;
-      if (!taskData) {
-        try {
-          containersData = JSON.parse(await fs.readFile(containersPath, 'utf8'));
-        } catch (error) {
-          console.error(`Failed to read ${containersPath}:`, error);
-          // Continue without containers data, will rely on taskData
-        }
+      try {
+        containersData = JSON.parse(await fs.readFile(containersPath, 'utf8'));
+      } catch (error) {
+        console.error(`Failed to read ${containersPath}:`, error);
+        // Continue without containers data
       }
 
       // Cerca la task nei containers per ottenere tutti i dati
@@ -1009,6 +1007,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (containersData && containersData.containers) {
         try {
           let taskRemoved = false;
+          
+          // CRITICAL: Salva revisione containers PRIMA di modificare (per supporto undo)
+          try {
+            const { pgDailyAssignmentsService } = await import('./services/pg-daily-assignments-service');
+            await pgDailyAssignmentsService.saveContainersToHistory(workDate, modifyingUserFromRequest, 'task_moved_to_timeline');
+            console.log(`📜 Containers history saved before removing task ${normalizedTaskId}`);
+          } catch (historyError) {
+            console.warn(`⚠️ Could not save containers history (non-blocking):`, historyError);
+          }
 
           // Cerca in tutti i container e rimuovi TUTTI i duplicati basandosi su task_id univoco
           for (const [containerType, container] of Object.entries(containersData.containers)) {
@@ -1139,6 +1146,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // RIPORTA la task nel container corretto
       if (removedTask) {
         try {
+          // CRITICAL: Salva revisione containers PRIMA di modificare (per supporto undo)
+          try {
+            const { pgDailyAssignmentsService } = await import('./services/pg-daily-assignments-service');
+            await pgDailyAssignmentsService.saveContainersToHistory(workDate, modifyingUser, 'task_returned_to_container');
+            console.log(`📜 Containers history saved before adding task back`);
+          } catch (historyError) {
+            console.warn(`⚠️ Could not save containers history (non-blocking):`, historyError);
+          }
+          
           const containersData = JSON.parse(await fs.readFile(containersPath, 'utf8'));
 
           // Determina il container corretto in base alla priority della task
