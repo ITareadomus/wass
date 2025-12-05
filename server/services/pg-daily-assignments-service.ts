@@ -743,6 +743,268 @@ export class PgDailyAssignmentsService {
     }
   }
 
+  // ==================== CONTAINERS HISTORY (UNDO/ROLLBACK) ====================
+
+  /**
+   * Save current containers state to history before making changes
+   * Creates a new revision with all current container tasks
+   */
+  async saveContainersToHistory(
+    workDate: string,
+    createdBy: string = 'system',
+    modificationType: string = 'manual'
+  ): Promise<number> {
+    const client = await pool.connect();
+    
+    try {
+      await client.query('BEGIN');
+      
+      // Lock revisions table to prevent race conditions
+      await client.query(
+        'SELECT 1 FROM daily_containers_revisions WHERE work_date = $1 FOR UPDATE',
+        [workDate]
+      );
+      
+      // Get next revision number
+      const revResult = await client.query(
+        'SELECT COALESCE(MAX(revision), 0) + 1 as next_revision FROM daily_containers_revisions WHERE work_date = $1',
+        [workDate]
+      );
+      const revision = parseInt(revResult.rows[0]?.next_revision || '1');
+      
+      // Get current containers
+      const currentContainers = await client.query(
+        'SELECT * FROM daily_containers WHERE work_date = $1',
+        [workDate]
+      );
+      
+      console.log(`📜 PG Containers History: Salvando revisione ${revision} con ${currentContainers.rows.length} task per ${workDate}...`);
+      
+      // Create revision metadata entry
+      await client.query(`
+        INSERT INTO daily_containers_revisions (work_date, revision, task_count, created_by, modification_type)
+        VALUES ($1, $2, $3, $4, $5)
+      `, [workDate, revision, currentContainers.rows.length, createdBy, modificationType]);
+      
+      // Copy current containers to history
+      for (const row of currentContainers.rows) {
+        await client.query(`
+          INSERT INTO daily_containers_history (
+            work_date, revision, priority,
+            task_id, logistic_code, client_id, premium, address, lat, lng,
+            cleaning_time, checkin_date, checkout_date, checkin_time, checkout_time,
+            pax_in, pax_out, small_equipment, operation_id, confirmed_operation,
+            straordinaria, type_apt, alias, customer_name, reasons, created_by
+          ) VALUES (
+            $1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
+            $11, $12, $13, $14, $15, $16, $17, $18, $19, $20,
+            $21, $22, $23, $24, $25, $26
+          )
+        `, [
+          workDate,
+          revision,
+          row.priority,
+          row.task_id,
+          row.logistic_code,
+          row.client_id,
+          row.premium,
+          row.address,
+          row.lat,
+          row.lng,
+          row.cleaning_time,
+          row.checkin_date,
+          row.checkout_date,
+          row.checkin_time,
+          row.checkout_time,
+          row.pax_in,
+          row.pax_out,
+          row.small_equipment,
+          row.operation_id,
+          row.confirmed_operation,
+          row.straordinaria,
+          row.type_apt,
+          row.alias,
+          row.customer_name,
+          row.reasons || [],
+          createdBy
+        ]);
+      }
+      
+      await client.query('COMMIT');
+      console.log(`✅ PG Containers History: Salvata revisione ${revision} con ${currentContainers.rows.length} task`);
+      return revision;
+      
+    } catch (error) {
+      await client.query('ROLLBACK');
+      console.error('❌ PG Containers History: Errore nel salvataggio:', error);
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  /**
+   * Get list of container revisions for a work_date
+   */
+  async getContainersRevisions(workDate: string): Promise<any[]> {
+    try {
+      const result = await query(
+        `SELECT revision, task_count, created_at, created_by, modification_type 
+         FROM daily_containers_revisions 
+         WHERE work_date = $1 
+         ORDER BY revision DESC`,
+        [workDate]
+      );
+      return result.rows;
+    } catch (error) {
+      console.error('❌ PG Containers History: Errore nel caricamento revisioni:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Get containers state at a specific revision
+   */
+  async getContainersAtRevision(workDate: string, revision: number): Promise<any | null> {
+    try {
+      const result = await query(
+        'SELECT * FROM daily_containers_history WHERE work_date = $1 AND revision = $2 ORDER BY priority, task_id',
+        [workDate, revision]
+      );
+      
+      if (result.rows.length === 0) {
+        return null;
+      }
+
+      // Reconstruct containers structure
+      const containers: { [key: string]: any[] } = {
+        early_out: [],
+        high: [],
+        low: []
+      };
+
+      for (const row of result.rows) {
+        const task: any = {
+          task_id: row.task_id,
+          logistic_code: row.logistic_code,
+          priority: row.priority,
+          client_id: row.client_id,
+          premium: row.premium,
+          address: row.address,
+          lat: row.lat,
+          lng: row.lng,
+          cleaning_time: row.cleaning_time,
+          checkin_date: row.checkin_date,
+          checkout_date: row.checkout_date,
+          checkin_time: row.checkin_time,
+          checkout_time: row.checkout_time,
+          pax_in: row.pax_in,
+          pax_out: row.pax_out,
+          small_equipment: row.small_equipment,
+          operation_id: row.operation_id,
+          confirmed_operation: row.confirmed_operation,
+          straordinaria: row.straordinaria,
+          type_apt: row.type_apt,
+          alias: row.alias,
+          customer_name: row.customer_name,
+          reasons: row.reasons || []
+        };
+
+        const priority = row.priority || 'low';
+        if (!containers[priority]) containers[priority] = [];
+        containers[priority].push(task);
+      }
+
+      return { containers };
+    } catch (error) {
+      console.error('❌ PG Containers History: Errore nel caricamento revisione:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Restore containers from a specific revision (for undo)
+   * Replaces current containers with the state from the given revision
+   */
+  async restoreContainersFromRevision(workDate: string, revision: number, createdBy: string = 'system'): Promise<boolean> {
+    const client = await pool.connect();
+    
+    try {
+      // First, save current state to history (so we can redo if needed)
+      await this.saveContainersToHistory(workDate, createdBy, 'pre_restore');
+      
+      await client.query('BEGIN');
+      
+      // Get containers at the target revision
+      const historyResult = await client.query(
+        'SELECT * FROM daily_containers_history WHERE work_date = $1 AND revision = $2',
+        [workDate, revision]
+      );
+      
+      if (historyResult.rows.length === 0) {
+        console.log(`⚠️ PG Containers: Nessun dato trovato per revisione ${revision}`);
+        await client.query('ROLLBACK');
+        return false;
+      }
+      
+      // Delete current containers
+      await client.query('DELETE FROM daily_containers WHERE work_date = $1', [workDate]);
+      
+      // Restore from history
+      for (const row of historyResult.rows) {
+        await client.query(`
+          INSERT INTO daily_containers (
+            work_date, priority,
+            task_id, logistic_code, client_id, premium, address, lat, lng,
+            cleaning_time, checkin_date, checkout_date, checkin_time, checkout_time,
+            pax_in, pax_out, small_equipment, operation_id, confirmed_operation,
+            straordinaria, type_apt, alias, customer_name, reasons
+          ) VALUES (
+            $1, $2, $3, $4, $5, $6, $7, $8, $9,
+            $10, $11, $12, $13, $14, $15, $16, $17, $18, $19,
+            $20, $21, $22, $23, $24
+          )
+        `, [
+          workDate,
+          row.priority,
+          row.task_id,
+          row.logistic_code,
+          row.client_id,
+          row.premium,
+          row.address,
+          row.lat,
+          row.lng,
+          row.cleaning_time,
+          row.checkin_date,
+          row.checkout_date,
+          row.checkin_time,
+          row.checkout_time,
+          row.pax_in,
+          row.pax_out,
+          row.small_equipment,
+          row.operation_id,
+          row.confirmed_operation,
+          row.straordinaria,
+          row.type_apt,
+          row.alias,
+          row.customer_name,
+          row.reasons || []
+        ]);
+      }
+      
+      await client.query('COMMIT');
+      console.log(`✅ PG Containers: Ripristinati ${historyResult.rows.length} task dalla revisione ${revision}`);
+      return true;
+      
+    } catch (error) {
+      await client.query('ROLLBACK');
+      console.error('❌ PG Containers: Errore nel ripristino:', error);
+      return false;
+    } finally {
+      client.release();
+    }
+  }
+
   // ==================== SELECTED CLEANERS ====================
 
   /**
