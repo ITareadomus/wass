@@ -1,6 +1,6 @@
 {
   "meta": {
-    "total_tasks": 4,
+    "total_tasks": 5,
     "used_cleaners": 0,
     "assigned_tasks": 0,
     "total_cleaners": 2
@@ -11,7 +11,7 @@
     "modified_by": [
       "Admin"
     ],
-    "last_updated": "2025-12-05 12:53:51"
+    "last_updated": "2025-12-05 14:20:24"
   },
   "cleaners_assignments": [
     {
@@ -165,6 +165,39 @@
           "followup": true,
           "sequence": 2,
           "travel_time": 42
+        },
+        {
+          "task_id": 219865,
+          "logistic_code": 1472,
+          "client_id": null,
+          "premium": false,
+          "address": "via Voghera 9/A",
+          "lat": "45.4540455",
+          "lng": "9.1676391",
+          "cleaning_time": 120,
+          "checkin_date": "2025-12-09",
+          "checkout_date": "2025-12-08",
+          "checkin_time": "15:00",
+          "checkout_time": null,
+          "pax_in": 2,
+          "pax_out": 3,
+          "small_equipment": false,
+          "operation_id": 2,
+          "confirmed_operation": false,
+          "straordinaria": false,
+          "type_apt": "C",
+          "alias": "NTM",
+          "customer_name": "NOTA-MI",
+          "reasons": [
+            "manually_moved_to_timeline",
+            "manual_assignment"
+          ],
+          "priority": "early_out",
+          "start_time": "13:11",
+          "end_time": "15:11",
+          "followup": true,
+          "sequence": 3,
+          "travel_time": 29
         }
       ]
     }
