@@ -362,12 +362,20 @@ export class PgDailyAssignmentsService {
    * 
    * Uses daily_assignments_revisions table to track revision numbers reliably.
    * Each save creates a new revision entry (even for empty timelines).
+   * 
+   * Change tracking:
+   * - editedFields: array of field names that changed (e.g. ["cleaner_id", "sequence", "start_time"])
+   * - oldValues: array of previous values in same order
+   * - newValues: array of new values in same order
    */
   async saveToHistory(
     workDate: string, 
     timeline: any, 
     createdBy: string = 'system',
-    modificationType: string = 'manual'
+    modificationType: string = 'manual',
+    editedFields: string[] = [],
+    oldValues: string[] = [],
+    newValues: string[] = []
   ): Promise<number> {
     const client = await pool.connect();
     
@@ -394,10 +402,11 @@ export class PgDailyAssignmentsService {
 
       // ALWAYS create revision metadata entry (even for empty timelines)
       // This ensures revision numbers advance reliably
+      // Includes change tracking: edited_fields, old_values, new_values
       await client.query(`
-        INSERT INTO daily_assignments_revisions (work_date, revision, task_count, created_by, modification_type)
-        VALUES ($1, $2, $3, $4, $5)
-      `, [workDate, revision, rows.length, createdBy, modificationType]);
+        INSERT INTO daily_assignments_revisions (work_date, revision, task_count, created_by, modification_type, edited_fields, old_values, new_values)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+      `, [workDate, revision, rows.length, createdBy, modificationType, editedFields, oldValues, newValues]);
 
       // Insert task rows if any (includes cleaner data for full reconstruction)
       for (const row of rows) {
@@ -476,11 +485,22 @@ export class PgDailyAssignmentsService {
   /**
    * Get history revisions for a work_date
    * Uses the revisions metadata table for reliable revision tracking
+   * Includes change tracking fields: edited_fields, old_values, new_values
    */
-  async getHistoryRevisions(workDate: string): Promise<{ revision: number; created_at: Date; created_by: string; task_count: number; modification_type: string }[]> {
+  async getHistoryRevisions(workDate: string): Promise<{ 
+    revision: number; 
+    created_at: Date; 
+    created_by: string; 
+    task_count: number; 
+    modification_type: string;
+    edited_fields: string[];
+    old_values: string[];
+    new_values: string[];
+  }[]> {
     try {
       const result = await query(`
-        SELECT revision, created_at, created_by, task_count, modification_type
+        SELECT revision, created_at, created_by, task_count, modification_type, 
+               edited_fields, old_values, new_values
         FROM daily_assignments_revisions 
         WHERE work_date = $1
         ORDER BY revision DESC

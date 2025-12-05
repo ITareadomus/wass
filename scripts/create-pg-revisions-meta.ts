@@ -13,6 +13,9 @@ async function createRevisionsMetaTable() {
         created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
         created_by VARCHAR(100) DEFAULT 'system',
         modification_type VARCHAR(100),
+        edited_fields TEXT[] DEFAULT '{}',
+        old_values TEXT[] DEFAULT '{}',
+        new_values TEXT[] DEFAULT '{}',
         UNIQUE(work_date, revision)
       );
     `);
