@@ -70,6 +70,33 @@
           "followup": true,
           "sequence": 2,
           "travel_time": 34
+        },
+        {
+          "task_id": "219859",
+          "logistic_code": "839",
+          "premium": false,
+          "address": "Via dei Biancospini 13",
+          "lat": 45.449483,
+          "lng": 9.140038,
+          "cleaning_time": 60,
+          "checkin_date": "2025-12-08T00:00:00.000Z",
+          "checkout_date": "2025-12-08T00:00:00.000Z",
+          "pax_in": 1,
+          "pax_out": 2,
+          "small_equipment": false,
+          "operation_id": 2,
+          "confirmed_operation": false,
+          "straordinaria": false,
+          "type_apt": "A",
+          "alias": "NTM",
+          "customer_name": "NOTA-MI",
+          "reasons": [
+            "manually_moved_to_timeline"
+          ],
+          "priority": "early_out",
+          "followup": true,
+          "sequence": 3,
+          "travel_time": 0
         }
       ]
     },
@@ -186,11 +213,64 @@
           "travel_time": 0
         }
       ]
+    },
+    {
+      "cleaner": {
+        "id": 1,
+        "name": "Unknown",
+        "lastname": "",
+        "role": "Standard",
+        "premium": false,
+        "start_time": "10:00"
+      },
+      "tasks": [
+        {
+          "task_id": 219600,
+          "logistic_code": 1541,
+          "client_id": 118,
+          "premium": false,
+          "address": "VIA GONIN, 58",
+          "lat": "45.4423379",
+          "lng": "9.1195717",
+          "cleaning_time": 90,
+          "checkin_date": "2025-12-08",
+          "checkout_date": "2025-12-08",
+          "checkin_time": "15:00",
+          "checkout_time": "10:00",
+          "pax_in": 4,
+          "pax_out": 4,
+          "small_equipment": false,
+          "operation_id": 2,
+          "confirmed_operation": true,
+          "straordinaria": false,
+          "type_apt": "B",
+          "alias": "CLTR",
+          "customer_name": "CALLATRONI ELENA",
+          "reasons": [
+            "checkout_time_eo_window_or_before_start",
+            "manually_moved_to_timeline"
+          ],
+          "priority": "early_out",
+          "start_time": "10:00",
+          "end_time": "11:30",
+          "followup": false,
+          "sequence": 1,
+          "travel_time": 0
+        }
+      ]
     }
   ],
   "metadata": {
     "date": "2025-12-08",
-    "last_updated": "2025-12-05T15:01:44.398Z",
-    "source": "postgresql"
+    "last_updated": "2025-12-05 16:15:07",
+    "source": "postgresql",
+    "created_by": "test_user",
+    "modified_by": [
+      "test_user"
+    ]
+  },
+  "meta": {
+    "total_cleaners": 4,
+    "total_tasks": 7
   }
 }
