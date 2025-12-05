@@ -3,14 +3,16 @@
     {
       "id": 132,
       "name": "JOHOISER ERNESTO",
-      "lastname": "LOPEZ GIRON",
       "role": "Premium",
       "active": true,
       "ranking": 0,
-      "counter_hours": 0,
-      "counter_days": 0,
+      "lastname": "LOPEZ GIRON",
       "available": true,
+      "start_time": "10:00",
+      "telegram_id": 1577716674,
+      "counter_days": 0,
       "contract_type": "C",
+      "counter_hours": 0,
       "preferred_customers": [
         2,
         3,
@@ -35,21 +37,21 @@
         123,
         124
       ],
-      "telegram_id": 1577716674,
-      "start_time": "10:00",
       "can_do_straordinaria": true
     },
     {
       "id": 495,
       "name": "EL HADJI",
-      "lastname": "BA",
       "role": "Premium",
       "active": true,
       "ranking": 0,
-      "counter_hours": 0,
-      "counter_days": 1,
+      "lastname": "BA",
       "available": true,
+      "start_time": "10:00",
+      "telegram_id": 8035270407,
+      "counter_days": 1,
       "contract_type": "B",
+      "counter_hours": 0,
       "preferred_customers": [
         2,
         3,
@@ -70,21 +72,21 @@
         121,
         123
       ],
-      "telegram_id": 8035270407,
-      "start_time": "10:00",
       "can_do_straordinaria": true
     },
     {
       "id": 445,
       "name": "IBRAHIM",
-      "lastname": "SANYANG",
       "role": "Premium",
       "active": true,
       "ranking": 0,
-      "counter_hours": 0,
-      "counter_days": 0,
+      "lastname": "SANYANG",
       "available": true,
+      "start_time": "10:00",
+      "telegram_id": null,
+      "counter_days": 0,
       "contract_type": "B",
+      "counter_hours": 0,
       "preferred_customers": [
         2,
         61,
@@ -102,15 +104,12 @@
         123,
         124
       ],
-      "telegram_id": null,
-      "start_time": "10:00",
       "can_do_straordinaria": false
     }
   ],
   "total_selected": 3,
   "metadata": {
     "date": "2025-12-08",
-    "loaded_at": "2025-12-05 14:01:30",
-    "last_updated": "2025-12-05 15:02:09"
+    "loaded_at": "2025-12-05 14:30:39"
   }
 }

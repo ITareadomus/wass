@@ -155,17 +155,34 @@ async function atomicWriteJson(filePath: string, data: any): Promise<void> {
 
 /**
  * Load timeline for a specific work date
- * Priority: MySQL → filesystem → null
+ * PRIMARY SOURCE: PostgreSQL (DigitalOcean)
+ * FALLBACK: MySQL → filesystem (legacy, will be removed)
+ * 
+ * Phase 1 Migration: PostgreSQL is now the primary source of truth
  */
 export async function loadTimeline(workDate: string): Promise<any | null> {
+  // PRIMARY: Try PostgreSQL first (new architecture)
   try {
-    // Try MySQL first
+    const { pgDailyAssignmentsService } = await import('./pg-daily-assignments-service');
+    const pgTimeline = await pgDailyAssignmentsService.loadTimeline(workDate);
+    
+    if (pgTimeline) {
+      console.log(`✅ Timeline loaded from PostgreSQL for ${workDate}`);
+      // Normalize and sync to filesystem for Python scripts (write-only)
+      const normalizedTimeline = getNormalizedTimeline(pgTimeline);
+      await atomicWriteJson(PATHS.timeline, normalizedTimeline);
+      return normalizedTimeline;
+    }
+  } catch (err) {
+    console.error(`⚠️ Error loading timeline from PostgreSQL:`, err);
+  }
+
+  // FALLBACK: Try MySQL (legacy - will be removed in Phase 2)
+  try {
     const rev = await dailyAssignmentRevisionsService.getLatestRevision(workDate);
     if (rev?.timeline) {
-      console.log(`✅ Timeline loaded from MySQL for ${workDate} (revision ${rev.revision})`);
-      // CRITICAL: Normalize before writing to filesystem to ensure correct key order
+      console.log(`⚠️ Timeline loaded from MySQL (legacy fallback) for ${workDate} (revision ${rev.revision})`);
       const normalizedTimeline = getNormalizedTimeline(rev.timeline);
-      // Sync to filesystem for Python scripts
       await atomicWriteJson(PATHS.timeline, normalizedTimeline);
       return normalizedTimeline;
     }
@@ -173,14 +190,13 @@ export async function loadTimeline(workDate: string): Promise<any | null> {
     console.error(`Error loading timeline from MySQL:`, err);
   }
 
-  // Fallback to filesystem (first-time or migration)
+  // LAST RESORT: Filesystem (legacy - will be removed in Phase 2)
   try {
     const data = await fs.readFile(PATHS.timeline, 'utf-8');
     const parsed = JSON.parse(data);
 
     if (parsed.metadata?.date === workDate || parsed.cleaners_assignments) {
-      console.log(`✅ Timeline loaded from filesystem for ${workDate}`);
-      // Normalize and re-save to ensure correct key order
+      console.log(`⚠️ Timeline loaded from filesystem (legacy fallback) for ${workDate}`);
       const normalized = getNormalizedTimeline(parsed);
       await atomicWriteJson(PATHS.timeline, normalized);
       return normalized;
@@ -330,16 +346,32 @@ async function loadContainersFromFile(workDate: string): Promise<any | null> {
 
 /**
  * Load containers.json for a specific work date
- * Priority: MySQL → filesystem → null
- * Now persisted to MySQL for historical date viewing
+ * PRIMARY SOURCE: PostgreSQL (DigitalOcean)
+ * FALLBACK: MySQL → filesystem (legacy, will be removed)
+ * 
+ * Phase 1 Migration: PostgreSQL is now the primary source of truth
  */
 export async function loadContainers(workDate: string): Promise<any | null> {
+  // PRIMARY: Try PostgreSQL first (new architecture)
   try {
-    // Try MySQL first
+    const { pgDailyAssignmentsService } = await import('./pg-daily-assignments-service');
+    const pgContainers = await pgDailyAssignmentsService.loadContainers(workDate);
+    
+    if (pgContainers) {
+      console.log(`✅ Containers loaded from PostgreSQL for ${workDate}`);
+      // Sync to filesystem for Python scripts (write-only)
+      await atomicWriteJson(PATHS.containers, pgContainers);
+      return pgContainers;
+    }
+  } catch (err) {
+    console.error(`⚠️ Error loading containers from PostgreSQL:`, err);
+  }
+
+  // FALLBACK: Try MySQL (legacy - will be removed in Phase 2)
+  try {
     const rev = await dailyAssignmentRevisionsService.getLatestRevision(workDate);
     if (rev?.containers) {
-      console.log(`✅ Containers loaded from MySQL for ${workDate} (revision ${rev.revision})`);
-      // Sync to filesystem for Python scripts
+      console.log(`⚠️ Containers loaded from MySQL (legacy fallback) for ${workDate} (revision ${rev.revision})`);
       await atomicWriteJson(PATHS.containers, rev.containers);
       return rev.containers;
     }
@@ -347,13 +379,13 @@ export async function loadContainers(workDate: string): Promise<any | null> {
     console.error(`Error loading containers from MySQL:`, err);
   }
 
-  // Fallback to filesystem
+  // LAST RESORT: Filesystem (legacy - will be removed in Phase 2)
   try {
     const data = await fs.readFile(PATHS.containers, 'utf-8');
     const parsed = JSON.parse(data);
 
     if (parsed.containers) {
-      console.log(`✅ Containers loaded from filesystem for ${workDate}`);
+      console.log(`⚠️ Containers loaded from filesystem (legacy fallback) for ${workDate}`);
       return parsed;
     }
   } catch (err) {
@@ -366,16 +398,25 @@ export async function loadContainers(workDate: string): Promise<any | null> {
 
 /**
  * Save containers.json for a specific work date
- * Writes to filesystem always (for Python scripts)
- * Writes to MySQL only for today/future dates (for historical viewing)
- * @param createdBy - Username of the user making the change (default: 'system')
- * @param modificationType - Type of modification (default: 'manual')
+ * PRIMARY: Writes to PostgreSQL (DigitalOcean)
+ * ALSO: Writes to filesystem (for Python scripts)
+ * LEGACY: Writes to MySQL (will be removed in Phase 2)
+ * 
+ * Phase 1 Migration: PostgreSQL is now the primary storage
  */
 export async function saveContainers(workDate: string, data: any, createdBy: string = 'system', modificationType: string = 'manual'): Promise<boolean> {
   try {
     // ALWAYS write to filesystem (for Python scripts compatibility)
     await atomicWriteJson(PATHS.containers, data);
     console.log(`✅ Containers saved to filesystem for ${workDate}`);
+
+    // PRIMARY: Save to PostgreSQL
+    try {
+      const { pgDailyAssignmentsService } = await import('./pg-daily-assignments-service');
+      await pgDailyAssignmentsService.saveContainers(workDate, data);
+    } catch (pgError) {
+      console.error(`⚠️ PG: Errore nel salvataggio containers (non bloccante):`, pgError);
+    }
 
     // Check if this is a past date
     const today = new Date();
@@ -386,11 +427,11 @@ export async function saveContainers(workDate: string, data: any, createdBy: str
 
     // For past dates: skip MySQL write
     if (isPastDate) {
-      console.log(`📜 Data passata ${workDate} - containers salvati solo su filesystem`);
+      console.log(`📜 Data passata ${workDate} - containers salvati solo su filesystem + PG`);
       return true;
     }
 
-    // Get current timeline and selected_cleaners
+    // LEGACY: Also save to MySQL (will be removed in Phase 2)
     let timeline = null;
     let cleanersArray: any[] = [];
 
@@ -408,14 +449,13 @@ export async function saveContainers(workDate: string, data: any, createdBy: str
       cleanersArray = [];
     }
 
-    // Create revision with containers
     const hasContainers = data?.containers && Object.keys(data.containers).length > 0;
     const hasAssignments = timeline?.cleaners_assignments && timeline.cleaners_assignments.length > 0;
     const hasCleaners = cleanersArray.length > 0;
 
     if (hasContainers || hasAssignments || hasCleaners) {
       await dailyAssignmentRevisionsService.createRevision(workDate, timeline, cleanersArray, data, createdBy, modificationType);
-      console.log(`✅ Containers revision created in MySQL for ${workDate} by ${createdBy} (type: ${modificationType})`);
+      console.log(`⚠️ Containers revision created in MySQL (legacy) for ${workDate}`);
     }
 
     return true;
@@ -449,11 +489,34 @@ async function loadSelectedCleanersFromFile(workDate: string): Promise<any | nul
 
 /**
  * Load selected_cleaners for a specific work date
- * Priority: MySQL → filesystem → null
+ * PRIMARY SOURCE: PostgreSQL (DigitalOcean)
+ * FALLBACK: MySQL → filesystem (legacy, will be removed)
+ * 
+ * Phase 1 Migration: PostgreSQL is now the primary source of truth
  */
 export async function loadSelectedCleaners(workDate: string): Promise<any | null> {
+  // PRIMARY: Try PostgreSQL first (new architecture)
   try {
-    // Try MySQL first
+    const { pgDailyAssignmentsService } = await import('./pg-daily-assignments-service');
+    const pgCleaners = await pgDailyAssignmentsService.loadSelectedCleaners(workDate);
+    
+    if (pgCleaners) {
+      const scData = {
+        cleaners: Array.isArray(pgCleaners) ? pgCleaners : [],
+        total_selected: Array.isArray(pgCleaners) ? pgCleaners.length : 0,
+        metadata: { date: workDate, loaded_at: getRomeTimestamp() }
+      };
+      console.log(`✅ Selected cleaners loaded from PostgreSQL for ${workDate}`);
+      // Sync to filesystem for Python scripts (write-only)
+      await atomicWriteJson(PATHS.selectedCleaners, scData);
+      return scData;
+    }
+  } catch (err) {
+    console.error(`⚠️ Error loading selected cleaners from PostgreSQL:`, err);
+  }
+
+  // FALLBACK: Try MySQL (legacy - will be removed in Phase 2)
+  try {
     const rev = await dailyAssignmentRevisionsService.getLatestRevision(workDate);
     if (rev?.selected_cleaners) {
       const scData = {
@@ -461,8 +524,7 @@ export async function loadSelectedCleaners(workDate: string): Promise<any | null
         total_selected: Array.isArray(rev.selected_cleaners) ? rev.selected_cleaners.length : 0,
         metadata: { date: workDate, loaded_at: getRomeTimestamp() }
       };
-      console.log(`✅ Selected cleaners loaded from MySQL for ${workDate} (revision ${rev.revision})`);
-      // Sync to filesystem
+      console.log(`⚠️ Selected cleaners loaded from MySQL (legacy fallback) for ${workDate}`);
       await atomicWriteJson(PATHS.selectedCleaners, scData);
       return scData;
     }
@@ -470,13 +532,13 @@ export async function loadSelectedCleaners(workDate: string): Promise<any | null
     console.error(`Error loading selected cleaners from MySQL:`, err);
   }
 
-  // Fallback to filesystem
+  // LAST RESORT: Filesystem (legacy - will be removed in Phase 2)
   try {
     const data = await fs.readFile(PATHS.selectedCleaners, 'utf-8');
     const parsed = JSON.parse(data);
 
     if (!parsed.metadata?.date || parsed.metadata.date === workDate) {
-      console.log(`✅ Selected cleaners loaded from filesystem for ${workDate}`);
+      console.log(`⚠️ Selected cleaners loaded from filesystem (legacy fallback) for ${workDate}`);
       return parsed;
     }
   } catch (err) {
@@ -489,13 +551,11 @@ export async function loadSelectedCleaners(workDate: string): Promise<any | null
 
 /**
  * Save selected_cleaners for a specific work date
- * Writes to filesystem always (for Python scripts)
- * Writes to MySQL only for today/future dates
- * @param skipRevision - If true, only saves to filesystem without creating a MySQL revision
- *                       Use this for intermediate saves (e.g., update-cleaner-start-time)
- *                       to avoid creating multiple revisions for a single user action
- * @param createdBy - Username of the user making the change (default: 'system')
- * @param modificationType - Type of modification (e.g., 'convocazioni_save', 'cleaner_removed', 'start_time_updated', etc.)
+ * PRIMARY: Writes to PostgreSQL (DigitalOcean)
+ * ALSO: Writes to filesystem (for Python scripts)
+ * LEGACY: Writes to MySQL (will be removed in Phase 2)
+ * 
+ * Phase 1 Migration: PostgreSQL is now the primary storage
  */
 export async function saveSelectedCleaners(workDate: string, data: any, skipRevision: boolean = false, createdBy: string = 'system', modificationType: string = 'manual'): Promise<boolean> {
   try {
@@ -511,13 +571,22 @@ export async function saveSelectedCleaners(workDate: string, data: any, skipRevi
     data.metadata.date = workDate;
     data.metadata.last_updated = getRomeTimestamp();
 
-    // ALWAYS write to filesystem
+    // ALWAYS write to filesystem (for Python scripts)
     await atomicWriteJson(PATHS.selectedCleaners, data);
     console.log(`✅ Selected cleaners saved to filesystem for ${workDate}`);
 
+    // PRIMARY: Save to PostgreSQL
+    try {
+      const { pgDailyAssignmentsService } = await import('./pg-daily-assignments-service');
+      const cleanersArray = data.cleaners || [];
+      await pgDailyAssignmentsService.saveSelectedCleaners(workDate, cleanersArray);
+    } catch (pgError) {
+      console.error(`⚠️ PG: Errore nel salvataggio selected cleaners (non bloccante):`, pgError);
+    }
+
     // For past dates: skip MySQL write but return success
     if (isPastDate) {
-      console.log(`📜 Data passata ${workDate} - file JSON aggiornato, MySQL non modificato`);
+      console.log(`📜 Data passata ${workDate} - salvato su filesystem + PG`);
       return true;
     }
 
@@ -527,7 +596,7 @@ export async function saveSelectedCleaners(workDate: string, data: any, skipRevi
       return true;
     }
 
-    // Get current timeline and containers
+    // LEGACY: Also save to MySQL (will be removed in Phase 2)
     let timeline = null;
     let containers = null;
 
@@ -544,13 +613,9 @@ export async function saveSelectedCleaners(workDate: string, data: any, skipRevi
       containers = null;
     }
 
-    const cleanersArray = data.cleaners || [];
-
-    // ALWAYS create revision in MySQL - even for empty states
-    // This ensures removals/deletions are properly persisted
-    // Empty state IS valid data that should be saved
-    await dailyAssignmentRevisionsService.createRevision(workDate, timeline, cleanersArray, containers, createdBy, modificationType);
-    console.log(`✅ Selected cleaners revision created in MySQL for ${workDate} by ${createdBy} (type: ${modificationType})`);
+    const cleanersForMySQL = data.cleaners || [];
+    await dailyAssignmentRevisionsService.createRevision(workDate, timeline, cleanersForMySQL, containers, createdBy, modificationType);
+    console.log(`⚠️ Selected cleaners revision created in MySQL (legacy) for ${workDate}`);
 
     return true;
   } catch (err) {
