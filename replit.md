@@ -24,13 +24,28 @@ Preferred communication style: Simple, everyday language.
 - **Build System**: ESBuild for production bundling with platform-specific optimizations
 
 ## Data Storage
-- **Primary Database**: MySQL with mysql2 library for assignment revision storage
-- **Secondary Database**: PostgreSQL with Neon serverless integration (legacy)
+- **Primary Database**: PostgreSQL (DigitalOcean) - transitioning from MySQL
+- **Legacy Database**: MySQL with mysql2 library (being phased out)
 - **ORM**: Drizzle ORM for type-safe database operations and migrations
 - **Schema Design**: Three main entities (tasks, personnel, assignments) with foreign key relationships
 - **Data Validation**: Zod schemas for runtime type checking and API request validation
-- **Dual-Write Pattern**: Timeline and selected_cleaners saved to both filesystem (for Python scripts) and MySQL (for versioning)
-- **Auto-Save**: All assignment changes are automatically persisted to MySQL with revision tracking
+- **Tri-Write Pattern**: Timeline, containers, selected_cleaners saved to PostgreSQL + filesystem (Python) + MySQL (legacy)
+- **Auto-Save**: All assignment changes are automatically persisted with revision tracking
+
+## PostgreSQL Architecture (December 2025) - Flat Tables Design
+- **Read Priority**: PostgreSQL → MySQL fallback → Filesystem fallback
+- **Write Pattern**: PostgreSQL + JSON (for Python scripts) + MySQL (legacy, will be removed)
+- **Tables**:
+  - `daily_assignments_current`: Current timeline state (1 row per cleaner-task pair)
+  - `daily_assignments_history`: All timeline revisions for audit/rollback
+  - `daily_assignments_revisions`: Metadata per revision (work_date, revision, task_count, change tracking)
+  - `daily_containers`: Current unassigned tasks (flat: 1 row per task)
+  - `daily_containers_revisions`: Container revision metadata
+  - `daily_containers_history`: All container revisions for undo
+  - `daily_selected_cleaners`: Selected cleaners per work_date (JSONB)
+- **Container Task Fields**: task_id, logistic_code, client_id, premium, address, lat, lng, cleaning_time, checkin_date, checkout_date, checkin_time, checkout_time, pax_in, pax_out, small_equipment, operation_id, confirmed_operation, straordinaria, type_apt, alias, customer_name, reasons, priority
+- **Undo Flow**: When task moves container→timeline, containers history saved first for rollback
+- **Service File**: `server/services/pg-daily-assignments-service.ts`
 
 ## MySQL Storage Architecture (November 2025) - Two-Table Design
 - **Two-Table Architecture**:
