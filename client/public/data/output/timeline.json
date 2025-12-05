@@ -144,11 +144,53 @@
           "travel_time": 41
         }
       ]
+    },
+    {
+      "cleaner": {
+        "id": 495,
+        "name": "EL HADJI",
+        "lastname": "BA",
+        "role": "Premium",
+        "premium": false,
+        "start_time": "10:00"
+      },
+      "tasks": [
+        {
+          "task_id": "219866",
+          "logistic_code": "1487",
+          "premium": false,
+          "address": "viale monteceneri 58",
+          "lat": 45.492065,
+          "lng": 9.15414,
+          "cleaning_time": 60,
+          "checkin_date": "2025-12-08T00:00:00.000Z",
+          "checkout_date": "2025-12-08T00:00:00.000Z",
+          "checkin_time": "19:30:00",
+          "pax_in": 1,
+          "pax_out": 1,
+          "small_equipment": false,
+          "operation_id": 2,
+          "confirmed_operation": false,
+          "straordinaria": false,
+          "type_apt": "A",
+          "alias": "NTM",
+          "customer_name": "NOTA-MI",
+          "reasons": [
+            "manually_moved_to_timeline"
+          ],
+          "priority": "early_out",
+          "start_time": "10:00:00",
+          "end_time": "11:00:00",
+          "followup": false,
+          "sequence": 1,
+          "travel_time": 0
+        }
+      ]
     }
   ],
   "metadata": {
     "date": "2025-12-08",
-    "last_updated": "2025-12-05T14:50:33.970Z",
+    "last_updated": "2025-12-05T14:52:30.876Z",
     "source": "postgresql"
   }
 }
