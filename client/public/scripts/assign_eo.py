@@ -553,9 +553,10 @@ def load_containers_data() -> Dict:
 def load_tasks() -> List[Task]:
     data = load_containers_data()
 
-    # Carica settings per leggere eo_start_time dinamicamente
+    # Carica settings da API per leggere eo_start_time dinamicamente
     try:
-        settings = json.loads(SETTINGS_PATH.read_text(encoding="utf-8"))
+        from api_client import load_settings_from_api
+        settings = load_settings_from_api()
     except Exception:
         settings = {}
 

@@ -317,6 +317,26 @@ class ApiClient:
     def load_selected_cleaners(self, date: str) -> List[Dict]:
         """Alias per get_selected_cleaners."""
         return self.get_selected_cleaners(date)
+    
+    # ==================== SETTINGS ====================
+    
+    def get_settings(self) -> Dict:
+        """
+        Carica le impostazioni dell'applicazione da PostgreSQL.
+        
+        Returns:
+            Dict con le impostazioni (early-out, high-priority, task_types, ecc.)
+        """
+        return self._get("/api/settings")
+    
+    def get_client_timewindows(self) -> Dict:
+        """
+        Carica le finestre temporali dei clienti da PostgreSQL.
+        
+        Returns:
+            Dict con le finestre temporali
+        """
+        return self._get("/api/client-timewindows")
 
 
 # ==================== FUNZIONI DI COMPATIBILITÀ ====================
@@ -351,6 +371,16 @@ def load_selected_cleaners_from_api(date: str) -> List[Dict]:
     """Wrapper per compatibilità."""
     client = ApiClient()
     return client.get_selected_cleaners(date)
+
+def load_settings_from_api() -> Dict:
+    """Wrapper per compatibilità - carica settings da PostgreSQL."""
+    client = ApiClient()
+    return client.get_settings()
+
+def load_client_timewindows_from_api() -> Dict:
+    """Wrapper per compatibilità - carica finestre temporali da PostgreSQL."""
+    client = ApiClient()
+    return client.get_client_timewindows()
 
 
 if __name__ == "__main__":
