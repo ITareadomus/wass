@@ -347,36 +347,17 @@ export async function loadSelectedCleaners(workDate: string): Promise<any | null
       };
       console.log(`✅ Selected cleaners loaded from PostgreSQL for ${workDate}: ${cleanersData.length} cleaners`);
       
-      // Write to filesystem for Python script compatibility - ensure directory exists
-      try {
-        const dir = path.dirname(PATHS.selectedCleaners);
-        await fs.mkdir(dir, { recursive: true });
-        await atomicWriteJson(PATHS.selectedCleaners, scData);
-      } catch (fsErr) {
-        console.warn(`⚠️ Could not write selected_cleaners to filesystem (non-blocking):`, fsErr);
-      }
-      
+      // PostgreSQL is the only source of truth - no filesystem writes
       return scData;
     }
     
     // No cleaners found - return empty
     console.log(`ℹ️ No selected cleaners found for ${workDate}`);
-    const emptyData = {
+    return {
       cleaners: [],
       total_selected: 0,
       metadata: { date: workDate, loaded_at: getRomeTimestamp() }
     };
-    
-    // Ensure directory exists for empty file
-    try {
-      const dir = path.dirname(PATHS.selectedCleaners);
-      await fs.mkdir(dir, { recursive: true });
-      await atomicWriteJson(PATHS.selectedCleaners, emptyData);
-    } catch (fsErr) {
-      console.warn(`⚠️ Could not write empty selected_cleaners (non-blocking):`, fsErr);
-    }
-    
-    return emptyData;
   } catch (err) {
     console.error(`❌ Error loading selected cleaners from PostgreSQL:`, err);
     return null;
@@ -386,7 +367,7 @@ export async function loadSelectedCleaners(workDate: string): Promise<any | null
 /**
  * Save selected_cleaners for a specific work date
  * PRIMARY: PostgreSQL (IDs to daily_selected_cleaners, full data to cleaners table)
- * ALSO: filesystem (for Python scripts), LEGACY: MySQL
+ * LEGACY: MySQL (will be removed)
  */
 export async function saveSelectedCleaners(workDate: string, data: any, skipRevision: boolean = false, createdBy: string = 'system', modificationType: string = 'manual'): Promise<boolean> {
   try {
@@ -400,31 +381,23 @@ export async function saveSelectedCleaners(workDate: string, data: any, skipRevi
     data.metadata.date = workDate;
     data.metadata.last_updated = getRomeTimestamp();
 
-    // Write to filesystem (for Python scripts - selected_cleaners still needs this)
-    await atomicWriteJson(PATHS.selectedCleaners, data);
-    console.log(`✅ Selected cleaners saved to filesystem for ${workDate}`);
-
-    // PRIMARY: Save to PostgreSQL
-    try {
-      const { pgDailyAssignmentsService } = await import('./pg-daily-assignments-service');
-      const cleanersArray = data.cleaners || [];
-      
-      // Extract IDs for daily_selected_cleaners table (now INTEGER[])
-      const cleanerIds = cleanersArray.map((c: any) => typeof c === 'number' ? c : c.id).filter((id: any) => id != null);
-      await pgDailyAssignmentsService.saveSelectedCleaners(workDate, cleanerIds);
-      
-      // Also save full cleaner data to cleaners table if available
-      if (cleanersArray.length > 0 && typeof cleanersArray[0] === 'object') {
-        await pgDailyAssignmentsService.saveCleanersForDate(workDate, cleanersArray, 'selected_cleaners_update');
-      }
-      
-      console.log(`✅ Selected cleaners saved to PostgreSQL for ${workDate}: ${cleanerIds.length} IDs`);
-    } catch (pgError) {
-      console.error(`⚠️ PG: Errore nel salvataggio selected cleaners (non bloccante):`, pgError);
+    // PRIMARY: Save to PostgreSQL (only source of truth)
+    const { pgDailyAssignmentsService } = await import('./pg-daily-assignments-service');
+    const cleanersArray = data.cleaners || [];
+    
+    // Extract IDs for daily_selected_cleaners table (now INTEGER[])
+    const cleanerIds = cleanersArray.map((c: any) => typeof c === 'number' ? c : c.id).filter((id: any) => id != null);
+    await pgDailyAssignmentsService.saveSelectedCleaners(workDate, cleanerIds);
+    
+    // Also save full cleaner data to cleaners table if available
+    if (cleanersArray.length > 0 && typeof cleanersArray[0] === 'object') {
+      await pgDailyAssignmentsService.saveCleanersForDate(workDate, cleanersArray, 'selected_cleaners_update');
     }
+    
+    console.log(`✅ Selected cleaners saved to PostgreSQL for ${workDate}: ${cleanerIds.length} IDs`);
 
     if (isPastDate) {
-      console.log(`📜 Data passata ${workDate} - salvato su filesystem + PG`);
+      console.log(`📜 Data passata ${workDate} - salvato su PG`);
       return true;
     }
 
@@ -433,7 +406,7 @@ export async function saveSelectedCleaners(workDate: string, data: any, skipRevi
       return true;
     }
 
-    // LEGACY: Also save to MySQL
+    // LEGACY: Also save to MySQL (will be removed)
     try {
       const timeline = await loadTimeline(workDate);
       const containers = await loadContainersInternal(workDate);
