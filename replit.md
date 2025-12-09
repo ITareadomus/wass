@@ -24,12 +24,12 @@ Preferred communication style: Simple, everyday language.
 - **Build System**: ESBuild for production bundling with platform-specific optimizations
 
 ## Data Storage
-- **Primary Database**: PostgreSQL (DigitalOcean) - transitioning from MySQL
-- **Legacy Database**: MySQL with mysql2 library (being phased out)
+- **Primary Database**: PostgreSQL (DigitalOcean) - SINGLE SOURCE OF TRUTH
+- **Legacy Database**: MySQL with mysql2 library (being phased out, used for revision history only)
 - **ORM**: Drizzle ORM for type-safe database operations and migrations
 - **Schema Design**: Three main entities (tasks, personnel, assignments) with foreign key relationships
 - **Data Validation**: Zod schemas for runtime type checking and API request validation
-- **Tri-Write Pattern**: Timeline, containers, selected_cleaners saved to PostgreSQL + filesystem (Python) + MySQL (legacy)
+- **Storage Pattern**: PostgreSQL only - filesystem writes removed (December 2025)
 - **Auto-Save**: All assignment changes are automatically persisted with revision tracking
 
 ## PostgreSQL Architecture (December 2025) - Flat Tables Design
@@ -101,9 +101,9 @@ Preferred communication style: Simple, everyday language.
 
 ## Python API Integration (December 2025)
 - **API Client Module**: `client/public/scripts/api_client.py` provides HTTP client for backend API
-- **Helper Functions**: `client/public/scripts/api_helpers.py` has shared functions for timeline/containers/cleaners operations
-- **Script Support**: All assign scripts (assign_eo.py, assign_hp.py, assign_lp.py) accept `--use-api` flag
-- **Current State**: Flag infrastructure ready, but load/save flows still use filesystem. Next phase: modify scripts to use API when flag is active
+- **Helper Functions**: `client/public/scripts/api_helpers.py` has shared functions for timeline/containers/cleaners operations (defaults to API mode)
+- **Script Support**: All assign scripts (assign_eo.py, assign_hp.py, assign_lp.py) use API by default (`use_api=True`)
+- **Current State**: API is default mode; filesystem only used as offline fallback
 - **API Endpoints Available**:
   - `GET /api/timeline?date=YYYY-MM-DD` - Load timeline from PostgreSQL
   - `POST /api/timeline` - Save timeline to PostgreSQL (body: {date, timeline})
