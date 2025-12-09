@@ -624,7 +624,7 @@ def load_cleaners() -> List[Cleaner]:
     cleaners: List[Cleaner] = []
     for c in data:
         role = (c.get("role") or "").strip()
-        is_premium = bool(c.get("premium", (role.lower() == "premium")))
+        is_premium = role.lower() == "premium"
         can_do_straordinaria = bool(c.get("can_do_straordinaria", False))
 
         if not can_cleaner_handle_priority(role, "low_priority"):

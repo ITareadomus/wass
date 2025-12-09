@@ -499,7 +499,7 @@ def load_cleaners() -> List[Cleaner]:
     all_cleaners: List[Cleaner] = []
     for c in cleaners_data:
         role = (c.get("role") or "").strip()
-        is_premium = bool(c.get("premium", (role.lower() == "premium")))
+        is_premium = role.lower() == "premium"
         can_do_straordinaria = bool(c.get("can_do_straordinaria", False))
 
         # NUOVO: Valida se il cleaner può gestire Early-Out basandosi su settings.json
