@@ -40,14 +40,14 @@ export async function loadValidationRules(): Promise<TaskTypesByCleaner> {
   if (cachedRules) return cachedRules;
 
   try {
-    const response = await fetch(`/data/input/settings.json?t=${Date.now()}`, {
+    const response = await fetch('/api/settings', {
       cache: "no-store",
       headers: { 'Cache-Control': 'no-cache' }
     });
 
     // If the response is not ok, we should still return default rules to avoid crashing
     if (!response.ok) {
-      console.warn('⚠️ Warning: Could not load settings.json, using empty rules and no apartment types.');
+      console.warn('⚠️ Warning: Could not load settings from API, using empty rules and no apartment types.');
       cachedRules = {};
       cachedApartmentTypes = null;
       return cachedRules;
@@ -60,7 +60,7 @@ export async function loadValidationRules(): Promise<TaskTypesByCleaner> {
 
     return cachedRules;
   } catch (error) {
-    console.warn('⚠️ Warning: Error loading settings.json:', error);
+    console.warn('⚠️ Warning: Error loading settings from API:', error);
     cachedRules = {};
     cachedApartmentTypes = null;
     return cachedRules;

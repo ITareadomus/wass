@@ -95,15 +95,19 @@ export default function SystemSettings() {
   const loadSettings = async () => {
     setIsLoading(true);
     try {
-      const timestamp = Date.now();
-      const response = await fetch(`/data/input/settings.json?t=${timestamp}`, {
+      const response = await fetch('/api/settings', {
         cache: 'no-store',
         headers: { 'Cache-Control': 'no-cache' }
       });
 
       if (response.ok) {
         const data = await response.json();
-        setSettings(data);
+        // Se vuoto, imposta valori default
+        if (Object.keys(data).length === 0) {
+          setSettings(null);
+        } else {
+          setSettings(data);
+        }
       }
     } catch (error) {
       toast({
