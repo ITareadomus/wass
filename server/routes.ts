@@ -4362,6 +4362,104 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
 
+  // Endpoint per sincronizzare checkin_time/checkout_time dal database ADAM alle task nella timeline
+  app.post("/api/sync-timeline-from-adam", async (req, res) => {
+    try {
+      const { date } = req.body;
+      const workDate = date || format(new Date(), 'yyyy-MM-dd');
+
+      console.log(`🔄 Sincronizzazione dati ADAM per timeline ${workDate}...`);
+
+      // 1. Carica la timeline corrente
+      let timelineData = await workspaceFiles.loadTimeline(workDate);
+      if (!timelineData || !timelineData.cleaners_assignments || timelineData.cleaners_assignments.length === 0) {
+        return res.json({
+          success: true,
+          message: "Nessuna timeline da sincronizzare",
+          updated_tasks: 0
+        });
+      }
+
+      // 2. Raccogli tutti i task_id dalla timeline
+      const taskIds: number[] = [];
+      for (const cleanerEntry of timelineData.cleaners_assignments) {
+        for (const task of cleanerEntry.tasks || []) {
+          if (task.task_id) {
+            taskIds.push(task.task_id);
+          }
+        }
+      }
+
+      if (taskIds.length === 0) {
+        return res.json({
+          success: true,
+          message: "Nessuna task nella timeline",
+          updated_tasks: 0
+        });
+      }
+
+      // 3. Query database ADAM per ottenere i dati aggiornati
+      const mysql = await import('mysql2/promise');
+      const adamConnection = await mysql.createConnection({
+        host: process.env.DB_HOST,
+        user: process.env.DB_USER,
+        password: process.env.DB_PASSWORD,
+        database: process.env.DB_NAME,
+        port: parseInt(process.env.DB_PORT || '3306')
+      });
+
+      const [rows]: any = await adamConnection.execute(`
+        SELECT 
+          h.id AS task_id,
+          h.checkin_time,
+          h.checkout_time
+        FROM app_housekeeping h
+        WHERE h.id IN (${taskIds.join(',')})
+      `);
+      await adamConnection.end();
+
+      // 4. Crea mappa task_id -> dati ADAM
+      const adamDataMap = new Map<number, { checkin_time: string | null, checkout_time: string | null }>();
+      for (const row of rows) {
+        adamDataMap.set(row.task_id, {
+          checkin_time: row.checkin_time && row.checkin_time.trim() ? row.checkin_time.trim() : null,
+          checkout_time: row.checkout_time && row.checkout_time.trim() ? row.checkout_time.trim() : null
+        });
+      }
+
+      // 5. Aggiorna le task nella timeline
+      let updatedCount = 0;
+      for (const cleanerEntry of timelineData.cleaners_assignments) {
+        for (const task of cleanerEntry.tasks || []) {
+          const adamData = adamDataMap.get(task.task_id);
+          if (adamData) {
+            if (adamData.checkin_time !== task.checkin_time || adamData.checkout_time !== task.checkout_time) {
+              task.checkin_time = adamData.checkin_time;
+              task.checkout_time = adamData.checkout_time;
+              updatedCount++;
+            }
+          }
+        }
+      }
+
+      // 6. Salva la timeline aggiornata
+      if (updatedCount > 0) {
+        await workspaceFiles.saveTimeline(workDate, timelineData, false, 'system', 'sync_from_adam');
+        console.log(`✅ Sincronizzate ${updatedCount} task con dati ADAM per ${workDate}`);
+      }
+
+      res.json({
+        success: true,
+        message: `Sincronizzate ${updatedCount} task con dati ADAM`,
+        updated_tasks: updatedCount,
+        total_tasks_checked: taskIds.length
+      });
+    } catch (error: any) {
+      console.error("Errore nella sincronizzazione ADAM:", error);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }
