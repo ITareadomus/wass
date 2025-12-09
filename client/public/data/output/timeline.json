@@ -1,6 +1,6 @@
 {
   "metadata": {
-    "last_updated": "2025-12-09T09:46:15.536256",
+    "last_updated": "2025-12-09T09:47:42.479198",
     "date": "2025-12-10",
     "modification_type": "auto_assign_low_priority"
   },
@@ -428,8 +428,8 @@
             "automatic_assignment_hp"
           ],
           "priority": "high_priority",
-          "start_time": "11:00",
-          "end_time": "12:00",
+          "start_time": "10:00",
+          "end_time": "11:00",
           "followup": false,
           "sequence": 1,
           "travel_time": 0
@@ -461,8 +461,8 @@
             "automatic_assignment_hp"
           ],
           "priority": "high_priority",
-          "start_time": "12:25",
-          "end_time": "13:55",
+          "start_time": "11:25",
+          "end_time": "12:55",
           "followup": true,
           "sequence": 2,
           "travel_time": 25
@@ -506,8 +506,8 @@
             "automatic_assignment_hp"
           ],
           "priority": "high_priority",
-          "start_time": "11:00",
-          "end_time": "12:00",
+          "start_time": "10:00",
+          "end_time": "11:00",
           "followup": false,
           "sequence": 1,
           "travel_time": 0
@@ -539,8 +539,8 @@
             "automatic_assignment_hp"
           ],
           "priority": "high_priority",
-          "start_time": "12:20",
-          "end_time": "13:50",
+          "start_time": "11:20",
+          "end_time": "12:50",
           "followup": true,
           "sequence": 2,
           "travel_time": 20
@@ -573,8 +573,8 @@
             "not_hp",
             "automatic_assignment_lp"
           ],
-          "start_time": "14:09",
-          "end_time": "15:39",
+          "start_time": "13:09",
+          "end_time": "14:39",
           "followup": true,
           "sequence": 3,
           "travel_time": 19
@@ -618,8 +618,8 @@
             "automatic_assignment_hp"
           ],
           "priority": "high_priority",
-          "start_time": "11:00",
-          "end_time": "12:00",
+          "start_time": "10:00",
+          "end_time": "11:00",
           "followup": false,
           "sequence": 1,
           "travel_time": 0
@@ -652,8 +652,8 @@
             "automatic_assignment_hp"
           ],
           "priority": "high_priority",
-          "start_time": "12:25",
-          "end_time": "13:25",
+          "start_time": "11:25",
+          "end_time": "12:25",
           "followup": true,
           "sequence": 2,
           "travel_time": 25
@@ -707,8 +707,7 @@
     }
   ],
   "meta": {
-    "total_cleaners": 12,
-    "total_tasks": 0,
+    "total_cleaners": 11,
     "used_cleaners": 12,
     "assigned_tasks": 17
   }
