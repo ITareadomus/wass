@@ -218,6 +218,25 @@ class ApiClient:
         }
         return self._post("/api/selected-cleaners", payload)
     
+    def save_cleaners(self, date: str, cleaners: List[Dict]) -> Dict:
+        """
+        Salva tutti i cleaners (anagrafica) su PostgreSQL.
+        
+        Args:
+            date: Data nel formato YYYY-MM-DD
+            cleaners: Lista di dizionari cleaner con tutti i campi
+                      (id, name, lastname, role, can_do_straordinaria, etc.)
+            
+        Returns:
+            Risposta API con conferma
+        """
+        payload = {
+            "date": date,
+            "cleaners": cleaners,
+            "snapshotReason": "extract_cleaners_optimized"
+        }
+        return self._post("/api/cleaners", payload)
+    
     # ==================== HELPER METHODS ====================
     
     def get_assigned_task_ids(self, date: str) -> set:
