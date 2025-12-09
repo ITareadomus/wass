@@ -99,6 +99,19 @@ Preferred communication style: Simple, everyday language.
 - **Assignment Flow**: create_containers.py → assign_eo.py → assign_hp.py → assign_lp.py → timeline.json
 - **Verification**: Tested with logistic_code 777 (task_ids 210458, 218427) - one assigned, one kept in container
 
+## Python API Integration (December 2025)
+- **API Client Module**: `client/public/scripts/api_client.py` provides HTTP client for backend API
+- **Helper Functions**: `client/public/scripts/api_helpers.py` has shared functions for timeline/containers/cleaners operations
+- **Script Support**: All assign scripts (assign_eo.py, assign_hp.py, assign_lp.py) accept `--use-api` flag
+- **Current State**: Flag infrastructure ready, but load/save flows still use filesystem. Next phase: modify scripts to use API when flag is active
+- **API Endpoints Available**:
+  - `GET /api/timeline?date=YYYY-MM-DD` - Load timeline from PostgreSQL
+  - `POST /api/timeline` - Save timeline to PostgreSQL (body: {date, timeline})
+  - `GET /api/containers?date=YYYY-MM-DD` - Load containers from PostgreSQL
+  - `POST /api/containers` - Save containers to PostgreSQL (body: {date, containers})
+  - `GET /api/cleaners?date=YYYY-MM-DD` - Load full cleaner data
+  - `GET /api/selected-cleaners?date=YYYY-MM-DD` - Load selected cleaner IDs
+
 ## Component Architecture
 - **Modular Design**: Separate components for drag-drop interface, timeline view, statistics panel, and map section
 - **Reusable UI**: Comprehensive component library with consistent styling and accessibility features
