@@ -73,6 +73,7 @@ export default function TimelineView({
   isReadOnly = false,
 }: TimelineViewProps) {
   const [cleaners, setCleaners] = useState<Cleaner[]>([]);
+  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [selectedCleaner, setSelectedCleaner] = useState<Cleaner | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedSwapCleaner, setSelectedSwapCleaner] = useState<string>("");
