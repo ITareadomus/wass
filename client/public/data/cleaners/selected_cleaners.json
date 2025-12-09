@@ -2,97 +2,97 @@
   "cleaners": [
     {
       "id": 626,
-      "name": "Unknown",
-      "lastname": "",
-      "role": "Standard",
+      "name": "DORA PATRICIA",
+      "lastname": "JIMENEZ",
+      "role": "Formatore",
       "premium": false,
       "start_time": "10:00"
     },
     {
       "id": 24,
-      "name": "Unknown",
-      "lastname": "",
-      "role": "Standard",
+      "name": "HUSSAIN",
+      "lastname": "SYED SHUJIAHAT",
+      "role": "Premium",
       "premium": false,
       "start_time": "10:00"
     },
     {
       "id": 404,
-      "name": "Unknown",
-      "lastname": "",
+      "name": "RASEL",
+      "lastname": "MOLLA",
       "role": "Standard",
       "premium": false,
       "start_time": "10:00"
     },
     {
       "id": 1060,
-      "name": "Unknown",
-      "lastname": "",
+      "name": "NELLY GABRIELLE",
+      "lastname": "TENKAM",
       "role": "Standard",
       "premium": false,
       "start_time": "10:00"
     },
     {
       "id": 326,
-      "name": "Unknown",
-      "lastname": "",
-      "role": "Standard",
+      "name": "FESTUS OSARO",
+      "lastname": "AIHIVBERE",
+      "role": "Premium",
       "premium": false,
       "start_time": "10:00"
     },
     {
       "id": 722,
-      "name": "Unknown",
-      "lastname": "",
-      "role": "Standard",
+      "name": "LACINE",
+      "lastname": "KONE",
+      "role": "Premium",
       "premium": false,
       "start_time": "10:00"
     },
     {
       "id": 1031,
-      "name": "Unknown",
-      "lastname": "",
-      "role": "Standard",
+      "name": "YAH PRISCA LEA",
+      "lastname": "ADOU",
+      "role": "Premium",
       "premium": false,
       "start_time": "10:00"
     },
     {
       "id": 1045,
-      "name": "Unknown",
-      "lastname": "",
-      "role": "Standard",
+      "name": "ARACELY ROCIO",
+      "lastname": "MORLA ZAMBRANO",
+      "role": "Premium",
       "premium": false,
       "start_time": "10:00"
     },
     {
       "id": 1063,
-      "name": "Unknown",
-      "lastname": "",
+      "name": "ALEXANDER DENNYS",
+      "lastname": "CARDENAS OLAYA",
       "role": "Standard",
       "premium": false,
       "start_time": "10:00"
     },
     {
       "id": 785,
-      "name": "Unknown",
-      "lastname": "",
-      "role": "Standard",
+      "name": "RACHEL",
+      "lastname": "OTSHINGA",
+      "role": "Premium",
       "premium": false,
       "start_time": "10:00"
     },
     {
       "id": 1070,
-      "name": "Unknown",
-      "lastname": "",
-      "role": "Standard",
+      "name": "ABUBACAR",
+      "lastname": "DIAMMEH",
+      "role": "Premium",
       "premium": false,
       "start_time": "10:00"
     },
     {
       "id": 132,
-      "name": "Unknown",
-      "lastname": "",
-      "role": "Standard",
+      "name": "JOHOISER ERNESTO",
+      "lastname": "LOPEZ GIRON",
+      "role": "Premium",
       "premium": false,
       "start_time": "10:00"
     }
@@ -100,6 +100,6 @@
   "total_selected": 12,
   "metadata": {
     "date": "2025-12-10",
-    "loaded_at": "2025-12-09 10:34:10"
+    "loaded_at": "2025-12-09 10:42:35"
   }
 }
