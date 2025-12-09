@@ -116,6 +116,9 @@ def parse_dt(d: Optional[str], t: Optional[str]) -> Optional[datetime]:
 
 
 def hhmm_to_dt(ref_date: str, hhmm: str) -> datetime:
+    # Rimuovi i secondi se presenti (es. "10:30:00" -> "10:30")
+    if hhmm and hhmm.count(':') == 2:
+        hhmm = ':'.join(hhmm.split(':')[:2])
     return datetime.strptime(f"{ref_date} {hhmm}", "%Y-%m-%d %H:%M")
 
 

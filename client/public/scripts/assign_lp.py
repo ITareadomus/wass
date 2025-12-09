@@ -108,8 +108,10 @@ class Cleaner:
 def hhmm_to_min(hhmm: Optional[str], default: str = "10:00") -> int:
     if not hhmm or not isinstance(hhmm, str) or ":" not in hhmm:
         hhmm = default
-    h, m = hhmm.strip().split(":")
-    return int(h) * 60 + int(m)
+    # Rimuovi i secondi se presenti (es. "10:30:00" -> "10:30")
+    parts = hhmm.strip().split(":")
+    h, m = int(parts[0]), int(parts[1])
+    return h * 60 + m
 
 
 def min_to_hhmm(m: float) -> str:
