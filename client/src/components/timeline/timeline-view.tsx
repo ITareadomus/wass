@@ -2323,9 +2323,9 @@ export default function TimelineView({
               Dettagli Cleaner #{selectedCleaner?.id}
               {selectedCleaner && (
                 <>
-                  {/* Se straordinario, mostra SOLO badge straordinario */}
+                  {/* Se straordinario, mostra SOLO badge straordinario (priorità assoluta) */}
                   {selectedCleaner.can_do_straordinaria ? (
-                    <span className="px-2 py-0.5 rounded border font-medium text-sm bg-red-500/20 text-red-700 dark:text-red-300 border-red-500">
+                    <span className="px-2 py-0.5 rounded border font-medium text-sm bg-red-500/30 text-red-800 dark:bg-red-500/40 dark:text-red-200 border-red-600 dark:border-red-400">
                       Straordinario
                     </span>
                   ) : (
