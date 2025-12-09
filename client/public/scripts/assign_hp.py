@@ -712,12 +712,8 @@ def plan_day(
         candidates: List[Tuple[Cleaner, int, float]] = []
 
         for cleaner in cleaners:
-            task_type = (
-                "straordinario_apt"
-                if task.straordinaria
-                else ("premium_apt" if task.is_premium else "standard_apt")
-            )
-            if not can_cleaner_handle_task(cleaner.role, task_type, cleaner.can_do_straordinaria):
+            # Validazione tipo di task (premium / straordinaria / standard)
+            if not can_cleaner_handle_task(cleaner.role, task.is_premium, task.straordinaria, cleaner.can_do_straordinaria):
                 continue
 
             if not can_cleaner_handle_apartment(cleaner.role, task.apt_type):

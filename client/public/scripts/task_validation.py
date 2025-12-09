@@ -13,16 +13,16 @@ def load_settings(settings_path=None):
         return {}
 
 class TaskValidator:
-    def __init__(self, settings_path='client/public/data/input/settings.json'):
+    def __init__(self, settings_path=None):
         settings = load_settings(settings_path)
-
         self.rules = settings.get('task_types', {})
         self.apartment_types = settings.get('apartment_types', {})
-        self.priority_types = settings.get('priority_types', {}) # Aggiunto per le priorità
+        self.priority_types = settings.get('priority_types', {})
 
     def _normalize_cleaner_role(self, role: str) -> str:
+        if not role:
+            return 'standard_cleaner'
         normalized = role.lower().strip()
-
         if 'standard' in normalized:
             return 'standard_cleaner'
         elif 'premium' in normalized:
@@ -31,26 +31,33 @@ class TaskValidator:
             return 'straordinario_cleaner'
         elif 'formatore' in normalized:
             return 'formatore_cleaner'
-
         return normalized
 
-    def can_cleaner_handle_task(self, cleaner_role: str, task_type: str, can_do_straordinaria=False) -> bool:
+    def can_cleaner_handle_task(self, cleaner_role: str, task_premium: bool, task_straordinaria: bool, can_do_straordinaria: bool = False) -> bool:
+        """
+        Valida se un cleaner può gestire una task in base a:
+        - Task standard: tutti i cleaner possono gestirla
+        - Task premium: solo cleaner con role = "Premium"
+        - Task straordinaria: solo cleaner con can_do_straordinaria = True
+        """
         role_key = self._normalize_cleaner_role(cleaner_role)
-
-        # straordinaria: flag per-cleaner
-        if task_type == "straordinario_apt":
+        
+        # Task straordinaria: solo cleaner con flag can_do_straordinaria
+        if task_straordinaria:
             return bool(can_do_straordinaria)
-
-        role_rules = self.rules.get(role_key, {})
-        allowed = role_rules.get(task_type)
-
-        if allowed is None:
-            return True
-
-        return bool(allowed)
+        
+        # Task premium: solo cleaner Premium possono gestirla
+        if task_premium:
+            return role_key == 'premium_cleaner'
+        
+        # Task standard: tutti possono gestirla
+        return True
 
     def can_cleaner_handle_priority(self, cleaner_role: str, task_priority: str) -> bool:
-        """Valida se il cleaner può gestire task con questa priorità (EO/HP/LP)"""
+        """
+        Valida se il cleaner può gestire task con questa priorità (EO/HP/LP)
+        basandosi su settings -> priority_types
+        """
         if not task_priority:
             return True
         
@@ -78,9 +85,7 @@ class TaskValidator:
     def can_cleaner_handle_apartment(self, cleaner_role: str, apt_type: str) -> bool:
         if not apt_type:
             return True
-
         role_key = self._normalize_cleaner_role(cleaner_role)
-
         if role_key == 'standard_cleaner':
             allowed_apts = self.apartment_types.get('standard_apt', [])
         elif role_key == 'premium_cleaner':
@@ -91,37 +96,25 @@ class TaskValidator:
             allowed_apts = self.apartment_types.get('formatore_apt', [])
         else:
             return True
-
         return apt_type in allowed_apts
-
-    # Nuova funzione per validare la priorità
-    def can_cleaner_handle_priority(self, cleaner_role: str, priority: str) -> bool:
-        """
-        Verifica se un cleaner con un certo ruolo può gestire una task con una certa priorità
-        basandosi su settings.json -> priority_types
-        """
-        role_key = self._normalize_cleaner_role(cleaner_role)
-        allowed_priorities = self.priority_types.get(role_key, {})
-
-        # Se la priorità non è esplicitamente permessa, allora non è permessa
-        # Se la chiave di ruolo non esiste, allowed_priorities sarà {}, e .get(priority, False) restituirà False
-        return allowed_priorities.get(priority, False)
 
 
 # Istanza globale del validator
 _validator = TaskValidator()
 
 # Funzioni standalone per l'import negli script di assegnazione
-def can_cleaner_handle_task(cleaner_role: str, task_type: str, can_do_straordinaria=False) -> bool:
-    return _validator.can_cleaner_handle_task(cleaner_role, task_type, can_do_straordinaria)
+def can_cleaner_handle_task(cleaner_role: str, task_premium: bool, task_straordinaria: bool, can_do_straordinaria: bool = False) -> bool:
+    """
+    Valida se un cleaner può gestire una task:
+    - Task standard: tutti i cleaner
+    - Task premium: solo cleaner con role = "Premium"
+    - Task straordinaria: solo cleaner con can_do_straordinaria = True
+    """
+    return _validator.can_cleaner_handle_task(cleaner_role, task_premium, task_straordinaria, can_do_straordinaria)
+
+def can_cleaner_handle_priority(cleaner_role: str, priority: str) -> bool:
+    """Verifica se un cleaner può gestire una task con una certa priorità (EO/HP/LP)."""
+    return _validator.can_cleaner_handle_priority(cleaner_role, priority)
 
 def can_cleaner_handle_apartment(cleaner_role: str, apt_type: str) -> bool:
     return _validator.can_cleaner_handle_apartment(cleaner_role, apt_type)
-
-# Nuova funzione standalone per la validazione della priorità
-def can_cleaner_handle_priority(cleaner_role: str, priority: str) -> bool:
-    """
-    Verifica se un cleaner con un certo ruolo può gestire una task con una certa priorità
-    basandosi su settings.json -> priority_types.
-    """
-    return _validator.can_cleaner_handle_priority(cleaner_role, priority)

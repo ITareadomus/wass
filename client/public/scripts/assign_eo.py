@@ -682,12 +682,7 @@ def plan_day(
         # 1) Trova tutti i cleaner che POSSONO prendere la task (vincoli gestiti da find_best_position)
         for cleaner in cleaners:
             # Validazione tipo di task (premium / straordinaria / standard)
-            task_type = (
-                "straordinario_apt"
-                if task.straordinaria
-                else ("premium_apt" if task.is_premium else "standard_apt")
-            )
-            if not can_cleaner_handle_task(cleaner.role, task_type, cleaner.can_do_straordinaria):
+            if not can_cleaner_handle_task(cleaner.role, task.is_premium, task.straordinaria, cleaner.can_do_straordinaria):
                 continue
 
             # Validazione tipo appartamento
