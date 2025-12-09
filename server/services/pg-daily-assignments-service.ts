@@ -44,6 +44,23 @@ export interface PgDailyAssignmentRow {
 export class PgDailyAssignmentsService {
 
   /**
+   * Ensure cleaners table has alias column (migration)
+   */
+  async ensureAliasColumn(): Promise<void> {
+    try {
+      await query(`
+        ALTER TABLE cleaners ADD COLUMN IF NOT EXISTS alias TEXT DEFAULT NULL
+      `);
+      await query(`
+        ALTER TABLE cleaners_history ADD COLUMN IF NOT EXISTS alias TEXT DEFAULT NULL
+      `);
+      console.log('✅ PG: Colonna alias verificata/aggiunta alla tabella cleaners');
+    } catch (error) {
+      console.warn('⚠️ PG: Errore (ignorabile) nella migrazione alias:', error);
+    }
+  }
+
+  /**
    * Convert timeline JSON to flat rows for PostgreSQL
    * Each row includes both cleaner and task data for complete reconstruction
    */
@@ -1115,7 +1132,7 @@ export class PgDailyAssignmentsService {
         SELECT 
           cleaner_id as id, name, lastname, role, active, ranking,
           counter_hours, counter_days, available, contract_type,
-          preferred_customers, telegram_id, start_time, can_do_straordinaria
+          preferred_customers, telegram_id, start_time, can_do_straordinaria, alias
         FROM cleaners 
         WHERE work_date = $1 AND active = true
         ORDER BY counter_hours DESC
@@ -1141,7 +1158,7 @@ export class PgDailyAssignmentsService {
         SELECT 
           cleaner_id as id, name, lastname, role, active, ranking,
           counter_hours, counter_days, available, contract_type,
-          preferred_customers, telegram_id, start_time, can_do_straordinaria
+          preferred_customers, telegram_id, start_time, can_do_straordinaria, alias
         FROM cleaners 
         WHERE cleaner_id = $1 AND work_date = $2
       `, [cleanerId, workDate]);
@@ -1167,7 +1184,7 @@ export class PgDailyAssignmentsService {
         SELECT 
           cleaner_id as id, name, lastname, role, active, ranking,
           counter_hours, counter_days, available, contract_type,
-          preferred_customers, telegram_id, start_time, can_do_straordinaria
+          preferred_customers, telegram_id, start_time, can_do_straordinaria, alias
         FROM cleaners 
         WHERE cleaner_id = ANY($1) AND work_date = $2
       `, [cleanerIds, workDate]);
@@ -1195,12 +1212,12 @@ export class PgDailyAssignmentsService {
           INSERT INTO cleaners_history 
           (cleaner_id, work_date, name, lastname, role, active, ranking,
            counter_hours, counter_days, available, contract_type,
-           preferred_customers, telegram_id, start_time, can_do_straordinaria,
+           preferred_customers, telegram_id, start_time, can_do_straordinaria, alias,
            snapshot_at, snapshot_reason)
           SELECT 
             cleaner_id, work_date, name, lastname, role, active, ranking,
             counter_hours, counter_days, available, contract_type,
-            preferred_customers, telegram_id, start_time, can_do_straordinaria,
+            preferred_customers, telegram_id, start_time, can_do_straordinaria, alias,
             NOW(), $2
           FROM cleaners 
           WHERE work_date = $1
@@ -1216,9 +1233,9 @@ export class PgDailyAssignmentsService {
           INSERT INTO cleaners 
           (cleaner_id, work_date, name, lastname, role, active, ranking,
            counter_hours, counter_days, available, contract_type,
-           preferred_customers, telegram_id, start_time, can_do_straordinaria,
+           preferred_customers, telegram_id, start_time, can_do_straordinaria, alias,
            created_at, updated_at)
-          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, NOW(), NOW())
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, NOW(), NOW())
         `, [
           cleaner.id,
           workDate,
@@ -1234,7 +1251,8 @@ export class PgDailyAssignmentsService {
           cleaner.preferred_customers || [],
           cleaner.telegram_id || null,
           cleaner.start_time || '09:00',
-          cleaner.can_do_straordinaria || false
+          cleaner.can_do_straordinaria || false,
+          cleaner.alias || null
         ]);
       }
 
@@ -1254,7 +1272,7 @@ export class PgDailyAssignmentsService {
    * Update a single cleaner's field (e.g., start_time)
    */
   async updateCleanerField(cleanerId: number, workDate: string, field: string, value: any): Promise<boolean> {
-    const allowedFields = ['start_time', 'available', 'active', 'ranking', 'counter_hours', 'counter_days'];
+    const allowedFields = ['start_time', 'available', 'active', 'ranking', 'counter_hours', 'counter_days', 'alias'];
     if (!allowedFields.includes(field)) {
       console.error(`❌ PG: Campo non consentito: ${field}`);
       return false;
