@@ -95,7 +95,6 @@ class Cleaner:
     name: str
     lastname: str
     role: str
-    is_premium: bool
     can_do_straordinaria: bool = False
     home_lat: Optional[float] = None
     home_lng: Optional[float] = None
@@ -259,8 +258,8 @@ def travel_minutes(a: Optional[Task], b: Optional[Task]) -> float:
 
 
 def can_handle_premium(cleaner: Cleaner, task: Task) -> bool:
-    # Premium task requires premium cleaner
-    if task.is_premium and not cleaner.is_premium:
+    # Premium task requires premium cleaner (role = "Premium")
+    if task.is_premium and cleaner.role.lower() != "premium":
         return False
     # Straordinaria requires cleaner with can_do_straordinaria=True
     if task.straordinaria and not cleaner.can_do_straordinaria:
@@ -498,11 +497,10 @@ def load_cleaners() -> List[Cleaner]:
     cleaners_data = load_cleaners_data()
     all_cleaners: List[Cleaner] = []
     for c in cleaners_data:
-        role = (c.get("role") or "").strip()
-        is_premium = role.lower() == "premium"
+        role = (c.get("role") or "Standard").strip()
         can_do_straordinaria = bool(c.get("can_do_straordinaria", False))
 
-        # NUOVO: Valida se il cleaner può gestire Early-Out basandosi su settings.json
+        # Valida se il cleaner può gestire Early-Out basandosi su settings
         if not can_cleaner_handle_priority(role, "early_out"):
             print(f"   ⏭️  Cleaner {c.get('name')} ({role}) escluso da Early-Out (priority_types settings)")
             continue
@@ -511,8 +509,7 @@ def load_cleaners() -> List[Cleaner]:
             id=c.get("id"),
             name=c.get("name") or str(c.get("id")),
             lastname=c.get("lastname", ""),
-            role=role or ("Premium" if is_premium else "Standard"),
-            is_premium=is_premium,
+            role=role,
             can_do_straordinaria=can_do_straordinaria,
             home_lat=c.get("home_lat"),
             home_lng=c.get("home_lng"),
@@ -883,7 +880,7 @@ def build_output(cleaners: List[Cleaner], unassigned: List[Task], original_tasks
                 "name": cl.name,
                 "lastname": cl.lastname,
                 "role": cl.role,
-                "premium": cl.is_premium
+                "premium": cl.role.lower() == "premium"
             },
             "tasks": tasks_list
         })

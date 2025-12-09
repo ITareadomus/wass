@@ -94,7 +94,6 @@ class Cleaner:
     name: str
     lastname: str
     role: str
-    is_premium: bool
     start_time: datetime
     can_do_straordinaria: bool = False
     available_from: Optional[datetime] = None
@@ -233,8 +232,10 @@ def travel_minutes(a_lat: float, a_lng: float, b_lat: float, b_lng: float,
 
 
 def can_handle_premium(cleaner: Cleaner, task: Task) -> bool:
-    if task.is_premium and not cleaner.is_premium:
+    # Premium task requires premium cleaner (role = "Premium")
+    if task.is_premium and cleaner.role.lower() != "premium":
         return False
+    # Straordinaria requires cleaner with can_do_straordinaria=True
     if task.straordinaria and not cleaner.can_do_straordinaria:
         return False
     return True
@@ -567,8 +568,7 @@ def load_cleaners(ref_date: str) -> List[Cleaner]:
     data = load_cleaners_data()
     cleaners: List[Cleaner] = []
     for c in data:
-        role = (c.get("role") or "").strip()
-        is_premium = role.lower() == "premium"
+        role = (c.get("role") or "Standard").strip()
         can_do_straordinaria = bool(c.get("can_do_straordinaria", False))
 
         if not can_cleaner_handle_priority(role, "high_priority"):
@@ -587,8 +587,7 @@ def load_cleaners(ref_date: str) -> List[Cleaner]:
                 id=c.get("id"),
                 name=c.get("name") or str(c.get("id")),
                 lastname=c.get("lastname", ""),
-                role=role or ("Premium" if is_premium else "Standard"),
-                is_premium=is_premium,
+                role=role,
                 can_do_straordinaria=can_do_straordinaria,
                 start_time=start_dt,
             ))
@@ -904,7 +903,7 @@ def build_output(cleaners: List[Cleaner], unassigned: List[Task], original_tasks
                 "name": cl.name,
                 "lastname": cl.lastname,
                 "role": cl.role,
-                "premium": cl.is_premium
+                "premium": cl.role.lower() == "premium"
             },
             "tasks": tasks_list
         })
