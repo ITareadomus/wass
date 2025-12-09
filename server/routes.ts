@@ -693,6 +693,88 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Endpoint per leggere tutti i cleaners per una data da PostgreSQL
+  // Sostituisce la lettura di cleaners.json per il frontend
+  app.get("/api/cleaners", async (req, res) => {
+    try {
+      const dateParam = (req.query.date as string) || format(new Date(), "yyyy-MM-dd");
+      const workDate = dateParam;
+
+      console.log(`📖 GET /api/cleaners - Caricamento cleaners per ${workDate}`);
+
+      const { pgDailyAssignmentsService } = await import("./services/pg-daily-assignments-service");
+      const cleaners = await pgDailyAssignmentsService.loadCleanersForDate(workDate);
+
+      if (!cleaners || cleaners.length === 0) {
+        // Fallback: carica da cleaners.json se PostgreSQL non ha dati
+        try {
+          const cleanersJsonPath = path.join(process.cwd(), 'client/public/data/cleaners/cleaners.json');
+          const cleanersData = JSON.parse(await fs.readFile(cleanersJsonPath, 'utf-8'));
+          const dateCleaners = cleanersData.dates?.[workDate]?.cleaners || [];
+          
+          if (dateCleaners.length > 0) {
+            console.log(`⚠️ Cleaners caricati da filesystem (fallback) per ${workDate}: ${dateCleaners.length}`);
+            return res.json({
+              cleaners: dateCleaners,
+              total: dateCleaners.length,
+              metadata: { date: workDate, source: 'filesystem' }
+            });
+          }
+        } catch (fsError) {
+          console.warn(`⚠️ Errore caricamento cleaners.json:`, fsError);
+        }
+        
+        return res.json({
+          cleaners: [],
+          total: 0,
+          metadata: { date: workDate }
+        });
+      }
+
+      console.log(`✅ Cleaners caricati da PostgreSQL per ${workDate}: ${cleaners.length}`);
+      res.json({
+        cleaners,
+        total: cleaners.length,
+        metadata: { date: workDate, source: 'postgresql' }
+      });
+    } catch (error: any) {
+      console.error("Errore nel load dei cleaners:", error);
+      res.status(500).json({
+        success: false,
+        error: error.message,
+      });
+    }
+  });
+
+  // Endpoint per salvare/aggiornare i cleaners per una data (bulk import)
+  app.post("/api/cleaners", async (req, res) => {
+    try {
+      const { date, cleaners, snapshotReason } = req.body;
+      const workDate = date || format(new Date(), "yyyy-MM-dd");
+
+      if (!cleaners || !Array.isArray(cleaners)) {
+        return res.status(400).json({ success: false, error: "cleaners array required" });
+      }
+
+      console.log(`📝 POST /api/cleaners - Salvando ${cleaners.length} cleaners per ${workDate}`);
+
+      const { pgDailyAssignmentsService } = await import("./services/pg-daily-assignments-service");
+      const success = await pgDailyAssignmentsService.saveCleanersForDate(workDate, cleaners, snapshotReason || 'api_update');
+
+      if (success) {
+        res.json({ success: true, message: `${cleaners.length} cleaners salvati per ${workDate}` });
+      } else {
+        res.status(500).json({ success: false, error: "Errore nel salvataggio cleaners" });
+      }
+    } catch (error: any) {
+      console.error("Errore nel salvataggio cleaners:", error);
+      res.status(500).json({
+        success: false,
+        error: error.message,
+      });
+    }
+  });
+
   // Endpoint per verificare i dati su PostgreSQL (DigitalOcean)
   app.get("/api/pg-assignments", async (req, res) => {
     try {

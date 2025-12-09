@@ -1103,6 +1103,176 @@ export class PgDailyAssignmentsService {
       return false;
     }
   }
+
+  // ==================== CLEANERS (ANAGRAFICA) ====================
+
+  /**
+   * Load all cleaners for a work_date from PostgreSQL
+   */
+  async loadCleanersForDate(workDate: string): Promise<any[] | null> {
+    try {
+      const result = await query(`
+        SELECT 
+          cleaner_id as id, name, lastname, role, active, ranking,
+          counter_hours, counter_days, available, contract_type,
+          preferred_customers, telegram_id, start_time, can_do_straordinaria
+        FROM cleaners 
+        WHERE work_date = $1 AND active = true
+        ORDER BY counter_hours DESC
+      `, [workDate]);
+      
+      if (result.rows.length > 0) {
+        console.log(`✅ PG: ${result.rows.length} cleaners caricati per ${workDate}`);
+        return result.rows;
+      }
+      return null;
+    } catch (error) {
+      console.error('❌ PG: Errore nel caricamento cleaners:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Load a single cleaner by ID and date
+   */
+  async loadCleanerById(cleanerId: number, workDate: string): Promise<any | null> {
+    try {
+      const result = await query(`
+        SELECT 
+          cleaner_id as id, name, lastname, role, active, ranking,
+          counter_hours, counter_days, available, contract_type,
+          preferred_customers, telegram_id, start_time, can_do_straordinaria
+        FROM cleaners 
+        WHERE cleaner_id = $1 AND work_date = $2
+      `, [cleanerId, workDate]);
+      
+      if (result.rows.length > 0) {
+        return result.rows[0];
+      }
+      return null;
+    } catch (error) {
+      console.error(`❌ PG: Errore nel caricamento cleaner ${cleanerId}:`, error);
+      return null;
+    }
+  }
+
+  /**
+   * Load multiple cleaners by IDs for a specific date
+   */
+  async loadCleanersByIds(cleanerIds: number[], workDate: string): Promise<any[]> {
+    if (!cleanerIds || cleanerIds.length === 0) return [];
+    
+    try {
+      const result = await query(`
+        SELECT 
+          cleaner_id as id, name, lastname, role, active, ranking,
+          counter_hours, counter_days, available, contract_type,
+          preferred_customers, telegram_id, start_time, can_do_straordinaria
+        FROM cleaners 
+        WHERE cleaner_id = ANY($1) AND work_date = $2
+      `, [cleanerIds, workDate]);
+      
+      console.log(`✅ PG: ${result.rows.length} cleaners caricati per IDs ${cleanerIds.join(',')}`);
+      return result.rows;
+    } catch (error) {
+      console.error('❌ PG: Errore nel caricamento cleaners per IDs:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Save/upsert cleaners for a work_date (bulk insert)
+   * Replaces all cleaners for the date
+   */
+  async saveCleanersForDate(workDate: string, cleaners: any[], snapshotReason?: string): Promise<boolean> {
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+
+      // Save to history first if snapshotReason provided
+      if (snapshotReason) {
+        await client.query(`
+          INSERT INTO cleaners_history 
+          (cleaner_id, work_date, name, lastname, role, active, ranking,
+           counter_hours, counter_days, available, contract_type,
+           preferred_customers, telegram_id, start_time, can_do_straordinaria,
+           snapshot_at, snapshot_reason)
+          SELECT 
+            cleaner_id, work_date, name, lastname, role, active, ranking,
+            counter_hours, counter_days, available, contract_type,
+            preferred_customers, telegram_id, start_time, can_do_straordinaria,
+            NOW(), $2
+          FROM cleaners 
+          WHERE work_date = $1
+        `, [workDate, snapshotReason]);
+      }
+
+      // Delete existing cleaners for this date
+      await client.query('DELETE FROM cleaners WHERE work_date = $1', [workDate]);
+
+      // Insert new cleaners
+      for (const cleaner of cleaners) {
+        await client.query(`
+          INSERT INTO cleaners 
+          (cleaner_id, work_date, name, lastname, role, active, ranking,
+           counter_hours, counter_days, available, contract_type,
+           preferred_customers, telegram_id, start_time, can_do_straordinaria,
+           created_at, updated_at)
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, NOW(), NOW())
+        `, [
+          cleaner.id,
+          workDate,
+          cleaner.name || '',
+          cleaner.lastname || '',
+          cleaner.role || 'Standard',
+          cleaner.active !== false,
+          cleaner.ranking || 0,
+          cleaner.counter_hours || 0,
+          cleaner.counter_days || 0,
+          cleaner.available !== false,
+          cleaner.contract_type || null,
+          cleaner.preferred_customers || [],
+          cleaner.telegram_id || null,
+          cleaner.start_time || '09:00',
+          cleaner.can_do_straordinaria || false
+        ]);
+      }
+
+      await client.query('COMMIT');
+      console.log(`✅ PG: ${cleaners.length} cleaners salvati per ${workDate}`);
+      return true;
+    } catch (error) {
+      await client.query('ROLLBACK');
+      console.error('❌ PG: Errore nel salvataggio cleaners:', error);
+      return false;
+    } finally {
+      client.release();
+    }
+  }
+
+  /**
+   * Update a single cleaner's field (e.g., start_time)
+   */
+  async updateCleanerField(cleanerId: number, workDate: string, field: string, value: any): Promise<boolean> {
+    const allowedFields = ['start_time', 'available', 'active', 'ranking', 'counter_hours', 'counter_days'];
+    if (!allowedFields.includes(field)) {
+      console.error(`❌ PG: Campo non consentito: ${field}`);
+      return false;
+    }
+
+    try {
+      await query(`
+        UPDATE cleaners 
+        SET ${field} = $1, updated_at = NOW()
+        WHERE cleaner_id = $2 AND work_date = $3
+      `, [value, cleanerId, workDate]);
+      console.log(`✅ PG: Cleaner ${cleanerId} aggiornato: ${field} = ${value}`);
+      return true;
+    } catch (error) {
+      console.error(`❌ PG: Errore nell'aggiornamento cleaner ${cleanerId}:`, error);
+      return false;
+    }
+  }
 }
 
 export const pgDailyAssignmentsService = new PgDailyAssignmentsService();
