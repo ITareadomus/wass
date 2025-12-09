@@ -20,7 +20,6 @@ import { useToast } from "@/hooks/use-toast";
 interface Account {
   id: number;
   username: string;
-  password: string;
   role: string;
 }
 
@@ -42,8 +41,8 @@ export function ThemeToggle() {
       document.documentElement.classList.remove("dark");
     }
 
-    // Load accounts
-    fetch("/data/accounts.json")
+    // Load accounts from PostgreSQL API (no passwords exposed)
+    fetch("/api/accounts")
       .then(res => res.json())
       .then(data => setAccounts(data.users || []))
       .catch(err => console.error("Error loading accounts:", err));

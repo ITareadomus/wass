@@ -417,10 +417,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Se il cleaner di destinazione non esiste ancora, crealo
       if (!destEntry) {
-        // Carica i dati del cleaner da selected_cleaners.json
-        const cleanersPath = path.join(process.cwd(), 'client/public/data/cleaners/selected_cleaners.json');
-        const cleanersData = JSON.parse(await fs.readFile(cleanersPath, 'utf8'));
-        const cleanerInfo = cleanersData.cleaners.find((c: any) => c.id === destCleanerId);
+        // Carica i dati del cleaner da PostgreSQL
+        const cleanersData = await workspaceFiles.loadSelectedCleaners(workDate);
+        const cleanerInfo = cleanersData?.cleaners?.find((c: any) => c.id === destCleanerId);
 
         if (!cleanerInfo) {
           return res.status(404).json({ success: false, message: "Cleaner di destinazione non trovato" });
@@ -548,11 +547,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let sourceEntry = timelineData.cleaners_assignments.find((c: any) => c.cleaner.id === sourceCleanerId);
       let destEntry = timelineData.cleaners_assignments.find((c: any) => c.cleaner.id === destCleanerId);
 
-      // Se non esistono, creali con array vuoto
+      // Se non esistono, creali con array vuoto (usa PostgreSQL)
+      const selectedData = await workspaceFiles.loadSelectedCleaners(workDate);
+      
       if (!sourceEntry) {
-        const selectedCleanersPath = path.join(process.cwd(), 'client/public/data/cleaners/selected_cleaners.json');
-        const selectedData = JSON.parse(await fs.readFile(selectedCleanersPath, 'utf8'));
-        const cleanerData = selectedData.cleaners.find((c: any) => c.id === sourceCleanerId);
+        const cleanerData = selectedData?.cleaners?.find((c: any) => c.id === sourceCleanerId);
 
         if (!cleanerData) {
           return res.status(404).json({
@@ -575,9 +574,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       if (!destEntry) {
-        const selectedCleanersPath = path.join(process.cwd(), 'client/public/data/cleaners/selected_cleaners.json');
-        const selectedData = JSON.parse(await fs.readFile(selectedCleanersPath, 'utf8'));
-        const cleanerData = selectedData.cleaners.find((c: any) => c.id === destCleanerId);
+        const cleanerData = selectedData?.cleaners?.find((c: any) => c.id === destCleanerId);
 
         if (!cleanerData) {
           return res.status(404).json({
@@ -811,28 +808,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const cleaners = await pgDailyAssignmentsService.loadCleanersForDate(workDate);
 
       if (!cleaners || cleaners.length === 0) {
-        // Fallback: carica da cleaners.json se PostgreSQL non ha dati
-        try {
-          const cleanersJsonPath = path.join(process.cwd(), 'client/public/data/cleaners/cleaners.json');
-          const cleanersData = JSON.parse(await fs.readFile(cleanersJsonPath, 'utf-8'));
-          const dateCleaners = cleanersData.dates?.[workDate]?.cleaners || [];
-          
-          if (dateCleaners.length > 0) {
-            console.log(`⚠️ Cleaners caricati da filesystem (fallback) per ${workDate}: ${dateCleaners.length}`);
-            return res.json({
-              cleaners: dateCleaners,
-              total: dateCleaners.length,
-              metadata: { date: workDate, source: 'filesystem' }
-            });
-          }
-        } catch (fsError) {
-          console.warn(`⚠️ Errore caricamento cleaners.json:`, fsError);
-        }
-        
+        // PostgreSQL is the only source of truth - no filesystem fallback
+        console.log(`ℹ️ Nessun cleaner trovato in PostgreSQL per ${workDate}`);
         return res.json({
           cleaners: [],
           total: 0,
-          metadata: { date: workDate }
+          metadata: { date: workDate, source: 'postgresql' }
         });
       }
 
@@ -844,6 +825,47 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     } catch (error: any) {
       console.error("Errore nel load dei cleaners:", error);
+      res.status(500).json({
+        success: false,
+        error: error.message,
+      });
+    }
+  });
+
+  // GET /api/cleaners-aliases - Carica alias cleaners da PostgreSQL
+  app.get("/api/cleaners-aliases", async (req, res) => {
+    try {
+      const dateParam = req.query.date as string;
+      const workDate = dateParam || format(new Date(), "yyyy-MM-dd");
+
+      console.log(`📖 GET /api/cleaners-aliases - Caricamento alias per ${workDate}`);
+
+      const { pgDailyAssignmentsService } = await import("./services/pg-daily-assignments-service");
+      const cleaners = await pgDailyAssignmentsService.loadCleanersForDate(workDate);
+
+      // Build aliases map from cleaner data
+      const aliases: Record<string, { id: number; name: string; lastname: string; alias: string }> = {};
+      
+      if (cleaners && cleaners.length > 0) {
+        for (const c of cleaners) {
+          if (c.alias) {
+            aliases[c.id.toString()] = {
+              id: c.id,
+              name: c.name || '',
+              lastname: c.lastname || '',
+              alias: c.alias
+            };
+          }
+        }
+      }
+
+      console.log(`✅ Alias caricati da PostgreSQL per ${workDate}: ${Object.keys(aliases).length}`);
+      res.json({
+        aliases,
+        metadata: { date: workDate, source: 'postgresql', last_updated: new Date().toISOString() }
+      });
+    } catch (error: any) {
+      console.error("Errore nel load degli alias:", error);
       res.status(500).json({
         success: false,
         error: error.message,
@@ -1085,7 +1107,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const workDate = date || format(new Date(), 'yyyy-MM-dd');
       const currentUsername = modified_by || getCurrentUsername(req);
       const modificationType = modification_type || 'task_assigned_manually';
-      const cleanersPath = path.join(process.cwd(), 'client/public/data/cleaners/selected_cleaners.json');
 
       // Carica containers per ottenere i dati completi del task
       let fullTaskData: any = null;
@@ -1215,19 +1236,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       );
 
       if (!cleanerEntry) {
-        // Carica dati del cleaner da selected_cleaners.json
-        const cleanersPath = path.join(process.cwd(), 'client/public/data/cleaners/selected_cleaners.json');
-        let cleanersData;
-        try {
-          const cleanersRawData = await fs.readFile(cleanersPath, 'utf8');
-          cleanersData = JSON.parse(cleanersRawData);
-        } catch (error) {
-          console.error(`Failed to read ${cleanersPath}:`, error);
-          // Fallback to default cleaner info if file is missing
-          cleanersData = { cleaners: [] };
-        }
-
-        const cleanerInfo = cleanersData.cleaners.find((c: any) => c.id === normalizedCleanerId);
+        // Carica dati del cleaner da PostgreSQL
+        const cleanersData = await workspaceFiles.loadSelectedCleaners(workDate) || { cleaners: [] };
+        const cleanerInfo = cleanersData.cleaners?.find((c: any) => c.id === normalizedCleanerId);
 
         cleanerEntry = {
           cleaner: {
@@ -1318,20 +1329,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       cleanerEntry.tasks.splice(targetIndex, 0, taskForTimeline);
 
-      // CRITICAL: Carica start_time aggiornato da selected_cleaners.json PRIMA di ricalcolare
+      // CRITICAL: Carica start_time aggiornato da PostgreSQL PRIMA di ricalcolare
       try {
-        const cleanersData = JSON.parse(await fs.readFile(cleanersPath, 'utf8'));
-        const selectedCleaner = cleanersData.cleaners?.find((c: any) => c.id === normalizedCleanerId);
+        const selectedCleanersData = await workspaceFiles.loadSelectedCleaners(workDate);
+        const selectedCleaner = selectedCleanersData?.cleaners?.find((c: any) => c.id === normalizedCleanerId);
         
         if (selectedCleaner?.start_time) {
           cleanerEntry.cleaner.start_time = selectedCleaner.start_time;
-          console.log(`✅ Loaded start_time ${selectedCleaner.start_time} from selected_cleaners for cleaner ${normalizedCleanerId}`);
+          console.log(`✅ Loaded start_time ${selectedCleaner.start_time} from PostgreSQL for cleaner ${normalizedCleanerId}`);
         } else {
           console.warn(`⚠️ No start_time found for cleaner ${normalizedCleanerId}, using default 10:00`);
           cleanerEntry.cleaner.start_time = "10:00";
         }
       } catch (err) {
-        console.warn(`⚠️ Could not load start_time from selected_cleaners for cleaner ${normalizedCleanerId}, using default`);
+        console.warn(`⚠️ Could not load start_time from PostgreSQL for cleaner ${normalizedCleanerId}, using default`);
         cleanerEntry.cleaner.start_time = "10:00";
       }
 
@@ -1724,28 +1735,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
-      // Gestione selected_cleaners - MySQL è la fonte di verità, filesystem è cache per Python
-      const selectedCleanersPath = path.join(process.cwd(), 'client/public/data/cleaners/selected_cleaners.json');
-
-      // SEMPRE sincronizza filesystem da MySQL se abbiamo dati MySQL
+      // Selected cleaners già caricati da PostgreSQL - nessuna scrittura filesystem necessaria
       if (selectedCleanersData && selectedCleanersData.cleaners) {
-        // Aggiorna metadata con la data corretta
-        selectedCleanersData.metadata = selectedCleanersData.metadata || {};
-        selectedCleanersData.metadata.date = workDate;
-        selectedCleanersData.metadata.loaded_at = new Date().toISOString().replace('T', ' ').slice(0, 19);
-
-        await fs.writeFile(selectedCleanersPath, JSON.stringify(selectedCleanersData, null, 2));
-        const mysqlCleanerCount = selectedCleanersData.cleaners?.length || 0;
-        console.log(`✅ Selected cleaners sincronizzati da MySQL per ${workDate} (${mysqlCleanerCount} cleaners)`);
+        const cleanerCount = selectedCleanersData.cleaners?.length || 0;
+        console.log(`✅ Selected cleaners sincronizzati da PostgreSQL per ${workDate} (${cleanerCount} cleaners)`);
       } else {
-        // Nessun dato in MySQL - crea file vuoto con data corretta
-        const emptyCleaners = {
-          cleaners: [],
-          total_selected: 0,
-          metadata: { date: workDate, saved_at: new Date().toISOString() }
-        };
-        await fs.writeFile(selectedCleanersPath, JSON.stringify(emptyCleaners, null, 2));
-        console.log(`✅ Inizializzato selected_cleaners vuoto per ${workDate} (nessun dato MySQL)`);
+        console.log(`✅ Nessun selected_cleaners trovato in PostgreSQL per ${workDate}`);
       }
 
       // CRITICAL: Sincronizza timeline da database a filesystem per Python scripts
@@ -1793,7 +1788,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Endpoint per rimuovere un cleaner da selected_cleaners.json
+  // Endpoint per rimuovere un cleaner da PostgreSQL
   app.post("/api/remove-cleaner-from-selected", async (req, res) => {
     try {
       const { cleanerId, date } = req.body;
@@ -1806,17 +1801,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const workDate = date || format(new Date(), 'yyyy-MM-dd');
-      const selectedCleanersPath = path.join(
-        process.cwd(),
-        'client/public/data/cleaners/selected_cleaners.json'
-      );
 
-      // Carica i cleaners selezionati da filesystem (selected_cleaners rimane su filesystem)
-      let selectedData: any;
-      try {
-        const content = await fs.readFile(selectedCleanersPath, 'utf8');
-        selectedData = JSON.parse(content);
-      } catch (error) {
+      // Carica i cleaners selezionati da PostgreSQL
+      let selectedData: any = await workspaceFiles.loadSelectedCleaners(workDate);
+      if (!selectedData) {
         selectedData = { cleaners: [], total_selected: 0 };
       }
 
@@ -1871,12 +1859,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         await workspaceFiles.saveTimeline(workDate, timelineData, false, currentUsername, 'cleaner_removed_from_selection');
 
         console.log(`✅ Cleaner ${cleanerId} rimosso completamente (nessuna task)`);
-        console.log(`   - Rimosso da selected_cleaners.json (${cleanersBefore} -> ${selectedData.cleaners.length})`);
-        console.log(`   - Rimosso da timeline.json`);
+        console.log(`   - Rimosso da PostgreSQL selected_cleaners (${cleanersBefore} -> ${selectedData.cleaners.length})`);
+        console.log(`   - Rimosso da timeline`);
         message = "Cleaner rimosso completamente (nessuna task)";
       } else {
-        console.log(`✅ Cleaner ${cleanerId} rimosso da selected_cleaners.json (${cleanersBefore} -> ${selectedData.cleaners.length})`);
-        console.log(`   Il cleaner rimane in timeline.json con le sue task fino a sostituzione`);
+        console.log(`✅ Cleaner ${cleanerId} rimosso da PostgreSQL selected_cleaners (${cleanersBefore} -> ${selectedData.cleaners.length})`);
+        console.log(`   Il cleaner rimane in timeline con le sue task fino a sostituzione`);
         message = "Cleaner rimosso dalla selezione (task mantenute)";
       }
 
@@ -1891,7 +1879,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Endpoint per salvare i cleaners selezionati
+  // Endpoint per salvare i cleaners selezionati (PostgreSQL only)
   app.post("/api/save-selected-cleaners", async (req, res) => {
     try {
       const { cleaners: selectedCleaners, total_selected, date } = req.body;
@@ -1906,34 +1894,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Usa la data fornita o la data corrente
       const workDate = date || format(new Date(), 'yyyy-MM-dd');
 
-      // CRITICAL: Imposta un flag temporaneo per prevenire il ripristino automatico
-      const flagPath = path.join(process.cwd(), 'client/public/data/cleaners/.editing_cleaners');
-      await fs.writeFile(flagPath, JSON.stringify({
-        date: workDate,
-        timestamp: Date.now(),
-        action: 'editing_cleaners'
-      }));
-
-      // Carica cleaners.json per ottenere l'oggetto COMPLETO di ogni cleaner
-      const cleanersPath = path.join(process.cwd(), 'client/public/data/cleaners/cleaners.json');
-      const cleanersContent = await fs.readFile(cleanersPath, 'utf8');
-      const cleanersData = JSON.parse(cleanersContent);
-
-      // Usa la data specifica o la più recente
-      const dates = Object.keys(cleanersData.dates);
-      const targetDate = dates.includes(workDate) ? workDate : dates.sort().reverse()[0];
-      const allCleaners = cleanersData.dates[targetDate]?.cleaners || [];
+      // Carica dati completi dei cleaners da PostgreSQL
+      const { pgDailyAssignmentsService } = await import('./services/pg-daily-assignments-service');
+      const cleanerIds = selectedCleaners.map((c: any) => typeof c === 'number' ? c : c.id);
+      const fullCleanersData = await pgDailyAssignmentsService.loadCleanersByIds(cleanerIds, workDate);
 
       // Crea mappa completa dei cleaners per ID
       const cleanersMap = new Map();
-      allCleaners.forEach((c: any) => {
+      fullCleanersData.forEach((c: any) => {
         cleanersMap.set(c.id, c);
       });
 
-      // Sostituisci ogni cleaner selezionato con l'oggetto COMPLETO da cleaners.json
+      // Arricchisci i cleaners con i dati completi da PostgreSQL
       // Preserva solo lo start_time se è stato modificato dall'utente
       const enrichedCleaners = selectedCleaners.map((c: any) => {
-        const fullCleaner = cleanersMap.get(c.id);
+        const cleanerId = typeof c === 'number' ? c : c.id;
+        const fullCleaner = cleanersMap.get(cleanerId);
         if (fullCleaner) {
           // Usa l'oggetto completo, ma preserva start_time custom se presente
           return {
@@ -1941,14 +1917,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
             start_time: c.start_time || fullCleaner.start_time
           };
         }
-        // Fallback: mantieni il cleaner così com'è se non trovato
-        return c;
+        // Fallback: usa i dati passati se non trovato in PostgreSQL
+        return typeof c === 'number' ? { id: c, name: 'Unknown', start_time: '10:00' } : c;
       });
-
-      const selectedCleanersPath = path.join(
-        process.cwd(),
-        'client/public/data/cleaners/selected_cleaners.json'
-      );
 
       const dataToSave = {
         cleaners: enrichedCleaners,
@@ -1962,18 +1933,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Get username from request
       const currentUsername = req.body.modified_by || req.body.created_by || getCurrentUsername(req);
 
-      // Usa workspaceFiles.saveSelectedCleaners per dual-write (filesystem + MySQL)
+      // Salva su PostgreSQL (unica fonte di verità)
       await workspaceFiles.saveSelectedCleaners(workDate, dataToSave, false, currentUsername);
 
-      console.log(`✅ Salvati ${enrichedCleaners.length} cleaners in selected_cleaners.json per ${workDate} (con can_do_straordinaria e metadata) by ${currentUsername}`);
-
-      // Rimuovi il flag di editing dopo un breve delay
-      setTimeout(async () => {
-        try {
-          const flagPath = path.join(process.cwd(), 'client/public/data/cleaners/.editing_cleaners');
-          await fs.unlink(flagPath).catch(() => {});
-        } catch (e) {}
-      }, 5000); // 5 secondi di protezione
+      console.log(`✅ Salvati ${enrichedCleaners.length} cleaners in PostgreSQL per ${workDate} by ${currentUsername}`);
 
       res.json({
         success: true,
@@ -1981,7 +1944,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         count: selectedCleaners.length
       });
     } catch (error: any) {
-      console.error("Errore nel salvataggio di selected_cleaners.json:", error);
+      console.error("Errore nel salvataggio selected_cleaners su PostgreSQL:", error);
       res.status(500).json({
         success: false,
         error: error.message
@@ -1995,65 +1958,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { cleanerId, date, modified_by, created_by } = req.body;
       const workDate = date || format(new Date(), 'yyyy-MM-dd');
       const currentUsername = modified_by || created_by || getCurrentUsername(req);
-      const cleanersPath = path.join(process.cwd(), 'client/public/data/cleaners/cleaners.json');
-      const selectedCleanersPath = path.join(process.cwd(), 'client/public/data/cleaners/selected_cleaners.json');
 
       console.log(`Aggiunta cleaner ${cleanerId} alla timeline per data ${workDate}`);
 
-      // Carica cleaners.json per ottenere i dati del cleaner da aggiungere
-      let cleanersData: any;
-      try {
-        const cleanersContent = await fs.readFile(cleanersPath, 'utf8');
-        cleanersData = JSON.parse(cleanersContent);
-      } catch (error) {
-        console.error("Errore nel caricamento di cleaners.json:", error);
-        return res.status(500).json({ success: false, error: "Cleaners file non trovato" });
-      }
-
-      // Trova il cleaner per la data specificata
-      const dateCleaners = cleanersData.dates?.[workDate]?.cleaners || [];
-      let cleanerData = dateCleaners.find((c: any) => c.id === cleanerId);
-
-      // Se non trovato nella data corrente, cerca in tutte le date
-      if (!cleanerData) {
-        for (const date of Object.keys(cleanersData.dates || {})) {
-          const dateCl = cleanersData.dates[date]?.cleaners || [];
-          cleanerData = dateCl.find((c: any) => c.id === cleanerId);
-          if (cleanerData) {
-            console.log(`✅ Cleaner ${cleanerId} trovato nella data ${date}`);
-            break;
-          }
-        }
-      }
+      // Carica dati del cleaner da PostgreSQL
+      const { pgDailyAssignmentsService } = await import('./services/pg-daily-assignments-service');
+      const cleanersFromPg = await pgDailyAssignmentsService.loadCleanersByIds([cleanerId], workDate);
+      
+      let cleanerData = cleanersFromPg.length > 0 ? cleanersFromPg[0] : null;
 
       if (!cleanerData) {
-        return res.status(404).json({ success: false, error: "Cleaner non trovato in cleaners.json" });
+        console.error(`Cleaner ${cleanerId} non trovato in PostgreSQL`);
+        return res.status(404).json({ success: false, error: "Cleaner non trovato" });
       }
 
-      // CRITICAL: Verifica se esiste già uno start_time impostato dall'utente
-      // Questo può venire da due fonti:
-      // 1. selected_cleaners.json (se il cleaner era già stato aggiunto)
-      // 2. Una chiamata precedente a /api/update-cleaner-start-time (dalla UI)
-      try {
-        const selectedCleanersPath = path.join(process.cwd(), 'client/public/data/cleaners/selected_cleaners.json');
-        const selectedData = JSON.parse(await fs.readFile(selectedCleanersPath, 'utf8'));
-        const existingCleaner = selectedData.cleaners?.find((c: any) => c.id === cleanerId);
-        if (existingCleaner?.start_time) {
-          cleanerData.start_time = existingCleaner.start_time;
-          console.log(`✅ Usando start_time ${existingCleaner.start_time} esistente da selected_cleaners per cleaner ${cleanerId}`);
-        }
-      } catch (e) {
-        // File non esiste ancora o cleaner non presente, usa il default da cleaners.json
+      // Verifica se esiste già uno start_time impostato dall'utente in selected_cleaners
+      const selectedCleanersData = await workspaceFiles.loadSelectedCleaners(workDate) || { cleaners: [], total_selected: 0, metadata: { date: workDate } };
+      const existingCleaner = selectedCleanersData.cleaners?.find((c: any) => c.id === cleanerId);
+      if (existingCleaner?.start_time) {
+        cleanerData.start_time = existingCleaner.start_time;
+        console.log(`✅ Usando start_time ${existingCleaner.start_time} esistente da PostgreSQL per cleaner ${cleanerId}`);
+      } else {
         console.log(`ℹ️ Nessun start_time pre-esistente, usando default ${cleanerData.start_time || '10:00'}`);
-      }
-
-      // Carica selected_cleaners.json
-      let selectedCleanersData: any;
-      try {
-        const selectedContent = await fs.readFile(selectedCleanersPath, 'utf8');
-        selectedCleanersData = JSON.parse(selectedContent);
-      } catch (error) {
-        selectedCleanersData = { cleaners: [], total_selected: 0, metadata: { date: workDate } };
       }
 
       const selectedCleanerIds = new Set(selectedCleanersData.cleaners.map((c: any) => c.id));
@@ -2109,7 +2035,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // AGGIUNTA: Nessun cleaner rimosso da sostituire, aggiungi alla fine
         console.log(`➕ Nessun cleaner da sostituire, aggiunta nuovo cleaner ${cleanerId} (senza task)`);
 
-        // Cerca la posizione corretta basandoti su selected_cleaners.json
+        // Cerca la posizione corretta basandoti su selected_cleaners da PostgreSQL
         // per mantenere l'ordine visivo
         const insertIndex = selectedCleanersData.cleaners.findIndex((c: any) => c.id === cleanerId);
 
@@ -2145,7 +2071,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Salva timeline (dual-write: filesystem + Object Storage)
       await workspaceFiles.saveTimeline(workDate, timelineData, false, currentUsername, replacedCleanerId ? 'cleaner_replaced' : 'cleaner_added_to_timeline');
 
-      // Aggiungi il cleaner a selected_cleaners.json (se non già presente)
+      // Aggiungi il cleaner a PostgreSQL (se non già presente)
       const existingCleanerIndex = selectedCleanersData.cleaners.findIndex((c: any) => c.id === cleanerId);
 
       if (existingCleanerIndex === -1) {
@@ -2154,16 +2080,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         selectedCleanersData.total_selected = selectedCleanersData.cleaners.length;
         selectedCleanersData.metadata = selectedCleanersData.metadata || {};
         selectedCleanersData.metadata.date = workDate;
-        console.log(`✅ Cleaner ${cleanerId} aggiunto a selected_cleaners.json con oggetto completo`);
+        console.log(`✅ Cleaner ${cleanerId} aggiunto a PostgreSQL selected_cleaners`);
       } else {
         // Cleaner già presente, aggiorna i suoi dati con l'oggetto completo
         selectedCleanersData.cleaners[existingCleanerIndex] = cleanerData;
         selectedCleanersData.metadata = selectedCleanersData.metadata || {};
         selectedCleanersData.metadata.date = workDate;
-        console.log(`✅ Cleaner ${cleanerId} aggiornato in selected_cleaners.json con oggetto completo`);
+        console.log(`✅ Cleaner ${cleanerId} aggiornato in PostgreSQL selected_cleaners`);
       }
 
-      // Salva selected_cleaners usando workspace helper (dual-write: filesystem + MySQL)
+      // Salva selected_cleaners su PostgreSQL
       await workspaceFiles.saveSelectedCleaners(workDate, selectedCleanersData, false, currentUsername);
 
       console.log(`✅ Operazione completata: cleaner ${cleanerId} ${replacedCleanerId ? `ha sostituito ${replacedCleanerId}` : 'aggiunto'}`);
@@ -2184,16 +2110,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Endpoint per aggiornare assignments.json quando un task viene assegnato a un cleaner
   app.post("/api/update-assignments", async (req, res) => {
     try {
-      const { cleanerId, tasks } = req.body;
-
-      // Use await import('fs/promises') within the route handler
-      // const fs = await import('fs/promises');
+      const { cleanerId, tasks, date } = req.body;
+      const workDate = date || format(new Date(), 'yyyy-MM-dd');
 
       const assignmentsPath = path.join(process.cwd(), 'client/public/data/output/assignments.json');
-      const cleanersPath = path.join(process.cwd(), 'client/public/data/cleaners/selected_cleaners.json');
 
-      // Carica i dati dei cleaners
-      const cleanersData = await fs.readFile(cleanersPath, 'utf8').then(JSON.parse);
+      // Carica i dati dei cleaners da PostgreSQL
+      const cleanersData = await workspaceFiles.loadSelectedCleaners(workDate) || { cleaners: [] };
 
       // Trova il cleaner corrispondente (per ora usa un mapping, poi sarà dinamico)
       const cleanerMapping: { [key: string]: number } = {
@@ -2203,7 +2126,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       };
 
       const cleanerRealId = cleanerMapping[cleanerId];
-      const cleaner = cleanersData.cleaners.find((c: any) => c.id === cleanerRealId);
+      const cleaner = cleanersData.cleaners?.find((c: any) => c.id === cleanerRealId);
 
       if (!cleaner) {
         res.status(404).json({ success: false, message: "Cleaner non trovato" });
@@ -4133,10 +4056,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Endpoint per salvare alias cleaner
+  // Endpoint per salvare alias cleaner (PostgreSQL)
   app.post("/api/save-cleaner-alias", async (req, res) => {
     try {
-      const { cleanerId, alias } = req.body;
+      const { cleanerId, alias, date } = req.body;
 
       if (!cleanerId) {
         return res.status(400).json({
@@ -4145,57 +4068,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      const aliasesPath = path.join(process.cwd(), "client/public/data/cleaners/cleaners_aliases.json");
-      let aliasesData: any;
+      const workDate = date || format(new Date(), "yyyy-MM-dd");
+      const { pgDailyAssignmentsService } = await import("./services/pg-daily-assignments-service");
 
-      try {
-        const content = await fs.readFile(aliasesPath, 'utf8');
-        aliasesData = JSON.parse(content);
-      } catch (error) {
-        // Se il file non esiste, crea la struttura base
-        aliasesData = {
-          metadata: {
-            last_updated: new Date().toISOString(),
-            description: "Alias personalizzati per i cleaners da visualizzare sulla timeline"
-          },
-          aliases: {}
-        };
-      }
+      // Salva alias direttamente in PostgreSQL
+      const success = await pgDailyAssignmentsService.updateCleanerField(
+        cleanerId, 
+        workDate, 
+        'alias', 
+        alias || null
+      );
 
-      // Carica i dati del cleaner da cleaners.json per ottenere name e lastname
-      const cleanersPath = path.join(process.cwd(), "client/public/data/cleaners/cleaners.json");
-      const cleanersData = JSON.parse(await fs.readFile(cleanersPath, 'utf8'));
-
-      let cleanerInfo = null;
-      for (const date of Object.keys(cleanersData.dates || {})) {
-        const dateCleaners = cleanersData.dates[date]?.cleaners || [];
-        cleanerInfo = dateCleaners.find((c: any) => c.id === cleanerId);
-        if (cleanerInfo) break;
-      }
-
-      if (!cleanerInfo) {
-        return res.status(404).json({
+      if (!success) {
+        return res.status(500).json({
           success: false,
-          message: "Cleaner non trovato"
+          message: "Errore nel salvataggio dell'alias in PostgreSQL"
         });
       }
 
-      // Aggiorna o crea l'alias
-      aliasesData.aliases[cleanerId] = {
-        name: cleanerInfo.name,
-        lastname: cleanerInfo.lastname,
-        alias: alias || ""
-      };
-
-      // Aggiorna metadata
-      aliasesData.metadata.last_updated = new Date().toISOString();
-
-      // Salva il file
-      const tmpPath = `${aliasesPath}.tmp`;
-      await fs.writeFile(tmpPath, JSON.stringify(aliasesData, null, 2));
-      await fs.rename(tmpPath, aliasesPath);
-
-      console.log(`✅ Alias salvato per cleaner ${cleanerId}: "${alias}"`);
+      console.log(`✅ Alias salvato in PostgreSQL per cleaner ${cleanerId}: "${alias}"`);
 
       res.json({
         success: true,
@@ -4203,6 +4094,52 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     } catch (error: any) {
       console.error("Errore nel salvataggio dell'alias:", error);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  // Endpoint per migrare gli alias da JSON a PostgreSQL
+  app.post("/api/migrate-aliases", async (req, res) => {
+    try {
+      const aliasesPath = path.join(process.cwd(), "client/public/data/cleaners/cleaners_aliases.json");
+      let aliasesData: any;
+
+      try {
+        const content = await fs.readFile(aliasesPath, 'utf8');
+        aliasesData = JSON.parse(content);
+      } catch (error) {
+        return res.json({ success: true, message: "Nessun file aliases da migrare", migrated: 0 });
+      }
+
+      const aliases = aliasesData.aliases || {};
+      const { pgDailyAssignmentsService } = await import("./services/pg-daily-assignments-service");
+      
+      // Get all unique work_dates from cleaners table
+      const { query } = await import("../shared/pg-db");
+      const datesResult = await query("SELECT DISTINCT work_date FROM cleaners");
+      const workDates = datesResult.rows.map((r: any) => r.work_date);
+
+      let migrated = 0;
+      for (const [cleanerId, aliasInfo] of Object.entries(aliases)) {
+        const alias = (aliasInfo as any).alias;
+        if (alias) {
+          // Update alias for this cleaner on all available dates
+          for (const workDate of workDates) {
+            await pgDailyAssignmentsService.updateCleanerField(
+              parseInt(cleanerId),
+              workDate,
+              'alias',
+              alias
+            );
+          }
+          migrated++;
+        }
+      }
+
+      console.log(`✅ Migrati ${migrated} alias da JSON a PostgreSQL`);
+      res.json({ success: true, message: `Migrati ${migrated} alias`, migrated });
+    } catch (error: any) {
+      console.error("Errore nella migrazione degli alias:", error);
       res.status(500).json({ success: false, error: error.message });
     }
   });

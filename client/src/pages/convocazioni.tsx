@@ -96,28 +96,19 @@ export default function Convocazioni() {
 
         setLoadingMessage("Caricamento cleaners...");
 
-        // Carica cleaners.json per la data
-        const cleanersResponse = await fetch(`/data/cleaners/cleaners.json?t=${Date.now()}`);
+        // Carica cleaners da API (PostgreSQL)
+        const cleanersResponse = await fetch(`/api/cleaners?date=${dateStr}`, {
+          cache: 'no-store',
+          headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' }
+        });
         if (!cleanersResponse.ok) {
           throw new Error('Impossibile caricare i cleaners');
         }
 
         const cleanersData = await cleanersResponse.json();
+        let dateCleaners = cleanersData.cleaners || [];
 
-        // Trova i cleaners per la data specifica
-        let dateCleaners = cleanersData.dates?.[dateStr]?.cleaners || [];
-
-        // Se non ci sono cleaners per questa data, usa la data più recente disponibile
-        if (dateCleaners.length === 0) {
-          const availableDates = Object.keys(cleanersData.dates || {}).sort().reverse();
-          if (availableDates.length > 0) {
-            const latestDate = availableDates[0];
-            dateCleaners = cleanersData.dates[latestDate]?.cleaners || [];
-            console.log(`⚠️ Nessun cleaner per ${dateStr}, usando data ${latestDate}`);
-          }
-        }
-
-        console.log(`📅 Cleaners totali per ${dateStr}:`, dateCleaners.length);
+        console.log(`📅 Cleaners totali per ${dateStr} (PostgreSQL):`, dateCleaners.length);
 
         // Carica selected_cleaners da API per gestire la persistenza delle selezioni
         const selectedResponse = await fetch(`/api/selected-cleaners?date=${dateStr}`, {

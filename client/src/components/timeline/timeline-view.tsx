@@ -517,19 +517,21 @@ export default function TimelineView({
         console.log(`⚠️ selected_cleaners vuoto ma timeline ha ${timelineCleaners.length} cleaners`);
         console.log('🔄 Caricamento cleaners dalla timeline per visualizzazione');
 
-        // Carica i dati completi dei cleaners da cleaners.json
-        const cleanersResponse = await fetch(`/data/cleaners/cleaners.json?t=${Date.now()}`);
+        // Carica i dati completi dei cleaners da API (PostgreSQL)
+        const cleanersResponse = await fetch(`/api/cleaners?date=${format(selectedDate, 'yyyy-MM-dd')}`, {
+          cache: 'no-store',
+          headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' }
+        });
         if (cleanersResponse.ok) {
           const cleanersData = await cleanersResponse.json();
-          const allCleaners = Object.values(cleanersData.dates || {})
-            .flatMap((d: any) => d.cleaners || []);
+          const allCleaners = cleanersData.cleaners || [];
 
           cleanersList = timelineCleaners.map((tc: any) => {
             const fullData = allCleaners.find((c: any) => c.id === tc.id);
             return fullData || tc;
           });
 
-          console.log(`✅ Caricati ${cleanersList.length} cleaners dalla timeline`);
+          console.log(`✅ Caricati ${cleanersList.length} cleaners dalla timeline (PostgreSQL)`);
         }
       }
 
@@ -542,14 +544,18 @@ export default function TimelineView({
 
   const loadAliases = async () => {
     try {
-      const response = await fetch(`/data/cleaners/cleaners_aliases.json?t=${Date.now()}`);
+      const dateStr = format(selectedDate, 'yyyy-MM-dd');
+      const response = await fetch(`/api/cleaners-aliases?date=${dateStr}`, {
+        cache: 'no-store',
+        headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' }
+      });
       if (!response.ok) {
-        console.warn('File aliases non trovato, uso nomi default');
+        console.warn('Alias non trovati in PostgreSQL, uso nomi default');
         return;
       }
       const aliasesData = await response.json();
       setCleanersAliases(aliasesData.aliases || {});
-      console.log("Alias cleaners caricati:", aliasesData.aliases);
+      console.log("Alias cleaners caricati da PostgreSQL:", aliasesData.aliases);
     } catch (error) {
       console.error("Errore nel caricamento degli alias:", error);
     }
@@ -684,26 +690,25 @@ export default function TimelineView({
 
       if (!extractResponse.ok) {
         console.error('Errore durante l\'estrazione dei cleaners');
-        // Continua comunque a provare a caricare cleaners.json
       } else {
         const extractResult = await extractResponse.json();
         console.log('✅ Cleaners estratti:', extractResult);
       }
 
-      // Carica tutti i cleaners per la data corrente
-      const cleanersResponse = await fetch(`/data/cleaners/cleaners.json?t=${Date.now()}`, {
+      // Carica tutti i cleaners per la data corrente da API (PostgreSQL)
+      const cleanersResponse = await fetch(`/api/cleaners?date=${workDate}`, {
         cache: 'no-store',
         headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' }
       });
 
       if (!cleanersResponse.ok) {
-        console.error('Impossibile caricare cleaners.json');
+        console.error('Impossibile caricare cleaners da API');
         setAvailableCleaners([]);
         return;
       }
 
       const cleanersData = await cleanersResponse.json();
-      const dateCleaners = cleanersData.dates?.[workDate]?.cleaners || [];
+      const dateCleaners = cleanersData.cleaners || [];
 
       console.log(`✅ Cleaners trovati per ${workDate}:`, dateCleaners.length);
 
