@@ -788,6 +788,141 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // POST /api/timeline - Salva timeline completa (per script Python)
+  app.post("/api/timeline", async (req, res) => {
+    try {
+      const { date, timeline } = req.body;
+      const workDate = date || format(new Date(), "yyyy-MM-dd");
+
+      if (!timeline) {
+        return res.status(400).json({ success: false, error: "timeline data required" });
+      }
+
+      console.log(`📝 POST /api/timeline - Salvando timeline per ${workDate}`);
+
+      // Assicura che metadata abbia la data corretta
+      const timelineData = {
+        ...timeline,
+        metadata: {
+          ...timeline.metadata,
+          date: workDate,
+          last_updated: new Date().toISOString()
+        }
+      };
+
+      // Salva via workspaceFiles (scrive su PostgreSQL + filesystem per compatibilità)
+      await workspaceFiles.saveTimeline(workDate, timelineData, false, 'python_script', 'api_save_timeline');
+
+      const taskCount = timelineData.cleaners_assignments?.reduce(
+        (sum: number, c: any) => sum + (c.tasks?.length || 0), 0
+      ) || 0;
+
+      console.log(`✅ Timeline salvata per ${workDate}: ${timelineData.cleaners_assignments?.length || 0} cleaners, ${taskCount} task`);
+      res.json({ 
+        success: true, 
+        message: `Timeline salvata per ${workDate}`,
+        cleaners_count: timelineData.cleaners_assignments?.length || 0,
+        tasks_count: taskCount
+      });
+    } catch (error: any) {
+      console.error("Errore nel salvataggio timeline:", error);
+      res.status(500).json({
+        success: false,
+        error: error.message,
+      });
+    }
+  });
+
+  // POST /api/containers - Salva containers completi (per script Python)
+  app.post("/api/containers", async (req, res) => {
+    try {
+      const { date, containers } = req.body;
+      const workDate = date || format(new Date(), "yyyy-MM-dd");
+
+      if (!containers) {
+        return res.status(400).json({ success: false, error: "containers data required" });
+      }
+
+      console.log(`📝 POST /api/containers - Salvando containers per ${workDate}`);
+
+      // Normalizza struttura containers
+      const containersData = containers.containers ? containers : { containers };
+      
+      // Aggiungi metadata se mancante
+      if (!containersData.metadata) {
+        containersData.metadata = { date: workDate, last_updated: new Date().toISOString() };
+      }
+      containersData.metadata.date = workDate;
+      containersData.metadata.last_updated = new Date().toISOString();
+
+      // Calcola summary
+      const eoTasks = containersData.containers?.early_out?.tasks || [];
+      const hpTasks = containersData.containers?.high_priority?.tasks || [];
+      const lpTasks = containersData.containers?.low_priority?.tasks || [];
+
+      containersData.summary = {
+        early_out: eoTasks.length,
+        high_priority: hpTasks.length,
+        low_priority: lpTasks.length,
+        total_tasks: eoTasks.length + hpTasks.length + lpTasks.length
+      };
+
+      // Salva via workspaceFiles (scrive su PostgreSQL + filesystem per compatibilità)
+      await workspaceFiles.saveContainers(workDate, containersData);
+
+      console.log(`✅ Containers salvati per ${workDate}: EO=${eoTasks.length}, HP=${hpTasks.length}, LP=${lpTasks.length}`);
+      res.json({ 
+        success: true, 
+        message: `Containers salvati per ${workDate}`,
+        summary: containersData.summary
+      });
+    } catch (error: any) {
+      console.error("Errore nel salvataggio containers:", error);
+      res.status(500).json({
+        success: false,
+        error: error.message,
+      });
+    }
+  });
+
+  // POST /api/selected-cleaners - Salva selected cleaners (per script Python)
+  app.post("/api/selected-cleaners", async (req, res) => {
+    try {
+      const { date, cleaner_ids, cleaners } = req.body;
+      const workDate = date || format(new Date(), "yyyy-MM-dd");
+
+      // Supporta sia array di ID che array di oggetti cleaner
+      let ids: number[] = [];
+      if (cleaner_ids && Array.isArray(cleaner_ids)) {
+        ids = cleaner_ids;
+      } else if (cleaners && Array.isArray(cleaners)) {
+        ids = cleaners.map((c: any) => c.id).filter((id: any) => id !== undefined);
+      }
+
+      if (ids.length === 0) {
+        return res.status(400).json({ success: false, error: "cleaner_ids or cleaners array required" });
+      }
+
+      console.log(`📝 POST /api/selected-cleaners - Salvando ${ids.length} cleaners per ${workDate}`);
+
+      const { pgDailyAssignmentsService } = await import("./services/pg-daily-assignments-service");
+      await pgDailyAssignmentsService.saveSelectedCleaners(workDate, ids);
+
+      console.log(`✅ Selected cleaners salvati per ${workDate}: ${ids.length} cleaners`);
+      res.json({ 
+        success: true, 
+        message: `${ids.length} cleaners selezionati salvati per ${workDate}`,
+        count: ids.length
+      });
+    } catch (error: any) {
+      console.error("Errore nel salvataggio selected cleaners:", error);
+      res.status(500).json({
+        success: false,
+        error: error.message,
+      });
+    }
+  });
+
   // Endpoint per salvare/aggiornare i cleaners per una data (bulk import)
   app.post("/api/cleaners", async (req, res) => {
     try {

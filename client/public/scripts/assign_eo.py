@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 from __future__ import annotations
-import json, math
+import json, math, argparse
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Tuple
 from pathlib import Path
@@ -13,6 +13,13 @@ from assign_utils import (
     cleaner_load_minutes, cleaner_load_hours, get_cleaners_for_eo
 )
 
+# API Client import (opzionale, con fallback)
+try:
+    from api_client import ApiClient
+    API_AVAILABLE = True
+except ImportError:
+    API_AVAILABLE = False
+
 # =============================
 # I/O paths
 # =============================
@@ -22,6 +29,10 @@ SETTINGS_PATH = BASE / "input" / "settings.json"
 INPUT_CONTAINERS = BASE / "output" / "containers.json"
 INPUT_CLEANERS = BASE / "cleaners" / "selected_cleaners.json"
 OUTPUT_ASSIGN = BASE / "output" / "early_out_assignments.json"
+
+# Variabile globale per la data di lavoro e modalità API
+WORK_DATE: Optional[str] = None
+USE_API: bool = False
 
 # =============================
 # CONFIG - REGOLE CLUSTERING OTTIMIZZATE
@@ -464,10 +475,29 @@ def find_best_position(cleaner: Cleaner, task: Task) -> Optional[Tuple[int, floa
 
 
 # -------- Loader --------
-def load_cleaners() -> List[Cleaner]:
+def load_cleaners_data() -> List[Dict]:
+    """Carica dati cleaners da API o file."""
+    global USE_API, WORK_DATE
+    
+    # Prova API se disponibile
+    if USE_API and API_AVAILABLE and WORK_DATE:
+        try:
+            client = ApiClient()
+            cleaners_list = client.get_selected_cleaners(WORK_DATE)
+            if cleaners_list:
+                print(f"   ✅ Cleaners caricati da API: {len(cleaners_list)}")
+                return cleaners_list
+        except Exception as e:
+            print(f"   ⚠️ Fallback su file: {e}")
+    
+    # Fallback su file
     data = json.loads(INPUT_CLEANERS.read_text(encoding="utf-8"))
+    return data.get("cleaners", [])
+
+def load_cleaners() -> List[Cleaner]:
+    cleaners_data = load_cleaners_data()
     all_cleaners: List[Cleaner] = []
-    for c in data.get("cleaners", []):
+    for c in cleaners_data:
         role = (c.get("role") or "").strip()
         is_premium = bool(c.get("premium", (role.lower() == "premium")))
         can_do_straordinaria = bool(c.get("can_do_straordinaria", False))
@@ -501,8 +531,26 @@ def load_cleaners() -> List[Cleaner]:
     return cleaners
 
 
+def load_containers_data() -> Dict:
+    """Carica dati containers da API o file."""
+    global USE_API, WORK_DATE
+    
+    # Prova API se disponibile
+    if USE_API and API_AVAILABLE and WORK_DATE:
+        try:
+            client = ApiClient()
+            data = client.get_containers(WORK_DATE)
+            if data and data.get("containers"):
+                print(f"   ✅ Containers caricati da API")
+                return data
+        except Exception as e:
+            print(f"   ⚠️ Fallback su file: {e}")
+    
+    # Fallback su file
+    return json.loads(INPUT_CONTAINERS.read_text(encoding="utf-8"))
+
 def load_tasks() -> List[Task]:
-    data = json.loads(INPUT_CONTAINERS.read_text(encoding="utf-8"))
+    data = load_containers_data()
 
     # Carica settings per leggere eo_start_time dinamicamente
     try:
@@ -905,76 +953,121 @@ def build_output(cleaners: List[Cleaner], unassigned: List[Task], original_tasks
 
 def load_timeline(work_date: str) -> Dict[str, Any]:
     """
-    Carica la timeline.json esistente o crea una struttura vuota.
+    Carica la timeline esistente da API o file.
     """
+    global USE_API
+    
+    empty_timeline = {
+        "metadata": {
+            "last_updated": datetime.now().isoformat(),
+            "date": work_date,
+            "modification_type": "auto_assign_early_out"
+        },
+        "cleaners_assignments": [],
+        "meta": {"total_cleaners": 0, "used_cleaners": 0, "assigned_tasks": 0}
+    }
+    
+    # Prova API se disponibile
+    if USE_API and API_AVAILABLE:
+        try:
+            client = ApiClient()
+            data = client.get_timeline(work_date)
+            if data and data.get("cleaners_assignments") is not None:
+                # Verifica data match
+                if data.get("metadata", {}).get("date") != work_date:
+                    print(f"   ⚠️ Timeline data mismatch da API: Expected {work_date}, found {data.get('metadata', {}).get('date')}. Resetting.")
+                    return empty_timeline
+                print(f"   ✅ Timeline caricata da API: {len(data.get('cleaners_assignments', []))} cleaners")
+                return data
+        except Exception as e:
+            print(f"   ⚠️ Errore API timeline, fallback su file: {e}")
+    
+    # Fallback su file
     timeline_path = OUTPUT_ASSIGN.parent / "timeline.json"
     if timeline_path.exists():
         try:
             data = json.loads(timeline_path.read_text(encoding="utf-8"))
-            # Assicura che la data sia corretta, altrimenti resetta
             if data.get("metadata", {}).get("date") != work_date:
                 print(f"   ⚠️ Timeline data mismatch: Expected {work_date}, found {data.get('metadata', {}).get('date')}. Resetting.")
-                return {
-                    "metadata": {
-                        "last_updated": datetime.now().isoformat(),
-                        "date": work_date,
-                        "modification_type": "auto_assign_early_out"
-                    },
-                    "cleaners_assignments": [],
-                    "meta": {"total_cleaners": 0, "used_cleaners": 0, "assigned_tasks": 0}
-                }
+                return empty_timeline
             return data
         except json.JSONDecodeError:
             print(f"   ⚠️ Errore nel decodificare {timeline_path}. Creazione di una nuova timeline.")
-            return {
-                "metadata": {
-                    "last_updated": datetime.now().isoformat(),
-                    "date": work_date,
-                    "modification_type": "auto_assign_early_out"
-                },
-                "cleaners_assignments": [],
-                "meta": {"total_cleaners": 0, "used_cleaners": 0, "assigned_tasks": 0}
-            }
+            return empty_timeline
         except Exception as e:
             print(f"   ⚠️ Errore inatteso nel caricamento {timeline_path}: {e}. Creazione di una nuova timeline.")
-            return {
-                "metadata": {
-                    "last_updated": datetime.now().isoformat(),
-                    "date": work_date,
-                    "modification_type": "auto_assign_early_out"
-                },
-                "cleaners_assignments": [],
-                "meta": {"total_cleaners": 0, "used_cleaners": 0, "assigned_tasks": 0}
-            }
+            return empty_timeline
     else:
-        # Crea la directory se non esiste
         OUTPUT_ASSIGN.parent.mkdir(parents=True, exist_ok=True)
-        return {
-            "metadata": {
-                "last_updated": datetime.now().isoformat(),
-                "date": work_date,
-                "modification_type": "auto_assign_early_out"
-            },
-            "cleaners_assignments": [],
-            "meta": {"total_cleaners": 0, "used_cleaners": 0, "assigned_tasks": 0}
-        }
+        return empty_timeline
+
+
+def save_timeline_via_api(work_date: str, timeline_data: Dict) -> bool:
+    """Salva timeline via API se disponibile."""
+    global USE_API
+    
+    if not USE_API or not API_AVAILABLE:
+        return False
+    
+    try:
+        client = ApiClient()
+        client.save_timeline(work_date, timeline_data)
+        print(f"   ✅ Timeline salvata via API per {work_date}")
+        return True
+    except Exception as e:
+        print(f"   ⚠️ Errore salvataggio API timeline: {e}")
+        return False
+
+
+def save_containers_via_api(work_date: str, containers_data: Dict) -> bool:
+    """Salva containers via API se disponibile."""
+    global USE_API
+    
+    if not USE_API or not API_AVAILABLE:
+        return False
+    
+    try:
+        client = ApiClient()
+        client.save_containers(work_date, containers_data)
+        print(f"   ✅ Containers salvati via API per {work_date}")
+        return True
+    except Exception as e:
+        print(f"   ⚠️ Errore salvataggio API containers: {e}")
+        return False
 
 
 def main():
-    if not INPUT_CONTAINERS.exists():
-        raise SystemExit(f"Missing input file: {INPUT_CONTAINERS}")
-    if not INPUT_CLEANERS.exists():
-        raise SystemExit(f"Missing input file: {INPUT_CLEANERS}")
-
-    # Usa la data passata come argomento da riga di comando
-    import sys
-    if len(sys.argv) > 1:
-        ref_date = sys.argv[1]
-        print(f"📅 Usando data specificata: {ref_date}")
-    else:
-        from datetime import datetime
-        ref_date = datetime.now().strftime("%Y-%m-%d")
-        print(f"📅 Nessuna data specificata, usando: {ref_date}")
+    global USE_API, WORK_DATE
+    
+    # Parse argomenti da linea di comando
+    parser = argparse.ArgumentParser(description='Assegna task Early-Out ai cleaners')
+    parser.add_argument('date', nargs='?', default=None, help='Data nel formato YYYY-MM-DD')
+    parser.add_argument('--use-api', action='store_true', help='Usa API HTTP invece di file JSON')
+    parser.add_argument('--date', dest='date_opt', type=str, help='Data nel formato YYYY-MM-DD')
+    args = parser.parse_args()
+    
+    # Determina la data di lavoro
+    ref_date = args.date_opt or args.date or datetime.now().strftime("%Y-%m-%d")
+    
+    # Configura variabili globali
+    USE_API = args.use_api
+    WORK_DATE = ref_date
+    
+    if USE_API:
+        if API_AVAILABLE:
+            print(f"🌐 Modalità API attiva (PostgreSQL)")
+        else:
+            print(f"⚠️ API client non disponibile, fallback su file")
+            USE_API = False
+    
+    print(f"📅 Data di lavoro: {ref_date}")
+    
+    # In modalità API, non servono file locali
+    if not USE_API:
+        if not INPUT_CONTAINERS.exists():
+            raise SystemExit(f"Missing input file: {INPUT_CONTAINERS}")
+        if not INPUT_CLEANERS.exists():
+            raise SystemExit(f"Missing input file: {INPUT_CLEANERS}")
 
 
     cleaners = load_cleaners()
@@ -1101,8 +1194,13 @@ def main():
         "used_cleaners": used_cleaners_count,
         "assigned_tasks": total_assigned_tasks
     }
+    
+    # Salva via API se attiva, altrimenti solo file
+    api_saved = save_timeline_via_api(ref_date, timeline_data_output)
+    
+    # Sempre scrivi anche su file (per compatibilità)
     timeline_path.write_text(json.dumps(timeline_data_output, ensure_ascii=False, indent=2), encoding="utf-8")
-    print(f"✅ Timeline aggiornata: {timeline_path}")
+    print(f"✅ Timeline aggiornata: {timeline_path}" + (" + API" if api_saved else ""))
 
     # Conta i cleaner con task di ogni tipo basandosi sui reasons
     eo_count = len([c for c in timeline_data_output["cleaners_assignments"]
@@ -1145,9 +1243,12 @@ def main():
                     containers_data["summary"].get("total_tasks", 0) - (original_count - new_count)
                 )
 
+                # Salva containers via API se attiva
+                containers_api_saved = save_containers_via_api(ref_date, containers_data)
+                
                 # Scrivi containers.json aggiornato
                 containers_path.write_text(json.dumps(containers_data, ensure_ascii=False, indent=2), encoding="utf-8")
-                print(f"✅ Rimosse {original_count - new_count} task da containers.json (early_out) usando task_id")
+                print(f"✅ Rimosse {original_count - new_count} task da containers.json (early_out) usando task_id" + (" + API" if containers_api_saved else ""))
                 print(f"   - Task rimaste in early_out: {new_count}")
                 print(f"   💡 Task con logistic_code duplicati rimangono disponibili nei container")
         except Exception as e:
