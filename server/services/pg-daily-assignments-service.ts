@@ -1061,17 +1061,20 @@ export class PgDailyAssignmentsService {
   // ==================== SELECTED CLEANERS ====================
 
   /**
-   * Load selected cleaners for a work_date
+   * Load selected cleaner IDs for a work_date
+   * Returns array of cleaner IDs (integers)
    */
-  async loadSelectedCleaners(workDate: string): Promise<any[] | null> {
+  async loadSelectedCleaners(workDate: string): Promise<number[] | null> {
     try {
       const result = await query(
         'SELECT cleaners FROM daily_selected_cleaners WHERE work_date = $1',
         [workDate]
       );
       if (result.rows.length > 0 && result.rows[0].cleaners) {
-        console.log(`✅ PG: Selected cleaners caricati per ${workDate}`);
-        return result.rows[0].cleaners;
+        // cleaners is now an integer[] array, not JSON
+        const cleanerIds = result.rows[0].cleaners;
+        console.log(`✅ PG: Selected cleaners caricati per ${workDate}: ${cleanerIds.length} IDs`);
+        return cleanerIds;
       }
       return null;
     } catch (error) {
@@ -1081,17 +1084,19 @@ export class PgDailyAssignmentsService {
   }
 
   /**
-   * Save selected cleaners for a work_date (upsert)
+   * Save selected cleaner IDs for a work_date (upsert)
+   * @param cleanerIds - Array of cleaner IDs (integers)
    */
-  async saveSelectedCleaners(workDate: string, cleaners: any[]): Promise<boolean> {
+  async saveSelectedCleaners(workDate: string, cleanerIds: number[]): Promise<boolean> {
     try {
+      // Use PostgreSQL array syntax for integer[]
       await query(`
         INSERT INTO daily_selected_cleaners (work_date, cleaners, updated_at)
-        VALUES ($1, $2, NOW())
+        VALUES ($1, $2::integer[], NOW())
         ON CONFLICT (work_date) 
-        DO UPDATE SET cleaners = $2, updated_at = NOW()
-      `, [workDate, JSON.stringify(cleaners)]);
-      console.log(`✅ PG: Selected cleaners salvati per ${workDate}`);
+        DO UPDATE SET cleaners = $2::integer[], updated_at = NOW()
+      `, [workDate, cleanerIds]);
+      console.log(`✅ PG: Selected cleaners salvati per ${workDate}: ${cleanerIds.length} IDs`);
       return true;
     } catch (error) {
       console.error('❌ PG: Errore nel salvataggio selected cleaners:', error);
