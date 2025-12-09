@@ -267,10 +267,14 @@ def get_tasks_from_db(selected_date, assigned_task_ids=None):
     return results
 
 # ---------- Classificazione task ----------
-def classify_tasks(tasks, selected_date):
-    # Carica settings
-    with open(SETTINGS_PATH, "r", encoding="utf-8") as f:
-        settings = json.load(f)
+def classify_tasks(tasks, selected_date, use_api=False):
+    # Carica settings da API o filesystem
+    if use_api:
+        from api_client import load_settings_from_api
+        settings = load_settings_from_api()
+    else:
+        with open(SETTINGS_PATH, "r", encoding="utf-8") as f:
+            settings = json.load(f)
 
     early_out_config = settings.get("early-out", {})
     high_priority_config = settings.get("high-priority", {})
@@ -575,7 +579,7 @@ def main():
 
     # Classifica task (senza deduplica - le task duplicate rimangono visibili)
     print(f"🔄 Classificazione task in containers...")
-    early_out, high_priority, low_priority = classify_tasks(all_tasks, target_date)
+    early_out, high_priority, low_priority = classify_tasks(all_tasks, target_date, use_api=True)
 
     # Crea output
     output = {
