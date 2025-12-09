@@ -2909,7 +2909,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { spawn } = await import('child_process');
       const scriptPath = path.join(process.cwd(), 'client/public/scripts/assign_hp.py');
 
-      const pythonProcess = spawn('python3', [scriptPath, workDate]);
+      const pythonProcess = spawn('python3', [scriptPath, workDate, '--use-api']);
 
       let stdoutData = '';
       pythonProcess.stdout.on('data', (data) => {
@@ -2966,7 +2966,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const pythonProcess = spawn('python3', [
         scriptPath,
-        workDate
+        workDate,
+        '--use-api'
       ]);
 
       let stdoutData = '';
@@ -3038,7 +3039,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { spawn } = await import('child_process');
       const scriptPath = path.join(process.cwd(), 'client/public/scripts/assign_eo.py');
 
-      const pythonProcess = spawn('python3', [scriptPath, workDate], {
+      const pythonProcess = spawn('python3', [scriptPath, workDate, '--use-api'], {
         cwd: process.cwd()
       });
 
@@ -3125,7 +3126,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { spawn } = await import('child_process');
       const scriptPath = path.join(process.cwd(), 'client/public/scripts/assign_hp.py');
 
-      const pythonProcess = spawn('python3', [scriptPath, workDate], {
+      const pythonProcess = spawn('python3', [scriptPath, workDate, '--use-api'], {
         cwd: process.cwd()
       });
 
@@ -3212,7 +3213,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { spawn } = await import('child_process');
       const scriptPath = path.join(process.cwd(), 'client/public/scripts/assign_lp.py');
 
-      const pythonProcess = spawn('python3', [scriptPath, workDate], {
+      const pythonProcess = spawn('python3', [scriptPath, workDate, '--use-api'], {
         cwd: process.cwd()
       });
 
