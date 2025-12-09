@@ -338,7 +338,8 @@ export async function loadSelectedCleaners(workDate: string): Promise<any | null
             counter_days: c.counter_days || 0,
             contract_type: c.contract_type || null,
             preferred_customers: c.preferred_customers || [],
-            telegram_id: c.telegram_id || null
+            telegram_id: c.telegram_id || null,
+            alias: c.alias || null
           }))
         : pgCleanerIds.map(id => ({ 
             id, 
@@ -347,7 +348,8 @@ export async function loadSelectedCleaners(workDate: string): Promise<any | null
             role: 'Standard', 
             premium: false,
             start_time: '10:00',
-            can_do_straordinaria: false
+            can_do_straordinaria: false,
+            alias: null
           }));
       
       const scData = {

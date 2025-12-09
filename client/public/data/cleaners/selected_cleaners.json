@@ -2,112 +2,138 @@
   "cleaners": [
     {
       "id": 626,
-      "name": "DORA PATRICIA",
-      "lastname": "JIMENEZ",
-      "role": "Formatore",
+      "name": "Unknown",
+      "lastname": "",
+      "role": "Standard",
       "premium": false,
-      "start_time": "10:00"
+      "start_time": "10:00",
+      "can_do_straordinaria": false,
+      "alias": null
     },
     {
       "id": 24,
-      "name": "HUSSAIN",
-      "lastname": "SYED SHUJIAHAT",
-      "role": "Premium",
+      "name": "Unknown",
+      "lastname": "",
+      "role": "Standard",
       "premium": false,
-      "start_time": "10:00"
+      "start_time": "10:00",
+      "can_do_straordinaria": false,
+      "alias": null
     },
     {
       "id": 404,
-      "name": "RASEL",
-      "lastname": "MOLLA",
+      "name": "Unknown",
+      "lastname": "",
       "role": "Standard",
       "premium": false,
-      "start_time": "10:00"
+      "start_time": "10:00",
+      "can_do_straordinaria": false,
+      "alias": null
     },
     {
       "id": 1060,
-      "name": "NELLY GABRIELLE",
-      "lastname": "TENKAM",
+      "name": "Unknown",
+      "lastname": "",
       "role": "Standard",
       "premium": false,
-      "start_time": "10:00"
+      "start_time": "10:00",
+      "can_do_straordinaria": false,
+      "alias": null
     },
     {
       "id": 326,
-      "name": "FESTUS OSARO",
-      "lastname": "AIHIVBERE",
-      "role": "Premium",
+      "name": "Unknown",
+      "lastname": "",
+      "role": "Standard",
       "premium": false,
-      "start_time": "10:00"
+      "start_time": "10:00",
+      "can_do_straordinaria": false,
+      "alias": null
     },
     {
       "id": 722,
-      "name": "LACINE",
-      "lastname": "KONE",
-      "role": "Premium",
+      "name": "Unknown",
+      "lastname": "",
+      "role": "Standard",
       "premium": false,
-      "start_time": "10:00"
+      "start_time": "10:00",
+      "can_do_straordinaria": false,
+      "alias": null
     },
     {
       "id": 1031,
-      "name": "YAH PRISCA LEA",
-      "lastname": "ADOU",
-      "role": "Premium",
+      "name": "Unknown",
+      "lastname": "",
+      "role": "Standard",
       "premium": false,
-      "start_time": "10:00"
+      "start_time": "10:00",
+      "can_do_straordinaria": false,
+      "alias": null
     },
     {
       "id": 1045,
-      "name": "ARACELY ROCIO",
-      "lastname": "MORLA ZAMBRANO",
-      "role": "Premium",
+      "name": "Unknown",
+      "lastname": "",
+      "role": "Standard",
       "premium": false,
-      "start_time": "10:00"
+      "start_time": "10:00",
+      "can_do_straordinaria": false,
+      "alias": null
     },
     {
       "id": 1063,
-      "name": "ALEXANDER DENNYS",
-      "lastname": "CARDENAS OLAYA",
+      "name": "Unknown",
+      "lastname": "",
       "role": "Standard",
       "premium": false,
-      "start_time": "10:00"
+      "start_time": "10:00",
+      "can_do_straordinaria": false,
+      "alias": null
     },
     {
       "id": 785,
-      "name": "RACHEL",
-      "lastname": "OTSHINGA",
-      "role": "Premium",
+      "name": "Unknown",
+      "lastname": "",
+      "role": "Standard",
       "premium": false,
-      "start_time": "10:00"
+      "start_time": "10:00",
+      "can_do_straordinaria": false,
+      "alias": null
     },
     {
       "id": 1070,
-      "name": "ABUBACAR",
-      "lastname": "DIAMMEH",
-      "role": "Premium",
+      "name": "Unknown",
+      "lastname": "",
+      "role": "Standard",
       "premium": false,
-      "start_time": "10:00"
+      "start_time": "10:00",
+      "can_do_straordinaria": false,
+      "alias": null
     },
     {
       "id": 132,
-      "name": "JOHOISER ERNESTO",
-      "lastname": "LOPEZ GIRON",
-      "role": "Premium",
+      "name": "Unknown",
+      "lastname": "",
+      "role": "Standard",
       "premium": false,
-      "start_time": "10:00"
+      "start_time": "10:00",
+      "can_do_straordinaria": false,
+      "alias": null
     },
     {
       "id": 249,
-      "name": "Ogbodo Chidi",
-      "lastname": "Igwe",
-      "role": "Premium",
+      "name": "Unknown",
+      "lastname": "",
+      "role": "Standard",
       "premium": false,
-      "start_time": "10:00"
+      "start_time": "10:00",
+      "can_do_straordinaria": false,
+      "alias": null
     }
   ],
   "total_selected": 13,
   "metadata": {
     "date": "2025-12-10",
-    "loaded_at": "2025-12-09 10:56:38"
+    "loaded_at": "2025-12-09 11:06:26"
   }
 }

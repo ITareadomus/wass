@@ -174,12 +174,38 @@ async function recalculateCleanerTimes(cleanerData: any, workDate?: string): Pro
 }
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Initialize PostgreSQL tables on startup
+  try {
+    const { pgUsersService } = await import("./services/pg-users-service");
+    const { pgDailyAssignmentsService } = await import("./services/pg-daily-assignments-service");
+    
+    await pgUsersService.ensureTable();
+    await pgDailyAssignmentsService.ensureAliasColumn();
+    
+    // Migrate existing users from JSON if table is empty
+    const existingUsers = await pgUsersService.getAllUsers();
+    if (existingUsers.length === 0) {
+      try {
+        const accountsPath = path.join(process.cwd(), 'client/public/data/accounts.json');
+        const accountsData = JSON.parse(await fs.readFile(accountsPath, 'utf8'));
+        if (accountsData.users && accountsData.users.length > 0) {
+          await pgUsersService.migrateFromJson(accountsData.users);
+          console.log('✅ Utenti migrati da accounts.json a PostgreSQL');
+        }
+      } catch (e) {
+        console.log('ℹ️ Nessun accounts.json da migrare');
+      }
+    }
+  } catch (initError) {
+    console.warn('⚠️ Inizializzazione tabelle PostgreSQL fallita (non bloccante):', initError);
+  }
+
   // Health check endpoint for Python API client
   app.get("/api/health", (req, res) => {
     res.json({ status: "ok", timestamp: new Date().toISOString() });
   });
 
-  // Endpoint per il login
+  // Endpoint per il login (PostgreSQL)
   app.post("/api/login", async (req, res) => {
     try {
       const { username, password } = req.body;
@@ -191,14 +217,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      // Carica accounts.json
-      const accountsPath = path.join(process.cwd(), 'client/public/data/accounts.json');
-      const accountsData = JSON.parse(await fs.readFile(accountsPath, 'utf8'));
-
-      // Trova l'utente
-      const user = accountsData.users.find(
-        (u: any) => u.username === username && u.password === password
-      );
+      const { pgUsersService } = await import("./services/pg-users-service");
+      const user = await pgUsersService.validateLogin(username, password);
 
       if (!user) {
         return res.status(401).json({
@@ -207,7 +227,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      // Rimuovi la password dalla risposta
       const { password: _, ...userWithoutPassword } = user;
 
       res.json({
@@ -4188,12 +4207,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // API per la gestione degli account utente
+  // API per la gestione degli account utente (PostgreSQL)
   app.get("/api/accounts", async (req, res) => {
     try {
-      const accountsPath = path.join(process.cwd(), "client/public/data/accounts.json");
-      const accountsData = JSON.parse(await fs.readFile(accountsPath, "utf-8"));
-      res.json(accountsData);
+      const { pgUsersService } = await import("./services/pg-users-service");
+      const users = await pgUsersService.getAllUsers();
+      res.json({ users });
     } catch (error) {
       console.error("Errore nel caricamento degli account:", error);
       res.status(500).json({ success: false, message: "Errore del server" });
@@ -4202,14 +4221,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/accounts/add", async (req, res) => {
     try {
-      const accountsPath = path.join(process.cwd(), "client/public/data/accounts.json");
-      const accountsData = JSON.parse(await fs.readFile(accountsPath, "utf-8"));
+      const { username, password, role } = req.body;
+      if (!username || !password) {
+        return res.status(400).json({ success: false, message: "Username e password sono obbligatori." });
+      }
 
-      const newId = Math.max(0, ...accountsData.users.map((u: any) => u.id)) + 1;
-      const newAccount = { id: newId, ...req.body };
+      const { pgUsersService } = await import("./services/pg-users-service");
+      const newUser = await pgUsersService.createUser(username, password, role || 'user');
 
-      accountsData.users.push(newAccount);
-      await fs.writeFile(accountsPath, JSON.stringify(accountsData, null, 2));
+      if (!newUser) {
+        return res.status(400).json({ success: false, message: "Errore nella creazione dell'account (username già esistente?)." });
+      }
 
       res.json({ success: true, message: "Account aggiunto con successo." });
     } catch (error) {
@@ -4220,27 +4242,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/accounts/update", async (req, res) => {
     try {
-      const accountsPath = path.join(process.cwd(), "client/public/data/accounts.json");
-      const accountsData = JSON.parse(await fs.readFile(accountsPath, "utf-8"));
-
-      const index = accountsData.users.findIndex((u: any) => u.id === req.body.id);
-      if (index !== -1) {
-        const currentAccount = accountsData.users[index];
-
-        // Impedisci modifica ruolo se è l'account admin principale (id=1)
-        if (currentAccount.id === 1 && req.body.role && req.body.role !== 'admin') {
-          return res.status(403).json({
-            success: false,
-            message: "Non puoi modificare il ruolo dell'account admin principale."
-          });
-        }
-
-        accountsData.users[index] = { ...accountsData.users[index], ...req.body };
-        await fs.writeFile(accountsPath, JSON.stringify(accountsData, null, 2));
-        res.json({ success: true, message: "Account aggiornato con successo." });
-      } else {
-        res.status(404).json({ success: false, message: "Account non trovato" });
+      const { id, username, password, role } = req.body;
+      if (typeof id === 'undefined') {
+        return res.status(400).json({ success: false, message: "ID account mancante." });
       }
+
+      const { pgUsersService } = await import("./services/pg-users-service");
+      const currentUser = await pgUsersService.getUserById(id);
+
+      if (!currentUser) {
+        return res.status(404).json({ success: false, message: "Account non trovato" });
+      }
+
+      // Impedisci modifica ruolo se è l'account admin principale (id=1)
+      if (currentUser.id === 1 && role && role !== 'admin') {
+        return res.status(403).json({
+          success: false,
+          message: "Non puoi modificare il ruolo dell'account admin principale."
+        });
+      }
+
+      const updates: any = {};
+      if (username !== undefined) updates.username = username;
+      if (password !== undefined) updates.password = password;
+      if (role !== undefined) updates.role = role;
+
+      await pgUsersService.updateUser(id, updates);
+      res.json({ success: true, message: "Account aggiornato con successo." });
     } catch (error) {
       console.error("Errore nell'aggiornamento dell'account:", error);
       res.status(500).json({ success: false, message: "Errore del server" });
@@ -4262,17 +4290,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      const accountsPath = path.join(process.cwd(), "client/public/data/accounts.json");
-      const accountsData = JSON.parse(await fs.readFile(accountsPath, "utf-8"));
+      const { pgUsersService } = await import("./services/pg-users-service");
+      const deleted = await pgUsersService.deleteUser(id);
 
-      const initialLength = accountsData.users.length;
-      accountsData.users = accountsData.users.filter((u: any) => u.id !== id);
-
-      if (accountsData.users.length === initialLength) {
+      if (!deleted) {
         return res.status(404).json({ success: false, message: "Account non trovato." });
       }
-
-      await fs.writeFile(accountsPath, JSON.stringify(accountsData, null, 2));
 
       res.json({ success: true, message: "Account eliminato con successo." });
     } catch (error) {
@@ -4289,17 +4312,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ success: false, message: "ID utente e nuova password sono obbligatori." });
       }
 
-      const accountsPath = path.join(process.cwd(), "client/public/data/accounts.json");
-      const accountsData = JSON.parse(await fs.readFile(accountsPath, "utf-8"));
+      const { pgUsersService } = await import("./services/pg-users-service");
+      const user = await pgUsersService.getUserById(userId);
 
-      const userIndex = accountsData.users.findIndex((u: any) => u.id === userId);
-
-      if (userIndex === -1) {
+      if (!user) {
         return res.status(404).json({ success: false, message: "Utente non trovato." });
       }
 
-      accountsData.users[userIndex].password = newPassword;
-      await fs.writeFile(accountsPath, JSON.stringify(accountsData, null, 2));
+      await pgUsersService.updateUser(userId, { password: newPassword });
 
       res.json({ success: true, message: "Password cambiata con successo." });
 
