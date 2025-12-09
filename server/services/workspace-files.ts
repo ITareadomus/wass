@@ -94,6 +94,10 @@ function getNormalizedTimeline(timelineData: any): any {
 }
 
 async function atomicWriteJson(filePath: string, data: any): Promise<void> {
+  // Ensure directory exists
+  const dir = path.dirname(filePath);
+  await fs.mkdir(dir, { recursive: true });
+  
   const tmpPath = `${filePath}.tmp`;
   await fs.writeFile(tmpPath, JSON.stringify(data, null, 2), 'utf-8');
   await fs.rename(tmpPath, filePath);
@@ -317,8 +321,24 @@ export async function loadSelectedCleaners(workDate: string): Promise<any | null
       // Get full cleaner data from cleaners table
       const fullCleaners = await pgDailyAssignmentsService.loadCleanersByIds(pgCleanerIds, workDate);
       
-      // If cleaners table has data, use it. Otherwise, just return IDs
-      const cleanersData = fullCleaners.length > 0 ? fullCleaners : pgCleanerIds.map(id => ({ id }));
+      // Ensure all cleaners have required fields
+      const cleanersData = fullCleaners.length > 0 
+        ? fullCleaners.map(c => ({
+            id: c.id,
+            name: c.name || 'Unknown',
+            lastname: c.lastname || '',
+            role: c.role || 'Standard',
+            premium: c.premium || false,
+            start_time: c.start_time || '10:00'
+          }))
+        : pgCleanerIds.map(id => ({ 
+            id, 
+            name: 'Unknown', 
+            lastname: '', 
+            role: 'Standard', 
+            premium: false,
+            start_time: '10:00'
+          }));
       
       const scData = {
         cleaners: cleanersData,
@@ -326,18 +346,37 @@ export async function loadSelectedCleaners(workDate: string): Promise<any | null
         metadata: { date: workDate, loaded_at: getRomeTimestamp() }
       };
       console.log(`✅ Selected cleaners loaded from PostgreSQL for ${workDate}: ${cleanersData.length} cleaners`);
-      // Write to filesystem for Python script compatibility
-      await atomicWriteJson(PATHS.selectedCleaners, scData);
+      
+      // Write to filesystem for Python script compatibility - ensure directory exists
+      try {
+        const dir = path.dirname(PATHS.selectedCleaners);
+        await fs.mkdir(dir, { recursive: true });
+        await atomicWriteJson(PATHS.selectedCleaners, scData);
+      } catch (fsErr) {
+        console.warn(`⚠️ Could not write selected_cleaners to filesystem (non-blocking):`, fsErr);
+      }
+      
       return scData;
     }
     
     // No cleaners found - return empty
     console.log(`ℹ️ No selected cleaners found for ${workDate}`);
-    return {
+    const emptyData = {
       cleaners: [],
       total_selected: 0,
       metadata: { date: workDate, loaded_at: getRomeTimestamp() }
     };
+    
+    // Ensure directory exists for empty file
+    try {
+      const dir = path.dirname(PATHS.selectedCleaners);
+      await fs.mkdir(dir, { recursive: true });
+      await atomicWriteJson(PATHS.selectedCleaners, emptyData);
+    } catch (fsErr) {
+      console.warn(`⚠️ Could not write empty selected_cleaners (non-blocking):`, fsErr);
+    }
+    
+    return emptyData;
   } catch (err) {
     console.error(`❌ Error loading selected cleaners from PostgreSQL:`, err);
     return null;
