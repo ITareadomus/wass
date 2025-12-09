@@ -2,20 +2,14 @@ import json
 import os
 from typing import Optional
 
-# Funzione helper per caricare le impostazioni da settings.json
-def load_settings(settings_path='client/public/data/input/settings.json'):
-    """Carica le impostazioni dal file JSON specificato."""
-    if not os.path.exists(settings_path):
-        print(f"Errore: Il file delle impostazioni non esiste: {settings_path}")
-        return {}
+# Funzione helper per caricare le impostazioni da API (PostgreSQL)
+def load_settings(settings_path=None):
+    """Carica le impostazioni da API PostgreSQL."""
     try:
-        with open(settings_path, 'r', encoding='utf-8') as f:
-            return json.load(f)
-    except json.JSONDecodeError:
-        print(f"Errore: Impossibile decodificare il file JSON: {settings_path}")
-        return {}
+        from api_client import load_settings_from_api
+        return load_settings_from_api()
     except Exception as e:
-        print(f"Errore durante il caricamento delle impostazioni: {e}")
+        print(f"Errore durante il caricamento delle impostazioni da API: {e}")
         return {}
 
 class TaskValidator:
