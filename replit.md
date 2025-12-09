@@ -45,6 +45,8 @@ Preferred communication style: Simple, everyday language.
   - `daily_selected_cleaners`: Selected cleaners per work_date (INTEGER[] array of cleaner IDs)
   - `cleaners`: Full cleaner data per work_date (replaces cleaners.json)
   - `cleaners_history`: Cleaner snapshots for audit/rollback
+  - `app_settings`: Key-value store for application settings (replaces settings.json, client_timewindows.json)
+  - `users`: User accounts with hashed passwords (replaces accounts.json)
 - **Container Task Fields**: task_id, logistic_code, client_id, premium, address, lat, lng, cleaning_time, checkin_date, checkout_date, checkin_time, checkout_time, pax_in, pax_out, small_equipment, operation_id, confirmed_operation, straordinaria, type_apt, alias, customer_name, reasons, priority
 - **Undo Flow**: When task moves container→timeline, containers history saved first for rollback
 - **Service File**: `server/services/pg-daily-assignments-service.ts`
