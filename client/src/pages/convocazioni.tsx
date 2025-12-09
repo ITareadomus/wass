@@ -563,26 +563,23 @@ export default function Convocazioni() {
                               Non disponibile
                             </span>
                           )}
-                          {/* Se straordinario, mostra SOLO badge S (priorità assoluta) */}
-                          {canDoStraordinaria ? (
+                          {isFormatore && (
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded border text-xs font-medium bg-orange-500/30 text-orange-800 dark:bg-orange-500/40 dark:text-orange-200 border-orange-600 dark:border-orange-400">
+                              Formatore
+                            </span>
+                          )}
+                          {canDoStraordinaria && (
                             <span className="inline-flex items-center px-2.5 py-0.5 rounded border text-xs font-medium bg-red-500/30 text-red-800 dark:bg-red-500/40 dark:text-red-200 border-red-600 dark:border-red-400">
                               Straordinario
                             </span>
-                          ) : (
-                            /* Altrimenti mostra badge role normale */
-                            <>
-                              {isFormatore && (
-                                <span className="inline-flex items-center px-2.5 py-0.5 rounded border text-xs font-medium bg-orange-500/30 text-orange-800 dark:bg-orange-500/40 dark:text-orange-200 border-orange-600 dark:border-orange-400">
-                                  Formatore
-                                </span>
-                              )}
-                              {isPremium && (
-                                <span className="inline-flex items-center px-2.5 py-0.5 rounded border text-xs font-medium bg-yellow-500/30 text-yellow-800 dark:bg-yellow-500/40 dark:text-yellow-200 border-yellow-600 dark:border-yellow-400">
-                                  Premium
-                                </span>
-                              )}
-                              {!isPremium && !isFormatore && (
-                                <span className="inline-flex items-center px-2.5 py-0.5 rounded border text-xs font-medium bg-green-500/30 text-green-800 dark:bg-green-500/40 dark:text-green-200 border-green-600 dark:border-green-400">
+                          )}
+                          {isPremium && !canDoStraordinaria && (
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded border text-xs font-medium bg-yellow-500/30 text-yellow-800 dark:bg-yellow-500/40 dark:text-yellow-200 border-yellow-600 dark:border-yellow-400">
+                              Premium
+                            </span>
+                          )}
+                          {!isPremium && !isFormatore && !canDoStraordinaria && (
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded border text-xs font-medium bg-green-500/30 text-green-800 dark:bg-green-500/40 dark:text-green-200 border-green-600 dark:border-green-400">
                               Standard
                             </span>
                           )}
