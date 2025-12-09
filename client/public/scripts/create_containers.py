@@ -14,6 +14,20 @@ OUTPUT_DIR = BASE_DIR / "output"
 SETTINGS_PATH = INPUT_DIR / "settings.json"
 OUTPUT_CONTAINERS = OUTPUT_DIR / "containers.json"
 
+# API-only mode: load ApiClient
+USE_API = False
+api_client = None
+
+def init_api_client():
+    global api_client
+    try:
+        from api_client import ApiClient
+        api_client = ApiClient()
+        return api_client.test_connection()
+    except Exception as e:
+        print(f"⚠️ Failed to initialize API client: {e}")
+        return False
+
 # Script paths
 EXTRACT_CLEANERS_SCRIPT = Path(__file__).parent / "extract_cleaners_optimized.py"
 EXTRACT_ACTIVE_CLIENTS_SCRIPT = Path(__file__).parent / "extract_active_clients.py"
@@ -465,9 +479,12 @@ def deduplicate_tasks(tasks):
 
 # ---------- Main ----------
 def main():
+    global USE_API
+    
     parser = argparse.ArgumentParser(description='Crea containers.json per una data specifica.')
     parser.add_argument('--date', type=str, help='Data nel formato YYYY-MM-DD (es. 2025-11-17)')
     parser.add_argument('--skip-extract', action='store_true', help='Salta estrazione cleaners (usa quelli già presenti)')
+    parser.add_argument('--use-api', action='store_true', help='Usa API per salvare i dati (OBBLIGATORIO)')
     args = parser.parse_args()
 
     target_date = args.date if args.date else None
@@ -476,6 +493,16 @@ def main():
     else:
         target_date = datetime.now().strftime('%Y-%m-%d')
         print(f"Nessuna data specificata, usando oggi: {target_date}")
+    
+    # API mode initialization
+    if args.use_api:
+        if init_api_client():
+            print("✅ API client connesso - salvataggio via API")
+            USE_API = True
+        else:
+            raise RuntimeError("❌ Errore: --use-api specificato ma API non disponibile")
+    else:
+        raise RuntimeError("❌ Errore: --use-api è obbligatorio. Lo script usa solo API, non filesystem.")
 
     # Aggiorna operations.json
     print("Aggiorno la lista delle operazioni attive dal DB...")
@@ -489,14 +516,13 @@ def main():
         print("⏭️ Salto estrazione cleaners (--skip-extract attivo), uso selected_cleaners.json esistente")
 
 
-    # Leggi timeline.json per aggiornare i dati delle task assegnate
+    # Leggi timeline da API per aggiornare i dati delle task assegnate
     assigned_task_ids = set()
-    timeline_path = OUTPUT_DIR / "timeline.json"
     timeline_data = None
 
-    if timeline_path.exists():
-        try:
-            timeline_data = json.loads(timeline_path.read_text(encoding="utf-8"))
+    try:
+        timeline_data = api_client.load_timeline(target_date)
+        if timeline_data:
             for cleaner_entry in timeline_data.get("cleaners_assignments", []):
                 for task in cleaner_entry.get("tasks", []):
                     task_id = task.get("task_id")
@@ -504,8 +530,8 @@ def main():
                         assigned_task_ids.add(int(task_id))
             if assigned_task_ids:
                 print(f"✅ Task già assegnate nella timeline: {len(assigned_task_ids)}")
-        except Exception as e:
-            print(f"⚠️ Errore lettura timeline: {e}")
+    except Exception as e:
+        print(f"⚠️ Errore lettura timeline da API: {e}")
 
     # Estrai TUTTE le task dal database (anche quelle assegnate per aggiornarle)
     all_tasks_from_db = get_tasks_from_db(target_date, assigned_task_ids=set())  # Non filtrare
@@ -538,11 +564,11 @@ def main():
                     updated_count += 1
 
         if updated_count > 0:
-            # Salva timeline.json preservando metadata e struttura
+            # Salva timeline via API preservando metadata e struttura
             timeline_data["metadata"]["last_updated"] = datetime.now().isoformat()
             # NON cambiare la data - mantieni quella della timeline
-            timeline_path.write_text(json.dumps(timeline_data, ensure_ascii=False, indent=2), encoding="utf-8")
-            print(f"✅ Aggiornate {updated_count} task in timeline.json (preservati campi timeline: start_time, end_time, travel_time, sequence)")
+            api_client.save_timeline(target_date, timeline_data)
+            print(f"✅ Aggiornate {updated_count} task in timeline via API (preservati campi timeline: start_time, end_time, travel_time, sequence)")
 
     # Filtra le task già assegnate per containers.json
     all_tasks = [t for t in all_tasks_from_db if t["task_id"] not in assigned_task_ids]
@@ -579,17 +605,15 @@ def main():
         }
     }
 
-    # Salva file
-    with open(OUTPUT_CONTAINERS, "w", encoding="utf-8") as f:
-        json.dump(output, f, indent=2, ensure_ascii=False)
+    # Salva containers via API
+    api_client.save_containers(target_date, output)
 
-    print(f"\n✅ File containers.json creato con successo!")
+    print(f"\n✅ Containers salvati via API con successo!")
     print(f"   📅 Data: {target_date}")
     print(f"   📦 Task totali: {len(all_tasks)}")
     print(f"   🔴 Early-Out: {len(early_out)}")
     print(f"   🟡 High-Priority: {len(high_priority)}")
     print(f"   🟢 Low-Priority: {len(low_priority)}")
-    print(f"   💾 Salvato in: {OUTPUT_CONTAINERS}")
 
 # ---------- Funzione per estrazione task con filtro già assegnate ----------
 def extract_tasks_from_db(work_date=None, assigned_task_ids=None):

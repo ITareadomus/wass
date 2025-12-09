@@ -4,7 +4,7 @@ hidden = [".config", ".git", "generated-icon.png", "node_modules", "dist"]
 
 [nix]
 channel = "stable-24_05"
-packages = ["libxcrypt", "pkg-config", "xsimd"]
+packages = ["libxcrypt", "pkg-config", "xsimd", "python311Packages.requests"]
 
 [deployment]
 deploymentTarget = "autoscale"
@@ -14,6 +14,10 @@ run = ["npm", "run", "start"]
 [[ports]]
 localPort = 5000
 externalPort = 80
+
+[[ports]]
+localPort = 32967
+externalPort = 8080
 
 [[ports]]
 localPort = 33991
@@ -34,10 +38,6 @@ externalPort = 6800
 [[ports]]
 localPort = 37603
 externalPort = 8000
-
-[[ports]]
-localPort = 40429
-externalPort = 8080
 
 [[ports]]
 localPort = 40905

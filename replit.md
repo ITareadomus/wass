@@ -99,10 +99,18 @@ Preferred communication style: Simple, everyday language.
 - **Assignment Flow**: create_containers.py → assign_eo.py → assign_hp.py → assign_lp.py → timeline.json
 - **Verification**: Tested with logistic_code 777 (task_ids 210458, 218427) - one assigned, one kept in container
 
-## Python API Integration (December 2025)
-- **API Client Module**: `client/public/scripts/api_client.py` provides HTTP client for backend API
-- **Helper Functions**: `client/public/scripts/api_helpers.py` has shared functions for timeline/containers/cleaners operations (defaults to API mode)
-- **Script Support**: All assign scripts (assign_eo.py, assign_hp.py, assign_lp.py) use API by default (`use_api=True`)
+## Python API Integration (December 2025) - API-Only Mode
+- **API Client Module**: `client/public/scripts/api_client.py` provides HTTP client for backend API (uses urllib, no external dependencies)
+- **Helper Functions**: `client/public/scripts/api_helpers.py` has shared functions for timeline/containers/cleaners operations
+- **Script Support**: ALL Python scripts require `--use-api` flag and fail if API unavailable (no filesystem fallback)
+- **Scripts Migrated to API-Only**:
+  - `assign_eo.py`: Reads timeline/containers from API, writes timeline to API
+  - `assign_hp.py`: Reads timeline/containers from API, writes timeline to API
+  - `assign_lp.py`: Reads timeline/containers from API, writes timeline to API
+  - `create_containers.py`: Reads timeline from API, writes containers to API
+- **Static Config Exceptions**: `settings.json` and `operations.json` still use filesystem (configuration, not runtime data)
+- **Backend Invocation**: All Python script calls include `--use-api` flag
+- **Health Check**: `/api/health` endpoint for Python client connection testing
 - **Current State**: API is default mode; filesystem only used as offline fallback
 - **API Endpoints Available**:
   - `GET /api/timeline?date=YYYY-MM-DD` - Load timeline from PostgreSQL
