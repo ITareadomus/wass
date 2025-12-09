@@ -722,11 +722,11 @@ export default function TimelineView({
       // e per ore della settimana (weekly_hours) DESC all'interno di ogni gruppo
       available.sort((a: any, b: any) => {
         const getPriority = (cleaner: any) => {
-          // 1. Formatore
+          // 1. Formatore (massima priorità)
           if (cleaner.role === "Formatore") return 1;
-          // 2. Straordinario (ruolo esplicito O flag straordinaria attivo)
-          if (cleaner.role === "Straordinario" || cleaner.can_do_straordinaria) return 2;
-          // 3. Premium
+          // 2. Straordinario (flag can_do_straordinaria ha PRIORITÀ sul ruolo)
+          if (cleaner.can_do_straordinaria === true) return 2;
+          // 3. Premium (solo se NON straordinario)
           if (cleaner.role === "Premium") return 3;
           // 4. Standard / qualsiasi altro
           return 4;
