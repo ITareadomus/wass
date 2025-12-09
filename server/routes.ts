@@ -30,6 +30,53 @@ function getCurrentUsername(req?: any): string {
   return req?.body?.created_by || req?.body?.modified_by || 'system';
 }
 
+/**
+ * Helper: Load cleaner start_time from PostgreSQL (selected cleaners)
+ * Falls back to filesystem if PostgreSQL fails
+ */
+async function getCleanerStartTime(cleanerId: number, workDate: string): Promise<string | null> {
+  try {
+    // Try PostgreSQL first
+    const selectedCleaners = await workspaceFiles.loadSelectedCleaners(workDate);
+    if (selectedCleaners?.cleaners) {
+      const cleaner = selectedCleaners.cleaners.find((c: any) => c.id === cleanerId);
+      if (cleaner?.start_time) {
+        return cleaner.start_time;
+      }
+    }
+  } catch (err) {
+    console.warn(`⚠️ Could not load start_time from PostgreSQL for cleaner ${cleanerId}`);
+  }
+  return null;
+}
+
+/**
+ * Helper: Load full cleaner data from PostgreSQL
+ */
+async function getCleanerData(cleanerId: number, workDate: string): Promise<any | null> {
+  try {
+    const { pgDailyAssignmentsService } = await import("./services/pg-daily-assignments-service");
+    return await pgDailyAssignmentsService.loadCleanerById(cleanerId, workDate);
+  } catch (err) {
+    console.warn(`⚠️ Could not load cleaner ${cleanerId} from PostgreSQL`);
+    return null;
+  }
+}
+
+/**
+ * Helper: Load all cleaners for a date from PostgreSQL
+ */
+async function getAllCleanersForDate(workDate: string): Promise<any[]> {
+  try {
+    const { pgDailyAssignmentsService } = await import("./services/pg-daily-assignments-service");
+    const cleaners = await pgDailyAssignmentsService.loadCleanersForDate(workDate);
+    return cleaners || [];
+  } catch (err) {
+    console.warn(`⚠️ Could not load cleaners from PostgreSQL for ${workDate}`);
+    return [];
+  }
+}
+
 // Utility: costruzione chiave file consistente
 function buildKey(isoDate: string) {
   const d = new Date(isoDate);
@@ -44,25 +91,20 @@ function buildKey(isoDate: string) {
 
 /**
  * Helper function to recalculate travel_time, start_time, end_time for a cleaner's tasks
- * CRITICAL: Ensures cleaner's start_time is loaded from selected_cleaners.json before recalculation
+ * CRITICAL: Ensures cleaner's start_time is loaded from PostgreSQL before recalculation
  */
-async function recalculateCleanerTimes(cleanerData: any): Promise<any> {
+async function recalculateCleanerTimes(cleanerData: any, workDate?: string): Promise<any> {
   try {
     const { spawn } = await import('child_process');
 
-    // CRITICAL: Load start_time from selected_cleaners.json to ensure it's up-to-date
-    const selectedCleanersPath = path.join(process.cwd(), 'client/public/data/cleaners/selected_cleaners.json');
-    try {
-      const selectedData = JSON.parse(await fs.readFile(selectedCleanersPath, 'utf8'));
-      const selectedCleaner = selectedData.cleaners?.find((c: any) => c.id === cleanerData.cleaner.id);
-      
-      if (selectedCleaner?.start_time) {
-        // Use start_time from selected_cleaners (source of truth)
-        cleanerData.cleaner.start_time = selectedCleaner.start_time;
-        console.log(`✅ Loaded start_time ${selectedCleaner.start_time} from selected_cleaners for cleaner ${cleanerData.cleaner.id}`);
-      }
-    } catch (err) {
-      console.warn(`⚠️ Could not load start_time from selected_cleaners for cleaner ${cleanerData.cleaner.id}, using default`);
+    // CRITICAL: Load start_time from PostgreSQL to ensure it's up-to-date
+    const dateToUse = workDate || format(new Date(), 'yyyy-MM-dd');
+    const startTime = await getCleanerStartTime(cleanerData.cleaner.id, dateToUse);
+    if (startTime) {
+      cleanerData.cleaner.start_time = startTime;
+      console.log(`✅ Loaded start_time ${startTime} from PostgreSQL for cleaner ${cleanerData.cleaner.id}`);
+    } else {
+      console.warn(`⚠️ Could not load start_time from PostgreSQL for cleaner ${cleanerData.cleaner.id}, using default`);
     }
 
     return new Promise((resolve, reject) => {
