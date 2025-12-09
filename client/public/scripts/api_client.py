@@ -21,7 +21,9 @@ Uso:
 """
 
 import json
-import requests
+import urllib.request
+import urllib.parse
+import urllib.error
 from typing import Any, Dict, List, Optional
 from datetime import datetime
 
@@ -34,46 +36,60 @@ class ApiClient:
         self.timeout = 30  # secondi
     
     def _get(self, endpoint: str, params: Optional[Dict] = None) -> Dict:
-        """Esegue GET request."""
+        """Esegue GET request usando urllib (built-in)."""
         url = f"{self.base_url}{endpoint}"
+        if params:
+            query_string = urllib.parse.urlencode(params)
+            url = f"{url}?{query_string}"
         try:
-            response = requests.get(url, params=params, timeout=self.timeout)
-            response.raise_for_status()
-            return response.json()
-        except requests.exceptions.RequestException as e:
-            print(f"❌ Errore API GET {endpoint}: {e}")
+            req = urllib.request.Request(url, method='GET')
+            with urllib.request.urlopen(req, timeout=self.timeout) as response:
+                return json.loads(response.read().decode('utf-8'))
+        except urllib.error.HTTPError as e:
+            print(f"❌ Errore API GET {endpoint}: HTTP {e.code}")
+            raise
+        except urllib.error.URLError as e:
+            print(f"❌ Errore API GET {endpoint}: {e.reason}")
             raise
     
     def _post(self, endpoint: str, data: Dict) -> Dict:
-        """Esegue POST request."""
+        """Esegue POST request usando urllib (built-in)."""
         url = f"{self.base_url}{endpoint}"
         try:
-            response = requests.post(
+            json_data = json.dumps(data).encode('utf-8')
+            req = urllib.request.Request(
                 url, 
-                json=data, 
+                data=json_data,
                 headers={"Content-Type": "application/json"},
-                timeout=self.timeout
+                method='POST'
             )
-            response.raise_for_status()
-            return response.json()
-        except requests.exceptions.RequestException as e:
-            print(f"❌ Errore API POST {endpoint}: {e}")
+            with urllib.request.urlopen(req, timeout=self.timeout) as response:
+                return json.loads(response.read().decode('utf-8'))
+        except urllib.error.HTTPError as e:
+            print(f"❌ Errore API POST {endpoint}: HTTP {e.code}")
+            raise
+        except urllib.error.URLError as e:
+            print(f"❌ Errore API POST {endpoint}: {e.reason}")
             raise
     
     def _put(self, endpoint: str, data: Dict) -> Dict:
-        """Esegue PUT request."""
+        """Esegue PUT request usando urllib (built-in)."""
         url = f"{self.base_url}{endpoint}"
         try:
-            response = requests.put(
+            json_data = json.dumps(data).encode('utf-8')
+            req = urllib.request.Request(
                 url, 
-                json=data, 
+                data=json_data,
                 headers={"Content-Type": "application/json"},
-                timeout=self.timeout
+                method='PUT'
             )
-            response.raise_for_status()
-            return response.json()
-        except requests.exceptions.RequestException as e:
-            print(f"❌ Errore API PUT {endpoint}: {e}")
+            with urllib.request.urlopen(req, timeout=self.timeout) as response:
+                return json.loads(response.read().decode('utf-8'))
+        except urllib.error.HTTPError as e:
+            print(f"❌ Errore API PUT {endpoint}: HTTP {e.code}")
+            raise
+        except urllib.error.URLError as e:
+            print(f"❌ Errore API PUT {endpoint}: {e.reason}")
             raise
 
     # ==================== TIMELINE ====================
@@ -254,13 +270,34 @@ class ApiClient:
             True se il server risponde, False altrimenti
         """
         try:
-            response = requests.get(
-                f"{self.base_url}/api/health", 
-                timeout=5
-            )
-            return response.status_code == 200
+            req = urllib.request.Request(f"{self.base_url}/api/health", method='GET')
+            with urllib.request.urlopen(req, timeout=5) as response:
+                return response.status == 200
         except:
             return False
+    
+    # ==================== ALIAS METHODS ====================
+    # Per compatibilità con codice che usa nomi diversi
+    
+    def test_connection(self) -> bool:
+        """Alias per health_check."""
+        return self.health_check()
+    
+    def load_timeline(self, date: str) -> Dict:
+        """Alias per get_timeline."""
+        return self.get_timeline(date)
+    
+    def load_containers(self, date: str) -> Dict:
+        """Alias per get_containers."""
+        return self.get_containers(date)
+    
+    def load_cleaners(self, date: str) -> List[Dict]:
+        """Alias per get_cleaners."""
+        return self.get_cleaners(date)
+    
+    def load_selected_cleaners(self, date: str) -> List[Dict]:
+        """Alias per get_selected_cleaners."""
+        return self.get_selected_cleaners(date)
 
 
 # ==================== FUNZIONI DI COMPATIBILITÀ ====================

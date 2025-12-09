@@ -174,6 +174,11 @@ async function recalculateCleanerTimes(cleanerData: any, workDate?: string): Pro
 }
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Health check endpoint for Python API client
+  app.get("/api/health", (req, res) => {
+    res.json({ status: "ok", timestamp: new Date().toISOString() });
+  });
+
   // Endpoint per il login
   app.post("/api/login", async (req, res) => {
     try {
@@ -1641,7 +1646,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const createContainersPath = path.join(process.cwd(), 'client/public/scripts/create_containers.py');
       try {
         await new Promise<string>((resolve, reject) => {
-          exec(`python3 "${createContainersPath}" --date "${workDate}" --skip-extract`, (error, stdout, stderr) => {
+          exec(`python3 "${createContainersPath}" --date "${workDate}" --skip-extract --use-api`, (error, stdout, stderr) => {
             if (error) {
               console.error(`❌ Errore create_containers: ${error.message}`);
               reject(new Error(stderr || error.message));
@@ -1652,10 +1657,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           });
         });
 
-        // Carica i containers appena rigenerati
-        const containersPath = path.join(process.cwd(), 'client/public/data/output/containers.json');
-        containersData = JSON.parse(await fs.readFile(containersPath, 'utf8'));
-        console.log(`✅ Containers rigenerati dal DB ADAM per ${workDate}`);
+        // Carica i containers appena rigenerati da PostgreSQL (salvati da Python via API)
+        containersData = await workspaceFiles.loadContainers(workDate);
+        console.log(`✅ Containers rigenerati dal DB ADAM per ${workDate} (caricati da PostgreSQL)`);
 
         // Sincronizza: rimuovi task già assegnate dai containers
         const assignedTaskIds = new Set<number>();
@@ -3068,26 +3072,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         console.log("assign_eo output:", stdoutData);
 
-        // CRITICAL: Leggi timeline dal FILESYSTEM (dove Python ha scritto) e salva su MySQL
-        try {
-          const timelinePath = path.join(process.cwd(), 'client/public/data/output/timeline.json');
-          const timelineContent = await fs.readFile(timelinePath, 'utf8');
-          const timelineData = JSON.parse(timelineContent);
-
-          if (timelineData && timelineData.metadata?.date === workDate) {
-            console.log(`💾 Salvataggio timeline da filesystem a MySQL per ${workDate}...`);
-            await workspaceFiles.saveTimeline(workDate, timelineData);
-            console.log(`✅ Timeline sincronizzata su MySQL dopo assign_eo`);
-          } else {
-            console.warn(`⚠️ Timeline dal filesystem ha data diversa: ${timelineData?.metadata?.date} vs ${workDate}`);
-          }
-        } catch (err) {
-          console.warn(`⚠️ Errore salvataggio MySQL dopo assign_eo:`, err);
-        }
+        // Python script salva direttamente via API - nessun filesystem da leggere
+        console.log(`✅ assign_eo.py ha salvato direttamente su PostgreSQL via API`);
 
         res.json({
           success: true,
-          message: "Early Out tasks assegnati con successo in timeline.json",
+          message: "Early Out tasks assegnati con successo",
           output: stdoutData
         });
       });
@@ -3155,26 +3145,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         console.log("assign_hp output:", stdoutData);
 
-        // CRITICAL: Leggi timeline dal FILESYSTEM (dove Python ha scritto) e salva su MySQL
-        try {
-          const timelinePath = path.join(process.cwd(), 'client/public/data/output/timeline.json');
-          const timelineContent = await fs.readFile(timelinePath, 'utf8');
-          const timelineData = JSON.parse(timelineContent);
-
-          if (timelineData && timelineData.metadata?.date === workDate) {
-            console.log(`💾 Salvataggio timeline da filesystem a MySQL per ${workDate}...`);
-            await workspaceFiles.saveTimeline(workDate, timelineData);
-            console.log(`✅ Timeline sincronizzata su MySQL dopo assign_hp`);
-          } else {
-            console.warn(`⚠️ Timeline dal filesystem ha data diversa: ${timelineData?.metadata?.date} vs ${workDate}`);
-          }
-        } catch (err) {
-          console.warn(`⚠️ Errore salvataggio MySQL dopo assign_hp:`, err);
-        }
+        // Python script salva direttamente via API - nessun filesystem da leggere
+        console.log(`✅ assign_hp.py ha salvato direttamente su PostgreSQL via API`);
 
         res.json({
           success: true,
-          message: "High Priority tasks assegnati con successo in timeline.json",
+          message: "High Priority tasks assegnati con successo",
           output: stdoutData
         });
       });
@@ -3242,26 +3218,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         console.log("assign_lp output:", stdoutData);
 
-        // CRITICAL: Leggi timeline dal FILESYSTEM (dove Python ha scritto) e salva su MySQL
-        try {
-          const timelinePath = path.join(process.cwd(), 'client/public/data/output/timeline.json');
-          const timelineContent = await fs.readFile(timelinePath, 'utf8');
-          const timelineData = JSON.parse(timelineContent);
-
-          if (timelineData && timelineData.metadata?.date === workDate) {
-            console.log(`💾 Salvataggio timeline da filesystem a MySQL per ${workDate}...`);
-            await workspaceFiles.saveTimeline(workDate, timelineData);
-            console.log(`✅ Timeline sincronizzata su MySQL dopo assign_lp`);
-          } else {
-            console.warn(`⚠️ Timeline dal filesystem ha data diversa: ${timelineData?.metadata?.date} vs ${workDate}`);
-          }
-        } catch (err) {
-          console.warn(`⚠️ Errore salvataggio MySQL dopo assign_lp:`, err);
-        }
+        // Python script salva direttamente via API - nessun filesystem da leggere
+        console.log(`✅ assign_lp.py ha salvato direttamente su PostgreSQL via API`);
 
         res.json({
           success: true,
-          message: "Low Priority tasks assegnati con successo in timeline.json",
+          message: "Low Priority tasks assegnati con successo",
           output: stdoutData
         });
       });
@@ -3517,7 +3479,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log(`Eseguendo create_containers.py per data ${date}...`);
       const containersResult = await new Promise<string>((resolve, reject) => {
         exec(
-          `python3 client/public/scripts/create_containers.py --date ${date}`,
+          `python3 client/public/scripts/create_containers.py --date ${date} --use-api`,
           (error, stdout, stderr) => {
             if (error) {
               console.error("Errore create_containers:", stderr);
@@ -3530,17 +3492,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
       console.log("create_containers output:", containersResult);
 
-      // Leggi containers dal filesystem (dove Python ha scritto) e salva su PostgreSQL
-      try {
-        const containersPath = path.join(DATA_OUTPUT_DIR, 'containers.json');
-        const containersJson = await fs.readFile(containersPath, 'utf-8');
-        const containersData = JSON.parse(containersJson);
-        
-        await workspaceFiles.saveContainers(date, containersData, createdBy, 'containers_extracted');
-        console.log(`✅ Containers salvati su PostgreSQL per ${date}`);
-      } catch (pgError) {
-        console.error(`⚠️ Errore nel salvataggio containers su PG (non bloccante):`, pgError);
-      }
+      // Python ha già salvato containers via API - nessuna azione necessaria
+      console.log(`✅ Containers già salvati via API da Python per ${date}`);
 
       res.json({
         success: true,
