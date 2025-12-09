@@ -280,8 +280,8 @@ export async function saveContainers(workDate: string, data: any, createdBy: str
 }
 
 /**
- * Load selected_cleaners from PostgreSQL for legacy MySQL operations
- * Fallback to filesystem only if PostgreSQL fails
+ * Load selected_cleaners from PostgreSQL for internal operations
+ * No filesystem fallback - PostgreSQL is the only source
  */
 async function loadSelectedCleanersFromPg(workDate: string): Promise<any | null> {
   try {
@@ -297,21 +297,10 @@ async function loadSelectedCleanersFromPg(workDate: string): Promise<any | null>
         metadata: { date: workDate }
       };
     }
-    return null;
+    return { cleaners: [], total_selected: 0, metadata: { date: workDate } };
   } catch (err) {
-    console.warn(`⚠️ loadSelectedCleanersFromPg failed, trying filesystem:`, err);
-    // Fallback to filesystem for legacy compatibility
-    try {
-      const data = await fs.readFile(PATHS.selectedCleaners, 'utf-8');
-      const parsed = JSON.parse(data);
-      const fileDate = parsed?.metadata?.date;
-      if (fileDate && fileDate !== workDate) {
-        return null;
-      }
-      return parsed;
-    } catch {
-      return null;
-    }
+    console.error(`❌ loadSelectedCleanersFromPg failed:`, err);
+    return { cleaners: [], total_selected: 0, metadata: { date: workDate } };
   }
 }
 
