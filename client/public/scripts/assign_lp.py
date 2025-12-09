@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 from __future__ import annotations
-import json, math
+import json, math, argparse
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Tuple
 from pathlib import Path
@@ -14,6 +14,24 @@ from assign_utils import (
     cleaner_load_minutes, cleaner_load_hours
 )
 
+# API Client import (opzionale, con fallback)
+try:
+    from api_client import ApiClient
+    from api_helpers import (
+        save_timeline_via_api, save_containers_via_api,
+        load_timeline_via_api, load_containers_via_api, load_cleaners_via_api,
+        get_assigned_logistic_codes_via_api
+    )
+    API_AVAILABLE = True
+except ImportError:
+    API_AVAILABLE = False
+    def save_timeline_via_api(*args, **kwargs): return False
+    def save_containers_via_api(*args, **kwargs): return False
+    def load_timeline_via_api(*args, **kwargs): return None
+    def load_containers_via_api(*args, **kwargs): return None
+    def load_cleaners_via_api(*args, **kwargs): return None
+    def get_assigned_logistic_codes_via_api(*args, **kwargs): return None
+
 # =============================
 # I/O paths
 # =============================
@@ -24,6 +42,10 @@ INPUT_CLEANERS = BASE / "cleaners" / "selected_cleaners.json"
 INPUT_EO_ASSIGN = BASE / "output" / "early_out_assignments.json"
 INPUT_HP_ASSIGN = BASE / "output" / "high_priority_assignments.json"
 OUTPUT_ASSIGN = BASE / "output" / "low_priority_assignments.json"
+
+# Variabile globale per la data di lavoro e modalità API
+WORK_DATE: Optional[str] = None
+USE_API: bool = False
 
 # =============================
 # CONFIG - REGOLE CLUSTERING OTTIMIZZATE
@@ -1170,19 +1192,37 @@ def build_output(cleaners: List[Cleaner], unassigned: List[Task], original_tasks
 
 
 def main():
-    if not INPUT_CONTAINERS.exists():
-        raise SystemExit(f"Missing input file: {INPUT_CONTAINERS}")
-    if not INPUT_CLEANERS.exists():
-        raise SystemExit(f"Missing input file: {INPUT_CLEANERS}")
-
-    # Usa la data passata come argomento da riga di comando
-    if len(sys.argv) > 1:
-        ref_date = sys.argv[1]
-        print(f"📅 Usando data da argomento: {ref_date}")
-    else:
-        # Fallback: usa la data corrente
-        ref_date = datetime.now().strftime("%Y-%m-%d")
-        print(f"📅 Nessuna data specificata, usando: {ref_date}")
+    global USE_API, WORK_DATE
+    
+    # Parse argomenti da linea di comando
+    parser = argparse.ArgumentParser(description='Assegna task Low-Priority ai cleaners')
+    parser.add_argument('date', nargs='?', default=None, help='Data nel formato YYYY-MM-DD')
+    parser.add_argument('--use-api', action='store_true', help='Usa API HTTP invece di file JSON')
+    parser.add_argument('--date', dest='date_opt', type=str, help='Data nel formato YYYY-MM-DD')
+    args = parser.parse_args()
+    
+    # Determina la data di lavoro
+    ref_date = args.date_opt or args.date or datetime.now().strftime("%Y-%m-%d")
+    
+    # Configura variabili globali
+    USE_API = args.use_api
+    WORK_DATE = ref_date
+    
+    if USE_API:
+        if API_AVAILABLE:
+            print(f"🌐 Modalità API attiva (PostgreSQL)")
+        else:
+            print(f"⚠️ API client non disponibile, fallback su file")
+            USE_API = False
+    
+    print(f"📅 Data di lavoro: {ref_date}")
+    
+    # In modalità API, non servono file locali
+    if not USE_API:
+        if not INPUT_CONTAINERS.exists():
+            raise SystemExit(f"Missing input file: {INPUT_CONTAINERS}")
+        if not INPUT_CLEANERS.exists():
+            raise SystemExit(f"Missing input file: {INPUT_CLEANERS}")
 
     cleaners = load_cleaners()
     seed_cleaners_from_assignments(cleaners)
