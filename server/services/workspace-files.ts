@@ -329,7 +329,16 @@ export async function loadSelectedCleaners(workDate: string): Promise<any | null
             lastname: c.lastname || '',
             role: c.role || 'Standard',
             premium: c.premium || false,
-            start_time: c.start_time || '10:00'
+            start_time: c.start_time || '10:00',
+            can_do_straordinaria: c.can_do_straordinaria || false,
+            active: c.active !== false,
+            available: c.available !== false,
+            ranking: c.ranking || 0,
+            counter_hours: c.counter_hours || 0,
+            counter_days: c.counter_days || 0,
+            contract_type: c.contract_type || null,
+            preferred_customers: c.preferred_customers || [],
+            telegram_id: c.telegram_id || null
           }))
         : pgCleanerIds.map(id => ({ 
             id, 
@@ -337,7 +346,8 @@ export async function loadSelectedCleaners(workDate: string): Promise<any | null
             lastname: '', 
             role: 'Standard', 
             premium: false,
-            start_time: '10:00'
+            start_time: '10:00',
+            can_do_straordinaria: false
           }));
       
       const scData = {

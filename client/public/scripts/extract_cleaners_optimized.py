@@ -218,3 +218,14 @@ print(f"📅 DATA NEL JSON: {target_date_str}")
 print(f"👥 CLEANERS TROVATI: {len(cleaners_data)}")
 print(f"🔄 RESET COMPLETATO - Il file contiene SOLO i dati per {target_date_str}")
 print(f"Aggiornato data/cleaners/cleaners.json con {len(cleaners_data)} cleaners per la data {target_date_str}.")
+
+# SALVATAGGIO SU POSTGRESQL VIA API
+# Importa api_client e salva i cleaners nel database PostgreSQL
+try:
+    from api_client import ApiClient
+    api = ApiClient()
+    result = api.save_cleaners(target_date_str, cleaners_data)
+    print(f"✅ Cleaners salvati su PostgreSQL via API: {result.get('message', 'OK')}")
+except Exception as api_err:
+    print(f"⚠️ Salvataggio API fallito (non bloccante): {api_err}")
+    print("   I dati sono stati salvati solo su cleaners.json")

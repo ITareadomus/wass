@@ -95,11 +95,19 @@
       "role": "Premium",
       "premium": false,
       "start_time": "10:00"
+    },
+    {
+      "id": 249,
+      "name": "Ogbodo Chidi",
+      "lastname": "Igwe",
+      "role": "Premium",
+      "premium": false,
+      "start_time": "10:00"
     }
   ],
-  "total_selected": 12,
+  "total_selected": 13,
   "metadata": {
     "date": "2025-12-10",
-    "loaded_at": "2025-12-09 10:48:29"
+    "loaded_at": "2025-12-09 10:56:38"
   }
 }
