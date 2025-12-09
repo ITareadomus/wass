@@ -1696,6 +1696,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         // Carica i containers appena rigenerati da PostgreSQL (salvati da Python via API)
         containersData = await workspaceFiles.loadContainers(workDate);
+        // Guard against null containersData
+        if (!containersData) {
+          containersData = {
+            containers: { early_out: { tasks: [], count: 0 }, high_priority: { tasks: [], count: 0 }, low_priority: { tasks: [], count: 0 } },
+            summary: { early_out: 0, high_priority: 0, low_priority: 0, total_tasks: 0 },
+            metadata: { date: workDate }
+          };
+        }
         console.log(`✅ Containers rigenerati dal DB ADAM per ${workDate} (caricati da PostgreSQL)`);
 
         // Sincronizza: rimuovi task già assegnate dai containers
