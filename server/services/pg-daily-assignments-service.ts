@@ -114,10 +114,10 @@ export class PgDailyAssignmentsService {
    */
   async saveTimeline(workDate: string, timeline: any): Promise<number> {
     const client = await pool.connect();
-    
+
     try {
       const rows = this.timelineToRows(workDate, timeline);
-      
+
       console.log(`📝 PG: Salvando ${rows.length} righe per ${workDate}...`);
 
       await client.query('BEGIN');
@@ -172,8 +172,8 @@ export class PgDailyAssignmentsService {
           row.cleaning_time,
           row.checkin_date,
           row.checkout_date,
-          row.checkin_time,
-          row.checkout_time,
+          row.checkin_time ? row.checkin_time.substring(0, 5) : null,
+          row.checkout_time ? row.checkout_time.substring(0, 5) : null,
           row.pax_in,
           row.pax_out,
           row.small_equipment,
@@ -238,7 +238,7 @@ export class PgDailyAssignmentsService {
   async loadTimeline(workDate: string): Promise<any | null> {
     try {
       const rows = await this.getAssignments(workDate);
-      
+
       if (rows.length === 0) {
         console.log(`📖 PG: Nessuna assegnazione trovata per ${workDate}`);
         return null;
@@ -256,7 +256,7 @@ export class PgDailyAssignmentsService {
           if (row.cleaner_role) cleaner.role = row.cleaner_role;
           if (row.cleaner_premium !== null) cleaner.premium = row.cleaner_premium;
           cleaner.start_time = row.cleaner_start_time || '10:00';
-          
+
           cleanerMap.set(row.cleaner_id, {
             cleaner,
             tasks: []
@@ -267,7 +267,7 @@ export class PgDailyAssignmentsService {
           task_id: row.task_id,
           logistic_code: row.logistic_code,
         };
-        
+
         // Add optional fields only if they have values
         if (row.client_id) task.client_id = row.client_id;
         if (row.premium !== null) task.premium = row.premium;
@@ -277,8 +277,8 @@ export class PgDailyAssignmentsService {
         if (row.cleaning_time) task.cleaning_time = row.cleaning_time;
         if (row.checkin_date) task.checkin_date = row.checkin_date;
         if (row.checkout_date) task.checkout_date = row.checkout_date;
-        if (row.checkin_time) task.checkin_time = row.checkin_time;
-        if (row.checkout_time) task.checkout_time = row.checkout_time;
+        if (row.checkin_time) task.checkin_time = row.checkin_time.substring(0, 5);
+        if (row.checkout_time) task.checkout_time = row.checkout_time.substring(0, 5);
         if (row.pax_in !== null) task.pax_in = row.pax_in;
         if (row.pax_out !== null) task.pax_out = row.pax_out;
         if (row.small_equipment !== null) task.small_equipment = row.small_equipment;
@@ -378,10 +378,10 @@ export class PgDailyAssignmentsService {
     newValues: string[] = []
   ): Promise<number> {
     const client = await pool.connect();
-    
+
     try {
       const rows = this.timelineToRows(workDate, timeline);
-      
+
       await client.query('BEGIN');
 
       // Lock the revisions table for this work_date to prevent race conditions
@@ -390,14 +390,14 @@ export class PgDailyAssignmentsService {
         'SELECT 1 FROM daily_assignments_revisions WHERE work_date = $1 FOR UPDATE',
         [workDate]
       );
-      
+
       // Now safely get the next revision number
       const revResult = await client.query(
         'SELECT COALESCE(MAX(revision), 0) + 1 as next_revision FROM daily_assignments_revisions WHERE work_date = $1',
         [workDate]
       );
       const revision = parseInt(revResult.rows[0]?.next_revision || '1');
-      
+
       console.log(`📜 PG History: Salvando revisione ${revision} con ${rows.length} righe per ${workDate}...`);
 
       // ALWAYS create revision metadata entry (even for empty timelines)
@@ -542,7 +542,7 @@ export class PgDailyAssignmentsService {
         'SELECT * FROM daily_containers WHERE work_date = $1 ORDER BY priority, task_id',
         [workDate]
       );
-      
+
       if (result.rows.length === 0) {
         console.log(`📖 PG: Nessun container trovato per ${workDate}`);
         return null;
@@ -570,7 +570,7 @@ export class PgDailyAssignmentsService {
           logistic_code: row.logistic_code,
           priority: row.priority
         };
-        
+
         // Add optional fields
         if (row.client_id) task.client_id = row.client_id;
         if (row.premium !== null) task.premium = row.premium;
@@ -580,8 +580,8 @@ export class PgDailyAssignmentsService {
         if (row.cleaning_time) task.cleaning_time = row.cleaning_time;
         if (row.checkin_date) task.checkin_date = row.checkin_date;
         if (row.checkout_date) task.checkout_date = row.checkout_date;
-        if (row.checkin_time) task.checkin_time = row.checkin_time;
-        if (row.checkout_time) task.checkout_time = row.checkout_time;
+        if (row.checkin_time) task.checkin_time = row.checkin_time.substring(0, 5);
+        if (row.checkout_time) task.checkout_time = row.checkout_time.substring(0, 5);
         if (row.pax_in !== null) task.pax_in = row.pax_in;
         if (row.pax_out !== null) task.pax_out = row.pax_out;
         if (row.small_equipment !== null) task.small_equipment = row.small_equipment;
@@ -617,7 +617,7 @@ export class PgDailyAssignmentsService {
 
       const totalTasks = containers.early_out.count + containers.high_priority.count + containers.low_priority.count;
       console.log(`✅ PG: Containers caricati per ${workDate} (${totalTasks} task)`);
-      
+
       return { 
         containers,
         summary: {
@@ -642,23 +642,23 @@ export class PgDailyAssignmentsService {
    */
   async saveContainers(workDate: string, containersData: any): Promise<boolean> {
     const client = await pool.connect();
-    
+
     try {
       await client.query('BEGIN');
-      
+
       // Delete existing containers for this date
       await client.query('DELETE FROM daily_containers WHERE work_date = $1', [workDate]);
-      
+
       const containers = containersData?.containers || {};
       let totalInserted = 0;
-      
+
       // Define priority mappings (support both naming conventions)
       const priorityConfigs = [
         { dbName: 'early_out', keys: ['early_out'] },
         { dbName: 'high_priority', keys: ['high_priority', 'high'] },
         { dbName: 'low_priority', keys: ['low_priority', 'low'] }
       ];
-      
+
       for (const config of priorityConfigs) {
         // Find tasks for this priority (check all possible keys)
         let tasks: any[] = [];
@@ -670,10 +670,10 @@ export class PgDailyAssignmentsService {
             break;
           }
         }
-        
+
         for (const task of tasks) {
           if (!task.task_id) continue;
-          
+
           await client.query(`
             INSERT INTO daily_containers (
               work_date, priority,
@@ -712,11 +712,11 @@ export class PgDailyAssignmentsService {
             task.customer_name || null,
             task.reasons || []
           ]);
-          
+
           totalInserted++;
         }
       }
-      
+
       await client.query('COMMIT');
       console.log(`✅ PG: Containers salvati per ${workDate} (${totalInserted} task)`);
       return true;
@@ -787,7 +787,7 @@ export class PgDailyAssignmentsService {
         task.customer_name || null,
         task.reasons || []
       ]);
-      
+
       console.log(`✅ PG: Task ${task.task_id} aggiunto ai containers (${priority}) per ${workDate}`);
       return true;
     } catch (error) {
@@ -808,37 +808,37 @@ export class PgDailyAssignmentsService {
     modificationType: string = 'manual'
   ): Promise<number> {
     const client = await pool.connect();
-    
+
     try {
       await client.query('BEGIN');
-      
+
       // Lock revisions table to prevent race conditions
       await client.query(
         'SELECT 1 FROM daily_containers_revisions WHERE work_date = $1 FOR UPDATE',
         [workDate]
       );
-      
+
       // Get next revision number
       const revResult = await client.query(
         'SELECT COALESCE(MAX(revision), 0) + 1 as next_revision FROM daily_containers_revisions WHERE work_date = $1',
         [workDate]
       );
       const revision = parseInt(revResult.rows[0]?.next_revision || '1');
-      
+
       // Get current containers
       const currentContainers = await client.query(
         'SELECT * FROM daily_containers WHERE work_date = $1',
         [workDate]
       );
-      
+
       console.log(`📜 PG Containers History: Salvando revisione ${revision} con ${currentContainers.rows.length} task per ${workDate}...`);
-      
+
       // Create revision metadata entry
       await client.query(`
         INSERT INTO daily_containers_revisions (work_date, revision, task_count, created_by, modification_type)
         VALUES ($1, $2, $3, $4, $5)
       `, [workDate, revision, currentContainers.rows.length, createdBy, modificationType]);
-      
+
       // Copy current containers to history
       for (const row of currentContainers.rows) {
         await client.query(`
@@ -882,11 +882,11 @@ export class PgDailyAssignmentsService {
           createdBy
         ]);
       }
-      
+
       await client.query('COMMIT');
       console.log(`✅ PG Containers History: Salvata revisione ${revision} con ${currentContainers.rows.length} task`);
       return revision;
-      
+
     } catch (error) {
       await client.query('ROLLBACK');
       console.error('❌ PG Containers History: Errore nel salvataggio:', error);
@@ -924,7 +924,7 @@ export class PgDailyAssignmentsService {
         'SELECT * FROM daily_containers_history WHERE work_date = $1 AND revision = $2 ORDER BY priority, task_id',
         [workDate, revision]
       );
-      
+
       if (result.rows.length === 0) {
         return null;
       }
@@ -981,28 +981,28 @@ export class PgDailyAssignmentsService {
    */
   async restoreContainersFromRevision(workDate: string, revision: number, createdBy: string = 'system'): Promise<boolean> {
     const client = await pool.connect();
-    
+
     try {
       // First, save current state to history (so we can redo if needed)
       await this.saveContainersToHistory(workDate, createdBy, 'pre_restore');
-      
+
       await client.query('BEGIN');
-      
+
       // Get containers at the target revision
       const historyResult = await client.query(
         'SELECT * FROM daily_containers_history WHERE work_date = $1 AND revision = $2',
         [workDate, revision]
       );
-      
+
       if (historyResult.rows.length === 0) {
         console.log(`⚠️ PG Containers: Nessun dato trovato per revisione ${revision}`);
         await client.query('ROLLBACK');
         return false;
       }
-      
+
       // Delete current containers
       await client.query('DELETE FROM daily_containers WHERE work_date = $1', [workDate]);
-      
+
       // Restore from history
       for (const row of historyResult.rows) {
         await client.query(`
@@ -1044,11 +1044,11 @@ export class PgDailyAssignmentsService {
           row.reasons || []
         ]);
       }
-      
+
       await client.query('COMMIT');
       console.log(`✅ PG Containers: Ripristinati ${historyResult.rows.length} task dalla revisione ${revision}`);
       return true;
-      
+
     } catch (error) {
       await client.query('ROLLBACK');
       console.error('❌ PG Containers: Errore nel ripristino:', error);
@@ -1120,7 +1120,7 @@ export class PgDailyAssignmentsService {
         WHERE work_date = $1 AND active = true
         ORDER BY counter_hours DESC
       `, [workDate]);
-      
+
       if (result.rows.length > 0) {
         console.log(`✅ PG: ${result.rows.length} cleaners caricati per ${workDate}`);
         return result.rows;
@@ -1145,7 +1145,7 @@ export class PgDailyAssignmentsService {
         FROM cleaners 
         WHERE cleaner_id = $1 AND work_date = $2
       `, [cleanerId, workDate]);
-      
+
       if (result.rows.length > 0) {
         return result.rows[0];
       }
@@ -1161,7 +1161,7 @@ export class PgDailyAssignmentsService {
    */
   async loadCleanersByIds(cleanerIds: number[], workDate: string): Promise<any[]> {
     if (!cleanerIds || cleanerIds.length === 0) return [];
-    
+
     try {
       const result = await query(`
         SELECT 
@@ -1171,7 +1171,7 @@ export class PgDailyAssignmentsService {
         FROM cleaners 
         WHERE cleaner_id = ANY($1) AND work_date = $2
       `, [cleanerIds, workDate]);
-      
+
       console.log(`✅ PG: ${result.rows.length} cleaners caricati per IDs ${cleanerIds.join(',')}`);
       return result.rows;
     } catch (error) {
