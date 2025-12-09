@@ -671,6 +671,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         timelineData.metadata.modified_by.push(modifyingUser);
       }
 
+      // Inizializza meta se non esiste
+      timelineData.meta = timelineData.meta || {};
       timelineData.meta.total_cleaners = timelineData.cleaners_assignments.length;
       timelineData.meta.total_tasks = timelineData.cleaners_assignments.reduce(
         (sum: number, c: any) => sum + c.tasks.length,
