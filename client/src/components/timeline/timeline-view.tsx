@@ -150,7 +150,7 @@ export default function TimelineView({
 
   // Stato per memorizzare i dati della timeline (inclusi i metadata)
   const [timelineData, setTimelineData] = useState<any>(null);
-  
+
   // Larghezza della timeline in pixel per calcolo larghezze task
   const [timelineWidthPx, setTimelineWidthPx] = useState<number>(0);
   const timelineRowRef = useRef<HTMLDivElement>(null);
@@ -179,14 +179,14 @@ export default function TimelineView({
 
     // Combina selected_cleaners + timeline cleaners con task
     const combined = [...cleaners, ...timelineCleanersWithTasks];
-    
+
     // Ordina per start_time crescente (dal minore al maggiore)
     combined.sort((a, b) => {
       const timeA = a.start_time || "10:00";
       const timeB = b.start_time || "10:00";
       return timeA.localeCompare(timeB);
     });
-    
+
     return combined;
   }, [cleaners, timelineCleaners]);
 
@@ -391,13 +391,13 @@ export default function TimelineView({
   const generateGlobalTimeSlots = () => {
     const globalStartTime = getGlobalStartTime();
     const [startHour, startMin] = globalStartTime.split(':').map(Number);
-    
+
     // Arrotonda all'ora intera precedente per iniziare sempre da un'ora intera
     const startHourRounded = startMin > 0 ? startHour : startHour;
     const endHour = 19; // Fine fissa alle 19:00
 
     const slots: string[] = [];
-    
+
     // Genera slot ogni ora fino alle 19:00 (solo orari interi)
     for (let hour = startHourRounded; hour <= endHour; hour++) {
       slots.push(`${String(hour).padStart(2, '0')}:00`);
@@ -410,7 +410,7 @@ export default function TimelineView({
   const getGlobalTimelineMinutes = () => {
     const globalStartTime = getGlobalStartTime();
     const [startHour, startMin] = globalStartTime.split(':').map(Number);
-    
+
     // CRITICAL: Usa l'ora arrotondata (come la griglia visiva) per calcolare i minuti
     const startHourRounded = startMin > 0 ? startHour : startHour;
     const startMinutes = startHourRounded * 60; // Parte dall'ora intera
@@ -440,13 +440,13 @@ export default function TimelineView({
         (window as any).timelineWidthPx = width;
       }
     };
-    
+
     measureWidth();
     window.addEventListener('resize', measureWidth);
-    
+
     // Rimisura dopo un breve delay per catturare layout post-render
     const timer = setTimeout(measureWidth, 100);
-    
+
     return () => {
       window.removeEventListener('resize', measureWidth);
       clearTimeout(timer);
@@ -462,7 +462,7 @@ export default function TimelineView({
       "#EAB308", "#06B6D4", "#F43F5E", "#2563EB", "#16A34A",
       "#C026D3", "#EA580C", "#7C3AED", "#0891B2", "#CA8A04",
       "#DB2777", "#4F46E5", "#65A30D", "#059669", "#9333EA",
-      "#D97706", "#E11D48", "#0284C7", "#15803D", "#0D9488"
+      "#D97706", "#E11D48", "#0284C7", "#15803D", "#059669"
     ];
     return colors[cleanerId % colors.length];
   };
@@ -471,7 +471,7 @@ export default function TimelineView({
   const loadCleaners = async (skipLoadSaved = false) => {
     try {
       const dateStr = format(selectedDate, 'yyyy-MM-dd');
-      
+
       // Carica sia selected_cleaners che timeline da API per verificare la sincronizzazione
       const [selectedResponse, timelineResponse] = await Promise.all([
         fetch(`/api/selected-cleaners?date=${dateStr}`, {
@@ -1129,7 +1129,7 @@ export default function TimelineView({
 
   const handleResetAssignments = async () => {
     try {
-      // La data è già nel formato corretto yyyy-MM-dd nel localStorage
+      // La data è già nel formato corretto yyy-MM-dd nel localStorage
       const dateStr = localStorage.getItem('selected_work_date') || (() => {
         const today = new Date();
         const year = today.getFullYear();
@@ -1490,9 +1490,9 @@ export default function TimelineView({
           {/* Header con orari - unico per tutti i cleaner */}
           <div className="flex mb-2 px-4">
             <div className="flex-shrink-0" style={{ width: `${cleanerColumnWidth}px` }}></div>
-            <div 
+            <div
               ref={timelineRowRef}
-              className="flex-1" 
+              className="flex-1"
               style={{ display: 'grid', gridTemplateColumns: `repeat(${globalTimeSlots.length}, 1fr)` }}
             >
               {globalTimeSlots.map((slot, idx) => (
@@ -1751,11 +1751,11 @@ export default function TimelineView({
                                     const [prevEndH, prevEndM] = prevTask.end_time.split(':').map(Number);
                                     const prevEndMinutes = prevEndH * 60 + prevEndM;
                                     const expectedStartMinutes = prevEndMinutes + travelTime;
-                                    
+
                                     // Calcola lo start effettivo di questa task
                                     const [taskStartH, taskStartM] = taskObj.start_time.split(':').map(Number);
                                     const actualStartMinutes = taskStartH * 60 + taskStartM;
-                                    
+
                                     // Se lo start effettivo è DOPO quello previsto, c'è un gap (attesa)
                                     if (actualStartMinutes > expectedStartMinutes) {
                                       waitingGap = actualStartMinutes - expectedStartMinutes;
@@ -1824,7 +1824,7 @@ export default function TimelineView({
               {/* Pulsanti nella riga finale */}
               <div className="flex-1 p-1 border-t border-border flex gap-2">
                 {!isReadOnly && (
-                  <div 
+                  <div
                     className="flex-1 h-full flex items-center justify-center gap-2 px-4 py-2 rounded-md border-2 border-custom-blue bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200"
                     data-testid="indicator-autosave"
                   >
