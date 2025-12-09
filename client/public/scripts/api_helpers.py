@@ -14,8 +14,8 @@ except ImportError:
     API_AVAILABLE = False
 
 
-def save_timeline_via_api(work_date: str, timeline_data: Dict, use_api: bool = False) -> bool:
-    """Salva timeline via API se disponibile."""
+def save_timeline_via_api(work_date: str, timeline_data: Dict, use_api: bool = True) -> bool:
+    """Salva timeline via API se disponibile (default: True)."""
     if not use_api or not API_AVAILABLE:
         return False
     
@@ -29,8 +29,8 @@ def save_timeline_via_api(work_date: str, timeline_data: Dict, use_api: bool = F
         return False
 
 
-def save_containers_via_api(work_date: str, containers_data: Dict, use_api: bool = False) -> bool:
-    """Salva containers via API se disponibile."""
+def save_containers_via_api(work_date: str, containers_data: Dict, use_api: bool = True) -> bool:
+    """Salva containers via API se disponibile (default: True)."""
     if not use_api or not API_AVAILABLE:
         return False
     
@@ -44,8 +44,8 @@ def save_containers_via_api(work_date: str, containers_data: Dict, use_api: bool
         return False
 
 
-def load_timeline_via_api(work_date: str, use_api: bool = False) -> Optional[Dict]:
-    """Carica timeline via API se disponibile."""
+def load_timeline_via_api(work_date: str, use_api: bool = True) -> Optional[Dict]:
+    """Carica timeline via API se disponibile (default: True)."""
     if not use_api or not API_AVAILABLE:
         return None
     
@@ -61,8 +61,8 @@ def load_timeline_via_api(work_date: str, use_api: bool = False) -> Optional[Dic
     return None
 
 
-def load_containers_via_api(work_date: str, use_api: bool = False) -> Optional[Dict]:
-    """Carica containers via API se disponibile."""
+def load_containers_via_api(work_date: str, use_api: bool = True) -> Optional[Dict]:
+    """Carica containers via API se disponibile (default: True)."""
     if not use_api or not API_AVAILABLE:
         return None
     
@@ -78,8 +78,8 @@ def load_containers_via_api(work_date: str, use_api: bool = False) -> Optional[D
     return None
 
 
-def load_cleaners_via_api(work_date: str, use_api: bool = False) -> Optional[List[Dict]]:
-    """Carica cleaners selezionati via API se disponibile."""
+def load_cleaners_via_api(work_date: str, use_api: bool = True) -> Optional[List[Dict]]:
+    """Carica cleaners selezionati via API se disponibile (default: True)."""
     if not use_api or not API_AVAILABLE:
         return None
     
@@ -95,8 +95,8 @@ def load_cleaners_via_api(work_date: str, use_api: bool = False) -> Optional[Lis
     return None
 
 
-def get_assigned_logistic_codes_via_api(work_date: str, use_api: bool = False) -> Optional[set]:
-    """Ottiene set di logistic_code già assegnati dalla timeline via API."""
+def get_assigned_logistic_codes_via_api(work_date: str, use_api: bool = True) -> Optional[set]:
+    """Ottiene set di logistic_code già assegnati dalla timeline via API (default: True)."""
     if not use_api or not API_AVAILABLE:
         return None
     

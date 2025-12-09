@@ -262,15 +262,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.log(`📦 Trovate ${assignedTasks.length} task assegnate da riportare nei containers`);
       }
 
-      // 2. Caricare i containers esistenti
-      let containersData = await workspaceFiles.loadContainers(workDate);
-      if (!containersData) {
-        containersData = {
+      // 2. Caricare i containers esistenti (struttura: { containers: { early_out: {...}, ... }, metadata: {...} })
+      let containersResponse = await workspaceFiles.loadContainers(workDate);
+      
+      // Inizializza struttura corretta
+      let containersData: any = {
+        containers: {
           early_out: { tasks: [] },
           high_priority: { tasks: [] },
-          low_priority: { tasks: [] },
-          metadata: { date: workDate }
-        };
+          low_priority: { tasks: [] }
+        },
+        metadata: { date: workDate }
+      };
+
+      // Se abbiamo dati esistenti, usa quelli
+      if (containersResponse) {
+        // loadContainers può restituire struttura annidata o diretta
+        if (containersResponse.containers) {
+          containersData = containersResponse;
+        } else if (containersResponse.early_out || containersResponse.high_priority || containersResponse.low_priority) {
+          // Struttura diretta - wrappa in containers
+          containersData.containers = {
+            early_out: containersResponse.early_out || { tasks: [] },
+            high_priority: containersResponse.high_priority || { tasks: [] },
+            low_priority: containersResponse.low_priority || { tasks: [] }
+          };
+          containersData.metadata = containersResponse.metadata || { date: workDate };
+        }
+      }
+
+      // Assicura che i container abbiano tasks array
+      for (const priority of ['early_out', 'high_priority', 'low_priority']) {
+        if (!containersData.containers[priority]) {
+          containersData.containers[priority] = { tasks: [] };
+        }
+        if (!containersData.containers[priority].tasks) {
+          containersData.containers[priority].tasks = [];
+        }
       }
 
       // 3. Aggiungere le task estratte ai containers in base alla priorità
@@ -279,21 +307,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const targetContainer = priority === 'early_out' ? 'early_out' :
                                priority === 'high_priority' ? 'high_priority' : 'low_priority';
 
-        // Verifica che il container esista
-        if (!containersData[targetContainer]) {
-          containersData[targetContainer] = { tasks: [] };
-        }
-        if (!containersData[targetContainer].tasks) {
-          containersData[targetContainer].tasks = [];
-        }
-
         // Evita duplicati: controlla se la task è già nel container
-        const alreadyExists = containersData[targetContainer].tasks.some(
+        const alreadyExists = containersData.containers[targetContainer].tasks.some(
           (t: any) => String(t.task_id) === String(task.task_id)
         );
 
         if (!alreadyExists) {
-          containersData[targetContainer].tasks.push(task);
+          containersData.containers[targetContainer].tasks.push(task);
           console.log(`  ➕ Task ${task.task_id} (${task.logistic_code}) → ${targetContainer}`);
         }
       }
