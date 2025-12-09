@@ -66,9 +66,9 @@ export default function ClientSettings() {
       const clientsData = await clientsResponse.json();
       setClients(clientsData.clients);
 
-      // Carica client_timewindows.json se esiste
+      // Carica client_timewindows da API (PostgreSQL)
       try {
-        const windowsResponse = await fetch(`/data/input/client_timewindows.json?t=${Date.now()}`, {
+        const windowsResponse = await fetch('/api/client-timewindows', {
           cache: 'no-store',
           headers: { 'Cache-Control': 'no-cache' }
         });
@@ -77,7 +77,7 @@ export default function ClientSettings() {
           const windowsData: ClientWindowsData = await windowsResponse.json();
           const windowsMap = new Map<number, { checkin: string; checkout: string }>();
           
-          windowsData.windows.forEach(w => {
+          (windowsData.windows || []).forEach(w => {
             windowsMap.set(w.client_id, {
               checkin: w.checkin_time || "",
               checkout: w.checkout_time || ""
@@ -87,7 +87,7 @@ export default function ClientSettings() {
           setWindows(windowsMap);
         }
       } catch (err) {
-        console.log("client_timewindows.json non trovato, usando valori vuoti");
+        console.log("client_timewindows non trovato in PostgreSQL, usando valori vuoti");
       }
     } catch (error) {
       toast({
