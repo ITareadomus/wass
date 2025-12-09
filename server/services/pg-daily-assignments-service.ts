@@ -1115,7 +1115,8 @@ export class PgDailyAssignmentsService {
         SELECT 
           cleaner_id as id, name, lastname, role, active, ranking,
           counter_hours, counter_days, available, contract_type,
-          preferred_customers, telegram_id, start_time, can_do_straordinaria
+          preferred_customers, telegram_id, start_time, can_do_straordinaria,
+          premium
         FROM cleaners 
         WHERE work_date = $1 AND active = true
         ORDER BY counter_hours DESC
@@ -1141,7 +1142,8 @@ export class PgDailyAssignmentsService {
         SELECT 
           cleaner_id as id, name, lastname, role, active, ranking,
           counter_hours, counter_days, available, contract_type,
-          preferred_customers, telegram_id, start_time, can_do_straordinaria
+          preferred_customers, telegram_id, start_time, can_do_straordinaria,
+          premium
         FROM cleaners 
         WHERE cleaner_id = $1 AND work_date = $2
       `, [cleanerId, workDate]);
@@ -1167,7 +1169,8 @@ export class PgDailyAssignmentsService {
         SELECT 
           cleaner_id as id, name, lastname, role, active, ranking,
           counter_hours, counter_days, available, contract_type,
-          preferred_customers, telegram_id, start_time, can_do_straordinaria
+          preferred_customers, telegram_id, start_time, can_do_straordinaria,
+          premium
         FROM cleaners 
         WHERE cleaner_id = ANY($1) AND work_date = $2
       `, [cleanerIds, workDate]);
