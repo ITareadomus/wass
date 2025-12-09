@@ -77,33 +77,33 @@ def get_operation_names(operation_ids):
     """Recupera i nomi delle operazioni dalla tabella app_structure_operation_langs"""
     if not operation_ids:
         return {}
-    
+
     connection = mysql.connector.connect(**DB_CONFIG)
     cursor = connection.cursor(dictionary=True)
-    
+
     placeholders = ','.join(['%s'] * len(operation_ids))
     query = f"""
         SELECT structure_operation_id, name
         FROM app_structure_operation_langs
         WHERE id_lang = 1 AND structure_operation_id IN ({placeholders})
     """
-    
+
     cursor.execute(query, operation_ids)
     results = cursor.fetchall()
     cursor.close()
     connection.close()
-    
+
     # Crea dizionario id -> nome
     operation_names = {}
     for row in results:
         operation_names[row['structure_operation_id']] = row['name']
-    
+
     return operation_names
 
 def save_operations_to_file(operation_ids):
     # Recupera i nomi delle operazioni
     operation_names_map = get_operation_names(operation_ids)
-    
+
     # Crea array con oggetti {id, name}
     active_operations = []
     for op_id in operation_ids:
@@ -111,7 +111,7 @@ def save_operations_to_file(operation_ids):
             "id": op_id,
             "name": operation_names_map.get(op_id, f"Operazione {op_id}")
         })
-    
+
     operations_data = {
         "timestamp": datetime.now().isoformat(),
         "active_operations": active_operations,
@@ -162,8 +162,16 @@ def get_tasks_from_db(selected_date, assigned_task_ids=None):
             ) AS cleaning_time,
             h.checkin,
             h.checkout,
-            h.checkin_time,
-            h.checkout_time,
+            CASE 
+                WHEN h.checkin_time IS NOT NULL 
+                THEN DATE_FORMAT(h.checkin_time, '%H:%i')
+                ELSE NULL 
+            END AS checkin_time,
+            CASE 
+                WHEN h.checkout_time IS NOT NULL 
+                THEN DATE_FORMAT(h.checkout_time, '%H:%i')
+                ELSE NULL 
+            END AS checkout_time,
             h.checkin_pax AS pax_in,
             h.checkout_pax AS pax_out,
             s.structure_type_id,
