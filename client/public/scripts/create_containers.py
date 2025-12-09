@@ -54,7 +54,9 @@ def date_to_str(value):
 def varchar_to_str(value):
     if value is None:
         return None
-    return str(value)
+    # Treat empty strings as None
+    s = str(value).strip()
+    return s if s else None
 
 def normalize_coord(coord):
     if coord is None:
@@ -176,16 +178,8 @@ def get_tasks_from_db(selected_date, assigned_task_ids=None):
             ) AS cleaning_time,
             h.checkin,
             h.checkout,
-            CASE 
-                WHEN h.checkin_time IS NOT NULL 
-                THEN DATE_FORMAT(h.checkin_time, '%H:%i')
-                ELSE NULL 
-            END AS checkin_time,
-            CASE 
-                WHEN h.checkout_time IS NOT NULL 
-                THEN DATE_FORMAT(h.checkout_time, '%H:%i')
-                ELSE NULL 
-            END AS checkout_time,
+            h.checkin_time,
+            h.checkout_time,
             h.checkin_pax AS pax_in,
             h.checkout_pax AS pax_out,
             s.structure_type_id,
@@ -247,8 +241,8 @@ def get_tasks_from_db(selected_date, assigned_task_ids=None):
             "cleaning_time": r.get("cleaning_time"),
             "checkin_date": date_to_str(r.get("checkin")) if r.get("checkin") else None,
             "checkout_date": date_to_str(r.get("checkout")) if r.get("checkout") else None,
-            "checkin_time": varchar_to_str(r.get("checkin_time")) if r.get("checkin_time") else None,
-            "checkout_time": varchar_to_str(r.get("checkout_time")) if r.get("checkout_time") else None,
+            "checkin_time": varchar_to_str(r.get("checkin_time")),
+            "checkout_time": varchar_to_str(r.get("checkout_time")),
             "pax_in": r.get("pax_in"),
             "pax_out": r.get("pax_out"),
             "small_equipment": small_equipment_bool,
@@ -740,8 +734,8 @@ def extract_tasks_from_db(work_date=None, assigned_task_ids=None):
             "cleaning_time": r.get("cleaning_time"),
             "checkin_date": date_to_str(r.get("checkin")) if r.get("checkin") else None,
             "checkout_date": date_to_str(r.get("checkout")) if r.get("checkout") else None,
-            "checkin_time": varchar_to_str(r.get("checkin_time")) if r.get("checkin_time") else None,
-            "checkout_time": varchar_to_str(r.get("checkout_time")) if r.get("checkout_time") else None,
+            "checkin_time": varchar_to_str(r.get("checkin_time")),
+            "checkout_time": varchar_to_str(r.get("checkout_time")),
             "pax_in": r.get("pax_in"),
             "pax_out": r.get("pax_out"),
             "small_equipment": small_equipment_bool,
