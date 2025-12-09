@@ -387,8 +387,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Carica timeline da PostgreSQL
       let timelineData: any = await workspaceFiles.loadTimeline(workDate);
       if (!timelineData) {
-        timelineData = { cleaners_assignments: [], metadata: { date: workDate }, meta: {} };
+        timelineData = { cleaners_assignments: [], metadata: { date: workDate }, meta: { total_cleaners: 0, used_cleaners: 0, assigned_tasks: 0 } };
       }
+      // Assicurati che meta esista sempre
+      timelineData.meta = timelineData.meta || { total_cleaners: 0, used_cleaners: 0, assigned_tasks: 0 };
 
       let taskToMove: any = null;
 
@@ -540,8 +542,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Carica timeline da PostgreSQL
       let timelineData: any = await workspaceFiles.loadTimeline(workDate);
       if (!timelineData) {
-        timelineData = { cleaners_assignments: [], metadata: { date: workDate }, meta: {} };
+        timelineData = { cleaners_assignments: [], metadata: { date: workDate }, meta: { total_cleaners: 0, used_cleaners: 0, assigned_tasks: 0 } };
       }
+      // Assicurati che meta esista sempre
+      timelineData.meta = timelineData.meta || { total_cleaners: 0, used_cleaners: 0, assigned_tasks: 0 };
 
       // Trova entrambi i cleaners (creali se non esistono)
       let sourceEntry = timelineData.cleaners_assignments.find((c: any) => c.cleaner.id === sourceCleanerId);
@@ -713,7 +717,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Restituisci struttura vuota invece di 404 per compatibilità frontend
         return res.json({
           metadata: { date: workDate },
-          cleaners_assignments: []
+          cleaners_assignments: [],
+          meta: { total_cleaners: 0, used_cleaners: 0, assigned_tasks: 0 }
         });
       }
 

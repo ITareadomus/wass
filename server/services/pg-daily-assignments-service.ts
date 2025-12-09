@@ -322,16 +322,24 @@ export class PgDailyAssignmentsService {
         tasks: ca.tasks.sort((a, b) => (a.sequence || 0) - (b.sequence || 0))
       }));
 
+      const totalTasks = cleaners_assignments.reduce((sum, ca) => sum + ca.tasks.length, 0);
+      const usedCleaners = cleaners_assignments.filter(ca => ca.tasks.length > 0).length;
+
       const timeline = {
         cleaners_assignments,
         metadata: {
           date: workDate,
           last_updated: new Date().toISOString(),
           source: 'postgresql'
+        },
+        meta: {
+          total_cleaners: cleaners_assignments.length,
+          used_cleaners: usedCleaners,
+          assigned_tasks: totalTasks
         }
       };
 
-      console.log(`✅ PG: Timeline ricostruita per ${workDate} (${rows.length} task, ${cleaners_assignments.length} cleaners)`);
+      console.log(`✅ PG: Timeline ricostruita per ${workDate} (${totalTasks} task, ${cleaners_assignments.length} cleaners)`);
       return timeline;
 
     } catch (error) {
