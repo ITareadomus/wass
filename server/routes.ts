@@ -244,7 +244,65 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const workDate = date || format(new Date(), 'yyyy-MM-dd');
       const currentUsername = modified_by || getCurrentUsername(req);
 
-      // Svuota la timeline con struttura corretta
+      console.log(`🔄 Reset assegnazioni per ${workDate}...`);
+
+      // 1. PRIMA caricare la timeline esistente per estrarre le task assegnate
+      const existingTimeline = await workspaceFiles.loadTimeline(workDate);
+      const assignedTasks: any[] = [];
+
+      if (existingTimeline && existingTimeline.cleaners_assignments) {
+        // Estrai tutte le task assegnate da tutti i cleaners
+        for (const cleanerEntry of existingTimeline.cleaners_assignments) {
+          if (cleanerEntry.tasks && Array.isArray(cleanerEntry.tasks)) {
+            for (const task of cleanerEntry.tasks) {
+              assignedTasks.push(task);
+            }
+          }
+        }
+        console.log(`📦 Trovate ${assignedTasks.length} task assegnate da riportare nei containers`);
+      }
+
+      // 2. Caricare i containers esistenti
+      let containersData = await workspaceFiles.loadContainers(workDate);
+      if (!containersData) {
+        containersData = {
+          early_out: { tasks: [] },
+          high_priority: { tasks: [] },
+          low_priority: { tasks: [] },
+          metadata: { date: workDate }
+        };
+      }
+
+      // 3. Aggiungere le task estratte ai containers in base alla priorità
+      for (const task of assignedTasks) {
+        const priority = task.priority || 'low_priority';
+        const targetContainer = priority === 'early_out' ? 'early_out' :
+                               priority === 'high_priority' ? 'high_priority' : 'low_priority';
+
+        // Verifica che il container esista
+        if (!containersData[targetContainer]) {
+          containersData[targetContainer] = { tasks: [] };
+        }
+        if (!containersData[targetContainer].tasks) {
+          containersData[targetContainer].tasks = [];
+        }
+
+        // Evita duplicati: controlla se la task è già nel container
+        const alreadyExists = containersData[targetContainer].tasks.some(
+          (t: any) => String(t.task_id) === String(task.task_id)
+        );
+
+        if (!alreadyExists) {
+          containersData[targetContainer].tasks.push(task);
+          console.log(`  ➕ Task ${task.task_id} (${task.logistic_code}) → ${targetContainer}`);
+        }
+      }
+
+      // 4. Salvare i containers aggiornati su PostgreSQL
+      await workspaceFiles.saveContainers(workDate, containersData, currentUsername, 'containers_reset');
+      console.log(`✅ Containers aggiornati con ${assignedTasks.length} task ripristinate`);
+
+      // 5. DOPO svuotare la timeline
       const emptyTimeline = {
         metadata: {
           last_updated: new Date().toISOString(),
@@ -259,56 +317,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       };
 
-      // Salva timeline su PostgreSQL
       await workspaceFiles.saveTimeline(workDate, emptyTimeline, false, currentUsername, 'timeline_reset');
-      console.log(`Timeline resettata su PostgreSQL (struttura corretta)`);
+      console.log(`✅ Timeline svuotata su PostgreSQL`);
 
-      // FORZA la ricreazione dei containers rieseguendo create_containers.py
-      console.log(`Rieseguendo create_containers.py per ripristinare i containers...`);
-      const containersResult = await new Promise<string>((resolve, reject) => {
-        exec(
-          `python3 client/public/scripts/create_containers.py --date ${workDate}`,
-          (error, stdout, stderr) => {
-            if (error) {
-              console.error("Errore create_containers:", stderr);
-              reject(new Error(stderr || error.message));
-            } else {
-              resolve(stdout);
-            }
-          }
-        );
+      // === RESET: NON modificare selected_cleaners ===
+      console.log(`✅ Reset completato - selected_cleaners NON modificato`);
+
+      res.json({ 
+        success: true, 
+        message: "Timeline resettata con successo",
+        tasksRestored: assignedTasks.length
       });
-      console.log("create_containers output:", containersResult);
-
-      // Leggi containers dal filesystem (dove Python ha scritto) e salva su PostgreSQL
-      try {
-        const containersPath = path.join(DATA_OUTPUT_DIR, 'containers.json');
-        const containersJson = await fs.readFile(containersPath, 'utf-8');
-        const containersData = JSON.parse(containersJson);
-        
-        await workspaceFiles.saveContainers(workDate, containersData, currentUsername, 'containers_reset');
-        console.log(`✅ Containers salvati su PostgreSQL per ${workDate}`);
-      } catch (pgError) {
-        console.error(`⚠️ Errore nel salvataggio containers su PG (non bloccante):`, pgError);
-      }
-
-      // CRITICAL: Forza nuovamente il reset della timeline dopo create_containers
-      // perché lo script Python potrebbe aver sovrascritto il file
-      console.log(`🔄 Forzatura reset timeline dopo create_containers...`);
-      await workspaceFiles.saveTimeline(workDate, emptyTimeline, false, currentUsername, 'timeline_reset_after_containers');
-      console.log(`✅ Timeline resettata nuovamente dopo create_containers`);
-
-      // CRITICAL: Elimina il flag di ultimo salvataggio per evitare ricaricamenti automatici
-      console.log(`🗑️ Reset flag ultimo salvataggio per data ${workDate}`);
-      // Il frontend gestirà la rimozione del localStorage
-
-      // === RESET: NON modificare selected_cleaners.json ===
-      // Durante il reset, selected_cleaners.json rimane INVARIATO
-      // Viene svuotato SOLO quando si cambia data (in /api/extract-data)
-      console.log(`✅ Reset completato - selected_cleaners.json NON modificato (rimane invariato)`);
-      // === END ===
-
-      res.json({ success: true, message: "Timeline resettata con successo" });
     } catch (error: any) {
       console.error("Errore nel reset della timeline:", error);
       res.status(500).json({ success: false, error: error.message });
