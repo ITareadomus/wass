@@ -47,29 +47,32 @@ PREFERRED_TRAVEL = 18.0  # da 20.0, preferenza per percorsi < 18'
 # NUOVO: Limite per tipologia FLESSIBILE (può essere infranto da cluster)
 MAX_TASKS_PER_PRIORITY = 2  # Max 2 task High-Priority per cleaner (base, infrangibile da cluster vicini)
 
-# Default HP start time (può essere sovrascritto da settings)
+# Default HP start/end time (può essere sovrascritto da settings)
 HP_HARD_EARLIEST_H = 11
 HP_HARD_EARLIEST_M = 0
+HP_HARD_LATEST_H = 15
+HP_HARD_LATEST_M = 30
 
-# Variabile globale per HP start time da settings
+# Variabili globali per HP start/end time da settings
 HP_START_TIME_FROM_SETTINGS: Optional[Tuple[int, int]] = None
+HP_END_TIME_FROM_SETTINGS: Optional[Tuple[int, int]] = None
 
 def load_hp_settings():
-    """Carica hp_start_time da settings via API."""
-    global HP_START_TIME_FROM_SETTINGS
+    """Carica hp_start_time e hp_end_time da settings via API."""
+    global HP_START_TIME_FROM_SETTINGS, HP_END_TIME_FROM_SETTINGS
     
     if not API_AVAILABLE:
-        print("   ⚠️ API non disponibile, uso default HP start time 11:00")
+        print("   ⚠️ API non disponibile, uso default HP start 11:00, end 15:30")
         return
     
     try:
         from api_client import load_settings_from_api
         settings = load_settings_from_api()
         hp_config = settings.get("high-priority", {})
-        hp_start = hp_config.get("hp_start_time")
         
+        # Carica hp_start_time
+        hp_start = hp_config.get("hp_start_time")
         if hp_start:
-            # Normalizza: rimuovi secondi se presenti
             if hp_start.count(':') == 2:
                 hp_start = ':'.join(hp_start.split(':')[:2])
             parts = hp_start.split(':')
@@ -77,11 +80,24 @@ def load_hp_settings():
                 h, m = int(parts[0]), int(parts[1])
                 HP_START_TIME_FROM_SETTINGS = (h, m)
                 print(f"   ✅ HP start time da settings: {h:02d}:{m:02d}")
-                return
+        else:
+            print(f"   ℹ️ hp_start_time non trovato, uso default 11:00")
         
-        print(f"   ℹ️ hp_start_time non trovato in settings, uso default 11:00")
+        # Carica hp_end_time (orario MAX in cui una task HP può INIZIARE)
+        hp_end = hp_config.get("hp_end_time")
+        if hp_end:
+            if hp_end.count(':') == 2:
+                hp_end = ':'.join(hp_end.split(':')[:2])
+            parts = hp_end.split(':')
+            if len(parts) >= 2:
+                h, m = int(parts[0]), int(parts[1])
+                HP_END_TIME_FROM_SETTINGS = (h, m)
+                print(f"   ✅ HP end time da settings: {h:02d}:{m:02d}")
+        else:
+            print(f"   ℹ️ hp_end_time non trovato, uso default 15:30")
+            
     except Exception as e:
-        print(f"   ⚠️ Errore caricamento settings: {e}, uso default 11:00")
+        print(f"   ⚠️ Errore caricamento settings: {e}, uso default")
 
 def get_hp_earliest(year: int, month: int, day: int) -> datetime:
     """Restituisce datetime per HP earliest start, da settings o default."""
@@ -89,6 +105,14 @@ def get_hp_earliest(year: int, month: int, day: int) -> datetime:
         h, m = HP_START_TIME_FROM_SETTINGS
     else:
         h, m = HP_HARD_EARLIEST_H, HP_HARD_EARLIEST_M
+    return datetime(year, month, day, h, m)
+
+def get_hp_latest(year: int, month: int, day: int) -> datetime:
+    """Restituisce datetime per HP latest start (orario max inizio task), da settings o default."""
+    if HP_END_TIME_FROM_SETTINGS:
+        h, m = HP_END_TIME_FROM_SETTINGS
+    else:
+        h, m = HP_HARD_LATEST_H, HP_HARD_LATEST_M
     return datetime(year, month, day, h, m)
 
 NEARBY_TRAVEL_THRESHOLD = 5  # da 7, minuti, soglia per considerare due apt "stesso blocco"
@@ -321,9 +345,10 @@ def evaluate_route(cleaner: Cleaner, route: List[Task]) -> Tuple[bool, List[Tupl
         else:
             start = arrival
     else:
-        # Usa HP start time da settings (se caricato) o default
+        # Usa HP start/end time da settings (se caricato) o default
         hp_hard_earliest = get_hp_earliest(arrival.year, arrival.month, arrival.day)
-        print(f"   🔍 DEBUG: Task {first.logistic_code} - arrival={fmt_hhmm(arrival)}, hp_earliest={fmt_hhmm(hp_hard_earliest)}, checkout={fmt_hhmm(first.checkout_dt) if first.checkout_dt else 'None'}")
+        hp_hard_latest = get_hp_latest(arrival.year, arrival.month, arrival.day)
+        print(f"   🔍 DEBUG: Task {first.logistic_code} - arrival={fmt_hhmm(arrival)}, hp_earliest={fmt_hhmm(hp_hard_earliest)}, hp_latest={fmt_hhmm(hp_hard_latest)}, checkout={fmt_hhmm(first.checkout_dt) if first.checkout_dt else 'None'}")
 
         # CRITICAL: Per task HP non-straordinaria, start deve essere >= hp_hard_earliest E >= checkout
         # Applica sempre ENTRAMBI i vincoli: checkout e hp_hard_earliest
@@ -334,6 +359,12 @@ def evaluate_route(cleaner: Cleaner, route: List[Task]) -> Tuple[bool, List[Tupl
         else:
             # start = max(arrival, hp_hard_earliest)
             start = max(arrival, hp_hard_earliest)
+        
+        # VINCOLO HP END TIME: la task non può INIZIARE dopo hp_hard_latest
+        if start > hp_hard_latest:
+            print(f"   ❌ Task {first.logistic_code} rifiutata: start {fmt_hhmm(start)} > hp_end_time {fmt_hhmm(hp_hard_latest)}")
+            return False, []
+        
         print(f"   🔍 DEBUG: Task {first.logistic_code} - CALCULATED start={fmt_hhmm(start)}")
 
     finish = start + timedelta(minutes=first.cleaning_time)
@@ -361,6 +392,7 @@ def evaluate_route(cleaner: Cleaner, route: List[Task]) -> Tuple[bool, List[Tupl
 
         # CRITICAL: Per task HP successive, applica anche hp_hard_earliest (non solo checkout)
         hp_earliest = get_hp_earliest(arrival.year, arrival.month, arrival.day)
+        hp_latest = get_hp_latest(arrival.year, arrival.month, arrival.day)
         
         if t.straordinaria:
             # Straordinaria: solo checkout constraint
@@ -374,6 +406,11 @@ def evaluate_route(cleaner: Cleaner, route: List[Task]) -> Tuple[bool, List[Tupl
                 cur = max(arrival, hp_earliest)
 
         start = cur
+        
+        # VINCOLO HP END TIME: la task non può INIZIARE dopo hp_latest
+        if not t.straordinaria and start > hp_latest:
+            print(f"   ❌ Task {t.logistic_code} rifiutata: start {fmt_hhmm(start)} > hp_end_time {fmt_hhmm(hp_latest)}")
+            return False, []
         finish = start + timedelta(minutes=t.cleaning_time)
 
         if t.checkin_dt and t.checkout_dt:
