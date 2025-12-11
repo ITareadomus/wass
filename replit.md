@@ -147,6 +147,12 @@ Preferred communication style: Simple, everyday language.
   - Added immediate UI feedback: timeline clears before async operations complete
   - State: `isResetting` tracks operation status for button/dialog disabling
   - Spinner shows in button during reset for user feedback
+- **Date/Time Picker Normalization** (task-card.tsx):
+  - Added `normalizeDate()` function to convert any date format to YYYY-MM-DD (HTML5 requirement)
+  - Added `normalizeTime()` function to convert any time format to HH:MM (HTML5 requirement)
+  - Applies normalization on input load and before opening native pickers (fixes "Failed to show ShowPicker" errors)
+  - Normalizes date/time in `isOverdue()` calculation to restore red blinking animation for overdue tasks
+  - Handles formats: ISO dates, timestamps, HH:MM:SS times from ADAM database
 
 ## Component Architecture
 - **Modular Design**: Separate components for drag-drop interface, timeline view, statistics panel, and map section
