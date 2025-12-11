@@ -150,11 +150,16 @@ def parse_dt(d: Optional[str], t: Optional[str]) -> Optional[datetime]:
     if not d or not t:
         return None
     try:
+        # Normalizza data: gestisci formato ISO timestamp (es. "2025-12-13T00:00:00.000Z" -> "2025-12-13")
+        normalized_d = d
+        if 'T' in d:
+            normalized_d = d.split('T')[0]
+        
         # Normalizza tempo: rimuovi secondi se presenti (es. "11:00:00" -> "11:00")
         normalized_t = t
         if t and t.count(':') == 2:
             normalized_t = ':'.join(t.split(':')[:2])
-        return datetime.strptime(f"{d} {normalized_t}", "%Y-%m-%d %H:%M")
+        return datetime.strptime(f"{normalized_d} {normalized_t}", "%Y-%m-%d %H:%M")
     except Exception:
         return None
 
