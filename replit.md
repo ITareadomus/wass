@@ -42,12 +42,17 @@ Preferred communication style: Simple, everyday language.
   - `daily_containers_revisions`: Container revision metadata
   - `daily_containers_history`: All container revisions for undo
   - `daily_selected_cleaners`: Selected cleaners per work_date (INTEGER[] array of cleaner IDs)
+  - `selected_cleaners_revisions`: Revision history for selected_cleaners changes (ADD, REMOVE, SWAP, ROLLBACK)
   - `cleaners`: Full cleaner data per work_date (replaces cleaners.json)
-  - `cleaners_history`: Cleaner snapshots for audit/rollback
+  - `cleaner_aliases`: Permanent aliases for cleaners (date-independent, replaces alias column)
   - `app_settings`: Key-value store for application settings (replaces settings.json, client_timewindows.json)
   - `users`: User accounts with hashed passwords (replaces accounts.json)
+- **Removed Tables (December 2025)**:
+  - `cleaners_history`: Removed - no longer needed for audit
 - **Container Task Fields**: task_id, logistic_code, client_id, premium, address, lat, lng, cleaning_time, checkin_date, checkout_date, checkin_time, checkout_time, pax_in, pax_out, small_equipment, operation_id, confirmed_operation, straordinaria, type_apt, alias, customer_name, reasons, priority
 - **Undo Flow**: When task moves container→timeline, containers history saved first for rollback
+- **Selected Cleaners Revisions**: Every change to daily_selected_cleaners is tracked with before/after state, action type, and performer
+- **Cleaner Aliases**: Permanent table for cleaner display names, independent of work_date
 - **Service File**: `server/services/pg-daily-assignments-service.ts`
 
 ## Timeline Data Flow (December 2025) - PostgreSQL Only

@@ -45,18 +45,50 @@ export class PgDailyAssignmentsService {
 
   /**
    * Ensure cleaners table has alias column (migration)
+   * NOTE: cleaners_history è stata rimossa - gli alias sono ora in cleaner_aliases
    */
   async ensureAliasColumn(): Promise<void> {
     try {
+      // Ensure alias column exists on cleaners table (legacy, per backward compat)
       await query(`
         ALTER TABLE cleaners ADD COLUMN IF NOT EXISTS alias TEXT DEFAULT NULL
       `);
+      // Create cleaner_aliases table if not exists
       await query(`
-        ALTER TABLE cleaners_history ADD COLUMN IF NOT EXISTS alias TEXT DEFAULT NULL
+        CREATE TABLE IF NOT EXISTS cleaner_aliases (
+          cleaner_id INTEGER PRIMARY KEY,
+          alias VARCHAR(100) NOT NULL,
+          name VARCHAR(255),
+          lastname VARCHAR(255),
+          created_at TIMESTAMP DEFAULT NOW(),
+          updated_at TIMESTAMP DEFAULT NOW()
+        )
       `);
-      console.log('✅ PG: Colonna alias verificata/aggiunta alla tabella cleaners');
+      // Create selected_cleaners_revisions table if not exists
+      await query(`
+        CREATE TABLE IF NOT EXISTS selected_cleaners_revisions (
+          id SERIAL PRIMARY KEY,
+          selected_cleaners_id INTEGER NOT NULL,
+          work_date DATE NOT NULL,
+          revision_number INTEGER NOT NULL,
+          cleaners_before INTEGER[] NOT NULL DEFAULT '{}',
+          cleaners_after INTEGER[] NOT NULL DEFAULT '{}',
+          action_type VARCHAR(30) NOT NULL,
+          action_payload JSONB,
+          performed_by VARCHAR(100),
+          created_at TIMESTAMP DEFAULT NOW(),
+          UNIQUE (selected_cleaners_id, revision_number)
+        )
+      `);
+      await query(`
+        CREATE INDEX IF NOT EXISTS idx_sel_cleaners_revisions_date
+        ON selected_cleaners_revisions(work_date)
+      `);
+      // Drop deprecated cleaners_history table (no longer needed)
+      await query(`DROP TABLE IF EXISTS cleaners_history CASCADE`);
+      console.log('✅ PG: Tabelle cleaner_aliases e selected_cleaners_revisions verificate, cleaners_history rimossa');
     } catch (error) {
-      console.warn('⚠️ PG: Errore (ignorabile) nella migrazione alias:', error);
+      console.warn('⚠️ PG: Errore (ignorabile) nella migrazione:', error);
     }
   }
 
@@ -1109,23 +1141,177 @@ export class PgDailyAssignmentsService {
   }
 
   /**
-   * Save selected cleaner IDs for a work_date (upsert)
+   * Save selected cleaner IDs for a work_date (upsert) with revision tracking
    * @param cleanerIds - Array of cleaner IDs (integers)
+   * @param actionType - Type of action: 'ADD', 'REMOVE', 'SWAP', 'ROLLBACK', 'INIT'
+   * @param actionPayload - Optional JSON payload with action details
+   * @param performedBy - Username/identifier of who performed the action
    */
-  async saveSelectedCleaners(workDate: string, cleanerIds: number[]): Promise<boolean> {
+  async saveSelectedCleaners(
+    workDate: string, 
+    cleanerIds: number[], 
+    actionType: string = 'MANUAL',
+    actionPayload: any = null,
+    performedBy: string = 'system'
+  ): Promise<boolean> {
+    const client = await pool.connect();
     try {
-      // Use PostgreSQL array syntax for integer[]
-      await query(`
-        INSERT INTO daily_selected_cleaners (work_date, cleaners, updated_at)
-        VALUES ($1, $2::integer[], NOW())
-        ON CONFLICT (work_date) 
-        DO UPDATE SET cleaners = $2::integer[], updated_at = NOW()
-      `, [workDate, cleanerIds]);
+      await client.query('BEGIN');
+
+      // 1. Load current state (before)
+      const currentResult = await client.query(
+        'SELECT id, cleaners FROM daily_selected_cleaners WHERE work_date = $1',
+        [workDate]
+      );
+      const cleanersBefore: number[] = currentResult.rows[0]?.cleaners || [];
+      let selectedCleanersId = currentResult.rows[0]?.id;
+
+      // 2. Insert/update the main record
+      if (selectedCleanersId) {
+        await client.query(`
+          UPDATE daily_selected_cleaners 
+          SET cleaners = $2::integer[], updated_at = NOW()
+          WHERE id = $1
+        `, [selectedCleanersId, cleanerIds]);
+      } else {
+        const insertResult = await client.query(`
+          INSERT INTO daily_selected_cleaners (work_date, cleaners, updated_at)
+          VALUES ($1, $2::integer[], NOW())
+          RETURNING id
+        `, [workDate, cleanerIds]);
+        selectedCleanersId = insertResult.rows[0].id;
+      }
+
+      // 3. Calculate revision number and save revision (only if there's a real change)
+      const beforeSorted = [...cleanersBefore].sort((a, b) => a - b);
+      const afterSorted = [...cleanerIds].sort((a, b) => a - b);
+      const hasChanged = JSON.stringify(beforeSorted) !== JSON.stringify(afterSorted);
+
+      if (hasChanged && actionType !== 'INIT') {
+        const revResult = await client.query(`
+          SELECT COALESCE(MAX(revision_number), 0) + 1 as next_rev
+          FROM selected_cleaners_revisions
+          WHERE selected_cleaners_id = $1
+        `, [selectedCleanersId]);
+        const revisionNumber = revResult.rows[0].next_rev;
+
+        await client.query(`
+          INSERT INTO selected_cleaners_revisions 
+          (selected_cleaners_id, work_date, revision_number, cleaners_before, cleaners_after, action_type, action_payload, performed_by)
+          VALUES ($1, $2, $3, $4::integer[], $5::integer[], $6, $7, $8)
+        `, [
+          selectedCleanersId,
+          workDate,
+          revisionNumber,
+          cleanersBefore,
+          cleanerIds,
+          actionType,
+          actionPayload ? JSON.stringify(actionPayload) : null,
+          performedBy
+        ]);
+        console.log(`📝 PG: Revision ${revisionNumber} salvata per ${workDate} (${actionType})`);
+      }
+
+      await client.query('COMMIT');
       console.log(`✅ PG: Selected cleaners salvati per ${workDate}: ${cleanerIds.length} IDs`);
       return true;
     } catch (error) {
+      await client.query('ROLLBACK');
       console.error('❌ PG: Errore nel salvataggio selected cleaners:', error);
       return false;
+    } finally {
+      client.release();
+    }
+  }
+
+  /**
+   * Rollback selected cleaners to a specific revision
+   */
+  async rollbackSelectedCleaners(workDate: string, toRevisionNumber: number, performedBy: string = 'system'): Promise<boolean> {
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+
+      // Get the revision to rollback to
+      const revResult = await client.query(`
+        SELECT cleaners_before, selected_cleaners_id 
+        FROM selected_cleaners_revisions 
+        WHERE work_date = $1 AND revision_number = $2
+      `, [workDate, toRevisionNumber]);
+
+      if (revResult.rows.length === 0) {
+        console.error(`❌ PG: Revision ${toRevisionNumber} non trovata per ${workDate}`);
+        await client.query('ROLLBACK');
+        return false;
+      }
+
+      const cleanersToRestore = revResult.rows[0].cleaners_before;
+      const selectedCleanersId = revResult.rows[0].selected_cleaners_id;
+
+      // Get current state for the new revision record
+      const currentResult = await client.query(
+        'SELECT cleaners FROM daily_selected_cleaners WHERE work_date = $1',
+        [workDate]
+      );
+      const cleanersBefore = currentResult.rows[0]?.cleaners || [];
+
+      // Update selected_cleaners
+      await client.query(`
+        UPDATE daily_selected_cleaners 
+        SET cleaners = $1::integer[], updated_at = NOW()
+        WHERE work_date = $2
+      `, [cleanersToRestore, workDate]);
+
+      // Create a new revision with ROLLBACK action
+      const nextRevResult = await client.query(`
+        SELECT COALESCE(MAX(revision_number), 0) + 1 as next_rev
+        FROM selected_cleaners_revisions
+        WHERE selected_cleaners_id = $1
+      `, [selectedCleanersId]);
+
+      await client.query(`
+        INSERT INTO selected_cleaners_revisions 
+        (selected_cleaners_id, work_date, revision_number, cleaners_before, cleaners_after, action_type, action_payload, performed_by)
+        VALUES ($1, $2, $3, $4::integer[], $5::integer[], 'ROLLBACK', $6, $7)
+      `, [
+        selectedCleanersId,
+        workDate,
+        nextRevResult.rows[0].next_rev,
+        cleanersBefore,
+        cleanersToRestore,
+        JSON.stringify({ rolled_back_to_revision: toRevisionNumber }),
+        performedBy
+      ]);
+
+      await client.query('COMMIT');
+      console.log(`✅ PG: Rollback a revision ${toRevisionNumber} completato per ${workDate}`);
+      return true;
+    } catch (error) {
+      await client.query('ROLLBACK');
+      console.error('❌ PG: Errore nel rollback selected cleaners:', error);
+      return false;
+    } finally {
+      client.release();
+    }
+  }
+
+  /**
+   * Get revision history for a work_date
+   */
+  async getSelectedCleanersRevisions(workDate: string): Promise<any[]> {
+    try {
+      const result = await query(`
+        SELECT 
+          revision_number, cleaners_before, cleaners_after, 
+          action_type, action_payload, performed_by, created_at
+        FROM selected_cleaners_revisions 
+        WHERE work_date = $1
+        ORDER BY revision_number DESC
+      `, [workDate]);
+      return result.rows;
+    } catch (error) {
+      console.error('❌ PG: Errore nel caricamento revisions:', error);
+      return [];
     }
   }
 
@@ -1208,43 +1394,36 @@ export class PgDailyAssignmentsService {
   /**
    * Save/upsert cleaners for a work_date (bulk insert)
    * Replaces all cleaners for the date
+   * NOTE: Aliases are now stored in cleaner_aliases table (permanent, date-independent)
    */
   async saveCleanersForDate(workDate: string, cleaners: any[], snapshotReason?: string): Promise<boolean> {
     const client = await pool.connect();
     try {
       await client.query('BEGIN');
 
-      // Save to history first if snapshotReason provided
-      if (snapshotReason) {
-        await client.query(`
-          INSERT INTO cleaners_history 
-          (cleaner_id, work_date, name, lastname, role, active, ranking,
-           counter_hours, counter_days, available, contract_type,
-           preferred_customers, telegram_id, start_time, can_do_straordinaria, alias,
-           snapshot_at, snapshot_reason)
-          SELECT 
-            cleaner_id, work_date, name, lastname, role, active, ranking,
-            counter_hours, counter_days, available, contract_type,
-            preferred_customers, telegram_id, start_time, can_do_straordinaria, alias,
-            NOW(), $2
-          FROM cleaners 
-          WHERE work_date = $1
-        `, [workDate, snapshotReason]);
-      }
-
-      // Save existing aliases before deletion
-      const existingAliases = await client.query(`
-        SELECT cleaner_id, alias FROM cleaners 
-        WHERE work_date = $1 AND alias IS NOT NULL
-      `, [workDate]);
-      const aliasMap = new Map(existingAliases.rows.map((r: any) => [r.cleaner_id, r.alias]));
+      // Load permanent aliases from cleaner_aliases table
+      const permanentAliases = await client.query(`
+        SELECT cleaner_id, alias, name, lastname FROM cleaner_aliases
+      `);
+      const aliasMap = new Map(permanentAliases.rows.map((r: any) => [r.cleaner_id, r.alias]));
 
       // Delete existing cleaners for this date
       await client.query('DELETE FROM cleaners WHERE work_date = $1', [workDate]);
 
-      // Insert new cleaners, preserving aliases
+      // Insert new cleaners (alias column kept for backward compat, but read from cleaner_aliases)
       for (const cleaner of cleaners) {
-        const preservedAlias = aliasMap.get(cleaner.id) || cleaner.alias || null;
+        // Use alias from cleaner_aliases if exists, otherwise from cleaner object
+        const alias = aliasMap.get(cleaner.id) || cleaner.alias || null;
+        
+        // If cleaner has a new alias, save it to cleaner_aliases (permanent)
+        if (cleaner.alias && !aliasMap.has(cleaner.id)) {
+          await client.query(`
+            INSERT INTO cleaner_aliases (cleaner_id, alias, name, lastname, updated_at)
+            VALUES ($1, $2, $3, $4, NOW())
+            ON CONFLICT (cleaner_id) DO UPDATE SET alias = $2, updated_at = NOW()
+          `, [cleaner.id, cleaner.alias, cleaner.name, cleaner.lastname]);
+        }
+        
         await client.query(`
           INSERT INTO cleaners 
           (cleaner_id, work_date, name, lastname, role, active, ranking,
@@ -1268,7 +1447,7 @@ export class PgDailyAssignmentsService {
           cleaner.telegram_id || null,
           cleaner.start_time || '09:00',
           cleaner.can_do_straordinaria || false,
-          preservedAlias
+          alias // Still write to cleaners.alias for backward compat
         ]);
       }
 
@@ -1286,6 +1465,7 @@ export class PgDailyAssignmentsService {
 
   /**
    * Update a single cleaner's field (e.g., start_time)
+   * NOTE: For alias updates, this also saves to cleaner_aliases table
    */
   async updateCleanerField(cleanerId: number, workDate: string, field: string, value: any): Promise<boolean> {
     const allowedFields = ['start_time', 'available', 'active', 'ranking', 'counter_hours', 'counter_days', 'alias'];
@@ -1295,6 +1475,25 @@ export class PgDailyAssignmentsService {
     }
 
     try {
+      // For alias updates, also save to permanent cleaner_aliases table
+      if (field === 'alias' && value) {
+        // Get cleaner name/lastname for the alias record
+        const cleanerData = await query(
+          'SELECT name, lastname FROM cleaners WHERE cleaner_id = $1 AND work_date = $2',
+          [cleanerId, workDate]
+        );
+        const name = cleanerData.rows[0]?.name || null;
+        const lastname = cleanerData.rows[0]?.lastname || null;
+        
+        await query(`
+          INSERT INTO cleaner_aliases (cleaner_id, alias, name, lastname, updated_at)
+          VALUES ($1, $2, $3, $4, NOW())
+          ON CONFLICT (cleaner_id) DO UPDATE SET alias = $2, updated_at = NOW()
+        `, [cleanerId, value, name, lastname]);
+        console.log(`✅ PG: Alias permanente salvato per cleaner ${cleanerId}: ${value}`);
+      }
+      
+      // Also update the cleaners table (for backward compat)
       await query(`
         UPDATE cleaners 
         SET ${field} = $1, updated_at = NOW()
@@ -1305,6 +1504,112 @@ export class PgDailyAssignmentsService {
     } catch (error) {
       console.error(`❌ PG: Errore nell'aggiornamento cleaner ${cleanerId}:`, error);
       return false;
+    }
+  }
+
+  // ==================== CLEANER ALIASES (PERMANENT) ====================
+
+  /**
+   * Get alias for a cleaner (from permanent cleaner_aliases table)
+   */
+  async getCleanerAlias(cleanerId: number): Promise<string | null> {
+    try {
+      const result = await query(
+        'SELECT alias FROM cleaner_aliases WHERE cleaner_id = $1',
+        [cleanerId]
+      );
+      return result.rows[0]?.alias || null;
+    } catch (error) {
+      console.error(`❌ PG: Errore nel caricamento alias per cleaner ${cleanerId}:`, error);
+      return null;
+    }
+  }
+
+  /**
+   * Get all cleaner aliases
+   */
+  async getAllCleanerAliases(): Promise<Map<number, { alias: string; name?: string; lastname?: string }>> {
+    try {
+      const result = await query('SELECT cleaner_id, alias, name, lastname FROM cleaner_aliases');
+      const aliasMap = new Map();
+      for (const row of result.rows) {
+        aliasMap.set(row.cleaner_id, {
+          alias: row.alias,
+          name: row.name,
+          lastname: row.lastname
+        });
+      }
+      return aliasMap;
+    } catch (error) {
+      console.error('❌ PG: Errore nel caricamento aliases:', error);
+      return new Map();
+    }
+  }
+
+  /**
+   * Save/update a cleaner alias (permanent, date-independent)
+   */
+  async saveCleanerAlias(cleanerId: number, alias: string, name?: string, lastname?: string): Promise<boolean> {
+    try {
+      await query(`
+        INSERT INTO cleaner_aliases (cleaner_id, alias, name, lastname, updated_at)
+        VALUES ($1, $2, $3, $4, NOW())
+        ON CONFLICT (cleaner_id) 
+        DO UPDATE SET alias = $2, name = COALESCE($3, cleaner_aliases.name), 
+                      lastname = COALESCE($4, cleaner_aliases.lastname), updated_at = NOW()
+      `, [cleanerId, alias, name || null, lastname || null]);
+      console.log(`✅ PG: Alias salvato per cleaner ${cleanerId}: ${alias}`);
+      return true;
+    } catch (error) {
+      console.error(`❌ PG: Errore nel salvataggio alias per cleaner ${cleanerId}:`, error);
+      return false;
+    }
+  }
+
+  /**
+   * Delete a cleaner alias
+   */
+  async deleteCleanerAlias(cleanerId: number): Promise<boolean> {
+    try {
+      await query('DELETE FROM cleaner_aliases WHERE cleaner_id = $1', [cleanerId]);
+      console.log(`✅ PG: Alias rimosso per cleaner ${cleanerId}`);
+      return true;
+    } catch (error) {
+      console.error(`❌ PG: Errore nella rimozione alias per cleaner ${cleanerId}:`, error);
+      return false;
+    }
+  }
+
+  /**
+   * Import aliases from JSON format (for migration)
+   */
+  async importAliasesFromJson(aliasData: Record<string, { name: string; lastname: string; alias: string }>): Promise<number> {
+    let imported = 0;
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      for (const [cleanerIdStr, data] of Object.entries(aliasData)) {
+        const cleanerId = parseInt(cleanerIdStr, 10);
+        if (isNaN(cleanerId)) continue;
+        
+        await client.query(`
+          INSERT INTO cleaner_aliases (cleaner_id, alias, name, lastname, updated_at)
+          VALUES ($1, $2, $3, $4, NOW())
+          ON CONFLICT (cleaner_id) 
+          DO UPDATE SET alias = EXCLUDED.alias, name = EXCLUDED.name, 
+                        lastname = EXCLUDED.lastname, updated_at = NOW()
+        `, [cleanerId, data.alias, data.name, data.lastname]);
+        imported++;
+      }
+      await client.query('COMMIT');
+      console.log(`✅ PG: ${imported} aliases importati`);
+      return imported;
+    } catch (error) {
+      await client.query('ROLLBACK');
+      console.error('❌ PG: Errore nell\'import aliases:', error);
+      return 0;
+    } finally {
+      client.release();
     }
   }
 }
