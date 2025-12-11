@@ -58,8 +58,9 @@ conn = mysql.connector.connect(**db_config)
 cur = conn.cursor(dictionary=True)
 
 # 1) Lista cleaners (7=Standard, 13=Formatore, 15=Premium)
-# NOTE: Non selezionare tw_start - useremo solo custom start_time da PostgreSQL
-cur.execute("""        SELECT id, name, lastname, user_role_id, active, contract_type_id, telegram_id
+# NOTA: Leggiamo tw_start da ADAM per usarlo come default se non c'è custom PostgreSQL
+cur.execute("""
+    SELECT id, name, lastname, user_role_id, active, contract_type_id, telegram_id, tw_start
     FROM app_users 
     WHERE user_role_id IN (7, 13, 15) AND active = 1;
 """)
@@ -192,8 +193,18 @@ for u in cleaners:
     # Lopez (132), El Hadji (495), Henry (644), Chidi (249)
     straordinaria_authorized = {132, 495, 644, 249}
 
-    # Usa start time custom se disponibile in PostgreSQL, altrimenti None (il backend userà il default 10:00)
-    start_time = custom_start_times.get(cid)
+    # Gerarchia start_time:
+    # 1. PostgreSQL custom (date-scoped) se disponibile
+    # 2. tw_start da ADAM se disponibile e non vuoto
+    # 3. None → il backend applicherà il default 10:00
+    if cid in custom_start_times:
+        # Custom start_time da PostgreSQL (ha priorità assoluta)
+        start_time = custom_start_times[cid]
+    else:
+        # Prova tw_start da ADAM
+        adam_tw_start = u.get("tw_start")
+        # Gestisci il caso di stringa vuota o None
+        start_time = adam_tw_start if adam_tw_start else None
 
     # counter_hours (somma delle ore lavorate nella settimana target, NON ieri)
     # Ogni task nella settimana conta per task_duration in MINUTI diviso 60
