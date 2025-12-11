@@ -315,7 +315,8 @@ export default function Convocazioni() {
       const dataToSave = {
         cleaners: selectedCleanersData,
         total_selected: selectedCleanersData.length,
-        date: dateStr
+        date: dateStr,
+        action_type: 'replace'
       };
 
       const response = await fetch('/api/save-selected-cleaners', {
@@ -399,7 +400,8 @@ export default function Convocazioni() {
       const dataToSave = {
         cleaners: mergedCleaners,
         total_selected: mergedCleaners.length,
-        date: dateStr
+        date: dateStr,
+        action_type: 'add'
       };
 
       const response = await fetch('/api/save-selected-cleaners', {
