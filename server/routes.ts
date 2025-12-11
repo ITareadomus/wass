@@ -2748,10 +2748,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         output: stdout
       });
     } catch (error: any) {
-      console.error("Errore durante l'estrazione dei cleaners (ottimizzato):", error);
-      res.status(500).json({
+      console.error("Errore durante l'estrazione dei cleaners (ottimizzato):", error.message);
+      // Return 200 with success:false to avoid blocking UI
+      res.status(200).json({
         success: false,
-        message: "Errore durante l'estrazione dei cleaners (ottimizzato)",
+        message: "Impossibile estrarre cleaners dal database ADAM. Verifica la connessione o usa i cleaners da PostgreSQL.",
         error: error.message,
         stderr: error.stderr
       });
@@ -3273,22 +3274,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const createdBy = created_by || 'unknown';
       const assignedDir = path.join(process.cwd(), 'client/public/data/assigned');
 
-      // CRITICAL: Esegui SEMPRE extract_cleaners_optimized.py per avere i cleaners aggiornati
+      // CRITICAL: Esegui extract_cleaners_optimized.py ma non bloccare se fallisce
       console.log(`🔄 Estrazione cleaners dal database per ${date}...`);
-      const extractCleanersResult = await new Promise<string>((resolve, reject) => {
-        exec(
-          `python3 client/public/scripts/extract_cleaners_optimized.py ${date}`,
-          (error, stdout, stderr) => {
-            if (error) {
-              console.error("Errore extract_cleaners_optimized:", stderr);
-              reject(new Error(stderr || error.message));
-            } else {
-              resolve(stdout);
+      let extractCleanersResult = '';
+      try {
+        const extractResult = await new Promise<string>((resolve, reject) => {
+          exec(
+            `python3 client/public/scripts/extract_cleaners_optimized.py ${date}`,
+            { timeout: 30000 },
+            (error, stdout, stderr) => {
+              if (error) {
+                console.warn("⚠️ extract_cleaners_optimized fallito, userò cleaners da PostgreSQL:", stderr?.substring(0, 200));
+                resolve(''); // Non bloccare il flusso
+              } else {
+                resolve(stdout);
+              }
             }
-          }
-        );
-      });
-      console.log("extract_cleaners_optimized output:", extractCleanersResult);
+          );
+        });
+        extractCleanersResult = extractResult;
+      } catch (err: any) {
+        console.warn("⚠️ extract_cleaners_optimized timeout/errore, procedo con PostgreSQL");
+      }
+      console.log("extract_cleaners_optimized output (se disponibile):", extractCleanersResult.substring(0, 500));
 
       // CRITICAL: NON resettare timeline - preservala sempre
       // Anche se la data cambia, mantieni le assegnazioni esistenti
