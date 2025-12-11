@@ -710,7 +710,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       console.log(`📖 GET /api/timeline - Caricamento timeline per ${workDate}`);
 
-      // Carica la timeline da PostgreSQL (con fallback su MySQL e filesystem)
+      // Carica la timeline da PostgreSQL
       const timeline = await workspaceFiles.loadTimeline(workDate);
 
       if (!timeline) {
@@ -772,7 +772,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Endpoint per leggere i cleaners selezionati da PostgreSQL/MySQL
+  // Endpoint per leggere i cleaners selezionati da PostgreSQL
   // Il frontend dovrebbe usare questo endpoint invece di leggere direttamente selected_cleaners.json
   app.get("/api/selected-cleaners", async (req, res) => {
     try {
@@ -1617,22 +1617,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Endpoint per verificare SE esistono assegnazioni salvate in MySQL (senza caricarle)
+  // Endpoint per verificare SE esistono assegnazioni salvate nel database (senza caricarle)
   app.post("/api/check-saved-assignments", async (req, res) => {
     try {
-      const { dailyAssignmentRevisionsService } = await import("./services/daily-assignment-revisions-service");
-
       const workDate = req.body?.date || format(new Date(), "yyyy-MM-dd");
+      const { pgDailyAssignmentsService } = await import("./services/pg-daily-assignments-service");
 
-      const revision = await dailyAssignmentRevisionsService.getLatestRevision(workDate);
+      // Usa la tabella daily_assignments_revisions (PostgreSQL) come sorgente di verità
+      const revisions = await pgDailyAssignmentsService.getHistoryRevisions(workDate);
 
-      if (revision) {
-        const d = new Date(workDate);
+      if (revisions && revisions.length > 0) {
+        const latest = revisions[0];
+        const createdAt = latest.created_at ? new Date(latest.created_at) : new Date(workDate);
+
         return res.json({
           success: true,
           found: true,
-          revision: revision.revision,
-          formattedDateTime: format(d, "dd/MM/yyyy", { locale: it })
+          revision: latest.revision,
+          formattedDateTime: format(createdAt, "dd/MM/yyyy HH:mm", { locale: it })
         });
       }
 
@@ -1648,22 +1650,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // [DEPRECATED] Endpoint per confermare le assegnazioni - ora il salvataggio è automatico su MySQL
+  // [DEPRECATED] Endpoint per confermare le assegnazioni - ora il salvataggio è automatico su PostgreSQL
   app.post("/api/confirm-assignments", async (req, res) => {
     // Questo endpoint non è più necessario - il salvataggio avviene automaticamente
-    // via workspace-files.ts che crea revisioni in MySQL ad ogni modifica
+    // via workspace-files.ts che salva in PostgreSQL ad ogni modifica
     console.log("[DEPRECATED] /api/confirm-assignments chiamato - salvataggio automatico già attivo");
     res.json({ success: true, message: "Salvataggio automatico attivo - questo endpoint è deprecato" });
   });
 
-  // Endpoint per caricare assegnazioni salvate da MySQL
+  // Endpoint per caricare assegnazioni salvate dal database (PostgreSQL)
   app.post("/api/load-saved-assignments", async (req, res) => {
     try {
       const workDate = req.body?.date || format(new Date(), "yyyy-MM-dd");
 
-      console.log(`📥 Caricamento assegnazioni da MySQL per ${workDate}...`);
+      console.log(`📥 Caricamento assegnazioni dal database per ${workDate}...`);
 
-      // Carica timeline, selected_cleaners E CONTAINERS da MySQL via workspace-files
+      // Carica timeline, selected_cleaners E CONTAINERS da PostgreSQL via workspace-files
       const timelineData = await workspaceFiles.loadTimeline(workDate);
       const selectedCleanersData = await workspaceFiles.loadSelectedCleaners(workDate);
       let containersData = await workspaceFiles.loadContainers(workDate);
@@ -1744,9 +1746,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.log(`✅ Containers sincronizzati: rimosse ${removedCount} task già assegnate, salvati su PostgreSQL`);
       } catch (err) {
         console.error('❌ Errore nella rigenerazione containers:', err);
-        // Fallback: se c'è un errore, usa i containers salvati in MySQL se disponibili
         if (!containersData) {
-          console.warn('⚠️ Impossibile rigenerare containers e nessun dato in MySQL');
+          console.warn('⚠️ Impossibile rigenerare containers e nessun dato containers salvato disponibile');
         }
       }
 
@@ -1795,7 +1796,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         found: true,
         formattedDateTime,
         data: timelineData,
-        message: `Assegnazioni caricate da MySQL per ${workDate}`
+        message: `Assegnazioni caricate dal database per ${workDate}`
       });
     } catch (error: any) {
       console.error("Errore nel caricamento delle assegnazioni:", error);
@@ -1848,7 +1849,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Get username from request
       const currentUsername = req.body.modified_by || getCurrentUsername(req);
 
-      // Salva selected_cleaners usando workspace helper (dual-write: filesystem + MySQL)
+      // Salva selected_cleaners usando workspace helper (PostgreSQL + filesystem come cache)
       await workspaceFiles.saveSelectedCleaners(workDate, selectedData, false, currentUsername);
 
       let message = "";
@@ -2446,7 +2447,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
             }
 
             // Salva timeline su PostgreSQL (skipRevision=true)
-            // La revisione MySQL viene creata da /api/save-selected-cleaners al termine
             await workspaceFiles.saveTimeline(workDate, timelineData, true);
           }
         }
@@ -2605,20 +2605,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ success: false, error: "Task non trovata" });
       }
 
-      // Prepara opzioni di tracking per MySQL history
+      // Prepara opzioni di tracking per history
       const editOptions = editedFields.length > 0 ? {
         editedField: editedFields.join(', '),
         oldValue: oldValues.join(', '),
         newValue: newValues.join(', ')
       } : undefined;
 
-      // Salva containers (filesystem + MySQL)
+      // Salva containers (PostgreSQL)
       await workspaceFiles.saveContainers(workDate, containersData);
       
-      // Salva timeline con tracking delle modifiche (skipRevision=false per creare revision in MySQL)
+      // Salva timeline con tracking delle modifiche (skipRevision=false per creare revision in PostgreSQL)
       await workspaceFiles.saveTimeline(workDate, timelineData, false, currentUsername, 'task_edit', editOptions);
 
-      // CRITICAL: Propaga le modifiche al database MySQL (app_housekeeping E wass_housekeeping)
+      // CRITICAL: Propaga le modifiche al database ADAM (wass_housekeeping)
       if (taskId) {
         try {
           const mysql = await import('mysql2/promise');
@@ -2669,8 +2669,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
             await connection.end();
           }
         } catch (dbError: any) {
-          console.error('⚠️ Errore aggiornamento database MySQL:', dbError.message);
-          // Non bloccare la risposta, i file JSON sono comunque salvati
+          console.error('⚠️ Errore aggiornamento database ADAM:', dbError.message);
+          // Non bloccare la risposta, PostgreSQL è comunque salvato
         }
       }
 
@@ -4335,31 +4335,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Endpoint per eliminare revisioni MySQL per una data specifica (pulizia dati errati)
-  app.delete("/api/mysql-revisions/:workDate", async (req, res) => {
-    try {
-      const { workDate } = req.params;
-      const { dailyAssignmentRevisionsService } = await import("./services/daily-assignment-revisions-service");
-
-      if (!workDate || !/^\d{4}-\d{2}-\d{2}$/.test(workDate)) {
-        return res.status(400).json({
-          success: false,
-          error: "Data non valida. Formato richiesto: YYYY-MM-DD"
-        });
-      }
-
-      const deletedCount = await dailyAssignmentRevisionsService.deleteAllRevisionsForDate(workDate);
-
-      res.json({
-        success: true,
-        deletedCount,
-        message: `Eliminate ${deletedCount} revisioni MySQL per ${workDate}`
-      });
-    } catch (error: any) {
-      console.error("Errore nella cancellazione revisioni MySQL:", error);
-      res.status(500).json({ success: false, error: error.message });
-    }
-  });
 
 
   // Endpoint per sincronizzare checkin_time/checkout_time dal database ADAM alle task nella timeline
