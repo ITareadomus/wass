@@ -598,10 +598,10 @@ export default function TaskCard({
     const taskObj = displayTask as any;
     const startTime = assignmentTimes.start_time || taskObj.start_time || taskObj.startTime;
     const endTime = assignmentTimes.end_time || taskObj.end_time || taskObj.endTime;
-    const checkoutTime = taskObj.checkout_time;
-    const checkinTime = taskObj.checkin_time;
-    const checkoutDate = taskObj.checkout_date;
-    const checkinDate = taskObj.checkin_date;
+    const checkoutTime = normalizeTime(taskObj.checkout_time);
+    const checkinTime = normalizeTime(taskObj.checkin_time);
+    const checkoutDate = normalizeDate(taskObj.checkout_date);
+    const checkinDate = normalizeDate(taskObj.checkin_date);
 
     if (!isInTimeline) return false;
 
