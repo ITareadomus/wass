@@ -679,26 +679,32 @@ export default function TimelineView({
   // Funzione per caricare i cleaner disponibili (non già in timeline)
   const loadAvailableCleaners = async () => {
     try {
-      // CRITICAL: Prima estrai i cleaners dal database per la data corrente
-      // Questo assicura che anche per date future (es. domani) i cleaners siano disponibili
-      console.log(`🔄 Estrazione cleaners dal database per ${workDate}...`);
-      const extractResponse = await fetch('/api/extract-cleaners-optimized', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ date: workDate })
-      });
+      // Non bloccare se l'estrazione fallisce - continua con i cleaners da PostgreSQL
+      try {
+        console.log(`🔄 Estrazione cleaners dal database per ${workDate}...`);
+        const extractResponse = await fetch('/api/extract-cleaners-optimized', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ date: workDate })
+        });
 
-      if (!extractResponse.ok) {
-        console.error('Errore durante l\'estrazione dei cleaners');
-      } else {
-        const extractResult = await extractResponse.json();
-        console.log('✅ Cleaners estratti:', extractResult);
+        if (extractResponse.ok) {
+          const extractResult = await extractResponse.json();
+          if (extractResult.success) {
+            console.log('✅ Cleaners estratti:', extractResult);
+          } else {
+            console.warn('⚠️ Estrazione non disponibile, uso cleaners da PostgreSQL');
+          }
+        }
+      } catch (err) {
+        console.warn('⚠️ Estrazione cleaners fallita (ADAM unavailable), proceedo con PostgreSQL');
       }
 
       // Carica tutti i cleaners per la data corrente da API (PostgreSQL)
       const cleanersResponse = await fetch(`/api/cleaners?date=${workDate}`, {
         cache: 'no-store',
-        headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' }
+        headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' },
+        signal: AbortSignal.timeout(15000) // Timeout di 15 secondi
       });
 
       if (!cleanersResponse.ok) {
@@ -715,7 +721,9 @@ export default function TimelineView({
       // CRITICAL: Filtra cleaners già presenti in timeline (sia selezionati che rimossi)
       // Questo previene di avere duplicati (cleaner rimosso + stesso cleaner aggiunto)
       const selectedCleanerIds = new Set(cleaners.map(c => c.id));
-      const timelineCleanerIds = new Set(timelineCleaners.map(tc => tc.cleaner?.id).filter(Boolean));
+      const timelineCleanerIds = new Set(
+        (timelineCleaners || []).map(tc => tc.cleaner?.id).filter(Boolean)
+      );
 
       const available = dateCleaners.filter((c: any) =>
         c.active === true &&
