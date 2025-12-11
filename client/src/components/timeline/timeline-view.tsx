@@ -1,5 +1,5 @@
 import { Personnel, TaskType as Task } from "@shared/schema";
-import { Calendar as CalendarIcon, RotateCcw, Users, RefreshCw, UserPlus, Maximize2, Minimize2, Check, CheckCircle, Save, Pencil, ChevronLeft, ChevronRight } from "lucide-react";
+import { Calendar as CalendarIcon, RotateCcw, Users, RefreshCw, UserPlus, Maximize2, Minimize2, Check, CheckCircle, Save, Pencil, ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import * as React from "react";
 import { Droppable, Draggable } from "react-beautiful-dnd";
@@ -131,6 +131,7 @@ export default function TimelineView({
   const [editingStartTime, setEditingStartTime] = useState<string>("10:00");
   const [startTimeEditDialog, setStartTimeEditDialog] = useState<{ open: boolean; cleanerId: number | null; cleanerName: string }>({ open: false, cleanerId: null, cleanerName: '' });
   const [isSavingStartTime, setIsSavingStartTime] = useState(false);
+  const [isResetting, setIsResetting] = useState(false);
 
   // Stato per le regole di validazione task-cleaner
   const [validationRules, setValidationRules] = useState<any>(null);
@@ -1142,66 +1143,30 @@ export default function TimelineView({
 
   const handleResetAssignments = async () => {
     try {
-      // La data è già nel formato corretto yyy-MM-dd nel localStorage
-      const dateStr = localStorage.getItem('selected_work_date') || (() => {
-        const today = new Date();
-        const year = today.getFullYear();
-        const month = String(today.getMonth() + 1).padStart(2, '0');
-        const day = String(today.getDate()).padStart(2, '0');
-        return `${year}-${month}-${day}`;
-      })();
+      setIsResetting(true);
 
-      // 1. Reset timeline_assignments.json (file principale)
       const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
-      const resetResponse = await apiRequest("POST", "/api/reset-timeline-assignments", {
+
+      await apiRequest("POST", "/api/reset-timeline-assignments", {
         date: workDate,
         modified_by: currentUser.username || 'unknown'
       });
 
-      if (!resetResponse.ok) {
-        throw new Error('Errore nel reset della timeline');
-      }
-
-      // 2. CRITICAL: Resetta il lastSavedFilename per indicare che non ci sono salvataggi
+      // Svuota subito la timeline in UI, così l'utente vede l'effetto
+      setTimelineData(null);
       setLastSavedFilename(null);
       localStorage.removeItem('last_saved_assignment');
+      (window as any).setHasUnsavedChanges?.(true);
 
-      // 3. CRITICAL: Ricarica i dati da PostgreSQL
-      // Il backend ha già resettato la timeline e ricreato i containers
-      // Dobbiamo solo ricaricare il frontend con i nuovi dati
+      // Una SOLA pipeline di reload dei dati
+      await (window as any).reloadAllTasks?.();
+      await loadTimelineData();
 
-      // Ricarica containers da PostgreSQL (contengono tutte le task)
-      const containersResponse = await fetch(`/api/containers?date=${workDate}`, {
-        cache: 'no-store',
-        headers: { 'Cache-Control': 'no-cache' }
+      toast({
+        title: "Reset completato",
+        description: "Timeline svuotata, task tornate nei containers",
+        variant: "success",
       });
-
-      // Ricarica timeline da PostgreSQL (ora è vuota)
-      const timelineResponse = await fetch(`/api/timeline?date=${workDate}`, {
-        cache: 'no-store',
-        headers: { 'Cache-Control': 'no-cache' }
-      });
-
-      if (containersResponse.ok && timelineResponse.ok) {
-        // Triggera il reload dei containers nella pagina principale
-        if ((window as any).reloadAllTasks) {
-          await (window as any).reloadAllTasks();
-        }
-
-        if ((window as any).setHasUnsavedChanges) {
-          (window as any).setHasUnsavedChanges(true);
-        }
-        // Aggiorna i dati della timeline per mostrare i metadata aggiornati
-        await loadTimelineData();
-
-        toast({
-          title: "Reset completato",
-          description: "Timeline svuotata, task tornate nei containers",
-          variant: "success",
-        });
-      } else {
-        throw new Error('Errore nel ricaricamento dei file JSON');
-      }
     } catch (error) {
       console.error('Errore nel reset:', error);
       toast({
@@ -1209,6 +1174,8 @@ export default function TimelineView({
         description: "Errore durante il reset delle assegnazioni",
         variant: "destructive",
       });
+    } finally {
+      setIsResetting(false);
     }
   };
 
@@ -1490,10 +1457,11 @@ export default function TimelineView({
                 variant="outline"
                 size="sm"
                 className="flex items-center gap-2 border-2 border-custom-blue"
-                disabled={isReadOnly || !hasTasksInTimeline}
+                disabled={isReadOnly || !hasTasksInTimeline || isResetting}
                 title={!hasTasksInTimeline ? "Nessuna task assegnata nella timeline" : "Reset delle assegnazioni"}
               >
-                <RotateCcw className="w-4 h-4" />
+                {isResetting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                {!isResetting && <RotateCcw className="w-4 h-4" />}
                 Reset Assegnazioni
               </Button>
             </div>
@@ -2564,6 +2532,7 @@ export default function TimelineView({
                 setShowResetDialog(false);
                 handleResetAssignments();
               }}
+              disabled={isResetting}
               className="border-2 border-custom-blue bg-background text-foreground hover:bg-accent hover:text-accent-foreground"
             >
               Ho capito

@@ -55,11 +55,12 @@ Preferred communication style: Simple, everyday language.
   - Action types: `'add'` (cleaner aggiunto), `'removal'` (cleaner rimosso), `'replace'` (lista completamente sostituita), `'swap'` (cleaners scambiati), `'rollback'` (ripristino a revisione precedente), `'init'` (inizializzazione)
   - Each revision includes: cleaners_before[], cleaners_after[], action_type, action_payload (metadata specifici dell'azione), performed_by, created_at
 - **Cleaner Aliases**: Permanent table for cleaner display names, independent of work_date (37 aliases imported Dec 11, 2025)
-- **Start Time Management (December 11, 2025 - Date-Scoped)**: 
+- **Start Time Management (December 11, 2025 - Date-Scoped with Hierarchy)**: 
+  - **Gerarchia**: PostgreSQL custom (date-scoped) > tw_start ADAM > 10:00 default
   - Each cleaner's start_time is stored per work_date in the `cleaners` table (date-scoped)
   - When user modifies start_time via `/api/update-cleaner-start-time`, it saves ONLY for that date
-  - When extracting cleaners for a different date, `extract_cleaners_optimized.py` reads start_time from PostgreSQL for that specific date
-  - If no custom start_time for a date, defaults to cleaner's `tw_start` from ADAM or 10:00
+  - `extract_cleaners_optimized.py` applies gerarchia: reads custom from PostgreSQL, falls back to tw_start ADAM, defaults to 10:00
+  - Backend default in `saveCleanersForDate()` applies 10:00 only when start_time is null
   - This prevents modified start_times from affecting other dates
 - **Service File**: `server/services/pg-daily-assignments-service.ts`
 
@@ -117,6 +118,35 @@ Preferred communication style: Simple, everyday language.
   - `POST /api/containers` - Save containers to PostgreSQL (body: {date, containers})
   - `GET /api/cleaners?date=YYYY-MM-DD` - Load full cleaner data
   - `GET /api/selected-cleaners?date=YYYY-MM-DD` - Load selected cleaner IDs
+
+## Assignment Fairness Optimization (December 11, 2025)
+- **Global Parameters** (assign_utils.py):
+  - `NEARBY_TRAVEL_THRESHOLD`: 5 min (down from 7) - stricter definition of "same block"
+  - `NEW_CLEANER_PENALTY_MIN`: 45 min (down from 60) - lower cost to activate new cleaner
+  - `FAIRNESS_DELTA_HOURS`: 0.5h (down from 1.0h) - tighter tolerance for hour balance
+- **Early-Out Priority** (assign_eo.py):
+  - `CLUSTER_EXTENDED_TRAVEL`: 7.0 min (down from 10.0) - reduced extended clusters
+- **High Priority** (assign_hp.py):
+  - `CLUSTER_EXTENDED_TRAVEL`: 7.0 min (down from 10.0)
+  - `CLUSTER_MAX_TRAVEL`: 12.0 min (down from 15.0)
+  - `ZONE_RADIUS_KM`: 0.20 km (down from 0.25) - smaller micro-zones
+  - `PREFERRED_TRAVEL`: 18.0 min (down from 20.0)
+  - `NEARBY_TRAVEL_THRESHOLD`: 5 min (down from 7)
+- **Low Priority** (assign_lp.py):
+  - `CLUSTER_EXTENDED_TRAVEL`: 7.0 min (down from 10.0)
+  - `CLUSTER_MAX_TRAVEL`: 12.0 min (down from 15.0)
+  - `ZONE_RADIUS_KM`: 0.6 km (down from 0.8)
+  - `PREFERRED_TRAVEL`: 18.0 min (down from 20.0)
+  - `NEARBY_TRAVEL_THRESHOLD`: 5 min (down from 7)
+- **Effect**: More balanced work distribution, fewer "clusteroni", safer travel time constraints
+
+## Frontend UX Optimization (December 11, 2025)
+- **handleResetAssignments()** (timeline-view.tsx):
+  - Removed redundant fetch calls to `/api/containers` and `/api/timeline`
+  - Now uses single reload pipeline: `reloadAllTasks()` → `loadTimelineData()`
+  - Added immediate UI feedback: timeline clears before async operations complete
+  - State: `isResetting` tracks operation status for button/dialog disabling
+  - Spinner shows in button during reset for user feedback
 
 ## Component Architecture
 - **Modular Design**: Separate components for drag-drop interface, timeline view, statistics panel, and map section
