@@ -191,8 +191,8 @@ for u in cleaners:
     # Lopez (132), El Hadji (495), Henry (644), Chidi (249)
     straordinaria_authorized = {132, 495, 644, 249}
 
-    # Usa start time custom se disponibile, altrimenti usa tw_start dal DB
-    start_time = custom_start_times.get(cid) or u.get("tw_start")
+    # Usa start time custom se disponibile in PostgreSQL, altrimenti None (il backend userà il default 10:00)
+    start_time = custom_start_times.get(cid)
 
     # counter_hours (somma delle ore lavorate nella settimana target, NON ieri)
     # Ogni task nella settimana conta per task_duration in MINUTI diviso 60
