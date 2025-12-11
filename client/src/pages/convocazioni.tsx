@@ -577,7 +577,14 @@ export default function Convocazioni() {
                         </div>
                       </div>
                       <div className="text-xs text-foreground/80">
-                        <span className="font-semibold">Ore questa settimana:</span> {Number(cleaner.counter_hours || 0).toFixed(2)}h
+                        <span className="font-semibold">Ore questa settimana:</span> {(() => {
+                          const hours = cleaner.counter_hours;
+                          // Handle if counter_hours is accidentally a time string like "10:00"
+                          if (typeof hours === 'string' && hours.includes(':')) {
+                            return '0.00';
+                          }
+                          return Number(hours || 0).toFixed(2);
+                        })()}h
                         <span className="mx-2">|</span>
                         <span className="font-semibold">Giorni consecutivi:</span> {cleaner.counter_days}
                         <span className="mx-2">|</span>
