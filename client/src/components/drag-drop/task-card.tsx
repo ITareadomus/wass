@@ -399,10 +399,12 @@ export default function TaskCard({
       }
     };
 
-    if (isModalOpen) {
+    // CRITICAL: Carica assignmentTimes sempre per le task in timeline (per isOverdue),
+    // non solo quando il modale si apre
+    if (isInTimeline || isModalOpen) {
       calculateAssignmentTimes();
     }
-  }, [isModalOpen, displayTask]);
+  }, [isInTimeline, isModalOpen, displayTask]);
 
   // Supporto navigazione con frecce da tastiera
   useEffect(() => {
