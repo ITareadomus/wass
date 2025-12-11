@@ -25,16 +25,15 @@ Preferred communication style: Simple, everyday language.
 
 ## Data Storage
 - **Primary Database**: PostgreSQL (DigitalOcean) - SINGLE SOURCE OF TRUTH
-- **Legacy Database**: MySQL with mysql2 library (being phased out, used for revision history only)
 - **ORM**: Drizzle ORM for type-safe database operations and migrations
 - **Schema Design**: Three main entities (tasks, personnel, assignments) with foreign key relationships
 - **Data Validation**: Zod schemas for runtime type checking and API request validation
-- **Storage Pattern**: PostgreSQL only - filesystem writes removed (December 2025)
+- **Storage Pattern**: PostgreSQL only - filesystem and MySQL removed (December 2025)
 - **Auto-Save**: All assignment changes are automatically persisted with revision tracking
+- **External Database**: ADAM (MySQL) - external source database for task data only (read-only sync)
 
 ## PostgreSQL Architecture (December 2025) - Flat Tables Design
-- **Read Priority**: PostgreSQL ONLY (no fallback to MySQL or filesystem)
-- **Write Pattern**: PostgreSQL (primary) + JSON (for Python scripts only) + MySQL (legacy, will be removed)
+- **Read/Write**: PostgreSQL ONLY (MySQL revisions service removed)
 - **Tables**:
   - `daily_assignments_current`: Current timeline state (1 row per cleaner-task pair)
   - `daily_assignments_history`: All timeline revisions for audit/rollback
@@ -51,28 +50,12 @@ Preferred communication style: Simple, everyday language.
 - **Undo Flow**: When task moves container→timeline, containers history saved first for rollback
 - **Service File**: `server/services/pg-daily-assignments-service.ts`
 
-## MySQL Storage Architecture (November 2025) - Two-Table Design
-- **Two-Table Architecture**:
-  - `daily_assignments_current`: Current state (1 row per work_date, fast queries)
-  - `daily_assignments_history`: All revisions for audit/rollback
-- **Current Table Schema**: `work_date` (PK), `timeline` (JSON), `selected_cleaners` (JSON), `last_revision` (INT), `updated_at`
-- **History Table Schema**: `id` (PK), `work_date`, `revision`, `timeline` (JSON), `selected_cleaners` (JSON), `created_at`, `created_by`
-- **Performance**: Reading current state is O(1) - no ORDER BY or LIMIT needed
-- **Versioning**: Automatic revision numbering per work_date, stored in both tables
-- **Connection**: Pooled connections via mysql2/promise with environment variables (DB_HOST, DB_USER, DB_PASSWORD, DB_NAME, DB_PORT)
-- **Files**:
-  - `shared/mysql-db.ts`: Connection pool, table initialization, and auto-migration from old schema
-  - `server/services/daily-assignment-revisions-service.ts`: CRUD operations with dual-table writes
-  - `server/services/workspace-files.ts`: Dual-write logic (filesystem + MySQL)
-- **Date Guards**: Writes blocked for past dates to prevent data contamination
-- **Deprecated**: Object Storage (`@replit/object-storage`) removed, manual "Conferma Assegnazioni" button removed
-
 ## Timeline Data Flow (December 2025) - PostgreSQL Only
 - **Source of Truth**: PostgreSQL is the ONLY source of truth for timeline, containers, and selected_cleaners data
 - **Frontend Reads**: All frontend components read via API endpoints:
   - `GET /api/timeline?date=YYYY-MM-DD` - Timeline data from PostgreSQL
   - `GET /api/containers?date=YYYY-MM-DD` - Containers data from PostgreSQL
-  - `GET /api/selected-cleaners?date=YYYY-MM-DD` - Selected cleaners from PostgreSQL/MySQL
+  - `GET /api/selected-cleaners?date=YYYY-MM-DD` - Selected cleaners from PostgreSQL
   - `generate-assignments.tsx`: loadTasks() uses /api/containers and /api/timeline
   - `timeline-view.tsx`: loadTimelineData(), loadTimelineCleaners(), loadCleaners() use API endpoints
   - `convocazioni.tsx`: Uses /api/selected-cleaners and /api/timeline for cleaner preselection

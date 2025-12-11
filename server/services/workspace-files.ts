@@ -1,19 +1,13 @@
-import * as fs from 'fs/promises';
-import path from 'path';
 import { formatInTimeZone } from 'date-fns-tz';
 
 /**
  * Workspace Files Helper
  * 
- * PostgreSQL-only storage for timeline and containers
- * Selected cleaners still uses filesystem for backward compatibility
+ * PostgreSQL-only storage for timeline, containers, and selected cleaners
  * 
  * Storage: PostgreSQL (primary and only source of truth)
+ * MySQL/Filesystem: REMOVED (December 2025)
  */
-
-const PATHS = {
-  selectedCleaners: path.join(process.cwd(), 'client/public/data/cleaners/selected_cleaners.json'),
-};
 
 const TIMEZONE = 'Europe/Rome';
 
@@ -92,14 +86,6 @@ function getNormalizedTimeline(timelineData: any): any {
   return cloned;
 }
 
-async function atomicWriteJson(filePath: string, data: any): Promise<void> {
-  const dir = path.dirname(filePath);
-  await fs.mkdir(dir, { recursive: true });
-  
-  const tmpPath = `${filePath}.tmp`;
-  await fs.writeFile(tmpPath, JSON.stringify(data, null, 2), 'utf-8');
-  await fs.rename(tmpPath, filePath);
-}
 
 /**
  * Load timeline for a specific work date
@@ -429,12 +415,11 @@ export async function resetTimeline(workDate: string, createdBy: string = 'syste
 }
 
 /**
- * Get raw file paths (for backward compatibility - only selected_cleaners now)
+ * Get raw file paths (deprecated - PostgreSQL is the only source of truth)
  */
 export function getFilePaths() {
   return { 
-    selectedCleaners: PATHS.selectedCleaners,
-    // Timeline and containers are now PostgreSQL-only
+    selectedCleaners: null,
     timeline: null,
     containers: null
   };
