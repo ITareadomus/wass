@@ -318,6 +318,7 @@ def evaluate_route(cleaner: Cleaner, route: List[Task]) -> Tuple[bool, List[Tupl
     else:
         # Usa HP start time da settings (se caricato) o default
         hp_hard_earliest = get_hp_earliest(arrival.year, arrival.month, arrival.day)
+        print(f"   🔍 DEBUG: Task {first.logistic_code} - arrival={fmt_hhmm(arrival)}, hp_earliest={fmt_hhmm(hp_hard_earliest)}, checkout={fmt_hhmm(first.checkout_dt) if first.checkout_dt else 'None'}")
 
         # CRITICAL: Per task HP non-straordinaria, start deve essere >= hp_hard_earliest E >= checkout
         # Applica sempre ENTRAMBI i vincoli: checkout e hp_hard_earliest
@@ -328,6 +329,7 @@ def evaluate_route(cleaner: Cleaner, route: List[Task]) -> Tuple[bool, List[Tupl
         else:
             # start = max(arrival, hp_hard_earliest)
             start = max(arrival, hp_hard_earliest)
+        print(f"   🔍 DEBUG: Task {first.logistic_code} - CALCULATED start={fmt_hhmm(start)}")
 
     finish = start + timedelta(minutes=first.cleaning_time)
 
