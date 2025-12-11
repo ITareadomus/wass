@@ -31,6 +31,46 @@ import {
 // Normalizza la chiave di una task indipendentemente dal campo usato
 const getTaskKey = (t: any) => String(t?.id ?? t?.task_id ?? t?.logistic_code ?? "");
 
+// Normalizza data nel formato YYYY-MM-DD per il picker HTML5
+const normalizeDate = (dateStr: any): string => {
+  if (!dateStr) return "";
+  try {
+    // Se è già nel formato YYYY-MM-DD, ritorna così
+    if (typeof dateStr === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+      return dateStr;
+    }
+    // Prova a convertire da vari formati
+    const parsed = new Date(dateStr);
+    if (!isNaN(parsed.getTime())) {
+      const year = parsed.getFullYear();
+      const month = String(parsed.getMonth() + 1).padStart(2, '0');
+      const day = String(parsed.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    }
+  } catch (e) {
+    // Silenziosamente fallisce
+  }
+  return "";
+};
+
+// Normalizza ora nel formato HH:MM per il picker HTML5
+const normalizeTime = (timeStr: any): string => {
+  if (!timeStr) return "";
+  try {
+    // Se è già nel formato HH:MM, ritorna così
+    if (typeof timeStr === 'string' && /^\d{2}:\d{2}$/.test(timeStr)) {
+      return timeStr;
+    }
+    // Se è HH:MM:SS, rimuovi i secondi
+    if (typeof timeStr === 'string' && /^\d{2}:\d{2}:\d{2}$/.test(timeStr)) {
+      return timeStr.substring(0, 5);
+    }
+  } catch (e) {
+    // Silenziosamente fallisce
+  }
+  return "";
+};
+
 interface MultiSelectContextType {
   isMultiSelectMode: boolean;
   selectedTasks: Array<{ taskId: string; order: number; container?: string }>;
@@ -273,11 +313,11 @@ export default function TaskCard({
       // CRITICAL: Sincronizza currentTaskId con displayTask corrente
       setCurrentTaskId(getTaskKey(displayTask));
 
-      // Inizializza campi editabili con i valori attuali della task visualizzata
-      setEditedCheckoutDate((displayTask as any).checkout_date || "");
-      setEditedCheckoutTime((displayTask as any).checkout_time || "");
-      setEditedCheckinDate((displayTask as any).checkin_date || "");
-      setEditedCheckinTime((displayTask as any).checkin_time || "");
+      // Inizializza campi editabili con i valori attuali della task visualizzata (normalizzati)
+      setEditedCheckoutDate(normalizeDate((displayTask as any).checkout_date));
+      setEditedCheckoutTime(normalizeTime((displayTask as any).checkout_time));
+      setEditedCheckinDate(normalizeDate((displayTask as any).checkin_date));
+      setEditedCheckinTime(normalizeTime((displayTask as any).checkin_time));
 
       // Converti duration da "1.30" a "90" minuti
       const duration = displayTask.duration || "0.0";
@@ -986,7 +1026,9 @@ export default function TaskCard({
                         onChange={(e) => setEditedCheckoutDate(e.target.value)}
                         onFocus={(e) => {
                           e.stopPropagation();
-                          e.target.showPicker?.();
+                          // Normalizza prima di aprire il picker per evitare errori
+                          setEditedCheckoutDate(prev => normalizeDate(prev));
+                          setTimeout(() => (e.target as HTMLInputElement).showPicker?.(), 0);
                         }}
                         onBlur={(e) => e.stopPropagation()}
                         onClick={(e) => e.stopPropagation()}
@@ -1001,7 +1043,9 @@ export default function TaskCard({
                         onChange={(e) => setEditedCheckoutTime(e.target.value)}
                         onFocus={(e) => {
                           e.stopPropagation();
-                          e.target.showPicker?.();
+                          // Normalizza prima di aprire il picker per evitare errori
+                          setEditedCheckoutTime(prev => normalizeTime(prev));
+                          setTimeout(() => (e.target as HTMLInputElement).showPicker?.(), 0);
                         }}
                         onBlur={(e) => e.stopPropagation()}
                         onClick={(e) => e.stopPropagation()}
@@ -1046,7 +1090,9 @@ export default function TaskCard({
                         onChange={(e) => setEditedCheckinDate(e.target.value)}
                         onFocus={(e) => {
                           e.stopPropagation();
-                          e.target.showPicker?.();
+                          // Normalizza prima di aprire il picker per evitare errori
+                          setEditedCheckinDate(prev => normalizeDate(prev));
+                          setTimeout(() => (e.target as HTMLInputElement).showPicker?.(), 0);
                         }}
                         onBlur={(e) => e.stopPropagation()}
                         onClick={(e) => e.stopPropagation()}
@@ -1061,7 +1107,9 @@ export default function TaskCard({
                         onChange={(e) => setEditedCheckinTime(e.target.value)}
                         onFocus={(e) => {
                           e.stopPropagation();
-                          e.target.showPicker?.();
+                          // Normalizza prima di aprire il picker per evitare errori
+                          setEditedCheckinTime(prev => normalizeTime(prev));
+                          setTimeout(() => (e.target as HTMLInputElement).showPicker?.(), 0);
                         }}
                         onBlur={(e) => e.stopPropagation()}
                         onClick={(e) => e.stopPropagation()}
