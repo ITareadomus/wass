@@ -1,0 +1,63 @@
+Modifiche fatte per aumentare la fairness
+
+L’obiettivo che mi hai dato:
+
+Meno “clusteroni” tipo 4 task a uno e 1–2 agli altri
+
+Tenere solo i cluster veramente convenienti (stessa via / zona molto vicina)
+
+Sacrificare più facilmente i cluster con travel time alto
+
+Per farlo ho agito su due fronti:
+
+2.1. Più peso all’equilibrio tra cleaner
+
+File: client/public/scripts/assign_utils.py
+
+Ho ristretto la definizione di “stesso blocco” e reso più severo il concetto di fairness:
+
+# --- COSTANTI GLOBALI TUNABILI ---
+
+NEARBY_TRAVEL_THRESHOLD = 5        # prima 7: ora “stesso blocco” è <= 5'
+NEW_CLEANER_PENALTY_MIN = 45       # prima 60: meno penalità ad aprire un cleaner nuovo
+FAIRNESS_DELTA_HOURS = 0.5         # prima 1.0: tolleranza solo di 30' tra cleaner
+
+
+Effetto atteso:
+
+Il motore accetta meno differenze di ore tra cleaners (spinge a distribuire di più).
+
+Costa meno “attivare” un cleaner che non ha ancora molti task → riduce i casi 4 vs 1.
+
+“Stesso blocco” è più stretto: devi avere davvero 5’ di travel o meno per sfruttare il cluster.
+
+2.2. Cluster molto più selettivi su travel time
+
+Per Early-Out, High Priority e Low Priority ho stretto le soglie dei cluster:
+
+Early-Out – assign_eo.py
+CLUSTER_PRIORITY_TRAVEL = 5.0      # invariato: cluster TOP (stessa via / vicinissimo)
+CLUSTER_EXTENDED_TRAVEL = 7.0      # prima 10.0 ⇒ ora cluster “lunghi” molto ridotti
+# limiti task invariati (BASE_MAX_TASKS, ABSOLUTE_MAX_TASKS, DAILY_TASK_LIMIT)
+
+High Priority – assign_hp.py
+CLUSTER_PRIORITY_TRAVEL = 5.0
+CLUSTER_EXTENDED_TRAVEL = 7.0      # prima 10.0
+CLUSTER_MAX_TRAVEL = 12.0          # prima 15.0
+ZONE_RADIUS_KM = 0.20              # prima 0.25 (zona più piccola)
+PREFERRED_TRAVEL = 18.0            # prima 20.0
+
+Low Priority – assign_lp.py
+CLUSTER_PRIORITY_TRAVEL = 5.0
+CLUSTER_EXTENDED_TRAVEL = 7.0      # prima 10.0
+CLUSTER_MAX_TRAVEL = 12.0          # prima 15.0
+ZONE_RADIUS_KM = 0.6               # prima 0.8
+PREFERRED_TRAVEL = 18.0            # prima 20.0
+NEARBY_TRAVEL_THRESHOLD = 5        # prima 7 (allineato a assign_utils)
+
+
+Effetto atteso:
+
+I cluster che rompono le regole (cioè superano i limiti di task per tipologia/giorno) ora si formano solo se i task sono davvero vicino (<=5–7 minuti e raggio geografico più stretto).
+
+I “giri lunghi” vengono penalizzati di più → il motore preferisce distribuire il lavoro su più cleaner invece di forzare cluster con travel alto.

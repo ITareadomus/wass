@@ -5,15 +5,15 @@ Helper comuni per assign_eo.py, assign_hp.py, assign_lp.py
 
 # --- COSTANTI GLOBALI TUNABILI ---
 
-NEARBY_TRAVEL_THRESHOLD = 7        # min: soglia per considerare due apt "stesso blocco"
+NEARBY_TRAVEL_THRESHOLD = 5        # min: soglia per considerare due apt "stesso blocco" (da 7)
 
-NEW_CLEANER_PENALTY_MIN = 60       # costo di attivazione per cleaner vuoto
+NEW_CLEANER_PENALTY_MIN = 45       # costo di attivazione per cleaner vuoto (da 60)
 NEW_TRAINER_PENALTY_MIN = 0        # il formatore non è penalizzato per il primo task
 
 TARGET_MIN_LOAD_MIN = 240          # 4 ore = carico minimo "desiderato" per TUTTI
 TRAINER_TARGET_MIN_LOAD_MIN = 240  # 4 ore = target specifico per il Formatore
 
-FAIRNESS_DELTA_HOURS = 1.0         # tolleranza di 1h tra cleaner per essere "fair"
+FAIRNESS_DELTA_HOURS = 0.5         # tolleranza di 30' tra cleaner per essere "fair" (da 1.0)
 LOAD_WEIGHT = 10                   # peso delle ore nel punteggio
 SAME_BUILDING_BONUS = -5           # bonus per cluster edificio/blocco
 
