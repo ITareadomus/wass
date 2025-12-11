@@ -1232,11 +1232,19 @@ export class PgDailyAssignmentsService {
         `, [workDate, snapshotReason]);
       }
 
+      // Save existing aliases before deletion
+      const existingAliases = await client.query(`
+        SELECT cleaner_id, alias FROM cleaners 
+        WHERE work_date = $1 AND alias IS NOT NULL
+      `, [workDate]);
+      const aliasMap = new Map(existingAliases.rows.map((r: any) => [r.cleaner_id, r.alias]));
+
       // Delete existing cleaners for this date
       await client.query('DELETE FROM cleaners WHERE work_date = $1', [workDate]);
 
-      // Insert new cleaners
+      // Insert new cleaners, preserving aliases
       for (const cleaner of cleaners) {
+        const preservedAlias = aliasMap.get(cleaner.id) || cleaner.alias || null;
         await client.query(`
           INSERT INTO cleaners 
           (cleaner_id, work_date, name, lastname, role, active, ranking,
@@ -1260,7 +1268,7 @@ export class PgDailyAssignmentsService {
           cleaner.telegram_id || null,
           cleaner.start_time || '09:00',
           cleaner.can_do_straordinaria || false,
-          cleaner.alias || null
+          preservedAlias
         ]);
       }
 
