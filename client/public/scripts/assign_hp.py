@@ -109,7 +109,11 @@ def parse_dt(d: Optional[str], t: Optional[str]) -> Optional[datetime]:
     if not d or not t:
         return None
     try:
-        return datetime.strptime(f"{d} {t}", "%Y-%m-%d %H:%M")
+        # Normalizza tempo: rimuovi secondi se presenti (es. "11:00:00" -> "11:00")
+        normalized_t = t
+        if t and t.count(':') == 2:
+            normalized_t = ':'.join(t.split(':')[:2])
+        return datetime.strptime(f"{d} {normalized_t}", "%Y-%m-%d %H:%M")
     except Exception:
         return None
 
@@ -273,14 +277,15 @@ def evaluate_route(cleaner: Cleaner, route: List[Task]) -> Tuple[bool, List[Tupl
     else:
         hp_hard_earliest = datetime(arrival.year, arrival.month, arrival.day, HP_HARD_EARLIEST_H, HP_HARD_EARLIEST_M)
 
+        # CRITICAL: Per task HP non-straordinaria, start deve essere >= hp_hard_earliest E >= checkout
+        # Applica sempre ENTRAMBI i vincoli: checkout e hp_hard_earliest
         if first.checkout_dt:
-            arrival = max(arrival, first.checkout_dt)
-            start = arrival
+            # start = max(arrival, checkout, hp_hard_earliest)
+            start = max(arrival, first.checkout_dt, hp_hard_earliest)
+            arrival = start
         else:
-            if arrival < hp_hard_earliest:
-                start = arrival
-            else:
-                start = max(arrival, hp_hard_earliest)
+            # start = max(arrival, hp_hard_earliest)
+            start = max(arrival, hp_hard_earliest)
 
     finish = start + timedelta(minutes=first.cleaning_time)
 
