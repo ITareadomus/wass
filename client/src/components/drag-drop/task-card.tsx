@@ -598,8 +598,9 @@ export default function TaskCard({
   // Verifica violazioni temporali (considerando le date!)
   const isOverdue = (() => {
     const taskObj = displayTask as any;
-    const startTime = assignmentTimes.start_time || taskObj.start_time || taskObj.startTime;
-    const endTime = assignmentTimes.end_time || taskObj.end_time || taskObj.endTime;
+    // CRITICAL: Normalizza TUTTI i tempi per evitare date invalide (es. "15:55:00" -> "15:55")
+    const startTime = normalizeTime(assignmentTimes.start_time || taskObj.start_time || taskObj.startTime);
+    const endTime = normalizeTime(assignmentTimes.end_time || taskObj.end_time || taskObj.endTime);
     const checkoutTime = normalizeTime(taskObj.checkout_time);
     const checkinTime = normalizeTime(taskObj.checkin_time);
     const checkoutDate = normalizeDate(taskObj.checkout_date);
