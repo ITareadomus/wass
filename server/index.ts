@@ -3,7 +3,6 @@ import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { fileURLToPath } from "url";
 import path from "path";
-import { initMySQLDatabase, testMySQLConnection } from "../shared/mysql-db";
 
 const app = express();
 app.use(express.json());
@@ -40,15 +39,6 @@ app.use((req, res, next) => {
 });
 
 (async () => {
-  // Initialize MySQL connection and verify table exists
-  log("🔌 Connecting to MySQL database...");
-  const mysqlOk = await testMySQLConnection();
-  if (mysqlOk) {
-    await initMySQLDatabase();
-  } else {
-    console.error("⚠️ MySQL connection failed - storage will use filesystem fallback");
-  }
-
   const server = await registerRoutes(app);
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {

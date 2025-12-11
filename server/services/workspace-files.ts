@@ -1,6 +1,5 @@
 import * as fs from 'fs/promises';
 import path from 'path';
-import { dailyAssignmentRevisionsService } from './daily-assignment-revisions-service';
 import { formatInTimeZone } from 'date-fns-tz';
 
 /**
@@ -94,7 +93,6 @@ function getNormalizedTimeline(timelineData: any): any {
 }
 
 async function atomicWriteJson(filePath: string, data: any): Promise<void> {
-  // Ensure directory exists
   const dir = path.dirname(filePath);
   await fs.mkdir(dir, { recursive: true });
   
@@ -144,12 +142,6 @@ export async function saveTimeline(
   }
 ): Promise<boolean> {
   try {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const targetDate = new Date(workDate);
-    targetDate.setHours(0, 0, 0, 0);
-    const isPastDate = targetDate < today;
-
     const normalizedData = getNormalizedTimeline(data);
 
     normalizedData.metadata = normalizedData.metadata || {};
@@ -179,7 +171,7 @@ export async function saveTimeline(
       }
     }
     
-    // Save to history for audit/rollback
+    // Save to history for audit/rollback (PostgreSQL only)
     if (!skipRevision) {
       await pgDailyAssignmentsService.saveToHistory(
         workDate, 
@@ -190,20 +182,7 @@ export async function saveTimeline(
         oldValues,
         newValues
       );
-      console.log(`✅ Timeline history saved for ${workDate} by ${createdBy}`);
-    }
-
-    // LEGACY: Also save to MySQL for backward compatibility (will be removed)
-    if (!isPastDate && !skipRevision) {
-      try {
-        const selected = await loadSelectedCleanersFromPg(workDate);
-        const cleanersArray = selected?.cleaners || [];
-        const containers = await loadContainersInternal(workDate);
-        await dailyAssignmentRevisionsService.createRevision(workDate, normalizedData, cleanersArray, containers, createdBy, modificationType, editOptions);
-        console.log(`⚠️ Timeline revision created in MySQL (legacy) for ${workDate}`);
-      } catch (mysqlError) {
-        console.warn(`⚠️ MySQL legacy save failed (non-blocking):`, mysqlError);
-      }
+      console.log(`✅ Timeline history saved in PostgreSQL for ${workDate} by ${createdBy}`);
     }
 
     return true;
@@ -256,25 +235,6 @@ export async function saveContainers(workDate: string, data: any, createdBy: str
     const { pgDailyAssignmentsService } = await import('./pg-daily-assignments-service');
     await pgDailyAssignmentsService.saveContainers(workDate, data);
     console.log(`✅ Containers saved to PostgreSQL for ${workDate}`);
-
-    // LEGACY: Also save to MySQL for backward compatibility (will be removed)
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const targetDate = new Date(workDate);
-    targetDate.setHours(0, 0, 0, 0);
-    const isPastDate = targetDate < today;
-
-    if (!isPastDate) {
-      try {
-        const timeline = await loadTimeline(workDate);
-        const selected = await loadSelectedCleanersFromPg(workDate);
-        const cleanersArray = selected?.cleaners || [];
-        await dailyAssignmentRevisionsService.createRevision(workDate, timeline || {}, cleanersArray, data, createdBy, modificationType);
-        console.log(`⚠️ Containers revision created in MySQL (legacy) for ${workDate}`);
-      } catch (mysqlError) {
-        console.warn(`⚠️ MySQL legacy save failed (non-blocking):`, mysqlError);
-      }
-    }
 
     return true;
   } catch (err) {
@@ -379,7 +339,6 @@ export async function loadSelectedCleaners(workDate: string): Promise<any | null
 /**
  * Save selected_cleaners for a specific work date
  * PRIMARY: PostgreSQL (IDs to daily_selected_cleaners, full data to cleaners table)
- * LEGACY: MySQL (will be removed)
  */
 export async function saveSelectedCleaners(workDate: string, data: any, skipRevision: boolean = false, createdBy: string = 'system', modificationType: string = 'manual'): Promise<boolean> {
   try {
@@ -414,21 +373,11 @@ export async function saveSelectedCleaners(workDate: string, data: any, skipRevi
     }
 
     if (skipRevision) {
-      console.log(`⏭️ Saltata revisione MySQL per ${workDate} (skipRevision=true)`);
+      console.log(`⏭️ Saltata creazione revisione per ${workDate} (skipRevision=true)`);
       return true;
     }
 
-    // LEGACY: Also save to MySQL (will be removed)
-    try {
-      const timeline = await loadTimeline(workDate);
-      const containers = await loadContainersInternal(workDate);
-      const cleanersForMySQL = data.cleaners || [];
-      await dailyAssignmentRevisionsService.createRevision(workDate, timeline || {}, cleanersForMySQL, containers, createdBy, modificationType);
-      console.log(`⚠️ Selected cleaners revision created in MySQL (legacy) for ${workDate}`);
-    } catch (mysqlError) {
-      console.warn(`⚠️ MySQL legacy save failed (non-blocking):`, mysqlError);
-    }
-
+    // PostgreSQL is the only source of truth - no legacy MySQL writes
     return true;
   } catch (err) {
     console.error(`Error saving selected cleaners for ${workDate}:`, err);
@@ -471,18 +420,7 @@ export async function resetTimeline(workDate: string, createdBy: string = 'syste
     await pgDailyAssignmentsService.saveToHistory(workDate, emptyTimeline, createdBy, modificationType, [], [], []);
     console.log(`✅ Timeline reset in PostgreSQL for ${workDate}`);
 
-    // LEGACY: Also save to MySQL
-    try {
-      const selected = await loadSelectedCleanersFromPg(workDate);
-      const containers = await loadContainersInternal(workDate);
-      if (selected?.cleaners && selected.cleaners.length > 0) {
-        await dailyAssignmentRevisionsService.createRevision(workDate, emptyTimeline, selected.cleaners, containers, createdBy, modificationType);
-        console.log(`⚠️ Timeline reset revision created in MySQL (legacy) for ${workDate}`);
-      }
-    } catch (mysqlError) {
-      console.warn(`⚠️ MySQL legacy reset failed (non-blocking):`, mysqlError);
-    }
-
+    // PostgreSQL is the only source of truth - no legacy MySQL writes
     return true;
   } catch (err) {
     console.error(`Error resetting timeline for ${workDate}:`, err);
