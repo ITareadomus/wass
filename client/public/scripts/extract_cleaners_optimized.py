@@ -58,7 +58,8 @@ conn = mysql.connector.connect(**db_config)
 cur = conn.cursor(dictionary=True)
 
 # 1) Lista cleaners (7=Standard, 13=Formatore, 15=Premium)
-cur.execute("""        SELECT id, name, lastname, user_role_id, active, contract_type_id, telegram_id, tw_start
+# NOTE: Non selezionare tw_start - useremo solo custom start_time da PostgreSQL
+cur.execute("""        SELECT id, name, lastname, user_role_id, active, contract_type_id, telegram_id
     FROM app_users 
     WHERE user_role_id IN (7, 13, 15) AND active = 1;
 """)
