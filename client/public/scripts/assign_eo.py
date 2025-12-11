@@ -39,7 +39,7 @@ USE_API: bool = False
 # =============================
 BASE_MAX_TASKS = 2  # Base: max 2 task per cleaner
 CLUSTER_PRIORITY_TRAVEL = 5.0  # Cluster prioritario: <= 5' (massima priorità)
-CLUSTER_EXTENDED_TRAVEL = 10.0  # Cluster esteso: <= 10' (infrange limiti tipologia)
+CLUSTER_EXTENDED_TRAVEL = 7.0  # Cluster esteso: <= 7' (da 10, infrange limiti tipologia)
 ABSOLUTE_MAX_TASKS = 4  # Max assoluto 4 task
 ABSOLUTE_MAX_TASKS_IF_BEFORE_18 = 5  # Max 5 task se finisce entro le 18:00
 DAILY_TASK_LIMIT = 5  # Limite giornaliero HARD

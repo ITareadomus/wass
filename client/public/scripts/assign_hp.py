@@ -33,16 +33,16 @@ USE_API: bool = False
 # =============================
 # CONFIG - REGOLE CLUSTERING OTTIMIZZATE
 CLUSTER_PRIORITY_TRAVEL = 5.0
-CLUSTER_EXTENDED_TRAVEL = 10.0
-CLUSTER_MAX_TRAVEL = 15.0
-ZONE_RADIUS_KM = 0.25  # ~250m, micro-zona
+CLUSTER_EXTENDED_TRAVEL = 7.0  # da 10.0 per ridurre cluster lunghi
+CLUSTER_MAX_TRAVEL = 12.0  # da 15.0 per penalizzare giri lunghi
+ZONE_RADIUS_KM = 0.20  # da 0.25, zona più piccola (~200m)
 # =============================
 BASE_MAX_TASKS = 2  # Base: max 2 task per cleaner
 ABSOLUTE_MAX_TASKS = 4  # Max assoluto 4 task
 ABSOLUTE_MAX_TASKS_IF_BEFORE_18 = 5  # Max 5 task se finisce entro le 18:00
 DAILY_TASK_LIMIT = 5  # Limite giornaliero HARD
 
-PREFERRED_TRAVEL = 20.0  # Preferenza per percorsi < 20'
+PREFERRED_TRAVEL = 18.0  # da 20.0, preferenza per percorsi < 18'
 
 # NUOVO: Limite per tipologia FLESSIBILE (può essere infranto da cluster)
 MAX_TASKS_PER_PRIORITY = 2  # Max 2 task High-Priority per cleaner (base, infrangibile da cluster vicini)
@@ -50,7 +50,7 @@ MAX_TASKS_PER_PRIORITY = 2  # Max 2 task High-Priority per cleaner (base, infran
 HP_HARD_EARLIEST_H = 11
 HP_HARD_EARLIEST_M = 0
 
-NEARBY_TRAVEL_THRESHOLD = 7  # minuti, soglia per considerare due apt "stesso blocco"
+NEARBY_TRAVEL_THRESHOLD = 5  # da 7, minuti, soglia per considerare due apt "stesso blocco"
 
 # Travel model (min)
 SHORT_RANGE_KM = 0.30
