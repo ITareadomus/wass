@@ -352,10 +352,19 @@ def evaluate_route(cleaner: Cleaner, route: List[Task]) -> Tuple[bool, List[Tupl
         cur += timedelta(minutes=tt)
         arrival = cur
 
-        wait = timedelta(0)
-        if t.checkout_dt and arrival < t.checkout_dt:
-            wait = t.checkout_dt - arrival
-            cur += wait
+        # CRITICAL: Per task HP successive, applica anche hp_hard_earliest (non solo checkout)
+        hp_earliest = get_hp_earliest(arrival.year, arrival.month, arrival.day)
+        
+        if t.straordinaria:
+            # Straordinaria: solo checkout constraint
+            if t.checkout_dt and arrival < t.checkout_dt:
+                cur = t.checkout_dt
+        else:
+            # HP normale: max(arrival, checkout, hp_earliest)
+            if t.checkout_dt:
+                cur = max(arrival, t.checkout_dt, hp_earliest)
+            else:
+                cur = max(arrival, hp_earliest)
 
         start = cur
         finish = start + timedelta(minutes=t.cleaning_time)
