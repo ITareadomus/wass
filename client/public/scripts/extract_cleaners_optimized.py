@@ -154,7 +154,7 @@ cleaners_data = []
 contract_map = {1: "A", 2: "B", 3: "C", 4: "a chiamata"}
 
 for u in cleaners:
-    uid = u["id"]
+    cid = u["id"] # cleaner ID
     role_id = u.get("user_role_id")
     if role_id == 15:
         role = "Premium"
@@ -162,30 +162,44 @@ for u in cleaners:
         role = "Formatore"
     else:
         role = "Standard"
-    available = 0 if uid in leave_set else 1
+    available = 0 if cid in leave_set else 1
 
     # Lista ID cleaner autorizzati per task straordinarie
     # Lopez (132), El Hadji (495), Henry (644), Chidi (249)
     straordinaria_authorized = {132, 495, 644, 249}
-    
+
     # Usa start time custom se disponibile, altrimenti usa tw_start dal DB
-    start_time = custom_start_times.get(uid) or u.get("tw_start")
-    
+    start_time = custom_start_times.get(cid) or u.get("tw_start")
+
+    # counter_hours (somma delle ore lavorate nella settimana target, NON ieri)
+    # Ogni task nella settimana conta per task_duration in MINUTI diviso 60
+    cur.execute("""
+        SELECT SUM(task_duration) / 60.0
+        FROM cleaners_day_tasks
+        WHERE cleaner_id = %s
+          AND work_date >= %s AND work_date < %s
+    """, (cid, week_start, week_end_excl))
+    row = cur.fetchone()
+    counter_hours_value = row[0] if (row and row[0] is not None) else 0.0
+    # Ensure it's a float number, not a time string
+    counter_hours = float(counter_hours_value) if counter_hours_value is not None else 0.0
+
+
     cleaner = {
-        "id": uid,
+        "id": cid,
         "name": u.get("name"),
         "lastname": u.get("lastname"),
         "role": role,
         "active": bool(u.get("active")),
         "ranking": 0,
-        "counter_hours": float(weekly_hours.get(uid, 0.0)),
-        "counter_days": int(streak_until_yesterday(uid)),
+        "counter_hours": counter_hours,
+        "counter_days": int(streak_until_yesterday(cid)),
         "available": bool(available),
         "contract_type": contract_map.get(u.get("contract_type_id"), u.get("contract_type_id")),
-        "preferred_customers": prefs_map.get(uid, []),
+        "preferred_customers": prefs_map.get(cid, []),
         "telegram_id": u.get("telegram_id"),
         "start_time": start_time,
-        "can_do_straordinaria": uid in straordinaria_authorized,
+        "can_do_straordinaria": cid in straordinaria_authorized,
     }
     cleaners_data.append(cleaner)
 
