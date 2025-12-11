@@ -47,8 +47,49 @@ PREFERRED_TRAVEL = 18.0  # da 20.0, preferenza per percorsi < 18'
 # NUOVO: Limite per tipologia FLESSIBILE (può essere infranto da cluster)
 MAX_TASKS_PER_PRIORITY = 2  # Max 2 task High-Priority per cleaner (base, infrangibile da cluster vicini)
 
+# Default HP start time (può essere sovrascritto da settings)
 HP_HARD_EARLIEST_H = 11
 HP_HARD_EARLIEST_M = 0
+
+# Variabile globale per HP start time da settings
+HP_START_TIME_FROM_SETTINGS: Optional[Tuple[int, int]] = None
+
+def load_hp_settings():
+    """Carica hp_start_time da settings via API."""
+    global HP_START_TIME_FROM_SETTINGS
+    
+    if not API_AVAILABLE:
+        print("   ⚠️ API non disponibile, uso default HP start time 11:00")
+        return
+    
+    try:
+        from api_client import load_settings_from_api
+        settings = load_settings_from_api()
+        hp_config = settings.get("high-priority", {})
+        hp_start = hp_config.get("hp_start_time")
+        
+        if hp_start:
+            # Normalizza: rimuovi secondi se presenti
+            if hp_start.count(':') == 2:
+                hp_start = ':'.join(hp_start.split(':')[:2])
+            parts = hp_start.split(':')
+            if len(parts) >= 2:
+                h, m = int(parts[0]), int(parts[1])
+                HP_START_TIME_FROM_SETTINGS = (h, m)
+                print(f"   ✅ HP start time da settings: {h:02d}:{m:02d}")
+                return
+        
+        print(f"   ℹ️ hp_start_time non trovato in settings, uso default 11:00")
+    except Exception as e:
+        print(f"   ⚠️ Errore caricamento settings: {e}, uso default 11:00")
+
+def get_hp_earliest(year: int, month: int, day: int) -> datetime:
+    """Restituisce datetime per HP earliest start, da settings o default."""
+    if HP_START_TIME_FROM_SETTINGS:
+        h, m = HP_START_TIME_FROM_SETTINGS
+    else:
+        h, m = HP_HARD_EARLIEST_H, HP_HARD_EARLIEST_M
+    return datetime(year, month, day, h, m)
 
 NEARBY_TRAVEL_THRESHOLD = 5  # da 7, minuti, soglia per considerare due apt "stesso blocco"
 
@@ -275,7 +316,8 @@ def evaluate_route(cleaner: Cleaner, route: List[Task]) -> Tuple[bool, List[Tupl
         else:
             start = arrival
     else:
-        hp_hard_earliest = datetime(arrival.year, arrival.month, arrival.day, HP_HARD_EARLIEST_H, HP_HARD_EARLIEST_M)
+        # Usa HP start time da settings (se caricato) o default
+        hp_hard_earliest = get_hp_earliest(arrival.year, arrival.month, arrival.day)
 
         # CRITICAL: Per task HP non-straordinaria, start deve essere >= hp_hard_earliest E >= checkout
         # Applica sempre ENTRAMBI i vincoli: checkout e hp_hard_earliest
@@ -983,6 +1025,9 @@ def main():
     
     print(f"🌐 Modalità API attiva (PostgreSQL)")
     print(f"📅 Data di lavoro: {ref_date}")
+
+    # Carica HP start time da settings
+    load_hp_settings()
 
     tasks, _ = load_tasks()
     cleaners = load_cleaners(ref_date)
