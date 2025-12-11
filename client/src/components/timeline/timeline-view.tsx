@@ -2153,7 +2153,7 @@ export default function TimelineView({
                           {cleaner.name} {cleaner.lastname}
                         </p>
                         <p className="text-sm text-muted-foreground">
-                          {cleaner.role} • Contratto: {cleaner.contract_type} • {cleaner.counter_hours?.toFixed(2) || '0.00'}h
+                          {cleaner.role} • Contratto: {cleaner.contract_type} • {Number(cleaner.counter_hours || 0).toFixed(2)}h
                         </p>
                       </div>
                     </div>
