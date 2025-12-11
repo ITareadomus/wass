@@ -445,7 +445,9 @@ def deduplicate_tasks(tasks):
                 checkin_str = t.get("checkin_date")
                 if checkin_str:
                     try:
-                        checkin_dt = datetime.strptime(checkin_str, "%Y-%m-%d")
+                        # Normalizza formato ISO (es. "2025-12-13T00:00:00.000Z" -> "2025-12-13")
+                        normalized_date = checkin_str.split('T')[0] if 'T' in checkin_str else checkin_str
+                        checkin_dt = datetime.strptime(normalized_date, "%Y-%m-%d")
                         # Inverti per ordinare dal più recente
                         checkin_score = -checkin_dt.timestamp()
                     except:
