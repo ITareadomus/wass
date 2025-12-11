@@ -325,8 +325,15 @@ export async function loadSelectedCleaners(workDate: string): Promise<any | null
 /**
  * Save selected_cleaners for a specific work date
  * PRIMARY: PostgreSQL (IDs to daily_selected_cleaners, full data to cleaners table)
+ * Now with revision tracking via selected_cleaners_revisions table
  */
-export async function saveSelectedCleaners(workDate: string, data: any, skipRevision: boolean = false, createdBy: string = 'system', modificationType: string = 'manual'): Promise<boolean> {
+export async function saveSelectedCleaners(
+  workDate: string, 
+  data: any, 
+  skipRevision: boolean = false, 
+  createdBy: string = 'system', 
+  modificationType: string = 'MANUAL'
+): Promise<boolean> {
   try {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -344,22 +351,24 @@ export async function saveSelectedCleaners(workDate: string, data: any, skipRevi
     
     // Extract IDs for daily_selected_cleaners table (now INTEGER[])
     const cleanerIds = cleanersArray.map((c: any) => typeof c === 'number' ? c : c.id).filter((id: any) => id != null);
-    await pgDailyAssignmentsService.saveSelectedCleaners(workDate, cleanerIds);
+    
+    // Determine action type based on modificationType
+    const actionType = skipRevision ? 'INIT' : modificationType.toUpperCase();
+    
+    // Build action payload
+    const actionPayload = data.actionPayload || null;
+    
+    await pgDailyAssignmentsService.saveSelectedCleaners(workDate, cleanerIds, actionType, actionPayload, createdBy);
     
     // Also save full cleaner data to cleaners table if available
     if (cleanersArray.length > 0 && typeof cleanersArray[0] === 'object') {
-      await pgDailyAssignmentsService.saveCleanersForDate(workDate, cleanersArray, 'selected_cleaners_update');
+      await pgDailyAssignmentsService.saveCleanersForDate(workDate, cleanersArray);
     }
     
     console.log(`✅ Selected cleaners saved to PostgreSQL for ${workDate}: ${cleanerIds.length} IDs`);
 
     if (isPastDate) {
       console.log(`📜 Data passata ${workDate} - salvato su PG`);
-      return true;
-    }
-
-    if (skipRevision) {
-      console.log(`⏭️ Saltata creazione revisione per ${workDate} (skipRevision=true)`);
       return true;
     }
 

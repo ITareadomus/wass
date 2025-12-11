@@ -1,7 +1,49 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, timestamp, integer, serial, boolean } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, timestamp, integer, serial, boolean, date, jsonb } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
+
+// ==================== SELECTED_CLEANERS_REVISIONS ====================
+// Traccia le modifiche alla selezione giornaliera dei cleaners
+export const selectedCleanersRevisions = pgTable("selected_cleaners_revisions", {
+  id: serial("id").primaryKey(),
+  selectedCleanersId: integer("selected_cleaners_id").notNull(),
+  workDate: date("work_date").notNull(),
+  revisionNumber: integer("revision_number").notNull(),
+  cleanersBefore: integer("cleaners_before").array().notNull().default(sql`'{}'`),
+  cleanersAfter: integer("cleaners_after").array().notNull().default(sql`'{}'`),
+  actionType: varchar("action_type", { length: 30 }).notNull(), // 'REMOVE', 'ADD', 'SWAP', 'ROLLBACK'
+  actionPayload: jsonb("action_payload"), // dettagli extra, es: {"removed": 123}
+  performedBy: varchar("performed_by", { length: 100 }),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertSelectedCleanersRevisionSchema = createInsertSchema(selectedCleanersRevisions).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertSelectedCleanersRevision = z.infer<typeof insertSelectedCleanersRevisionSchema>;
+export type SelectedCleanersRevision = typeof selectedCleanersRevisions.$inferSelect;
+
+// ==================== CLEANER_ALIASES ====================
+// Tabella permanente per gli alias dei cleaners (indipendente dalla data)
+export const cleanerAliases = pgTable("cleaner_aliases", {
+  cleanerId: integer("cleaner_id").primaryKey(),
+  alias: varchar("alias", { length: 100 }).notNull(),
+  name: varchar("name", { length: 255 }),
+  lastname: varchar("lastname", { length: 255 }),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertCleanerAliasSchema = createInsertSchema(cleanerAliases).omit({
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertCleanerAlias = z.infer<typeof insertCleanerAliasSchema>;
+export type CleanerAlias = typeof cleanerAliases.$inferSelect;
 
 // ==================== USERS (replaces accounts.json) ====================
 export const users = pgTable("users", {
