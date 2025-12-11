@@ -1849,7 +1849,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Get username from request
       const currentUsername = req.body.modified_by || getCurrentUsername(req);
 
-      // Salva selected_cleaners usando workspace helper (PostgreSQL + filesystem come cache)
+      // Salva su PostgreSQL con action_type 'removal'
+      const { pgDailyAssignmentsService: pgService } = await import('./services/pg-daily-assignments-service');
+      const remainingIds = selectedData.cleaners.map((c: any) => typeof c === 'number' ? c : c.id);
+      await pgService.saveSelectedCleaners(workDate, remainingIds, 'removal', { removed_cleaner_id: cleanerId }, currentUsername);
+
+      // Salva selected_cleaners usando workspace helper (filesystem come cache)
       await workspaceFiles.saveSelectedCleaners(workDate, selectedData, false, currentUsername);
 
       let message = "";
@@ -1898,7 +1903,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Endpoint per salvare i cleaners selezionati (PostgreSQL only)
   app.post("/api/save-selected-cleaners", async (req, res) => {
     try {
-      const { cleaners: selectedCleaners, total_selected, date } = req.body;
+      const { cleaners: selectedCleaners, total_selected, date, action_type = 'replace' } = req.body;
 
       if (!selectedCleaners || !Array.isArray(selectedCleaners)) {
         return res.status(400).json({
@@ -1949,7 +1954,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Get username from request
       const currentUsername = req.body.modified_by || req.body.created_by || getCurrentUsername(req);
 
-      // Salva su PostgreSQL (unica fonte di verità)
+      // Salva su PostgreSQL con action_type descrittivo
+      const { pgDailyAssignmentsService: pgService } = await import('./services/pg-daily-assignments-service');
+      await pgService.saveSelectedCleaners(workDate, cleanerIds, action_type, null, currentUsername);
+      
+      // Salva anche su filesystem per backward compat
       await workspaceFiles.saveSelectedCleaners(workDate, dataToSave, false, currentUsername);
 
       console.log(`✅ Salvati ${enrichedCleaners.length} cleaners in PostgreSQL per ${workDate} by ${currentUsername}`);

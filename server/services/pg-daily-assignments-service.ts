@@ -1143,14 +1143,14 @@ export class PgDailyAssignmentsService {
   /**
    * Save selected cleaner IDs for a work_date (upsert) with revision tracking
    * @param cleanerIds - Array of cleaner IDs (integers)
-   * @param actionType - Type of action: 'ADD', 'REMOVE', 'SWAP', 'ROLLBACK', 'INIT'
+   * @param actionType - Type of action: 'add', 'remove', 'replace', 'swap', 'rollback', 'init'
    * @param actionPayload - Optional JSON payload with action details
    * @param performedBy - Username/identifier of who performed the action
    */
   async saveSelectedCleaners(
     workDate: string, 
     cleanerIds: number[], 
-    actionType: string = 'MANUAL',
+    actionType: string = 'replace',
     actionPayload: any = null,
     performedBy: string = 'system'
   ): Promise<boolean> {
