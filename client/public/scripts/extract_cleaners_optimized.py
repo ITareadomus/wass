@@ -131,23 +131,46 @@ for r in cur.fetchall():
     else:
         prefs_map[r["user_id"]] = []
 
-# --- CARICA START TIME CUSTOM DA selected_cleaners.json ----------------
+# --- CARICA START TIME DA PostgreSQL (date-scoped) ----------------
+# IMPORTANTE: Ogni cleaner ha uno start_time specifico per ogni data
+# Non usare selected_cleaners.json perché è globale e non rispetta le date
 custom_start_times = {}
 target_date_str = target_date.strftime("%Y-%m-%d")
 try:
-    selected_cleaners_path = Path(__file__).resolve().parents[1] / "data" / "cleaners" / "selected_cleaners.json"
-    if selected_cleaners_path.exists():
-        with selected_cleaners_path.open("r", encoding="utf-8") as f:
-            selected_data = json.load(f)
-            # Verifica che sia per la stessa data target
-            if selected_data.get("metadata", {}).get("date") == target_date_str:
-                for sc in selected_data.get("cleaners", []):
-                    if sc.get("start_time"):
-                        custom_start_times[sc["id"]] = sc["start_time"]
-                if custom_start_times:
-                    print(f"✅ Trovati {len(custom_start_times)} start time custom da selected_cleaners.json")
-except Exception as e:
-    print(f"⚠️ Impossibile leggere start time custom: {e}")
+    import psycopg2
+    from psycopg2.extras import RealDictCursor
+    import os
+    db_url = os.environ.get("DATABASE_URL")
+    if db_url:
+        from urllib.parse import urlparse
+        parsed = urlparse(db_url)
+        pg_config = {
+            "host": parsed.hostname,
+            "port": parsed.port or 5432,
+            "user": parsed.username,
+            "password": parsed.password,
+            "database": parsed.path.lstrip("/")
+        }
+        try:
+            pg_conn = psycopg2.connect(**pg_config)
+            pg_cur = pg_conn.cursor(cursor_factory=RealDictCursor)
+            # Leggi start_time da PostgreSQL per questa data specifica (date-scoped!)
+            pg_cur.execute("""
+                SELECT cleaner_id, start_time FROM cleaners
+                WHERE work_date = %s AND start_time IS NOT NULL
+            """, (target_date_str,))
+            for row in pg_cur.fetchall():
+                custom_start_times[row["cleaner_id"]] = row["start_time"]
+            if custom_start_times:
+                print(f"✅ Trovati {len(custom_start_times)} start_time custom da PostgreSQL per {target_date_str}")
+            pg_cur.close()
+            pg_conn.close()
+        except Exception as pg_error:
+            print(f"⚠️ Impossibile leggere da PostgreSQL: {pg_error}, continuo con tw_start come default")
+    else:
+        print(f"⚠️ DATABASE_URL non disponibile, uso tw_start come default")
+except ImportError:
+    print(f"⚠️ psycopg2 non disponibile, uso tw_start come default")
 
 # --- COSTRUZIONE OUTPUT -------------------------------------------------
 cleaners_data = []

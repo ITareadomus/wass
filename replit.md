@@ -42,8 +42,8 @@ Preferred communication style: Simple, everyday language.
   - `daily_containers_revisions`: Container revision metadata
   - `daily_containers_history`: All container revisions for undo
   - `daily_selected_cleaners`: Selected cleaners per work_date (INTEGER[] array of cleaner IDs)
-  - `selected_cleaners_revisions`: Revision history for selected_cleaners changes (ADD, REMOVE, SWAP, ROLLBACK)
-  - `cleaners`: Full cleaner data per work_date (replaces cleaners.json)
+  - `selected_cleaners_revisions`: Revision history for selected_cleaners changes with descriptive action types (see below)
+  - `cleaners`: Full cleaner data per work_date, INCLUDING start_time which is date-scoped (replaces cleaners.json)
   - `cleaner_aliases`: Permanent aliases for cleaners (date-independent, replaces alias column)
   - `app_settings`: Key-value store for application settings (replaces settings.json, client_timewindows.json)
   - `users`: User accounts with hashed passwords (replaces accounts.json)
@@ -51,8 +51,16 @@ Preferred communication style: Simple, everyday language.
   - `cleaners_history`: Removed - no longer needed for audit
 - **Container Task Fields**: task_id, logistic_code, client_id, premium, address, lat, lng, cleaning_time, checkin_date, checkout_date, checkin_time, checkout_time, pax_in, pax_out, small_equipment, operation_id, confirmed_operation, straordinaria, type_apt, alias, customer_name, reasons, priority
 - **Undo Flow**: When task moves container→timeline, containers history saved first for rollback
-- **Selected Cleaners Revisions**: Every change to daily_selected_cleaners is tracked with before/after state, action type, and performer
-- **Cleaner Aliases**: Permanent table for cleaner display names, independent of work_date
+- **Selected Cleaners Revisions**: Every change to daily_selected_cleaners is tracked with before/after state, descriptive action type, and performer
+  - Action types: `'add'` (cleaner aggiunto), `'removal'` (cleaner rimosso), `'replace'` (lista completamente sostituita), `'swap'` (cleaners scambiati), `'rollback'` (ripristino a revisione precedente), `'init'` (inizializzazione)
+  - Each revision includes: cleaners_before[], cleaners_after[], action_type, action_payload (metadata specifici dell'azione), performed_by, created_at
+- **Cleaner Aliases**: Permanent table for cleaner display names, independent of work_date (37 aliases imported Dec 11, 2025)
+- **Start Time Management (December 11, 2025 - Date-Scoped)**: 
+  - Each cleaner's start_time is stored per work_date in the `cleaners` table (date-scoped)
+  - When user modifies start_time via `/api/update-cleaner-start-time`, it saves ONLY for that date
+  - When extracting cleaners for a different date, `extract_cleaners_optimized.py` reads start_time from PostgreSQL for that specific date
+  - If no custom start_time for a date, defaults to cleaner's `tw_start` from ADAM or 10:00
+  - This prevents modified start_times from affecting other dates
 - **Service File**: `server/services/pg-daily-assignments-service.ts`
 
 ## Timeline Data Flow (December 2025) - PostgreSQL Only
