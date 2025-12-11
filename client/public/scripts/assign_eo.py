@@ -34,6 +34,58 @@ OUTPUT_ASSIGN = BASE / "output" / "early_out_assignments.json"
 WORK_DATE: Optional[str] = None
 USE_API: bool = False
 
+# Variabili globali per EO settings (caricate da API)
+EO_START_TIME_MIN: Optional[int] = None  # Orario minimo inizio task EO (in minuti)
+EO_END_TIME_MIN: Optional[int] = None    # Orario massimo inizio task EO (in minuti)
+
+def load_eo_settings():
+    """Carica eo_start_time e eo_end_time da settings via API."""
+    global EO_START_TIME_MIN, EO_END_TIME_MIN
+    
+    if not API_AVAILABLE:
+        print("   ⚠️ API non disponibile, uso default EO start 10:00, end 10:59")
+        EO_START_TIME_MIN = 10 * 60  # 10:00
+        EO_END_TIME_MIN = 10 * 60 + 59  # 10:59
+        return
+    
+    try:
+        from api_client import load_settings_from_api
+        settings = load_settings_from_api()
+        eo_config = settings.get("early-out", {})
+        
+        # Carica eo_start_time
+        eo_start = eo_config.get("eo_start_time")
+        if eo_start:
+            if eo_start.count(':') == 2:
+                eo_start = ':'.join(eo_start.split(':')[:2])
+            parts = eo_start.split(':')
+            if len(parts) >= 2:
+                h, m = int(parts[0]), int(parts[1])
+                EO_START_TIME_MIN = h * 60 + m
+                print(f"   ✅ EO start time da settings: {h:02d}:{m:02d}")
+        else:
+            EO_START_TIME_MIN = 10 * 60
+            print(f"   ℹ️ eo_start_time non trovato, uso default 10:00")
+        
+        # Carica eo_end_time (orario MAX in cui una task EO può INIZIARE)
+        eo_end = eo_config.get("eo_end_time")
+        if eo_end:
+            if eo_end.count(':') == 2:
+                eo_end = ':'.join(eo_end.split(':')[:2])
+            parts = eo_end.split(':')
+            if len(parts) >= 2:
+                h, m = int(parts[0]), int(parts[1])
+                EO_END_TIME_MIN = h * 60 + m
+                print(f"   ✅ EO end time da settings: {h:02d}:{m:02d}")
+        else:
+            EO_END_TIME_MIN = 10 * 60 + 59  # 10:59
+            print(f"   ℹ️ eo_end_time non trovato, uso default 10:59")
+            
+    except Exception as e:
+        print(f"   ⚠️ Errore caricamento settings: {e}, uso default")
+        EO_START_TIME_MIN = 10 * 60
+        EO_END_TIME_MIN = 10 * 60 + 59
+
 # =============================
 # CONFIG - REGOLE CLUSTERING OTTIMIZZATE
 # =============================
@@ -305,6 +357,10 @@ def evaluate_route(route: List[Task]) -> Tuple[bool, List[Tuple[int, int, int]]]
             wait = max(0.0, t.checkout_time - arrival)
             cur += wait
             start = cur
+            
+            # VINCOLO EO END TIME: la task EO non può INIZIARE dopo eo_end_time
+            if EO_END_TIME_MIN is not None and start > EO_END_TIME_MIN:
+                return False, []
 
         finish = start + t.cleaning_time
 
@@ -1048,6 +1104,8 @@ def main():
     if not USE_API:
         raise SystemExit("❌ Errore: --use-api è obbligatorio. Lo script usa solo API, non filesystem.")
 
+    # Carica EO settings (eo_start_time, eo_end_time)
+    load_eo_settings()
 
     cleaners = load_cleaners()
     containers_data = load_containers_data()  # Carica containers da API
