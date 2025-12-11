@@ -1445,7 +1445,7 @@ export class PgDailyAssignmentsService {
           cleaner.contract_type || null,
           cleaner.preferred_customers || [],
           cleaner.telegram_id || null,
-          cleaner.start_time || '09:00',
+          cleaner.start_time || '10:00',
           cleaner.can_do_straordinaria || false,
           alias // Still write to cleaners.alias for backward compat
         ]);
