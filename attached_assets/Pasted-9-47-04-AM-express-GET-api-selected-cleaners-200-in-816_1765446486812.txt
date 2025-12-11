@@ -1,0 +1,27 @@
+9:47:04 AM [express] GET /api/selected-cleaners 200 in 816ms :: {"cleaners":[{"id":626,"name":"DORA …
+Eseguendo extract_cleaners_optimized.py con comando: python3 /home/runner/workspace/client/public/scripts/extract_cleaners_optimized.py 2025-12-11
+Errore durante l'estrazione dei cleaners (ottimizzato): Command failed: python3 /home/runner/workspace/client/public/scripts/extract_cleaners_optimized.py 2025-12-11
+Traceback (most recent call last):
+  File "/home/runner/workspace/client/public/scripts/extract_cleaners_optimized.py", line 176, in <module>
+    cur.execute("""
+  File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/mysql/connector/cursor.py", line 416, in execute
+    self._connection.cmd_query(
+  File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/mysql/connector/opentelemetry/context_propagation.py", line 97, in wrapper
+    return method(cnx, *args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/mysql/connector/_decorating.py", line 89, in handle_cnx_method
+    raise err
+  File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/mysql/connector/_decorating.py", line 85, in handle_cnx_method
+    return cnx_method(cnx, *args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/mysql/connector/connection.py", line 984, in cmd_query
+    result = self._handle_result(
+             ^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/mysql/connector/_decorating.py", line 89, in handle_cnx_method
+    raise err
+  File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/mysql/connector/_decorating.py", line 85, in handle_cnx_method
+    return cnx_method(cnx, *args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/mysql/connector/connection.py", line 745, in _handle_result
+    raise get_exception(packet)
+mysql.connector.errors.ProgrammingError: 1146 (42S02): Table 'adamdb.cleaners_day_tasks' doesn't exist
