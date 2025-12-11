@@ -692,7 +692,11 @@ def load_tasks() -> List[Task]:
         checkin_time = t.get("checkin_time")
         if checkin_date and checkin_time:
             try:
-                checkin_dt = datetime.strptime(f"{checkin_date} {checkin_time}", "%Y-%m-%d %H:%M")
+                # Normalizza formato ISO (es. "2025-12-13T00:00:00.000Z" -> "2025-12-13")
+                normalized_date = checkin_date.split('T')[0] if 'T' in checkin_date else checkin_date
+                # Normalizza tempo (es. "11:00:00" -> "11:00")
+                normalized_time = ':'.join(checkin_time.split(':')[:2]) if checkin_time.count(':') == 2 else checkin_time
+                checkin_dt = datetime.strptime(f"{normalized_date} {normalized_time}", "%Y-%m-%d %H:%M")
             except:
                 pass
 
@@ -700,7 +704,11 @@ def load_tasks() -> List[Task]:
         checkout_time = t.get("checkout_time")
         if checkout_date and checkout_time:
             try:
-                checkout_dt = datetime.strptime(f"{checkout_date} {checkout_time}", "%Y-%m-%d %H:%M")
+                # Normalizza formato ISO (es. "2025-12-13T00:00:00.000Z" -> "2025-12-13")
+                normalized_date = checkout_date.split('T')[0] if 'T' in checkout_date else checkout_date
+                # Normalizza tempo (es. "11:00:00" -> "11:00")
+                normalized_time = ':'.join(checkout_time.split(':')[:2]) if checkout_time.count(':') == 2 else checkout_time
+                checkout_dt = datetime.strptime(f"{normalized_date} {normalized_time}", "%Y-%m-%d %H:%M")
             except:
                 pass
 
