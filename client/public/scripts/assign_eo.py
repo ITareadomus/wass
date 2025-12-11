@@ -1131,19 +1131,16 @@ def main():
             cleaner_entry_existing["tasks"].extend(new_tasks)
             print(f"   ✅ Usando cleaner entry esistente per {cleaner_entry['cleaner']['name']} {cleaner_entry['cleaner']['lastname']} (aggiunte {len(new_tasks)} task)")
 
-    # CRITICAL FIX: Ricalcola sequenze E travel_time per tutti i cleaner dopo il merge
-    # Importa la funzione di ricalcolo da recalculate_times.py
-    from recalculate_times import recalculate_cleaner_times
+    # NOTA: Non chiamare recalculate_cleaner_times qui!
+    # I tempi sono già calcolati correttamente da build_output/evaluate_route
+    # con i vincoli EO (eo_end_time). recalculate_cleaner_times non conosce
+    # questi vincoli e sovrascriverebbe i tempi EO con valori errati.
     
+    # Solo ordinamento per start_time (senza ricalcolo)
     for entry in timeline_data_output["cleaners_assignments"]:
         tasks = entry.get("tasks", [])
         if len(tasks) > 1:
-            # Ordina per start_time per mantenere l'ordine cronologico
             tasks.sort(key=lambda t: t.get("start_time") or "00:00")
-            # Usa recalculate_cleaner_times per ricalcolare sequence, travel_time, start_time, end_time
-            updated_entry = recalculate_cleaner_times(entry)
-            entry["tasks"] = updated_entry["tasks"]
-            print(f"   🔄 Ricalcolati tempi per cleaner {entry['cleaner']['name']} {entry['cleaner']['lastname']}: {len(tasks)} task")
 
 
     # Aggiorna meta

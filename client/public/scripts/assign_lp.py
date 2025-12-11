@@ -1165,14 +1165,16 @@ def main():
                 "tasks": cleaner_entry["tasks"]
             })
 
-    from recalculate_times import recalculate_cleaner_times
+    # NOTA: Non chiamare recalculate_cleaner_times qui!
+    # I tempi sono già calcolati correttamente da build_output/evaluate_route.
+    # recalculate_cleaner_times usa WORK_START_TIME hardcoded e non conosce
+    # i vincoli HP/EO, quindi sovrascriverebbe i tempi calcolati.
     
+    # Solo ordinamento per start_time (senza ricalcolo)
     for entry in timeline_data["cleaners_assignments"]:
         tasks_list = entry.get("tasks", [])
         if len(tasks_list) > 1:
             tasks_list.sort(key=lambda t: t.get("start_time") or "00:00")
-            updated_entry = recalculate_cleaner_times(entry)
-            entry["tasks"] = updated_entry["tasks"]
 
     total_available_cleaners = len(cleaners)
 
