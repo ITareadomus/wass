@@ -173,16 +173,25 @@ for u in cleaners:
 
     # counter_hours (somma delle ore lavorate nella settimana target, NON ieri)
     # Ogni task nella settimana conta per task_duration in MINUTI diviso 60
-    cur.execute("""
-        SELECT SUM(task_duration) / 60.0
-        FROM cleaners_day_tasks
-        WHERE cleaner_id = %s
-          AND work_date >= %s AND work_date < %s
-    """, (cid, week_start, week_end_excl))
-    row = cur.fetchone()
-    counter_hours_value = row[0] if (row and row[0] is not None) else 0.0
-    # Ensure it's a float number, not a time string
-    counter_hours = float(counter_hours_value) if counter_hours_value is not None else 0.0
+    counter_hours = 0.0
+    try:
+        cur.execute("""
+            SELECT SUM(task_duration) / 60.0
+            FROM cleaners_day_tasks
+            WHERE cleaner_id = %s
+              AND work_date >= %s AND work_date < %s
+        """, (cid, week_start, week_end_excl))
+        row = cur.fetchone()
+        counter_hours_value = row[0] if (row and row[0] is not None) else 0.0
+        # Ensure it's a float number, not a time string
+        counter_hours = float(counter_hours_value) if counter_hours_value is not None else 0.0
+    except mysql.connector.Error as e:
+        # Se la tabella cleaners_day_tasks non esiste, usa il counter_hours da weekly_hours
+        if "doesn't exist" in str(e) or "1146" in str(e):
+            counter_hours = weekly_hours.get(cid, 0.0)
+            print(f"⚠️ Tabella cleaners_day_tasks non trovata per cleaner {cid}, uso weekly_hours: {counter_hours}")
+        else:
+            raise
 
 
     cleaner = {
