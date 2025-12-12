@@ -49,6 +49,13 @@ const applyPendingEdits = (task: any): any => {
   
   if (!edits) return task;
   
+  // CRITICAL: Per operation_id, usa il flag operationIdModified per sapere se è stato modificato
+  // Se operationIdModified è true, usa il valore (anche se null)
+  // Se operationIdModified è false/undefined, usa il valore originale
+  const operationIdToUse = edits.operationIdModified 
+    ? edits.operationId 
+    : task.operation_id;
+  
   // Crea una copia della task con le modifiche applicate
   return {
     ...task,
@@ -57,7 +64,7 @@ const applyPendingEdits = (task: any): any => {
     checkin_date: edits.checkinDate !== undefined ? edits.checkinDate : task.checkin_date,
     checkin_time: edits.checkinTime !== undefined ? edits.checkinTime : task.checkin_time,
     pax_in: edits.paxIn !== undefined ? edits.paxIn : task.pax_in,
-    operation_id: edits.operationId !== undefined ? edits.operationId : task.operation_id,
+    operation_id: operationIdToUse,
     // Converti cleaningTime in duration formato "H.MM"
     duration: edits.cleaningTime !== undefined 
       ? `${Math.floor(edits.cleaningTime / 60)}.${String(edits.cleaningTime % 60).padStart(2, '0')}`
@@ -402,9 +409,12 @@ export default function TaskCard({
   // Normalizza confirmed_operation da boolean/number/string a boolean sicuro
   // CRITICAL: Se l'utente ha modificato operation_id tramite pending edits, considera confermato
   // Questo distingue tra operation_id=2 di default (sistema) e operation_id=2 scelto manualmente
-  const taskKey = getTaskKey(task);
-  const pendingEditsForTask = getPendingEdits()[taskKey];
-  const hasPendingOperationEdit = pendingEditsForTask?.operationId !== undefined;
+  const taskKeyForConfirm = getTaskKey(task);
+  const pendingEditsForTask = getPendingEdits()[taskKeyForConfirm];
+  // Usa il flag operationIdModified per determinare se l'utente ha modificato l'operazione
+  // Se l'utente seleziona "Nessuna operazione" (null), operationIdModified è true ma operationId è null
+  // In quel caso NON è confermato, il punto di domanda rimane
+  const hasPendingOperationEdit = pendingEditsForTask?.operationIdModified === true && pendingEditsForTask?.operationId !== null;
   
   const rawConfirmed = (task as any).confirmed_operation; // Usa task originale per confirmed_operation
   const originalConfirmed = 
@@ -416,7 +426,7 @@ export default function TaskCard({
           ? ["true", "1", "yes"].includes(rawConfirmed.toLowerCase().trim())
           : false;
   
-  // Confermato se: utente ha modificato manualmente operation_id O confirmed_operation originale è true
+  // Confermato se: utente ha modificato manualmente operation_id (con valore non-null) O confirmed_operation originale è true
   const isConfirmedOperation = hasPendingOperationEdit || originalConfirmed;
 
   // Determina il tipo della CARD dai flag dell'oggetto *task* (non quelli della navigazione nel modale)
@@ -551,6 +561,13 @@ export default function TaskCard({
       // CRITICAL: Salva le modifiche SOLO in sessionStorage locale, NON su PostgreSQL
       // Le modifiche verranno salvate solo al trasferimento a ADAM
       const taskKey = getTaskKey(displayTask);
+      
+      // Gestisce operation_id: "none" = null (scelta esplicita di nessuna operazione)
+      // Altrimenti parseInt, se è un numero valido
+      const operationIdValue = editedOperationId === "none" 
+        ? null 
+        : (parseInt(editedOperationId) || null);
+      
       const pendingEdits = {
         taskId: taskKey,
         logisticCode: displayTask.name,
@@ -561,7 +578,10 @@ export default function TaskCard({
         cleaningTime: parseInt(editedDuration),
         paxIn: parseInt(editedPaxIn),
         paxOut: displayTask.pax_out,
-        operationId: parseInt(editedOperationId) || null,
+        operationId: operationIdValue,
+        // CRITICAL: Flag per indicare che l'utente ha modificato operation_id
+        // Questo distingue tra "non modificato" e "impostato a null esplicitamente"
+        operationIdModified: editingFields.has('operation'),
       };
 
       // Salva in sessionStorage come "pending_task_edits"
@@ -1211,6 +1231,7 @@ export default function TaskCard({
                         <SelectValue placeholder="Seleziona operazione" />
                       </SelectTrigger>
                       <SelectContent>
+                        <SelectItem value="none">— Nessuna operazione —</SelectItem>
                         <SelectItem value="1">FERMATA</SelectItem>
                         <SelectItem value="2">PARTENZA</SelectItem>
                         <SelectItem value="3">PULIZIA STRAORDINARIA</SelectItem>
@@ -1226,20 +1247,30 @@ export default function TaskCard({
                       if (!isReadOnly) toggleEditingField('operation');
                     }}
                   >
-                    {!isConfirmedOperation
-                      ? "non migrato"
-                      : (displayTask as any).operation_id
-                        ? (() => {
-                            const opId = (displayTask as any).operation_id;
-                            const operationNames: Record<number, string> = {
-                              1: "FERMATA",
-                              2: "PARTENZA",
-                              3: "PULIZIA STRAORDINARIA",
-                              4: "RIPASSO"
-                            };
-                            return operationNames[opId] || `Operazione ${opId}`;
-                          })()
-                        : "-"}
+                    {(() => {
+                      // Controlla se l'utente ha scelto esplicitamente "Nessuna operazione"
+                      const taskKeyDisplay = getTaskKey(displayTask);
+                      const pendingEditsDisplay = getPendingEdits()[taskKeyDisplay];
+                      const userChoseNone = pendingEditsDisplay?.operationIdModified === true && pendingEditsDisplay?.operationId === null;
+                      
+                      if (userChoseNone) {
+                        return "— Nessuna operazione —";
+                      }
+                      if (!isConfirmedOperation) {
+                        return "non migrato";
+                      }
+                      const opId = (displayTask as any).operation_id;
+                      if (opId) {
+                        const operationNames: Record<number, string> = {
+                          1: "FERMATA",
+                          2: "PARTENZA",
+                          3: "PULIZIA STRAORDINARIA",
+                          4: "RIPASSO"
+                        };
+                        return operationNames[opId] || `Operazione ${opId}`;
+                      }
+                      return "-";
+                    })()}
                   </p>
                 )}
               </div>
