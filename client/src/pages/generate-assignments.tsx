@@ -98,6 +98,40 @@ const isDateInPast = (date: Date): boolean => {
   return targetDate < today;
 };
 
+// === OPTIMISTIC UPDATE HELPERS ===
+// Aggiorna localmente assignedCleaner di una task (ritorna snapshot per rollback)
+function optimisticMoveTask(
+  tasks: Task[],
+  taskId: string,
+  newCleanerId: number | null
+): { updated: Task[]; snapshot: Task[] } {
+  const snapshot = [...tasks];
+  const updated = tasks.map(t => {
+    if (getTaskId(t) === taskId) {
+      return { ...t, assignedCleaner: newCleanerId };
+    }
+    return t;
+  });
+  return { updated, snapshot };
+}
+
+// Batch move per multi-select
+function optimisticBatchMoveTask(
+  tasks: Task[],
+  taskIds: string[],
+  newCleanerId: number | null
+): { updated: Task[]; snapshot: Task[] } {
+  const snapshot = [...tasks];
+  const taskIdSet = new Set(taskIds);
+  const updated = tasks.map(t => {
+    if (taskIdSet.has(getTaskId(t))) {
+      return { ...t, assignedCleaner: newCleanerId };
+    }
+    return t;
+  });
+  return { updated, snapshot };
+}
+
 // MultiSelect Context per gestire selezione multipla task
 interface MultiSelectContextType {
   isMultiSelectMode: boolean;
@@ -1463,6 +1497,10 @@ export default function GenerateAssignments() {
       if (fromCleanerId !== null && toCleanerId !== null && fromCleanerId !== toCleanerId) {
         dlog(`🔄 Spostamento task ${taskId} da cleaner ${fromCleanerId} a cleaner ${toCleanerId}`);
 
+        // OPTIMISTIC UPDATE: Sposta immediatamente nella UI
+        const { updated, snapshot } = optimisticMoveTask(allTasksWithAssignments, taskId, toCleanerId);
+        setAllTasksWithAssignments(updated);
+
         try {
           // Usa l'endpoint corretto per spostare tra cleaners
           const dateStr = format(selectedDate, "yyyy-MM-dd");
@@ -1507,6 +1545,8 @@ export default function GenerateAssignments() {
           // PATCH B: Reload debounced in background
           scheduleManualRefresh(600);
         } catch (err) {
+          // ROLLBACK: Ripristina stato precedente
+          setAllTasksWithAssignments(snapshot);
           console.error("Errore nello spostamento:", err);
           toast({
             title: "Errore",
@@ -1527,6 +1567,12 @@ export default function GenerateAssignments() {
 
       if (isAnyMultiSelectActive && selectedTasks.length > 0 && isDraggedTaskSelected && toCleanerId !== null && !toContainer) {
         dlog(`🔄 BATCH MOVE CROSS-CONTAINER: Spostamento di ${selectedTasks.length} task selezionate a cleaner ${toCleanerId}`);
+
+        // OPTIMISTIC UPDATE: Sposta tutte le task selezionate immediatamente
+        const taskIds = selectedTasks.map(st => st.taskId);
+        const { updated, snapshot } = optimisticBatchMoveTask(allTasksWithAssignments, taskIds, toCleanerId);
+        setAllTasksWithAssignments(updated);
+        const numTasks = selectedTasks.length; // Salva prima di pulire
 
         try {
           // PATCH C: Usa ID nel toast invece di fetch
@@ -1556,7 +1602,7 @@ export default function GenerateAssignments() {
 
           toast({
             title: "Task assegnate",
-            description: `${selectedTasks.length} task cross-container assegnate a ${cleanerName}`,
+            description: `${numTasks} task cross-container assegnate a ${cleanerName}`,
             variant: "success",
           });
 
@@ -1567,6 +1613,8 @@ export default function GenerateAssignments() {
           // PATCH B: Reload debounced in background
           scheduleManualRefresh(600);
         } catch (err) {
+          // ROLLBACK: Ripristina stato precedente
+          setAllTasksWithAssignments(snapshot);
           console.error("Errore nello spostamento batch:", err);
           toast({
             title: "Errore",
@@ -1587,6 +1635,10 @@ export default function GenerateAssignments() {
 
       if (!fromCleanerId && fromContainer && toCleanerId !== null && !toContainer) {
         dlog(`🔄 Spostamento da container ${fromContainer} a cleaner ${toCleanerId}`);
+
+        // OPTIMISTIC UPDATE: Aggiorna UI immediatamente
+        const { updated, snapshot } = optimisticMoveTask(allTasksWithAssignments, taskId, toCleanerId);
+        setAllTasksWithAssignments(updated);
 
         try {
           // PATCH C: Usa ID nel toast invece di fetch
@@ -1614,6 +1666,8 @@ export default function GenerateAssignments() {
           // PATCH B: Reload debounced in background
           scheduleManualRefresh(600);
         } catch (err) {
+          // ROLLBACK: Ripristina stato precedente
+          setAllTasksWithAssignments(snapshot);
           console.error("Errore nell'assegnazione:", err);
           toast({
             title: "Errore",
@@ -1632,21 +1686,39 @@ export default function GenerateAssignments() {
       if (fromCleanerId !== null && toContainer && !toCleanerId) { // Aggiunto !toCleanerId per evitare sovrapposizioni
         dlog(`🔄 Spostamento da cleaner ${fromCleanerId} a container ${toContainer}`);
 
-        // Rimuovi da timeline.json
-        await removeTimelineAssignment(taskId, logisticCode);
+        // OPTIMISTIC UPDATE: Rimuovi assignedCleaner immediatamente
+        const { updated, snapshot } = optimisticMoveTask(allTasksWithAssignments, taskId, null);
+        setAllTasksWithAssignments(updated);
 
-        // CRITICAL: Marca modifiche dopo rimozione da timeline
-        setHasUnsavedChanges(true);
-        if (handleTaskMoved) {
-          handleTaskMoved();
+        try {
+          // Rimuovi da timeline.json
+          await removeTimelineAssignment(taskId, logisticCode);
+
+          // CRITICAL: Marca modifiche dopo rimozione da timeline
+          setHasUnsavedChanges(true);
+          if (handleTaskMoved) {
+            handleTaskMoved();
+          }
+
+          // Rilascia lock PRIMA del reload
+          isDraggingRef.current = false;
+          if (dragTimeoutRef.current) clearTimeout(dragTimeoutRef.current);
+
+          // PATCH B: Reload debounced in background
+          scheduleManualRefresh(600);
+        } catch (err) {
+          // ROLLBACK: Ripristina stato precedente
+          setAllTasksWithAssignments(snapshot);
+          console.error("Errore nella rimozione:", err);
+          toast({
+            title: "Errore",
+            description: "Impossibile rimuovere la task dalla timeline.",
+            variant: "destructive",
+          });
+        } finally {
+          isDraggingRef.current = false;
+          if (dragTimeoutRef.current) clearTimeout(dragTimeoutRef.current);
         }
-
-        // Rilascia lock PRIMA del reload
-        isDraggingRef.current = false;
-        if (dragTimeoutRef.current) clearTimeout(dragTimeoutRef.current);
-
-        // PATCH B: Reload debounced in background
-        scheduleManualRefresh(600);
         return;
       }
 
