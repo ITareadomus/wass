@@ -32,6 +32,40 @@ import {
 // Normalizza la chiave di una task indipendentemente dal campo usato
 const getTaskKey = (t: any) => String(t?.id ?? t?.task_id ?? t?.logistic_code ?? "");
 
+// Legge le pending edits da sessionStorage
+const getPendingEdits = (): Record<string, any> => {
+  try {
+    return JSON.parse(sessionStorage.getItem('pending_task_edits') || '{}');
+  } catch {
+    return {};
+  }
+};
+
+// Applica le pending edits a una task per la visualizzazione
+const applyPendingEdits = (task: any): any => {
+  const taskKey = getTaskKey(task);
+  const pendingEdits = getPendingEdits();
+  const edits = pendingEdits[taskKey];
+  
+  if (!edits) return task;
+  
+  // Crea una copia della task con le modifiche applicate
+  return {
+    ...task,
+    checkout_date: edits.checkoutDate !== undefined ? edits.checkoutDate : task.checkout_date,
+    checkout_time: edits.checkoutTime !== undefined ? edits.checkoutTime : task.checkout_time,
+    checkin_date: edits.checkinDate !== undefined ? edits.checkinDate : task.checkin_date,
+    checkin_time: edits.checkinTime !== undefined ? edits.checkinTime : task.checkin_time,
+    pax_in: edits.paxIn !== undefined ? edits.paxIn : task.pax_in,
+    operation_id: edits.operationId !== undefined ? edits.operationId : task.operation_id,
+    // Converti cleaningTime in duration formato "H.MM"
+    duration: edits.cleaningTime !== undefined 
+      ? `${Math.floor(edits.cleaningTime / 60)}.${String(edits.cleaningTime % 60).padStart(2, '0')}`
+      : task.duration,
+    _hasPendingEdits: true, // Flag per indicare che ha modifiche pendenti
+  };
+};
+
 // Normalizza data nel formato YYYY-MM-DD per il picker HTML5
 const normalizeDate = (dateStr: any): string => {
   if (!dateStr) return "";
@@ -125,6 +159,7 @@ export default function TaskCard({
 }: TaskCardProps) {
   console.log('🔧 TaskCard render - isReadOnly:', isReadOnly, 'for task:', task.name);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  
   const [clickTimer, setClickTimer] = useState<NodeJS.Timeout | null>(null);
   // Operation names rimossi - ora usiamo solo gli ID numerici
 
@@ -199,6 +234,12 @@ export default function TaskCard({
   const [editedPaxIn, setEditedPaxIn] = useState("");
   const [editedOperationId, setEditedOperationId] = useState("");
   const [isSaving, setIsSaving] = useState(false);
+  
+  // Stato per forzare re-render quando pending edits cambiano
+  const [pendingEditsVersion, setPendingEditsVersion] = useState(0);
+
+  // CRITICAL: Applica le pending edits alla task per la visualizzazione nella card
+  const taskWithPendingEdits = React.useMemo(() => applyPendingEdits(task), [task, pendingEditsVersion]);
 
   // Determina le task navigabili in base al contesto
   const getNavigableTasks = (): Task[] => {
@@ -225,7 +266,7 @@ export default function TaskCard({
   }, [allTasks, task]);
 
   // Trova l'indice effettivo della task nel cleaner
-  const { currentIndex, effectiveCurrentId, currentTaskInNavigable, displayTask, canGoPrev, canGoNext } = (() => {
+  const { currentIndex, effectiveCurrentId, currentTaskInNavigable, displayTask, canGoPrev, canGoNext } = React.useMemo(() => {
     const normalizedCurrentId = currentTaskId ? String(currentTaskId) : null;
     const normalizedTaskId    = getTaskKey(task);
 
@@ -241,7 +282,8 @@ export default function TaskCard({
     const safeIdx = currIdx >= 0 ? currIdx : 0;
     const effId = currIdx >= 0 ? (navigableTasks[currIdx] as any).__key : normalizedTaskId;
     const curr = navigableTasks[safeIdx];
-    const disp = curr || task;
+    // CRITICAL: Applica le pending edits per la visualizzazione immediata
+    const disp = applyPendingEdits(curr || task);
 
     const prev = safeIdx > 0;
     const next = safeIdx < navigableTasks.length - 1;
@@ -254,7 +296,7 @@ export default function TaskCard({
       canGoPrev: prev,
       canGoNext: next
     };
-  })();
+  }, [navigableTasks, currentTaskId, task, pendingEditsVersion]);
 
   console.log('🔍 Stato navigazione:', {
     currentTaskId,
@@ -525,6 +567,8 @@ export default function TaskCard({
       });
 
       setEditingFields(new Set());
+      // CRITICAL: Incrementa versione per forzare re-render con i nuovi valori
+      setPendingEditsVersion(v => v + 1);
       setIsModalOpen(false);
 
     } catch (error: any) {
