@@ -428,15 +428,15 @@ export default function TaskCard({
     try {
       setIsSaving(true);
 
-      // Validazione: checkout deve avere entrambi data e ora, oppure entrambi vuoti
+      // Validazione: checkout - se hai ora, devi avere anche data
       if (editingFields.has('checkout')) {
         const hasCheckoutDate = !!editedCheckoutDate;
         const hasCheckoutTime = !!editedCheckoutTime;
-        // Controlla che non siano solo parzialmente riempiti (uno sì, uno no)
-        if ((hasCheckoutDate && !hasCheckoutTime) || (!hasCheckoutDate && hasCheckoutTime)) {
+        // Non puoi avere ora senza data, ma puoi avere data senza ora
+        if (hasCheckoutTime && !hasCheckoutDate) {
           toast({
             title: "Errore di validazione",
-            description: "Check-out: inserisci sia la data che l'orario, o lascia vuoti entrambi",
+            description: "Check-out: se inserisci l'orario, devi inserire anche la data",
             variant: "destructive",
           });
           setIsSaving(false);
@@ -444,15 +444,15 @@ export default function TaskCard({
         }
       }
 
-      // Validazione: checkin deve avere entrambi data e ora, oppure entrambi vuoti
+      // Validazione: checkin - se hai ora, devi avere anche data
       if (editingFields.has('checkin')) {
         const hasCheckinDate = !!editedCheckinDate;
         const hasCheckinTime = !!editedCheckinTime;
-        // Controlla che non siano solo parzialmente riempiti (uno sì, uno no)
-        if ((hasCheckinDate && !hasCheckinTime) || (!hasCheckinDate && hasCheckinTime)) {
+        // Non puoi avere ora senza data, ma puoi avere data senza ora
+        if (hasCheckinTime && !hasCheckinDate) {
           toast({
             title: "Errore di validazione",
-            description: "Check-in: inserisci sia la data che l'orario, o lascia vuoti entrambi",
+            description: "Check-in: se inserisci l'orario, devi inserire anche la data",
             variant: "destructive",
           });
           setIsSaving(false);
