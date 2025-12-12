@@ -400,16 +400,19 @@ export default function TaskCard({
   }, [effectiveCurrentId, isModalOpen, displayTask]);
 
   // Normalizza confirmed_operation da boolean/number/string a boolean sicuro
-  // USA displayTask invece di task
-  const rawConfirmed = (displayTask as any).confirmed_operation;
-  const isConfirmedOperation =
+  // USA taskWithPendingEdits per mostrare aggiornamenti immediati nella card
+  const rawConfirmed = (taskWithPendingEdits as any).confirmed_operation;
+  // CRITICAL: Se operation_id è stato modificato, considera confermato
+  const hasOperationId = !!(taskWithPendingEdits as any).operation_id;
+  const isConfirmedOperation = hasOperationId || (
     typeof rawConfirmed === "boolean"
       ? rawConfirmed
       : typeof rawConfirmed === "number"
         ? rawConfirmed !== 0
         : typeof rawConfirmed === "string"
           ? ["true", "1", "yes"].includes(rawConfirmed.toLowerCase().trim())
-          : false;
+          : false
+  );
 
   // Determina il tipo della CARD dai flag dell'oggetto *task* (non quelli della navigazione nel modale)
   const cardIsPremium = Boolean(task.premium);
@@ -840,27 +843,27 @@ export default function TaskCard({
                     )}
 
                     {/* Frecce check-in e check-out con orari - solo per task >= 1 ora */}
-                    {shouldShowCheckInOutArrows && ((task as any).checkout_time || (task as any).checkin_time || isFutureCheckin) && (
+                    {shouldShowCheckInOutArrows && ((taskWithPendingEdits as any).checkout_time || (taskWithPendingEdits as any).checkin_time || isFutureCheckin) && (
                       <div className="absolute right-1 top-1/2 -translate-y-1/2 flex flex-col gap-0.5 z-40">
-                        {(task as any).checkout_time && (
+                        {(taskWithPendingEdits as any).checkout_time && (
                           <div className="flex items-center gap-0.5">
                             <span className="font-black text-[15px] text-[#257537]">↑</span>
-                            <span className="text-[11px] text-[#137537] font-bold">{(task as any).checkout_time}</span>
+                            <span className="text-[11px] text-[#137537] font-bold">{(taskWithPendingEdits as any).checkout_time}</span>
                           </div>
                         )}
-                        {((task as any).checkin_time || isFutureCheckin) && (
-                          <div className={`flex items-center ${(task as any).checkin_time ? 'gap-0.5' : 'gap-0'}`}>
-                            {(task as any).checkin_time && !isFutureCheckin && (
+                        {((taskWithPendingEdits as any).checkin_time || isFutureCheckin) && (
+                          <div className={`flex items-center ${(taskWithPendingEdits as any).checkin_time ? 'gap-0.5' : 'gap-0'}`}>
+                            {(taskWithPendingEdits as any).checkin_time && !isFutureCheckin && (
                               <>
                                 <span className="text-red-600 font-black text-[15px]">↓</span>
-                                <span className="text-red-600 text-[11px] font-bold">{(task as any).checkin_time}</span>
+                                <span className="text-red-600 text-[11px] font-bold">{(taskWithPendingEdits as any).checkin_time}</span>
                               </>
                             )}
                             {isFutureCheckin && (
                               <>
                                 <Calendar className="w-3.5 h-3.5 text-red-600" strokeWidth={2.5} />
-                                {(task as any).checkin_time && (
-                                  <span className="text-red-600 text-[11px] font-bold">{(task as any).checkin_time}</span>
+                                {(taskWithPendingEdits as any).checkin_time && (
+                                  <span className="text-red-600 text-[11px] font-bold">{(taskWithPendingEdits as any).checkin_time}</span>
                                 )}
                               </>
                             )}
