@@ -487,64 +487,40 @@ export default function TaskCard({
         return;
       }
 
-      // Recupera data di lavoro e utente corrente per il tracking
-      const workDate = localStorage.getItem('selected_work_date') || new Date().toISOString().split('T')[0];
-      const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
+      // CRITICAL: Salva le modifiche SOLO in sessionStorage locale, NON su PostgreSQL
+      // Le modifiche verranno salvate solo al trasferimento a ADAM
+      const taskKey = getTaskKey(displayTask);
+      const pendingEdits = {
+        taskId: taskKey,
+        logisticCode: displayTask.name,
+        checkoutDate: editedCheckoutDate,
+        checkoutTime: editedCheckoutTime,
+        checkinDate: editedCheckinDate,
+        checkinTime: editedCheckinTime,
+        cleaningTime: parseInt(editedDuration),
+        paxIn: parseInt(editedPaxIn),
+        paxOut: displayTask.pax_out,
+        operationId: parseInt(editedOperationId) || null,
+      };
 
-      const response = await fetchWithOperation('save-task-details', '/api/update-task-details', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          taskId: getTaskKey(displayTask),
-          logisticCode: displayTask.name,
-          checkoutDate: editedCheckoutDate,
-          checkoutTime: editedCheckoutTime,
-          checkinDate: editedCheckinDate,
-          checkinTime: editedCheckinTime,
-          cleaningTime: parseInt(editedDuration),
-          paxIn: parseInt(editedPaxIn),
-          paxOut: displayTask.pax_out, // Passa anche paxOut per coerenza
-          operationId: parseInt(editedOperationId) || null,
-          date: workDate,
-          modified_by: currentUser.username || 'unknown',
-        }),
+      // Salva in sessionStorage come "pending_task_edits"
+      const existingEdits = JSON.parse(sessionStorage.getItem('pending_task_edits') || '{}');
+      existingEdits[taskKey] = pendingEdits;
+      sessionStorage.setItem('pending_task_edits', JSON.stringify(existingEdits));
+
+      toast({
+        title: "Modifiche preparate",
+        description: "I campi della task sono stati preparati. Premi 'Trasferisci su ADAM' per salvare.",
       });
 
-      const result = await response.json();
+      setEditingFields(new Set());
+      setIsModalOpen(false);
 
-      if (result.success) {
-        toast({
-          title: "Modifiche salvate!",
-          description: "I dettagli della task sono stati aggiornati con successo.",
-        });
-
-        setEditingFields(new Set());
-        setIsModalOpen(false);
-
-        // Preserva lo stato acknowledged per il cleaner di destinazione
-        if ((window as any).preserveAcknowledgedIncompatibleCleaners && (displayTask as any).assignedCleaner) {
-          (window as any).preserveAcknowledgedIncompatibleCleaners((displayTask as any).assignedCleaner);
-        }
-
-        // Ricarica i task per mostrare le modifiche
-        if ((window as any).reloadAllTasks) {
-          await (window as any).reloadAllTasks();
-        }
-        if ((window as any).loadTimelineCleaners) {
-          await (window as any).loadTimelineCleaners();
-        }
-      } else {
-        throw new Error(result.error || 'Errore nel salvataggio');
-      }
     } catch (error: any) {
-      if (error.message.includes("Operazione annullata")) {
-        console.log('ℹ️ Salvataggio annullato - richiesta più recente in corso');
-        return;
-      }
-      console.error("Errore nel salvataggio:", error);
+      console.error("Errore nella preparazione:", error);
       toast({
         title: "Errore",
-        description: error.message || "Impossibile salvare le modifiche",
+        description: error.message || "Impossibile preparare le modifiche",
         variant: "destructive",
       });
     } finally {

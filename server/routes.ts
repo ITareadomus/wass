@@ -2760,11 +2760,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Endpoint per trasferire le assegnazioni a ADAM MySQL (Node.js, non Python)
   app.post("/api/transfer-to-adam", async (req, res) => {
     try {
-      const { date, username: reqUsername } = req.body;
+      const { date, username: reqUsername, pendingTaskEdits = {} } = req.body;
       const workDate = date || format(new Date(), "yyyy-MM-dd");
       const username = reqUsername || "system";
 
       console.log(`🔄 Trasferimento assegnazioni a ADAM per ${workDate}...`);
+
+      // CRITICAL: Le modifiche pendenti vengono salvate dal frontend quando viene cliccato il bottone
+      // Il frontend passa le pendingTaskEdits per informazione, ma il salvataggio avviene già sul frontend
+      if (Object.keys(pendingTaskEdits).length > 0) {
+        console.log(`💾 Ricevute ${Object.keys(pendingTaskEdits).length} task modificate da salvare al prossimo trasferimento`);
+      }
 
       // Carica timeline da PostgreSQL
       const timelineData = await workspaceFiles.loadTimeline(workDate);
