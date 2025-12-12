@@ -1037,42 +1037,12 @@ export default function TaskCard({
                 <p className="text-sm">{displayTask.address?.toUpperCase() || "NON MIGRATO"}</p>
               </div>
               <div>
-                <p className="text-sm font-semibold text-muted-foreground mb-1 flex items-center gap-1">
+                <p className="text-sm font-semibold text-muted-foreground mb-1">
                   Durata pulizia
-                  {!isReadOnly && <Pencil className="w-3 h-3 text-muted-foreground/60" />}
                 </p>
-                {editingFields.has('duration') && !isReadOnly ? (
-                  <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
-                    <Input
-                      type="text"
-                      inputMode="numeric"
-                      pattern="[0-9]*"
-                      value={editedDuration}
-                      onChange={(e) => {
-                        const value = e.target.value.replace(/\D/g, '');
-                        setEditedDuration(value);
-                      }}
-                      onFocus={(e) => e.stopPropagation()}
-                      onBlur={(e) => e.stopPropagation()}
-                      onClick={(e) => e.stopPropagation()}
-                      className="text-sm w-20 [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                      min="0"
-                    />
-                    <span className="text-sm text-muted-foreground">minuti</span>
-                  </div>
-                ) : (
-                  <p
-                    className={`text-sm p-1 rounded ${!isReadOnly ? 'cursor-pointer hover:bg-muted/50' : ''}`}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      if (!isReadOnly) {
-                        toggleEditingField('duration');
-                      }
-                    }}
-                  >
-                    {(displayTask.duration || "0.0").replace(".", ":")} ore
-                  </p>
-                )}
+                <p className="text-sm p-1">
+                  {(displayTask.duration || "0.0").replace(".", ":")} ore
+                </p>
               </div>
             </div>
 
