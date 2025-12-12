@@ -2759,6 +2759,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Endpoint per trasferire le assegnazioni a ADAM MySQL (Node.js, non Python)
   app.post("/api/transfer-to-adam", async (req, res) => {
+    // Helper per convertire date ISO in formato MySQL YYYY-MM-DD
+    const formatDateForMySQL = (dateValue: string | null | undefined): string | null => {
+      if (!dateValue) return null;
+      // Se è già in formato YYYY-MM-DD, restituiscilo
+      if (/^\d{4}-\d{2}-\d{2}$/.test(dateValue)) {
+        return dateValue;
+      }
+      // Se è in formato ISO (2025-12-13T00:00:00.000Z), estrai solo la data
+      if (dateValue.includes('T')) {
+        return dateValue.split('T')[0];
+      }
+      // Prova a parsare come Date
+      try {
+        const d = new Date(dateValue);
+        if (!isNaN(d.getTime())) {
+          return d.toISOString().split('T')[0];
+        }
+      } catch {
+        // ignore
+      }
+      return null;
+    };
+
     try {
       const { date, username: reqUsername, pendingTaskEdits = {} } = req.body;
       const workDate = date || format(new Date(), "yyyy-MM-dd");
@@ -2835,9 +2858,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
               `;
 
               const values = [
-                task.checkout_date ?? null,
+                formatDateForMySQL(task.checkout_date),
                 task.checkout_time ?? null,
-                task.checkin_date ?? null,
+                formatDateForMySQL(task.checkin_date),
                 task.checkin_time ?? null,
                 task.pax_in ?? null,
                 task.operation_id ?? null,
