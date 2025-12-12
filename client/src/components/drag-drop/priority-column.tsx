@@ -64,7 +64,8 @@ export default function PriorityColumn({
     getTaskOrder,
   }), [isMultiSelectMode, selectedTasks, toggleMode, toggleTask, clearSelection, isTaskSelected, getTaskOrder]);
   
-  console.log('[DEBUG PriorityColumn]', priority, 'isMultiSelectMode:', isMultiSelectMode, 'selectedTasks:', selectedTasks.length);
+  // DEBUG: commentato per performance
+  // console.log('[DEBUG PriorityColumn]', priority, 'isMultiSelectMode:', isMultiSelectMode, 'selectedTasks:', selectedTasks.length);
 
   // Verifica se la data selezionata è nel passato
   useEffect(() => {
