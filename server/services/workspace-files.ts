@@ -25,7 +25,7 @@ function getNormalizedCleaner(cleaner: any): any {
   if (cleaner.lastname !== undefined) normalizedCleaner.lastname = cleaner.lastname;
   if (cleaner.role !== undefined) normalizedCleaner.role = cleaner.role;
   if (cleaner.premium !== undefined) normalizedCleaner.premium = cleaner.premium;
-  normalizedCleaner.start_time = cleaner.start_time || "10:00";
+  normalizedCleaner.start_time = cleaner.start_time ?? "10:00";
   
   return normalizedCleaner;
 }
