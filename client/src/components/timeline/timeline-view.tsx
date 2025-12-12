@@ -1879,11 +1879,11 @@ export default function TimelineView({
                   onClick={() => setShowAdamTransferDialog(true)} // Apri il dialog di conferma
                   size="sm"
                   variant="outline"
-                  className="ml-2 border-2 border-custom-blue"
+                  className="ml-6 px-2 py-1 text-xs h-7 border border-custom-blue"
                   disabled={!hasTasksInTimeline}
                   title={!hasTasksInTimeline ? "Nessuna task assegnata nella timeline" : "Trasferisci le assegnazioni sul database ADAM"}
                 >
-                  <svg className="mr-2 h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="mr-1 h-2.5 w-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
                   </svg>
                   Trasferisci su ADAM
