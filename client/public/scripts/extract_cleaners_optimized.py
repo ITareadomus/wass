@@ -133,10 +133,11 @@ for r in cur.fetchall():
     else:
         prefs_map[r["user_id"]] = []
 
-# --- CARICA START TIME DA PostgreSQL (date-scoped) ----------------
-# IMPORTANTE: Ogni cleaner ha uno start_time specifico per ogni data
-# Non usare selected_cleaners.json perché è globale e non rispetta le date
+# --- CARICA CLEANERS ESISTENTI DA PostgreSQL (per preservarli) ----------------
+# IMPORTANTE: I cleaners esistenti in PostgreSQL devono essere preservati
+# anche se non esistono più in ADAM (potrebbero essere stati aggiunti manualmente)
 custom_start_times = {}
+existing_pg_cleaners = {}  # {cleaner_id: full_cleaner_data}
 target_date_str = target_date.strftime("%Y-%m-%d")
 try:
     import psycopg2
@@ -156,15 +157,40 @@ try:
         try:
             pg_conn = psycopg2.connect(**pg_config)
             pg_cur = pg_conn.cursor(cursor_factory=RealDictCursor)
-            # Leggi start_time da PostgreSQL per questa data specifica (date-scoped!)
+            # Leggi TUTTI i cleaners esistenti da PostgreSQL per questa data
+            # Li preserveremo se non sono in ADAM
             pg_cur.execute("""
-                SELECT cleaner_id, start_time FROM cleaners
-                WHERE work_date = %s AND start_time IS NOT NULL
+                SELECT cleaner_id, name, lastname, role, active, ranking,
+                       counter_hours, counter_days, available, contract_type,
+                       preferred_customers, telegram_id, start_time, can_do_straordinaria
+                FROM cleaners
+                WHERE work_date = %s
             """, (target_date_str,))
             for row in pg_cur.fetchall():
-                custom_start_times[row["cleaner_id"]] = row["start_time"]
+                cid = row["cleaner_id"]
+                existing_pg_cleaners[cid] = {
+                    "id": cid,
+                    "name": row["name"],
+                    "lastname": row["lastname"],
+                    "role": row["role"],
+                    "active": row["active"],
+                    "ranking": row["ranking"],
+                    "counter_hours": float(row["counter_hours"]) if row["counter_hours"] else 0.0,
+                    "counter_days": int(row["counter_days"]) if row["counter_days"] else 0,
+                    "available": row["available"],
+                    "contract_type": row["contract_type"],
+                    "preferred_customers": row["preferred_customers"] or [],
+                    "telegram_id": row["telegram_id"],
+                    "start_time": row["start_time"],
+                    "can_do_straordinaria": row["can_do_straordinaria"]
+                }
+                # Salva anche lo start_time custom per uso successivo
+                if row["start_time"]:
+                    custom_start_times[cid] = row["start_time"]
+            if existing_pg_cleaners:
+                print(f"✅ Trovati {len(existing_pg_cleaners)} cleaners esistenti in PostgreSQL per {target_date_str}")
             if custom_start_times:
-                print(f"✅ Trovati {len(custom_start_times)} start_time custom da PostgreSQL per {target_date_str}")
+                print(f"✅ Trovati {len(custom_start_times)} start_time custom da PostgreSQL")
             pg_cur.close()
             pg_conn.close()
         except Exception as pg_error:
@@ -246,6 +272,21 @@ for u in cleaners:
         "can_do_straordinaria": cid in straordinaria_authorized,
     }
     cleaners_data.append(cleaner)
+
+# --- PRESERVA CLEANERS CHE ESISTONO SOLO IN PostgreSQL ---
+# Questi cleaners potrebbero essere stati aggiunti manualmente o non esistere più in ADAM
+# Li preserviamo per non perdere dati (es. start_time custom)
+adam_cleaner_ids = {c["id"] for c in cleaners_data}
+preserved_count = 0
+for pg_cid, pg_cleaner in existing_pg_cleaners.items():
+    if pg_cid not in adam_cleaner_ids:
+        # Questo cleaner esiste solo in PostgreSQL, preservalo
+        cleaners_data.append(pg_cleaner)
+        preserved_count += 1
+        print(f"✅ Preservato cleaner {pg_cid} ({pg_cleaner.get('name', 'Unknown')}) da PostgreSQL (non in ADAM)")
+
+if preserved_count > 0:
+    print(f"✅ Totale cleaners preservati da PostgreSQL: {preserved_count}")
 
 # Struttura JSON identica a quella scritta dallo script originale
 fresh_data = {
