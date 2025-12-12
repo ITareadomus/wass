@@ -119,7 +119,7 @@ export class PgDailyAssignmentsService {
           cleaner_lastname: cleaner.lastname || null,
           cleaner_role: cleaner.role || null,
           cleaner_premium: cleaner.premium != null ? Boolean(cleaner.premium) : null,
-          cleaner_start_time: cleaner.start_time || '10:00',
+          cleaner_start_time: cleaner.start_time ?? '10:00',
           // Task data
           task_id: Number(task.task_id),
           logistic_code: Number(task.logistic_code || 0),
@@ -304,7 +304,7 @@ export class PgDailyAssignmentsService {
           if (row.cleaner_lastname) cleaner.lastname = row.cleaner_lastname;
           if (row.cleaner_role) cleaner.role = row.cleaner_role;
           if (row.cleaner_premium !== null) cleaner.premium = row.cleaner_premium;
-          cleaner.start_time = row.cleaner_start_time || '10:00';
+          cleaner.start_time = row.cleaner_start_time ?? '10:00';
 
           cleanerMap.set(row.cleaner_id, {
             cleaner,
