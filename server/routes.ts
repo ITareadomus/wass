@@ -2756,6 +2756,131 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Endpoint rimosso: get-operation-names non più necessario
 
+  // Endpoint per trasferire le assegnazioni a ADAM MySQL (Node.js, non Python)
+  app.post("/api/transfer-to-adam", async (req, res) => {
+    try {
+      const { date, username: reqUsername } = req.body;
+      const workDate = date || format(new Date(), "yyyy-MM-dd");
+      const username = reqUsername || "system";
+
+      console.log(`🔄 Trasferimento assegnazioni a ADAM per ${workDate}...`);
+
+      // Carica timeline da PostgreSQL
+      const timelineData = await workspaceFiles.loadTimeline(workDate);
+      if (!timelineData || !timelineData.cleaners_assignments || timelineData.cleaners_assignments.length === 0) {
+        console.log("⚠️ Nessuna assegnazione trovata per il trasferimento");
+        return res.json({
+          success: false,
+          message: "Nessuna assegnazione trovata nella timeline"
+        });
+      }
+
+      // Connessione MySQL a ADAM
+      const mysql = require('mysql2/promise');
+      let connection: any = null;
+      let totalUpdated = 0;
+      let totalErrors = 0;
+      const errors: string[] = [];
+
+      try {
+        connection = await mysql.createConnection({
+          host: "139.59.132.41",
+          user: "admin",
+          password: "ed329a875c6c4ebdf4e87e2bbe53a15771b5844ef6606dde",
+          database: "adamdb",
+          waitForConnections: true,
+          connectionLimit: 1,
+          queueLimit: 0
+        });
+        console.log("✅ Connessione MySQL ADAM stabilita");
+      } catch (dbError: any) {
+        console.error("❌ Errore connessione ADAM MySQL:", dbError.message);
+        return res.json({
+          success: false,
+          message: `Errore connessione database ADAM: ${dbError.message}`
+        });
+      }
+
+      try {
+        // Itera su cleaners e tasks
+        for (const cleanerEntry of timelineData.cleaners_assignments) {
+          const cleanerId = cleanerEntry.cleaner?.id;
+          const tasks = cleanerEntry.tasks || [];
+
+          for (const task of tasks) {
+            try {
+              const taskId = task.task_id;
+              if (!taskId) continue;
+
+              const query = `
+                UPDATE wass_housekeeping 
+                SET 
+                  checkout = ?,
+                  checkout_time = ?,
+                  checkin = ?,
+                  checkin_time = ?,
+                  checkin_pax = ?,
+                  operation_id = ?,
+                  cleaned_by_us = ?,
+                  sequence = ?,
+                  updated_by = ?,
+                  updated_at = ?
+                WHERE id = ?
+              `;
+
+              const values = [
+                task.checkout_date ?? null,
+                task.checkout_time ?? null,
+                task.checkin_date ?? null,
+                task.checkin_time ?? null,
+                task.pax_in ?? null,
+                task.operation_id ?? null,
+                cleanerId ?? null,
+                task.sequence ?? null,
+                username,
+                new Date().toISOString().replace('T', ' ').substring(0, 19)
+              ];
+
+              await connection.execute(query, [...values, taskId]);
+              totalUpdated++;
+              console.log(`✅ Task ${task.logistic_code} (ID: ${taskId}) trasferita su ADAM`);
+
+            } catch (taskError: any) {
+              totalErrors++;
+              const errorMsg = `Task ${task.logistic_code}: ${taskError.message}`;
+              errors.push(errorMsg);
+              console.error(`❌ ${errorMsg}`);
+            }
+          }
+        }
+
+        console.log(`\n✅ Trasferimento completato! (${totalUpdated} task aggiornate, ${totalErrors} errori)`);
+
+        res.json({
+          success: true,
+          message: `Trasferimento completato: ${totalUpdated} task aggiornate${totalErrors > 0 ? `, ${totalErrors} errori` : ''}`,
+          stats: {
+            updated: totalUpdated,
+            errors: totalErrors,
+            errorDetails: errors
+          }
+        });
+
+      } finally {
+        if (connection) {
+          await connection.end();
+        }
+      }
+
+    } catch (error: any) {
+      console.error("❌ Errore trasferimento a ADAM:", error.message);
+      res.status(500).json({
+        success: false,
+        message: `Errore trasferimento: ${error.message}`
+      });
+    }
+  });
+
   // Endpoint per estrarre i cleaners (versione ottimizzata)
   app.post("/api/extract-cleaners-optimized", async (req, res) => {
     try {
@@ -3217,90 +3342,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Endpoint per trasferire assegnazioni su ADAM database
-  app.post("/api/transfer-to-adam", async (req, res) => {
-    try {
-      const { date, username } = req.body;
-      const workDate = date || format(new Date(), 'yyyy-MM-dd');
-      const currentUser = username || getCurrentUsername(req);
-
-      console.log(`🔄 Avvio trasferimento su ADAM per data ${workDate}...`);
-
-      const { spawn } = await import('child_process');
-      const scriptPath = path.join(process.cwd(), 'client/public/scripts/transfer_to_adam.py');
-
-      const pythonProcess = spawn('python3', [scriptPath, workDate, currentUser]);
-
-      let stdoutData = '';
-      pythonProcess.stdout.on('data', (data) => {
-        stdoutData += data.toString();
-        console.log(data.toString());
-      });
-
-      let stderrData = '';
-      pythonProcess.stderr.on('data', (data) => {
-        stderrData += data.toString();
-        console.error(`transfer_to_adam.py stderr: ${data}`);
-      });
-
-      pythonProcess.on('close', (code) => {
-        if (code !== 0) {
-          console.error(`transfer_to_adam.py exited with code ${code}`);
-          res.status(500).json({
-            success: false,
-            message: "Trasferimento ADAM fallito",
-            stderr: stderrData,
-            stdout: stdoutData
-          });
-          return;
-        }
-
-        try {
-          // Cerca l'ultimo JSON valido nell'output
-          const lines = stdoutData.split('\n');
-          let resultJson = null;
-
-          for (let i = lines.length - 1; i >= 0; i--) {
-            const line = lines[i].trim();
-            if (line.startsWith('{')) {
-              try {
-                resultJson = JSON.parse(line);
-                break;
-              } catch (e) {
-                continue;
-              }
-            }
-          }
-
-          if (resultJson) {
-            console.log("✅ Trasferimento ADAM completato");
-            res.json(resultJson);
-          } else {
-            console.log("⚠️ Nessun JSON trovato nell'output");
-            res.json({
-              success: true,
-              message: "Trasferimento completato",
-              output: stdoutData
-            });
-          }
-        } catch (parseError: any) {
-          console.error('Errore parsing output:', parseError);
-          res.json({
-            success: true,
-            message: "Trasferimento completato",
-            output: stdoutData
-          });
-        }
-      });
-
-    } catch (error: any) {
-      console.error("Errore nel trasferimento su ADAM:", error);
-      res.status(500).json({
-        success: false,
-        error: error.message
-      });
-    }
-  });
 
   // Endpoint per estrarre i dati
   app.post("/api/extract-data", async (req, res) => {
