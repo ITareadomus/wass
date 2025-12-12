@@ -152,7 +152,8 @@ try:
             "port": parsed.port or 5432,
             "user": parsed.username,
             "password": parsed.password,
-            "database": parsed.path.lstrip("/")
+            "database": parsed.path.lstrip("/"),
+            "sslmode": "require"
         }
         try:
             pg_conn = psycopg2.connect(**pg_config)
