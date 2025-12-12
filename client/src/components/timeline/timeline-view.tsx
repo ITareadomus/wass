@@ -1331,10 +1331,12 @@ export default function TimelineView({
   // Variabile per determinare se ci sono task assegnate (per mostrare/nascondere pulsante conferma)
   const hasAssignedTasks = tasks.some(task => (task as any).assignedCleaner !== undefined);
 
-  // Verifica se la timeline ha task assegnate
-  const hasTasksInTimeline = timelineData?.cleaners_assignments?.some(
-    (ca: any) => ca.tasks && ca.tasks.length > 0
-  ) || false;
+  // Verifica se la timeline ha task assegnate - usa ENTRAMBE le fonti:
+  // 1. timelineData dal server (può essere stale dopo reset)
+  // 2. tasks array (sempre aggiornato con optimistic updates)
+  const hasTasksInTimeline = 
+    timelineData?.cleaners_assignments?.some((ca: any) => ca.tasks && ca.tasks.length > 0) || 
+    tasks.some(task => (task as any).assignedCleaner !== undefined && (task as any).assignedCleaner !== null);
 
   // Mutation per rimuovere task dalla timeline
   const removeTaskMutation = useMutation({
