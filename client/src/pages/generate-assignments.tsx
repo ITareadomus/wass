@@ -99,36 +99,149 @@ const isDateInPast = (date: Date): boolean => {
 };
 
 // === OPTIMISTIC UPDATE HELPERS ===
-// Aggiorna localmente assignedCleaner di una task (ritorna snapshot per rollback)
+// Aggiorna localmente assignedCleaner di una task CON posizione corretta (usa splice)
 function optimisticMoveTask(
   tasks: Task[],
   taskId: string,
-  newCleanerId: number | null
+  newCleanerId: number | null,
+  destIndex?: number
 ): { updated: Task[]; snapshot: Task[] } {
   const snapshot = [...tasks];
-  const updated = tasks.map(t => {
-    if (getTaskId(t) === taskId) {
-      return { ...t, assignedCleaner: newCleanerId };
+  
+  // Trova il task da spostare
+  const taskIndex = tasks.findIndex(t => getTaskId(t) === taskId);
+  if (taskIndex === -1) {
+    return { updated: [...tasks], snapshot };
+  }
+  
+  const movedTask = { ...tasks[taskIndex], assignedCleaner: newCleanerId };
+  
+  // Se destIndex non è specificato o newCleanerId è null, usa il vecchio metodo
+  if (destIndex === undefined || newCleanerId === null) {
+    const updated = tasks.map(t => {
+      if (getTaskId(t) === taskId) {
+        return movedTask;
+      }
+      return t;
+    });
+    return { updated, snapshot };
+  }
+  
+  // NUOVO: Usa splice per posizionare correttamente
+  // 1. Rimuovi il task dalla posizione attuale
+  const withoutTask = tasks.filter(t => getTaskId(t) !== taskId);
+  
+  // 2. Trova i task del cleaner destinatario (nell'ordine attuale)
+  const destCleanerTasks: Task[] = [];
+  const otherTasks: Task[] = [];
+  
+  for (const t of withoutTask) {
+    if ((t as any).assignedCleaner === newCleanerId) {
+      destCleanerTasks.push(t);
+    } else {
+      otherTasks.push(t);
     }
-    return t;
-  });
+  }
+  
+  // 3. Inserisci il task alla posizione corretta
+  const clampedIndex = Math.min(destIndex, destCleanerTasks.length);
+  destCleanerTasks.splice(clampedIndex, 0, movedTask);
+  
+  // 4. Riassembla l'array mantenendo l'ordine originale dei cleaner
+  // Per mantenere l'ordine visivo, ricostruisco in modo che i task del cleaner
+  // destinatario siano nell'ordine corretto dove comparirebbero
+  const updated: Task[] = [];
+  let destInserted = false;
+  
+  for (const t of snapshot) {
+    const tid = getTaskId(t);
+    if (tid === taskId) {
+      // Skip, lo inseriamo dopo
+      continue;
+    }
+    if ((t as any).assignedCleaner === newCleanerId && !destInserted) {
+      // Inserisci tutti i task del cleaner dest (incluso il nuovo) qui
+      updated.push(...destCleanerTasks);
+      destInserted = true;
+    } else if ((t as any).assignedCleaner !== newCleanerId) {
+      updated.push(t);
+    }
+    // Skip altri task dello stesso cleaner dest (già inseriti)
+  }
+  
+  // Se il cleaner dest non aveva task prima, aggiungi alla fine
+  if (!destInserted) {
+    updated.push(...destCleanerTasks);
+  }
+  
   return { updated, snapshot };
 }
 
-// Batch move per multi-select
+// Batch move per multi-select CON posizione corretta
 function optimisticBatchMoveTask(
   tasks: Task[],
   taskIds: string[],
-  newCleanerId: number | null
+  newCleanerId: number | null,
+  destIndex?: number
 ): { updated: Task[]; snapshot: Task[] } {
   const snapshot = [...tasks];
   const taskIdSet = new Set(taskIds);
-  const updated = tasks.map(t => {
-    if (taskIdSet.has(getTaskId(t))) {
-      return { ...t, assignedCleaner: newCleanerId };
+  
+  // Se newCleanerId è null o destIndex non specificato, usa il vecchio metodo
+  if (newCleanerId === null || destIndex === undefined) {
+    const updated = tasks.map(t => {
+      if (taskIdSet.has(getTaskId(t))) {
+        return { ...t, assignedCleaner: newCleanerId };
+      }
+      return t;
+    });
+    return { updated, snapshot };
+  }
+  
+  // Trova i task da spostare (mantieni ordine di selezione)
+  const movedTasks = taskIds
+    .map(tid => tasks.find(t => getTaskId(t) === tid))
+    .filter((t): t is Task => t !== undefined)
+    .map(t => ({ ...t, assignedCleaner: newCleanerId }));
+  
+  // Rimuovi i task dalla posizione attuale
+  const withoutTasks = tasks.filter(t => !taskIdSet.has(getTaskId(t)));
+  
+  // Trova i task del cleaner destinatario
+  const destCleanerTasks: Task[] = [];
+  const otherTasks: Task[] = [];
+  
+  for (const t of withoutTasks) {
+    if ((t as any).assignedCleaner === newCleanerId) {
+      destCleanerTasks.push(t);
+    } else {
+      otherTasks.push(t);
     }
-    return t;
-  });
+  }
+  
+  // Inserisci i task alla posizione corretta
+  const clampedIndex = Math.min(destIndex, destCleanerTasks.length);
+  destCleanerTasks.splice(clampedIndex, 0, ...movedTasks);
+  
+  // Riassembla l'array
+  const updated: Task[] = [];
+  let destInserted = false;
+  
+  for (const t of snapshot) {
+    const tid = getTaskId(t);
+    if (taskIdSet.has(tid)) continue;
+    if ((t as any).assignedCleaner === newCleanerId && !destInserted) {
+      updated.push(...destCleanerTasks);
+      destInserted = true;
+    } else if ((t as any).assignedCleaner !== newCleanerId) {
+      updated.push(t);
+    }
+  }
+  
+  if (!destInserted) {
+    updated.push(...destCleanerTasks);
+  }
+  
   return { updated, snapshot };
 }
 
@@ -1504,10 +1617,10 @@ export default function GenerateAssignments() {
 
       // Spostamento tra cleaners diversi
       if (fromCleanerId !== null && toCleanerId !== null && fromCleanerId !== toCleanerId) {
-        dlog(`🔄 Spostamento task ${taskId} da cleaner ${fromCleanerId} a cleaner ${toCleanerId}`);
+        dlog(`🔄 Spostamento task ${taskId} da cleaner ${fromCleanerId} a cleaner ${toCleanerId} @ index ${destination.index}`);
 
-        // OPTIMISTIC UPDATE: Sposta immediatamente nella UI
-        const { updated, snapshot } = optimisticMoveTask(allTasksWithAssignments, taskId, toCleanerId);
+        // OPTIMISTIC UPDATE: Sposta immediatamente nella UI CON posizione corretta
+        const { updated, snapshot } = optimisticMoveTask(allTasksWithAssignments, taskId, toCleanerId, destination.index);
         setAllTasksWithAssignments(updated);
 
         try {
@@ -1575,11 +1688,11 @@ export default function GenerateAssignments() {
       const isDraggedTaskSelected = selectedTasks.some(st => st.taskId === taskId);
 
       if (isAnyMultiSelectActive && selectedTasks.length > 0 && isDraggedTaskSelected && toCleanerId !== null && !toContainer) {
-        dlog(`🔄 BATCH MOVE CROSS-CONTAINER: Spostamento di ${selectedTasks.length} task selezionate a cleaner ${toCleanerId}`);
+        dlog(`🔄 BATCH MOVE CROSS-CONTAINER: Spostamento di ${selectedTasks.length} task selezionate a cleaner ${toCleanerId} @ index ${destination.index}`);
 
-        // OPTIMISTIC UPDATE: Sposta tutte le task selezionate immediatamente
+        // OPTIMISTIC UPDATE: Sposta tutte le task selezionate immediatamente CON posizione corretta
         const taskIds = selectedTasks.map(st => st.taskId);
-        const { updated, snapshot } = optimisticBatchMoveTask(allTasksWithAssignments, taskIds, toCleanerId);
+        const { updated, snapshot } = optimisticBatchMoveTask(allTasksWithAssignments, taskIds, toCleanerId, destination.index);
         setAllTasksWithAssignments(updated);
         const numTasks = selectedTasks.length; // Salva prima di pulire
 
@@ -1643,10 +1756,10 @@ export default function GenerateAssignments() {
       const toContainer = parseContainerKey(destination.droppableId);
 
       if (!fromCleanerId && fromContainer && toCleanerId !== null && !toContainer) {
-        dlog(`🔄 Spostamento da container ${fromContainer} a cleaner ${toCleanerId}`);
+        dlog(`🔄 Spostamento da container ${fromContainer} a cleaner ${toCleanerId} @ index ${destination.index}`);
 
-        // OPTIMISTIC UPDATE: Aggiorna UI immediatamente
-        const { updated, snapshot } = optimisticMoveTask(allTasksWithAssignments, taskId, toCleanerId);
+        // OPTIMISTIC UPDATE: Aggiorna UI immediatamente CON posizione corretta
+        const { updated, snapshot } = optimisticMoveTask(allTasksWithAssignments, taskId, toCleanerId, destination.index);
         setAllTasksWithAssignments(updated);
 
         try {
