@@ -1374,6 +1374,44 @@ export default function TimelineView({
     try {
       setShowAdamTransferDialog(false); // Chiudi il dialog di conferma
 
+      const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
+      // Leggi le pending_edits da sessionStorage
+      const pendingEdits = JSON.parse(sessionStorage.getItem('pending_task_edits') || '{}');
+
+      // CRITICAL: Salva prima TUTTE le modifiche pendenti su PostgreSQL
+      if (Object.keys(pendingEdits).length > 0) {
+        console.log(`💾 Salvando ${Object.keys(pendingEdits).length} task modificate su PostgreSQL...`);
+        for (const [taskKey, edit] of Object.entries(pendingEdits)) {
+          try {
+            const taskEdit = edit as any;
+            const updateResponse = await fetch('/api/update-task-details', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                taskId: taskEdit.taskId,
+                logisticCode: taskEdit.logisticCode,
+                checkoutDate: taskEdit.checkoutDate,
+                checkoutTime: taskEdit.checkoutTime,
+                checkinDate: taskEdit.checkinDate,
+                checkinTime: taskEdit.checkinTime,
+                cleaningTime: taskEdit.cleaningTime,
+                paxIn: taskEdit.paxIn,
+                paxOut: taskEdit.paxOut,
+                operationId: taskEdit.operationId,
+                date: workDate,
+                modified_by: currentUser.username || 'system',
+              }),
+            });
+            const updateResult = await updateResponse.json();
+            if (updateResult.success) {
+              console.log(`✅ Task ${taskEdit.logisticCode} salvata su PostgreSQL`);
+            }
+          } catch (editError: any) {
+            console.error(`⚠️ Errore salvaggio task ${taskKey}:`, editError.message);
+          }
+        }
+      }
+
       toast({
         title: "Trasferimento in corso...",
         description: "Invio dati al database ADAM",
@@ -1383,13 +1421,13 @@ export default function TimelineView({
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 secondi timeout
 
-      const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
       const response = await fetch('/api/transfer-to-adam', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           date: workDate,
-          username: currentUser.username || 'system'
+          username: currentUser.username || 'system',
+          pendingTaskEdits: pendingEdits // Passa le modifiche pendenti
         }),
         signal: controller.signal
       });
@@ -1403,6 +1441,8 @@ export default function TimelineView({
       const result = await response.json();
 
       if (result.success) {
+        // Pulisci sessionStorage dopo il trasferimento riuscito
+        sessionStorage.removeItem('pending_task_edits');
         toast({
           title: "✅ Trasferimento completato",
           description: result.message || `Task aggiornate sul database ADAM`,
