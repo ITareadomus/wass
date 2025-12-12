@@ -10,6 +10,7 @@ import { format } from "date-fns";
 import { it } from "date-fns/locale";
 import { storageService } from "./services/storage-service";
 import * as workspaceFiles from "./services/workspace-files";
+import * as mysql from 'mysql2/promise';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -2653,7 +2654,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Salva timeline con tracking delle modifiche (skipRevision=false per creare revision in PostgreSQL)
       await workspaceFiles.saveTimeline(workDate, timelineData, false, currentUsername, 'task_edit', editOptions);
 
-      // CRITICAL: Propaga le modifiche al database ADAM (wass_housekeeping)
+      // CRITICAL: Propaga le modifiche al database ADAM (wass_housekeeping_2)
       if (taskId) {
         try {
           const mysql = await import('mysql2/promise');
@@ -2696,10 +2697,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           if (updates.length > 0) {
             values.push(taskId); // WHERE id = ?
             
-            // Aggiorna SOLO wass_housekeeping
-            const query = `UPDATE wass_housekeeping SET ${updates.join(', ')} WHERE id = ?`;
+            // Aggiorna SOLO wass_housekeeping_2
+            const query = `UPDATE wass_housekeeping_2 SET ${updates.join(', ')} WHERE id = ?`;
             await connection.execute(query, values);
-            console.log(`✅ Task ${logisticCode} aggiornata su wass_housekeeping`);
+            console.log(`✅ Task ${logisticCode} aggiornata su wass_housekeeping_2`);
 
             await connection.end();
           }
@@ -2776,7 +2777,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Connessione MySQL a ADAM
-      const mysql = require('mysql2/promise');
       let connection: any = null;
       let totalUpdated = 0;
       let totalErrors = 0;
@@ -2813,7 +2813,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               if (!taskId) continue;
 
               const query = `
-                UPDATE wass_housekeeping 
+                UPDATE wass_housekeeping_2
                 SET 
                   checkout = ?,
                   checkout_time = ?,
