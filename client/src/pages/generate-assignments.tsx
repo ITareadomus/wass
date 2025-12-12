@@ -618,18 +618,6 @@ export default function GenerateAssignments() {
       // Ottieni username corrente
       const currentUsername = getCurrentUsername();
 
-      // Resetta la timeline
-      const resetResponse = await fetch('/api/reset-timeline-assignments', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ date: dateStr, created_by: currentUsername })
-      });
-      if (!resetResponse.ok) {
-        console.error("Errore nel reset della timeline prima dell'estrazione:", await resetResponse.text());
-        // Continua comunque, potremmo avere dati parziali ma è meglio che niente
-      }
-
-
       const response = await fetch('/api/extract-data', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
