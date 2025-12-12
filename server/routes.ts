@@ -2841,6 +2841,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
               const taskId = task.task_id;
               if (!taskId) continue;
 
+              // Genera timestamp per assigned_at_us e assigned_at_milliseconds
+              const now = new Date();
+              const assignedAtUs = now.toISOString().replace('T', ' ').substring(0, 19); // 'Y-m-d H:i:s'
+              // 'YmdHisu' format: 20251212143045123456 (anno mese giorno ora minuto secondo microsecondi)
+              const pad = (n: number, len: number = 2) => n.toString().padStart(len, '0');
+              const assignedAtMilliseconds = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}${pad(now.getMilliseconds(), 3)}000`;
+
               const query = `
                 UPDATE wass_housekeeping_2
                 SET 
@@ -2852,6 +2859,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   operation_id = ?,
                   cleaned_by_us = ?,
                   sequence = ?,
+                  assigned_at_us = ?,
+                  assigned_at_milliseconds = ?,
                   updated_by = ?,
                   updated_at = ?
                 WHERE id = ?
@@ -2866,6 +2875,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 task.operation_id ?? null,
                 cleanerId ?? null,
                 task.sequence ?? null,
+                assignedAtUs,
+                assignedAtMilliseconds,
                 username,
                 new Date().toISOString().replace('T', ' ').substring(0, 19)
               ];
