@@ -2654,7 +2654,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Salva timeline con tracking delle modifiche (skipRevision=false per creare revision in PostgreSQL)
       await workspaceFiles.saveTimeline(workDate, timelineData, false, currentUsername, 'task_edit', editOptions);
 
-      // CRITICAL: Propaga le modifiche al database ADAM (wass_housekeeping)
+      // CRITICAL: Propaga le modifiche al database ADAM (app_housekeeping)
       if (taskId) {
         try {
           const mysql = await import('mysql2/promise');
@@ -2697,10 +2697,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           if (updates.length > 0) {
             values.push(taskId); // WHERE id = ?
             
-            // Aggiorna SOLO wass_housekeeping_2
-            const query = `UPDATE wass_housekeeping_2 SET ${updates.join(', ')} WHERE id = ?`;
+            // Aggiorna SOLO app_housekeeping
+            const query = `UPDATE app_housekeeping SET ${updates.join(', ')} WHERE id = ?`;
             await connection.execute(query, values);
-            console.log(`✅ Task ${logisticCode} aggiornata su wass_housekeeping_2`);
+            console.log(`✅ Task ${logisticCode} aggiornata su app_housekeeping`);
 
             await connection.end();
           }
@@ -2841,15 +2841,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
               const taskId = task.task_id;
               if (!taskId) continue;
 
-              // Genera timestamp per assigned_at_us e assigned_at_milliseconds
-              const now = new Date();
-              const assignedAtUs = now.toISOString().replace('T', ' ').substring(0, 19); // 'Y-m-d H:i:s'
-              // 'YmdHisu' format: 20251212143045123456 (anno mese giorno ora minuto secondo microsecondi)
-              const pad = (n: number, len: number = 2) => n.toString().padStart(len, '0');
-              const assignedAtMilliseconds = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}${pad(now.getMilliseconds(), 3)}000`;
-
               const query = `
-                UPDATE wass_housekeeping_2
+                UPDATE app_housekeeping
                 SET 
                   checkout = ?,
                   checkout_time = ?,
@@ -2859,8 +2852,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   operation_id = ?,
                   cleaned_by_us = ?,
                   sequence = ?,
-                  assigned_at_us = ?,
-                  assigned_at_milliseconds = ?,
                   updated_by = ?,
                   updated_at = ?
                 WHERE id = ?
@@ -2875,8 +2866,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 task.operation_id ?? null,
                 cleanerId ?? null,
                 task.sequence ?? null,
-                assignedAtUs,
-                assignedAtMilliseconds,
                 username,
                 new Date().toISOString().replace('T', ' ').substring(0, 19)
               ];
