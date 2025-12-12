@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { Draggable } from "react-beautiful-dnd";
 import { TaskType as Task } from "@shared/schema";
+import { fetchWithOperation } from '@/lib/operationManager';
 import {
   Dialog,
   DialogContent,
@@ -490,7 +491,7 @@ export default function TaskCard({
       const workDate = localStorage.getItem('selected_work_date') || new Date().toISOString().split('T')[0];
       const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
 
-      const response = await fetch('/api/update-task-details', {
+      const response = await fetchWithOperation('save-task-details', '/api/update-task-details', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -502,7 +503,7 @@ export default function TaskCard({
           checkinTime: editedCheckinTime,
           cleaningTime: parseInt(editedDuration),
           paxIn: parseInt(editedPaxIn),
-          paxOut: displayTask.paxOut, // Passa anche paxOut per coerenza
+          paxOut: displayTask.pax_out, // Passa anche paxOut per coerenza
           operationId: parseInt(editedOperationId) || null,
           date: workDate,
           modified_by: currentUser.username || 'unknown',
@@ -536,6 +537,10 @@ export default function TaskCard({
         throw new Error(result.error || 'Errore nel salvataggio');
       }
     } catch (error: any) {
+      if (error.message.includes("Operazione annullata")) {
+        console.log('ℹ️ Salvataggio annullato - richiesta più recente in corso');
+        return;
+      }
       console.error("Errore nel salvataggio:", error);
       toast({
         title: "Errore",

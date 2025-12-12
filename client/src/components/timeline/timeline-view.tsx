@@ -5,6 +5,7 @@ import * as React from "react";
 import { Droppable, Draggable } from "react-beautiful-dnd";
 import { useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { fetchWithOperation } from "@/lib/operationManager";
 import { useToast } from "@/hooks/use-toast";
 import TaskCard from "@/components/drag-drop/task-card";
 import {
@@ -1147,10 +1148,18 @@ export default function TimelineView({
 
       const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
 
-      await apiRequest("POST", "/api/reset-timeline-assignments", {
-        date: workDate,
-        modified_by: currentUser.username || 'unknown'
+      const response = await fetchWithOperation('reset-timeline', '/api/reset-timeline-assignments', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          date: workDate,
+          modified_by: currentUser.username || 'unknown'
+        })
       });
+
+      if (!response.ok) {
+        throw new Error('Errore durante il reset');
+      }
 
       // Svuota subito la timeline in UI, così l'utente vede l'effetto
       setTimelineData(null);
@@ -1167,7 +1176,11 @@ export default function TimelineView({
         description: "Timeline svuotata, task tornate nei containers",
         variant: "success",
       });
-    } catch (error) {
+    } catch (error: any) {
+      if (error.message.includes("Operazione annullata")) {
+        console.log('ℹ️ Reset annullato - richiesta più recente in corso');
+        return;
+      }
       console.error('Errore nel reset:', error);
       toast({
         title: "Errore",

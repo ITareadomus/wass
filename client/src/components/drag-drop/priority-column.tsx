@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { useState, useEffect, useMemo } from "react";
+import { fetchWithOperation } from "@/lib/operationManager";
 
 interface ContainerMultiSelectState {
   isActive: boolean;
@@ -190,7 +191,7 @@ export default function PriorityColumn({
       }
 
       console.log(`🔄 Esecuzione assegnazione ${priority} per data: ${dateStr}`);
-      const response = await fetch(endpoint, {
+      const response = await fetchWithOperation(`assign-${priority}`, endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ date: dateStr })
@@ -216,6 +217,10 @@ export default function PriorityColumn({
         console.log('✅ Task ricaricati con successo');
       }
     } catch (error: any) {
+      if (error.message.includes("Operazione annullata")) {
+        console.log(`ℹ️ Assegnazione ${priority} annullata - richiesta più recente in corso`);
+        return; // Non mostrare toast per operazioni annullate
+      }
       console.error(`Errore nell'assegnazione ${priority}:`, error);
       toast({
         title: "Errore",
