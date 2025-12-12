@@ -2654,7 +2654,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Salva timeline con tracking delle modifiche (skipRevision=false per creare revision in PostgreSQL)
       await workspaceFiles.saveTimeline(workDate, timelineData, false, currentUsername, 'task_edit', editOptions);
 
-      // CRITICAL: Propaga le modifiche al database ADAM (wass_housekeeping_2)
+      // CRITICAL: Propaga le modifiche al database ADAM (wass_housekeeping)
       if (taskId) {
         try {
           const mysql = await import('mysql2/promise');
