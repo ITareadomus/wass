@@ -1028,7 +1028,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log(`📝 POST /api/cleaners - Salvando ${cleaners.length} cleaners per ${workDate}`);
 
       const { pgDailyAssignmentsService } = await import("./services/pg-daily-assignments-service");
-      const success = await pgDailyAssignmentsService.saveCleanersForDate(workDate, cleaners, snapshotReason || 'api_update');
+      
+      // CRITICAL: Carica gli start_time esistenti da PostgreSQL PRIMA di sovrascrivere
+      // Questo preserva gli start_time custom impostati dall'utente
+      const existingCleaners = await pgDailyAssignmentsService.loadCleanersForDate(workDate);
+      const existingStartTimes = new Map<number, string>();
+      if (existingCleaners && existingCleaners.length > 0) {
+        for (const c of existingCleaners) {
+          if (c.id && c.start_time) {
+            existingStartTimes.set(c.id, c.start_time);
+          }
+        }
+        console.log(`✅ Preservati ${existingStartTimes.size} start_time custom da PostgreSQL`);
+      }
+      
+      // Merge: usa lo start_time esistente se presente e non nullo, altrimenti usa quello passato
+      const mergedCleaners = cleaners.map((c: any) => {
+        const existingStartTime = existingStartTimes.get(c.id);
+        // Preserva lo start_time esistente solo se è custom (diverso da '10:00' o tw_start da ADAM)
+        // Se il cleaner passato ha start_time e anche PostgreSQL ha uno start_time diverso dal default,
+        // usa quello di PostgreSQL (è quello impostato dall'utente)
+        return {
+          ...c,
+          start_time: existingStartTime ?? c.start_time ?? '10:00'
+        };
+      });
+      
+      const success = await pgDailyAssignmentsService.saveCleanersForDate(workDate, mergedCleaners, snapshotReason || 'api_update');
 
       if (success) {
         res.json({ success: true, message: `${cleaners.length} cleaners salvati per ${workDate}` });
