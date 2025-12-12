@@ -435,8 +435,10 @@ export default function GenerateAssignments() {
     try {
       if (trigger === "manual" || trigger === "manual-refresh") {
         // Refresh manuale dopo drag-and-drop: solo reload file, NO auto-load, NO extractData
-        console.log('📂 Refresh manuale - solo reload file JSON (preserva timeline.json)');
-        await loadTasks(true);
+        // silent=true per "manual" (DnD) per evitare schermata di caricamento
+        const isSilent = trigger === "manual";
+        dlog('📂 Refresh manuale - solo reload file JSON (preserva timeline.json)', { silent: isSilent });
+        await loadTasks(true, isSilent);
         return;
       }
 
@@ -764,10 +766,13 @@ export default function GenerateAssignments() {
   };
 
   // Carica i task dai file JSON (SENZA rieseguire extract-data)
-  const loadTasks = async (skipExtraction: boolean = false) => {
+  // silent=true per evitare loader durante DnD background refresh
+  const loadTasks = async (skipExtraction: boolean = false, silent: boolean = false) => {
     try {
-      setIsLoadingTasks(true);
-      setExtractionStep("Caricamento task nei contenitori...");
+      if (!silent) {
+        setIsLoadingTasks(true);
+        setExtractionStep("Caricamento task nei contenitori...");
+      }
 
       const dateStr = format(selectedDate, "yyyy-MM-dd");
 
@@ -1033,14 +1038,18 @@ export default function GenerateAssignments() {
 
       setAllTasksWithAssignments(dedupedTasks);
 
-      setIsLoadingTasks(false);
-      setExtractionStep("Task caricati con successo!");
+      if (!silent) {
+        setIsLoadingTasks(false);
+        setExtractionStep("Task caricati con successo!");
+      }
 
       dlog(`✅ SINCRONIZZAZIONE COMPLETATA - Containers e Timeline allineati con i file JSON`);
     } catch (error) {
       console.error("Errore nel caricamento dei task:", error);
-      setIsLoadingTasks(false);
-      setExtractionStep("Errore nel caricamento dei task");
+      if (!silent) {
+        setIsLoadingTasks(false);
+        setExtractionStep("Errore nel caricamento dei task");
+      }
     }
   };
 
