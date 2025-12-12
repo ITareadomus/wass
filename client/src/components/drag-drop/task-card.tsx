@@ -428,28 +428,39 @@ export default function TaskCard({
     try {
       setIsSaving(true);
 
-      // Validazione: verifica che i campi obbligatori siano compilati
-      if (editingFields.has('checkout') && (!editedCheckoutDate || !editedCheckoutTime)) {
-        toast({
-          title: "Errore di validazione",
-          description: "Devi inserire sia la data che l'orario del check-out",
-          variant: "destructive",
-        });
-        setIsSaving(false);
-        return;
+      // Validazione: checkout deve avere entrambi data e ora, oppure entrambi vuoti
+      if (editingFields.has('checkout')) {
+        const hasCheckoutDate = !!editedCheckoutDate;
+        const hasCheckoutTime = !!editedCheckoutTime;
+        // Controlla che non siano solo parzialmente riempiti (uno sì, uno no)
+        if ((hasCheckoutDate && !hasCheckoutTime) || (!hasCheckoutDate && hasCheckoutTime)) {
+          toast({
+            title: "Errore di validazione",
+            description: "Check-out: inserisci sia la data che l'orario, o lascia vuoti entrambi",
+            variant: "destructive",
+          });
+          setIsSaving(false);
+          return;
+        }
       }
 
-      if (editingFields.has('checkin') && (!editedCheckinDate || !editedCheckinTime)) {
-        toast({
-          title: "Errore di validazione",
-          description: "Devi inserire sia la data che l'orario del check-in",
-          variant: "destructive",
-        });
-        setIsSaving(false);
-        return;
+      // Validazione: checkin deve avere entrambi data e ora, oppure entrambi vuoti
+      if (editingFields.has('checkin')) {
+        const hasCheckinDate = !!editedCheckinDate;
+        const hasCheckinTime = !!editedCheckinTime;
+        // Controlla che non siano solo parzialmente riempiti (uno sì, uno no)
+        if ((hasCheckinDate && !hasCheckinTime) || (!hasCheckinDate && hasCheckinTime)) {
+          toast({
+            title: "Errore di validazione",
+            description: "Check-in: inserisci sia la data che l'orario, o lascia vuoti entrambi",
+            variant: "destructive",
+          });
+          setIsSaving(false);
+          return;
+        }
       }
 
-      // Validazione: il check-in non può essere precedente al check-out
+      // Validazione: il check-in non può essere precedente al check-out (solo se entrambi sono riempiti)
       if (editedCheckoutDate && editedCheckoutTime && editedCheckinDate && editedCheckinTime) {
         const checkoutDateTime = new Date(`${editedCheckoutDate}T${editedCheckoutTime}:00`);
         const checkinDateTime = new Date(`${editedCheckinDate}T${editedCheckinTime}:00`);
@@ -493,10 +504,10 @@ export default function TaskCard({
       const pendingEdits = {
         taskId: taskKey,
         logisticCode: displayTask.name,
-        checkoutDate: editedCheckoutDate,
-        checkoutTime: editedCheckoutTime,
-        checkinDate: editedCheckinDate,
-        checkinTime: editedCheckinTime,
+        checkoutDate: editedCheckoutDate || null,  // null se vuoto
+        checkoutTime: editedCheckoutTime || null,  // null se vuoto
+        checkinDate: editedCheckinDate || null,    // null se vuoto
+        checkinTime: editedCheckinTime || null,    // null se vuoto
         cleaningTime: parseInt(editedDuration),
         paxIn: parseInt(editedPaxIn),
         paxOut: displayTask.pax_out,
