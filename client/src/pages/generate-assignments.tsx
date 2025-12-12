@@ -4,6 +4,9 @@ import PriorityColumn from "@/components/drag-drop/priority-column";
 import TimelineView from "@/components/timeline/timeline-view";
 import MapSection from "@/components/map/map-section";
 import { useState, useEffect, useRef, useCallback, createContext, useContext, useMemo } from "react";
+
+const DEBUG = false;
+const dlog = (...args: any[]) => DEBUG && console.log(...args);
 import { ThemeToggle } from "@/components/theme-toggle";
 import { CalendarIcon, Users, RefreshCw, Settings } from "lucide-react";
 import { useLocation } from 'wouter';
@@ -169,6 +172,15 @@ export default function GenerateAssignments() {
   // Ref per tracciare se è in corso un'operazione di drag-and-drop (useRef per sincronizzazione immediata)
   const isDraggingRef = useRef<boolean>(false);
   const dragTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // PATCH B: Debounce per refreshAssignments (evita reload multipli)
+  const refreshDebounceRef = useRef<NodeJS.Timeout | null>(null);
+  const scheduleManualRefresh = useCallback((delayMs: number = 600) => {
+    if (refreshDebounceRef.current) clearTimeout(refreshDebounceRef.current);
+    refreshDebounceRef.current = setTimeout(() => {
+      refreshAssignments("manual").catch(console.error);
+    }, delayMs);
+  }, []);
 
   // Preview della posizione di sequenza mentre trascini
   const [dragSequencePreview, setDragSequencePreview] = useState<{ sequenceIndex: number } | null>(null);
@@ -763,9 +775,9 @@ export default function GenerateAssignments() {
               timelineAssignmentsData = { metadata: {}, cleaners_assignments: [] };
             } else {
               timelineAssignmentsData = JSON.parse(timelineText);
-              console.log("Timeline assignments data:", timelineAssignmentsData);
-              console.log("Cleaners assignments count:", timelineAssignmentsData.cleaners_assignments?.length || 0);
-              console.log("Total tasks in timeline:", timelineAssignmentsData.cleaners_assignments?.reduce((sum: number, c: any) => sum + (c.tasks?.length || 0), 0) || 0);
+              dlog("Timeline assignments data:", timelineAssignmentsData);
+              dlog("Cleaners assignments count:", timelineAssignmentsData.cleaners_assignments?.length || 0);
+              dlog("Total tasks in timeline:", timelineAssignmentsData.cleaners_assignments?.reduce((sum: number, c: any) => sum + (c.tasks?.length || 0), 0) || 0);
             }
           } else {
             console.warn('Timeline file is not JSON, using empty timeline');
@@ -794,25 +806,25 @@ export default function GenerateAssignments() {
         convertRawTask(task, "low_priority")
       );
 
-      console.log("Task convertiti - Early:", initialEarlyOut.length, "High:", initialHigh.length, "Low:", initialLow.length);
+      dlog("Task convertiti - Early:", initialEarlyOut.length, "High:", initialHigh.length, "Low:", initialLow.length);
 
       // Costruisci la mappa task_id -> assegnazione dalla timeline
       const timelineAssignmentsMap = new Map();
       const timelineTasks: Task[] = [];
 
       if (timelineAssignmentsData.cleaners_assignments) {
-        console.log('📋 Caricamento da cleaners_assignments:', timelineAssignmentsData.cleaners_assignments.length);
+        dlog('📋 Caricamento da cleaners_assignments:', timelineAssignmentsData.cleaners_assignments.length);
         for (const cleanerEntry of timelineAssignmentsData.cleaners_assignments) {
           if (!cleanerEntry.cleaner || !cleanerEntry.cleaner.id) {
             console.warn('⚠️ Trovata entry senza cleaner, salto:', cleanerEntry);
             continue;
           }
 
-          console.log(`   Cleaner ${cleanerEntry.cleaner.id} (${cleanerEntry.cleaner.name}) ha ${cleanerEntry.tasks?.length || 0} task`);
+          dlog(`   Cleaner ${cleanerEntry.cleaner.id} (${cleanerEntry.cleaner.name}) ha ${cleanerEntry.tasks?.length || 0} task`);
           for (const task of cleanerEntry.tasks || []) {
             const taskId = String(task.task_id);
             const taskLC = String(task.logistic_code);
-            console.log(`      → Task ${taskLC} (ID: ${taskId}) assegnata a cleaner ${cleanerEntry.cleaner.id}`);
+            dlog(`      → Task ${taskLC} (ID: ${taskId}) assegnata a cleaner ${cleanerEntry.cleaner.id}`);
 
             const taskWithAssignment = {
               ...task,
@@ -830,7 +842,7 @@ export default function GenerateAssignments() {
         }
       } else if (timelineAssignmentsData.assignments) {
         // Vecchia struttura piatta (fallback)
-        console.log('📋 Caricamento da assignments (vecchia struttura):', timelineAssignmentsData.assignments.length);
+        dlog('📋 Caricamento da assignments (vecchia struttura):', timelineAssignmentsData.assignments.length);
         for (const a of timelineAssignmentsData.assignments) {
           const taskWithAssignment = {
             ...a,
@@ -844,8 +856,8 @@ export default function GenerateAssignments() {
         }
       }
 
-      console.log("✅ Task assegnate nella timeline (task_id):", Array.from(timelineAssignmentsMap.keys()));
-      console.log("✅ Timeline tasks array length:", timelineTasks.length);
+      dlog("✅ Task assegnate nella timeline (task_id):", Array.from(timelineAssignmentsMap.keys()));
+      dlog("✅ Timeline tasks array length:", timelineTasks.length);
 
 
       // Filtra le task già presenti nella timeline dai container usando l'id univoco
@@ -853,7 +865,7 @@ export default function GenerateAssignments() {
         const tid = String(task.id);
         const isAssigned = timelineAssignmentsMap.has(tid);
         if (isAssigned) {
-          console.log(`Task ${task.name} (ID: ${tid}) filtrata da Early Out (è nella timeline)`);
+          dlog(`Task ${task.name} (ID: ${tid}) filtrata da Early Out (è nella timeline)`);
         }
         return !isAssigned;
       });
@@ -862,7 +874,7 @@ export default function GenerateAssignments() {
         const tid = String(task.id);
         const isAssigned = timelineAssignmentsMap.has(tid);
         if (isAssigned) {
-          console.log(`Task ${task.name} (ID: ${tid}) filtrata da High Priority (è nella timeline)`);
+          dlog(`Task ${task.name} (ID: ${tid}) filtrata da High Priority (è nella timeline)`);
         }
         return !isAssigned;
       });
@@ -871,35 +883,23 @@ export default function GenerateAssignments() {
         const tid = String(task.id);
         const isAssigned = timelineAssignmentsMap.has(tid);
         if (isAssigned) {
-          console.log(`Task ${task.name} (ID: ${tid}) filtrata da Low Priority (è nella timeline)`);
+          dlog(`Task ${task.name} (ID: ${tid}) filtrata da Low Priority (è nella timeline)`);
         }
         return !isAssigned;
       });
 
-      console.log("Task dopo filtro - Early:", filteredEarlyOut.length, "High:", filteredHigh.length, "Low:", filteredLow.length);
+      dlog("Task dopo filtro - Early:", filteredEarlyOut.length, "High:", filteredHigh.length, "Low:", filteredLow.length);
 
       // AGGIORNA GLI STATI IN MODO SINCRONIZZATO
       setEarlyOutTasks(filteredEarlyOut);
       setHighPriorityTasks(filteredHigh);
       setLowPriorityTasks(filteredLow);
 
-      console.log(`📊 SINCRONIZZAZIONE CONTAINERS:`);
-      console.log(`   - Early Out: ${filteredEarlyOut.length} task (filtrate ${initialEarlyOut.length - filteredEarlyOut.length})`);
-      console.log(`   - High Priority: ${filteredHigh.length} task (filtrate ${initialHigh.length - filteredHigh.length})`);
-      console.log(`   - Low Priority: ${filteredLow.length} task (filtrate ${initialLow.length - filteredLow.length})`);
-      console.log(`   - Timeline ha ${timelineAssignmentsMap.size} task assegnate`);
-
-      // Debug: mostra alcune task assegnate
-      const assignedTasks = Array.from(timelineAssignmentsMap.values());
-      if (assignedTasks.length > 0) {
-        console.log(`📌 Esempio task assegnate (prime 3):`, assignedTasks.slice(0, 3).map(t => ({
-          id: t.task_id,
-          logistic_code: t.logistic_code,
-          cleanerId: t.cleanerId,
-          sequence: t.sequence,
-          start_time: t.start_time
-        })));
-      }
+      dlog(`📊 SINCRONIZZAZIONE CONTAINERS:`);
+      dlog(`   - Early Out: ${filteredEarlyOut.length} task (filtrate ${initialEarlyOut.length - filteredEarlyOut.length})`);
+      dlog(`   - High Priority: ${filteredHigh.length} task (filtrate ${initialHigh.length - filteredHigh.length})`);
+      dlog(`   - Low Priority: ${filteredLow.length} task (filtrate ${initialLow.length - filteredLow.length})`);
+      dlog(`   - Timeline ha ${timelineAssignmentsMap.size} task assegnate`);
 
       // Crea l'array unificato usando dedupe per id (non per logisticCode!)
       const tasksWithAssignments: Task[] = [];
@@ -917,14 +917,14 @@ export default function GenerateAssignments() {
       }
 
       // Aggiungi SOLO task che sono effettivamente in timeline.json con i loro dati completi
-      console.log(`🔄 Elaborazione ${timelineAssignmentsMap.size} task dalla timeline...`);
+      dlog(`🔄 Elaborazione ${timelineAssignmentsMap.size} task dalla timeline...`);
       for (const [taskId, timelineAssignment] of timelineAssignmentsMap.entries()) {
         // Trova la task originale dai containers usando l'id univoco
         const originalTask = [...initialEarlyOut, ...initialHigh, ...initialLow].find(
           t => String(t.id) === String(taskId)
         );
 
-        console.log(`   → Task ${timelineAssignment.logistic_code} (ID: ${taskId}):`, {
+        dlog(`   → Task ${timelineAssignment.logistic_code} (ID: ${taskId}):`, {
           hasOriginalTask: !!originalTask,
           cleanerId: timelineAssignment.cleanerId,
           priority: timelineAssignment.priority
@@ -953,7 +953,7 @@ export default function GenerateAssignments() {
           };
 
           const taskLogCode = getLogisticCode(baseTask);
-          console.log(`➕ Aggiungendo task ${taskLogCode} dalla timeline a cleaner ${timelineAssignment.cleanerId} con sequence ${timelineAssignment.sequence}`);
+          dlog(`➕ Aggiungendo task ${taskLogCode} dalla timeline a cleaner ${timelineAssignment.cleanerId} con sequence ${timelineAssignment.sequence}`);
 
           // IMPORTANTE: Assicurati che assignedCleaner sia propagato correttamente
           const taskWithAssignment = {
@@ -991,18 +991,18 @@ export default function GenerateAssignments() {
       // DEDUPE finale per id prima di salvare lo stato
       const dedupedTasks = dedupeById(tasksWithAssignments);
 
-      console.log(`📊 SINCRONIZZAZIONE TIMELINE:`);
-      console.log(`   - Task totali (prima dedupe): ${tasksWithAssignments.length}`);
-      console.log(`   - Task totali (dopo dedupe): ${dedupedTasks.length}`);
-      console.log(`   - Task assegnate: ${dedupedTasks.filter(t => (t as any).assignedCleaner).length}`);
-      console.log(`   - Task nei containers: ${dedupedTasks.filter(t => !(t as any).assignedCleaner).length}`);
+      dlog(`📊 SINCRONIZZAZIONE TIMELINE:`);
+      dlog(`   - Task totali (prima dedupe): ${tasksWithAssignments.length}`);
+      dlog(`   - Task totali (dopo dedupe): ${dedupedTasks.length}`);
+      dlog(`   - Task assegnate: ${dedupedTasks.filter(t => (t as any).assignedCleaner).length}`);
+      dlog(`   - Task nei containers: ${dedupedTasks.filter(t => !(t as any).assignedCleaner).length}`);
 
       setAllTasksWithAssignments(dedupedTasks);
 
       setIsLoadingTasks(false);
       setExtractionStep("Task caricati con successo!");
 
-      console.log(`✅ SINCRONIZZAZIONE COMPLETATA - Containers e Timeline allineati con i file JSON`);
+      dlog(`✅ SINCRONIZZAZIONE COMPLETATA - Containers e Timeline allineati con i file JSON`);
     } catch (error) {
       console.error("Errore nel caricamento dei task:", error);
       setIsLoadingTasks(false);
@@ -1050,7 +1050,7 @@ export default function GenerateAssignments() {
           duration: 3000,
         });
 
-        await refreshAssignments("manual");
+        scheduleManualRefresh(0); // PATCH D: non blocca UI
       } else {
         toast({
           title: "Errore",
@@ -1101,7 +1101,7 @@ export default function GenerateAssignments() {
           duration: 3000,
         });
 
-        await refreshAssignments("manual");
+        scheduleManualRefresh(0); // PATCH D: non blocca UI
       } else {
         toast({
           title: "Errore",
@@ -1152,7 +1152,7 @@ export default function GenerateAssignments() {
           duration: 3000,
         });
 
-        await refreshAssignments("manual");
+        scheduleManualRefresh(0); // PATCH D: non blocca UI
       } else {
         toast({
           title: "Errore",
@@ -1442,8 +1442,8 @@ export default function GenerateAssignments() {
           isDraggingRef.current = false;
           if (dragTimeoutRef.current) clearTimeout(dragTimeoutRef.current);
 
-          // Reload in background
-          await refreshAssignments("manual");
+          // PATCH B: Reload debounced in background
+          scheduleManualRefresh(600);
         } catch (err) {
           console.error("Errore nel riordino:", err);
           toast({
@@ -1461,7 +1461,7 @@ export default function GenerateAssignments() {
 
       // Spostamento tra cleaners diversi
       if (fromCleanerId !== null && toCleanerId !== null && fromCleanerId !== toCleanerId) {
-        console.log(`🔄 Spostamento task ${taskId} da cleaner ${fromCleanerId} a cleaner ${toCleanerId}`);
+        dlog(`🔄 Spostamento task ${taskId} da cleaner ${fromCleanerId} a cleaner ${toCleanerId}`);
 
         try {
           // Usa l'endpoint corretto per spostare tra cleaners
@@ -1491,13 +1491,8 @@ export default function GenerateAssignments() {
             handleTaskMoved();
           }
 
-          const cleanersResponse = await fetch(`/api/selected-cleaners?date=${dateStr}`, {
-            cache: 'no-store',
-            headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' }
-          });
-          const cleanersData = await cleanersResponse.json();
-          const toCleaner = cleanersData.cleaners.find((c: any) => c.id === toCleanerId);
-          const toCleanerName = toCleaner ? `${toCleaner.name} ${toCleaner.lastname}` : `ID ${toCleanerId}`;
+          // PATCH C: Usa ID nel toast invece di fetch
+          const toCleanerName = `ID ${toCleanerId}`;
 
           toast({
             title: "Task spostata",
@@ -1509,8 +1504,8 @@ export default function GenerateAssignments() {
           isDraggingRef.current = false;
           if (dragTimeoutRef.current) clearTimeout(dragTimeoutRef.current);
 
-          // Reload in background
-          await refreshAssignments("manual");
+          // PATCH B: Reload debounced in background
+          scheduleManualRefresh(600);
         } catch (err) {
           console.error("Errore nello spostamento:", err);
           toast({
@@ -1531,18 +1526,11 @@ export default function GenerateAssignments() {
       const isDraggedTaskSelected = selectedTasks.some(st => st.taskId === taskId);
 
       if (isAnyMultiSelectActive && selectedTasks.length > 0 && isDraggedTaskSelected && toCleanerId !== null && !toContainer) {
-        console.log(`🔄 BATCH MOVE CROSS-CONTAINER: Spostamento di ${selectedTasks.length} task selezionate a cleaner ${toCleanerId}`);
+        dlog(`🔄 BATCH MOVE CROSS-CONTAINER: Spostamento di ${selectedTasks.length} task selezionate a cleaner ${toCleanerId}`);
 
         try {
-          // Carica i dati del cleaner
-          const dateStr = format(selectedDate, "yyyy-MM-dd");
-          const cleanersResponse = await fetch(`/api/selected-cleaners?date=${dateStr}`, {
-            cache: 'no-store',
-            headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' }
-          });
-          const cleanersData = await cleanersResponse.json();
-          const cleaner = cleanersData.cleaners.find((c: any) => c.id === toCleanerId);
-          const cleanerName = cleaner ? `${cleaner.name} ${cleaner.lastname}` : `ID ${toCleanerId}`;
+          // PATCH C: Usa ID nel toast invece di fetch
+          const cleanerName = `ID ${toCleanerId}`;
 
           // Ordina le task selezionate per ordine di selezione
           const sortedTasks = [...selectedTasks].sort((a, b) => a.order - b.order);
@@ -1576,8 +1564,8 @@ export default function GenerateAssignments() {
           isDraggingRef.current = false;
           if (dragTimeoutRef.current) clearTimeout(dragTimeoutRef.current);
 
-          // Reload in background
-          await refreshAssignments("manual");
+          // PATCH B: Reload debounced in background
+          scheduleManualRefresh(600);
         } catch (err) {
           console.error("Errore nello spostamento batch:", err);
           toast({
@@ -1598,17 +1586,11 @@ export default function GenerateAssignments() {
       const toContainer = parseContainerKey(destination.droppableId);
 
       if (!fromCleanerId && fromContainer && toCleanerId !== null && !toContainer) {
-        console.log(`🔄 Spostamento da container ${fromContainer} a cleaner ${toCleanerId}`);
+        dlog(`🔄 Spostamento da container ${fromContainer} a cleaner ${toCleanerId}`);
 
         try {
-          const dateStr = format(selectedDate, "yyyy-MM-dd");
-          const cleanersResponse = await fetch(`/api/selected-cleaners?date=${dateStr}`, {
-            cache: 'no-store',
-            headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' }
-          });
-          const cleanersData = await cleanersResponse.json();
-          const cleaner = cleanersData.cleaners.find((c: any) => c.id === toCleanerId);
-          const cleanerName = cleaner ? `${cleaner.name} ${cleaner.lastname}` : `ID ${toCleanerId}`;
+          // PATCH C: Usa ID nel toast invece di fetch
+          const cleanerName = `ID ${toCleanerId}`;
 
           // Salva in timeline.json (rimuove automaticamente da containers.json)
           await saveTaskAssignment(taskId, toCleanerId, logisticCode, destination.index);
@@ -1629,8 +1611,8 @@ export default function GenerateAssignments() {
           isDraggingRef.current = false;
           if (dragTimeoutRef.current) clearTimeout(dragTimeoutRef.current);
 
-          // Reload in background
-          await refreshAssignments("manual");
+          // PATCH B: Reload debounced in background
+          scheduleManualRefresh(600);
         } catch (err) {
           console.error("Errore nell'assegnazione:", err);
           toast({
@@ -1648,7 +1630,7 @@ export default function GenerateAssignments() {
 
       // Caso: Da timeline a container
       if (fromCleanerId !== null && toContainer && !toCleanerId) { // Aggiunto !toCleanerId per evitare sovrapposizioni
-        console.log(`🔄 Spostamento da cleaner ${fromCleanerId} a container ${toContainer}`);
+        dlog(`🔄 Spostamento da cleaner ${fromCleanerId} a container ${toContainer}`);
 
         // Rimuovi da timeline.json
         await removeTimelineAssignment(taskId, logisticCode);
@@ -1663,8 +1645,8 @@ export default function GenerateAssignments() {
         isDraggingRef.current = false;
         if (dragTimeoutRef.current) clearTimeout(dragTimeoutRef.current);
 
-        // Reload in background
-        await refreshAssignments("manual");
+        // PATCH B: Reload debounced in background
+        scheduleManualRefresh(600);
         return;
       }
 

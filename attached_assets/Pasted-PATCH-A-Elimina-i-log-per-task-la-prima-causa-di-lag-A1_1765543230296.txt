@@ -1,0 +1,156 @@
+PATCH A — Elimina i log “per task” (è la prima causa di lag)
+A1) loadTasks() in client/src/pages/generate-assignments.tsx
+
+Dentro loadTasks() ci sono una quantità enorme di console.log dentro cicli (per ogni cleaner e per ogni task). In produzione/uso reale è devastante.
+
+✅ Soluzione: metti un flag DEBUG=false e wrappa tutti i log pesanti.
+
+Diff (inizio file o sopra loadTasks)
+
++ const DEBUG = false;
++ const dlog = (...args: any[]) => DEBUG && console.log(...args);
+
+
+E poi dentro loadTasks() sostituisci/“spengi” i log più pesanti:
+
+- console.log("Timeline assignments data:", timelineAssignmentsData);
+- console.log("Cleaners assignments count:", timelineAssignmentsData.cleaners_assignments?.length || 0);
+- console.log("Total tasks in timeline:", ...);
++ dlog("Timeline assignments data:", timelineAssignmentsData);
++ dlog("Cleaners assignments count:", timelineAssignmentsData.cleaners_assignments?.length || 0);
++ dlog("Total tasks in timeline:", ...);
+
+
+e soprattutto questi dentro i loop:
+
+- console.log(`   Cleaner ${cleanerEntry.cleaner.id} (...) ha ${...} task`);
++ dlog(`   Cleaner ${cleanerEntry.cleaner.id} (...) ha ${...} task`);
+
+- console.log(`      → Task ${taskLC} ...`);
++ dlog(`      → Task ${taskLC} ...`);
+
+- console.log(`Task ${task.name} ... filtrata...`);
++ dlog(`Task ${task.name} ... filtrata...`);
+
+
+Se vuoi fare più veloce: commenta direttamente i log nei loop. Il guadagno è enorme.
+
+A2) PriorityColumn stampa log ad ogni render
+
+In client/src/components/drag-drop/priority-column.tsx hai:
+
+console.log('[DEBUG PriorityColumn]', ...)
+
+
+Diff
+
+- console.log('[DEBUG PriorityColumn]', priority, 'isMultiSelectMode:', isMultiSelectMode, 'selectedTasks:', selectedTasks.length);
++ // DEBUG: commenta per performance
++ // console.log('[DEBUG PriorityColumn]', priority, 'isMultiSelectMode:', isMultiSelectMode, 'selectedTasks:', selectedTasks.length);
+
+PATCH B — Non rifare loadTasks(true) ad ogni DnD: fai debounce (e non bloccare UI)
+
+Oggi ogni drag finisce con:
+
+await refreshAssignments("manual");
+
+
+che fa await loadTasks(true). È la seconda grossa causa.
+
+✅ Obiettivo: dopo DnD aggiorni subito UI (o almeno non blocchi), e fai un solo reload “a pacchetto” dopo che l’utente ha finito di spostare.
+
+B1) Aggiungi un debounce per refreshAssignments("manual")
+
+In generate-assignments.tsx (zona refs), aggiungi:
+
++ const refreshDebounceRef = useRef<NodeJS.Timeout | null>(null);
++
++ const scheduleManualRefresh = (delayMs: number = 600) => {
++   if (refreshDebounceRef.current) clearTimeout(refreshDebounceRef.current);
++   refreshDebounceRef.current = setTimeout(() => {
++     refreshAssignments("manual").catch(console.error);
++   }, delayMs);
++ };
+
+B2) Sostituisci tutte le chiamate “await refreshAssignments("manual")” dentro onDragEnd
+
+Esempio (riordino stesso cleaner):
+
+- await refreshAssignments("manual");
++ scheduleManualRefresh(600);
+
+
+E fallo in TUTTI i rami dove ora lo fai (riordino, move cleaner->cleaner, container->cleaner, batch move, cleaner->container).
+
+Questo da solo ti toglie la “penalità” di un reload completo per ogni drop.
+
+PATCH C — Togli il fetch /api/selected-cleaners ad ogni drop (è latenza inutile)
+
+Dentro onDragEnd, nei rami “spostamento tra cleaners” e “container→cleaner”, fai:
+
+const cleanersResponse = await fetch(`/api/selected-cleaners?...`);
+...
+
+
+È un roundtrip in più solo per costruire un toast.
+
+✅ Soluzione rapida: non fetchare, mostra ID nel toast (o usa cache).
+
+C1) Soluzione immediata (zero fetch)
+- const cleanersResponse = await fetch(`/api/selected-cleaners?date=${dateStr}`, ...);
+- const cleanersData = await cleanersResponse.json();
+- const toCleaner = cleanersData.cleaners.find((c: any) => c.id === toCleanerId);
+- const toCleanerName = toCleaner ? `${toCleaner.name} ${toCleaner.lastname}` : `ID ${toCleanerId}`;
++ const toCleanerName = `ID ${toCleanerId}`;
+
+
+✅ Risultato: il drop “risponde” subito.
+
+(Se vuoi cache invece di ID, dimmelo e ti do patch con cleanersCacheRef che si riempie una sola volta.)
+
+PATCH D — Pulsante “Assegna”: non aspettare il reload pesante dopo che Python ha finito
+
+Le route /api/assign-... lanciano Python (assign_eo.py, assign_hp.py, assign_lp.py): quello tempo non lo azzeri senza cambiare server/job queue.
+
+Però tu aggiungi anche un costo extra:
+
+await refreshAssignments("manual");
+
+
+che rimette in moto loadTasks(true) e tutti i loop.
+
+✅ Soluzione: dopo successo, fai reload in background (debounced), non “await”.
+
+Esempio in assignEarlyOutToTimeline / assignHighPriorityToTimeline / assignLowPriorityToTimeline:
+
+- await refreshAssignments("manual");
++ scheduleManualRefresh(0); // subito, ma non blocca il click/UI
+
+
+Oppure ancora meglio (per non far partire 3 reload se l’utente clicca più volte):
+
++ scheduleManualRefresh(600);
+
+PATCH E — Drag&Drop: fai update “ottimistico” (opzionale ma dà il boost più grande)
+
+Questa è la patch più “da prodotto”: appena l’utente droppa, aggiorni gli state locali (sposti la task tra array) e poi fai sync server + refresh debounced.
+
+Nel tuo onDragEnd oggi fai l’API e poi reload totale.
+
+Il miglioramento è:
+
+aggiorna subito allTasksWithAssignments (assignedCleaner / sequence)
+
+aggiorna subito earlyOutTasks / highPriorityTasks / lowPriorityTasks rimuovendo la task dal container
+
+poi chiami l’API (già lo fai)
+
+poi scheduleManualRefresh(800) solo come “verifica e riallineamento”
+
+Se vuoi, te la scrivo come patch completa (è un po’ più lunga perché bisogna gestire i vari casi: reorder, move cleaner, container→cleaner, cleaner→container).
+
+Cosa cambia davvero dopo queste patch
+
+Drag&Drop: non più “drop → freeze → reload completo”, ma “drop → UI continua a scorrere”.
+
+Assegna: finito Python → toast subito, e aggiornamento dati senza “secondo freeze”.
