@@ -400,19 +400,24 @@ export default function TaskCard({
   }, [effectiveCurrentId, isModalOpen, displayTask]);
 
   // Normalizza confirmed_operation da boolean/number/string a boolean sicuro
-  // USA taskWithPendingEdits per mostrare aggiornamenti immediati nella card
-  const rawConfirmed = (taskWithPendingEdits as any).confirmed_operation;
-  // CRITICAL: Se operation_id è stato modificato, considera confermato
-  const hasOperationId = !!(taskWithPendingEdits as any).operation_id;
-  const isConfirmedOperation = hasOperationId || (
+  // CRITICAL: Se l'utente ha modificato operation_id tramite pending edits, considera confermato
+  // Questo distingue tra operation_id=2 di default (sistema) e operation_id=2 scelto manualmente
+  const taskKey = getTaskKey(task);
+  const pendingEditsForTask = getPendingEdits()[taskKey];
+  const hasPendingOperationEdit = pendingEditsForTask?.operationId !== undefined;
+  
+  const rawConfirmed = (task as any).confirmed_operation; // Usa task originale per confirmed_operation
+  const originalConfirmed = 
     typeof rawConfirmed === "boolean"
       ? rawConfirmed
       : typeof rawConfirmed === "number"
         ? rawConfirmed !== 0
         : typeof rawConfirmed === "string"
           ? ["true", "1", "yes"].includes(rawConfirmed.toLowerCase().trim())
-          : false
-  );
+          : false;
+  
+  // Confermato se: utente ha modificato manualmente operation_id O confirmed_operation originale è true
+  const isConfirmedOperation = hasPendingOperationEdit || originalConfirmed;
 
   // Determina il tipo della CARD dai flag dell'oggetto *task* (non quelli della navigazione nel modale)
   const cardIsPremium = Boolean(task.premium);
