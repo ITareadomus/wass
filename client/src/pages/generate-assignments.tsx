@@ -632,11 +632,9 @@ export default function GenerateAssignments() {
       console.log("Estrazione completata:", result);
 
       setExtractionStep("Caricamento task...");
-      await new Promise(resolve => setTimeout(resolve, 500));
       await loadTasks();
 
       setExtractionStep("Task caricati!");
-      await new Promise(resolve => setTimeout(resolve, 100));
 
       // CRITICAL: Dopo estrazione nuovi dati, NON ci sono modifiche da salvare
       setHasUnsavedChanges(false);
