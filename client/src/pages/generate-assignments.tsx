@@ -614,6 +614,9 @@ export default function GenerateAssignments() {
   // Stato per tracciare modifiche non salvate
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
+  // Stato per tracciare se un drag&drop è in corso
+  const [isLoadingDragDrop, setIsLoadingDragDrop] = useState(false);
+
   // Stati di caricamento
   const [isExtracting, setIsExtracting] = useState(true);
   const [extractionStep, setExtractionStep] = useState<string>("Inizializzazione...");
@@ -1685,17 +1688,22 @@ export default function GenerateAssignments() {
 
   const onDragEnd = async (result: any) => {
     setDragSequencePreview(null);
+    setIsLoadingDragDrop(true);
 
     const { destination, source, draggableId } = result;
 
     // niente destinazione => niente da fare
-    if (!destination) return;
+    if (!destination) {
+      setIsLoadingDragDrop(false);
+      return;
+    }
 
     // se posizione identica, esci
     if (
       destination.droppableId === source.droppableId &&
       destination.index === source.index
     ) {
+      setIsLoadingDragDrop(false);
       return;
     }
 
@@ -1708,6 +1716,7 @@ export default function GenerateAssignments() {
         variant: "warning",
         duration: 2000,
       });
+      setIsLoadingDragDrop(false);
       return;
     }
 
@@ -1724,6 +1733,7 @@ export default function GenerateAssignments() {
         description: "La timeline è in sola visualizzazione per questa data.",
         variant: "warning",
       });
+      setIsLoadingDragDrop(false);
       return;
     }
 
@@ -1764,6 +1774,7 @@ export default function GenerateAssignments() {
           // Rilascia lock PRIMA del reload
           isDraggingRef.current = false;
           if (dragTimeoutRef.current) clearTimeout(dragTimeoutRef.current);
+          setIsLoadingDragDrop(false);
 
           // PATCH B: Reload debounced in background
           scheduleManualRefresh(600);
@@ -1778,6 +1789,7 @@ export default function GenerateAssignments() {
           // Rilascia lock indipendentemente dall'esito
           isDraggingRef.current = false;
           if (dragTimeoutRef.current) clearTimeout(dragTimeoutRef.current);
+          setIsLoadingDragDrop(false);
         }
         return;
       }
@@ -1830,6 +1842,7 @@ export default function GenerateAssignments() {
           // Rilascia lock PRIMA del reload
           isDraggingRef.current = false;
           if (dragTimeoutRef.current) clearTimeout(dragTimeoutRef.current);
+          setIsLoadingDragDrop(false);
 
           // PATCH B: Reload debounced in background
           scheduleManualRefresh(600);
@@ -1846,6 +1859,7 @@ export default function GenerateAssignments() {
           // Rilascia lock indipendentemente dall'esito
           isDraggingRef.current = false;
           if (dragTimeoutRef.current) clearTimeout(dragTimeoutRef.current);
+          setIsLoadingDragDrop(false);
         }
         return;
       }
@@ -2218,6 +2232,7 @@ export default function GenerateAssignments() {
                   hasUnsavedChanges={hasUnsavedChanges}
                   onTaskMoved={handleTaskMoved}
                   isReadOnly={isTimelineReadOnly} // Passa lo stato read-only
+                  isLoadingDragDrop={isLoadingDragDrop}
                 />
               </div>
             </div>
