@@ -1207,7 +1207,27 @@ def main():
         tasks = entry.get("tasks", [])
         if len(tasks) > 1:
             tasks.sort(key=lambda t: t.get("start_time") or "00:00")
-
+        
+        # FIX A: Rinumera sequence e ricalcola travel_time dopo il merge
+        # Questo elimina sequence duplicate e corregge travel_time
+        prev_end_min = None
+        for i, task in enumerate(tasks):
+            # Rinumera sequence (1-based)
+            task["sequence"] = i + 1
+            task["followup"] = i > 0
+            
+            # Ricalcola travel_time basandosi su start_time corrente e end_time precedente
+            if i > 0 and prev_end_min is not None:
+                start_time_str = task.get("start_time") or "00:00"
+                start_min = hhmm_to_min(start_time_str, "00:00")
+                travel = max(0, start_min - prev_end_min)
+                task["travel_time"] = travel
+            else:
+                task["travel_time"] = 0
+            
+            # Salva end_time corrente per la prossima iterazione
+            end_time_str = task.get("end_time") or "00:00"
+            prev_end_min = hhmm_to_min(end_time_str, "00:00")
 
     # Aggiorna meta
     # Conta i cleaner totali disponibili

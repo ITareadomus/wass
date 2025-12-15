@@ -192,7 +192,7 @@ function recomputeCleanerTimes(allTasks: Task[], cleanerId: number): Task[] {
       end_time: endStr,
       startTime: startStr,  // camelCase per UI
       endTime: endStr,      // camelCase per UI
-      sequence: idx,
+      sequence: idx + 1,
       travel_time: travel,
       travelTime: travel,
     } as Task;
