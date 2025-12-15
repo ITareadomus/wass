@@ -1695,7 +1695,11 @@ export default function TimelineView({
                           {...provided.droppableProps}
                           data-testid={`timeline-cleaner-${cleaner.id}`}
                           data-cleaner-id={cleaner.id}
-                          className="relative min-h-[45px] flex-1 border-l border-border bg-background"
+                          className={`relative min-h-[45px] flex-1 border-l border-border transition-colors duration-200 ${
+                            snapshot.isDraggingOver
+                              ? 'bg-blue-200/40 dark:bg-blue-900/40 border-l-2 border-blue-400 dark:border-blue-600'
+                              : 'bg-background'
+                          }`}
                           style={{
                             zIndex: filteredCleanerId === cleaner.id || hasIncompatibleTasks ? 15 : 'auto'
                           }}
