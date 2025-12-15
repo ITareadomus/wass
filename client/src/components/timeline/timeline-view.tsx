@@ -1789,13 +1789,13 @@ export default function TimelineView({
                                   return 60;
                                 };
 
-                                // Usa sequence se disponibile, altrimenti fallback su idx (0-indexed)
-                                const seq = (taskObj as any).sequence ?? idx;
+                                // Usa sequence se disponibile, altrimenti fallback su idx+1
+                                const seq = (taskObj as any).sequence ?? (idx + 1);
 
                                 // Calcola offset iniziale basato sulla differenza tra start time del cleaner e start time ARROTONDATO della griglia
-                                // CRITICAL: Usa seq === 0 invece di seq === 1 perché sequence è 0-indexed
+                                // CRITICAL: Usa seq === 1 invece di idx === 0 per coerenza con la logica sequence
                                 let timeOffset = 0;
-                                if (seq === 0) {
+                                if (seq === 1) {
                                   // CRITICAL: Usa l'ora arrotondata (come la griglia) per calcolare l'offset
                                   const [globalStartHour, globalStartMin] = globalStartTime.split(':').map(Number);
                                   const globalStartHourRounded = globalStartMin > 0 ? globalStartHour : globalStartHour;
@@ -1824,18 +1824,17 @@ export default function TimelineView({
 
                                 // Calcola larghezza EFFETTIVA in base ai minuti reali di travel_time
                                 // Usa la stessa base di calcolo dei task (slot * 60 minuti virtuali)
-                                const effectiveTravelMinutes = seq > 0 && travelTime > 0 ? travelTime : 0;
+                                const effectiveTravelMinutes = seq >= 2 && travelTime > 0 ? travelTime : 0;
                                 const virtualMinutes = globalTimeSlots.length * 60;
                                 const totalWidth = effectiveTravelMinutes > 0 ? (effectiveTravelMinutes / virtualMinutes) * 100 : 0;
 
-                                // CRITICAL FIX: Calcola il "waitingGap" per task con sequence > 0 (non prima task)
+                                // CRITICAL FIX: Calcola il "waitingGap" per task con sequence >= 2
                                 // Questo gap rappresenta l'attesa tra la fine della task precedente e l'inizio effettivo di questa task
                                 // (es. quando c'è un checkout constraint che ritarda lo start_time)
                                 // ROBUSTO: funziona anche se prevTask non ha end_time
-                                // NOTA: sequence è 0-indexed (0, 1, 2...)
                                 let waitingGap = 0;
 
-                                if (seq > 0 && taskObj.start_time) {
+                                if (seq >= 2 && taskObj.start_time) {
                                   const prevTask = cleanerTasks[idx - 1] as any;
 
                                   const workDateStr = localStorage.getItem('selected_work_date') || format(new Date(), 'yyyy-MM-dd');
@@ -1892,9 +1891,9 @@ export default function TimelineView({
                                       allTasks={cleanerTasks}
                                       isDragDisabled={isReadOnly}
                                       isReadOnly={isReadOnly}
-                                      timeOffset={seq === 0 ? timeOffset : 0}
-                                      travelTime={seq > 0 ? travelTime : 0}
-                                      waitingGap={seq > 0 ? waitingGap : 0}
+                                      timeOffset={seq === 1 ? timeOffset : 0}
+                                      travelTime={seq >= 2 ? travelTime : 0}
+                                      waitingGap={seq >= 2 ? waitingGap : 0}
                                       globalTimeSlots={globalTimeSlots.length}
                                     />
                                 );
