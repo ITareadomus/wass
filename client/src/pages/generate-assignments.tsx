@@ -183,11 +183,18 @@ function recomputeCleanerTimes(allTasks: Task[], cleanerId: number): Task[] {
     const end = start + cleaning;
     prevEnd = end;
 
+    const startStr = formatHHMM(start);
+    const endStr = formatHHMM(end);
+    
     return {
       ...task,
-      start_time: formatHHMM(start),
-      end_time: formatHHMM(end),
+      start_time: startStr,
+      end_time: endStr,
+      startTime: startStr,  // camelCase per UI
+      endTime: endStr,      // camelCase per UI
       sequence: idx,
+      travel_time: travel,
+      travelTime: travel,
     } as Task;
   });
 
@@ -338,9 +345,9 @@ function optimisticBatchMoveTask(
     });
     
     // Ricalcola orari per tutti i cleaner coinvolti
-    for (const prevId of prevCleanerIds) {
+    Array.from(prevCleanerIds).forEach(prevId => {
       updated = recomputeCleanerTimes(updated, prevId);
-    }
+    });
     if (newCleanerId != null) {
       updated = recomputeCleanerTimes(updated, newCleanerId);
     }
@@ -393,11 +400,11 @@ function optimisticBatchMoveTask(
   }
   
   // CRITICAL: Ricalcola orari per tutti i cleaner coinvolti (elimina salti UI)
-  for (const prevId of prevCleanerIds) {
+  Array.from(prevCleanerIds).forEach(prevId => {
     if (prevId !== newCleanerId) {
       updated = recomputeCleanerTimes(updated, prevId);
     }
-  }
+  });
   if (newCleanerId != null) {
     updated = recomputeCleanerTimes(updated, newCleanerId);
   }
