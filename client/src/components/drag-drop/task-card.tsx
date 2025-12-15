@@ -768,55 +768,6 @@ export default function TaskCard({
 
   return (
     <>
-      {/* Offset spacer per prima task (sequence === 1) - FUORI dal Draggable */}
-      {isInTimeline && seq === 1 && timeOffset > 0 && offsetWidthPx > 0 && (
-        <div
-          className="flex-shrink-0"
-          style={{ width: `${offsetWidthPx}px` }}
-        />
-      )}
-
-      {/* Travel time marker - FUORI dal Draggable (solo per sequence >= 2) */}
-      {isInTimeline && seq >= 2 && travelTime > 0 && travelWidthPx > 0 && (
-        <div
-          className="flex items-center justify-center flex-shrink-0 py-3"
-          style={{ width: `${travelWidthPx}px`, minHeight: '50px' }}
-          title={`${travelTime} min`}
-        >
-          <svg
-            width="20"
-            height="20"
-            viewBox="0 0 24 24"
-            fill="currentColor"
-            className="text-custom-blue flex-shrink-0"
-          >
-            <path d="M13.5 5.5c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zM9.8 8.9L7 23h2.1l1.8-8 2.1 2v6h2v-7.5l-2.1-2 .6-3C14.8 12 16.8 13 19 13v-2c-1.9 0-3.5-1-4.3-2.4l-1-1.6c-.4-.6-1-1-1.7-1-.3 0-.5.1-.8.1L6 8.3V13h2V9.6l1.8-.7"/>
-          </svg>
-        </div>
-      )}
-
-      {/* Waiting gap spacer - spazio per vincolo checkout - FUORI dal Draggable (solo per sequence >= 2) */}
-      {isInTimeline && seq >= 2 && waitingGap > 0 && waitingGapWidthPx > 0 && (
-        <div
-          className="flex items-center justify-center flex-shrink-0 py-3 bg-amber-100/50 dark:bg-amber-900/20 border-y border-dashed border-amber-400"
-          style={{ width: `${waitingGapWidthPx}px`, minHeight: '50px' }}
-          title={`Attesa checkout: ${waitingGap} min`}
-        >
-          <svg
-            width="16"
-            height="16"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            className="text-amber-600 dark:text-amber-400 flex-shrink-0"
-          >
-            <circle cx="12" cy="12" r="10"/>
-            <polyline points="12,6 12,12 16,14"/>
-          </svg>
-        </div>
-      )}
-
       <Draggable
         draggableId={getTaskKey(task)}
         index={index}
@@ -829,12 +780,63 @@ export default function TaskCard({
             <div
               ref={provided.innerRef}
               {...provided.draggableProps}
-              {...provided.dragHandleProps}
               style={{
                 ...provided.draggableProps.style,
                 zIndex: snapshot.isDragging ? 9999 : 'auto',
               }}
+              className={isInTimeline ? "flex items-center" : ""}
             >
+              {/* Offset spacer per prima task (sequence === 1) - DENTRO il Draggable */}
+              {isInTimeline && seq === 1 && timeOffset > 0 && offsetWidthPx > 0 && (
+                <div
+                  className="flex-shrink-0"
+                  style={{ width: `${offsetWidthPx}px` }}
+                />
+              )}
+
+              {/* Travel time marker - DENTRO il Draggable (solo per sequence >= 2) */}
+              {isInTimeline && seq >= 2 && travelTime > 0 && travelWidthPx > 0 && (
+                <div
+                  className="flex items-center justify-center flex-shrink-0 py-3"
+                  style={{ width: `${travelWidthPx}px`, minHeight: '50px' }}
+                  title={`${travelTime} min`}
+                >
+                  <svg
+                    width="20"
+                    height="20"
+                    viewBox="0 0 24 24"
+                    fill="currentColor"
+                    className="text-custom-blue flex-shrink-0"
+                  >
+                    <path d="M13.5 5.5c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zM9.8 8.9L7 23h2.1l1.8-8 2.1 2v6h2v-7.5l-2.1-2 .6-3C14.8 12 16.8 13 19 13v-2c-1.9 0-3.5-1-4.3-2.4l-1-1.6c-.4-.6-1-1-1.7-1-.3 0-.5.1-.8.1L6 8.3V13h2V9.6l1.8-.7"/>
+                  </svg>
+                </div>
+              )}
+
+              {/* Waiting gap spacer - DENTRO il Draggable (solo per sequence >= 2) */}
+              {isInTimeline && seq >= 2 && waitingGap > 0 && waitingGapWidthPx > 0 && (
+                <div
+                  className="flex items-center justify-center flex-shrink-0 py-3 bg-amber-100/50 dark:bg-amber-900/20 border-y border-dashed border-amber-400"
+                  style={{ width: `${waitingGapWidthPx}px`, minHeight: '50px' }}
+                  title={`Attesa checkout: ${waitingGap} min`}
+                >
+                  <svg
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    className="text-amber-600 dark:text-amber-400 flex-shrink-0"
+                  >
+                    <circle cx="12" cy="12" r="10"/>
+                    <polyline points="12,6 12,12 16,14"/>
+                  </svg>
+                </div>
+              )}
+
+              {/* Task card con drag handle */}
+              <div {...provided.dragHandleProps}>
               {/* Task card effettiva */}
               <TooltipProvider delayDuration={300}>
                 <Tooltip>
@@ -968,6 +970,7 @@ export default function TaskCard({
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>
+              </div>
             </div>
           );
         }}
