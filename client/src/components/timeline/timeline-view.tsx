@@ -1820,42 +1820,19 @@ export default function TimelineView({
                                   const prevTaskDate = normDate(prevTask?.checkin_date);
                                   const prevTaskHasDifferentDate = !!(prevTaskDate && prevTaskDate !== workDateStr);
                                   
-                                  if (prevTask && !prevTaskHasDifferentDate) {
-                                    let prevEndMinutes: number | null = null;
-                                    
-                                    // 1) Prova end_time prima
-                                    if (prevTask.end_time) {
-                                      const [prevEndH, prevEndM] = prevTask.end_time.split(':').map(Number);
-                                      if (!Number.isNaN(prevEndH) && !Number.isNaN(prevEndM)) {
-                                        prevEndMinutes = prevEndH * 60 + prevEndM;
-                                      }
-                                    }
-                                    
-                                    // 2) Se end_time manca, calcola da start_time + durata
-                                    if (prevEndMinutes === null && prevTask.start_time) {
-                                      const [prevStartH, prevStartM] = prevTask.start_time.split(':').map(Number);
-                                      if (!Number.isNaN(prevStartH) && !Number.isNaN(prevStartM)) {
-                                        const prevStartMinutes = prevStartH * 60 + prevStartM;
-                                        // Usa cleaning_time o fallback a 60 minuti
-                                        const durationMinutes = prevTask.cleaning_time ? Number(prevTask.cleaning_time) : 60;
-                                        prevEndMinutes = prevStartMinutes + durationMinutes;
-                                      }
-                                    }
-                                    
-                                    // Calcola gap solo se abbiamo prevEndMinutes
-                                    if (prevEndMinutes !== null) {
-                                      const expectedStartMinutes = prevEndMinutes + travelTime;
+                                  if (prevTask && prevTask.end_time && !prevTaskHasDifferentDate) {
+                                    // Calcola la fine prevista: end_time della task precedente + travel_time
+                                    const [prevEndH, prevEndM] = prevTask.end_time.split(':').map(Number);
+                                    const prevEndMinutes = prevEndH * 60 + prevEndM;
+                                    const expectedStartMinutes = prevEndMinutes + travelTime;
 
-                                      // Calcola lo start effettivo di questa task
-                                      const [taskStartH, taskStartM] = taskObj.start_time.split(':').map(Number);
-                                      if (!Number.isNaN(taskStartH) && !Number.isNaN(taskStartM)) {
-                                        const actualStartMinutes = taskStartH * 60 + taskStartM;
+                                    // Calcola lo start effettivo di questa task
+                                    const [taskStartH, taskStartM] = taskObj.start_time.split(':').map(Number);
+                                    const actualStartMinutes = taskStartH * 60 + taskStartM;
 
-                                        // Se lo start effettivo è DOPO quello previsto, c'è un gap (attesa)
-                                        if (actualStartMinutes > expectedStartMinutes) {
-                                          waitingGap = actualStartMinutes - expectedStartMinutes;
-                                        }
-                                      }
+                                    // Se lo start effettivo è DOPO quello previsto, c'è un gap (attesa)
+                                    if (actualStartMinutes > expectedStartMinutes) {
+                                      waitingGap = actualStartMinutes - expectedStartMinutes;
                                     }
                                   }
                                 }
