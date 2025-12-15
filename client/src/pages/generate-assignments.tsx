@@ -171,13 +171,14 @@ function recomputeCleanerTimes(allTasks: Task[], cleanerId: number): Task[] {
     const travel = getTravelMinutes(task);
     const cleaning = getCleaningMinutes(task);
     
-    // checkout_time può vincolare l'inizio (non prima del checkout)
+    // checkout_time può vincolare l'inizio (non prima del checkout + waitgap)
     const checkoutMinutes = parseHHMM((task as any).checkout_time);
+    const CHECKOUT_WAITGAP = 15; // 15 minuti dopo checkout prima di poter iniziare
     
-    // start = max(prevEnd + travel, checkout_time)
+    // start = max(prevEnd + travel, checkout_time + waitgap)
     let start = prevEnd + travel;
-    if ((task as any).checkout_time && checkoutMinutes > start) {
-      start = checkoutMinutes;
+    if ((task as any).checkout_time && (checkoutMinutes + CHECKOUT_WAITGAP) > start) {
+      start = checkoutMinutes + CHECKOUT_WAITGAP;
     }
     
     const end = start + cleaning;
