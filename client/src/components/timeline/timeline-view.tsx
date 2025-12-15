@@ -1767,28 +1767,6 @@ export default function TimelineView({
                                 // Helper: normalizza date "2025-12-15T..." -> "2025-12-15"
                                 const normDate = (d?: string | null) => (d ? String(d).slice(0, 10) : null);
 
-                                // Helper: parsing HH:MM format
-                                const parseHHMM = (t?: string | null) => {
-                                  if (!t) return null;
-                                  const [h, m] = String(t).split(":").map(Number);
-                                  if (Number.isNaN(h) || Number.isNaN(m)) return null;
-                                  return h * 60 + m;
-                                };
-
-                                // Helper: estrai durata della pulizia in minuti
-                                const getCleaningMinutes = (task: any): number => {
-                                  if (task.cleaning_time) return Number(task.cleaning_time);
-                                  if (task.duration) {
-                                    const match = String(task.duration).match(/(\d+)h?\s*(\d+)?m?/);
-                                    if (match) {
-                                      const hours = parseInt(match[1]) || 0;
-                                      const mins = parseInt(match[2]) || 0;
-                                      return hours * 60 + mins;
-                                    }
-                                  }
-                                  return 60;
-                                };
-
                                 // Usa sequence se disponibile, altrimenti fallback su idx+1
                                 const seq = (taskObj as any).sequence ?? (idx + 1);
 
@@ -1831,38 +1809,52 @@ export default function TimelineView({
                                 // CRITICAL FIX: Calcola il "waitingGap" per task con sequence >= 2
                                 // Questo gap rappresenta l'attesa tra la fine della task precedente e l'inizio effettivo di questa task
                                 // (es. quando c'è un checkout constraint che ritarda lo start_time)
-                                // ROBUSTO: funziona anche se prevTask non ha end_time
                                 let waitingGap = 0;
-
                                 if (seq >= 2 && taskObj.start_time) {
-                                  const prevTask = cleanerTasks[idx - 1] as any;
+                                  // CRITICAL: L'array è ordinato per sequence, quindi idx-1 è la vera task precedente
+                                  const prevTask = idx > 0 ? cleanerTasks[idx - 1] as any : null;
 
                                   const workDateStr = localStorage.getItem('selected_work_date') || format(new Date(), 'yyyy-MM-dd');
 
                                   // CRITICAL: Normalizza le date per evitare mismatch di formato (es. "2025-12-15T00:00:00Z" vs "2025-12-15")
                                   const prevTaskDate = normDate(prevTask?.checkin_date);
                                   const prevTaskHasDifferentDate = !!(prevTaskDate && prevTaskDate !== workDateStr);
-
+                                  
                                   if (prevTask && !prevTaskHasDifferentDate) {
-                                    // 1) fine precedente: end_time se c'è, altrimenti start_time + durata
-                                    let prevEndMinutes = parseHHMM(prevTask.end_time);
-
-                                    if (prevEndMinutes === null) {
-                                      const prevStart = parseHHMM(prevTask.start_time);
-                                      if (prevStart !== null) {
-                                        prevEndMinutes = prevStart + getCleaningMinutes(prevTask);
+                                    let prevEndMinutes: number | null = null;
+                                    
+                                    // 1) Prova end_time prima
+                                    if (prevTask.end_time) {
+                                      const [prevEndH, prevEndM] = prevTask.end_time.split(':').map(Number);
+                                      if (!Number.isNaN(prevEndH) && !Number.isNaN(prevEndM)) {
+                                        prevEndMinutes = prevEndH * 60 + prevEndM;
                                       }
                                     }
-
-                                    // se ancora null, non posso calcolare gap
+                                    
+                                    // 2) Se end_time manca, calcola da start_time + durata
+                                    if (prevEndMinutes === null && prevTask.start_time) {
+                                      const [prevStartH, prevStartM] = prevTask.start_time.split(':').map(Number);
+                                      if (!Number.isNaN(prevStartH) && !Number.isNaN(prevStartM)) {
+                                        const prevStartMinutes = prevStartH * 60 + prevStartM;
+                                        // Usa cleaning_time o fallback a 60 minuti
+                                        const durationMinutes = prevTask.cleaning_time ? Number(prevTask.cleaning_time) : 60;
+                                        prevEndMinutes = prevStartMinutes + durationMinutes;
+                                      }
+                                    }
+                                    
+                                    // Calcola gap solo se abbiamo prevEndMinutes
                                     if (prevEndMinutes !== null) {
-                                      // travelTime deve essere "verso questa task" (quello che già stai leggendo da taskObj.travel_time)
                                       const expectedStartMinutes = prevEndMinutes + travelTime;
 
-                                      const actualStartMinutes = parseHHMM(taskObj.start_time);
+                                      // Calcola lo start effettivo di questa task
+                                      const [taskStartH, taskStartM] = taskObj.start_time.split(':').map(Number);
+                                      if (!Number.isNaN(taskStartH) && !Number.isNaN(taskStartM)) {
+                                        const actualStartMinutes = taskStartH * 60 + taskStartM;
 
-                                      if (actualStartMinutes !== null && actualStartMinutes > expectedStartMinutes) {
-                                        waitingGap = actualStartMinutes - expectedStartMinutes;
+                                        // Se lo start effettivo è DOPO quello previsto, c'è un gap (attesa)
+                                        if (actualStartMinutes > expectedStartMinutes) {
+                                          waitingGap = actualStartMinutes - expectedStartMinutes;
+                                        }
                                       }
                                     }
                                   }
