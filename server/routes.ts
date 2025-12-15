@@ -2537,9 +2537,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Endpoint per aggiornare i dettagli di una task (checkout, checkin, durata)
+  // skipAdam: se true, aggiorna SOLO PostgreSQL e non propaga su ADAM
   app.post("/api/update-task-details", async (req, res) => {
     try {
-      const { taskId, logisticCode, checkoutDate, checkoutTime, checkinDate, checkinTime, cleaningTime, paxIn, paxOut, operationId, date, modified_by } = req.body;
+      const { taskId, logisticCode, checkoutDate, checkoutTime, checkinDate, checkinTime, cleaningTime, paxIn, paxOut, operationId, date, modified_by, skipAdam } = req.body;
 
       if (!taskId && !logisticCode) {
         return res.status(400).json({ success: false, error: "taskId o logisticCode richiesto" });
@@ -2655,7 +2656,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       await workspaceFiles.saveTimeline(workDate, timelineData, false, currentUsername, 'task_edit', editOptions);
 
       // CRITICAL: Propaga le modifiche al database ADAM (app_housekeeping)
-      if (taskId) {
+      // SOLO se skipAdam non è true
+      if (taskId && !skipAdam) {
         try {
           const mysql = await import('mysql2/promise');
           const connection = await mysql.createConnection({
