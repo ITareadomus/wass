@@ -20,6 +20,86 @@ try:
 except ImportError:
     API_AVAILABLE = False
 
+# MySQL import per fallback geodata da ADAM
+try:
+    import mysql.connector
+    MYSQL_AVAILABLE = True
+except ImportError:
+    MYSQL_AVAILABLE = False
+
+
+def get_geodata_from_adam(task_ids: List[int], work_date: str) -> Dict[str, Dict[str, Any]]:
+    """
+    Recupera lat/lng/address da ADAM per una lista di task_id.
+    Usato come fallback quando le coordinate non sono disponibili nei containers.
+    """
+    if not MYSQL_AVAILABLE or not task_ids:
+        return {}
+    
+    try:
+        import os
+        db_config = {
+            'host': os.environ.get('DB_HOST', 'localhost'),
+            'user': os.environ.get('DB_USER', 'root'),
+            'password': os.environ.get('DB_PASSWORD', ''),
+            'database': os.environ.get('DB_NAME', 'wass_housekeeping'),
+            'port': int(os.environ.get('DB_PORT', 3306))
+        }
+        
+        connection = mysql.connector.connect(**db_config)
+        cursor = connection.cursor(dictionary=True)
+        
+        # Query per ottenere coordinate dalle strutture
+        placeholders = ','.join(['%s'] * len(task_ids))
+        query = f"""
+            SELECT 
+                h.id AS task_id,
+                s.lat,
+                s.lng,
+                s.address1 AS address,
+                s.structure_type_id
+            FROM app_housekeeping h
+            JOIN app_structures s ON h.structure_id = s.id
+            WHERE h.id IN ({placeholders})
+              AND s.lat IS NOT NULL AND s.lng IS NOT NULL
+              AND s.lat != '' AND s.lng != ''
+        """
+        
+        cursor.execute(query, task_ids)
+        rows = cursor.fetchall()
+        cursor.close()
+        connection.close()
+        
+        result = {}
+        for row in rows:
+            task_id = str(row.get("task_id", ""))
+            if task_id:
+                lat = row.get("lat")
+                lng = row.get("lng")
+                # Normalizza coordinate
+                try:
+                    lat = float(str(lat).replace(',', '.')) if lat else None
+                    lng = float(str(lng).replace(',', '.')) if lng else None
+                except (ValueError, TypeError):
+                    lat = None
+                    lng = None
+                
+                if lat and lng:
+                    result[task_id] = {
+                        "lat": lat,
+                        "lng": lng,
+                        "address": row.get("address", ""),
+                        "small_equipment": row.get("structure_type_id") == 1
+                    }
+        
+        if result:
+            print(f"   📍 Recuperate {len(result)} coordinate da ADAM")
+        return result
+        
+    except Exception as e:
+        print(f"   ⚠️ Errore query ADAM per geodata: {e}")
+        return {}
+
 # =============================
 # I/O paths
 # =============================
@@ -1259,6 +1339,85 @@ def main():
     # I tempi sono già calcolati correttamente da build_output/evaluate_route
     # con i vincoli EO (eo_end_time). recalculate_cleaner_times non conosce
     # questi vincoli e sovrascriverebbe i tempi EO con valori errati.
+    
+    # FIX: Backfill lat/lng per task pre-esistenti che non hanno coordinate
+    # Costruisci un indice geodata da containers e nuove assegnazioni EO
+    geodata_index: Dict[str, Dict[str, Any]] = {}
+    
+    # 1. Popola da containers (tutte le priorità)
+    try:
+        containers_data = load_containers(ref_date)
+        if containers_data and "containers" in containers_data:
+            for priority in ["early_out", "high_priority", "low_priority"]:
+                for t in containers_data["containers"].get(priority, {}).get("tasks", []):
+                    task_id = str(t.get("task_id", ""))
+                    if task_id and (t.get("lat") or t.get("latitude")):
+                        geodata_index[task_id] = {
+                            "lat": t.get("lat") or t.get("latitude"),
+                            "lng": t.get("lng") or t.get("longitude"),
+                            "address": t.get("address", ""),
+                            "small_equipment": t.get("small_equipment", False)
+                        }
+    except Exception as e:
+        print(f"   ⚠️ Errore caricamento geodata da containers: {e}")
+    
+    # 2. Popola da nuove assegnazioni EO (hanno sempre le coordinate)
+    for cleaner_entry in output.get("early_out_tasks_assigned", []):
+        for t in cleaner_entry.get("tasks", []):
+            task_id = str(t.get("task_id", ""))
+            if task_id and (t.get("lat") or t.get("latitude")):
+                geodata_index[task_id] = {
+                    "lat": t.get("lat") or t.get("latitude"),
+                    "lng": t.get("lng") or t.get("longitude"),
+                    "address": t.get("address", ""),
+                    "small_equipment": t.get("small_equipment", False)
+                }
+    
+    print(f"   📍 Geodata index: {len(geodata_index)} task con coordinate (da containers/EO)")
+    
+    # 3. Trova task senza coordinate per query ADAM
+    missing_task_ids = []
+    for entry in timeline_data_output["cleaners_assignments"]:
+        for task in entry.get("tasks", []):
+            task_id = str(task.get("task_id", ""))
+            if task_id and not task.get("lat") and not task.get("latitude"):
+                if task_id not in geodata_index:
+                    try:
+                        missing_task_ids.append(int(task_id))
+                    except (ValueError, TypeError):
+                        pass
+    
+    # 4. Query ADAM per task mancanti
+    if missing_task_ids:
+        print(f"   🔍 Cercando coordinate per {len(missing_task_ids)} task in ADAM...")
+        adam_geodata = get_geodata_from_adam(missing_task_ids, ref_date)
+        geodata_index.update({str(k): v for k, v in adam_geodata.items()})
+    
+    # 5. Backfill lat/lng per tutte le task nella timeline
+    backfilled_count = 0
+    still_missing = 0
+    for entry in timeline_data_output["cleaners_assignments"]:
+        for task in entry.get("tasks", []):
+            task_id = str(task.get("task_id", ""))
+            # Se manca lat/lng, prova a recuperarle dall'indice
+            if not task.get("lat") and not task.get("latitude"):
+                if task_id in geodata_index:
+                    geo = geodata_index[task_id]
+                    task["lat"] = geo["lat"]
+                    task["lng"] = geo["lng"]
+                    if geo.get("address") and not task.get("address"):
+                        task["address"] = geo["address"]
+                    if geo.get("small_equipment"):
+                        task["small_equipment"] = geo["small_equipment"]
+                    backfilled_count += 1
+                else:
+                    still_missing += 1
+                    print(f"   ⚠️ Task {task_id} senza coordinate (nessuna fonte disponibile)")
+    
+    if backfilled_count > 0:
+        print(f"   ✅ Backfilled coordinate per {backfilled_count} task pre-esistenti")
+    if still_missing > 0:
+        print(f"   ⚠️ {still_missing} task rimaste senza coordinate")
     
     # Solo ordinamento per start_time (senza ricalcolo)
     # FIX: Usa ordinamento numerico invece di stringa per gestire "9:30" vs "10:00"
