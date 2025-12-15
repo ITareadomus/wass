@@ -46,6 +46,7 @@ interface TimelineViewProps {
   hasUnsavedChanges?: boolean; // Stato delle modifiche non salvate dal parent
   onTaskMoved?: () => void; // Callback quando una task viene spostata
   isReadOnly?: boolean; // Modalità read-only: disabilita tutte le modifiche
+  isLoadingDragDrop?: boolean; // Mostra loading overlay durante drag&drop
 }
 
 interface Cleaner {
@@ -72,6 +73,7 @@ export default function TimelineView({
   hasUnsavedChanges = false,
   onTaskMoved,
   isReadOnly = false,
+  isLoadingDragDrop = false,
 }: TimelineViewProps) {
   const [cleaners, setCleaners] = useState<Cleaner[]>([]);
   const [selectedDate, setSelectedDate] = useState<Date>(() => {
@@ -1489,8 +1491,18 @@ export default function TimelineView({
     <>
       <div
         ref={timelineRef}
-        className={`bg-custom-blue-light rounded-lg border-2 border-custom-blue shadow-sm ${isFullscreen ? 'fixed inset-0 z-50 overflow-auto' : ''}`}
+        className={`bg-custom-blue-light rounded-lg border-2 border-custom-blue shadow-sm relative ${isFullscreen ? 'fixed inset-0 z-50 overflow-auto' : ''}`}
       >
+        {/* Loading overlay durante drag&drop */}
+        {isLoadingDragDrop && (
+          <div className="absolute inset-0 bg-black/20 dark:bg-black/40 rounded-lg flex items-center justify-center z-40 backdrop-blur-sm">
+            <div className="flex flex-col items-center gap-3">
+              <Loader2 className="h-8 w-8 animate-spin text-custom-blue" />
+              <p className="text-sm font-medium text-foreground">La timeline sta ragionando...</p>
+            </div>
+          </div>
+        )}
+      
         <div className="p-4 border-b border-border">
           <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
             <div>
