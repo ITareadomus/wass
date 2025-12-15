@@ -1,0 +1,91 @@
+Perfetto: questo comportamento (“**funziona quando 1641 è 3ª**, ma **non quando è 4ª/ultima**”) è quasi sempre dovuto a una cosa molto specifica nel tuo codice attuale:
+
+✅ Il `waitingGap` **viene calcolato solo se la task precedente ha `end_time`**
+👉 quando 1641 diventa **4ª**, la sua “prev” (la 3ª) **probabilmente non ha `end_time` valorizzato** (tipico: l’ultima ricalcolata / alcune task importate hanno solo `start_time` e durata, ma non `end_time`), quindi il blocco:
+
+```ts
+if (prevTask && prevTask.end_time && !prevTaskHasDifferentDate) {
+  ...
+}
+```
+
+salta completamente → `waitingGap = 0` → niente spacer → posizionamento “anticipato”.
+
+### Fix robusto (senza dipendere da `end_time`)
+
+In `client/src/components/timeline/timeline-view.tsx`, modifica il calcolo del waitingGap così:
+
+1. aggiungi due helper sopra (anche dentro il map va bene, ma meglio fuori):
+
+```ts
+const parseHHMM = (t?: string | null) => {
+  if (!t) return null;
+  const [h, m] = String(t).split(":").map(Number);
+  if (Number.isNaN(h) || Number.isNaN(m)) return null;
+  return h * 60 + m;
+};
+
+const getCleaningMinutes = (task: any): number => {
+  if (task.cleaning_time) return Number(task.cleaning_time);
+  if (task.duration) {
+    const match = String(task.duration).match(/(\d+)h?\s*(\d+)?m?/);
+    if (match) {
+      const hours = parseInt(match[1]) || 0;
+      const mins = parseInt(match[2]) || 0;
+      return hours * 60 + mins;
+    }
+  }
+  return 60;
+};
+```
+
+2. poi sostituisci il blocco `waitingGap` con questo (nota: calcolo `prevEndMinutes` anche se manca `end_time`):
+
+```ts
+let waitingGap = 0;
+
+const seq = (taskObj as any).sequence ?? (idx + 1);
+
+if (seq >= 2 && taskObj.start_time) {
+  const prevTask = cleanerTasks[idx - 1] as any;
+
+  const workDateStr =
+    localStorage.getItem("selected_work_date") || format(new Date(), "yyyy-MM-dd");
+
+  const normDate = (d?: string | null) => (d ? String(d).slice(0, 10) : null);
+  const prevTaskHasDifferentDate =
+    !!(prevTask?.checkin_date && normDate(prevTask.checkin_date) !== workDateStr);
+
+  if (prevTask && !prevTaskHasDifferentDate) {
+    // 1) fine precedente: end_time se c'è, altrimenti start_time + durata
+    let prevEndMinutes = parseHHMM(prevTask.end_time);
+
+    if (prevEndMinutes === null) {
+      const prevStart = parseHHMM(prevTask.start_time);
+      if (prevStart !== null) {
+        prevEndMinutes = prevStart + getCleaningMinutes(prevTask);
+      }
+    }
+
+    // se ancora null, non posso calcolare gap
+    if (prevEndMinutes !== null) {
+      // travelTime deve essere "verso questa task" (quello che già stai leggendo da taskObj.travel_time)
+      const expectedStartMinutes = prevEndMinutes + travelTime;
+
+      const actualStartMinutes = parseHHMM(taskObj.start_time);
+
+      if (actualStartMinutes !== null && actualStartMinutes > expectedStartMinutes) {
+        waitingGap = actualStartMinutes - expectedStartMinutes;
+      }
+    }
+  }
+}
+```
+
+### Perché questo risolve ESATTAMENTE “solo l’ultima non ha gap”
+
+Perché l’ultima cambia “prevTask”: se quella prevTask è una di quelle senza `end_time`, prima **non entravi mai nel calcolo**. Con questo fix invece ricavi comunque la fine precedente da `start_time + durata`, quindi il gap torna a comparire.
+
+---
+
+Se vuoi beccare la conferma al 100% in 10 secondi: fai un `console.log` della task “prev” quando 1641 è ultima e guarda se `end_time` è `undefined/null`. È quasi certamente quello.
