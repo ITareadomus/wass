@@ -1,0 +1,139 @@
+Obiettivo
+
+Eliminare i “salti” nel drag&drop rendendo l’optimistic UI coerente:
+
+snapshot vero (deep copy) per rollback
+
+ricalcolo immediato di start_time/end_time/sequence lato client (best-effort)
+
+recupero dello start_time del cleaner dalla timeline per i drop “in vuoto”
+
+1) Modifica client/src/pages/generate-assignments.tsx
+1.1 Aggiungi helper in alto (vicino agli altri helper / sopra le funzioni optimistic)
+
+Inserisci queste funzioni:
+
+deepCopyTasks(tasks) → copia profonda degli oggetti (non solo array)
+
+parser/formatter orari:
+
+parseHHMM("12:30") -> minuti
+
+formatHHMM(minuti) -> "HH:MM"
+
+estrazione minuti:
+
+getCleaningMinutes(task) (usa cleaning_time, fallback duration se esiste)
+
+getTravelMinutes(task) (usa travel_time / travelTime)
+
+lettura start_time cleaner:
+
+getCleanerStartTime(cleanerId) che legge da window.__timelineCleanerStartTimes con fallback "10:00"
+
+ricalcolo per un cleaner:
+
+recomputeCleanerTimes(allTasks, cleanerId) che:
+
+filtra le task del cleaner
+
+le ordina per sequence (o start_time fallback)
+
+ricalcola per ogni task:
+
+start = max(prevEnd + travel, checkout_time se presente)
+
+end = start + cleaning_time
+
+aggiorna anche sequence = idx
+
+reinietta le task aggiornate dentro l’array completo
+
+Nota: questo ricalcolo è “best-effort” per UX. Il backend resta la fonte definitiva.
+
+1.2 Cambia lo snapshot in optimisticMoveTask
+
+Trova dove fai:
+
+const snapshot = [...tasks];
+
+Sostituisci con:
+
+const snapshot = deepCopyTasks(tasks);
+
+Motivo: [...tasks] copia solo l’array, e lo snapshot si sporca se gli oggetti vengono mutati.
+
+1.3 In optimisticMoveTask, salva anche il cleaner precedente
+
+Quando trovi il task da spostare, salva:
+
+prevCleanerId = tasks[taskIndex].assignedCleaner
+
+perché dopo lo spostamento devi ricalcolare sia il cleaner vecchio sia quello nuovo.
+
+1.4 In optimisticMoveTask, dopo aver ricostruito updated, ricalcola i cleaner
+
+Alla fine della funzione (sia nel ramo semplice, sia nel ramo con splice/insert), fai:
+
+se prevCleanerId != null → updated = recomputeCleanerTimes(updated, prevCleanerId)
+
+se newCleanerId != null → updated = recomputeCleanerTimes(updated, newCleanerId)
+
+Questo è il punto che elimina il comportamento:
+
+“durante lo snapshot resta 12:30” → perché ora ricalcoli subito start/end coerenti col nuovo ordine.
+
+1.5 Fai lo stesso per optimisticBatchMoveTask
+
+snapshot: usa deepCopyTasks
+
+raccogli un set di prevCleanerIds per tutte le task spostate
+
+a fine update:
+
+ricalcola tutti i prevCleanerIds
+
+poi ricalcola newCleanerId
+
+2) Modifica client/src/components/timeline/timeline-view.tsx
+2.1 Esponi gli start_time dei cleaner alla pagina che fa il DnD
+
+Aggiungi un useEffect (dopo che hai la lista dei cleaner che stai renderizzando, tipo allCleanersToShow o equivalente):
+
+costruisci una mappa { [cleanerId: string]: start_time }
+
+mettila su:
+
+window.__timelineCleanerStartTimes = m
+
+Fallback:
+
+se un cleaner non ha start_time, metti "10:00".
+
+Motivo: quando droppi su un cleaner “vuoto”, l’optimistic UI deve sapere da che ora parte quel cleaner.
+
+3) Verifica rapida (test manuale)
+
+task che inizia alle 12:30
+
+trascinala in un cleaner dove non ci sono altre task
+
+risultato atteso:
+
+subito nello snapshot la task assume l’orario “giusto” (es. start_time del cleaner)
+
+niente salto 12:30 → orario corretto
+
+trascina una task in mezzo a una lista piena:
+
+deve entrare subito al posto giusto
+
+e gli orari sotto devono aggiornarsi subito (senza refresh)
+
+4) Nota importante (per evitare regressioni)
+
+Il ricalcolo client è volutamente “semplice”:
+
+non replica al 100% la logica server se il server fa ottimizzazioni complesse,
+
+però elimina i glitch UX e riduce tantissimo il “salto”.
