@@ -1,0 +1,100 @@
+Obiettivo
+
+Far sì che la placeholder/drop zone di react-beautiful-dnd segua sempre il layout reale della lista (anche quando inserisci tra due task o in testa).
+
+Scaletta di cose da fare
+
+Individua il punto di rendering della timeline
+
+Cerca il componente che renderizza la lista delle task del cleaner (es. CleanerTimeline, TaskList, AssignmentsColumn, ecc.).
+
+Trova il mapping tipo:
+
+tasks.map((t, i) => <Draggable ...>...</Draggable>)
+
+E trova anche eventuali elementi “di contorno” tra le task:
+
+spacer/offset
+
+“travel time”
+
+“waiting gap”
+
+separatori/righe
+
+Verifica se spacer/gap/separator sono fuori dal <Draggable>
+
+Il bug tipico accade quando hai una struttura simile:
+
+<Offset />
+
+<Draggable> <TaskCard/> </Draggable>
+
+<Gap />
+
+In questo caso il placeholder si calcola solo sui Draggable e “non vede” offset/gap, quindi resta “indietro”.
+
+Refactor: rendi ogni item “un blocco unico” dentro il Draggable
+
+Per ogni task, crea un wrapper unico (es. TimelineItem) dentro il Draggable che contenga:
+
+eventuale offset/spacer PRIMA della card
+
+la card della task
+
+eventuale gap/travel/waiting DOPO la card (se logicamente appartiene a quella task)
+
+In pratica: tutto ciò che cambia l’altezza/posizione verticale deve stare nel DOM dentro il Draggable.
+
+Mantieni il provided.draggableProps.style sul wrapper esterno
+
+Dentro il Draggable fai:
+
+<div ref={provided.innerRef} {...provided.draggableProps} style={provided.draggableProps.style}>
+
+poi dentro metti il contenuto timeline (offset/task/gap)
+
+Il provided.dragHandleProps lo puoi mettere sulla card o su un’icona “handle”.
+
+Assicurati che il placeholder sia sempre presente nel Droppable
+
+Nel Droppable, a fine lista:
+
+{provided.placeholder}
+
+Non metterlo in wrapper “strani” o condizionati.
+
+Controlla che non ci siano wrapper con position: absolute/transform che alterano il flusso
+
+Se la timeline usa contenitori con transform, position: absolute, overflow: hidden in modo non previsto, può peggiorare il placeholder.
+
+Regola pratica: la lista del Droppable dovrebbe essere layout “normale” (flex/column o block), e gli elementi devono contribuire al flusso.
+
+Test case minimi da verificare
+
+Cleaner con 1 task: trascina (ok)
+
+Cleaner con 2+ task:
+
+trascina la 1ª in mezzo
+
+trascina l’ultima in mezzo
+
+trascina una task e droppala come prima (index 0)
+
+Verifica che durante il drag:
+
+lo spazio “buco” (placeholder) si sposti insieme alla posizione prevista
+
+non rimanga nel punto originale
+
+(Se esistono “gap” come elementi separati tra task) Piano B più robusto
+Se per design devi mantenere gap come elementi indipendenti:
+
+Non usare Draggable solo sulla “task”, ma crea una lista di item normalizzati:
+
+es. [{type:'task', id...}, {type:'gap', id...}, ...]
+
+Rendi Draggable ogni “task+gap associati” come un unico item (o rendi draggable anche i gap se serve).
+
+Questo elimina definitivamente mismatch tra layout reale e placeholder.
