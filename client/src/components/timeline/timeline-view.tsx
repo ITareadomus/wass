@@ -1764,9 +1764,16 @@ export default function TimelineView({
                                   travelTime = 0;
                                 }
 
+                                // Helper: normalizza date "2025-12-15T..." -> "2025-12-15"
+                                const normDate = (d?: string | null) => (d ? String(d).slice(0, 10) : null);
+
+                                // Usa sequence se disponibile, altrimenti fallback su idx+1
+                                const seq = (taskObj as any).sequence ?? (idx + 1);
+
                                 // Calcola offset iniziale basato sulla differenza tra start time del cleaner e start time ARROTONDATO della griglia
+                                // CRITICAL: Usa seq === 1 invece di idx === 0 per coerenza con la logica sequence
                                 let timeOffset = 0;
-                                if (idx === 0) {
+                                if (seq === 1) {
                                   // CRITICAL: Usa l'ora arrotondata (come la griglia) per calcolare l'offset
                                   const [globalStartHour, globalStartMin] = globalStartTime.split(':').map(Number);
                                   const globalStartHourRounded = globalStartMin > 0 ? globalStartHour : globalStartHour;
@@ -1795,15 +1802,9 @@ export default function TimelineView({
 
                                 // Calcola larghezza EFFETTIVA in base ai minuti reali di travel_time
                                 // Usa la stessa base di calcolo dei task (slot * 60 minuti virtuali)
-                                const effectiveTravelMinutes = idx > 0 && travelTime > 0 ? travelTime : 0;
+                                const effectiveTravelMinutes = seq >= 2 && travelTime > 0 ? travelTime : 0;
                                 const virtualMinutes = globalTimeSlots.length * 60;
                                 const totalWidth = effectiveTravelMinutes > 0 ? (effectiveTravelMinutes / virtualMinutes) * 100 : 0;
-
-                                // Helper: normalizza date "2025-12-15T..." -> "2025-12-15"
-                                const normDate = (d?: string | null) => (d ? String(d).slice(0, 10) : null);
-
-                                // Usa sequence se disponibile, altrimenti fallback su idx+1
-                                const seq = (taskObj as any).sequence ?? (idx + 1);
 
                                 // CRITICAL FIX: Calcola il "waitingGap" per task con sequence >= 2
                                 // Questo gap rappresenta l'attesa tra la fine della task precedente e l'inizio effettivo di questa task
