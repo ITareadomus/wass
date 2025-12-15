@@ -1495,10 +1495,13 @@ export default function TimelineView({
       >
         {/* Loading overlay durante drag&drop */}
         {isLoadingDragDrop && (
-          <div className="absolute inset-0 bg-black/20 dark:bg-black/40 rounded-lg flex items-center justify-center z-40 backdrop-blur-sm">
-            <div className="flex flex-col items-center gap-3">
-              <Loader2 className="h-8 w-8 animate-spin text-custom-blue" />
-              <p className="text-sm font-medium text-foreground">La timeline sta ragionando...</p>
+          <div className="absolute inset-0 bg-black/30 dark:bg-black/50 rounded-lg flex items-center justify-center z-40 backdrop-blur-sm">
+            <div className="flex flex-col items-center gap-4 bg-background/90 dark:bg-background/80 p-6 rounded-xl shadow-xl border-2 border-custom-blue">
+              <Loader2 className="h-10 w-10 animate-spin text-custom-blue" />
+              <div className="text-center">
+                <p className="text-base font-semibold text-foreground">Ricalcolo in corso...</p>
+                <p className="text-xs text-muted-foreground mt-1">Sequenza, tempi di viaggio, orari</p>
+              </div>
             </div>
           </div>
         )}
@@ -1695,13 +1698,22 @@ export default function TimelineView({
                           {...provided.droppableProps}
                           data-testid={`timeline-cleaner-${cleaner.id}`}
                           data-cleaner-id={cleaner.id}
-                          className="relative min-h-[45px] flex-1 border-l border-border bg-background"
+                          className={`relative min-h-[45px] flex-1 border-l bg-background transition-all duration-200 ${
+                            snapshot.isDraggingOver 
+                              ? 'border-4 border-blue-500 dark:border-blue-400 bg-blue-100/50 dark:bg-blue-900/30 shadow-lg shadow-blue-500/30' 
+                              : 'border-border'
+                          }`}
                           style={{
-                            zIndex: filteredCleanerId === cleaner.id || hasIncompatibleTasks ? 15 : 'auto'
+                            zIndex: snapshot.isDraggingOver ? 25 : (filteredCleanerId === cleaner.id || hasIncompatibleTasks ? 15 : 'auto')
                           }}
                         >
-                          {/* Griglia oraria di sfondo (solo visiva) con alternanza colori */}
-                          <div className="absolute inset-0 pointer-events-none" style={{ display: 'grid', gridTemplateColumns: `repeat(${globalTimeSlots.length}, 1fr)` }}>
+                          {/* Griglia oraria di sfondo - nascosta durante il drag */}
+                          <div 
+                            className={`absolute inset-0 pointer-events-none transition-opacity duration-200 ${
+                              snapshot.isDraggingOver ? 'opacity-0' : 'opacity-100'
+                            }`} 
+                            style={{ display: 'grid', gridTemplateColumns: `repeat(${globalTimeSlots.length}, 1fr)` }}
+                          >
                             {globalTimeSlots.map((slot, idx) => {
                               const isEvenHour = idx % 2 === 0;
                               return (
