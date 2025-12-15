@@ -309,6 +309,64 @@ def travel_minutes(a: Optional[Task], b: Optional[Task]) -> float:
     return max(MIN_TRAVEL, min(MAX_TRAVEL, total_time))
 
 
+def travel_minutes_dict(a: Optional[Dict], b: Optional[Dict]) -> float:
+    """
+    Versione di travel_minutes che accetta dizionari invece di Task objects.
+    Usata per calcolare travel_time dopo il merge di task nella timeline.
+    """
+    if a is None or b is None:
+        return 0.0
+
+    # Estrai coordinate (supporta sia 'lat'/'lng' che 'latitude'/'longitude')
+    try:
+        lat_a = float(a.get("lat") or a.get("latitude") or 0)
+        lng_a = float(a.get("lng") or a.get("longitude") or 0)
+        lat_b = float(b.get("lat") or b.get("latitude") or 0)
+        lng_b = float(b.get("lng") or b.get("longitude") or 0)
+    except (TypeError, ValueError):
+        return 0.0
+
+    # Se mancano coordinate, ritorna 0
+    if lat_a == 0 or lng_a == 0 or lat_b == 0 or lng_b == 0:
+        return 0.0
+
+    addr_a = a.get("address", "")
+    addr_b = b.get("address", "")
+
+    # Stesso edificio: 3 minuti per cambio appartamento
+    if same_building(addr_a, addr_b):
+        return 3.0
+
+    km = haversine_km(lat_a, lng_a, lat_b, lng_b)
+
+    # Fattore correzione percorsi non rettilinei
+    dist_reale = km * 1.5
+
+    # Modello progressivo
+    if dist_reale < 0.8:
+        travel_time = dist_reale * 6.0  # ~10 km/h a piedi
+    elif dist_reale < 2.5:
+        travel_time = dist_reale * 10.0  # ~6 km/h misto
+    else:
+        travel_time = dist_reale * 5.0  # ~12 km/h mezzi
+
+    # Tempo base
+    base_time = 5.0
+    total_time = base_time + travel_time
+
+    # Penalità small_equipment
+    small_eq_a = a.get("small_equipment", False)
+    small_eq_b = b.get("small_equipment", False)
+    if small_eq_a or small_eq_b:
+        total_time += (EQ_EXTRA_LT05 if km < 0.5 else EQ_EXTRA_GE05)
+
+    # Bonus stesso strada (riduce tempo base)
+    if same_street(addr_a, addr_b) and km < 0.10:
+        total_time = max(total_time - 2.0, MIN_TRAVEL)
+
+    return max(MIN_TRAVEL, min(MAX_TRAVEL, total_time))
+
+
 def can_handle_premium(cleaner: Cleaner, task: Task) -> bool:
     # Premium task requires premium cleaner (role = "Premium")
     if task.is_premium and cleaner.role.lower() != "premium":
@@ -1224,38 +1282,23 @@ def main():
         if not tasks:
             continue
             
-        prev_end_min = None
+        prev_task = None
         for i, task in enumerate(tasks):
             # Rinumera sequence (1-based)
             task["sequence"] = i + 1
             task["followup"] = i > 0
             
-            # Ricalcola travel_time basandosi su start_time corrente e end_time precedente
-            # SAFEGUARD: Verifica che i tempi siano validi prima di calcolare
-            start_time_str = task.get("start_time")
-            if i > 0 and prev_end_min is not None and start_time_str and ":" in str(start_time_str):
-                try:
-                    start_min = hhmm_to_min(start_time_str, "00:00")
-                    travel = max(0, start_min - prev_end_min)
-                    task["travel_time"] = travel
-                except (ValueError, TypeError):
-                    # Se parsing fallisce, mantieni travel_time esistente o default a 0
-                    if "travel_time" not in task:
-                        task["travel_time"] = 0
+            # Ricalcola travel_time usando distanza geografica (lat/lng)
+            # Usa travel_minutes_dict() per calcolo realistico del tempo di viaggio
+            if i > 0 and prev_task is not None:
+                travel = travel_minutes_dict(prev_task, task)
+                task["travel_time"] = int(round(travel))
             else:
-                # Prima task o tempo mancante: travel_time = 0
+                # Prima task: travel_time = 0
                 task["travel_time"] = 0
             
-            # Salva end_time corrente per la prossima iterazione
-            # SAFEGUARD: Solo se end_time è valido
-            end_time_str = task.get("end_time")
-            if end_time_str and ":" in str(end_time_str):
-                try:
-                    prev_end_min = hhmm_to_min(end_time_str, "00:00")
-                except (ValueError, TypeError):
-                    prev_end_min = None
-            else:
-                prev_end_min = None
+            # Salva task corrente per la prossima iterazione
+            prev_task = task
 
     # Aggiorna meta
     # Conta i cleaner totali disponibili
