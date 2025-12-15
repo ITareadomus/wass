@@ -1782,7 +1782,13 @@ export default function TimelineView({
                                 let waitingGap = 0;
                                 if (idx > 0 && taskObj.start_time) {
                                   const prevTask = cleanerTasks[idx - 1] as any;
-                                  if (prevTask && prevTask.end_time) {
+                                  // CRITICAL: Ignora il waitingGap se:
+                                  // 1. La task precedente ha checkin_date DIVERSO da quello della timeline (task in data diversa)
+                                  // 2. La task precedente non ha end_time definito
+                                  const workDateStr = localStorage.getItem('selected_work_date') || format(new Date(), 'yyyy-MM-dd');
+                                  const prevTaskHasDifferentDate = prevTask?.checkin_date && prevTask.checkin_date !== workDateStr;
+                                  
+                                  if (prevTask && prevTask.end_time && !prevTaskHasDifferentDate) {
                                     // Calcola la fine prevista: end_time della task precedente + travel_time
                                     const [prevEndH, prevEndM] = prevTask.end_time.split(':').map(Number);
                                     const prevEndMinutes = prevEndH * 60 + prevEndM;
