@@ -1,0 +1,104 @@
+Ok, da come è scritto adesso il waitingGap viene calcolato solo se:
+
+idx > 0
+
+c’è taskObj.start_time
+
+la task precedente ha end_time
+
+e soprattutto la task precedente non risulta “di un’altra data” rispetto alla data selezionata (selected_work_date)
+
+Nel tuo caso (task 1641, checkout alle 18:00, start_time alle 18:00), il sintomo “me la disegna verso le 15:00” è tipico di questo scenario:
+
+➡️ il codice sta “saltando” il waitingGap perché pensa che la task precedente sia su un’altra data (quasi sempre per un confronto stringa non normalizzato: es. 2025-12-15T00:00:00Z vs 2025-12-15).
+
+In più: tu vuoi proprio cambiare regola:
+
+timeOffset SOLO per le prime task del cleaner
+
+waitingGap SOLO quando sequence >= 2 (non quando idx > 0)
+
+Sotto ti lascio le modifiche “chirurgiche” (2 file) per ottenere esattamente quel comportamento.
+
+1) Fix robusto della data + waitingGap solo con sequence >= 2
+
+File: client/src/components/timeline/timeline-view.tsx
+
+Nel blocco dove calcoli waitingGap, cambia così:
+
+// helper: normalizza "2025-12-15T..." -> "2025-12-15"
+const normDate = (d?: string | null) => (d ? String(d).slice(0, 10) : null);
+
+let waitingGap = 0;
+
+// usa sequence se c'è, altrimenti fallback su idx+1
+const seq = (taskObj as any).sequence ?? (idx + 1);
+
+if (seq >= 2 && taskObj.start_time) {
+  const prevTask = cleanerTasks[idx - 1] as any;
+
+  const workDateStr =
+    localStorage.getItem("selected_work_date") || format(new Date(), "yyyy-MM-dd");
+
+  const prevTaskDate = normDate(prevTask?.checkin_date);
+  const prevTaskHasDifferentDate = !!(prevTaskDate && prevTaskDate !== workDateStr);
+
+  if (prevTask && prevTask.end_time && !prevTaskHasDifferentDate) {
+    const [prevEndH, prevEndM] = prevTask.end_time.split(":").map(Number);
+    const prevEndMinutes = prevEndH * 60 + prevEndM;
+
+    // travelTime qui deve essere quello "verso" questa task (come già fai)
+    const expectedStartMinutes = prevEndMinutes + travelTime;
+
+    const [taskStartH, taskStartM] = taskObj.start_time.split(":").map(Number);
+    const actualStartMinutes = taskStartH * 60 + taskStartM;
+
+    if (actualStartMinutes > expectedStartMinutes) {
+      waitingGap = actualStartMinutes - expectedStartMinutes;
+    }
+  }
+}
+
+E poi applica la tua regola su timeOffset
+
+Quando passi le props al TaskCard, invece di basarti su idx === 0, basati su sequence === 1:
+
+const seq = (taskObj as any).sequence ?? (idx + 1);
+
+<TaskCard
+  ...
+  timeOffset={seq === 1 ? timeOffset : 0}
+  travelTime={seq >= 2 ? travelTime : 0}
+  waitingGap={seq >= 2 ? waitingGap : 0}
+  ...
+/>
+
+2) Rendering del waitingGap basato su sequence >= 2 (non su index)
+
+File: client/src/components/drag-drop/task-card.tsx
+
+Adesso hai:
+
+{isInTimeline && index > 0 && waitingGap > 0 && waitingGapWidthPx > 0 && (
+  <div ... />
+)}
+
+
+Sostituiscilo con:
+
+const seq = (displayTask as any).sequence ?? (index + 1);
+
+{isInTimeline && seq >= 2 && waitingGap > 0 && waitingGapWidthPx > 0 && (
+  <div ... />
+)}
+
+
+(Se vuoi, stessa logica anche per l’icona “travel time” così tutto è coerente con sequence.)
+
+Perché così risolvi proprio la 1641 (posizionata alle 15 invece che 18)
+
+Se prima il confronto data “falliva” (formati diversi), il codice saltava waitingGap → quindi la task veniva piazzata al tempo “atteso” (end prev + travel), cioè ~15:00.
+
+Normalizzando la data (slice(0,10)) il waitingGap torna a essere calcolato.
+
+E con la nuova regola sequence >= 2 sei allineato alla tua logica di business (non dipendi più dal solo idx).

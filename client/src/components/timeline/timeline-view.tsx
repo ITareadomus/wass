@@ -1799,17 +1799,24 @@ export default function TimelineView({
                                 const virtualMinutes = globalTimeSlots.length * 60;
                                 const totalWidth = effectiveTravelMinutes > 0 ? (effectiveTravelMinutes / virtualMinutes) * 100 : 0;
 
-                                // CRITICAL FIX: Calcola il "waitingGap" per task successive (idx > 0)
+                                // Helper: normalizza date "2025-12-15T..." -> "2025-12-15"
+                                const normDate = (d?: string | null) => (d ? String(d).slice(0, 10) : null);
+
+                                // Usa sequence se disponibile, altrimenti fallback su idx+1
+                                const seq = (taskObj as any).sequence ?? (idx + 1);
+
+                                // CRITICAL FIX: Calcola il "waitingGap" per task con sequence >= 2
                                 // Questo gap rappresenta l'attesa tra la fine della task precedente e l'inizio effettivo di questa task
                                 // (es. quando c'è un checkout constraint che ritarda lo start_time)
                                 let waitingGap = 0;
-                                if (idx > 0 && taskObj.start_time) {
+                                if (seq >= 2 && taskObj.start_time) {
                                   const prevTask = cleanerTasks[idx - 1] as any;
-                                  // CRITICAL: Ignora il waitingGap se:
-                                  // 1. La task precedente ha checkin_date DIVERSO da quello della timeline (task in data diversa)
-                                  // 2. La task precedente non ha end_time definito
+
                                   const workDateStr = localStorage.getItem('selected_work_date') || format(new Date(), 'yyyy-MM-dd');
-                                  const prevTaskHasDifferentDate = prevTask?.checkin_date && prevTask.checkin_date !== workDateStr;
+
+                                  // CRITICAL: Normalizza le date per evitare mismatch di formato (es. "2025-12-15T00:00:00Z" vs "2025-12-15")
+                                  const prevTaskDate = normDate(prevTask?.checkin_date);
+                                  const prevTaskHasDifferentDate = !!(prevTaskDate && prevTaskDate !== workDateStr);
                                   
                                   if (prevTask && prevTask.end_time && !prevTaskHasDifferentDate) {
                                     // Calcola la fine prevista: end_time della task precedente + travel_time
@@ -1851,9 +1858,9 @@ export default function TimelineView({
                                       allTasks={cleanerTasks}
                                       isDragDisabled={isReadOnly}
                                       isReadOnly={isReadOnly}
-                                      timeOffset={idx === 0 ? timeOffset : 0}
-                                      travelTime={idx > 0 ? travelTime : 0}
-                                      waitingGap={waitingGap}
+                                      timeOffset={seq === 1 ? timeOffset : 0}
+                                      travelTime={seq >= 2 ? travelTime : 0}
+                                      waitingGap={seq >= 2 ? waitingGap : 0}
                                       globalTimeSlots={globalTimeSlots.length}
                                     />
                                 );
