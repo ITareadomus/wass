@@ -901,6 +901,46 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       };
 
+      // FIX C: Guard-rail - Normalizza sequence per ogni cleaner prima di salvare
+      // Questo previene sequence duplicate o buchi
+      if (timelineData.cleaners_assignments && Array.isArray(timelineData.cleaners_assignments)) {
+        for (const entry of timelineData.cleaners_assignments) {
+          const tasks = entry.tasks;
+          if (tasks && Array.isArray(tasks) && tasks.length > 0) {
+            // Ordina per start_time
+            tasks.sort((a: any, b: any) => {
+              const stA = a.start_time || "00:00";
+              const stB = b.start_time || "00:00";
+              return stA.localeCompare(stB);
+            });
+            
+            // Rinumera sequence 1..N e correggi followup
+            let prevEndMin: number | null = null;
+            for (let i = 0; i < tasks.length; i++) {
+              const task = tasks[i];
+              task.sequence = i + 1;
+              task.followup = i > 0;
+              
+              // Ricalcola travel_time se possibile
+              if (i > 0 && prevEndMin !== null && task.start_time) {
+                const [h, m] = task.start_time.split(':').map(Number);
+                const startMin = h * 60 + m;
+                task.travel_time = Math.max(0, startMin - prevEndMin);
+              } else if (i === 0) {
+                task.travel_time = 0;
+              }
+              
+              // Salva end_time per prossima iterazione
+              if (task.end_time) {
+                const [eh, em] = task.end_time.split(':').map(Number);
+                prevEndMin = eh * 60 + em;
+              }
+            }
+          }
+        }
+        console.log(`   ✅ Sequence normalizzate per ${timelineData.cleaners_assignments.length} cleaners`);
+      }
+
       // Salva via workspaceFiles (scrive su PostgreSQL + filesystem per compatibilità)
       await workspaceFiles.saveTimeline(workDate, timelineData, false, 'python_script', 'api_save_timeline');
 
