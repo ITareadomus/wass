@@ -455,6 +455,17 @@ export default function TimelineView({
     };
   }, [cleaners, isFullscreen]);
 
+  // Esponi gli start_time dei cleaner alla pagina per optimistic UI nel DnD
+  // Quando droppi su un cleaner "vuoto", l'optimistic UI deve sapere da che ora parte
+  React.useEffect(() => {
+    const startTimeMap: Record<string, string> = {};
+    for (const cleaner of allCleanersToShow) {
+      const cleanerId = String(cleaner.id);
+      startTimeMap[cleanerId] = cleaner.start_time || "10:00";
+    }
+    (window as any).__timelineCleanerStartTimes = startTimeMap;
+  }, [allCleanersToShow]);
+
   const getCleanerColor = (cleanerId: number) => {
     // Colori distribuiti per massimo contrasto visivo
     const colors = [

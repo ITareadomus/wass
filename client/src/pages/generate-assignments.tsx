@@ -98,32 +98,154 @@ const isDateInPast = (date: Date): boolean => {
   return targetDate < today;
 };
 
+// === DEEP COPY & TIME CALCULATION HELPERS ===
+// Deep copy degli oggetti task (non solo array) per snapshot rollback
+function deepCopyTasks(tasks: Task[]): Task[] {
+  return tasks.map(t => ({ ...t }));
+}
+
+// Parser "HH:MM" -> minuti totali
+function parseHHMM(time: string | null | undefined): number {
+  if (!time) return 10 * 60; // fallback 10:00
+  const [h, m] = time.split(':').map(Number);
+  return (h || 0) * 60 + (m || 0);
+}
+
+// Formatter minuti -> "HH:MM"
+function formatHHMM(minutes: number): string {
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+}
+
+// Estrae cleaning_time in minuti
+function getCleaningMinutes(task: any): number {
+  if (task.cleaning_time) return task.cleaning_time;
+  if (task.duration) {
+    // Duration può essere "1h 30m" o simile
+    const match = String(task.duration).match(/(\d+)h?\s*(\d+)?m?/);
+    if (match) {
+      const hours = parseInt(match[1]) || 0;
+      const mins = parseInt(match[2]) || 0;
+      return hours * 60 + mins;
+    }
+  }
+  return 60; // default 60 min
+}
+
+// Estrae travel_time in minuti
+function getTravelMinutes(task: any): number {
+  return task.travel_time || task.travelTime || 0;
+}
+
+// Legge lo start_time del cleaner da window.__timelineCleanerStartTimes
+function getCleanerStartTime(cleanerId: number): string {
+  const map = (window as any).__timelineCleanerStartTimes;
+  if (map && map[String(cleanerId)]) {
+    return map[String(cleanerId)];
+  }
+  return "10:00"; // fallback
+}
+
+// Ricalcola start_time/end_time/sequence per le task di un cleaner (best-effort client-side)
+function recomputeCleanerTimes(allTasks: Task[], cleanerId: number): Task[] {
+  // Filtra e ordina le task del cleaner per sequence (o start_time fallback)
+  const cleanerTasks = allTasks
+    .filter(t => (t as any).assignedCleaner === cleanerId)
+    .sort((a, b) => {
+      const seqA = (a as any).sequence ?? 999;
+      const seqB = (b as any).sequence ?? 999;
+      if (seqA !== seqB) return seqA - seqB;
+      // fallback: ordina per start_time
+      const stA = parseHHMM((a as any).start_time);
+      const stB = parseHHMM((b as any).start_time);
+      return stA - stB;
+    });
+
+  // Start time iniziale del cleaner
+  const cleanerStart = parseHHMM(getCleanerStartTime(cleanerId));
+  let prevEnd = cleanerStart;
+
+  // Ricalcola per ogni task
+  const updatedCleanerTasks = cleanerTasks.map((task, idx) => {
+    const travel = getTravelMinutes(task);
+    const cleaning = getCleaningMinutes(task);
+    
+    // checkout_time può vincolare l'inizio (non prima del checkout)
+    const checkoutMinutes = parseHHMM((task as any).checkout_time);
+    
+    // start = max(prevEnd + travel, checkout_time)
+    let start = prevEnd + travel;
+    if ((task as any).checkout_time && checkoutMinutes > start) {
+      start = checkoutMinutes;
+    }
+    
+    const end = start + cleaning;
+    prevEnd = end;
+
+    return {
+      ...task,
+      start_time: formatHHMM(start),
+      end_time: formatHHMM(end),
+      sequence: idx,
+    } as Task;
+  });
+
+  // Reinjecta le task aggiornate nell'array completo
+  const cleanerTaskIds = new Set(cleanerTasks.map(t => getTaskId(t)));
+  const result: Task[] = [];
+  
+  for (const t of allTasks) {
+    if (cleanerTaskIds.has(getTaskId(t))) {
+      // Sostituisci con la versione ricalcolata
+      const updated = updatedCleanerTasks.find(ut => getTaskId(ut) === getTaskId(t));
+      if (updated) result.push(updated);
+    } else {
+      result.push(t);
+    }
+  }
+
+  return result;
+}
+
 // === OPTIMISTIC UPDATE HELPERS ===
 // Aggiorna localmente assignedCleaner di una task CON posizione corretta (usa splice)
+// Con deep copy per snapshot e ricalcolo orari per eliminare "salti" UI
 function optimisticMoveTask(
   tasks: Task[],
   taskId: string,
   newCleanerId: number | null,
   destIndex?: number
 ): { updated: Task[]; snapshot: Task[] } {
-  const snapshot = [...tasks];
+  // CRITICAL: Deep copy per snapshot (non solo array) per rollback corretto
+  const snapshot = deepCopyTasks(tasks);
   
-  // Trova il task da spostare
+  // Trova il task da spostare e salva il cleaner precedente
   const taskIndex = tasks.findIndex(t => getTaskId(t) === taskId);
   if (taskIndex === -1) {
-    return { updated: [...tasks], snapshot };
+    return { updated: deepCopyTasks(tasks), snapshot };
   }
   
+  const prevCleanerId = (tasks[taskIndex] as any).assignedCleaner;
   const movedTask = { ...tasks[taskIndex], assignedCleaner: newCleanerId };
   
   // Se destIndex non è specificato o newCleanerId è null, usa il vecchio metodo
   if (destIndex === undefined || newCleanerId === null) {
-    const updated = tasks.map(t => {
+    let updated = tasks.map(t => {
       if (getTaskId(t) === taskId) {
         return movedTask;
       }
-      return t;
+      return { ...t }; // shallow copy per evitare mutazioni
     });
+    
+    // Ricalcola orari per cleaner coinvolti
+    if (prevCleanerId != null) {
+      updated = recomputeCleanerTimes(updated, prevCleanerId);
+    }
+    if (newCleanerId != null) {
+      updated = recomputeCleanerTimes(updated, newCleanerId);
+    }
+    
     return { updated, snapshot };
   }
   
@@ -137,9 +259,9 @@ function optimisticMoveTask(
   
   for (const t of withoutTask) {
     if ((t as any).assignedCleaner === newCleanerId) {
-      destCleanerTasks.push(t);
+      destCleanerTasks.push({ ...t });
     } else {
-      otherTasks.push(t);
+      otherTasks.push({ ...t });
     }
   }
   
@@ -150,7 +272,7 @@ function optimisticMoveTask(
   // 4. Riassembla l'array mantenendo l'ordine originale dei cleaner
   // Per mantenere l'ordine visivo, ricostruisco in modo che i task del cleaner
   // destinatario siano nell'ordine corretto dove comparirebbero
-  const updated: Task[] = [];
+  let updated: Task[] = [];
   let destInserted = false;
   
   for (const t of snapshot) {
@@ -164,7 +286,7 @@ function optimisticMoveTask(
       updated.push(...destCleanerTasks);
       destInserted = true;
     } else if ((t as any).assignedCleaner !== newCleanerId) {
-      updated.push(t);
+      updated.push({ ...t });
     }
     // Skip altri task dello stesso cleaner dest (già inseriti)
   }
@@ -174,27 +296,55 @@ function optimisticMoveTask(
     updated.push(...destCleanerTasks);
   }
   
+  // CRITICAL: Ricalcola orari per cleaner coinvolti (elimina salti UI)
+  if (prevCleanerId != null && prevCleanerId !== newCleanerId) {
+    updated = recomputeCleanerTimes(updated, prevCleanerId);
+  }
+  if (newCleanerId != null) {
+    updated = recomputeCleanerTimes(updated, newCleanerId);
+  }
+  
   return { updated, snapshot };
 }
 
 // Batch move per multi-select CON posizione corretta
+// Con deep copy per snapshot e ricalcolo orari per eliminare "salti" UI
 function optimisticBatchMoveTask(
   tasks: Task[],
   taskIds: string[],
   newCleanerId: number | null,
   destIndex?: number
 ): { updated: Task[]; snapshot: Task[] } {
-  const snapshot = [...tasks];
+  // CRITICAL: Deep copy per snapshot (non solo array) per rollback corretto
+  const snapshot = deepCopyTasks(tasks);
   const taskIdSet = new Set(taskIds);
+  
+  // Raccogli i cleaner precedenti di tutte le task spostate
+  const prevCleanerIds = new Set<number>();
+  for (const tid of taskIds) {
+    const task = tasks.find(t => getTaskId(t) === tid);
+    if (task && (task as any).assignedCleaner != null) {
+      prevCleanerIds.add((task as any).assignedCleaner);
+    }
+  }
   
   // Se newCleanerId è null o destIndex non specificato, usa il vecchio metodo
   if (newCleanerId === null || destIndex === undefined) {
-    const updated = tasks.map(t => {
+    let updated = tasks.map(t => {
       if (taskIdSet.has(getTaskId(t))) {
         return { ...t, assignedCleaner: newCleanerId };
       }
-      return t;
+      return { ...t };
     });
+    
+    // Ricalcola orari per tutti i cleaner coinvolti
+    for (const prevId of prevCleanerIds) {
+      updated = recomputeCleanerTimes(updated, prevId);
+    }
+    if (newCleanerId != null) {
+      updated = recomputeCleanerTimes(updated, newCleanerId);
+    }
+    
     return { updated, snapshot };
   }
   
@@ -213,9 +363,9 @@ function optimisticBatchMoveTask(
   
   for (const t of withoutTasks) {
     if ((t as any).assignedCleaner === newCleanerId) {
-      destCleanerTasks.push(t);
+      destCleanerTasks.push({ ...t });
     } else {
-      otherTasks.push(t);
+      otherTasks.push({ ...t });
     }
   }
   
@@ -224,7 +374,7 @@ function optimisticBatchMoveTask(
   destCleanerTasks.splice(clampedIndex, 0, ...movedTasks);
   
   // Riassembla l'array
-  const updated: Task[] = [];
+  let updated: Task[] = [];
   let destInserted = false;
   
   for (const t of snapshot) {
@@ -234,12 +384,22 @@ function optimisticBatchMoveTask(
       updated.push(...destCleanerTasks);
       destInserted = true;
     } else if ((t as any).assignedCleaner !== newCleanerId) {
-      updated.push(t);
+      updated.push({ ...t });
     }
   }
   
   if (!destInserted) {
     updated.push(...destCleanerTasks);
+  }
+  
+  // CRITICAL: Ricalcola orari per tutti i cleaner coinvolti (elimina salti UI)
+  for (const prevId of prevCleanerIds) {
+    if (prevId !== newCleanerId) {
+      updated = recomputeCleanerTimes(updated, prevId);
+    }
+  }
+  if (newCleanerId != null) {
+    updated = recomputeCleanerTimes(updated, newCleanerId);
   }
   
   return { updated, snapshot };
