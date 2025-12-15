@@ -1914,11 +1914,12 @@ export default function TimelineView({
                                       timeOffset={seq === 1 ? timeOffset : 0}
                                       globalTimeSlots={globalTimeSlots.length}
                                     />
+                                    {/* Placeholder segue la task - renderizzato DENTRO il loop */}
+                                    {idx === cleanerTasks.length - 1 && provided.placeholder}
                                   </>
                                 );
                               });
                             })()}
-                            {provided.placeholder}
                           </div>
                         </div>
                       )}
