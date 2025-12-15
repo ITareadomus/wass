@@ -1692,62 +1692,58 @@ export default function GenerateAssignments() {
 
     const { destination, source, draggableId } = result;
 
-    // niente destinazione => niente da fare
-    if (!destination) {
-      setIsLoadingDragDrop(false);
-      return;
-    }
-
-    // se posizione identica, esci
-    if (
-      destination.droppableId === source.droppableId &&
-      destination.index === source.index
-    ) {
-      setIsLoadingDragDrop(false);
-      return;
-    }
-
-    // CRITICAL: Blocca drag simultanei (con timeout di sicurezza di 10 secondi)
-    if (isDraggingRef.current) {
-      console.log("⚠️ Drag già in corso, operazione annullata per prevenire conflitti");
-      toast({
-        title: "Operazione in corso",
-        description: "Attendi il completamento del movimento precedente",
-        variant: "warning",
-        duration: 2000,
-      });
-      setIsLoadingDragDrop(false);
-      return;
-    }
-
-    // draggableId è sempre l'id univoco della task
-    const taskId = draggableId;
-    const task = allTasksWithAssignments.find(t => String(t.id) === String(taskId));
-    const logisticCode = task?.name; // name contiene il logistic_code
-
-    // Se la timeline è read-only, non permettere modifiche
-    if (isTimelineReadOnly) {
-      console.log("Timeline è READ-ONLY, spostamento annullato.");
-      toast({
-        title: "Operazione non permessa",
-        description: "La timeline è in sola visualizzazione per questa data.",
-        variant: "warning",
-      });
-      setIsLoadingDragDrop(false);
-      return;
-    }
-
-    // Imposta lock con timeout di sicurezza (10 secondi)
-    isDraggingRef.current = true;
-    if (dragTimeoutRef.current) {
-      clearTimeout(dragTimeoutRef.current);
-    }
-    dragTimeoutRef.current = setTimeout(() => {
-      console.log("⏰ Timeout sicurezza: rilascio lock drag forzato");
-      isDraggingRef.current = false;
-    }, 10000);
-
     try {
+      // niente destinazione => niente da fare
+      if (!destination) {
+        return;
+      }
+
+      // se posizione identica, esci
+      if (
+        destination.droppableId === source.droppableId &&
+        destination.index === source.index
+      ) {
+        return;
+      }
+
+      // CRITICAL: Blocca drag simultanei (con timeout di sicurezza di 10 secondi)
+      if (isDraggingRef.current) {
+        console.log("⚠️ Drag già in corso, operazione annullata per prevenire conflitti");
+        toast({
+          title: "Operazione in corso",
+          description: "Attendi il completamento del movimento precedente",
+          variant: "warning",
+          duration: 2000,
+        });
+        return;
+      }
+
+      // draggableId è sempre l'id univoco della task
+      const taskId = draggableId;
+      const task = allTasksWithAssignments.find(t => String(t.id) === String(taskId));
+      const logisticCode = task?.name; // name contiene il logistic_code
+
+      // Se la timeline è read-only, non permettere modifiche
+      if (isTimelineReadOnly) {
+        console.log("Timeline è READ-ONLY, spostamento annullato.");
+        toast({
+          title: "Operazione non permessa",
+          description: "La timeline è in sola visualizzazione per questa data.",
+          variant: "warning",
+        });
+        return;
+      }
+
+      // Imposta lock con timeout di sicurezza (10 secondi)
+      isDraggingRef.current = true;
+      if (dragTimeoutRef.current) {
+        clearTimeout(dragTimeoutRef.current);
+      }
+      dragTimeoutRef.current = setTimeout(() => {
+        console.log("⏰ Timeout sicurezza: rilascio lock drag forzato");
+        isDraggingRef.current = false;
+        setIsLoadingDragDrop(false);
+      }, 10000);
       // 🔹 Ramo TIMELINE (drag tra cleaners o riordino nello stesso cleaner)
       const fromCleanerId = parseCleanerId(source.droppableId);
       const toCleanerId = parseCleanerId(destination.droppableId);
@@ -2073,7 +2069,8 @@ export default function GenerateAssignments() {
         description: "Errore nello spostamento della task",
         variant: "destructive",
       });
-      // Assicurati che il lock venga sempre rilasciato
+    } finally {
+      // CRITICAL: Rilascia SEMPRE il loader e il lock, indipendentemente da come si esce
       isDraggingRef.current = false;
       if (dragTimeoutRef.current) clearTimeout(dragTimeoutRef.current);
       setIsLoadingDragDrop(false);
