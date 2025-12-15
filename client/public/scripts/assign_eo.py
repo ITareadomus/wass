@@ -20,86 +20,6 @@ try:
 except ImportError:
     API_AVAILABLE = False
 
-# MySQL import per fallback geodata da ADAM
-try:
-    import mysql.connector
-    MYSQL_AVAILABLE = True
-except ImportError:
-    MYSQL_AVAILABLE = False
-
-
-def get_geodata_from_adam(task_ids: List[int], work_date: str) -> Dict[str, Dict[str, Any]]:
-    """
-    Recupera lat/lng/address da ADAM per una lista di task_id.
-    Usato come fallback quando le coordinate non sono disponibili nei containers.
-    """
-    if not MYSQL_AVAILABLE or not task_ids:
-        return {}
-    
-    try:
-        import os
-        db_config = {
-            'host': os.environ.get('DB_HOST', 'localhost'),
-            'user': os.environ.get('DB_USER', 'root'),
-            'password': os.environ.get('DB_PASSWORD', ''),
-            'database': os.environ.get('DB_NAME', 'wass_housekeeping'),
-            'port': int(os.environ.get('DB_PORT', 3306))
-        }
-        
-        connection = mysql.connector.connect(**db_config)
-        cursor = connection.cursor(dictionary=True)
-        
-        # Query per ottenere coordinate dalle strutture
-        placeholders = ','.join(['%s'] * len(task_ids))
-        query = f"""
-            SELECT 
-                h.id AS task_id,
-                s.lat,
-                s.lng,
-                s.address1 AS address,
-                s.structure_type_id
-            FROM app_housekeeping h
-            JOIN app_structures s ON h.structure_id = s.id
-            WHERE h.id IN ({placeholders})
-              AND s.lat IS NOT NULL AND s.lng IS NOT NULL
-              AND s.lat != '' AND s.lng != ''
-        """
-        
-        cursor.execute(query, task_ids)
-        rows = cursor.fetchall()
-        cursor.close()
-        connection.close()
-        
-        result = {}
-        for row in rows:
-            task_id = str(row.get("task_id", ""))
-            if task_id:
-                lat = row.get("lat")
-                lng = row.get("lng")
-                # Normalizza coordinate
-                try:
-                    lat = float(str(lat).replace(',', '.')) if lat else None
-                    lng = float(str(lng).replace(',', '.')) if lng else None
-                except (ValueError, TypeError):
-                    lat = None
-                    lng = None
-                
-                if lat and lng:
-                    result[task_id] = {
-                        "lat": lat,
-                        "lng": lng,
-                        "address": row.get("address", ""),
-                        "small_equipment": row.get("structure_type_id") == 1
-                    }
-        
-        if result:
-            print(f"   📍 Recuperate {len(result)} coordinate da ADAM")
-        return result
-        
-    except Exception as e:
-        print(f"   ⚠️ Errore query ADAM per geodata: {e}")
-        return {}
-
 # =============================
 # I/O paths
 # =============================
@@ -384,64 +304,6 @@ def travel_minutes(a: Optional[Task], b: Optional[Task]) -> float:
 
     # Bonus stesso strada (riduce tempo base)
     if same_street(a.address, b.address) and km < 0.10:
-        total_time = max(total_time - 2.0, MIN_TRAVEL)
-
-    return max(MIN_TRAVEL, min(MAX_TRAVEL, total_time))
-
-
-def travel_minutes_dict(a: Optional[Dict], b: Optional[Dict]) -> float:
-    """
-    Versione di travel_minutes che accetta dizionari invece di Task objects.
-    Usata per calcolare travel_time dopo il merge di task nella timeline.
-    """
-    if a is None or b is None:
-        return 0.0
-
-    # Estrai coordinate (supporta sia 'lat'/'lng' che 'latitude'/'longitude')
-    try:
-        lat_a = float(a.get("lat") or a.get("latitude") or 0)
-        lng_a = float(a.get("lng") or a.get("longitude") or 0)
-        lat_b = float(b.get("lat") or b.get("latitude") or 0)
-        lng_b = float(b.get("lng") or b.get("longitude") or 0)
-    except (TypeError, ValueError):
-        return 0.0
-
-    # Se mancano coordinate, ritorna 0
-    if lat_a == 0 or lng_a == 0 or lat_b == 0 or lng_b == 0:
-        return 0.0
-
-    addr_a = a.get("address", "")
-    addr_b = b.get("address", "")
-
-    # Stesso edificio: 3 minuti per cambio appartamento
-    if same_building(addr_a, addr_b):
-        return 3.0
-
-    km = haversine_km(lat_a, lng_a, lat_b, lng_b)
-
-    # Fattore correzione percorsi non rettilinei
-    dist_reale = km * 1.5
-
-    # Modello progressivo
-    if dist_reale < 0.8:
-        travel_time = dist_reale * 6.0  # ~10 km/h a piedi
-    elif dist_reale < 2.5:
-        travel_time = dist_reale * 10.0  # ~6 km/h misto
-    else:
-        travel_time = dist_reale * 5.0  # ~12 km/h mezzi
-
-    # Tempo base
-    base_time = 5.0
-    total_time = base_time + travel_time
-
-    # Penalità small_equipment
-    small_eq_a = a.get("small_equipment", False)
-    small_eq_b = b.get("small_equipment", False)
-    if small_eq_a or small_eq_b:
-        total_time += (EQ_EXTRA_LT05 if km < 0.5 else EQ_EXTRA_GE05)
-
-    # Bonus stesso strada (riduce tempo base)
-    if same_street(addr_a, addr_b) and km < 0.10:
         total_time = max(total_time - 2.0, MIN_TRAVEL)
 
     return max(MIN_TRAVEL, min(MAX_TRAVEL, total_time))
@@ -1340,85 +1202,6 @@ def main():
     # con i vincoli EO (eo_end_time). recalculate_cleaner_times non conosce
     # questi vincoli e sovrascriverebbe i tempi EO con valori errati.
     
-    # FIX: Backfill lat/lng per task pre-esistenti che non hanno coordinate
-    # Costruisci un indice geodata da containers e nuove assegnazioni EO
-    geodata_index: Dict[str, Dict[str, Any]] = {}
-    
-    # 1. Popola da containers (tutte le priorità)
-    try:
-        containers_data = load_containers(ref_date)
-        if containers_data and "containers" in containers_data:
-            for priority in ["early_out", "high_priority", "low_priority"]:
-                for t in containers_data["containers"].get(priority, {}).get("tasks", []):
-                    task_id = str(t.get("task_id", ""))
-                    if task_id and (t.get("lat") or t.get("latitude")):
-                        geodata_index[task_id] = {
-                            "lat": t.get("lat") or t.get("latitude"),
-                            "lng": t.get("lng") or t.get("longitude"),
-                            "address": t.get("address", ""),
-                            "small_equipment": t.get("small_equipment", False)
-                        }
-    except Exception as e:
-        print(f"   ⚠️ Errore caricamento geodata da containers: {e}")
-    
-    # 2. Popola da nuove assegnazioni EO (hanno sempre le coordinate)
-    for cleaner_entry in output.get("early_out_tasks_assigned", []):
-        for t in cleaner_entry.get("tasks", []):
-            task_id = str(t.get("task_id", ""))
-            if task_id and (t.get("lat") or t.get("latitude")):
-                geodata_index[task_id] = {
-                    "lat": t.get("lat") or t.get("latitude"),
-                    "lng": t.get("lng") or t.get("longitude"),
-                    "address": t.get("address", ""),
-                    "small_equipment": t.get("small_equipment", False)
-                }
-    
-    print(f"   📍 Geodata index: {len(geodata_index)} task con coordinate (da containers/EO)")
-    
-    # 3. Trova task senza coordinate per query ADAM
-    missing_task_ids = []
-    for entry in timeline_data_output["cleaners_assignments"]:
-        for task in entry.get("tasks", []):
-            task_id = str(task.get("task_id", ""))
-            if task_id and not task.get("lat") and not task.get("latitude"):
-                if task_id not in geodata_index:
-                    try:
-                        missing_task_ids.append(int(task_id))
-                    except (ValueError, TypeError):
-                        pass
-    
-    # 4. Query ADAM per task mancanti
-    if missing_task_ids:
-        print(f"   🔍 Cercando coordinate per {len(missing_task_ids)} task in ADAM...")
-        adam_geodata = get_geodata_from_adam(missing_task_ids, ref_date)
-        geodata_index.update({str(k): v for k, v in adam_geodata.items()})
-    
-    # 5. Backfill lat/lng per tutte le task nella timeline
-    backfilled_count = 0
-    still_missing = 0
-    for entry in timeline_data_output["cleaners_assignments"]:
-        for task in entry.get("tasks", []):
-            task_id = str(task.get("task_id", ""))
-            # Se manca lat/lng, prova a recuperarle dall'indice
-            if not task.get("lat") and not task.get("latitude"):
-                if task_id in geodata_index:
-                    geo = geodata_index[task_id]
-                    task["lat"] = geo["lat"]
-                    task["lng"] = geo["lng"]
-                    if geo.get("address") and not task.get("address"):
-                        task["address"] = geo["address"]
-                    if geo.get("small_equipment"):
-                        task["small_equipment"] = geo["small_equipment"]
-                    backfilled_count += 1
-                else:
-                    still_missing += 1
-                    print(f"   ⚠️ Task {task_id} senza coordinate (nessuna fonte disponibile)")
-    
-    if backfilled_count > 0:
-        print(f"   ✅ Backfilled coordinate per {backfilled_count} task pre-esistenti")
-    if still_missing > 0:
-        print(f"   ⚠️ {still_missing} task rimaste senza coordinate")
-    
     # Solo ordinamento per start_time (senza ricalcolo)
     # FIX: Usa ordinamento numerico invece di stringa per gestire "9:30" vs "10:00"
     def parse_time_for_sort(time_str):
@@ -1441,23 +1224,38 @@ def main():
         if not tasks:
             continue
             
-        prev_task = None
+        prev_end_min = None
         for i, task in enumerate(tasks):
             # Rinumera sequence (1-based)
             task["sequence"] = i + 1
             task["followup"] = i > 0
             
-            # Ricalcola travel_time usando distanza geografica (lat/lng)
-            # Usa travel_minutes_dict() per calcolo realistico del tempo di viaggio
-            if i > 0 and prev_task is not None:
-                travel = travel_minutes_dict(prev_task, task)
-                task["travel_time"] = int(round(travel))
+            # Ricalcola travel_time basandosi su start_time corrente e end_time precedente
+            # SAFEGUARD: Verifica che i tempi siano validi prima di calcolare
+            start_time_str = task.get("start_time")
+            if i > 0 and prev_end_min is not None and start_time_str and ":" in str(start_time_str):
+                try:
+                    start_min = hhmm_to_min(start_time_str, "00:00")
+                    travel = max(0, start_min - prev_end_min)
+                    task["travel_time"] = travel
+                except (ValueError, TypeError):
+                    # Se parsing fallisce, mantieni travel_time esistente o default a 0
+                    if "travel_time" not in task:
+                        task["travel_time"] = 0
             else:
-                # Prima task: travel_time = 0
+                # Prima task o tempo mancante: travel_time = 0
                 task["travel_time"] = 0
             
-            # Salva task corrente per la prossima iterazione
-            prev_task = task
+            # Salva end_time corrente per la prossima iterazione
+            # SAFEGUARD: Solo se end_time è valido
+            end_time_str = task.get("end_time")
+            if end_time_str and ":" in str(end_time_str):
+                try:
+                    prev_end_min = hhmm_to_min(end_time_str, "00:00")
+                except (ValueError, TypeError):
+                    prev_end_min = None
+            else:
+                prev_end_min = None
 
     # Aggiorna meta
     # Conta i cleaner totali disponibili
