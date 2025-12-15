@@ -1811,7 +1811,9 @@ export default function TimelineView({
                                 // (es. quando c'è un checkout constraint che ritarda lo start_time)
                                 let waitingGap = 0;
                                 if (seq >= 2 && taskObj.start_time) {
-                                  const prevTask = cleanerTasks[idx - 1] as any;
+                                  // CRITICAL: Trova la task precedente per sequence (non per index)
+                                  // Questo funziona anche se ci sono buchi o ordini strani nell'array
+                                  const prevTask = cleanerTasks.find((t: any) => Number(t.sequence ?? (cleanerTasks.indexOf(t) + 1)) === seq - 1);
 
                                   const workDateStr = localStorage.getItem('selected_work_date') || format(new Date(), 'yyyy-MM-dd');
 
