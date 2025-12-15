@@ -558,8 +558,6 @@ export default function TaskCard({
         return;
       }
 
-      // CRITICAL: Salva le modifiche SOLO in sessionStorage locale, NON su PostgreSQL
-      // Le modifiche verranno salvate solo al trasferimento a ADAM
       const taskKey = getTaskKey(displayTask);
       
       // Gestisce operation_id: "none" = null (scelta esplicita di nessuna operazione)
@@ -584,14 +582,43 @@ export default function TaskCard({
         operationIdModified: editingFields.has('operation'),
       };
 
-      // Salva in sessionStorage come "pending_task_edits"
+      // Salva in sessionStorage per UI ottimistica
       const existingEdits = JSON.parse(sessionStorage.getItem('pending_task_edits') || '{}');
       existingEdits[taskKey] = pendingEdits;
       sessionStorage.setItem('pending_task_edits', JSON.stringify(existingEdits));
 
+      // CRITICAL: Salva anche su PostgreSQL (ma NON su ADAM) 
+      // ADAM verrà aggiornato solo con "Trasferisci su ADAM"
+      const workDate = localStorage.getItem('selected_work_date') || new Date().toISOString().split('T')[0];
+      const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
+      
+      const response = await fetch('/api/update-task-details', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          taskId: (displayTask as any).task_id || displayTask.id,
+          logisticCode: displayTask.name,
+          checkoutDate: editedCheckoutDate || null,
+          checkoutTime: editedCheckoutTime || null,
+          checkinDate: editedCheckinDate || null,
+          checkinTime: editedCheckinTime || null,
+          cleaningTime: parseInt(editedDuration),
+          paxIn: parseInt(editedPaxIn),
+          operationId: operationIdValue,
+          date: workDate,
+          modified_by: currentUser.username || 'unknown',
+          skipAdam: true  // NON propagare su ADAM, solo PostgreSQL
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Errore nel salvataggio su PostgreSQL');
+      }
+
       toast({
-        title: "Modifiche preparate",
-        description: "I campi della task sono stati preparati. Premi 'Trasferisci su ADAM' per salvare.",
+        title: "Modifiche salvate",
+        description: "I campi della task sono stati salvati. Premi 'Trasferisci su ADAM' per sincronizzare.",
       });
 
       setEditingFields(new Set());
