@@ -1744,6 +1744,19 @@ export default function TimelineView({
                                   return timeA.localeCompare(timeB);
                                 });
 
+                              // Estrai l'indice della task in drag dal draggableId (es. "task-123" -> idx non è diretto, ma possiamo usare draggingOverWith)
+                              // snapshot.draggingOverWith contiene il draggableId di quello che viene trascinato
+                              const draggedTaskKey = snapshot.draggingOverWith;
+                              let draggedTaskIndex: number | null = null;
+                              
+                              if (draggedTaskKey) {
+                                // Trova l'indice della task trascinata nel cleaner corrente
+                                draggedTaskIndex = cleanerTasks.findIndex((t: any) => {
+                                  const key = (t as any).task_id || (t as any).id;
+                                  return String(key) === draggedTaskKey.replace('task-', '');
+                                });
+                              }
+
                               return cleanerTasks.map((task, idx) => {
                                 const taskObj = task as any;
 
@@ -1914,12 +1927,14 @@ export default function TimelineView({
                                       timeOffset={seq === 1 ? timeOffset : 0}
                                       globalTimeSlots={globalTimeSlots.length}
                                     />
-                                    {/* Placeholder segue la task - renderizzato DENTRO il loop */}
-                                    {idx === cleanerTasks.length - 1 && provided.placeholder}
+                                    {/* Renderizza placeholder SOLO dopo la task dove verrebbe droppata */}
+                                    {draggedTaskIndex !== null && draggedTaskIndex === idx && provided.placeholder}
                                   </>
                                 );
                               });
                             })()}
+                            {/* Placeholder finale se non c'è drag attivo o se viene droppato alla fine */}
+                            {draggedTaskIndex === null && provided.placeholder}
                           </div>
                         </div>
                       )}
