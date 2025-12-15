@@ -1818,22 +1818,6 @@ export default function TimelineView({
                                   // CRITICAL: Normalizza le date per evitare mismatch di formato (es. "2025-12-15T00:00:00Z" vs "2025-12-15")
                                   const prevTaskDate = normDate(prevTask?.checkin_date);
                                   const prevTaskHasDifferentDate = !!(prevTaskDate && prevTaskDate !== workDateStr);
-
-                                  // DEBUG: Log per task 1641
-                                  if (taskObj.task_id === 1641 || taskObj.logistic_code === 1641 || String(taskObj.task_id) === '1641') {
-                                    console.log('🔍 DEBUG Task 1641:', {
-                                      seq,
-                                      idx,
-                                      start_time: taskObj.start_time,
-                                      checkout_time: taskObj.checkout_time,
-                                      prevTask_end_time: prevTask?.end_time,
-                                      prevTask_sequence: prevTask?.sequence,
-                                      prevTaskDate,
-                                      workDateStr,
-                                      prevTaskHasDifferentDate,
-                                      travelTime
-                                    });
-                                  }
                                   
                                   if (prevTask && prevTask.end_time && !prevTaskHasDifferentDate) {
                                     // Calcola la fine prevista: end_time della task precedente + travel_time
