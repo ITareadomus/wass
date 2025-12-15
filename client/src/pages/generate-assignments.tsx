@@ -1923,6 +1923,7 @@ export default function GenerateAssignments() {
           // Rilascia lock PRIMA del reload
           isDraggingRef.current = false;
           if (dragTimeoutRef.current) clearTimeout(dragTimeoutRef.current);
+          setIsLoadingDragDrop(false);
 
           // PATCH B: Reload debounced in background
           scheduleManualRefresh(600);
@@ -1942,6 +1943,7 @@ export default function GenerateAssignments() {
           // Rilascia lock indipendentemente dall'esito
           isDraggingRef.current = false;
           if (dragTimeoutRef.current) clearTimeout(dragTimeoutRef.current);
+          setIsLoadingDragDrop(false);
         }
         return;
       }
@@ -1993,6 +1995,7 @@ export default function GenerateAssignments() {
           // Rilascia lock PRIMA del reload
           isDraggingRef.current = false;
           if (dragTimeoutRef.current) clearTimeout(dragTimeoutRef.current);
+          setIsLoadingDragDrop(false);
 
           // PATCH B: Reload debounced in background
           scheduleManualRefresh(600);
@@ -2016,6 +2019,7 @@ export default function GenerateAssignments() {
           // Rilascia lock indipendentemente dall'esito
           isDraggingRef.current = false;
           if (dragTimeoutRef.current) clearTimeout(dragTimeoutRef.current);
+          setIsLoadingDragDrop(false);
         }
         return;
       }
@@ -2041,6 +2045,7 @@ export default function GenerateAssignments() {
           // Rilascia lock PRIMA del reload
           isDraggingRef.current = false;
           if (dragTimeoutRef.current) clearTimeout(dragTimeoutRef.current);
+          setIsLoadingDragDrop(false);
 
           // PATCH B: Reload debounced in background
           scheduleManualRefresh(600);
@@ -2056,6 +2061,7 @@ export default function GenerateAssignments() {
         } finally {
           isDraggingRef.current = false;
           if (dragTimeoutRef.current) clearTimeout(dragTimeoutRef.current);
+          setIsLoadingDragDrop(false);
         }
         return;
       }
@@ -2070,6 +2076,7 @@ export default function GenerateAssignments() {
       // Assicurati che il lock venga sempre rilasciato
       isDraggingRef.current = false;
       if (dragTimeoutRef.current) clearTimeout(dragTimeoutRef.current);
+      setIsLoadingDragDrop(false);
     }
   };
 
