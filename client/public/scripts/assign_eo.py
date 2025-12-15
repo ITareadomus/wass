@@ -1344,10 +1344,9 @@ def main():
     # Costruisci un indice geodata da containers e nuove assegnazioni EO
     geodata_index: Dict[str, Dict[str, Any]] = {}
     
-    # 1. Popola da containers (tutte le priorità) via API
+    # 1. Popola da containers (tutte le priorità)
     try:
-        client = ApiClient()
-        containers_data = client.get_containers(ref_date)
+        containers_data = load_containers(ref_date)
         if containers_data and "containers" in containers_data:
             for priority in ["early_out", "high_priority", "low_priority"]:
                 for t in containers_data["containers"].get(priority, {}).get("tasks", []):
