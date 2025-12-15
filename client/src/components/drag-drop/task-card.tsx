@@ -763,21 +763,21 @@ export default function TaskCard({
     ? (waitingGap / virtualMinutes) * timelineWidth
     : 0;
 
-  // Usa sequence per determinare se è la prima task o successive (più robusto di index)
-  const seq = (displayTask as any).sequence ?? (index + 1);
+  // Usa sequence per determinare se è la prima task o successive (0-indexed)
+  const seq = (displayTask as any).sequence ?? index;
 
   return (
     <>
-      {/* Offset spacer per prima task (sequence === 1) - FUORI dal Draggable */}
-      {isInTimeline && seq === 1 && timeOffset > 0 && offsetWidthPx > 0 && (
+      {/* Offset spacer per prima task (sequence === 0) - FUORI dal Draggable */}
+      {isInTimeline && seq === 0 && timeOffset > 0 && offsetWidthPx > 0 && (
         <div
           className="flex-shrink-0"
           style={{ width: `${offsetWidthPx}px` }}
         />
       )}
 
-      {/* Travel time marker - FUORI dal Draggable (solo per sequence >= 2) */}
-      {isInTimeline && seq >= 2 && travelTime > 0 && travelWidthPx > 0 && (
+      {/* Travel time marker - FUORI dal Draggable (solo per sequence > 0) */}
+      {isInTimeline && seq > 0 && travelTime > 0 && travelWidthPx > 0 && (
         <div
           className="flex items-center justify-center flex-shrink-0 py-3"
           style={{ width: `${travelWidthPx}px`, minHeight: '50px' }}
@@ -795,8 +795,8 @@ export default function TaskCard({
         </div>
       )}
 
-      {/* Waiting gap spacer - spazio per vincolo checkout - FUORI dal Draggable (solo per sequence >= 2) */}
-      {isInTimeline && seq >= 2 && waitingGap > 0 && waitingGapWidthPx > 0 && (
+      {/* Waiting gap spacer - spazio per vincolo checkout - FUORI dal Draggable (solo per sequence > 0) */}
+      {isInTimeline && seq > 0 && waitingGap > 0 && waitingGapWidthPx > 0 && (
         <div
           className="flex items-center justify-center flex-shrink-0 py-3 bg-amber-100/50 dark:bg-amber-900/20 border-y border-dashed border-amber-400"
           style={{ width: `${waitingGapWidthPx}px`, minHeight: '50px' }}
