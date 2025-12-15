@@ -132,7 +132,7 @@ interface TaskCardProps {
   isDuplicate?: boolean;
   isDragDisabled?: boolean;
   isReadOnly?: boolean;
-  multiSelectContext?: MultiSelectContextType;
+  multiSelectContext?: MultiSelectContextType | null;
   isIncompatible?: boolean;
   timeOffset?: number;
   globalTimeSlots?: number;
@@ -469,10 +469,10 @@ export default function TaskCard({
 
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "ArrowLeft" && canGoPrev) {
-        handlePrevTask(new MouseEvent('click') as any);
+        handlePrevTask();
       }
       if (e.key === "ArrowRight" && canGoNext) {
-        handleNextTask(new MouseEvent('click') as any);
+        handleNextTask();
       }
     };
 
