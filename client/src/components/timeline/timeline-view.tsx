@@ -1806,7 +1806,7 @@ export default function TimelineView({
 
                                 // Calcola larghezza EFFETTIVA in base ai minuti reali di travel_time
                                 // Usa la stessa base di calcolo dei task (slot * 60 minuti virtuali)
-                                const effectiveTravelMinutes = seq >= 2 && travelTime > 0 ? travelTime : 0;
+                                const effectiveTravelMinutes = seq >= 2 && travelTime > 0 && !snapshot.isDraggingOver ? travelTime : 0;
                                 const virtualMinutes = globalTimeSlots.length * 60;
                                 const totalWidth = effectiveTravelMinutes > 0 ? (effectiveTravelMinutes / virtualMinutes) * 100 : 0;
 
@@ -1814,7 +1814,7 @@ export default function TimelineView({
                                 // Questo gap rappresenta l'attesa tra la fine della task precedente e l'inizio effettivo di questa task
                                 // (es. quando c'è un checkout constraint che ritarda lo start_time)
                                 let waitingGap = 0;
-                                if (seq >= 2 && taskObj.start_time) {
+                                if (seq >= 2 && taskObj.start_time && !snapshot.isDraggingOver) {
                                   // CRITICAL: L'array è ordinato per sequence, quindi idx-1 è la vera task precedente
                                   const prevTask = idx > 0 ? cleanerTasks[idx - 1] as any : null;
 
@@ -1865,8 +1865,8 @@ export default function TimelineView({
                                       isDragDisabled={isReadOnly}
                                       isReadOnly={isReadOnly}
                                       timeOffset={seq === 1 ? timeOffset : 0}
-                                      travelTime={seq >= 2 ? travelTime : 0}
-                                      waitingGap={seq >= 2 ? waitingGap : 0}
+                                      travelTime={seq >= 2 && !snapshot.isDraggingOver ? travelTime : 0}
+                                      waitingGap={seq >= 2 && !snapshot.isDraggingOver ? waitingGap : 0}
                                       globalTimeSlots={globalTimeSlots.length}
                                     />
                                 );
