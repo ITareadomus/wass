@@ -1203,13 +1203,27 @@ def main():
     # questi vincoli e sovrascriverebbe i tempi EO con valori errati.
     
     # Solo ordinamento per start_time (senza ricalcolo)
+    # FIX: Usa ordinamento numerico invece di stringa per gestire "9:30" vs "10:00"
+    def parse_time_for_sort(time_str):
+        """Converte HH:MM in minuti per ordinamento numerico, fallback a 9999"""
+        if not time_str or not isinstance(time_str, str) or ":" not in time_str:
+            return 9999  # Metti task senza tempo alla fine
+        try:
+            return hhmm_to_min(time_str, "00:00")
+        except (ValueError, TypeError):
+            return 9999
+    
     for entry in timeline_data_output["cleaners_assignments"]:
         tasks = entry.get("tasks", [])
         if len(tasks) > 1:
-            tasks.sort(key=lambda t: t.get("start_time") or "00:00")
+            tasks.sort(key=lambda t: (parse_time_for_sort(t.get("start_time")), t.get("sequence", 9999)))
         
         # FIX A: Rinumera sequence e ricalcola travel_time dopo il merge
         # Questo elimina sequence duplicate e corregge travel_time
+        # SAFEGUARD: Solo se ci sono task
+        if not tasks:
+            continue
+            
         prev_end_min = None
         for i, task in enumerate(tasks):
             # Rinumera sequence (1-based)
@@ -1217,17 +1231,31 @@ def main():
             task["followup"] = i > 0
             
             # Ricalcola travel_time basandosi su start_time corrente e end_time precedente
-            if i > 0 and prev_end_min is not None:
-                start_time_str = task.get("start_time") or "00:00"
-                start_min = hhmm_to_min(start_time_str, "00:00")
-                travel = max(0, start_min - prev_end_min)
-                task["travel_time"] = travel
+            # SAFEGUARD: Verifica che i tempi siano validi prima di calcolare
+            start_time_str = task.get("start_time")
+            if i > 0 and prev_end_min is not None and start_time_str and ":" in str(start_time_str):
+                try:
+                    start_min = hhmm_to_min(start_time_str, "00:00")
+                    travel = max(0, start_min - prev_end_min)
+                    task["travel_time"] = travel
+                except (ValueError, TypeError):
+                    # Se parsing fallisce, mantieni travel_time esistente o default a 0
+                    if "travel_time" not in task:
+                        task["travel_time"] = 0
             else:
+                # Prima task o tempo mancante: travel_time = 0
                 task["travel_time"] = 0
             
             # Salva end_time corrente per la prossima iterazione
-            end_time_str = task.get("end_time") or "00:00"
-            prev_end_min = hhmm_to_min(end_time_str, "00:00")
+            # SAFEGUARD: Solo se end_time è valido
+            end_time_str = task.get("end_time")
+            if end_time_str and ":" in str(end_time_str):
+                try:
+                    prev_end_min = hhmm_to_min(end_time_str, "00:00")
+                except (ValueError, TypeError):
+                    prev_end_min = None
+            else:
+                prev_end_min = None
 
     # Aggiorna meta
     # Conta i cleaner totali disponibili

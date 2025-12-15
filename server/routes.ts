@@ -903,39 +903,56 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // FIX C: Guard-rail - Normalizza sequence per ogni cleaner prima di salvare
       // Questo previene sequence duplicate o buchi
+      // Helper: Parse HH:MM to minutes safely
+      const parseHHMMSafe = (timeStr: any): number | null => {
+        if (!timeStr || typeof timeStr !== 'string' || !timeStr.includes(':')) return null;
+        try {
+          const parts = timeStr.split(':');
+          if (parts.length < 2) return null;
+          const h = parseInt(parts[0], 10);
+          const m = parseInt(parts[1], 10);
+          if (isNaN(h) || isNaN(m) || h < 0 || h > 23 || m < 0 || m > 59) return null;
+          return h * 60 + m;
+        } catch {
+          return null;
+        }
+      };
+      
       if (timelineData.cleaners_assignments && Array.isArray(timelineData.cleaners_assignments)) {
         for (const entry of timelineData.cleaners_assignments) {
           const tasks = entry.tasks;
-          if (tasks && Array.isArray(tasks) && tasks.length > 0) {
-            // Ordina per start_time
-            tasks.sort((a: any, b: any) => {
-              const stA = a.start_time || "00:00";
-              const stB = b.start_time || "00:00";
-              return stA.localeCompare(stB);
-            });
+          if (!tasks || !Array.isArray(tasks) || tasks.length === 0) continue;
+          
+          // FIX: Ordina per start_time usando comparazione NUMERICA
+          // Questo gestisce correttamente "9:30" vs "10:00"
+          tasks.sort((a: any, b: any) => {
+            const stA = parseHHMMSafe(a.start_time) ?? 9999;
+            const stB = parseHHMMSafe(b.start_time) ?? 9999;
+            if (stA !== stB) return stA - stB;
+            // Secondary: mantieni ordine originale per tempi uguali
+            const seqA = a.sequence ?? 9999;
+            const seqB = b.sequence ?? 9999;
+            return seqA - seqB;
+          });
+          
+          // Rinumera sequence 1..N e correggi followup
+          let prevEndMin: number | null = null;
+          for (let i = 0; i < tasks.length; i++) {
+            const task = tasks[i];
+            task.sequence = i + 1;
+            task.followup = i > 0;
             
-            // Rinumera sequence 1..N e correggi followup
-            let prevEndMin: number | null = null;
-            for (let i = 0; i < tasks.length; i++) {
-              const task = tasks[i];
-              task.sequence = i + 1;
-              task.followup = i > 0;
-              
-              // Ricalcola travel_time se possibile
-              if (i > 0 && prevEndMin !== null && task.start_time) {
-                const [h, m] = task.start_time.split(':').map(Number);
-                const startMin = h * 60 + m;
-                task.travel_time = Math.max(0, startMin - prevEndMin);
-              } else if (i === 0) {
-                task.travel_time = 0;
-              }
-              
-              // Salva end_time per prossima iterazione
-              if (task.end_time) {
-                const [eh, em] = task.end_time.split(':').map(Number);
-                prevEndMin = eh * 60 + em;
-              }
+            // Ricalcola travel_time solo se abbiamo dati validi
+            const startMin = parseHHMMSafe(task.start_time);
+            if (i > 0 && prevEndMin !== null && startMin !== null) {
+              task.travel_time = Math.max(0, startMin - prevEndMin);
+            } else if (i === 0) {
+              task.travel_time = 0;
             }
+            // Se dati mancanti, mantieni travel_time esistente
+            
+            // Salva end_time per prossima iterazione
+            prevEndMin = parseHHMMSafe(task.end_time);
           }
         }
         console.log(`   ✅ Sequence normalizzate per ${timelineData.cleaners_assignments.length} cleaners`);
