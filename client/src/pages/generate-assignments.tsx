@@ -498,6 +498,9 @@ export default function GenerateAssignments() {
 
   // Preview della posizione di sequenza mentre trascini
   const [dragSequencePreview, setDragSequencePreview] = useState<{ sequenceIndex: number } | null>(null);
+  
+  // Traccia l'indice valido durante il drag per evitare bug con destination.index
+  const [lastValidDragIndex, setLastValidDragIndex] = useState<number | null>(null);
 
   // Stati per selezione multipla INDIPENDENTE per container (ma selezione CROSS-CONTAINER)
   const [multiSelectModes, setMultiSelectModes] = useState<{
@@ -1669,6 +1672,7 @@ export default function GenerateAssignments() {
 
     if (!destination) {
       setDragSequencePreview(null);
+      setLastValidDragIndex(null);
       return;
     }
 
@@ -1677,9 +1681,12 @@ export default function GenerateAssignments() {
     // Mostriamo il numero di sequenza solo quando siamo sulla timeline di un cleaner
     if (toCleanerId === null) {
       setDragSequencePreview(null);
+      setLastValidDragIndex(null);
       return;
     }
 
+    // CRITICAL: Salva l'indice valido durante il drag per evitare bug con destination.index inaffidabile
+    setLastValidDragIndex(destination.index);
     setDragSequencePreview({
       // index è 0-based, mostrato come 1-based
       sequenceIndex: destination.index + 1,
@@ -1688,6 +1695,7 @@ export default function GenerateAssignments() {
 
   const onDragEnd = async (result: any) => {
     setDragSequencePreview(null);
+    setLastValidDragIndex(null);
     setIsLoadingDragDrop(true);
 
     const { destination, source, draggableId } = result;
@@ -1792,10 +1800,12 @@ export default function GenerateAssignments() {
 
       // Spostamento tra cleaners diversi
       if (fromCleanerId !== null && toCleanerId !== null && fromCleanerId !== toCleanerId) {
-        dlog(`🔄 Spostamento task ${taskId} da cleaner ${fromCleanerId} a cleaner ${toCleanerId} @ index ${destination.index}`);
+        // CRITICAL: Usa lastValidDragIndex salvato durante onDragUpdate per evitare bug di posizionamento
+        const correctIndex = lastValidDragIndex !== null ? lastValidDragIndex : destination.index;
+        dlog(`🔄 Spostamento task ${taskId} da cleaner ${fromCleanerId} a cleaner ${toCleanerId} @ index ${correctIndex}`);
 
         // OPTIMISTIC UPDATE: Sposta immediatamente nella UI CON posizione corretta
-        const { updated, snapshot } = optimisticMoveTask(allTasksWithAssignments, taskId, toCleanerId, destination.index);
+        const { updated, snapshot } = optimisticMoveTask(allTasksWithAssignments, taskId, toCleanerId, correctIndex);
         setAllTasksWithAssignments(updated);
 
         try {
@@ -1810,7 +1820,7 @@ export default function GenerateAssignments() {
               logisticCode,
               sourceCleanerId: fromCleanerId,
               destCleanerId: toCleanerId,
-              destIndex: destination.index,
+              destIndex: correctIndex,
               date: dateStr,
               modified_by: currentUser.username || 'unknown'
             }),
