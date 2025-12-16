@@ -30,6 +30,7 @@ interface Account {
   id: number;
   username: string;
   password: string;
+  plain_password?: string;
   role: "admin" | "user" | "viewer";
 }
 
@@ -480,7 +481,7 @@ export default function Settings() {
                           <div className="flex items-center gap-2">
                             <p className="text-sm text-muted-foreground">
                               {showPassword[account.id]
-                                ? account.password
+                                ? (account.plain_password || "••••••••")
                                 : "••••••••"}
                             </p>
                             <Button

@@ -5,6 +5,7 @@ export interface User {
   id: number;
   username: string;
   password: string;
+  plain_password?: string;
   role: string;
   adam_id?: number;
   created_at?: Date;
@@ -20,6 +21,7 @@ export class PgUsersService {
           id SERIAL PRIMARY KEY,
           username TEXT NOT NULL UNIQUE,
           password TEXT NOT NULL,
+          plain_password TEXT,
           role TEXT NOT NULL DEFAULT 'user',
           adam_id INTEGER,
           created_at TIMESTAMP DEFAULT NOW(),
@@ -28,6 +30,7 @@ export class PgUsersService {
       `);
       // Ensure adam_id column exists (migration for existing tables)
       await query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS adam_id INTEGER`);
+      await query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS plain_password TEXT`);
       console.log('✅ PG: Tabella users verificata/creata');
     } catch (error) {
       console.error('❌ PG: Errore nella creazione tabella users:', error);
@@ -36,8 +39,8 @@ export class PgUsersService {
 
   async getAllUsers(): Promise<User[]> {
     try {
-      // Include passwords for admin settings page
-      const result = await query('SELECT id, username, password, role, adam_id, created_at, updated_at FROM users ORDER BY id');
+      // Include plain_password for admin settings page
+      const result = await query('SELECT id, username, password, plain_password, role, adam_id, created_at, updated_at FROM users ORDER BY id');
       return result.rows;
     } catch (error) {
       console.error('❌ PG: Errore nel caricamento users:', error);
@@ -69,8 +72,8 @@ export class PgUsersService {
     try {
       const hashedPassword = await bcrypt.hash(password, 10);
       const result = await query(
-        'INSERT INTO users (username, password, role) VALUES ($1, $2, $3) RETURNING id, username, password, role, created_at, updated_at',
-        [username, hashedPassword, role]
+        'INSERT INTO users (username, password, plain_password, role) VALUES ($1, $2, $3, $4) RETURNING id, username, password, plain_password, role, created_at, updated_at',
+        [username, hashedPassword, password, role]
       );
       console.log(`✅ PG: User ${username} creato`);
       return result.rows[0] || null;
@@ -94,6 +97,8 @@ export class PgUsersService {
         const hashedPassword = await bcrypt.hash(updates.password, 10);
         setClauses.push(`password = $${paramIndex++}`);
         values.push(hashedPassword);
+        setClauses.push(`plain_password = $${paramIndex++}`);
+        values.push(updates.password);
       }
       if (updates.role !== undefined) {
         setClauses.push(`role = $${paramIndex++}`);
