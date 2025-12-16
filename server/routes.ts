@@ -145,22 +145,27 @@ async function hydrateTasksFromAdamDb(cleanerData: any): Promise<any> {
       });
     }
 
-    // Merge coordinates into tasks - only if not already set
+    // Merge coordinates into tasks - ALWAYS use adamdb as authoritative source for coordinates
     let hydratedCount = 0;
     for (const task of cleanerData.tasks) {
       const adamGeo = coordsMap.get(task.task_id);
       if (adamGeo) {
-        // Only update if task doesn't have valid coordinates (null or 0)
-        if (task.lat == null || task.lat === 0) {
-          task.lat = adamGeo.lat; // Already filtered, can be null
-          if (adamGeo.lat !== null) hydratedCount++;
+        const oldLat = task.lat;
+        const oldLng = task.lng;
+        
+        // Always update from adamdb if we have valid coordinates
+        if (adamGeo.lat !== null) {
+          task.lat = adamGeo.lat;
+          hydratedCount++;
         }
-        if (task.lng == null || task.lng === 0) {
-          task.lng = adamGeo.lng; // Already filtered, can be null
+        if (adamGeo.lng !== null) {
+          task.lng = adamGeo.lng;
         }
-        if (!task.address && adamGeo.address) {
+        if (adamGeo.address) {
           task.address = adamGeo.address;
         }
+        
+        console.log(`📍 Task ${task.task_id} (${task.logistic_code}): lat ${oldLat} → ${task.lat}, lng ${oldLng} → ${task.lng}`);
       }
     }
 
