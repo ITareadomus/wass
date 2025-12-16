@@ -1250,6 +1250,7 @@ def main():
             continue
             
         prev_task = None
+        cleaner_name = entry.get("cleaner", {}).get("name", "Unknown")
         for i, task in enumerate(tasks):
             # Rinumera sequence (1-based)
             task["sequence"] = i + 1
@@ -1270,11 +1271,14 @@ def main():
                             float(curr_lat), float(curr_lng)
                         )))
                         task["travel_time"] = travel
-                    except (ValueError, TypeError):
+                        print(f"   🚗 {cleaner_name}: task {prev_task.get('logistic_code')} -> {task.get('logistic_code')} = {travel} min (coords: {prev_lat},{prev_lng} -> {curr_lat},{curr_lng})")
+                    except (ValueError, TypeError) as e:
                         task["travel_time"] = 0
+                        print(f"   ⚠️ Error calculating travel for {cleaner_name}: {e}")
                 else:
                     # Coordinate mancanti: usa default
                     task["travel_time"] = 0
+                    print(f"   ⚠️ Missing coords for {cleaner_name}: prev=({prev_lat},{prev_lng}) curr=({curr_lat},{curr_lng})")
             else:
                 # Prima task: travel_time = 0
                 task["travel_time"] = 0
