@@ -116,14 +116,16 @@ async function hydrateTasksFromContainers(cleanerData: any, workDate: string): P
     console.log(`🔍 Hydration query returned ${result.rows.length} rows:`, result.rows.slice(0, 3));
 
     // Build lookup map - first occurrence wins (assignments take priority)
+    // IMPORTANT: Convert task_id to number because PostgreSQL returns it as string
     const coordsMap = new Map<number, { lat: number | null; lng: number | null; address: string | null }>();
     
     for (const row of result.rows) {
-      if (!coordsMap.has(row.task_id)) {
+      const taskIdNum = parseInt(String(row.task_id), 10);
+      if (!coordsMap.has(taskIdNum)) {
         const lat = row.lat != null ? parseFloat(String(row.lat)) : null;
         const lng = row.lng != null ? parseFloat(String(row.lng)) : null;
         
-        coordsMap.set(row.task_id, {
+        coordsMap.set(taskIdNum, {
           lat: (lat && !isNaN(lat) && Math.abs(lat) > 0.0001) ? lat : null,
           lng: (lng && !isNaN(lng) && Math.abs(lng) > 0.0001) ? lng : null,
           address: row.address || null
