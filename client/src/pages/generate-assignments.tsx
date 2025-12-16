@@ -812,7 +812,14 @@ export default function GenerateAssignments() {
           }
 
           // Ricarica i task per mostrare i dati aggiornati
+          console.log("⏳ Caricamento task in corso (includerà recalcolo tempi)...");
           await loadTasks(true);
+          
+          // CRITICAL: Attendi che il server finisca il recalcolo dei tempi
+          // Questo è necessario perché il POST /api/load-saved-assignments nel backend
+          // chiama il POST /api/timeline che ricalcola i travel_time
+          console.log("⏳ Attendendo completamento recalcolo tempi dal server...");
+          await new Promise(resolve => setTimeout(resolve, 500));
 
           // SOLO date passate sono READ-ONLY, tutte le altre (corrente e future) sono EDITABILI
           const toastMessage = isPastDate
@@ -847,7 +854,7 @@ export default function GenerateAssignments() {
           // CRITICAL: Dopo aver caricato assegnazioni salvate, NON ci sono modifiche
           setHasUnsavedChanges(false);
 
-          setExtractionStep("Assegnazioni caricate!");
+          setExtractionStep("✅ Tempi ricalcolati!");
           await new Promise(resolve => setTimeout(resolve, 100));
           setIsExtracting(false);
         } else {
