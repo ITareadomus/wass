@@ -1932,8 +1932,8 @@ export default function TimelineView({
                                         {/* Renderizza placeholder PRIMA della task all'indice target */}
                                         {draggedTaskIndex !== null && draggedTaskIndex === idx && provided.placeholder}
 
-                                        {/* Renderizza TaskCard SOLO se non è la task trascinata dalla timeline */}
-                                        {!(draggedTaskKey && draggedTaskIndex === idx) && (
+                                        {/* Renderizza TaskCard SOLO se NON è l'indice target del drag */}
+                                        {!(draggedTaskIndex !== null && draggedTaskIndex === idx) && (
                                           <TaskCard
                                             key={uniqueKey}
                                             task={task}
