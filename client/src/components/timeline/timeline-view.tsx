@@ -29,6 +29,7 @@ import { format } from 'date-fns';
 import { loadValidationRules, canCleanerHandleTaskSync } from "@/lib/taskValidation";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import { getCleanerBgColor, getCleanerBadgeColor, getCleanerHexColor } from "@/lib/cleaner-colors";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -1642,9 +1643,10 @@ export default function TimelineView({
                   <div key={cleaner.id} className="flex mb-0.5">
                     {/* Info cleaner */}
                     <div
-                      className="flex-shrink-0 p-1 flex items-center border-2 border-custom-blue bg-custom-blue/10 cursor-pointer hover:opacity-90 transition-opacity"
+                      className={`flex-shrink-0 p-1 flex items-center border-2 cursor-pointer hover:opacity-90 transition-opacity ${getCleanerBgColor(cleaner.id)}`}
                       style={{
                         width: `${cleanerColumnWidth}px`,
+                        borderColor: 'var(--custom-blue)',
                         boxShadow: hasIncompatibleTasks && !isRemoved
                           ? '0 0 0 3px #EAB308, 0 0 20px 5px rgba(234, 179, 8, 0.6), inset 0 0 15px rgba(234, 179, 8, 0.3)'
                           : filteredCleanerId === cleaner.id ? '0 0 0 3px #3B82F6, 0 0 20px 5px rgba(59, 130, 246, 0.5)' : 'none',
@@ -1674,7 +1676,7 @@ export default function TimelineView({
                         {!isRemoved && (
                           <div
                             className="flex-shrink-0 w-3 h-3 rounded-full"
-                            style={{ backgroundColor: color }}
+                            style={{ backgroundColor: getCleanerHexColor(cleaner.id) }}
                           />
                         )}
                         <div className="break-words font-bold text-[13px] flex-1">
@@ -2311,8 +2313,8 @@ export default function TimelineView({
                 return (
                   <div
                     key={cleaner.id}
-                    className={`flex items-center justify-between p-3 border rounded-lg cursor-pointer ${
-                      !isAvailable ? 'opacity-70 hover:opacity-80' : 'hover:bg-accent'
+                    className={`flex items-center justify-between p-3 border rounded-lg cursor-pointer ${getCleanerBgColor(cleaner.id)} ${
+                      !isAvailable ? 'opacity-70 hover:opacity-80' : 'hover:opacity-90'
                     }`}
                     onClick={() => handleAddCleaner(cleaner.id, isAvailable)}
                     data-testid={`cleaner-option-${cleaner.id}`}
