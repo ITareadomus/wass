@@ -78,6 +78,92 @@ async function getAllCleanersForDate(workDate: string): Promise<any[]> {
   }
 }
 
+/**
+ * Helper: Hydrate tasks with lat/lng/address from adamdb
+ * This ensures tasks have real coordinates before travel time calculation
+ */
+async function hydrateTasksFromAdamDb(cleanerData: any): Promise<any> {
+  if (!cleanerData?.tasks || cleanerData.tasks.length === 0) {
+    return cleanerData;
+  }
+
+  // Collect all task_ids that need coordinates
+  const taskIds = cleanerData.tasks
+    .map((t: any) => t.task_id)
+    .filter((id: any) => id != null);
+
+  if (taskIds.length === 0) {
+    return cleanerData;
+  }
+
+  let connection: any = null;
+  try {
+    connection = await mysql.createConnection({
+      host: "139.59.132.41",
+      user: "admin",
+      password: "ed329a875c6c4ebdf4e87e2bbe53a15771b5844ef6606dde",
+      database: "adamdb",
+    });
+
+    // Query adamdb for coordinates - handle both lat/lng and latitude/longitude column names
+    const placeholders = taskIds.map(() => '?').join(',');
+    const [rows] = await connection.execute(
+      `SELECT 
+        id as task_id,
+        COALESCE(lat, latitude) as lat,
+        COALESCE(lng, longitude) as lng,
+        address
+      FROM app_housekeeping 
+      WHERE id IN (${placeholders})`,
+      taskIds
+    );
+
+    await connection.end();
+
+    // Create lookup map
+    const coordsMap = new Map<number, { lat: number | null; lng: number | null; address: string | null }>();
+    for (const row of rows as any[]) {
+      coordsMap.set(row.task_id, {
+        lat: row.lat,
+        lng: row.lng,
+        address: row.address
+      });
+    }
+
+    // Merge coordinates into tasks - only if not already set and not (0,0)
+    for (const task of cleanerData.tasks) {
+      const adamGeo = coordsMap.get(task.task_id);
+      if (adamGeo) {
+        // Only update if task doesn't have valid coordinates
+        if (task.lat == null || task.lat === 0) {
+          task.lat = adamGeo.lat ?? null;
+        }
+        if (task.lng == null || task.lng === 0) {
+          task.lng = adamGeo.lng ?? null;
+        }
+        if (!task.address && adamGeo.address) {
+          task.address = adamGeo.address;
+        }
+      }
+    }
+
+    console.log(`✅ Hydrated ${coordsMap.size}/${taskIds.length} tasks with coordinates from adamdb`);
+  } catch (error: any) {
+    console.warn(`⚠️ Could not hydrate tasks from adamdb: ${error.message}`);
+    // Non-blocking - continue without coordinates
+  } finally {
+    if (connection) {
+      try {
+        await connection.end();
+      } catch (e) {
+        // Ignore close errors
+      }
+    }
+  }
+
+  return cleanerData;
+}
+
 // Utility: costruzione chiave file consistente
 function buildKey(isoDate: string) {
   const d = new Date(isoDate);
