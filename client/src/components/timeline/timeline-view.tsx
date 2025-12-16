@@ -1497,8 +1497,8 @@ export default function TimelineView({
         ref={timelineRef}
         className={`bg-custom-blue-light rounded-lg border-2 border-custom-blue shadow-sm relative ${isFullscreen ? 'fixed inset-0 z-50 overflow-auto' : ''}`}
       >
-        {/* Loading overlay durante drag&drop */}
-        {isLoadingDragDrop && (
+        {/* Loading overlay durante drag&drop e rimozione cleaner */}
+        {(isLoadingDragDrop || removeCleanerMutation.isPending) && (
           <div className="absolute inset-0 bg-black/20 dark:bg-black/40 rounded-lg flex items-center justify-center z-40 backdrop-blur-sm">
             <div className="flex flex-col items-center gap-3">
               <Loader2 className="h-8 w-8 animate-spin text-custom-blue" />
