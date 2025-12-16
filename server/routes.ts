@@ -88,7 +88,7 @@ async function hydrateTasksFromContainers(cleanerData: any, workDate: string): P
   }
 
   try {
-    const { query } = await import("./db");
+    const { query } = await import("../shared/pg-db");
     
     // Get task_ids that need coordinates
     const taskIds = cleanerData.tasks
