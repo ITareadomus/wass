@@ -6,6 +6,7 @@ export interface User {
   username: string;
   password: string;
   role: string;
+  adam_id?: number;
   created_at?: Date;
   updated_at?: Date;
 }
@@ -20,10 +21,13 @@ export class PgUsersService {
           username TEXT NOT NULL UNIQUE,
           password TEXT NOT NULL,
           role TEXT NOT NULL DEFAULT 'user',
+          adam_id INTEGER,
           created_at TIMESTAMP DEFAULT NOW(),
           updated_at TIMESTAMP DEFAULT NOW()
         )
       `);
+      // Ensure adam_id column exists (migration for existing tables)
+      await query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS adam_id INTEGER`);
       console.log('✅ PG: Tabella users verificata/creata');
     } catch (error) {
       console.error('❌ PG: Errore nella creazione tabella users:', error);
@@ -33,7 +37,7 @@ export class PgUsersService {
   async getAllUsers(): Promise<User[]> {
     try {
       // Include passwords for admin settings page
-      const result = await query('SELECT id, username, password, role, created_at, updated_at FROM users ORDER BY id');
+      const result = await query('SELECT id, username, password, role, adam_id, created_at, updated_at FROM users ORDER BY id');
       return result.rows;
     } catch (error) {
       console.error('❌ PG: Errore nel caricamento users:', error);
@@ -43,7 +47,7 @@ export class PgUsersService {
 
   async getUserById(id: number): Promise<User | null> {
     try {
-      const result = await query('SELECT id, username, password, role, created_at, updated_at FROM users WHERE id = $1', [id]);
+      const result = await query('SELECT id, username, password, role, adam_id, created_at, updated_at FROM users WHERE id = $1', [id]);
       return result.rows[0] || null;
     } catch (error) {
       console.error(`❌ PG: Errore nel caricamento user ${id}:`, error);
@@ -53,7 +57,7 @@ export class PgUsersService {
 
   async getUserByUsername(username: string): Promise<User | null> {
     try {
-      const result = await query('SELECT id, username, password, role, created_at, updated_at FROM users WHERE username = $1', [username]);
+      const result = await query('SELECT id, username, password, role, adam_id, created_at, updated_at FROM users WHERE username = $1', [username]);
       return result.rows[0] || null;
     } catch (error) {
       console.error(`❌ PG: Errore nel caricamento user ${username}:`, error);
