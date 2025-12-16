@@ -1932,20 +1932,17 @@ export default function TimelineView({
                                         {/* Renderizza placeholder PRIMA della task all'indice target */}
                                         {draggedTaskIndex !== null && draggedTaskIndex === idx && provided.placeholder}
 
-                                        {/* Renderizza TaskCard SOLO se NON è l'indice target del drag */}
-                                        {!(draggedTaskIndex !== null && draggedTaskIndex === idx) && (
-                                          <TaskCard
-                                            key={uniqueKey}
-                                            task={task}
-                                            index={idx}
-                                            isInTimeline={true}
-                                            allTasks={cleanerTasks}
-                                            isDragDisabled={isReadOnly}
-                                            isReadOnly={isReadOnly}
-                                            timeOffset={seq === 1 ? timeOffset : 0}
-                                            globalTimeSlots={globalTimeSlots.length}
-                                          />
-                                        )}
+                                        <TaskCard
+                                          key={uniqueKey}
+                                          task={task}
+                                          index={idx}
+                                          isInTimeline={true}
+                                          allTasks={cleanerTasks}
+                                          isDragDisabled={isReadOnly}
+                                          isReadOnly={isReadOnly}
+                                          timeOffset={seq === 1 ? timeOffset : 0}
+                                          globalTimeSlots={globalTimeSlots.length}
+                                        />
                                       </>
                                     );
                                   })}
