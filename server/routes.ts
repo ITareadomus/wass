@@ -121,12 +121,22 @@ async function hydrateTasksFromAdamDb(cleanerData: any): Promise<any> {
 
     await connection.end();
 
+    // Helper to parse coordinates that may use comma as decimal separator (European format)
+    const parseCoord = (val: any): number | null => {
+      if (val == null || val === '') return null;
+      // Convert string with comma to use dot as decimal separator
+      const strVal = String(val).replace(',', '.');
+      const num = parseFloat(strVal);
+      // Filter out 0/0 or invalid coordinates
+      if (isNaN(num) || Math.abs(num) < 0.0001) return null;
+      return num;
+    };
+
     // Create lookup map - filter out zero/falsy coordinates to ensure they become null
     const coordsMap = new Map<number, { lat: number | null; lng: number | null; address: string | null }>();
     for (const row of rows as any[]) {
-      // Convert 0/0 or falsy coordinates to null (requirement: never (0,0))
-      const lat = (row.lat && Math.abs(row.lat) > 0.0001) ? row.lat : null;
-      const lng = (row.lng && Math.abs(row.lng) > 0.0001) ? row.lng : null;
+      const lat = parseCoord(row.lat);
+      const lng = parseCoord(row.lng);
       
       coordsMap.set(row.task_id, {
         lat,
