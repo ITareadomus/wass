@@ -79,8 +79,8 @@ async function getAllCleanersForDate(workDate: string): Promise<any[]> {
 }
 
 /**
- * Helper: Hydrate tasks with lat/lng/address from PostgreSQL containers
- * This ensures tasks have real coordinates before travel time calculation
+ * Helper: Hydrate tasks with lat/lng/address from PostgreSQL
+ * Searches both daily_assignments_current (assigned tasks) and daily_containers (unassigned tasks)
  */
 async function hydrateTasksFromContainers(cleanerData: any, workDate: string): Promise<any> {
   if (!cleanerData?.tasks || cleanerData.tasks.length === 0) {
@@ -88,57 +88,65 @@ async function hydrateTasksFromContainers(cleanerData: any, workDate: string): P
   }
 
   try {
-    const { pgDailyAssignmentsService } = await import("./services/pg-daily-assignments-service");
-    const containers = await pgDailyAssignmentsService.loadContainers(workDate);
+    const { query } = await import("./db");
     
-    if (!containers) {
-      console.log(`⚠️ No containers found in PostgreSQL for ${workDate}`);
+    // Get task_ids that need coordinates
+    const taskIds = cleanerData.tasks
+      .map((t: any) => t.task_id)
+      .filter((id: any) => id != null);
+    
+    if (taskIds.length === 0) {
       return cleanerData;
     }
 
-    // Build lookup map from all container priorities
+    // Query both tables to find coordinates - assignments first (already assigned), then containers (unassigned)
+    const result = await query(`
+      SELECT task_id, lat, lng, address FROM (
+        SELECT task_id, lat, lng, address FROM daily_assignments_current 
+        WHERE work_date = $1 AND task_id = ANY($2)
+        UNION ALL
+        SELECT task_id, lat, lng, address FROM daily_containers 
+        WHERE work_date = $1 AND task_id = ANY($2)
+      ) combined
+    `, [workDate, taskIds]);
+
+    // Build lookup map - first occurrence wins (assignments take priority)
     const coordsMap = new Map<number, { lat: number | null; lng: number | null; address: string | null }>();
     
-    const allPriorities = ['early_out', 'high_priority', 'low_priority'];
-    for (const priority of allPriorities) {
-      const tasks = containers.containers?.[priority]?.tasks || [];
-      for (const task of tasks) {
-        if (task.task_id) {
-          // Parse coordinates - they might be strings from PostgreSQL
-          const lat = task.lat != null ? parseFloat(String(task.lat)) : null;
-          const lng = task.lng != null ? parseFloat(String(task.lng)) : null;
-          
-          coordsMap.set(task.task_id, {
-            lat: (lat && !isNaN(lat) && Math.abs(lat) > 0.0001) ? lat : null,
-            lng: (lng && !isNaN(lng) && Math.abs(lng) > 0.0001) ? lng : null,
-            address: task.address || null
-          });
-        }
+    for (const row of result.rows) {
+      if (!coordsMap.has(row.task_id)) {
+        const lat = row.lat != null ? parseFloat(String(row.lat)) : null;
+        const lng = row.lng != null ? parseFloat(String(row.lng)) : null;
+        
+        coordsMap.set(row.task_id, {
+          lat: (lat && !isNaN(lat) && Math.abs(lat) > 0.0001) ? lat : null,
+          lng: (lng && !isNaN(lng) && Math.abs(lng) > 0.0001) ? lng : null,
+          address: row.address || null
+        });
       }
     }
 
     // Merge coordinates into cleaner's tasks
     let hydratedCount = 0;
     for (const task of cleanerData.tasks) {
-      const containerGeo = coordsMap.get(task.task_id);
-      if (containerGeo) {
-        // Always update from containers if we have valid coordinates
-        if (containerGeo.lat !== null) {
-          task.lat = containerGeo.lat;
+      const geo = coordsMap.get(task.task_id);
+      if (geo) {
+        if (geo.lat !== null) {
+          task.lat = geo.lat;
           hydratedCount++;
         }
-        if (containerGeo.lng !== null) {
-          task.lng = containerGeo.lng;
+        if (geo.lng !== null) {
+          task.lng = geo.lng;
         }
-        if (containerGeo.address && !task.address) {
-          task.address = containerGeo.address;
+        if (geo.address && !task.address) {
+          task.address = geo.address;
         }
       }
     }
 
-    console.log(`✅ Hydrated ${hydratedCount}/${cleanerData.tasks.length} tasks with coordinates from PostgreSQL containers`);
+    console.log(`✅ Hydrated ${hydratedCount}/${cleanerData.tasks.length} tasks with coordinates from PostgreSQL`);
   } catch (error: any) {
-    console.warn(`⚠️ Could not hydrate tasks from containers: ${error.message}`);
+    console.warn(`⚠️ Could not hydrate tasks from PostgreSQL: ${error.message}`);
   }
 
   return cleanerData;
