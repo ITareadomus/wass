@@ -1875,11 +1875,13 @@ export default function GenerateAssignments() {
       const isDraggedTaskSelected = selectedTasks.some(st => st.taskId === taskId);
 
       if (isAnyMultiSelectActive && selectedTasks.length > 0 && isDraggedTaskSelected && toCleanerId !== null && !toContainer) {
-        dlog(`🔄 BATCH MOVE CROSS-CONTAINER: Spostamento di ${selectedTasks.length} task selezionate a cleaner ${toCleanerId} @ index ${destination.index}`);
+        // CRITICAL: Usa lastValidDragIndex salvato durante onDragUpdate per evitare bug di posizionamento
+        const correctBatchIndex = lastValidDragIndex !== null ? lastValidDragIndex : destination.index;
+        dlog(`🔄 BATCH MOVE CROSS-CONTAINER: Spostamento di ${selectedTasks.length} task selezionate a cleaner ${toCleanerId} @ index ${correctBatchIndex}`);
 
         // OPTIMISTIC UPDATE: Sposta tutte le task selezionate immediatamente CON posizione corretta
         const taskIds = selectedTasks.map(st => st.taskId);
-        const { updated, snapshot } = optimisticBatchMoveTask(allTasksWithAssignments, taskIds, toCleanerId, destination.index);
+        const { updated, snapshot } = optimisticBatchMoveTask(allTasksWithAssignments, taskIds, toCleanerId, correctBatchIndex);
         setAllTasksWithAssignments(updated);
         const numTasks = selectedTasks.length; // Salva prima di pulire
 
@@ -1902,7 +1904,7 @@ export default function GenerateAssignments() {
           const sortedTasks = [...selectedTasks].sort((a, b) => a.order - b.order);
 
           // Sposta ciascuna task in sequenza alla destinazione
-          let currentIndex = destination.index;
+          let currentIndex = correctBatchIndex;
           for (const selectedTask of sortedTasks) {
             const task = allTasksWithAssignments.find(t => String(t.id) === selectedTask.taskId);
             if (task) {
@@ -1959,10 +1961,12 @@ export default function GenerateAssignments() {
       const toContainer = parseContainerKey(destination.droppableId);
 
       if (!fromCleanerId && fromContainer && toCleanerId !== null && !toContainer) {
-        dlog(`🔄 Spostamento da container ${fromContainer} a cleaner ${toCleanerId} @ index ${destination.index}`);
+        // CRITICAL: Usa lastValidDragIndex salvato durante onDragUpdate per evitare bug di posizionamento
+        const correctIndex = lastValidDragIndex !== null ? lastValidDragIndex : destination.index;
+        dlog(`🔄 Spostamento da container ${fromContainer} a cleaner ${toCleanerId} @ index ${correctIndex}`);
 
         // OPTIMISTIC UPDATE: Aggiorna UI immediatamente CON posizione corretta
-        const { updated, snapshot } = optimisticMoveTask(allTasksWithAssignments, taskId, toCleanerId, destination.index);
+        const { updated, snapshot } = optimisticMoveTask(allTasksWithAssignments, taskId, toCleanerId, correctIndex);
         setAllTasksWithAssignments(updated);
 
         // OPTIMISTIC UPDATE: Rimuovi immediatamente la task dal container (evita "sdoppiamento")
@@ -1984,7 +1988,7 @@ export default function GenerateAssignments() {
           const cleanerName = `ID ${toCleanerId}`;
 
           // Salva in timeline.json (rimuove automaticamente da containers.json)
-          await saveTaskAssignment(taskId, toCleanerId, logisticCode, destination.index);
+          await saveTaskAssignment(taskId, toCleanerId, logisticCode, correctIndex);
 
           // CRITICAL: Marca modifiche dopo drag-and-drop da container
           setHasUnsavedChanges(true);
