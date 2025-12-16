@@ -1,4 +1,5 @@
 import pool, { query } from '../../shared/pg-db';
+import bcrypt from 'bcrypt';
 
 export interface User {
   id: number;
@@ -62,9 +63,10 @@ export class PgUsersService {
 
   async createUser(username: string, password: string, role: string = 'user'): Promise<User | null> {
     try {
+      const hashedPassword = await bcrypt.hash(password, 10);
       const result = await query(
         'INSERT INTO users (username, password, role) VALUES ($1, $2, $3) RETURNING id, username, password, role, created_at, updated_at',
-        [username, password, role]
+        [username, hashedPassword, role]
       );
       console.log(`✅ PG: User ${username} creato`);
       return result.rows[0] || null;
@@ -85,8 +87,9 @@ export class PgUsersService {
         values.push(updates.username);
       }
       if (updates.password !== undefined) {
+        const hashedPassword = await bcrypt.hash(updates.password, 10);
         setClauses.push(`password = $${paramIndex++}`);
-        values.push(updates.password);
+        values.push(hashedPassword);
       }
       if (updates.role !== undefined) {
         setClauses.push(`role = $${paramIndex++}`);
@@ -127,10 +130,17 @@ export class PgUsersService {
   async validateLogin(username: string, password: string): Promise<User | null> {
     try {
       const result = await query(
-        'SELECT id, username, password, role, created_at, updated_at FROM users WHERE username = $1 AND password = $2',
-        [username, password]
+        'SELECT id, username, password, role, created_at, updated_at FROM users WHERE username = $1',
+        [username]
       );
-      return result.rows[0] || null;
+      
+      const user = result.rows[0];
+      if (!user) return null;
+      
+      const passwordMatch = await bcrypt.compare(password, user.password);
+      if (!passwordMatch) return null;
+      
+      return user;
     } catch (error) {
       console.error(`❌ PG: Errore nella validazione login:`, error);
       return null;
