@@ -845,16 +845,22 @@ export default function GenerateAssignments() {
             console.log("✏️ Timeline impostata in modalità EDITABILE (data corrente/futura con salvataggio)");
           }
 
-          // Ricarica la timeline UI
+          // Ricarica la timeline UI e aspetta che il rendering sia completato
           if ((window as any).loadTimelineCleaners) {
             console.log("🔄 Ricaricamento timeline cleaners dopo auto-load...");
-            await (window as any).loadTimelineCleaners();
+            setExtractionStep("⏳ Generazione visualizzazione travel time...");
+            await new Promise<void>(resolve => {
+              (window as any).loadTimelineCleaners(() => {
+                console.log("✅ Timeline cleaners caricati e renderizzati");
+                resolve();
+              });
+            });
           }
 
           // CRITICAL: Dopo aver caricato assegnazioni salvate, NON ci sono modifiche
           setHasUnsavedChanges(false);
 
-          setExtractionStep("✅ Tempi ricalcolati!");
+          setExtractionStep("✅ Timeline pronta!");
           await new Promise(resolve => setTimeout(resolve, 100));
           setIsExtracting(false);
         } else {
