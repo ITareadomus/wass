@@ -47,6 +47,8 @@ interface TimelineViewProps {
   onTaskMoved?: () => void; // Callback quando una task viene spostata
   isReadOnly?: boolean; // Modalità read-only: disabilita tutte le modifiche
   isLoadingDragDrop?: boolean; // Mostra loading overlay durante drag&drop
+  lastValidDragIndex?: number | null; // Indice valido durante il drag (da container verso timeline)
+  draggingOverCleanerId?: number | null; // ID del cleaner su cui si sta trascinando
 }
 
 interface Cleaner {
@@ -74,6 +76,8 @@ export default function TimelineView({
   onTaskMoved,
   isReadOnly = false,
   isLoadingDragDrop = false,
+  lastValidDragIndex = null,
+  draggingOverCleanerId = null,
 }: TimelineViewProps) {
   const [cleaners, setCleaners] = useState<Cleaner[]>([]);
   const [selectedDate, setSelectedDate] = useState<Date>(() => {
@@ -1754,9 +1758,13 @@ export default function TimelineView({
                                   const key = (t as any).task_id || (t as any).id;
                                   return String(key) === draggedTaskKey.replace('task-', '');
                                 });
-                                // Se non trovata, resetta a null
+                                // Se non trovata (task da container), usa lastValidDragIndex se stiamo trascinando su questo cleaner
                                 if (draggedTaskIndex === -1) {
-                                  draggedTaskIndex = null;
+                                  if (draggingOverCleanerId === cleaner.id && lastValidDragIndex !== null) {
+                                    draggedTaskIndex = lastValidDragIndex;
+                                  } else {
+                                    draggedTaskIndex = null;
+                                  }
                                 }
                               }
 
@@ -1921,6 +1929,9 @@ export default function TimelineView({
                                           </div>
                                         )}
 
+                                        {/* Renderizza placeholder PRIMA della task all'indice target */}
+                                        {draggedTaskIndex !== null && draggedTaskIndex === idx && provided.placeholder}
+
                                         <TaskCard
                                           key={uniqueKey}
                                           task={task}
@@ -1932,13 +1943,11 @@ export default function TimelineView({
                                           timeOffset={seq === 1 ? timeOffset : 0}
                                           globalTimeSlots={globalTimeSlots.length}
                                         />
-                                        {/* Renderizza placeholder SOLO dopo la task dove verrebbe droppata */}
-                                        {draggedTaskIndex !== null && draggedTaskIndex === idx && provided.placeholder}
                                       </>
                                     );
                                   })}
-                                  {/* Placeholder finale se non c'è drag attivo o se viene droppato alla fine */}
-                                  {draggedTaskIndex === null && provided.placeholder}
+                                  {/* Placeholder finale se non c'è drag attivo o se viene droppato alla fine (oltre l'ultimo elemento) */}
+                                  {(draggedTaskIndex === null || draggedTaskIndex >= cleanerTasks.length) && provided.placeholder}
                                 </>
                               );
                             })()}
