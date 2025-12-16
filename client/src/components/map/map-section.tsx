@@ -4,6 +4,7 @@ import { TaskType as Task } from "@shared/schema";
 import TaskCard from "@/components/drag-drop/task-card";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import { getCleanerHexColor } from "@/lib/cleaner-colors";
 
 interface MapSectionProps {
   tasks: Task[];
@@ -72,18 +73,9 @@ export default function MapSection({ tasks }: MapSectionProps) {
     return () => clearInterval(checkFilterUpdates);
   }, [filteredCleanerId, filteredTaskId]);
 
-  // Funzione per ottenere il colore del cleaner (basato su ID, non su indice)
+  // Funzione per ottenere il colore del cleaner (sincronizzato con timeline)
   const getCleanerColor = (cleanerId: number) => {
-    const colors = [
-      "#EF4444", "#3B82F6", "#22C55E", "#D946EF", "#F59E0B",
-      "#8B5CF6", "#14B8A6", "#F97316", "#6366F1", "#84CC16",
-      "#EC4899", "#0EA5E9", "#DC2626", "#10B981", "#A855F7",
-      "#EAB308", "#06B6D4", "#F43F5E", "#2563EB", "#16A34A",
-      "#C026D3", "#EA580C", "#7C3AED", "#0891B2", "#CA8A04",
-      "#DB2777", "#4F46E5", "#65A30D", "#059669", "#9333EA",
-      "#D97706", "#E11D48", "#0284C7", "#15803D", "#0D9488"
-    ];
-    return colors[cleanerId % colors.length];
+    return getCleanerHexColor(cleanerId);
   };
 
   // Carica Google Maps API
