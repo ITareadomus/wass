@@ -136,7 +136,9 @@ async function hydrateTasksFromContainers(cleanerData: any, workDate: string): P
     // Merge coordinates into cleaner's tasks
     let hydratedCount = 0;
     for (const task of cleanerData.tasks) {
-      const geo = coordsMap.get(task.task_id);
+      // CRITICAL: Convert task_id to number for lookup (mappa uses numeric keys)
+      const taskIdNum = parseInt(String(task.task_id), 10);
+      const geo = coordsMap.get(taskIdNum);
       if (geo) {
         if (geo.lat !== null) {
           task.lat = geo.lat;
