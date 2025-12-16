@@ -594,7 +594,7 @@ export default function TaskCard({
       // CRITICAL: Salva anche su PostgreSQL (ma NON su ADAM) 
       // ADAM verrà aggiornato solo con "Trasferisci su ADAM"
       const workDate = localStorage.getItem('selected_work_date') || new Date().toISOString().split('T')[0];
-      const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
+      const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
       
       const response = await fetch('/api/update-task-details', {
         method: 'POST',

@@ -213,7 +213,7 @@ export default function TimelineView({
   // Mutation per rimuovere un cleaner da selected_cleaners
   const removeCleanerMutation = useMutation({
     mutationFn: async (cleanerId: number) => {
-      const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
+      const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
       const response = await apiRequest("POST", "/api/remove-cleaner-from-selected", {
         cleanerId,
         date: workDate,
@@ -261,7 +261,7 @@ export default function TimelineView({
   // Mutation per aggiungere un cleaner alla timeline
   const addCleanerMutation = useMutation({
     mutationFn: async (cleanerId: number) => {
-      const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
+      const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
       const response = await apiRequest("POST", "/api/add-cleaner-to-timeline", {
         cleanerId,
         date: workDate,
@@ -323,7 +323,7 @@ export default function TimelineView({
   // Mutation per scambiare task tra cleaners
   const swapCleanersMutation = useMutation({
     mutationFn: async ({ sourceCleanerId, destCleanerId }: { sourceCleanerId: number; destCleanerId: number }) => {
-      const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
+      const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
       const response = await apiRequest("POST", "/api/swap-cleaners-tasks", {
         sourceCleanerId,
         destCleanerId,
@@ -832,7 +832,7 @@ export default function TimelineView({
 
     try {
       // Salva lo start_time usando l'API dedicata
-      const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
+      const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
       const response = await fetch('/api/update-cleaner-start-time', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1047,7 +1047,7 @@ export default function TimelineView({
 
     setIsSavingStartTime(true);
     try {
-      const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
+      const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
       const response = await fetch('/api/update-cleaner-start-time', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1163,7 +1163,7 @@ export default function TimelineView({
     try {
       setIsResetting(true);
 
-      const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
+      const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
 
       const response = await fetchWithOperation('reset-timeline', '/api/reset-timeline-assignments', {
         method: 'POST',
@@ -1374,7 +1374,7 @@ export default function TimelineView({
   // Mutation per rimuovere task dalla timeline
   const removeTaskMutation = useMutation({
     mutationFn: async ({ taskId, logisticCode }: { taskId: number | string; logisticCode: number | string }) => {
-      const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
+      const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
       const response = await apiRequest("POST", "/api/remove-timeline-assignment", {
         taskId,
         logisticCode,
@@ -1409,7 +1409,7 @@ export default function TimelineView({
     try {
       setShowAdamTransferDialog(false); // Chiudi il dialog di conferma
 
-      const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
+      const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
       // Leggi le pending_edits da sessionStorage
       const pendingEdits = JSON.parse(sessionStorage.getItem('pending_task_edits') || '{}');
 
