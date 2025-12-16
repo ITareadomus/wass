@@ -2925,6 +2925,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
+      // Verifica se creare una nuova revision: solo se l'utente è diverso dall'ultimo
+      const { pgDailyAssignmentsService } = await import("./services/pg-daily-assignments-service");
+      const lastRevisionUser = await pgDailyAssignmentsService.getLastRevisionUser(workDate);
+      let revisionCreated = false;
+      
+      if (lastRevisionUser && lastRevisionUser !== username) {
+        // Utente diverso: crea nuova revision
+        console.log(`📝 Utente diverso (ultimo: ${lastRevisionUser}, corrente: ${username}) - creazione nuova revision`);
+        await pgDailyAssignmentsService.saveToHistory(
+          workDate, 
+          timelineData, 
+          username, 
+          'transfer_to_adam',
+          [],
+          [],
+          []
+        );
+        revisionCreated = true;
+      } else {
+        console.log(`📝 Stesso utente (${username}) - nessuna nuova revision creata`);
+      }
+
       // Connessione MySQL a ADAM
       let connection: any = null;
       let totalUpdated = 0;
@@ -3003,15 +3025,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
         }
 
-        console.log(`\n✅ Trasferimento completato! (${totalUpdated} task aggiornate, ${totalErrors} errori)`);
+        console.log(`\n✅ Trasferimento completato! (${totalUpdated} task aggiornate, ${totalErrors} errori${revisionCreated ? ', nuova revision creata' : ''})`);
 
         res.json({
           success: true,
-          message: `Trasferimento completato: ${totalUpdated} task aggiornate${totalErrors > 0 ? `, ${totalErrors} errori` : ''}`,
+          message: `Trasferimento completato: ${totalUpdated} task aggiornate${totalErrors > 0 ? `, ${totalErrors} errori` : ''}${revisionCreated ? ' (nuova revision creata)' : ''}`,
           stats: {
             updated: totalUpdated,
             errors: totalErrors,
-            errorDetails: errors
+            errorDetails: errors,
+            revisionCreated
           }
         });
 

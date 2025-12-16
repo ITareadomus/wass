@@ -585,6 +585,26 @@ export class PgDailyAssignmentsService {
     }
   }
 
+  /**
+   * Get the user who created the last revision for a work_date
+   * Returns null if no revisions exist
+   */
+  async getLastRevisionUser(workDate: string): Promise<string | null> {
+    try {
+      const result = await query(`
+        SELECT created_by 
+        FROM daily_assignments_revisions 
+        WHERE work_date = $1
+        ORDER BY revision DESC
+        LIMIT 1
+      `, [workDate]);
+      return result.rows[0]?.created_by || null;
+    } catch (error) {
+      console.error('❌ PG History: Errore nel recupero ultimo utente:', error);
+      return null;
+    }
+  }
+
   // ==================== CONTAINERS (FLAT STRUCTURE) ====================
 
   /**
