@@ -120,26 +120,32 @@ async function hydrateTasksFromAdamDb(cleanerData: any): Promise<any> {
 
     await connection.end();
 
-    // Create lookup map
+    // Create lookup map - filter out zero/falsy coordinates to ensure they become null
     const coordsMap = new Map<number, { lat: number | null; lng: number | null; address: string | null }>();
     for (const row of rows as any[]) {
+      // Convert 0/0 or falsy coordinates to null (requirement: never (0,0))
+      const lat = (row.lat && Math.abs(row.lat) > 0.0001) ? row.lat : null;
+      const lng = (row.lng && Math.abs(row.lng) > 0.0001) ? row.lng : null;
+      
       coordsMap.set(row.task_id, {
-        lat: row.lat,
-        lng: row.lng,
-        address: row.address
+        lat,
+        lng,
+        address: row.address || null
       });
     }
 
-    // Merge coordinates into tasks - only if not already set and not (0,0)
+    // Merge coordinates into tasks - only if not already set
+    let hydratedCount = 0;
     for (const task of cleanerData.tasks) {
       const adamGeo = coordsMap.get(task.task_id);
       if (adamGeo) {
-        // Only update if task doesn't have valid coordinates
+        // Only update if task doesn't have valid coordinates (null or 0)
         if (task.lat == null || task.lat === 0) {
-          task.lat = adamGeo.lat ?? null;
+          task.lat = adamGeo.lat; // Already filtered, can be null
+          if (adamGeo.lat !== null) hydratedCount++;
         }
         if (task.lng == null || task.lng === 0) {
-          task.lng = adamGeo.lng ?? null;
+          task.lng = adamGeo.lng; // Already filtered, can be null
         }
         if (!task.address && adamGeo.address) {
           task.address = adamGeo.address;
@@ -147,7 +153,7 @@ async function hydrateTasksFromAdamDb(cleanerData: any): Promise<any> {
       }
     }
 
-    console.log(`✅ Hydrated ${coordsMap.size}/${taskIds.length} tasks with coordinates from adamdb`);
+    console.log(`✅ Hydrated ${hydratedCount}/${taskIds.length} tasks with valid coordinates from adamdb (${coordsMap.size} found in DB)`);
   } catch (error: any) {
     console.warn(`⚠️ Could not hydrate tasks from adamdb: ${error.message}`);
     // Non-blocking - continue without coordinates
@@ -542,12 +548,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       try {
         // Ricalcola cleaner di origine (se ha ancora task)
         if (sourceEntry && sourceEntry.tasks.length > 0) {
+          await hydrateTasksFromAdamDb(sourceEntry);
           const updatedSourceData = await recalculateCleanerTimes(sourceEntry);
           sourceEntry.tasks = updatedSourceData.tasks;
           console.log(`✅ Tempi ricalcolati per cleaner sorgente ${sourceCleanerId}`);
         }
 
         // Ricalcola cleaner di destinazione
+        await hydrateTasksFromAdamDb(destEntry);
         const updatedDestData = await recalculateCleanerTimes(destEntry);
         destEntry.tasks = updatedDestData.tasks;
         console.log(`✅ Tempi ricalcolati per cleaner destinazione ${destCleanerId}`);
@@ -718,12 +726,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Ricalcola tempi per entrambi i cleaners
       try {
         if (sourceEntry.tasks.length > 0) {
+          await hydrateTasksFromAdamDb(sourceEntry);
           const updatedSourceData = await recalculateCleanerTimes(sourceEntry);
           sourceEntry.tasks = updatedSourceData.tasks;
           console.log(`✅ Tempi ricalcolati per cleaner ${sourceCleanerId} (dopo swap)`);
         }
 
         if (destEntry.tasks.length > 0) {
+          await hydrateTasksFromAdamDb(destEntry);
           const updatedDestData = await recalculateCleanerTimes(destEntry);
           destEntry.tasks = updatedDestData.tasks;
           console.log(`✅ Tempi ricalcolati per cleaner ${destCleanerId} (dopo swap)`);
@@ -1525,6 +1535,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Ricalcola travel_time, start_time, end_time usando lo script Python
       try {
+        await hydrateTasksFromAdamDb(cleanerEntry);
         const updatedCleanerData = await recalculateCleanerTimes(cleanerEntry);
         cleanerEntry.tasks = updatedCleanerData.tasks;
         console.log(`✅ Tempi ricalcolati per cleaner ${normalizedCleanerId}`);
@@ -2219,6 +2230,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Ricalcola i tempi per le task con il nuovo cleaner
         if (taskCount > 0) {
           try {
+            await hydrateTasksFromAdamDb(cleanerToReplace);
             const updatedData = await recalculateCleanerTimes(cleanerToReplace);
             cleanerToReplace.tasks = updatedData.tasks;
             console.log(`✅ Tempi ricalcolati per ${taskCount} task del nuovo cleaner ${cleanerId}`);
@@ -4147,6 +4159,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Ricalcola tempi usando lo script Python per avere start_time/end_time coerenti con la sequenza
       try {
+        await hydrateTasksFromAdamDb(dstEntry);
         const updatedDst = await recalculateCleanerTimes(dstEntry);
         dstEntry.tasks = updatedDst.tasks;
         console.log(`✅ Tempi ricalcolati per cleaner ${toCleanerId} dopo inserimento`);
@@ -4155,6 +4168,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (typeof fromCleanerId === 'number' && fromCleanerId !== toCleanerId) {
           const srcEntry = getCleanerEntry(fromCleanerId);
           if (srcEntry && srcEntry.tasks.length > 0) {
+            await hydrateTasksFromAdamDb(srcEntry);
             const updatedSrc = await recalculateCleanerTimes(srcEntry);
             srcEntry.tasks = updatedSrc.tasks;
             console.log(`✅ Tempi ricalcolati per cleaner ${fromCleanerId} dopo rimozione`);
@@ -4245,6 +4259,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Ricalcola travel_time, start_time, end_time usando lo script Python
       try {
+        await hydrateTasksFromAdamDb(cleanerEntry);
         const updatedCleanerData = await recalculateCleanerTimes(cleanerEntry);
         // Sostituisci le task con quelle ricalcolate
         cleanerEntry.tasks = updatedCleanerData.tasks;
