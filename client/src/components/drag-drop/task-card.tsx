@@ -136,6 +136,10 @@ interface TaskCardProps {
   isIncompatible?: boolean;
   timeOffset?: number;
   globalTimeSlots?: number;
+  travelTime?: number;
+  travelWidthPx?: number;
+  waitingGap?: number;
+  waitingGapWidthPx?: number;
 }
 
 interface AssignedTask {
@@ -159,6 +163,10 @@ export default function TaskCard({
   isIncompatible = false,
   timeOffset = 0,
   globalTimeSlots = 0,
+  travelTime = 0,
+  travelWidthPx = 0,
+  waitingGap = 0,
+  waitingGapWidthPx = 0,
 }: TaskCardProps) {
   console.log('🔧 TaskCard render - isReadOnly:', isReadOnly, 'for task:', task.name);
   const [isModalOpen, setIsModalOpen] = useState(false);
