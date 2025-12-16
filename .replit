@@ -7,7 +7,7 @@ channel = "stable-24_05"
 packages = ["libxcrypt", "pkg-config", "xsimd", "python311Packages.requests"]
 
 [deployment]
-deploymentTarget = "static"
+deploymentTarget = "gce"
 build = ["npm", "run", "build"]
 run = ["npm", "run", "start"]
 publicDir = "dist/public"
