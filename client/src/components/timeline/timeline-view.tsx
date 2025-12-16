@@ -29,6 +29,7 @@ import { format } from 'date-fns';
 import { loadValidationRules, canCleanerHandleTaskSync } from "@/lib/taskValidation";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import { getCleanerHexColor } from "@/lib/cleaner-colors";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -1674,7 +1675,7 @@ export default function TimelineView({
                         {!isRemoved && (
                           <div
                             className="flex-shrink-0 w-3 h-3 rounded-full"
-                            style={{ backgroundColor: color }}
+                            style={{ backgroundColor: getCleanerHexColor(cleaner.id) }}
                           />
                         )}
                         <div className="break-words font-bold text-[13px] flex-1">
