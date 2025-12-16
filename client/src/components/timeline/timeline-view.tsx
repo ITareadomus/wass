@@ -1744,8 +1744,7 @@ export default function TimelineView({
                                   return timeA.localeCompare(timeB);
                                 });
 
-                              // Estrai l'indice della task in drag dal draggableId (es. "task-123" -> idx non è diretto, ma possiamo usare draggingOverWith)
-                              // snapshot.draggingOverWith contiene il draggableId di quello che viene trascinato
+                              // Calcola draggedTaskIndex utilizzando snapshot (disponibile nel Droppable render function)
                               const draggedTaskKey = snapshot.draggingOverWith;
                               let draggedTaskIndex: number | null = null;
                               
@@ -1755,186 +1754,194 @@ export default function TimelineView({
                                   const key = (t as any).task_id || (t as any).id;
                                   return String(key) === draggedTaskKey.replace('task-', '');
                                 });
+                                // Se non trovata, resetta a null
+                                if (draggedTaskIndex === -1) {
+                                  draggedTaskIndex = null;
+                                }
                               }
 
-                              return cleanerTasks.map((task, idx) => {
-                                const taskObj = task as any;
+                              return (
+                                <>
+                                  {cleanerTasks.map((task, idx) => {
+                                    const taskObj = task as any;
 
-                                // Per il drag and drop, usa l'indice locale (idx) non globalIndex
-                                // React-beautiful-dnd richiede indici sequenziali 0,1,2,3... per ogni Droppable
+                                    // Per il drag and drop, usa l'indice locale (idx) non globalIndex
+                                    // React-beautiful-dnd richiede indici sequenziali 0,1,2,3... per ogni Droppable
 
-                                // Leggi travel_time dalla task normalizzata (che viene da timeline_assignments.json)
-                                // Prova sia travel_time che travelTime per compatibilità
-                                let travelTime = 0;
-                                if (taskObj.travel_time !== undefined && taskObj.travel_time !== null) {
-                                  travelTime = typeof taskObj.travel_time === 'number'
-                                    ? taskObj.travel_time
-                                    : parseInt(String(taskObj.travel_time), 10);
-                                } else if (taskObj.travelTime !== undefined && taskObj.travelTime !== null) {
-                                  travelTime = typeof taskObj.travelTime === 'number'
-                                    ? taskObj.travelTime
-                                    : parseInt(String(taskObj.travelTime), 10);
-                                }
-
-                                // Se il parsing fallisce, usa 0
-                                if (isNaN(travelTime)) {
-                                  travelTime = 0;
-                                }
-
-                                // Helper: normalizza date "2025-12-15T..." -> "2025-12-15"
-                                const normDate = (d?: string | null) => (d ? String(d).slice(0, 10) : null);
-
-                                // Usa sequence se disponibile, altrimenti fallback su idx+1
-                                const seq = (taskObj as any).sequence ?? (idx + 1);
-
-                                // Calcola offset iniziale basato sulla differenza tra start time del cleaner e start time ARROTONDATO della griglia
-                                // CRITICAL: Usa seq === 1 invece di idx === 0 per coerenza con la logica sequence
-                                let timeOffset = 0;
-                                if (seq === 1) {
-                                  // CRITICAL: Usa l'ora arrotondata (come la griglia) per calcolare l'offset
-                                  const [globalStartHour, globalStartMin] = globalStartTime.split(':').map(Number);
-                                  const globalStartHourRounded = globalStartMin > 0 ? globalStartHour : globalStartHour;
-                                  const gridStartMinutes = globalStartHourRounded * 60; // Ora intera della griglia
-
-                                  const [cleanerStartHour, cleanerStartMin] = cleanerStartTime.split(':').map(Number);
-                                  const cleanerStartMinutes = cleanerStartHour * 60 + cleanerStartMin;
-
-                                  // Se il cleaner inizia dopo l'ora arrotondata della griglia, aggiungi offset
-                                  const cleanerOffset = cleanerStartMinutes - gridStartMinutes;
-                                  if (cleanerOffset > 0) {
-                                    timeOffset = cleanerOffset;
-                                  }
-
-                                  // Se la task ha un start_time specifico, aggiungi ulteriore offset
-                                  if (taskObj.start_time) {
-                                    const [taskHours, taskMinutes] = taskObj.start_time.split(':').map(Number);
-                                    const taskStartMinutes = taskHours * 60 + taskMinutes;
-
-                                    const additionalOffset = taskStartMinutes - cleanerStartMinutes;
-                                    if (additionalOffset > 0) {
-                                      timeOffset += additionalOffset;
+                                    // Leggi travel_time dalla task normalizzata (che viene da timeline_assignments.json)
+                                    // Prova sia travel_time che travelTime per compatibilità
+                                    let travelTime = 0;
+                                    if (taskObj.travel_time !== undefined && taskObj.travel_time !== null) {
+                                      travelTime = typeof taskObj.travel_time === 'number'
+                                        ? taskObj.travel_time
+                                        : parseInt(String(taskObj.travel_time), 10);
+                                    } else if (taskObj.travelTime !== undefined && taskObj.travelTime !== null) {
+                                      travelTime = typeof taskObj.travelTime === 'number'
+                                        ? taskObj.travelTime
+                                        : parseInt(String(taskObj.travelTime), 10);
                                     }
-                                  }
-                                }
 
-                                // Calcola larghezza EFFETTIVA in base ai minuti reali di travel_time
-                                // Usa la stessa base di calcolo dei task (slot * 60 minuti virtuali)
-                                const effectiveTravelMinutes = seq >= 2 && travelTime > 0 && !snapshot.isDraggingOver ? travelTime : 0;
-                                const virtualMinutes = globalTimeSlots.length * 60;
-                                const timelineWidth = (window as any).timelineWidthPx || 0;
-                                const travelWidthPx = effectiveTravelMinutes > 0 && virtualMinutes > 0 && timelineWidth > 0
-                                  ? (effectiveTravelMinutes / virtualMinutes) * timelineWidth
-                                  : 0;
-
-                                // CRITICAL FIX: Calcola il "waitingGap" per task con sequence >= 2
-                                // Questo gap rappresenta l'attesa tra la fine della task precedente e l'inizio effettivo di questa task
-                                // (es. quando c'è un checkout constraint che ritarda lo start_time)
-                                let waitingGap = 0;
-                                if (seq >= 2 && taskObj.start_time && !snapshot.isDraggingOver) {
-                                  // CRITICAL: L'array è ordinato per sequence, quindi idx-1 è la vera task precedente
-                                  const prevTask = idx > 0 ? cleanerTasks[idx - 1] as any : null;
-
-                                  const workDateStr = localStorage.getItem('selected_work_date') || format(new Date(), 'yyyy-MM-dd');
-
-                                  // CRITICAL: Normalizza le date per evitare mismatch di formato (es. "2025-12-15T00:00:00Z" vs "2025-12-15")
-                                  const prevTaskDate = normDate(prevTask?.checkin_date);
-                                  const prevTaskHasDifferentDate = !!(prevTaskDate && prevTaskDate !== workDateStr);
-                                  
-                                  if (prevTask && prevTask.end_time && !prevTaskHasDifferentDate) {
-                                    // Calcola la fine prevista: end_time della task precedente + travel_time
-                                    const [prevEndH, prevEndM] = prevTask.end_time.split(':').map(Number);
-                                    const prevEndMinutes = prevEndH * 60 + prevEndM;
-                                    const expectedStartMinutes = prevEndMinutes + travelTime;
-
-                                    // Calcola lo start effettivo di questa task
-                                    const [taskStartH, taskStartM] = taskObj.start_time.split(':').map(Number);
-                                    const actualStartMinutes = taskStartH * 60 + taskStartM;
-
-                                    // Se lo start effettivo è DOPO quello previsto, c'è un gap (attesa)
-                                    if (actualStartMinutes > expectedStartMinutes) {
-                                      waitingGap = actualStartMinutes - expectedStartMinutes;
+                                    // Se il parsing fallisce, usa 0
+                                    if (isNaN(travelTime)) {
+                                      travelTime = 0;
                                     }
-                                  }
-                                }
-                                const waitingGapWidthPx = waitingGap > 0 && virtualMinutes > 0 && timelineWidth > 0
-                                  ? (waitingGap / virtualMinutes) * timelineWidth
-                                  : 0;
 
-                                // Usa task.id o task.task_id come chiave univoca (non logistic_code che può essere duplicato)
-                                const uniqueKey = taskObj.task_id || taskObj.id;
+                                    // Helper: normalizza date "2025-12-15T..." -> "2025-12-15"
+                                    const normDate = (d?: string | null) => (d ? String(d).slice(0, 10) : null);
 
-                                // Verifica compatibilità task-cleaner
-                                const isIncompatible = validationRules && cleaner?.role
-                                  ? !canCleanerHandleTaskSync(
-                                      cleaner.role,
-                                      task,
-                                      validationRules,
-                                      cleaner.can_do_straordinaria ?? false
-                                    )
-                                  : false;
+                                    // Usa sequence se disponibile, altrimenti fallback su idx+1
+                                    const seq = (taskObj as any).sequence ?? (idx + 1);
 
-                                return (
-                                  <>
-                                    {/* Travel time marker - FUORI dal Draggable (solo per sequence >= 2) */}
-                                    {seq >= 2 && travelTime > 0 && travelWidthPx > 0 && (
-                                      <div
-                                        className="flex items-center justify-center flex-shrink-0 py-3"
-                                        style={{ width: `${travelWidthPx}px`, minHeight: '50px' }}
-                                        title={`${travelTime} min`}
-                                      >
-                                        <svg
-                                          width="20"
-                                          height="20"
-                                          viewBox="0 0 24 24"
-                                          fill="currentColor"
-                                          className="text-custom-blue flex-shrink-0"
-                                        >
-                                          <path d="M13.5 5.5c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zM9.8 8.9L7 23h2.1l1.8-8 2.1 2v6h2v-7.5l-2.1-2 .6-3C14.8 12 16.8 13 19 13v-2c-1.9 0-3.5-1-4.3-2.4l-1-1.6c-.4-.6-1-1-1.7-1-.3 0-.5.1-.8.1L6 8.3V13h2V9.6l1.8-.7"/>
-                                        </svg>
-                                      </div>
-                                    )}
+                                    // Calcola offset iniziale basato sulla differenza tra start time del cleaner e start time ARROTONDATO della griglia
+                                    // CRITICAL: Usa seq === 1 invece di idx === 0 per coerenza con la logica sequence
+                                    let timeOffset = 0;
+                                    if (seq === 1) {
+                                      // CRITICAL: Usa l'ora arrotondata (come la griglia) per calcolare l'offset
+                                      const [globalStartHour, globalStartMin] = globalStartTime.split(':').map(Number);
+                                      const globalStartHourRounded = globalStartMin > 0 ? globalStartHour : globalStartHour;
+                                      const gridStartMinutes = globalStartHourRounded * 60; // Ora intera della griglia
 
-                                    {/* Waiting gap spacer - FUORI dal Draggable (solo per sequence >= 2) */}
-                                    {seq >= 2 && waitingGap > 0 && waitingGapWidthPx > 0 && (
-                                      <div
-                                        className="flex items-center justify-center flex-shrink-0 py-3 bg-amber-100/50 dark:bg-amber-900/20 border-y border-dashed border-amber-400"
-                                        style={{ width: `${waitingGapWidthPx}px`, minHeight: '50px' }}
-                                        title={`Attesa checkout: ${waitingGap} min`}
-                                      >
-                                        <svg
-                                          width="16"
-                                          height="16"
-                                          viewBox="0 0 24 24"
-                                          fill="none"
-                                          stroke="currentColor"
-                                          strokeWidth="2"
-                                          className="text-amber-600 dark:text-amber-400 flex-shrink-0"
-                                        >
-                                          <circle cx="12" cy="12" r="10"/>
-                                          <polyline points="12,6 12,12 16,14"/>
-                                        </svg>
-                                      </div>
-                                    )}
+                                      const [cleanerStartHour, cleanerStartMin] = cleanerStartTime.split(':').map(Number);
+                                      const cleanerStartMinutes = cleanerStartHour * 60 + cleanerStartMin;
 
-                                    <TaskCard
-                                      key={uniqueKey}
-                                      task={task}
-                                      index={idx}
-                                      isInTimeline={true}
-                                      allTasks={cleanerTasks}
-                                      isDragDisabled={isReadOnly}
-                                      isReadOnly={isReadOnly}
-                                      timeOffset={seq === 1 ? timeOffset : 0}
-                                      globalTimeSlots={globalTimeSlots.length}
-                                    />
-                                    {/* Renderizza placeholder SOLO dopo la task dove verrebbe droppata */}
-                                    {draggedTaskIndex !== null && draggedTaskIndex === idx && provided.placeholder}
-                                  </>
-                                );
-                              });
+                                      // Se il cleaner inizia dopo l'ora arrotondata della griglia, aggiungi offset
+                                      const cleanerOffset = cleanerStartMinutes - gridStartMinutes;
+                                      if (cleanerOffset > 0) {
+                                        timeOffset = cleanerOffset;
+                                      }
+
+                                      // Se la task ha un start_time specifico, aggiungi ulteriore offset
+                                      if (taskObj.start_time) {
+                                        const [taskHours, taskMinutes] = taskObj.start_time.split(':').map(Number);
+                                        const taskStartMinutes = taskHours * 60 + taskMinutes;
+
+                                        const additionalOffset = taskStartMinutes - cleanerStartMinutes;
+                                        if (additionalOffset > 0) {
+                                          timeOffset += additionalOffset;
+                                        }
+                                      }
+                                    }
+
+                                    // Calcola larghezza EFFETTIVA in base ai minuti reali di travel_time
+                                    // Usa la stessa base di calcolo dei task (slot * 60 minuti virtuali)
+                                    const effectiveTravelMinutes = seq >= 2 && travelTime > 0 && !snapshot.isDraggingOver ? travelTime : 0;
+                                    const virtualMinutes = globalTimeSlots.length * 60;
+                                    const timelineWidth = (window as any).timelineWidthPx || 0;
+                                    const travelWidthPx = effectiveTravelMinutes > 0 && virtualMinutes > 0 && timelineWidth > 0
+                                      ? (effectiveTravelMinutes / virtualMinutes) * timelineWidth
+                                      : 0;
+
+                                    // CRITICAL FIX: Calcola il "waitingGap" per task con sequence >= 2
+                                    // Questo gap rappresenta l'attesa tra la fine della task precedente e l'inizio effettivo di questa task
+                                    // (es. quando c'è un checkout constraint che ritarda lo start_time)
+                                    let waitingGap = 0;
+                                    if (seq >= 2 && taskObj.start_time && !snapshot.isDraggingOver) {
+                                      // CRITICAL: L'array è ordinato per sequence, quindi idx-1 è la vera task precedente
+                                      const prevTask = idx > 0 ? cleanerTasks[idx - 1] as any : null;
+
+                                      const workDateStr = localStorage.getItem('selected_work_date') || format(new Date(), 'yyyy-MM-dd');
+
+                                      // CRITICAL: Normalizza le date per evitare mismatch di formato (es. "2025-12-15T00:00:00Z" vs "2025-12-15")
+                                      const prevTaskDate = normDate(prevTask?.checkin_date);
+                                      const prevTaskHasDifferentDate = !!(prevTaskDate && prevTaskDate !== workDateStr);
+                                      
+                                      if (prevTask && prevTask.end_time && !prevTaskHasDifferentDate) {
+                                        // Calcola la fine prevista: end_time della task precedente + travel_time
+                                        const [prevEndH, prevEndM] = prevTask.end_time.split(':').map(Number);
+                                        const prevEndMinutes = prevEndH * 60 + prevEndM;
+                                        const expectedStartMinutes = prevEndMinutes + travelTime;
+
+                                        // Calcola lo start effettivo di questa task
+                                        const [taskStartH, taskStartM] = taskObj.start_time.split(':').map(Number);
+                                        const actualStartMinutes = taskStartH * 60 + taskStartM;
+
+                                        // Se lo start effettivo è DOPO quello previsto, c'è un gap (attesa)
+                                        if (actualStartMinutes > expectedStartMinutes) {
+                                          waitingGap = actualStartMinutes - expectedStartMinutes;
+                                        }
+                                      }
+                                    }
+                                    const waitingGapWidthPx = waitingGap > 0 && virtualMinutes > 0 && timelineWidth > 0
+                                      ? (waitingGap / virtualMinutes) * timelineWidth
+                                      : 0;
+
+                                    // Usa task.id o task.task_id come chiave univoca (non logistic_code che può essere duplicato)
+                                    const uniqueKey = taskObj.task_id || taskObj.id;
+
+                                    // Verifica compatibilità task-cleaner
+                                    const isIncompatible = validationRules && cleaner?.role
+                                      ? !canCleanerHandleTaskSync(
+                                          cleaner.role,
+                                          task,
+                                          validationRules,
+                                          cleaner.can_do_straordinaria ?? false
+                                        )
+                                      : false;
+
+                                    return (
+                                      <>
+                                        {/* Travel time marker - FUORI dal Draggable (solo per sequence >= 2) */}
+                                        {seq >= 2 && travelTime > 0 && travelWidthPx > 0 && (
+                                          <div
+                                            className="flex items-center justify-center flex-shrink-0 py-3"
+                                            style={{ width: `${travelWidthPx}px`, minHeight: '50px' }}
+                                            title={`${travelTime} min`}
+                                          >
+                                            <svg
+                                              width="20"
+                                              height="20"
+                                              viewBox="0 0 24 24"
+                                              fill="currentColor"
+                                              className="text-custom-blue flex-shrink-0"
+                                            >
+                                              <path d="M13.5 5.5c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zM9.8 8.9L7 23h2.1l1.8-8 2.1 2v6h2v-7.5l-2.1-2 .6-3C14.8 12 16.8 13 19 13v-2c-1.9 0-3.5-1-4.3-2.4l-1-1.6c-.4-.6-1-1-1.7-1-.3 0-.5.1-.8.1L6 8.3V13h2V9.6l1.8-.7"/>
+                                            </svg>
+                                          </div>
+                                        )}
+
+                                        {/* Waiting gap spacer - FUORI dal Draggable (solo per sequence >= 2) */}
+                                        {seq >= 2 && waitingGap > 0 && waitingGapWidthPx > 0 && (
+                                          <div
+                                            className="flex items-center justify-center flex-shrink-0 py-3 bg-amber-100/50 dark:bg-amber-900/20 border-y border-dashed border-amber-400"
+                                            style={{ width: `${waitingGapWidthPx}px`, minHeight: '50px' }}
+                                            title={`Attesa checkout: ${waitingGap} min`}
+                                          >
+                                            <svg
+                                              width="16"
+                                              height="16"
+                                              viewBox="0 0 24 24"
+                                              fill="none"
+                                              stroke="currentColor"
+                                              strokeWidth="2"
+                                              className="text-amber-600 dark:text-amber-400 flex-shrink-0"
+                                            >
+                                              <circle cx="12" cy="12" r="10"/>
+                                              <polyline points="12,6 12,12 16,14"/>
+                                            </svg>
+                                          </div>
+                                        )}
+
+                                        <TaskCard
+                                          key={uniqueKey}
+                                          task={task}
+                                          index={idx}
+                                          isInTimeline={true}
+                                          allTasks={cleanerTasks}
+                                          isDragDisabled={isReadOnly}
+                                          isReadOnly={isReadOnly}
+                                          timeOffset={seq === 1 ? timeOffset : 0}
+                                          globalTimeSlots={globalTimeSlots.length}
+                                        />
+                                        {/* Renderizza placeholder SOLO dopo la task dove verrebbe droppata */}
+                                        {draggedTaskIndex !== null && draggedTaskIndex === idx && provided.placeholder}
+                                      </>
+                                    );
+                                  })}
+                                  {/* Placeholder finale se non c'è drag attivo o se viene droppato alla fine */}
+                                  {draggedTaskIndex === null && provided.placeholder}
+                                </>
+                              );
                             })()}
-                            {/* Placeholder finale se non c'è drag attivo o se viene droppato alla fine */}
-                            {draggedTaskIndex === null && provided.placeholder}
                           </div>
                         </div>
                       )}
