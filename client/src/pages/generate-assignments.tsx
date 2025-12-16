@@ -1571,10 +1571,10 @@ export default function GenerateAssignments() {
         }),
       });
       if (!response.ok) {
-        console.error('Errore nel salvataggio dell\'assegnazione nella timeline');
-      } else {
-        console.log(`Assegnazione salvata: taskId=${taskId}, logisticCode=${logisticCode}`);
+        const errData = await response.json().catch(() => ({}));
+        throw new Error(`Errore nel salvataggio dell'assegnazione: ${errData.error || response.statusText}`);
       }
+      console.log(`Assegnazione salvata: taskId=${taskId}, logisticCode=${logisticCode}`);
     } catch (error) {
       console.error('Errore nella chiamata API di salvataggio timeline:', error);
     }
