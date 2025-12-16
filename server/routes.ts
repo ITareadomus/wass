@@ -105,16 +105,17 @@ async function hydrateTasksFromAdamDb(cleanerData: any): Promise<any> {
       database: "adamdb",
     });
 
-    // Query adamdb for coordinates - handle both lat/lng and latitude/longitude column names
+    // Query adamdb for coordinates - lat/lng are in app_structures, not app_housekeeping
     const placeholders = taskIds.map(() => '?').join(',');
     const [rows] = await connection.execute(
       `SELECT 
-        id as task_id,
-        COALESCE(lat, latitude) as lat,
-        COALESCE(lng, longitude) as lng,
-        address
-      FROM app_housekeeping 
-      WHERE id IN (${placeholders})`,
+        h.id as task_id,
+        s.lat,
+        s.lng,
+        s.address1 as address
+      FROM app_housekeeping h
+      JOIN app_structures s ON h.structure_id = s.id
+      WHERE h.id IN (${placeholders})`,
       taskIds
     );
 
