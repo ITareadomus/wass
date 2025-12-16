@@ -49,7 +49,6 @@ interface TimelineViewProps {
   isLoadingDragDrop?: boolean; // Mostra loading overlay durante drag&drop
   lastValidDragIndex?: number | null; // Indice valido durante il drag (da container verso timeline)
   draggingOverCleanerId?: number | null; // ID del cleaner su cui si sta trascinando
-  dragProjection?: { taskId: string; cleanerId: number; index: number } | null; // Proiezione per task fantasma durante drag
 }
 
 interface Cleaner {
@@ -79,7 +78,6 @@ export default function TimelineView({
   isLoadingDragDrop = false,
   lastValidDragIndex = null,
   draggingOverCleanerId = null,
-  dragProjection = null,
 }: TimelineViewProps) {
   const [cleaners, setCleaners] = useState<Cleaner[]>([]);
   const [selectedDate, setSelectedDate] = useState<Date>(() => {
@@ -1732,7 +1730,7 @@ export default function TimelineView({
                           <div className="relative z-10 flex items-center h-full" style={{ minHeight: '45px' }}>
                             {(() => {
                               // Calcola l'array delle task per questo cleaner una sola volta
-                              let cleanerTasks = tasks
+                              const cleanerTasks = tasks
                                 .filter((task) =>
                                   (task as any).assignedCleaner === cleaner.id
                                 )
@@ -1749,25 +1747,6 @@ export default function TimelineView({
                                   const timeB = taskB.start_time || taskB.fw_start_time || taskB.startTime || "00:00";
                                   return timeA.localeCompare(timeB);
                                 });
-
-                              // PROIEZIONE: se stiamo trascinando una task verso questo cleaner, 
-                              // inserisci una task fantasma (placeholder) all'indice target
-                              if (dragProjection && dragProjection.cleanerId === cleaner.id) {
-                                const phantomTask = {
-                                  id: `phantom-${dragProjection.taskId}`,
-                                  task_id: `phantom-${dragProjection.taskId}`,
-                                  name: '...',
-                                  duration: 0,
-                                  cleaning_time: 0,
-                                  isPhantom: true, // marcatore per non renderizzare come task reale
-                                };
-                                const insertAt = Math.min(dragProjection.index, cleanerTasks.length);
-                                cleanerTasks = [
-                                  ...cleanerTasks.slice(0, insertAt),
-                                  phantomTask as any,
-                                  ...cleanerTasks.slice(insertAt)
-                                ];
-                              }
 
                               // Calcola draggedTaskIndex utilizzando snapshot (disponibile nel Droppable render function)
                               const draggedTaskKey = snapshot.draggingOverWith;
@@ -1950,12 +1929,11 @@ export default function TimelineView({
                                           </div>
                                         )}
 
-                                        {/* Task fantasma (placeholder visivo durante drag) */}
-                                        {taskObj.isPhantom ? (
-                                          <div 
-                                            className="flex-shrink-0 h-[45px] w-[80px] rounded border-2 border-dashed border-blue-400 bg-blue-100/50 dark:bg-blue-900/30"
-                                          />
-                                        ) : (
+                                        {/* Renderizza placeholder PRIMA della task all'indice target */}
+                                        {draggedTaskIndex !== null && draggedTaskIndex === idx && provided.placeholder}
+
+                                        {/* Renderizza TaskCard SOLO se NON è l'indice target del drag */}
+                                        {!(draggedTaskIndex !== null && draggedTaskIndex === idx) && (
                                           <TaskCard
                                             key={uniqueKey}
                                             task={task}
@@ -1971,8 +1949,8 @@ export default function TimelineView({
                                       </>
                                     );
                                   })}
-                                  {/* Placeholder di react-beautiful-dnd - sempre alla fine */}
-                                  {provided.placeholder}
+                                  {/* Placeholder finale se non c'è drag attivo o se viene droppato alla fine (oltre l'ultimo elemento) */}
+                                  {(draggedTaskIndex === null || draggedTaskIndex >= cleanerTasks.length) && provided.placeholder}
                                 </>
                               );
                             })()}
