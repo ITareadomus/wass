@@ -1,0 +1,105 @@
+1) Backend: correggi POST /api/timeline (server/routes.ts)
+
+File: server/routes.ts
+Endpoint: app.post("/api/timeline", ...) (intorno alla riga ~967)
+
+1A — RIMUOVI/EVITA questa logica “guard-rail” attuale
+
+Dentro l’endpoint, c’è un blocco che:
+
+ordina le task per start_time
+
+rinumera sequence
+
+ricalcola travel_time come start_time - prevEnd
+
+Questa parte è la causa principale del bug: non ricalcola davvero i tempi geo, e quando gli script auto mettono start_time “placeholder” (es. 10:00) o quando manual move non aggiorna start_time coerente, ti ritrovi tutte a 10:00 o travel_time nonsense.
+
+➡️ Quindi: togli l’ordinamento per start_time e togli il travel_time = gap.
+
+1B — SOSTITUISCI con: “idrata coords” + “recalculateCleanerTimes” per ogni cleaner
+
+Sempre in POST /api/timeline, dopo aver costruito timelineData, fai:
+
+Per ogni entry in timelineData.cleaners_assignments:
+
+ordina per sequence (o lascia ordine array se già coerente)
+
+rinumera sequence = 1..N e followup
+
+hydrateTasksFromContainers(entry, workDate) (così lat/lng/address non sono null)
+
+recalculateCleanerTimes(entry, workDate) (chiama client/public/scripts/recalculate_times.py)
+
+rimpiazza entry.tasks con quelle ricalcolate
+
+Snippet (da incollare dentro l’endpoint, al posto del blocco guard-rail):
+
+if (timelineData.cleaners_assignments && Array.isArray(timelineData.cleaners_assignments)) {
+  for (let idx = 0; idx < timelineData.cleaners_assignments.length; idx++) {
+    let entry = timelineData.cleaners_assignments[idx];
+    const tasks = entry.tasks;
+
+    if (!tasks || !Array.isArray(tasks) || tasks.length === 0) continue;
+
+    // 1) Ordina per sequence (NON per start_time)
+    tasks.sort((a: any, b: any) => (a.sequence ?? 9999) - (b.sequence ?? 9999));
+
+    // 2) Normalizza sequence + followup
+    for (let i = 0; i < tasks.length; i++) {
+      tasks[i].sequence = i + 1;
+      tasks[i].followup = i > 0;
+    }
+
+    // 3) Hydrate coords/address (fondamentale per travel_time realistico)
+    entry = await hydrateTasksFromContainers(entry, workDate);
+
+    // 4) Ricalcolo reale start/end/travel via Python
+    entry = await recalculateCleanerTimes(entry, workDate);
+
+    // 5) Salva back
+    timelineData.cleaners_assignments[idx] = entry;
+  }
+}
+
+
+✅ Risultato: quando lo script auto-assign salva la timeline, il server la rende coerente (start/end/travel) anche se prima hai fatto uno spostamento manuale.
+
+2) Python: fai rispettare un eventuale start_time già presente come “vincolo minimo”
+
+File: client/public/scripts/recalculate_times.py
+Funzione: recalculate_cleaner_times()
+
+Problema tipico: alcune task (soprattutto auto) arrivano con start_time placeholder o già calcolato; dopo un riordino manuale vuoi evitare che il recalc le anticipi “a caso”.
+
+Modifica
+
+Per ogni task, prima di finalizzare start_time_min, aggiungi:
+
+se task["start_time"] è valido → trattalo come minimo: start_time_min = max(start_time_min, that_value)
+
+Punto pratico: dopo che hai calcolato start_time_min (sia nel ramo i==0 che else), inserisci:
+
+existing_start = task.get("start_time")
+if existing_start:
+    try:
+        existing_min = time_to_minutes(existing_start)
+        if start_time_min < existing_min:
+            start_time_min = existing_min
+            current_time_min = max(current_time_min, existing_min)
+    except:
+        pass
+
+
+✅ Risultato: se una task aveva già un orario “sensato”, il recalc non la riporta indietro.
+
+3) (Consigliato) Assicurati che gli script auto-assign NON si affidino allo start_time “di default”
+
+Negli script assign_hp.py / assign_lp.py / assign_eo.py spesso le Task hanno start_time di default (tipo "10:00").
+Non è obbligatorio toccarli se fai il ricalcolo server-side al salvataggio (punto 1), però è consigliato:
+
+quando costruisci la timeline da salvare, non mettere start_time fisso se non è realmente calcolato
+
+oppure metti start_time = None/vuoto e lascia fare al recalc finale
+
+✅ Questo evita che l’ordinamento/normalizzazione lato server (se qualcuno lo rimette in futuro) venga “ingannato” dai placeholder.
