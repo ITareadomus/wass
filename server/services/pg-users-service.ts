@@ -29,10 +29,10 @@ export class PgUsersService {
     }
   }
 
-  async getAllUsers(): Promise<Omit<User, 'password'>[]> {
+  async getAllUsers(): Promise<User[]> {
     try {
-      // SECURITY: Never return passwords to clients
-      const result = await query('SELECT id, username, role, created_at, updated_at FROM users ORDER BY id');
+      // Include passwords for admin settings page
+      const result = await query('SELECT id, username, password, role, created_at, updated_at FROM users ORDER BY id');
       return result.rows;
     } catch (error) {
       console.error('❌ PG: Errore nel caricamento users:', error);
