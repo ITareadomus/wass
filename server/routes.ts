@@ -2947,6 +2947,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.log(`📝 Stesso utente (${username}) - nessuna nuova revision creata`);
       }
 
+      // Recupera adam_id dell'utente per usarlo come updated_by
+      const { pgUsersService } = await import("./services/pg-users-service");
+      const userRecord = await pgUsersService.getUserByUsername(username);
+      const adamUpdatedBy = userRecord?.adam_id ? `E${userRecord.adam_id}` : username;
+      console.log(`📝 updated_by per ADAM: ${adamUpdatedBy} (adam_id: ${userRecord?.adam_id || 'N/A'})`);
+
       // Connessione MySQL a ADAM
       let connection: any = null;
       let totalUpdated = 0;
@@ -3008,7 +3014,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 task.operation_id ?? null,
                 cleanerId ?? null,
                 task.sequence ?? null,
-                username,
+                adamUpdatedBy,
                 new Date().toISOString().replace('T', ' ').substring(0, 19)
               ];
 
