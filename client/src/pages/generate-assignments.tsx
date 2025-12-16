@@ -1559,7 +1559,7 @@ export default function GenerateAssignments() {
           taskId: task.id,
           logisticCode: task.name,
           cleanerId: cleanerId,
-          dropIndex: dropIndex,
+          insertAt: dropIndex,
           taskData: task,
           priority: priority,
           date: dateStr,
