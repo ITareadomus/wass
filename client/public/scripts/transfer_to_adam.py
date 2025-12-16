@@ -28,7 +28,7 @@ BASE = Path(__file__).parent.parent / "data"
 TIMELINE_PATH = BASE / "output" / "timeline.json"
 
 
-def transfer_to_adam(work_date: str, username: str = "system"):
+def transfer_to_adam(work_date: str, username: str = "E0"):
     """
     Trasferisce le assegnazioni dalla timeline al database ADAM
     
@@ -198,7 +198,7 @@ def main():
         print(f"⚠️ Nessuna data specificata, usando oggi: {work_date}")
     
     # Leggi username (opzionale)
-    username = sys.argv[2] if len(sys.argv) > 2 else "system"
+    username = sys.argv[2] if len(sys.argv) > 2 else "E0"
     
     # Esegui trasferimento
     result = transfer_to_adam(work_date, username)

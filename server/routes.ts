@@ -2917,6 +2917,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Carica timeline da PostgreSQL
       const timelineData = await workspaceFiles.loadTimeline(workDate);
+      
+      // ========== ADAM APPROVAL LOGIC ==========
+      // Se l'utente che invia è diverso da chi ha fatto l'ultima revision,
+      // crea una nuova revision con modification_type = 'adam_approval'
+      // Questo attesta che l'utente si fa carico della timeline di un altro
+      const { pgDailyAssignmentsService } = await import('./services/pg-daily-assignments-service');
+      const revisions = await pgDailyAssignmentsService.getHistoryRevisions(workDate);
+      
+      if (revisions.length > 0) {
+        const lastRevision = revisions[0]; // Ordinato per DESC, quindi il primo è l'ultimo
+        const lastCreatedBy = lastRevision.created_by;
+        
+        if (lastCreatedBy && lastCreatedBy !== username) {
+          console.log(`📋 ADAM Approval: Utente ${username} invia timeline di ${lastCreatedBy} - creando revision di approvazione`);
+          
+          // Crea una nuova revision con modification_type = 'adam_approval'
+          await pgDailyAssignmentsService.saveToHistory(
+            workDate,
+            timelineData,
+            username,
+            'adam_approval',
+            ['approved_by'],
+            [lastCreatedBy],
+            [username]
+          );
+          
+          console.log(`✅ Revision 'adam_approval' creata: ${username} approva il lavoro di ${lastCreatedBy}`);
+        } else {
+          console.log(`📋 Stesso utente (${username}) ha fatto l'ultima modifica - nessuna revision di approvazione necessaria`);
+        }
+      } else {
+        console.log(`📋 Nessuna revision precedente trovata per ${workDate}`);
+      }
+      // ========== END ADAM APPROVAL LOGIC ==========
       if (!timelineData || !timelineData.cleaners_assignments || timelineData.cleaners_assignments.length === 0) {
         console.log("⚠️ Nessuna assegnazione trovata per il trasferimento");
         return res.json({
