@@ -95,6 +95,8 @@ async function hydrateTasksFromContainers(cleanerData: any, workDate: string): P
       .map((t: any) => t.task_id)
       .filter((id: any) => id != null);
     
+    console.log(`🔍 Hydration: searching for task_ids: ${JSON.stringify(taskIds)} on date ${workDate}`);
+    
     if (taskIds.length === 0) {
       return cleanerData;
     }
@@ -110,6 +112,8 @@ async function hydrateTasksFromContainers(cleanerData: any, workDate: string): P
         WHERE work_date = $1 AND task_id = ANY($2)
       ) combined
     `, [workDate, taskIds]);
+    
+    console.log(`🔍 Hydration query returned ${result.rows.length} rows:`, result.rows.slice(0, 3));
 
     // Build lookup map - first occurrence wins (assignments take priority)
     const coordsMap = new Map<number, { lat: number | null; lng: number | null; address: string | null }>();
