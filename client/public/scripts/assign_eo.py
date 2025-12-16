@@ -266,6 +266,31 @@ def haversine_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
     return R * c
 
 
+def travel_minutes_raw(lat1: float, lng1: float, lat2: float, lng2: float) -> float:
+    """
+    Calcola travel time tra due coordinate (versione raw senza oggetti Task).
+    Modello realistico Milano urbano.
+    """
+    km = haversine_km(lat1, lng1, lat2, lng2)
+    
+    # Fattore correzione percorsi non rettilinei
+    dist_reale = km * 1.5
+    
+    # Modello progressivo
+    if dist_reale < 0.8:
+        travel_time = dist_reale * 6.0  # ~10 km/h a piedi
+    elif dist_reale < 2.5:
+        travel_time = dist_reale * 10.0  # ~6 km/h misto
+    else:
+        travel_time = dist_reale * 5.0  # ~12 km/h mezzi
+    
+    # Tempo base
+    base_time = 5.0
+    total_time = base_time + travel_time
+    
+    return max(MIN_TRAVEL, min(MAX_TRAVEL, total_time))
+
+
 def travel_minutes(a: Optional[Task], b: Optional[Task]) -> float:
     """
     Modello realistico Milano urbano:
@@ -1224,38 +1249,37 @@ def main():
         if not tasks:
             continue
             
-        prev_end_min = None
+        prev_task = None
         for i, task in enumerate(tasks):
             # Rinumera sequence (1-based)
             task["sequence"] = i + 1
             task["followup"] = i > 0
             
-            # Ricalcola travel_time basandosi su start_time corrente e end_time precedente
-            # SAFEGUARD: Verifica che i tempi siano validi prima di calcolare
-            start_time_str = task.get("start_time")
-            if i > 0 and prev_end_min is not None and start_time_str and ":" in str(start_time_str):
-                try:
-                    start_min = hhmm_to_min(start_time_str, "00:00")
-                    travel = max(0, start_min - prev_end_min)
-                    task["travel_time"] = travel
-                except (ValueError, TypeError):
-                    # Se parsing fallisce, mantieni travel_time esistente o default a 0
-                    if "travel_time" not in task:
+            # Ricalcola travel_time usando le coordinate geografiche
+            if i > 0 and prev_task is not None:
+                # Usa travel_minutes_raw con le coordinate delle task
+                prev_lat = prev_task.get("lat")
+                prev_lng = prev_task.get("lng")
+                curr_lat = task.get("lat")
+                curr_lng = task.get("lng")
+                
+                if prev_lat and prev_lng and curr_lat and curr_lng:
+                    try:
+                        travel = int(round(travel_minutes_raw(
+                            float(prev_lat), float(prev_lng),
+                            float(curr_lat), float(curr_lng)
+                        )))
+                        task["travel_time"] = travel
+                    except (ValueError, TypeError):
                         task["travel_time"] = 0
+                else:
+                    # Coordinate mancanti: usa default
+                    task["travel_time"] = 0
             else:
-                # Prima task o tempo mancante: travel_time = 0
+                # Prima task: travel_time = 0
                 task["travel_time"] = 0
             
-            # Salva end_time corrente per la prossima iterazione
-            # SAFEGUARD: Solo se end_time è valido
-            end_time_str = task.get("end_time")
-            if end_time_str and ":" in str(end_time_str):
-                try:
-                    prev_end_min = hhmm_to_min(end_time_str, "00:00")
-                except (ValueError, TypeError):
-                    prev_end_min = None
-            else:
-                prev_end_min = None
+            prev_task = task
 
     # Aggiorna meta
     # Conta i cleaner totali disponibili
