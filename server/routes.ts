@@ -79,108 +79,66 @@ async function getAllCleanersForDate(workDate: string): Promise<any[]> {
 }
 
 /**
- * Helper: Hydrate tasks with lat/lng/address from adamdb
+ * Helper: Hydrate tasks with lat/lng/address from PostgreSQL containers
  * This ensures tasks have real coordinates before travel time calculation
  */
-async function hydrateTasksFromAdamDb(cleanerData: any): Promise<any> {
+async function hydrateTasksFromContainers(cleanerData: any, workDate: string): Promise<any> {
   if (!cleanerData?.tasks || cleanerData.tasks.length === 0) {
     return cleanerData;
   }
 
-  // Collect all task_ids that need coordinates
-  const taskIds = cleanerData.tasks
-    .map((t: any) => t.task_id)
-    .filter((id: any) => id != null);
-
-  if (taskIds.length === 0) {
-    return cleanerData;
-  }
-
-  let connection: any = null;
   try {
-    connection = await mysql.createConnection({
-      host: "139.59.132.41",
-      user: "admin",
-      password: "ed329a875c6c4ebdf4e87e2bbe53a15771b5844ef6606dde",
-      database: "adamdb",
-    });
-
-    // Query adamdb for coordinates - lat/lng are in app_structures, not app_housekeeping
-    const placeholders = taskIds.map(() => '?').join(',');
-    const [rows] = await connection.execute(
-      `SELECT 
-        h.id as task_id,
-        s.lat,
-        s.lng,
-        s.address1 as address
-      FROM app_housekeeping h
-      JOIN app_structures s ON h.structure_id = s.id
-      WHERE h.id IN (${placeholders})`,
-      taskIds
-    );
-
-    await connection.end();
-
-    // Helper to parse coordinates that may use comma as decimal separator (European format)
-    const parseCoord = (val: any): number | null => {
-      if (val == null || val === '') return null;
-      // Convert string with comma to use dot as decimal separator
-      const strVal = String(val).replace(',', '.');
-      const num = parseFloat(strVal);
-      // Filter out 0/0 or invalid coordinates
-      if (isNaN(num) || Math.abs(num) < 0.0001) return null;
-      return num;
-    };
-
-    // Create lookup map - filter out zero/falsy coordinates to ensure they become null
-    const coordsMap = new Map<number, { lat: number | null; lng: number | null; address: string | null }>();
-    for (const row of rows as any[]) {
-      const lat = parseCoord(row.lat);
-      const lng = parseCoord(row.lng);
-      
-      coordsMap.set(row.task_id, {
-        lat,
-        lng,
-        address: row.address || null
-      });
+    const { pgDailyAssignmentsService } = await import("./services/pg-daily-assignments-service");
+    const containers = await pgDailyAssignmentsService.loadContainers(workDate);
+    
+    if (!containers) {
+      console.log(`⚠️ No containers found in PostgreSQL for ${workDate}`);
+      return cleanerData;
     }
 
-    // Merge coordinates into tasks - ALWAYS use adamdb as authoritative source for coordinates
+    // Build lookup map from all container priorities
+    const coordsMap = new Map<number, { lat: number | null; lng: number | null; address: string | null }>();
+    
+    const allPriorities = ['early_out', 'high_priority', 'low_priority'];
+    for (const priority of allPriorities) {
+      const tasks = containers.containers?.[priority]?.tasks || [];
+      for (const task of tasks) {
+        if (task.task_id) {
+          // Parse coordinates - they might be strings from PostgreSQL
+          const lat = task.lat != null ? parseFloat(String(task.lat)) : null;
+          const lng = task.lng != null ? parseFloat(String(task.lng)) : null;
+          
+          coordsMap.set(task.task_id, {
+            lat: (lat && !isNaN(lat) && Math.abs(lat) > 0.0001) ? lat : null,
+            lng: (lng && !isNaN(lng) && Math.abs(lng) > 0.0001) ? lng : null,
+            address: task.address || null
+          });
+        }
+      }
+    }
+
+    // Merge coordinates into cleaner's tasks
     let hydratedCount = 0;
     for (const task of cleanerData.tasks) {
-      const adamGeo = coordsMap.get(task.task_id);
-      if (adamGeo) {
-        const oldLat = task.lat;
-        const oldLng = task.lng;
-        
-        // Always update from adamdb if we have valid coordinates
-        if (adamGeo.lat !== null) {
-          task.lat = adamGeo.lat;
+      const containerGeo = coordsMap.get(task.task_id);
+      if (containerGeo) {
+        // Always update from containers if we have valid coordinates
+        if (containerGeo.lat !== null) {
+          task.lat = containerGeo.lat;
           hydratedCount++;
         }
-        if (adamGeo.lng !== null) {
-          task.lng = adamGeo.lng;
+        if (containerGeo.lng !== null) {
+          task.lng = containerGeo.lng;
         }
-        if (adamGeo.address) {
-          task.address = adamGeo.address;
+        if (containerGeo.address && !task.address) {
+          task.address = containerGeo.address;
         }
-        
-        console.log(`📍 Task ${task.task_id} (${task.logistic_code}): lat ${oldLat} → ${task.lat}, lng ${oldLng} → ${task.lng}`);
       }
     }
 
-    console.log(`✅ Hydrated ${hydratedCount}/${taskIds.length} tasks with valid coordinates from adamdb (${coordsMap.size} found in DB)`);
+    console.log(`✅ Hydrated ${hydratedCount}/${cleanerData.tasks.length} tasks with coordinates from PostgreSQL containers`);
   } catch (error: any) {
-    console.warn(`⚠️ Could not hydrate tasks from adamdb: ${error.message}`);
-    // Non-blocking - continue without coordinates
-  } finally {
-    if (connection) {
-      try {
-        await connection.end();
-      } catch (e) {
-        // Ignore close errors
-      }
-    }
+    console.warn(`⚠️ Could not hydrate tasks from containers: ${error.message}`);
   }
 
   return cleanerData;
@@ -564,14 +522,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       try {
         // Ricalcola cleaner di origine (se ha ancora task)
         if (sourceEntry && sourceEntry.tasks.length > 0) {
-          await hydrateTasksFromAdamDb(sourceEntry);
+          await hydrateTasksFromContainers(sourceEntry, workDate);
           const updatedSourceData = await recalculateCleanerTimes(sourceEntry);
           sourceEntry.tasks = updatedSourceData.tasks;
           console.log(`✅ Tempi ricalcolati per cleaner sorgente ${sourceCleanerId}`);
         }
 
         // Ricalcola cleaner di destinazione
-        await hydrateTasksFromAdamDb(destEntry);
+        await hydrateTasksFromContainers(destEntry, workDate);
         const updatedDestData = await recalculateCleanerTimes(destEntry);
         destEntry.tasks = updatedDestData.tasks;
         console.log(`✅ Tempi ricalcolati per cleaner destinazione ${destCleanerId}`);
@@ -742,14 +700,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Ricalcola tempi per entrambi i cleaners
       try {
         if (sourceEntry.tasks.length > 0) {
-          await hydrateTasksFromAdamDb(sourceEntry);
+          await hydrateTasksFromContainers(sourceEntry, workDate);
           const updatedSourceData = await recalculateCleanerTimes(sourceEntry);
           sourceEntry.tasks = updatedSourceData.tasks;
           console.log(`✅ Tempi ricalcolati per cleaner ${sourceCleanerId} (dopo swap)`);
         }
 
         if (destEntry.tasks.length > 0) {
-          await hydrateTasksFromAdamDb(destEntry);
+          await hydrateTasksFromContainers(destEntry, workDate);
           const updatedDestData = await recalculateCleanerTimes(destEntry);
           destEntry.tasks = updatedDestData.tasks;
           console.log(`✅ Tempi ricalcolati per cleaner ${destCleanerId} (dopo swap)`);
@@ -1551,7 +1509,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Ricalcola travel_time, start_time, end_time usando lo script Python
       try {
-        await hydrateTasksFromAdamDb(cleanerEntry);
+        await hydrateTasksFromContainers(cleanerEntry, workDate);
         const updatedCleanerData = await recalculateCleanerTimes(cleanerEntry);
         cleanerEntry.tasks = updatedCleanerData.tasks;
         console.log(`✅ Tempi ricalcolati per cleaner ${normalizedCleanerId}`);
@@ -2246,7 +2204,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Ricalcola i tempi per le task con il nuovo cleaner
         if (taskCount > 0) {
           try {
-            await hydrateTasksFromAdamDb(cleanerToReplace);
+            await hydrateTasksFromContainers(cleanerToReplace, workDate);
             const updatedData = await recalculateCleanerTimes(cleanerToReplace);
             cleanerToReplace.tasks = updatedData.tasks;
             console.log(`✅ Tempi ricalcolati per ${taskCount} task del nuovo cleaner ${cleanerId}`);
@@ -4175,7 +4133,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Ricalcola tempi usando lo script Python per avere start_time/end_time coerenti con la sequenza
       try {
-        await hydrateTasksFromAdamDb(dstEntry);
+        await hydrateTasksFromContainers(dstEntry, workDate);
         const updatedDst = await recalculateCleanerTimes(dstEntry);
         dstEntry.tasks = updatedDst.tasks;
         console.log(`✅ Tempi ricalcolati per cleaner ${toCleanerId} dopo inserimento`);
@@ -4184,7 +4142,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (typeof fromCleanerId === 'number' && fromCleanerId !== toCleanerId) {
           const srcEntry = getCleanerEntry(fromCleanerId);
           if (srcEntry && srcEntry.tasks.length > 0) {
-            await hydrateTasksFromAdamDb(srcEntry);
+            await hydrateTasksFromContainers(srcEntry, workDate);
             const updatedSrc = await recalculateCleanerTimes(srcEntry);
             srcEntry.tasks = updatedSrc.tasks;
             console.log(`✅ Tempi ricalcolati per cleaner ${fromCleanerId} dopo rimozione`);
@@ -4275,7 +4233,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Ricalcola travel_time, start_time, end_time usando lo script Python
       try {
-        await hydrateTasksFromAdamDb(cleanerEntry);
+        await hydrateTasksFromContainers(cleanerEntry, workDate);
         const updatedCleanerData = await recalculateCleanerTimes(cleanerEntry);
         // Sostituisci le task con quelle ricalcolate
         cleanerEntry.tasks = updatedCleanerData.tasks;
