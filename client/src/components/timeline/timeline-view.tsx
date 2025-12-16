@@ -1214,38 +1214,22 @@ export default function TimelineView({
 
   const [lastSavedFilename, setLastSavedFilename] = useState<string | null>(null);
 
-  const loadTimelineCleaners = async (onLoadComplete?: () => void) => {
+  const loadTimelineCleaners = async () => {
     try {
       const dateStr = format(selectedDate, 'yyyy-MM-dd');
       const response = await fetch(`/api/timeline?date=${dateStr}`);
       if (!response.ok) {
         console.warn(`Timeline not found (${response.status}), using empty timeline`);
         setTimelineCleaners([]);
-        // Attendi il prossimo frame del browser prima di chiamare il callback
-        if (onLoadComplete) {
-          await new Promise(resolve => requestAnimationFrame(() => resolve(null)));
-          onLoadComplete();
-        }
         return;
       }
 
       const timelineData = await response.json();
       const timelineCleanersList = timelineData.cleaners_assignments || [];
       setTimelineCleaners(timelineCleanersList);
-      
-      // CRITICAL: Attendi il prossimo frame del browser per assicurarti che React abbia completato il render
-      if (onLoadComplete) {
-        await new Promise(resolve => requestAnimationFrame(() => resolve(null)));
-        onLoadComplete();
-      }
     } catch (error) {
       console.error("Errore nel caricamento timeline cleaners:", error);
       setTimelineCleaners([]);
-      // Attendi il prossimo frame del browser prima di chiamare il callback
-      if (onLoadComplete) {
-        await new Promise(resolve => requestAnimationFrame(() => resolve(null)));
-        onLoadComplete();
-      }
     }
   };
 
