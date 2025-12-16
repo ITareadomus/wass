@@ -812,14 +812,7 @@ export default function GenerateAssignments() {
           }
 
           // Ricarica i task per mostrare i dati aggiornati
-          console.log("⏳ Caricamento task in corso (includerà recalcolo tempi)...");
           await loadTasks(true);
-          
-          // CRITICAL: Attendi che il server finisca il recalcolo dei tempi
-          // Questo è necessario perché il POST /api/load-saved-assignments nel backend
-          // chiama il POST /api/timeline che ricalcola i travel_time
-          console.log("⏳ Attendendo completamento recalcolo tempi dal server...");
-          await new Promise(resolve => setTimeout(resolve, 500));
 
           // SOLO date passate sono READ-ONLY, tutte le altre (corrente e future) sono EDITABILI
           const toastMessage = isPastDate
@@ -845,22 +838,16 @@ export default function GenerateAssignments() {
             console.log("✏️ Timeline impostata in modalità EDITABILE (data corrente/futura con salvataggio)");
           }
 
-          // Ricarica la timeline UI e aspetta che il rendering sia completato
+          // Ricarica la timeline UI
           if ((window as any).loadTimelineCleaners) {
             console.log("🔄 Ricaricamento timeline cleaners dopo auto-load...");
-            setExtractionStep("⏳ Generazione visualizzazione travel time...");
-            await new Promise<void>(resolve => {
-              (window as any).loadTimelineCleaners(() => {
-                console.log("✅ Timeline cleaners caricati e renderizzati");
-                resolve();
-              });
-            });
+            await (window as any).loadTimelineCleaners();
           }
 
           // CRITICAL: Dopo aver caricato assegnazioni salvate, NON ci sono modifiche
           setHasUnsavedChanges(false);
 
-          setExtractionStep("✅ Timeline pronta!");
+          setExtractionStep("Assegnazioni caricate!");
           await new Promise(resolve => setTimeout(resolve, 100));
           setIsExtracting(false);
         } else {
