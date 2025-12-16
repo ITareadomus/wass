@@ -986,59 +986,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       };
 
-      // FIX C: Guard-rail - Normalizza sequence per ogni cleaner prima di salvare
-      // Questo previene sequence duplicate o buchi
-      // Helper: Parse HH:MM to minutes safely
-      const parseHHMMSafe = (timeStr: any): number | null => {
-        if (!timeStr || typeof timeStr !== 'string' || !timeStr.includes(':')) return null;
-        try {
-          const parts = timeStr.split(':');
-          if (parts.length < 2) return null;
-          const h = parseInt(parts[0], 10);
-          const m = parseInt(parts[1], 10);
-          if (isNaN(h) || isNaN(m) || h < 0 || h > 23 || m < 0 || m > 59) return null;
-          return h * 60 + m;
-        } catch {
-          return null;
-        }
-      };
-      
+      // Hydrate coords + recalculate times per ogni cleaner
       if (timelineData.cleaners_assignments && Array.isArray(timelineData.cleaners_assignments)) {
-        for (const entry of timelineData.cleaners_assignments) {
+        for (let idx = 0; idx < timelineData.cleaners_assignments.length; idx++) {
+          let entry = timelineData.cleaners_assignments[idx];
           const tasks = entry.tasks;
+
           if (!tasks || !Array.isArray(tasks) || tasks.length === 0) continue;
-          
-          // FIX: Ordina per start_time usando comparazione NUMERICA
-          // Questo gestisce correttamente "9:30" vs "10:00"
-          tasks.sort((a: any, b: any) => {
-            const stA = parseHHMMSafe(a.start_time) ?? 9999;
-            const stB = parseHHMMSafe(b.start_time) ?? 9999;
-            if (stA !== stB) return stA - stB;
-            // Secondary: mantieni ordine originale per tempi uguali
-            const seqA = a.sequence ?? 9999;
-            const seqB = b.sequence ?? 9999;
-            return seqA - seqB;
-          });
-          
-          // Rinumera sequence 1..N e correggi followup
-          let prevEndMin: number | null = null;
+
+          // 1) Ordina per sequence (NON per start_time)
+          tasks.sort((a: any, b: any) => (a.sequence ?? 9999) - (b.sequence ?? 9999));
+
+          // 2) Normalizza sequence + followup
           for (let i = 0; i < tasks.length; i++) {
-            const task = tasks[i];
-            task.sequence = i + 1;
-            task.followup = i > 0;
-            
-            // Ricalcola travel_time solo se abbiamo dati validi
-            const startMin = parseHHMMSafe(task.start_time);
-            if (i > 0 && prevEndMin !== null && startMin !== null) {
-              task.travel_time = Math.max(0, startMin - prevEndMin);
-            } else if (i === 0) {
-              task.travel_time = 0;
-            }
-            // Se dati mancanti, mantieni travel_time esistente
-            
-            // Salva end_time per prossima iterazione
-            prevEndMin = parseHHMMSafe(task.end_time);
+            tasks[i].sequence = i + 1;
+            tasks[i].followup = i > 0;
           }
+
+          // 3) Hydrate coords/address (fondamentale per travel_time realistico)
+          entry = await hydrateTasksFromContainers(entry, workDate);
+
+          // 4) Ricalcolo reale start/end/travel via Python
+          entry = await recalculateCleanerTimes(entry, workDate);
+
+          // 5) Salva back
+          timelineData.cleaners_assignments[idx] = entry;
         }
         console.log(`   ✅ Sequence normalizzate per ${timelineData.cleaners_assignments.length} cleaners`);
       }

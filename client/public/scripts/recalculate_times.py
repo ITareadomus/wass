@@ -220,7 +220,18 @@ def recalculate_cleaner_times(cleaner_data: Dict[str, Any]) -> Dict[str, Any]:
                 except (ValueError, AttributeError):
                     # Se checkout_time non è valido, ignora il vincolo
                     pass
-                    pass
+
+        # Rispetta start_time esistente come vincolo minimo
+        # Se la task aveva già un orario sensato, non riportarla indietro
+        existing_start = task.get("start_time")
+        if existing_start:
+            try:
+                existing_min = time_to_minutes(existing_start)
+                if start_time_min < existing_min:
+                    start_time_min = existing_min
+                    current_time_min = max(current_time_min, existing_min)
+            except (ValueError, AttributeError):
+                pass
 
         # End time: start + cleaning_time
         end_time_min = start_time_min + cleaning_time
