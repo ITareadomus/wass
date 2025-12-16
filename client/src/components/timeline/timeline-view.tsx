@@ -1929,9 +1929,6 @@ export default function TimelineView({
                                           </div>
                                         )}
 
-                                        {/* Renderizza placeholder PRIMA della task all'indice target */}
-                                        {draggedTaskIndex !== null && draggedTaskIndex === idx && provided.placeholder}
-
                                         <TaskCard
                                           key={uniqueKey}
                                           task={task}
@@ -1946,8 +1943,8 @@ export default function TimelineView({
                                       </>
                                     );
                                   })}
-                                  {/* Placeholder finale se non c'è drag attivo o se viene droppato alla fine (oltre l'ultimo elemento) */}
-                                  {(draggedTaskIndex === null || draggedTaskIndex >= cleanerTasks.length) && provided.placeholder}
+                                  {/* Placeholder di react-beautiful-dnd - sempre alla fine */}
+                                  {provided.placeholder}
                                 </>
                               );
                             })()}
