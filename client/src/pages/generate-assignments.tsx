@@ -504,14 +504,6 @@ export default function GenerateAssignments() {
   
   // Traccia il cleaner su cui si sta trascinando per posizionare il placeholder
   const [draggingOverCleanerId, setDraggingOverCleanerId] = useState<number | null>(null);
-  
-  // Proiezione del drag: quando si trascina da un container verso timeline, 
-  // questo contiene i dati per inserire una task fantasma nell'array
-  const [dragProjection, setDragProjection] = useState<{
-    taskId: string;
-    cleanerId: number;
-    index: number;
-  } | null>(null);
 
   // Stati per selezione multipla INDIPENDENTE per container (ma selezione CROSS-CONTAINER)
   const [multiSelectModes, setMultiSelectModes] = useState<{
@@ -1679,25 +1671,22 @@ export default function GenerateAssignments() {
   };
 
   const onDragUpdate = (update: any) => {
-    const { destination, source, draggableId } = update;
+    const { destination } = update;
 
     if (!destination) {
       setDragSequencePreview(null);
       setLastValidDragIndex(null);
       setDraggingOverCleanerId(null);
-      setDragProjection(null);
       return;
     }
 
     const toCleanerId = parseCleanerId(destination.droppableId);
-    const fromCleanerId = parseCleanerId(source.droppableId);
 
     // Mostriamo il numero di sequenza solo quando siamo sulla timeline di un cleaner
     if (toCleanerId === null) {
       setDragSequencePreview(null);
       setLastValidDragIndex(null);
       setDraggingOverCleanerId(null);
-      setDragProjection(null);
       return;
     }
 
@@ -1708,25 +1697,12 @@ export default function GenerateAssignments() {
       // index è 0-based, mostrato come 1-based
       sequenceIndex: destination.index + 1,
     });
-    
-    // Proiezione: se stiamo trascinando da un container (non da timeline) verso timeline
-    // oppure tra cleaners diversi, setta la proiezione per inserire task fantasma
-    if (fromCleanerId !== toCleanerId) {
-      setDragProjection({
-        taskId: draggableId,
-        cleanerId: toCleanerId,
-        index: destination.index,
-      });
-    } else {
-      setDragProjection(null);
-    }
   };
 
   const onDragEnd = async (result: any) => {
     setDragSequencePreview(null);
     setLastValidDragIndex(null);
     setDraggingOverCleanerId(null);
-    setDragProjection(null);
     setIsLoadingDragDrop(true);
 
     const { destination, source, draggableId } = result;
@@ -2284,7 +2260,6 @@ export default function GenerateAssignments() {
                   isLoadingDragDrop={isLoadingDragDrop}
                   lastValidDragIndex={lastValidDragIndex}
                   draggingOverCleanerId={draggingOverCleanerId}
-                  dragProjection={dragProjection}
                 />
               </div>
             </div>
