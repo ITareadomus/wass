@@ -100,12 +100,13 @@ async function hydrateTasksFromContainers(cleanerData: any, workDate: string): P
     }
 
     // Query both tables to find coordinates - assignments first (already assigned), then containers (unassigned)
+    // CAST to numeric because daily_containers stores lat/lng as varchar while daily_assignments_current uses numeric
     const result = await query(`
       SELECT task_id, lat, lng, address FROM (
-        SELECT task_id, lat, lng, address FROM daily_assignments_current 
+        SELECT task_id, lat::numeric, lng::numeric, address FROM daily_assignments_current 
         WHERE work_date = $1 AND task_id = ANY($2)
         UNION ALL
-        SELECT task_id, lat, lng, address FROM daily_containers 
+        SELECT task_id, lat::numeric, lng::numeric, address FROM daily_containers 
         WHERE work_date = $1 AND task_id = ANY($2)
       ) combined
     `, [workDate, taskIds]);
