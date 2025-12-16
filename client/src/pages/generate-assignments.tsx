@@ -501,6 +501,9 @@ export default function GenerateAssignments() {
   
   // Traccia l'indice valido durante il drag per evitare bug con destination.index
   const [lastValidDragIndex, setLastValidDragIndex] = useState<number | null>(null);
+  
+  // Traccia il cleaner su cui si sta trascinando per posizionare il placeholder
+  const [draggingOverCleanerId, setDraggingOverCleanerId] = useState<number | null>(null);
 
   // Stati per selezione multipla INDIPENDENTE per container (ma selezione CROSS-CONTAINER)
   const [multiSelectModes, setMultiSelectModes] = useState<{
@@ -1673,6 +1676,7 @@ export default function GenerateAssignments() {
     if (!destination) {
       setDragSequencePreview(null);
       setLastValidDragIndex(null);
+      setDraggingOverCleanerId(null);
       return;
     }
 
@@ -1682,11 +1686,13 @@ export default function GenerateAssignments() {
     if (toCleanerId === null) {
       setDragSequencePreview(null);
       setLastValidDragIndex(null);
+      setDraggingOverCleanerId(null);
       return;
     }
 
     // CRITICAL: Salva l'indice valido durante il drag per evitare bug con destination.index inaffidabile
     setLastValidDragIndex(destination.index);
+    setDraggingOverCleanerId(toCleanerId);
     setDragSequencePreview({
       // index è 0-based, mostrato come 1-based
       sequenceIndex: destination.index + 1,
@@ -1696,6 +1702,7 @@ export default function GenerateAssignments() {
   const onDragEnd = async (result: any) => {
     setDragSequencePreview(null);
     setLastValidDragIndex(null);
+    setDraggingOverCleanerId(null);
     setIsLoadingDragDrop(true);
 
     const { destination, source, draggableId } = result;
@@ -2251,6 +2258,8 @@ export default function GenerateAssignments() {
                   onTaskMoved={handleTaskMoved}
                   isReadOnly={isTimelineReadOnly} // Passa lo stato read-only
                   isLoadingDragDrop={isLoadingDragDrop}
+                  lastValidDragIndex={lastValidDragIndex}
+                  draggingOverCleanerId={draggingOverCleanerId}
                 />
               </div>
             </div>
