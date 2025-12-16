@@ -1706,6 +1706,12 @@ export default function GenerateAssignments() {
     setIsLoadingDragDrop(true);
 
     const { destination, source, draggableId } = result;
+    
+    // Estrai container e cleaner ID dalle destinazioni
+    const toContainer = parseContainerKey(destination?.droppableId);
+    const toCleanerId = parseCleanerId(destination?.droppableId);
+    const fromContainer = parseContainerKey(source?.droppableId);
+    const fromCleanerId = parseCleanerId(source?.droppableId);
 
     try {
       // niente destinazione => niente da fare
@@ -1760,8 +1766,6 @@ export default function GenerateAssignments() {
         setIsLoadingDragDrop(false);
       }, 10000);
       // 🔹 Ramo TIMELINE (drag tra cleaners o riordino nello stesso cleaner)
-      const fromCleanerId = parseCleanerId(source.droppableId);
-      const toCleanerId = parseCleanerId(destination.droppableId);
 
       // Caso: Riordino nella stessa timeline
       if (fromCleanerId === toCleanerId && fromCleanerId !== null) {
@@ -1964,8 +1968,6 @@ export default function GenerateAssignments() {
       }
 
       // ✅ NUOVO CASO: da container (early/high/low) → timeline di un cleaner
-      const fromContainer = parseContainerKey(source.droppableId);
-      const toContainer = parseContainerKey(destination.droppableId);
 
       if (!fromCleanerId && fromContainer && toCleanerId !== null && !toContainer) {
         // CRITICAL: Usa lastValidDragIndex salvato durante onDragUpdate per evitare bug di posizionamento
