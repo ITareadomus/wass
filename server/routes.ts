@@ -2879,6 +2879,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { date } = req.body;
       const scriptPath = path.join(process.cwd(), 'client', 'public', 'scripts', 'extract_tasks_for_convocazioni.py');
+      const convocazioniFilePath = path.join(process.cwd(), 'client', 'public', 'data', 'output', 'convocazioni_tasks.json');
 
       // Se la data è fornita, passala come argomento allo script
       const command = date
@@ -2887,26 +2888,50 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       console.log("Eseguendo extract_tasks_for_convocazioni.py con comando:", command);
 
-      const { stdout, stderr } = await execAsync(command, { maxBuffer: 1024 * 1024 * 10 });
+      try {
+        const { stdout, stderr } = await execAsync(command, { maxBuffer: 1024 * 1024 * 10 });
 
-      if (stderr && !stderr.includes('Browserslist')) {
-        console.error("Errore extract_tasks_for_convocazioni:", stderr);
+        if (stderr && !stderr.includes('Browserslist')) {
+          console.warn("⚠️ Warning extract_tasks_for_convocazioni:", stderr);
+        }
+
+        console.log("extract_tasks_for_convocazioni output:", stdout);
+
+        res.json({
+          success: true,
+          message: 'Statistiche task per convocazioni estratte con successo',
+          output: stdout
+        });
+      } catch (scriptError: any) {
+        // Se lo script fallisce (es. connessione DB non disponibile), carica il file statico
+        console.warn("⚠️ Script fallito, caricamento file statico:", scriptError.message);
+        
+        try {
+          const fileContent = await fs.readFile(convocazioniFilePath, 'utf8');
+          const fileData = JSON.parse(fileContent);
+          
+          console.log("✅ Statistiche task caricate dal file statico");
+          res.json({
+            success: true,
+            message: 'Statistiche task per convocazioni caricate dal file locale',
+            output: JSON.stringify(fileData)
+          });
+        } catch (fileError: any) {
+          console.error("❌ Errore caricamento file statico:", fileError.message);
+          res.status(500).json({
+            success: false,
+            message: "Errore durante l'estrazione delle statistiche task per convocazioni",
+            error: scriptError.message,
+            fileError: fileError.message
+          });
+        }
       }
-
-      console.log("extract_tasks_for_convocazioni output:", stdout);
-
-      res.json({
-        success: true,
-        message: 'Statistiche task per convocazioni estratte con successo',
-        output: stdout
-      });
     } catch (error: any) {
       console.error("Errore durante l'estrazione delle statistiche task per convocazioni:", error);
       res.status(500).json({
         success: false,
         message: "Errore durante l'estrazione delle statistiche task per convocazioni",
-        error: error.message,
-        stderr: error.stderr
+        error: error.message
       });
     }
   });
