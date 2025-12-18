@@ -264,7 +264,10 @@ export default function UnconfirmedTasks() {
                   </div>
                 </div>
 
-                <div className="w-2/3 border-2 border-custom-blue rounded-lg p-6 max-h-[70vh]">
+                <div 
+                  className="w-2/3 border-2 border-custom-blue rounded-lg p-6 max-h-[70vh] cursor-pointer"
+                  onClick={() => setSelectedTask(null)}
+                >
                   {!selectedTask ? (
                     <div className="flex items-center justify-center h-full text-muted-foreground">
                       Seleziona una task per vedere i dettagli
