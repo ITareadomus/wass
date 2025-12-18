@@ -42,10 +42,20 @@ Preferred communication style: Simple, everyday language.
 - **Fairness**: Global parameters for `NEARBY_TRAVEL_THRESHOLD`, `NEW_CLEANER_PENALTY_MIN`, and `FAIRNESS_DELTA_HOURS` are tightened to ensure more balanced work distribution and safer travel times.
 - **Time Window Constraints**: Early-Out (EO) and High Priority (HP) tasks have configurable start/end time windows, loaded dynamically from application settings, restricting when tasks can be assigned. Low Priority (LP) tasks have no time constraints.
 
+# Production Configuration
+
+## Database Connection Details
+- **Database Port**: 25060
+- **Node Environment Variables**: 
+  - `NODE_ENV=production`
+  - `PORT=5000` (frontend & backend on same port)
+  - `DATABASE_URL=postgresql://USER:PASSWORD@HOST:25060/DATABASE`
+  - `SESSION_SECRET=your-secure-session-secret`
+
 # External Dependencies
 
 ## Database Services
-- **Neon Database**: Serverless PostgreSQL hosting.
+- **Neon Database**: Serverless PostgreSQL hosting (port 25060).
 - **Drizzle Kit**: Database migration and schema management.
 - **ADAM (MySQL)**: External read-only source for task data.
 
