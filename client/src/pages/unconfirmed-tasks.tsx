@@ -130,26 +130,6 @@ export default function UnconfirmedTasks() {
 
   return (
     <div className="min-h-screen bg-background">
-      <header className="sticky top-0 z-50 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <div className="container flex h-14 items-center justify-between px-4">
-          <div className="flex items-center gap-4">
-            <AlertTriangle className="h-6 w-6 text-amber-500" />
-            <h1 className="text-lg font-semibold">Task Non Confermate</h1>
-          </div>
-          <div className="flex items-center gap-2">
-            <Button
-              onClick={() => setLocation("/generate-assignments")}
-              variant="default"
-              data-testid="button-go-to-assignments"
-            >
-              <ArrowRight className="h-4 w-4 mr-2" />
-              Vai alle Assegnazioni
-            </Button>
-            <ThemeToggle />
-          </div>
-        </div>
-      </header>
-
       <main className="container mx-auto px-4 py-6">
         <div className="flex flex-col gap-6">
           <div className="flex flex-wrap items-center justify-between gap-4">
@@ -178,6 +158,17 @@ export default function UnconfirmedTasks() {
               >
                 <ChevronRight className="h-4 w-4" />
               </Button>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                onClick={() => setLocation("/generate-assignments")}
+                variant="default"
+                data-testid="button-go-to-assignments"
+              >
+                <ArrowRight className="h-4 w-4 mr-2" />
+                Vai alle Assegnazioni
+              </Button>
+              <ThemeToggle />
             </div>
           </div>
 
