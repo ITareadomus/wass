@@ -6,6 +6,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import GenerateAssignments from "@/pages/generate-assignments";
 import Convocazioni from "@/pages/convocazioni";
 import UnconfirmedTasks from "@/pages/unconfirmed-tasks";
+import HomeGate from "@/pages/home-gate";
 import Login from "@/pages/login";
 import Settings from "@/pages/settings";
 import SystemSettings from "@/pages/system-settings";
@@ -36,7 +37,7 @@ function Router() {
     <Switch>
       <Route path="/login" component={Login} />
       <Route path="/">
-        {() => <ProtectedRoute component={GenerateAssignments} />}
+        {() => <ProtectedRoute component={HomeGate} />}
       </Route>
       <Route path="/unconfirmed-tasks">
         {() => <ProtectedRoute component={UnconfirmedTasks} />}

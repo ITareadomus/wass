@@ -4978,6 +4978,71 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Endpoint per verificare se ci sono task non confermate (per routing condizionale homepage)
+  app.get("/api/unconfirmed-tasks-summary", async (req, res) => {
+    try {
+      const dateParam = (req.query.date as string) || format(new Date(), "yyyy-MM-dd");
+      const workDate = dateParam;
+
+      console.log(`📖 GET /api/unconfirmed-tasks-summary - Conteggio task non confermate per ${workDate}`);
+
+      // 1. Carica containers da PostgreSQL
+      const containers = await workspaceFiles.loadContainers(workDate);
+
+      if (!containers || !containers.containers) {
+        return res.json({ unconfirmedCount: 0, date: workDate });
+      }
+
+      // 2. Raccogli tutti i task_id
+      const taskIds: number[] = [];
+      for (const containerKey of Object.keys(containers.containers)) {
+        const container = containers.containers[containerKey];
+        if (container?.tasks) {
+          for (const task of container.tasks) {
+            if (task.task_id) {
+              taskIds.push(Number(task.task_id));
+            }
+          }
+        }
+      }
+
+      if (taskIds.length === 0) {
+        return res.json({ unconfirmedCount: 0, date: workDate });
+      }
+
+      // 3. Query database ADAM per contare task non confermate
+      try {
+        const mysql = await import('mysql2/promise');
+        const adamConnection = await mysql.createConnection({
+          host: process.env.DB_HOST,
+          user: process.env.DB_USER,
+          password: process.env.DB_PASSWORD,
+          database: process.env.DB_NAME,
+          port: parseInt(process.env.DB_PORT || '3306')
+        });
+
+        const [rows]: any = await adamConnection.execute(`
+          SELECT COUNT(*) as unconfirmed_count
+          FROM app_housekeeping
+          WHERE id IN (${taskIds.join(',')})
+            AND (confirmed_operation = 0 OR confirmed_operation IS NULL)
+        `);
+        await adamConnection.end();
+
+        const unconfirmedCount = rows[0]?.unconfirmed_count || 0;
+        console.log(`✅ Task non confermate per ${workDate}: ${unconfirmedCount}`);
+
+        res.json({ unconfirmedCount, date: workDate, total: taskIds.length });
+      } catch (adamError: any) {
+        console.warn(`⚠️ Errore connessione ADAM, rispondo con 0:`, adamError.message);
+        res.json({ unconfirmedCount: 0, date: workDate, error: 'ADAM non disponibile' });
+      }
+    } catch (error: any) {
+      console.error("Errore nel conteggio task non confermate:", error);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }
