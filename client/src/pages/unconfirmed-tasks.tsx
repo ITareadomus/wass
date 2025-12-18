@@ -26,6 +26,7 @@ import {
   Users,
   ChevronLeft,
   ChevronRight,
+  CheckCircle,
 } from "lucide-react";
 
 interface Task {
@@ -198,8 +199,9 @@ export default function UnconfirmedTasks() {
           ) : filteredTasks.length === 0 ? (
             <Card>
               <CardContent className="flex flex-col items-center justify-center p-12 text-center">
+                <CheckCircle className="h-12 w-12 text-green-500 mb-4" />
                 <h3 className="text-lg font-semibold mb-2">
-                  Tutti i task per questa data hanno l'operazione confermata
+                  Tutti i task per questa data hanno la tipologia d'intervento correttamente impostata.
                 </h3>
               </CardContent>
             </Card>
@@ -209,11 +211,10 @@ export default function UnconfirmedTasks() {
                 <AlertTriangle className="h-8 w-8 text-amber-500 flex-shrink-0" />
                 <div>
                   <h2 className="font-semibold text-amber-800 dark:text-amber-200">
-                    {filteredTasks.length} Task con operazione non confermata
+                    {filteredTasks.length} Task con tipologia d'intervento non impostata
                   </h2>
                   <p className="text-sm text-amber-700 dark:text-amber-300">
-                    Queste task hanno operation_id = 0, indicando che
-                    l'operazione non è stata confermata nel sistema.
+                    Imposta la tipologia d'intervento per ogni task prima di procedere con le assegnazioni.
                   </p>
                 </div>
               </div>
