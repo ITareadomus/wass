@@ -30,9 +30,10 @@ export default function UnassignedTasks({ tasks, hasAssigned = false, isDragDisa
             ref={provided.innerRef}
             {...provided.droppableProps}
             className={`
-              space-y-2 min-h-48 transition-colors duration-200
+              space-y-2 min-h-48 transition-colors duration-200 overflow-visible
               ${snapshot.isDraggingOver ? "drop-zone-active" : ""}
             `}
+            style={{ overflow: 'visible' }}
             data-testid="unassigned-tasks-container"
           >
             {tasks.map((task, index) => (
