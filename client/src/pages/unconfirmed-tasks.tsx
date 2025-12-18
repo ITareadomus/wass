@@ -209,11 +209,11 @@ export default function UnconfirmedTasks() {
               </div>
 
               <div className="flex gap-4 items-start">
-                <div className="w-1/3 border-2 border-custom-blue rounded-lg p-4 max-h-[70vh] overflow-y-auto">
+                <div className="w-1/3 border-2 border-custom-blue rounded-lg p-4 max-h-[70vh] overflow-y-auto custom-scrollbar">
                   <div className="relative w-full mb-3">
                     <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                     <Input
-                      placeholder="Cerca per ID, codice, indirizzo..."
+                      placeholder="Cerca per ID, codice ADAM, indirizzo..."
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
                       className="pl-10"
