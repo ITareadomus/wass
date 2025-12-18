@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { it } from "date-fns/locale";
 import { useLocation } from "wouter";
@@ -27,7 +27,11 @@ import {
   ChevronLeft,
   ChevronRight,
   CheckCircle,
+  Save,
+  Loader2,
 } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import { queryClient } from "@/lib/queryClient";
 
 interface Task {
   task_id: string | number;
@@ -66,6 +70,33 @@ export default function UnconfirmedTasks() {
   });
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+  const { toast } = useToast();
+
+  const saveOperationMutation = useMutation({
+    mutationFn: async ({ taskId, operationId }: { taskId: string | number; operationId: number }) => {
+      const response = await fetch(`/api/adam/task/${taskId}/operation`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ operation_id: operationId }),
+      });
+      if (!response.ok) throw new Error("Failed to save operation");
+      return response.json();
+    },
+    onSuccess: (data) => {
+      toast({
+        title: "Salvato",
+        description: data.message || "Operation ID aggiornato su ADAM",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/containers-enriched", selectedDate] });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Errore",
+        description: error.message || "Errore nel salvataggio",
+        variant: "destructive",
+      });
+    },
+  });
 
   const { data: containersData, isLoading } = useQuery<ContainersData>({
     queryKey: ["/api/containers-enriched", selectedDate],
@@ -464,6 +495,40 @@ export default function UnconfirmedTasks() {
                           </p>
                           <p className="text-base">{selectedTask.pax_out ?? "non migrato"}</p>
                         </div>
+                      </div>
+
+                      <div className="flex justify-end pt-4 border-t border-border">
+                        <Button
+                          onClick={() => {
+                            if (selectedTask.operation_id !== undefined) {
+                              saveOperationMutation.mutate({
+                                taskId: selectedTask.task_id,
+                                operationId: selectedTask.operation_id,
+                              });
+                            } else {
+                              toast({
+                                title: "Attenzione",
+                                description: "Seleziona prima una tipologia intervento",
+                                variant: "destructive",
+                              });
+                            }
+                          }}
+                          disabled={saveOperationMutation.isPending || selectedTask.operation_id === undefined}
+                          className="bg-custom-blue hover:bg-custom-blue/90 text-white"
+                          data-testid="button-save-operation"
+                        >
+                          {saveOperationMutation.isPending ? (
+                            <>
+                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                              Salvataggio...
+                            </>
+                          ) : (
+                            <>
+                              <Save className="mr-2 h-4 w-4" />
+                              Salva su ADAM
+                            </>
+                          )}
+                        </Button>
                       </div>
                     </div>
                   )}

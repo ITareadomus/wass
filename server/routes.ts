@@ -3095,6 +3095,97 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Endpoint per aggiornare solo l'operation_id di una task su ADAM
+  app.patch("/api/adam/task/:taskId/operation", async (req, res) => {
+    try {
+      const { taskId } = req.params;
+      const { operation_id } = req.body;
+
+      if (!taskId) {
+        return res.status(400).json({
+          success: false,
+          message: "taskId è obbligatorio"
+        });
+      }
+
+      if (operation_id === undefined) {
+        return res.status(400).json({
+          success: false,
+          message: "operation_id è obbligatorio"
+        });
+      }
+
+      // Connessione MySQL a ADAM
+      let connection: any = null;
+
+      try {
+        connection = await mysql.createConnection({
+          host: "139.59.132.41",
+          user: "admin",
+          password: "ed329a875c6c4ebdf4e87e2bbe53a15771b5844ef6606dde",
+          database: "adamdb",
+          waitForConnections: true,
+          connectionLimit: 1,
+          queueLimit: 0
+        });
+        console.log("✅ Connessione MySQL ADAM stabilita per update operation_id");
+      } catch (dbError: any) {
+        console.error("❌ Errore connessione ADAM MySQL:", dbError.message);
+        return res.status(500).json({
+          success: false,
+          message: `Errore connessione database ADAM: ${dbError.message}`
+        });
+      }
+
+      try {
+        const query = `
+          UPDATE app_housekeeping
+          SET 
+            operation_id = ?,
+            updated_at = ?
+          WHERE id = ?
+        `;
+
+        const operationValue = operation_id === 0 ? null : operation_id;
+        const values = [
+          operationValue,
+          getRomeTimestamp().replace('T', ' ').substring(0, 19),
+          taskId
+        ];
+
+        const [result]: any = await connection.execute(query, values);
+        
+        if (result.affectedRows === 0) {
+          return res.json({
+            success: false,
+            message: `Task con ID ${taskId} non trovata su ADAM`
+          });
+        }
+
+        console.log(`✅ Task ${taskId} - operation_id aggiornato a ${operationValue} su ADAM`);
+
+        res.json({
+          success: true,
+          message: `Operation ID aggiornato con successo`,
+          taskId,
+          operation_id: operationValue
+        });
+
+      } finally {
+        if (connection) {
+          await connection.end();
+        }
+      }
+
+    } catch (error: any) {
+      console.error("❌ Errore aggiornamento operation_id su ADAM:", error.message);
+      res.status(500).json({
+        success: false,
+        message: `Errore aggiornamento: ${error.message}`
+      });
+    }
+  });
+
   // Endpoint per estrarre i cleaners (versione ottimizzata)
   app.post("/api/extract-cleaners-optimized", async (req, res) => {
     try {
