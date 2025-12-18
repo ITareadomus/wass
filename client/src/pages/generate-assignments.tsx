@@ -2248,7 +2248,7 @@ export default function GenerateAssignments() {
               />
             </div>
 
-            {useMemo(() => {
+            {(() => {
               const filterTasks = (tasks: Task[]): Task[] => {
                 if (!searchTask.trim()) return tasks;
                 const lowerSearch = searchTask.toLowerCase();
@@ -2300,7 +2300,7 @@ export default function GenerateAssignments() {
                   />
                 </div>
               );
-            }, [searchTask, earlyOutTasks, highPriorityTasks, lowPriorityTasks, getContainerMultiSelectState, assignEarlyOutToTimeline, assignHighPriorityToTimeline, assignLowPriorityToTimeline])}
+            })()}
 
           <div className="mt-6 grid grid-cols-1 xl:grid-cols-3 gap-6">
             <div className="xl:col-span-2">
