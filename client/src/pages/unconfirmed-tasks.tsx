@@ -113,6 +113,19 @@ export default function UnconfirmedTasks() {
     setSelectedDate(format(current, "yyyy-MM-dd"));
   };
 
+  const navigateTask = (direction: number) => {
+    if (!selectedTask || filteredTasks.length === 0) return;
+    const currentIndex = filteredTasks.findIndex(t => t.task_id === selectedTask.task_id);
+    const newIndex = currentIndex + direction;
+    if (newIndex >= 0 && newIndex < filteredTasks.length) {
+      setSelectedTask({ ...filteredTasks[newIndex], operation_id: undefined });
+    }
+  };
+
+  const currentTaskIndex = selectedTask 
+    ? filteredTasks.findIndex(t => t.task_id === selectedTask.task_id)
+    : -1;
+
   const getPriorityBadge = (priority?: string) => {
     switch (priority) {
       case "early_out":
@@ -272,42 +285,62 @@ export default function UnconfirmedTasks() {
                   ) : (
                     <div className="space-y-4">
                       <div className="flex items-center justify-between">
-                        <h3 className="text-lg font-semibold flex items-center gap-2">
-                          Dettagli Task #{selectedTask.task_id}
-                          <Badge
+                        <div className="flex items-center gap-3">
+                          <Button
                             variant="outline"
-                            className={`text-xs shrink-0 px-2 py-0.5 rounded border font-medium ${
-                              selectedTask.straordinaria
-                                ? "bg-red-500/20 text-red-700 dark:text-red-300 border-red-500"
-                                : selectedTask.premium
-                                  ? "bg-yellow-500/30 text-yellow-800 dark:text-yellow-200 border-yellow-600 dark:border-yellow-400"
-                                  : "bg-green-500/30 text-green-800 dark:text-green-200 border-green-600 dark:border-green-400"
-                            }`}
+                            size="icon"
+                            onClick={() => navigateTask(-1)}
+                            disabled={currentTaskIndex <= 0}
+                            data-testid="button-prev-task"
                           >
-                            {selectedTask.straordinaria
-                              ? "STRAORDINARIA"
-                              : selectedTask.premium
-                                ? "PREMIUM"
-                                : "STANDARD"}
-                          </Badge>
-                          {selectedTask.priority && (
+                            <ChevronLeft className="h-4 w-4" />
+                          </Button>
+                          <h3 className="text-lg font-semibold flex items-center gap-2">
+                            Task {currentTaskIndex + 1}/{filteredTasks.length}
                             <Badge
-                              className={
-                                selectedTask.priority === "early_out"
-                                  ? "bg-blue-500 text-white border-blue-700"
-                                  : selectedTask.priority === "high_priority"
-                                    ? "bg-orange-500 text-white border-orange-700"
-                                    : "bg-gray-500 text-white border-gray-700"
-                              }
+                              variant="outline"
+                              className={`text-xs shrink-0 px-2 py-0.5 rounded border font-medium ${
+                                selectedTask.straordinaria
+                                  ? "bg-red-500/20 text-red-700 dark:text-red-300 border-red-500"
+                                  : selectedTask.premium
+                                    ? "bg-yellow-500/30 text-yellow-800 dark:text-yellow-200 border-yellow-600 dark:border-yellow-400"
+                                    : "bg-green-500/30 text-green-800 dark:text-green-200 border-green-600 dark:border-green-400"
+                              }`}
                             >
-                              {selectedTask.priority === "early_out"
-                                ? "EO"
-                                : selectedTask.priority === "high_priority"
-                                  ? "HP"
-                                  : "LP"}
+                              {selectedTask.straordinaria
+                                ? "STRAORDINARIA"
+                                : selectedTask.premium
+                                  ? "PREMIUM"
+                                  : "STANDARD"}
                             </Badge>
-                          )}
-                        </h3>
+                            {selectedTask.priority && (
+                              <Badge
+                                className={
+                                  selectedTask.priority === "early_out"
+                                    ? "bg-blue-500 text-white border-blue-700"
+                                    : selectedTask.priority === "high_priority"
+                                      ? "bg-orange-500 text-white border-orange-700"
+                                      : "bg-gray-500 text-white border-gray-700"
+                                }
+                              >
+                                {selectedTask.priority === "early_out"
+                                  ? "EO"
+                                  : selectedTask.priority === "high_priority"
+                                    ? "HP"
+                                    : "LP"}
+                              </Badge>
+                            )}
+                          </h3>
+                          <Button
+                            variant="outline"
+                            size="icon"
+                            onClick={() => navigateTask(1)}
+                            disabled={currentTaskIndex >= filteredTasks.length - 1}
+                            data-testid="button-next-task"
+                          >
+                            <ChevronRight className="h-4 w-4" />
+                          </Button>
+                        </div>
                       </div>
 
                       <div className="grid grid-cols-2 gap-6">
