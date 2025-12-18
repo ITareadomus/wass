@@ -1765,14 +1765,6 @@ export default function TimelineView({
                                   return timeA.localeCompare(timeB);
                                 });
 
-                              // Helper placeholder visivo (dimensione "decente")
-                              const VisualPlaceholder = () => (
-                                <div
-                                  className="flex-shrink-0 mx-0.5 rounded-md border-2 border-dashed border-custom-blue bg-custom-blue/10"
-                                  style={{ width: 160, minHeight: 38 }}
-                                />
-                              );
-
                               return (
                                 <>
                                   {cleanerTasks.map((task, idx) => {
@@ -1891,17 +1883,8 @@ export default function TimelineView({
                                         )
                                       : false;
 
-                                    // Calcola targetIndex per il placeholder visivo
-                                    const targetIndex =
-                                      draggingOverCleanerId === cleaner.id && lastValidDragIndex !== null
-                                        ? lastValidDragIndex
-                                        : null;
-
                                     return (
                                       <>
-                                        {/* Placeholder VISIBILE nel punto target */}
-                                        {targetIndex !== null && targetIndex === idx && <VisualPlaceholder />}
-
                                         {/* Travel time marker - FUORI dal Draggable (solo per sequence >= 2) */}
                                         {seq >= 2 && travelTime > 0 && travelWidthPx > 0 && (
                                           <div
@@ -1943,6 +1926,18 @@ export default function TimelineView({
                                           </div>
                                         )}
 
+                                        {/* Drop indicator visivo: segue il mouse durante il drag */}
+                                        {(() => {
+                                          const showDropIndicator =
+                                            draggingOverCleanerId === cleaner.id &&
+                                            lastValidDragIndex !== null &&
+                                            lastValidDragIndex === idx;
+                                          
+                                          return showDropIndicator ? (
+                                            <div className="h-0 border-t-4 border-custom-blue rounded" />
+                                          ) : null;
+                                        })()}
+
                                         {/* TaskCard: non deve mai sparire */}
                                         <TaskCard
                                           key={uniqueKey}
@@ -1958,10 +1953,8 @@ export default function TimelineView({
                                       </>
                                     );
                                   })}
-                                  {/* Placeholder tecnico RBDND (invisibile) */}
-                                  <div style={{ position: "absolute", opacity: 0, pointerEvents: "none" }}>
-                                    {provided.placeholder}
-                                  </div>
+                                  {/* Placeholder: renderizzato UNA SOLA VOLTA alla fine */}
+                                  {provided.placeholder}
                                 </>
                               );
                             })()}
