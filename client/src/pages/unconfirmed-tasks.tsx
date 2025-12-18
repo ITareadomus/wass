@@ -412,9 +412,10 @@ export default function UnconfirmedTasks() {
                                 3: "PULIZIA STRAORDINARIA",
                                 4: "RIPASSO"
                               };
-                              return selectedTask.operation_id
-                                ? operationNames[selectedTask.operation_id] || `Operazione ${selectedTask.operation_id}`
-                                : "non migrato";
+                              if (!selectedTask.operation_id || selectedTask.operation_id === 0) {
+                                return "non migrato";
+                              }
+                              return operationNames[selectedTask.operation_id] || `Operazione ${selectedTask.operation_id}`;
                             })()}
                           </p>
                         </div>
