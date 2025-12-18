@@ -1765,13 +1765,11 @@ export default function TimelineView({
                                   return timeA.localeCompare(timeB);
                                 });
 
-                              // Helper placeholder visivo (dimensione "decente")
-                              const VisualPlaceholder = () => (
-                                <div
-                                  className="flex-shrink-0 mx-0.5 rounded-md border-2 border-dashed border-custom-blue bg-custom-blue/10"
-                                  style={{ width: 160, minHeight: 38 }}
-                                />
-                              );
+                              // Calcola placeholderIndex UNA sola volta
+                              const placeholderIndex =
+                                draggingOverCleanerId === cleaner.id && lastValidDragIndex !== null
+                                  ? lastValidDragIndex
+                                  : null;
 
                               return (
                                 <>
@@ -1891,16 +1889,10 @@ export default function TimelineView({
                                         )
                                       : false;
 
-                                    // Calcola targetIndex per il placeholder visivo
-                                    const targetIndex =
-                                      draggingOverCleanerId === cleaner.id && lastValidDragIndex !== null
-                                        ? lastValidDragIndex
-                                        : null;
-
                                     return (
-                                      <>
-                                        {/* Placeholder VISIBILE nel punto target */}
-                                        {targetIndex !== null && targetIndex === idx && <VisualPlaceholder />}
+                                      <React.Fragment key={`task-${taskObj.task_id || taskObj.id}`}>
+                                        {/* Placeholder di RBDND UNA sola volta PRIMA della task */}
+                                        {placeholderIndex === idx && provided.placeholder}
 
                                         {/* Travel time marker - FUORI dal Draggable (solo per sequence >= 2) */}
                                         {seq >= 2 && travelTime > 0 && travelWidthPx > 0 && (
@@ -1955,13 +1947,11 @@ export default function TimelineView({
                                           timeOffset={seq === 1 ? timeOffset : 0}
                                           globalTimeSlots={globalTimeSlots.length}
                                         />
-                                      </>
+                                      </React.Fragment>
                                     );
                                   })}
-                                  {/* Placeholder tecnico RBDND (invisibile) */}
-                                  <div style={{ position: "absolute", opacity: 0, pointerEvents: "none" }}>
-                                    {provided.placeholder}
-                                  </div>
+                                  {/* Placeholder in coda (se fuori range) */}
+                                  {placeholderIndex !== null && placeholderIndex >= cleanerTasks.length && provided.placeholder}
                                 </>
                               );
                             })()}
