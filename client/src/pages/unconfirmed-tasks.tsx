@@ -209,7 +209,7 @@ export default function UnconfirmedTasks() {
               </div>
 
               <div className="flex gap-4">
-                <div className="w-2/3 border-2 border-custom-blue rounded-lg p-4">
+                <div className="w-1/3 border-2 border-custom-blue rounded-lg p-4">
                   <div className="grid gap-4 md:grid-cols-2">
                     {filteredTasks.map((task) => (
                       <Card
@@ -295,7 +295,7 @@ export default function UnconfirmedTasks() {
                   </div>
                 </div>
 
-                <div className="w-1/3 border-2 border-custom-blue rounded-lg p-4">
+                <div className="w-2/3 border-2 border-custom-blue rounded-lg p-4">
                   <Card className="border-0 shadow-none">
                     <CardHeader>
                       <CardTitle className="text-lg">
