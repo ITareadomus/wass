@@ -235,7 +235,7 @@ export default function UnconfirmedTasks() {
                             </span>
                           </div>
                           {task.address && (
-                            <span className="text-sm text-muted-foreground truncate max-w-[250px]">
+                            <span className="text-sm text-muted-foreground truncate max-w-[250px] uppercase">
                               {task.address}
                             </span>
                           )}
