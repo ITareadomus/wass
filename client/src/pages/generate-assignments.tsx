@@ -2243,7 +2243,7 @@ export default function GenerateAssignments() {
                 placeholder="🔍 Cerca task per ID, logistic code o indirizzo..."
                 value={searchTask}
                 onChange={(e) => setSearchTask(e.target.value)}
-                className="border-2"
+                className="border-2 border-blue-500 dark:border-cyan-400 focus:border-blue-600 dark:focus:border-cyan-300 focus:ring-blue-500 dark:focus:ring-cyan-400"
                 data-testid="input-search-task"
               />
             </div>
