@@ -280,16 +280,22 @@ export default function UnconfirmedTasks() {
                       <div className="flex items-center justify-between">
                         <h3 className="text-lg font-semibold flex items-center gap-2">
                           Dettagli Task #{selectedTask.task_id}
-                          {selectedTask.straordinaria && (
-                            <Badge className="bg-red-500/20 text-red-700 dark:text-red-300 border-red-500">
-                              Straordinaria
-                            </Badge>
-                          )}
-                          {selectedTask.premium && !selectedTask.straordinaria && (
-                            <Badge className="bg-yellow-500/30 text-yellow-800 dark:text-yellow-200 border-yellow-600">
-                              Premium
-                            </Badge>
-                          )}
+                          <Badge
+                            variant="outline"
+                            className={
+                              selectedTask.straordinaria
+                                ? "bg-red-500/20 text-red-700 dark:text-red-300 border-red-500"
+                                : selectedTask.premium
+                                  ? "bg-yellow-500/30 text-yellow-800 dark:text-yellow-200 border-yellow-600 dark:border-yellow-400"
+                                  : "bg-green-500/30 text-green-800 dark:text-green-200 border-green-600 dark:border-green-400"
+                            }
+                          >
+                            {selectedTask.straordinaria
+                              ? "STRAORDINARIA"
+                              : selectedTask.premium
+                                ? "PREMIUM"
+                                : "STANDARD"}
+                          </Badge>
                           {selectedTask.priority && (
                             <Badge
                               className={
