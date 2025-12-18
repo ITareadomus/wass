@@ -1683,11 +1683,6 @@ export default function GenerateAssignments() {
     return null;
   };
 
-  // Handler per inizio drag - aggiunge classe per CSS overflow fix
-  const onDragStart = () => {
-    document.body.classList.add('dragging-active');
-  };
-
   const onDragUpdate = (update: any) => {
     const { destination } = update;
 
@@ -1718,9 +1713,6 @@ export default function GenerateAssignments() {
   };
 
   const onDragEnd = async (result: any) => {
-    // Rimuovi classe CSS per overflow fix
-    document.body.classList.remove('dragging-active');
-    
     setDragSequencePreview(null);
     setLastValidDragIndex(null);
     setDraggingOverCleanerId(null);
@@ -2237,7 +2229,6 @@ export default function GenerateAssignments() {
 
         <MultiSelectContext.Provider value={multiSelectContextValue}>
           <DragDropContext
-            onDragStart={onDragStart}
             onDragEnd={onDragEnd}
             onDragUpdate={onDragUpdate}
           >
