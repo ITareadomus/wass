@@ -1516,7 +1516,7 @@ export default function TimelineView({
       >
         {/* Loading overlay durante drag&drop e rimozione cleaner */}
         {(isLoadingDragDrop || removeCleanerMutation.isPending) && (
-          <div className="absolute inset-0 bg-black/20 dark:bg-black/40 rounded-lg flex items-center justify-center z-40 backdrop-blur-sm">
+          <div className="absolute inset-0 bg-black/20 dark:bg-black/40 rounded-lg flex items-center justify-center z-40 backdrop-blur-sm pointer-events-none">
             <div className="flex flex-col items-center gap-3">
               <Loader2 className="h-8 w-8 animate-spin text-custom-blue" />
               <p className="text-sm font-medium text-foreground">La timeline sta ragionando...</p>
@@ -1765,25 +1765,11 @@ export default function TimelineView({
                                   return timeA.localeCompare(timeB);
                                 });
 
-                              // Calcola draggedTaskIndex utilizzando snapshot (disponibile nel Droppable render function)
-                              const draggedTaskKey = snapshot.draggingOverWith;
-                              let draggedTaskIndex: number | null = null;
-                              
-                              if (draggedTaskKey) {
-                                // Trova l'indice della task trascinata nel cleaner corrente
-                                draggedTaskIndex = cleanerTasks.findIndex((t: any) => {
-                                  const key = (t as any).task_id || (t as any).id;
-                                  return String(key) === draggedTaskKey.replace('task-', '');
-                                });
-                                // Se non trovata (task da container), usa lastValidDragIndex se stiamo trascinando su questo cleaner
-                                if (draggedTaskIndex === -1) {
-                                  if (draggingOverCleanerId === cleaner.id && lastValidDragIndex !== null) {
-                                    draggedTaskIndex = lastValidDragIndex;
-                                  } else {
-                                    draggedTaskIndex = null;
-                                  }
-                                }
-                              }
+                              // Calcola placeholderIndex basato su draggingOverCleanerId + lastValidDragIndex
+                              const placeholderIndex =
+                                draggingOverCleanerId === cleaner.id && lastValidDragIndex !== null
+                                  ? lastValidDragIndex
+                                  : null;
 
                               return (
                                 <>
@@ -1946,28 +1932,26 @@ export default function TimelineView({
                                           </div>
                                         )}
 
-                                        {/* Renderizza placeholder PRIMA della task all'indice target */}
-                                        {draggedTaskIndex !== null && draggedTaskIndex === idx && provided.placeholder}
+                                        {/* Placeholder solo per mostrare il punto di inserimento */}
+                                        {placeholderIndex === idx && provided.placeholder}
 
-                                        {/* Renderizza TaskCard SOLO se NON è l'indice target del drag */}
-                                        {!(draggedTaskIndex !== null && draggedTaskIndex === idx) && (
-                                          <TaskCard
-                                            key={uniqueKey}
-                                            task={task}
-                                            index={idx}
-                                            isInTimeline={true}
-                                            allTasks={cleanerTasks}
-                                            isDragDisabled={isReadOnly}
-                                            isReadOnly={isReadOnly}
-                                            timeOffset={seq === 1 ? timeOffset : 0}
-                                            globalTimeSlots={globalTimeSlots.length}
-                                          />
-                                        )}
+                                        {/* TaskCard: non deve mai sparire */}
+                                        <TaskCard
+                                          key={uniqueKey}
+                                          task={task}
+                                          index={idx}
+                                          isInTimeline={true}
+                                          allTasks={cleanerTasks}
+                                          isDragDisabled={isReadOnly}
+                                          isReadOnly={isReadOnly}
+                                          timeOffset={seq === 1 ? timeOffset : 0}
+                                          globalTimeSlots={globalTimeSlots.length}
+                                        />
                                       </>
                                     );
                                   })}
-                                  {/* Placeholder finale se non c'è drag attivo o se viene droppato alla fine (oltre l'ultimo elemento) */}
-                                  {(draggedTaskIndex === null || draggedTaskIndex >= cleanerTasks.length) && provided.placeholder}
+                                  {/* Placeholder alla fine se non c'è posizionamento specifico */}
+                                  {(placeholderIndex === null || placeholderIndex >= cleanerTasks.length) && provided.placeholder}
                                 </>
                               );
                             })()}
