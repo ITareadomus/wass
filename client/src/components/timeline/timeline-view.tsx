@@ -1926,6 +1926,18 @@ export default function TimelineView({
                                           </div>
                                         )}
 
+                                        {/* Drop indicator visivo: segue il mouse durante il drag */}
+                                        {(() => {
+                                          const showDropIndicator =
+                                            draggingOverCleanerId === cleaner.id &&
+                                            lastValidDragIndex !== null &&
+                                            lastValidDragIndex === idx;
+                                          
+                                          return showDropIndicator ? (
+                                            <div className="h-0 border-t-4 border-custom-blue rounded" />
+                                          ) : null;
+                                        })()}
+
                                         {/* TaskCard: non deve mai sparire */}
                                         <TaskCard
                                           key={uniqueKey}
