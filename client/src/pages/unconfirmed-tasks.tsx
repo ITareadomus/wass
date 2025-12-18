@@ -187,99 +187,116 @@ export default function UnconfirmedTasks() {
             </div>
           </div>
 
-          {isLoading ? (
-            <div className="flex items-center justify-center p-12">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-            </div>
-          ) : filteredTasks.length === 0 ? (
-            <Card>
-              <CardContent className="flex flex-col items-center justify-center p-12 text-center">
-                <AlertTriangle className="h-12 w-12 text-muted-foreground mb-4" />
-                <h3 className="text-lg font-semibold mb-2">
-                  {searchTerm ? "Nessun risultato" : "Nessuna task non confermata"}
-                </h3>
-                <p className="text-muted-foreground">
-                  {searchTerm 
-                    ? "Prova a modificare i termini di ricerca" 
-                    : "Tutte le task per questa data hanno l'operazione confermata"}
-                </p>
-              </CardContent>
-            </Card>
-          ) : (
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {filteredTasks.map((task) => (
-                <Card 
-                  key={`${task.task_id}-${task.logistic_code}`}
-                  className="border-amber-200 dark:border-amber-800"
-                  data-testid={`card-task-${task.task_id}`}
-                >
-                  <CardHeader className="pb-2">
-                    <div className="flex items-start justify-between">
-                      <div>
-                        <CardTitle className="text-sm font-mono">
-                          {task.logistic_code}
-                        </CardTitle>
-                        <p className="text-xs text-muted-foreground">ID: {task.task_id}</p>
-                      </div>
-                      {getPriorityBadge(task.priority)}
-                    </div>
-                  </CardHeader>
-                  <CardContent className="space-y-3">
-                    {task.address && (
-                      <div className="flex items-start gap-2">
-                        <MapPin className="h-4 w-4 text-muted-foreground mt-0.5 flex-shrink-0" />
-                        <span className="text-sm">{task.address}</span>
-                      </div>
-                    )}
-                    
-                    {(task.alias || task.customer_name) && (
-                      <div className="flex items-center gap-2">
-                        <Building className="h-4 w-4 text-muted-foreground" />
-                        <span className="text-sm font-medium">{task.alias || task.customer_name}</span>
-                      </div>
-                    )}
-
-                    <div className="flex items-center gap-4 text-sm">
-                      {task.checkout_time && (
-                        <div className="flex items-center gap-1">
-                          <Clock className="h-4 w-4 text-muted-foreground" />
-                          <span>Check-out: {task.checkout_time}</span>
-                        </div>
-                      )}
-                      {task.cleaning_time && (
-                        <span className="text-muted-foreground">
-                          {task.cleaning_time} min
-                        </span>
-                      )}
-                    </div>
-
-                    {(task.pax_out || task.pax_in) && (
-                      <div className="flex items-center gap-2">
-                        <Users className="h-4 w-4 text-muted-foreground" />
-                        <span className="text-sm">
-                          {task.pax_out && `Out: ${task.pax_out}`}
-                          {task.pax_out && task.pax_in && " / "}
-                          {task.pax_in && `In: ${task.pax_in}`}
-                        </span>
-                      </div>
-                    )}
-
-                    <div className="flex flex-wrap gap-1">
-                      {task.premium && (
-                        <Badge variant="outline" className="text-xs">Premium</Badge>
-                      )}
-                      {task.straordinaria && (
-                        <Badge variant="outline" className="text-xs">Straordinaria</Badge>
-                      )}
-                      {task.type_apt && (
-                        <Badge variant="outline" className="text-xs">{task.type_apt}</Badge>
-                      )}
-                    </div>
+          <div className="flex gap-4">
+            <div className="w-2/3">
+              {isLoading ? (
+                <div className="flex items-center justify-center p-12">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                </div>
+              ) : filteredTasks.length === 0 ? (
+                <Card>
+                  <CardContent className="flex flex-col items-center justify-center p-12 text-center">
+                    <AlertTriangle className="h-12 w-12 text-muted-foreground mb-4" />
+                    <h3 className="text-lg font-semibold mb-2">
+                      {searchTerm ? "Nessun risultato" : "Nessuna task non confermata"}
+                    </h3>
+                    <p className="text-muted-foreground">
+                      {searchTerm 
+                        ? "Prova a modificare i termini di ricerca" 
+                        : "Tutte le task per questa data hanno l'operazione confermata"}
+                    </p>
                   </CardContent>
                 </Card>
-              ))}
+              ) : (
+                <div className="grid gap-4 md:grid-cols-2">
+                  {filteredTasks.map((task) => (
+                    <Card 
+                      key={`${task.task_id}-${task.logistic_code}`}
+                      className="border-amber-200 dark:border-amber-800"
+                      data-testid={`card-task-${task.task_id}`}
+                    >
+                      <CardHeader className="pb-2">
+                        <div className="flex items-start justify-between">
+                          <div>
+                            <CardTitle className="text-sm font-mono">
+                              {task.logistic_code}
+                            </CardTitle>
+                            <p className="text-xs text-muted-foreground">ID: {task.task_id}</p>
+                          </div>
+                          {getPriorityBadge(task.priority)}
+                        </div>
+                      </CardHeader>
+                      <CardContent className="space-y-3">
+                        {task.address && (
+                          <div className="flex items-start gap-2">
+                            <MapPin className="h-4 w-4 text-muted-foreground mt-0.5 flex-shrink-0" />
+                            <span className="text-sm">{task.address}</span>
+                          </div>
+                        )}
+                        
+                        {(task.alias || task.customer_name) && (
+                          <div className="flex items-center gap-2">
+                            <Building className="h-4 w-4 text-muted-foreground" />
+                            <span className="text-sm font-medium">{task.alias || task.customer_name}</span>
+                          </div>
+                        )}
+
+                        <div className="flex items-center gap-4 text-sm">
+                          {task.checkout_time && (
+                            <div className="flex items-center gap-1">
+                              <Clock className="h-4 w-4 text-muted-foreground" />
+                              <span>Check-out: {task.checkout_time}</span>
+                            </div>
+                          )}
+                          {task.cleaning_time && (
+                            <span className="text-muted-foreground">
+                              {task.cleaning_time} min
+                            </span>
+                          )}
+                        </div>
+
+                        {(task.pax_out || task.pax_in) && (
+                          <div className="flex items-center gap-2">
+                            <Users className="h-4 w-4 text-muted-foreground" />
+                            <span className="text-sm">
+                              {task.pax_out && `Out: ${task.pax_out}`}
+                              {task.pax_out && task.pax_in && " / "}
+                              {task.pax_in && `In: ${task.pax_in}`}
+                            </span>
+                          </div>
+                        )}
+
+                        <div className="flex flex-wrap gap-1">
+                          {task.premium && (
+                            <Badge variant="outline" className="text-xs">Premium</Badge>
+                          )}
+                          {task.straordinaria && (
+                            <Badge variant="outline" className="text-xs">Straordinaria</Badge>
+                          )}
+                          {task.type_apt && (
+                            <Badge variant="outline" className="text-xs">{task.type_apt}</Badge>
+                          )}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              )}
             </div>
-          )}
+            
+            <div className="w-1/3">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">Pannello laterale</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-muted-foreground text-sm">
+                    Contenuto da definire
+                  </p>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
         </div>
       </main>
     </div>
