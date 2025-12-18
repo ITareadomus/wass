@@ -43,6 +43,7 @@ export default function Convocazioni() {
   const [selectedCleaners, setSelectedCleaners] = useState<Set<number>>(new Set());
   const [isLoading, setIsLoading] = useState(true);
   const [loadingMessage, setLoadingMessage] = useState("Inizializzazione...");
+  const [searchCleaner, setSearchCleaner] = useState("");
   const [selectedDate, setSelectedDate] = useState<Date>(() => {
     // Leggi la data dal parametro URL se presente
     const urlParams = new URLSearchParams(window.location.search);
@@ -514,8 +515,21 @@ export default function Convocazioni() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-[calc(100vh-200px)]">
           {/* Lista Cleaners - 2/3 dello spazio */}
           <Card className="p-6 lg:col-span-2 flex flex-col overflow-hidden border-2 border-custom-blue bg-custom-blue-light">
+          <div className="mb-4">
+            <Input
+              placeholder="🔍 Cerca cleaner per nome..."
+              value={searchCleaner}
+              onChange={(e) => setSearchCleaner(e.target.value)}
+              className="border-2 border-custom-blue"
+              data-testid="input-search-cleaner"
+            />
+          </div>
           <div className="space-y-3 flex-1 overflow-y-auto pr-2">
-            {filteredCleaners.map((cleaner) => { // Itera su filteredCleaners
+            {filteredCleaners
+              .filter((cleaner) => 
+                `${cleaner.name} ${cleaner.lastname}`.toUpperCase().includes(searchCleaner.toUpperCase())
+              )
+              .map((cleaner) => { // Itera su filteredCleaners
               const isPremium = cleaner.role === "Premium";
               const isAvailable = cleaner.available !== false;
               const isFormatore = cleaner.role === "Formatore";
