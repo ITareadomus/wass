@@ -2320,6 +2320,7 @@ export default function GenerateAssignments() {
                   isLoadingDragDrop={isLoadingDragDrop}
                   lastValidDragIndex={lastValidDragIndex}
                   draggingOverCleanerId={draggingOverCleanerId}
+                  searchTask={searchTask}
                 />
               </div>
             </div>
