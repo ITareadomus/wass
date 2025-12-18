@@ -8,9 +8,9 @@ import { useState, useEffect, useRef, useCallback, createContext, useContext, us
 const DEBUG = false;
 const dlog = (...args: any[]) => DEBUG && console.log(...args);
 import { ThemeToggle } from "@/components/theme-toggle";
-import { CalendarIcon, Users, RefreshCw, Settings } from "lucide-react";
+import { CalendarIcon, Users, RefreshCw, Settings, AlertCircle } from "lucide-react";
 import { Input } from "@/components/ui/input";
-import { useLocation } from 'wouter';
+import { useLocation, Link } from 'wouter';
 import { format } from "date-fns";
 import { it } from "date-fns/locale";
 import { Calendar } from "@/components/ui/calendar";
@@ -2229,6 +2229,12 @@ export default function GenerateAssignments() {
             </Popover>
           </div>
           <div className="flex items-center gap-3">
+            <Link href="/unconfirmed-tasks">
+              <Button variant="outline" className="border-custom-blue" data-testid="link-unconfirmed-tasks">
+                <AlertCircle className="mr-2 h-4 w-4" />
+                Task Non Confermate
+              </Button>
+            </Link>
             <ThemeToggle />
           </div>
         </div>
