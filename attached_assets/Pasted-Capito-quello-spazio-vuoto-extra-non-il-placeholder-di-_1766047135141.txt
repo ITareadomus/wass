@@ -1,0 +1,65 @@
+Capito: quello “spazio vuoto” extra non è il placeholder di react-beautiful-dnd — è spazio creato da una seconda cosa che continua a occupare altezza durante il drag (di solito: una TaskCard “nascosta” con opacity:0/visibility:hidden, oppure il placeholder renderizzato due volte).
+
+Se vuoi solo il placeholder, fai così (scaletta super concreta):
+
+1) timeline-view.tsx: renderizza provided.placeholder UNA SOLA VOLTA
+
+Dentro ogni Droppable, devi avere:
+
+niente placeholder inserito “a indice”
+
+nessun placeholderIndex
+
+provided.placeholder solo in fondo al container droppable
+
+✅ Struttura corretta (l’unica che deve rimanere):
+
+<Droppable droppableId={...}>
+  {(provided) => (
+    <div ref={provided.innerRef} {...provided.droppableProps}>
+      {tasks.map((t, index) => (
+        <Draggable key={t.id} draggableId={String(t.id)} index={index}>
+          {(provided, snapshot) => (
+            <div
+              ref={provided.innerRef}
+              {...provided.draggableProps}
+              {...provided.dragHandleProps}
+              style={provided.draggableProps.style}
+            >
+              <TaskCard task={t} />
+            </div>
+          )}
+        </Draggable>
+      ))}
+
+      {provided.placeholder}
+    </div>
+  )}
+</Droppable>
+
+
+Da rimuovere dal file:
+
+qualunque {provided.placeholder} dentro il .map(...)
+
+qualunque logica tipo placeholderIndex, draggedTaskIndex, “inserisci placeholder prima della task…”
+
+qualunque “spacer div” creato a mano per simulare il placeholder
+
+👉 Questo elimina al 100% il “placeholder doppio”.
+
+2) Non “nascondere” la task mentre trascini con opacity/visibility
+
+Se nel Draggable o nella TaskCard hai qualcosa tipo:
+
+opacity: 0
+
+visibility: hidden
+
+height: 0 / margin manipolati
+
+classi tipo invisible, opacity-0
+
+…durante snapshot.isDragging, allora la task resta nel layout e sommandosi al placeholder crea il secondo buco.
+
+✅ Regola: durante il drag non fare niente sulla visibilità/layout della card. Lascia che sia react-beautiful-dnd a gestire posizione e placeholder.

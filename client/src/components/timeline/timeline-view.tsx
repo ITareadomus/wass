@@ -1765,12 +1765,6 @@ export default function TimelineView({
                                   return timeA.localeCompare(timeB);
                                 });
 
-                              // Calcola placeholderIndex basato su draggingOverCleanerId + lastValidDragIndex
-                              const placeholderIndex =
-                                draggingOverCleanerId === cleaner.id && lastValidDragIndex !== null
-                                  ? lastValidDragIndex
-                                  : null;
-
                               return (
                                 <>
                                   {cleanerTasks.map((task, idx) => {
@@ -1932,9 +1926,6 @@ export default function TimelineView({
                                           </div>
                                         )}
 
-                                        {/* Placeholder solo per mostrare il punto di inserimento */}
-                                        {placeholderIndex === idx && provided.placeholder}
-
                                         {/* TaskCard: non deve mai sparire */}
                                         <TaskCard
                                           key={uniqueKey}
@@ -1950,8 +1941,8 @@ export default function TimelineView({
                                       </>
                                     );
                                   })}
-                                  {/* Placeholder alla fine se non c'è posizionamento specifico */}
-                                  {(placeholderIndex === null || placeholderIndex >= cleanerTasks.length) && provided.placeholder}
+                                  {/* Placeholder: renderizzato UNA SOLA VOLTA alla fine */}
+                                  {provided.placeholder}
                                 </>
                               );
                             })()}
