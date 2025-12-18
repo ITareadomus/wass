@@ -220,7 +220,7 @@ export default function UnconfirmedTasks() {
                             ? "bg-primary/10 border-primary"
                             : "bg-muted/50 border-custom-blue"
                         }`}
-                        onClick={() => setSelectedTask(task)}
+                        onClick={() => setSelectedTask({ ...task, operation_id: undefined })}
                         data-testid={`task-${task.task_id}`}
                       >
                         <div className="flex flex-col gap-1">
@@ -406,6 +406,9 @@ export default function UnconfirmedTasks() {
                                 3: "PULIZIA STRAORDINARIA",
                                 4: "RIPASSO"
                               };
+                              if (selectedTask.confirmed_operation === false && !selectedTask.operation_id) {
+                                return "non migrato";
+                              }
                               if (!selectedTask.operation_id || selectedTask.operation_id === 0) {
                                 return "non migrato";
                               }
