@@ -214,7 +214,7 @@ export default function UnconfirmedTasks() {
                     {filteredTasks.map((task) => (
                       <div
                         key={`${task.task_id}-${task.logistic_code}`}
-                        className="flex items-center gap-4 p-2 bg-muted/50 rounded cursor-pointer hover:bg-muted"
+                        className="flex items-center gap-4 p-2 bg-muted/50 rounded border border-custom-blue cursor-pointer hover:bg-muted"
                         data-testid={`task-${task.task_id}`}
                       >
                         <span className="text-red-500 font-mono text-sm font-semibold">
