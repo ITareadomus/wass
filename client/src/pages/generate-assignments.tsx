@@ -1716,7 +1716,6 @@ export default function GenerateAssignments() {
     setDragSequencePreview(null);
     setLastValidDragIndex(null);
     setDraggingOverCleanerId(null);
-    setIsLoadingDragDrop(true);
 
     const { destination, source, draggableId } = result;
     
@@ -1727,7 +1726,7 @@ export default function GenerateAssignments() {
     const fromCleanerId = parseCleanerId(source?.droppableId);
 
     try {
-      // niente destinazione => niente da fare
+      // niente destinazione => niente da fare (e NON mostrare overlay)
       if (!destination) {
         return;
       }
@@ -1739,6 +1738,9 @@ export default function GenerateAssignments() {
       ) {
         return;
       }
+
+      // solo ora ha senso mostrare overlay
+      setIsLoadingDragDrop(true);
 
       // CRITICAL: Blocca drag simultanei (con timeout di sicurezza di 10 secondi)
       if (isDraggingRef.current) {
