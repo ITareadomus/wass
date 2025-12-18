@@ -46,6 +46,8 @@ interface Task {
   premium?: boolean;
   straordinaria?: boolean;
   type_apt?: string;
+  operation_id?: number;
+  duration?: string;
 }
 
 interface ContainersData {
@@ -62,6 +64,7 @@ export default function UnconfirmedTasks() {
     return dateParam || format(new Date(), "yyyy-MM-dd");
   });
   const [searchTerm, setSearchTerm] = useState("");
+  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
 
   const { data: containersData, isLoading } = useQuery<ContainersData>({
     queryKey: ["/api/containers-enriched", selectedDate],
@@ -221,7 +224,12 @@ export default function UnconfirmedTasks() {
                     {filteredTasks.map((task) => (
                       <div
                         key={`${task.task_id}-${task.logistic_code}`}
-                        className="flex items-center justify-between gap-4 p-3 bg-muted/50 rounded border border-custom-blue cursor-pointer hover:bg-muted"
+                        className={`flex items-center justify-between gap-4 p-3 rounded border cursor-pointer hover:bg-muted ${
+                          selectedTask?.task_id === task.task_id
+                            ? "bg-primary/10 border-primary"
+                            : "bg-muted/50 border-custom-blue"
+                        }`}
+                        onClick={() => setSelectedTask(task)}
                         data-testid={`task-${task.task_id}`}
                       >
                         <div className="flex flex-col gap-1">
@@ -263,18 +271,165 @@ export default function UnconfirmedTasks() {
                 </div>
 
                 <div className="w-2/3 border-2 border-custom-blue rounded-lg p-4">
-                  <Card className="border-0 shadow-none">
-                    <CardHeader>
-                      <CardTitle className="text-lg">
-                        Pannello laterale
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <p className="text-muted-foreground text-sm">
-                        Contenuto da definire
-                      </p>
-                    </CardContent>
-                  </Card>
+                  {!selectedTask ? (
+                    <div className="flex items-center justify-center h-full text-muted-foreground">
+                      Seleziona una task per vedere i dettagli
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <h3 className="text-lg font-semibold flex items-center gap-2">
+                          Dettagli Task #{selectedTask.task_id}
+                          {selectedTask.straordinaria && (
+                            <Badge className="bg-red-500/20 text-red-700 dark:text-red-300 border-red-500">
+                              Straordinaria
+                            </Badge>
+                          )}
+                          {selectedTask.premium && !selectedTask.straordinaria && (
+                            <Badge className="bg-yellow-500/30 text-yellow-800 dark:text-yellow-200 border-yellow-600">
+                              Premium
+                            </Badge>
+                          )}
+                          {selectedTask.priority && (
+                            <Badge
+                              className={
+                                selectedTask.priority === "early_out"
+                                  ? "bg-blue-500 text-white border-blue-700"
+                                  : selectedTask.priority === "high_priority"
+                                    ? "bg-orange-500 text-white border-orange-700"
+                                    : "bg-gray-500 text-white border-gray-700"
+                              }
+                            >
+                              {selectedTask.priority === "early_out"
+                                ? "EO"
+                                : selectedTask.priority === "high_priority"
+                                  ? "HP"
+                                  : "LP"}
+                            </Badge>
+                          )}
+                        </h3>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <p className="text-sm font-semibold text-muted-foreground">
+                            Codice ADAM
+                          </p>
+                          <p className="text-sm">{selectedTask.logistic_code}</p>
+                        </div>
+                        <div>
+                          <p className="text-sm font-semibold text-muted-foreground">
+                            Cliente
+                          </p>
+                          <p className="text-sm">{selectedTask.customer_name || selectedTask.alias || "non migrato"}</p>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <p className="text-sm font-semibold text-muted-foreground">
+                            Indirizzo
+                          </p>
+                          <p className="text-sm uppercase">{selectedTask.address || "NON MIGRATO"}</p>
+                        </div>
+                        <div>
+                          <p className="text-sm font-semibold text-muted-foreground">
+                            Durata pulizia
+                          </p>
+                          <p className="text-sm">
+                            {selectedTask.cleaning_time
+                              ? `${selectedTask.cleaning_time} minuti`
+                              : selectedTask.duration
+                                ? `${selectedTask.duration.replace(".", ":")} ore`
+                                : "non migrato"}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <p className="text-sm font-semibold text-muted-foreground">
+                            Check-out
+                          </p>
+                          <p className="text-sm">
+                            {selectedTask.checkout_date
+                              ? new Date(selectedTask.checkout_date).toLocaleDateString("it-IT", {
+                                  day: "2-digit",
+                                  month: "2-digit",
+                                  year: "numeric",
+                                })
+                              : "non migrato"}
+                            {selectedTask.checkout_date && selectedTask.checkout_time
+                              ? ` - ${selectedTask.checkout_time}`
+                              : selectedTask.checkout_date
+                                ? " - orario non migrato"
+                                : ""}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-sm font-semibold text-muted-foreground">
+                            Check-in
+                          </p>
+                          <p className="text-sm">
+                            {selectedTask.checkin_date
+                              ? new Date(selectedTask.checkin_date).toLocaleDateString("it-IT", {
+                                  day: "2-digit",
+                                  month: "2-digit",
+                                  year: "numeric",
+                                })
+                              : "non migrato"}
+                            {selectedTask.checkin_date && selectedTask.checkin_time
+                              ? ` - ${selectedTask.checkin_time}`
+                              : selectedTask.checkin_date
+                                ? " - orario non migrato"
+                                : ""}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <p className="text-sm font-semibold text-muted-foreground">
+                            Tipologia appartamento
+                          </p>
+                          <p className="text-sm">{selectedTask.type_apt || "non migrato"}</p>
+                        </div>
+                        <div>
+                          <p className="text-sm font-semibold text-muted-foreground">
+                            Tipologia intervento
+                          </p>
+                          <p className="text-sm">
+                            {(() => {
+                              const operationNames: Record<number, string> = {
+                                1: "FERMATA",
+                                2: "PARTENZA",
+                                3: "PULIZIA STRAORDINARIA",
+                                4: "RIPASSO"
+                              };
+                              return selectedTask.operation_id
+                                ? operationNames[selectedTask.operation_id] || `Operazione ${selectedTask.operation_id}`
+                                : "non migrato";
+                            })()}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <p className="text-sm font-semibold text-muted-foreground">
+                            Pax-In
+                          </p>
+                          <p className="text-sm">{selectedTask.pax_in ?? "non migrato"}</p>
+                        </div>
+                        <div>
+                          <p className="text-sm font-semibold text-muted-foreground">
+                            Pax-Out
+                          </p>
+                          <p className="text-sm">{selectedTask.pax_out ?? "non migrato"}</p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             </>
