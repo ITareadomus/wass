@@ -1,0 +1,81 @@
+Obiettivo
+
+✅ Indicatore di drop tra due task (segue il mouse)
+✅ Senza creare un “buco” doppio
+✅ Senza far sparire task
+
+La soluzione più pulita è:
+
+lasciare provided.placeholder UNA SOLA VOLTA (serve al layout DnD, ma non lo usi come indicatore visivo)
+
+creare un DropIndicator “visivo” a altezza zero tra le task (una riga/border), usando lastValidDragIndex + draggingOverCleanerId che già gestisci in generate-assignments.tsx (li resetti in onDragEnd) 
+
+generate-assignments
+
+Scaletta modifiche (copiaincolla)
+1) timeline-view.tsx — elimina il placeholder “in mezzo” e lo hide della TaskCard
+TROVA e RIMUOVI questi pezzi:
+
+A) Questo placeholder “in mezzo”:
+
+{draggedTaskIndex !== null && draggedTaskIndex === idx && provided.placeholder}
+
+
+timeline-view
+
+B) Questa logica che non renderizza la card (fa “sparire” roba):
+
+{!(draggedTaskIndex !== null && draggedTaskIndex === idx) && (
+  <TaskCard ... />
+)}
+
+
+timeline-view
+
+2) timeline-view.tsx — aggiungi un “DropIndicator” visivo tra le task (senza altezza)
+
+Nel punto della .map((task, idx) => ...) prima di <TaskCard />, aggiungi:
+
+const showDropIndicator =
+  draggingOverCleanerId === cleaner.id &&
+  lastValidDragIndex !== null &&
+  lastValidDragIndex === idx;
+
+{showDropIndicator && (
+  <div className="h-0 border-t-4 border-custom-blue my-1 rounded" />
+)}
+
+<TaskCard ... />
+
+
+👉 Questo crea una linea tra due task, che “segue” l’indice di drop, senza aggiungere uno spazio vuoto (h-0).
+
+Se vuoi un indicatore più “cicciotto”, invece di h-0 fai h-2 ma allora stai aggiungendo spazio: io te lo sto dando “solo indicatore”.
+
+3) timeline-view.tsx — lascia provided.placeholder SOLO una volta (in fondo)
+
+Tieni questo (va bene così):
+
+{provided.placeholder}
+
+
+e rimuovi la condizione che lo rende “solo se draggedTaskIndex…” (perché ora non vuoi più quella logica). Attualmente lo hai condizionato qui: 
+
+timeline-view
+
+Quindi sostituisci:
+
+{(draggedTaskIndex === null || draggedTaskIndex >= cleanerTasks.length) && provided.placeholder}
+
+
+con:
+
+{provided.placeholder}
+
+Perché così funziona (in 1 riga)
+
+provided.placeholder resta a fare il suo lavoro “tecnico” per il layout
+
+l’indicatore visivo è una riga a altezza zero: non può generare “doppio buco”
+
+non nascondi mai task → niente sparizioni
