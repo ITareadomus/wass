@@ -270,7 +270,7 @@ export default function UnconfirmedTasks() {
                   </div>
                 </div>
 
-                <div className="w-2/3 border-2 border-custom-blue rounded-lg p-6 sticky top-4 min-h-[calc(100vh-200px)]">
+                <div className="w-2/3 border-2 border-custom-blue rounded-lg p-6 sticky top-4 h-fit">
                   {!selectedTask ? (
                     <div className="flex items-center justify-center h-full text-muted-foreground">
                       Seleziona una task per vedere i dettagli
