@@ -57,9 +57,9 @@ export default function UnconfirmedTasks() {
   const [searchTerm, setSearchTerm] = useState("");
 
   const { data: containersData, isLoading } = useQuery<ContainersData>({
-    queryKey: ["/api/containers", selectedDate],
+    queryKey: ["/api/containers-enriched", selectedDate],
     queryFn: async () => {
-      const response = await fetch(`/api/containers?date=${selectedDate}`);
+      const response = await fetch(`/api/containers-enriched?date=${selectedDate}`);
       if (!response.ok) throw new Error("Failed to fetch containers");
       return response.json();
     },
