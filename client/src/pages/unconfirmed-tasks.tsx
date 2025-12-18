@@ -9,6 +9,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   AlertTriangle,
   Calendar,
   Clock,
@@ -210,16 +217,33 @@ export default function UnconfirmedTasks() {
 
               <div className="flex gap-4">
                 <div className="w-1/3 border-2 border-custom-blue rounded-lg p-4">
-                  <div className="flex flex-col gap-2">
+                  <div className="flex flex-col gap-3">
                     {filteredTasks.map((task) => (
                       <div
                         key={`${task.task_id}-${task.logistic_code}`}
-                        className="flex items-center gap-4 p-2 bg-muted/50 rounded border border-custom-blue cursor-pointer hover:bg-muted"
+                        className="flex items-center justify-between gap-4 p-3 bg-muted/50 rounded border border-custom-blue cursor-pointer hover:bg-muted"
                         data-testid={`task-${task.task_id}`}
                       >
-                        <span className="text-red-500 font-mono text-sm font-semibold">
+                        <span className="text-red-500 font-mono text-base font-semibold min-w-[80px]">
                           {task.logistic_code}
                         </span>
+                        <Select
+                          defaultValue=""
+                          onValueChange={(value) => {
+                            console.log(`Task ${task.task_id}: operation_id = ${value}`);
+                          }}
+                        >
+                          <SelectTrigger className="w-[200px] text-sm">
+                            <SelectValue placeholder="Seleziona operazione" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="none">— Nessuna operazione —</SelectItem>
+                            <SelectItem value="1">FERMATA</SelectItem>
+                            <SelectItem value="2">PARTENZA</SelectItem>
+                            <SelectItem value="3">PULIZIA STRAORDINARIA</SelectItem>
+                            <SelectItem value="4">RIPASSO</SelectItem>
+                          </SelectContent>
+                        </Select>
                       </div>
                     ))}
                   </div>
