@@ -49,7 +49,11 @@ interface ContainersData {
 
 export default function UnconfirmedTasks() {
   const [, setLocation] = useLocation();
-  const [selectedDate, setSelectedDate] = useState(() => format(new Date(), "yyyy-MM-dd"));
+  const [selectedDate, setSelectedDate] = useState(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const dateParam = urlParams.get("date");
+    return dateParam || format(new Date(), "yyyy-MM-dd");
+  });
   const [searchTerm, setSearchTerm] = useState("");
 
   const { data: containersData, isLoading } = useQuery<ContainersData>({

@@ -2229,7 +2229,7 @@ export default function GenerateAssignments() {
             </Popover>
           </div>
           <div className="flex items-center gap-3">
-            <Link href="/unconfirmed-tasks">
+            <Link href={`/unconfirmed-tasks?date=${format(selectedDate, "yyyy-MM-dd")}`}>
               <Button variant="outline" size="icon" className="rounded-full" title="Task Non Confermate" data-testid="link-unconfirmed-tasks">
                 <HelpCircle className="h-5 w-5" />
               </Button>
