@@ -224,9 +224,21 @@ export default function UnconfirmedTasks() {
                         className="flex items-center justify-between gap-4 p-3 bg-muted/50 rounded border border-custom-blue cursor-pointer hover:bg-muted"
                         data-testid={`task-${task.task_id}`}
                       >
-                        <span className="text-red-500 font-mono text-base font-semibold min-w-[80px]">
-                          {task.logistic_code}
-                        </span>
+                        <div className="flex flex-col gap-1">
+                          <div className="flex items-center gap-3">
+                            <span className="text-muted-foreground font-mono text-sm">
+                              ID:{String(task.task_id).padStart(5, '0')}
+                            </span>
+                            <span className="text-red-500 font-mono text-base font-semibold">
+                              {task.logistic_code}
+                            </span>
+                          </div>
+                          {task.address && (
+                            <span className="text-sm text-muted-foreground truncate max-w-[250px]">
+                              {task.address}
+                            </span>
+                          )}
+                        </div>
                         <Select
                           defaultValue=""
                           onValueChange={(value) => {
