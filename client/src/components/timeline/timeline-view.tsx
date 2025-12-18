@@ -1891,10 +1891,8 @@ export default function TimelineView({
 
                                     return (
                                       <React.Fragment key={`task-${taskObj.task_id || taskObj.id}`}>
-                                        {/* Visual placeholder per DESTINATION (punto di arrivo) - box dashed */}
-                                        {placeholderIndex === idx && (
-                                          <div className="flex-shrink-0 mx-0.5 rounded-md border-2 border-dashed border-custom-blue bg-custom-blue/10" style={{ width: 160, minHeight: 38 }} />
-                                        )}
+                                        {/* Placeholder di RBDND UNA sola volta PRIMA della task */}
+                                        {placeholderIndex === idx && provided.placeholder}
 
                                         {/* Travel time marker - FUORI dal Draggable (solo per sequence >= 2) */}
                                         {seq >= 2 && travelTime > 0 && travelWidthPx > 0 && (
@@ -1953,10 +1951,7 @@ export default function TimelineView({
                                     );
                                   })}
                                   {/* Placeholder in coda (se fuori range) */}
-                                  {/* Visual placeholder in coda per DESTINATION */}
-                                  {placeholderIndex !== null && placeholderIndex >= cleanerTasks.length && (
-                                    <div className="flex-shrink-0 mx-0.5 rounded-md border-2 border-dashed border-custom-blue bg-custom-blue/10" style={{ width: 160, minHeight: 38 }} />
-                                  )}
+                                  {placeholderIndex !== null && placeholderIndex >= cleanerTasks.length && provided.placeholder}
                                 </>
                               );
                             })()}
