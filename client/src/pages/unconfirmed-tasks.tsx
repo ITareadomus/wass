@@ -242,7 +242,10 @@ export default function UnconfirmedTasks() {
                         <Select
                           defaultValue=""
                           onValueChange={(value) => {
-                            console.log(`Task ${task.task_id}: operation_id = ${value}`);
+                            const newOperationId = value === "none" ? 0 : parseInt(value);
+                            if (selectedTask?.task_id === task.task_id) {
+                              setSelectedTask({ ...selectedTask, operation_id: newOperationId });
+                            }
                           }}
                         >
                           <SelectTrigger className="w-[200px] text-sm">
