@@ -282,13 +282,13 @@ export default function UnconfirmedTasks() {
                           Dettagli Task #{selectedTask.task_id}
                           <Badge
                             variant="outline"
-                            className={
+                            className={`text-xs shrink-0 px-2 py-0.5 rounded border font-medium ${
                               selectedTask.straordinaria
                                 ? "bg-red-500/20 text-red-700 dark:text-red-300 border-red-500"
                                 : selectedTask.premium
                                   ? "bg-yellow-500/30 text-yellow-800 dark:text-yellow-200 border-yellow-600 dark:border-yellow-400"
                                   : "bg-green-500/30 text-green-800 dark:text-green-200 border-green-600 dark:border-green-400"
-                            }
+                            }`}
                           >
                             {selectedTask.straordinaria
                               ? "STRAORDINARIA"
