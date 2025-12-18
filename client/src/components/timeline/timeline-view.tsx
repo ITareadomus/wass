@@ -1765,12 +1765,6 @@ export default function TimelineView({
                                   return timeA.localeCompare(timeB);
                                 });
 
-                              // Calcola placeholderIndex UNA sola volta
-                              const placeholderIndex =
-                                draggingOverCleanerId === cleaner.id && lastValidDragIndex !== null
-                                  ? lastValidDragIndex
-                                  : null;
-
                               return (
                                 <>
                                   {cleanerTasks.map((task, idx) => {
@@ -1891,8 +1885,6 @@ export default function TimelineView({
 
                                     return (
                                       <React.Fragment key={`task-${taskObj.task_id || taskObj.id}`}>
-                                        {/* Placeholder di RBDND UNA sola volta PRIMA della task */}
-                                        {placeholderIndex === idx && provided.placeholder}
 
                                         {/* Travel time marker - FUORI dal Draggable (solo per sequence >= 2) */}
                                         {seq >= 2 && travelTime > 0 && travelWidthPx > 0 && (
@@ -1950,8 +1942,8 @@ export default function TimelineView({
                                       </React.Fragment>
                                     );
                                   })}
-                                  {/* Placeholder in coda (se fuori range) */}
-                                  {placeholderIndex !== null && placeholderIndex >= cleanerTasks.length && provided.placeholder}
+                                  {/* Placeholder esattamente come nei container */}
+                                  {provided.placeholder}
                                 </>
                               );
                             })()}
