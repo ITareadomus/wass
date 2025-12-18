@@ -2249,54 +2249,59 @@ export default function GenerateAssignments() {
             </div>
 
             {(() => {
-              const filterTasks = (tasks: Task[]): Task[] => {
-                if (!searchTask.trim()) return tasks;
+              const getHighlightedTaskIds = (tasks: Task[]): Set<string> => {
+                if (!searchTask.trim()) return new Set();
                 const lowerSearch = searchTask.toLowerCase();
-                return tasks.filter(task => {
-                  const taskId = String((task as any).id || (task as any).task_id || '');
-                  const logisticCode = String((task as any).logisticCode || (task as any).logistic_code || (task as any).name || '');
-                  const address = String((task as any).address || '');
-                  
-                  return (
-                    taskId.toLowerCase().includes(lowerSearch) ||
-                    logisticCode.toLowerCase().includes(lowerSearch) ||
-                    address.toLowerCase().includes(lowerSearch)
-                  );
-                });
+                return new Set(tasks
+                  .filter(task => {
+                    const taskId = String((task as any).id || (task as any).task_id || '');
+                    const logisticCode = String((task as any).logisticCode || (task as any).logistic_code || (task as any).name || '');
+                    const address = String((task as any).address || '');
+                    
+                    return (
+                      taskId.toLowerCase().includes(lowerSearch) ||
+                      logisticCode.toLowerCase().includes(lowerSearch) ||
+                      address.toLowerCase().includes(lowerSearch)
+                    );
+                  })
+                  .map(t => String((t as any).id || (t as any).task_id || '')));
               };
 
-              const filteredEarlyOut = filterTasks(earlyOutTasks);
-              const filteredHighPriority = filterTasks(highPriorityTasks);
-              const filteredLowPriority = filterTasks(lowPriorityTasks);
+              const highlightedEarlyOut = getHighlightedTaskIds(earlyOutTasks);
+              const highlightedHighPriority = getHighlightedTaskIds(highPriorityTasks);
+              const highlightedLowPriority = getHighlightedTaskIds(lowPriorityTasks);
 
               return (
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6 w-full">
                   <PriorityColumn
                     title="EARLY OUT"
                     priority="early-out"
-                    tasks={filteredEarlyOut}
+                    tasks={earlyOutTasks}
                     droppableId="early-out"
                     icon="clock"
                     assignAction={assignEarlyOutToTimeline}
                     containerMultiSelectState={getContainerMultiSelectState('early_out')}
+                    highlightedTaskIds={highlightedEarlyOut}
                   />
                   <PriorityColumn
                     title="HIGH PRIORITY"
                     priority="high"
-                    tasks={filteredHighPriority}
+                    tasks={highPriorityTasks}
                     droppableId="high"
                     icon="alert-circle"
                     assignAction={assignHighPriorityToTimeline}
                     containerMultiSelectState={getContainerMultiSelectState('high_priority')}
+                    highlightedTaskIds={highlightedHighPriority}
                   />
                   <PriorityColumn
                     title="LOW PRIORITY"
                     priority="low"
-                    tasks={filteredLowPriority}
+                    tasks={lowPriorityTasks}
                     droppableId="low"
                     icon="arrow-down"
                     assignAction={assignLowPriorityToTimeline}
                     containerMultiSelectState={getContainerMultiSelectState('low_priority')}
+                    highlightedTaskIds={highlightedLowPriority}
                   />
                 </div>
               );
