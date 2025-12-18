@@ -8,7 +8,7 @@ import { useState, useEffect, useRef, useCallback, createContext, useContext, us
 const DEBUG = false;
 const dlog = (...args: any[]) => DEBUG && console.log(...args);
 import { ThemeToggle } from "@/components/theme-toggle";
-import { CalendarIcon, Users, RefreshCw, Settings, HelpCircle } from "lucide-react";
+import { CalendarIcon, Users, RefreshCw, Settings, HelpCircle, Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { useLocation, Link } from 'wouter';
 import { format } from "date-fns";
@@ -2243,12 +2243,13 @@ export default function GenerateAssignments() {
             onDragEnd={onDragEnd}
             onDragUpdate={onDragUpdate}
           >
-            <div className="mb-4">
+            <div className="mb-4 relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-[color:var(--priority-border-color)]" />
               <Input
-                placeholder="🔍 Cerca task per ID, logistic code o indirizzo..."
+                placeholder="Cerca task per ID, logistic code o indirizzo..."
                 value={searchTask}
                 onChange={(e) => setSearchTask(e.target.value)}
-                className="border-2 border-custom-blue"
+                className="border-2 border-custom-blue pl-10"
                 data-testid="input-search-task"
               />
             </div>
