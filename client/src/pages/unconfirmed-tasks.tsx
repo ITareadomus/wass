@@ -270,7 +270,7 @@ export default function UnconfirmedTasks() {
                   </div>
                 </div>
 
-                <div className="w-2/3 border-2 border-custom-blue rounded-lg p-4 sticky top-4 max-h-[80vh] overflow-y-auto">
+                <div className="w-2/3 border-2 border-custom-blue rounded-lg p-6 sticky top-4 min-h-[calc(100vh-200px)]">
                   {!selectedTask ? (
                     <div className="flex items-center justify-center h-full text-muted-foreground">
                       Seleziona una task per vedere i dettagli
@@ -316,33 +316,33 @@ export default function UnconfirmedTasks() {
                         </h3>
                       </div>
 
-                      <div className="grid grid-cols-2 gap-4">
+                      <div className="grid grid-cols-2 gap-6">
                         <div>
-                          <p className="text-sm font-semibold text-muted-foreground">
+                          <p className="text-base font-semibold text-muted-foreground">
                             Codice ADAM
                           </p>
-                          <p className="text-sm">{selectedTask.logistic_code}</p>
+                          <p className="text-base">{selectedTask.logistic_code}</p>
                         </div>
                         <div>
-                          <p className="text-sm font-semibold text-muted-foreground">
+                          <p className="text-base font-semibold text-muted-foreground">
                             Cliente
                           </p>
-                          <p className="text-sm">{selectedTask.customer_name || selectedTask.alias || "non migrato"}</p>
+                          <p className="text-base">{selectedTask.customer_name || selectedTask.alias || "non migrato"}</p>
                         </div>
                       </div>
 
-                      <div className="grid grid-cols-2 gap-4">
+                      <div className="grid grid-cols-2 gap-6">
                         <div>
-                          <p className="text-sm font-semibold text-muted-foreground">
+                          <p className="text-base font-semibold text-muted-foreground">
                             Indirizzo
                           </p>
-                          <p className="text-sm uppercase">{selectedTask.address || "NON MIGRATO"}</p>
+                          <p className="text-base uppercase">{selectedTask.address || "NON MIGRATO"}</p>
                         </div>
                         <div>
-                          <p className="text-sm font-semibold text-muted-foreground">
+                          <p className="text-base font-semibold text-muted-foreground">
                             Durata pulizia
                           </p>
-                          <p className="text-sm">
+                          <p className="text-base">
                             {selectedTask.cleaning_time
                               ? `${selectedTask.cleaning_time} minuti`
                               : selectedTask.duration
@@ -352,12 +352,12 @@ export default function UnconfirmedTasks() {
                         </div>
                       </div>
 
-                      <div className="grid grid-cols-2 gap-4">
+                      <div className="grid grid-cols-2 gap-6">
                         <div>
-                          <p className="text-sm font-semibold text-muted-foreground">
+                          <p className="text-base font-semibold text-muted-foreground">
                             Check-out
                           </p>
-                          <p className="text-sm">
+                          <p className="text-base">
                             {selectedTask.checkout_date
                               ? new Date(selectedTask.checkout_date).toLocaleDateString("it-IT", {
                                   day: "2-digit",
@@ -373,10 +373,10 @@ export default function UnconfirmedTasks() {
                           </p>
                         </div>
                         <div>
-                          <p className="text-sm font-semibold text-muted-foreground">
+                          <p className="text-base font-semibold text-muted-foreground">
                             Check-in
                           </p>
-                          <p className="text-sm">
+                          <p className="text-base">
                             {selectedTask.checkin_date
                               ? new Date(selectedTask.checkin_date).toLocaleDateString("it-IT", {
                                   day: "2-digit",
@@ -393,18 +393,18 @@ export default function UnconfirmedTasks() {
                         </div>
                       </div>
 
-                      <div className="grid grid-cols-2 gap-4">
+                      <div className="grid grid-cols-2 gap-6">
                         <div>
-                          <p className="text-sm font-semibold text-muted-foreground">
+                          <p className="text-base font-semibold text-muted-foreground">
                             Tipologia appartamento
                           </p>
-                          <p className="text-sm">{selectedTask.type_apt || "non migrato"}</p>
+                          <p className="text-base">{selectedTask.type_apt || "non migrato"}</p>
                         </div>
                         <div>
-                          <p className="text-sm font-semibold text-muted-foreground">
+                          <p className="text-base font-semibold text-muted-foreground">
                             Tipologia intervento
                           </p>
-                          <p className="text-sm">
+                          <p className="text-base">
                             {(() => {
                               const operationNames: Record<number, string> = {
                                 1: "FERMATA",
@@ -421,18 +421,18 @@ export default function UnconfirmedTasks() {
                         </div>
                       </div>
 
-                      <div className="grid grid-cols-2 gap-4">
+                      <div className="grid grid-cols-2 gap-6">
                         <div>
-                          <p className="text-sm font-semibold text-muted-foreground">
+                          <p className="text-base font-semibold text-muted-foreground">
                             Pax-In
                           </p>
-                          <p className="text-sm">{selectedTask.pax_in ?? "non migrato"}</p>
+                          <p className="text-base">{selectedTask.pax_in ?? "non migrato"}</p>
                         </div>
                         <div>
-                          <p className="text-sm font-semibold text-muted-foreground">
+                          <p className="text-base font-semibold text-muted-foreground">
                             Pax-Out
                           </p>
-                          <p className="text-sm">{selectedTask.pax_out ?? "non migrato"}</p>
+                          <p className="text-base">{selectedTask.pax_out ?? "non migrato"}</p>
                         </div>
                       </div>
                     </div>
