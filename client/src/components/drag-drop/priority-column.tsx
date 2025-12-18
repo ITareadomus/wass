@@ -328,7 +328,10 @@ export default function PriorityColumn({
                 />
               );
             })}
-            {provided.placeholder}
+            {/* Visual placeholder per SOURCE (punto di partenza) - linea thin */}
+            <div className="w-full h-1 border-b-2 border-custom-blue/40 rounded" style={{ minWidth: '100%' }}>
+              {provided.placeholder}
+            </div>
           </div>
         )}
       </Droppable>
