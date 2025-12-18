@@ -36,7 +36,7 @@ function Router() {
     <Switch>
       <Route path="/login" component={Login} />
       <Route path="/">
-        {() => <ProtectedRoute component={UnconfirmedTasks} />}
+        {() => <ProtectedRoute component={GenerateAssignments} />}
       </Route>
       <Route path="/unconfirmed-tasks">
         {() => <ProtectedRoute component={UnconfirmedTasks} />}
