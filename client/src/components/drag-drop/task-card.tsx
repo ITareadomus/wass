@@ -780,6 +780,8 @@ export default function TaskCard({
               style={{
                 ...provided.draggableProps.style,
                 zIndex: snapshot.isDragging ? 9999 : 'auto',
+                visibility: 'visible' as any,
+                opacity: 1,
               }}
               className={isInTimeline ? "flex items-center" : ""}
             >

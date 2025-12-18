@@ -302,9 +302,10 @@ export default function PriorityColumn({
             ref={provided.innerRef}
             {...provided.droppableProps}
             className={`
-              flex flex-wrap gap-2 min-h-[120px] transition-colors duration-200 content-start p-2
+              flex flex-wrap gap-2 min-h-[120px] transition-colors duration-200 content-start p-2 overflow-visible
               ${snapshot.isDraggingOver ? "drop-zone-active" : ""}
             `}
+            style={{ overflow: 'visible' }}
             data-testid={`priority-column-${droppableId}`}
           >
             {tasks.map((task, index) => {
