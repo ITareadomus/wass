@@ -27,6 +27,7 @@ interface PriorityColumnProps {
   assignAction?: () => Promise<void>;
   isDragDisabled?: boolean;
   containerMultiSelectState?: ContainerMultiSelectState;
+  highlightedTaskIds?: Set<string>;
 }
 
 export default function PriorityColumn({
@@ -38,6 +39,7 @@ export default function PriorityColumn({
   assignAction,
   isDragDisabled = false,
   containerMultiSelectState,
+  highlightedTaskIds = new Set(),
 }: PriorityColumnProps) {
   const [isAssigning, setIsAssigning] = useState(false);
   const [isDateInPast, setIsDateInPast] = useState(false);
@@ -312,6 +314,7 @@ export default function PriorityColumn({
               const isDuplicate = hasAssigned && tasks.some(
                 t => t.name === task.name && t.id !== task.id
               );
+              const isHighlighted = highlightedTaskIds.has(String(task.id));
               
               return (
                 <TaskCard
@@ -325,6 +328,7 @@ export default function PriorityColumn({
                   isDragDisabled={isDragDisabled || isDateInPast}
                   isReadOnly={isDateInPast}
                   multiSelectContext={multiSelectCtx}
+                  isHighlighted={isHighlighted}
                 />
               );
             })}
