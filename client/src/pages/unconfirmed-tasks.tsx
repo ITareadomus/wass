@@ -218,8 +218,8 @@ export default function UnconfirmedTasks() {
                 </div>
               </div>
 
-              <div className="flex gap-4">
-                <div className="w-1/3 border-2 border-custom-blue rounded-lg p-4">
+              <div className="flex gap-4 items-start">
+                <div className="w-1/3 border-2 border-custom-blue rounded-lg p-4 max-h-[70vh] overflow-y-auto">
                   <div className="flex flex-col gap-3">
                     {filteredTasks.map((task) => (
                       <div
@@ -270,7 +270,7 @@ export default function UnconfirmedTasks() {
                   </div>
                 </div>
 
-                <div className="w-2/3 border-2 border-custom-blue rounded-lg p-4">
+                <div className="w-2/3 border-2 border-custom-blue rounded-lg p-4 sticky top-4 max-h-[80vh] overflow-y-auto">
                   {!selectedTask ? (
                     <div className="flex items-center justify-center h-full text-muted-foreground">
                       Seleziona una task per vedere i dettagli
