@@ -806,7 +806,6 @@ export default function TaskCard({
                         ${snapshot.isDragging ? "shadow-lg" : ""}
                         ${isOverdue && isInTimeline ? "animate-blink" : ""}
                         ${isDuplicate && !isInTimeline ? "animate-blink-yellow" : ""}
-                        ${isHighlighted ? "ring-2 ring-yellow-400 ring-offset-1" : ""}
                         hover:shadow-md cursor-pointer
                         flex-shrink-0 relative
                       `}
@@ -816,6 +815,10 @@ export default function TaskCard({
                         maxWidth: cardWidth,
                         minHeight: "40px",
                         zIndex: isMapFiltered ? 10 : 'auto',
+                        ...(isHighlighted && !snapshot.isDragging ? {
+                          boxShadow: '0 0 0 3px #FBBF24, 0 0 15px 3px rgba(251, 191, 36, 0.6)',
+                          transform: 'scale(1.02)',
+                        } : {}),
                         ...(isMapFiltered && !snapshot.isDragging ? {
                           boxShadow: '0 0 0 3px #3B82F6, 0 0 20px 5px rgba(59, 130, 246, 0.5)',
                           transform: 'scale(1.05)',
