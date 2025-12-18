@@ -230,7 +230,7 @@ export default function UnconfirmedTasks() {
                         key={`${task.task_id}-${task.logistic_code}`}
                         className={`flex items-center justify-between gap-4 p-3 rounded cursor-pointer hover:bg-muted ${
                           selectedTask?.task_id === task.task_id
-                            ? "bg-primary/20 border-2 border-primary ring-2 ring-primary/50 shadow-md"
+                            ? "bg-custom-blue-light border-2 border-custom-blue ring-2 ring-[color:var(--priority-border-color)]/50 shadow-md"
                             : "bg-muted/50 border border-custom-blue"
                         }`}
                         onClick={() => setSelectedTask({ ...task, operation_id: undefined })}
