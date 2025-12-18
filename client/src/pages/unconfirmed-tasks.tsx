@@ -394,11 +394,11 @@ export default function UnconfirmedTasks() {
                           </p>
                           <p className="text-base">{selectedTask.type_apt || "non migrato"}</p>
                         </div>
-                        <div>
-                          <p className="text-base font-semibold text-muted-foreground">
+                        <div className="bg-amber-100 dark:bg-amber-900/30 border-2 border-amber-400 dark:border-amber-600 rounded-lg p-3 -m-1">
+                          <p className="text-base font-semibold text-amber-700 dark:text-amber-300">
                             Tipologia intervento
                           </p>
-                          <p className="text-base">
+                          <p className="text-base font-bold text-amber-800 dark:text-amber-200">
                             {(() => {
                               const operationNames: Record<number, string> = {
                                 1: "FERMATA",
