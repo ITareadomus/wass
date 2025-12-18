@@ -175,40 +175,36 @@ export default function UnconfirmedTasks() {
             </div>
           </div>
 
-          <div className="flex items-center gap-4 p-4 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-lg">
-            <AlertTriangle className="h-8 w-8 text-amber-500 flex-shrink-0" />
-            <div>
-              <h2 className="font-semibold text-amber-800 dark:text-amber-200">
-                {filteredTasks.length} Task con operazione non confermata
-              </h2>
-              <p className="text-sm text-amber-700 dark:text-amber-300">
-                Queste task hanno operation_id = 0, indicando che l'operazione non è stata confermata nel sistema.
-              </p>
+          {isLoading ? (
+            <div className="flex items-center justify-center p-12">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
             </div>
-          </div>
-
-          <div className="flex gap-4">
-            <div className="w-2/3">
-              {isLoading ? (
-                <div className="flex items-center justify-center p-12">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+          ) : filteredTasks.length === 0 ? (
+            <Card>
+              <CardContent className="flex flex-col items-center justify-center p-12 text-center">
+                <h3 className="text-lg font-semibold mb-2">Nessuna task non confermata</h3>
+                <p className="text-muted-foreground">
+                  Tutte le task per questa data hanno l'operazione confermata
+                </p>
+              </CardContent>
+            </Card>
+          ) : (
+            <>
+              <div className="flex items-center gap-4 p-4 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-lg">
+                <AlertTriangle className="h-8 w-8 text-amber-500 flex-shrink-0" />
+                <div>
+                  <h2 className="font-semibold text-amber-800 dark:text-amber-200">
+                    {filteredTasks.length} Task con operazione non confermata
+                  </h2>
+                  <p className="text-sm text-amber-700 dark:text-amber-300">
+                    Queste task hanno operation_id = 0, indicando che l'operazione non è stata confermata nel sistema.
+                  </p>
                 </div>
-              ) : filteredTasks.length === 0 ? (
-                <Card>
-                  <CardContent className="flex flex-col items-center justify-center p-12 text-center">
-                    <AlertTriangle className="h-12 w-12 text-muted-foreground mb-4" />
-                    <h3 className="text-lg font-semibold mb-2">
-                      {searchTerm ? "Nessun risultato" : "Nessuna task non confermata"}
-                    </h3>
-                    <p className="text-muted-foreground">
-                      {searchTerm 
-                        ? "Prova a modificare i termini di ricerca" 
-                        : "Tutte le task per questa data hanno l'operazione confermata"}
-                    </p>
-                  </CardContent>
-                </Card>
-              ) : (
-                <div className="grid gap-4 md:grid-cols-2">
+              </div>
+
+              <div className="flex gap-4">
+                <div className="w-2/3">
+                  <div className="grid gap-4 md:grid-cols-2">
                   {filteredTasks.map((task) => (
                     <Card 
                       key={`${task.task_id}-${task.logistic_code}`}
@@ -281,22 +277,23 @@ export default function UnconfirmedTasks() {
                     </Card>
                   ))}
                 </div>
-              )}
-            </div>
-            
-            <div className="w-1/3">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-lg">Pannello laterale</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-muted-foreground text-sm">
-                    Contenuto da definire
-                  </p>
-                </CardContent>
-              </Card>
-            </div>
-          </div>
+                </div>
+                
+                <div className="w-1/3">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-lg">Pannello laterale</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <p className="text-muted-foreground text-sm">
+                        Contenuto da definire
+                      </p>
+                    </CardContent>
+                  </Card>
+                </div>
+              </div>
+            </>
+          )}
         </div>
       </main>
     </div>
