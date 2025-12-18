@@ -229,6 +229,7 @@ export default function UnconfirmedTasks() {
                             <span className="text-muted-foreground font-mono text-sm">
                               ID:{String(task.task_id).padStart(5, '0')}
                             </span>
+                            <span className="text-muted-foreground">-</span>
                             <span className="text-red-500 font-mono text-base font-semibold">
                               {task.logistic_code}
                             </span>
