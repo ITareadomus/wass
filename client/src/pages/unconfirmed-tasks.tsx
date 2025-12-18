@@ -190,10 +190,10 @@ export default function UnconfirmedTasks() {
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
             </div>
           ) : filteredTasks.length === 0 ? (
-            <Card>
+            <Card className="border-2 border-green-300 dark:border-green-700 bg-green-50 dark:bg-green-950/30">
               <CardContent className="flex flex-col items-center justify-center p-12 text-center">
                 <CheckCircle className="h-12 w-12 text-green-500 mb-4" />
-                <h3 className="text-lg font-semibold mb-2">
+                <h3 className="text-lg font-semibold mb-2 text-green-800 dark:text-green-200">
                   Tutti i task per questa data hanno la tipologia d'intervento correttamente impostata.
                 </h3>
               </CardContent>
