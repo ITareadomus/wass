@@ -4839,6 +4839,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 if (adamData.alias) task.alias = adamData.alias;
                 if (adamData.customer_name) task.customer_name = adamData.customer_name;
                 if (adamData.premium !== undefined) task.premium = adamData.premium;
+                if (adamData.operation_id !== undefined) task.operation_id = adamData.operation_id;
                 task.confirmed_operation = adamData.confirmed_operation;
               }
             }
