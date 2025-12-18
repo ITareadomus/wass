@@ -1,6 +1,6 @@
 {
     "metadata": {
-        "last_updated": "2025-12-18T09:39:49.404919",
+        "last_updated": "2025-12-18T10:00:36.235708",
         "db_config": {
             "host": "139.59.132.41",
             "user": "admin",
@@ -10,8 +10,8 @@
         "schema_version": "1.0"
     },
     "dates": {
-        "2025-12-19": {
-            "timestamp": "2025-12-18T09:39:49.404930",
+        "2025-12-18": {
+            "timestamp": "2025-12-18T10:00:36.235723",
             "cleaners": [
                 {
                     "id": 24,
@@ -419,7 +419,7 @@
                     "ranking": 0,
                     "counter_hours": 3.5,
                     "counter_days": 0,
-                    "available": true,
+                    "available": false,
                     "contract_type": "B",
                     "preferred_customers": [
                         3,
@@ -598,7 +598,7 @@
                     "ranking": 0,
                     "counter_hours": 3.0,
                     "counter_days": 0,
-                    "available": false,
+                    "available": true,
                     "contract_type": "a chiamata",
                     "preferred_customers": [],
                     "telegram_id": null,
@@ -687,7 +687,7 @@
                 }
             ],
             "total_cleaners": 27,
-            "date": "2025-12-19",
+            "date": "2025-12-18",
             "data_source": "database_query"
         }
     }
