@@ -2244,7 +2244,7 @@ export default function GenerateAssignments() {
             onDragUpdate={onDragUpdate}
           >
             <div className="mb-4 relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-[color:var(--priority-border-color)]" />
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-custom-blue" />
               <Input
                 placeholder="Cerca task per ID, logistic code o indirizzo..."
                 value={searchTask}

@@ -215,7 +215,7 @@ export default function UnconfirmedTasks() {
               <div className="flex gap-4 items-start">
                 <div className="w-1/3 border-2 border-custom-blue rounded-lg p-4 max-h-[70vh] overflow-y-auto custom-scrollbar">
                   <div className="relative w-full mb-3">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-[color:var(--priority-border-color)]" />
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-custom-blue" />
                     <Input
                       placeholder="Cerca per ID, codice ADAM, indirizzo..."
                       value={searchTerm}
