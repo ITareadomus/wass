@@ -210,15 +210,17 @@ export default function UnconfirmedTasks() {
 
               <div className="flex gap-4">
                 <div className="w-1/3 border-2 border-custom-blue rounded-lg p-4">
-                  <div className="flex flex-wrap gap-2">
+                  <div className="flex flex-col gap-2">
                     {filteredTasks.map((task) => (
-                      <span
+                      <div
                         key={`${task.task_id}-${task.logistic_code}`}
-                        className="text-red-500 font-mono text-sm cursor-pointer hover:underline"
+                        className="flex items-center gap-4 p-2 bg-muted/50 rounded cursor-pointer hover:bg-muted"
                         data-testid={`task-${task.task_id}`}
                       >
-                        {task.logistic_code}
-                      </span>
+                        <span className="text-red-500 font-mono text-sm font-semibold">
+                          {task.logistic_code}
+                        </span>
+                      </div>
                     ))}
                   </div>
                 </div>
