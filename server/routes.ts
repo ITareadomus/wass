@@ -1656,9 +1656,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
             return !matchCode && !matchId;
           }
         );
-        removedCount += (initialTaskCountForCleaner - (cleanerEntry.tasks?.length || 0));
+        const thisCleanerRemovedCount = initialTaskCountForCleaner - (cleanerEntry.tasks?.length || 0);
+        removedCount += thisCleanerRemovedCount;
+        
+        // CRITICAL: Rinumera le sequence SUBITO per le task rimanenti (1, 2, 3...)
+        // Il ricalcolo completo con hydrate+recalculate avverrà dopo con async
+        if (cleanerEntry.tasks.length > 0 && thisCleanerRemovedCount > 0) {
+          cleanerEntry.tasks = cleanerEntry.tasks.map((task: any, idx: number) => {
+            task.sequence = idx + 1;
+            task.followup = idx > 0;
+            return task;
+          });
+          cleanerEntry._needsRecalculation = true; // Flag per ricalcolo async
+          console.log(`🔢 Sequence rinumerata per ${cleanerEntry.tasks.length} task di cleaner ${cleanerEntry.cleaner?.id}`);
+        }
+        
         return cleanerEntry;
       }).filter((c: any) => c.tasks.length > 0); // Rimuovi cleaner vuoti
+      
+      // ASYNC: Ricalcola travel_time e start/end time per i cleaner che hanno perso task
+      for (const cleanerEntry of assignmentsData.cleaners_assignments) {
+        if (cleanerEntry._needsRecalculation) {
+          try {
+            await hydrateTasksFromContainers(cleanerEntry, workDate);
+            const updatedData = await recalculateCleanerTimes(cleanerEntry, workDate);
+            Object.assign(cleanerEntry, updatedData);
+            console.log(`✅ Ricalcolati travel_time e orari per cleaner ${cleanerEntry.cleaner?.id}`);
+          } catch (recalcError: any) {
+            console.warn(`⚠️ Errore ricalcolo per cleaner ${cleanerEntry.cleaner?.id}: ${recalcError.message}`);
+          }
+          delete cleanerEntry._needsRecalculation;
+        }
+      }
 
       console.log(`Rimosse ${removedCount} assegnazioni`);
 
