@@ -41,7 +41,7 @@ export default function HomeGate() {
   useEffect(() => {
     if (hasRedirected) return;
     setHasRedirected(true);
-    setLocation(`/unconfirmed-tasks?date=${selectedDate}`);
+    setLocation(`/generate-assignments?date=${selectedDate}`);
   }, [hasRedirected, setLocation, selectedDate]);
 
   return (
