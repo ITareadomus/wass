@@ -82,6 +82,7 @@ export default function UnconfirmedTasks() {
   const [isSaving, setIsSaving] = useState(false);
   const [showRecap, setShowRecap] = useState(false);
   const [recapOperations, setRecapOperations] = useState<Map<string | number, number>>(new Map());
+  const [expandedTaskId, setExpandedTaskId] = useState<string | number | null>(null);
 
   const { data: containersData, isLoading } = useQuery<ContainersData>({
     queryKey: ["/api/containers-enriched", selectedDate],
@@ -588,37 +589,43 @@ export default function UnconfirmedTasks() {
                     <DialogTitle>Recap - Conferma Salvataggio</DialogTitle>
                   </DialogHeader>
 
-                  <div className="space-y-2 py-2 max-h-[calc(80vh-150px)] overflow-y-auto">
+                  <div className="space-y-1.5 py-2 max-h-[calc(80vh-150px)] overflow-y-auto">
                     {Array.from(recapOperations.entries()).map(([taskId, opId]) => {
                       const task = filteredTasks.find(t => t.task_id === taskId);
+                      const isExpanded = expandedTaskId === taskId;
                       if (!task) return null;
 
                       return (
-                        <div key={taskId} className="bg-custom-blue-light border border-custom-blue rounded-lg p-2 space-y-1.5">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <span className="font-mono text-xs font-semibold">ID: {String(task.task_id).padStart(5, '0')}</span>
-                            <span className="text-red-500 text-xs font-semibold">{task.logistic_code}</span>
-                            {task.address && <span className="text-xs text-muted-foreground truncate">{task.address}</span>}
-                          </div>
+                        <div 
+                          key={taskId} 
+                          className="bg-custom-blue-light border border-custom-blue rounded-lg p-2 cursor-pointer hover:opacity-80 transition-opacity"
+                          onClick={() => setExpandedTaskId(isExpanded ? null : taskId)}
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-2 flex-wrap flex-1 min-w-0">
+                              <span className="font-mono text-xs font-semibold">ID: {String(task.task_id).padStart(5, '0')}</span>
+                              <span className="text-red-500 text-xs font-semibold">{task.logistic_code}</span>
+                              {task.address && <span className="text-xs text-muted-foreground truncate">{task.address}</span>}
+                            </div>
 
-                          <div className="space-y-1">
-                            <label className="text-xs font-semibold block">Tipologia</label>
-                            <Select value={String(opId)} onValueChange={(val) => {
-                              const newOps = new Map(recapOperations);
-                              newOps.set(taskId, parseInt(val));
-                              setRecapOperations(newOps);
-                            }}>
-                              <SelectTrigger className="bg-white dark:bg-slate-900 h-8 text-xs">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="0">Nessuna</SelectItem>
-                                <SelectItem value="1">FERMATA</SelectItem>
-                                <SelectItem value="2">PARTENZA</SelectItem>
-                                <SelectItem value="3">STRAORDINARIA</SelectItem>
-                                <SelectItem value="4">RIPASSO</SelectItem>
-                              </SelectContent>
-                            </Select>
+                            {isExpanded && (
+                              <Select value={String(opId)} onValueChange={(val) => {
+                                const newOps = new Map(recapOperations);
+                                newOps.set(taskId, parseInt(val));
+                                setRecapOperations(newOps);
+                              }}>
+                                <SelectTrigger className="bg-white dark:bg-slate-900 h-7 text-xs w-auto flex-shrink-0">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="0">Nessuna</SelectItem>
+                                  <SelectItem value="1">FERMATA</SelectItem>
+                                  <SelectItem value="2">PARTENZA</SelectItem>
+                                  <SelectItem value="3">STRAORDINARIA</SelectItem>
+                                  <SelectItem value="4">RIPASSO</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            )}
                           </div>
                         </div>
                       );
