@@ -431,13 +431,13 @@ export default function UnconfirmedTasks() {
                               </p>
                             </div>
                           </PopoverTrigger>
-                          <PopoverContent className="w-56 p-2" align="start">
-                            <div className="flex flex-col gap-1">
+                          <PopoverContent className="w-48 p-1" align="start">
+                            <div className="flex flex-col">
                               {[
-                                { value: 0, label: "— Nessuna operazione —" },
+                                { value: 0, label: "Nessuna" },
                                 { value: 1, label: "FERMATA" },
                                 { value: 2, label: "PARTENZA" },
-                                { value: 3, label: "PULIZIA STRAORDINARIA" },
+                                { value: 3, label: "STRAORDINARIA" },
                                 { value: 4, label: "RIPASSO" },
                               ].map((option) => (
                                 <button
@@ -445,7 +445,7 @@ export default function UnconfirmedTasks() {
                                   onClick={() => {
                                     setSelectedTask({ ...selectedTask, operation_id: option.value });
                                   }}
-                                  className={`text-left px-3 py-2 rounded hover:bg-muted transition-colors ${
+                                  className={`text-left text-sm px-2 py-1.5 rounded hover:bg-muted transition-colors ${
                                     selectedTask.operation_id === option.value ? "bg-amber-100 dark:bg-amber-900/50 font-semibold" : ""
                                   }`}
                                   data-testid={`option-operation-${option.value}`}
