@@ -6,7 +6,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { Users, CalendarIcon, ArrowLeft, Save, UserPlus } from "lucide-react";
+import { Users, CalendarIcon, ArrowLeft, Save, UserPlus, Search } from "lucide-react";
 import { format } from "date-fns";
 import { it } from "date-fns/locale";
 import { cn } from "@/lib/utils";
@@ -515,12 +515,13 @@ export default function Convocazioni() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-[calc(100vh-200px)]">
           {/* Lista Cleaners - 2/3 dello spazio */}
           <Card className="p-6 lg:col-span-2 flex flex-col overflow-hidden border-2 border-custom-blue bg-custom-blue-light">
-          <div className="mb-4">
+          <div className="mb-4 relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-custom-blue" />
             <Input
-              placeholder="🔍 Cerca cleaner per nome..."
+              placeholder="Cerca cleaner per nome..."
               value={searchCleaner}
               onChange={(e) => setSearchCleaner(e.target.value)}
-              className="border-2 border-custom-blue"
+              className="pl-10 border-2 border-custom-blue"
               data-testid="input-search-cleaner"
             />
           </div>
