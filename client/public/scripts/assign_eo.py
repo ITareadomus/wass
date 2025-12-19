@@ -101,6 +101,14 @@ MAX_TASKS_PER_PRIORITY = 2  # Max 2 task Early-Out per cleaner (base, infrangibi
 
 PREFERRED_TRAVEL = 20.0  # Preferenza per percorsi < 20'
 
+# =============================
+# CONFIG - PROPOSTA A: EO_END SOFT + GERARCHIA VICINANZA
+# =============================
+NEAR_TRAVEL_MIN = 15.0  # Soglia "vicino" in minuti di viaggio
+EO_GRACE_MAX_OVER_MIN = 20  # Max sforamento oltre EO_END_TIME in minuti (grace period)
+MAX_TASKS_IF_NEAR = 2  # Max task se vicinanza è solo travel-time ≤ 15'
+MAX_TASKS_IF_STREET_OR_BUILDING = 3  # Max task se stessa via o stesso edificio
+
 # Travel model (min)
 SHORT_RANGE_KM = 0.30
 SHORT_BASE_MIN = 3.5
@@ -201,6 +209,25 @@ def same_street(a: Optional[str], b: Optional[str]) -> bool:
     sa, _ = split_street_number(na)
     sb, _ = split_street_number(nb)
     return sa == sb
+
+
+def proximity_rank(a: Task, b: Task) -> int:
+    """
+    Calcola il rank di vicinanza tra due task.
+    Ritorna:
+        3 = stesso edificio (vicinissimo)
+        2 = stessa via (più vicino)
+        1 = travel_time <= NEAR_TRAVEL_MIN (vicino)
+        0 = lontano
+    """
+    if same_building(a.address, b.address):
+        return 3
+    if same_street(a.address, b.address):
+        return 2
+    if travel_minutes(a, b) <= NEAR_TRAVEL_MIN:
+        return 1
+    return 0
+
 
 def is_nearby_same_block(t1: Task, t2: Task) -> bool:
     """
@@ -383,9 +410,21 @@ def evaluate_route(route: List[Task]) -> Tuple[bool, List[Tuple[int, int, int]]]
             cur += wait
             start = cur
             
-            # VINCOLO EO END TIME: la task EO non può INIZIARE dopo eo_end_time
+            # VINCOLO EO END TIME SOFT (Proposta A):
+            # La task EO può iniziare dopo eo_end_time SOLO SE:
+            # 1. C'è una task precedente "vicina" (proximity_rank >= 1)
+            # 2. Lo sforamento è <= EO_GRACE_MAX_OVER_MIN (20 minuti)
             if EO_END_TIME_MIN is not None and start > EO_END_TIME_MIN:
-                return False, []
+                over = start - EO_END_TIME_MIN
+                # Prima task: nessuna grace possibile
+                if prev is None:
+                    return False, []
+                # Calcola il rank di vicinanza con la task precedente
+                rank = proximity_rank(prev, t)
+                # Grace rule: consenti se rank >= 1 E sforamento <= max grace
+                if rank < 1 or over > EO_GRACE_MAX_OVER_MIN:
+                    return False, []
+                # Altrimenti consenti (passa al prossimo task)
 
         finish = start + t.cleaning_time
 
@@ -447,7 +486,30 @@ def can_add_task(cleaner: Cleaner, task: Task) -> bool:
         if task.straordinaria:
             return False
 
-    # CLUSTERING AVANZATO: controlla vicinanza con task esistenti
+    # =====================================================
+    # PROPOSTA A: CAP 2/3 BASATO SU GERARCHIA DI VICINANZA
+    # =====================================================
+    # Prima di tutto, applica il cap EO basato sulla gerarchia:
+    # - max 2 task se vicinanza è solo travel <= 15'
+    # - max 3 task se stessa via o stesso edificio
+    if current_count > 0:
+        # Calcola il rank massimo di vicinanza con le task esistenti
+        max_rank = max(proximity_rank(existing_task, task) for existing_task in cleaner.route)
+        
+        # Determina il cap in base alla gerarchia
+        # rank >= 2 (stessa via o edificio) → max 3 task
+        # rank == 1 (travel <= 15') → max 2 task
+        # rank == 0 (lontano) → max 2 task (regola base)
+        if max_rank >= 2:
+            max_allowed = MAX_TASKS_IF_STREET_OR_BUILDING  # 3
+        else:
+            max_allowed = MAX_TASKS_IF_NEAR  # 2
+        
+        # Applica il cap (hard limit per EO)
+        if current_count >= max_allowed:
+            return False
+
+    # CLUSTERING AVANZATO: controlla vicinanza con task esistenti (logica legacy per altri controlli)
     if current_count > 0:
         # Cluster prioritario: ≤5' o stessa via
         is_priority_cluster = any(
@@ -457,7 +519,7 @@ def can_add_task(cleaner: Cleaner, task: Task) -> bool:
             for existing_task in cleaner.route
         )
 
-        # Cluster esteso: ≤10' (infrange limite tipologia)
+        # Cluster esteso: ≤7' (infrange limite tipologia)
         is_extended_cluster = any(
             (travel_minutes(existing_task, task) <= CLUSTER_EXTENDED_TRAVEL or
              travel_minutes(task, existing_task) <= CLUSTER_EXTENDED_TRAVEL)
@@ -467,40 +529,24 @@ def can_add_task(cleaner: Cleaner, task: Task) -> bool:
         # NUOVO: Cluster geografico
         is_geo_cluster = any(same_zone(existing_task, task) for existing_task in cleaner.route)
 
-        # Se è in cluster prioritario o geografico: ignora limiti tipologia, rispetta SEMPRE limite giornaliero
+        # Se è in cluster prioritario o geografico: ignora limiti tipologia
         if is_priority_cluster or is_geo_cluster:
-            # Verifica limite giornaliero HARD
-            if current_count >= DAILY_TASK_LIMIT:
-                return False
-            # Verifica max assoluto (anche se in cluster)
-            if current_count >= ABSOLUTE_MAX_TASKS:
-                return False
             return True
 
-        # Se è in cluster esteso: ignora limite tipologia, rispetta limiti giornaliero e max assoluto
+        # Se è in cluster esteso: ignora limite tipologia
         if is_extended_cluster:
-            # Verifica limite giornaliero HARD
-            if current_count >= DAILY_TASK_LIMIT:
-                return False
-            # Verifica max assoluto
-            if current_count >= ABSOLUTE_MAX_TASKS:
-                return False
             return True
 
     # Regola base: max 2 task
     if current_count < BASE_MAX_TASKS:
         return True
 
-    # 3ª-5ª task: solo se fattibile temporalmente
-    if current_count >= BASE_MAX_TASKS and current_count < ABSOLUTE_MAX_TASKS:
+    # 3ª task: solo se fattibile temporalmente (già passato il cap check sopra)
+    if current_count >= BASE_MAX_TASKS:
         test_route = cleaner.route + [task]
         feasible, schedule = evaluate_route(test_route)
-        if feasible and schedule:
-            last_finish = schedule[-1][2]  # finish time in minuti
-            if current_count < ABSOLUTE_MAX_TASKS_IF_BEFORE_18 and last_finish <= 18 * 60:
-                return True
-            elif current_count < ABSOLUTE_MAX_TASKS:
-                return True
+        if feasible:
+            return True
 
     return False
 
