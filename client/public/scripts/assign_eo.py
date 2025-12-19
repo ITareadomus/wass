@@ -107,7 +107,7 @@ PREFERRED_TRAVEL = 20.0  # Preferenza per percorsi < 20'
 NEAR_TRAVEL_MIN = 15.0  # Soglia "vicino" in minuti di viaggio
 EO_GRACE_MAX_OVER_MIN = 20  # Max sforamento oltre EO_END_TIME in minuti (grace period)
 MAX_TASKS_IF_NEAR = 2  # Max task se vicinanza è solo travel-time ≤ 15'
-MAX_TASKS_IF_STREET_OR_BUILDING = 3  # Max task se stessa via o stesso edificio
+MAX_TASKS_IF_STREET_OR_BUILDING = 4  # Max task se stessa via o stesso edificio
 
 # Travel model (min)
 SHORT_RANGE_KM = 0.30
