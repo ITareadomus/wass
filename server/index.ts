@@ -9,6 +9,14 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
 app.use((req, res, next) => {
+  if (req.path.includes('%3F') || req.path.includes('%3f')) {
+    const decodedPath = decodeURIComponent(req.originalUrl);
+    return res.redirect(301, decodedPath);
+  }
+  next();
+});
+
+app.use((req, res, next) => {
   const start = Date.now();
   const path = req.path;
   let capturedJsonResponse: Record<string, any> | undefined = undefined;
