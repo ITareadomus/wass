@@ -2692,8 +2692,125 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Endpoint per aggiornare i dettagli di una task (checkout, checkin, durata)
   // skipAdam: se true, aggiorna SOLO PostgreSQL e non propaga su ADAM
+  // Supporta sia aggiornamenti singoli che batch (array di updates)
   app.post("/api/update-task-details", async (req, res) => {
     try {
+      // Supporto per batch updates (array di updates)
+      if (req.body.updates && Array.isArray(req.body.updates)) {
+        const updates = req.body.updates;
+        const skipAdam = req.body.skipAdam || false;
+        const results: { taskId: string; success: boolean; error?: string }[] = [];
+        
+        // Raggruppa updates per data per ottimizzare i salvataggi
+        const updatesByDate = new Map<string, typeof updates>();
+        for (const update of updates) {
+          const workDate = update.date || format(new Date(), 'yyyy-MM-dd');
+          if (!updatesByDate.has(workDate)) {
+            updatesByDate.set(workDate, []);
+          }
+          updatesByDate.get(workDate)!.push(update);
+        }
+        
+        // Apri connessione MySQL una sola volta (se non skipAdam)
+        let mysqlConnection: any = null;
+        if (!skipAdam) {
+          try {
+            const mysql = await import('mysql2/promise');
+            mysqlConnection = await mysql.createConnection({
+              host: "139.59.132.41",
+              user: "admin",
+              password: "ed329a875c6c4ebdf4e87e2bbe53a15771b5844ef6606dde",
+              database: "adamdb",
+            });
+          } catch (dbError: any) {
+            console.warn(`⚠️ Connessione ADAM non disponibile: ${dbError.message}`);
+          }
+        }
+        
+        // Processa ogni data
+        for (const [workDate, dateUpdates] of updatesByDate) {
+          try {
+            // Carica containers una volta per data
+            const containersData = await workspaceFiles.loadContainers(workDate) || { containers: {} };
+            let anyUpdated = false;
+            
+            for (const update of dateUpdates) {
+              const { taskId, operationId } = update;
+              if (!taskId) {
+                results.push({ taskId: 'unknown', success: false, error: 'taskId richiesto' });
+                continue;
+              }
+              
+              let taskUpdated = false;
+              
+              // Aggiorna nei containers
+              if (containersData.containers) {
+                for (const containerType of ['early_out', 'high_priority', 'low_priority']) {
+                  const container = (containersData.containers as any)[containerType];
+                  if (container?.tasks) {
+                    for (const task of container.tasks) {
+                      if (String(task.task_id) === String(taskId)) {
+                        if (operationId !== undefined) {
+                          task.operation_id = operationId;
+                          task.confirmed_operation = true;
+                        }
+                        taskUpdated = true;
+                        anyUpdated = true;
+                        break;
+                      }
+                    }
+                  }
+                  if (taskUpdated) break;
+                }
+              }
+              
+              if (taskUpdated) {
+                // Propaga su ADAM se connessione disponibile
+                if (mysqlConnection && operationId !== undefined) {
+                  try {
+                    await mysqlConnection.execute(
+                      'UPDATE app_housekeeping SET operation_id = ? WHERE id = ?',
+                      [operationId, taskId]
+                    );
+                    console.log(`✅ Task ${taskId} operation_id aggiornato su ADAM: ${operationId}`);
+                  } catch (dbError: any) {
+                    console.error(`⚠️ Errore ADAM per task ${taskId}:`, dbError.message);
+                  }
+                }
+                results.push({ taskId: String(taskId), success: true });
+              } else {
+                results.push({ taskId: String(taskId), success: false, error: 'Task non trovata' });
+              }
+            }
+            
+            // Salva containers una volta per data (se qualcosa è stato aggiornato)
+            if (anyUpdated) {
+              await workspaceFiles.saveContainers(workDate, containersData);
+            }
+          } catch (err: any) {
+            for (const update of dateUpdates) {
+              results.push({ taskId: String(update.taskId || 'unknown'), success: false, error: err.message });
+            }
+          }
+        }
+        
+        // Chiudi connessione MySQL
+        if (mysqlConnection) {
+          try {
+            await mysqlConnection.end();
+          } catch (e) {}
+        }
+        
+        const successCount = results.filter(r => r.success).length;
+        console.log(`✅ Batch update completato: ${successCount}/${updates.length} task aggiornate`);
+        return res.json({ 
+          success: successCount > 0, 
+          message: `${successCount}/${updates.length} task aggiornate`,
+          results 
+        });
+      }
+      
+      // Singolo update (comportamento originale)
       const { taskId, logisticCode, checkoutDate, checkoutTime, checkinDate, checkinTime, cleaningTime, paxIn, paxOut, operationId, date, modified_by, skipAdam } = req.body;
 
       if (!taskId && !logisticCode) {
