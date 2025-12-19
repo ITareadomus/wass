@@ -23,7 +23,22 @@ import {
   ChevronRight,
   CheckCircle,
   Save,
+  X,
 } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 interface Task {
   task_id: string | number;
@@ -65,6 +80,8 @@ export default function UnconfirmedTasks() {
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [selectedOperations, setSelectedOperations] = useState<Map<string | number, number>>(new Map());
   const [isSaving, setIsSaving] = useState(false);
+  const [showRecap, setShowRecap] = useState(false);
+  const [recapOperations, setRecapOperations] = useState<Map<string | number, number>>(new Map());
 
   const { data: containersData, isLoading } = useQuery<ContainersData>({
     queryKey: ["/api/containers-enriched", selectedDate],
@@ -145,7 +162,7 @@ export default function UnconfirmedTasks() {
     }
   };
 
-  const handleSaveToAdam = async () => {
+  const handleShowRecap = () => {
     if (selectedOperations.size === 0) {
       toast({
         title: "Nessuna modifica",
@@ -153,10 +170,14 @@ export default function UnconfirmedTasks() {
       });
       return;
     }
+    setRecapOperations(new Map(selectedOperations));
+    setShowRecap(true);
+  };
 
+  const handleConfirmSave = async () => {
     setIsSaving(true);
     try {
-      const updates = Array.from(selectedOperations.entries()).map(([taskId, operationId]) => ({
+      const updates = Array.from(recapOperations.entries()).map(([taskId, operationId]) => ({
         taskId: String(taskId),
         operationId,
         date: selectedDate,
@@ -172,12 +193,13 @@ export default function UnconfirmedTasks() {
 
       toast({
         title: "Successo",
-        description: `${selectedOperations.size} task salvati su ADAM`,
+        description: `${recapOperations.size} task salvati su ADAM`,
         variant: "default",
       });
 
-      // Reset la mappa dopo il salvataggio
+      setShowRecap(false);
       setSelectedOperations(new Map());
+      setRecapOperations(new Map());
     } catch (error: any) {
       toast({
         title: "Errore",
@@ -187,6 +209,17 @@ export default function UnconfirmedTasks() {
     } finally {
       setIsSaving(false);
     }
+  };
+
+  const getOperationName = (opId: number) => {
+    const names: Record<number, string> = {
+      0: "Nessuna",
+      1: "FERMATA",
+      2: "PARTENZA",
+      3: "STRAORDINARIA",
+      4: "RIPASSO"
+    };
+    return names[opId] || `Operazione ${opId}`;
   };
 
   return (
@@ -540,7 +573,7 @@ export default function UnconfirmedTasks() {
 
               <div className="flex justify-center pt-0.5">
                 <Button
-                  onClick={handleSaveToAdam}
+                  onClick={handleShowRecap}
                   disabled={selectedOperations.size === 0 || isSaving}
                   data-testid="button-save-adam"
                 >
@@ -548,6 +581,67 @@ export default function UnconfirmedTasks() {
                   {isSaving ? "Salvataggio..." : `Salva su ADAM (${selectedOperations.size})`}
                 </Button>
               </div>
+
+              <Dialog open={showRecap} onOpenChange={setShowRecap}>
+                <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+                  <DialogHeader>
+                    <DialogTitle>Recap - Conferma Salvataggio</DialogTitle>
+                  </DialogHeader>
+
+                  <div className="space-y-4 py-4">
+                    {Array.from(recapOperations.entries()).map(([taskId, opId]) => {
+                      const task = filteredTasks.find(t => t.task_id === taskId);
+                      if (!task) return null;
+
+                      return (
+                        <div key={taskId} className="bg-custom-blue-light border border-custom-blue rounded-lg p-4 space-y-3">
+                          <div className="flex items-center gap-3">
+                            <span className="font-mono font-semibold">ID: {String(task.task_id).padStart(5, '0')}</span>
+                            <span className="text-red-500 font-semibold">{task.logistic_code}</span>
+                            {task.address && <span className="text-sm text-muted-foreground">{task.address}</span>}
+                          </div>
+
+                          <div className="space-y-2">
+                            <label className="text-sm font-semibold">Tipologia Intervento</label>
+                            <Select value={String(opId)} onValueChange={(val) => {
+                              const newOps = new Map(recapOperations);
+                              newOps.set(taskId, parseInt(val));
+                              setRecapOperations(newOps);
+                            }}>
+                              <SelectTrigger className="bg-white dark:bg-slate-900">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="0">Nessuna</SelectItem>
+                                <SelectItem value="1">FERMATA</SelectItem>
+                                <SelectItem value="2">PARTENZA</SelectItem>
+                                <SelectItem value="3">STRAORDINARIA</SelectItem>
+                                <SelectItem value="4">RIPASSO</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  <DialogFooter className="gap-2">
+                    <Button
+                      variant="outline"
+                      onClick={() => setShowRecap(false)}
+                      disabled={isSaving}
+                    >
+                      Annulla
+                    </Button>
+                    <Button
+                      onClick={handleConfirmSave}
+                      disabled={isSaving}
+                    >
+                      {isSaving ? "Salvataggio..." : "Conferma Salvataggio"}
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
             </>
           )}
         </div>
