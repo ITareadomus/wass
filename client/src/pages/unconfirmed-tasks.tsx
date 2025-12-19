@@ -354,7 +354,7 @@ export default function UnconfirmedTasks() {
                           )}
                         </div>
                         {selectedOperations.has(task.task_id) && (
-                          <span className="text-xs font-semibold text-amber-700 dark:text-amber-300 whitespace-nowrap ml-2">
+                          <span className="text-sm font-semibold text-amber-700 dark:text-amber-300 whitespace-nowrap ml-2">
                             Tipologia = {selectedOperations.get(task.task_id) === 0 ? "Nessuna" : selectedOperations.get(task.task_id) === 1 ? "FERMATA" : selectedOperations.get(task.task_id) === 2 ? "PARTENZA" : selectedOperations.get(task.task_id) === 3 ? "STRAORDINARIA" : "RIPASSO"}
                           </span>
                         )}
@@ -363,13 +363,13 @@ export default function UnconfirmedTasks() {
                   </div>
                 </div>
 
-                <div className="w-1/2 border-2 border-custom-blue rounded-lg p-6 h-[70vh] overflow-y-auto bg-custom-blue-light">
+                <div className="w-1/2 border-2 border-custom-blue rounded-lg p-4 h-[70vh] overflow-y-auto bg-custom-blue-light">
                   {!selectedTask ? (
                     <div className="flex items-center justify-center h-full text-muted-foreground">
                       Seleziona una task per vedere i dettagli
                     </div>
                   ) : (
-                    <div className="space-y-8 h-full flex flex-col justify-between">
+                    <div className="space-y-3 h-full flex flex-col justify-between">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
                           <Button
@@ -429,7 +429,7 @@ export default function UnconfirmedTasks() {
                         </div>
                       </div>
 
-                      <div className="grid grid-cols-2 gap-6">
+                      <div className="grid grid-cols-2 gap-3">
                         <div>
                           <p className="text-base font-semibold text-muted-foreground">
                             Codice ADAM
@@ -444,7 +444,7 @@ export default function UnconfirmedTasks() {
                         </div>
                       </div>
 
-                      <div className="grid grid-cols-2 gap-6">
+                      <div className="grid grid-cols-2 gap-3">
                         <div>
                           <p className="text-base font-semibold text-muted-foreground">
                             Indirizzo
@@ -465,7 +465,7 @@ export default function UnconfirmedTasks() {
                         </div>
                       </div>
 
-                      <div className="grid grid-cols-2 gap-6">
+                      <div className="grid grid-cols-2 gap-3">
                         <div>
                           <p className="text-base font-semibold text-muted-foreground">
                             Check-out
@@ -506,7 +506,7 @@ export default function UnconfirmedTasks() {
                         </div>
                       </div>
 
-                      <div className="grid grid-cols-2 gap-6">
+                      <div className="grid grid-cols-2 gap-3">
                         <div>
                           <p className="text-base font-semibold text-muted-foreground">
                             Tipologia appartamento
@@ -569,7 +569,7 @@ export default function UnconfirmedTasks() {
                         </Popover>
                       </div>
 
-                      <div className="grid grid-cols-2 gap-6">
+                      <div className="grid grid-cols-2 gap-3">
                         <div>
                           <p className="text-base font-semibold text-muted-foreground">
                             Pax-In
