@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { it } from "date-fns/locale";
 import { useLocation } from "wouter";
@@ -23,10 +23,7 @@ import {
   ChevronLeft,
   ChevronRight,
   CheckCircle,
-  Loader2,
 } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
-import { queryClient } from "@/lib/queryClient";
 
 interface Task {
   task_id: string | number;
@@ -65,33 +62,6 @@ export default function UnconfirmedTasks() {
   });
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
-  const { toast } = useToast();
-
-  const saveOperationMutation = useMutation({
-    mutationFn: async ({ taskId, operationId }: { taskId: string | number; operationId: number }) => {
-      const response = await fetch(`/api/adam/task/${taskId}/operation`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ operation_id: operationId }),
-      });
-      if (!response.ok) throw new Error("Failed to save operation");
-      return response.json();
-    },
-    onSuccess: (data) => {
-      toast({
-        title: "Salvato",
-        description: data.message || "Tipologia intervento aggiornata",
-      });
-      queryClient.invalidateQueries({ queryKey: ["/api/containers-enriched", selectedDate] });
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Errore",
-        description: error.message || "Errore nel salvataggio",
-        variant: "destructive",
-      });
-    },
-  });
 
   const { data: containersData, isLoading } = useQuery<ContainersData>({
     queryKey: ["/api/containers-enriched", selectedDate],
@@ -442,25 +412,13 @@ export default function UnconfirmedTasks() {
                             onValueChange={(value) => {
                               const newOperationId = value === "none" ? 0 : parseInt(value);
                               setSelectedTask({ ...selectedTask, operation_id: newOperationId });
-                              saveOperationMutation.mutate({
-                                taskId: selectedTask.task_id,
-                                operationId: newOperationId,
-                              });
                             }}
-                            disabled={saveOperationMutation.isPending}
                           >
                             <SelectTrigger 
                               className="w-full bg-white dark:bg-gray-900 border-amber-400 dark:border-amber-600 text-amber-800 dark:text-amber-200 font-bold"
                               data-testid="select-operation-type"
                             >
-                              {saveOperationMutation.isPending ? (
-                                <div className="flex items-center gap-2">
-                                  <Loader2 className="h-4 w-4 animate-spin" />
-                                  Salvataggio...
-                                </div>
-                              ) : (
-                                <SelectValue placeholder="Seleziona tipologia" />
-                              )}
+                              <SelectValue placeholder="Seleziona tipologia" />
                             </SelectTrigger>
                             <SelectContent>
                               <SelectItem value="none">— Nessuna operazione —</SelectItem>
