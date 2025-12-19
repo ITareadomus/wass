@@ -250,6 +250,11 @@ export default function UnconfirmedTasks() {
                               {task.address}
                             </span>
                           )}
+                          {selectedTask?.task_id === task.task_id && selectedTask.operation_id !== undefined && (
+                            <span className="text-xs font-semibold text-amber-700 dark:text-amber-300 mt-1">
+                              Tipologia Intervento = {selectedTask.operation_id === 0 ? "Nessuna" : selectedTask.operation_id === 1 ? "FERMATA" : selectedTask.operation_id === 2 ? "PARTENZA" : selectedTask.operation_id === 3 ? "STRAORDINARIA" : "RIPASSO"}
+                            </span>
+                          )}
                         </div>
                       </div>
                     ))}
