@@ -228,9 +228,9 @@ export default function UnconfirmedTasks() {
                     {filteredTasks.map((task) => (
                       <div
                         key={`${task.task_id}-${task.logistic_code}`}
-                        className={`flex items-center justify-between gap-4 p-3 rounded cursor-pointer hover:opacity-80 ${
+                        className={`flex items-center justify-between gap-4 p-3 rounded cursor-pointer hover:opacity-80 transition-all ${
                           selectedTask?.task_id === task.task_id
-                            ? "bg-custom-blue-light border-2 border-custom-blue ring-2 ring-[color:var(--priority-border-color)]/50 shadow-md"
+                            ? "bg-custom-blue-light border-2 border-l-4 border-custom-blue ring-2 ring-[color:var(--priority-border-color)]/50 shadow-lg scale-[1.02]"
                             : "bg-custom-blue-light border border-custom-blue"
                         }`}
                         onClick={() => setSelectedTask(task)}
