@@ -104,9 +104,9 @@ PREFERRED_TRAVEL = 20.0  # Preferenza per percorsi < 20'
 # =============================
 # CONFIG - PROPOSTA A: EO_END SOFT + GERARCHIA VICINANZA
 # =============================
-NEAR_TRAVEL_MIN = 15.0  # Soglia "vicino" in minuti di viaggio
+NEAR_TRAVEL_MIN = 10.0  # Soglia "vicino" in minuti di viaggio (<=10 min)
 EO_GRACE_MAX_OVER_MIN = 20  # Max sforamento oltre EO_END_TIME in minuti (grace period)
-MAX_TASKS_IF_NEAR = 2  # Max task se vicinanza è solo travel-time ≤ 15'
+MAX_TASKS_IF_NEAR = 4  # Max task se vicinanza travel-time ≤ 10' (o stessa via/edificio)
 MAX_TASKS_IF_STREET_OR_BUILDING = 4  # Max task se stessa via o stesso edificio
 
 # Travel model (min)
