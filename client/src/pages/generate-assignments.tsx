@@ -1028,8 +1028,15 @@ export default function GenerateAssignments() {
     }
   }, [selectedDate, isInitialMount]);
 
-
-
+  // Redirect a unconfirmed-tasks quando cambia la data (ma non al primo mount)
+  useEffect(() => {
+    const currentDateStr = format(selectedDate, 'yyyy-MM-dd');
+    // Solo se la data è cambiata (non al primo mount)
+    if (prevDateRef.current !== null && prevDateRef.current !== currentDateStr) {
+      console.log(`🔄 Data cambiata, redirect a unconfirmed-tasks...`);
+      setLocation(`/unconfirmed-tasks?date=${currentDateStr}`);
+    }
+  }, [selectedDate, setLocation]);
 
   // Funzione per convertire cleaning_time (minuti) in formato ore.minuti
   const formatDuration = (minutes: number): string => {
