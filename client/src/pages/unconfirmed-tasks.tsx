@@ -433,35 +433,27 @@ export default function UnconfirmedTasks() {
                         </div>
                       </div>
 
-                      <div className="grid grid-cols-2 gap-3">
+                      <div className="grid grid-cols-2 gap-1.5">
                         <div>
-                          <p className="text-sm font-semibold text-muted-foreground">
-                            Codice ADAM
-                          </p>
-                          <p className="text-sm">{selectedTask.logistic_code}</p>
+                          <p className="text-xs font-medium text-muted-foreground">Codice ADAM</p>
+                          <p className="text-xs">{selectedTask.logistic_code}</p>
                         </div>
                         <div>
-                          <p className="text-sm font-semibold text-muted-foreground">
-                            Cliente
-                          </p>
-                          <p className="text-sm">{selectedTask.customer_name || selectedTask.alias || "non migrato"}</p>
+                          <p className="text-xs font-medium text-muted-foreground">Cliente</p>
+                          <p className="text-xs">{selectedTask.customer_name || selectedTask.alias || "non migrato"}</p>
                         </div>
                       </div>
 
-                      <div className="grid grid-cols-2 gap-3">
+                      <div className="grid grid-cols-2 gap-1.5">
                         <div>
-                          <p className="text-sm font-semibold text-muted-foreground">
-                            Indirizzo
-                          </p>
-                          <p className="text-sm uppercase">{selectedTask.address || "NON MIGRATO"}</p>
+                          <p className="text-xs font-medium text-muted-foreground">Indirizzo</p>
+                          <p className="text-xs uppercase">{selectedTask.address || "NON MIGRATO"}</p>
                         </div>
                         <div>
-                          <p className="text-sm font-semibold text-muted-foreground">
-                            Durata pulizia
-                          </p>
-                          <p className="text-sm">
+                          <p className="text-xs font-medium text-muted-foreground">Durata pulizia</p>
+                          <p className="text-xs">
                             {selectedTask.cleaning_time
-                              ? `${selectedTask.cleaning_time} minuti`
+                              ? `${selectedTask.cleaning_time} min`
                               : selectedTask.duration
                                 ? `${selectedTask.duration.replace(".", ":")} ore`
                                 : "non migrato"}
@@ -469,64 +461,52 @@ export default function UnconfirmedTasks() {
                         </div>
                       </div>
 
-                      <div className="grid grid-cols-2 gap-3">
+                      <div className="grid grid-cols-2 gap-1.5">
                         <div>
-                          <p className="text-sm font-semibold text-muted-foreground">
-                            Check-out
-                          </p>
-                          <p className="text-sm">
+                          <p className="text-xs font-medium text-muted-foreground">Check-out</p>
+                          <p className="text-xs">
                             {selectedTask.checkout_date
                               ? new Date(selectedTask.checkout_date).toLocaleDateString("it-IT", {
                                   day: "2-digit",
                                   month: "2-digit",
                                   year: "numeric",
                                 })
-                              : "non migrato"}
+                              : "n/d"}
                             {selectedTask.checkout_date && selectedTask.checkout_time
                               ? ` - ${selectedTask.checkout_time}`
-                              : selectedTask.checkout_date
-                                ? " - orario non migrato"
-                                : ""}
+                              : ""}
                           </p>
                         </div>
                         <div>
-                          <p className="text-sm font-semibold text-muted-foreground">
-                            Check-in
-                          </p>
-                          <p className="text-sm">
+                          <p className="text-xs font-medium text-muted-foreground">Check-in</p>
+                          <p className="text-xs">
                             {selectedTask.checkin_date
                               ? new Date(selectedTask.checkin_date).toLocaleDateString("it-IT", {
                                   day: "2-digit",
                                   month: "2-digit",
                                   year: "numeric",
                                 })
-                              : "non migrato"}
+                              : "n/d"}
                             {selectedTask.checkin_date && selectedTask.checkin_time
                               ? ` - ${selectedTask.checkin_time}`
-                              : selectedTask.checkin_date
-                                ? " - orario non migrato"
-                                : ""}
+                              : ""}
                           </p>
                         </div>
                       </div>
 
-                      <div className="grid grid-cols-2 gap-3">
+                      <div className="grid grid-cols-2 gap-1.5">
                         <div>
-                          <p className="text-sm font-semibold text-muted-foreground">
-                            Tipologia appartamento
-                          </p>
-                          <p className="text-sm">{selectedTask.type_apt || "non migrato"}</p>
+                          <p className="text-xs font-medium text-muted-foreground">Tipo apt</p>
+                          <p className="text-xs">{selectedTask.type_apt || "n/d"}</p>
                         </div>
                         <Popover>
                           <PopoverTrigger asChild>
                             <div 
-                              className="bg-amber-50 dark:bg-amber-950/30 border-2 border-amber-200 dark:border-amber-800 rounded-lg p-3 -m-1 cursor-pointer hover:bg-amber-100 dark:hover:bg-amber-900/40 transition-colors"
+                              className="bg-amber-50 dark:bg-amber-950/30 border-2 border-amber-200 dark:border-amber-800 rounded-lg p-2 -m-0.5 cursor-pointer hover:bg-amber-100 dark:hover:bg-amber-900/40 transition-colors"
                               data-testid="trigger-operation-type"
                             >
-                              <p className="text-sm font-semibold text-amber-800 dark:text-amber-200">
-                                Tipologia intervento
-                              </p>
-                              <p className="text-sm font-bold text-amber-700 dark:text-amber-300">
+                              <p className="text-xs font-medium text-amber-800 dark:text-amber-200">Tipologia intervento</p>
+                              <p className="text-xs font-bold text-amber-700 dark:text-amber-300">
                                 {(() => {
                                   const selectedOp = selectedOperations.get(selectedTask.task_id);
                                   if (selectedOp === undefined) {
@@ -573,18 +553,14 @@ export default function UnconfirmedTasks() {
                         </Popover>
                       </div>
 
-                      <div className="grid grid-cols-2 gap-3">
+                      <div className="grid grid-cols-2 gap-1.5">
                         <div>
-                          <p className="text-sm font-semibold text-muted-foreground">
-                            Pax-In
-                          </p>
-                          <p className="text-sm">{selectedTask.pax_in ?? "non migrato"}</p>
+                          <p className="text-xs font-medium text-muted-foreground">Pax-In</p>
+                          <p className="text-xs">{selectedTask.pax_in ?? "n/d"}</p>
                         </div>
                         <div>
-                          <p className="text-sm font-semibold text-muted-foreground">
-                            Pax-Out
-                          </p>
-                          <p className="text-sm">{selectedTask.pax_out ?? "non migrato"}</p>
+                          <p className="text-xs font-medium text-muted-foreground">Pax-Out</p>
+                          <p className="text-xs">{selectedTask.pax_out ?? "n/d"}</p>
                         </div>
                       </div>
                     </div>
