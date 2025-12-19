@@ -451,11 +451,15 @@ export default function UnconfirmedTasks() {
                                   key={option.value}
                                   onClick={() => {
                                     const newOps = new Map(selectedOperations);
-                                    newOps.set(selectedTask.task_id, option.value);
+                                    if (option.value === 0) {
+                                      newOps.delete(selectedTask.task_id);
+                                    } else {
+                                      newOps.set(selectedTask.task_id, option.value);
+                                    }
                                     setSelectedOperations(newOps);
                                   }}
                                   className={`text-left text-sm px-2 py-1.5 rounded hover:bg-muted transition-colors ${
-                                    selectedOperations.get(selectedTask.task_id) === option.value ? "bg-amber-100 dark:bg-amber-900/50 font-semibold" : ""
+                                    (option.value === 0 && !selectedOperations.has(selectedTask.task_id)) || selectedOperations.get(selectedTask.task_id) === option.value ? "bg-amber-100 dark:bg-amber-900/50 font-semibold" : ""
                                   }`}
                                   data-testid={`option-operation-${option.value}`}
                                 >
