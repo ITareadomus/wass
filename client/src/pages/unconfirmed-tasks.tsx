@@ -538,16 +538,17 @@ export default function UnconfirmedTasks() {
                 </div>
               </div>
 
-              <Button
-                onClick={handleSaveToAdam}
-                disabled={selectedOperations.size === 0 || isSaving}
-                className="w-full"
-                size="lg"
-                data-testid="button-save-adam"
-              >
-                <Save className="h-4 w-4 mr-2" />
-                {isSaving ? "Salvataggio..." : `Salva su ADAM (${selectedOperations.size})`}
-              </Button>
+              <div className="flex justify-center pt-4">
+                <Button
+                  onClick={handleSaveToAdam}
+                  disabled={selectedOperations.size === 0 || isSaving}
+                  size="md"
+                  data-testid="button-save-adam"
+                >
+                  <Save className="h-4 w-4 mr-2" />
+                  {isSaving ? "Salvataggio..." : `Salva su ADAM (${selectedOperations.size})`}
+                </Button>
+              </div>
             </>
           )}
         </div>
