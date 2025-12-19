@@ -9,12 +9,10 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import {
   AlertTriangle,
   Calendar,
@@ -408,32 +406,56 @@ export default function UnconfirmedTasks() {
                           </p>
                           <p className="text-base">{selectedTask.type_apt || "non migrato"}</p>
                         </div>
-                        <div className="bg-amber-50 dark:bg-amber-950/30 border-2 border-amber-200 dark:border-amber-800 rounded-lg p-3 -m-1">
-                          <p className="text-base font-semibold text-amber-800 dark:text-amber-200 mb-2">
-                            Tipologia intervento
-                          </p>
-                          <Select
-                            value={selectedTask.operation_id?.toString() || ""}
-                            onValueChange={(value) => {
-                              const newOperationId = value === "none" ? 0 : parseInt(value);
-                              setSelectedTask({ ...selectedTask, operation_id: newOperationId });
-                            }}
-                          >
-                            <SelectTrigger 
-                              className="w-full bg-white dark:bg-gray-900 border-amber-400 dark:border-amber-600 text-amber-800 dark:text-amber-200 font-bold"
-                              data-testid="select-operation-type"
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <div 
+                              className="bg-amber-50 dark:bg-amber-950/30 border-2 border-amber-200 dark:border-amber-800 rounded-lg p-3 -m-1 cursor-pointer hover:bg-amber-100 dark:hover:bg-amber-900/40 transition-colors"
+                              data-testid="trigger-operation-type"
                             >
-                              <SelectValue placeholder="Seleziona tipologia" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="none">— Nessuna operazione —</SelectItem>
-                              <SelectItem value="1">FERMATA</SelectItem>
-                              <SelectItem value="2">PARTENZA</SelectItem>
-                              <SelectItem value="3">PULIZIA STRAORDINARIA</SelectItem>
-                              <SelectItem value="4">RIPASSO</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
+                              <p className="text-base font-semibold text-amber-800 dark:text-amber-200">
+                                Tipologia intervento
+                              </p>
+                              <p className="text-base font-bold text-amber-700 dark:text-amber-300">
+                                {(() => {
+                                  const operationNames: Record<number, string> = {
+                                    1: "FERMATA",
+                                    2: "PARTENZA",
+                                    3: "PULIZIA STRAORDINARIA",
+                                    4: "RIPASSO"
+                                  };
+                                  if (!selectedTask.operation_id || selectedTask.operation_id === 0) {
+                                    return "non migrato";
+                                  }
+                                  return operationNames[selectedTask.operation_id] || `Operazione ${selectedTask.operation_id}`;
+                                })()}
+                              </p>
+                            </div>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-56 p-2" align="start">
+                            <div className="flex flex-col gap-1">
+                              {[
+                                { value: 0, label: "— Nessuna operazione —" },
+                                { value: 1, label: "FERMATA" },
+                                { value: 2, label: "PARTENZA" },
+                                { value: 3, label: "PULIZIA STRAORDINARIA" },
+                                { value: 4, label: "RIPASSO" },
+                              ].map((option) => (
+                                <button
+                                  key={option.value}
+                                  onClick={() => {
+                                    setSelectedTask({ ...selectedTask, operation_id: option.value });
+                                  }}
+                                  className={`text-left px-3 py-2 rounded hover:bg-muted transition-colors ${
+                                    selectedTask.operation_id === option.value ? "bg-amber-100 dark:bg-amber-900/50 font-semibold" : ""
+                                  }`}
+                                  data-testid={`option-operation-${option.value}`}
+                                >
+                                  {option.label}
+                                </button>
+                              ))}
+                            </div>
+                          </PopoverContent>
+                        </Popover>
                       </div>
 
                       <div className="grid grid-cols-2 gap-6">
