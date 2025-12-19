@@ -583,32 +583,32 @@ export default function UnconfirmedTasks() {
               </div>
 
               <Dialog open={showRecap} onOpenChange={setShowRecap}>
-                <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+                <DialogContent className="max-w-2xl">
                   <DialogHeader>
                     <DialogTitle>Recap - Conferma Salvataggio</DialogTitle>
                   </DialogHeader>
 
-                  <div className="space-y-4 py-4">
+                  <div className="space-y-2 py-2 max-h-[calc(80vh-150px)] overflow-y-auto">
                     {Array.from(recapOperations.entries()).map(([taskId, opId]) => {
                       const task = filteredTasks.find(t => t.task_id === taskId);
                       if (!task) return null;
 
                       return (
-                        <div key={taskId} className="bg-custom-blue-light border border-custom-blue rounded-lg p-4 space-y-3">
-                          <div className="flex items-center gap-3">
-                            <span className="font-mono font-semibold">ID: {String(task.task_id).padStart(5, '0')}</span>
-                            <span className="text-red-500 font-semibold">{task.logistic_code}</span>
-                            {task.address && <span className="text-sm text-muted-foreground">{task.address}</span>}
+                        <div key={taskId} className="bg-custom-blue-light border border-custom-blue rounded-lg p-2 space-y-1.5">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-mono text-xs font-semibold">ID: {String(task.task_id).padStart(5, '0')}</span>
+                            <span className="text-red-500 text-xs font-semibold">{task.logistic_code}</span>
+                            {task.address && <span className="text-xs text-muted-foreground truncate">{task.address}</span>}
                           </div>
 
-                          <div className="space-y-2">
-                            <label className="text-sm font-semibold">Tipologia Intervento</label>
+                          <div className="space-y-1">
+                            <label className="text-xs font-semibold block">Tipologia</label>
                             <Select value={String(opId)} onValueChange={(val) => {
                               const newOps = new Map(recapOperations);
                               newOps.set(taskId, parseInt(val));
                               setRecapOperations(newOps);
                             }}>
-                              <SelectTrigger className="bg-white dark:bg-slate-900">
+                              <SelectTrigger className="bg-white dark:bg-slate-900 h-8 text-xs">
                                 <SelectValue />
                               </SelectTrigger>
                               <SelectContent>
