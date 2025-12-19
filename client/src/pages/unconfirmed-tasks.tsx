@@ -605,6 +605,7 @@ export default function UnconfirmedTasks() {
                             <div className="flex items-center gap-2 flex-wrap flex-1 min-w-0">
                               <span className="font-mono text-xs font-semibold">ID: {String(task.task_id).padStart(5, '0')}</span>
                               <span className="text-red-500 text-xs font-semibold">{task.logistic_code}</span>
+                              <span className="text-amber-700 dark:text-amber-300 text-xs font-semibold">Tipologia = {getOperationName(opId)}</span>
                               {task.address && <span className="text-xs text-muted-foreground truncate">{task.address}</span>}
                             </div>
 
