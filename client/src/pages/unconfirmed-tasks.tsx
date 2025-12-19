@@ -18,7 +18,6 @@ import {
   AlertTriangle,
   Calendar,
   Search,
-  Home,
   ChevronLeft,
   ChevronRight,
   CheckCircle,
@@ -278,14 +277,6 @@ export default function UnconfirmedTasks() {
               </Button>
             </div>
             <div className="flex items-center gap-2">
-              <Button
-                onClick={() => setLocation("/generate-assignments")}
-                variant="default"
-                data-testid="button-go-home"
-              >
-                <Home className="h-4 w-4 mr-2" />
-                Torna alla Home
-              </Button>
               <ThemeToggle />
             </div>
           </div>
