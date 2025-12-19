@@ -39,35 +39,17 @@ export default function HomeGate() {
   });
 
   useEffect(() => {
-    if (hasRedirected || isLoading || isError) return;
+    if (hasRedirected) return;
+    setHasRedirected(true);
+    setLocation(`/unconfirmed-tasks?date=${selectedDate}`);
+  }, [hasRedirected, setLocation, selectedDate]);
 
-    if (data && data.unconfirmedCount > 0) {
-      setHasRedirected(true);
-      setLocation(`/unconfirmed-tasks?date=${selectedDate}`);
-    }
-  }, [data, isLoading, isError, hasRedirected, setLocation, selectedDate]);
-
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen bg-background" data-testid="home-gate-loading">
-        <div className="flex flex-col items-center gap-4">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
-          <p className="text-muted-foreground">Verifica task in corso...</p>
-        </div>
+  return (
+    <div className="flex items-center justify-center min-h-screen bg-background" data-testid="home-gate-loading">
+      <div className="flex flex-col items-center gap-4">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <p className="text-muted-foreground">Caricamento task...</p>
       </div>
-    );
-  }
-
-  if (data && data.unconfirmedCount > 0 && !hasRedirected) {
-    return (
-      <div className="flex items-center justify-center min-h-screen bg-background" data-testid="home-gate-redirecting">
-        <div className="flex flex-col items-center gap-4">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
-          <p className="text-muted-foreground">Trovate {data.unconfirmedCount} task da confermare...</p>
-        </div>
-      </div>
-    );
-  }
-
-  return <GenerateAssignments />;
+    </div>
+  );
 }
