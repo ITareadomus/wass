@@ -1008,35 +1008,24 @@ export default function GenerateAssignments() {
   useEffect(() => {
     const currentDateStr = format(selectedDate, 'yyyy-MM-dd');
 
-    // CRITICAL: Carica automaticamente SOLO se:
-    // 1. È il primo montaggio (isInitialMount = true)
-    // 2. OPPURE la data è cambiata rispetto alla precedente
-    const shouldLoad = isInitialMount || (prevDateRef.current !== null && prevDateRef.current !== currentDateStr);
-
-    if (shouldLoad) {
-      // Determina il trigger corretto
-      const trigger = isInitialMount ? "initial" : "date-change";
-      console.log(`📅 Data changed o initial mount - trigger: "${trigger}"`);
-      refreshAssignments(trigger, selectedDate);
+    // CRITICAL: Se la data è cambiata (non al primo mount), redirect a unconfirmed-tasks
+    const isDateChange = prevDateRef.current !== null && prevDateRef.current !== currentDateStr;
+    
+    if (isDateChange) {
+      console.log(`🔄 Data cambiata da ${prevDateRef.current} a ${currentDateStr}, redirect a unconfirmed-tasks...`);
       prevDateRef.current = currentDateStr;
+      setLocation(`/unconfirmed-tasks?date=${currentDateStr}`);
+      return; // Non eseguire refreshAssignments se stiamo reindirizzando
     }
 
-    // Reset isInitialMount dopo la prima chiamata
+    // Al primo mount, carica i dati
     if (isInitialMount) {
+      console.log(`📅 Initial mount - trigger: "initial"`);
+      refreshAssignments("initial", selectedDate);
       setIsInitialMount(false);
       prevDateRef.current = currentDateStr;
     }
-  }, [selectedDate, isInitialMount]);
-
-  // Redirect a unconfirmed-tasks quando cambia la data (ma non al primo mount)
-  useEffect(() => {
-    const currentDateStr = format(selectedDate, 'yyyy-MM-dd');
-    // Solo se la data è cambiata (non al primo mount)
-    if (prevDateRef.current !== null && prevDateRef.current !== currentDateStr) {
-      console.log(`🔄 Data cambiata, redirect a unconfirmed-tasks...`);
-      setLocation(`/unconfirmed-tasks?date=${currentDateStr}`);
-    }
-  }, [selectedDate, setLocation]);
+  }, [selectedDate, isInitialMount, setLocation]);
 
   // Funzione per convertire cleaning_time (minuti) in formato ore.minuti
   const formatDuration = (minutes: number): string => {
