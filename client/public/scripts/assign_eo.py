@@ -487,62 +487,35 @@ def can_add_task(cleaner: Cleaner, task: Task) -> bool:
             return False
 
     # =====================================================
-    # PROPOSTA A: CAP 2/3 BASATO SU GERARCHIA DI VICINANZA
+    # PROPOSTA A: LOGICA SEMPLIFICATA PER CLUSTERING EO
     # =====================================================
-    # Prima di tutto, applica il cap EO basato sulla gerarchia:
-    # - max 2 task se vicinanza è solo travel <= 15'
-    # - max 3 task se stessa via o stesso edificio
+    # Regola: se la nuova task è "vicina" a QUALSIASI task esistente
+    # (travel <= NEAR_TRAVEL_MIN o stessa via/edificio), consenti fino a 4 task
+    
     if current_count > 0:
-        # Calcola il rank massimo di vicinanza con le task esistenti
-        max_rank = max(proximity_rank(existing_task, task) for existing_task in cleaner.route)
-        
-        # Determina il cap in base alla gerarchia
-        # rank >= 2 (stessa via o edificio) → max 3 task
-        # rank == 1 (travel <= 15') → max 2 task
-        # rank == 0 (lontano) → max 2 task (regola base)
-        if max_rank >= 2:
-            max_allowed = MAX_TASKS_IF_STREET_OR_BUILDING  # 3
-        else:
-            max_allowed = MAX_TASKS_IF_NEAR  # 2
-        
-        # Applica il cap (hard limit per EO)
-        if current_count >= max_allowed:
-            return False
-
-    # CLUSTERING AVANZATO: controlla vicinanza con task esistenti
-    # NOTA: Il cap 2/3 sopra è già stato applicato, quindi qui passiamo solo
-    # task che rispettano il limite. Questa sezione serve per ignorare limiti tipologia.
-    if current_count > 0:
-        # Cluster prioritario: ≤5' o stessa via
-        is_priority_cluster = any(
-            (travel_minutes(existing_task, task) <= CLUSTER_PRIORITY_TRAVEL or
-             travel_minutes(task, existing_task) <= CLUSTER_PRIORITY_TRAVEL or
-             same_street(existing_task.address, task.address))
+        # Verifica se la nuova task è vicina ad almeno una task esistente
+        is_nearby = any(
+            travel_minutes(existing_task, task) <= NEAR_TRAVEL_MIN or
+            same_street(existing_task.address, task.address) or
+            same_building(existing_task.address, task.address)
             for existing_task in cleaner.route
         )
-
-        # Cluster esteso: ≤7'
-        is_extended_cluster = any(
-            (travel_minutes(existing_task, task) <= CLUSTER_EXTENDED_TRAVEL or
-             travel_minutes(task, existing_task) <= CLUSTER_EXTENDED_TRAVEL)
-            for existing_task in cleaner.route
-        )
-
-        # Cluster geografico
-        is_geo_cluster = any(same_zone(existing_task, task) for existing_task in cleaner.route)
-
-        # Se è in cluster: ignora limiti tipologia ma verifica fattibilità temporale
-        if is_priority_cluster or is_geo_cluster or is_extended_cluster:
+        
+        if is_nearby:
+            # Task vicina: consenti fino a MAX_TASKS_IF_NEAR (4)
+            if current_count >= MAX_TASKS_IF_NEAR:
+                return False
+            # Verifica fattibilità temporale
             test_route = cleaner.route + [task]
             feasible, _ = evaluate_route(test_route)
             return feasible
-
-    # Regola base: max 2 task
+        else:
+            # Task lontana: max 2 task (regola base)
+            if current_count >= BASE_MAX_TASKS:
+                return False
+    
+    # Prima task o seconda task (regola base): verifica solo fattibilità
     if current_count < BASE_MAX_TASKS:
-        return True
-
-    # Task aggiuntive: solo se fattibile temporalmente (già passato il cap check sopra)
-    if current_count >= BASE_MAX_TASKS:
         test_route = cleaner.route + [task]
         feasible, _ = evaluate_route(test_route)
         return feasible
