@@ -294,7 +294,7 @@ export default function UnconfirmedTasks() {
             <div className="flex items-center justify-center p-12">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
             </div>
-          ) : filteredTasks.length === 0 ? (
+          ) : unconfirmedTasks.length === 0 ? (
             <Card className="border-2 border-custom-blue bg-green-50 dark:bg-green-950/30">
               <CardContent className="flex flex-col items-center justify-center p-12 text-center">
                 <CheckCircle className="h-12 w-12 text-green-500 mb-4" />
@@ -309,7 +309,7 @@ export default function UnconfirmedTasks() {
                 <AlertTriangle className="h-8 w-8 text-amber-500 flex-shrink-0" />
                 <div>
                   <h2 className="font-semibold text-amber-800 dark:text-amber-200">
-                    {filteredTasks.length} Task con tipologia d'intervento non impostata
+                    {unconfirmedTasks.length} Task con tipologia d'intervento non impostata
                   </h2>
                   <p className="text-sm text-amber-700 dark:text-amber-300">
                     Imposta la tipologia d'intervento per ogni task prima di procedere con le assegnazioni.
@@ -330,40 +330,56 @@ export default function UnconfirmedTasks() {
                     />
                   </div>
                   <div className="flex flex-col gap-3">
-                    {filteredTasks.map((task) => (
-                      <div
-                        key={`${task.task_id}-${task.logistic_code}`}
-                        className={`flex items-center justify-between gap-4 p-3 rounded cursor-pointer hover:opacity-80 transition-all ${
-                          selectedTask?.task_id === task.task_id
-                            ? "bg-custom-blue-light border-2 border-l-4 border-custom-blue ring-2 ring-[color:var(--priority-border-color)]/50 shadow-lg scale-[1.02]"
-                            : "bg-custom-blue-light border border-custom-blue"
-                        }`}
-                        onClick={() => setSelectedTask(task)}
-                        data-testid={`task-${task.task_id}`}
-                      >
-                        <div className="flex flex-col gap-1 flex-grow">
-                          <div className="flex items-center gap-3">
-                            <span className="text-muted-foreground font-mono text-sm">
-                              ID:{String(task.task_id).padStart(5, '0')}
-                            </span>
-                            <span className="text-muted-foreground">-</span>
-                            <span className="text-red-500 font-mono text-base font-semibold">
-                              {task.logistic_code}
-                            </span>
+                    {filteredTasks.length === 0 && searchTerm ? (
+                      <div className="flex flex-col items-center justify-center p-6 text-center text-muted-foreground">
+                        <Search className="h-8 w-8 mb-2 opacity-50" />
+                        <p className="text-sm">Nessun risultato per "{searchTerm}"</p>
+                        <Button 
+                          variant="link" 
+                          size="sm" 
+                          onClick={() => setSearchTerm("")}
+                          className="mt-2"
+                          data-testid="button-clear-search"
+                        >
+                          Cancella ricerca
+                        </Button>
+                      </div>
+                    ) : (
+                      filteredTasks.map((task) => (
+                        <div
+                          key={`${task.task_id}-${task.logistic_code}`}
+                          className={`flex items-center justify-between gap-4 p-3 rounded cursor-pointer hover:opacity-80 transition-all ${
+                            selectedTask?.task_id === task.task_id
+                              ? "bg-custom-blue-light border-2 border-l-4 border-custom-blue ring-2 ring-[color:var(--priority-border-color)]/50 shadow-lg scale-[1.02]"
+                              : "bg-custom-blue-light border border-custom-blue"
+                          }`}
+                          onClick={() => setSelectedTask(task)}
+                          data-testid={`task-${task.task_id}`}
+                        >
+                          <div className="flex flex-col gap-1 flex-grow">
+                            <div className="flex items-center gap-3">
+                              <span className="text-muted-foreground font-mono text-sm">
+                                ID:{String(task.task_id).padStart(5, '0')}
+                              </span>
+                              <span className="text-muted-foreground">-</span>
+                              <span className="text-red-500 font-mono text-base font-semibold">
+                                {task.logistic_code}
+                              </span>
+                            </div>
+                            {task.address && (
+                              <span className="text-sm text-muted-foreground truncate max-w-[350px] uppercase">
+                                {task.address}
+                              </span>
+                            )}
                           </div>
-                          {task.address && (
-                            <span className="text-sm text-muted-foreground truncate max-w-[350px] uppercase">
-                              {task.address}
+                          {selectedOperations.has(task.task_id) && (
+                            <span className="text-sm font-semibold text-amber-700 dark:text-amber-300 whitespace-nowrap ml-2">
+                              Tipologia = {selectedOperations.get(task.task_id) === 0 ? "Nessuna" : selectedOperations.get(task.task_id) === 1 ? "FERMATA" : selectedOperations.get(task.task_id) === 2 ? "PARTENZA" : selectedOperations.get(task.task_id) === 3 ? "STRAORDINARIA" : "RIPASSO"}
                             </span>
                           )}
                         </div>
-                        {selectedOperations.has(task.task_id) && (
-                          <span className="text-sm font-semibold text-amber-700 dark:text-amber-300 whitespace-nowrap ml-2">
-                            Tipologia = {selectedOperations.get(task.task_id) === 0 ? "Nessuna" : selectedOperations.get(task.task_id) === 1 ? "FERMATA" : selectedOperations.get(task.task_id) === 2 ? "PARTENZA" : selectedOperations.get(task.task_id) === 3 ? "STRAORDINARIA" : "RIPASSO"}
-                          </span>
-                        )}
-                      </div>
-                    ))}
+                      ))
+                    )}
                   </div>
                 </div>
 
