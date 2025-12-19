@@ -21,6 +21,7 @@ Uso:
 """
 
 import json
+import os
 import urllib.request
 import urllib.parse
 import urllib.error
@@ -31,8 +32,10 @@ from datetime import datetime
 class ApiClient:
     """Client per API REST del backend."""
     
-    def __init__(self, base_url: str = "http://localhost:5000"):
-        self.base_url = base_url
+    def __init__(self, base_url: str = None):
+        if base_url is None:
+            base_url = os.environ.get("API_URL", "http://localhost:5000")
+        self.base_url = base_url.rstrip("/")
         self.timeout = 30  # secondi
     
     def _get(self, endpoint: str, params: Optional[Dict] = None) -> Dict:
