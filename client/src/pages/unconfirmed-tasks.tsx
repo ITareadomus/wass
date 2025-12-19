@@ -605,28 +605,30 @@ export default function UnconfirmedTasks() {
                             <div className="flex items-center gap-2 flex-wrap flex-1 min-w-0">
                               <span className="font-mono text-xs font-semibold">ID: {String(task.task_id).padStart(5, '0')}</span>
                               <span className="text-red-500 text-xs font-semibold">{task.logistic_code}</span>
-                              <span className="text-amber-700 dark:text-amber-300 text-xs font-semibold">Tipologia = {getOperationName(opId)}</span>
                               {task.address && <span className="text-xs text-muted-foreground truncate">{task.address}</span>}
                             </div>
 
-                            {isExpanded && (
-                              <Select value={String(opId)} onValueChange={(val) => {
-                                const newOps = new Map(recapOperations);
-                                newOps.set(taskId, parseInt(val));
-                                setRecapOperations(newOps);
-                              }}>
-                                <SelectTrigger className="bg-white dark:bg-slate-900 h-7 text-xs w-auto flex-shrink-0">
-                                  <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="0">Nessuna</SelectItem>
-                                  <SelectItem value="1">FERMATA</SelectItem>
-                                  <SelectItem value="2">PARTENZA</SelectItem>
-                                  <SelectItem value="3">STRAORDINARIA</SelectItem>
-                                  <SelectItem value="4">RIPASSO</SelectItem>
-                                </SelectContent>
-                              </Select>
-                            )}
+                            <div className="flex items-center gap-2 flex-shrink-0">
+                              <span className="text-amber-700 dark:text-amber-300 text-xs font-semibold whitespace-nowrap">Tipologia = {getOperationName(opId)}</span>
+                              {isExpanded && (
+                                <Select value={String(opId)} onValueChange={(val) => {
+                                  const newOps = new Map(recapOperations);
+                                  newOps.set(taskId, parseInt(val));
+                                  setRecapOperations(newOps);
+                                }}>
+                                  <SelectTrigger className="bg-white dark:bg-slate-900 h-7 text-xs w-auto">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="0">Nessuna</SelectItem>
+                                    <SelectItem value="1">FERMATA</SelectItem>
+                                    <SelectItem value="2">PARTENZA</SelectItem>
+                                    <SelectItem value="3">STRAORDINARIA</SelectItem>
+                                    <SelectItem value="4">RIPASSO</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              )}
+                            </div>
                           </div>
                         </div>
                       );
