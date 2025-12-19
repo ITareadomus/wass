@@ -18,7 +18,7 @@ import {
   AlertTriangle,
   Calendar,
   Search,
-  ArrowRight,
+  Home,
   ChevronLeft,
   ChevronRight,
   CheckCircle,
@@ -281,10 +281,10 @@ export default function UnconfirmedTasks() {
               <Button
                 onClick={() => setLocation("/generate-assignments")}
                 variant="default"
-                data-testid="button-go-to-assignments"
+                data-testid="button-go-home"
               >
-                <ArrowRight className="h-4 w-4 mr-2" />
-                Vai alle Assegnazioni
+                <Home className="h-4 w-4 mr-2" />
+                Torna alla Home
               </Button>
               <ThemeToggle />
             </div>
