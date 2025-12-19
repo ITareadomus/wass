@@ -542,7 +542,6 @@ export default function UnconfirmedTasks() {
                 <Button
                   onClick={handleSaveToAdam}
                   disabled={selectedOperations.size === 0 || isSaving}
-                  size="md"
                   data-testid="button-save-adam"
                 >
                   <Save className="h-4 w-4 mr-2" />
