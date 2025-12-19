@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Draggable } from "react-beautiful-dnd";
+import { useQuery } from "@tanstack/react-query";
 import { TaskType as Task } from "@shared/schema";
 import { fetchWithOperation } from '@/lib/operationManager';
 import {
@@ -174,7 +175,22 @@ export default function TaskCard({
   const [isModalOpen, setIsModalOpen] = useState(false);
   
   const [clickTimer, setClickTimer] = useState<NodeJS.Timeout | null>(null);
-  // Operation names rimossi - ora usiamo solo gli ID numerici
+
+  // Carica le operazioni da operations.json
+  const { data: operationsData } = useQuery<{ active_operations: { id: number; name: string }[] }>({
+    queryKey: ["/data/input/operations.json"],
+    queryFn: async () => {
+      const response = await fetch("/data/input/operations.json");
+      if (!response.ok) throw new Error("Failed to fetch operations");
+      return response.json();
+    },
+    staleTime: 60000,
+  });
+
+  const operationNames: Record<number, string> = operationsData?.active_operations?.reduce(
+    (acc, op) => ({ ...acc, [op.id]: op.name }),
+    {} as Record<number, string>
+  ) || { 1: "FERMATA", 2: "PARTENZA", 3: "PULIZIA STRAORDINARIA", 4: "RIPASSO" };
 
   const [isMapFiltered, setIsMapFiltered] = useState(false);
 
@@ -1197,10 +1213,9 @@ export default function TaskCard({
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="none">— Nessuna operazione —</SelectItem>
-                        <SelectItem value="1">FERMATA</SelectItem>
-                        <SelectItem value="2">PARTENZA</SelectItem>
-                        <SelectItem value="3">PULIZIA STRAORDINARIA</SelectItem>
-                        <SelectItem value="4">RIPASSO</SelectItem>
+                        {(operationsData?.active_operations || []).map((op) => (
+                          <SelectItem key={op.id} value={String(op.id)}>{op.name}</SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                   </div>
@@ -1226,12 +1241,6 @@ export default function TaskCard({
                       }
                       const opId = (displayTask as any).operation_id;
                       if (opId) {
-                        const operationNames: Record<number, string> = {
-                          1: "FERMATA",
-                          2: "PARTENZA",
-                          3: "PULIZIA STRAORDINARIA",
-                          4: "RIPASSO"
-                        };
                         return operationNames[opId] || `Operazione ${opId}`;
                       }
                       return "-";
