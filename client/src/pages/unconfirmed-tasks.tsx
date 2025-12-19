@@ -608,9 +608,10 @@ export default function UnconfirmedTasks() {
                               {task.address && <span className="text-xs text-muted-foreground truncate">{task.address}</span>}
                             </div>
 
-                            <div className="flex items-center gap-2 flex-shrink-0">
-                              <span className="text-amber-700 dark:text-amber-300 text-xs font-semibold whitespace-nowrap">Tipologia = {getOperationName(opId)}</span>
-                              {isExpanded && (
+                            <div className="flex-shrink-0">
+                              {!isExpanded ? (
+                                <span className="text-amber-700 dark:text-amber-300 text-xs font-semibold whitespace-nowrap">Tipologia = {getOperationName(opId)}</span>
+                              ) : (
                                 <Select value={String(opId)} onValueChange={(val) => {
                                   const newOps = new Map(recapOperations);
                                   newOps.set(taskId, parseInt(val));
