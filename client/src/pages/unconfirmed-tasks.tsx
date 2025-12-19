@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { it } from "date-fns/locale";
 import { useLocation } from "wouter";
@@ -23,7 +23,10 @@ import {
   ChevronLeft,
   ChevronRight,
   CheckCircle,
+  Loader2,
 } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import { queryClient } from "@/lib/queryClient";
 
 interface Task {
   task_id: string | number;
@@ -62,6 +65,33 @@ export default function UnconfirmedTasks() {
   });
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+  const { toast } = useToast();
+
+  const saveOperationMutation = useMutation({
+    mutationFn: async ({ taskId, operationId }: { taskId: string | number; operationId: number }) => {
+      const response = await fetch(`/api/adam/task/${taskId}/operation`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ operation_id: operationId }),
+      });
+      if (!response.ok) throw new Error("Failed to save operation");
+      return response.json();
+    },
+    onSuccess: (data) => {
+      toast({
+        title: "Salvato",
+        description: data.message || "Tipologia intervento aggiornata",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/containers-enriched", selectedDate] });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Errore",
+        description: error.message || "Errore nel salvataggio",
+        variant: "destructive",
+      });
+    },
+  });
 
   const { data: containersData, isLoading } = useQuery<ContainersData>({
     queryKey: ["/api/containers-enriched", selectedDate],
@@ -232,7 +262,7 @@ export default function UnconfirmedTasks() {
                         onClick={() => setSelectedTask({ ...task, operation_id: undefined })}
                         data-testid={`task-${task.task_id}`}
                       >
-                        <div className="flex flex-col gap-1">
+                        <div className="flex flex-col gap-1 w-full">
                           <div className="flex items-center gap-3">
                             <span className="text-muted-foreground font-mono text-sm">
                               ID:{String(task.task_id).padStart(5, '0')}
@@ -243,31 +273,11 @@ export default function UnconfirmedTasks() {
                             </span>
                           </div>
                           {task.address && (
-                            <span className="text-sm text-muted-foreground truncate max-w-[250px] uppercase">
+                            <span className="text-sm text-muted-foreground truncate max-w-[350px] uppercase">
                               {task.address}
                             </span>
                           )}
                         </div>
-                        <Select
-                          defaultValue=""
-                          onValueChange={(value) => {
-                            const newOperationId = value === "none" ? 0 : parseInt(value);
-                            if (selectedTask?.task_id === task.task_id) {
-                              setSelectedTask({ ...selectedTask, operation_id: newOperationId });
-                            }
-                          }}
-                        >
-                          <SelectTrigger className="w-[200px] text-sm">
-                            <SelectValue placeholder="Seleziona operazione" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="none">— Nessuna operazione —</SelectItem>
-                            <SelectItem value="1">FERMATA</SelectItem>
-                            <SelectItem value="2">PARTENZA</SelectItem>
-                            <SelectItem value="3">PULIZIA STRAORDINARIA</SelectItem>
-                            <SelectItem value="4">RIPASSO</SelectItem>
-                          </SelectContent>
-                        </Select>
                       </div>
                     ))}
                   </div>
@@ -424,26 +434,42 @@ export default function UnconfirmedTasks() {
                           <p className="text-base">{selectedTask.type_apt || "non migrato"}</p>
                         </div>
                         <div className="bg-amber-50 dark:bg-amber-950/30 border-2 border-amber-200 dark:border-amber-800 rounded-lg p-3 -m-1">
-                          <p className="text-base font-semibold text-amber-800 dark:text-amber-200">
+                          <p className="text-base font-semibold text-amber-800 dark:text-amber-200 mb-2">
                             Tipologia intervento
                           </p>
-                          <p className="text-base font-bold text-amber-700 dark:text-amber-300">
-                            {(() => {
-                              const operationNames: Record<number, string> = {
-                                1: "FERMATA",
-                                2: "PARTENZA",
-                                3: "PULIZIA STRAORDINARIA",
-                                4: "RIPASSO"
-                              };
-                              if (selectedTask.confirmed_operation === false && !selectedTask.operation_id) {
-                                return "non migrato";
-                              }
-                              if (!selectedTask.operation_id || selectedTask.operation_id === 0) {
-                                return "non migrato";
-                              }
-                              return operationNames[selectedTask.operation_id] || `Operazione ${selectedTask.operation_id}`;
-                            })()}
-                          </p>
+                          <Select
+                            value={selectedTask.operation_id?.toString() || ""}
+                            onValueChange={(value) => {
+                              const newOperationId = value === "none" ? 0 : parseInt(value);
+                              setSelectedTask({ ...selectedTask, operation_id: newOperationId });
+                              saveOperationMutation.mutate({
+                                taskId: selectedTask.task_id,
+                                operationId: newOperationId,
+                              });
+                            }}
+                            disabled={saveOperationMutation.isPending}
+                          >
+                            <SelectTrigger 
+                              className="w-full bg-white dark:bg-gray-900 border-amber-400 dark:border-amber-600 text-amber-800 dark:text-amber-200 font-bold"
+                              data-testid="select-operation-type"
+                            >
+                              {saveOperationMutation.isPending ? (
+                                <div className="flex items-center gap-2">
+                                  <Loader2 className="h-4 w-4 animate-spin" />
+                                  Salvataggio...
+                                </div>
+                              ) : (
+                                <SelectValue placeholder="Seleziona tipologia" />
+                              )}
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="none">— Nessuna operazione —</SelectItem>
+                              <SelectItem value="1">FERMATA</SelectItem>
+                              <SelectItem value="2">PARTENZA</SelectItem>
+                              <SelectItem value="3">PULIZIA STRAORDINARIA</SelectItem>
+                              <SelectItem value="4">RIPASSO</SelectItem>
+                            </SelectContent>
+                          </Select>
                         </div>
                       </div>
 
