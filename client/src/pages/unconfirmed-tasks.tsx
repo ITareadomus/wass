@@ -68,6 +68,10 @@ interface ContainersData {
   };
 }
 
+interface OperationsData {
+  active_operations: { id: number; name: string }[];
+}
+
 export default function UnconfirmedTasks() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
@@ -83,6 +87,21 @@ export default function UnconfirmedTasks() {
   const [showRecap, setShowRecap] = useState(false);
   const [recapOperations, setRecapOperations] = useState<Map<string | number, number>>(new Map());
   const [expandedTaskId, setExpandedTaskId] = useState<string | number | null>(null);
+
+  const { data: operationsData } = useQuery<OperationsData>({
+    queryKey: ["/data/input/operations.json"],
+    queryFn: async () => {
+      const response = await fetch("/data/input/operations.json");
+      if (!response.ok) throw new Error("Failed to fetch operations");
+      return response.json();
+    },
+    staleTime: 60000,
+  });
+
+  const operationNames: Record<number, string> = operationsData?.active_operations?.reduce(
+    (acc, op) => ({ ...acc, [op.id]: op.name }),
+    {} as Record<number, string>
+  ) || { 1: "FERMATA", 2: "PARTENZA", 3: "PULIZIA STRAORDINARIA", 4: "RIPASSO" };
 
   const { data: containersData, isLoading } = useQuery<ContainersData>({
     queryKey: ["/api/containers-enriched", selectedDate],
@@ -505,12 +524,6 @@ export default function UnconfirmedTasks() {
                               </p>
                               <p className="text-base font-bold text-amber-700 dark:text-amber-300">
                                 {(() => {
-                                  const operationNames: Record<number, string> = {
-                                    1: "FERMATA",
-                                    2: "PARTENZA",
-                                    3: "PULIZIA STRAORDINARIA",
-                                    4: "RIPASSO"
-                                  };
                                   const selectedOp = selectedOperations.get(selectedTask.task_id);
                                   if (selectedOp === undefined) {
                                     return "non migrato";
@@ -522,30 +535,33 @@ export default function UnconfirmedTasks() {
                           </PopoverTrigger>
                           <PopoverContent className="w-48 p-1" align="start">
                             <div className="flex flex-col">
-                              {[
-                                { value: 0, label: "Nessuna" },
-                                { value: 1, label: "FERMATA" },
-                                { value: 2, label: "PARTENZA" },
-                                { value: 3, label: "STRAORDINARIA" },
-                                { value: 4, label: "RIPASSO" },
-                              ].map((option) => (
+                              <button
+                                onClick={() => {
+                                  const newOps = new Map(selectedOperations);
+                                  newOps.delete(selectedTask.task_id);
+                                  setSelectedOperations(newOps);
+                                }}
+                                className={`text-left text-sm px-2 py-1.5 rounded hover:bg-muted transition-colors ${
+                                  !selectedOperations.has(selectedTask.task_id) ? "bg-amber-100 dark:bg-amber-900/50 font-semibold" : ""
+                                }`}
+                                data-testid="option-operation-0"
+                              >
+                                Nessuna
+                              </button>
+                              {(operationsData?.active_operations || []).map((op) => (
                                 <button
-                                  key={option.value}
+                                  key={op.id}
                                   onClick={() => {
                                     const newOps = new Map(selectedOperations);
-                                    if (option.value === 0) {
-                                      newOps.delete(selectedTask.task_id);
-                                    } else {
-                                      newOps.set(selectedTask.task_id, option.value);
-                                    }
+                                    newOps.set(selectedTask.task_id, op.id);
                                     setSelectedOperations(newOps);
                                   }}
                                   className={`text-left text-sm px-2 py-1.5 rounded hover:bg-muted transition-colors ${
-                                    (option.value === 0 && !selectedOperations.has(selectedTask.task_id)) || selectedOperations.get(selectedTask.task_id) === option.value ? "bg-amber-100 dark:bg-amber-900/50 font-semibold" : ""
+                                    selectedOperations.get(selectedTask.task_id) === op.id ? "bg-amber-100 dark:bg-amber-900/50 font-semibold" : ""
                                   }`}
-                                  data-testid={`option-operation-${option.value}`}
+                                  data-testid={`option-operation-${op.id}`}
                                 >
-                                  {option.label}
+                                  {op.name}
                                 </button>
                               ))}
                             </div>
