@@ -1028,27 +1028,6 @@ export default function GenerateAssignments() {
     }
   }, [selectedDate, isInitialMount]);
 
-  // Controlla se ci sono task non confermate quando cambia la data
-  // e reindirizza a /unconfirmed-tasks se trovate
-  useEffect(() => {
-    const checkUnconfirmedTasks = async () => {
-      const dateStr = format(selectedDate, 'yyyy-MM-dd');
-      try {
-        const response = await fetch(`/api/unconfirmed-tasks-summary?date=${dateStr}`);
-        if (response.ok) {
-          const data = await response.json();
-          if (data.unconfirmedCount > 0) {
-            console.log(`⚠️ Trovate ${data.unconfirmedCount} task non confermate per ${dateStr}, redirect...`);
-            setLocation(`/unconfirmed-tasks?date=${dateStr}`);
-          }
-        }
-      } catch (error) {
-        console.warn('Errore controllo task non confermate:', error);
-      }
-    };
-
-    checkUnconfirmedTasks();
-  }, [selectedDate, setLocation]);
 
 
 
