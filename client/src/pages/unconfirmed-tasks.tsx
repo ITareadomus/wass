@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { it } from "date-fns/locale";
@@ -108,6 +108,11 @@ export default function UnconfirmedTasks() {
     current.setDate(current.getDate() + days);
     setSelectedDate(format(current, "yyyy-MM-dd"));
   };
+
+  // Reset selected task when date changes
+  useEffect(() => {
+    setSelectedTask(null);
+  }, [selectedDate]);
 
   const navigateTask = (direction: number) => {
     if (!selectedTask || filteredTasks.length === 0) return;
