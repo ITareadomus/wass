@@ -77,8 +77,18 @@ export default function UnconfirmedTasks() {
   const [selectedDate, setSelectedDate] = useState(() => {
     const urlParams = new URLSearchParams(window.location.search);
     const dateParam = urlParams.get("date");
-    return dateParam || format(new Date(), "yyyy-MM-dd");
+    if (dateParam) {
+      localStorage.setItem("selected_work_date", dateParam);
+      return dateParam;
+    }
+    const savedDate = localStorage.getItem("selected_work_date");
+    return savedDate || format(new Date(), "yyyy-MM-dd");
   });
+
+  useEffect(() => {
+    localStorage.setItem("selected_work_date", selectedDate);
+  }, [selectedDate]);
+
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [selectedOperations, setSelectedOperations] = useState<Map<string | number, number>>(new Map());
