@@ -228,10 +228,10 @@ export default function UnconfirmedTasks() {
                     {filteredTasks.map((task) => (
                       <div
                         key={`${task.task_id}-${task.logistic_code}`}
-                        className={`flex items-center justify-between gap-4 p-3 rounded cursor-pointer hover:bg-muted ${
+                        className={`flex items-center justify-between gap-4 p-3 rounded cursor-pointer hover:opacity-80 ${
                           selectedTask?.task_id === task.task_id
                             ? "bg-custom-blue-light border-2 border-custom-blue ring-2 ring-[color:var(--priority-border-color)]/50 shadow-md"
-                            : "bg-muted/50 border border-custom-blue"
+                            : "bg-custom-blue-light border border-custom-blue"
                         }`}
                         onClick={() => setSelectedTask(task)}
                         data-testid={`task-${task.task_id}`}
@@ -262,7 +262,7 @@ export default function UnconfirmedTasks() {
                   </div>
                 </div>
 
-                <div className="w-2/3 border-2 border-custom-blue rounded-lg p-6 min-h-[70vh] max-h-[70vh] overflow-y-auto">
+                <div className="w-2/3 border-2 border-custom-blue rounded-lg p-6 min-h-[70vh] max-h-[70vh] overflow-y-auto bg-custom-blue-light">
                   {!selectedTask ? (
                     <div className="flex items-center justify-center h-full text-muted-foreground">
                       Seleziona una task per vedere i dettagli
