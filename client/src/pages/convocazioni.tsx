@@ -433,7 +433,7 @@ export default function Convocazioni() {
 
       // Torna alla pagina principale SENZA resettare la timeline
       sessionStorage.setItem('preserveAssignments', 'true');
-      setLocation('/');
+      setLocation('/generate-assignments');
     } catch (error) {
       console.error('Errore nell\'aggiunta cleaners:', error);
       toast({
@@ -703,7 +703,7 @@ export default function Convocazioni() {
             <Button
               onClick={async () => {
                 await handleSaveSelection();
-                setLocation('/');
+                setLocation('/generate-assignments');
               }}
               size="lg"
               disabled={selectedCleaners.size === 0}
