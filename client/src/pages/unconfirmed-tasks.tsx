@@ -60,6 +60,7 @@ export default function UnconfirmedTasks() {
   });
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+  const [selectedOperations, setSelectedOperations] = useState<Map<string | number, number>>(new Map());
 
   const { data: containersData, isLoading } = useQuery<ContainersData>({
     queryKey: ["/api/containers-enriched", selectedDate],
@@ -232,10 +233,10 @@ export default function UnconfirmedTasks() {
                             ? "bg-custom-blue-light border-2 border-custom-blue ring-2 ring-[color:var(--priority-border-color)]/50 shadow-md"
                             : "bg-muted/50 border border-custom-blue"
                         }`}
-                        onClick={() => setSelectedTask({ ...task, operation_id: undefined })}
+                        onClick={() => setSelectedTask(task)}
                         data-testid={`task-${task.task_id}`}
                       >
-                        <div className="flex flex-col gap-1 w-full">
+                        <div className="flex flex-col gap-1 flex-grow">
                           <div className="flex items-center gap-3">
                             <span className="text-muted-foreground font-mono text-sm">
                               ID:{String(task.task_id).padStart(5, '0')}
@@ -250,12 +251,12 @@ export default function UnconfirmedTasks() {
                               {task.address}
                             </span>
                           )}
-                          {selectedTask?.task_id === task.task_id && selectedTask.operation_id !== undefined && (
-                            <span className="text-xs font-semibold text-amber-700 dark:text-amber-300 mt-1">
-                              Tipologia Intervento = {selectedTask.operation_id === 0 ? "Nessuna" : selectedTask.operation_id === 1 ? "FERMATA" : selectedTask.operation_id === 2 ? "PARTENZA" : selectedTask.operation_id === 3 ? "STRAORDINARIA" : "RIPASSO"}
-                            </span>
-                          )}
                         </div>
+                        {selectedOperations.has(task.task_id) && (
+                          <span className="text-xs font-semibold text-amber-700 dark:text-amber-300 whitespace-nowrap ml-2">
+                            Tipologia = {selectedOperations.get(task.task_id) === 0 ? "Nessuna" : selectedOperations.get(task.task_id) === 1 ? "FERMATA" : selectedOperations.get(task.task_id) === 2 ? "PARTENZA" : selectedOperations.get(task.task_id) === 3 ? "STRAORDINARIA" : "RIPASSO"}
+                          </span>
+                        )}
                       </div>
                     ))}
                   </div>
