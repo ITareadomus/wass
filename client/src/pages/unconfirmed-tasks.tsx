@@ -429,10 +429,11 @@ export default function UnconfirmedTasks() {
                                     3: "PULIZIA STRAORDINARIA",
                                     4: "RIPASSO"
                                   };
-                                  if (!selectedTask.operation_id || selectedTask.operation_id === 0) {
+                                  const selectedOp = selectedOperations.get(selectedTask.task_id);
+                                  if (selectedOp === undefined) {
                                     return "non migrato";
                                   }
-                                  return operationNames[selectedTask.operation_id] || `Operazione ${selectedTask.operation_id}`;
+                                  return operationNames[selectedOp] || `Operazione ${selectedOp}`;
                                 })()}
                               </p>
                             </div>
@@ -449,10 +450,12 @@ export default function UnconfirmedTasks() {
                                 <button
                                   key={option.value}
                                   onClick={() => {
-                                    setSelectedTask({ ...selectedTask, operation_id: option.value });
+                                    const newOps = new Map(selectedOperations);
+                                    newOps.set(selectedTask.task_id, option.value);
+                                    setSelectedOperations(newOps);
                                   }}
                                   className={`text-left text-sm px-2 py-1.5 rounded hover:bg-muted transition-colors ${
-                                    selectedTask.operation_id === option.value ? "bg-amber-100 dark:bg-amber-900/50 font-semibold" : ""
+                                    selectedOperations.get(selectedTask.task_id) === option.value ? "bg-amber-100 dark:bg-amber-900/50 font-semibold" : ""
                                   }`}
                                   data-testid={`option-operation-${option.value}`}
                                 >
