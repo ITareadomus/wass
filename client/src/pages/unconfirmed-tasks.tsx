@@ -538,7 +538,7 @@ export default function UnconfirmedTasks() {
                 </div>
               </div>
 
-              <div className="flex justify-center pt-2">
+              <div className="flex justify-center pt-1">
                 <Button
                   onClick={handleSaveToAdam}
                   disabled={selectedOperations.size === 0 || isSaving}
