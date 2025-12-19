@@ -135,7 +135,7 @@ export function ThemeToggle() {
       </Button>
       {location !== "/" && location !== "/generate-assignments" && (
         <Button 
-          onClick={() => setLocation("/")} 
+          onClick={() => setLocation("/generate-assignments")} 
           variant="outline" 
           size="icon"
           className="rounded-full"
