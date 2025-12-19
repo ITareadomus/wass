@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { useToast } from "@/hooks/use-toast";
 import {
   Popover,
   PopoverContent,
@@ -21,6 +22,7 @@ import {
   ChevronLeft,
   ChevronRight,
   CheckCircle,
+  Save,
 } from "lucide-react";
 
 interface Task {
@@ -53,6 +55,7 @@ interface ContainersData {
 
 export default function UnconfirmedTasks() {
   const [, setLocation] = useLocation();
+  const { toast } = useToast();
   const [selectedDate, setSelectedDate] = useState(() => {
     const urlParams = new URLSearchParams(window.location.search);
     const dateParam = urlParams.get("date");
@@ -61,6 +64,7 @@ export default function UnconfirmedTasks() {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [selectedOperations, setSelectedOperations] = useState<Map<string | number, number>>(new Map());
+  const [isSaving, setIsSaving] = useState(false);
 
   const { data: containersData, isLoading } = useQuery<ContainersData>({
     queryKey: ["/api/containers-enriched", selectedDate],
@@ -138,6 +142,50 @@ export default function UnconfirmedTasks() {
         return <Badge className="bg-blue-500 text-white">Low Priority</Badge>;
       default:
         return <Badge variant="secondary">Non assegnata</Badge>;
+    }
+  };
+
+  const handleSaveToAdam = async () => {
+    if (selectedOperations.size === 0) {
+      toast({
+        title: "Nessuna modifica",
+        description: "Seleziona almeno una tipologia d'intervento prima di salvare.",
+      });
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      const updates = Array.from(selectedOperations.entries()).map(([taskId, operationId]) => ({
+        taskId: String(taskId),
+        operationId,
+        date: selectedDate,
+      }));
+
+      const response = await fetch("/api/update-task-details", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ updates }),
+      });
+
+      if (!response.ok) throw new Error("Errore nel salvataggio");
+
+      toast({
+        title: "Successo",
+        description: `${selectedOperations.size} task salvati su ADAM`,
+        variant: "default",
+      });
+
+      // Reset la mappa dopo il salvataggio
+      setSelectedOperations(new Map());
+    } catch (error: any) {
+      toast({
+        title: "Errore",
+        description: error.message || "Errore nel salvataggio su ADAM",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -489,6 +537,17 @@ export default function UnconfirmedTasks() {
                   )}
                 </div>
               </div>
+
+              <Button
+                onClick={handleSaveToAdam}
+                disabled={selectedOperations.size === 0 || isSaving}
+                className="w-full"
+                size="lg"
+                data-testid="button-save-adam"
+              >
+                <Save className="h-4 w-4 mr-2" />
+                {isSaving ? "Salvataggio..." : `Salva su ADAM (${selectedOperations.size})`}
+              </Button>
             </>
           )}
         </div>
