@@ -122,7 +122,11 @@ export default function UnconfirmedTasks() {
     Object.values(containersData.containers).forEach((container) => {
       const tasks = (container as { tasks?: Task[] })?.tasks || [];
       tasks.forEach((task) => {
-        if (task.confirmed_operation === false) {
+        // Task non confermata se confirmed_operation è false, 0, null o undefined
+        if (task.confirmed_operation === false || 
+            task.confirmed_operation === 0 || 
+            task.confirmed_operation === null || 
+            task.confirmed_operation === undefined) {
           allTasks.push(task);
         }
       });
