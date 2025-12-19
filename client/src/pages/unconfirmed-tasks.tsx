@@ -326,7 +326,7 @@ export default function UnconfirmedTasks() {
                       placeholder="Cerca per ID, codice ADAM, indirizzo..."
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
-                      className="pl-10"
+                      className="pl-10 border-2 border-custom-blue"
                       data-testid="input-search"
                     />
                   </div>
