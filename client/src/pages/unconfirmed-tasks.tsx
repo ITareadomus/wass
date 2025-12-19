@@ -314,7 +314,7 @@ export default function UnconfirmedTasks() {
               </div>
 
               <div className="flex gap-4 items-stretch">
-                <div className="w-1/2 border-2 border-custom-blue rounded-lg p-4 h-[70vh] overflow-y-auto custom-scrollbar">
+                <div className="w-1/3 border-2 border-custom-blue rounded-lg p-4 h-[70vh] overflow-y-auto custom-scrollbar">
                   <div className="relative w-full mb-3">
                     <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-custom-blue" />
                     <Input
@@ -363,7 +363,7 @@ export default function UnconfirmedTasks() {
                   </div>
                 </div>
 
-                <div className="w-1/2 border-2 border-custom-blue rounded-lg p-4 h-[70vh] overflow-y-auto bg-custom-blue-light">
+                <div className="w-2/3 border-2 border-custom-blue rounded-lg p-4 h-[70vh] overflow-y-auto bg-custom-blue-light">
                   {!selectedTask ? (
                     <div className="flex items-center justify-center h-full text-muted-foreground">
                       Seleziona una task per vedere i dettagli
