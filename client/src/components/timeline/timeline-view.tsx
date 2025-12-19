@@ -1858,10 +1858,10 @@ export default function TimelineView({
                                       : 0;
 
                                     // CRITICAL FIX: Calcola il "waitingGap" per task con sequence >= 2
-                                    // Questo gap rappresenta l'attesa tra la fine della task precedente e l'inizio effettivo di questa task
-                                    // (es. quando c'è un checkout constraint che ritarda lo start_time)
+                                    // Il waitingGap rappresenta l'attesa del cleaner quando arriva prima che l'appartamento si liberi
+                                    // IMPORTANTE: Mostra il waitingGap SOLO se la task corrente ha un checkout_time reale
                                     let waitingGap = 0;
-                                    if (seq >= 2 && taskObj.start_time && !snapshot.isDraggingOver) {
+                                    if (seq >= 2 && taskObj.start_time && taskObj.checkout_time && !snapshot.isDraggingOver) {
                                       // CRITICAL: L'array è ordinato per sequence, quindi idx-1 è la vera task precedente
                                       const prevTask = idx > 0 ? cleanerTasks[idx - 1] as any : null;
 
