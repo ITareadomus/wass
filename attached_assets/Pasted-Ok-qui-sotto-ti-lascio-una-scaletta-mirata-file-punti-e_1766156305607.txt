@@ -1,0 +1,180 @@
+Ok: qui sotto ti lascio una scaletta mirata (file → punti esatti → cosa cambiare) per implementare Proposta A (EO_END “soft”) con la gerarchia di vicinanza e i cap 2/3 task per cleaner come l’hai descritta, senza toccare i container.
+
+0) File da toccare
+
+Solo 1 file:
+
+TaskFlowMaster/client/public/scripts/assign_eo.py
+
+(I punti chiave sono nelle funzioni: evaluate_route() e can_add_task().)
+
+1) Aggiungi i nuovi parametri di regola (config)
+
+Dove: in alto in assign_eo.py, nella sezione # CONFIG - REGOLE... (dove oggi hai BASE_MAX_TASKS, CLUSTER_PRIORITY_TRAVEL, ecc.)
+
+Cosa fare:
+
+Definisci esplicitamente:
+
+NEAR_TRAVEL_MIN = 15.0 → “vicino”
+
+EO_GRACE_MAX_OVER_MIN = 20 → max sforamento oltre EO_END_TIME_MIN
+
+MAX_TASKS_IF_NEAR = 2 → se la “vicinanza” è solo travel-time ≤ 15
+
+MAX_TASKS_IF_STREET_OR_BUILDING = 3 → se stessa via o stesso edificio
+
+Nota: non usare ABSOLUTE_MAX_TASKS per questa logica EO: qui vuoi un cap “di policy” (2/3) più forte.
+
+2) Crea una funzione unica per la gerarchia di vicinanza (rank)
+
+Dove: subito dopo le utility già presenti (same_building, same_street, ecc.). Ti conviene inserirla vicino a same_building() e same_street().
+
+Cosa fare (logica, non patch):
+Crea una funzione tipo:
+
+proximity_rank(a: Task, b: Task) -> int
+
+Con ritorno:
+
+3 se same_building(a.address, b.address) → vicinissimo
+
+2 se same_street(a.address, b.address) → più vicino
+
+1 se travel_minutes(a, b) <= NEAR_TRAVEL_MIN → vicino
+
+0 altrimenti
+
+Perché serve:
+così implementi la gerarchia una volta sola e la riusi sia per:
+
+la “grace rule” in evaluate_route()
+
+il cap 2/3 in can_add_task()
+
+3) Modifica evaluate_route() per rendere “soft” il vincolo EO_END (con gerarchia)
+
+Dove: in evaluate_route() (circa dove ora hai il blocco):
+
+# VINCOLO EO END TIME...
+if EO_END_TIME_MIN is not None and start > EO_END_TIME_MIN:
+    return False, []
+
+
+Cosa fare:
+Sostituisci quella “return False” con una logica a step:
+
+Calcola lo sforamento:
+
+over = start - EO_END_TIME_MIN
+
+Se over <= 0 → tutto ok, nessuna eccezione necessaria.
+
+Se over > 0:
+
+Se prev is None → fallisci (il primo task non ha “ancora” un vicino che lo giustifichi)
+
+Altrimenti calcola:
+
+rank = proximity_rank(prev, t)
+
+Applica la “grace rule”:
+
+Consenti lo start oltre EO_END solo se:
+
+rank >= 1 (quindi: travel<=15 o meglio)
+
+e over <= EO_GRACE_MAX_OVER_MIN (max +20 minuti)
+
+👉 Risultato: un secondo appartamento che parte alle 11:05 (start=665) con EO_END=659:
+
+over=6 → ok
+
+se rank>=1 → passa
+
+Nota importante (coerente con la tua gerarchia)
+
+La gerarchia qui non serve a “passare/non passare” (rank>=1 passa), ma serve per prioritizzare e per il cap (punto 4).
+Se vuoi, puoi anche usare la gerarchia per rendere più permissivo lo sforamento (es: +20 se rank=1, +30 se rank>=2), ma non me l’hai chiesto: quindi in scaletta resto su +20 per tutti i “vicini”.
+
+4) Modifica can_add_task() per applicare i cap 2/3 in base alla gerarchia
+
+Dove: dentro can_add_task() prima che inizi la logica di “clustering avanzato” (cioè prima di questo blocco):
+
+# CLUSTERING AVANZATO: controlla vicinanza con task esistenti
+if current_count > 0:
+    ...
+
+
+Cosa fare:
+Aggiungi una sezione “hard cap” basata sulla tua regola:
+
+Step logici
+
+Calcola current_count = len(cleaner.route)
+
+Determina se il nuovo task ha un legame “forte” con la route esistente:
+
+has_street_or_building_link = any(proximity_rank(existing, task) >= 2 for existing in cleaner.route)
+
+(rank 2 = stessa via, rank 3 = same building)
+
+Imposta il cap:
+
+se has_street_or_building_link: max_allowed = 3
+
+altrimenti: max_allowed = 2
+(qui rientra anche travel<=15: non alza il cap)
+
+Applica il cap:
+
+se current_count >= max_allowed: return False
+
+Questa parte è cruciale perché oggi la funzione può arrivare a 4/5 task (tra ABSOLUTE_MAX_TASKS, DAILY_TASK_LIMIT, ecc.).
+Tu invece vuoi:
+
+max 2 se il “collante” è solo travel<=15
+
+max 3 se stessa via o stesso edificio
+
+5) Allinea i “cluster threshold” già esistenti per non creare contraddizioni
+
+Non è obbligatorio, ma evita incoerenze perché oggi hai:
+
+CLUSTER_PRIORITY_TRAVEL = 5
+
+CLUSTER_EXTENDED_TRAVEL = 7
+
+NEARBY_TRAVEL_THRESHOLD importato da assign_utils
+
+e tu vuoi lavorare su 15
+
+Dove: sempre nella sezione CONFIG + dentro can_add_task().
+
+Cosa fare (minimo indispensabile):
+
+Lascia pure CLUSTER_PRIORITY_TRAVEL/EXTENDED se ti servono per “bonus” e logica preesistente…
+
+ma per queste nuove regole usa solo proximity_rank() (che usa i 15 e la gerarchia).
+
+In pratica: la scelta “passa/non passa” sul cap e sulla grace rule deve dipendere da proximity_rank(), non dai vecchi 5/7.
+
+6) Check finale: cosa ottieni con queste modifiche
+
+Con questa scaletta ottieni esattamente:
+
+EO_END soft: una task può iniziare dopo 10:59 solo se è “attaccata” alla precedente (travel<=15 o meglio) e solo fino a +20 min.
+
+Gerarchia rispettata:
+
+same building / same street “vincono” perché:
+
+fanno scattare il cap a 3
+
+e, se in futuro vuoi, possono anche giustificare grace più ampia (opzionale)
+
+Cap coerenti:
+
+due apt vicini “solo” per travel<=15 → max 2
+
+stessa via / stesso edificio → puoi arrivare a max 3
