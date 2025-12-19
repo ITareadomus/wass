@@ -593,6 +593,8 @@ export default function UnconfirmedTasks() {
                 <Button
                   onClick={handleShowRecap}
                   disabled={selectedOperations.size === 0 || isSaving}
+                  variant="outline"
+                  className="border-2 border-custom-blue"
                   data-testid="button-save-adam"
                 >
                   <Save className="h-4 w-4 mr-2" />
@@ -656,12 +658,15 @@ export default function UnconfirmedTasks() {
                   <DialogFooter className="gap-2">
                     <Button
                       variant="outline"
+                      className="border-2 border-custom-blue"
                       onClick={() => setShowRecap(false)}
                       disabled={isSaving}
                     >
                       Annulla
                     </Button>
                     <Button
+                      variant="outline"
+                      className="border-2 border-custom-blue"
                       onClick={handleConfirmSave}
                       disabled={isSaving}
                     >
