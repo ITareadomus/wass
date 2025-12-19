@@ -509,7 +509,9 @@ def can_add_task(cleaner: Cleaner, task: Task) -> bool:
         if current_count >= max_allowed:
             return False
 
-    # CLUSTERING AVANZATO: controlla vicinanza con task esistenti (logica legacy per altri controlli)
+    # CLUSTERING AVANZATO: controlla vicinanza con task esistenti
+    # NOTA: Il cap 2/3 sopra è già stato applicato, quindi qui passiamo solo
+    # task che rispettano il limite. Questa sezione serve per ignorare limiti tipologia.
     if current_count > 0:
         # Cluster prioritario: ≤5' o stessa via
         is_priority_cluster = any(
@@ -519,34 +521,31 @@ def can_add_task(cleaner: Cleaner, task: Task) -> bool:
             for existing_task in cleaner.route
         )
 
-        # Cluster esteso: ≤7' (infrange limite tipologia)
+        # Cluster esteso: ≤7'
         is_extended_cluster = any(
             (travel_minutes(existing_task, task) <= CLUSTER_EXTENDED_TRAVEL or
              travel_minutes(task, existing_task) <= CLUSTER_EXTENDED_TRAVEL)
             for existing_task in cleaner.route
         )
 
-        # NUOVO: Cluster geografico
+        # Cluster geografico
         is_geo_cluster = any(same_zone(existing_task, task) for existing_task in cleaner.route)
 
-        # Se è in cluster prioritario o geografico: ignora limiti tipologia
-        if is_priority_cluster or is_geo_cluster:
-            return True
-
-        # Se è in cluster esteso: ignora limite tipologia
-        if is_extended_cluster:
-            return True
+        # Se è in cluster: ignora limiti tipologia ma verifica fattibilità temporale
+        if is_priority_cluster or is_geo_cluster or is_extended_cluster:
+            test_route = cleaner.route + [task]
+            feasible, _ = evaluate_route(test_route)
+            return feasible
 
     # Regola base: max 2 task
     if current_count < BASE_MAX_TASKS:
         return True
 
-    # 3ª task: solo se fattibile temporalmente (già passato il cap check sopra)
+    # Task aggiuntive: solo se fattibile temporalmente (già passato il cap check sopra)
     if current_count >= BASE_MAX_TASKS:
         test_route = cleaner.route + [task]
-        feasible, schedule = evaluate_route(test_route)
-        if feasible:
-            return True
+        feasible, _ = evaluate_route(test_route)
+        return feasible
 
     return False
 
