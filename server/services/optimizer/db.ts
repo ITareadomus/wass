@@ -21,6 +21,7 @@ export async function loadTasksForDate(workDate: string): Promise<TaskInput[]> {
   const result = await pool.query(`
     SELECT 
       task_id as "taskId",
+      logistic_code as "logisticCode",
       lat,
       lng,
       priority
@@ -33,6 +34,7 @@ export async function loadTasksForDate(workDate: string): Promise<TaskInput[]> {
 
   return result.rows.map(row => ({
     taskId: row.taskId,
+    logisticCode: row.logisticCode,
     lat: parseFloat(row.lat),
     lng: parseFloat(row.lng),
     priority: row.priority
@@ -105,11 +107,13 @@ export function groupToDecision(
     eventType: 'PHASE1_GROUP_CANDIDATE',
     payload: {
       tasks: group.taskIds,
+      logistic_codes: group.logisticCodes,
       zone: group.zone,
       avg_travel_min: group.avgTravelMin,
       max_travel_min: group.maxTravelMin,
       score: group.score,
-      seed_task: group.seedTaskId
+      seed_task: group.seedTaskId,
+      seed_logistic_code: group.seedLogisticCode
     }
   };
 }
