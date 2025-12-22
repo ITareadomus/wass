@@ -1,0 +1,106 @@
+// server/services/optimizer/zone.ts
+// Zoning "Municipi 1..9" stimato con centri (centroids) + nearest-centroid assignment.
+// Basato sulla mappa dei 9 municipi di Milano (forme irregolari).
+//
+// Nota: non è una geometria ufficiale. È un'approssimazione robusta per clustering.
+// In futuro puoi sostituire computeZone() con una versione polygon/GeoJSON senza cambiare il resto.
+
+export type ZoneId = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9;
+
+export type LatLng = { lat: number; lng: number };
+
+type ZoneDef = {
+  id: ZoneId;
+  name: string;
+  centroid: LatLng;
+};
+
+/**
+ * Centroid approssimativi per i 9 Municipi (zone) di Milano.
+ * Sono scelti per stare "dentro" le aree della mappa (Duomo, nord, est, ecc.)
+ * e funzionano bene per una partizione Voronoi.
+ */
+export const ZONES: ZoneDef[] = [
+  { id: 1, name: "Centro (Duomo/Brera/Ticinese)", centroid: { lat: 45.4642, lng: 9.1900 } },
+  { id: 2, name: "Nord-Est (Gorla/Turro/Greco)", centroid: { lat: 45.5050, lng: 9.2250 } },
+  { id: 3, name: "Est (Città Studi/Lambrate)", centroid: { lat: 45.4850, lng: 9.2450 } },
+  { id: 4, name: "Sud-Est (Forlanini/Corvetto/S. Giulia)", centroid: { lat: 45.4500, lng: 9.2550 } },
+  { id: 5, name: "Sud (Vigentino/Chiaravalle/Gratosoglio)", centroid: { lat: 45.4150, lng: 9.2100 } },
+  { id: 6, name: "Sud-Ovest (Barona/Lorenteggio)", centroid: { lat: 45.4400, lng: 9.1450 } },
+  { id: 7, name: "Ovest (Baggio/Quinto Romano)", centroid: { lat: 45.4650, lng: 9.0850 } },
+  { id: 8, name: "Nord-Ovest (San Siro/Gallaratese)", centroid: { lat: 45.4850, lng: 9.1250 } },
+  { id: 9, name: "Nord (Bovisa/Affori/Niguarda)", centroid: { lat: 45.5200, lng: 9.1650 } }
+];
+
+/**
+ * Adiacenze tra municipi (include se stessa).
+ * È utile come fallback in FASE 1 (es. se una zona ha pochissime task).
+ * Queste adiacenze sono coerenti con la mappa “a grandi linee”.
+ */
+export const ADJACENT_ZONES: Record<ZoneId, ZoneId[]> = {
+  1: [1, 2, 3, 4, 5, 6, 7, 8, 9],
+  2: [2, 1, 3, 9],
+  3: [3, 1, 2, 4],
+  4: [4, 1, 3, 5],
+  5: [5, 1, 4, 6],
+  6: [6, 1, 5, 7],
+  7: [7, 1, 6, 8],
+  8: [8, 1, 7, 9],
+  9: [9, 1, 2, 8] 
+};
+
+/**
+ * Assegna una zona (1..9) in base al "centro" più vicino.
+ * Approssima bene i confini irregolari senza bisogno di poligoni.
+ */
+export function computeZone(lat: number, lng: number): ZoneId {
+  const p = { lat, lng };
+
+  // Se coordinate non valide, fallback su 1 (centro) per non rompere la pipeline.
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return 1;
+
+  let best: ZoneDef | null = null;
+  let bestD = Infinity;
+
+  for (const z of ZONES) {
+    const d = haversineMeters(p, z.centroid);
+    if (d < bestD) {
+      bestD = d;
+      best = z;
+    }
+  }
+
+  return (best?.id ?? 1) as ZoneId;
+}
+
+export function getZoneName(zone: ZoneId): string {
+  return ZONES.find(z => z.id === zone)?.name ?? `Zona ${zone}`;
+}
+
+export function getAdjacentZones(zone: ZoneId, includeSelf = true): ZoneId[] {
+  const arr = ADJACENT_ZONES[zone] ?? [zone];
+  if (includeSelf) return arr;
+  return arr.filter(z => z !== zone) as ZoneId[];
+}
+
+/** Haversine distance in meters */
+function haversineMeters(a: LatLng, b: LatLng): number {
+  const R = 6371000; // Earth radius meters
+  const toRad = (deg: number) => (deg * Math.PI) / 180;
+
+  const dLat = toRad(b.lat - a.lat);
+  const dLng = toRad(b.lng - a.lng);
+
+  const lat1 = toRad(a.lat);
+  const lat2 = toRad(b.lat);
+
+  const sinDLat = Math.sin(dLat / 2);
+  const sinDLng = Math.sin(dLng / 2);
+
+  const h =
+    sinDLat * sinDLat +
+    Math.cos(lat1) * Math.cos(lat2) * sinDLng * sinDLng;
+
+  const c = 2 * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h));
+  return R * c;
+}
