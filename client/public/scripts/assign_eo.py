@@ -10,9 +10,7 @@ from assign_utils import (
     NEARBY_TRAVEL_THRESHOLD, NEW_CLEANER_PENALTY_MIN, NEW_TRAINER_PENALTY_MIN,
     TARGET_MIN_LOAD_MIN, FAIRNESS_DELTA_HOURS, LOAD_WEIGHT,
     SAME_BUILDING_BONUS, ROLE_TRAINER_BONUS,
-    cleaner_load_minutes, cleaner_load_hours, get_cleaners_for_eo,
-    CLUSTER_NEAR_MIN, CLUSTER_VERY_NEAR_MIN, BASE_MAX_TASKS_PER_DAY, ABSOLUTE_MAX_TASKS_PER_DAY,
-    can_add_task_daily
+    cleaner_load_minutes, cleaner_load_hours, get_cleaners_for_eo
 )
 
 # API Client import (opzionale, con fallback)
@@ -154,7 +152,6 @@ class Cleaner:
     home_lng: Optional[float] = None
     start_time: str = "10:00"
     route: List[Task] = field(default_factory=list)
-    daily_tasks: List[Task] = field(default_factory=list)  # Tutte le task giornaliere (EO = route in questo modulo)
 
 
 # -------- Utils --------
@@ -422,28 +419,22 @@ def can_add_task(cleaner: Cleaner, task: Task) -> bool:
     Verifica se è possibile aggiungere una task al cleaner secondo le regole:
     1. Premium task -> premium cleaner
     2. Straordinaria -> premium cleaner, deve essere la prima (pos=0)
-    3. LIMITE GIORNALIERO GLOBALE (EO+HP+LP): max 3 task, o 4 solo se cluster 10'/5'
-    4. CLUSTERING: appartamenti vicini per priorità assegnazione
+    3. CLUSTERING: appartamenti vicini (≤10') possono infrangere limiti tipologia
+    4. Stessa via o ≤5': massima priorità cluster
+    5. Limite giornaliero: max 5 task totali
     """
     # Check premium/straordinaria
     if not can_handle_premium(cleaner, task):
         return False
 
-    # Check tipo appartamento
+    # NUOVO: Check tipo appartamento
     if not can_cleaner_handle_apartment(cleaner.role, task.apt_type):
         return False
 
     current_count = len(cleaner.route)
-    
-    # In EO, daily_tasks = route (siamo il primo modulo)
-    daily_tasks = list(cleaner.route)
 
-    # REGOLA GIORNALIERA GLOBALE: max 3 task, o 4 solo con cluster
-    # Wrapper per travel_minutes compatibile con can_add_task_daily
-    def travel_fn(t1, t2):
-        return travel_minutes(t1, t2)
-    
-    if not can_add_task_daily(daily_tasks, task, travel_fn):
+    # Limite giornaliero HARD: max 5 task
+    if current_count >= DAILY_TASK_LIMIT:
         return False
 
     # Straordinaria deve essere la prima
@@ -456,9 +447,9 @@ def can_add_task(cleaner: Cleaner, task: Task) -> bool:
         if task.straordinaria:
             return False
 
-    # CLUSTERING per priorità assegnazione (NON per infrangere limiti, ora gestito da can_add_task_daily)
+    # CLUSTERING AVANZATO: controlla vicinanza con task esistenti
     if current_count > 0:
-        # Cluster prioritario: ≤5' o stessa via - utile per scoring, non per limiti
+        # Cluster prioritario: ≤5' o stessa via
         is_priority_cluster = any(
             (travel_minutes(existing_task, task) <= CLUSTER_PRIORITY_TRAVEL or
              travel_minutes(task, existing_task) <= CLUSTER_PRIORITY_TRAVEL or
@@ -466,30 +457,50 @@ def can_add_task(cleaner: Cleaner, task: Task) -> bool:
             for existing_task in cleaner.route
         )
 
-        # Cluster esteso: ≤10'
+        # Cluster esteso: ≤10' (infrange limite tipologia)
         is_extended_cluster = any(
             (travel_minutes(existing_task, task) <= CLUSTER_EXTENDED_TRAVEL or
              travel_minutes(task, existing_task) <= CLUSTER_EXTENDED_TRAVEL)
             for existing_task in cleaner.route
         )
 
-        # Cluster geografico
+        # NUOVO: Cluster geografico
         is_geo_cluster = any(same_zone(existing_task, task) for existing_task in cleaner.route)
 
-        # Se è in cluster (qualsiasi tipo): può essere aggiunto (già passato can_add_task_daily)
-        if is_priority_cluster or is_geo_cluster or is_extended_cluster:
+        # Se è in cluster prioritario o geografico: ignora limiti tipologia, rispetta SEMPRE limite giornaliero
+        if is_priority_cluster or is_geo_cluster:
+            # Verifica limite giornaliero HARD
+            if current_count >= DAILY_TASK_LIMIT:
+                return False
+            # Verifica max assoluto (anche se in cluster)
+            if current_count >= ABSOLUTE_MAX_TASKS:
+                return False
             return True
 
-    # Regola base: se abbiamo meno di 3 task giornaliere, ok
-    if current_count < BASE_MAX_TASKS_PER_DAY:
+        # Se è in cluster esteso: ignora limite tipologia, rispetta limiti giornaliero e max assoluto
+        if is_extended_cluster:
+            # Verifica limite giornaliero HARD
+            if current_count >= DAILY_TASK_LIMIT:
+                return False
+            # Verifica max assoluto
+            if current_count >= ABSOLUTE_MAX_TASKS:
+                return False
+            return True
+
+    # Regola base: max 2 task
+    if current_count < BASE_MAX_TASKS:
         return True
 
-    # Per la 4ª task: deve essere fattibile temporalmente
-    if current_count >= BASE_MAX_TASKS_PER_DAY and current_count < ABSOLUTE_MAX_TASKS_PER_DAY:
+    # 3ª-5ª task: solo se fattibile temporalmente
+    if current_count >= BASE_MAX_TASKS and current_count < ABSOLUTE_MAX_TASKS:
         test_route = cleaner.route + [task]
         feasible, schedule = evaluate_route(test_route)
         if feasible and schedule:
-            return True
+            last_finish = schedule[-1][2]  # finish time in minuti
+            if current_count < ABSOLUTE_MAX_TASKS_IF_BEFORE_18 and last_finish <= 18 * 60:
+                return True
+            elif current_count < ABSOLUTE_MAX_TASKS:
+                return True
 
     return False
 

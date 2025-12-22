@@ -11,9 +11,7 @@ from assign_utils import (
     NEARBY_TRAVEL_THRESHOLD, NEW_CLEANER_PENALTY_MIN, NEW_TRAINER_PENALTY_MIN,
     TARGET_MIN_LOAD_MIN, TRAINER_TARGET_MIN_LOAD_MIN, FAIRNESS_DELTA_HOURS, LOAD_WEIGHT,
     SAME_BUILDING_BONUS, ROLE_TRAINER_BONUS,
-    cleaner_load_minutes, cleaner_load_hours,
-    CLUSTER_NEAR_MIN, CLUSTER_VERY_NEAR_MIN, BASE_MAX_TASKS_PER_DAY, ABSOLUTE_MAX_TASKS_PER_DAY,
-    can_add_task_daily
+    cleaner_load_minutes, cleaner_load_hours
 )
 
 # API Client import (required)
@@ -102,8 +100,7 @@ class Cleaner:
     last_lng: Optional[float] = None
     last_sequence: int = 0
     route: List[Task] = field(default_factory=list)
-    total_daily_tasks: int = 0  # Totale task giornaliere (EO + HP) prima di LP
-    daily_tasks: List[Task] = field(default_factory=list)  # Tutte le task giornaliere (EO + HP + LP)
+    total_daily_tasks: int = 0  # Totale task giornaliere (EO + HP + LP)
 
 
 # -------- Utils --------
@@ -364,10 +361,6 @@ def can_add_lp_task(cleaner: Cleaner, all_cleaners: List[Cleaner]) -> bool:
 
 
 def can_add_task(cleaner: Cleaner, task: Task) -> bool:
-    """
-    Verifica se è possibile aggiungere una task LP al cleaner.
-    Usa limite giornaliero globale: max 3 task, o 4 solo se cluster 10'/5'.
-    """
     if task.apt_type and not can_cleaner_handle_apartment(cleaner.role, task.apt_type):
         return False
 
@@ -375,19 +368,10 @@ def can_add_task(cleaner: Cleaner, task: Task) -> bool:
         return False
 
     current_count = len(cleaner.route)
-    
-    # LIMITE GIORNALIERO GLOBALE (EO + HP + LP)
-    # daily_tasks = EO+HP tasks + LP route corrente (per cluster check cross-fase)
-    daily_tasks = list(cleaner.daily_tasks) + list(cleaner.route)
-    
-    total_daily_count = len(daily_tasks)
-    
-    # Wrapper per travel_minutes compatibile con can_add_task_daily
-    def travel_fn(t1, t2):
-        return travel_minutes(t1.lat, t1.lng, t2.lat, t2.lng, t1.address, t2.address)
-    
-    # REGOLA GIORNALIERA GLOBALE: max 3 task, o 4 solo con cluster
-    if not can_add_task_daily(daily_tasks, task, travel_fn):
+
+    total_daily = cleaner.total_daily_tasks + current_count
+
+    if total_daily >= MAX_DAILY_TASKS:
         return False
 
     if task.straordinaria:
@@ -398,7 +382,6 @@ def can_add_task(cleaner: Cleaner, task: Task) -> bool:
         if task.straordinaria:
             return False
 
-    # CLUSTERING per priorità assegnazione
     if current_count > 0:
         is_priority_cluster = any(
             (travel_minutes(existing_task.lat, existing_task.lng, task.lat, task.lng,
@@ -417,20 +400,49 @@ def can_add_task(cleaner: Cleaner, task: Task) -> bool:
             for existing_task in cleaner.route
         )
 
-        # Se è in cluster: può essere aggiunto (già passato can_add_task_daily)
-        if is_priority_cluster or is_extended_cluster:
+        if is_priority_cluster:
+            if total_daily >= MAX_DAILY_TASKS:
+                return False
+            if current_count >= ABSOLUTE_MAX_TASKS:
+                return False
             return True
 
-    # Regola base: se abbiamo meno di 3 task giornaliere, ok
-    if total_daily_count < BASE_MAX_TASKS_PER_DAY:
+        if is_extended_cluster:
+            if total_daily >= MAX_DAILY_TASKS:
+                return False
+            if current_count >= ABSOLUTE_MAX_TASKS:
+                return False
+            return True
+
+    eo_hp_count = cleaner.total_daily_tasks
+
+    if eo_hp_count == 0:
+        dynamic_max_lp = 3
+    elif eo_hp_count == 1:
+        dynamic_max_lp = 3
+    elif eo_hp_count == 2:
+        dynamic_max_lp = 2
+    elif eo_hp_count == 3:
+        dynamic_max_lp = 1
+    else:
+        dynamic_max_lp = 0
+
+    if current_count >= dynamic_max_lp and not (current_count < BASE_MAX_TASKS):
+        if not (is_priority_cluster or is_extended_cluster):
+            return False
+
+    if current_count < BASE_MAX_TASKS:
         return True
 
-    # Per la 4ª task: deve essere fattibile temporalmente
-    if total_daily_count >= BASE_MAX_TASKS_PER_DAY and total_daily_count < ABSOLUTE_MAX_TASKS_PER_DAY:
+    if current_count >= BASE_MAX_TASKS and current_count < ABSOLUTE_MAX_TASKS:
         test_route = cleaner.route + [task]
         feasible, schedule = evaluate_route(cleaner, test_route)
         if feasible and schedule:
-            return True
+            last_finish = schedule[-1][2]
+            if current_count < ABSOLUTE_MAX_TASKS_IF_BEFORE_18 and last_finish <= 18 * 60:
+                return True
+            elif current_count < ABSOLUTE_MAX_TASKS:
+                return True
 
     return False
 
@@ -634,7 +646,6 @@ def seed_cleaners_from_assignments(cleaners: List[Cleaner], work_date: str):
     """
     Seed cleaners con informazioni da timeline via API (EO e HP assignments)
     Conta anche il totale task giornaliere per applicare il limite di 5
-    Popola daily_tasks con oggetti Task per cluster check cross-fase
     """
     timeline_data = load_timeline(work_date)
     blocks = timeline_data.get("cleaners_assignments", [])
@@ -667,52 +678,6 @@ def seed_cleaners_from_assignments(cleaners: List[Cleaner], work_date: str):
                 cl.last_lng = float(last_lng) if last_lng is not None else None
                 cl.last_sequence = max_sequence
                 cl.total_daily_tasks = len(tasks)
-                
-                # NUOVO: Popola daily_tasks con task EO+HP dalla timeline per cluster check
-                eo_hp_task_objects = []
-                for t in all_tasks_sorted:
-                    try:
-                        # Converti date/time per Task LP format
-                        checkin_dt = None
-                        checkout_dt = None
-                        
-                        checkin_date = t.get("checkin_date")
-                        checkin_time = t.get("checkin_time")
-                        if checkin_date and checkin_time:
-                            try:
-                                normalized_date = checkin_date.split('T')[0] if 'T' in checkin_date else checkin_date
-                                normalized_time = ':'.join(checkin_time.split(':')[:2]) if checkin_time.count(':') == 2 else checkin_time
-                                checkin_dt = datetime.strptime(f"{normalized_date} {normalized_time}", "%Y-%m-%d %H:%M")
-                            except:
-                                pass
-                        
-                        checkout_date = t.get("checkout_date")
-                        checkout_time = t.get("checkout_time")
-                        if checkout_date and checkout_time:
-                            try:
-                                normalized_date = checkout_date.split('T')[0] if 'T' in checkout_date else checkout_date
-                                normalized_time = ':'.join(checkout_time.split(':')[:2]) if checkout_time.count(':') == 2 else checkout_time
-                                checkout_dt = datetime.strptime(f"{normalized_date} {normalized_time}", "%Y-%m-%d %H:%M")
-                            except:
-                                pass
-                        
-                        task_obj = Task(
-                            task_id=str(t.get("task_id", "")),
-                            logistic_code=str(t.get("logistic_code", "")),
-                            lat=float(t.get("lat", 0)),
-                            lng=float(t.get("lng", 0)),
-                            cleaning_time=int(t.get("cleaning_time", 60) or 60),
-                            is_premium=bool(t.get("premium", False)),
-                            checkin_dt=checkin_dt,
-                            checkout_dt=checkout_dt,
-                            apt_type=t.get("type_apt"),
-                            address=t.get("address"),
-                            alias=t.get("alias"),
-                        )
-                        eo_hp_task_objects.append(task_obj)
-                    except Exception:
-                        pass  # Skip malformed tasks
-                cl.daily_tasks = eo_hp_task_objects
                 break
 
 
