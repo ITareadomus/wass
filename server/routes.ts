@@ -5138,6 +5138,66 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ========== OPTIMIZER PHASE 1 ENDPOINTS ==========
+  
+  app.post("/api/optimizer/run-phase1", async (req, res) => {
+    try {
+      const { date, params } = req.body;
+      const workDate = date || format(new Date(), "yyyy-MM-dd");
+      
+      console.log(`🚀 POST /api/optimizer/run-phase1 - Avvio FASE 1 per ${workDate}`);
+      
+      const { runPhase1 } = await import('./services/optimizer/runPhase1');
+      const result = await runPhase1(workDate, params || {});
+      
+      console.log(`✅ FASE 1 completata: ${result.groupsGenerated} gruppi generati in ${result.durationMs}ms`);
+      
+      res.json({
+        success: result.status === 'success',
+        ...result
+      });
+    } catch (error: any) {
+      console.error("❌ Errore FASE 1 optimizer:", error);
+      res.status(500).json({
+        success: false,
+        error: error.message
+      });
+    }
+  });
+
+  app.get("/api/optimizer/phase1-stats", async (req, res) => {
+    try {
+      const dateParam = (req.query.date as string) || format(new Date(), "yyyy-MM-dd");
+      
+      const { getPhase1Stats } = await import('./services/optimizer/runPhase1');
+      const stats = await getPhase1Stats(dateParam);
+      
+      res.json(stats);
+    } catch (error: any) {
+      console.error("❌ Errore stats FASE 1:", error);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  app.get("/api/optimizer/decisions", async (req, res) => {
+    try {
+      const runId = req.query.runId as string;
+      const phase = req.query.phase ? parseInt(req.query.phase as string) : undefined;
+      
+      if (!runId) {
+        return res.status(400).json({ success: false, error: "runId required" });
+      }
+      
+      const { getDecisionsForRun } = await import('./services/optimizer/db');
+      const decisions = await getDecisionsForRun(runId, phase);
+      
+      res.json({ decisions, count: decisions.length });
+    } catch (error: any) {
+      console.error("❌ Errore lettura decisions:", error);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }
