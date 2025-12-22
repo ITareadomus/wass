@@ -40,10 +40,11 @@ export type CandidateGroup = {
 };
 
 const AVG_SPEED_KMH = 18;
+const NON_LINEAR_PATH_FACTOR = 1.5; // Percorsi non rettilinei (allineato a script Python)
 
 export function estimateTravelMinutes(a: TaskInput, b: TaskInput): number {
   const meters = haversineMeters(a.lat, a.lng, b.lat, b.lng);
-  const km = meters / 1000;
+  const km = (meters / 1000) * NON_LINEAR_PATH_FACTOR;
   const hours = km / AVG_SPEED_KMH;
   return Math.max(1, Math.round(hours * 60));
 }
