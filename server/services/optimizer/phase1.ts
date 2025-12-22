@@ -3,6 +3,7 @@ import { scoreGroup } from "./scoring";
 
 export type TaskInput = {
   taskId: number;
+  logisticCode: number;
   lat: number;
   lng: number;
   zone?: number | null;
@@ -29,8 +30,10 @@ export const DEFAULT_PHASE1_PARAMS: Phase1Params = {
 
 export type CandidateGroup = {
   taskIds: number[];
+  logisticCodes: number[];
   zone: number;
   seedTaskId: number;
+  seedLogisticCode: number;
   avgTravelMin: number;
   maxTravelMin: number;
   score: number;
@@ -133,10 +136,15 @@ function addGroup(
 
   const score = scoreGroup(avgTravelMin, maxTravelMin, sameZone);
 
+  const sortedTasks = [...groupTasks].sort((a, b) => a.taskId - b.taskId);
+  const logisticCodes = sortedTasks.map(t => t.logisticCode);
+
   groupMap.set(key, {
     taskIds: ids,
+    logisticCodes,
     zone: seedZone,
     seedTaskId: seed.taskId,
+    seedLogisticCode: seed.logisticCode,
     avgTravelMin,
     maxTravelMin,
     score
