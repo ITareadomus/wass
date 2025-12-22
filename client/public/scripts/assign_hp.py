@@ -10,9 +10,7 @@ from assign_utils import (
     NEARBY_TRAVEL_THRESHOLD, NEW_CLEANER_PENALTY_MIN, NEW_TRAINER_PENALTY_MIN,
     TARGET_MIN_LOAD_MIN, FAIRNESS_DELTA_HOURS, LOAD_WEIGHT,
     SAME_BUILDING_BONUS, ROLE_TRAINER_BONUS,
-    cleaner_load_minutes, cleaner_load_hours,
-    CLUSTER_NEAR_MIN, CLUSTER_VERY_NEAR_MIN, BASE_MAX_TASKS_PER_DAY, ABSOLUTE_MAX_TASKS_PER_DAY,
-    can_add_task_daily
+    cleaner_load_minutes, cleaner_load_hours
 )
 
 # API Client import (required)
@@ -169,7 +167,6 @@ class Cleaner:
     last_eo_lng: Optional[float] = None
     eo_last_sequence: int = 0
     route: List[Task] = field(default_factory=list)
-    daily_tasks: List[Task] = field(default_factory=list)  # Tutte le task giornaliere (EO + HP)
 
 
 # -------- Utils --------
@@ -435,29 +432,16 @@ def evaluate_route(cleaner: Cleaner, route: List[Task]) -> Tuple[bool, List[Tupl
 
 
 def can_add_task(cleaner: Cleaner, task: Task) -> bool:
-    """
-    Verifica se è possibile aggiungere una task HP al cleaner.
-    Usa limite giornaliero globale: max 3 task, o 4 solo se cluster 10'/5'.
-    """
     if not can_handle_premium(cleaner, task):
         return False
     if not can_cleaner_handle_apartment(cleaner.role, task.apt_type):
         return False
 
     current_count = len(cleaner.route)
-    
-    # LIMITE GIORNALIERO GLOBALE (EO + HP)
-    # daily_tasks = EO tasks + HP route corrente (per cluster check cross-fase)
-    daily_tasks = list(cleaner.daily_tasks) + list(cleaner.route)
-    
-    total_daily_count = len(daily_tasks)
-    
-    # Wrapper per travel_minutes compatibile con can_add_task_daily
-    def travel_fn(t1, t2):
-        return travel_minutes(t1.lat, t1.lng, t2.lat, t2.lng, t1.address, t2.address)
-    
-    # REGOLA GIORNALIERA GLOBALE: max 3 task, o 4 solo con cluster
-    if not can_add_task_daily(daily_tasks, task, travel_fn):
+
+    total_daily = cleaner.eo_last_sequence + current_count
+
+    if total_daily >= DAILY_TASK_LIMIT:
         return False
 
     if task.straordinaria:
@@ -468,7 +452,6 @@ def can_add_task(cleaner: Cleaner, task: Task) -> bool:
         if task.straordinaria:
             return False
 
-    # CLUSTERING per priorità assegnazione
     if current_count > 0:
         is_priority_cluster = any(
             (travel_minutes(existing_task.lat, existing_task.lng, task.lat, task.lng,
@@ -487,20 +470,32 @@ def can_add_task(cleaner: Cleaner, task: Task) -> bool:
             for existing_task in cleaner.route
         )
 
-        # Se è in cluster: può essere aggiunto (già passato can_add_task_daily)
-        if is_priority_cluster or is_extended_cluster:
+        if is_priority_cluster:
+            if total_daily >= DAILY_TASK_LIMIT:
+                return False
+            if current_count >= ABSOLUTE_MAX_TASKS:
+                return False
             return True
 
-    # Regola base: se abbiamo meno di 3 task giornaliere, ok
-    if total_daily_count < BASE_MAX_TASKS_PER_DAY:
+        if is_extended_cluster:
+            if total_daily >= DAILY_TASK_LIMIT:
+                return False
+            if current_count >= ABSOLUTE_MAX_TASKS:
+                return False
+            return True
+
+    if current_count < BASE_MAX_TASKS:
         return True
 
-    # Per la 4ª task: deve essere fattibile temporalmente
-    if total_daily_count >= BASE_MAX_TASKS_PER_DAY and total_daily_count < ABSOLUTE_MAX_TASKS_PER_DAY:
+    if current_count >= BASE_MAX_TASKS and current_count < ABSOLUTE_MAX_TASKS:
         test_route = cleaner.route + [task]
         feasible, schedule = evaluate_route(cleaner, test_route)
         if feasible and schedule:
-            return True
+            last_finish = schedule[-1][2]
+            if current_count < ABSOLUTE_MAX_TASKS_IF_BEFORE_18 and last_finish.hour < 18:
+                return True
+            elif current_count < ABSOLUTE_MAX_TASKS:
+                return True
 
     return False
 
@@ -700,7 +695,7 @@ def load_cleaners(ref_date: str) -> List[Cleaner]:
 
 
 def seed_cleaners_from_eo(cleaners: List[Cleaner], ref_date: str):
-    """Leggi dalla timeline via API per determinare available_from, last_eo_address e popolare daily_tasks."""
+    """Leggi dalla timeline via API per determinare available_from e last_eo_address."""
     timeline_data = load_timeline(ref_date)
     blocks = timeline_data.get("cleaners_assignments", [])
 
@@ -732,28 +727,6 @@ def seed_cleaners_from_eo(cleaners: List[Cleaner], ref_date: str):
                     cl.last_eo_lat = float(last_lat) if last_lat is not None else None
                     cl.last_eo_lng = float(last_lng) if last_lng is not None else None
                     cl.eo_last_sequence = max_sequence
-                    
-                    # NUOVO: Popola daily_tasks con le task EO dalla timeline per cluster check
-                    eo_task_objects = []
-                    for t in all_tasks_sorted:
-                        try:
-                            eo_task = Task(
-                                task_id=str(t.get("task_id", "")),
-                                logistic_code=str(t.get("logistic_code", "")),
-                                lat=float(t.get("lat", 0)),
-                                lng=float(t.get("lng", 0)),
-                                cleaning_time=int(t.get("cleaning_time", 60) or 60),
-                                checkout_dt=parse_dt(t.get("checkout_date"), t.get("checkout_time")),
-                                checkin_dt=parse_dt(t.get("checkin_date"), t.get("checkin_time")),
-                                is_premium=bool(t.get("premium", False)),
-                                apt_type=t.get("type_apt"),
-                                address=t.get("address"),
-                                alias=t.get("alias"),
-                            )
-                            eo_task_objects.append(eo_task)
-                        except Exception:
-                            pass  # Skip malformed tasks
-                    cl.daily_tasks = eo_task_objects
                     break
 
 

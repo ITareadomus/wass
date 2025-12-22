@@ -41,10 +41,6 @@ interface SettingsData {
     hp_end_time: string;
     hp_clients: number[];
   };
-  "low-priority": {
-    lp_start_time: string;
-    lp_end_time: string;
-  };
   dedupe_strategy: string;
   apartment_types: {
     standard_apt: string[];
@@ -410,37 +406,21 @@ export default function SystemSettings() {
                     </span>
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="lp_start_time" className="text-sm">Start Time</Label>
+                    <Label htmlFor="lp_start_time" className="text-sm text-muted-foreground">Start Time</Label>
                     <Input
                       id="lp_start_time"
                       type="time"
-                      value={settings["low-priority"]?.lp_start_time || ""}
-                      onChange={(e) =>
-                        setSettings({
-                          ...settings,
-                          "low-priority": {
-                            ...settings["low-priority"],
-                            lp_start_time: e.target.value,
-                          },
-                        })
-                      }
+                      disabled
+                      placeholder="Non valorizzato"
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="lp_end_time" className="text-sm">End Time</Label>
+                    <Label htmlFor="lp_time" className="text-sm text-muted-foreground">End Time</Label>
                     <Input
-                      id="lp_end_time"
+                      id="lp_time"
                       type="time"
-                      value={settings["low-priority"]?.lp_end_time || ""}
-                      onChange={(e) =>
-                        setSettings({
-                          ...settings,
-                          "low-priority": {
-                            ...settings["low-priority"],
-                            lp_end_time: e.target.value,
-                          },
-                        })
-                      }
+                      disabled
+                      placeholder="Non valorizzato"
                     />
                   </div>
                   <div className="space-y-2">
