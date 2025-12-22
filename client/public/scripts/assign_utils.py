@@ -76,24 +76,45 @@ def has_edge_within(tasks: List[Any], candidate: Any, travel_minutes_fn: Callabl
     return False
 
 
-def can_add_task_daily(daily_tasks: List[Any], candidate: Any, travel_minutes_fn: Callable[[Any, Any], int]) -> bool:
+def can_add_task_daily(daily_tasks: List[Any], candidate: Any, travel_minutes_fn: Callable[[Any, Any], int], extra_count: int = 0) -> bool:
     """
     Verifica se è possibile aggiungere una task al totale giornaliero del cleaner.
     
+    Args:
+        daily_tasks: Lista di task disponibili come oggetti (per cluster check)
+        candidate: Task candidata da aggiungere
+        travel_minutes_fn: Funzione per calcolare travel time tra due task
+        extra_count: Numero di task aggiuntive da fasi precedenti (senza oggetti disponibili)
+    
     Regole:
-    - Se |daily_tasks| < 3 → puoi aggiungere
-    - Se |daily_tasks| == 3 → puoi aggiungere la 4ª solo se:
+    - Se totale < 3 → puoi aggiungere
+    - Se totale == 3 → puoi aggiungere la 4ª solo se:
         1. daily_tasks è un cluster connesso a 10 min
         2. candidate è ≤ 5 min da almeno una task in daily_tasks
         3. daily_tasks + candidate resta un cluster connesso a 10 min
-    - Se |daily_tasks| >= 4 → stop
+    - Se totale >= 4 → stop
+    
+    Nota: extra_count conta task da fasi precedenti che non sono disponibili come oggetti.
+    Il cluster check viene fatto solo sulle task disponibili (daily_tasks).
     """
     n = len(daily_tasks)
+    total = n + extra_count
     
-    if n < BASE_MAX_TASKS_PER_DAY:
+    # Limite assoluto: mai più di 4 task
+    if total >= ABSOLUTE_MAX_TASKS_PER_DAY:
+        return False
+    
+    # Se abbiamo meno di 3 task totali, possiamo sempre aggiungere
+    if total < BASE_MAX_TASKS_PER_DAY:
         return True
     
-    if n == BASE_MAX_TASKS_PER_DAY:
+    # Se siamo esattamente a 3 task totali, possiamo aggiungere la 4ª solo con cluster
+    if total == BASE_MAX_TASKS_PER_DAY:
+        # Se non abbiamo task come oggetti per il cluster check, blocchiamo
+        if not daily_tasks:
+            return False
+        
+        # Cluster check sulle task disponibili
         if not is_connected_cluster(daily_tasks, travel_minutes_fn, CLUSTER_NEAR_MIN):
             return False
         if not has_edge_within(daily_tasks, candidate, travel_minutes_fn, CLUSTER_VERY_NEAR_MIN):
