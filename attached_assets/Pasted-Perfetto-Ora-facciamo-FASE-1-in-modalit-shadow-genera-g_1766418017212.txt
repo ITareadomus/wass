@@ -1,0 +1,328 @@
+Perfetto. Ora facciamo FASE 1 in modalità shadow: genera gruppi candidati (2/3/4 con regola “≤5 min”) e salva solo in optimizer.optimizer_run + optimizer.optimizer_decision.
+
+Qui sotto ti do una scaletta + codice “scheletro” che puoi far implementare a Replit Agent. È pensato per essere isolato, senza toccare l’assegnazione attuale.
+
+FASE 1 – cosa deve fare (in pratica)
+
+Caricare le task del giorno (read-only dal DB prod)
+
+Per ogni task: calcolare zone con computeZone() (se non presente)
+
+Generare gruppi candidati:
+
+max 3 task
+
+4 task SOLO se esiste almeno un legame “molto vicino” (≤5 min) tra la 4ª e una delle 3
+
+se la zona ha poche task → includere anche task di zone adiacenti (getAdjacentZones)
+
+Calcolare metriche del gruppo:
+
+avgTravelMin, maxTravelMin, score
+
+Salvare tutto come decision log:
+
+PHASE1_GROUP_CANDIDATE
+
+Salvare una riga run in optimizer.optimizer_run (status='partial')
+
+File da creare
+1) server/services/optimizer/phase1.ts
+
+Contiene: travel estimate + group generation.
+
+A) Travel time stimato (senza API, sicuro)
+
+Per shadow mode usiamo:
+
+distanza haversine → minuti assumendo velocità media urbana (es 18 km/h)
+
+È abbastanza per ranking. In futuro lo sostituisci con travel time reale/cached.
+
+B) Generazione gruppi
+
+Algoritmo semplice ma robusto:
+
+per ogni “seed” task:
+
+prendi neighbors = stessa zona + adiacenti
+
+calcola distanza seed↔neighbor e tieni top K vicini (es 12–20) per evitare combinazioni enormi
+
+genera combinazioni di 2 e 3
+
+genera 4 solo se la regola 5 minuti è soddisfatta
+
+dedup gruppi (stesso set di task)
+
+ordina per score desc
+
+opzionale: tieni top N totali (es 3000)
+
+2) server/services/optimizer/scoring.ts
+
+Una funzione semplice: score più alto = gruppo migliore.
+
+Esempio:
+
+penalizza travel medio e massimo
+
+bonus se tutte in stessa zona
+
+3) server/services/optimizer/runPhase1.ts
+
+Orchestratore:
+
+load tasks
+
+create run
+
+generate groups
+
+insert decision rows (batch)
+
+return stats
+
+4) server/services/optimizer/db.ts
+
+Minimo indispensabile:
+
+loadTasksForDate(workDate) (read-only prod)
+
+createRun(...)
+
+insertDecisionsBatch(...)
+
+Specifiche dei payload in optimizer_decision
+event_type
+
+PHASE1_GROUP_CANDIDATE
+
+payload (consigliato)
+{
+  "tasks": [617, 618, 723],
+  "zone": 6,
+  "avg_travel_min": 4.2,
+  "max_travel_min": 7,
+  "score": 82,
+  "seed_task": 617
+}
+
+Parametri consigliati (mettili in params JSON)
+
+max_apts: 3
+
+allow_fourth_if_travel_le_min: 5
+
+neighbor_limit: 15
+
+nearby_seed_max_min: 12 (se vuoi filtrare vicini)
+
+max_groups_total: 3000
+
+Codice (da dare a Replit Agent)
+scoring.ts
+export function scoreGroup(avgTravelMin: number, maxTravelMin: number, sameZone: boolean): number {
+  const base = 100;
+  const penalty = avgTravelMin * 2 + maxTravelMin * 3;
+  const bonus = sameZone ? 10 : 0;
+  return Math.round((base - penalty + bonus) * 10) / 10;
+}
+
+phase1.ts (core)
+import { computeZone, getAdjacentZones } from "./zone";
+import { scoreGroup } from "./scoring";
+
+export type TaskInput = {
+  taskId: number;
+  lat: number;
+  lng: number;
+  zone?: number | null;
+  priority?: string | null;
+};
+
+export type Phase1Params = {
+  maxApts: 3;
+  allowFourthIfTravelLeMin: number; // 5
+  neighborLimit: number;            // 15
+  nearbySeedMaxMin: number;         // 12
+  maxGroupsTotal: number;           // 3000
+  useAdjacentZones: boolean;        // true
+};
+
+export type CandidateGroup = {
+  taskIds: number[];
+  zone: number;
+  seedTaskId: number;
+  avgTravelMin: number;
+  maxTravelMin: number;
+  score: number;
+};
+
+const AVG_SPEED_KMH = 18; // stima urbana
+
+export function estimateTravelMinutes(a: TaskInput, b: TaskInput): number {
+  const meters = haversineMeters(a.lat, a.lng, b.lat, b.lng);
+  const km = meters / 1000;
+  const hours = km / AVG_SPEED_KMH;
+  return Math.max(1, Math.round(hours * 60));
+}
+
+export function generateCandidateGroups(tasks: TaskInput[], params: Phase1Params): CandidateGroup[] {
+  // assign zone
+  const tasksWithZone = tasks.map(t => ({
+    ...t,
+    zone: (t.zone ?? computeZone(t.lat, t.lng))
+  }));
+
+  // index by zone
+  const byZone = new Map<number, TaskInput[]>();
+  for (const t of tasksWithZone) {
+    const z = t.zone as number;
+    if (!byZone.has(z)) byZone.set(z, []);
+    byZone.get(z)!.push(t);
+  }
+
+  const groupMap = new Map<string, CandidateGroup>();
+
+  for (const seed of tasksWithZone) {
+    const seedZone = seed.zone as number;
+
+    // candidate pool: same zone + adjacent
+    let pool: TaskInput[] = [...(byZone.get(seedZone) ?? [])].filter(t => t.taskId !== seed.taskId);
+
+    if (params.useAdjacentZones) {
+      const adj = getAdjacentZones(seedZone as any, false) as number[];
+      for (const z of adj) {
+        pool.push(...(byZone.get(z) ?? []));
+      }
+    }
+
+    // unique pool by taskId
+    const seen = new Set<number>();
+    pool = pool.filter(t => {
+      if (seen.has(t.taskId)) return false;
+      seen.add(t.taskId);
+      return true;
+    });
+
+    // compute distances from seed and keep closest
+    const ranked = pool
+      .map(t => ({ t, d: estimateTravelMinutes(seed, t) }))
+      .filter(x => x.d <= params.nearbySeedMaxMin)
+      .sort((a, b) => a.d - b.d)
+      .slice(0, params.neighborLimit)
+      .map(x => x.t);
+
+    // build combinations
+    const candidates2 = comb2(ranked);
+    const candidates3 = comb3(ranked);
+
+    // groups of 2
+    for (const [a, b] of candidates2) {
+      addGroup([seed, a, b].slice(0, 2), seed, seedZone, groupMap, params); // (seed,a) and (seed,b) separately? no
+    }
+
+    // better: build groups including seed explicitly
+    for (const a of ranked) {
+      addGroup([seed, a], seed, seedZone, groupMap);
+    }
+    for (const [a, b] of candidates2) {
+      addGroup([seed, a, b], seed, seedZone, groupMap);
+    }
+    for (const [a, b, c] of candidates3) {
+      // group size 4 attempt: seed + a + b + c
+      const g4 = [seed, a, b, c];
+      if (allowFourth(g4, params.allowFourthIfTravelLeMin)) {
+        addGroup(g4, seed, seedZone, groupMap);
+      }
+      // always add 3-size variants too
+      addGroup([seed, a, b], seed, seedZone, groupMap);
+      addGroup([seed, a, c], seed, seedZone, groupMap);
+      addGroup([seed, b, c], seed, seedZone, groupMap);
+    }
+  }
+
+  // to array + sort + limit
+  const all = Array.from(groupMap.values())
+    .sort((x, y) => y.score - x.score)
+    .slice(0, params.maxGroupsTotal);
+
+  return all;
+}
+
+function addGroup(groupTasks: TaskInput[], seed: TaskInput, seedZone: number, groupMap: Map<string, CandidateGroup>) {
+  // require size 2..4
+  if (groupTasks.length < 2 || groupTasks.length > 4) return;
+
+  const ids = groupTasks.map(t => t.taskId).sort((a, b) => a - b);
+  const key = ids.join("-");
+  if (groupMap.has(key)) return;
+
+  const { avgTravelMin, maxTravelMin } = travelStats(groupTasks);
+
+  const zones = new Set(groupTasks.map(t => t.zone));
+  const sameZone = zones.size === 1;
+
+  const score = scoreGroup(avgTravelMin, maxTravelMin, sameZone);
+
+  groupMap.set(key, {
+    taskIds: ids,
+    zone: seedZone,
+    seedTaskId: seed.taskId,
+    avgTravelMin,
+    maxTravelMin,
+    score
+  });
+}
+
+function allowFourth(tasks: TaskInput[], thresholdMin: number): boolean {
+  if (tasks.length !== 4) return false;
+  // check if the 4th task is within threshold of any of the other 3
+  const t4 = tasks[3];
+  for (let i = 0; i < 3; i++) {
+    const d = estimateTravelMinutes(t4, tasks[i]);
+    if (d <= thresholdMin) return true;
+  }
+  return false;
+}
+
+function travelStats(tasks: TaskInput[]): { avgTravelMin: number; maxTravelMin: number } {
+  const dists: number[] = [];
+  for (let i = 0; i < tasks.length; i++) {
+    for (let j = i + 1; j < tasks.length; j++) {
+      dists.push(estimateTravelMinutes(tasks[i], tasks[j]));
+    }
+  }
+  const avg = dists.reduce((s, x) => s + x, 0) / Math.max(1, dists.length);
+  const max = dists.length ? Math.max(...dists) : 0;
+  return { avgTravelMin: Math.round(avg * 10) / 10, maxTravelMin: max };
+}
+
+function comb2<T>(arr: T[]): [T, T][] {
+  const out: [T, T][] = [];
+  for (let i = 0; i < arr.length; i++) for (let j = i + 1; j < arr.length; j++) out.push([arr[i], arr[j]]);
+  return out;
+}
+
+function comb3<T>(arr: T[]): [T, T, T][] {
+  const out: [T, T, T][] = [];
+  for (let i = 0; i < arr.length; i++)
+    for (let j = i + 1; j < arr.length; j++)
+      for (let k = j + 1; k < arr.length; k++) out.push([arr[i], arr[j], arr[k]]);
+  return out;
+}
+
+function haversineMeters(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const R = 6371000;
+  const toRad = (d: number) => (d * Math.PI) / 180;
+  const dLat = toRad(lat2 - lat1);
+  const dLon = toRad(lon2 - lon1);
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
+  return 2 * R * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+
+Nota: ho lasciato il travel “stimato” semplice; è perfetto per iniziare.
