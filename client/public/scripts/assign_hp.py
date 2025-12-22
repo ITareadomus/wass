@@ -447,13 +447,10 @@ def can_add_task(cleaner: Cleaner, task: Task) -> bool:
     current_count = len(cleaner.route)
     
     # LIMITE GIORNALIERO GLOBALE (EO + HP)
-    # Usa daily_tasks se popolato, altrimenti usa route + eo_last_sequence come conteggio
-    if cleaner.daily_tasks:
-        daily_tasks = list(cleaner.daily_tasks) + list(cleaner.route)
-    else:
-        daily_tasks = list(cleaner.route)
+    # daily_tasks = EO tasks + HP route corrente (per cluster check cross-fase)
+    daily_tasks = list(cleaner.daily_tasks) + list(cleaner.route)
     
-    total_daily_count = cleaner.eo_last_sequence + current_count
+    total_daily_count = len(daily_tasks)
     
     # Wrapper per travel_minutes compatibile con can_add_task_daily
     def travel_fn(t1, t2):
@@ -703,7 +700,7 @@ def load_cleaners(ref_date: str) -> List[Cleaner]:
 
 
 def seed_cleaners_from_eo(cleaners: List[Cleaner], ref_date: str):
-    """Leggi dalla timeline via API per determinare available_from e last_eo_address."""
+    """Leggi dalla timeline via API per determinare available_from, last_eo_address e popolare daily_tasks."""
     timeline_data = load_timeline(ref_date)
     blocks = timeline_data.get("cleaners_assignments", [])
 
@@ -735,6 +732,28 @@ def seed_cleaners_from_eo(cleaners: List[Cleaner], ref_date: str):
                     cl.last_eo_lat = float(last_lat) if last_lat is not None else None
                     cl.last_eo_lng = float(last_lng) if last_lng is not None else None
                     cl.eo_last_sequence = max_sequence
+                    
+                    # NUOVO: Popola daily_tasks con le task EO dalla timeline per cluster check
+                    eo_task_objects = []
+                    for t in all_tasks_sorted:
+                        try:
+                            eo_task = Task(
+                                task_id=str(t.get("task_id", "")),
+                                logistic_code=str(t.get("logistic_code", "")),
+                                lat=float(t.get("lat", 0)),
+                                lng=float(t.get("lng", 0)),
+                                cleaning_time=int(t.get("cleaning_time", 60) or 60),
+                                checkout_dt=parse_dt(t.get("checkout_date"), t.get("checkout_time")),
+                                checkin_dt=parse_dt(t.get("checkin_date"), t.get("checkin_time")),
+                                is_premium=bool(t.get("premium", False)),
+                                apt_type=t.get("type_apt"),
+                                address=t.get("address"),
+                                alias=t.get("alias"),
+                            )
+                            eo_task_objects.append(eo_task)
+                        except Exception:
+                            pass  # Skip malformed tasks
+                    cl.daily_tasks = eo_task_objects
                     break
 
 
