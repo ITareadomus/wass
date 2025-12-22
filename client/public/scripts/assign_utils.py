@@ -2,6 +2,8 @@
 """
 Helper comuni per assign_eo.py, assign_hp.py, assign_lp.py
 """
+from typing import List, Callable, Any
+from collections import deque
 
 # --- COSTANTI GLOBALI TUNABILI ---
 
@@ -18,6 +20,111 @@ LOAD_WEIGHT = 10                   # peso delle ore nel punteggio
 SAME_BUILDING_BONUS = -5           # bonus per cluster edificio/blocco
 
 ROLE_TRAINER_BONUS = -10           # bonus extra per il Formatore (prima -5)
+
+
+# --- COSTANTI CLUSTER GIORNALIERO ---
+
+CLUSTER_NEAR_MIN = 10              # min: soglia per cluster "normale" (grafo connesso)
+CLUSTER_VERY_NEAR_MIN = 5          # min: soglia per sbloccare la 4ª task
+BASE_MAX_TASKS_PER_DAY = 3         # max task/giorno normalmente
+ABSOLUTE_MAX_TASKS_PER_DAY = 4     # max assoluto task/giorno (solo con cluster)
+
+
+# --- HELPER CLUSTER GIORNALIERO ---
+
+def is_connected_cluster(tasks: List[Any], travel_minutes_fn: Callable[[Any, Any], int], threshold_min: int) -> bool:
+    """
+    Verifica se le task formano un grafo connesso con soglia threshold_min.
+    Due task sono collegate se travel_minutes_fn(t1, t2) <= threshold_min.
+    Ritorna True se tutte le task sono raggiungibili da qualsiasi altra.
+    """
+    if len(tasks) <= 1:
+        return True
+    
+    adj = {i: [] for i in range(len(tasks))}
+    for i in range(len(tasks)):
+        for j in range(i + 1, len(tasks)):
+            travel = travel_minutes_fn(tasks[i], tasks[j])
+            if travel <= threshold_min:
+                adj[i].append(j)
+                adj[j].append(i)
+    
+    visited = set()
+    queue = deque([0])
+    visited.add(0)
+    
+    while queue:
+        node = queue.popleft()
+        for neighbor in adj[node]:
+            if neighbor not in visited:
+                visited.add(neighbor)
+                queue.append(neighbor)
+    
+    return len(visited) == len(tasks)
+
+
+def has_edge_within(tasks: List[Any], candidate: Any, travel_minutes_fn: Callable[[Any, Any], int], threshold_min: int) -> bool:
+    """
+    Ritorna True se il candidato è entro threshold_min da almeno una task in tasks.
+    """
+    if not tasks:
+        return True
+    
+    for t in tasks:
+        if travel_minutes_fn(candidate, t) <= threshold_min:
+            return True
+    return False
+
+
+def can_add_task_daily(daily_tasks: List[Any], candidate: Any, travel_minutes_fn: Callable[[Any, Any], int]) -> bool:
+    """
+    Verifica se è possibile aggiungere una task al totale giornaliero del cleaner.
+    
+    Regole:
+    - Se |daily_tasks| < 3 → puoi aggiungere
+    - Se |daily_tasks| == 3 → puoi aggiungere la 4ª solo se:
+        1. daily_tasks è un cluster connesso a 10 min
+        2. candidate è ≤ 5 min da almeno una task in daily_tasks
+        3. daily_tasks + candidate resta un cluster connesso a 10 min
+    - Se |daily_tasks| >= 4 → stop
+    """
+    n = len(daily_tasks)
+    
+    if n < BASE_MAX_TASKS_PER_DAY:
+        return True
+    
+    if n == BASE_MAX_TASKS_PER_DAY:
+        if not is_connected_cluster(daily_tasks, travel_minutes_fn, CLUSTER_NEAR_MIN):
+            return False
+        if not has_edge_within(daily_tasks, candidate, travel_minutes_fn, CLUSTER_VERY_NEAR_MIN):
+            return False
+        if not is_connected_cluster(daily_tasks + [candidate], travel_minutes_fn, CLUSTER_NEAR_MIN):
+            return False
+        return True
+    
+    return False
+
+
+def get_daily_tasks_count(cleaner) -> int:
+    """
+    Ritorna il numero totale di task giornaliere del cleaner.
+    Cerca prima daily_tasks, poi total_daily_tasks + route.
+    """
+    if hasattr(cleaner, 'daily_tasks') and cleaner.daily_tasks is not None:
+        return len(cleaner.daily_tasks)
+    total = getattr(cleaner, 'total_daily_tasks', 0)
+    route_count = len(getattr(cleaner, 'route', []))
+    return total + route_count
+
+
+def get_daily_tasks_list(cleaner) -> List[Any]:
+    """
+    Ritorna la lista di tutte le task giornaliere del cleaner.
+    Se daily_tasks esiste, la usa. Altrimenti concatena le task da diverse fasi.
+    """
+    if hasattr(cleaner, 'daily_tasks') and cleaner.daily_tasks is not None:
+        return list(cleaner.daily_tasks)
+    return list(getattr(cleaner, 'route', []))
 
 
 # --- HELPER CARICO ---

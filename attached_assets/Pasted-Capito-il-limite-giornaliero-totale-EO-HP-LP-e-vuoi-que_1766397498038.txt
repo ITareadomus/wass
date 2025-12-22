@@ -1,0 +1,165 @@
+Capito: il limite è giornaliero totale (EO+HP+LP) e vuoi questa regola:
+
+max 3 task/day normalmente
+
+si può andare a 4 task/day solo se:
+
+le 3 già assegnate sono “clusterizzate” (travel time < 10 min)
+
+esiste una 4ª task molto vicina: travel time ≤ 5 min da almeno una delle task già in cluster
+
+dopo aver aggiunto la 4ª, il gruppo resta “coeso” (non diventa una cosa sparsa)
+
+Quindi esempi validi:
+
+3 EO vicine + 1 LP vicina (≤5’ da una delle EO) ✅
+
+1 EO + 2 HP (tutte tra loro <10’) + 1 LP (≤5’ dal gruppo) ✅
+
+E soprattutto: NON 4 EO + 4 HP + 4 LP perché il cap è globale.
+
+Come tradurla in regole precise (senza ambiguità)
+Definizioni
+
+NEAR_10 = 10 minuti (cluster “normale”)
+
+VERY_NEAR_5 = 5 minuti (bonus per sbloccare la 4ª)
+
+Regola per accettare una nuova task
+
+Sia T l’insieme delle task già assegnate al cleaner quel giorno (EO+HP+LP).
+
+Se |T| < 3 → puoi aggiungere.
+Se |T| == 3 → puoi aggiungere la 4ª solo se:
+
+T è un cluster 10-min (vedi sotto)
+
+la candidata c è ≤ 5 min da almeno una task in T
+
+T ∪ {c} resta un cluster 10-min (opzionale ma consigliato)
+
+Se |T| >= 4 → stop.
+
+Che significa “cluster 10-min” (scelta consigliata)
+
+Per evitare interpretazioni strane, ti consiglio questa definizione robusta:
+
+Cluster 10-min = “grafo connesso” con soglia 10
+
+costruisci un grafo dove due task sono collegate se travel <= 10
+
+T è cluster se il grafo su T è connesso
+
+✅ Pro: non richiede che tutte le coppie siano entro 10 (che spesso è troppo restrittivo).
+Se vuoi più rigidità: usa “diametro ≤ 10” (tutte le coppie ≤ 10), ma rischi di negare cluster buoni.
+
+Implementazione pratica (scaletta “cosa modificare e come”)
+1) assign_utils.py: parametri + funzioni di policy globali
+
+Aggiungi parametri:
+
+CLUSTER_NEAR_MIN = 10
+
+CLUSTER_VERY_NEAR_MIN = 5
+
+BASE_MAX_TASKS_PER_DAY = 3
+
+ABSOLUTE_MAX_TASKS_PER_DAY = 4
+
+Aggiungi helper (fondamentali):
+
+is_connected_cluster(tasks, travel_minutes_fn, threshold_min)
+
+ritorna True se le task sono connesse nel grafo (BFS/DFS)
+
+has_edge_within(tasks, candidate, travel_minutes_fn, threshold_min)
+
+True se min(travel(candidate, t) for t in tasks) <= threshold_min
+
+can_add_task_daily(cleaner_daily_tasks, candidate, travel_minutes_fn)
+
+qui dentro applichi tutta la regola (3 oppure 4 con condizioni 10/5)
+
+Pseudo-regola:
+
+def can_add_task_daily(T, c, travel_fn):
+    n = len(T)
+    if n < 3:
+        return True
+
+    if n == 3:
+        if not is_connected_cluster(T, travel_fn, 10):
+            return False
+        if not has_edge_within(T, c, travel_fn, 5):
+            return False
+        # consigliato:
+        if not is_connected_cluster(T + [c], travel_fn, 10):
+            return False
+        return True
+
+    return False
+
+
+Nota: T DEVE essere la lista “giornaliera totale”, non solo EO o HP.
+
+2) Unifica lo “stato giornaliero” del cleaner (globale)
+
+In qualunque punto tu tenga le route separate (EO_route / HP_route / LP_route), devi avere anche:
+
+cleaner.daily_tasks (lista di tutte le task del giorno)
+
+oppure una funzione get_daily_tasks(cleaner) che le concatena in modo coerente
+
+Obiettivo: ogni modulo (EO/HP/LP) chiama can_add_task_daily(...) passando le task totali.
+
+3) Modifica EO/HP/LP: il check di cap NON è più per modulo
+
+Nei file:
+
+assign_eo.py
+
+assign_hp.py
+
+assign_lp.py
+
+Sostituisci le condizioni tipo “len(route) < 3” / “len(route) < 4 se cluster” con:
+
+T = cleaner.daily_tasks (oppure get_daily_tasks(cleaner))
+
+if can_add_task_daily(T, task, travel_minutes_fn): ...
+
+Così ottieni naturalmente:
+
+3 EO + 1 LP vicino ✅
+
+1 EO + 2 HP + 1 LP vicino ✅
+
+mai oltre 4 ✅
+
+mai 4 per modulo ✅
+
+4) (Opzionale) Selezione più “cluster-friendly”
+
+Se vuoi che l’algoritmo “tenda” a compattare:
+
+quando scegli quale task assegnare a un cleaner, aggiungi un bonus/scoring:
+
+preferisci task con min_travel_to_daily_tasks piccolo
+
+e, quando sei a 3, considera candidate entro 5 come prioritarie
+
+Questo non è obbligatorio per rispettare il vincolo, ma migliora molto la qualità.
+
+Dettaglio importante (per evitare casi brutti)
+
+Con la regola “connesso a 10”, può succedere che 4 task formino una catena A–B–C–D dove A e D sono lontane (ma connesse tramite intermedi). Se non lo vuoi:
+
+mantieni il cluster connesso a 10
+
+ma aggiungi una clausola extra per la 4ª:
+
+max(min_dist(task_i, other_tasks)) <= 10 per ogni task (ogni task deve avere almeno un “vicino” entro 10)
+
+oppure un limite sul “diametro” approssimato
+
+Se mi dici se vuoi evitare l’effetto “catena lunga”, ti dico quale variante è la più semplice da implementare nel tuo codice.
