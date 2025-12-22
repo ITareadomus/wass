@@ -1,7 +1,11 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, timestamp, integer, serial, boolean, date, jsonb } from "drizzle-orm/pg-core";
+import { pgTable, pgSchema, text, varchar, timestamp, integer, serial, boolean, date, jsonb, uuid, smallint, bigserial } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
+
+// ==================== OPTIMIZER SCHEMA ====================
+// Schema separato per le tabelle dell'algoritmo di ottimizzazione
+export const optimizerSchema = pgSchema("optimizer");
 
 // ==================== SELECTED_CLEANERS_REVISIONS ====================
 // Traccia le modifiche alla selezione giornaliera dei cleaners
@@ -182,3 +186,68 @@ export const timelineFileSchema = z.object({
 
 export type TimelineAssignment = z.infer<typeof timelineAssignmentSchema>;
 export type TimelineFile = z.infer<typeof timelineFileSchema>;
+
+// ==================== OPTIMIZER TABLES ====================
+// Tabelle nello schema 'optimizer' per l'algoritmo decisionale
+
+// Tabella: una riga = una run dell'algoritmo
+export const optimizerRun = optimizerSchema.table("optimizer_run", {
+  runId: uuid("run_id").primaryKey(),
+  workDate: date("work_date").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  algorithmVersion: text("algorithm_version").notNull(),
+  params: jsonb("params").notNull(),
+  status: text("status").notNull(), // 'success', 'partial', 'failed'
+  summary: jsonb("summary"),
+});
+
+export const insertOptimizerRunSchema = createInsertSchema(optimizerRun).omit({
+  createdAt: true,
+});
+export type InsertOptimizerRun = z.infer<typeof insertOptimizerRunSchema>;
+export type OptimizerRun = typeof optimizerRun.$inferSelect;
+
+// Log decisioni / reasoning (append-only)
+export const optimizerDecision = optimizerSchema.table("optimizer_decision", {
+  id: bigserial("id", { mode: "number" }).primaryKey(),
+  runId: uuid("run_id").notNull().references(() => optimizerRun.runId, { onDelete: "cascade" }),
+  phase: smallint("phase").notNull(),
+  eventType: text("event_type").notNull(),
+  payload: jsonb("payload").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const insertOptimizerDecisionSchema = createInsertSchema(optimizerDecision).omit({
+  id: true,
+  createdAt: true,
+});
+export type InsertOptimizerDecision = z.infer<typeof insertOptimizerDecisionSchema>;
+export type OptimizerDecision = typeof optimizerDecision.$inferSelect;
+
+// Assegnazioni finali prodotte dall'optimizer
+export const optimizerAssignment = optimizerSchema.table("optimizer_assignment", {
+  runId: uuid("run_id").notNull().references(() => optimizerRun.runId, { onDelete: "cascade" }),
+  cleanerId: integer("cleaner_id").notNull(),
+  taskId: integer("task_id").notNull(),
+  sequence: smallint("sequence").notNull(),
+  startTime: timestamp("start_time", { withTimezone: true }),
+  endTime: timestamp("end_time", { withTimezone: true }),
+  travelMinutesFromPrev: integer("travel_minutes_from_prev"),
+  reasons: text("reasons").array(),
+});
+
+export const insertOptimizerAssignmentSchema = createInsertSchema(optimizerAssignment);
+export type InsertOptimizerAssignment = z.infer<typeof insertOptimizerAssignmentSchema>;
+export type OptimizerAssignment = typeof optimizerAssignment.$inferSelect;
+
+// Task non assegnate + motivazione
+export const optimizerUnassigned = optimizerSchema.table("optimizer_unassigned", {
+  runId: uuid("run_id").notNull().references(() => optimizerRun.runId, { onDelete: "cascade" }),
+  taskId: integer("task_id").notNull(),
+  reasonCode: text("reason_code").notNull(),
+  details: jsonb("details"),
+});
+
+export const insertOptimizerUnassignedSchema = createInsertSchema(optimizerUnassigned);
+export type InsertOptimizerUnassigned = z.infer<typeof insertOptimizerUnassignedSchema>;
+export type OptimizerUnassigned = typeof optimizerUnassigned.$inferSelect;
