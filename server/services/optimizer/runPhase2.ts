@@ -1,4 +1,3 @@
-import { v4 as uuidv4 } from 'uuid';
 import pool from '../../../shared/pg-db';
 import { 
   runPhase2Algorithm, 
@@ -37,7 +36,9 @@ async function loadSelectedCleanerIds(workDate: string): Promise<number[]> {
   if (result.rows.length === 0 || !result.rows[0].cleaners) {
     return [];
   }
-  return result.rows[0].cleaners;
+  return (result.rows[0].cleaners || [])
+    .map((x: any) => Number(x))
+    .filter((n: number) => Number.isFinite(n));
 }
 
 async function loadCleanersForDate(workDate: string): Promise<CleanerInput[]> {
