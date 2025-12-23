@@ -11,20 +11,24 @@ export type TaskInput = {
 };
 
 export type Phase1Params = {
-  maxApts: number;
-  allowFourthIfTravelLeMin: number;
+  nearbySeedMaxMin: number;        // 15 (soglia vicino)
+  fallbackSeedMaxMin: number;      // 20 (soglia fallback)
+  minNearbyBeforeFallback: number; // 8 (quando attivare fallback)
+  createSingleGroups: boolean;     // true
   neighborLimit: number;
-  nearbySeedMaxMin: number;
   maxGroupsTotal: number;
+  allowFourthIfTravelLeMin: number; // 5
   useAdjacentZones: boolean;
 };
 
 export const DEFAULT_PHASE1_PARAMS: Phase1Params = {
-  maxApts: 3,
-  allowFourthIfTravelLeMin: 5,
+  nearbySeedMaxMin: 15,
+  fallbackSeedMaxMin: 20,
+  minNearbyBeforeFallback: 8,
+  createSingleGroups: true,
   neighborLimit: 15,
-  nearbySeedMaxMin: 12,
   maxGroupsTotal: 3000,
+  allowFourthIfTravelLeMin: 5,
   useAdjacentZones: true
 };
 
@@ -37,10 +41,29 @@ export type CandidateGroup = {
   avgTravelMin: number;
   maxTravelMin: number;
   score: number;
+  isSingle?: boolean;
+  reason?: string;
+};
+
+export type Phase1Event = {
+  eventType: string;
+  payload: Record<string, unknown>;
+};
+
+export type Phase1Result = {
+  groups: CandidateGroup[];
+  events: Phase1Event[];
+  stats: {
+    taskCount: number;
+    groupCount: number;
+    singleGroupCount: number;
+    fallbackSeedCount: number;
+    thresholds: { nearby: number; fallback: number };
+  };
 };
 
 const AVG_SPEED_KMH = 18;
-const NON_LINEAR_PATH_FACTOR = 1.5; // Percorsi non rettilinei (allineato a script Python)
+const NON_LINEAR_PATH_FACTOR = 1.5;
 
 export function estimateTravelMinutes(a: TaskInput, b: TaskInput): number {
   const meters = haversineMeters(a.lat, a.lng, b.lat, b.lng);
@@ -49,7 +72,11 @@ export function estimateTravelMinutes(a: TaskInput, b: TaskInput): number {
   return Math.max(1, Math.round(hours * 60));
 }
 
-export function generateCandidateGroups(tasks: TaskInput[], params: Phase1Params): CandidateGroup[] {
+export function generateCandidateGroups(tasks: TaskInput[], params: Phase1Params): Phase1Result {
+  const events: Phase1Event[] = [];
+  let fallbackSeedCount = 0;
+  let singleGroupCount = 0;
+
   const tasksWithZone = tasks.map(t => ({
     ...t,
     zone: (t.zone ?? computeZone(t.lat, t.lng))
@@ -83,23 +110,51 @@ export function generateCandidateGroups(tasks: TaskInput[], params: Phase1Params
       return true;
     });
 
-    const ranked = pool
+    const rankedAll = pool
       .map(t => ({ t, d: estimateTravelMinutes(seed, t) }))
-      .filter(x => x.d <= params.nearbySeedMaxMin)
-      .sort((a, b) => a.d - b.d)
-      .slice(0, params.neighborLimit)
-      .map(x => x.t);
+      .sort((a, b) => a.d - b.d);
 
-    for (const a of ranked) {
+    const nearby15 = rankedAll.filter(x => x.d <= params.nearbySeedMaxMin);
+
+    let ranked = nearby15;
+    let usedFallback = false;
+
+    if (nearby15.length < params.minNearbyBeforeFallback) {
+      ranked = rankedAll.filter(x => x.d <= params.fallbackSeedMaxMin);
+      usedFallback = ranked.length > nearby15.length;
+    }
+
+    if (usedFallback) {
+      fallbackSeedCount++;
+      events.push({
+        eventType: "PHASE1_USED_FALLBACK_20",
+        payload: {
+          seed_task: seed.taskId,
+          seed_logistic_code: seed.logisticCode,
+          seed_zone: seedZone,
+          nearby_count_15: nearby15.length,
+          neighbors_count_selected: ranked.length,
+          nearby_threshold: params.nearbySeedMaxMin,
+          fallback_threshold: params.fallbackSeedMaxMin
+        }
+      });
+    }
+
+    const neighbors = ranked.slice(0, params.neighborLimit).map(x => x.t);
+
+    let groupsAddedForSeed = 0;
+    const countBefore = groupMap.size;
+
+    for (const a of neighbors) {
       addGroup([seed, a], seed, seedZone, groupMap);
     }
 
-    const candidates2 = comb2(ranked);
+    const candidates2 = comb2(neighbors);
     for (const [a, b] of candidates2) {
       addGroup([seed, a, b], seed, seedZone, groupMap);
     }
 
-    const candidates3 = comb3(ranked);
+    const candidates3 = comb3(neighbors);
     for (const [a, b, c] of candidates3) {
       const g4 = [seed, a, b, c];
       if (allowFourth(g4, params.allowFourthIfTravelLeMin)) {
@@ -109,13 +164,58 @@ export function generateCandidateGroups(tasks: TaskInput[], params: Phase1Params
       addGroup([seed, a, c], seed, seedZone, groupMap);
       addGroup([seed, b, c], seed, seedZone, groupMap);
     }
+
+    groupsAddedForSeed = groupMap.size - countBefore;
+
+    if (groupsAddedForSeed === 0 && params.createSingleGroups) {
+      const singleKey = String(seed.taskId);
+      if (!groupMap.has(singleKey)) {
+        const singleScore = 15;
+        groupMap.set(singleKey, {
+          taskIds: [seed.taskId],
+          logisticCodes: [seed.logisticCode],
+          zone: seedZone,
+          seedTaskId: seed.taskId,
+          seedLogisticCode: seed.logisticCode,
+          avgTravelMin: 0,
+          maxTravelMin: 0,
+          score: singleScore,
+          isSingle: true,
+          reason: "ISOLATED_NO_NEIGHBORS_UNDER_20"
+        });
+        singleGroupCount++;
+        events.push({
+          eventType: "PHASE1_GROUP_SINGLE_CREATED",
+          payload: {
+            tasks: [seed.taskId],
+            logistic_codes: [seed.logisticCode],
+            zone: seedZone,
+            score: singleScore,
+            reason: "ISOLATED_NO_NEIGHBORS_UNDER_20"
+          }
+        });
+      }
+    }
   }
 
   const all = Array.from(groupMap.values())
     .sort((x, y) => y.score - x.score)
     .slice(0, params.maxGroupsTotal);
 
-  return all;
+  return {
+    groups: all,
+    events,
+    stats: {
+      taskCount: tasks.length,
+      groupCount: all.length,
+      singleGroupCount,
+      fallbackSeedCount,
+      thresholds: {
+        nearby: params.nearbySeedMaxMin,
+        fallback: params.fallbackSeedMaxMin
+      }
+    }
+  };
 }
 
 function addGroup(

@@ -1,22 +1,25 @@
 import { v4 as uuidv4 } from 'uuid';
-import { generateCandidateGroups, Phase1Params, DEFAULT_PHASE1_PARAMS, CandidateGroup } from './phase1';
-import { loadTasksForDate, createRun, updateRunStatus, insertDecisionsBatch, groupToDecision, OptimizerRun } from './db';
+import { generateCandidateGroups, Phase1Params, DEFAULT_PHASE1_PARAMS, Phase1Result as Phase1GeneratorResult } from './phase1';
+import { loadTasksForDate, createRun, updateRunStatus, insertDecisionsBatch, groupToDecision, eventToDecision, OptimizerRun } from './db';
 
-export interface Phase1Result {
+export interface Phase1RunResult {
   runId: string;
   workDate: string;
   tasksLoaded: number;
   groupsGenerated: number;
+  singleGroupCount: number;
+  fallbackSeedCount: number;
   decisionsInserted: number;
   durationMs: number;
   status: 'success' | 'partial' | 'failed';
   error?: string;
+  thresholds: { nearby: number; fallback: number };
 }
 
 export async function runPhase1(
   workDate: string, 
   params: Partial<Phase1Params> = {}
-): Promise<Phase1Result> {
+): Promise<Phase1RunResult> {
   const startTime = Date.now();
   const runId = uuidv4();
   
@@ -25,21 +28,27 @@ export async function runPhase1(
     ...params
   };
 
-  const result: Phase1Result = {
+  const result: Phase1RunResult = {
     runId,
     workDate,
     tasksLoaded: 0,
     groupsGenerated: 0,
+    singleGroupCount: 0,
+    fallbackSeedCount: 0,
     decisionsInserted: 0,
     durationMs: 0,
-    status: 'partial'
+    status: 'partial',
+    thresholds: {
+      nearby: fullParams.nearbySeedMaxMin,
+      fallback: fullParams.fallbackSeedMaxMin
+    }
   };
 
   try {
     const run: OptimizerRun = {
       runId,
       workDate,
-      algorithmVersion: 'phase1-shadow-v1',
+      algorithmVersion: 'phase1.5-shadow-v1',
       params: fullParams,
       status: 'partial'
     };
@@ -56,17 +65,28 @@ export async function runPhase1(
       return result;
     }
 
-    const groups: CandidateGroup[] = generateCandidateGroups(tasks, fullParams);
-    result.groupsGenerated = groups.length;
+    const phase1Result: Phase1GeneratorResult = generateCandidateGroups(tasks, fullParams);
+    result.groupsGenerated = phase1Result.stats.groupCount;
+    result.singleGroupCount = phase1Result.stats.singleGroupCount;
+    result.fallbackSeedCount = phase1Result.stats.fallbackSeedCount;
 
-    const decisions = groups.map(g => groupToDecision(runId, g));
-    result.decisionsInserted = await insertDecisionsBatch(decisions);
+    const groupDecisions = phase1Result.groups.map(g => groupToDecision(runId, g));
+    
+    const eventDecisions = phase1Result.events
+      .filter(e => e.eventType === 'PHASE1_USED_FALLBACK_20')
+      .map(e => eventToDecision(runId, e));
+    
+    const allDecisions = [...groupDecisions, ...eventDecisions];
+    result.decisionsInserted = await insertDecisionsBatch(allDecisions);
 
     const summary = {
-      tasks_loaded: result.tasksLoaded,
-      groups_generated: result.groupsGenerated,
+      task_count: result.tasksLoaded,
+      group_count: result.groupsGenerated,
+      single_group_count: result.singleGroupCount,
+      fallback_seed_count: result.fallbackSeedCount,
       decisions_inserted: result.decisionsInserted,
-      duration_ms: Date.now() - startTime
+      duration_ms: Date.now() - startTime,
+      thresholds: result.thresholds
     };
 
     result.status = 'success';
@@ -93,6 +113,8 @@ export async function getPhase1Stats(workDate: string): Promise<{
     runId: string;
     status: string;
     groupsGenerated: number;
+    singleGroupCount: number;
+    fallbackSeedCount: number;
     createdAt?: string;
   };
 }> {
@@ -108,7 +130,9 @@ export async function getPhase1Stats(workDate: string): Promise<{
     latestRun: {
       runId: run.runId,
       status: run.status,
-      groupsGenerated: run.summary?.groups_generated || 0
+      groupsGenerated: run.summary?.group_count || 0,
+      singleGroupCount: run.summary?.single_group_count || 0,
+      fallbackSeedCount: run.summary?.fallback_seed_count || 0
     }
   };
 }
