@@ -1,0 +1,220 @@
+Soft rule EO/HP/LP in FASE 3 (da settings DB)
+
+Devi aggiungere la logica EO/HP/LP nella FASE 3 (scheduling) del progetto Node/TS già esistente, in shadow mode (scrivere solo su optimizer.*).
+Questa logica NON deve diventare un vincolo hard: non deve rendere task “impossibili”, ma solo influenzare la scelta tra permutazioni/timeline valide e produrre warning/spiegazioni.
+
+Contesto attuale
+
+FASE 3 esiste già con:
+
+phase3.ts: simulateSequence, permutazioni, check checkout/checkin, travel time
+
+runPhase3.ts: carica selected_cleaners, legge assegnazioni FASE 2, persiste optimizer_assignment e optimizer_unassigned
+
+La pipeline deve restare parallela: non toccare assegnazione in produzione.
+
+Obiettivo
+
+Integrare la policy oraria:
+
+EO: può iniziare in una finestra (es. 10:00–10:59)
+
+HP: può iniziare in una finestra (es. 11:00–15:29)
+
+LP: può iniziare da un orario minimo (es. >= 11:00)
+
+MA come soft constraint:
+
+se una task inizia fuori finestra → aggiungi penalità + reason/warning
+
+NON fallire la sequenza se checkout/checkin sono rispettati
+
+1) Caricare le finestre EO/HP/LP dal DB (NO hardcode)
+
+Crea un helper tipo:
+
+server/services/optimizer/priorityWindows.ts
+
+con:
+
+loadPriorityStartWindows(pg): Promise<PriorityWindows>
+
+legge la tabella app_settings (come fa già il progetto per altre impostazioni)
+
+recupera dal JSON settings i valori per:
+
+EO start/end
+
+HP start/end
+
+LP start (e end=null)
+
+Se mancano chiavi → fallback sensato (ma logga un evento SETTINGS_FALLBACK_USED in optimizer_decision phase=3)
+
+Nota: non conosco esattamente i path delle chiavi nel JSON app_settings del progetto, quindi:
+
+cerca nel codice dove oggi viene usata la logica oraria EO/HP/LP dell’assegnazione attuale (es. servizi “daily assignments” / UI)
+
+riusa gli stessi path/chiavi
+
+Struttura finale in memoria:
+
+type Priority = "EO" | "HP" | "LP";
+type Window = { startMin: number; endMin?: number|null; graceMin?: number };
+type PriorityWindows = Record<Priority, Window>;
+
+2) Mappare la priority della task (EO/HP/LP)
+
+Nel load delle tasks (FASE 3), aggiungi priorityType:
+
+dalla colonna già esistente (es: priority_type o equivalente) o dal campo che usate ora in produzione
+
+mappa ai valori "EO" | "HP" | "LP" (oppure null se non ha priority)
+
+3) Soft penalty: funzione di penalità per start time
+
+In phase3.ts aggiungi:
+
+function priorityPenalty(
+  priority: Priority | null,
+  startTimeMin: number,
+  windows: PriorityWindows
+): { penalty: number; reasons: string[] }
+
+
+Regole (soft):
+
+se priority null → penalty=0
+
+se dentro finestra (considerando grace) → penalty=0
+
+se fuori:
+
+calcola distanza (minuti) dalla finestra
+
+penalty = min(MAX, distance * K)
+
+Parametri K e MAX configurabili nel codice (per ora) ma NON hard-blocking.
+
+Esempio:
+
+EO: K=2, MAX=120
+
+HP: K=1, MAX=90
+
+LP: K=1, MAX=60
+
+reasons:
+
+EO_OUT_OF_PREFERRED_START_WINDOW
+
+HP_OUT_OF_PREFERRED_START_WINDOW
+
+LP_BEFORE_MIN_START
+
+NON usare penalty per far fallire la sequenza.
+
+4) Integrare nel simulatore timeline
+
+In simulateSequence() (phase3.ts):
+
+dopo aver calcolato lo start reale della task (earliestStart)
+
+calcola priorityPenalty per quella task
+
+accumula:
+
+totalPriorityPenalty
+
+reasons per task
+
+inserisci reasons in ogni schedule row (es. metadata.reasons[] o campo apposito)
+
+L’output della simulazione deve includere:
+
+totalPriorityPenalty
+
+priorityViolationsCount
+
+per-task reasons
+
+5) Cambiare la scelta della “migliore permutazione”
+
+Quando scegli tra permutazioni valide (2–4 task), ordina per:
+
+endTime minore (o lateness)
+
+totalPriorityPenalty minore ✅ (nuovo)
+
+totalWait minore
+
+totalTravel minore
+
+Questo garantisce che EO/HP/LP influenzino la scelta solo se ci sono alternative valide.
+
+6) Persistenza (shadow) e decision log
+
+Quando persisti optimizer.optimizer_assignment:
+
+salva anche i reasons (es. dentro metadata JSON):
+
+priorityType
+
+priorityReasons[]
+
+priorityPenalty per task
+
+In optimizer.optimizer_decision (phase=3) aggiungi nei payload:
+
+per PHASE3_GROUP_SCHEDULED:
+
+priorityPenaltyTotal
+
+priorityViolations (array con {taskId, priority, startTime, window, reason})
+
+Se usi fallback settings:
+
+PHASE3_SETTINGS_FALLBACK_USED con payload delle chiavi mancanti
+
+7) RunPhase3: carica windows una volta per run
+
+In runPhase3.ts:
+
+carica PriorityWindows una sola volta all’inizio
+
+passale a phase3.scheduleGroupsForCleaner o simulateSequence
+
+8) Non cambiare i vincoli hard
+
+Vincoli hard restano solo:
+
+checkout/checkin
+
+travel
+
+cleaning_time
+Nessun fail dovuto a EO/HP/LP.
+
+9) Output / debug
+
+Aggiorna optimizer_run.summary (se già presente) con metriche:
+
+priority_penalty_total
+
+priority_violations_total
+
+violations_by_type: { EO: n, HP: n, LP: n }
+
+10) Test minimo
+
+Aggiungi uno script/test che:
+
+esegue run-phase3 su una data
+
+verifica che in optimizer.optimizer_assignment.metadata compaiano priorityReasons quando una task è fuori finestra
+
+verifica che la sequenza continui comunque (non diventa unassigned solo per priority)
+
+Vincolo: non hardcoded
+
+Le finestre orarie devono arrivare dal DB via settings. Se mancano, fallback + log, ma mai hardcode “silenzioso”.
