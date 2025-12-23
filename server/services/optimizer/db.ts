@@ -1,5 +1,5 @@
 import pool from '../../../shared/pg-db';
-import { TaskInput, Phase1Params, CandidateGroup } from './phase1';
+import { TaskInput, Phase1Params, CandidateGroup, Phase1Event } from './phase1';
 
 export interface OptimizerRun {
   runId: string;
@@ -101,20 +101,39 @@ export function groupToDecision(
   runId: string,
   group: CandidateGroup
 ): OptimizerDecision {
+  const payload: Record<string, any> = {
+    tasks: group.taskIds,
+    logistic_codes: group.logisticCodes,
+    zone: group.zone,
+    avg_travel_min: group.avgTravelMin,
+    max_travel_min: group.maxTravelMin,
+    score: group.score,
+    seed_task: group.seedTaskId,
+    seed_logistic_code: group.seedLogisticCode
+  };
+  
+  if (group.isSingle) {
+    payload.is_single = true;
+    payload.reason = group.reason;
+  }
+  
   return {
     runId,
     phase: 1,
-    eventType: 'PHASE1_GROUP_CANDIDATE',
-    payload: {
-      tasks: group.taskIds,
-      logistic_codes: group.logisticCodes,
-      zone: group.zone,
-      avg_travel_min: group.avgTravelMin,
-      max_travel_min: group.maxTravelMin,
-      score: group.score,
-      seed_task: group.seedTaskId,
-      seed_logistic_code: group.seedLogisticCode
-    }
+    eventType: group.isSingle ? 'PHASE1_GROUP_SINGLE_CREATED' : 'PHASE1_GROUP_CANDIDATE',
+    payload
+  };
+}
+
+export function eventToDecision(
+  runId: string,
+  event: Phase1Event
+): OptimizerDecision {
+  return {
+    runId,
+    phase: 1,
+    eventType: event.eventType,
+    payload: event.payload as Record<string, any>
   };
 }
 
