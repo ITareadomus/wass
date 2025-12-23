@@ -1,4 +1,5 @@
 import { estimateTravelMinutes, TaskInput } from './phase1';
+import { Priority, PriorityWindows, priorityPenalty, PriorityPenaltyResult } from './priorityWindows';
 
 export interface TaskForScheduling {
   taskId: number;
@@ -8,6 +9,7 @@ export interface TaskForScheduling {
   cleaningTimeMinutes: number;
   checkoutTime: string | null;
   checkinTime: string | null;
+  priorityType: Priority | null;
 }
 
 export interface CleanerForScheduling {
@@ -24,6 +26,19 @@ export interface ScheduleRow {
   endTime: Date;
   travelMinutesFromPrev: number;
   waitMinutes: number;
+  priorityType: Priority | null;
+  priorityPenalty: number;
+  priorityReasons: string[];
+}
+
+export interface PriorityViolation {
+  taskId: number;
+  priority: Priority;
+  startTimeMin: number;
+  windowStart: number;
+  windowEnd: number | null;
+  distanceMin: number;
+  reason: string;
 }
 
 export interface SimulationResult {
@@ -31,6 +46,8 @@ export interface SimulationResult {
   scheduleRows: ScheduleRow[];
   totalTravel: number;
   totalWait: number;
+  totalPriorityPenalty: number;
+  priorityViolations: PriorityViolation[];
   endTime: Date | null;
   failReason?: string;
   failedTaskId?: number;
@@ -48,6 +65,8 @@ export interface GroupScheduleResult {
   scheduleRows: ScheduleRow[];
   totalTravel: number;
   totalWait: number;
+  totalPriorityPenalty: number;
+  priorityViolations: PriorityViolation[];
   endTime: Date;
   droppedTasks: number[];
   permutationsChecked: number;
@@ -62,6 +81,9 @@ export interface Phase3Result {
     tasksScheduled: number;
     tasksUnassigned: number;
     groupsScheduled: number;
+    priorityPenaltyTotal: number;
+    priorityViolationsTotal: number;
+    violationsByType: { EO: number; HP: number; LP: number };
   };
 }
 
@@ -91,13 +113,16 @@ export function simulateSequence(
   tasks: TaskForScheduling[],
   startTimeStr: string,
   tasksMap: Map<number, TaskForScheduling>,
-  previousTask: TaskForScheduling | null = null
+  previousTask: TaskForScheduling | null = null,
+  priorityWindows: PriorityWindows | null = null
 ): SimulationResult {
   const startMinutes = parseTimeToMinutes(startTimeStr) ?? 540;
   let currentMinutes = startMinutes;
   const scheduleRows: ScheduleRow[] = [];
   let totalTravel = 0;
   let totalWait = 0;
+  let totalPriorityPenalty = 0;
+  const priorityViolations: PriorityViolation[] = [];
 
   for (let i = 0; i < tasks.length; i++) {
     const task = tasks[i];
@@ -134,10 +159,34 @@ export function simulateSequence(
         scheduleRows,
         totalTravel,
         totalWait,
+        totalPriorityPenalty,
+        priorityViolations,
         endTime: null,
         failReason: 'TIME_WINDOW_IMPOSSIBLE',
         failedTaskId: task.taskId
       };
+    }
+
+    let taskPenalty = 0;
+    let taskReasons: string[] = [];
+    
+    if (priorityWindows && task.priorityType) {
+      const penaltyResult = priorityPenalty(task.priorityType, earliestStart, priorityWindows);
+      taskPenalty = penaltyResult.penalty;
+      taskReasons = penaltyResult.reasons;
+      totalPriorityPenalty += taskPenalty;
+      
+      if (penaltyResult.violation) {
+        priorityViolations.push({
+          taskId: task.taskId,
+          priority: penaltyResult.violation.priority,
+          startTimeMin: penaltyResult.violation.startTimeMin,
+          windowStart: penaltyResult.violation.windowStart,
+          windowEnd: penaltyResult.violation.windowEnd,
+          distanceMin: penaltyResult.violation.distanceMin,
+          reason: taskReasons[0] || ''
+        });
+      }
     }
 
     scheduleRows.push({
@@ -147,7 +196,10 @@ export function simulateSequence(
       startTime: minutesToDate(workDate, earliestStart),
       endTime: minutesToDate(workDate, endMinutes),
       travelMinutesFromPrev: travelMin,
-      waitMinutes: waitMin
+      waitMinutes: waitMin,
+      priorityType: task.priorityType,
+      priorityPenalty: taskPenalty,
+      priorityReasons: taskReasons
     });
 
     currentMinutes = endMinutes;
@@ -158,6 +210,8 @@ export function simulateSequence(
     scheduleRows,
     totalTravel,
     totalWait,
+    totalPriorityPenalty,
+    priorityViolations,
     endTime: minutesToDate(workDate, currentMinutes)
   };
 }
@@ -176,23 +230,43 @@ function permutations<T>(arr: T[]): T[][] {
   return result;
 }
 
-export function scheduleSingleGroup(
-  workDate: string,
-  taskIds: number[],
-  tasksMap: Map<number, TaskForScheduling>,
-  cleanerStartTime: string,
-  previousTask: TaskForScheduling | null = null
-): { 
+export interface ScheduleGroupResult {
   ok: boolean; 
   scheduleRows: ScheduleRow[]; 
   chosenOrder: number[];
   totalTravel: number;
   totalWait: number;
+  totalPriorityPenalty: number;
+  priorityViolations: PriorityViolation[];
   endTime: Date | null;
   permutationsChecked: number;
   droppedTasks: number[];
   failReason?: string;
-} {
+}
+
+function comparePermutations(a: SimulationResult, b: SimulationResult): number {
+  if (!a.endTime || !b.endTime) return 0;
+  
+  if (a.endTime.getTime() !== b.endTime.getTime()) {
+    return a.endTime.getTime() - b.endTime.getTime();
+  }
+  if (a.totalPriorityPenalty !== b.totalPriorityPenalty) {
+    return a.totalPriorityPenalty - b.totalPriorityPenalty;
+  }
+  if (a.totalWait !== b.totalWait) {
+    return a.totalWait - b.totalWait;
+  }
+  return a.totalTravel - b.totalTravel;
+}
+
+export function scheduleSingleGroup(
+  workDate: string,
+  taskIds: number[],
+  tasksMap: Map<number, TaskForScheduling>,
+  cleanerStartTime: string,
+  previousTask: TaskForScheduling | null = null,
+  priorityWindows: PriorityWindows | null = null
+): ScheduleGroupResult {
   const tasks = taskIds.map(id => tasksMap.get(id)).filter(Boolean) as TaskForScheduling[];
   
   if (tasks.length === 0) {
@@ -202,6 +276,8 @@ export function scheduleSingleGroup(
       chosenOrder: [],
       totalTravel: 0,
       totalWait: 0,
+      totalPriorityPenalty: 0,
+      priorityViolations: [],
       endTime: null,
       permutationsChecked: 0,
       droppedTasks: taskIds,
@@ -210,13 +286,15 @@ export function scheduleSingleGroup(
   }
 
   if (tasks.length === 1) {
-    const result = simulateSequence(workDate, tasks, cleanerStartTime, tasksMap, previousTask);
+    const result = simulateSequence(workDate, tasks, cleanerStartTime, tasksMap, previousTask, priorityWindows);
     return {
       ok: result.ok,
       scheduleRows: result.scheduleRows,
       chosenOrder: result.ok ? [tasks[0].taskId] : [],
       totalTravel: result.totalTravel,
       totalWait: result.totalWait,
+      totalPriorityPenalty: result.totalPriorityPenalty,
+      priorityViolations: result.priorityViolations,
       endTime: result.endTime,
       permutationsChecked: 1,
       droppedTasks: result.ok ? [] : [tasks[0].taskId],
@@ -231,13 +309,10 @@ export function scheduleSingleGroup(
 
   for (const perm of perms) {
     permutationsChecked++;
-    const result = simulateSequence(workDate, perm, cleanerStartTime, tasksMap, previousTask);
+    const result = simulateSequence(workDate, perm, cleanerStartTime, tasksMap, previousTask, priorityWindows);
     
     if (result.ok) {
-      if (!bestResult || 
-          (result.endTime && bestResult.endTime && result.endTime < bestResult.endTime) ||
-          (result.endTime && bestResult.endTime && result.endTime.getTime() === bestResult.endTime.getTime() && result.totalWait < bestResult.totalWait) ||
-          (result.endTime && bestResult.endTime && result.endTime.getTime() === bestResult.endTime.getTime() && result.totalWait === bestResult.totalWait && result.totalTravel < bestResult.totalTravel)) {
+      if (!bestResult || comparePermutations(result, bestResult) < 0) {
         bestResult = result;
         bestOrder = perm.map(t => t.taskId);
       }
@@ -251,19 +326,20 @@ export function scheduleSingleGroup(
       chosenOrder: bestOrder,
       totalTravel: bestResult.totalTravel,
       totalWait: bestResult.totalWait,
+      totalPriorityPenalty: bestResult.totalPriorityPenalty,
+      priorityViolations: bestResult.priorityViolations,
       endTime: bestResult.endTime,
       permutationsChecked,
       droppedTasks: []
     };
   }
 
-  const droppedTasks: number[] = [];
   for (let dropCount = 1; dropCount < tasks.length; dropCount++) {
     for (let dropIdx = 0; dropIdx < tasks.length; dropIdx++) {
       const remaining = tasks.filter((_, idx) => idx !== dropIdx);
       const remainingIds = remaining.map(t => t.taskId);
       
-      const subResult = scheduleSingleGroup(workDate, remainingIds, tasksMap, cleanerStartTime, previousTask);
+      const subResult = scheduleSingleGroup(workDate, remainingIds, tasksMap, cleanerStartTime, previousTask, priorityWindows);
       
       if (subResult.ok) {
         return {
@@ -272,6 +348,8 @@ export function scheduleSingleGroup(
           chosenOrder: subResult.chosenOrder,
           totalTravel: subResult.totalTravel,
           totalWait: subResult.totalWait,
+          totalPriorityPenalty: subResult.totalPriorityPenalty,
+          priorityViolations: subResult.priorityViolations,
           endTime: subResult.endTime,
           permutationsChecked: permutationsChecked + subResult.permutationsChecked,
           droppedTasks: [tasks[dropIdx].taskId, ...subResult.droppedTasks]
@@ -286,6 +364,8 @@ export function scheduleSingleGroup(
     chosenOrder: [],
     totalTravel: 0,
     totalWait: 0,
+    totalPriorityPenalty: 0,
+    priorityViolations: [],
     endTime: null,
     permutationsChecked,
     droppedTasks: taskIds,
@@ -309,7 +389,8 @@ function formatTimeFromMinutes(minutes: number): string {
 export function runPhase3Algorithm(
   workDate: string,
   cleanerGroups: CleanerGroups[],
-  tasksMap: Map<number, TaskForScheduling>
+  tasksMap: Map<number, TaskForScheduling>,
+  priorityWindows: PriorityWindows | null = null
 ): Phase3Result {
   const events: Phase3Event[] = [];
   const scheduledGroups: GroupScheduleResult[] = [];
@@ -317,6 +398,9 @@ export function runPhase3Algorithm(
   
   let tasksScheduled = 0;
   let groupsScheduled = 0;
+  let priorityPenaltyTotal = 0;
+  let priorityViolationsTotal = 0;
+  const violationsByType = { EO: 0, HP: 0, LP: 0 };
 
   for (const cg of cleanerGroups) {
     let currentTimeStr = cg.startTime;
@@ -324,7 +408,7 @@ export function runPhase3Algorithm(
     let lastTask: TaskForScheduling | null = null;
 
     for (const group of cg.groups) {
-      const result = scheduleSingleGroup(workDate, group.taskIds, tasksMap, currentTimeStr, lastTask);
+      const result = scheduleSingleGroup(workDate, group.taskIds, tasksMap, currentTimeStr, lastTask, priorityWindows);
 
       if (result.ok && result.endTime) {
         const adjustedRows = result.scheduleRows.map((row, idx) => ({
@@ -339,10 +423,18 @@ export function runPhase3Algorithm(
           scheduleRows: adjustedRows,
           totalTravel: result.totalTravel,
           totalWait: result.totalWait,
+          totalPriorityPenalty: result.totalPriorityPenalty,
+          priorityViolations: result.priorityViolations,
           endTime: result.endTime,
           droppedTasks: result.droppedTasks,
           permutationsChecked: result.permutationsChecked
         });
+
+        priorityPenaltyTotal += result.totalPriorityPenalty;
+        priorityViolationsTotal += result.priorityViolations.length;
+        for (const v of result.priorityViolations) {
+          violationsByType[v.priority]++;
+        }
 
         globalSequence += adjustedRows.length;
         tasksScheduled += adjustedRows.length;
@@ -367,6 +459,8 @@ export function runPhase3Algorithm(
             chosen_order_logistic_codes: chosenLogisticCodes,
             total_travel: result.totalTravel,
             total_wait: result.totalWait,
+            total_priority_penalty: result.totalPriorityPenalty,
+            priority_violations: result.priorityViolations,
             end_time: result.endTime.toISOString(),
             permutations_checked: result.permutationsChecked,
             sequence_range: [globalSequence - adjustedRows.length + 1, globalSequence]
@@ -443,7 +537,10 @@ export function runPhase3Algorithm(
       cleanersProcessed: cleanerGroups.length,
       tasksScheduled,
       tasksUnassigned: unassignedTasks.length,
-      groupsScheduled
+      groupsScheduled,
+      priorityPenaltyTotal,
+      priorityViolationsTotal,
+      violationsByType
     }
   };
 }
