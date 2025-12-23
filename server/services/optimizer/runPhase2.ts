@@ -15,6 +15,8 @@ export interface Phase2RunResult {
   runId: string;
   workDate: string;
   phase1RunId: string;
+  selectedCleanersCount: number;
+  availableCleanersBeforeFilter: number;
   cleanersLoaded: number;
   tasksLoaded: number;
   groupsProcessed: number;
@@ -25,6 +27,17 @@ export interface Phase2RunResult {
   durationMs: number;
   status: 'success' | 'partial' | 'failed';
   error?: string;
+}
+
+async function loadSelectedCleanerIds(workDate: string): Promise<number[]> {
+  const result = await pool.query(`
+    SELECT cleaners FROM daily_selected_cleaners WHERE work_date = $1
+  `, [workDate]);
+  
+  if (result.rows.length === 0 || !result.rows[0].cleaners) {
+    return [];
+  }
+  return result.rows[0].cleaners;
 }
 
 async function loadCleanersForDate(workDate: string): Promise<CleanerInput[]> {
@@ -162,6 +175,8 @@ export async function runPhase2(
     runId: runId || '',
     workDate,
     phase1RunId: runId || '',
+    selectedCleanersCount: 0,
+    availableCleanersBeforeFilter: 0,
     cleanersLoaded: 0,
     tasksLoaded: 0,
     groupsProcessed: 0,
@@ -183,24 +198,61 @@ export async function runPhase2(
   try {
     const fullParams: Phase2Params = { ...DEFAULT_PHASE2_PARAMS, ...params };
 
-    const [cleaners, tasksMap, allGroups] = await Promise.all([
+    const [selectedCleanerIds, allAvailableCleaners, tasksMap, allGroups] = await Promise.all([
+      loadSelectedCleanerIds(workDate),
       loadCleanersForDate(workDate),
       loadTasksForPhase2(workDate),
       loadPhase1Groups(runId)
     ]);
 
-    result.cleanersLoaded = cleaners.length;
+    result.selectedCleanersCount = selectedCleanerIds.length;
+    result.availableCleanersBeforeFilter = allAvailableCleaners.length;
     result.tasksLoaded = tasksMap.size;
 
-    if (cleaners.length === 0) {
-      result.status = 'failed';
-      result.error = 'No available cleaners for this date';
-      result.durationMs = Date.now() - startTime;
-      return result;
-    }
+    const cleaners = selectedCleanerIds.length > 0
+      ? allAvailableCleaners.filter(c => selectedCleanerIds.includes(c.cleanerId))
+      : [];
+    
+    result.cleanersLoaded = cleaners.length;
 
     const selectedGroups = selectNonOverlappingGroups(allGroups);
     result.groupsProcessed = selectedGroups.length;
+
+    if (cleaners.length === 0) {
+      const noCleanerEvents: Phase2Event[] = selectedGroups.map(g => ({
+        eventType: 'PHASE2_GROUP_UNASSIGNED_CANDIDATE',
+        payload: {
+          group_tasks: g.taskIds,
+          group_logistic_codes: g.logisticCodes,
+          reason: selectedCleanerIds.length === 0 ? 'NO_SELECTED_CLEANERS' : 'NO_AVAILABLE_CLEANERS_IN_SELECTION',
+          selected_cleaners_count: selectedCleanerIds.length,
+          available_cleaners_before_filter: allAvailableCleaners.length
+        }
+      }));
+
+      const decisions = noCleanerEvents.map(e => eventToDecision(runId, e));
+      result.decisionsInserted = await insertDecisionsBatch(decisions);
+      result.groupsUnassigned = selectedGroups.length;
+
+      const summary = {
+        phase: 2,
+        selected_cleaners_count: result.selectedCleanersCount,
+        available_cleaners_before_filter: result.availableCleanersBeforeFilter,
+        cleaners_loaded: result.cleanersLoaded,
+        tasks_loaded: result.tasksLoaded,
+        groups_processed: result.groupsProcessed,
+        groups_assigned: 0,
+        groups_unassigned: result.groupsUnassigned,
+        tasks_dropped: 0,
+        decisions_inserted: result.decisionsInserted,
+        duration_ms: Date.now() - startTime
+      };
+
+      await updateRunStatus(runId, 'success', summary);
+      result.status = 'success';
+      result.durationMs = Date.now() - startTime;
+      return result;
+    }
 
     const phase2Result = runPhase2Algorithm(selectedGroups, tasksMap, cleaners, fullParams);
 
@@ -213,6 +265,8 @@ export async function runPhase2(
 
     const summary = {
       phase: 2,
+      selected_cleaners_count: result.selectedCleanersCount,
+      available_cleaners_before_filter: result.availableCleanersBeforeFilter,
       cleaners_loaded: result.cleanersLoaded,
       tasks_loaded: result.tasksLoaded,
       groups_processed: result.groupsProcessed,
