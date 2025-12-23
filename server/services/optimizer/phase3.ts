@@ -9,6 +9,7 @@ export interface TaskForScheduling {
   cleaningTimeMinutes: number;
   checkoutTime: string | null;
   checkinTime: string | null;
+  checkinDate: string | null;
   priorityType: Priority | null;
 }
 
@@ -108,6 +109,13 @@ function dateToMinutes(d: Date): number {
   return d.getHours() * 60 + d.getMinutes();
 }
 
+function combineDateTime(dateStr: string, timeStr: string): Date {
+  const t = timeStr.slice(0, 5);
+  const [year, month, day] = dateStr.split('-').map(Number);
+  const [hours, minutes] = t.split(':').map(Number);
+  return new Date(year, month - 1, day, hours, minutes, 0, 0);
+}
+
 export function simulateSequence(
   workDate: string,
   tasks: TaskForScheduling[],
@@ -151,20 +159,39 @@ export function simulateSequence(
 
     const cleaningTime = task.cleaningTimeMinutes || 60;
     const endMinutes = earliestStart + cleaningTime;
+    const endDateTime = minutesToDate(workDate, endMinutes);
 
-    const checkinMinutes = parseTimeToMinutes(task.checkinTime);
-    if (checkinMinutes !== null && endMinutes > checkinMinutes) {
-      return {
-        ok: false,
-        scheduleRows,
-        totalTravel,
-        totalWait,
-        totalPriorityPenalty,
-        priorityViolations,
-        endTime: null,
-        failReason: 'TIME_WINDOW_IMPOSSIBLE',
-        failedTaskId: task.taskId
-      };
+    if (task.checkinDate && task.checkinTime) {
+      const checkinDateTime = combineDateTime(task.checkinDate, task.checkinTime);
+      if (endDateTime > checkinDateTime) {
+        return {
+          ok: false,
+          scheduleRows,
+          totalTravel,
+          totalWait,
+          totalPriorityPenalty,
+          priorityViolations,
+          endTime: null,
+          failReason: 'TIME_WINDOW_IMPOSSIBLE',
+          failedTaskId: task.taskId
+        };
+      }
+    } else if (task.checkinTime) {
+      console.log(`[Phase3] Task ${task.taskId}: MISSING_CHECKIN_DATE_FALLBACK_USED - using workDate for checkin constraint`);
+      const checkinMinutes = parseTimeToMinutes(task.checkinTime);
+      if (checkinMinutes !== null && endMinutes > checkinMinutes) {
+        return {
+          ok: false,
+          scheduleRows,
+          totalTravel,
+          totalWait,
+          totalPriorityPenalty,
+          priorityViolations,
+          endTime: null,
+          failReason: 'TIME_WINDOW_IMPOSSIBLE',
+          failedTaskId: task.taskId
+        };
+      }
     }
 
     let taskPenalty = 0;
@@ -245,18 +272,20 @@ export interface ScheduleGroupResult {
 }
 
 function comparePermutations(a: SimulationResult, b: SimulationResult): number {
-  if (!a.endTime || !b.endTime) return 0;
+  if (!a.endTime && !b.endTime) return 0;
+  if (!a.endTime) return 1;
+  if (!b.endTime) return -1;
   
-  if (a.endTime.getTime() !== b.endTime.getTime()) {
-    return a.endTime.getTime() - b.endTime.getTime();
-  }
   if (a.totalPriorityPenalty !== b.totalPriorityPenalty) {
     return a.totalPriorityPenalty - b.totalPriorityPenalty;
   }
-  if (a.totalWait !== b.totalWait) {
-    return a.totalWait - b.totalWait;
+  if (a.totalTravel !== b.totalTravel) {
+    return a.totalTravel - b.totalTravel;
   }
-  return a.totalTravel - b.totalTravel;
+  if (a.endTime.getTime() !== b.endTime.getTime()) {
+    return a.endTime.getTime() - b.endTime.getTime();
+  }
+  return a.totalWait - b.totalWait;
 }
 
 export function scheduleSingleGroup(
