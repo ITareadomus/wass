@@ -18,6 +18,7 @@ export interface CleanerForScheduling {
 
 export interface ScheduleRow {
   taskId: number;
+  logisticCode: number;
   sequence: number;
   startTime: Date;
   endTime: Date;
@@ -141,6 +142,7 @@ export function simulateSequence(
 
     scheduleRows.push({
       taskId: task.taskId,
+      logisticCode: task.logisticCode,
       sequence: i + 1,
       startTime: minutesToDate(workDate, earliestStart),
       endTime: minutesToDate(workDate, endMinutes),
@@ -352,13 +354,17 @@ export function runPhase3Algorithm(
           lastTask = tasksMap.get(result.chosenOrder[result.chosenOrder.length - 1]) || null;
         }
 
+        const chosenLogisticCodes = result.chosenOrder.map(id => tasksMap.get(id)?.logisticCode || 0);
+        
         events.push({
           eventType: 'PHASE3_GROUP_SCHEDULED',
           payload: {
             cleaner_id: cg.cleanerId,
             cleaner_name: cg.cleanerName,
             task_ids: group.taskIds,
+            logistic_codes: group.taskIds.map(id => tasksMap.get(id)?.logisticCode || 0),
             chosen_order: result.chosenOrder,
+            chosen_order_logistic_codes: chosenLogisticCodes,
             total_travel: result.totalTravel,
             total_wait: result.totalWait,
             end_time: result.endTime.toISOString(),
@@ -374,10 +380,12 @@ export function runPhase3Algorithm(
             reasonCode: 'TIME_WINDOW_IMPOSSIBLE',
             details: {
               cleaner_id: cg.cleanerId,
+              logistic_code: task?.logisticCode,
               checkout_time: task?.checkoutTime,
               checkin_time: task?.checkinTime,
               cleaning_time: task?.cleaningTimeMinutes,
-              dropped_from_group: group.taskIds
+              dropped_from_group: group.taskIds,
+              dropped_from_group_logistic_codes: group.taskIds.map(id => tasksMap.get(id)?.logisticCode || 0)
             }
           });
 
@@ -386,8 +394,10 @@ export function runPhase3Algorithm(
             payload: {
               cleaner_id: cg.cleanerId,
               dropped_task_id: droppedId,
+              dropped_logistic_code: task?.logisticCode,
               reason: 'TIME_WINDOW_IMPOSSIBLE',
-              remaining_tasks: result.chosenOrder
+              remaining_tasks: result.chosenOrder,
+              remaining_logistic_codes: result.chosenOrder.map(id => tasksMap.get(id)?.logisticCode || 0)
             }
           });
         }
@@ -399,10 +409,12 @@ export function runPhase3Algorithm(
             reasonCode: result.failReason || 'GROUP_SCHEDULING_FAILED',
             details: {
               cleaner_id: cg.cleanerId,
+              logistic_code: task?.logisticCode,
               checkout_time: task?.checkoutTime,
               checkin_time: task?.checkinTime,
               cleaning_time: task?.cleaningTimeMinutes,
               group_tasks: group.taskIds,
+              group_logistic_codes: group.taskIds.map(id => tasksMap.get(id)?.logisticCode || 0),
               permutations_checked: result.permutationsChecked
             }
           });
@@ -411,9 +423,11 @@ export function runPhase3Algorithm(
             eventType: 'PHASE3_TASK_UNASSIGNED_FINAL',
             payload: {
               task_id: taskId,
+              logistic_code: task?.logisticCode,
               reason_code: result.failReason || 'GROUP_SCHEDULING_FAILED',
               cleaner_id: cg.cleanerId,
-              group_tasks: group.taskIds
+              group_tasks: group.taskIds,
+              group_logistic_codes: group.taskIds.map(id => tasksMap.get(id)?.logisticCode || 0)
             }
           });
         }
