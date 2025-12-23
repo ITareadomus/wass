@@ -42,6 +42,17 @@ Preferred communication style: Simple, everyday language.
 - **Fairness**: Global parameters for `NEARBY_TRAVEL_THRESHOLD`, `NEW_CLEANER_PENALTY_MIN`, and `FAIRNESS_DELTA_HOURS` are tightened to ensure more balanced work distribution and safer travel times.
 - **Time Window Constraints**: Early-Out (EO) and High Priority (HP) tasks have configurable start/end time windows, loaded dynamically from application settings, restricting when tasks can be assigned. Low Priority (LP) tasks have no time constraints.
 
+## Optimizer System (Three-Phase)
+- **PHASE 1**: Groups nearby tasks using dual thresholds (15min→20min), creates single-task groups for isolated tasks, includes logistic_codes for deduplication.
+- **PHASE 2**: Assigns groups to compatible cleaners from daily_selected_cleaners, scores by travel/load/preference, preserves group_logistic_codes.
+- **PHASE 3**: Chronological scheduling with time windows and priority soft rules.
+  - **Priority Windows** (from app_settings DB): EO 10:00-10:59, HP 11:00-15:30, LP 11:00+
+  - **Soft Rules**: Penalties calculated based on distance from preferred windows (k=2 for EO, k=1 for HP/LP)
+  - **Max Penalties**: EO: 120, HP: 90, LP: 60
+  - **Permutation Selection**: Considers endTime → priorityPenalty → totalWait → totalTravel
+  - **Violation Tracking**: reason codes (LP_BEFORE_MIN_START, EO/HP_OUT_OF_PREFERRED_START_WINDOW) persisted to optimizer_assignment
+- **Shadow Mode**: ALL optimizer writes go to optimizer.* schema only, never touches production tables.
+
 # Production Configuration
 
 ## Database Connection Details
