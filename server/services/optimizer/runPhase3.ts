@@ -7,6 +7,7 @@ import {
   GroupScheduleResult
 } from './phase3';
 import { updateRunStatus, insertDecisionsBatch, OptimizerDecision, getLatestRunForDate } from './db';
+import { loadPriorityStartWindows, mapPriorityType, PriorityWindows } from './priorityWindows';
 
 export interface Phase3RunResult {
   runId: string;
@@ -78,7 +79,8 @@ async function loadTasksForScheduling(workDate: string): Promise<Map<number, Tas
       lng,
       COALESCE(cleaning_time, 60) as cleaning_time_minutes,
       checkout_time,
-      checkin_time
+      checkin_time,
+      priority
     FROM daily_containers
     WHERE work_date = $1
       AND lat IS NOT NULL 
@@ -94,7 +96,8 @@ async function loadTasksForScheduling(workDate: string): Promise<Map<number, Tas
       lng: parseFloat(row.lng),
       cleaningTimeMinutes: parseInt(row.cleaning_time_minutes, 10) || 60,
       checkoutTime: row.checkout_time,
-      checkinTime: row.checkin_time
+      checkinTime: row.checkin_time,
+      priorityType: mapPriorityType(row.priority)
     });
   }
   return map;
@@ -146,8 +149,9 @@ async function insertAssignments(
     for (const row of group.scheduleRows) {
       await pool.query(`
         INSERT INTO optimizer.optimizer_assignment (
-          run_id, cleaner_id, task_id, logistic_code, sequence, start_time, end_time, travel_minutes_from_prev, reasons
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+          run_id, cleaner_id, task_id, logistic_code, sequence, start_time, end_time, 
+          travel_minutes_from_prev, reasons, priority_type, priority_penalty, priority_reasons
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
       `, [
         runId,
         group.cleanerId,
@@ -157,7 +161,10 @@ async function insertAssignments(
         row.startTime,
         row.endTime,
         row.travelMinutesFromPrev,
-        []
+        [],
+        row.priorityType,
+        row.priorityPenalty,
+        row.priorityReasons
       ]);
       inserted++;
     }
@@ -214,10 +221,11 @@ export async function runPhase3(
   }
 
   try {
-    const [selectedCleanerIds, tasksMap, phase2Assignments] = await Promise.all([
+    const [selectedCleanerIds, tasksMap, phase2Assignments, priorityWindows] = await Promise.all([
       loadSelectedCleanerIds(workDate),
       loadTasksForScheduling(workDate),
-      loadPhase2Assignments(resolvedRunId)
+      loadPhase2Assignments(resolvedRunId),
+      loadPriorityStartWindows(resolvedRunId)
     ]);
 
     result.selectedCleanersCount = selectedCleanerIds.length;
@@ -277,7 +285,7 @@ export async function runPhase3(
 
     result.cleanersProcessed = cleanerGroups.length;
 
-    const phase3Result = runPhase3Algorithm(workDate, cleanerGroups, tasksMap);
+    const phase3Result = runPhase3Algorithm(workDate, cleanerGroups, tasksMap, priorityWindows);
 
     result.tasksScheduled = phase3Result.stats.tasksScheduled;
     result.tasksUnassigned = phase3Result.stats.tasksUnassigned;
@@ -298,6 +306,9 @@ export async function runPhase3(
       assignments_inserted: result.assignmentsInserted,
       unassigned_inserted: result.unassignedInserted,
       decisions_inserted: result.decisionsInserted,
+      priority_penalty_total: phase3Result.stats.priorityPenaltyTotal,
+      priority_violations_total: phase3Result.stats.priorityViolationsTotal,
+      violations_by_type: phase3Result.stats.violationsByType,
       duration_ms: Date.now() - startTime
     };
 
