@@ -5243,6 +5243,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.post("/api/optimizer/run-phase3", async (req, res) => {
+    try {
+      const { date, runId } = req.body;
+      const workDate = date || format(new Date(), "yyyy-MM-dd");
+      
+      console.log(`🚀 POST /api/optimizer/run-phase3 - Avvio FASE 3 per ${workDate}`);
+      
+      const { runPhase3 } = await import('./services/optimizer/runPhase3');
+      const result = await runPhase3(workDate, runId);
+      
+      console.log(`✅ FASE 3 completata: ${result.tasksScheduled} task schedulati, ${result.tasksUnassigned} non assegnabili in ${result.durationMs}ms`);
+      
+      res.json({
+        success: result.status === 'success',
+        ...result
+      });
+    } catch (error: any) {
+      console.error("❌ Errore FASE 3 optimizer:", error);
+      res.status(500).json({
+        success: false,
+        error: error.message
+      });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }
