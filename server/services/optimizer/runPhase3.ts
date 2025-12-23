@@ -146,12 +146,13 @@ async function insertAssignments(
     for (const row of group.scheduleRows) {
       await pool.query(`
         INSERT INTO optimizer.optimizer_assignment (
-          run_id, cleaner_id, task_id, sequence, start_time, end_time, travel_minutes_from_prev, reasons
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+          run_id, cleaner_id, task_id, logistic_code, sequence, start_time, end_time, travel_minutes_from_prev, reasons
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
       `, [
         runId,
         group.cleanerId,
         row.taskId,
+        row.logisticCode,
         row.sequence,
         row.startTime,
         row.endTime,
@@ -172,10 +173,11 @@ async function insertUnassigned(
   if (unassigned.length === 0) return 0;
   
   for (const item of unassigned) {
+    const logisticCode = item.details.logistic_code || null;
     await pool.query(`
-      INSERT INTO optimizer.optimizer_unassigned (run_id, task_id, reason_code, details)
-      VALUES ($1, $2, $3, $4)
-    `, [runId, item.taskId, item.reasonCode, JSON.stringify(item.details)]);
+      INSERT INTO optimizer.optimizer_unassigned (run_id, task_id, logistic_code, reason_code, details)
+      VALUES ($1, $2, $3, $4, $5)
+    `, [runId, item.taskId, logisticCode, item.reasonCode, JSON.stringify(item.details)]);
   }
   
   return unassigned.length;
