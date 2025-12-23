@@ -5198,6 +5198,51 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ========== OPTIMIZER PHASE 2 ENDPOINTS ==========
+
+  app.post("/api/optimizer/run-phase2", async (req, res) => {
+    try {
+      const { date, runId, params } = req.body;
+      const workDate = date || format(new Date(), "yyyy-MM-dd");
+      
+      console.log(`🚀 POST /api/optimizer/run-phase2 - Avvio FASE 2 per ${workDate}`);
+      
+      const { runPhase2 } = await import('./services/optimizer/runPhase2');
+      const result = await runPhase2(workDate, runId, params || {});
+      
+      console.log(`✅ FASE 2 completata: ${result.groupsAssigned}/${result.groupsProcessed} gruppi assegnati in ${result.durationMs}ms`);
+      
+      res.json({
+        success: result.status === 'success',
+        ...result
+      });
+    } catch (error: any) {
+      console.error("❌ Errore FASE 2 optimizer:", error);
+      res.status(500).json({
+        success: false,
+        error: error.message
+      });
+    }
+  });
+
+  app.get("/api/optimizer/phase2-stats", async (req, res) => {
+    try {
+      const runId = req.query.runId as string;
+      
+      if (!runId) {
+        return res.status(400).json({ success: false, error: "runId required" });
+      }
+      
+      const { getPhase2Stats } = await import('./services/optimizer/runPhase2');
+      const stats = await getPhase2Stats(runId);
+      
+      res.json(stats);
+    } catch (error: any) {
+      console.error("❌ Errore stats FASE 2:", error);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }
