@@ -997,55 +997,9 @@ export default function TaskCard({
                           {task.alias}{(task as any).type_apt ? ` (${(task as any).type_apt})` : ''}
                         </span>
                       )}
-                      {/* Icona lucchetto per blocco task - solo nei container */}
-                      {!isInTimeline && (
-                        <div className="flex items-center gap-1 mt-1">
-                          <button
-                            onClick={handleToggleLock}
-                            className={cn(
-                              "p-0.5 rounded transition-colors",
-                              isLocked 
-                                ? "text-red-600 hover:bg-red-100" 
-                                : "text-gray-400 hover:bg-gray-100 hover:text-gray-600"
-                            )}
-                            title={isLocked ? "Sblocca task" : "Blocca task"}
-                            data-testid={`lock-task-${getTaskKey(task)}`}
-                          >
-                            {isLocked ? <Lock className="w-3 h-3" /> : <LockOpen className="w-3 h-3" />}
-                          </button>
-                          {isLocked && (
-                            <div className="flex items-center gap-0.5">
-                              {isEditingReason ? (
-                                <>
-                                  <input
-                                    type="text"
-                                    value={lockedReason}
-                                    onChange={(e) => setLockedReason(e.target.value)}
-                                    onClick={(e) => e.stopPropagation()}
-                                    className="text-[9px] w-16 px-0.5 border border-gray-300 rounded"
-                                    placeholder="motivo..."
-                                    data-testid={`lock-reason-input-${getTaskKey(task)}`}
-                                  />
-                                  <button
-                                    onClick={handleSaveLockedReason}
-                                    className="text-green-600 hover:text-green-800"
-                                    title="Salva motivo"
-                                  >
-                                    <Save className="w-2.5 h-2.5" />
-                                  </button>
-                                </>
-                              ) : (
-                                <span 
-                                  className="text-[9px] text-red-600 cursor-pointer hover:underline truncate max-w-[60px]"
-                                  onClick={(e) => { e.stopPropagation(); setIsEditingReason(true); }}
-                                  title={lockedReason || "Clicca per aggiungere motivo"}
-                                >
-                                  {lockedReason || "motivo?"}
-                                </span>
-                              )}
-                            </div>
-                          )}
-                        </div>
+                      {/* Indicatore lucchetto sulla card - solo se bloccata */}
+                      {isLocked && !isInTimeline && (
+                        <Lock className="w-3 h-3 text-red-600 mt-0.5" />
                       )}
                     </div>
                   </div>
@@ -1448,6 +1402,42 @@ export default function TaskCard({
                 </div>
               </div>
             </div>
+
+            {/* Settima riga: Blocco Task - solo nei container */}
+            {!isInTimeline && (
+              <div className="pt-3 border-t mt-3">
+                <div className="flex items-center gap-3">
+                  <Button
+                    variant={isLocked ? "destructive" : "outline"}
+                    size="sm"
+                    onClick={handleToggleLock}
+                    className="flex items-center gap-2"
+                    data-testid={`lock-task-btn-${getTaskKey(task)}`}
+                  >
+                    {isLocked ? <Lock className="w-4 h-4" /> : <LockOpen className="w-4 h-4" />}
+                    {isLocked ? "Sblocca" : "Blocca"}
+                  </Button>
+                  {isLocked && (
+                    <div className="flex-1">
+                      <Input
+                        type="text"
+                        value={lockedReason}
+                        onChange={(e) => setLockedReason(e.target.value)}
+                        onBlur={() => handleSaveLockedReason({ stopPropagation: () => {} } as any)}
+                        placeholder="Motivo del blocco..."
+                        className="text-sm"
+                        data-testid={`lock-reason-input-${getTaskKey(task)}`}
+                      />
+                    </div>
+                  )}
+                </div>
+                {isLocked && (
+                  <p className="text-xs text-red-600 mt-1">
+                    Questa task non può essere assegnata o trascinata
+                  </p>
+                )}
+              </div>
+            )}
 
             {/* Pulsante Salva Modifiche */}
             {editingFields.size > 0 && !isReadOnly && (

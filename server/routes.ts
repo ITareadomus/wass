@@ -2691,6 +2691,55 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Endpoint per bloccare/sbloccare una task
+  app.post("/api/lock-task", async (req, res) => {
+    try {
+      const { task_id, logistic_code, locked, locked_reason } = req.body;
+      const workDate = req.body.date || format(new Date(), "yyyy-MM-dd");
+
+      if (!task_id) {
+        return res.status(400).json({ success: false, error: "task_id richiesto" });
+      }
+
+      console.log(`🔒 Lock task request: task_id=${task_id}, locked=${locked}, reason="${locked_reason}"`);
+
+      // Aggiorna nei containers JSON
+      const containersData = await workspaceFiles.loadContainers(workDate) || { containers: {} };
+      let taskUpdated = false;
+
+      if (containersData.containers) {
+        for (const containerType of ['early_out', 'high_priority', 'low_priority']) {
+          const container = (containersData.containers as any)[containerType];
+          if (container?.tasks) {
+            for (const task of container.tasks) {
+              if (String(task.task_id) === String(task_id)) {
+                task.locked = locked;
+                task.locked_reason = locked ? locked_reason : null;
+                taskUpdated = true;
+                break;
+              }
+            }
+          }
+          if (taskUpdated) break;
+        }
+      }
+
+      if (taskUpdated) {
+        await workspaceFiles.saveContainers(workDate, containersData);
+        console.log(`✅ Task ${task_id} ${locked ? 'bloccata' : 'sbloccata'} nei containers`);
+      }
+
+      // Aggiorna in PostgreSQL daily_containers
+      const { pgDailyAssignmentsService } = await import("./services/pg-daily-assignments-service");
+      await pgDailyAssignmentsService.updateTaskLockStatus(task_id, workDate, locked, locked_reason);
+
+      res.json({ success: true, locked, locked_reason });
+    } catch (error: any) {
+      console.error("Errore nel blocco task:", error);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
   // Endpoint per aggiornare i dettagli di una task (checkout, checkin, durata)
   // skipAdam: se true, aggiorna SOLO PostgreSQL e non propaga su ADAM
   // Supporta sia aggiornamenti singoli che batch (array di updates)

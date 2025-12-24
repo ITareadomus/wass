@@ -43,6 +43,8 @@ interface RawTask {
   alias?: string;
   confirmed_operation?: boolean;
   customer_reference?: string | number;
+  locked?: boolean;
+  locked_reason?: string;
 }
 
 // === HELPERS per gestire id univoco e logisticCode non univoco ===
@@ -1052,6 +1054,8 @@ export default function GenerateAssignments() {
       customer_name: (rawTask as any).customer_name,
       customer_reference: rawTask.customer_reference,
       type_apt: (rawTask as any).type_apt,
+      locked: (rawTask as any).locked,
+      locked_reason: (rawTask as any).locked_reason,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     };

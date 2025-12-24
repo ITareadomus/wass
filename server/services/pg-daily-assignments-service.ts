@@ -1575,6 +1575,56 @@ export class PgDailyAssignmentsService {
     }
   }
 
+  /**
+   * Update task lock status in daily_containers
+   */
+  async updateTaskLockStatus(taskId: string | number, workDate: string, locked: boolean, lockedReason?: string): Promise<boolean> {
+    try {
+      // Carica i containers correnti
+      const result = await query(
+        'SELECT containers_data FROM daily_containers WHERE work_date = $1',
+        [workDate]
+      );
+      
+      if (result.rows.length === 0) {
+        console.log(`⚠️ PG: Nessun container trovato per ${workDate}`);
+        return false;
+      }
+      
+      const containersData = result.rows[0].containers_data;
+      let updated = false;
+      
+      // Aggiorna il task nei containers
+      for (const containerType of ['early_out', 'high_priority', 'low_priority']) {
+        const container = containersData.containers?.[containerType];
+        if (container?.tasks) {
+          for (const task of container.tasks) {
+            if (String(task.task_id) === String(taskId)) {
+              task.locked = locked;
+              task.locked_reason = locked ? lockedReason : null;
+              updated = true;
+              break;
+            }
+          }
+        }
+        if (updated) break;
+      }
+      
+      if (updated) {
+        await query(
+          'UPDATE daily_containers SET containers_data = $1, updated_at = NOW() WHERE work_date = $2',
+          [containersData, workDate]
+        );
+        console.log(`✅ PG: Task ${taskId} ${locked ? 'bloccata' : 'sbloccata'} in daily_containers`);
+      }
+      
+      return true;
+    } catch (error) {
+      console.error(`❌ PG: Errore nell'aggiornamento lock status task ${taskId}:`, error);
+      return false;
+    }
+  }
+
   // ==================== CLEANER ALIASES (PERMANENT) ====================
 
   /**
