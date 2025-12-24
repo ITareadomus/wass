@@ -279,9 +279,9 @@ export default function PriorityColumn({
             variant="outline"
             size="sm"
             onClick={handleAssign} // Utilizza handleAssign
-            disabled={isAssigning || tasks.length === 0 || isDateInPast}
+            disabled={isAssigning || tasks.length === 0 || isDateInPast || tasks.every(t => (t as any).locked)}
             className="text-xs px-2 py-1 h-7 border-2 border-custom-blue"
-            title={isDateInPast ? "Non puoi assegnare task per date passate" : ""}
+            title={isDateInPast ? "Non puoi assegnare task per date passate" : tasks.every(t => (t as any).locked) ? "Tutte le task sono bloccate" : ""}
             data-testid="button-assign"
           >
             {isAssigning ? (

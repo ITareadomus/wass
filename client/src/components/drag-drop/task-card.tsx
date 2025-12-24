@@ -537,8 +537,11 @@ export default function TaskCard({
     return { label: "STANDARD", colorClass: "task-standard" };
   };
 
-  const { label: typeLabel, colorClass: cardColorClass } =
+  const { label: typeLabel, colorClass: baseCardColorClass } =
     getTaskTypeStyle(cardIsStraordinaria, cardIsPremium);
+  
+  // Se la task è bloccata, usa grigio invece del colore normale
+  const cardColorClass = isLocked && !isInTimeline ? "bg-gray-300 dark:bg-gray-600 opacity-60" : baseCardColorClass;
 
   useEffect(() => {
     const calculateAssignmentTimes = () => {
@@ -996,10 +999,6 @@ export default function TaskCard({
                         <span className="opacity-70 leading-none mt-0.5 text-[#000000] font-bold text-[11px]">
                           {task.alias}{(task as any).type_apt ? ` (${(task as any).type_apt})` : ''}
                         </span>
-                      )}
-                      {/* Indicatore lucchetto sulla card - solo se bloccata */}
-                      {isLocked && !isInTimeline && (
-                        <Lock className="w-3 h-3 text-red-600 mt-0.5" />
                       )}
                     </div>
                   </div>
