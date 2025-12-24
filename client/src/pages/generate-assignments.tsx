@@ -2232,7 +2232,7 @@ export default function GenerateAssignments() {
             <div className="mb-4 relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-custom-blue" />
               <Input
-                placeholder="Cerca task per ID, logistic code o indirizzo..."
+                placeholder="Cerca task per ID, logistic code, indirizzo, cliente, alias o reference..."
                 value={searchTask}
                 onChange={(e) => setSearchTask(e.target.value)}
                 className="border-2 border-custom-blue pl-10"
@@ -2249,11 +2249,17 @@ export default function GenerateAssignments() {
                     const taskId = String((task as any).id || (task as any).task_id || '');
                     const logisticCode = String((task as any).logisticCode || (task as any).logistic_code || (task as any).name || '');
                     const address = String((task as any).address || '');
+                    const customerName = String((task as any).customer_name || '');
+                    const alias = String((task as any).alias || '');
+                    const customerReference = String((task as any).customer_reference || '');
                     
                     return (
                       taskId.toLowerCase().includes(lowerSearch) ||
                       logisticCode.toLowerCase().includes(lowerSearch) ||
-                      address.toLowerCase().includes(lowerSearch)
+                      address.toLowerCase().includes(lowerSearch) ||
+                      customerName.toLowerCase().includes(lowerSearch) ||
+                      alias.toLowerCase().includes(lowerSearch) ||
+                      customerReference.toLowerCase().includes(lowerSearch)
                     );
                   })
                   .map(t => String((t as any).id || (t as any).task_id || '')));
