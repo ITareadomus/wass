@@ -340,6 +340,7 @@ export class PgDailyAssignmentsService {
         if (row.type_apt) task.type_apt = row.type_apt;
         if (row.alias) task.alias = row.alias;
         if (row.customer_name) task.customer_name = row.customer_name;
+        if (row.customer_reference) task.customer_reference = row.customer_reference;
         if (row.reasons && row.reasons.length > 0) task.reasons = row.reasons;
         if (row.priority) task.priority = row.priority;
         if (row.start_time) task.start_time = row.start_time;
