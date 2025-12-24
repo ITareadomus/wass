@@ -148,6 +148,9 @@ class Task:
     apt_type: Optional[str] = None
     address: Optional[str] = None
     alias: Optional[str] = None
+    customer_name: Optional[str] = None
+    customer_reference: Optional[str] = None
+    client_id: Optional[int] = None
     small_equipment: bool = False
     straordinaria: bool = False
     is_hp_soft: bool = False
@@ -751,6 +754,9 @@ def load_tasks() -> Tuple[List[Task], str]:
                 apt_type=t.get("type_apt"),
                 address=t.get("address"),
                 alias=t.get("alias"),
+                customer_name=t.get("customer_name"),
+                customer_reference=t.get("customer_reference"),
+                client_id=t.get("client_id"),
                 small_equipment=bool(t.get("small_equipment", False)),
                 straordinaria=bool(t.get("straordinaria", False)),
                 is_hp_soft=is_hp_soft,
