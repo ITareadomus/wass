@@ -1455,6 +1455,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         type_apt: fullTaskData.type_apt || null,
         alias: fullTaskData.alias || null,
         customer_name: fullTaskData.customer_name || fullTaskData.type || null,
+        customer_reference: fullTaskData.customer_reference || null,
 
         // Reasons (combina quelle da containers con quella timeline)
         reasons: [
