@@ -262,7 +262,10 @@ export default function SystemSettings() {
             <CardHeader className="bg-custom-blue-light py-3">
               <CardTitle className="text-lg">Priority Settings</CardTitle>
               <CardDescription className="text-xs">
-                Configurazione per le task Early-Out, High-Priority e Low-Priority
+                Configura i range d'orario in cui i task possono iniziare per essere considerati Early-Out, High-Priority o Low-Priority
+              </CardDescription>
+              <CardDescription className="text-[10px]">
+                (Questo modificherà il modo in cui i task verrano classificati e verrano assegnati automaticamente ai cleaner)
               </CardDescription>
             </CardHeader>
             <CardContent className="bg-custom-blue-light">
