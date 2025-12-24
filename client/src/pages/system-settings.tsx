@@ -261,10 +261,10 @@ export default function SystemSettings() {
           <Card className="bg-custom-blue-light border-2 border-custom-blue">
             <CardHeader className="bg-custom-blue-light py-3">
               <CardTitle className="text-lg">Priority Settings</CardTitle>
-              <CardDescription className="text-xs">
+              <CardDescription className="text-s">
                 Configura i range d'orario in cui i task possono iniziare per essere considerati Early-Out, High-Priority o Low-Priority
               </CardDescription>
-              <CardDescription className="text-[10px]">
+              <CardDescription className="text-xs">
                 (Questo modificherà il modo in cui i task verrano classificati e verrano assegnati automaticamente ai cleaner)
               </CardDescription>
             </CardHeader>
@@ -491,7 +491,7 @@ export default function SystemSettings() {
           <Card className="bg-custom-blue-light border-2 border-custom-blue">
             <CardHeader className="bg-custom-blue-light py-3">
               <CardTitle className="text-lg">Apartment Types & Task Types</CardTitle>
-              <CardDescription className="text-xs">
+              <CardDescription className="text-s">
                 Tipi di task, appartamento e priorità che ogni categoria di cleaner può gestire
               </CardDescription>
             </CardHeader>
