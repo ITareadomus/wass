@@ -325,7 +325,7 @@ export default function UnconfirmedTasks() {
                   <div className="relative w-full mb-3">
                     <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-custom-blue" />
                     <Input
-                      placeholder="Cerca per ID, code, indirizzo, cliente, alias o reference..."
+                      placeholder="Cerca per ID, code, indirizzo, cliente, alias o customer ID..."
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
                       className="pl-10 border-2 border-custom-blue text-xs"
