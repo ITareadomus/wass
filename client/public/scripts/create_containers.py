@@ -253,7 +253,7 @@ def get_tasks_from_db(selected_date, assigned_task_ids=None):
             "type_apt": map_structure_type_to_letter(structure_type_id),
             "alias": varchar_to_str(r.get("alias")) if r.get("alias") is not None else None,
             "customer_name": varchar_to_str(r.get("customer_name")) if r.get("customer_name") is not None else None,
-            "customer_reference": varchar_to_str(r.get("customer_reference")) if r.get("customer_reference") is not None else None,
+            "customer_reference": varchar_to_str(r.get("customer_reference")) if r.get("client_id") == 3 and r.get("customer_reference") is not None else None,
         }
         results.append(item)
 
