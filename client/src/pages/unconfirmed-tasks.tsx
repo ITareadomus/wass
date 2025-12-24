@@ -153,7 +153,8 @@ export default function UnconfirmedTasks() {
       String(task.logistic_code).toLowerCase().includes(search) ||
       (task.address || "").toLowerCase().includes(search) ||
       (task.alias || "").toLowerCase().includes(search) ||
-      (task.customer_name || "").toLowerCase().includes(search)
+      (task.customer_name || "").toLowerCase().includes(search) ||
+      (task.customer_reference ? String(task.customer_reference).toLowerCase().includes(search) : false)
     );
   });
 
