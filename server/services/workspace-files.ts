@@ -56,6 +56,7 @@ function getNormalizedTask(task: any): any {
   if (task.type_apt !== undefined) normalizedTask.type_apt = task.type_apt;
   if (task.alias !== undefined) normalizedTask.alias = task.alias;
   if (task.customer_name !== undefined) normalizedTask.customer_name = task.customer_name;
+  if (task.customer_reference !== undefined) normalizedTask.customer_reference = task.customer_reference;
   if (task.reasons !== undefined) normalizedTask.reasons = task.reasons;
   if (task.priority !== undefined) normalizedTask.priority = task.priority;
   if (task.start_time !== undefined) normalizedTask.start_time = task.start_time;
