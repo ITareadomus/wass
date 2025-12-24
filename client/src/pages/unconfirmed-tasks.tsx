@@ -325,10 +325,10 @@ export default function UnconfirmedTasks() {
                   <div className="relative w-full mb-3">
                     <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-custom-blue" />
                     <Input
-                      placeholder="Cerca per ID, logistic code, indirizzo, cliente, alias o reference..."
+                      placeholder="Cerca per ID, code, indirizzo, cliente, alias o reference..."
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
-                      className="pl-10 border-2 border-custom-blue"
+                      className="pl-10 border-2 border-custom-blue text-xs"
                       data-testid="input-search"
                     />
                   </div>
@@ -366,16 +366,8 @@ export default function UnconfirmedTasks() {
                               </span>
                               <span className="text-muted-foreground">-</span>
                               <span className="text-red-500 font-mono text-base font-semibold">
-                                {task.logistic_code}
+                                {task.logistic_code}{task.customer_reference ? ` (${task.customer_reference})` : ''}
                               </span>
-                              {task.customer_reference && (
-                                <>
-                                  <span className="text-muted-foreground">-</span>
-                                  <span className="text-red-500 font-mono text-sm font-semibold">
-                                    {task.customer_reference}
-                                  </span>
-                                </>
-                              )}
                             </div>
                             {task.address && (
                               <span className="text-sm text-muted-foreground truncate max-w-[350px] uppercase">
@@ -461,22 +453,22 @@ export default function UnconfirmedTasks() {
                       </div>
 
                       <div className="grid grid-cols-2 gap-2 px-4">
-                        <div className="text-center">
+                        <div>
                           <p className="text-sm font-semibold text-muted-foreground">Codice ADAM</p>
                           <p className="text-sm">{selectedTask.logistic_code}</p>
                         </div>
-                        <div className="text-center">
+                        <div>
                           <p className="text-sm font-semibold text-muted-foreground">Cliente</p>
                           <p className="text-sm">{selectedTask.customer_name || selectedTask.alias || "non migrato"}</p>
                         </div>
                       </div>
 
                       <div className="grid grid-cols-2 gap-2 px-4">
-                        <div className="text-center">
+                        <div>
                           <p className="text-sm font-semibold text-muted-foreground">Indirizzo</p>
                           <p className="text-sm uppercase">{selectedTask.address || "NON MIGRATO"}</p>
                         </div>
-                        <div className="text-center">
+                        <div>
                           <p className="text-sm font-semibold text-muted-foreground">Durata pulizia</p>
                           <p className="text-sm">
                             {selectedTask.cleaning_time
@@ -489,7 +481,7 @@ export default function UnconfirmedTasks() {
                       </div>
 
                       <div className="grid grid-cols-2 gap-2 px-4">
-                        <div className="text-center">
+                        <div>
                           <p className="text-sm font-semibold text-muted-foreground">Check-out</p>
                           <p className="text-sm">
                             {selectedTask.checkout_date
@@ -506,7 +498,7 @@ export default function UnconfirmedTasks() {
                                 : ""}
                           </p>
                         </div>
-                        <div className="text-center">
+                        <div>
                           <p className="text-sm font-semibold text-muted-foreground">Check-in</p>
                           <p className="text-sm">
                             {selectedTask.checkin_date
@@ -526,7 +518,7 @@ export default function UnconfirmedTasks() {
                       </div>
 
                       <div className="grid grid-cols-2 gap-2 px-4">
-                        <div className="text-center">
+                        <div>
                           <p className="text-sm font-semibold text-muted-foreground">Tipologia appartamento</p>
                           <p className="text-sm">{selectedTask.type_apt || "non migrato"}</p>
                         </div>
