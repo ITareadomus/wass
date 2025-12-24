@@ -185,7 +185,8 @@ def get_tasks_from_db(selected_date, assigned_task_ids=None):
             s.structure_type_id,
             h.operation_id,
             c.alias AS alias,
-            c.name AS customer_name
+            c.name AS customer_name,
+            s.customer_structure_reference AS customer_reference
         FROM app_housekeeping h
         JOIN app_structures s ON h.structure_id = s.id
         LEFT JOIN app_customers c ON s.customer_id = c.id
@@ -252,6 +253,7 @@ def get_tasks_from_db(selected_date, assigned_task_ids=None):
             "type_apt": map_structure_type_to_letter(structure_type_id),
             "alias": varchar_to_str(r.get("alias")) if r.get("alias") is not None else None,
             "customer_name": varchar_to_str(r.get("customer_name")) if r.get("customer_name") is not None else None,
+            "customer_reference": varchar_to_str(r.get("customer_reference")) if r.get("customer_reference") is not None else None,
         }
         results.append(item)
 
@@ -689,7 +691,8 @@ def extract_tasks_from_db(work_date=None, assigned_task_ids=None):
             s.structure_type_id,
             h.operation_id,
             c.alias AS alias,
-            c.name AS customer_name
+            c.name AS customer_name,
+            s.customer_structure_reference AS customer_reference
         FROM app_housekeeping h
         JOIN app_structures s ON h.structure_id = s.id
         LEFT JOIN app_customers c ON s.customer_id = c.id
