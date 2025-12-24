@@ -5022,10 +5022,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
             l.alias,
             l.type_apt,
             c.name AS customer_name,
-            c.id AS client_id
+            c.id AS client_id,
+            s.customer_structure_reference AS customer_reference
           FROM app_housekeeping h
           LEFT JOIN app_logistics l ON h.logistic_code = l.code
           LEFT JOIN app_client c ON l.id_client = c.id
+          LEFT JOIN app_structures s ON l.code = s.code AND l.id_client = s.id_client
           WHERE h.id IN (${taskIds.join(',')})
         `);
         await adamConnection.end();
@@ -5051,6 +5053,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             alias: row.alias,
             type_apt: row.type_apt,
             customer_name: row.customer_name,
+            customer_reference: row.customer_reference,
             client_id: row.client_id
           });
         }
@@ -5071,6 +5074,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 if (adamData.address) task.address = adamData.address;
                 if (adamData.alias) task.alias = adamData.alias;
                 if (adamData.customer_name) task.customer_name = adamData.customer_name;
+                if (adamData.customer_reference) task.customer_reference = adamData.customer_reference;
                 if (adamData.premium !== undefined) task.premium = adamData.premium;
                 if (adamData.operation_id !== undefined) task.operation_id = adamData.operation_id;
                 task.confirmed_operation = adamData.confirmed_operation;
