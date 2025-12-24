@@ -669,11 +669,52 @@ export class PgDailyAssignmentsService {
         if (row.alias) task.alias = row.alias;
         if (row.customer_name) task.customer_name = row.customer_name;
         if (row.reasons && row.reasons.length > 0) task.reasons = row.reasons;
+        if (row.customer_reference) task.customer_reference = row.customer_reference;
 
         // Add to appropriate priority bucket (map DB names to frontend names)
         const dbPriority = row.priority || 'low';
         const frontendPriority = priorityMap[dbPriority] || 'low_priority';
         tasksByPriority[frontendPriority].push(task);
+      }
+
+      // For client_id = 3, fetch customer_reference from ADAM if not already present
+      const allTasks = [...tasksByPriority.early_out, ...tasksByPriority.high_priority, ...tasksByPriority.low_priority];
+      const tasksNeedingRef = allTasks.filter(t => t.client_id === 3 && !t.customer_reference);
+      
+      if (tasksNeedingRef.length > 0) {
+        try {
+          const mysql = await import('mysql2/promise');
+          const adamConnection = await mysql.createConnection({
+            host: process.env.DB_HOST,
+            user: process.env.DB_USER,
+            password: process.env.DB_PASSWORD,
+            database: process.env.DB_NAME
+          });
+          
+          const logisticCodes = tasksNeedingRef.map(t => t.logistic_code);
+          const [rows] = await adamConnection.execute(
+            `SELECT logistic_code, customer_structure_reference 
+             FROM app_structures 
+             WHERE logistic_code IN (${logisticCodes.map(() => '?').join(',')})`,
+            logisticCodes
+          );
+          
+          const refMap = new Map<number, string>();
+          for (const row of rows as any[]) {
+            if (row.customer_structure_reference) {
+              refMap.set(row.logistic_code, row.customer_structure_reference);
+            }
+          }
+          
+          for (const task of tasksNeedingRef) {
+            const ref = refMap.get(task.logistic_code);
+            if (ref) task.customer_reference = ref;
+          }
+          
+          await adamConnection.end();
+        } catch (adamError) {
+          console.error('⚠️ PG: Errore nel caricamento customer_reference da ADAM:', adamError);
+        }
       }
 
       // Build structure matching create_containers.py format
@@ -757,11 +798,11 @@ export class PgDailyAssignmentsService {
               task_id, logistic_code, client_id, premium, address, lat, lng,
               cleaning_time, checkin_date, checkout_date, checkin_time, checkout_time,
               pax_in, pax_out, small_equipment, operation_id, confirmed_operation,
-              straordinaria, type_apt, alias, customer_name, reasons
+              straordinaria, type_apt, alias, customer_name, reasons, customer_reference
             ) VALUES (
               $1, $2, $3, $4, $5, $6, $7, $8, $9,
               $10, $11, $12, $13, $14, $15, $16, $17, $18, $19,
-              $20, $21, $22, $23, $24
+              $20, $21, $22, $23, $24, $25
             )
           `, [
             workDate,
@@ -787,7 +828,8 @@ export class PgDailyAssignmentsService {
             task.type_apt || null,
             task.alias || null,
             task.customer_name || null,
-            task.reasons || []
+            task.reasons || [],
+            task.customer_reference || null
           ]);
 
           totalInserted++;
@@ -831,11 +873,11 @@ export class PgDailyAssignmentsService {
           task_id, logistic_code, client_id, premium, address, lat, lng,
           cleaning_time, checkin_date, checkout_date, checkin_time, checkout_time,
           pax_in, pax_out, small_equipment, operation_id, confirmed_operation,
-          straordinaria, type_apt, alias, customer_name, reasons
+          straordinaria, type_apt, alias, customer_name, reasons, customer_reference
         ) VALUES (
           $1, $2, $3, $4, $5, $6, $7, $8, $9,
           $10, $11, $12, $13, $14, $15, $16, $17, $18, $19,
-          $20, $21, $22, $23, $24
+          $20, $21, $22, $23, $24, $25
         )
         ON CONFLICT (work_date, task_id) DO NOTHING
       `, [
@@ -862,7 +904,8 @@ export class PgDailyAssignmentsService {
         task.type_apt || null,
         task.alias || null,
         task.customer_name || null,
-        task.reasons || []
+        task.reasons || [],
+        task.customer_reference || null
       ]);
 
       console.log(`✅ PG: Task ${task.task_id} aggiunto ai containers (${priority}) per ${workDate}`);

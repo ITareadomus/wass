@@ -916,6 +916,11 @@ export default function TaskCard({
                         >
                           {task.name}
                         </span>
+                        {(task as any).customer_reference && (
+                          <span className="text-[#ff0000] font-bold text-[11px]">
+                            ({(task as any).customer_reference})
+                          </span>
+                        )}
                       </div>
                       {task.alias && (
                         <span className="opacity-70 leading-none mt-0.5 text-[#000000] font-bold text-[11px]">

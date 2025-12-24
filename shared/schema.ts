@@ -144,6 +144,7 @@ export const taskSchema = z.object({
   pax_out: z.number().optional(),
   operation_id: z.number().optional(),
   customer_name: z.string().optional(),
+  customer_reference: z.string().optional(),
   type_apt: z.string().optional(),
   startTime: z.string().optional(),
   endTime: z.string().optional(),
