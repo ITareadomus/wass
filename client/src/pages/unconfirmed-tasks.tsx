@@ -455,22 +455,22 @@ export default function UnconfirmedTasks() {
                       <div className="grid grid-cols-2 gap-2 px-4">
                         <div>
                           <p className="text-sm font-semibold text-muted-foreground">Codice ADAM</p>
-                          <p className="text-sm text-muted-foreground">{selectedTask.logistic_code}</p>
+                          <p className="text-sm">{selectedTask.logistic_code}</p>
                         </div>
                         <div>
                           <p className="text-sm font-semibold text-muted-foreground">Cliente</p>
-                          <p className="text-sm text-muted-foreground">{selectedTask.customer_name || selectedTask.alias || "non migrato"}</p>
+                          <p className="text-sm">{selectedTask.customer_name || selectedTask.alias || "non migrato"}</p>
                         </div>
                       </div>
 
                       <div className="grid grid-cols-2 gap-2 px-4">
                         <div>
                           <p className="text-sm font-semibold text-muted-foreground">Indirizzo</p>
-                          <p className="text-sm text-muted-foreground uppercase">{selectedTask.address || "NON MIGRATO"}</p>
+                          <p className="text-sm uppercase">{selectedTask.address || "NON MIGRATO"}</p>
                         </div>
                         <div>
                           <p className="text-sm font-semibold text-muted-foreground">Durata pulizia</p>
-                          <p className="text-sm text-muted-foreground">
+                          <p className="text-sm">
                             {selectedTask.cleaning_time
                               ? `${selectedTask.cleaning_time} minuti`
                               : selectedTask.duration
@@ -483,7 +483,7 @@ export default function UnconfirmedTasks() {
                       <div className="grid grid-cols-2 gap-2 px-4">
                         <div>
                           <p className="text-sm font-semibold text-muted-foreground">Check-out</p>
-                          <p className="text-sm text-muted-foreground">
+                          <p className="text-sm">
                             {selectedTask.checkout_date
                               ? new Date(selectedTask.checkout_date).toLocaleDateString("it-IT", {
                                   day: "2-digit",
@@ -500,7 +500,7 @@ export default function UnconfirmedTasks() {
                         </div>
                         <div>
                           <p className="text-sm font-semibold text-muted-foreground">Check-in</p>
-                          <p className="text-sm text-muted-foreground">
+                          <p className="text-sm">
                             {selectedTask.checkin_date
                               ? new Date(selectedTask.checkin_date).toLocaleDateString("it-IT", {
                                   day: "2-digit",
@@ -520,7 +520,7 @@ export default function UnconfirmedTasks() {
                       <div className="grid grid-cols-2 gap-2 px-4">
                         <div>
                           <p className="text-sm font-semibold text-muted-foreground">Tipologia appartamento</p>
-                          <p className="text-sm text-muted-foreground">{selectedTask.type_apt || "non migrato"}</p>
+                          <p className="text-sm">{selectedTask.type_apt || "non migrato"}</p>
                         </div>
                         <Popover>
                           <PopoverTrigger asChild>
