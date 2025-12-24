@@ -42,6 +42,7 @@ interface RawTask {
   reasons?: string[];
   alias?: string;
   confirmed_operation?: boolean;
+  customer_reference?: string | number;
 }
 
 // === HELPERS per gestire id univoco e logisticCode non univoco ===
@@ -1049,6 +1050,7 @@ export default function GenerateAssignments() {
       pax_out: rawTask.pax_out,
       operation_id: rawTask.operation_id,
       customer_name: (rawTask as any).customer_name,
+      customer_reference: rawTask.customer_reference,
       type_apt: (rawTask as any).type_apt,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
