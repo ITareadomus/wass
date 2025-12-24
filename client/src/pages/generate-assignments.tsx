@@ -1279,6 +1279,7 @@ export default function GenerateAssignments() {
             premium: timelineAssignment.premium,
             straordinaria: timelineAssignment.straordinaria,
             confirmed_operation: timelineAssignment.confirmed_operation,
+            customer_reference: timelineAssignment.customer_reference,
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString()
           };
@@ -1304,6 +1305,7 @@ export default function GenerateAssignments() {
             straordinaria: timelineAssignment.straordinaria !== undefined ? timelineAssignment.straordinaria : (baseTask as any).straordinaria,
             confirmed_operation: timelineAssignment.confirmed_operation !== undefined ? timelineAssignment.confirmed_operation : (baseTask as any).confirmed_operation,
             customer_name: timelineAssignment.customer_name,
+            customer_reference: timelineAssignment.customer_reference,
             type_apt: timelineAssignment.type_apt,
             checkin_date: timelineAssignment.checkin_date,
             checkout_date: timelineAssignment.checkout_date,
