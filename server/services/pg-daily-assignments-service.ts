@@ -30,6 +30,7 @@ export interface PgDailyAssignmentRow {
   type_apt?: string | null;
   alias?: string | null;
   customer_name?: string | null;
+  customer_reference?: string | number | null;
   reasons: string[];
   priority?: string | null;
   start_time?: string | null;
@@ -142,6 +143,7 @@ export class PgDailyAssignmentsService {
           type_apt: task.type_apt || null,
           alias: task.alias || null,
           customer_name: task.customer_name || null,
+          customer_reference: task.customer_reference ? String(task.customer_reference) : null,
           reasons: Array.isArray(task.reasons) ? task.reasons : [],
           priority: task.priority || null,
           start_time: task.start_time || null,
@@ -192,7 +194,7 @@ export class PgDailyAssignmentsService {
             premium, address, lat, lng, cleaning_time,
             checkin_date, checkout_date, checkin_time, checkout_time,
             pax_in, pax_out, small_equipment, operation_id, confirmed_operation, straordinaria,
-            type_apt, alias, customer_name, reasons, priority,
+            type_apt, alias, customer_name, customer_reference, reasons, priority,
             start_time, end_time, followup, sequence, travel_time
           ) VALUES (
             $1, $2, $3, $4, $5, $6, $7,
@@ -200,8 +202,8 @@ export class PgDailyAssignmentsService {
             $11, $12, $13, $14, $15,
             $16, $17, $18, $19,
             $20, $21, $22, $23, $24, $25,
-            $26, $27, $28, $29, $30,
-            $31, $32, $33, $34, $35
+            $26, $27, $28, $29, $30, $31,
+            $32, $33, $34, $35, $36
           )
         `, [
           row.work_date,
@@ -232,6 +234,7 @@ export class PgDailyAssignmentsService {
           row.type_apt,
           row.alias,
           row.customer_name,
+          row.customer_reference,
           row.reasons,
           row.priority,
           row.start_time,
@@ -474,7 +477,7 @@ export class PgDailyAssignmentsService {
             premium, address, lat, lng, cleaning_time,
             checkin_date, checkout_date, checkin_time, checkout_time,
             pax_in, pax_out, small_equipment, operation_id, confirmed_operation, straordinaria,
-            type_apt, alias, customer_name, reasons, priority,
+            type_apt, alias, customer_name, customer_reference, reasons, priority,
             start_time, end_time, followup, sequence, travel_time, created_by
           ) VALUES (
             $1, $2, $3, $4, $5, $6, $7, $8,
@@ -482,8 +485,8 @@ export class PgDailyAssignmentsService {
             $12, $13, $14, $15, $16,
             $17, $18, $19, $20,
             $21, $22, $23, $24, $25, $26,
-            $27, $28, $29, $30, $31,
-            $32, $33, $34, $35, $36, $37
+            $27, $28, $29, $30, $31, $32,
+            $33, $34, $35, $36, $37, $38
           )
         `, [
           row.work_date,
@@ -515,6 +518,7 @@ export class PgDailyAssignmentsService {
           row.type_apt,
           row.alias,
           row.customer_name,
+          row.customer_reference,
           row.reasons,
           row.priority,
           row.start_time,
