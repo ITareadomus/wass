@@ -45,6 +45,7 @@ interface Task {
   address?: string;
   alias?: string;
   customer_name?: string;
+  customer_reference?: string | number;
   cleaning_time?: number;
   checkout_time?: string;
   checkout_date?: string;
