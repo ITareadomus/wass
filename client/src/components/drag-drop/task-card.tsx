@@ -19,7 +19,7 @@ import {
 } from "@/components/ui/tooltip";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
-import { HelpCircle, ChevronLeft, ChevronRight, Save, Pencil, Calendar } from "lucide-react";
+import { HelpCircle, ChevronLeft, ChevronRight, Save, Pencil, Calendar, Lock, LockOpen } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -193,6 +193,11 @@ export default function TaskCard({
   ) || { 1: "FERMATA", 2: "PARTENZA", 3: "PULIZIA STRAORDINARIA", 4: "RIPASSO" };
 
   const [isMapFiltered, setIsMapFiltered] = useState(false);
+  
+  // Stato per blocco task
+  const [isLocked, setIsLocked] = useState((task as any).locked || false);
+  const [lockedReason, setLockedReason] = useState((task as any).locked_reason || '');
+  const [isEditingReason, setIsEditingReason] = useState(false);
 
   // Usa il context multi-select dalla prop (solo per container, non timeline)
   const isMultiSelectMode = multiSelectContext?.isMultiSelectMode ?? false;
@@ -252,6 +257,71 @@ export default function TaskCard({
   const [currentTaskId, setCurrentTaskId] = useState(getTaskKey(task));
   const [assignmentTimes, setAssignmentTimes] = useState<{ start_time?: string; end_time?: string; travel_time?: number }>({});
   const { toast } = useToast();
+
+  // Handler per toggle blocco task
+  const handleToggleLock = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const newLocked = !isLocked;
+    const newReason = newLocked ? lockedReason : '';
+    
+    try {
+      const response = await fetch('/api/lock-task', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          task_id: task.id,
+          logistic_code: task.name,
+          locked: newLocked,
+          locked_reason: newReason,
+        }),
+      });
+      
+      if (response.ok) {
+        setIsLocked(newLocked);
+        if (!newLocked) {
+          setLockedReason('');
+          setIsEditingReason(false);
+        }
+        toast({
+          title: newLocked ? "Task bloccata" : "Task sbloccata",
+          description: newLocked ? "La task non può essere assegnata o trascinata" : "La task è ora disponibile",
+        });
+      }
+    } catch (error) {
+      console.error('Errore nel blocco task:', error);
+      toast({
+        title: "Errore",
+        description: "Impossibile modificare lo stato del blocco",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleSaveLockedReason = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    try {
+      const response = await fetch('/api/lock-task', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          task_id: task.id,
+          logistic_code: task.name,
+          locked: isLocked,
+          locked_reason: lockedReason,
+        }),
+      });
+      
+      if (response.ok) {
+        setIsEditingReason(false);
+        toast({
+          title: "Motivo salvato",
+          description: "Il motivo del blocco è stato aggiornato",
+        });
+      }
+    } catch (error) {
+      console.error('Errore nel salvataggio motivo:', error);
+    }
+  };
 
   // Stati per editing - ora un set di campi invece di uno solo
   const [editingFields, setEditingFields] = useState<Set<'duration' | 'checkout' | 'checkin' | 'paxin' | 'operation'>>(new Set());
@@ -767,8 +837,8 @@ export default function TaskCard({
     return checkin > selectedDate;
   })();
 
-  // Determina se il drag è disabilitato in base alla data e se la task è già salvata
-  const shouldDisableDrag = isDragDisabled || (displayTask as any).checkin_date;
+  // Determina se il drag è disabilitato in base alla data, se la task è già salvata, o se è bloccata
+  const shouldDisableDrag = isDragDisabled || (displayTask as any).checkin_date || isLocked;
 
   // Calcola offset in pixel
   const timelineWidth = (window as any).timelineWidthPx || 0;
@@ -926,6 +996,56 @@ export default function TaskCard({
                         <span className="opacity-70 leading-none mt-0.5 text-[#000000] font-bold text-[11px]">
                           {task.alias}{(task as any).type_apt ? ` (${(task as any).type_apt})` : ''}
                         </span>
+                      )}
+                      {/* Icona lucchetto per blocco task - solo nei container */}
+                      {!isInTimeline && (
+                        <div className="flex items-center gap-1 mt-1">
+                          <button
+                            onClick={handleToggleLock}
+                            className={cn(
+                              "p-0.5 rounded transition-colors",
+                              isLocked 
+                                ? "text-red-600 hover:bg-red-100" 
+                                : "text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+                            )}
+                            title={isLocked ? "Sblocca task" : "Blocca task"}
+                            data-testid={`lock-task-${getTaskKey(task)}`}
+                          >
+                            {isLocked ? <Lock className="w-3 h-3" /> : <LockOpen className="w-3 h-3" />}
+                          </button>
+                          {isLocked && (
+                            <div className="flex items-center gap-0.5">
+                              {isEditingReason ? (
+                                <>
+                                  <input
+                                    type="text"
+                                    value={lockedReason}
+                                    onChange={(e) => setLockedReason(e.target.value)}
+                                    onClick={(e) => e.stopPropagation()}
+                                    className="text-[9px] w-16 px-0.5 border border-gray-300 rounded"
+                                    placeholder="motivo..."
+                                    data-testid={`lock-reason-input-${getTaskKey(task)}`}
+                                  />
+                                  <button
+                                    onClick={handleSaveLockedReason}
+                                    className="text-green-600 hover:text-green-800"
+                                    title="Salva motivo"
+                                  >
+                                    <Save className="w-2.5 h-2.5" />
+                                  </button>
+                                </>
+                              ) : (
+                                <span 
+                                  className="text-[9px] text-red-600 cursor-pointer hover:underline truncate max-w-[60px]"
+                                  onClick={(e) => { e.stopPropagation(); setIsEditingReason(true); }}
+                                  title={lockedReason || "Clicca per aggiungere motivo"}
+                                >
+                                  {lockedReason || "motivo?"}
+                                </span>
+                              )}
+                            </div>
+                          )}
+                        </div>
                       )}
                     </div>
                   </div>

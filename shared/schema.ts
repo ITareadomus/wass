@@ -148,6 +148,8 @@ export const taskSchema = z.object({
   type_apt: z.string().optional(),
   startTime: z.string().optional(),
   endTime: z.string().optional(),
+  locked: z.boolean().optional(),
+  locked_reason: z.string().optional(),
   createdAt: z.string(),
   updatedAt: z.string(),
 });
