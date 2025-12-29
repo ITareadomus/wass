@@ -2038,35 +2038,35 @@ export default function TimelineView({
                     📜 Sei in modalità storico
                   </Button>
                 )}
-                <div className="flex flex-col items-center">
-                  <Button
-                    onClick={() => setShowAdamTransferDialog(true)}
-                    size="sm"
-                    variant="outline"
-                    className="h-full px-3 border-2 border-custom-blue"
-                    disabled={!hasTasksInTimeline}
-                    title={!hasTasksInTimeline ? "Nessuna task assegnata nella timeline" : "Trasferisci le assegnazioni sul database ADAM"}
-                  >
-                    <svg className="mr-1 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
-                    </svg>
-                    Trasferisci su ADAM
-                  </Button>
-                  {lastAdamTransfer && (
-                    <span className="text-xs text-muted-foreground mt-1">
-                      Ultimo salvataggio: {(() => {
-                        const d = new Date(lastAdamTransfer);
-                        const day = String(d.getDate()).padStart(2, '0');
-                        const month = String(d.getMonth() + 1).padStart(2, '0');
-                        const year = d.getFullYear();
-                        const hours = String(d.getHours()).padStart(2, '0');
-                        const minutes = String(d.getMinutes()).padStart(2, '0');
-                        return `${day}-${month}-${year} - ${hours}:${minutes}`;
-                      })()}
-                    </span>
-                  )}
-                </div>
+                <Button
+                  onClick={() => setShowAdamTransferDialog(true)}
+                  size="sm"
+                  variant="outline"
+                  className="h-full px-3 border-2 border-custom-blue"
+                  disabled={!hasTasksInTimeline}
+                  title={!hasTasksInTimeline ? "Nessuna task assegnata nella timeline" : "Trasferisci le assegnazioni sul database ADAM"}
+                >
+                  <svg className="mr-1 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                  </svg>
+                  Trasferisci su ADAM
+                </Button>
               </div>
+              {lastAdamTransfer && (
+                <div className="px-1 pb-1">
+                  <span className="text-xs text-muted-foreground">
+                    Ultimo salvataggio su ADAM: {(() => {
+                      const d = new Date(lastAdamTransfer);
+                      const day = String(d.getDate()).padStart(2, '0');
+                      const month = String(d.getMonth() + 1).padStart(2, '0');
+                      const year = d.getFullYear();
+                      const hours = String(d.getHours()).padStart(2, '0');
+                      const minutes = String(d.getMinutes()).padStart(2, '0');
+                      return `${day}-${month}-${year} - ${hours}:${minutes}`;
+                    })()}
+                  </span>
+                </div>
+              )}
             </div>
           </div>
         </div>
