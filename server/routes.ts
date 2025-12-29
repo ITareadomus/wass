@@ -3154,27 +3154,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      // Verifica se creare una nuova revision: solo se l'utente è diverso dall'ultimo
+      // Crea sempre una revision per tracciare il trasferimento ADAM (per il timestamp)
       const { pgDailyAssignmentsService } = await import("./services/pg-daily-assignments-service");
-      const lastRevisionUser = await pgDailyAssignmentsService.getLastRevisionUser(workDate);
       let revisionCreated = false;
       
-      if (lastRevisionUser && lastRevisionUser !== username) {
-        // Utente diverso: crea nuova revision
-        console.log(`📝 Utente diverso (ultimo: ${lastRevisionUser}, corrente: ${username}) - creazione nuova revision`);
-        await pgDailyAssignmentsService.saveToHistory(
-          workDate, 
-          timelineData, 
-          username, 
-          'transfer_to_adam',
-          [],
-          [],
-          []
-        );
-        revisionCreated = true;
-      } else {
-        console.log(`📝 Stesso utente (${username}) - nessuna nuova revision creata`);
-      }
+      // Crea sempre una nuova revision per registrare il timestamp del trasferimento ADAM
+      console.log(`📝 Creazione revision per trasferimento ADAM da utente: ${username}`);
+      await pgDailyAssignmentsService.saveToHistory(
+        workDate, 
+        timelineData, 
+        username, 
+        'transfer_to_adam',
+        [],
+        [],
+        []
+      );
+      revisionCreated = true;
 
       // Recupera adam_id dell'utente per usarlo come updated_by
       const { pgUsersService } = await import("./services/pg-users-service");
