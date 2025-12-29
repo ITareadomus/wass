@@ -286,6 +286,10 @@ export default function TaskCard({
           title: newLocked ? "Task bloccata" : "Task sbloccata",
           description: newLocked ? "La task non può essere assegnata o trascinata" : "La task è ora disponibile",
         });
+        // Ricarica i container per aggiornare lo stato del pulsante Assegna
+        if ((window as any).reloadAllTasks) {
+          await (window as any).reloadAllTasks();
+        }
       }
     } catch (error) {
       console.error('Errore nel blocco task:', error);
