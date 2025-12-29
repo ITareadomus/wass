@@ -3247,6 +3247,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   startwork = ?,
                   startwork_at = ?,
                   startreport = ?,
+                  startreport_at = ?,
                   extratimes = ?
                 WHERE id = ?
               `;
@@ -3274,6 +3275,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 0,
                 null,
                 0,
+                null,
                 ''
               ];
 
