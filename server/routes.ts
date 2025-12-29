@@ -3305,16 +3305,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
         }
 
-        console.log(`\n✅ Trasferimento completato! (${totalUpdated} task aggiornate, ${totalErrors} errori${revisionCreated ? ', nuova revision creata' : ''})`);
+        // Se tutti gli aggiornamenti sono andati a buon fine, notifica ADAM API
+        let apiNotified = false;
+        if (totalErrors === 0 && totalUpdated > 0) {
+          try {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 30000);
+            
+            await fetch('https://app.adam.areadomus.it/adam/api/v1/optimo/route/receive', {
+              method: 'POST',
+              headers: {
+                'Authorization': 'Basic YXBpQGFyZWFkb211c2FwcC5pdDowMDAwMDAwMA==',
+                'Optimoid': '654321'
+              },
+              signal: controller.signal
+            });
+            
+            clearTimeout(timeoutId);
+            apiNotified = true;
+            console.log('✅ Notifica ADAM API route/receive inviata con successo');
+          } catch (apiError: any) {
+            console.warn(`⚠️ Notifica ADAM API fallita: ${apiError.message}`);
+          }
+        }
+
+        console.log(`\n✅ Trasferimento completato! (${totalUpdated} task aggiornate, ${totalErrors} errori${revisionCreated ? ', nuova revision creata' : ''}${apiNotified ? ', API notificata' : ''})`);
 
         res.json({
           success: true,
-          message: `Trasferimento completato: ${totalUpdated} task aggiornate${totalErrors > 0 ? `, ${totalErrors} errori` : ''}${revisionCreated ? ' (nuova revision creata)' : ''}`,
+          message: `Trasferimento completato: ${totalUpdated} task aggiornate${totalErrors > 0 ? `, ${totalErrors} errori` : ''}${revisionCreated ? ' (nuova revision creata)' : ''}${apiNotified ? ' (API notificata)' : ''}`,
           stats: {
             updated: totalUpdated,
             errors: totalErrors,
             errorDetails: errors,
-            revisionCreated
+            revisionCreated,
+            apiNotified
           }
         });
 
