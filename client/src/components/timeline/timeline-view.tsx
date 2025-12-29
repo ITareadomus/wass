@@ -207,6 +207,17 @@ export default function TimelineView({
     fetchLastTransfer();
   }, [workDate]);
 
+  // Stato per memorizzare i dati della timeline (inclusi i metadata)
+  const [timelineData, setTimelineData] = useState<any>(null);
+
+  // Larghezza della timeline in pixel per calcolo larghezze task
+  const [timelineWidthPx, setTimelineWidthPx] = useState<number>(0);
+  const timelineRowRef = useRef<HTMLDivElement>(null);
+
+  // Carica anche i cleaner dalla timeline.json per mostrare quelli nascosti
+  // DEVE essere definito PRIMA di allCleanersToShow che lo usa
+  const [timelineCleaners, setTimelineCleaners] = useState<any[]>([]);
+
   // Mostra cleaners da selected_cleaners API + cleaners che hanno task in timeline
   // DEVE essere definito PRIMA di getGlobalStartTime() che lo usa
   const allCleanersToShow = React.useMemo(() => {
