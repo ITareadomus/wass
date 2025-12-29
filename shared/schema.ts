@@ -254,3 +254,19 @@ export const optimizerUnassigned = optimizerSchema.table("optimizer_unassigned",
 export const insertOptimizerUnassignedSchema = createInsertSchema(optimizerUnassigned);
 export type InsertOptimizerUnassigned = z.infer<typeof insertOptimizerUnassignedSchema>;
 export type OptimizerUnassigned = typeof optimizerUnassigned.$inferSelect;
+
+// ==================== TRAVEL TIME CACHE ====================
+// Cache tecnica per i tempi di percorrenza stimati (non operativa)
+export const optimizerTravelTimeCache = optimizerSchema.table("optimizer_travel_time_cache", {
+  cacheKey: text("cache_key").primaryKey(),
+  minutes: smallint("minutes").notNull(),
+  source: text("source").notNull().default("estimated"),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  expiresAt: timestamp("expires_at", { withTimezone: true }),
+});
+
+export const insertOptimizerTravelTimeCacheSchema = createInsertSchema(optimizerTravelTimeCache).omit({
+  updatedAt: true,
+});
+export type InsertOptimizerTravelTimeCache = z.infer<typeof insertOptimizerTravelTimeCacheSchema>;
+export type OptimizerTravelTimeCache = typeof optimizerTravelTimeCache.$inferSelect;

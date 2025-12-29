@@ -1,0 +1,222 @@
+Principio non negoziabile
+
+L’assegnazione attuale (legacy / produzione) NON deve cambiare.
+Quello che implementiamo ora deve:
+
+leggere dati in read-only dalle tabelle operative
+
+scrivere solo su:
+
+optimizer.optimizer_run
+
+optimizer.optimizer_decision
+
+optimizer.optimizer_assignment
+
+optimizer.optimizer_unassigned
+
+(nuova) optimizer_travel_time_cache (cache tecnica, non operativa)
+
+NON creare/aggiornare assegnazioni reali, schedule reali, task reali.
+
+In pratica: FASI 1–2–3–4 restano “shadow optimizer” e servono solo a valutare coverage e qualità.
+
+Ordine di implementazione (senza rischio per produzione)
+Step 1 — Mettere un “guard rail” per evitare scritture operative
+
+Dove: server/services/optimizer/* + dove esiste l’endpoint che lancia optimizer
+
+Verifica che l’optimizer non scriva mai su tabelle di produzione (es. assignments reali).
+
+Se esiste già una flag tipo shadow=true, assicurati che sia sempre true in questi endpoint.
+
+Se non esiste, aggiungi un check centrale in runOptimizer/controller:
+
+“questa pipeline scrive solo nello schema optimizer”.
+
+Deliverable: prova con una run e conferma che nessun update/insert avviene su tabelle operative.
+
+TravelTimeProvider (cache + fallback + logging) — SOLO SUPPORTO, zero impatto operativo
+Step 2 — Aggiungere cache Postgres (tecnica)
+
+Nuova tabella (Postgres):
+
+optimizer_travel_time_cache
+
+cache_key TEXT PRIMARY KEY
+
+minutes SMALLINT NOT NULL
+
+source TEXT NOT NULL DEFAULT 'estimated'
+
+updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+
+indice su updated_at
+
+Questa tabella è tecnica e non cambia nulla in produzione: è solo cache.
+
+Step 3 — Implementare TravelTimeProvider unico
+
+Nuovo file
+
+server/services/optimizer/travelTimeProvider.ts
+
+Comportamento
+
+Lookup cache in Postgres
+
+Se miss o stale (>30 giorni) → calcola con la stima legacy attuale (così resta allineato ai vecchi script)
+
+Upsert in cache
+
+Se usa fallback stimato → logga evento ESTIMATED_TRAVEL_USED su optimizer.optimizer_decision
+
+Anti-spam
+
+log ESTIMATED_TRAVEL_USED max una volta per cacheKey per run (Set in memoria nel provider)
+
+Importantissimo
+
+Questo provider non cambia “il modello di assegnazione”: cambia solo come recuperi i minuti (sempre stessi minuti della stima legacy, solo cached).
+
+Patch travel in FASE 1–2–3 (shadow) — Output teorico deve restare uguale
+Step 4 — Sostituire estimateTravelMinutes(...) con TravelTimeProvider in FASE 1–2–3
+
+Dove:
+
+server/services/optimizer/phase1.ts
+
+server/services/optimizer/phase2.ts
+
+server/services/optimizer/phase3.ts
+
+Regola
+
+Il valore minuti deve rimanere identico a quello attuale (stima legacy), quindi non deve cambiare il risultato delle FASI 1–2–3 rispetto a prima, a parità di input.
+
+Nota tecnica
+
+se la simulazione FASE 3 è sincrona e introdurre await crea refactor grosso:
+
+soluzione consigliata: TravelTimeProvider offre anche getMinutesSyncFromLocalCacheOrThrow(...) dopo una fase di prefetch
+
+oppure precompute dei travel necessari per permutazione e passi una matrice alla simulazione
+
+l’obiettivo è: non riscrivere tutta la fase 3, mantenere output e performance.
+
+Deliverable
+
+Run A (prima) vs Run B (dopo provider) devono produrre:
+
+stessi gruppi candidati
+
+stesse assegnazioni shadow fase2
+
+stessa timeline shadow fase3
+(al netto di log extra ESTIMATED_TRAVEL_USED).
+
+Implementazione FASE 4 — SOLO shadow (nessuna scrittura operativa)
+Step 5 — Aggiungere FASE 4 come modulo separato
+
+Nuovi file
+
+server/services/optimizer/phase4.ts
+
+server/services/optimizer/runPhase4.ts
+
+Nuovo endpoint (shadow-only)
+
+POST /api/optimizer/run-phase4
+
+Oppure integrarla nel “run optimizer shadow completo” ma sempre senza writer.
+
+Step 6 — FASE 4 Recovery: cheapest insertion + single
+
+Input (shadow)
+
+optimizer.optimizer_assignment (output FASE 3)
+
+optimizer.optimizer_unassigned (FASE 3 + droppate)
+
+tasks del giorno (read-only dalle tabelle operative)
+
+selected_cleaners (read-only)
+
+priority windows settings (read-only)
+
+Algoritmo
+
+Cheapest insertion
+
+per ogni task unassigned:
+
+prova inserirla in tutte le posizioni in ogni schedule cleaner
+
+valida solo vincoli HARD (stessa simulazione fase3)
+
+scoring: Δtravel + Δwait + Δlateness + penalty EO/HP/LP
+
+bonus soft 1→2 task: solo nello scoring, mai riduce coverage
+
+se fattibile: applica miglior inserimento
+
+Single assignment
+
+se non entra:
+
+prova assegnarla come single (anche lontana), hard constraints only
+
+Remain unassigned
+
+se impossibile: resta unassigned con reason chiaro
+
+Logging
+
+PHASE4_RETRY_STARTED
+
+PHASE4_TASK_REASSIGNED_INSERTION
+
+PHASE4_TASK_ASSIGNED_SINGLE
+
+PHASE4_TASK_REMAIN_UNASSIGNED
+
+PHASE4_UNDERFILLED_BONUS_APPLIED
+
+Step 7 — Persistenza SOLO su tabelle optimizer
+
+Alla fine della fase 4:
+
+sovrascrivi solo:
+
+optimizer.optimizer_assignment (shadow timeline aggiornata)
+
+optimizer.optimizer_unassigned (shadow rimaste)
+
+NON toccare mai tabelle operative.
+
+QA finale “anti-rottura” (obbligatorio)
+Test 1 — Safety: nessuna scrittura operativa
+
+Verifica con log/DB che durante la run:
+
+nessun update/insert su tabelle di assegnazione reale
+
+solo schema optimizer + cache travel.
+
+Test 2 — Regressione: FASE 1–2–3 invarianti
+
+Esegui optimizer shadow prima e dopo TravelTimeProvider:
+
+output uguale (stessi task assegnati in fase3 shadow), cambia solo:
+
+ESTIMATED_TRAVEL_USED
+
+eventuali record cache.
+
+Test 3 — Coverage: FASE 4 non peggiora mai
+
+assigned_count_phase4 >= assigned_count_phase3 sempre.
+
+Prompt compatto per Replit Agent (focus “non rompere produzione”)
+
+Implementa TravelTimeProvider con cache Postgres (optimizer_travel_time_cache) e fallback sulla stima legacy, loggando ESTIMATED_TRAVEL_USED su optimizer.optimizer_decision quando usa fallback (max 1 per cacheKey per run). Sostituisci le chiamate travel nelle fasi 1–2–3 shadow senza cambiare i risultati attuali (output invarianti). Poi implementa FASE 4 Recovery shadow (cheapest insertion + single) che legge solo da tabelle operative e scrive solo su tabelle optimizer, senza modificare alcuna assegnazione reale.
