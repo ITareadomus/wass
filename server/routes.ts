@@ -3217,6 +3217,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
               const taskId = task.task_id;
               if (!taskId) continue;
 
+              const now = new Date();
+              const assignedAtUs = formatInTimeZone(now, ROME_TIMEZONE, 'yyyy-MM-dd HH:mm:ss');
+              const assignedAtMilliseconds = formatInTimeZone(now, ROME_TIMEZONE, 'yyyyMMddHHmmss') + 
+                String(now.getMilliseconds()).padStart(3, '0') + '000';
+
               const query = `
                 UPDATE app_housekeeping
                 SET 
@@ -3229,7 +3234,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   cleaned_by_us = ?,
                   sequence = ?,
                   updated_by = ?,
-                  updated_at = ?
+                  updated_at = ?,
+                  assigned_at_us = ?,
+                  assigned_at_milliseconds = ?,
+                  collaboration = ?,
+                  collaboration_by = ?,
+                  collaboration_at = ?,
+                  collaboration_bypass = ?,
+                  helpwork = ?,
+                  helpwork_by = ?,
+                  helpwork_at = ?,
+                  startwork = ?,
+                  startwork_at = ?,
+                  startreport = ?,
+                  extratimes = ?
                 WHERE id = ?
               `;
 
@@ -3243,7 +3261,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 cleanerId ?? null,
                 task.sequence ?? null,
                 adamUpdatedBy,
-                getRomeTimestamp().replace('T', ' ').substring(0, 19)
+                getRomeTimestamp().replace('T', ' ').substring(0, 19),
+                assignedAtUs,
+                assignedAtMilliseconds,
+                0,
+                0,
+                null,
+                0,
+                0,
+                0,
+                null,
+                0,
+                null,
+                0,
+                ''
               ];
 
               await connection.execute(query, [...values, taskId]);
