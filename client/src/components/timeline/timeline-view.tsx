@@ -169,6 +169,15 @@ export default function TimelineView({
   // Ref per tracciare i toast già mostrati (previene duplicati)
   const shownToastsRef = useRef<Set<string>>(new Set());
 
+  // Normalizza la data da localStorage per coerenza ovunque
+  const workDate = localStorage.getItem('selected_work_date') || (() => {
+    const today = new Date();
+    const year = today.getFullYear();
+    const month = String(today.getMonth() + 1).padStart(2, '0');
+    const day = String(today.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  })();
+
   // Carica le regole di validazione una sola volta all'init
   useEffect(() => {
     loadValidationRules().then(rules => {
@@ -197,26 +206,6 @@ export default function TimelineView({
     };
     fetchLastTransfer();
   }, [workDate]);
-
-  // Stato per memorizzare i dati della timeline (inclusi i metadata)
-  const [timelineData, setTimelineData] = useState<any>(null);
-
-  // Larghezza della timeline in pixel per calcolo larghezze task
-  const [timelineWidthPx, setTimelineWidthPx] = useState<number>(0);
-  const timelineRowRef = useRef<HTMLDivElement>(null);
-
-  // Carica anche i cleaner dalla timeline.json per mostrare quelli nascosti
-  // DEVE essere definito PRIMA di allCleanersToShow che lo usa
-  const [timelineCleaners, setTimelineCleaners] = useState<any[]>([]);
-
-  // Normalizza la data da localStorage per coerenza ovunque
-  const workDate = localStorage.getItem('selected_work_date') || (() => {
-    const today = new Date();
-    const year = today.getFullYear();
-    const month = String(today.getMonth() + 1).padStart(2, '0');
-    const day = String(today.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
-  })();
 
   // Mostra cleaners da selected_cleaners API + cleaners che hanno task in timeline
   // DEVE essere definito PRIMA di getGlobalStartTime() che lo usa
