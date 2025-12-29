@@ -2052,22 +2052,22 @@ export default function TimelineView({
                   Trasferisci su ADAM
                 </Button>
               </div>
-              {lastAdamTransfer && (
-                <div className="px-1 pb-1">
-                  <span className="text-xs text-muted-foreground">
-                    Ultimo salvataggio su ADAM: {(() => {
-                      const d = new Date(lastAdamTransfer);
-                      const day = String(d.getDate()).padStart(2, '0');
-                      const month = String(d.getMonth() + 1).padStart(2, '0');
-                      const year = d.getFullYear();
-                      const hours = String(d.getHours()).padStart(2, '0');
-                      const minutes = String(d.getMinutes()).padStart(2, '0');
-                      return `${day}-${month}-${year} - ${hours}:${minutes}`;
-                    })()}
-                  </span>
-                </div>
-              )}
             </div>
+            {lastAdamTransfer && (
+              <div className="flex justify-end px-1 pb-1">
+                <span className="text-xs text-muted-foreground">
+                  Ultimo salvataggio su ADAM: {(() => {
+                    const d = new Date(lastAdamTransfer);
+                    const day = String(d.getDate()).padStart(2, '0');
+                    const month = String(d.getMonth() + 1).padStart(2, '0');
+                    const year = d.getFullYear();
+                    const hours = String(d.getHours()).padStart(2, '0');
+                    const minutes = String(d.getMinutes()).padStart(2, '0');
+                    return `${day}-${month}-${year} - ${hours}:${minutes}`;
+                  })()}
+                </span>
+              </div>
+            )}
           </div>
         </div>
       </div>
