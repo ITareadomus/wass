@@ -1,7 +1,7 @@
 import { Droppable } from "react-beautiful-dnd";
 import { TaskType as Task } from "@shared/schema";
 import TaskCard from "./task-card";
-import { Clock, AlertCircle, ArrowDown, Calendar, CheckSquare } from "lucide-react";
+import { Clock, AlertCircle, ArrowDown, Calendar, CheckSquare, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";

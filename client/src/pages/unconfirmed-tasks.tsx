@@ -9,6 +9,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
+import { RefreshCw } from "lucide-react";
 import {
   Popover,
   PopoverContent,
@@ -599,7 +600,11 @@ export default function UnconfirmedTasks() {
                   className="border-2 border-custom-blue"
                   data-testid="button-save-adam"
                 >
-                  <Save className="h-4 w-4 mr-2" />
+                  {isSaving ? (
+                    <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <Save className="h-4 w-4 mr-2" />
+                  )}
                   {isSaving ? "Salvataggio..." : `Salva su ADAM (${selectedOperations.size})`}
                 </Button>
               </div>

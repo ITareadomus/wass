@@ -162,6 +162,7 @@ export default function TimelineView({
   const [startTimeEditDialog, setStartTimeEditDialog] = useState<{ open: boolean; cleanerId: number | null; cleanerName: string }>({ open: false, cleanerId: null, cleanerName: '' });
   const [isSavingStartTime, setIsSavingStartTime] = useState(false);
   const [isResetting, setIsResetting] = useState(false);
+  const [isTransferringToAdam, setIsTransferringToAdam] = useState(false);
 
   // Stato per le regole di validazione task-cleaner
   const [validationRules, setValidationRules] = useState<any>(null);
@@ -1449,6 +1450,7 @@ export default function TimelineView({
   // Funzione per il trasferimento dei dati ad ADAM
   const handleTransferToAdam = async () => {
     try {
+      setIsTransferringToAdam(true);
       setShowAdamTransferDialog(false); // Chiudi il dialog di conferma
 
       const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
@@ -2043,13 +2045,18 @@ export default function TimelineView({
                   size="sm"
                   variant="outline"
                   className="h-full px-3 border-2 border-custom-blue"
-                  disabled={!hasTasksInTimeline}
+                  disabled={!hasTasksInTimeline || isTransferringToAdam}
                   title={!hasTasksInTimeline ? "Nessuna task assegnata nella timeline" : "Trasferisci le assegnazioni sul database ADAM"}
+                  data-testid="button-transfer-adam"
                 >
-                  <svg className="mr-1 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
-                  </svg>
-                  Trasferisci su ADAM
+                  {isTransferringToAdam ? (
+                    <RefreshCw className="mr-1 h-4 w-4 animate-spin" />
+                  ) : (
+                    <svg className="mr-1 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                    </svg>
+                  )}
+                  {isTransferringToAdam ? "Trasferimento..." : "Trasferisci su ADAM"}
                 </Button>
               </div>
             </div>

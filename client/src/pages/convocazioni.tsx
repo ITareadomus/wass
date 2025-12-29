@@ -6,7 +6,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { Users, CalendarIcon, ArrowLeft, Save, UserPlus, Search } from "lucide-react";
+import { Users, CalendarIcon, ArrowLeft, Save, UserPlus, Search, RefreshCw } from "lucide-react";
 import { format } from "date-fns";
 import { it } from "date-fns/locale";
 import { cn } from "@/lib/utils";
@@ -714,12 +714,17 @@ export default function Convocazioni() {
                 setLocation('/generate-assignments');
               }}
               size="lg"
-              disabled={selectedCleaners.size === 0}
+              disabled={selectedCleaners.size === 0 || isSaving}
               className="flex items-center gap-2 bg-background border-2 border-custom-blue text-black dark:text-white hover:opacity-80"
+              data-testid="button-save-and-home"
             >
-              <Save className="w-4 h-4 mr-1" />
-              Salva e Torna alla Home
-              <ArrowLeft className="w-4 h-4 ml-1" />
+              {isSaving ? (
+                <RefreshCw className="w-4 h-4 mr-1 animate-spin" />
+              ) : (
+                <Save className="w-4 h-4 mr-1" />
+              )}
+              {isSaving ? "Salvataggio..." : "Salva e Torna alla Home"}
+              {!isSaving && <ArrowLeft className="w-4 h-4 ml-1" />}
             </Button>
           </div>
         </Card>
