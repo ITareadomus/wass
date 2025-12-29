@@ -2054,7 +2054,7 @@ export default function TimelineView({
               </div>
             </div>
             {lastAdamTransfer && (
-              <div className="flex justify-end px-1 pb-1">
+              <div className="flex justify-center px-1 pb-1">
                 <span className="text-xs text-muted-foreground">
                   Ultimo salvataggio su ADAM: {(() => {
                     const d = new Date(lastAdamTransfer);
