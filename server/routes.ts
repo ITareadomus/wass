@@ -3305,9 +3305,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
         }
 
-        // Se tutti gli aggiornamenti sono andati a buon fine, notifica ADAM API
+        // Se tutti gli aggiornamenti sono andati a buon fine e la data è oggi, notifica ADAM API
         let apiNotified = false;
-        if (totalErrors === 0 && totalUpdated > 0) {
+        const today = format(new Date(), "yyyy-MM-dd");
+        const isToday = workDate === today;
+        
+        if (totalErrors === 0 && totalUpdated > 0 && isToday) {
           try {
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), 30000);
