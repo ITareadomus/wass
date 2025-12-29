@@ -5322,6 +5322,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ========== OPTIMIZER PHASE 4 ENDPOINTS ==========
+  
+  app.post("/api/optimizer/run-phase4", async (req, res) => {
+    try {
+      const { date, runId, params } = req.body;
+      const workDate = date || format(new Date(), "yyyy-MM-dd");
+      
+      console.log(`🚀 POST /api/optimizer/run-phase4 - Avvio FASE 4 Recovery per ${workDate}`);
+      
+      const { runPhase4 } = await import('./services/optimizer/runPhase4');
+      const result = await runPhase4(workDate, runId, params || {});
+      
+      console.log(`✅ FASE 4 completata: ${result.insertedCount} inseriti, ${result.singleAssignedCount} single, ${result.remainUnassignedCount} rimasti non assegnati in ${result.durationMs}ms`);
+      
+      res.json({
+        success: result.status === 'success',
+        ...result
+      });
+    } catch (error: any) {
+      console.error("❌ Errore FASE 4 optimizer:", error);
+      res.status(500).json({
+        success: false,
+        error: error.message
+      });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }

@@ -1,5 +1,6 @@
 import { computeZone, getAdjacentZones, ZoneId } from "./zone";
 import { scoreGroup } from "./scoring";
+import { TravelTimeProvider } from './travelTimeProvider';
 
 export type TaskInput = {
   taskId: number;
@@ -70,6 +71,20 @@ export function estimateTravelMinutes(a: TaskInput, b: TaskInput): number {
   const km = (meters / 1000) * NON_LINEAR_PATH_FACTOR;
   const hours = km / AVG_SPEED_KMH;
   return Math.max(1, Math.round(hours * 60));
+}
+
+export function estimateTravelMinutesWithProvider(
+  a: TaskInput, 
+  b: TaskInput, 
+  provider?: TravelTimeProvider
+): number {
+  if (provider) {
+    return provider.getTravelMinutesSync(
+      { lat: a.lat, lng: a.lng },
+      { lat: b.lat, lng: b.lng }
+    );
+  }
+  return estimateTravelMinutes(a, b);
 }
 
 export function generateCandidateGroups(tasks: TaskInput[], params: Phase1Params): Phase1Result {
