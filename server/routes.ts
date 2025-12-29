@@ -3280,6 +3280,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
               ];
 
               await connection.execute(query, [...values, taskId]);
+
+              // Annulla le collaborazioni assegnate
+              await connection.execute(
+                'DELETE FROM housekeeping_collaborations WHERE housekeeping_id = ?',
+                [taskId]
+              );
+
+              // Annulla i tempi extra assegnati
+              await connection.execute(
+                'DELETE FROM housekeeping_extratimes WHERE housekeeping_id = ?',
+                [taskId]
+              );
+
               totalUpdated++;
               console.log(`✅ Task ${task.logistic_code} (ID: ${taskId}) trasferita su ADAM`);
 
