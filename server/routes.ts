@@ -3287,6 +3287,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Endpoint per ottenere l'ultimo timestamp di trasferimento a ADAM
+  app.get("/api/last-adam-transfer", async (req, res) => {
+    try {
+      const date = req.query.date as string;
+      if (!date) {
+        return res.status(400).json({ success: false, error: "date parameter required" });
+      }
+
+      const { pgDailyAssignmentsService } = await import("./services/pg-daily-assignments-service");
+      const lastTransfer = await pgDailyAssignmentsService.getLastTransferToAdamTimestamp(date);
+
+      res.json({
+        success: true,
+        lastTransfer: lastTransfer ? lastTransfer.toISOString() : null
+      });
+    } catch (error: any) {
+      console.error("❌ Errore recupero ultimo trasferimento ADAM:", error);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
   // Endpoint per aggiornare solo l'operation_id di una task su ADAM
   app.patch("/api/adam/task/:taskId/operation", async (req, res) => {
     try {

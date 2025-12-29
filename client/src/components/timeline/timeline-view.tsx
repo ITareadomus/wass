@@ -121,7 +121,8 @@ export default function TimelineView({
   const [pendingStartTime, setPendingStartTime] = useState<string>("10:00");
   const [pendingCleaner, setPendingCleaner] = useState<any>(null); // Added to track pending cleaner ID
   const [showAdamTransferDialog, setShowAdamTransferDialog] = useState(false); // Stato per il dialog di trasferimento ADAM
-  const [showResetDialog, setShowResetDialog] = useState(false); // Stato per il dialog di reset assegnazioniM
+  const [showResetDialog, setShowResetDialog] = useState(false); // Stato per il dialog di reset assegnazioni
+  const [lastAdamTransfer, setLastAdamTransfer] = useState<string | null>(null); // Timestamp ultimo trasferimento ADAM
 
   // Calcola gli highlightedTaskIds per la ricerca
   const highlightedTaskIds = (() => {
@@ -177,6 +178,25 @@ export default function TimelineView({
       setValidationRules(null); // Fallback permissive
     });
   }, []);
+
+  // Carica timestamp ultimo trasferimento ADAM quando cambia la data
+  useEffect(() => {
+    const fetchLastTransfer = async () => {
+      try {
+        const response = await fetch(`/api/last-adam-transfer?date=${workDate}`);
+        const data = await response.json();
+        if (data.success && data.lastTransfer) {
+          setLastAdamTransfer(data.lastTransfer);
+        } else {
+          setLastAdamTransfer(null);
+        }
+      } catch (error) {
+        console.error('Error fetching last ADAM transfer:', error);
+        setLastAdamTransfer(null);
+      }
+    };
+    fetchLastTransfer();
+  }, [workDate]);
 
   // Stato per memorizzare i dati della timeline (inclusi i metadata)
   const [timelineData, setTimelineData] = useState<any>(null);
@@ -1500,6 +1520,8 @@ export default function TimelineView({
       if (result.success) {
         // Pulisci sessionStorage dopo il trasferimento riuscito
         sessionStorage.removeItem('pending_task_edits');
+        // Aggiorna il timestamp dell'ultimo trasferimento
+        setLastAdamTransfer(new Date().toISOString());
         toast({
           title: "✅ Trasferimento completato",
           description: result.message || `Task aggiornate sul database ADAM`,
@@ -2016,19 +2038,34 @@ export default function TimelineView({
                     📜 Sei in modalità storico
                   </Button>
                 )}
-                <Button
-                  onClick={() => setShowAdamTransferDialog(true)}
-                  size="sm"
-                  variant="outline"
-                  className="h-full px-3 border-2 border-custom-blue"
-                  disabled={!hasTasksInTimeline}
-                  title={!hasTasksInTimeline ? "Nessuna task assegnata nella timeline" : "Trasferisci le assegnazioni sul database ADAM"}
-                >
-                  <svg className="mr-1 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
-                  </svg>
-                  Trasferisci su ADAM
-                </Button>
+                <div className="flex flex-col items-center">
+                  <Button
+                    onClick={() => setShowAdamTransferDialog(true)}
+                    size="sm"
+                    variant="outline"
+                    className="h-full px-3 border-2 border-custom-blue"
+                    disabled={!hasTasksInTimeline}
+                    title={!hasTasksInTimeline ? "Nessuna task assegnata nella timeline" : "Trasferisci le assegnazioni sul database ADAM"}
+                  >
+                    <svg className="mr-1 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                    </svg>
+                    Trasferisci su ADAM
+                  </Button>
+                  {lastAdamTransfer && (
+                    <span className="text-xs text-muted-foreground mt-1">
+                      Ultimo salvataggio: {(() => {
+                        const d = new Date(lastAdamTransfer);
+                        const day = String(d.getDate()).padStart(2, '0');
+                        const month = String(d.getMonth() + 1).padStart(2, '0');
+                        const year = d.getFullYear();
+                        const hours = String(d.getHours()).padStart(2, '0');
+                        const minutes = String(d.getMinutes()).padStart(2, '0');
+                        return `${day}-${month}-${year} - ${hours}:${minutes}`;
+                      })()}
+                    </span>
+                  )}
+                </div>
               </div>
             </div>
           </div>

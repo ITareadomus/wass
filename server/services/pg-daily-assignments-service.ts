@@ -610,6 +610,27 @@ export class PgDailyAssignmentsService {
     }
   }
 
+  /**
+   * Get the timestamp of the last transfer to ADAM for a work_date
+   * Looks for both 'api_save_timeline' and 'transfer_to_adam' modification_types
+   * Returns the most recent one
+   */
+  async getLastTransferToAdamTimestamp(workDate: string): Promise<Date | null> {
+    try {
+      const result = await query(`
+        SELECT created_at 
+        FROM daily_assignments_revisions 
+        WHERE work_date = $1 AND modification_type IN ('api_save_timeline', 'transfer_to_adam')
+        ORDER BY created_at DESC
+        LIMIT 1
+      `, [workDate]);
+      return result.rows[0]?.created_at || null;
+    } catch (error) {
+      console.error('❌ PG History: Errore nel recupero ultimo trasferimento ADAM:', error);
+      return null;
+    }
+  }
+
   // ==================== CONTAINERS (FLAT STRUCTURE) ====================
 
   /**
