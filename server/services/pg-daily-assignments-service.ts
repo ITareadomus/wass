@@ -94,6 +94,25 @@ export class PgDailyAssignmentsService {
   }
 
   /**
+   * Ensure locked columns exist on daily_containers and daily_containers_history tables
+   */
+  async ensureLockedColumns(): Promise<void> {
+    try {
+      // Add locked and locked_reason columns to daily_containers
+      await query(`ALTER TABLE daily_containers ADD COLUMN IF NOT EXISTS locked BOOLEAN DEFAULT FALSE`);
+      await query(`ALTER TABLE daily_containers ADD COLUMN IF NOT EXISTS locked_reason TEXT DEFAULT NULL`);
+      
+      // Add locked and locked_reason columns to daily_containers_history
+      await query(`ALTER TABLE daily_containers_history ADD COLUMN IF NOT EXISTS locked BOOLEAN DEFAULT FALSE`);
+      await query(`ALTER TABLE daily_containers_history ADD COLUMN IF NOT EXISTS locked_reason TEXT DEFAULT NULL`);
+      
+      console.log('✅ PG: Colonne locked e locked_reason aggiunte a daily_containers e daily_containers_history');
+    } catch (error) {
+      console.warn('⚠️ PG: Errore (ignorabile) nella migrazione locked columns:', error);
+    }
+  }
+
+  /**
    * Convert timeline JSON to flat rows for PostgreSQL
    * Each row includes both cleaner and task data for complete reconstruction
    */
@@ -696,6 +715,8 @@ export class PgDailyAssignmentsService {
         if (row.customer_name) task.customer_name = row.customer_name;
         if (row.reasons && row.reasons.length > 0) task.reasons = row.reasons;
         if (row.customer_reference) task.customer_reference = row.customer_reference;
+        if (row.locked) task.locked = row.locked;
+        if (row.locked_reason) task.locked_reason = row.locked_reason;
 
         // Add to appropriate priority bucket (map DB names to frontend names)
         const dbPriority = row.priority || 'low';
@@ -824,11 +845,12 @@ export class PgDailyAssignmentsService {
               task_id, logistic_code, client_id, premium, address, lat, lng,
               cleaning_time, checkin_date, checkout_date, checkin_time, checkout_time,
               pax_in, pax_out, small_equipment, operation_id, confirmed_operation,
-              straordinaria, type_apt, alias, customer_name, reasons, customer_reference
+              straordinaria, type_apt, alias, customer_name, reasons, customer_reference,
+              locked, locked_reason
             ) VALUES (
               $1, $2, $3, $4, $5, $6, $7, $8, $9,
               $10, $11, $12, $13, $14, $15, $16, $17, $18, $19,
-              $20, $21, $22, $23, $24, $25
+              $20, $21, $22, $23, $24, $25, $26, $27
             )
           `, [
             workDate,
@@ -855,7 +877,9 @@ export class PgDailyAssignmentsService {
             task.alias || null,
             task.customer_name || null,
             task.reasons || [],
-            task.customer_reference || null
+            task.customer_reference || null,
+            task.locked || false,
+            task.locked_reason || null
           ]);
 
           totalInserted++;
@@ -899,11 +923,12 @@ export class PgDailyAssignmentsService {
           task_id, logistic_code, client_id, premium, address, lat, lng,
           cleaning_time, checkin_date, checkout_date, checkin_time, checkout_time,
           pax_in, pax_out, small_equipment, operation_id, confirmed_operation,
-          straordinaria, type_apt, alias, customer_name, reasons, customer_reference
+          straordinaria, type_apt, alias, customer_name, reasons, customer_reference,
+          locked, locked_reason
         ) VALUES (
           $1, $2, $3, $4, $5, $6, $7, $8, $9,
           $10, $11, $12, $13, $14, $15, $16, $17, $18, $19,
-          $20, $21, $22, $23, $24, $25
+          $20, $21, $22, $23, $24, $25, $26, $27
         )
         ON CONFLICT (work_date, task_id) DO NOTHING
       `, [
@@ -931,7 +956,9 @@ export class PgDailyAssignmentsService {
         task.alias || null,
         task.customer_name || null,
         task.reasons || [],
-        task.customer_reference || null
+        task.customer_reference || null,
+        task.locked || false,
+        task.locked_reason || null
       ]);
 
       console.log(`✅ PG: Task ${task.task_id} aggiunto ai containers (${priority}) per ${workDate}`);
@@ -993,11 +1020,12 @@ export class PgDailyAssignmentsService {
             task_id, logistic_code, client_id, premium, address, lat, lng,
             cleaning_time, checkin_date, checkout_date, checkin_time, checkout_time,
             pax_in, pax_out, small_equipment, operation_id, confirmed_operation,
-            straordinaria, type_apt, alias, customer_name, reasons, created_by
+            straordinaria, type_apt, alias, customer_name, reasons, created_by,
+            locked, locked_reason
           ) VALUES (
             $1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
             $11, $12, $13, $14, $15, $16, $17, $18, $19, $20,
-            $21, $22, $23, $24, $25, $26
+            $21, $22, $23, $24, $25, $26, $27, $28
           )
         `, [
           workDate,
@@ -1025,7 +1053,9 @@ export class PgDailyAssignmentsService {
           row.alias,
           row.customer_name,
           row.reasons || [],
-          createdBy
+          createdBy,
+          row.locked || false,
+          row.locked_reason || null
         ]);
       }
 
@@ -1106,7 +1136,9 @@ export class PgDailyAssignmentsService {
           type_apt: row.type_apt,
           alias: row.alias,
           customer_name: row.customer_name,
-          reasons: row.reasons || []
+          reasons: row.reasons || [],
+          locked: row.locked || false,
+          locked_reason: row.locked_reason || null
         };
 
         const priority = row.priority || 'low';
@@ -1157,11 +1189,12 @@ export class PgDailyAssignmentsService {
             task_id, logistic_code, client_id, premium, address, lat, lng,
             cleaning_time, checkin_date, checkout_date, checkin_time, checkout_time,
             pax_in, pax_out, small_equipment, operation_id, confirmed_operation,
-            straordinaria, type_apt, alias, customer_name, reasons
+            straordinaria, type_apt, alias, customer_name, reasons,
+            locked, locked_reason
           ) VALUES (
             $1, $2, $3, $4, $5, $6, $7, $8, $9,
             $10, $11, $12, $13, $14, $15, $16, $17, $18, $19,
-            $20, $21, $22, $23, $24
+            $20, $21, $22, $23, $24, $25, $26
           )
         `, [
           workDate,
@@ -1187,7 +1220,9 @@ export class PgDailyAssignmentsService {
           row.type_apt,
           row.alias,
           row.customer_name,
-          row.reasons || []
+          row.reasons || [],
+          row.locked || false,
+          row.locked_reason || null
         ]);
       }
 
@@ -1601,44 +1636,20 @@ export class PgDailyAssignmentsService {
    */
   async updateTaskLockStatus(taskId: string | number, workDate: string, locked: boolean, lockedReason?: string): Promise<boolean> {
     try {
-      // Carica i containers correnti
+      // UPDATE diretto sulla riga del task
       const result = await query(
-        'SELECT containers_data FROM daily_containers WHERE work_date = $1',
-        [workDate]
+        `UPDATE daily_containers 
+         SET locked = $1, locked_reason = $2, updated_at = NOW() 
+         WHERE work_date = $3 AND task_id = $4`,
+        [locked, locked ? (lockedReason || null) : null, workDate, taskId]
       );
       
-      if (result.rows.length === 0) {
-        console.log(`⚠️ PG: Nessun container trovato per ${workDate}`);
+      if (result.rowCount === 0) {
+        console.log(`⚠️ PG: Task ${taskId} non trovato in daily_containers per ${workDate}`);
         return false;
       }
       
-      const containersData = result.rows[0].containers_data;
-      let updated = false;
-      
-      // Aggiorna il task nei containers
-      for (const containerType of ['early_out', 'high_priority', 'low_priority']) {
-        const container = containersData.containers?.[containerType];
-        if (container?.tasks) {
-          for (const task of container.tasks) {
-            if (String(task.task_id) === String(taskId)) {
-              task.locked = locked;
-              task.locked_reason = locked ? lockedReason : null;
-              updated = true;
-              break;
-            }
-          }
-        }
-        if (updated) break;
-      }
-      
-      if (updated) {
-        await query(
-          'UPDATE daily_containers SET containers_data = $1, updated_at = NOW() WHERE work_date = $2',
-          [containersData, workDate]
-        );
-        console.log(`✅ PG: Task ${taskId} ${locked ? 'bloccata' : 'sbloccata'} in daily_containers`);
-      }
-      
+      console.log(`✅ PG: Task ${taskId} ${locked ? 'bloccata' : 'sbloccata'} in daily_containers`);
       return true;
     } catch (error) {
       console.error(`❌ PG: Errore nell'aggiornamento lock status task ${taskId}:`, error);

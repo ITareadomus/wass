@@ -272,6 +272,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     
     await pgUsersService.ensureTable();
     await pgDailyAssignmentsService.ensureAliasColumn();
+    await pgDailyAssignmentsService.ensureLockedColumns();
     
     // Migrate existing users from JSON if table is empty
     const existingUsers = await pgUsersService.getAllUsers();
