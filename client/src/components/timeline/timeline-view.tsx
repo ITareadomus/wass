@@ -1550,6 +1550,8 @@ export default function TimelineView({
         description: errorMessage,
         variant: "destructive",
       });
+    } finally {
+      setIsTransferringToAdam(false);
     }
   };
 
