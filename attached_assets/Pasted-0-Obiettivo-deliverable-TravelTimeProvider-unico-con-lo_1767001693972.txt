@@ -1,0 +1,236 @@
+0) Obiettivo deliverable
+
+TravelTimeProvider unico con:
+
+lookup su Postgres (cache)
+
+fallback su stima legacy
+
+log ESTIMATED_TRAVEL_USED quando usa fallback
+
+(opzionale ma consigliato) per-run in-memory cache
+
+FASE 4 implementata, usando TravelTimeProvider e logging PHASE4_*.
+
+1) Postgres: tabella cache travel time
+1.1 Migrazione SQL
+
+Crea una migration (es. server/db/migrations/xxxx_travel_time_cache.sql):
+
+CREATE TABLE IF NOT EXISTS optimizer_travel_time_cache (
+  cache_key TEXT PRIMARY KEY,
+  minutes SMALLINT NOT NULL,
+  source TEXT NOT NULL DEFAULT 'estimated',
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_optimizer_travel_time_cache_updated_at
+  ON optimizer_travel_time_cache (updated_at);
+
+1.2 TTL policy (in codice)
+
+Non serve cron: nel provider, quando leggi:
+
+se updated_at < now() - interval '30 days' → considerala “stale” e ricalcola (upsert).
+
+2) Implementare TravelTimeProvider (Postgres + fallback + logging)
+2.1 Nuovo file
+
+server/services/optimizer/travelTimeProvider.ts
+
+2.2 API consigliata
+
+class TravelTimeProvider { constructor(db, runId, decisionLogger) }
+
+async getMinutes(from, to, { phase }): Promise<number>
+
+2.3 Cache key stabile
+
+rounding: 5 decimali (≈1m) è ok a Milano
+
+cache_key = "${r(fromLat)}:${r(fromLng)}->${r(toLat)}:${r(toLng)}"
+
+2.4 Log ESTIMATED_TRAVEL_USED
+
+Quando fai fallback:
+
+inserisci in DB + log su optimizer.optimizer_decision
+
+anti-spam: this.loggedFallbackKeys = new Set() e logga solo la prima volta per key/run.
+
+2.5 Query Postgres (lookup + upsert)
+
+Lookup
+
+SELECT minutes, updated_at
+FROM optimizer_travel_time_cache
+WHERE cache_key = $1;
+
+
+Upsert
+
+INSERT INTO optimizer_travel_time_cache(cache_key, minutes, source, updated_at)
+VALUES ($1, $2, $3, now())
+ON CONFLICT (cache_key) DO UPDATE
+SET minutes = EXCLUDED.minutes,
+    source = EXCLUDED.source,
+    updated_at = now();
+
+2.6 Per-run memory cache (consigliata)
+
+Dentro provider:
+
+this.localCache = new Map<string, number>()
+
+se presente, ritorna subito senza DB.
+
+3) Decision logger unico (se non esiste già)
+3.1 File (se serve)
+
+server/services/optimizer/decisionLogger.ts
+
+Funzione:
+
+logDecision(runId, eventType, payload) → insert in optimizer.optimizer_decision
+
+Così TravelTimeProvider può chiamare:
+
+logDecision(runId, "ESTIMATED_TRAVEL_USED", { phase, cacheKey, minutes, from, to })
+
+4) Patch: sostituire travel in FASE 1–2–3 con provider
+4.1 FASE 1
+
+Files tipici:
+
+server/services/optimizer/phase1.ts, runPhase1.ts
+
+Cosa fare:
+
+istanzia provider in runPhase1.ts e passalo a phase1(...)
+
+sostituisci dove oggi fai estimateTravelMinutes(...) con:
+
+await travelProvider.getMinutes(a, b, { phase: "PHASE1" })
+
+Nota: in FASE 1 fai tante chiamate:
+
+usa localCache del provider per evitare query DB ripetute nello stesso run.
+
+se hai loop stretti, valuta prefetch/batch solo se necessario (spesso basta localCache).
+
+4.2 FASE 2
+
+phase2.ts
+
+stessa sostituzione, phase: "PHASE2"
+
+4.3 FASE 3
+
+phase3.ts
+
+sostituisci travel tra task successivi e tra base->task (se lo fai)
+
+phase: "PHASE3"
+
+importantissimo: la simulazione timeline deve diventare async se prima era sync (perché travel ora è await).
+
+se vuoi evitare async “dentro permutazioni”, puoi far così:
+
+pre-calcoli travel tra tutte le coppie usate nella permutazione e passi una matrice “minutes” alla simulazione (ma è un ottimizzazione; localCache spesso basta).
+
+5) Implementare FASE 4 (Recovery)
+5.1 Nuovi file
+
+server/services/optimizer/phase4.ts
+
+server/services/optimizer/runPhase4.ts
+
+5.2 Endpoint
+
+In server/routes.ts:
+
+POST /api/optimizer/run-phase4
+
+5.3 runPhase4: input/output
+
+Leggi:
+
+assignment attuale (fase 3): optimizer.optimizer_assignment
+
+unassigned: optimizer.optimizer_unassigned
+
+tasks del giorno (daily containers / tasks)
+
+selected_cleaners
+
+settings EO/HP/LP (come in fase3)
+
+init TravelTimeProvider(db, runId, decisionLogger)
+
+Scrivi:
+
+riscrivi optimizer_assignment con schedule aggiornato
+
+riscrivi optimizer_unassigned con le rimaste
+
+Log:
+
+PHASE4_RETRY_STARTED (1 record)
+
+5.4 Algoritmo Phase4
+
+Step 1 – cheapest insertion
+Per ogni task unassigned:
+
+per ogni cleaner:
+
+per pos = 0..lenSchedule:
+
+nuovaSequenza = inserisci task
+
+simula timeline (hard constraints) usando TravelTimeProvider (phase="PHASE4")
+
+se valida:
+
+costo = Δtravel + Δwait + Δlateness + softPenalty(priority windows)
+
+bonus soft 1→2 task: se scheduleLen==1 prima, sottrai bonus e log PHASE4_UNDERFILLED_BONUS_APPLIED
+
+prendi best candidate globale → applica inserimento
+
+log PHASE4_TASK_REASSIGNED_INSERTION
+
+Step 2 – SINGLE
+Se non entra:
+
+prova cleaner con schedule vuoto (prima) o qualsiasi (poi) con simulazione [task]
+
+log PHASE4_TASK_ASSIGNED_SINGLE
+
+Step 3 – remain unassigned
+
+log PHASE4_TASK_REMAIN_UNASSIGNED con reason
+
+6) Check rapidi (QA) per l’agente
+
+Cache funziona
+
+prima run: molti ESTIMATED_TRAVEL_USED
+
+run successive: molto meno (cache hits)
+
+FASE 1–2–3 invarianti
+
+a parità di input, la stima travel deve rimanere identica alla legacy (estimateTravelMinutes) → output identico, solo più “cached”
+
+FASE 4 aumenta coverage
+
+numero assegnate FASE 4 >= FASE 3 sempre
+
+Niente spam log
+
+ESTIMATED_TRAVEL_USED loggato max 1 per cacheKey per run (set in provider)
+
+Mini prompt “incollabile” per Replit Agent (super operativo)
+
+Implementa in Postgres una tabella optimizer_travel_time_cache(cache_key pk, minutes smallint, source text, updated_at timestamptz). Crea TravelTimeProvider che: (1) usa una local Map per-run, (2) fa lookup su Postgres, (3) se cache miss o stale (>30 giorni) calcola minutes con la stima legacy attuale e upserta in cache, (4) quando usa la stima legacy logga su optimizer.optimizer_decision l’evento ESTIMATED_TRAVEL_USED (una sola volta per cacheKey per run). Poi sostituisci tutte le chiamate a estimateTravelMinutes in FASE 1–2–3 (e nella nuova FASE 4) con TravelTimeProvider. Infine implementa FASE 4 Recovery: cheapest insertion nelle schedule esistenti, poi single assignment, poi remain unassigned, loggando PHASE4_* come da spec, e riscrivendo optimizer_assignment/optimizer_unassigned a fine fase.

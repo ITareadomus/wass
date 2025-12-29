@@ -1,6 +1,22 @@
 import pool from '../../../shared/pg-db';
 import { TaskInput, Phase1Params, CandidateGroup, Phase1Event } from './phase1';
 
+export async function ensureTravelTimeCacheTable(): Promise<void> {
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS optimizer.optimizer_travel_time_cache (
+      cache_key TEXT PRIMARY KEY,
+      minutes SMALLINT NOT NULL,
+      source TEXT NOT NULL DEFAULT 'estimated',
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    )
+  `);
+  
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS idx_optimizer_travel_time_cache_updated_at
+      ON optimizer.optimizer_travel_time_cache (updated_at)
+  `);
+}
+
 export interface OptimizerRun {
   runId: string;
   workDate: string;
