@@ -1578,19 +1578,6 @@ export default function TimelineView({
                 <CalendarIcon className="w-5 h-5 mr-2 text-custom-blue" />
                 Timeline Assegnazioni - {cleaners.length} Cleaners
               </h2>
-              {lastAdamTransfer && (
-                <p className="text-xs text-muted-foreground">
-                  Ultimo salvataggio ADAM: {(() => {
-                    const d = new Date(lastAdamTransfer);
-                    const day = String(d.getDate()).padStart(2, '0');
-                    const month = String(d.getMonth() + 1).padStart(2, '0');
-                    const year = d.getFullYear();
-                    const hours = String(d.getHours()).padStart(2, '0');
-                    const minutes = String(d.getMinutes()).padStart(2, '0');
-                    return `${day}/${month}/${year} - ${hours}:${minutes}`;
-                  })()}
-                </p>
-              )}
             </div>
             <div className="flex gap-3 print:hidden">
               <Button
@@ -2067,6 +2054,21 @@ export default function TimelineView({
                 </Button>
               </div>
             </div>
+            {lastAdamTransfer && (
+              <div className="flex justify-center px-1 pb-1">
+                <span className="text-xs text-muted-foreground">
+                  Ultimo salvataggio su ADAM: {(() => {
+                    const d = new Date(lastAdamTransfer);
+                    const day = String(d.getDate()).padStart(2, '0');
+                    const month = String(d.getMonth() + 1).padStart(2, '0');
+                    const year = d.getFullYear();
+                    const hours = String(d.getHours()).padStart(2, '0');
+                    const minutes = String(d.getMinutes()).padStart(2, '0');
+                    return `${day}/${month}/${year} - ${hours}:${minutes}`;
+                  })()}
+                </span>
+              </div>
+            )}
           </div>
         </div>
       </div>
