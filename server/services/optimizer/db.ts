@@ -1,62 +1,6 @@
 import pool from '../../../shared/pg-db';
 import { TaskInput, Phase1Params, CandidateGroup, Phase1Event } from './phase1';
 
-// ==================== GUARD RAIL ====================
-// Lista delle tabelle sicure (solo schema optimizer + cache tecnica)
-const SAFE_TABLES = new Set([
-  'optimizer.optimizer_run',
-  'optimizer.optimizer_decision',
-  'optimizer.optimizer_assignment',
-  'optimizer.optimizer_unassigned',
-  'optimizer.optimizer_travel_time_cache'
-]);
-
-// Tabelle operative che NON devono MAI essere modificate dall'optimizer
-const FORBIDDEN_TABLES = new Set([
-  'assignments',
-  'daily_containers',
-  'daily_selected_cleaners',
-  'cleaners',
-  'tasks',
-  'timeline',
-  'schedule'
-]);
-
-export function assertOptimizerSchemaOnly(query: string): void {
-  const normalizedQuery = query.toLowerCase().trim();
-  
-  // Controllo solo per INSERT, UPDATE, DELETE (non SELECT)
-  if (!normalizedQuery.startsWith('insert') && 
-      !normalizedQuery.startsWith('update') && 
-      !normalizedQuery.startsWith('delete')) {
-    return; // SELECT queries are always allowed
-  }
-  
-  // Verifica che la query NON scriva su tabelle proibite
-  const forbiddenList = Array.from(FORBIDDEN_TABLES);
-  for (let i = 0; i < forbiddenList.length; i++) {
-    const table = forbiddenList[i];
-    if (normalizedQuery.includes(table) && !normalizedQuery.includes('optimizer.')) {
-      throw new Error(`SAFETY GUARD: Attempted write to production table '${table}'. Optimizer can only write to optimizer schema tables.`);
-    }
-  }
-  
-  // Verifica che le INSERT/UPDATE/DELETE siano su tabelle sicure
-  const hasOptimizerSchema = normalizedQuery.includes('optimizer.');
-  if (!hasOptimizerSchema) {
-    // Estrai il nome della tabella dalla query
-    const intoMatch = normalizedQuery.match(/into\s+([a-z_]+)/);
-    const updateMatch = normalizedQuery.match(/update\s+([a-z_]+)/);
-    const deleteMatch = normalizedQuery.match(/from\s+([a-z_]+)/);
-    
-    const tableName = intoMatch?.[1] || updateMatch?.[1] || deleteMatch?.[1];
-    
-    if (tableName && FORBIDDEN_TABLES.has(tableName)) {
-      throw new Error(`SAFETY GUARD: Attempted write to production table '${tableName}'. Optimizer can only write to optimizer schema tables.`);
-    }
-  }
-}
-
 export interface OptimizerRun {
   runId: string;
   workDate: string;
