@@ -2,7 +2,6 @@
 const DISTINCT_COLORS = [
   "#E6194B", // Rosso
   "#3CB44B", // Verde
-  "#FFE119", // Giallo
   "#4363D8", // Blu
   "#F58231", // Arancione
   "#911EB4", // Viola
@@ -13,13 +12,11 @@ const DISTINCT_COLORS = [
   "#008080", // Teal
   "#E6BEFF", // Lavanda
   "#9A6324", // Marrone
-  "#FFFAC8", // Giallo crema
   "#800000", // Bordeaux
   "#AAFFC3", // Menta
   "#808000", // Oliva
   "#FFD8B1", // Pesca
   "#000075", // Blu notte
-  "#808080", // Grigio
   "#FF4500", // Arancione rosso
   "#2E8B57", // Verde mare
   "#1E90FF", // Blu dodger
@@ -51,7 +48,15 @@ const DISTINCT_COLORS = [
   "#D2691E", // Cioccolato
 ];
 
+const cleanerColorMap = new Map<number, string>();
+let nextColorIndex = 0;
+
 export function getCleanerHexColor(cleanerId: number) {
-  const index = cleanerId % DISTINCT_COLORS.length;
-  return DISTINCT_COLORS[index];
+  if (!cleanerColorMap.has(cleanerId)) {
+    const color = DISTINCT_COLORS[nextColorIndex % DISTINCT_COLORS.length];
+    cleanerColorMap.set(cleanerId, color);
+    nextColorIndex++;
+  }
+
+  return cleanerColorMap.get(cleanerId)!;
 }
