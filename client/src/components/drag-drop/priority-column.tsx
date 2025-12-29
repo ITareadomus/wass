@@ -286,7 +286,7 @@ export default function PriorityColumn({
           >
             {isAssigning ? (
               <>
-                <span className="animate-spin mr-2">⏳</span>
+                <RefreshCw className="w-3 h-3 mr-1 animate-spin" />
                 Assegnando...
               </>
             ) : (

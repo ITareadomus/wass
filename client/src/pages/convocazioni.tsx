@@ -42,6 +42,7 @@ export default function Convocazioni() {
   const [taskStats, setTaskStats] = useState<TaskStats>({ total: 0, premium: 0, standard: 0, straordinarie: 0 });
   const [selectedCleaners, setSelectedCleaners] = useState<Set<number>>(new Set());
   const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
   const [loadingMessage, setLoadingMessage] = useState("Inizializzazione...");
   const [searchCleaner, setSearchCleaner] = useState("");
   const [selectedDate, setSelectedDate] = useState<Date>(() => {
@@ -288,6 +289,7 @@ export default function Convocazioni() {
     }
 
     try {
+      setIsSaving(true);
       const dateStr = format(selectedDate, "yyyy-MM-dd");
 
       // Carica cleaners dalla timeline (DB) per includerli nel salvataggio
@@ -346,6 +348,8 @@ export default function Convocazioni() {
         title: "❌ Errore nel salvataggio",
         description: "Si è verificato un errore nel salvataggio dei cleaners selezionati"
       });
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -360,6 +364,7 @@ export default function Convocazioni() {
     }
 
     try {
+      setIsSaving(true);
       const dateStr = format(selectedDate, "yyyy-MM-dd");
 
       // Carica cleaners dalla timeline (DB) per includerli
@@ -441,6 +446,8 @@ export default function Convocazioni() {
         title: "❌ Errore nell'aggiunta",
         description: "Si è verificato un errore durante l\'aggiunta dei cleaners"
       });
+    } finally {
+      setIsSaving(false);
     }
   };
 

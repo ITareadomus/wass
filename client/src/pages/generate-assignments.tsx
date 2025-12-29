@@ -624,6 +624,7 @@ export default function GenerateAssignments() {
   const [extractionStep, setExtractionStep] = useState<string>("Inizializzazione...");
   const [isLoadingTasks, setIsLoadingTasks] = useState(false);
   const [isConfirming, setIsConfirming] = useState(false);
+  const [isTransferringToAdam, setIsTransferringToAdam] = useState(false);
   const [lastSavedTimestamp, setLastSavedTimestamp] = useState<string | null>(null); // Renamed from lastSavedAssignment
   const { toast } = useToast();
   const [, setLocation] = useLocation();
