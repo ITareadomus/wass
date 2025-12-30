@@ -1,11 +1,12 @@
 import { v4 as uuidv4 } from 'uuid';
-import { generateCandidateGroups, Phase1Params, DEFAULT_PHASE1_PARAMS, Phase1Result as Phase1GeneratorResult } from './phase1';
-import { loadTasksForDate, createRun, updateRunStatus, insertDecisionsBatch, groupToDecision, eventToDecision, OptimizerRun } from './db';
+import { generateCandidateGroups, Phase1Params, DEFAULT_PHASE1_PARAMS, Phase1Result as Phase1GeneratorResult, TaskInput } from './phase1';
+import { loadTasksForDate, loadTasksWithLockStatus, createRun, updateRunStatus, insertDecisionsBatch, groupToDecision, eventToDecision, OptimizerRun } from './db';
 
 export interface Phase1RunResult {
   runId: string;
   workDate: string;
   tasksLoaded: number;
+  lockedTasksExcluded: number;
   groupsGenerated: number;
   singleGroupCount: number;
   fallbackSeedCount: number;
@@ -16,12 +17,19 @@ export interface Phase1RunResult {
   thresholds: { nearby: number; fallback: number };
 }
 
+export interface Phase1Options {
+  params?: Partial<Phase1Params>;
+  existingRunId?: string;
+  preFilteredTasks?: TaskInput[];
+}
+
 export async function runPhase1(
   workDate: string, 
-  params: Partial<Phase1Params> = {}
+  options: Phase1Options = {}
 ): Promise<Phase1RunResult> {
   const startTime = Date.now();
-  const runId = uuidv4();
+  const { params = {}, existingRunId, preFilteredTasks } = options;
+  const runId = existingRunId || uuidv4();
   
   const fullParams: Phase1Params = {
     ...DEFAULT_PHASE1_PARAMS,
@@ -32,6 +40,7 @@ export async function runPhase1(
     runId,
     workDate,
     tasksLoaded: 0,
+    lockedTasksExcluded: 0,
     groupsGenerated: 0,
     singleGroupCount: 0,
     fallbackSeedCount: 0,
@@ -45,16 +54,30 @@ export async function runPhase1(
   };
 
   try {
-    const run: OptimizerRun = {
-      runId,
-      workDate,
-      algorithmVersion: 'phase1.5-shadow-v1',
-      params: fullParams,
-      status: 'partial'
-    };
-    await createRun(run);
+    if (!existingRunId) {
+      const run: OptimizerRun = {
+        runId,
+        workDate,
+        algorithmVersion: 'phase1.5-shadow-v1',
+        params: fullParams,
+        status: 'partial'
+      };
+      await createRun(run);
+    }
 
-    const tasks = await loadTasksForDate(workDate);
+    let tasks: TaskInput[];
+    if (preFilteredTasks) {
+      tasks = preFilteredTasks;
+      console.log(`[Phase1] Using ${tasks.length} pre-filtered tasks from Phase0`);
+    } else {
+      const allTasks = await loadTasksWithLockStatus(workDate);
+      const lockedCount = allTasks.filter(t => t.locked).length;
+      tasks = allTasks.filter(t => !t.locked);
+      result.lockedTasksExcluded = lockedCount;
+      if (lockedCount > 0) {
+        console.log(`[Phase1] Excluded ${lockedCount} locked tasks`);
+      }
+    }
     result.tasksLoaded = tasks.length;
 
     if (tasks.length === 0) {
@@ -81,6 +104,7 @@ export async function runPhase1(
 
     const summary = {
       task_count: result.tasksLoaded,
+      locked_tasks_excluded: result.lockedTasksExcluded,
       group_count: result.groupsGenerated,
       single_group_count: result.singleGroupCount,
       fallback_seed_count: result.fallbackSeedCount,

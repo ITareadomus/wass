@@ -17,6 +17,18 @@ export interface OptimizerDecision {
   payload: Record<string, any>;
 }
 
+export interface OptimizerUnassigned {
+  runId: string;
+  taskId: number;
+  reasonCode: string;
+  details?: Record<string, any>;
+}
+
+export interface TaskInputWithLock extends TaskInput {
+  locked: boolean;
+  lockedReason?: string | null;
+}
+
 export async function loadTasksForDate(workDate: string): Promise<TaskInput[]> {
   const result = await pool.query(`
     SELECT 
@@ -38,6 +50,34 @@ export async function loadTasksForDate(workDate: string): Promise<TaskInput[]> {
     lat: parseFloat(row.lat),
     lng: parseFloat(row.lng),
     priority: row.priority
+  }));
+}
+
+export async function loadTasksWithLockStatus(workDate: string): Promise<TaskInputWithLock[]> {
+  const result = await pool.query(`
+    SELECT 
+      task_id as "taskId",
+      logistic_code as "logisticCode",
+      lat,
+      lng,
+      priority,
+      COALESCE(locked, false) as "locked",
+      locked_reason as "lockedReason"
+    FROM daily_containers
+    WHERE work_date = $1
+      AND lat IS NOT NULL 
+      AND lng IS NOT NULL
+    ORDER BY task_id
+  `, [workDate]);
+
+  return result.rows.map(row => ({
+    taskId: row.taskId,
+    logisticCode: row.logisticCode,
+    lat: parseFloat(row.lat),
+    lng: parseFloat(row.lng),
+    priority: row.priority,
+    locked: row.locked === true,
+    lockedReason: row.lockedReason
   }));
 }
 
@@ -182,4 +222,50 @@ export async function getDecisionsForRun(runId: string, phase?: number): Promise
 
   const result = await pool.query(query, params);
   return result.rows;
+}
+
+export async function insertUnassignedBatch(unassigned: OptimizerUnassigned[]): Promise<number> {
+  if (unassigned.length === 0) return 0;
+
+  const BATCH_SIZE = 500;
+  let inserted = 0;
+
+  for (let i = 0; i < unassigned.length; i += BATCH_SIZE) {
+    const batch = unassigned.slice(i, i + BATCH_SIZE);
+    
+    const values: any[] = [];
+    const placeholders: string[] = [];
+    
+    batch.forEach((u, idx) => {
+      const offset = idx * 4;
+      placeholders.push(`($${offset + 1}, $${offset + 2}, $${offset + 3}, $${offset + 4})`);
+      values.push(u.runId, u.taskId, u.reasonCode, u.details ? JSON.stringify(u.details) : null);
+    });
+
+    await pool.query(`
+      INSERT INTO optimizer.optimizer_unassigned (run_id, task_id, reason_code, details)
+      VALUES ${placeholders.join(', ')}
+    `, values);
+
+    inserted += batch.length;
+  }
+
+  return inserted;
+}
+
+export async function deletePhase0Data(runId: string): Promise<{ decisionsDeleted: number; unassignedDeleted: number }> {
+  const decisionsResult = await pool.query(`
+    DELETE FROM optimizer.optimizer_decision
+    WHERE run_id = $1 AND phase = 0 AND event_type = 'PHASE0_TASK_LOCKED'
+  `, [runId]);
+
+  const unassignedResult = await pool.query(`
+    DELETE FROM optimizer.optimizer_unassigned
+    WHERE run_id = $1 AND reason_code = 'LOCKED'
+  `, [runId]);
+
+  return {
+    decisionsDeleted: decisionsResult.rowCount || 0,
+    unassignedDeleted: unassignedResult.rowCount || 0
+  };
 }

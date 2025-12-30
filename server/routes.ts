@@ -5310,19 +5310,54 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ========== OPTIMIZER PHASE 0 ENDPOINTS (Locked Filter) ==========
+  
+  app.post("/api/optimizer/run-phase0", async (req, res) => {
+    try {
+      const { date, runId } = req.body;
+      const workDate = date || format(new Date(), "yyyy-MM-dd");
+      
+      if (!runId) {
+        return res.status(400).json({ success: false, error: "runId is required" });
+      }
+      
+      console.log(`🚀 POST /api/optimizer/run-phase0 - Avvio FASE 0 (Locked Filter) per ${workDate}`);
+      
+      const { runPhase0, getPhase0Summary } = await import('./services/optimizer/runPhase0');
+      const result = await runPhase0(workDate, runId);
+      
+      console.log(`✅ FASE 0 completata: ${result.lockedTasks} task bloccate, ${result.unlockedTasks} task sbloccate in ${result.durationMs}ms`);
+      
+      res.json({
+        success: result.status === 'success',
+        ...result,
+        summary: getPhase0Summary(result)
+      });
+    } catch (error: any) {
+      console.error("❌ Errore FASE 0 optimizer:", error);
+      res.status(500).json({
+        success: false,
+        error: error.message
+      });
+    }
+  });
+
   // ========== OPTIMIZER PHASE 1 ENDPOINTS ==========
   
   app.post("/api/optimizer/run-phase1", async (req, res) => {
     try {
-      const { date, params } = req.body;
+      const { date, params, runId: existingRunId } = req.body;
       const workDate = date || format(new Date(), "yyyy-MM-dd");
       
       console.log(`🚀 POST /api/optimizer/run-phase1 - Avvio FASE 1 per ${workDate}`);
       
       const { runPhase1 } = await import('./services/optimizer/runPhase1');
-      const result = await runPhase1(workDate, params || {});
+      const result = await runPhase1(workDate, { 
+        params: params || {},
+        existingRunId 
+      });
       
-      console.log(`✅ FASE 1 completata: ${result.groupsGenerated} gruppi generati in ${result.durationMs}ms`);
+      console.log(`✅ FASE 1 completata: ${result.groupsGenerated} gruppi generati, ${result.lockedTasksExcluded} task bloccate escluse in ${result.durationMs}ms`);
       
       res.json({
         success: result.status === 'success',
