@@ -3357,6 +3357,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Endpoint DEBUG per visualizzare le revisioni ADAM
+  app.get("/api/debug/revisions", async (req, res) => {
+    try {
+      const date = req.query.date as string;
+      const { query } = await import("../shared/pg-db");
+      
+      let sql = `
+        SELECT work_date, revision, modification_type, created_by, created_at 
+        FROM daily_assignments_revisions 
+        WHERE modification_type IN ('api_save_timeline', 'transfer_to_adam')
+      `;
+      const params: string[] = [];
+      
+      if (date) {
+        sql += ` AND work_date = $1`;
+        params.push(date);
+      }
+      
+      sql += ` ORDER BY created_at DESC LIMIT 20`;
+      
+      const result = await query(sql, params);
+      res.json({ success: true, revisions: result.rows });
+    } catch (error: any) {
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
   // Endpoint per ottenere l'ultimo timestamp di trasferimento a ADAM
   app.get("/api/last-adam-transfer", async (req, res) => {
     try {
