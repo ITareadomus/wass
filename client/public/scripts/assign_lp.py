@@ -687,7 +687,15 @@ def seed_cleaners_from_assignments(cleaners: List[Cleaner], work_date: str):
 def load_tasks() -> List[Task]:
     data = load_containers_data()
     tasks: List[Task] = []
-    for t in data.get("containers", {}).get("low_priority", {}).get("tasks", []):
+    all_tasks = data.get("containers", {}).get("low_priority", {}).get("tasks", [])
+    
+    # Filtra i task bloccati (locked=True)
+    unlocked_tasks = [t for t in all_tasks if not t.get("locked", False)]
+    locked_count = len(all_tasks) - len(unlocked_tasks)
+    if locked_count > 0:
+        print(f"   🔒 {locked_count} task bloccate escluse dall'assegnazione")
+    
+    for t in unlocked_tasks:
         checkin_dt = None
         checkout_dt = None
 

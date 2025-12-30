@@ -736,7 +736,15 @@ def seed_cleaners_from_eo(cleaners: List[Cleaner], ref_date: str):
 def load_tasks() -> Tuple[List[Task], str]:
     data = load_containers_data()
     tasks: List[Task] = []
-    for t in data.get("containers", {}).get("high_priority", {}).get("tasks", []):
+    all_tasks = data.get("containers", {}).get("high_priority", {}).get("tasks", [])
+    
+    # Filtra i task bloccati (locked=True)
+    unlocked_tasks = [t for t in all_tasks if not t.get("locked", False)]
+    locked_count = len(all_tasks) - len(unlocked_tasks)
+    if locked_count > 0:
+        print(f"   🔒 {locked_count} task bloccate escluse dall'assegnazione")
+    
+    for t in unlocked_tasks:
         checkout_dt = parse_dt(t.get("checkout_date"), t.get("checkout_time"))
         checkin_dt = parse_dt(t.get("checkin_date"), t.get("checkin_time"))
         is_hp_soft = (checkin_dt is None and checkout_dt is None)

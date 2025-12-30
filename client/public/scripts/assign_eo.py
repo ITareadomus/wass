@@ -645,7 +645,15 @@ def load_tasks() -> List[Task]:
     eo_start_str = early_out_cfg.get("eo_start_time") or "10:00"
     eo_start_min = hhmm_to_min(eo_start_str, default="10:00")
     tasks: List[Task] = []
-    for t in data.get("containers", {}).get("early_out", {}).get("tasks", []):
+    all_tasks = data.get("containers", {}).get("early_out", {}).get("tasks", [])
+    
+    # Filtra i task bloccati (locked=True)
+    unlocked_tasks = [t for t in all_tasks if not t.get("locked", False)]
+    locked_count = len(all_tasks) - len(unlocked_tasks)
+    if locked_count > 0:
+        print(f"   🔒 {locked_count} task bloccate escluse dall'assegnazione")
+    
+    for t in unlocked_tasks:
         # Checkout reale dell'appartamento (in minuti)
         real_checkout_min = hhmm_to_min(t.get("checkout_time"), default=eo_start_str)
 
