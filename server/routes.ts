@@ -3306,7 +3306,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const today = format(new Date(), "yyyy-MM-dd");
         const isToday = workDate === today;
         
-        if (totalErrors === 0 && totalUpdated > 0 && isToday) {
+        // Controllo orario: solo 7:00-10:00 AM timezone Roma
+        const romeHour = parseInt(formatInTimeZone(new Date(), 'Europe/Rome', 'H'), 10);
+        const isWithinTimeWindow = romeHour >= 7 && romeHour < 10;
+        
+        if (totalErrors === 0 && totalUpdated > 0 && isToday && isWithinTimeWindow) {
           try {
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), 30000);
@@ -3326,6 +3330,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           } catch (apiError: any) {
             console.warn(`⚠️ Notifica ADAM API fallita: ${apiError.message}`);
           }
+        } else if (totalErrors === 0 && totalUpdated > 0 && isToday && !isWithinTimeWindow) {
+          console.log(`⏰ Notifica ADAM API saltata: fuori finestra oraria (ora Roma: ${romeHour}:00, richiesto: 7:00-10:00)`);
         }
 
         console.log(`\n✅ Trasferimento completato! (${totalUpdated} task aggiornate, ${totalErrors} errori${revisionCreated ? ', nuova revision creata' : ''}${apiNotified ? ', API notificata' : ''})`);
