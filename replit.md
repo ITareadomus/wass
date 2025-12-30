@@ -42,19 +42,16 @@ Preferred communication style: Simple, everyday language.
 - **Fairness**: Global parameters for `NEARBY_TRAVEL_THRESHOLD`, `NEW_CLEANER_PENALTY_MIN`, and `FAIRNESS_DELTA_HOURS` are tightened to ensure more balanced work distribution and safer travel times.
 - **Time Window Constraints**: Early-Out (EO) and High Priority (HP) tasks have configurable start/end time windows, loaded dynamically from application settings, restricting when tasks can be assigned. Low Priority (LP) tasks have no time constraints.
 
-## Optimizer System (Four-Phase)
-- **PHASE 0**: Pre-processing - Filters locked tasks (task.locked=True), adds them to unassigned with reason_code="LOCKED". Only unlocked tasks proceed to optimization.
+## Optimizer System (Three-Phase)
 - **PHASE 1**: Groups nearby tasks using dual thresholds (15min→20min), creates single-task groups for isolated tasks, includes logistic_codes for deduplication.
-- **PHASE 2**: Assigns groups to compatible cleaners from daily_selected_cleaners, uses TaskValidator for compatibility checks, scores by travel/load/preference.
+- **PHASE 2**: Assigns groups to compatible cleaners from daily_selected_cleaners, scores by travel/load/preference, preserves group_logistic_codes.
 - **PHASE 3**: Chronological scheduling with time windows and priority soft rules.
   - **Priority Windows** (from app_settings DB): EO 10:00-10:59, HP 11:00-15:30, LP 11:00+
   - **Soft Rules**: Penalties calculated based on distance from preferred windows (k=2 for EO, k=1 for HP/LP)
   - **Max Penalties**: EO: 120, HP: 90, LP: 60
   - **Permutation Selection**: Considers endTime → priorityPenalty → totalWait → totalTravel
-  - **Violation Tracking**: reason codes (LP_BEFORE_MIN_START, EO/HP_OUT_OF_PREFERRED_START_WINDOW)
-- **PHASE 4**: Persistence - Saves results to JSON file in shadow mode (client/public/data/output/optimizer_run_{date}_{run_id}.json)
-- **Shadow Mode** (default): Results saved to local JSON file for testing/verification. Production mode requires API endpoint implementation.
-- **Script location**: client/public/scripts/optimizer_phases.py
+  - **Violation Tracking**: reason codes (LP_BEFORE_MIN_START, EO/HP_OUT_OF_PREFERRED_START_WINDOW) persisted to optimizer_assignment
+- **Shadow Mode**: ALL optimizer writes go to optimizer.* schema only, never touches production tables.
 
 # Production Configuration
 
