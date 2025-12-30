@@ -1,0 +1,109 @@
+Voglio aggiungere una nuova FASE 0 all’optimizer in TypeScript per filtrare i task locked prima della FASE 1.
+
+Obiettivo
+
+Implementare Phase 0: Locked filter che:
+
+carica i task del giorno (workDate) come fa già la pipeline optimizer;
+
+separa i task con locked === true;
+
+registra i task locked come unassigned nello schema optimizer e scrive anche una decisione/evento di audit;
+
+restituisce alla fase 1 solo i task non locked.
+
+Struttura richiesta
+1) File nuovo: server/services/optimizer/phase0.ts
+
+Crea una funzione pura:
+
+export function filterLockedTasks(
+  tasks: TaskRow[],
+  ctx: { workDate: string; runId: string }
+): {
+  unlockedTasks: TaskRow[];
+  lockedTasks: TaskRow[];
+  decisionEvents: OptimizerDecisionInsert[];
+  unassignedRows: OptimizerUnassignedInsert[];
+}
+
+
+Comportamento:
+
+lockedTasks = tasks.filter(t => t.locked === true)
+
+unlockedTasks = tasks.filter(t => !t.locked)
+
+Per ogni lockedTask:
+
+aggiungi una decisione con type PHASE0_TASK_LOCKED (o naming coerente con gli altri decision types)
+
+aggiungi una riga unassigned con:
+
+run_id = ctx.runId
+
+work_date = ctx.workDate
+
+task_id / logistic_code (usa i campi già usati nelle altre fasi)
+
+reason = 'LOCKED'
+
+se esiste locked_reason, salvarla in details/notes/metadata (nel campo disponibile nello schema)
+
+2) File nuovo: server/services/optimizer/runPhase0.ts
+
+Crea un runner che:
+
+riceve workDate e runId (oppure crea il run se l’orchestrazione lo fa qui — scegli il pattern già usato dagli altri runner);
+
+carica tasks per workDate usando lo stesso metodo già usato nella fase 1;
+
+chiama filterLockedTasks;
+
+scrive su DB nello schema optimizer:
+
+insert batch in optimizer.optimizer_decision per gli eventi fase0
+
+insert batch in optimizer.optimizer_unassigned per i locked
+
+aggiorna optimizer.optimizer_run summary con contatori:
+
+total_tasks, locked_tasks, unlocked_tasks (o campi equivalenti già presenti)
+
+ritorna unlockedTasks (e opzionalmente lockedTasks e conteggi per log).
+
+Idempotenza (importante):
+
+se runPhase0 viene rilanciata per lo stesso runId, evitare duplicati:
+
+prima cancellare decisioni di fase0 per quel run (PHASE0_*)
+
+e cancellare unassigned reason='LOCKED' per quel run
+
+poi reinserire.
+
+3) Integrazione nella pipeline
+
+Aggiorna l’orchestrazione dell’optimizer in modo che:
+
+prima si esegua runPhase0(workDate, runId)
+
+la fase 1 riceva solo unlockedTasks (o equivalenti)
+
+tutte le fasi successive lavorino su quel set filtrato.
+
+Se esiste un entrypoint tipo runOptimizer.ts o simile, inserisci Phase0 all’inizio.
+
+Output richiesto
+
+Implementa codice completo e compilabile.
+
+Usa gli stessi tipi e DB helper già esistenti (importa TaskRow, OptimizerDecisionInsert, OptimizerUnassignedInsert, funzioni insert batch / delete).
+
+Aggiungi log info con:
+
+total tasks
+
+locked count
+
+unlocked count
