@@ -631,15 +631,15 @@ export class PgDailyAssignmentsService {
 
   /**
    * Get the timestamp of the last transfer to ADAM for a work_date
-   * Looks for both 'api_save_timeline' and 'transfer_to_adam' modification_types
-   * Returns the most recent one
+   * Looks ONLY for 'transfer_to_adam' modification_type (actual ADAM transfers)
+   * NOT 'api_save_timeline' which is only local PostgreSQL saves
    */
   async getLastTransferToAdamTimestamp(workDate: string): Promise<Date | null> {
     try {
       const result = await query(`
         SELECT created_at 
         FROM daily_assignments_revisions 
-        WHERE work_date = $1 AND modification_type IN ('api_save_timeline', 'transfer_to_adam')
+        WHERE work_date = $1 AND modification_type = 'transfer_to_adam'
         ORDER BY created_at DESC
         LIMIT 1
       `, [workDate]);
