@@ -194,10 +194,20 @@ export default function TaskCard({
 
   const [isMapFiltered, setIsMapFiltered] = useState(false);
   
+  // Estrai locked e locked_reason dal task per dependency stabili
+  const taskLocked = (task as any).locked ?? false;
+  const taskLockedReason = (task as any).locked_reason ?? '';
+  
   // Stato per blocco task
-  const [isLocked, setIsLocked] = useState((task as any).locked || false);
-  const [lockedReason, setLockedReason] = useState((task as any).locked_reason || '');
+  const [isLocked, setIsLocked] = useState(taskLocked);
+  const [lockedReason, setLockedReason] = useState(taskLockedReason);
   const [isEditingReason, setIsEditingReason] = useState(false);
+
+  // Sincronizza isLocked quando il task cambia (es. dopo ricaricamento containers)
+  useEffect(() => {
+    setIsLocked(taskLocked);
+    setLockedReason(taskLockedReason);
+  }, [taskLocked, taskLockedReason, task.id]);
 
   // Usa il context multi-select dalla prop (solo per container, non timeline)
   const isMultiSelectMode = multiSelectContext?.isMultiSelectMode ?? false;
@@ -264,15 +274,22 @@ export default function TaskCard({
     const newLocked = !isLocked;
     const newReason = newLocked ? lockedReason : '';
     
+    // Ottieni la data selezionata da localStorage
+    const selectedWorkDate = localStorage.getItem('selected_work_date') || new Date().toISOString().split('T')[0];
+    
+    // Usa task_id se disponibile, altrimenti task.id
+    const taskId = (task as any).task_id || task.id;
+    
     try {
       const response = await fetch('/api/lock-task', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          task_id: task.id,
+          task_id: taskId,
           logistic_code: task.name,
           locked: newLocked,
           locked_reason: newReason,
+          date: selectedWorkDate,
         }),
       });
       
@@ -303,15 +320,23 @@ export default function TaskCard({
 
   const handleSaveLockedReason = async (e: React.MouseEvent) => {
     e.stopPropagation();
+    
+    // Ottieni la data selezionata da localStorage
+    const selectedWorkDate = localStorage.getItem('selected_work_date') || new Date().toISOString().split('T')[0];
+    
+    // Usa task_id se disponibile, altrimenti task.id
+    const taskId = (task as any).task_id || task.id;
+    
     try {
       const response = await fetch('/api/lock-task', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          task_id: task.id,
+          task_id: taskId,
           logistic_code: task.name,
           locked: isLocked,
           locked_reason: lockedReason,
+          date: selectedWorkDate,
         }),
       });
       
