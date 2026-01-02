@@ -2771,7 +2771,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               host: "139.59.132.41",
               user: "admin",
               password: "REMOVED_MYSQL_PASSWORD",
-              database: "adamdb",
+              database: "pippo",
             });
           } catch (dbError: any) {
             console.warn(`⚠️ Connessione ADAM non disponibile: ${dbError.message}`);
@@ -2986,7 +2986,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             host: "139.59.132.41",
             user: "admin",
             password: "REMOVED_MYSQL_PASSWORD",
-            database: "adamdb",
+            database: "pippo",
           });
 
           // Costruisci query UPDATE dinamica (aggiorna solo i campi forniti)
@@ -3188,7 +3188,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           host: "139.59.132.41",
           user: "admin",
           password: "REMOVED_MYSQL_PASSWORD",
-          database: "adamdb",
+          database: "pippo",
           waitForConnections: true,
           connectionLimit: 1,
           queueLimit: 0
@@ -3439,7 +3439,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           host: "139.59.132.41",
           user: "admin",
           password: "REMOVED_MYSQL_PASSWORD",
-          database: "adamdb",
+          database: "pippo",
           waitForConnections: true,
           connectionLimit: 1,
           queueLimit: 0

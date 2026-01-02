@@ -9,7 +9,7 @@ db_config = {
     "host": "139.59.132.41",
     "user": "admin",
     "password": "REMOVED_MYSQL_PASSWORD",
-    "database": "adamdb"
+    "database": "pippo"
 }
 
 # --- UTIL ---------------------------------------------------------------
