@@ -2768,7 +2768,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           try {
             const mysql = await import('mysql2/promise');
             mysqlConnection = await mysql.createConnection({
-              host: "139.59.132.41",
+              host: "pippo",
               user: "admin",
               password: "REMOVED_MYSQL_PASSWORD",
               database: "pippo",
@@ -2983,7 +2983,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         try {
           const mysql = await import('mysql2/promise');
           const connection = await mysql.createConnection({
-            host: "139.59.132.41",
+            host: "pippo",
             user: "admin",
             password: "REMOVED_MYSQL_PASSWORD",
             database: "pippo",
@@ -3185,7 +3185,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       try {
         connection = await mysql.createConnection({
-          host: "139.59.132.41",
+          host: "pippo",
           user: "admin",
           password: "REMOVED_MYSQL_PASSWORD",
           database: "pippo",
@@ -3436,7 +3436,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       try {
         connection = await mysql.createConnection({
-          host: "139.59.132.41",
+          host: "pippo",
           user: "admin",
           password: "REMOVED_MYSQL_PASSWORD",
           database: "pippo",

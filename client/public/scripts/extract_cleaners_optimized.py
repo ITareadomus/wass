@@ -6,7 +6,7 @@ from pathlib import Path
 
 # Configurazione del database (lasciata invariata rispetto allo script originale)
 db_config = {
-    "host": "139.59.132.41",
+    "host": "pippo",
     "user": "admin",
     "password": "REMOVED_MYSQL_PASSWORD",
     "database": "pippo"

@@ -39,7 +39,7 @@ OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
 # ---------- Config DB ----------
 DB_CONFIG = {
-    "host": "139.59.132.41",
+    "host": "pippo",
     "user": "admin",
     "password": "REMOVED_MYSQL_PASSWORD",
     "database": "pippo",

@@ -13,7 +13,7 @@ import sys
 def get_db_connection():
     """Crea connessione al database MySQL."""
     return mysql.connector.connect(
-        host=os.getenv("DB_HOST", "139.59.132.41"),
+        host=os.getenv("DB_HOST", "pippo"),
         database=os.getenv("DB_NAME", "pippo"),
         user=os.getenv("DB_USER", "admin"),
         password=os.getenv("DB_PASSWORD",
