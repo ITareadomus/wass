@@ -30,6 +30,120 @@ const BUCKET = "wass_assignments";
 const DATA_OUTPUT_DIR = path.join(process.cwd(), 'client/public/data/output');
 const CLEANERS_DIR = path.join(process.cwd(), 'client/public/data/cleaners');
 const SCRIPTS_DIR = path.join(process.cwd(), 'client/public/scripts');
+const LOG_DIR = path.join(process.cwd(), 'client/public/log');
+
+// Interfaccia per errori di validazione timeline
+interface TimelineValidationError {
+  cleaner_id: number;
+  cleaner_name: string;
+  error_type: 'invalid_sequence' | 'invalid_travel_time';
+  first_task: {
+    task_id: number;
+    logistic_code: number;
+    sequence: number;
+    travel_time: number;
+  };
+  expected: { sequence: number; travel_time: number };
+}
+
+/**
+ * Valida la timeline prima del trasferimento ad ADAM
+ * Verifica che il primo task di ogni cleaner abbia sequence=1 e travel_time=0
+ */
+function validateTimelineForAdam(timelineData: any): { valid: boolean; errors: TimelineValidationError[] } {
+  const errors: TimelineValidationError[] = [];
+
+  if (!timelineData?.cleaners_assignments || !Array.isArray(timelineData.cleaners_assignments)) {
+    return { valid: true, errors: [] };
+  }
+
+  for (const cleanerEntry of timelineData.cleaners_assignments) {
+    const cleaner = cleanerEntry.cleaner;
+    const tasks = cleanerEntry.tasks || [];
+
+    if (tasks.length === 0) continue;
+
+    // Ordina per sequence per trovare il "primo" task
+    const sortedTasks = [...tasks].sort((a: any, b: any) => (a.sequence ?? 9999) - (b.sequence ?? 9999));
+    const firstTask = sortedTasks[0];
+
+    // Verifica sequence = 1
+    if (firstTask.sequence !== 1) {
+      errors.push({
+        cleaner_id: cleaner?.id,
+        cleaner_name: `${cleaner?.name || ''} ${cleaner?.lastname || ''}`.trim(),
+        error_type: 'invalid_sequence',
+        first_task: {
+          task_id: firstTask.task_id,
+          logistic_code: firstTask.logistic_code,
+          sequence: firstTask.sequence,
+          travel_time: firstTask.travel_time
+        },
+        expected: { sequence: 1, travel_time: 0 }
+      });
+    }
+
+    // Verifica travel_time = 0 per il primo task (deve essere esattamente 0, non null/undefined)
+    if (firstTask.travel_time !== 0) {
+      errors.push({
+        cleaner_id: cleaner?.id,
+        cleaner_name: `${cleaner?.name || ''} ${cleaner?.lastname || ''}`.trim(),
+        error_type: 'invalid_travel_time',
+        first_task: {
+          task_id: firstTask.task_id,
+          logistic_code: firstTask.logistic_code,
+          sequence: firstTask.sequence,
+          travel_time: firstTask.travel_time
+        },
+        expected: { sequence: 1, travel_time: 0 }
+      });
+    }
+  }
+
+  return { valid: errors.length === 0, errors };
+}
+
+/**
+ * Genera file JSON di debug con tutti i cleaners e task per una data
+ */
+async function generateDebugLogFile(workDate: string, timelineData: any): Promise<string> {
+  // Assicura che la directory esista
+  await fs.mkdir(LOG_DIR, { recursive: true });
+
+  const debugData = {
+    generated_at: getRomeTimestamp(),
+    work_date: workDate,
+    total_cleaners: timelineData?.cleaners_assignments?.length || 0,
+    total_tasks: timelineData?.cleaners_assignments?.reduce((sum: number, c: any) => sum + (c.tasks?.length || 0), 0) || 0,
+    cleaners: (timelineData?.cleaners_assignments || []).map((entry: any) => ({
+      cleaner: {
+        id: entry.cleaner?.id,
+        name: entry.cleaner?.name,
+        lastname: entry.cleaner?.lastname,
+        start_time: entry.cleaner?.start_time
+      },
+      tasks_count: entry.tasks?.length || 0,
+      tasks: (entry.tasks || []).map((task: any) => ({
+        task_id: task.task_id,
+        logistic_code: task.logistic_code,
+        sequence: task.sequence,
+        travel_time: task.travel_time,
+        start_time: task.start_time,
+        end_time: task.end_time,
+        cleaning_time: task.cleaning_time,
+        priority: task.priority,
+        address: task.address,
+        alias: task.alias
+      }))
+    }))
+  };
+
+  const filePath = path.join(LOG_DIR, `${workDate}.json`);
+  await fs.writeFile(filePath, JSON.stringify(debugData, null, 2), 'utf-8');
+  console.log(`📝 Debug log generato: ${filePath}`);
+
+  return filePath;
+}
 
 // Helper per ottenere l'username corrente dalla richiesta
 function getCurrentUsername(req?: any): string {
@@ -3153,6 +3267,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
           message: "Nessuna assegnazione trovata nella timeline"
         });
       }
+
+      // VALIDAZIONE PRE-TRASFERIMENTO: Genera file debug e valida timeline
+      console.log(`🔍 Validazione timeline prima del trasferimento ADAM...`);
+      
+      // Genera sempre il file di debug (utile per diagnostica)
+      let debugFilePath: string;
+      try {
+        debugFilePath = await generateDebugLogFile(workDate, timelineData);
+      } catch (debugError: any) {
+        console.warn(`⚠️ Impossibile generare file debug: ${debugError.message}`);
+        debugFilePath = '';
+      }
+
+      // Valida la timeline
+      const validation = validateTimelineForAdam(timelineData);
+      if (!validation.valid) {
+        console.error(`❌ Validazione fallita: ${validation.errors.length} errori trovati`);
+        
+        // Formatta errori per la risposta
+        const errorDetails = validation.errors.map(err => ({
+          cleaner: `${err.cleaner_name} (ID: ${err.cleaner_id})`,
+          problema: err.error_type === 'invalid_sequence' 
+            ? `Il primo task ha sequence=${err.first_task.sequence} invece di 1`
+            : `Il primo task ha travel_time=${err.first_task.travel_time} invece di 0`,
+          task: `Task ${err.first_task.logistic_code} (ID: ${err.first_task.task_id})`
+        }));
+
+        return res.json({
+          success: false,
+          validation_failed: true,
+          message: `Trasferimento bloccato: ${validation.errors.length} errore/i di validazione trovato/i`,
+          errors: errorDetails,
+          debug_file: debugFilePath ? `/log/${workDate}.json` : null,
+          suggestion: "Rimuovi e riassegna le task problematiche per correggere sequence e travel_time"
+        });
+      }
+
+      console.log(`✅ Validazione timeline superata`);
 
       // Crea sempre una revision per tracciare il trasferimento ADAM (per il timestamp)
       const { pgDailyAssignmentsService } = await import("./services/pg-daily-assignments-service");

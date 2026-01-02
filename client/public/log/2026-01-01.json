@@ -1,0 +1,1112 @@
+{
+  "generated_at": "2026-01-02T11:37:44",
+  "work_date": "2026-01-01",
+  "total_cleaners": 12,
+  "total_tasks": 81,
+  "cleaners": [
+    {
+      "cleaner": {
+        "id": 132,
+        "name": "JOHOISER ERNESTO",
+        "lastname": "LOPEZ GIRON",
+        "start_time": "10:00"
+      },
+      "tasks_count": 10,
+      "tasks": [
+        {
+          "task_id": "220739",
+          "logistic_code": "1622",
+          "sequence": 1,
+          "travel_time": 0,
+          "start_time": "10:00:00",
+          "end_time": "11:30:00",
+          "cleaning_time": 90,
+          "priority": "early_out",
+          "address": "Viale Certosa 61",
+          "alias": "NTM"
+        },
+        {
+          "task_id": "220739",
+          "logistic_code": "1622",
+          "sequence": 1,
+          "travel_time": 0,
+          "start_time": "10:00:00",
+          "end_time": "11:30:00",
+          "cleaning_time": 90,
+          "priority": "early_out",
+          "address": "Viale Certosa 61",
+          "alias": "NTM"
+        },
+        {
+          "task_id": "220897",
+          "logistic_code": "618",
+          "sequence": 2,
+          "travel_time": 38,
+          "start_time": "12:08:00",
+          "end_time": "12:38:00",
+          "cleaning_time": 30,
+          "priority": "high_priority",
+          "address": "VIA VOGHERA, 4",
+          "alias": "EXP"
+        },
+        {
+          "task_id": "220897",
+          "logistic_code": "618",
+          "sequence": 2,
+          "travel_time": 38,
+          "start_time": "12:08:00",
+          "end_time": "12:38:00",
+          "cleaning_time": 30,
+          "priority": "high_priority",
+          "address": "VIA VOGHERA, 4",
+          "alias": "EXP"
+        },
+        {
+          "task_id": "220896",
+          "logistic_code": "617",
+          "sequence": 3,
+          "travel_time": 3,
+          "start_time": "12:41:00",
+          "end_time": "13:11:00",
+          "cleaning_time": 30,
+          "priority": "high_priority",
+          "address": "VIA VOGHERA, 4",
+          "alias": "EXP"
+        },
+        {
+          "task_id": "220896",
+          "logistic_code": "617",
+          "sequence": 3,
+          "travel_time": 3,
+          "start_time": "12:41:00",
+          "end_time": "13:11:00",
+          "cleaning_time": 30,
+          "priority": "high_priority",
+          "address": "VIA VOGHERA, 4",
+          "alias": "EXP"
+        },
+        {
+          "task_id": "220898",
+          "logistic_code": "619",
+          "sequence": 4,
+          "travel_time": 5,
+          "start_time": "13:16:00",
+          "end_time": "13:56:00",
+          "cleaning_time": 40,
+          "priority": "low_priority",
+          "address": "VIA TORTONA, 10",
+          "alias": "EXP"
+        },
+        {
+          "task_id": "220898",
+          "logistic_code": "619",
+          "sequence": 4,
+          "travel_time": 5,
+          "start_time": "13:16:00",
+          "end_time": "13:56:00",
+          "cleaning_time": 40,
+          "priority": "low_priority",
+          "address": "VIA TORTONA, 10",
+          "alias": "EXP"
+        },
+        {
+          "task_id": "220198",
+          "logistic_code": "1654",
+          "sequence": 5,
+          "travel_time": 19,
+          "start_time": "14:15:00",
+          "end_time": "15:45:00",
+          "cleaning_time": 90,
+          "priority": "high_priority",
+          "address": "CORSO SAN GOTTARDO 5",
+          "alias": "HMST"
+        },
+        {
+          "task_id": "220198",
+          "logistic_code": "1654",
+          "sequence": 5,
+          "travel_time": 19,
+          "start_time": "14:15:00",
+          "end_time": "15:45:00",
+          "cleaning_time": 90,
+          "priority": "high_priority",
+          "address": "CORSO SAN GOTTARDO 5",
+          "alias": "HMST"
+        }
+      ]
+    },
+    {
+      "cleaner": {
+        "id": 249,
+        "name": "Ogbodo Chidi",
+        "lastname": "Igwe",
+        "start_time": "10:00"
+      },
+      "tasks_count": 6,
+      "tasks": [
+        {
+          "task_id": "220762",
+          "logistic_code": "609",
+          "sequence": 1,
+          "travel_time": 0,
+          "start_time": "10:00:00",
+          "end_time": "11:00:00",
+          "cleaning_time": 60,
+          "priority": "early_out",
+          "address": "VIALE STELVIO 53",
+          "alias": "NTM"
+        },
+        {
+          "task_id": "220762",
+          "logistic_code": "609",
+          "sequence": 1,
+          "travel_time": 0,
+          "start_time": "10:00:00",
+          "end_time": "11:00:00",
+          "cleaning_time": 60,
+          "priority": "early_out",
+          "address": "VIALE STELVIO 53",
+          "alias": "NTM"
+        },
+        {
+          "task_id": "220704",
+          "logistic_code": "1503",
+          "sequence": 2,
+          "travel_time": 21,
+          "start_time": "11:21:00",
+          "end_time": "12:51:00",
+          "cleaning_time": 90,
+          "priority": "high_priority",
+          "address": "CORSO SEMPIONE 60",
+          "alias": "TRMB"
+        },
+        {
+          "task_id": "220704",
+          "logistic_code": "1503",
+          "sequence": 2,
+          "travel_time": 21,
+          "start_time": "11:21:00",
+          "end_time": "12:51:00",
+          "cleaning_time": 90,
+          "priority": "high_priority",
+          "address": "CORSO SEMPIONE 60",
+          "alias": "TRMB"
+        },
+        {
+          "task_id": "220910",
+          "logistic_code": "1393",
+          "sequence": 3,
+          "travel_time": 21,
+          "start_time": "14:00:00",
+          "end_time": "16:00:00",
+          "cleaning_time": 120,
+          "priority": "high_priority",
+          "address": "Via San Carpoforo, 7",
+          "alias": "TBR"
+        },
+        {
+          "task_id": "220910",
+          "logistic_code": "1393",
+          "sequence": 3,
+          "travel_time": 21,
+          "start_time": "14:00:00",
+          "end_time": "16:00:00",
+          "cleaning_time": 120,
+          "priority": "high_priority",
+          "address": "Via San Carpoforo, 7",
+          "alias": "TBR"
+        }
+      ]
+    },
+    {
+      "cleaner": {
+        "id": 326,
+        "name": "FESTUS OSARO",
+        "lastname": "AIHIVBERE",
+        "start_time": "10:00"
+      },
+      "tasks_count": 8,
+      "tasks": [
+        {
+          "task_id": "220765",
+          "logistic_code": "623",
+          "sequence": 1,
+          "travel_time": 0,
+          "start_time": "10:00:00",
+          "end_time": "11:00:00",
+          "cleaning_time": 60,
+          "priority": "early_out",
+          "address": "RIPA DI PORTA TICINESE 49",
+          "alias": "NTM"
+        },
+        {
+          "task_id": "220765",
+          "logistic_code": "623",
+          "sequence": 1,
+          "travel_time": 0,
+          "start_time": "10:00:00",
+          "end_time": "11:00:00",
+          "cleaning_time": 60,
+          "priority": "early_out",
+          "address": "RIPA DI PORTA TICINESE 49",
+          "alias": "NTM"
+        },
+        {
+          "task_id": "220783",
+          "logistic_code": "1632",
+          "sequence": 2,
+          "travel_time": 24,
+          "start_time": "11:24:00",
+          "end_time": "13:54:00",
+          "cleaning_time": 150,
+          "priority": "high_priority",
+          "address": "VIA LUPETTA 12",
+          "alias": "YHST"
+        },
+        {
+          "task_id": "220783",
+          "logistic_code": "1632",
+          "sequence": 2,
+          "travel_time": 24,
+          "start_time": "11:24:00",
+          "end_time": "13:54:00",
+          "cleaning_time": 150,
+          "priority": "high_priority",
+          "address": "VIA LUPETTA 12",
+          "alias": "YHST"
+        },
+        {
+          "task_id": "220913",
+          "logistic_code": "1537",
+          "sequence": 3,
+          "travel_time": 6,
+          "start_time": "14:00:00",
+          "end_time": "16:30:00",
+          "cleaning_time": 150,
+          "priority": "high_priority",
+          "address": "Via dei Piatti, 4 20123 (MI)",
+          "alias": "TBR"
+        },
+        {
+          "task_id": "220913",
+          "logistic_code": "1537",
+          "sequence": 3,
+          "travel_time": 6,
+          "start_time": "14:00:00",
+          "end_time": "16:30:00",
+          "cleaning_time": 150,
+          "priority": "high_priority",
+          "address": "Via dei Piatti, 4 20123 (MI)",
+          "alias": "TBR"
+        },
+        {
+          "task_id": "220929",
+          "logistic_code": "1683",
+          "sequence": 4,
+          "travel_time": 22,
+          "start_time": "16:52:00",
+          "end_time": "18:22:00",
+          "cleaning_time": 90,
+          "priority": "low_priority",
+          "address": "VIA ROSMINI 5",
+          "alias": "TBR"
+        },
+        {
+          "task_id": "220929",
+          "logistic_code": "1683",
+          "sequence": 4,
+          "travel_time": 22,
+          "start_time": "16:52:00",
+          "end_time": "18:22:00",
+          "cleaning_time": 90,
+          "priority": "low_priority",
+          "address": "VIA ROSMINI 5",
+          "alias": "TBR"
+        }
+      ]
+    },
+    {
+      "cleaner": {
+        "id": 404,
+        "name": "RASEL",
+        "lastname": "MOLLA",
+        "start_time": "10:00"
+      },
+      "tasks_count": 8,
+      "tasks": [
+        {
+          "task_id": "220723",
+          "logistic_code": "1540",
+          "sequence": 1,
+          "travel_time": 0,
+          "start_time": "10:15:00",
+          "end_time": "11:15:00",
+          "cleaning_time": 60,
+          "priority": "early_out",
+          "address": "VIA GONIN, 58",
+          "alias": "CLTR"
+        },
+        {
+          "task_id": "220723",
+          "logistic_code": "1540",
+          "sequence": 1,
+          "travel_time": 0,
+          "start_time": "10:15:00",
+          "end_time": "11:15:00",
+          "cleaning_time": 60,
+          "priority": "early_out",
+          "address": "VIA GONIN, 58",
+          "alias": "CLTR"
+        },
+        {
+          "task_id": "220903",
+          "logistic_code": "294",
+          "sequence": 2,
+          "travel_time": 42,
+          "start_time": "11:57:00",
+          "end_time": "13:57:00",
+          "cleaning_time": 120,
+          "priority": "high_priority",
+          "address": "VIA PEZZOTTI 6",
+          "alias": "TBR"
+        },
+        {
+          "task_id": "220903",
+          "logistic_code": "294",
+          "sequence": 2,
+          "travel_time": 42,
+          "start_time": "11:57:00",
+          "end_time": "13:57:00",
+          "cleaning_time": 120,
+          "priority": "high_priority",
+          "address": "VIA PEZZOTTI 6",
+          "alias": "TBR"
+        },
+        {
+          "task_id": "220773",
+          "logistic_code": "1618",
+          "sequence": 3,
+          "travel_time": 50,
+          "start_time": "14:47:00",
+          "end_time": "16:17:00",
+          "cleaning_time": 90,
+          "priority": "low_priority",
+          "address": "VIALE CERTOSA 92",
+          "alias": "IHST"
+        },
+        {
+          "task_id": "220773",
+          "logistic_code": "1618",
+          "sequence": 3,
+          "travel_time": 50,
+          "start_time": "14:47:00",
+          "end_time": "16:17:00",
+          "cleaning_time": 90,
+          "priority": "low_priority",
+          "address": "VIALE CERTOSA 92",
+          "alias": "IHST"
+        },
+        {
+          "task_id": "220764",
+          "logistic_code": "1533",
+          "sequence": 4,
+          "travel_time": 50,
+          "start_time": "17:07:00",
+          "end_time": "18:07:00",
+          "cleaning_time": 60,
+          "priority": "low_priority",
+          "address": "VIA GIULIO CARCANO, 19",
+          "alias": "IHST"
+        },
+        {
+          "task_id": "220764",
+          "logistic_code": "1533",
+          "sequence": 4,
+          "travel_time": 50,
+          "start_time": "17:07:00",
+          "end_time": "18:07:00",
+          "cleaning_time": 60,
+          "priority": "low_priority",
+          "address": "VIA GIULIO CARCANO, 19",
+          "alias": "IHST"
+        }
+      ]
+    },
+    {
+      "cleaner": {
+        "id": 469,
+        "name": "LAMIN",
+        "lastname": "SOLY",
+        "start_time": "10:00"
+      },
+      "tasks_count": 4,
+      "tasks": [
+        {
+          "task_id": "220922",
+          "logistic_code": "1698",
+          "sequence": 1,
+          "travel_time": 0,
+          "start_time": "11:15:00",
+          "end_time": "12:15:00",
+          "cleaning_time": 60,
+          "priority": "high_priority",
+          "address": "CORSO ITALIA 38",
+          "alias": "SNPD"
+        },
+        {
+          "task_id": "220922",
+          "logistic_code": "1698",
+          "sequence": 1,
+          "travel_time": 0,
+          "start_time": "11:15:00",
+          "end_time": "12:15:00",
+          "cleaning_time": 60,
+          "priority": "high_priority",
+          "address": "CORSO ITALIA 38",
+          "alias": "SNPD"
+        },
+        {
+          "task_id": "220923",
+          "logistic_code": "1700",
+          "sequence": 2,
+          "travel_time": 29,
+          "start_time": "12:44:00",
+          "end_time": "14:14:00",
+          "cleaning_time": 90,
+          "priority": "high_priority",
+          "address": "VIA BORGONUOVO 4",
+          "alias": "SNPD"
+        },
+        {
+          "task_id": "220923",
+          "logistic_code": "1700",
+          "sequence": 2,
+          "travel_time": 29,
+          "start_time": "12:44:00",
+          "end_time": "14:14:00",
+          "cleaning_time": 90,
+          "priority": "high_priority",
+          "address": "VIA BORGONUOVO 4",
+          "alias": "SNPD"
+        }
+      ]
+    },
+    {
+      "cleaner": {
+        "id": 495,
+        "name": "EL HADJI",
+        "lastname": "BA",
+        "start_time": "10:00"
+      },
+      "tasks_count": 6,
+      "tasks": [
+        {
+          "task_id": "220763",
+          "logistic_code": "1620",
+          "sequence": 1,
+          "travel_time": 0,
+          "start_time": "10:00:00",
+          "end_time": "11:30:00",
+          "cleaning_time": 90,
+          "priority": "early_out",
+          "address": "Via Pietro Borsieri, 29,",
+          "alias": "NTM"
+        },
+        {
+          "task_id": "220763",
+          "logistic_code": "1620",
+          "sequence": 2,
+          "travel_time": 3,
+          "start_time": "11:33:00",
+          "end_time": "13:03:00",
+          "cleaning_time": 90,
+          "priority": "early_out",
+          "address": "Via Pietro Borsieri, 29,",
+          "alias": "NTM"
+        },
+        {
+          "task_id": "220196",
+          "logistic_code": "1671",
+          "sequence": 3,
+          "travel_time": 21,
+          "start_time": "13:24:00",
+          "end_time": "14:54:00",
+          "cleaning_time": 90,
+          "priority": "high_priority",
+          "address": "VIA MARCELLO PRESTINARI 15",
+          "alias": "HMST"
+        },
+        {
+          "task_id": "220196",
+          "logistic_code": "1671",
+          "sequence": 4,
+          "travel_time": 3,
+          "start_time": "14:57:00",
+          "end_time": "16:27:00",
+          "cleaning_time": 90,
+          "priority": "high_priority",
+          "address": "VIA MARCELLO PRESTINARI 15",
+          "alias": "HMST"
+        },
+        {
+          "task_id": "220786",
+          "logistic_code": "1702",
+          "sequence": 5,
+          "travel_time": 33,
+          "start_time": "17:00:00",
+          "end_time": "18:00:00",
+          "cleaning_time": 60,
+          "priority": "low_priority",
+          "address": "VIA RASORI, 2",
+          "alias": "YHST"
+        },
+        {
+          "task_id": "220786",
+          "logistic_code": "1702",
+          "sequence": 6,
+          "travel_time": 3,
+          "start_time": "18:03:00",
+          "end_time": "19:03:00",
+          "cleaning_time": 60,
+          "priority": "low_priority",
+          "address": "VIA RASORI, 2",
+          "alias": "YHST"
+        }
+      ]
+    },
+    {
+      "cleaner": {
+        "id": 771,
+        "name": "PRECIOUS",
+        "lastname": "GYABAAH",
+        "start_time": "10:00"
+      },
+      "tasks_count": 8,
+      "tasks": [
+        {
+          "task_id": "220767",
+          "logistic_code": "1283",
+          "sequence": 1,
+          "travel_time": 0,
+          "start_time": "10:00:00",
+          "end_time": "11:00:00",
+          "cleaning_time": 60,
+          "priority": "early_out",
+          "address": "via della Commenda 28",
+          "alias": "NTM"
+        },
+        {
+          "task_id": "220767",
+          "logistic_code": "1283",
+          "sequence": 1,
+          "travel_time": 0,
+          "start_time": "10:00:00",
+          "end_time": "11:00:00",
+          "cleaning_time": 60,
+          "priority": "early_out",
+          "address": "via della Commenda 28",
+          "alias": "NTM"
+        },
+        {
+          "task_id": "220646",
+          "logistic_code": "1686",
+          "sequence": 2,
+          "travel_time": 8,
+          "start_time": "11:08:00",
+          "end_time": "12:38:00",
+          "cleaning_time": 90,
+          "priority": "high_priority",
+          "address": "VIALE EMILIO CALDARA 39",
+          "alias": "DRST"
+        },
+        {
+          "task_id": "220646",
+          "logistic_code": "1686",
+          "sequence": 2,
+          "travel_time": 8,
+          "start_time": "11:08:00",
+          "end_time": "12:38:00",
+          "cleaning_time": 90,
+          "priority": "high_priority",
+          "address": "VIALE EMILIO CALDARA 39",
+          "alias": "DRST"
+        },
+        {
+          "task_id": "220777",
+          "logistic_code": "1652",
+          "sequence": 3,
+          "travel_time": 20,
+          "start_time": "12:58:00",
+          "end_time": "14:28:00",
+          "cleaning_time": 90,
+          "priority": "high_priority",
+          "address": "VIA NINO BIXIO 33",
+          "alias": "YHST"
+        },
+        {
+          "task_id": "220777",
+          "logistic_code": "1652",
+          "sequence": 3,
+          "travel_time": 20,
+          "start_time": "12:58:00",
+          "end_time": "14:28:00",
+          "cleaning_time": 90,
+          "priority": "high_priority",
+          "address": "VIA NINO BIXIO 33",
+          "alias": "YHST"
+        },
+        {
+          "task_id": "220770",
+          "logistic_code": "1675",
+          "sequence": 4,
+          "travel_time": 7,
+          "start_time": "14:35:00",
+          "end_time": "16:05:00",
+          "cleaning_time": 90,
+          "priority": "low_priority",
+          "address": "Via Lambro, 12",
+          "alias": "YHST"
+        },
+        {
+          "task_id": "220770",
+          "logistic_code": "1675",
+          "sequence": 4,
+          "travel_time": 7,
+          "start_time": "14:35:00",
+          "end_time": "16:05:00",
+          "cleaning_time": 90,
+          "priority": "low_priority",
+          "address": "Via Lambro, 12",
+          "alias": "YHST"
+        }
+      ]
+    },
+    {
+      "cleaner": {
+        "id": 785,
+        "name": "RACHEL",
+        "lastname": "OTSHINGA",
+        "start_time": "10:00"
+      },
+      "tasks_count": 6,
+      "tasks": [
+        {
+          "task_id": "220780",
+          "logistic_code": "1627",
+          "sequence": 1,
+          "travel_time": 0,
+          "start_time": "10:00:00",
+          "end_time": "11:00:00",
+          "cleaning_time": 60,
+          "priority": "early_out",
+          "address": "via Nino Oxilia 24",
+          "alias": "NTM"
+        },
+        {
+          "task_id": "220780",
+          "logistic_code": "1627",
+          "sequence": 1,
+          "travel_time": 0,
+          "start_time": "10:00:00",
+          "end_time": "11:00:00",
+          "cleaning_time": 60,
+          "priority": "early_out",
+          "address": "via Nino Oxilia 24",
+          "alias": "NTM"
+        },
+        {
+          "task_id": "220906",
+          "logistic_code": "534",
+          "sequence": 2,
+          "travel_time": 39,
+          "start_time": "11:39:00",
+          "end_time": "14:09:00",
+          "cleaning_time": 150,
+          "priority": "high_priority",
+          "address": "VIA DE AMICIS, 4",
+          "alias": "TBR"
+        },
+        {
+          "task_id": "220906",
+          "logistic_code": "534",
+          "sequence": 2,
+          "travel_time": 39,
+          "start_time": "11:39:00",
+          "end_time": "14:09:00",
+          "cleaning_time": 150,
+          "priority": "high_priority",
+          "address": "VIA DE AMICIS, 4",
+          "alias": "TBR"
+        },
+        {
+          "task_id": "220912",
+          "logistic_code": "1483",
+          "sequence": 3,
+          "travel_time": 8,
+          "start_time": "14:17:00",
+          "end_time": "18:47:00",
+          "cleaning_time": 270,
+          "priority": "high_priority",
+          "address": "Via Santa Croce,8",
+          "alias": "TBR"
+        },
+        {
+          "task_id": "220912",
+          "logistic_code": "1483",
+          "sequence": 3,
+          "travel_time": 8,
+          "start_time": "14:17:00",
+          "end_time": "18:47:00",
+          "cleaning_time": 270,
+          "priority": "high_priority",
+          "address": "Via Santa Croce,8",
+          "alias": "TBR"
+        }
+      ]
+    },
+    {
+      "cleaner": {
+        "id": 789,
+        "name": "LAFORTUNE",
+        "lastname": "DJOUKOUO NGUEMTHE",
+        "start_time": "10:00"
+      },
+      "tasks_count": 5,
+      "tasks": [
+        {
+          "task_id": "220785",
+          "logistic_code": "1629",
+          "sequence": 1,
+          "travel_time": 0,
+          "start_time": "10:00:00",
+          "end_time": "11:00:00",
+          "cleaning_time": 60,
+          "priority": "early_out",
+          "address": "via Bianca Ceva, 32 lotto E",
+          "alias": "NTM"
+        },
+        {
+          "task_id": "220785",
+          "logistic_code": "1629",
+          "sequence": 2,
+          "travel_time": 3,
+          "start_time": "11:03:00",
+          "end_time": "12:03:00",
+          "cleaning_time": 60,
+          "priority": "early_out",
+          "address": "via Bianca Ceva, 32 lotto E",
+          "alias": "NTM"
+        },
+        {
+          "task_id": "220907",
+          "logistic_code": "754",
+          "sequence": 3,
+          "travel_time": 50,
+          "start_time": "12:53:00",
+          "end_time": "14:53:00",
+          "cleaning_time": 120,
+          "priority": "high_priority",
+          "address": "VIA STRADIVARI, 4",
+          "alias": "TBR"
+        },
+        {
+          "task_id": "220911",
+          "logistic_code": "1493",
+          "sequence": 4,
+          "travel_time": 34,
+          "start_time": "15:27:00",
+          "end_time": "17:27:00",
+          "cleaning_time": 120,
+          "priority": "high_priority",
+          "address": "Via Carlo Crivelli, 15/1",
+          "alias": "TBR"
+        },
+        {
+          "task_id": "220911",
+          "logistic_code": "1493",
+          "sequence": 5,
+          "travel_time": 3,
+          "start_time": "17:30:00",
+          "end_time": "19:30:00",
+          "cleaning_time": 120,
+          "priority": "high_priority",
+          "address": "Via Carlo Crivelli, 15/1",
+          "alias": "TBR"
+        }
+      ]
+    },
+    {
+      "cleaner": {
+        "id": 845,
+        "name": "YOHANNES",
+        "lastname": "TAMIRAT ALI",
+        "start_time": "10:00"
+      },
+      "tasks_count": 6,
+      "tasks": [
+        {
+          "task_id": "219714",
+          "logistic_code": "1553",
+          "sequence": 1,
+          "travel_time": 0,
+          "start_time": "11:00:00",
+          "end_time": "12:30:00",
+          "cleaning_time": 90,
+          "priority": "high_priority",
+          "address": "VIA GIACOMO GRIZIOTTI, 3",
+          "alias": "TRMB"
+        },
+        {
+          "task_id": "219714",
+          "logistic_code": "1553",
+          "sequence": 1,
+          "travel_time": 0,
+          "start_time": "11:00:00",
+          "end_time": "12:30:00",
+          "cleaning_time": 90,
+          "priority": "high_priority",
+          "address": "VIA GIACOMO GRIZIOTTI, 3",
+          "alias": "TRMB"
+        },
+        {
+          "task_id": "220766",
+          "logistic_code": "1494",
+          "sequence": 2,
+          "travel_time": 33,
+          "start_time": "13:03:00",
+          "end_time": "14:33:00",
+          "cleaning_time": 90,
+          "priority": "low_priority",
+          "address": "VIA ORTI 16D",
+          "alias": "IHST"
+        },
+        {
+          "task_id": "220766",
+          "logistic_code": "1494",
+          "sequence": 2,
+          "travel_time": 33,
+          "start_time": "13:03:00",
+          "end_time": "14:33:00",
+          "cleaning_time": 90,
+          "priority": "low_priority",
+          "address": "VIA ORTI 16D",
+          "alias": "IHST"
+        },
+        {
+          "task_id": "220893",
+          "logistic_code": "1576",
+          "sequence": 3,
+          "travel_time": 38,
+          "start_time": "15:11:00",
+          "end_time": "16:41:00",
+          "cleaning_time": 90,
+          "priority": "low_priority",
+          "address": "VIA SAVONA 127",
+          "alias": "IHST"
+        },
+        {
+          "task_id": "220893",
+          "logistic_code": "1576",
+          "sequence": 3,
+          "travel_time": 38,
+          "start_time": "15:11:00",
+          "end_time": "16:41:00",
+          "cleaning_time": 90,
+          "priority": "low_priority",
+          "address": "VIA SAVONA 127",
+          "alias": "IHST"
+        }
+      ]
+    },
+    {
+      "cleaner": {
+        "id": 1031,
+        "name": "YAH PRISCA LEA",
+        "lastname": "ADOU",
+        "start_time": "10:00"
+      },
+      "tasks_count": 6,
+      "tasks": [
+        {
+          "task_id": "220884",
+          "logistic_code": "1687",
+          "sequence": 1,
+          "travel_time": 0,
+          "start_time": "11:00:00",
+          "end_time": "12:30:00",
+          "cleaning_time": 90,
+          "priority": "high_priority",
+          "address": "VIALE EMIO CALDARA 39",
+          "alias": "DRST"
+        },
+        {
+          "task_id": "220883",
+          "logistic_code": "1135",
+          "sequence": 2,
+          "travel_time": 23,
+          "start_time": "12:53:00",
+          "end_time": "13:53:00",
+          "cleaning_time": 60,
+          "priority": "early_out",
+          "address": "VIA CORSICO,  5",
+          "alias": "NTM"
+        },
+        {
+          "task_id": "220883",
+          "logistic_code": "1135",
+          "sequence": 3,
+          "travel_time": 3,
+          "start_time": "13:56:00",
+          "end_time": "14:56:00",
+          "cleaning_time": 60,
+          "priority": "early_out",
+          "address": "VIA CORSICO,  5",
+          "alias": "NTM"
+        },
+        {
+          "task_id": "220884",
+          "logistic_code": "1687",
+          "sequence": 4,
+          "travel_time": 23,
+          "start_time": "15:19:00",
+          "end_time": "16:49:00",
+          "cleaning_time": 90,
+          "priority": "high_priority",
+          "address": "VIALE EMIO CALDARA 39",
+          "alias": "DRST"
+        },
+        {
+          "task_id": "220904",
+          "logistic_code": "144",
+          "sequence": 5,
+          "travel_time": 8,
+          "start_time": "16:57:00",
+          "end_time": "18:57:00",
+          "cleaning_time": 120,
+          "priority": "high_priority",
+          "address": "CORSO DI PORTA ROMANA 107",
+          "alias": "TBR"
+        },
+        {
+          "task_id": "220904",
+          "logistic_code": "144",
+          "sequence": 6,
+          "travel_time": 3,
+          "start_time": "19:00:00",
+          "end_time": "21:00:00",
+          "cleaning_time": 120,
+          "priority": "high_priority",
+          "address": "CORSO DI PORTA ROMANA 107",
+          "alias": "TBR"
+        }
+      ]
+    },
+    {
+      "cleaner": {
+        "id": 1060,
+        "name": "NELLY GABRIELLE",
+        "lastname": "TENKAM",
+        "start_time": "10:00"
+      },
+      "tasks_count": 8,
+      "tasks": [
+        {
+          "task_id": "220792",
+          "logistic_code": "937",
+          "sequence": 1,
+          "travel_time": 0,
+          "start_time": "11:00:00",
+          "end_time": "12:30:00",
+          "cleaning_time": 90,
+          "priority": "high_priority",
+          "address": "VIA VINCENZO MONTI, 77",
+          "alias": "RLST"
+        },
+        {
+          "task_id": "220792",
+          "logistic_code": "937",
+          "sequence": 1,
+          "travel_time": 0,
+          "start_time": "11:00:00",
+          "end_time": "12:30:00",
+          "cleaning_time": 90,
+          "priority": "high_priority",
+          "address": "VIA VINCENZO MONTI, 77",
+          "alias": "RLST"
+        },
+        {
+          "task_id": "220674",
+          "logistic_code": "1578",
+          "sequence": 2,
+          "travel_time": 26,
+          "start_time": "12:56:00",
+          "end_time": "14:26:00",
+          "cleaning_time": 90,
+          "priority": "high_priority",
+          "address": "VIA MOLINO DELLE ARMI, 13",
+          "alias": "ANLW"
+        },
+        {
+          "task_id": "220674",
+          "logistic_code": "1578",
+          "sequence": 2,
+          "travel_time": 26,
+          "start_time": "12:56:00",
+          "end_time": "14:26:00",
+          "cleaning_time": 90,
+          "priority": "high_priority",
+          "address": "VIA MOLINO DELLE ARMI, 13",
+          "alias": "ANLW"
+        },
+        {
+          "task_id": "220775",
+          "logistic_code": "1674",
+          "sequence": 3,
+          "travel_time": 7,
+          "start_time": "14:33:00",
+          "end_time": "15:33:00",
+          "cleaning_time": 60,
+          "priority": "low_priority",
+          "address": "Via Disciplini, 4",
+          "alias": "YHST"
+        },
+        {
+          "task_id": "220775",
+          "logistic_code": "1674",
+          "sequence": 3,
+          "travel_time": 7,
+          "start_time": "14:33:00",
+          "end_time": "15:33:00",
+          "cleaning_time": 60,
+          "priority": "low_priority",
+          "address": "Via Disciplini, 4",
+          "alias": "YHST"
+        },
+        {
+          "task_id": "220784",
+          "logistic_code": "1684",
+          "sequence": 4,
+          "travel_time": 26,
+          "start_time": "15:59:00",
+          "end_time": "16:59:00",
+          "cleaning_time": 60,
+          "priority": "low_priority",
+          "address": "CORSO MONFORTE 13",
+          "alias": "YHST"
+        },
+        {
+          "task_id": "220784",
+          "logistic_code": "1684",
+          "sequence": 4,
+          "travel_time": 26,
+          "start_time": "15:59:00",
+          "end_time": "16:59:00",
+          "cleaning_time": 60,
+          "priority": "low_priority",
+          "address": "CORSO MONFORTE 13",
+          "alias": "YHST"
+        }
+      ]
+    }
+  ]
+}
