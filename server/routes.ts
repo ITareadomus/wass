@@ -5197,7 +5197,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             s.type_apt,
             c.name AS customer_name,
             c.id AS client_id,
-            s.customer_structure_reference AS customer_reference
+            s.apt_code AS customer_reference
           FROM app_housekeeping h
           LEFT JOIN app_structures s ON h.structure_id = s.id
           LEFT JOIN app_client c ON s.id_client = c.id
