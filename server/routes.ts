@@ -5188,20 +5188,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
             h.cleaning_time,
             h.operation_id,
             h.confirmed_operation,
-            l.premium,
-            l.address,
-            l.lat,
-            l.lng,
-            l.small_equipment,
-            l.alias,
-            l.type_apt,
+            s.premium,
+            s.address,
+            s.lat,
+            s.lng,
+            s.small_equipment,
+            s.alias,
+            s.type_apt,
             c.name AS customer_name,
             c.id AS client_id,
             s.customer_structure_reference AS customer_reference
           FROM app_housekeeping h
-          LEFT JOIN app_logistics l ON h.logistic_code = l.code
-          LEFT JOIN app_client c ON l.id_client = c.id
-          LEFT JOIN app_structures s ON l.code = s.code AND l.id_client = s.id_client
+          LEFT JOIN app_structures s ON h.structure_id = s.id
+          LEFT JOIN app_client c ON s.id_client = c.id
           WHERE h.id IN (${taskIds.join(',')})
         `);
         await adamConnection.end();
