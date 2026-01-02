@@ -5193,14 +5193,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
             s.lat,
             s.lng,
             s.small_equipment,
-            s.alias,
             s.type_apt,
             c.name AS customer_name,
             c.id AS client_id,
+            c.alias AS alias,
             s.apt_code AS customer_reference
           FROM app_housekeeping h
           LEFT JOIN app_structures s ON h.structure_id = s.id
-          LEFT JOIN app_client c ON s.id_client = c.id
+          LEFT JOIN app_customers c ON s.customer_id = c.id
           WHERE h.id IN (${taskIds.join(',')})
         `);
         await adamConnection.end();
