@@ -1,14 +1,7 @@
 import mysql.connector
 import sys
 from datetime import datetime, timedelta
-
-# Configurazione del database (lasciata invariata rispetto allo script originale)
-db_config = {
-    "host": "pippo",
-    "user": "admin",
-    "password": "REMOVED_MYSQL_PASSWORD",
-    "database": "pippo"
-}
+from db_config import db_config
 
 # --- UTIL ---------------------------------------------------------------
 

@@ -6,19 +6,13 @@ Output: JSON con client_id e operation_name
 
 import json
 import mysql.connector
-import os
 import sys
+from db_config import db_config
 
 
 def get_db_connection():
     """Crea connessione al database MySQL."""
-    return mysql.connector.connect(
-        host=os.getenv("DB_HOST", "pippo"),
-        database=os.getenv("DB_NAME", "pippo"),
-        user=os.getenv("DB_USER", "admin"),
-        password=os.getenv("DB_PASSWORD",
-                           "REMOVED_MYSQL_PASSWORD"),
-        port=int(os.getenv("DB_PORT", "3306")))
+    return mysql.connector.connect(**db_config)
 
 
 def extract_active_clients():

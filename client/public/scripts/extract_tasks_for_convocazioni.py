@@ -15,12 +15,7 @@ OUTPUT_CONVOCAZIONI_TASKS = OUTPUT_DIR / "convocazioni_tasks.json"
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
 # ---------- Config DB ----------
-DB_CONFIG = {
-    "host": "pippo",
-    "user": "admin",
-    "password": "REMOVED_MYSQL_PASSWORD",
-    "database": "pippo",
-}
+from db_config import db_config as DB_CONFIG
 
 # ---------- Utilità ----------
 def date_to_str(value):

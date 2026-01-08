@@ -9,6 +9,7 @@ import * as fs from 'fs/promises';
 import { format } from "date-fns";
 import { it } from "date-fns/locale";
 import { formatInTimeZone } from "date-fns-tz";
+import { databaseConfig } from "../config/database";
 
 // Utility per timestamp in fuso orario di Roma
 const ROME_TIMEZONE = "Europe/Rome";
@@ -2768,10 +2769,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
           try {
             const mysql = await import('mysql2/promise');
             mysqlConnection = await mysql.createConnection({
-              host: "pippo",
-              user: "admin",
-              password: "REMOVED_MYSQL_PASSWORD",
-              database: "pippo",
+              host: databaseConfig.mysql.host,
+              port: databaseConfig.mysql.port,
+              user: databaseConfig.mysql.user,
+              password: databaseConfig.mysql.password,
+              database: databaseConfig.mysql.database,
             });
           } catch (dbError: any) {
             console.warn(`⚠️ Connessione ADAM non disponibile: ${dbError.message}`);
@@ -2983,10 +2985,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         try {
           const mysql = await import('mysql2/promise');
           const connection = await mysql.createConnection({
-            host: "pippo",
-            user: "admin",
-            password: "REMOVED_MYSQL_PASSWORD",
-            database: "pippo",
+            host: databaseConfig.mysql.host,
+            port: databaseConfig.mysql.port,
+            user: databaseConfig.mysql.user,
+            password: databaseConfig.mysql.password,
+            database: databaseConfig.mysql.database,
           });
 
           // Costruisci query UPDATE dinamica (aggiorna solo i campi forniti)
@@ -3185,13 +3188,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       try {
         connection = await mysql.createConnection({
-          host: "pippo",
-          user: "admin",
-          password: "REMOVED_MYSQL_PASSWORD",
-          database: "pippo",
-          waitForConnections: true,
-          connectionLimit: 1,
-          queueLimit: 0
+          host: databaseConfig.mysql.host,
+          port: databaseConfig.mysql.port,
+          user: databaseConfig.mysql.user,
+          password: databaseConfig.mysql.password,
+          database: databaseConfig.mysql.database,
         });
         console.log("✅ Connessione MySQL ADAM stabilita");
       } catch (dbError: any) {
@@ -3436,13 +3437,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       try {
         connection = await mysql.createConnection({
-          host: "pippo",
-          user: "admin",
-          password: "REMOVED_MYSQL_PASSWORD",
-          database: "pippo",
-          waitForConnections: true,
-          connectionLimit: 1,
-          queueLimit: 0
+          host: databaseConfig.mysql.host,
+          port: databaseConfig.mysql.port,
+          user: databaseConfig.mysql.user,
+          password: databaseConfig.mysql.password,
+          database: databaseConfig.mysql.database,
         });
         console.log("✅ Connessione MySQL ADAM stabilita per update operation_id");
       } catch (dbError: any) {
@@ -5065,11 +5064,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // 3. Query database ADAM per ottenere i dati aggiornati
       const mysql = await import('mysql2/promise');
       const adamConnection = await mysql.createConnection({
-        host: process.env.DB_HOST,
-        user: process.env.DB_USER,
-        password: process.env.DB_PASSWORD,
-        database: process.env.DB_NAME,
-        port: parseInt(process.env.DB_PORT || '3306')
+        host: databaseConfig.mysql.host,
+        port: databaseConfig.mysql.port,
+        user: databaseConfig.mysql.user,
+        password: databaseConfig.mysql.password,
+        database: databaseConfig.mysql.database,
       });
 
       const [rows]: any = await adamConnection.execute(`
@@ -5168,11 +5167,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       try {
         const mysql = await import('mysql2/promise');
         const adamConnection = await mysql.createConnection({
-          host: process.env.DB_HOST,
-          user: process.env.DB_USER,
-          password: process.env.DB_PASSWORD,
-          database: process.env.DB_NAME,
-          port: parseInt(process.env.DB_PORT || '3306')
+          host: databaseConfig.mysql.host,
+          port: databaseConfig.mysql.port,
+          user: databaseConfig.mysql.user,
+          password: databaseConfig.mysql.password,
+          database: databaseConfig.mysql.database,
         });
 
         const [rows]: any = await adamConnection.execute(`
