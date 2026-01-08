@@ -1,8 +1,6 @@
-import json
 import mysql.connector
 import sys
 from datetime import datetime, timedelta
-from pathlib import Path
 
 # Configurazione del database (lasciata invariata rispetto allo script originale)
 db_config = {
@@ -289,43 +287,14 @@ for pg_cid, pg_cleaner in existing_pg_cleaners.items():
 if preserved_count > 0:
     print(f"✅ Totale cleaners preservati da PostgreSQL: {preserved_count}")
 
-# Struttura JSON identica a quella scritta dallo script originale
-fresh_data = {
-    "metadata": {
-        "last_updated": datetime.now().isoformat(),
-        "db_config": db_config,
-        "schema_version": "1.0"
-    },
-    "dates": {
-        target_date_str: {
-            "timestamp": datetime.now().isoformat(),
-            "cleaners": cleaners_data,
-            "total_cleaners": len(cleaners_data),
-            "date": target_date_str,
-            "data_source": "database_query"
-        }
-    }
-}
+# SALVATAGGIO SU POSTGRESQL VIA API (UNICA DESTINAZIONE)
+# Il file cleaners.json non viene più utilizzato - PostgreSQL è la fonte unica
+from api_client import ApiClient
 
-# Scrittura su data/cleaners/cleaners.json (stesso percorso dell'originale)
-output_path = Path(__file__).resolve().parents[1] / "data" / "cleaners" / "cleaners.json"
-output_path.parent.mkdir(parents=True, exist_ok=True)
-with output_path.open("w", encoding="utf-8") as f:
-    json.dump(fresh_data, f, indent=4)
+print(f"📅 Data target: {target_date_str}")
+print(f"👥 Cleaners trovati: {len(cleaners_data)}")
 
-print(f"✅ File cleaners.json COMPLETAMENTE RESETTATO e aggiornato")
-print(f"📅 DATA NEL JSON: {target_date_str}")
-print(f"👥 CLEANERS TROVATI: {len(cleaners_data)}")
-print(f"🔄 RESET COMPLETATO - Il file contiene SOLO i dati per {target_date_str}")
-print(f"Aggiornato data/cleaners/cleaners.json con {len(cleaners_data)} cleaners per la data {target_date_str}.")
-
-# SALVATAGGIO SU POSTGRESQL VIA API
-# Importa api_client e salva i cleaners nel database PostgreSQL
-try:
-    from api_client import ApiClient
-    api = ApiClient()
-    result = api.save_cleaners(target_date_str, cleaners_data)
-    print(f"✅ Cleaners salvati su PostgreSQL via API: {result.get('message', 'OK')}")
-except Exception as api_err:
-    print(f"⚠️ Salvataggio API fallito (non bloccante): {api_err}")
-    print("   I dati sono stati salvati solo su cleaners.json")
+api = ApiClient()
+result = api.save_cleaners(target_date_str, cleaners_data)
+print(f"✅ Cleaners salvati su PostgreSQL via API: {result.get('message', 'OK')}")
+print(f"🔄 Completato - {len(cleaners_data)} cleaners salvati per {target_date_str}")

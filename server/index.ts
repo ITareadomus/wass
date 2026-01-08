@@ -74,7 +74,7 @@ app.use((req, res, next) => {
     await setupVite(app, server);
   } else {
     // In production, serve static reference data files from source
-    // This ensures cleaners.json, aliases, etc. are accessible after deployment
+    // This ensures aliases, accounts, etc. are accessible after deployment
     const __filename = fileURLToPath(import.meta.url);
     const __dirname = path.dirname(__filename);
     const staticDataPath = path.resolve(__dirname, "..", "client", "public", "data");

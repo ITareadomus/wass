@@ -869,7 +869,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Endpoint per leggere i cleaners selezionati da PostgreSQL
-  // Il frontend dovrebbe usare questo endpoint invece di leggere direttamente selected_cleaners.json
+  // PostgreSQL è l'unica fonte di dati per i selected cleaners
   app.get("/api/selected-cleaners", async (req, res) => {
     try {
       const dateParam = (req.query.date as string) || format(new Date(), "yyyy-MM-dd");
@@ -899,7 +899,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Endpoint per leggere tutti i cleaners per una data da PostgreSQL
-  // Sostituisce la lettura di cleaners.json per il frontend
+  // PostgreSQL è l'unica fonte di dati (cleaners.json non è più utilizzato)
   app.get("/api/cleaners", async (req, res) => {
     try {
       const dateParam = (req.query.date as string) || format(new Date(), "yyyy-MM-dd");
@@ -2021,7 +2021,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         hasTasks = false;
       }
 
-      // Rimuovi il cleaner da selected_cleaners.json
+      // Rimuovi il cleaner dai selected cleaners in PostgreSQL
       const cleanersBefore = selectedData.cleaners.length;
       selectedData.cleaners = selectedData.cleaners.filter((c: any) => c.id !== cleanerId);
       selectedData.total_selected = selectedData.cleaners.length;

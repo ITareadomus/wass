@@ -8,7 +8,6 @@ const __dirname = dirname(__filename);
 const projectRoot = join(__dirname, '..');
 
 const staticFiles = [
-  'client/public/data/cleaners/cleaners.json',
   'client/public/data/cleaners/cleaners_aliases.json',
   'client/public/data/accounts.json',
   'client/public/data/input/settings.json',
