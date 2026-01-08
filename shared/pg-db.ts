@@ -1,15 +1,30 @@
 import { Pool } from 'pg';
+import { databaseConfig } from '../config/database';
+
+const env = process.env.NODE_ENV || 'development';
+const pgConfig = databaseConfig.postgres;
+
+if (env !== 'production' && pgConfig.database === 'defaultdb') {
+  throw new Error(
+    '❌ Refusing to connect to PostgreSQL production database (defaultdb) in non-production environment. ' +
+    `Current NODE_ENV: "${env}". Check config/database.ts development.database.`
+  );
+}
+
+console.log(`🔒 PostgreSQL database: ${pgConfig.database} (from config/database.ts, NODE_ENV=${env})`);
 
 const pool = new Pool({
-  host: process.env.PG_HOST,
-  user: process.env.PG_USER,
-  password: process.env.PG_PASSWORD,
-  database: process.env.PG_DATABASE,
-  port: parseInt(process.env.PG_PORT || '25060'),
+  host: pgConfig.host,
+  user: pgConfig.username,
+  password: pgConfig.password,
+  database: pgConfig.database,
+  port: pgConfig.port,
   ssl: {
     rejectUnauthorized: false
   }
 });
+
+console.log(`🐘 PostgreSQL pool initialized: ${pgConfig.database} @ ${pgConfig.host}:${pgConfig.port}`);
 
 pool.on('error', (err) => {
   console.error('Unexpected error on PostgreSQL pool', err);
