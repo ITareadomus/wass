@@ -16,27 +16,25 @@ const env = process.env.NODE_ENV || 'development';
 
 const postgresConfig = {
   development: {
-    host: 'ep-aged-cherry-a2k34qxq.eu-central-1.aws.neon.tech',
+    username: '',
+    password: '',
+    host: '',
     port: 5432,
-    user: 'neondb_owner',
-    password: 'npg_cg9HZdDrB1lk',
-    database: 'neondb',
-    ssl: true,
-    // Connection string alternativa (usata da alcuni driver)
+    database: '',
+    sslmode: 'require',
     get connectionString() {
-      return `postgresql://${this.user}:${this.password}@${this.host}:${this.port}/${this.database}?sslmode=require`;
+      return `postgresql://${this.username}:${this.password}@${this.host}:${this.port}/${this.database}?sslmode=${this.sslmode}`;
     },
   },
   production: {
-    // ⚠️ DA COMPLETARE: Inserire credenziali PostgreSQL di produzione
-    host: 'INSERIRE_HOST_PRODUZIONE',
+    username: '',
+    password: '',
+    host: '',
     port: 5432,
-    user: 'INSERIRE_USER_PRODUZIONE',
-    password: 'INSERIRE_PASSWORD_PRODUZIONE',
-    database: 'INSERIRE_DATABASE_PRODUZIONE',
-    ssl: true,
+    database: '',
+    sslmode: 'require',
     get connectionString() {
-      return `postgresql://${this.user}:${this.password}@${this.host}:${this.port}/${this.database}?sslmode=require`;
+      return `postgresql://${this.username}:${this.password}@${this.host}:${this.port}/${this.database}?sslmode=${this.sslmode}`;
     },
   },
 };
@@ -80,7 +78,7 @@ export const databaseConfig = {
   // Helper per verificare se PostgreSQL è configurato correttamente  
   isPostgresConfigured(): boolean {
     const pg = this.postgres;
-    return !!(pg.host && !pg.host.includes('INSERIRE'));
+    return !!(pg.host && pg.username && pg.password && pg.database);
   },
 };
 
