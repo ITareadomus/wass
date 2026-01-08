@@ -16,22 +16,22 @@ const env = process.env.NODE_ENV || 'development';
 
 const postgresConfig = {
   development: {
-    username: '',
-    password: '',
-    host: '',
-    port: 5432,
-    database: '',
+    username: 'doadmin',
+    password: 'REMOVED_AIVEN_PASSWORD',
+    host: 'db-postgresql-fra1-32251-do-user-18568811-0.g.db.ondigitalocean.com',
+    port: 25060,
+    database: 'defaultdb_env',
     sslmode: 'require',
     get connectionString() {
       return `postgresql://${this.username}:${this.password}@${this.host}:${this.port}/${this.database}?sslmode=${this.sslmode}`;
     },
   },
   production: {
-    username: '',
-    password: '',
-    host: '',
-    port: 5432,
-    database: '',
+    username: 'doadmin',
+    password: 'REMOVED_AIVEN_PASSWORD',
+    host: 'db-postgresql-fra1-32251-do-user-18568811-0.g.db.ondigitalocean.com',
+    port: 25060,
+    database: 'defaultdb',
     sslmode: 'require',
     get connectionString() {
       return `postgresql://${this.username}:${this.password}@${this.host}:${this.port}/${this.database}?sslmode=${this.sslmode}`;
@@ -72,7 +72,7 @@ export const databaseConfig = {
   // Helper per verificare se MySQL è configurato correttamente
   isMysqlConfigured(): boolean {
     const mysql = this.mysql;
-    return !!(mysql.host && mysql.host !== 'pippo' && mysql.database && mysql.database !== 'pippo');
+    return !!(mysql.host && mysql.database && mysql.user && mysql.password);
   },
   
   // Helper per verificare se PostgreSQL è configurato correttamente  
