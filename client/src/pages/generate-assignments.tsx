@@ -1565,6 +1565,12 @@ export default function GenerateAssignments() {
 
       const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
 
+      // ENFORCEMENT: Check se la task è locked prima di assegnare
+      if ((task as any).locked) {
+        console.log(`🔒 Task ${taskId} è bloccata, assegnazione annullata`);
+        throw new Error((task as any).locked_reason || 'Task bloccata: impossibile assegnare');
+      }
+
       const response = await fetch("/api/save-timeline-assignment", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -1582,6 +1588,10 @@ export default function GenerateAssignments() {
       });
       if (!response.ok) {
         const errData = await response.json().catch(() => ({}));
+        // Gestione errore 423 (Task bloccata)
+        if (response.status === 423) {
+          throw new Error(errData.locked_reason || 'Task bloccata: impossibile assegnare');
+        }
         throw new Error(`Errore nel salvataggio dell'assegnazione: ${errData.error || response.statusText}`);
       }
       console.log(`Assegnazione salvata: taskId=${taskId}, logisticCode=${logisticCode}`);
@@ -1756,6 +1766,17 @@ export default function GenerateAssignments() {
       const task = allTasksWithAssignments.find(t => String(t.id) === String(taskId));
       const logisticCode = task?.name; // name contiene il logistic_code
 
+      // ENFORCEMENT: Se la task è bloccata, non permettere spostamento in timeline
+      if (task && (task as any).locked && !fromCleanerId) {
+        console.log(`🔒 Task ${taskId} è bloccata, spostamento annullato`);
+        toast({
+          title: "Task bloccata",
+          description: (task as any).locked_reason || "Questa task non può essere assegnata",
+          variant: "destructive",
+        });
+        return;
+      }
+
       // Se la timeline è read-only, non permettere modifiche
       if (isTimelineReadOnly) {
         console.log("Timeline è READ-ONLY, spostamento annullato.");
@@ -1850,6 +1871,11 @@ export default function GenerateAssignments() {
           });
 
           if (!response.ok) {
+            // Gestione errore 423 (Task bloccata)
+            if (response.status === 423) {
+              const errorData = await response.json().catch(() => ({}));
+              throw new Error(errorData.locked_reason || 'Task bloccata: impossibile assegnare');
+            }
             throw new Error('Errore nello spostamento tra cleaners');
           }
 
@@ -1902,11 +1928,38 @@ export default function GenerateAssignments() {
         const correctBatchIndex = lastValidDragIndex !== null ? lastValidDragIndex : destination.index;
         dlog(`🔄 BATCH MOVE CROSS-CONTAINER: Spostamento di ${selectedTasks.length} task selezionate a cleaner ${toCleanerId} @ index ${correctBatchIndex}`);
 
-        // OPTIMISTIC UPDATE: Sposta tutte le task selezionate immediatamente CON posizione corretta
-        const taskIds = selectedTasks.map(st => st.taskId);
+        // ENFORCEMENT: Filtra task locked dalla selezione batch
+        const unlockedSelectedTasks = selectedTasks.filter(st => {
+          const t = allTasksWithAssignments.find(task => String(task.id) === st.taskId);
+          return t && !(t as any).locked;
+        });
+        const lockedCount = selectedTasks.length - unlockedSelectedTasks.length;
+        
+        if (unlockedSelectedTasks.length === 0) {
+          toast({
+            title: "Tutte le task selezionate sono bloccate",
+            description: "Sblocca le task per poterle assegnare",
+            variant: "destructive",
+          });
+          isDraggingRef.current = false;
+          if (dragTimeoutRef.current) clearTimeout(dragTimeoutRef.current);
+          setIsLoadingDragDrop(false);
+          return;
+        }
+        
+        if (lockedCount > 0) {
+          toast({
+            title: "Alcune task ignorate",
+            description: `${lockedCount} task bloccate sono state ignorate`,
+            variant: "warning",
+          });
+        }
+
+        // OPTIMISTIC UPDATE: Sposta tutte le task selezionate (non locked) immediatamente CON posizione corretta
+        const taskIds = unlockedSelectedTasks.map(st => st.taskId);
         const { updated, snapshot } = optimisticBatchMoveTask(allTasksWithAssignments, taskIds, toCleanerId, correctBatchIndex);
         setAllTasksWithAssignments(updated);
-        const numTasks = selectedTasks.length; // Salva prima di pulire
+        const numTasks = unlockedSelectedTasks.length; // Usa solo le task non bloccate
 
         // OPTIMISTIC UPDATE: Rimuovi task selezionate dai container (evita "sdoppiamento")
         const containerSnapshots = {
@@ -1923,15 +1976,15 @@ export default function GenerateAssignments() {
           // PATCH C: Usa ID nel toast invece di fetch
           const cleanerName = `ID ${toCleanerId}`;
 
-          // Ordina le task selezionate per ordine di selezione
-          const sortedTasks = [...selectedTasks].sort((a, b) => a.order - b.order);
+          // Ordina le task selezionate (non locked) per ordine di selezione
+          const sortedTasks = [...unlockedSelectedTasks].sort((a, b) => a.order - b.order);
 
           // Sposta ciascuna task in sequenza alla destinazione
           let currentIndex = correctBatchIndex;
           for (const selectedTask of sortedTasks) {
-            const task = allTasksWithAssignments.find(t => String(t.id) === selectedTask.taskId);
-            if (task) {
-              await saveTaskAssignment(selectedTask.taskId, toCleanerId, task.name, currentIndex);
+            const taskItem = allTasksWithAssignments.find(t => String(t.id) === selectedTask.taskId);
+            if (taskItem) {
+              await saveTaskAssignment(selectedTask.taskId, toCleanerId, taskItem.name, currentIndex);
               currentIndex++; // Incrementa l'indice per la prossima task
             }
           }

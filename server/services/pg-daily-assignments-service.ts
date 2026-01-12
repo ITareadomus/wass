@@ -113,6 +113,151 @@ export class PgDailyAssignmentsService {
   }
 
   /**
+   * Ensure daily_task_locks table exists (source of truth for task locking)
+   * This table persists lock state across refreshes - locked tasks cannot be assigned to timeline
+   */
+  async ensureTaskLocksTable(): Promise<void> {
+    try {
+      await query(`
+        CREATE TABLE IF NOT EXISTS daily_task_locks (
+          work_date DATE NOT NULL,
+          task_id INTEGER NOT NULL,
+          locked BOOLEAN NOT NULL DEFAULT TRUE,
+          locked_reason TEXT,
+          locked_by TEXT,
+          updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+          PRIMARY KEY (work_date, task_id)
+        )
+      `);
+      await query(`
+        CREATE INDEX IF NOT EXISTS idx_daily_task_locks_date 
+        ON daily_task_locks(work_date)
+      `);
+      console.log('✅ PG: Tabella daily_task_locks verificata');
+    } catch (error) {
+      console.warn('⚠️ PG: Errore (ignorabile) nella creazione daily_task_locks:', error);
+    }
+  }
+
+  /**
+   * Get all locks for a specific work date as a map
+   * @returns Map of task_id -> { locked, locked_reason, locked_by }
+   */
+  async getLocksMap(workDate: string): Promise<Map<number, { locked: boolean; lockedReason: string | null; lockedBy: string | null }>> {
+    const result = await query(
+      'SELECT task_id, locked, locked_reason, locked_by FROM daily_task_locks WHERE work_date = $1',
+      [workDate]
+    );
+    
+    const locksMap = new Map<number, { locked: boolean; lockedReason: string | null; lockedBy: string | null }>();
+    for (const row of result.rows) {
+      locksMap.set(row.task_id, {
+        locked: row.locked,
+        lockedReason: row.locked_reason,
+        lockedBy: row.locked_by
+      });
+    }
+    return locksMap;
+  }
+
+  /**
+   * Get lock status for a specific task
+   * @returns Lock record or null if not locked
+   */
+  async getTaskLock(workDate: string, taskId: number): Promise<{ locked: boolean; lockedReason: string | null; lockedBy: string | null } | null> {
+    const result = await query(
+      'SELECT locked, locked_reason, locked_by FROM daily_task_locks WHERE work_date = $1 AND task_id = $2',
+      [workDate, taskId]
+    );
+    
+    if (result.rows.length === 0) {
+      return null;
+    }
+    
+    return {
+      locked: result.rows[0].locked,
+      lockedReason: result.rows[0].locked_reason,
+      lockedBy: result.rows[0].locked_by
+    };
+  }
+
+  /**
+   * Check if a task is locked (convenience method)
+   */
+  async isTaskLocked(workDate: string, taskId: number): Promise<boolean> {
+    const lock = await this.getTaskLock(workDate, taskId);
+    return lock?.locked ?? false;
+  }
+
+  /**
+   * Update lock status for a task (UPSERT)
+   */
+  async updateTaskLockStatus(
+    workDate: string, 
+    taskId: number, 
+    locked: boolean, 
+    lockedReason?: string | null, 
+    lockedBy?: string | null
+  ): Promise<void> {
+    await query(`
+      INSERT INTO daily_task_locks (work_date, task_id, locked, locked_reason, locked_by, updated_at)
+      VALUES ($1, $2, $3, $4, $5, NOW())
+      ON CONFLICT (work_date, task_id)
+      DO UPDATE SET 
+        locked = EXCLUDED.locked, 
+        locked_reason = EXCLUDED.locked_reason,
+        locked_by = EXCLUDED.locked_by,
+        updated_at = NOW()
+    `, [workDate, taskId, locked, lockedReason || null, lockedBy || null]);
+  }
+
+  /**
+   * Bulk update lock status for multiple tasks
+   */
+  async bulkUpdateTaskLockStatus(
+    workDate: string,
+    taskIds: number[],
+    locked: boolean,
+    lockedReason?: string | null,
+    lockedBy?: string | null
+  ): Promise<void> {
+    if (taskIds.length === 0) return;
+    
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      for (const taskId of taskIds) {
+        await client.query(`
+          INSERT INTO daily_task_locks (work_date, task_id, locked, locked_reason, locked_by, updated_at)
+          VALUES ($1, $2, $3, $4, $5, NOW())
+          ON CONFLICT (work_date, task_id)
+          DO UPDATE SET 
+            locked = EXCLUDED.locked, 
+            locked_reason = EXCLUDED.locked_reason,
+            locked_by = EXCLUDED.locked_by,
+            updated_at = NOW()
+        `, [workDate, taskId, locked, lockedReason || null, lockedBy || null]);
+      }
+      await client.query('COMMIT');
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  /**
+   * Remove lock for a task (delete from table)
+   */
+  async removeTaskLock(workDate: string, taskId: number): Promise<void> {
+    await query(
+      'DELETE FROM daily_task_locks WHERE work_date = $1 AND task_id = $2',
+      [workDate, taskId]
+    );
+  }
+
+  /**
    * Convert timeline JSON to flat rows for PostgreSQL
    * Each row includes both cleaner and task data for complete reconstruction
    */
@@ -670,6 +815,9 @@ export class PgDailyAssignmentsService {
         return null;
       }
 
+      // Load lock status from daily_task_locks (source of truth)
+      const locksMap = await this.getLocksMap(workDate);
+
       // Group rows by priority (using frontend naming: high_priority, low_priority)
       const tasksByPriority: { [key: string]: any[] } = {
         early_out: [],
@@ -715,8 +863,16 @@ export class PgDailyAssignmentsService {
         if (row.customer_name) task.customer_name = row.customer_name;
         if (row.reasons && row.reasons.length > 0) task.reasons = row.reasons;
         if (row.customer_reference) task.customer_reference = row.customer_reference;
-        if (row.locked) task.locked = row.locked;
-        if (row.locked_reason) task.locked_reason = row.locked_reason;
+
+        // Apply lock status from daily_task_locks (source of truth)
+        const lockInfo = locksMap.get(row.task_id);
+        if (lockInfo) {
+          task.locked = lockInfo.locked;
+          task.locked_reason = lockInfo.lockedReason;
+          task.locked_by = lockInfo.lockedBy;
+        } else {
+          task.locked = false;
+        }
 
         // Add to appropriate priority bucket (map DB names to frontend names)
         const dbPriority = row.priority || 'low';
@@ -1632,11 +1788,11 @@ export class PgDailyAssignmentsService {
   }
 
   /**
-   * Update task lock status in daily_containers
+   * Sync lock status to daily_containers table (for backward compat)
+   * NOTE: La source of truth per i lock è ora daily_task_locks
    */
-  async updateTaskLockStatus(taskId: string | number, workDate: string, locked: boolean, lockedReason?: string): Promise<boolean> {
+  async syncLockToContainers(taskId: string | number, workDate: string, locked: boolean, lockedReason?: string): Promise<boolean> {
     try {
-      // UPDATE diretto sulla riga del task
       const result = await query(
         `UPDATE daily_containers 
          SET locked = $1, locked_reason = $2, updated_at = NOW() 

@@ -274,6 +274,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     await pgUsersService.ensureTable();
     await pgDailyAssignmentsService.ensureAliasColumn();
     await pgDailyAssignmentsService.ensureLockedColumns();
+    await pgDailyAssignmentsService.ensureTaskLocksTable();
     
     // Migrate existing users from JSON if table is empty
     const existingUsers = await pgUsersService.getAllUsers();
@@ -476,6 +477,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { taskId, logisticCode, sourceCleanerId, destCleanerId, destIndex, date } = req.body;
       const workDate = date || format(new Date(), 'yyyy-MM-dd');
+
+      // Verifica se la task è bloccata (enforcement)
+      const { pgDailyAssignmentsService } = await import("./services/pg-daily-assignments-service");
+      if (taskId) {
+        const isLocked = await pgDailyAssignmentsService.isTaskLocked(workDate, Number(taskId));
+        if (isLocked) {
+          const lockInfo = await pgDailyAssignmentsService.getTaskLock(workDate, Number(taskId));
+          console.log(`🔒 BLOCKED: Task ${taskId} è bloccata, impossibile spostare`);
+          return res.status(423).json({
+            success: false,
+            error: "TASK_LOCKED",
+            message: "Task bloccata: impossibile assegnare",
+            locked_reason: lockInfo?.lockedReason
+          });
+        }
+      }
 
       // Carica timeline da PostgreSQL
       let timelineData: any = await workspaceFiles.loadTimeline(workDate);
@@ -1266,6 +1283,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const workDate = date || format(new Date(), 'yyyy-MM-dd');
       const currentUsername = modified_by || getCurrentUsername(req);
       const modificationType = modification_type || 'task_assigned_manually';
+
+      // ENFORCEMENT: Verifica se la task è bloccata prima di assegnare
+      if (taskId) {
+        const { pgDailyAssignmentsService } = await import("./services/pg-daily-assignments-service");
+        const isLocked = await pgDailyAssignmentsService.isTaskLocked(workDate, Number(taskId));
+        if (isLocked) {
+          const lockInfo = await pgDailyAssignmentsService.getTaskLock(workDate, Number(taskId));
+          console.log(`🔒 BLOCKED: Task ${taskId} è bloccata, assegnazione rifiutata`);
+          return res.status(423).json({
+            success: false,
+            error: "TASK_LOCKED",
+            message: "Task bloccata: impossibile assegnare",
+            locked_reason: lockInfo?.lockedReason
+          });
+        }
+      }
 
       // Carica containers per ottenere i dati completi del task
       let fullTaskData: any = null;
@@ -2694,50 +2727,95 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Endpoint per bloccare/sbloccare una task
+  // Source of truth: daily_task_locks table in PostgreSQL
   app.post("/api/lock-task", async (req, res) => {
     try {
-      const { task_id, logistic_code, locked, locked_reason } = req.body;
+      const { task_id, logistic_code, locked, locked_reason, locked_by } = req.body;
       const workDate = req.body.date || format(new Date(), "yyyy-MM-dd");
+      const currentUser = getCurrentUsername(req) || locked_by || 'unknown';
 
       if (!task_id) {
         return res.status(400).json({ success: false, error: "task_id richiesto" });
       }
 
-      console.log(`🔒 Lock task request: task_id=${task_id}, locked=${locked}, reason="${locked_reason}"`);
+      console.log(`🔒 Lock task request: task_id=${task_id}, locked=${locked}, reason="${locked_reason}", by="${currentUser}"`);
 
-      // Aggiorna nei containers JSON
-      const containersData = await workspaceFiles.loadContainers(workDate) || { containers: {} };
-      let taskUpdated = false;
-
-      if (containersData.containers) {
-        for (const containerType of ['early_out', 'high_priority', 'low_priority']) {
-          const container = (containersData.containers as any)[containerType];
-          if (container?.tasks) {
-            for (const task of container.tasks) {
-              if (String(task.task_id) === String(task_id)) {
-                task.locked = locked;
-                task.locked_reason = locked ? locked_reason : null;
-                taskUpdated = true;
-                break;
-              }
-            }
-          }
-          if (taskUpdated) break;
-        }
-      }
-
-      if (taskUpdated) {
-        await workspaceFiles.saveContainers(workDate, containersData);
-        console.log(`✅ Task ${task_id} ${locked ? 'bloccata' : 'sbloccata'} nei containers`);
-      }
-
-      // Aggiorna in PostgreSQL daily_containers
       const { pgDailyAssignmentsService } = await import("./services/pg-daily-assignments-service");
-      await pgDailyAssignmentsService.updateTaskLockStatus(task_id, workDate, locked, locked_reason);
+      
+      // Aggiorna nella tabella daily_task_locks (source of truth)
+      await pgDailyAssignmentsService.updateTaskLockStatus(
+        workDate, 
+        Number(task_id), 
+        locked, 
+        locked_reason || null, 
+        currentUser
+      );
+      
+      // Sincronizza anche su daily_containers per backward compatibility
+      await pgDailyAssignmentsService.syncLockToContainers(task_id, workDate, locked, locked_reason);
 
-      res.json({ success: true, locked, locked_reason });
+      console.log(`✅ Task ${task_id} ${locked ? 'bloccata' : 'sbloccata'} in daily_task_locks`);
+      res.json({ success: true, locked, locked_reason, locked_by: currentUser });
     } catch (error: any) {
       console.error("Errore nel blocco task:", error);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  // Endpoint per bloccare/sbloccare multiple tasks
+  app.post("/api/bulk-lock-tasks", async (req, res) => {
+    try {
+      const { task_ids, locked, locked_reason, locked_by } = req.body;
+      const workDate = req.body.date || format(new Date(), "yyyy-MM-dd");
+      const currentUser = getCurrentUsername(req) || locked_by || 'unknown';
+
+      if (!task_ids || !Array.isArray(task_ids) || task_ids.length === 0) {
+        return res.status(400).json({ success: false, error: "task_ids array richiesto" });
+      }
+
+      console.log(`🔒 Bulk lock request: ${task_ids.length} tasks, locked=${locked}`);
+
+      const { pgDailyAssignmentsService } = await import("./services/pg-daily-assignments-service");
+      
+      // Bulk update nella tabella daily_task_locks
+      await pgDailyAssignmentsService.bulkUpdateTaskLockStatus(
+        workDate,
+        task_ids.map(Number),
+        locked,
+        locked_reason || null,
+        currentUser
+      );
+
+      // Sincronizza su daily_containers
+      for (const taskId of task_ids) {
+        await pgDailyAssignmentsService.syncLockToContainers(taskId, workDate, locked, locked_reason);
+      }
+
+      console.log(`✅ ${task_ids.length} tasks ${locked ? 'bloccate' : 'sbloccate'}`);
+      res.json({ success: true, locked, count: task_ids.length });
+    } catch (error: any) {
+      console.error("Errore nel bulk lock tasks:", error);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  // Endpoint per ottenere tutti i lock per una data
+  app.get("/api/task-locks", async (req, res) => {
+    try {
+      const workDate = (req.query.date as string) || format(new Date(), "yyyy-MM-dd");
+
+      const { pgDailyAssignmentsService } = await import("./services/pg-daily-assignments-service");
+      const locksMap = await pgDailyAssignmentsService.getLocksMap(workDate);
+      
+      // Converti Map in oggetto per JSON response
+      const locks: { [taskId: number]: { locked: boolean; lockedReason: string | null; lockedBy: string | null } } = {};
+      locksMap.forEach((value, key) => {
+        locks[key] = value;
+      });
+
+      res.json({ success: true, workDate, locks });
+    } catch (error: any) {
+      console.error("Errore nel caricamento locks:", error);
       res.status(500).json({ success: false, error: error.message });
     }
   });
@@ -4431,6 +4509,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const taskKey = String(typeof taskId !== 'undefined' ? taskId : logisticCode);
       const workDate = req.body.date || format(new Date(), 'yyyy-MM-dd');
+
+      // Verifica se la task è bloccata (enforcement) - specialmente se viene da container
+      if (fromContainer && taskId) {
+        const { pgDailyAssignmentsService } = await import("./services/pg-daily-assignments-service");
+        const isLocked = await pgDailyAssignmentsService.isTaskLocked(workDate, Number(taskId));
+        if (isLocked) {
+          const lockInfo = await pgDailyAssignmentsService.getTaskLock(workDate, Number(taskId));
+          console.log(`🔒 BLOCKED: Task ${taskId} è bloccata, impossibile assegnare da container`);
+          return res.status(423).json({
+            success: false,
+            error: "TASK_LOCKED",
+            message: "Task bloccata: impossibile assegnare",
+            locked_reason: lockInfo?.lockedReason
+          });
+        }
+      }
 
       let timelineData: any = { metadata: {}, cleaners_assignments: [] };
       let containersData: any = null;

@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, pgSchema, text, varchar, timestamp, integer, serial, boolean, date, jsonb, uuid, smallint, bigserial } from "drizzle-orm/pg-core";
+import { pgTable, pgSchema, text, varchar, timestamp, integer, serial, boolean, date, jsonb, uuid, smallint, bigserial, primaryKey } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -48,6 +48,27 @@ export const insertCleanerAliasSchema = createInsertSchema(cleanerAliases).omit(
 
 export type InsertCleanerAlias = z.infer<typeof insertCleanerAliasSchema>;
 export type CleanerAlias = typeof cleanerAliases.$inferSelect;
+
+// ==================== DAILY_TASK_LOCKS ====================
+// Tabella per gestire il lock dei task nei containers (refresh-safe)
+// Un task locked non può essere assegnato/spostato in timeline
+export const dailyTaskLocks = pgTable("daily_task_locks", {
+  workDate: date("work_date").notNull(),
+  taskId: integer("task_id").notNull(),
+  locked: boolean("locked").notNull().default(true),
+  lockedReason: text("locked_reason"),
+  lockedBy: text("locked_by"),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => ({
+  pk: primaryKey({ columns: [table.workDate, table.taskId] }),
+}));
+
+export const insertDailyTaskLockSchema = createInsertSchema(dailyTaskLocks).omit({
+  updatedAt: true,
+});
+
+export type InsertDailyTaskLock = z.infer<typeof insertDailyTaskLockSchema>;
+export type DailyTaskLock = typeof dailyTaskLocks.$inferSelect;
 
 // ==================== USERS (replaces accounts.json) ====================
 export const users = pgTable("users", {
@@ -150,6 +171,7 @@ export const taskSchema = z.object({
   endTime: z.string().optional(),
   locked: z.boolean().optional(),
   locked_reason: z.string().optional(),
+  locked_by: z.string().optional(),
   createdAt: z.string(),
   updatedAt: z.string(),
 });
