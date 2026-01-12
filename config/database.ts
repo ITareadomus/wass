@@ -20,7 +20,7 @@ const postgresConfig = {
     password: 'REMOVED_AIVEN_PASSWORD',
     host: 'db-postgresql-fra1-32251-do-user-18568811-0.g.db.ondigitalocean.com',
     port: 25060,
-    database: 'defaultdb_dev',
+    database: 'defaultdb_env',
     sslmode: 'require',
     get connectionString() {
       return `postgresql://${this.username}:${this.password}@${this.host}:${this.port}/${this.database}?sslmode=${this.sslmode}`;
