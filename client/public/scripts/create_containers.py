@@ -166,9 +166,10 @@ def get_tasks_from_db(selected_date, assigned_task_ids=None):
                     AND ast.structure_operation_id = (
                         CASE WHEN h.operation_id = 0 THEN 2 ELSE h.operation_id END
                     )
-                    AND ast.data_contratto <= CURDATE()
+                    AND ast.structure_activity_id = h.activity_id
+                    AND ast.data_contratto <= h.checkout
                     AND ast.deleted_at IS NULL
-                ORDER BY ABS(DATEDIFF(ast.data_contratto, CURDATE()))
+                ORDER BY ast.data_contratto DESC
                 LIMIT 1
             ) AS cleaning_time,
             h.checkin,
@@ -672,9 +673,10 @@ def extract_tasks_from_db(work_date=None, assigned_task_ids=None):
                     AND ast.structure_operation_id = (
                         CASE WHEN h.operation_id = 0 THEN 2 ELSE h.operation_id END
                     )
-                    AND ast.data_contratto <= CURDATE()
+                    AND ast.structure_activity_id = h.activity_id
+                    AND ast.data_contratto <= h.checkout
                     AND ast.deleted_at IS NULL
-                ORDER BY ABS(DATEDIFF(ast.data_contratto, CURDATE()))
+                ORDER BY ast.data_contratto DESC
                 LIMIT 1
             ) AS cleaning_time,
             h.checkin,
