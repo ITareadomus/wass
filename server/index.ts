@@ -1,5 +1,7 @@
 import dotenv from "dotenv";
-dotenv.config({ path: ".env.local", override: true });
+if (process.env.NODE_ENV !== "production") {
+  dotenv.config({ path: ".env.local" });
+}
 
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
