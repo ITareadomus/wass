@@ -5,3 +5,7 @@ server/public
 vite.config.ts.*
 *.tar.gz
 .env.local
+
+# Local tools & secrets
+replacements.txt
+git-filter-repo/
