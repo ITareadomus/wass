@@ -3,6 +3,7 @@
  * 
  * Configurazione centralizzata per PostgreSQL e MySQL.
  * Usa NODE_ENV per selezionare l'ambiente corretto.
+ * Le credenziali sono lette da variabili d'ambiente (.env.local)
  * 
  * DEVELOPMENT (Replit): NODE_ENV=development o non impostato
  * PRODUCTION (GitHub): NODE_ENV=production
@@ -16,23 +17,23 @@ const env = process.env.NODE_ENV || 'development';
 
 const postgresConfig = {
   development: {
-    username: 'doadmin',
-    password: 'REMOVED_AIVEN_PASSWORD',
-    host: 'db-postgresql-fra1-32251-do-user-18568811-0.g.db.ondigitalocean.com',
-    port: 25060,
-    database: 'defaultdb_dev',
-    sslmode: 'require',
+    username: process.env.PG_USERNAME_DEV || '',
+    password: process.env.PG_PASSWORD_DEV || '',
+    host: process.env.PG_HOST_DEV || '',
+    port: parseInt(process.env.PG_PORT_DEV || '25060', 10),
+    database: process.env.PG_DATABASE_DEV || '',
+    sslmode: process.env.PG_SSLMODE_DEV || 'require',
     get connectionString() {
       return `postgresql://${this.username}:${this.password}@${this.host}:${this.port}/${this.database}?sslmode=${this.sslmode}`;
     },
   },
   production: {
-    username: 'doadmin',
-    password: 'REMOVED_AIVEN_PASSWORD',
-    host: 'db-postgresql-fra1-32251-do-user-18568811-0.g.db.ondigitalocean.com',
-    port: 25060,
-    database: 'defaultdb',
-    sslmode: 'require',
+    username: process.env.PG_USERNAME_PROD || '',
+    password: process.env.PG_PASSWORD_PROD || '',
+    host: process.env.PG_HOST_PROD || '',
+    port: parseInt(process.env.PG_PORT_PROD || '25060', 10),
+    database: process.env.PG_DATABASE_PROD || '',
+    sslmode: process.env.PG_SSLMODE_PROD || 'require',
     get connectionString() {
       return `postgresql://${this.username}:${this.password}@${this.host}:${this.port}/${this.database}?sslmode=${this.sslmode}`;
     },
@@ -45,18 +46,18 @@ const postgresConfig = {
 
 const mysqlConfig = {
   development: {
-    host: '139.59.132.41',
-    port: 3306,
-    user: 'wass_svil',
-    password: 'REMOVED_PASSWORD',
-    database: 'wass_sviluppo',
+    host: process.env.MYSQL_HOST_DEV || '',
+    port: parseInt(process.env.MYSQL_PORT_DEV || '3306', 10),
+    user: process.env.MYSQL_USER_DEV || '',
+    password: process.env.MYSQL_PASSWORD_DEV || '',
+    database: process.env.MYSQL_DATABASE_DEV || '',
   },
   production: {
-    host: '139.59.132.41',
-    port: 3306,
-    user: 'admin',
-    password: 'REMOVED_MYSQL_PASSWORD',
-    database: 'adamdb',
+    host: process.env.MYSQL_HOST_PROD || '',
+    port: parseInt(process.env.MYSQL_PORT_PROD || '3306', 10),
+    user: process.env.MYSQL_USER_PROD || '',
+    password: process.env.MYSQL_PASSWORD_PROD || '',
+    database: process.env.MYSQL_DATABASE_PROD || '',
   },
 };
 
