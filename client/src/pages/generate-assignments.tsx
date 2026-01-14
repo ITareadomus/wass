@@ -613,6 +613,23 @@ export default function GenerateAssignments() {
   // Stato per la ricerca di task
   const [searchTask, setSearchTask] = useState("");
 
+  // Stato per highlight task da mappa (doppio click su pallino grigio)
+  const [containerHighlightTaskId, setContainerHighlightTaskId] = useState<string | null>(null);
+  const containerHighlightRef = useRef<string | null>(null);
+
+  // Polling per containerHighlightTaskId dalla mappa
+  useEffect(() => {
+    const checkContainerHighlight = setInterval(() => {
+      const newHighlight = (window as any).containerHighlightTaskId ?? null;
+      if (newHighlight !== containerHighlightRef.current) {
+        containerHighlightRef.current = newHighlight;
+        setContainerHighlightTaskId(newHighlight);
+      }
+    }, 200);
+
+    return () => clearInterval(checkContainerHighlight);
+  }, []);
+
   // Stato per tracciare modifiche non salvate
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
@@ -2302,27 +2319,43 @@ export default function GenerateAssignments() {
 
             {(() => {
               const getHighlightedTaskIds = (tasks: Task[]): Set<string> => {
-                if (!searchTask.trim()) return new Set();
-                const lowerSearch = searchTask.toLowerCase();
-                return new Set(tasks
-                  .filter(task => {
-                    const taskId = String((task as any).id || (task as any).task_id || '');
-                    const logisticCode = String((task as any).logisticCode || (task as any).logistic_code || (task as any).name || '');
-                    const address = String((task as any).address || '');
-                    const customerName = String((task as any).customer_name || '');
-                    const alias = String((task as any).alias || '');
-                    const customerReference = String((task as any).customer_reference || '');
-                    
-                    return (
-                      taskId.toLowerCase().includes(lowerSearch) ||
-                      logisticCode.toLowerCase().includes(lowerSearch) ||
-                      address.toLowerCase().includes(lowerSearch) ||
-                      customerName.toLowerCase().includes(lowerSearch) ||
-                      alias.toLowerCase().includes(lowerSearch) ||
-                      customerReference.toLowerCase().includes(lowerSearch)
-                    );
-                  })
-                  .map(t => String((t as any).id || (t as any).task_id || '')));
+                const result = new Set<string>();
+                
+                // Highlight da doppio click su mappa (pallino grigio)
+                if (containerHighlightTaskId) {
+                  const matchingTask = tasks.find(t => 
+                    String((t as any).id || (t as any).task_id || '') === containerHighlightTaskId
+                  );
+                  if (matchingTask) {
+                    result.add(containerHighlightTaskId);
+                  }
+                }
+                
+                // Highlight da ricerca
+                if (searchTask.trim()) {
+                  const lowerSearch = searchTask.toLowerCase();
+                  tasks
+                    .filter(task => {
+                      const taskId = String((task as any).id || (task as any).task_id || '');
+                      const logisticCode = String((task as any).logisticCode || (task as any).logistic_code || (task as any).name || '');
+                      const address = String((task as any).address || '');
+                      const customerName = String((task as any).customer_name || '');
+                      const alias = String((task as any).alias || '');
+                      const customerReference = String((task as any).customer_reference || '');
+                      
+                      return (
+                        taskId.toLowerCase().includes(lowerSearch) ||
+                        logisticCode.toLowerCase().includes(lowerSearch) ||
+                        address.toLowerCase().includes(lowerSearch) ||
+                        customerName.toLowerCase().includes(lowerSearch) ||
+                        alias.toLowerCase().includes(lowerSearch) ||
+                        customerReference.toLowerCase().includes(lowerSearch)
+                      );
+                    })
+                    .forEach(t => result.add(String((t as any).id || (t as any).task_id || '')));
+                }
+                
+                return result;
               };
 
               const highlightedEarlyOut = getHighlightedTaskIds(earlyOutTasks);

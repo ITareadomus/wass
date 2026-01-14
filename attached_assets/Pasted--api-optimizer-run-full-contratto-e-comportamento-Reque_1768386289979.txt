@@ -1,0 +1,181 @@
+/api/optimizer/run-full – contratto e comportamento
+Request
+{
+  "workDate": "2026-01-14",
+  "mode": "replace",
+  "params": {
+    "timeWindowMode": "strict",
+    "maxTravelMinutes": 25
+  }
+}
+
+Response
+{
+  "success": true,
+  "workDate": "2026-01-14",
+  "runId": "…",
+  "stats": {
+    "assigned": 123,
+    "unassigned": 17,
+    "lockedKept": 12
+  }
+}
+
+Cosa fa
+
+genera runId
+
+esegue Phase0→4 sullo stesso runId
+
+esegue commit(runId, workDate, mode)
+
+ritorna contatori per UI/log
+
+COMMIT: cosa deve fare (transazione unica)
+Mode consigliato: replace
+
+È quello che mappa bene il tuo step “Auto-Assign”:
+
+Dentro una TX:
+
+salva da parte / preserva le locked tasks già presenti in daily_assignments_current (se la Phase0 le “filtra” significa che NON vuoi riassegnarle)
+
+DELETE delle righe non-locked in daily_assignments_current per quella data
+
+INSERT delle assegnazioni da optimizer.optimizer_assignment → daily_assignments_current
+
+ripristina le locked (se le hai rimosse) o più semplicemente non le cancelli mai
+
+DELETE da daily_containers delle task che ora sono in daily_assignments_current (o almeno quelle inserite dall’optimizer)
+
+Se non gestisci le locked così, succede la cosa peggiore: l’optimizer non le considera, ma tu le cancelli comunque → spariscono.
+
+SQL commit (schema “realistico”)
+A) Non cancellare le locked
+
+Se hai un flag tipo is_locked o locked = true in daily_assignments_current:
+
+-- 1) pulizia timeline SOLO non-locked (replace)
+DELETE FROM daily_assignments_current
+WHERE work_date = $1
+  AND COALESCE(is_locked,false) = false;
+
+B) Inserisci nuove assegnazioni
+
+Qui l’idea: prendi sequenza/tempi da optimizer e dati task da containers.
+
+INSERT INTO daily_assignments_current (
+  work_date,
+  cleaner_id,
+  task_id,
+  sequence,
+  start_time,
+  end_time,
+  travel_minutes,
+  logistic_code,
+  address,
+  lat,
+  lng
+)
+SELECT
+  a.work_date,
+  a.cleaner_id,
+  a.task_id,
+  a.sequence,
+  a.start_time,
+  a.end_time,
+  a.travel_minutes_from_prev,
+  c.logistic_code,
+  c.address,
+  c.lat,
+  c.lng
+FROM optimizer.optimizer_assignment a
+JOIN daily_containers c
+  ON c.work_date = a.work_date
+ AND c.task_id   = a.task_id
+WHERE a.work_date = $1
+  AND a.run_id    = $2;
+
+C) Rimuovi dai containers
+DELETE FROM daily_containers
+WHERE work_date = $1
+  AND task_id IN (
+    SELECT task_id
+    FROM optimizer.optimizer_assignment
+    WHERE work_date = $1
+      AND run_id = $2
+  );
+
+
+👉 Tutto questo dentro un’unica transazione.
+
+Endpoint separato /api/optimizer/commit (opzionale ma utile)
+
+Lo farei comunque, perché ti permette:
+
+run Phase0→4 in test
+
+poi commit solo quando sei ok
+
+Request
+
+{ "workDate":"2026-01-14", "runId":"…", "mode":"replace" }
+
+3 cose da non sbagliare (ti evitano bug “fantasma”)
+1) Locked tasks
+
+Phase0 “filtra locked tasks” significa: l’optimizer non le tocca.
+Quindi nel commit:
+
+o le preservi non cancellandole
+
+o le reinserisci dopo
+
+e soprattutto: nella pulizia containers, evita di cancellare containers che servono per locked? (di solito no: se sono locked e sono già in timeline, non dovrebbero stare in containers comunque)
+
+2) Task già fuori dai containers
+
+Se una task è già stata mossa manualmente (drag&drop) prima di auto-assign, potrebbe non essere in daily_containers.
+Con JOIN daily_containers la perdi nell’INSERT.
+
+Soluzioni (scegline una):
+
+replace “hard”: prima rimetti tutto in containers (reset), poi commit
+
+oppure usa LEFT JOIN + fallback a una tabella “task master” (se esiste)
+
+3) Idempotenza
+
+Se l’utente clicca due volte Auto-Assign:
+
+runId diverso
+
+con mode=replace non duplicherai perché cancelli e riscrivi.
+Buono.
+
+Come appare nel codice (struttura pulita)
+
+server/services/optimizer/runFull.ts
+
+orchestration Phase0..4 + commit
+
+server/services/optimizer/commit.ts
+
+transazione SQL
+
+server/routes.ts
+
+POST /api/optimizer/run-full
+
+POST /api/optimizer/commit
+
+UI flow
+
+Dopo response success:
+
+UI chiama GET /api/timeline → legge daily_assignments_current
+
+UI chiama GET /api/containers → legge daily_containers
+✅ risultato: task sparite dal pool e visibili sulla timeline.
+
+Se mi dici solo il nome del campo “locked” (o se le locked sono tenute in una tabella separata / logica diversa), ti adatto il commit con precisione al tuo schema (senza cambiare il flow).

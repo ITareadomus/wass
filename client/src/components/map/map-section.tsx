@@ -313,13 +313,20 @@ export default function MapSection({ tasks }: MapSectionProps) {
             clearTimeout(clickTimer);
             clickTimer = null;
             
-            // Toggle filtro (attiva/disattiva animazione)
+            // Toggle filtro per evidenziare nei containers (task non assegnate)
+            const currentContainerHighlight = (window as any).containerHighlightTaskId;
+            if (currentContainerHighlight === String(task.id)) {
+              // Spegni highlight
+              (window as any).containerHighlightTaskId = null;
+            } else {
+              // Accendi highlight nei containers
+              (window as any).containerHighlightTaskId = String(task.id);
+            }
+            // Aggiorna anche mapFilteredTaskId per animazione mappa
             const currentFilteredTaskId = (window as any).mapFilteredTaskId;
             if (currentFilteredTaskId === task.name) {
-              // Spegni animazione
               (window as any).mapFilteredTaskId = null;
             } else {
-              // Accendi animazione
               (window as any).mapFilteredTaskId = task.name;
             }
           } else {
