@@ -307,35 +307,21 @@ export default function MapSection({ tasks }: MapSectionProps) {
         });
 
         let clickTimer: NodeJS.Timeout | null = null;
+        
         marker.addListener('click', () => {
+          clickTimer = setTimeout(() => {
+            setSelectedTask(task);
+            clickTimer = null;
+          }, 250);
+        });
+
+        marker.addListener('dblclick', () => {
           if (clickTimer) {
-            // Doppio click rilevato
             clearTimeout(clickTimer);
             clickTimer = null;
-            
-            // Toggle filtro per evidenziare nei containers (task non assegnate)
-            const currentContainerHighlight = (window as any).containerHighlightTaskId;
-            if (currentContainerHighlight === String(task.id)) {
-              // Spegni highlight
-              (window as any).containerHighlightTaskId = null;
-            } else {
-              // Accendi highlight nei containers
-              (window as any).containerHighlightTaskId = String(task.id);
-            }
-            // Aggiorna anche mapFilteredTaskId per animazione mappa
-            const currentFilteredTaskId = (window as any).mapFilteredTaskId;
-            if (currentFilteredTaskId === task.name) {
-              (window as any).mapFilteredTaskId = null;
-            } else {
-              (window as any).mapFilteredTaskId = task.name;
-            }
-          } else {
-            // Primo click: apri dettagli
-            clickTimer = setTimeout(() => {
-              setSelectedTask(task);
-              clickTimer = null;
-            }, 250);
           }
+          const current = (window as any).mapFilteredTaskId;
+          (window as any).mapFilteredTaskId = current === task.name ? null : task.name;
         });
 
         markersRef.current.push(marker);
