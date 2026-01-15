@@ -2,52 +2,56 @@
 Database Configuration for Python Scripts
 
 Centralized configuration for MySQL database access.
-Uses environment variables with fallback to development defaults.
+Uses environment variables loaded from .env.local in development,
+or from system env vars in production (DigitalOcean App Platform).
 
 Environment Variables:
 - NODE_ENV: 'development' or 'production'
-- MYSQL_HOST, MYSQL_PORT, MYSQL_USER, MYSQL_PASSWORD, MYSQL_DATABASE
+- DB_HOST, DB_PORT, DB_USER, DB_PASSWORD, DB_NAME
 """
 
 import os
+from pathlib import Path
 
-# Determine environment
+# Load .env.local in development (like Node.js dotenv does)
 ENV = os.getenv("NODE_ENV", "development")
 
-# MySQL Configuration per environment
-MYSQL_CONFIG = {
-    "development": {
-        "host": "139.59.132.41",
-        "port": 3306,
-        "user": "wass_svil",
-        "password": "REMOVED_PASSWORD",
-        "database": "wass_sviluppo",
-    },
-    "production": {
-        "host": "139.59.132.41",
-        "port": 3306,
-        "user": "admin",
-        "password": "REMOVED_MYSQL_PASSWORD",
-        "database": "adamdb",
-    },
-}
+if ENV != "production":
+    # Find .env.local relative to this script (in project root)
+    script_dir = Path(__file__).resolve().parent
+    project_root = script_dir.parent.parent.parent  # client/public/scripts -> project root
+    env_file = project_root / ".env.local"
+    
+    if env_file.exists():
+        # Simple .env parser (no external dependency needed)
+        # Override existing env vars in development (like dotenv with override: true)
+        with open(env_file, "r") as f:
+            for line in f:
+                line = line.strip()
+                if line and not line.startswith("#") and "=" in line:
+                    key, _, value = line.partition("=")
+                    key = key.strip()
+                    value = value.strip()
+                    os.environ[key] = value
+
 
 def get_mysql_config():
-    """Get MySQL configuration for current environment."""
-    config = MYSQL_CONFIG.get(ENV, MYSQL_CONFIG["development"])
-    
-    # Allow environment variable overrides
+    """Get MySQL configuration from environment variables."""
     return {
-        "host": os.getenv("MYSQL_HOST", config["host"]),
-        "port": int(os.getenv("MYSQL_PORT", str(config["port"]))),
-        "user": os.getenv("MYSQL_USER", config["user"]),
-        "password": os.getenv("MYSQL_PASSWORD", config["password"]),
-        "database": os.getenv("MYSQL_DATABASE", config["database"]),
+        "host": os.getenv("DB_HOST", ""),
+        "port": int(os.getenv("DB_PORT", "3306")),
+        "user": os.getenv("DB_USER", ""),
+        "password": os.getenv("DB_PASSWORD", ""),
+        "database": os.getenv("DB_NAME", ""),
     }
+
 
 # Export config for easy import
 db_config = get_mysql_config()
 
 # Log configuration on import (without password)
-print(f"📊 Python DB config loaded for environment: {ENV}")
-print(f"   MySQL: {db_config['host']}:{db_config['port']}/{db_config['database']}")
+if db_config["host"]:
+    print(f"📊 Python DB config loaded for environment: {ENV}")
+    print(f"   MySQL: {db_config['host']}:{db_config['port']}/{db_config['database']}")
+else:
+    print(f"⚠️ Python DB config: MySQL credentials not found in environment")
