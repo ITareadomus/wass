@@ -2039,8 +2039,8 @@ export default function TimelineView({
                   size="sm"
                   variant="outline"
                   className="h-full px-3 border-2 border-custom-blue"
-                  disabled={!hasTasksInTimeline || isTransferringToAdam}
-                  title={!hasTasksInTimeline ? "Nessuna task assegnata nella timeline" : "Trasferisci le assegnazioni sul database ADAM"}
+                  disabled={isReadOnly || !hasTasksInTimeline || isTransferringToAdam}
+                  title={isReadOnly ? "Non puoi trasferire in modalità storico" : !hasTasksInTimeline ? "Nessuna task assegnata nella timeline" : "Trasferisci le assegnazioni sul database ADAM"}
                   data-testid="button-transfer-adam"
                 >
                   {isTransferringToAdam ? (
