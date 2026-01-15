@@ -55,20 +55,16 @@ Preferred communication style: Simple, everyday language.
 
 # Production Configuration
 
-## Database Connection Details
-- **Database Port**: 25060
-- **Node Environment Variables**: 
-  - `NODE_ENV=production`
-  - `PORT=5000` (frontend & backend on same port)
-  - `DATABASE_URL=postgresql://USER:PASSWORD@HOST:25060/DATABASE`
-  - `SESSION_SECRET=your-secure-session-secret`
+Configuration is managed via environment variables:
+- **Development (Replit)**: Variables loaded from `.env.local` (gitignored)
+- **Production (DigitalOcean App Platform)**: Variables set in the deployment panel
 
 # External Dependencies
 
 ## Database Services
-- **Neon Database**: Serverless PostgreSQL hosting (port 25060).
+- **PostgreSQL**: Primary database via DigitalOcean Managed Databases
 - **Drizzle Kit**: Database migration and schema management.
-- **ADAM (MySQL)**: External read-only source for task data.
+- **MySQL**: External read-only source for task data.
 
 ## UI & Styling
 - **Radix UI**: Headless UI component primitives.
