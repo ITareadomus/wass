@@ -20,6 +20,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { HelpCircle, ChevronLeft, ChevronRight, Save, Pencil, Calendar, Lock, LockOpen, Users, UserPlus } from "lucide-react";
+import { CleanerSelectorDialog } from "@/components/dialogs/cleaner-selector-dialog";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -187,22 +188,6 @@ export default function TaskCard({
     staleTime: 60000,
   });
   
-  // Carica i cleaners selezionati per la data corrente (per aggiungere collaboratori)
-  const selectedWorkDate = typeof window !== 'undefined' 
-    ? localStorage.getItem('selected_work_date') || new Date().toISOString().split('T')[0]
-    : new Date().toISOString().split('T')[0];
-  
-  const { data: selectedCleanersData } = useQuery<{ success: boolean; cleaners: Array<{ cleaner_id: number; name: string }> }>({
-    queryKey: ["/api/selected-cleaners", selectedWorkDate],
-    queryFn: async () => {
-      const response = await fetch(`/api/selected-cleaners?date=${selectedWorkDate}`);
-      if (!response.ok) throw new Error("Failed to fetch selected cleaners");
-      return response.json();
-    },
-    staleTime: 30000,
-    enabled: isModalOpen, // Abilitato sia per timeline che per containers
-  });
-
   const operationNames: Record<number, string> = operationsData?.active_operations?.reduce(
     (acc, op) => ({ ...acc, [op.id]: op.name }),
     {} as Record<number, string>
@@ -368,141 +353,116 @@ export default function TaskCard({
     }
   };
 
-  // Handler per assegnazione bulk da containers (Caso B)
-  const handleBulkAssign = async () => {
-    if (selectedBulkCleanerIds.length === 0) return;
+  // Handler unificato per conferma selezione collaboratori dal dialog
+  const handleCollaboratorSelection = async (selectedCleanerIds: number[]) => {
+    if (selectedCleanerIds.length === 0) return;
     
     const workDate = localStorage.getItem('selected_work_date') || new Date().toISOString().split('T')[0];
     const taskId = (task as any).task_id || task.id;
     
-    setIsBulkAssignLoading(true);
+    setIsCollaboratorLoading(true);
     
     try {
-      const response = await fetch(`/api/tasks/${taskId}/collaborators/assign`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          date: workDate,
-          cleanerIds: selectedBulkCleanerIds,
-        }),
-      });
+      let response: Response;
       
-      const data = await response.json();
-      
-      if (response.status === 409) {
-        // Collisione oraria
+      if (cleanerSelectorMode === 'add') {
+        // CASO A: Aggiungi collaboratori a task esistente in timeline
+        // Chiamiamo l'API per ogni cleaner selezionato
+        for (const cleanerId of selectedCleanerIds) {
+          response = await fetch(`/api/tasks/${taskId}/collaborators/add`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              date: workDate,
+              cleanerId: cleanerId,
+            }),
+          });
+          
+          const data = await response.json();
+          
+          if (response.status === 409) {
+            toast({
+              title: "Collisione oraria",
+              description: data.message || "Il collaboratore ha già task che si sovrappongono",
+              variant: "destructive",
+            });
+            // Continua con gli altri cleaners
+            continue;
+          }
+          
+          if (!response.ok) {
+            throw new Error(data.error || "Errore nell'aggiunta collaboratore");
+          }
+        }
+        
         toast({
-          title: "Collisione oraria",
-          description: data.message || "Uno o più cleaners hanno task che si sovrappongono",
-          variant: "destructive",
+          title: "Collaboratori aggiunti",
+          description: `${selectedCleanerIds.length} cleaner(s) aggiunti alla task`,
         });
-        return;
+        
+      } else {
+        // CASO B: Assegna task da container con N cleaners
+        response = await fetch(`/api/tasks/${taskId}/collaborators/assign`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            date: workDate,
+            cleanerIds: selectedCleanerIds,
+          }),
+        });
+        
+        const data = await response.json();
+        
+        if (response.status === 409) {
+          toast({
+            title: "Collisione oraria",
+            description: data.message || "Uno o più cleaners hanno task che si sovrappongono",
+            variant: "destructive",
+          });
+          return;
+        }
+        
+        if (!response.ok) {
+          throw new Error(data.error || "Errore nell'assegnazione");
+        }
+        
+        toast({
+          title: "Task assegnata",
+          description: `${data.collaboratorCount} cleaners assegnati (${data.effectiveCleaningTime}min ciascuno)`,
+        });
       }
       
-      if (!response.ok) {
-        throw new Error(data.error || "Errore nell'assegnazione");
-      }
-      
-      toast({
-        title: "Task assegnata",
-        description: `${data.collaboratorCount} cleaners assegnati (${data.effectiveCleaningTime}min ciascuno)`,
-      });
-      
-      // Reset stato
-      setIsBulkAssignMode(false);
-      setSelectedBulkCleanerIds([]);
+      // Chiudi dialog e modale
+      setIsCleanerSelectorOpen(false);
+      setIsModalOpen(false);
       
       // Ricarica timeline e containers
       if ((window as any).reloadAllTasks) {
         await (window as any).reloadAllTasks();
       }
       
-      // Chiudi il modale
-      setIsModalOpen(false);
-      
     } catch (error: any) {
-      console.error('Errore nell\'assegnazione bulk:', error);
+      console.error('Errore nella gestione collaboratori:', error);
       toast({
         title: "Errore",
-        description: error.message || "Impossibile assegnare la task",
+        description: error.message || "Impossibile completare l'operazione",
         variant: "destructive",
       });
     } finally {
-      setIsBulkAssignLoading(false);
+      setIsCollaboratorLoading(false);
     }
   };
 
-  // Toggle selezione cleaner nel bulk
-  const toggleBulkCleaner = (cleanerId: number) => {
-    setSelectedBulkCleanerIds(prev => 
-      prev.includes(cleanerId)
-        ? prev.filter(id => id !== cleanerId)
-        : [...prev, cleanerId]
-    );
+  // Apri il dialog per aggiungere collaboratori (Caso A - timeline)
+  const openAddCollaboratorDialog = () => {
+    setCleanerSelectorMode('add');
+    setIsCleanerSelectorOpen(true);
   };
 
-  // Handler per aggiungere un collaboratore alla task
-  const handleAddCollaborator = async () => {
-    if (!selectedCollaboratorId) return;
-    
-    const workDate = localStorage.getItem('selected_work_date') || new Date().toISOString().split('T')[0];
-    const taskId = (task as any).task_id || task.id;
-    
-    setIsAddingCollaboratorLoading(true);
-    
-    try {
-      const response = await fetch(`/api/tasks/${taskId}/collaborators/add`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          date: workDate,
-          cleanerId: Number(selectedCollaboratorId),
-        }),
-      });
-      
-      const data = await response.json();
-      
-      if (response.status === 409) {
-        // Collisione oraria
-        toast({
-          title: "Collisione oraria",
-          description: data.message || "Il collaboratore ha già task che si sovrappongono",
-          variant: "destructive",
-        });
-        return;
-      }
-      
-      if (!response.ok) {
-        throw new Error(data.error || "Errore nell'aggiunta collaboratore");
-      }
-      
-      toast({
-        title: "Collaboratore aggiunto",
-        description: `Ora ${data.collaboratorCount} cleaners lavorano su questa task (${data.effectiveCleaningTime}min ciascuno)`,
-      });
-      
-      // Reset stato e ricarica timeline
-      setIsAddingCollaborator(false);
-      setSelectedCollaboratorId("");
-      
-      // Ricarica timeline
-      if ((window as any).reloadAllTasks) {
-        await (window as any).reloadAllTasks();
-      }
-      
-      // Chiudi il modale
-      setIsModalOpen(false);
-      
-    } catch (error: any) {
-      console.error('Errore nell\'aggiunta collaboratore:', error);
-      toast({
-        title: "Errore",
-        description: error.message || "Impossibile aggiungere il collaboratore",
-        variant: "destructive",
-      });
-    } finally {
-      setIsAddingCollaboratorLoading(false);
-    }
+  // Apri il dialog per assegnare task con collaboratori (Caso B - containers)
+  const openBulkAssignDialog = () => {
+    setCleanerSelectorMode('assign');
+    setIsCleanerSelectorOpen(true);
   };
 
   // Stati per editing - ora un set di campi invece di uno solo
@@ -516,15 +476,10 @@ export default function TaskCard({
   const [editedOperationId, setEditedOperationId] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   
-  // Stato per gestione collaboratori (timeline - Caso A: aggiungi a task esistente)
-  const [isAddingCollaborator, setIsAddingCollaborator] = useState(false);
-  const [selectedCollaboratorId, setSelectedCollaboratorId] = useState<string>("");
-  const [isAddingCollaboratorLoading, setIsAddingCollaboratorLoading] = useState(false);
-  
-  // Stato per assegnazione bulk collaboratori (containers - Caso B: assegna task con N cleaners)
-  const [isBulkAssignMode, setIsBulkAssignMode] = useState(false);
-  const [selectedBulkCleanerIds, setSelectedBulkCleanerIds] = useState<number[]>([]);
-  const [isBulkAssignLoading, setIsBulkAssignLoading] = useState(false);
+  // Stato per il dialog di selezione collaboratori
+  const [isCleanerSelectorOpen, setIsCleanerSelectorOpen] = useState(false);
+  const [cleanerSelectorMode, setCleanerSelectorMode] = useState<'add' | 'assign'>('add');
+  const [isCollaboratorLoading, setIsCollaboratorLoading] = useState(false);
   
   // Stato per forzare re-render quando pending edits cambiano
   const [pendingEditsVersion, setPendingEditsVersion] = useState(0);
@@ -1621,11 +1576,11 @@ export default function TaskCard({
                       </Badge>
                     )}
                   </div>
-                  {!isAddingCollaborator && !isReadOnly && (
+                  {!isReadOnly && (
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => setIsAddingCollaborator(true)}
+                      onClick={openAddCollaboratorDialog}
                       className="flex items-center gap-1"
                     >
                       <UserPlus className="w-3 h-3" />
@@ -1653,89 +1608,6 @@ export default function TaskCard({
                     )}
                   </div>
                 )}
-                
-                {/* Form per aggiungere collaboratore */}
-                {isAddingCollaborator && !isReadOnly && (
-                  <div className="space-y-3 p-3 border rounded bg-muted/30">
-                    <div>
-                      <label className="text-xs font-medium mb-1 block">
-                        Seleziona cleaner da aggiungere:
-                      </label>
-                      <Select
-                        value={selectedCollaboratorId}
-                        onValueChange={setSelectedCollaboratorId}
-                      >
-                        <SelectTrigger className="text-sm">
-                          <SelectValue placeholder="Seleziona un cleaner..." />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {(selectedCleanersData?.cleaners || [])
-                            .filter(c => {
-                              // Escludi i cleaners già collaboratori
-                              const existingIds = (displayTask as any).collaborator_ids || [];
-                              const currentCleanerId = (displayTask as any).cleaner_id || (displayTask as any).assignedCleaner;
-                              return c.cleaner_id !== currentCleanerId && !existingIds.includes(c.cleaner_id);
-                            })
-                            .map((cleaner) => (
-                              <SelectItem key={cleaner.cleaner_id} value={String(cleaner.cleaner_id)}>
-                                {cleaner.name}
-                              </SelectItem>
-                            ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    
-                    {/* Preview della nuova durata */}
-                    {selectedCollaboratorId && (
-                      <div className="text-xs p-2 bg-green-50 dark:bg-green-900/20 rounded border border-green-200 dark:border-green-800">
-                        <p className="font-medium text-green-700 dark:text-green-300">
-                          Preview nuova durata:
-                        </p>
-                        <p className="text-green-600 dark:text-green-400">
-                          {(() => {
-                            const currentCount = (displayTask as any).collaborator_count || 1;
-                            // Se base_cleaning_time è presente, usalo; altrimenti calcola dalla durata attuale * count
-                            let baseTime = (displayTask as any).base_cleaning_time;
-                            if (!baseTime) {
-                              // duration è in formato "H.MM", convertilo in minuti
-                              const durationStr = displayTask.duration || "0.0";
-                              const [h, m] = durationStr.split('.').map(Number);
-                              const currentPerCleaner = (h || 0) * 60 + (m || 0);
-                              // Moltiplica per il count attuale per ottenere la durata base originale
-                              baseTime = currentPerCleaner * currentCount;
-                            }
-                            const newCount = currentCount + 1;
-                            const newDuration = Math.ceil(baseTime / newCount);
-                            const hours = Math.floor(newDuration / 60);
-                            const mins = newDuration % 60;
-                            return `${hours}:${String(mins).padStart(2, '0')} ore per cleaner (${newCount} collaboratori)`;
-                          })()}
-                        </p>
-                      </div>
-                    )}
-                    
-                    <div className="flex gap-2">
-                      <Button
-                        onClick={handleAddCollaborator}
-                        disabled={!selectedCollaboratorId || isAddingCollaboratorLoading}
-                        size="sm"
-                        className="flex-1"
-                      >
-                        {isAddingCollaboratorLoading ? "Aggiunta..." : "Conferma"}
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          setIsAddingCollaborator(false);
-                          setSelectedCollaboratorId("");
-                        }}
-                      >
-                        Annulla
-                      </Button>
-                    </div>
-                  </div>
-                )}
               </div>
             )}
 
@@ -1749,108 +1621,22 @@ export default function TaskCard({
                       Assegna con collaboratori
                     </span>
                   </div>
-                  {!isBulkAssignMode && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setIsBulkAssignMode(true)}
-                      className="flex items-center gap-1"
-                      disabled={isLocked}
-                    >
-                      <UserPlus className="w-3 h-3" />
-                      Seleziona cleaners
-                    </Button>
-                  )}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={openBulkAssignDialog}
+                    className="flex items-center gap-1"
+                    disabled={isLocked}
+                  >
+                    <UserPlus className="w-3 h-3" />
+                    Seleziona cleaners
+                  </Button>
                 </div>
                 
-                {isLocked && !isBulkAssignMode && (
+                {isLocked && (
                   <p className="text-xs text-muted-foreground">
                     Sblocca la task per assegnarla
                   </p>
-                )}
-                
-                {/* Form per assegnazione bulk */}
-                {isBulkAssignMode && (
-                  <div className="space-y-3 p-3 border rounded bg-muted/30">
-                    <div>
-                      <label className="text-xs font-medium mb-2 block">
-                        Seleziona i cleaners da assegnare:
-                      </label>
-                      <div className="max-h-40 overflow-y-auto space-y-1 p-2 border rounded bg-background">
-                        {(selectedCleanersData?.cleaners || []).length === 0 ? (
-                          <p className="text-xs text-muted-foreground py-2 text-center">
-                            Nessun cleaner disponibile per questa data
-                          </p>
-                        ) : (
-                          (selectedCleanersData?.cleaners || []).map((cleaner) => (
-                            <label 
-                              key={cleaner.cleaner_id}
-                              className={cn(
-                                "flex items-center gap-2 p-2 rounded cursor-pointer hover:bg-muted transition-colors",
-                                selectedBulkCleanerIds.includes(cleaner.cleaner_id) && "bg-purple-100 dark:bg-purple-900/30"
-                              )}
-                            >
-                              <Checkbox
-                                checked={selectedBulkCleanerIds.includes(cleaner.cleaner_id)}
-                                onCheckedChange={(checked) => {
-                                  if (checked) {
-                                    setSelectedBulkCleanerIds(prev => [...prev, cleaner.cleaner_id]);
-                                  } else {
-                                    setSelectedBulkCleanerIds(prev => prev.filter(id => id !== cleaner.cleaner_id));
-                                  }
-                                }}
-                              />
-                              <span className="text-sm">{cleaner.name}</span>
-                            </label>
-                          ))
-                        )}
-                      </div>
-                    </div>
-                    
-                    {/* Preview della durata */}
-                    {selectedBulkCleanerIds.length > 0 && (
-                      <div className="text-xs p-2 bg-green-50 dark:bg-green-900/20 rounded border border-green-200 dark:border-green-800">
-                        <p className="font-medium text-green-700 dark:text-green-300">
-                          Preview durata:
-                        </p>
-                        <p className="text-green-600 dark:text-green-400">
-                          {(() => {
-                            // Calcola la durata base dalla task
-                            const durationStr = displayTask.duration || "0.0";
-                            const [h, m] = durationStr.split('.').map(Number);
-                            const baseTime = (h || 0) * 60 + (m || 0);
-                            
-                            const cleanerCount = selectedBulkCleanerIds.length;
-                            const newDuration = Math.ceil(baseTime / cleanerCount);
-                            const hours = Math.floor(newDuration / 60);
-                            const mins = newDuration % 60;
-                            return `${hours}:${String(mins).padStart(2, '0')} ore per cleaner (${cleanerCount} collaborator${cleanerCount > 1 ? 'i' : 'e'})`;
-                          })()}
-                        </p>
-                      </div>
-                    )}
-                    
-                    <div className="flex gap-2">
-                      <Button
-                        onClick={handleBulkAssign}
-                        disabled={selectedBulkCleanerIds.length === 0 || isBulkAssignLoading}
-                        size="sm"
-                        className="flex-1"
-                      >
-                        {isBulkAssignLoading ? "Assegnazione..." : `Assegna a ${selectedBulkCleanerIds.length} cleaner${selectedBulkCleanerIds.length !== 1 ? 's' : ''}`}
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          setIsBulkAssignMode(false);
-                          setSelectedBulkCleanerIds([]);
-                        }}
-                      >
-                        Annulla
-                      </Button>
-                    </div>
-                  </div>
                 )}
               </div>
             )}
@@ -1927,6 +1713,33 @@ export default function TaskCard({
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Dialog per selezione collaboratori */}
+      <CleanerSelectorDialog
+        isOpen={isCleanerSelectorOpen}
+        onClose={() => setIsCleanerSelectorOpen(false)}
+        onConfirm={handleCollaboratorSelection}
+        excludeCleanerId={isInTimeline ? ((displayTask as any).cleaner_id || (displayTask as any).assignedCleaner) : null}
+        workDate={localStorage.getItem('selected_work_date') || new Date().toISOString().split('T')[0]}
+        title={cleanerSelectorMode === 'add' ? "Aggiungi Collaboratori" : "Assegna Task a Collaboratori"}
+        description={cleanerSelectorMode === 'add' 
+          ? "Seleziona uno o più cleaners da aggiungere come collaboratori a questa task"
+          : "Seleziona i cleaners a cui assegnare questa task in collaborazione"
+        }
+        confirmLabel={cleanerSelectorMode === 'add' ? "Aggiungi" : "Assegna"}
+        baseCleaningTime={(() => {
+          const currentCount = (displayTask as any).collaborator_count || 1;
+          let baseTime = (displayTask as any).base_cleaning_time;
+          if (!baseTime) {
+            const durationStr = displayTask.duration || "0.0";
+            const [h, m] = durationStr.split('.').map(Number);
+            baseTime = ((h || 0) * 60 + (m || 0)) * currentCount;
+          }
+          return baseTime;
+        })()}
+        existingCollaboratorCount={cleanerSelectorMode === 'add' ? ((displayTask as any).collaborator_count || 1) : 0}
+        isLoading={isCollaboratorLoading}
+      />
     </>
   );
 }
