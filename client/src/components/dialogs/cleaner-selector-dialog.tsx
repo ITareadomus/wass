@@ -8,8 +8,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Badge } from "@/components/ui/badge";
-import { RefreshCw, Users, Clock } from "lucide-react";
+import { RefreshCw, Users } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface Cleaner {
@@ -20,6 +19,11 @@ interface Cleaner {
   available?: boolean;
   start_time?: string;
   total_hours?: number;
+  counter_hours?: number;
+  weekly_hours?: number;
+  role?: string;
+  can_do_straordinaria?: boolean;
+  contract_type?: string;
 }
 
 interface CleanerSelectorDialogProps {
@@ -63,7 +67,9 @@ export function CleanerSelectorDialog({
   const loadCleaners = async () => {
     setIsLoadingCleaners(true);
     try {
-      const response = await fetch(`/api/selected-cleaners?date=${workDate}`, {
+      const response = await fetch(`/api/cleaners?date=${workDate}`, {
+        cache: 'no-store',
+        headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' },
         signal: AbortSignal.timeout(15000),
       });
 
@@ -77,13 +83,18 @@ export function CleanerSelectorDialog({
       let cleanersList = data.cleaners || [];
 
       cleanersList = cleanersList.map((c: any) => ({
-        id: c.cleaner_id || c.id,
-        cleaner_id: c.cleaner_id || c.id,
+        id: c.id,
+        cleaner_id: c.id,
         name: c.name,
         lastname: c.lastname || "",
         available: c.available !== false,
         start_time: c.start_time,
         total_hours: c.total_hours,
+        counter_hours: c.counter_hours,
+        weekly_hours: c.weekly_hours,
+        role: c.role,
+        can_do_straordinaria: c.can_do_straordinaria,
+        contract_type: c.contract_type,
       }));
 
       if (excludeCleanerId) {
@@ -93,9 +104,31 @@ export function CleanerSelectorDialog({
       }
 
       cleanersList.sort((a: Cleaner, b: Cleaner) => {
-        const nameA = `${a.name} ${a.lastname || ""}`.toLowerCase();
-        const nameB = `${b.name} ${b.lastname || ""}`.toLowerCase();
-        return nameA.localeCompare(nameB);
+        const getPriority = (cleaner: Cleaner) => {
+          if (cleaner.role === "Formatore") return 1;
+          if (cleaner.can_do_straordinaria === true) return 2;
+          if (cleaner.role === "Premium") return 3;
+          return 4;
+        };
+
+        const priorityA = getPriority(a);
+        const priorityB = getPriority(b);
+
+        if (priorityA !== priorityB) {
+          return priorityA - priorityB;
+        }
+
+        const hoursA = Number(
+          a.weekly_hours !== undefined && a.weekly_hours !== null
+            ? a.weekly_hours
+            : a.counter_hours ?? 0
+        );
+        const hoursB = Number(
+          b.weekly_hours !== undefined && b.weekly_hours !== null
+            ? b.weekly_hours
+            : b.counter_hours ?? 0
+        );
+        return hoursB - hoursA;
       });
 
       setCleaners(cleanersList);
@@ -177,25 +210,38 @@ export function CleanerSelectorDialog({
                       onCheckedChange={() => toggleCleaner(cleaner.id)}
                     />
                     <div>
-                      <span className="font-medium">{displayName}</span>
-                      {cleaner.start_time && (
-                        <div className="flex items-center gap-1 text-xs text-muted-foreground mt-0.5">
-                          <Clock className="w-3 h-3" />
-                          <span>Inizio: {cleaner.start_time}</span>
-                        </div>
-                      )}
+                      <p className="font-semibold">{displayName}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {cleaner.role || "Standard"} • Contratto: {cleaner.contract_type || "N/A"} • {Number(cleaner.counter_hours || 0).toFixed(2)}h
+                        {cleaner.start_time && ` • Inizio: ${cleaner.start_time}`}
+                      </p>
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
-                    {cleaner.total_hours !== undefined && (
-                      <Badge variant="outline" className="text-xs">
-                        {cleaner.total_hours.toFixed(1)}h
-                      </Badge>
-                    )}
                     {!cleaner.available && (
-                      <Badge variant="secondary" className="text-xs">
+                      <span className="inline-flex items-center px-2.5 py-0.5 rounded border text-xs font-medium bg-gray-500/30 text-gray-800 dark:bg-gray-500/40 dark:text-gray-200 border-gray-600 dark:border-gray-400">
                         Non disponibile
-                      </Badge>
+                      </span>
+                    )}
+                    {cleaner.role === "Formatore" && (
+                      <span className="inline-flex items-center px-2.5 py-0.5 rounded border text-xs font-medium bg-orange-100 text-orange-800 dark:bg-orange-950/50 dark:text-orange-200 border-orange-300 dark:border-orange-700">
+                        Formatore
+                      </span>
+                    )}
+                    {cleaner.role === "Standard" && (
+                      <span className="inline-flex items-center px-2.5 py-0.5 rounded border text-xs font-medium bg-green-100 text-green-800 dark:bg-green-950/50 dark:text-green-200 border-green-300 dark:border-green-700">
+                        Standard
+                      </span>
+                    )}
+                    {cleaner.can_do_straordinaria && (
+                      <span className="inline-flex items-center px-2.5 py-0.5 rounded border text-xs font-medium bg-red-100 text-red-800 dark:bg-red-950/50 dark:text-red-200 border-red-300 dark:border-red-700">
+                        Straordinario
+                      </span>
+                    )}
+                    {cleaner.role === "Premium" && !cleaner.can_do_straordinaria && (
+                      <span className="inline-flex items-center px-2.5 py-0.5 rounded border text-xs font-medium bg-yellow-100 text-yellow-800 dark:bg-yellow-950/50 dark:text-yellow-200 border-yellow-300 dark:border-yellow-700">
+                        Premium
+                      </span>
                     )}
                   </div>
                 </label>
