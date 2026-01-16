@@ -2927,6 +2927,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
           });
         }
 
+        // 3.5 AUTO-CONVOCAZIONE: Se il cleaner non è nei selected_cleaners, aggiungilo atomicamente
+        // Usa UPSERT con ON CONFLICT per evitare race conditions anche quando la riga non esiste
+        const selectedCleanersResult = await client.query(
+          'SELECT cleaners FROM daily_selected_cleaners WHERE work_date = $1 FOR UPDATE',
+          [workDate]
+        );
+        let currentSelectedCleaners: number[] = selectedCleanersResult.rows[0]?.cleaners || [];
+        let wasAutoSummoned = false;
+        
+        if (!currentSelectedCleaners.includes(Number(cleanerId))) {
+          console.log(`🆕 Auto-convocazione cleaner ${cleanerId} per ${workDate}`);
+          wasAutoSummoned = true;
+          
+          // UPSERT atomico: INSERT con ON CONFLICT per gestire sia create che update
+          await client.query(
+            `INSERT INTO daily_selected_cleaners (work_date, cleaners, updated_at)
+             VALUES ($1, ARRAY[$2::integer], NOW())
+             ON CONFLICT (work_date) DO UPDATE 
+             SET cleaners = ARRAY(SELECT DISTINCT unnest(array_append(daily_selected_cleaners.cleaners, $2::integer))),
+                 updated_at = NOW()`,
+            [workDate, Number(cleanerId)]
+          );
+          console.log(`✅ Cleaner ${cleanerId} aggiunto ai selected_cleaners per ${workDate}`);
+        }
+
         // 4. Inserisci in task_collaborators
         // Prima il primary (se non esiste già)
         if (!existingCollaboration.cleanerIds.includes(primaryCleanerId)) {
@@ -3057,7 +3082,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         await client.query('COMMIT');
 
-        console.log(`✅ Collaboratore ${cleanerId} aggiunto a task ${taskId} (${newCollabCount} totali, ${effectiveCleaningTime}min ciascuno)`);
+        console.log(`✅ Collaboratore ${cleanerId} aggiunto a task ${taskId} (${newCollabCount} totali, ${effectiveCleaningTime}min ciascuno)${wasAutoSummoned ? ' [AUTO-CONVOCATO]' : ''}`);
         res.json({
           success: true,
           taskId,
@@ -3065,7 +3090,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           collaboratorCount: newCollabCount,
           effectiveCleaningTime,
           baseCleaningTime,
-          primaryCleanerId
+          primaryCleanerId,
+          wasAutoSummoned
         });
 
       } catch (error: any) {
@@ -3134,6 +3160,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const baseCleaningTime = sourceTask.cleaning_time || 60;
         const collaboratorCount = cleanerIds.length;
         const effectiveCleaningTime = Math.ceil(baseCleaningTime / collaboratorCount);
+
+        // 2.5 AUTO-CONVOCAZIONE: Aggiungi atomicamente cleaners non convocati ai selected_cleaners
+        // Usa UPSERT con ON CONFLICT per evitare race conditions anche quando la riga non esiste
+        const selectedCleanersResult = await client.query(
+          'SELECT cleaners FROM daily_selected_cleaners WHERE work_date = $1 FOR UPDATE',
+          [workDate]
+        );
+        let currentSelectedCleaners: number[] = selectedCleanersResult.rows[0]?.cleaners || [];
+        const autoSummonedCleaners: number[] = [];
+        
+        for (const cId of cleanerIds) {
+          if (!currentSelectedCleaners.includes(Number(cId))) {
+            autoSummonedCleaners.push(Number(cId));
+          }
+        }
+        
+        if (autoSummonedCleaners.length > 0) {
+          console.log(`🆕 Auto-convocazione ${autoSummonedCleaners.length} cleaners per ${workDate}: ${autoSummonedCleaners.join(', ')}`);
+          
+          // UPSERT atomico: INSERT con ON CONFLICT per gestire sia create che update
+          await client.query(
+            `INSERT INTO daily_selected_cleaners (work_date, cleaners, updated_at)
+             VALUES ($1, $2::integer[], NOW())
+             ON CONFLICT (work_date) DO UPDATE 
+             SET cleaners = ARRAY(SELECT DISTINCT unnest(array_cat(daily_selected_cleaners.cleaners, $2::integer[]))),
+                 updated_at = NOW()`,
+            [workDate, autoSummonedCleaners]
+          );
+          console.log(`✅ ${autoSummonedCleaners.length} cleaners aggiunti ai selected_cleaners per ${workDate}`);
+        }
 
         // 3. Inserisci pivot per ogni cleaner (nessuno è primary per ora)
         for (const cId of cleanerIds) {
@@ -3243,14 +3299,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         await client.query('COMMIT');
 
-        console.log(`✅ Task ${taskId} assegnato a ${collaboratorCount} cleaners (${effectiveCleaningTime}min ciascuno)`);
+        console.log(`✅ Task ${taskId} assegnato a ${collaboratorCount} cleaners (${effectiveCleaningTime}min ciascuno)${autoSummonedCleaners.length > 0 ? ` [AUTO-CONVOCATI: ${autoSummonedCleaners.join(',')}]` : ''}`);
         res.json({
           success: true,
           taskId,
           cleanerIds: cleanerIds.map(Number),
           collaboratorCount,
           effectiveCleaningTime,
-          baseCleaningTime
+          baseCleaningTime,
+          autoSummonedCleaners
         });
 
       } catch (error: any) {
