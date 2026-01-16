@@ -1597,7 +1597,25 @@ export default function TaskCard({
                     <span className="text-sm font-semibold text-muted-foreground">
                       Collaboratori
                     </span>
-                    {(displayTask as any).collaborator_count > 1 && (
+                    {/* Lista collaboratori con alias con badge inline */}
+                    {taskCollaborators.length > 0 && (
+                      <div className="flex flex-wrap gap-1.5 ml-1">
+                        {taskCollaborators.map((collab) => (
+                          <Badge 
+                            key={collab.id} 
+                            variant={collab.isPrimary ? "default" : "secondary"}
+                            className={cn(
+                              "text-[10px] px-1.5 py-0 h-5",
+                              collab.isPrimary && "bg-blue-600 hover:bg-blue-700"
+                            )}
+                          >
+                            {collab.alias}
+                            {collab.isPrimary && <span className="ml-0.5 text-[8px] opacity-80">(P)</span>}
+                          </Badge>
+                        ))}
+                      </div>
+                    )}
+                    {(displayTask as any).collaborator_count > 1 && taskCollaborators.length === 0 && (
                       <Badge variant="secondary" className="text-xs">
                         {(displayTask as any).collaborator_count} cleaners
                       </Badge>
@@ -1616,25 +1634,6 @@ export default function TaskCard({
                   )}
                 </div>
 
-                {/* Lista collaboratori con alias con badge inline */}
-                {taskCollaborators.length > 0 && (
-                  <div className="flex flex-wrap gap-1.5 mb-3">
-                    {taskCollaborators.map((collab) => (
-                      <Badge 
-                        key={collab.id} 
-                        variant={collab.isPrimary ? "default" : "secondary"}
-                        className={cn(
-                          "text-[11px] px-2 py-0",
-                          collab.isPrimary && "bg-blue-600 hover:bg-blue-700"
-                        )}
-                      >
-                        {collab.alias}
-                        {collab.isPrimary && <span className="ml-1 text-[9px] opacity-80">(P)</span>}
-                      </Badge>
-                    ))}
-                  </div>
-                )}
-                
                 {/* Info collaborazione attuale */}
                 {(displayTask as any).collaborator_count > 1 && (
                   <div className="text-xs text-muted-foreground mb-2 p-2 bg-purple-50 dark:bg-purple-900/20 rounded">
