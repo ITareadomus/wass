@@ -19,7 +19,7 @@ import {
 } from "@/components/ui/tooltip";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
-import { HelpCircle, ChevronLeft, ChevronRight, Save, Pencil, Calendar, Lock, LockOpen } from "lucide-react";
+import { HelpCircle, ChevronLeft, ChevronRight, Save, Pencil, Calendar, Lock, LockOpen, Users, UserPlus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -185,6 +185,22 @@ export default function TaskCard({
       return response.json();
     },
     staleTime: 60000,
+  });
+  
+  // Carica i cleaners selezionati per la data corrente (per aggiungere collaboratori)
+  const selectedWorkDate = typeof window !== 'undefined' 
+    ? localStorage.getItem('selected_work_date') || new Date().toISOString().split('T')[0]
+    : new Date().toISOString().split('T')[0];
+  
+  const { data: selectedCleanersData } = useQuery<{ success: boolean; cleaners: Array<{ cleaner_id: number; name: string }> }>({
+    queryKey: ["/api/selected-cleaners", selectedWorkDate],
+    queryFn: async () => {
+      const response = await fetch(`/api/selected-cleaners?date=${selectedWorkDate}`);
+      if (!response.ok) throw new Error("Failed to fetch selected cleaners");
+      return response.json();
+    },
+    staleTime: 30000,
+    enabled: isInTimeline && isModalOpen,
   });
 
   const operationNames: Record<number, string> = operationsData?.active_operations?.reduce(
@@ -352,6 +368,70 @@ export default function TaskCard({
     }
   };
 
+  // Handler per aggiungere un collaboratore alla task
+  const handleAddCollaborator = async () => {
+    if (!selectedCollaboratorId) return;
+    
+    const workDate = localStorage.getItem('selected_work_date') || new Date().toISOString().split('T')[0];
+    const taskId = (task as any).task_id || task.id;
+    
+    setIsAddingCollaboratorLoading(true);
+    
+    try {
+      const response = await fetch(`/api/tasks/${taskId}/collaborators/add`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          date: workDate,
+          cleanerId: Number(selectedCollaboratorId),
+        }),
+      });
+      
+      const data = await response.json();
+      
+      if (response.status === 409) {
+        // Collisione oraria
+        toast({
+          title: "Collisione oraria",
+          description: data.message || "Il collaboratore ha già task che si sovrappongono",
+          variant: "destructive",
+        });
+        return;
+      }
+      
+      if (!response.ok) {
+        throw new Error(data.error || "Errore nell'aggiunta collaboratore");
+      }
+      
+      toast({
+        title: "Collaboratore aggiunto",
+        description: `Ora ${data.collaboratorCount} cleaners lavorano su questa task (${data.effectiveCleaningTime}min ciascuno)`,
+      });
+      
+      // Reset stato e ricarica timeline
+      setIsAddingCollaborator(false);
+      setSelectedCollaboratorId("");
+      
+      // Ricarica timeline
+      if ((window as any).reloadAllTasks) {
+        await (window as any).reloadAllTasks();
+      }
+      
+      // Chiudi il modale
+      setIsModalOpen(false);
+      
+    } catch (error: any) {
+      console.error('Errore nell\'aggiunta collaboratore:', error);
+      toast({
+        title: "Errore",
+        description: error.message || "Impossibile aggiungere il collaboratore",
+        variant: "destructive",
+      });
+    } finally {
+      setIsAddingCollaboratorLoading(false);
+    }
+  };
+
   // Stati per editing - ora un set di campi invece di uno solo
   const [editingFields, setEditingFields] = useState<Set<'duration' | 'checkout' | 'checkin' | 'paxin' | 'operation'>>(new Set());
   const [editedCheckoutDate, setEditedCheckoutDate] = useState("");
@@ -362,6 +442,11 @@ export default function TaskCard({
   const [editedPaxIn, setEditedPaxIn] = useState("");
   const [editedOperationId, setEditedOperationId] = useState("");
   const [isSaving, setIsSaving] = useState(false);
+  
+  // Stato per gestione collaboratori
+  const [isAddingCollaborator, setIsAddingCollaborator] = useState(false);
+  const [selectedCollaboratorId, setSelectedCollaboratorId] = useState<string>("");
+  const [isAddingCollaboratorLoading, setIsAddingCollaboratorLoading] = useState(false);
   
   // Stato per forzare re-render quando pending edits cambiano
   const [pendingEditsVersion, setPendingEditsVersion] = useState(0);
@@ -1023,6 +1108,18 @@ export default function TaskCard({
                             ({(task as any).customer_reference})
                           </span>
                         )}
+                        {/* Badge collaborativo */}
+                        {(task as any).collaborator_count > 1 && (
+                          <span className="bg-purple-500 text-white text-[9px] font-bold px-1 py-0.5 rounded">
+                            👥 x{(task as any).collaborator_count}
+                          </span>
+                        )}
+                        {/* Indicatore Primary */}
+                        {(task as any).is_primary === true && (task as any).collaborator_count > 1 && (
+                          <span className="bg-blue-600 text-white text-[8px] font-semibold px-1 py-0.5 rounded">
+                            Primary
+                          </span>
+                        )}
                       </div>
                       {task.alias && (
                         <span className="opacity-70 leading-none mt-0.5 text-[#000000] font-bold text-[11px]">
@@ -1431,7 +1528,140 @@ export default function TaskCard({
               </div>
             </div>
 
-            {/* Settima riga: Blocco Task - solo nei container */}
+            {/* Settima riga: Gestione Collaboratori - solo per task in timeline */}
+            {isInTimeline && (
+              <div className="pt-3 border-t mt-3">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <Users className="w-4 h-4 text-purple-600" />
+                    <span className="text-sm font-semibold text-muted-foreground">
+                      Collaboratori
+                    </span>
+                    {(displayTask as any).collaborator_count > 1 && (
+                      <Badge variant="secondary" className="text-xs">
+                        {(displayTask as any).collaborator_count} cleaners
+                      </Badge>
+                    )}
+                  </div>
+                  {!isAddingCollaborator && !isReadOnly && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setIsAddingCollaborator(true)}
+                      className="flex items-center gap-1"
+                    >
+                      <UserPlus className="w-3 h-3" />
+                      Aggiungi collaboratore
+                    </Button>
+                  )}
+                </div>
+                
+                {/* Info collaborazione attuale */}
+                {(displayTask as any).collaborator_count > 1 && (
+                  <div className="text-xs text-muted-foreground mb-2 p-2 bg-purple-50 dark:bg-purple-900/20 rounded">
+                    <p>
+                      <strong>Durata originale:</strong> {(() => {
+                        const baseTime = (displayTask as any).base_cleaning_time || 0;
+                        const hours = Math.floor(baseTime / 60);
+                        const mins = baseTime % 60;
+                        return `${hours}:${String(mins).padStart(2, '0')} ore`;
+                      })()}
+                    </p>
+                    <p>
+                      <strong>Durata per cleaner:</strong> {(displayTask.duration || "0.0").replace(".", ":")} ore
+                    </p>
+                    {(displayTask as any).is_primary && (
+                      <p className="text-blue-600 font-semibold mt-1">Questo cleaner è il Primary</p>
+                    )}
+                  </div>
+                )}
+                
+                {/* Form per aggiungere collaboratore */}
+                {isAddingCollaborator && !isReadOnly && (
+                  <div className="space-y-3 p-3 border rounded bg-muted/30">
+                    <div>
+                      <label className="text-xs font-medium mb-1 block">
+                        Seleziona cleaner da aggiungere:
+                      </label>
+                      <Select
+                        value={selectedCollaboratorId}
+                        onValueChange={setSelectedCollaboratorId}
+                      >
+                        <SelectTrigger className="text-sm">
+                          <SelectValue placeholder="Seleziona un cleaner..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {(selectedCleanersData?.cleaners || [])
+                            .filter(c => {
+                              // Escludi i cleaners già collaboratori
+                              const existingIds = (displayTask as any).collaborator_ids || [];
+                              const currentCleanerId = (displayTask as any).cleaner_id || (displayTask as any).assignedCleaner;
+                              return c.cleaner_id !== currentCleanerId && !existingIds.includes(c.cleaner_id);
+                            })
+                            .map((cleaner) => (
+                              <SelectItem key={cleaner.cleaner_id} value={String(cleaner.cleaner_id)}>
+                                {cleaner.name}
+                              </SelectItem>
+                            ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    
+                    {/* Preview della nuova durata */}
+                    {selectedCollaboratorId && (
+                      <div className="text-xs p-2 bg-green-50 dark:bg-green-900/20 rounded border border-green-200 dark:border-green-800">
+                        <p className="font-medium text-green-700 dark:text-green-300">
+                          Preview nuova durata:
+                        </p>
+                        <p className="text-green-600 dark:text-green-400">
+                          {(() => {
+                            const currentCount = (displayTask as any).collaborator_count || 1;
+                            // Se base_cleaning_time è presente, usalo; altrimenti calcola dalla durata attuale * count
+                            let baseTime = (displayTask as any).base_cleaning_time;
+                            if (!baseTime) {
+                              // duration è in formato "H.MM", convertilo in minuti
+                              const durationStr = displayTask.duration || "0.0";
+                              const [h, m] = durationStr.split('.').map(Number);
+                              const currentPerCleaner = (h || 0) * 60 + (m || 0);
+                              // Moltiplica per il count attuale per ottenere la durata base originale
+                              baseTime = currentPerCleaner * currentCount;
+                            }
+                            const newCount = currentCount + 1;
+                            const newDuration = Math.ceil(baseTime / newCount);
+                            const hours = Math.floor(newDuration / 60);
+                            const mins = newDuration % 60;
+                            return `${hours}:${String(mins).padStart(2, '0')} ore per cleaner (${newCount} collaboratori)`;
+                          })()}
+                        </p>
+                      </div>
+                    )}
+                    
+                    <div className="flex gap-2">
+                      <Button
+                        onClick={handleAddCollaborator}
+                        disabled={!selectedCollaboratorId || isAddingCollaboratorLoading}
+                        size="sm"
+                        className="flex-1"
+                      >
+                        {isAddingCollaboratorLoading ? "Aggiunta..." : "Conferma"}
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setIsAddingCollaborator(false);
+                          setSelectedCollaboratorId("");
+                        }}
+                      >
+                        Annulla
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Ottava riga: Blocco Task - solo nei container */}
             {!isInTimeline && (
               <div className="pt-3 border-t mt-3">
                 <div className="flex items-center gap-3">
