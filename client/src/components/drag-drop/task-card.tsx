@@ -1609,7 +1609,7 @@ export default function TaskCard({
                               collab.isPrimary && "bg-blue-600 hover:bg-blue-700"
                             )}
                           >
-                            {collab.alias}
+                            {collab.alias || collab.name}
                             {collab.isPrimary && <span className="text-[9px] font-bold">(P)</span>}
                           </Badge>
                         ))}
