@@ -1,5 +1,5 @@
 
-import { zonedTimeToUtc, utcToZonedTime, format as formatTz } from 'date-fns-tz';
+import { fromZonedTime, toZonedTime, format as formatTz } from 'date-fns-tz';
 import { addMinutes, parse } from 'date-fns';
 
 const TIMEZONE = 'Europe/Rome';
@@ -59,7 +59,7 @@ export async function recomputeSchedule(
   const [startHour, startMin] = cleanerStartHHmm.split(':').map(Number);
   dateObj.setHours(startHour, startMin, 0, 0);
 
-  let currentTime = zonedTimeToUtc(dateObj, TIMEZONE);
+  let currentTime = fromZonedTime(dateObj, TIMEZONE);
   let prevTask: Assignment | null = null;
 
   const updated = sorted.map((assignment, index) => {
@@ -70,7 +70,7 @@ export async function recomputeSchedule(
     currentTime = addMinutes(currentTime, travel);
     
     // Ora di inizio
-    const zonedStart = utcToZonedTime(currentTime, TIMEZONE);
+    const zonedStart = toZonedTime(currentTime, TIMEZONE);
     const startTime = formatTz(zonedStart, 'HH:mm', { timeZone: TIMEZONE });
     
     // Calcola durata pulizia (default 60 minuti se non specificata)
@@ -78,7 +78,7 @@ export async function recomputeSchedule(
     
     // Ora di fine
     currentTime = addMinutes(currentTime, cleaningMinutes);
-    const zonedEnd = utcToZonedTime(currentTime, TIMEZONE);
+    const zonedEnd = toZonedTime(currentTime, TIMEZONE);
     const endTime = formatTz(zonedEnd, 'HH:mm', { timeZone: TIMEZONE });
     
     prevTask = assignment;
