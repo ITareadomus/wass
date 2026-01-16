@@ -53,7 +53,8 @@ export function CleanerSelectorDialog({
   existingCollaboratorCount = 0,
   isLoading = false,
 }: CleanerSelectorDialogProps) {
-  const [cleaners, setCleaners] = useState<Cleaner[]>([]);
+  const [convocatiCleaners, setConvocatiCleaners] = useState<Cleaner[]>([]);
+  const [nonConvocatiCleaners, setNonConvocatiCleaners] = useState<Cleaner[]>([]);
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [isLoadingCleaners, setIsLoadingCleaners] = useState(false);
 
@@ -67,22 +68,32 @@ export function CleanerSelectorDialog({
   const loadCleaners = async () => {
     setIsLoadingCleaners(true);
     try {
-      const response = await fetch(`/api/cleaners?date=${workDate}`, {
-        cache: 'no-store',
-        headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' },
-        signal: AbortSignal.timeout(15000),
-      });
+      const [cleanersResponse, selectedResponse] = await Promise.all([
+        fetch(`/api/cleaners?date=${workDate}`, {
+          cache: 'no-store',
+          headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' },
+          signal: AbortSignal.timeout(15000),
+        }),
+        fetch(`/api/selected-cleaners?date=${workDate}`, {
+          signal: AbortSignal.timeout(15000),
+        })
+      ]);
 
-      if (!response.ok) {
+      if (!cleanersResponse.ok) {
         console.error("Impossibile caricare cleaners da API");
-        setCleaners([]);
+        setConvocatiCleaners([]);
+        setNonConvocatiCleaners([]);
         return;
       }
 
-      const data = await response.json();
-      let cleanersList = data.cleaners || [];
+      const cleanersData = await cleanersResponse.json();
+      const selectedData = selectedResponse.ok ? await selectedResponse.json() : { cleaners: [] };
+      
+      const convocatiIds = new Set(
+        (selectedData.cleaners || []).map((c: any) => c.cleaner_id || c.id)
+      );
 
-      cleanersList = cleanersList.map((c: any) => ({
+      let allCleaners = (cleanersData.cleaners || []).map((c: any) => ({
         id: c.id,
         cleaner_id: c.id,
         name: c.name,
@@ -98,43 +109,50 @@ export function CleanerSelectorDialog({
       }));
 
       if (excludeCleanerId) {
-        cleanersList = cleanersList.filter(
+        allCleaners = allCleaners.filter(
           (c: Cleaner) => c.id !== excludeCleanerId && c.cleaner_id !== excludeCleanerId
         );
       }
 
-      cleanersList.sort((a: Cleaner, b: Cleaner) => {
-        const getPriority = (cleaner: Cleaner) => {
-          if (cleaner.role === "Formatore") return 1;
-          if (cleaner.can_do_straordinaria === true) return 2;
-          if (cleaner.role === "Premium") return 3;
-          return 4;
-        };
+      const sortCleaners = (list: Cleaner[]) => {
+        return list.sort((a: Cleaner, b: Cleaner) => {
+          const getPriority = (cleaner: Cleaner) => {
+            if (cleaner.role === "Formatore") return 1;
+            if (cleaner.can_do_straordinaria === true) return 2;
+            if (cleaner.role === "Premium") return 3;
+            return 4;
+          };
 
-        const priorityA = getPriority(a);
-        const priorityB = getPriority(b);
+          const priorityA = getPriority(a);
+          const priorityB = getPriority(b);
 
-        if (priorityA !== priorityB) {
-          return priorityA - priorityB;
-        }
+          if (priorityA !== priorityB) {
+            return priorityA - priorityB;
+          }
 
-        const hoursA = Number(
-          a.weekly_hours !== undefined && a.weekly_hours !== null
-            ? a.weekly_hours
-            : a.counter_hours ?? 0
-        );
-        const hoursB = Number(
-          b.weekly_hours !== undefined && b.weekly_hours !== null
-            ? b.weekly_hours
-            : b.counter_hours ?? 0
-        );
-        return hoursB - hoursA;
-      });
+          const hoursA = Number(
+            a.weekly_hours !== undefined && a.weekly_hours !== null
+              ? a.weekly_hours
+              : a.counter_hours ?? 0
+          );
+          const hoursB = Number(
+            b.weekly_hours !== undefined && b.weekly_hours !== null
+              ? b.weekly_hours
+              : b.counter_hours ?? 0
+          );
+          return hoursB - hoursA;
+        });
+      };
 
-      setCleaners(cleanersList);
+      const convocati = allCleaners.filter((c: Cleaner) => convocatiIds.has(c.id));
+      const nonConvocati = allCleaners.filter((c: Cleaner) => !convocatiIds.has(c.id));
+
+      setConvocatiCleaners(sortCleaners(convocati));
+      setNonConvocatiCleaners(sortCleaners(nonConvocati));
     } catch (error) {
       console.error("Errore nel caricamento dei cleaners:", error);
-      setCleaners([]);
+      setConvocatiCleaners([]);
+      setNonConvocatiCleaners([]);
     } finally {
       setIsLoadingCleaners(false);
     }
@@ -176,77 +194,160 @@ export function CleanerSelectorDialog({
           <DialogDescription>{description}</DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-2 mt-4">
+        <div className="space-y-4 mt-4">
           {isLoadingCleaners ? (
             <div className="flex items-center justify-center py-8">
               <RefreshCw className="h-6 w-6 animate-spin text-purple-600 mr-2" />
               <p className="text-muted-foreground">Caricamento cleaners...</p>
             </div>
-          ) : cleaners.length === 0 ? (
+          ) : convocatiCleaners.length === 0 && nonConvocatiCleaners.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
               Nessun cleaner disponibile per questa data
             </div>
           ) : (
-            cleaners.map((cleaner) => {
-              const isSelected = selectedIds.includes(cleaner.id);
-              const displayName = cleaner.lastname
-                ? `${cleaner.name} ${cleaner.lastname}`
-                : cleaner.name;
+            <>
+              {convocatiCleaners.length > 0 && (
+                <div>
+                  <h4 className="text-sm font-semibold text-muted-foreground mb-2 flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-green-500"></span>
+                    Cleaners Convocati ({convocatiCleaners.length})
+                  </h4>
+                  <div className="space-y-2">
+                    {convocatiCleaners.map((cleaner) => {
+                      const isSelected = selectedIds.includes(cleaner.id);
+                      const displayName = cleaner.lastname
+                        ? `${cleaner.name} ${cleaner.lastname}`
+                        : cleaner.name;
 
-              return (
-                <label
-                  key={cleaner.id}
-                  className={cn(
-                    "flex items-center justify-between p-3 border rounded-lg cursor-pointer transition-colors",
-                    isSelected
-                      ? "bg-purple-100 dark:bg-purple-900/30 border-purple-300 dark:border-purple-700"
-                      : "hover:bg-accent",
-                    !cleaner.available && "opacity-70"
-                  )}
-                >
-                  <div className="flex items-center gap-3">
-                    <Checkbox
-                      checked={isSelected}
-                      onCheckedChange={() => toggleCleaner(cleaner.id)}
-                    />
-                    <div>
-                      <p className="font-semibold">{displayName}</p>
-                      <p className="text-sm text-muted-foreground">
-                        {cleaner.role || "Standard"} • Contratto: {cleaner.contract_type || "N/A"} • {Number(cleaner.counter_hours || 0).toFixed(2)}h
-                        {cleaner.start_time && ` • Inizio: ${cleaner.start_time}`}
-                      </p>
-                    </div>
+                      return (
+                        <label
+                          key={cleaner.id}
+                          className={cn(
+                            "flex items-center justify-between p-3 border rounded-lg cursor-pointer transition-colors",
+                            isSelected
+                              ? "bg-purple-100 dark:bg-purple-900/30 border-purple-300 dark:border-purple-700"
+                              : "hover:bg-accent",
+                            !cleaner.available && "opacity-70"
+                          )}
+                        >
+                          <div className="flex items-center gap-3">
+                            <Checkbox
+                              checked={isSelected}
+                              onCheckedChange={() => toggleCleaner(cleaner.id)}
+                            />
+                            <div>
+                              <p className="font-semibold">{displayName}</p>
+                              <p className="text-sm text-muted-foreground">
+                                {cleaner.role || "Standard"} • Contratto: {cleaner.contract_type || "N/A"} • {Number(cleaner.counter_hours || 0).toFixed(2)}h
+                                {cleaner.start_time && ` • Inizio: ${cleaner.start_time}`}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            {!cleaner.available && (
+                              <span className="inline-flex items-center px-2.5 py-0.5 rounded border text-xs font-medium bg-gray-500/30 text-gray-800 dark:bg-gray-500/40 dark:text-gray-200 border-gray-600 dark:border-gray-400">
+                                Non disponibile
+                              </span>
+                            )}
+                            {cleaner.role === "Formatore" && (
+                              <span className="inline-flex items-center px-2.5 py-0.5 rounded border text-xs font-medium bg-orange-100 text-orange-800 dark:bg-orange-950/50 dark:text-orange-200 border-orange-300 dark:border-orange-700">
+                                Formatore
+                              </span>
+                            )}
+                            {cleaner.role === "Standard" && (
+                              <span className="inline-flex items-center px-2.5 py-0.5 rounded border text-xs font-medium bg-green-100 text-green-800 dark:bg-green-950/50 dark:text-green-200 border-green-300 dark:border-green-700">
+                                Standard
+                              </span>
+                            )}
+                            {cleaner.can_do_straordinaria && (
+                              <span className="inline-flex items-center px-2.5 py-0.5 rounded border text-xs font-medium bg-red-100 text-red-800 dark:bg-red-950/50 dark:text-red-200 border-red-300 dark:border-red-700">
+                                Straordinario
+                              </span>
+                            )}
+                            {cleaner.role === "Premium" && !cleaner.can_do_straordinaria && (
+                              <span className="inline-flex items-center px-2.5 py-0.5 rounded border text-xs font-medium bg-yellow-100 text-yellow-800 dark:bg-yellow-950/50 dark:text-yellow-200 border-yellow-300 dark:border-yellow-700">
+                                Premium
+                              </span>
+                            )}
+                          </div>
+                        </label>
+                      );
+                    })}
                   </div>
-                  <div className="flex items-center gap-2">
-                    {!cleaner.available && (
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded border text-xs font-medium bg-gray-500/30 text-gray-800 dark:bg-gray-500/40 dark:text-gray-200 border-gray-600 dark:border-gray-400">
-                        Non disponibile
-                      </span>
-                    )}
-                    {cleaner.role === "Formatore" && (
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded border text-xs font-medium bg-orange-100 text-orange-800 dark:bg-orange-950/50 dark:text-orange-200 border-orange-300 dark:border-orange-700">
-                        Formatore
-                      </span>
-                    )}
-                    {cleaner.role === "Standard" && (
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded border text-xs font-medium bg-green-100 text-green-800 dark:bg-green-950/50 dark:text-green-200 border-green-300 dark:border-green-700">
-                        Standard
-                      </span>
-                    )}
-                    {cleaner.can_do_straordinaria && (
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded border text-xs font-medium bg-red-100 text-red-800 dark:bg-red-950/50 dark:text-red-200 border-red-300 dark:border-red-700">
-                        Straordinario
-                      </span>
-                    )}
-                    {cleaner.role === "Premium" && !cleaner.can_do_straordinaria && (
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded border text-xs font-medium bg-yellow-100 text-yellow-800 dark:bg-yellow-950/50 dark:text-yellow-200 border-yellow-300 dark:border-yellow-700">
-                        Premium
-                      </span>
-                    )}
+                </div>
+              )}
+
+              {nonConvocatiCleaners.length > 0 && (
+                <div>
+                  <h4 className="text-sm font-semibold text-muted-foreground mb-2 flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-gray-400"></span>
+                    Cleaners Non Convocati ({nonConvocatiCleaners.length})
+                  </h4>
+                  <div className="space-y-2">
+                    {nonConvocatiCleaners.map((cleaner) => {
+                      const isSelected = selectedIds.includes(cleaner.id);
+                      const displayName = cleaner.lastname
+                        ? `${cleaner.name} ${cleaner.lastname}`
+                        : cleaner.name;
+
+                      return (
+                        <label
+                          key={cleaner.id}
+                          className={cn(
+                            "flex items-center justify-between p-3 border rounded-lg cursor-pointer transition-colors",
+                            isSelected
+                              ? "bg-purple-100 dark:bg-purple-900/30 border-purple-300 dark:border-purple-700"
+                              : "hover:bg-accent",
+                            !cleaner.available && "opacity-70"
+                          )}
+                        >
+                          <div className="flex items-center gap-3">
+                            <Checkbox
+                              checked={isSelected}
+                              onCheckedChange={() => toggleCleaner(cleaner.id)}
+                            />
+                            <div>
+                              <p className="font-semibold">{displayName}</p>
+                              <p className="text-sm text-muted-foreground">
+                                {cleaner.role || "Standard"} • Contratto: {cleaner.contract_type || "N/A"} • {Number(cleaner.counter_hours || 0).toFixed(2)}h
+                                {cleaner.start_time && ` • Inizio: ${cleaner.start_time}`}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            {!cleaner.available && (
+                              <span className="inline-flex items-center px-2.5 py-0.5 rounded border text-xs font-medium bg-gray-500/30 text-gray-800 dark:bg-gray-500/40 dark:text-gray-200 border-gray-600 dark:border-gray-400">
+                                Non disponibile
+                              </span>
+                            )}
+                            {cleaner.role === "Formatore" && (
+                              <span className="inline-flex items-center px-2.5 py-0.5 rounded border text-xs font-medium bg-orange-100 text-orange-800 dark:bg-orange-950/50 dark:text-orange-200 border-orange-300 dark:border-orange-700">
+                                Formatore
+                              </span>
+                            )}
+                            {cleaner.role === "Standard" && (
+                              <span className="inline-flex items-center px-2.5 py-0.5 rounded border text-xs font-medium bg-green-100 text-green-800 dark:bg-green-950/50 dark:text-green-200 border-green-300 dark:border-green-700">
+                                Standard
+                              </span>
+                            )}
+                            {cleaner.can_do_straordinaria && (
+                              <span className="inline-flex items-center px-2.5 py-0.5 rounded border text-xs font-medium bg-red-100 text-red-800 dark:bg-red-950/50 dark:text-red-200 border-red-300 dark:border-red-700">
+                                Straordinario
+                              </span>
+                            )}
+                            {cleaner.role === "Premium" && !cleaner.can_do_straordinaria && (
+                              <span className="inline-flex items-center px-2.5 py-0.5 rounded border text-xs font-medium bg-yellow-100 text-yellow-800 dark:bg-yellow-950/50 dark:text-yellow-200 border-yellow-300 dark:border-yellow-700">
+                                Premium
+                              </span>
+                            )}
+                          </div>
+                        </label>
+                      );
+                    })}
                   </div>
-                </label>
-              );
-            })
+                </div>
+              )}
+            </>
           )}
         </div>
 
