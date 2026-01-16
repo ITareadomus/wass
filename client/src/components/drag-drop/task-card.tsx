@@ -484,6 +484,33 @@ export default function TaskCard({
   // Stato per forzare re-render quando pending edits cambiano
   const [pendingEditsVersion, setPendingEditsVersion] = useState(0);
 
+  // Stato per i collaboratori caricati
+  const [taskCollaborators, setTaskCollaborators] = useState<any[]>([]);
+  const [isLoadingCollabs, setIsLoadingCollabs] = useState(false);
+
+  // Carica i dettagli della collaborazione quando il modale si apre
+  useEffect(() => {
+    if (isModalOpen) {
+      const fetchCollaborators = async () => {
+        setIsLoadingCollabs(true);
+        try {
+          const workDate = localStorage.getItem('selected_work_date') || new Date().toISOString().split('T')[0];
+          const taskId = (task as any).task_id || task.id;
+          const response = await fetch(`/api/tasks/${taskId}/collaborators?date=${workDate}`);
+          const data = await response.json();
+          if (data.success) {
+            setTaskCollaborators(data.collaborators || []);
+          }
+        } catch (error) {
+          console.error("Errore caricamento collaboratori:", error);
+        } finally {
+          setIsLoadingCollabs(false);
+        }
+      };
+      fetchCollaborators();
+    }
+  }, [isModalOpen, task.id]);
+
   // CRITICAL: Applica le pending edits alla task per la visualizzazione nella card
   const taskWithPendingEdits = React.useMemo(() => applyPendingEdits(task), [task, pendingEditsVersion]);
 
@@ -1588,6 +1615,25 @@ export default function TaskCard({
                     </Button>
                   )}
                 </div>
+
+                {/* Lista collaboratori con alias */}
+                {taskCollaborators.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5 mb-3">
+                    {taskCollaborators.map((collab) => (
+                      <Badge 
+                        key={collab.id} 
+                        variant={collab.isPrimary ? "default" : "secondary"}
+                        className={cn(
+                          "text-[11px] px-2 py-0",
+                          collab.isPrimary && "bg-blue-600 hover:bg-blue-700"
+                        )}
+                      >
+                        {collab.alias}
+                        {collab.isPrimary && <span className="ml-1 text-[9px] opacity-80">(P)</span>}
+                      </Badge>
+                    ))}
+                  </div>
+                )}
                 
                 {/* Info collaborazione attuale */}
                 {(displayTask as any).collaborator_count > 1 && (
