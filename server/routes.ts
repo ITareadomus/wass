@@ -458,6 +458,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       await workspaceFiles.saveTimeline(workDate, emptyTimeline, false, currentUsername, 'timeline_reset');
       console.log(`✅ Timeline svuotata su PostgreSQL`);
 
+      // 6. Cancellare le collaborazioni dalla tabella task_collaborators
+      const { query } = await import("../shared/pg-db");
+      await query(`DELETE FROM task_collaborators WHERE work_date = $1`, [workDate]);
+      console.log(`✅ Collaborazioni cancellate da task_collaborators per ${workDate}`);
+
       // === RESET: NON modificare selected_cleaners ===
       console.log(`✅ Reset completato - selected_cleaners NON modificato`);
 
