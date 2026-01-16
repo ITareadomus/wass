@@ -1605,12 +1605,12 @@ export default function TaskCard({
                             key={collab.id} 
                             variant={collab.isPrimary ? "default" : "secondary"}
                             className={cn(
-                              "text-[10px] px-1.5 py-0 h-5",
+                              "text-[10px] px-1.5 py-0 h-5 flex items-center gap-1",
                               collab.isPrimary && "bg-blue-600 hover:bg-blue-700"
                             )}
                           >
                             {collab.alias}
-                            {collab.isPrimary && <span className="ml-0.5 text-[8px] opacity-80">(P)</span>}
+                            {collab.isPrimary && <span className="text-[9px] font-bold">(P)</span>}
                           </Badge>
                         ))}
                       </div>
