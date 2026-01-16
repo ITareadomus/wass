@@ -1,4 +1,5 @@
 import pool, { query } from '../../shared/pg-db';
+import { taskCollaborationService } from './pg-task-collaboration-service';
 
 export interface PgDailyAssignmentRow {
   id?: number;
@@ -17,6 +18,7 @@ export interface PgDailyAssignmentRow {
   lat?: number | null;
   lng?: number | null;
   cleaning_time: number;
+  base_cleaning_time?: number | null;
   checkin_date?: string | null;
   checkout_date?: string | null;
   checkin_time?: string | null;
@@ -294,6 +296,7 @@ export class PgDailyAssignmentsService {
           lat: task.lat ? parseFloat(String(task.lat)) : null,
           lng: task.lng ? parseFloat(String(task.lng)) : null,
           cleaning_time: Number(task.cleaning_time || 0),
+          base_cleaning_time: task.base_cleaning_time != null ? Number(task.base_cleaning_time) : Number(task.cleaning_time || 0),
           checkin_date: task.checkin_date || null,
           checkout_date: task.checkout_date || null,
           checkin_time: task.checkin_time || null,
@@ -355,7 +358,7 @@ export class PgDailyAssignmentsService {
           INSERT INTO daily_assignments_current (
             work_date, cleaner_id, cleaner_name, cleaner_lastname, cleaner_role, cleaner_premium, cleaner_start_time,
             task_id, logistic_code, client_id,
-            premium, address, lat, lng, cleaning_time,
+            premium, address, lat, lng, cleaning_time, base_cleaning_time,
             checkin_date, checkout_date, checkin_time, checkout_time,
             pax_in, pax_out, small_equipment, operation_id, confirmed_operation, straordinaria,
             type_apt, alias, customer_name, customer_reference, reasons, priority,
@@ -363,11 +366,11 @@ export class PgDailyAssignmentsService {
           ) VALUES (
             $1, $2, $3, $4, $5, $6, $7,
             $8, $9, $10,
-            $11, $12, $13, $14, $15,
-            $16, $17, $18, $19,
-            $20, $21, $22, $23, $24, $25,
-            $26, $27, $28, $29, $30, $31,
-            $32, $33, $34, $35, $36
+            $11, $12, $13, $14, $15, $16,
+            $17, $18, $19, $20,
+            $21, $22, $23, $24, $25, $26,
+            $27, $28, $29, $30, $31, $32,
+            $33, $34, $35, $36, $37
           )
         `, [
           row.work_date,
@@ -385,6 +388,7 @@ export class PgDailyAssignmentsService {
           row.lat,
           row.lng,
           row.cleaning_time,
+          row.base_cleaning_time,
           row.checkin_date,
           row.checkout_date,
           row.checkin_time ? row.checkin_time.substring(0, 5) : null,
@@ -460,6 +464,9 @@ export class PgDailyAssignmentsService {
         return null;
       }
 
+      // Load collaborations map for this work_date
+      const collaborationsMap = await taskCollaborationService.getCollaborationsMap(workDate);
+
       // Group rows by cleaner_id
       const cleanerMap = new Map<number, { cleaner: any; tasks: any[] }>();
 
@@ -490,7 +497,39 @@ export class PgDailyAssignmentsService {
         if (row.address) task.address = row.address;
         if (row.lat !== null) task.lat = parseFloat(String(row.lat));
         if (row.lng !== null) task.lng = parseFloat(String(row.lng));
-        if (row.cleaning_time) task.cleaning_time = row.cleaning_time;
+        
+        // Get collaboration info
+        const collaboration = collaborationsMap.get(row.task_id);
+        const hasCollaborators = collaboration && collaboration.count > 1;
+        
+        // Calculate base_cleaning_time (original duration before collaboration split)
+        // If base_cleaning_time is null and there are collaborators, assume cleaning_time 
+        // is already the effective time and we need to reconstruct the base
+        let baseTime: number;
+        if (row.base_cleaning_time != null) {
+          baseTime = row.base_cleaning_time;
+        } else if (hasCollaborators) {
+          // Reconstruct: base = effective * count (for legacy data without base_cleaning_time)
+          baseTime = row.cleaning_time * collaboration!.count;
+        } else {
+          baseTime = row.cleaning_time;
+        }
+        task.base_cleaning_time = baseTime;
+        
+        // Calculate effective cleaning time
+        if (hasCollaborators) {
+          // Multiple collaborators: divide time proportionally
+          task.cleaning_time = Math.ceil(baseTime / collaboration!.count);
+          task.collaborator_ids = collaboration!.cleanerIds;
+          task.collaborator_count = collaboration!.count;
+          if (collaboration!.primaryCleanerId !== null) {
+            task.is_primary = row.cleaner_id === collaboration!.primaryCleanerId;
+          }
+        } else {
+          // No collaboration: use base time as-is
+          task.cleaning_time = baseTime;
+        }
+        
         if (row.checkin_date) task.checkin_date = row.checkin_date;
         if (row.checkout_date) task.checkout_date = row.checkout_date;
         if (row.checkin_time) task.checkin_time = row.checkin_time.substring(0, 5);
@@ -639,7 +678,7 @@ export class PgDailyAssignmentsService {
           INSERT INTO daily_assignments_history (
             work_date, revision, cleaner_id, cleaner_name, cleaner_lastname, cleaner_role, cleaner_premium, cleaner_start_time,
             task_id, logistic_code, client_id,
-            premium, address, lat, lng, cleaning_time,
+            premium, address, lat, lng, cleaning_time, base_cleaning_time,
             checkin_date, checkout_date, checkin_time, checkout_time,
             pax_in, pax_out, small_equipment, operation_id, confirmed_operation, straordinaria,
             type_apt, alias, customer_name, customer_reference, reasons, priority,
@@ -647,11 +686,11 @@ export class PgDailyAssignmentsService {
           ) VALUES (
             $1, $2, $3, $4, $5, $6, $7, $8,
             $9, $10, $11,
-            $12, $13, $14, $15, $16,
-            $17, $18, $19, $20,
-            $21, $22, $23, $24, $25, $26,
-            $27, $28, $29, $30, $31, $32,
-            $33, $34, $35, $36, $37, $38
+            $12, $13, $14, $15, $16, $17,
+            $18, $19, $20, $21,
+            $22, $23, $24, $25, $26, $27,
+            $28, $29, $30, $31, $32, $33,
+            $34, $35, $36, $37, $38, $39
           )
         `, [
           row.work_date,
@@ -670,6 +709,7 @@ export class PgDailyAssignmentsService {
           row.lat,
           row.lng,
           row.cleaning_time,
+          row.base_cleaning_time,
           row.checkin_date,
           row.checkout_date,
           row.checkin_time,
