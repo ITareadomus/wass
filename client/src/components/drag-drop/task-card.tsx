@@ -200,7 +200,7 @@ export default function TaskCard({
       return response.json();
     },
     staleTime: 30000,
-    enabled: isInTimeline && isModalOpen,
+    enabled: isModalOpen, // Abilitato sia per timeline che per containers
   });
 
   const operationNames: Record<number, string> = operationsData?.active_operations?.reduce(
@@ -368,6 +368,79 @@ export default function TaskCard({
     }
   };
 
+  // Handler per assegnazione bulk da containers (Caso B)
+  const handleBulkAssign = async () => {
+    if (selectedBulkCleanerIds.length === 0) return;
+    
+    const workDate = localStorage.getItem('selected_work_date') || new Date().toISOString().split('T')[0];
+    const taskId = (task as any).task_id || task.id;
+    
+    setIsBulkAssignLoading(true);
+    
+    try {
+      const response = await fetch(`/api/tasks/${taskId}/collaborators/assign`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          date: workDate,
+          cleanerIds: selectedBulkCleanerIds,
+        }),
+      });
+      
+      const data = await response.json();
+      
+      if (response.status === 409) {
+        // Collisione oraria
+        toast({
+          title: "Collisione oraria",
+          description: data.message || "Uno o più cleaners hanno task che si sovrappongono",
+          variant: "destructive",
+        });
+        return;
+      }
+      
+      if (!response.ok) {
+        throw new Error(data.error || "Errore nell'assegnazione");
+      }
+      
+      toast({
+        title: "Task assegnata",
+        description: `${data.collaboratorCount} cleaners assegnati (${data.effectiveCleaningTime}min ciascuno)`,
+      });
+      
+      // Reset stato
+      setIsBulkAssignMode(false);
+      setSelectedBulkCleanerIds([]);
+      
+      // Ricarica timeline e containers
+      if ((window as any).reloadAllTasks) {
+        await (window as any).reloadAllTasks();
+      }
+      
+      // Chiudi il modale
+      setIsModalOpen(false);
+      
+    } catch (error: any) {
+      console.error('Errore nell\'assegnazione bulk:', error);
+      toast({
+        title: "Errore",
+        description: error.message || "Impossibile assegnare la task",
+        variant: "destructive",
+      });
+    } finally {
+      setIsBulkAssignLoading(false);
+    }
+  };
+
+  // Toggle selezione cleaner nel bulk
+  const toggleBulkCleaner = (cleanerId: number) => {
+    setSelectedBulkCleanerIds(prev => 
+      prev.includes(cleanerId)
+        ? prev.filter(id => id !== cleanerId)
+        : [...prev, cleanerId]
+    );
+  };
+
   // Handler per aggiungere un collaboratore alla task
   const handleAddCollaborator = async () => {
     if (!selectedCollaboratorId) return;
@@ -443,10 +516,15 @@ export default function TaskCard({
   const [editedOperationId, setEditedOperationId] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   
-  // Stato per gestione collaboratori
+  // Stato per gestione collaboratori (timeline - Caso A: aggiungi a task esistente)
   const [isAddingCollaborator, setIsAddingCollaborator] = useState(false);
   const [selectedCollaboratorId, setSelectedCollaboratorId] = useState<string>("");
   const [isAddingCollaboratorLoading, setIsAddingCollaboratorLoading] = useState(false);
+  
+  // Stato per assegnazione bulk collaboratori (containers - Caso B: assegna task con N cleaners)
+  const [isBulkAssignMode, setIsBulkAssignMode] = useState(false);
+  const [selectedBulkCleanerIds, setSelectedBulkCleanerIds] = useState<number[]>([]);
+  const [isBulkAssignLoading, setIsBulkAssignLoading] = useState(false);
   
   // Stato per forzare re-render quando pending edits cambiano
   const [pendingEditsVersion, setPendingEditsVersion] = useState(0);
@@ -1651,6 +1729,122 @@ export default function TaskCard({
                         onClick={() => {
                           setIsAddingCollaborator(false);
                           setSelectedCollaboratorId("");
+                        }}
+                      >
+                        Annulla
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Settima-bis riga: Assegnazione Collaboratori Bulk - solo nei container */}
+            {!isInTimeline && !isReadOnly && (
+              <div className="pt-3 border-t mt-3">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <Users className="w-4 h-4 text-purple-600" />
+                    <span className="text-sm font-semibold text-muted-foreground">
+                      Assegna con collaboratori
+                    </span>
+                  </div>
+                  {!isBulkAssignMode && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setIsBulkAssignMode(true)}
+                      className="flex items-center gap-1"
+                      disabled={isLocked}
+                    >
+                      <UserPlus className="w-3 h-3" />
+                      Seleziona cleaners
+                    </Button>
+                  )}
+                </div>
+                
+                {isLocked && !isBulkAssignMode && (
+                  <p className="text-xs text-muted-foreground">
+                    Sblocca la task per assegnarla
+                  </p>
+                )}
+                
+                {/* Form per assegnazione bulk */}
+                {isBulkAssignMode && (
+                  <div className="space-y-3 p-3 border rounded bg-muted/30">
+                    <div>
+                      <label className="text-xs font-medium mb-2 block">
+                        Seleziona i cleaners da assegnare:
+                      </label>
+                      <div className="max-h-40 overflow-y-auto space-y-1 p-2 border rounded bg-background">
+                        {(selectedCleanersData?.cleaners || []).length === 0 ? (
+                          <p className="text-xs text-muted-foreground py-2 text-center">
+                            Nessun cleaner disponibile per questa data
+                          </p>
+                        ) : (
+                          (selectedCleanersData?.cleaners || []).map((cleaner) => (
+                            <label 
+                              key={cleaner.cleaner_id}
+                              className={cn(
+                                "flex items-center gap-2 p-2 rounded cursor-pointer hover:bg-muted transition-colors",
+                                selectedBulkCleanerIds.includes(cleaner.cleaner_id) && "bg-purple-100 dark:bg-purple-900/30"
+                              )}
+                            >
+                              <Checkbox
+                                checked={selectedBulkCleanerIds.includes(cleaner.cleaner_id)}
+                                onCheckedChange={(checked) => {
+                                  if (checked) {
+                                    setSelectedBulkCleanerIds(prev => [...prev, cleaner.cleaner_id]);
+                                  } else {
+                                    setSelectedBulkCleanerIds(prev => prev.filter(id => id !== cleaner.cleaner_id));
+                                  }
+                                }}
+                              />
+                              <span className="text-sm">{cleaner.name}</span>
+                            </label>
+                          ))
+                        )}
+                      </div>
+                    </div>
+                    
+                    {/* Preview della durata */}
+                    {selectedBulkCleanerIds.length > 0 && (
+                      <div className="text-xs p-2 bg-green-50 dark:bg-green-900/20 rounded border border-green-200 dark:border-green-800">
+                        <p className="font-medium text-green-700 dark:text-green-300">
+                          Preview durata:
+                        </p>
+                        <p className="text-green-600 dark:text-green-400">
+                          {(() => {
+                            // Calcola la durata base dalla task
+                            const durationStr = displayTask.duration || "0.0";
+                            const [h, m] = durationStr.split('.').map(Number);
+                            const baseTime = (h || 0) * 60 + (m || 0);
+                            
+                            const cleanerCount = selectedBulkCleanerIds.length;
+                            const newDuration = Math.ceil(baseTime / cleanerCount);
+                            const hours = Math.floor(newDuration / 60);
+                            const mins = newDuration % 60;
+                            return `${hours}:${String(mins).padStart(2, '0')} ore per cleaner (${cleanerCount} collaborator${cleanerCount > 1 ? 'i' : 'e'})`;
+                          })()}
+                        </p>
+                      </div>
+                    )}
+                    
+                    <div className="flex gap-2">
+                      <Button
+                        onClick={handleBulkAssign}
+                        disabled={selectedBulkCleanerIds.length === 0 || isBulkAssignLoading}
+                        size="sm"
+                        className="flex-1"
+                      >
+                        {isBulkAssignLoading ? "Assegnazione..." : `Assegna a ${selectedBulkCleanerIds.length} cleaner${selectedBulkCleanerIds.length !== 1 ? 's' : ''}`}
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setIsBulkAssignMode(false);
+                          setSelectedBulkCleanerIds([]);
                         }}
                       >
                         Annulla
