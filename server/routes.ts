@@ -2820,6 +2820,594 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ==================== TASK COLLABORATION ENDPOINTS ====================
+
+  // GET /api/tasks/:taskId/collaborators - Info collaborazione per UI
+  app.get("/api/tasks/:taskId/collaborators", async (req, res) => {
+    try {
+      const taskId = parseInt(req.params.taskId, 10);
+      const workDate = (req.query.date as string) || format(new Date(), "yyyy-MM-dd");
+
+      if (isNaN(taskId)) {
+        return res.status(400).json({ success: false, error: "taskId deve essere un numero" });
+      }
+
+      const { taskCollaborationService } = await import("./services/pg-task-collaboration-service");
+      const collaboration = await taskCollaborationService.getCollaboration(workDate, taskId);
+
+      res.json({
+        success: true,
+        workDate,
+        taskId,
+        cleanerIds: collaboration.cleanerIds,
+        primaryCleanerId: collaboration.primaryCleanerId,
+        count: collaboration.count
+      });
+    } catch (error: any) {
+      console.error("Errore nel caricamento collaborazione:", error);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  // POST /api/tasks/:taskId/collaborators/add - Caso A: aggiungi collaboratore a task esistente
+  app.post("/api/tasks/:taskId/collaborators/add", async (req, res) => {
+    try {
+      const taskId = parseInt(req.params.taskId, 10);
+      const { date, cleanerId } = req.body;
+      const workDate = date || format(new Date(), "yyyy-MM-dd");
+
+      if (isNaN(taskId)) {
+        return res.status(400).json({ success: false, error: "taskId deve essere un numero" });
+      }
+      if (!cleanerId || isNaN(Number(cleanerId))) {
+        return res.status(400).json({ success: false, error: "cleanerId richiesto e deve essere un numero" });
+      }
+
+      const { query } = await import("../shared/pg-db");
+      const pool = (await import("../shared/pg-db")).default;
+      const { taskCollaborationService } = await import("./services/pg-task-collaboration-service");
+      const { recomputeSchedule, validateOverlap } = await import("./schedule/recompute");
+
+      const client = await pool.connect();
+
+      try {
+        await client.query('BEGIN');
+
+        // 1. Verifica che il task esista già in timeline
+        const existingTask = await client.query(
+          `SELECT * FROM daily_assignments_current 
+           WHERE work_date = $1 AND task_id = $2 
+           ORDER BY cleaner_id LIMIT 1`,
+          [workDate, taskId]
+        );
+
+        if (existingTask.rows.length === 0) {
+          await client.query('ROLLBACK');
+          return res.status(404).json({ 
+            success: false, 
+            error: "Task non trovato in timeline. Usa /assign per assegnare da containers." 
+          });
+        }
+
+        const originalRow = existingTask.rows[0];
+        const baseCleaningTime = originalRow.base_cleaning_time || originalRow.cleaning_time;
+
+        // 2. Identifica il primary cleaner
+        const existingCollaboration = await taskCollaborationService.getCollaboration(workDate, taskId);
+        const primaryCleanerId: number = existingCollaboration.primaryCleanerId ?? originalRow.cleaner_id;
+
+        // 3. Verifica che il nuovo cleaner non sia già un collaboratore
+        if (existingCollaboration.cleanerIds.includes(Number(cleanerId))) {
+          await client.query('ROLLBACK');
+          return res.status(400).json({ 
+            success: false, 
+            error: "Il cleaner è già un collaboratore di questa task" 
+          });
+        }
+
+        // 4. Inserisci in task_collaborators
+        // Prima il primary (se non esiste già)
+        if (!existingCollaboration.cleanerIds.includes(primaryCleanerId)) {
+          await client.query(
+            `INSERT INTO task_collaborators (work_date, task_id, cleaner_id, is_primary)
+             VALUES ($1, $2, $3, true)
+             ON CONFLICT (work_date, task_id, cleaner_id) DO UPDATE SET is_primary = true`,
+            [workDate, taskId, primaryCleanerId]
+          );
+        }
+
+        // Poi il nuovo collaboratore
+        await client.query(
+          `INSERT INTO task_collaborators (work_date, task_id, cleaner_id, is_primary)
+           VALUES ($1, $2, $3, false)
+           ON CONFLICT (work_date, task_id, cleaner_id) DO NOTHING`,
+          [workDate, taskId, Number(cleanerId)]
+        );
+
+        // 5. Ri-query count reale dopo tutti gli inserimenti
+        const countResult = await client.query(
+          `SELECT COUNT(*)::int as count FROM task_collaborators 
+           WHERE work_date = $1 AND task_id = $2`,
+          [workDate, taskId]
+        );
+        const newCollabCount = countResult.rows[0].count;
+        const effectiveCleaningTime = Math.ceil(baseCleaningTime / newCollabCount);
+
+        // 6. Trova sequence per il nuovo cleaner (append in coda)
+        const maxSeqResult = await client.query(
+          `SELECT COALESCE(MAX(sequence), 0) as max_seq 
+           FROM daily_assignments_current 
+           WHERE work_date = $1 AND cleaner_id = $2`,
+          [workDate, Number(cleanerId)]
+        );
+        const newSequence = maxSeqResult.rows[0].max_seq + 1;
+
+        // 7. Crea la riga di assegnazione per il nuovo cleaner
+        await client.query(`
+          INSERT INTO daily_assignments_current (
+            work_date, cleaner_id, task_id, logistic_code, client_id,
+            premium, address, lat, lng, cleaning_time, base_cleaning_time,
+            checkin_date, checkout_date, checkin_time, checkout_time,
+            pax_in, pax_out, small_equipment, operation_id, confirmed_operation, straordinaria,
+            type_apt, alias, customer_name, customer_reference, reasons, priority,
+            start_time, end_time, followup, sequence, travel_time
+          )
+          SELECT 
+            $1, $2, task_id, logistic_code, client_id,
+            premium, address, lat, lng, $3, $4,
+            checkin_date, checkout_date, checkin_time, checkout_time,
+            pax_in, pax_out, small_equipment, operation_id, confirmed_operation, straordinaria,
+            type_apt, alias, customer_name, customer_reference, reasons, priority,
+            NULL, NULL, followup, $5, 0
+          FROM daily_assignments_current
+          WHERE work_date = $1 AND task_id = $6 
+          LIMIT 1
+        `, [workDate, Number(cleanerId), effectiveCleaningTime, baseCleaningTime, newSequence, taskId]);
+
+        // 8. Aggiorna cleaning_time per tutti i collaboratori esistenti
+        await client.query(
+          `UPDATE daily_assignments_current 
+           SET cleaning_time = $1, base_cleaning_time = $2
+           WHERE work_date = $3 AND task_id = $4`,
+          [effectiveCleaningTime, baseCleaningTime, workDate, taskId]
+        );
+
+        // 9. Ricalcola orari per tutti i cleaners coinvolti
+        // Ri-query i collaboratori dal DB per includere anche il primary appena inserito
+        const collabResult = await client.query(
+          `SELECT cleaner_id FROM task_collaborators WHERE work_date = $1 AND task_id = $2`,
+          [workDate, taskId]
+        );
+        const allCollaboratorIds = collabResult.rows.map((r: any) => r.cleaner_id);
+        const overlaps: any[] = [];
+
+        for (const cId of allCollaboratorIds) {
+          // Carica tutti i task del cleaner
+          const tasksResult = await client.query(
+            `SELECT task_id as "taskId", logistic_code as "logisticCode", cleaner_id as "cleanerId",
+                    sequence, cleaning_time as "cleaningTime", address, lat, lng,
+                    start_time as "startTime", end_time as "endTime", travel_time as "travelTime"
+             FROM daily_assignments_current
+             WHERE work_date = $1 AND cleaner_id = $2
+             ORDER BY sequence`,
+            [workDate, cId]
+          );
+
+          if (tasksResult.rows.length === 0) continue;
+
+          // Ottieni start_time del cleaner
+          const cleanerStartTime = await getCleanerStartTime(cId, workDate) || '10:00';
+
+          // Ricalcola
+          const recalculated = await recomputeSchedule(tasksResult.rows, cleanerStartTime, workDate);
+
+          // Valida overlap
+          const overlapCheck = validateOverlap(recalculated.map(t => ({
+            taskId: String(t.taskId),
+            startTime: t.startTime,
+            endTime: t.endTime
+          })), cId);
+
+          if (overlapCheck.hasOverlap) {
+            overlaps.push(overlapCheck);
+          }
+
+          // Aggiorna gli orari nel DB
+          for (const task of recalculated) {
+            await client.query(
+              `UPDATE daily_assignments_current 
+               SET start_time = $1, end_time = $2, travel_time = $3
+               WHERE work_date = $4 AND cleaner_id = $5 AND task_id = $6`,
+              [task.startTime, task.endTime, task.travelTime, workDate, cId, task.taskId]
+            );
+          }
+        }
+
+        // 10. Se ci sono overlap, rollback e restituisci 409
+        if (overlaps.length > 0) {
+          await client.query('ROLLBACK');
+          return res.status(409).json({
+            success: false,
+            error: "Collisione oraria rilevata",
+            overlaps
+          });
+        }
+
+        await client.query('COMMIT');
+
+        console.log(`✅ Collaboratore ${cleanerId} aggiunto a task ${taskId} (${newCollabCount} totali, ${effectiveCleaningTime}min ciascuno)`);
+        res.json({
+          success: true,
+          taskId,
+          cleanerId: Number(cleanerId),
+          collaboratorCount: newCollabCount,
+          effectiveCleaningTime,
+          baseCleaningTime,
+          primaryCleanerId
+        });
+
+      } catch (error: any) {
+        await client.query('ROLLBACK');
+        throw error;
+      } finally {
+        client.release();
+      }
+
+    } catch (error: any) {
+      console.error("Errore nell'aggiunta collaboratore:", error);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  // POST /api/tasks/:taskId/collaborators/assign - Caso B: assegna N collaboratori da containers
+  app.post("/api/tasks/:taskId/collaborators/assign", async (req, res) => {
+    try {
+      const taskId = parseInt(req.params.taskId, 10);
+      const { date, cleanerIds } = req.body;
+      const workDate = date || format(new Date(), "yyyy-MM-dd");
+
+      if (isNaN(taskId)) {
+        return res.status(400).json({ success: false, error: "taskId deve essere un numero" });
+      }
+      if (!cleanerIds || !Array.isArray(cleanerIds) || cleanerIds.length === 0) {
+        return res.status(400).json({ success: false, error: "cleanerIds array richiesto" });
+      }
+
+      const pool = (await import("../shared/pg-db")).default;
+      const { recomputeSchedule, validateOverlap } = await import("./schedule/recompute");
+
+      const client = await pool.connect();
+
+      try {
+        await client.query('BEGIN');
+
+        // 1. Verifica che il task NON sia già in timeline
+        const existingTask = await client.query(
+          `SELECT 1 FROM daily_assignments_current 
+           WHERE work_date = $1 AND task_id = $2 LIMIT 1`,
+          [workDate, taskId]
+        );
+
+        if (existingTask.rows.length > 0) {
+          await client.query('ROLLBACK');
+          return res.status(400).json({ 
+            success: false, 
+            error: "Task già presente in timeline. Usa /add per aggiungere collaboratori." 
+          });
+        }
+
+        // 2. Carica il task dai containers
+        const containerTask = await client.query(
+          `SELECT * FROM daily_containers 
+           WHERE work_date = $1 AND task_id = $2 LIMIT 1`,
+          [workDate, taskId]
+        );
+
+        if (containerTask.rows.length === 0) {
+          await client.query('ROLLBACK');
+          return res.status(404).json({ success: false, error: "Task non trovato nei containers" });
+        }
+
+        const sourceTask = containerTask.rows[0];
+        const baseCleaningTime = sourceTask.cleaning_time || 60;
+        const collaboratorCount = cleanerIds.length;
+        const effectiveCleaningTime = Math.ceil(baseCleaningTime / collaboratorCount);
+
+        // 3. Inserisci pivot per ogni cleaner (nessuno è primary per ora)
+        for (const cId of cleanerIds) {
+          await client.query(
+            `INSERT INTO task_collaborators (work_date, task_id, cleaner_id, is_primary)
+             VALUES ($1, $2, $3, false)
+             ON CONFLICT (work_date, task_id, cleaner_id) DO NOTHING`,
+            [workDate, taskId, Number(cId)]
+          );
+        }
+
+        // 4. Crea N righe in daily_assignments_current (una per cleaner)
+        const overlaps: any[] = [];
+
+        for (const cId of cleanerIds) {
+          // Trova sequence per il cleaner (append in coda)
+          const maxSeqResult = await client.query(
+            `SELECT COALESCE(MAX(sequence), 0) as max_seq 
+             FROM daily_assignments_current 
+             WHERE work_date = $1 AND cleaner_id = $2`,
+            [workDate, Number(cId)]
+          );
+          const newSequence = maxSeqResult.rows[0].max_seq + 1;
+
+          // Inserisci la riga
+          await client.query(`
+            INSERT INTO daily_assignments_current (
+              work_date, cleaner_id, task_id, logistic_code, client_id,
+              premium, address, lat, lng, cleaning_time, base_cleaning_time,
+              checkin_date, checkout_date, checkin_time, checkout_time,
+              pax_in, pax_out, small_equipment, operation_id, confirmed_operation, straordinaria,
+              type_apt, alias, customer_name, customer_reference, reasons, priority,
+              start_time, end_time, followup, sequence, travel_time
+            ) VALUES (
+              $1, $2, $3, $4, $5,
+              $6, $7, $8, $9, $10, $11,
+              $12, $13, $14, $15,
+              $16, $17, $18, $19, $20, $21,
+              $22, $23, $24, $25, $26, $27,
+              NULL, NULL, $28, $29, 0
+            )
+          `, [
+            workDate, Number(cId), taskId, sourceTask.logistic_code, sourceTask.client_id,
+            sourceTask.premium, sourceTask.address, sourceTask.lat, sourceTask.lng, 
+            effectiveCleaningTime, baseCleaningTime,
+            sourceTask.checkin_date, sourceTask.checkout_date, sourceTask.checkin_time, sourceTask.checkout_time,
+            sourceTask.pax_in, sourceTask.pax_out, sourceTask.small_equipment, 
+            sourceTask.operation_id, sourceTask.confirmed_operation, sourceTask.straordinaria,
+            sourceTask.type_apt, sourceTask.alias, sourceTask.customer_name, sourceTask.customer_reference,
+            sourceTask.reasons || [], sourceTask.priority,
+            sourceTask.followup, newSequence
+          ]);
+        }
+
+        // 5. Ricalcola orari per ogni cleaner e valida overlap
+        for (const cId of cleanerIds) {
+          const tasksResult = await client.query(
+            `SELECT task_id as "taskId", logistic_code as "logisticCode", cleaner_id as "cleanerId",
+                    sequence, cleaning_time as "cleaningTime", address, lat, lng,
+                    start_time as "startTime", end_time as "endTime", travel_time as "travelTime"
+             FROM daily_assignments_current
+             WHERE work_date = $1 AND cleaner_id = $2
+             ORDER BY sequence`,
+            [workDate, Number(cId)]
+          );
+
+          if (tasksResult.rows.length === 0) continue;
+
+          const cleanerStartTime = await getCleanerStartTime(Number(cId), workDate) || '10:00';
+          const recalculated = await recomputeSchedule(tasksResult.rows, cleanerStartTime, workDate);
+
+          const overlapCheck = validateOverlap(recalculated.map(t => ({
+            taskId: String(t.taskId),
+            startTime: t.startTime,
+            endTime: t.endTime
+          })), Number(cId));
+
+          if (overlapCheck.hasOverlap) {
+            overlaps.push(overlapCheck);
+          }
+
+          for (const task of recalculated) {
+            await client.query(
+              `UPDATE daily_assignments_current 
+               SET start_time = $1, end_time = $2, travel_time = $3
+               WHERE work_date = $4 AND cleaner_id = $5 AND task_id = $6`,
+              [task.startTime, task.endTime, task.travelTime, workDate, Number(cId), task.taskId]
+            );
+          }
+        }
+
+        // 6. Se ci sono overlap, rollback e restituisci 409
+        if (overlaps.length > 0) {
+          await client.query('ROLLBACK');
+          return res.status(409).json({
+            success: false,
+            error: "Collisione oraria rilevata",
+            overlaps
+          });
+        }
+
+        // 7. Rimuovi il task dai containers
+        await client.query(
+          `DELETE FROM daily_containers WHERE work_date = $1 AND task_id = $2`,
+          [workDate, taskId]
+        );
+
+        await client.query('COMMIT');
+
+        console.log(`✅ Task ${taskId} assegnato a ${collaboratorCount} cleaners (${effectiveCleaningTime}min ciascuno)`);
+        res.json({
+          success: true,
+          taskId,
+          cleanerIds: cleanerIds.map(Number),
+          collaboratorCount,
+          effectiveCleaningTime,
+          baseCleaningTime
+        });
+
+      } catch (error: any) {
+        await client.query('ROLLBACK');
+        throw error;
+      } finally {
+        client.release();
+      }
+
+    } catch (error: any) {
+      console.error("Errore nell'assegnazione collaboratori:", error);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  // POST /api/tasks/:taskId/collaborators/remove - Rimuovi collaboratore
+  app.post("/api/tasks/:taskId/collaborators/remove", async (req, res) => {
+    try {
+      const taskId = parseInt(req.params.taskId, 10);
+      const { date, cleanerId } = req.body;
+      const workDate = date || format(new Date(), "yyyy-MM-dd");
+
+      if (isNaN(taskId)) {
+        return res.status(400).json({ success: false, error: "taskId deve essere un numero" });
+      }
+      if (!cleanerId || isNaN(Number(cleanerId))) {
+        return res.status(400).json({ success: false, error: "cleanerId richiesto" });
+      }
+
+      const pool = (await import("../shared/pg-db")).default;
+      const { taskCollaborationService } = await import("./services/pg-task-collaboration-service");
+      const { recomputeSchedule, validateOverlap } = await import("./schedule/recompute");
+
+      const client = await pool.connect();
+
+      try {
+        await client.query('BEGIN');
+
+        // 1. Verifica collaborazione esistente
+        const existingCollaboration = await taskCollaborationService.getCollaboration(workDate, taskId);
+
+        if (!existingCollaboration.cleanerIds.includes(Number(cleanerId))) {
+          await client.query('ROLLBACK');
+          return res.status(404).json({ 
+            success: false, 
+            error: "Il cleaner non è un collaboratore di questa task" 
+          });
+        }
+
+        // 2. Ottieni base_cleaning_time dalla riga esistente
+        const existingRow = await client.query(
+          `SELECT base_cleaning_time, cleaning_time FROM daily_assignments_current 
+           WHERE work_date = $1 AND task_id = $2 LIMIT 1`,
+          [workDate, taskId]
+        );
+        const baseCleaningTime = existingRow.rows[0]?.base_cleaning_time || existingRow.rows[0]?.cleaning_time || 60;
+
+        // 3. Rimuovi il pivot
+        await client.query(
+          `DELETE FROM task_collaborators 
+           WHERE work_date = $1 AND task_id = $2 AND cleaner_id = $3`,
+          [workDate, taskId, Number(cleanerId)]
+        );
+
+        // 4. Rimuovi la riga dalla timeline
+        await client.query(
+          `DELETE FROM daily_assignments_current 
+           WHERE work_date = $1 AND task_id = $2 AND cleaner_id = $3`,
+          [workDate, taskId, Number(cleanerId)]
+        );
+
+        // 5. Conta collaboratori rimanenti
+        const remainingResult = await client.query(
+          `SELECT cleaner_id FROM task_collaborators 
+           WHERE work_date = $1 AND task_id = $2`,
+          [workDate, taskId]
+        );
+        const remainingCount = remainingResult.rows.length;
+        const remainingCleanerIds = remainingResult.rows.map((r: any) => r.cleaner_id);
+
+        // 6. Se rimane 1 solo cleaner, elimina pivot (non più collaborativo)
+        if (remainingCount === 1) {
+          await client.query(
+            `DELETE FROM task_collaborators WHERE work_date = $1 AND task_id = $2`,
+            [workDate, taskId]
+          );
+          // Aggiorna cleaning_time al valore base
+          await client.query(
+            `UPDATE daily_assignments_current 
+             SET cleaning_time = base_cleaning_time
+             WHERE work_date = $1 AND task_id = $2`,
+            [workDate, taskId]
+          );
+        } else if (remainingCount > 1) {
+          // Ricalcola durata effettiva per i rimanenti
+          const newEffectiveTime = Math.ceil(baseCleaningTime / remainingCount);
+          await client.query(
+            `UPDATE daily_assignments_current 
+             SET cleaning_time = $1
+             WHERE work_date = $2 AND task_id = $3`,
+            [newEffectiveTime, workDate, taskId]
+          );
+        }
+
+        // 7. Ricalcola orari per i cleaners rimanenti + quello rimosso
+        const allAffectedCleaners = [...remainingCleanerIds, Number(cleanerId)];
+        const overlaps: any[] = [];
+
+        for (const cId of allAffectedCleaners) {
+          const tasksResult = await client.query(
+            `SELECT task_id as "taskId", logistic_code as "logisticCode", cleaner_id as "cleanerId",
+                    sequence, cleaning_time as "cleaningTime", address, lat, lng,
+                    start_time as "startTime", end_time as "endTime", travel_time as "travelTime"
+             FROM daily_assignments_current
+             WHERE work_date = $1 AND cleaner_id = $2
+             ORDER BY sequence`,
+            [workDate, cId]
+          );
+
+          if (tasksResult.rows.length === 0) continue;
+
+          const cleanerStartTime = await getCleanerStartTime(cId, workDate) || '10:00';
+          const recalculated = await recomputeSchedule(tasksResult.rows, cleanerStartTime, workDate);
+
+          const overlapCheck = validateOverlap(recalculated.map(t => ({
+            taskId: String(t.taskId),
+            startTime: t.startTime,
+            endTime: t.endTime
+          })), cId);
+
+          if (overlapCheck.hasOverlap) {
+            overlaps.push(overlapCheck);
+          }
+
+          for (const task of recalculated) {
+            await client.query(
+              `UPDATE daily_assignments_current 
+               SET start_time = $1, end_time = $2, travel_time = $3
+               WHERE work_date = $4 AND cleaner_id = $5 AND task_id = $6`,
+              [task.startTime, task.endTime, task.travelTime, workDate, cId, task.taskId]
+            );
+          }
+        }
+
+        // 8. Se overlap sui rimanenti, rollback (nota: non dovrebbe succedere rimuovendo)
+        if (overlaps.length > 0) {
+          await client.query('ROLLBACK');
+          return res.status(409).json({
+            success: false,
+            error: "Collisione oraria rilevata dopo rimozione",
+            overlaps
+          });
+        }
+
+        await client.query('COMMIT');
+
+        console.log(`✅ Collaboratore ${cleanerId} rimosso da task ${taskId} (${remainingCount} rimanenti)`);
+        res.json({
+          success: true,
+          taskId,
+          removedCleanerId: Number(cleanerId),
+          remainingCount,
+          remainingCleanerIds,
+          isCollaborative: remainingCount > 1
+        });
+
+      } catch (error: any) {
+        await client.query('ROLLBACK');
+        throw error;
+      } finally {
+        client.release();
+      }
+
+    } catch (error: any) {
+      console.error("Errore nella rimozione collaboratore:", error);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
   // Endpoint per aggiornare i dettagli di una task (checkout, checkin, durata)
   // skipAdam: se true, aggiorna SOLO PostgreSQL e non propaga su ADAM
   // Supporta sia aggiornamenti singoli che batch (array di updates)

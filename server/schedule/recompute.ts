@@ -101,3 +101,67 @@ export function isValidTimeFormat(time?: string): boolean {
   if (!time) return false;
   return /^\d{2}:\d{2}$/.test(time);
 }
+
+/**
+ * Converte HH:mm in minuti dal mezzanotte
+ */
+function timeToMinutes(time: string): number {
+  const [hours, mins] = time.split(':').map(Number);
+  return hours * 60 + mins;
+}
+
+/**
+ * Rappresenta una collisione oraria tra task
+ */
+export interface OverlapInfo {
+  hasOverlap: boolean;
+  cleanerId?: number;
+  task1?: { taskId: string; startTime: string; endTime: string };
+  task2?: { taskId: string; startTime: string; endTime: string };
+  message?: string;
+}
+
+/**
+ * Valida che non ci siano sovrapposizioni orarie tra i task di un cleaner
+ * I task devono essere già ordinati per sequence e con orari calcolati
+ */
+export function validateOverlap(
+  tasks: Array<{ taskId: string; startTime?: string; endTime?: string }>,
+  cleanerId: number
+): OverlapInfo {
+  if (tasks.length < 2) {
+    return { hasOverlap: false };
+  }
+
+  // Filtra task con orari validi
+  const validTasks = tasks.filter(t => t.startTime && t.endTime);
+
+  for (let i = 0; i < validTasks.length - 1; i++) {
+    const current = validTasks[i];
+    const next = validTasks[i + 1];
+
+    const currentEnd = timeToMinutes(current.endTime!);
+    const nextStart = timeToMinutes(next.startTime!);
+
+    // Overlap se il task corrente finisce dopo l'inizio del successivo
+    if (currentEnd > nextStart) {
+      return {
+        hasOverlap: true,
+        cleanerId,
+        task1: {
+          taskId: current.taskId,
+          startTime: current.startTime!,
+          endTime: current.endTime!
+        },
+        task2: {
+          taskId: next.taskId,
+          startTime: next.startTime!,
+          endTime: next.endTime!
+        },
+        message: `Cleaner ${cleanerId}: task ${current.taskId} (ends ${current.endTime}) overlaps with task ${next.taskId} (starts ${next.startTime})`
+      };
+    }
+  }
+
+  return { hasOverlap: false };
+}
