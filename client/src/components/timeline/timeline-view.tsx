@@ -1309,7 +1309,7 @@ export default function TimelineView({
         ? rawConfirmed
         : typeof rawConfirmed === "number"
           ? rawConfirmed !== 0
-          : typeof rawConfirmed === "string"
+          : typeof rawConfirmed === "string" && rawConfirmed
             ? ["true", "1", "yes"].includes(rawConfirmed.toLowerCase().trim())
             : false;
 
