@@ -1591,49 +1591,45 @@ export default function TaskCard({
             {/* Settima riga: Gestione Collaboratori - solo per task in timeline */}
             {isInTimeline && (
               <div className="pt-3 border-t mt-3">
-                <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-3 mb-2 flex-wrap">
                   <div className="flex items-center gap-2">
                     <Users className="w-4 h-4 text-purple-600" />
-                    <span className="text-sm font-semibold text-muted-foreground">
+                    <span className="text-sm font-semibold text-muted-foreground whitespace-nowrap">
                       Collaboratori
                     </span>
-                    {(displayTask as any).collaborator_count > 1 && (
-                      <Badge variant="secondary" className="text-xs">
-                        {(displayTask as any).collaborator_count} cleaners
-                      </Badge>
-                    )}
                   </div>
+
+                  {/* Lista collaboratori con alias in linea */}
+                  {taskCollaborators.length > 0 && (
+                    <div className="flex flex-wrap gap-1">
+                      {taskCollaborators.map((collab) => (
+                        <Badge 
+                          key={collab.id} 
+                          variant={collab.isPrimary ? "default" : "secondary"}
+                          className={cn(
+                            "text-[10px] px-1.5 py-0 h-5",
+                            collab.isPrimary && "bg-blue-600 hover:bg-blue-700"
+                          )}
+                        >
+                          {collab.alias}
+                          {collab.isPrimary && <span className="ml-0.5 text-[8px] opacity-80">(P)</span>}
+                        </Badge>
+                      ))}
+                    </div>
+                  )}
+
                   {!isReadOnly && (
                     <Button
                       variant="outline"
                       size="sm"
                       onClick={openAddCollaboratorDialog}
-                      className="flex items-center gap-1"
+                      className="flex items-center gap-1 h-7 text-xs px-2 ml-auto"
                     >
                       <UserPlus className="w-3 h-3" />
-                      Aggiungi collaboratore
+                      Aggiungi
                     </Button>
                   )}
                 </div>
-
-                {/* Lista collaboratori con alias */}
-                {taskCollaborators.length > 0 && (
-                  <div className="flex flex-wrap gap-1.5 mb-3">
-                    {taskCollaborators.map((collab) => (
-                      <Badge 
-                        key={collab.id} 
-                        variant={collab.isPrimary ? "default" : "secondary"}
-                        className={cn(
-                          "text-[11px] px-2 py-0",
-                          collab.isPrimary && "bg-blue-600 hover:bg-blue-700"
-                        )}
-                      >
-                        {collab.alias}
-                        {collab.isPrimary && <span className="ml-1 text-[9px] opacity-80">(P)</span>}
-                      </Badge>
-                    ))}
-                  </div>
-                )}
                 
                 {/* Info collaborazione attuale */}
                 {(displayTask as any).collaborator_count > 1 && (
