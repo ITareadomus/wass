@@ -1161,8 +1161,11 @@ export default function GenerateAssignments() {
 
       dlog("Task convertiti - Early:", initialEarlyOut.length, "High:", initialHigh.length, "Low:", initialLow.length);
 
-      // Costruisci la mappa task_id -> assegnazione dalla timeline
-      const timelineAssignmentsMap = new Map();
+      // Costruisci la mappa task_id -> assegnazioni dalla timeline
+      // NOTA: usare Set per sapere quali task_id sono assegnati (per filtrare containers)
+      // e Map con chiave composita task_id-cleaner_id per tracciare tutte le assegnazioni
+      const assignedTaskIds = new Set<string>();
+      const timelineAssignmentsMap = new Map<string, any>(); // chiave: taskId-cleanerId
       const timelineTasks: Task[] = [];
 
       if (timelineAssignmentsData.cleaners_assignments) {
@@ -1176,20 +1179,24 @@ export default function GenerateAssignments() {
           dlog(`   Cleaner ${cleanerEntry.cleaner.id} (${cleanerEntry.cleaner.name}) ha ${cleanerEntry.tasks?.length || 0} task`);
           for (const task of cleanerEntry.tasks || []) {
             const taskId = String(task.task_id);
+            const cleanerId = cleanerEntry.cleaner.id;
             const taskLC = String(task.logistic_code);
-            dlog(`      → Task ${taskLC} (ID: ${taskId}) assegnata a cleaner ${cleanerEntry.cleaner.id}`);
+            dlog(`      → Task ${taskLC} (ID: ${taskId}) assegnata a cleaner ${cleanerId}`);
 
             const taskWithAssignment = {
               ...task,
               id: task.task_id || task.id,
               name: String(task.logistic_code),
-              assignedCleaner: cleanerEntry.cleaner.id,
-              cleanerId: cleanerEntry.cleaner.id,
+              assignedCleaner: cleanerId,
+              cleanerId: cleanerId,
               sequence: task.sequence,
               priority: task.priority || 'low_priority'
             };
 
-            timelineAssignmentsMap.set(taskId, taskWithAssignment);
+            // Chiave composita per supportare collaborazione (stesso task su più cleaners)
+            const compositeKey = `${taskId}-${cleanerId}`;
+            assignedTaskIds.add(taskId); // Per filtrare containers
+            timelineAssignmentsMap.set(compositeKey, taskWithAssignment);
             timelineTasks.push(taskWithAssignment as Task);
           }
         }
@@ -1197,26 +1204,30 @@ export default function GenerateAssignments() {
         // Vecchia struttura piatta (fallback)
         dlog('📋 Caricamento da assignments (vecchia struttura):', timelineAssignmentsData.assignments.length);
         for (const a of timelineAssignmentsData.assignments) {
+          const taskId = String(a.task_id);
+          const cleanerId = a.cleanerId || a.cleaner_id;
           const taskWithAssignment = {
             ...a,
             id: a.task_id || a.id,
             name: String(a.logistic_code),
-            assignedCleaner: a.cleanerId || a.cleaner_id,
+            assignedCleaner: cleanerId,
             priority: a.priority || 'low_priority'
           };
-          timelineAssignmentsMap.set(String(a.task_id), taskWithAssignment);
+          const compositeKey = `${taskId}-${cleanerId}`;
+          assignedTaskIds.add(taskId);
+          timelineAssignmentsMap.set(compositeKey, taskWithAssignment);
           timelineTasks.push(taskWithAssignment as Task);
         }
       }
 
-      dlog("✅ Task assegnate nella timeline (task_id):", Array.from(timelineAssignmentsMap.keys()));
+      dlog("✅ Task assegnate nella timeline (task_id):", Array.from(assignedTaskIds));
       dlog("✅ Timeline tasks array length:", timelineTasks.length);
 
 
       // Filtra le task già presenti nella timeline dai container usando l'id univoco
       const filteredEarlyOut = initialEarlyOut.filter(task => {
         const tid = String(task.id);
-        const isAssigned = timelineAssignmentsMap.has(tid);
+        const isAssigned = assignedTaskIds.has(tid);
         if (isAssigned) {
           dlog(`Task ${task.name} (ID: ${tid}) filtrata da Early Out (è nella timeline)`);
         }
@@ -1225,7 +1236,7 @@ export default function GenerateAssignments() {
 
       const filteredHigh = initialHigh.filter(task => {
         const tid = String(task.id);
-        const isAssigned = timelineAssignmentsMap.has(tid);
+        const isAssigned = assignedTaskIds.has(tid);
         if (isAssigned) {
           dlog(`Task ${task.name} (ID: ${tid}) filtrata da High Priority (è nella timeline)`);
         }
@@ -1234,7 +1245,7 @@ export default function GenerateAssignments() {
 
       const filteredLow = initialLow.filter(task => {
         const tid = String(task.id);
-        const isAssigned = timelineAssignmentsMap.has(tid);
+        const isAssigned = assignedTaskIds.has(tid);
         if (isAssigned) {
           dlog(`Task ${task.name} (ID: ${tid}) filtrata da Low Priority (è nella timeline)`);
         }
@@ -1252,32 +1263,36 @@ export default function GenerateAssignments() {
       dlog(`   - Early Out: ${filteredEarlyOut.length} task (filtrate ${initialEarlyOut.length - filteredEarlyOut.length})`);
       dlog(`   - High Priority: ${filteredHigh.length} task (filtrate ${initialHigh.length - filteredHigh.length})`);
       dlog(`   - Low Priority: ${filteredLow.length} task (filtrate ${initialLow.length - filteredLow.length})`);
-      dlog(`   - Timeline ha ${timelineAssignmentsMap.size} task assegnate`);
+      dlog(`   - Timeline ha ${assignedTaskIds.size} task assegnate (${timelineAssignmentsMap.size} assegnazioni totali inclusi collaboratori)`);
 
-      // Crea l'array unificato usando dedupe per id (non per logisticCode!)
+      // Crea l'array unificato usando dedupe per chiave composita id-cleanerId
+      // per supportare la collaborazione (stesso task su più cleaners)
       const tasksWithAssignments: Task[] = [];
 
-      // CRITICAL: usa Set per tracciare id già inseriti
-      const addedIds = new Set<string>();
+      // CRITICAL: usa Set per tracciare chiavi composite già inserite
+      const addedKeys = new Set<string>();
 
-      // Aggiungi task NON assegnate dai containers
+      // Aggiungi task NON assegnate dai containers (dedupe per id, non hanno cleanerId)
       for (const task of [...filteredEarlyOut, ...filteredHigh, ...filteredLow]) {
         const tid = String(task.id);
-        if (!addedIds.has(tid)) {
+        if (!addedKeys.has(tid)) {
           tasksWithAssignments.push(task);
-          addedIds.add(tid);
+          addedKeys.add(tid);
         }
       }
 
       // Aggiungi SOLO task che sono effettivamente in timeline.json con i loro dati completi
-      dlog(`🔄 Elaborazione ${timelineAssignmentsMap.size} task dalla timeline...`);
-      for (const [taskId, timelineAssignment] of timelineAssignmentsMap.entries()) {
+      dlog(`🔄 Elaborazione ${timelineAssignmentsMap.size} assegnazioni dalla timeline...`);
+      for (const [compositeKey, timelineAssignment] of timelineAssignmentsMap.entries()) {
+        // La chiave composita è taskId-cleanerId, estraiamo il taskId
+        const taskId = String(timelineAssignment.task_id || timelineAssignment.id);
+        
         // Trova la task originale dai containers usando l'id univoco
         const originalTask = [...initialEarlyOut, ...initialHigh, ...initialLow].find(
-          t => String(t.id) === String(taskId)
+          t => String(t.id) === taskId
         );
 
-        dlog(`   → Task ${timelineAssignment.logistic_code} (ID: ${taskId}):`, {
+        dlog(`   → Task ${timelineAssignment.logistic_code} (ID: ${taskId}, key: ${compositeKey}):`, {
           hasOriginalTask: !!originalTask,
           cleanerId: timelineAssignment.cleanerId,
           priority: timelineAssignment.priority
@@ -1339,12 +1354,17 @@ export default function GenerateAssignments() {
             alias: timelineAssignment.alias,
           } as any;
 
-          tasksWithAssignments.push(taskWithAssignment);
+          // Usa chiave composita per evitare dedup tra collaboratori
+          if (!addedKeys.has(compositeKey)) {
+            tasksWithAssignments.push(taskWithAssignment);
+            addedKeys.add(compositeKey);
+          }
         }
       }
 
-      // DEDUPE finale per id prima di salvare lo stato
-      const dedupedTasks = dedupeById(tasksWithAssignments);
+      // NON usare dedupeById perché rimuoverebbe i collaboratori
+      // La dedupe è già gestita con addedKeys
+      const dedupedTasks = tasksWithAssignments;
 
       dlog(`📊 SINCRONIZZAZIONE TIMELINE:`);
       dlog(`   - Task totali (prima dedupe): ${tasksWithAssignments.length}`);
