@@ -292,3 +292,22 @@ export const insertOptimizerTravelTimeCacheSchema = createInsertSchema(optimizer
 });
 export type InsertOptimizerTravelTimeCache = z.infer<typeof insertOptimizerTravelTimeCacheSchema>;
 export type OptimizerTravelTimeCache = typeof optimizerTravelTimeCache.$inferSelect;
+
+// ==================== TASK COLLABORATORS ====================
+// Tabella per gestire la collaborazione multi-cleaner su un singolo task
+// Quando più cleaners collaborano, il cleaning_time viene diviso proporzionalmente
+export const taskCollaborators = pgTable("task_collaborators", {
+  workDate: date("work_date").notNull(),
+  taskId: integer("task_id").notNull(),
+  cleanerId: integer("cleaner_id").notNull(),
+  isPrimary: boolean("is_primary").notNull().default(false),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => ({
+  pk: primaryKey({ columns: [table.workDate, table.taskId, table.cleanerId] }),
+}));
+
+export const insertTaskCollaboratorSchema = createInsertSchema(taskCollaborators).omit({
+  createdAt: true,
+});
+export type InsertTaskCollaborator = z.infer<typeof insertTaskCollaboratorSchema>;
+export type TaskCollaborator = typeof taskCollaborators.$inferSelect;
