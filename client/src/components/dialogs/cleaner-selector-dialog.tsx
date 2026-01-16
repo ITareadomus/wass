@@ -351,22 +351,25 @@ export function CleanerSelectorDialog({
           )}
         </div>
 
-        {selectedIds.length > 0 && baseCleaningTime > 0 && previewDuration && (
-          <div className="mt-4 p-3 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800">
-            <p className="text-sm font-medium text-green-700 dark:text-green-300">
-              Preview durata:
-            </p>
-            <p className="text-sm text-green-600 dark:text-green-400">
-              {previewDuration.duration} ore per cleaner ({previewDuration.totalCollaborators} collaborator
-              {previewDuration.totalCollaborators > 1 ? "i" : "e"} totali)
-            </p>
-            {existingCollaboratorCount > 0 && (
-              <p className="text-xs text-green-500 dark:text-green-500 mt-1">
-                ({existingCollaboratorCount} esistenti + {selectedIds.length} nuov{selectedIds.length > 1 ? "i" : "o"})
-              </p>
+            {selectedIds.length > 0 && baseCleaningTime > 0 && previewDuration && (
+              <div className="mt-4 p-3 bg-purple-50 dark:bg-purple-900/20 rounded-lg border border-purple-200 dark:border-purple-800">
+                <p className="text-sm font-semibold text-purple-700 dark:text-purple-300 flex items-center gap-2">
+                  <Users className="w-4 h-4" />
+                  Preview durata:
+                </p>
+                <p className="text-sm text-purple-600 dark:text-purple-400 font-bold mt-1">
+                  {previewDuration.duration} ore per cleaner
+                </p>
+                <p className="text-xs text-purple-500 dark:text-purple-500">
+                  ({previewDuration.totalCollaborators} collaborator{previewDuration.totalCollaborators > 1 ? "i" : "e"} totali)
+                </p>
+                {existingCollaboratorCount > 0 && (
+                  <p className="text-xs text-purple-400 dark:text-purple-600 mt-1 italic">
+                    ({existingCollaboratorCount} esistenti + {selectedIds.length} nuov{selectedIds.length > 1 ? "i" : "o"})
+                  </p>
+                )}
+              </div>
             )}
-          </div>
-        )}
 
         <div className="flex justify-end gap-2 mt-4">
           <Button variant="outline" onClick={onClose}>
