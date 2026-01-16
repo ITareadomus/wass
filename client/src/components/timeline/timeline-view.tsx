@@ -1718,7 +1718,7 @@ export default function TimelineView({
                           />
                         )}
                         <div className="break-words font-bold text-[13px] flex-1">
-                          {cleanersAliases[cleaner.id]?.alias || `${cleaner.name.toUpperCase()} ${cleaner.lastname.toUpperCase()}`}
+                          {cleanersAliases[cleaner.id]?.alias || `${(cleaner.name || '').toUpperCase()} ${(cleaner.lastname || '').toUpperCase()}`}
                         </div>
                         {isRemoved && (
                           <div className="bg-red-600 text-white font-bold text-[10px] px-1 py-0.5 rounded flex-shrink-0">
