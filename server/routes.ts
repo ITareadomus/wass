@@ -2838,13 +2838,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const { taskCollaborationService } = await import("./services/pg-task-collaboration-service");
+      const { pgDailyAssignmentsService } = await import("./services/pg-daily-assignments-service");
+      
       const collaboration = await taskCollaborationService.getCollaboration(workDate, taskId);
+      
+      // Recupera alias per i collaboratori
+      const { query } = await import("../shared/pg-db");
+      const aliasesResult = await query(
+        `SELECT cleaner_id, alias FROM cleaner_aliases WHERE cleaner_id = ANY($1)`,
+        [collaboration.cleanerIds]
+      );
+      
+      const aliasMap = new Map(aliasesResult.rows.map(r => [r.cleaner_id, r.alias]));
+      
+      const collaborators = collaboration.cleanerIds.map(id => ({
+        id,
+        alias: aliasMap.get(id) || `Cleaner ${id}`,
+        isPrimary: id === collaboration.primaryCleanerId
+      }));
 
       res.json({
         success: true,
         workDate,
         taskId,
-        cleanerIds: collaboration.cleanerIds,
+        collaborators,
         primaryCleanerId: collaboration.primaryCleanerId,
         count: collaboration.count
       });
