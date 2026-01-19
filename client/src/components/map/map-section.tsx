@@ -289,9 +289,9 @@ export default function MapSection({ tasks }: MapSectionProps) {
               this.polyline = new window.google.maps.Polyline({
                 map: googleMapRef.current,
                 path: [this.baseLatLng, this.baseLatLng],
-                strokeColor: '#6B7280',
-                strokeOpacity: 0.9,
-                strokeWeight: 2,
+                strokeColor: '#1F2937',
+                strokeOpacity: 1,
+                strokeWeight: 3,
                 clickable: false,
                 zIndex: isHighlighted ? 999 : 1,
               });
