@@ -21,6 +21,7 @@ export default function MapSection({ tasks }: MapSectionProps) {
   const mapRef = useRef<HTMLDivElement>(null);
   const googleMapRef = useRef<any>(null);
   const markersRef = useRef<any[]>([]);
+  const polylinesRef = useRef<any[]>([]);
   const [isMapLoaded, setIsMapLoaded] = useState(false);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [cleaners, setCleaners] = useState<any[]>([]);
@@ -128,6 +129,10 @@ export default function MapSection({ tasks }: MapSectionProps) {
     markersRef.current.forEach(marker => marker.setMap(null));
     markersRef.current = [];
 
+    // Rimuovi eventuali linee di collegamento (collaborazioni)
+    polylinesRef.current.forEach(line => line.setMap(null));
+    polylinesRef.current = [];
+
     // Filtra task con coordinate valide - MA NON FILTRARE PER VISUALIZZAZIONE
     let tasksWithCoordinates = tasks.filter(task => {
       const hasCoordinates = task.address && task.lat && task.lng;
@@ -185,18 +190,16 @@ export default function MapSection({ tasks }: MapSectionProps) {
       const assignedCleaner = (task as any).assignedCleaner as number | null;
       const isCollaborativeTask = collaboratorIds && Array.isArray(collaboratorIds) && collaboratorIds.length > 1;
       
-      // Calculate horizontal offset for collaborative tasks
-      // Each collaborator gets a horizontal offset to show markers side-by-side
-      let collaboratorOffset = 0;
+      // Per task collaborativi: offset in pixel (costante sullo schermo a qualsiasi zoom)
+      let collaboratorPixelOffsetX = 0;
+      let collaboratorPixelOffsetY = 0;
       if (isCollaborativeTask && assignedCleaner) {
         const collaboratorIndex = collaboratorIds.indexOf(assignedCleaner);
-        // Defensive guard: if cleaner not found in collaborator_ids, use 0 offset
         if (collaboratorIndex >= 0) {
           const totalCollaborators = collaboratorIds.length;
-          // Offset range: about 50-60 meters each side for visibility at all zoom levels
-          // 0.001 degrees ≈ 110 meters total spread
-          const offsetStep = 0.001 / Math.max(totalCollaborators - 1, 1);
-          collaboratorOffset = (collaboratorIndex - (totalCollaborators - 1) / 2) * offsetStep;
+          const spreadPx = 28; // distanza fissa tra marker a schermo
+          collaboratorPixelOffsetX = (collaboratorIndex - (totalCollaborators - 1) / 2) * spreadPx;
+          collaboratorPixelOffsetY = 0;
         }
       }
 
@@ -205,9 +208,12 @@ export default function MapSection({ tasks }: MapSectionProps) {
       const duplicateOffset = !isCollaborativeTask ? count * 0.00005 : 0;
       const angle = count * (Math.PI / 3); // 60 gradi tra ogni marker
       const lat = baseLat + (duplicateOffset * Math.cos(angle));
-      const lng = baseLng + (duplicateOffset * Math.sin(angle)) + collaboratorOffset;
+      const lng = baseLng + (duplicateOffset * Math.sin(angle));
 
-      const position = { lat, lng };
+      // Per task collaborativi mantieni le coordinate base (l'offset è in pixel)
+      const position = isCollaborativeTask
+        ? { lat: baseLat, lng: baseLng }
+        : { lat, lng };
       
       // Ottieni il colore in base al cleaner assegnato (assignedCleaner già dichiarato sopra)
       const markerColor = assignedCleaner ? getCleanerColor(assignedCleaner) : '#6B7280';
@@ -219,16 +225,23 @@ export default function MapSection({ tasks }: MapSectionProps) {
       const strokeWeight = isHighlighted ? 2 : 2; // Bordo più sottile anche se evidenziata
       const strokeColor = isHighlighted ? '#FFD700' : '#ffffff'; // Bordo dorato se evidenziata
 
-      // Se c'è una sequenza, usa un custom HTML marker
-      if (sequence !== undefined && sequence !== null) {
-        // Crea un custom overlay
+      // Usa custom overlay per task con sequenza O task collaborativi (per supportare offset pixel e polyline)
+      const shouldUseCustomOverlay = isCollaborativeTask || (sequence !== undefined && sequence !== null);
+      
+      if (shouldUseCustomOverlay) {
+        // Crea un custom overlay con supporto per offset pixel e polyline
         class CustomMarker extends window.google.maps.OverlayView {
-          position: any;
+          baseLatLng: any;
+          pixelOffsetX: number;
+          pixelOffsetY: number;
           div: HTMLDivElement | null = null;
+          polyline: any | null = null;
           
-          constructor(position: any) {
+          constructor(pos: any, offsetX: number, offsetY: number) {
             super();
-            this.position = position;
+            this.baseLatLng = new window.google.maps.LatLng(pos.lat, pos.lng);
+            this.pixelOffsetX = offsetX;
+            this.pixelOffsetY = offsetY;
           }
           
           onAdd() {
@@ -247,12 +260,26 @@ export default function MapSection({ tasks }: MapSectionProps) {
             div.style.fontSize = isHighlighted ? '14px' : '12px';
             div.style.fontWeight = 'bold';
             div.style.zIndex = isHighlighted ? '1000' : String(index);
-            div.textContent = String(sequence);
-            div.title = `${task.name} - ${task.type} (Seq: ${sequence})`;
+            div.textContent = sequence !== undefined && sequence !== null ? String(sequence) : '';
+            div.title = `${task.name} - ${task.type}${sequence !== undefined ? ` (Seq: ${sequence})` : ''}`;
             
             // Aggiungi animazione bounce se evidenziato
             if (isHighlighted) {
               div.style.animation = 'bounce 0.5s ease infinite alternate';
+            }
+            
+            // Crea polyline di collegamento per task collaborativi
+            if (isCollaborativeTask && this.pixelOffsetX !== 0) {
+              this.polyline = new window.google.maps.Polyline({
+                map: googleMapRef.current,
+                path: [this.baseLatLng, this.baseLatLng],
+                strokeColor: '#6B7280',
+                strokeOpacity: 0.9,
+                strokeWeight: 2,
+                clickable: false,
+                zIndex: isHighlighted ? 999 : 1,
+              });
+              polylinesRef.current.push(this.polyline);
             }
             
             let clickTimer: NodeJS.Timeout | null = null;
@@ -288,10 +315,24 @@ export default function MapSection({ tasks }: MapSectionProps) {
           draw() {
             if (!this.div) return;
             const overlayProjection = this.getProjection();
-            const pos = overlayProjection.fromLatLngToDivPixel(this.position);
-            if (pos) {
-              this.div.style.left = `${pos.x - markerScale}px`;
-              this.div.style.top = `${pos.y - markerScale}px`;
+            const pos = overlayProjection.fromLatLngToDivPixel(this.baseLatLng);
+            if (!pos) return;
+            
+            // Applica offset pixel
+            const x = pos.x + this.pixelOffsetX;
+            const y = pos.y + this.pixelOffsetY;
+            
+            this.div.style.left = `${x - markerScale}px`;
+            this.div.style.top = `${y - markerScale}px`;
+            
+            // Aggiorna la polyline per collegarla al punto reale
+            if (this.polyline) {
+              const endLatLng = overlayProjection.fromDivPixelToLatLng(
+                new window.google.maps.Point(x, y)
+              );
+              if (endLatLng) {
+                this.polyline.setPath([this.baseLatLng, endLatLng]);
+              }
             }
           }
           
@@ -300,10 +341,18 @@ export default function MapSection({ tasks }: MapSectionProps) {
               this.div.parentNode.removeChild(this.div);
               this.div = null;
             }
+            if (this.polyline) {
+              this.polyline.setMap(null);
+              this.polyline = null;
+            }
           }
         }
         
-        const customMarker = new CustomMarker(position);
+        const customMarker = new CustomMarker(
+          position,
+          isCollaborativeTask ? collaboratorPixelOffsetX : 0,
+          isCollaborativeTask ? collaboratorPixelOffsetY : 0
+        );
         customMarker.setMap(googleMapRef.current);
         markersRef.current.push(customMarker);
       } else {
