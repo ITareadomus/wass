@@ -184,6 +184,16 @@ export default function MapSection({ tasks }: MapSectionProps) {
     // Traccia le coordinate già usate per aggiungere offset
     const coordinateCount = new Map<string, number>();
 
+    // Gestione gruppi collaborativi: UNA sola linea per appartamento, che collega
+    // direttamente i marker (marker ↔ marker). La linea è una curva "a U" ottenuta
+    // approssimando una Bezier quadratica in coordinate pixel.
+    type CollabGroup = {
+      baseLatLng: any;
+      pointsByCleaner: Map<number, { x: number; y: number }>;
+      polyline: any;
+    };
+    const collaborationGroups = new Map<string, CollabGroup>();
+
     // Crea marker per ogni task
     tasksWithCoordinates.forEach((task, index) => {
       const baseLat = parseFloat(task.lat || '0');
@@ -244,20 +254,28 @@ export default function MapSection({ tasks }: MapSectionProps) {
       // Usa custom overlay per task con sequenza O task collaborativi (per supportare offset pixel e polyline)
       const shouldUseCustomOverlay = isCollaborativeTask || (sequence !== undefined && sequence !== null);
       
+      // Per task collaborativi, raggruppa per appartamento (task+coordinate) così da avere UNA sola linea.
+      const collaborationGroupKey = isCollaborativeTask
+        ? `${task.name}:${coordKey}`
+        : null;
+      
       if (shouldUseCustomOverlay) {
-        // Crea un custom overlay con supporto per offset pixel e polyline
+        // Crea un custom overlay con supporto per offset pixel e polyline curva a U
         class CustomMarker extends window.google.maps.OverlayView {
           baseLatLng: any;
           pixelOffsetX: number;
           pixelOffsetY: number;
+          cleanerId: number | null;
+          groupKey: string | null;
           div: HTMLDivElement | null = null;
-          polyline: any | null = null;
           
-          constructor(pos: any, offsetX: number, offsetY: number) {
+          constructor(pos: any, offsetX: number, offsetY: number, cleanerIdParam: number | null, groupKeyParam: string | null) {
             super();
             this.baseLatLng = new window.google.maps.LatLng(pos.lat, pos.lng);
             this.pixelOffsetX = offsetX;
             this.pixelOffsetY = offsetY;
+            this.cleanerId = cleanerIdParam;
+            this.groupKey = groupKeyParam;
           }
           
           onAdd() {
@@ -284,18 +302,28 @@ export default function MapSection({ tasks }: MapSectionProps) {
               div.style.animation = 'bounce 0.5s ease infinite alternate';
             }
             
-            // Crea polyline di collegamento per task collaborativi
-            if (isCollaborativeTask && this.pixelOffsetX !== 0) {
-              this.polyline = new window.google.maps.Polyline({
-                map: googleMapRef.current,
-                path: [this.baseLatLng, this.baseLatLng],
-                strokeColor: '#1F2937',
-                strokeOpacity: 1,
-                strokeWeight: 3,
-                clickable: false,
-                zIndex: isHighlighted ? 999 : 1,
-              });
-              polylinesRef.current.push(this.polyline);
+            // Crea (se non esiste) UNA polyline per gruppo collaborativo
+            if (isCollaborativeTask && this.groupKey) {
+              const existing = collaborationGroups.get(this.groupKey);
+              if (!existing) {
+                const polyline = new window.google.maps.Polyline({
+                  map: googleMapRef.current,
+                  path: [this.baseLatLng, this.baseLatLng],
+                  strokeColor: '#1F2937',
+                  strokeOpacity: 1,
+                  strokeWeight: 3,
+                  clickable: false,
+                  zIndex: isHighlighted ? 999 : 1,
+                });
+
+                collaborationGroups.set(this.groupKey, {
+                  baseLatLng: this.baseLatLng,
+                  pointsByCleaner: new Map(),
+                  polyline,
+                });
+
+                polylinesRef.current.push(polyline);
+              }
             }
             
             let clickTimer: NodeJS.Timeout | null = null;
@@ -341,13 +369,49 @@ export default function MapSection({ tasks }: MapSectionProps) {
             this.div.style.left = `${x - markerScale}px`;
             this.div.style.top = `${y - markerScale}px`;
             
-            // Aggiorna la polyline per collegarla al punto reale
-            if (this.polyline) {
-              const endLatLng = overlayProjection.fromDivPixelToLatLng(
-                new window.google.maps.Point(x, y)
-              );
-              if (endLatLng) {
-                this.polyline.setPath([this.baseLatLng, endLatLng]);
+            // Aggiorna la polyline di gruppo: collega direttamente i marker.
+            // "Effetto a U": curva ottenuta campionando una Bezier quadratica in pixel.
+            if (isCollaborativeTask && this.groupKey && this.cleanerId !== null) {
+              const group = collaborationGroups.get(this.groupKey);
+              if (group) {
+                group.pointsByCleaner.set(this.cleanerId, { x, y });
+
+                // Caso tipico: 2 cleaner. Se 2+ punti, collega i primi 2.
+                const pts = Array.from(group.pointsByCleaner.values());
+                if (pts.length >= 2) {
+                  const p1 = pts[0];
+                  const p2 = pts[1];
+
+                  // Punto di controllo: sotto i marker per creare l'arco "a U"
+                  const curvePx = 22;
+                  const cx = (p1.x + p2.x) / 2;
+                  const cy = Math.max(p1.y, p2.y) + curvePx;
+
+                  const samples = 12;
+                  const path: any[] = [];
+                  for (let i = 0; i <= samples; i++) {
+                    const t = i / samples;
+                    const oneMinus = 1 - t;
+
+                    // Bezier quadratica in pixel
+                    const bx =
+                      (oneMinus * oneMinus) * p1.x +
+                      2 * oneMinus * t * cx +
+                      (t * t) * p2.x;
+
+                    const by =
+                      (oneMinus * oneMinus) * p1.y +
+                      2 * oneMinus * t * cy +
+                      (t * t) * p2.y;
+
+                    const latLng = overlayProjection.fromDivPixelToLatLng(
+                      new window.google.maps.Point(bx, by)
+                    );
+                    if (latLng) path.push(latLng);
+                  }
+
+                  if (path.length >= 2) group.polyline.setPath(path);
+                }
               }
             }
           }
@@ -357,9 +421,16 @@ export default function MapSection({ tasks }: MapSectionProps) {
               this.div.parentNode.removeChild(this.div);
               this.div = null;
             }
-            if (this.polyline) {
-              this.polyline.setMap(null);
-              this.polyline = null;
+            // Rimuovi il punto dal gruppo. Se rimane 0/1 marker, nascondi la linea.
+            if (isCollaborativeTask && this.groupKey && this.cleanerId !== null) {
+              const group = collaborationGroups.get(this.groupKey);
+              if (group) {
+                group.pointsByCleaner.delete(this.cleanerId);
+                if (group.pointsByCleaner.size < 2) {
+                  group.polyline.setMap(null);
+                  collaborationGroups.delete(this.groupKey);
+                }
+              }
             }
           }
         }
@@ -367,7 +438,9 @@ export default function MapSection({ tasks }: MapSectionProps) {
         const customMarker = new CustomMarker(
           position,
           isCollaborativeTask ? collaboratorPixelOffsetX : 0,
-          isCollaborativeTask ? collaboratorPixelOffsetY : 0
+          isCollaborativeTask ? collaboratorPixelOffsetY : 0,
+          assignedCleaner ?? null,
+          collaborationGroupKey
         );
         customMarker.setMap(googleMapRef.current);
         markersRef.current.push(customMarker);
