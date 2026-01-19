@@ -1329,10 +1329,12 @@ export default function GenerateAssignments() {
           // Usa formatDuration per calcolare duration dal cleaning_time aggiornato
           const taskWithAssignment = {
             ...baseTask,
-            duration: timelineAssignment.cleaning_time 
+            duration: (typeof timelineAssignment.cleaning_time === "number")
               ? formatDuration(timelineAssignment.cleaning_time) 
               : baseTask.duration,
-            cleaning_time: timelineAssignment.cleaning_time,
+            cleaning_time: (typeof timelineAssignment.cleaning_time === "number")
+              ? timelineAssignment.cleaning_time
+              : (baseTask as any).cleaning_time,
             base_cleaning_time: timelineAssignment.base_cleaning_time,
             collaborator_ids: timelineAssignment.collaborator_ids,
             collaborator_count: timelineAssignment.collaborator_count,
