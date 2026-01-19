@@ -2990,9 +2990,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const newSequence = maxSeqResult.rows[0].max_seq + 1;
 
         // 7. Crea la riga di assegnazione per il nuovo cleaner
+        // Genera un nuovo ID esplicitamente per evitare conflitti con sequence non sincronizzata
+        const maxIdResult = await client.query(
+          `SELECT COALESCE(MAX(id), 0) + 1 as new_id FROM daily_assignments_current`
+        );
+        const newId = maxIdResult.rows[0].new_id;
+
         await client.query(`
           INSERT INTO daily_assignments_current (
-            work_date, cleaner_id, task_id, logistic_code, client_id,
+            id, work_date, cleaner_id, task_id, logistic_code, client_id,
             premium, address, lat, lng, cleaning_time, base_cleaning_time,
             checkin_date, checkout_date, checkin_time, checkout_time,
             pax_in, pax_out, small_equipment, operation_id, confirmed_operation, straordinaria,
@@ -3000,7 +3006,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             start_time, end_time, followup, sequence, travel_time
           )
           SELECT 
-            $1, $2, task_id, logistic_code, client_id,
+            $7, $1, $2, task_id, logistic_code, client_id,
             premium, address, lat, lng, $3, $4,
             checkin_date, checkout_date, checkin_time, checkout_time,
             pax_in, pax_out, small_equipment, operation_id, confirmed_operation, straordinaria,
@@ -3009,7 +3015,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           FROM daily_assignments_current
           WHERE work_date = $1 AND task_id = $6 
           LIMIT 1
-        `, [workDate, Number(cleanerId), effectiveCleaningTime, baseCleaningTime, newSequence, taskId]);
+        `, [workDate, Number(cleanerId), effectiveCleaningTime, baseCleaningTime, newSequence, taskId, newId]);
 
         // 8. Aggiorna cleaning_time per tutti i collaboratori esistenti
         await client.query(
