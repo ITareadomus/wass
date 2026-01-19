@@ -139,25 +139,38 @@ export default function MapSection({ tasks }: MapSectionProps) {
       return hasCoordinates;
     });
 
-    // Determina quali task evidenziare (non nascondere le altre)
-    const highlightedTaskIds = new Set<string>();
+    // Determina quali marker evidenziare (non nascondere gli altri)
+    // Usa ID univoco per marker: "taskName:cleanerId" per task collaborativi, "taskName" per altri
+    const highlightedMarkerIds = new Set<string>();
     
     // Se c'è un filtro per task ID (doppio click su task card)
+    // L'ID può essere semplice "taskName" o composto "taskName:cleanerId"
     if (filteredTaskId !== null && filteredTaskId !== undefined) {
-      highlightedTaskIds.add(filteredTaskId);
+      highlightedMarkerIds.add(filteredTaskId);
     }
     // Se c'è un filtro per cleaner (doppio click su cleaner nella timeline)
+    // Per task collaborativi: evidenzia TUTTI i marker del task se il cleaner filtrato è uno dei collaboratori
     else if (filteredCleanerId !== null && filteredCleanerId !== undefined && filteredCleanerId !== 0) {
       tasksWithCoordinates.forEach(task => {
         const assignedCleaner = (task as any).assignedCleaner;
         const collaboratorIds = (task as any).collaborator_ids as number[] | null;
+        const isCollaborativeTask = collaboratorIds && Array.isArray(collaboratorIds) && collaboratorIds.length > 1;
         
-        // Evidenzia se il task è assegnato al cleaner O se il cleaner è tra i collaboratori
-        const isAssignedToFilteredCleaner = assignedCleaner === filteredCleanerId;
-        const isCollaborator = collaboratorIds && Array.isArray(collaboratorIds) && collaboratorIds.includes(filteredCleanerId);
-        
-        if (isAssignedToFilteredCleaner || isCollaborator) {
-          highlightedTaskIds.add(task.name);
+        // Per task NON collaborativi: evidenzia se assegnato al cleaner filtrato
+        if (!isCollaborativeTask) {
+          if (assignedCleaner === filteredCleanerId) {
+            highlightedMarkerIds.add(task.name);
+          }
+        } else {
+          // Per task collaborativi: se il cleaner filtrato è tra i collaboratori,
+          // evidenzia TUTTI i marker di quel task (tutti i collaboratori)
+          const isCleanerInvolved = collaboratorIds.includes(filteredCleanerId);
+          if (isCleanerInvolved) {
+            // Aggiungi marker ID per ogni collaboratore
+            collaboratorIds.forEach(collaboratorId => {
+              highlightedMarkerIds.add(`${task.name}:${collaboratorId}`);
+            });
+          }
         }
       });
     }
@@ -165,7 +178,7 @@ export default function MapSection({ tasks }: MapSectionProps) {
     console.log('Task totali:', tasks.length);
     console.log('Task con coordinate:', tasksWithCoordinates.length);
     console.log('Cleaners caricati:', cleaners.length);
-    console.log('Task evidenziate:', highlightedTaskIds.size);
+    console.log('Marker evidenziati:', highlightedMarkerIds.size);
     console.log('Prime 3 task con coordinate:', tasksWithCoordinates.slice(0, 3).map(t => ({
       name: t.name,
       address: t.address,
@@ -226,8 +239,13 @@ export default function MapSection({ tasks }: MapSectionProps) {
       const markerColor = assignedCleaner ? getCleanerColor(assignedCleaner) : '#6B7280';
       const sequence = (task as any).sequence;
       
-      // Verifica se questa task è evidenziata
-      const isHighlighted = highlightedTaskIds.has(task.name);
+      // Calcola ID univoco per questo marker: "taskName:cleanerId" per collaborativi, "taskName" per altri
+      const markerId = isCollaborativeTask && assignedCleaner 
+        ? `${task.name}:${assignedCleaner}` 
+        : task.name;
+      
+      // Verifica se questo marker specifico è evidenziato
+      const isHighlighted = highlightedMarkerIds.has(markerId);
       const markerScale = 12; // Dimensione costante per tutti i marker
       const strokeWeight = isHighlighted ? 2 : 2; // Bordo più sottile anche se evidenziata
       const strokeColor = isHighlighted ? '#FFD700' : '#ffffff'; // Bordo dorato se evidenziata
@@ -296,14 +314,14 @@ export default function MapSection({ tasks }: MapSectionProps) {
                 clearTimeout(clickTimer);
                 clickTimer = null;
                 
-                // Toggle filtro (attiva/disattiva animazione)
+                // Toggle filtro (attiva/disattiva animazione) usando ID marker univoco
                 const currentFilteredTaskId = (window as any).mapFilteredTaskId;
-                if (currentFilteredTaskId === task.name) {
+                if (currentFilteredTaskId === markerId) {
                   // Spegni animazione
                   (window as any).mapFilteredTaskId = null;
                 } else {
                   // Accendi animazione
-                  (window as any).mapFilteredTaskId = task.name;
+                  (window as any).mapFilteredTaskId = markerId;
                 }
               } else {
                 // Primo click: apri dettagli
@@ -396,7 +414,7 @@ export default function MapSection({ tasks }: MapSectionProps) {
             clickTimer = null;
           }
           const current = (window as any).mapFilteredTaskId;
-          (window as any).mapFilteredTaskId = current === task.name ? null : task.name;
+          (window as any).mapFilteredTaskId = current === markerId ? null : markerId;
         });
 
         markersRef.current.push(marker);
@@ -409,11 +427,18 @@ export default function MapSection({ tasks }: MapSectionProps) {
     if (tasksWithCoordinates.length > 0) {
       googleMapRef.current.fitBounds(bounds);
       
-      // Se ci sono task evidenziate, centra sulla loro area
-      if (highlightedTaskIds.size > 0 && highlightedTaskIds.size < tasksWithCoordinates.length) {
+      // Se ci sono marker evidenziati, centra sulla loro area
+      if (highlightedMarkerIds.size > 0 && highlightedMarkerIds.size < tasksWithCoordinates.length) {
         const highlightedBounds = new window.google.maps.LatLngBounds();
         tasksWithCoordinates.forEach(task => {
-          if (highlightedTaskIds.has(task.name)) {
+          const collaboratorIds = (task as any).collaborator_ids as number[] | null;
+          const assignedCleaner = (task as any).assignedCleaner as number | null;
+          const isCollaborativeTask = collaboratorIds && Array.isArray(collaboratorIds) && collaboratorIds.length > 1;
+          const markerId = isCollaborativeTask && assignedCleaner 
+            ? `${task.name}:${assignedCleaner}` 
+            : task.name;
+          
+          if (highlightedMarkerIds.has(markerId)) {
             const lat = parseFloat(task.lat || '0');
             const lng = parseFloat(task.lng || '0');
             if (!isNaN(lat) && !isNaN(lng) && lat !== 0 && lng !== 0) {

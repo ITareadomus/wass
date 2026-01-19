@@ -219,14 +219,22 @@ export default function TaskCard({
   useEffect(() => {
     const checkMapFilter = setInterval(() => {
       const currentFilteredTaskId = (window as any).mapFilteredTaskId;
-      const shouldBeFiltered = currentFilteredTaskId === task.name;
+      // Per task collaborativi, controlla sia ID composto che task.name semplice
+      const collaboratorIds = (task as any).collaborator_ids as number[] | null;
+      const isCollaborativeTask = collaboratorIds && Array.isArray(collaboratorIds) && collaboratorIds.length > 1;
+      const assignedCleaner = (task as any).assignedCleaner as number | null;
+      const markerId = isCollaborativeTask && assignedCleaner 
+        ? `${task.name}:${assignedCleaner}` 
+        : task.name;
+      
+      const shouldBeFiltered = currentFilteredTaskId === markerId;
       if (shouldBeFiltered !== isMapFiltered) {
         setIsMapFiltered(shouldBeFiltered);
       }
     }, 100);
 
     return () => clearInterval(checkMapFilter);
-  }, [task.name, isMapFiltered]);
+  }, [task.name, isMapFiltered, task]);
 
   // Gestisce il click sulla card: se multi-select toggle selezione, altrimenti apri modale
   const handleCardClick = (e: React.MouseEvent) => {
@@ -245,13 +253,21 @@ export default function TaskCard({
       setClickTimer(null);
 
       // Toggle filtro mappa per questa task (attiva/disattiva animazione)
+      // Per task collaborativi usa ID composto "taskName:cleanerId" per identificare il marker specifico
+      const collaboratorIds = (task as any).collaborator_ids as number[] | null;
+      const isCollaborativeTask = collaboratorIds && Array.isArray(collaboratorIds) && collaboratorIds.length > 1;
+      const assignedCleaner = (task as any).assignedCleaner as number | null;
+      const markerId = isCollaborativeTask && assignedCleaner 
+        ? `${task.name}:${assignedCleaner}` 
+        : task.name;
+      
       const currentFilteredTaskId = (window as any).mapFilteredTaskId;
-      if (currentFilteredTaskId === task.name) {
+      if (currentFilteredTaskId === markerId) {
         // Spegni animazione
         (window as any).mapFilteredTaskId = null;
       } else {
         // Accendi animazione
-        (window as any).mapFilteredTaskId = task.name;
+        (window as any).mapFilteredTaskId = markerId;
       }
     } else {
       // Primo click: avvia timer
