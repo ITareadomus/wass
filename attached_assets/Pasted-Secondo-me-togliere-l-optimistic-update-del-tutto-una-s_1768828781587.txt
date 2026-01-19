@@ -1,0 +1,176 @@
+Secondo me togliere l’optimistic update del tutto è una scelta sensata in questo progetto, soprattutto perché avete casi “non banali” (collaborazioni = stesso task_id su più cleaners) e perché oggi l’optimistic vi sta già costringendo a:
+
+gestire rollback (snapshot, ripristino container, ecc.)
+
+ricalcolare tempi lato client (recomputeCleanerTimes) con edge-case
+
+convivere con bug da “identità” (task_id non è una chiave di istanza)
+
+Se il backend è la source of truth (timeline.json / containers.json), la UI può semplicemente: chiamo API → ricarico → renderizzo.
+
+Il trade-off è UX: dopo il drop la task “torna indietro” per un attimo e poi ricompare nel posto giusto dopo il refresh. Però nel vostro file avete già isLoadingDragDrop + overlay + refreshAssignments("manual"), quindi si può rendere l’esperienza comunque pulita.
+
+Come lo implementerei (approccio “server-driven”)
+Obiettivo
+
+Niente optimisticMoveTask, optimisticBatchMoveTask, recomputeCleanerTimes per la UI post-drop
+
+Ogni drop fa:
+
+mostra overlay
+
+chiama endpoint
+
+await refresh (non debounced) per aggiornare lo stato da server
+
+toast success/error
+
+sblocca
+
+Modifiche concrete nel tuo generate-assignments.tsx
+1) Elimina gli helper optimistic (e la logica di rollback)
+
+Puoi proprio rimuovere:
+
+deepCopyTasks
+
+optimisticMoveTask
+
+optimisticBatchMoveTask
+
+(idealmente) recomputeCleanerTimes se non serve per altro (oggi serve solo per “smussare” l’optimistic)
+
+Questo riduce tantissimo la superficie di bug.
+
+2) Cambia la strategia di refresh: refresh immediato e atteso
+
+Adesso dopo molte operazioni fai scheduleManualRefresh(600) (debounced, “in background”).
+
+Se non fai optimistic, io farei invece:
+
+dopo l’API call: await refreshAssignments("manual-refresh") (così l’utente vede subito lo stato vero)
+
+niente debounce (il drop è già un’azione discreta)
+
+Nota: avete già la distinzione in refreshAssignments tra "manual" (silent) e "manual-refresh" (mostra loader globale). Per il drop, userei "manual" o "manual-refresh" a seconda di quanto “forte” vuoi l’overlay. Visto che già usi isLoadingDragDrop, puoi usare "manual" e tenere l’overlay DnD.
+
+3) Esempi di refactor nei rami di onDragEnd
+A) Spostamento tra cleaners (/api/move-task-between-cleaners)
+
+Oggi fai:
+
+optimistic update (sposta subito)
+
+API
+
+se ok → schedule refresh
+
+se errore → rollback snapshot
+
+Nuovo:
+
+no optimistic
+
+API
+
+await refreshAssignments("manual") o "manual-refresh"
+
+niente rollback (non serve)
+
+Pseudo-diff logico:
+
+// RIMUOVI:
+// const { updated, snapshot } = optimisticMoveTask(...)
+// setAllTasksWithAssignments(updated);
+
+try {
+  await fetch('/api/move-task-between-cleaners', ...);
+
+  setHasUnsavedChanges(true);
+  handleTaskMoved?.();
+
+  // invece del debounce
+  await refreshAssignments("manual"); // oppure "manual-refresh"
+
+  toast(...success);
+} catch (err) {
+  toast(...error);
+}
+
+B) Da container → timeline (saveTaskAssignment)
+
+Stessa idea: non rimuovere subito dal container state.
+Chiami saveTaskAssignment(...) e poi refresh.
+
+Rimuovi:
+
+setAllTasksWithAssignments(updated)
+
+setEarlyOutTasks(prev => prev.filter(...)) ecc.
+
+snapshot containers
+
+Poi:
+
+await saveTaskAssignment(taskId, toCleanerId, logisticCode, correctIndex);
+setHasUnsavedChanges(true);
+handleTaskMoved?.();
+await refreshAssignments("manual");
+
+C) Timeline → container (removeTimelineAssignment)
+
+Stessa cosa: niente optimistic “assignedCleaner: null”.
+API → refresh.
+
+4) Batch move (multi-select)
+
+Qui oggi fai un sacco di optimistic e poi chiami saveTaskAssignment in loop.
+
+Versione “pulita” senza optimistic:
+
+fai il loop di API calls (o meglio: un endpoint batch)
+
+poi await refreshAssignments("manual")
+
+clear selection
+
+toast
+
+Se vuoi migliorare molto UX/performance: crea endpoint tipo /api/batch-assign-tasks che riceve:
+
+{ "date": "...", "destCleanerId": 12, "destIndex": 3, "tasks": [ { "taskId": "...", "logisticCode": "..."} ] }
+
+
+così fai una roundtrip e hai meno finestre di inconsistenza.
+
+UX: come evitare che “sembri rotto” senza optimistic
+
+Senza optimistic, l’elemento dopo il drop può “tornare” nella posizione originale finché non arriva il refresh. Per renderlo ok:
+
+Overlay immediato (già ce l’hai con isLoadingDragDrop)
+
+Disabilita nuovi drag mentre isLoadingDragDrop === true (già lo fai col lock)
+
+Toast “Salvataggio…” (facoltativo) oppure niente toast finché non hai fatto refresh e poi solo “Completato”
+
+Idealmente: riduci la durata percepita facendo refresh subito (niente debounce)
+
+Perché questa scelta ti aiuta davvero (nel vostro caso specifico)
+
+Elimini alla radice collisioni tipo “stesso task_id su più cleaners”
+
+Elimini i “tempi ricalcolati client-side” che possono divergere dal backend
+
+Elimini rollback e snapshot (molta complessità e bug)
+
+Ogni stato mostrato è sempre coerente con timeline.json / containers.json
+
+Un compromesso che consiglio (se vuoi UX migliore senza tornare all’optimistic “vero”)
+
+Se il “snap-back” ti dà fastidio, puoi fare una via di mezzo senza optimistic update strutturale:
+
+al drop: non sposti davvero la task, ma la “grigi” / la segni come pending (es. overlay sulla card) finché non arriva refresh
+
+quando arriva refresh, sparisce dal punto vecchio e appare nel punto nuovo (ma l’utente aveva già il feedback “ok, sta salvando”)
+
+Questo richiede solo una Set di pendingIds, non tutta la logica di splice/rollback.
