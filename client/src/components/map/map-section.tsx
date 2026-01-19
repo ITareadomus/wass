@@ -383,11 +383,11 @@ export default function MapSection({ tasks }: MapSectionProps) {
                   const p2 = pts[1];
 
                   // Punto di controllo: sotto i marker per creare l'arco "a U"
-                  const curvePx = 22;
+                  const curvePx = 30;
                   const cx = (p1.x + p2.x) / 2;
                   const cy = Math.max(p1.y, p2.y) + curvePx;
 
-                  const samples = 12;
+                  const samples = 100;
                   const path: any[] = [];
                   for (let i = 0; i <= samples; i++) {
                     const t = i / samples;
