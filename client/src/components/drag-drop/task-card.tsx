@@ -19,7 +19,7 @@ import {
 } from "@/components/ui/tooltip";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
-import { HelpCircle, ChevronLeft, ChevronRight, Save, Pencil, Calendar, Lock, LockOpen, Users, UserPlus, Loader2 } from "lucide-react";
+import { HelpCircle, ChevronLeft, ChevronRight, Save, Pencil, Calendar, Lock, LockOpen, Users, UserPlus } from "lucide-react";
 import { CleanerSelectorDialog } from "@/components/dialogs/cleaner-selector-dialog";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
@@ -454,21 +454,15 @@ export default function TaskCard({
   };
 
   // Apri il dialog per aggiungere collaboratori (Caso A - timeline)
-  const openAddCollaboratorDialog = async () => {
-    const success = await extractCleanersBeforeDialog('add');
-    if (success) {
-      setCleanerSelectorMode('add');
-      setIsCleanerSelectorOpen(true);
-    }
+  const openAddCollaboratorDialog = () => {
+    setCleanerSelectorMode('add');
+    setIsCleanerSelectorOpen(true);
   };
 
   // Apri il dialog per assegnare task con collaboratori (Caso B - containers)
-  const openBulkAssignDialog = async () => {
-    const success = await extractCleanersBeforeDialog('assign');
-    if (success) {
-      setCleanerSelectorMode('assign');
-      setIsCleanerSelectorOpen(true);
-    }
+  const openBulkAssignDialog = () => {
+    setCleanerSelectorMode('assign');
+    setIsCleanerSelectorOpen(true);
   };
 
   // Stati per editing - ora un set di campi invece di uno solo
@@ -486,45 +480,6 @@ export default function TaskCard({
   const [isCleanerSelectorOpen, setIsCleanerSelectorOpen] = useState(false);
   const [cleanerSelectorMode, setCleanerSelectorMode] = useState<'add' | 'assign'>('add');
   const [isCollaboratorLoading, setIsCollaboratorLoading] = useState(false);
-  const [isExtractingCleaners, setIsExtractingCleaners] = useState(false);
-
-  // Funzione per estrarre cleaners prima di aprire il dialog
-  const extractCleanersBeforeDialog = async (mode: 'add' | 'assign'): Promise<boolean> => {
-    const workDate = localStorage.getItem('selected_work_date') || new Date().toISOString().split('T')[0];
-    setIsExtractingCleaners(true);
-    
-    try {
-      const response = await fetch('/api/extract-cleaners-optimized', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ date: workDate }),
-      });
-      
-      if (!response.ok) {
-        console.error('Errore estrazione cleaners:', await response.text());
-        toast({
-          title: "Errore",
-          description: "Impossibile caricare la lista cleaners. Riprova.",
-          variant: "destructive",
-        });
-        return false;
-      }
-      
-      // Attendi un momento per permettere al database di propagare i dati
-      await new Promise(resolve => setTimeout(resolve, 300));
-      return true;
-    } catch (error) {
-      console.error('Errore estrazione cleaners:', error);
-      toast({
-        title: "Errore",
-        description: "Impossibile caricare la lista cleaners. Riprova.",
-        variant: "destructive",
-      });
-      return false;
-    } finally {
-      setIsExtractingCleaners(false);
-    }
-  };
   
   // Stato per forzare re-render quando pending edits cambiano
   const [pendingEditsVersion, setPendingEditsVersion] = useState(0);
@@ -1672,19 +1627,9 @@ export default function TaskCard({
                       size="sm"
                       onClick={openAddCollaboratorDialog}
                       className="flex items-center gap-1"
-                      disabled={isExtractingCleaners}
                     >
-                      {isExtractingCleaners ? (
-                        <>
-                          <Loader2 className="w-3 h-3 animate-spin" />
-                          Caricamento...
-                        </>
-                      ) : (
-                        <>
-                          <UserPlus className="w-3 h-3" />
-                          Aggiungi collaboratore
-                        </>
-                      )}
+                      <UserPlus className="w-3 h-3" />
+                      Aggiungi collaboratore
                     </Button>
                   )}
                 </div>
@@ -1726,19 +1671,10 @@ export default function TaskCard({
                     size="sm"
                     onClick={openBulkAssignDialog}
                     className="flex items-center gap-1"
-                    disabled={isLocked || isExtractingCleaners}
+                    disabled={isLocked}
                   >
-                    {isExtractingCleaners ? (
-                      <>
-                        <Loader2 className="w-3 h-3 animate-spin" />
-                        Caricamento...
-                      </>
-                    ) : (
-                      <>
-                        <UserPlus className="w-3 h-3" />
-                        Seleziona cleaners
-                      </>
-                    )}
+                    <UserPlus className="w-3 h-3" />
+                    Seleziona cleaners
                   </Button>
                 </div>
                 

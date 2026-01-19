@@ -68,6 +68,20 @@ export function CleanerSelectorDialog({
   const loadCleaners = async () => {
     setIsLoadingCleaners(true);
     try {
+      // Prima sincronizza i cleaners da MySQL a PostgreSQL
+      try {
+        await fetch('/api/extract-cleaners-optimized', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ date: workDate }),
+          signal: AbortSignal.timeout(30000),
+        });
+        // Attendi un momento per permettere al database di propagare i dati
+        await new Promise(resolve => setTimeout(resolve, 300));
+      } catch (extractError) {
+        console.warn('Estrazione cleaners fallita, uso dati esistenti:', extractError);
+      }
+
       const [cleanersResponse, selectedResponse] = await Promise.all([
         fetch(`/api/cleaners?date=${workDate}`, {
           cache: 'no-store',
