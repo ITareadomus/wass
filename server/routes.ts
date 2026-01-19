@@ -485,6 +485,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Verifica se la task è bloccata (enforcement)
       const { pgDailyAssignmentsService } = await import("./services/pg-daily-assignments-service");
+      const { taskCollaborationService } = await import("./services/pg-task-collaboration-service");
+      
       if (taskId) {
         const isLocked = await pgDailyAssignmentsService.isTaskLocked(workDate, Number(taskId));
         if (isLocked) {
@@ -498,6 +500,55 @@ export async function registerRoutes(app: Express): Promise<Server> {
           });
         }
       }
+
+      // --- COLLABORATION-AWARE LOGIC ---
+      // Se la task è collaborativa e il sourceCleanerId è uno dei collaboratori,
+      // eseguiamo una "replace collaborator" invece di un semplice spostamento
+      let isCollaborativeMove = false;
+      
+      // Normalizza ID a numeri per evitare confronti string/number
+      const numTaskId = taskId ? Number(taskId) : null;
+      const numSourceCleanerId = sourceCleanerId ? Number(sourceCleanerId) : null;
+      const numDestCleanerId = destCleanerId ? Number(destCleanerId) : null;
+      
+      if (numTaskId && numSourceCleanerId && numDestCleanerId) {
+        const collab = await taskCollaborationService.getCollaboration(workDate, numTaskId);
+        
+        if (collab.count > 1 && collab.cleanerIds.includes(numSourceCleanerId)) {
+          // Task è collaborativa e source è un collaboratore
+          console.log(`🔄 Collaboration move detected: task ${numTaskId} has ${collab.count} collaborators`);
+          
+          // Blocca se destCleanerId è già un collaboratore
+          if (collab.cleanerIds.includes(numDestCleanerId)) {
+            console.log(`⚠️ BLOCKED: destCleanerId ${numDestCleanerId} è già collaboratore del task ${numTaskId}`);
+            return res.status(400).json({
+              success: false,
+              error: "DEST_ALREADY_COLLABORATOR",
+              message: "Il cleaner di destinazione è già collaboratore di questa task"
+            });
+          }
+          
+          // Esegui replace collaborator
+          const replaceResult = await taskCollaborationService.replaceCollaborator(
+            workDate,
+            numTaskId,
+            numSourceCleanerId,
+            numDestCleanerId
+          );
+          
+          if (!replaceResult.success) {
+            return res.status(400).json({
+              success: false,
+              error: replaceResult.error,
+              message: "Errore nella sostituzione del collaboratore"
+            });
+          }
+          
+          isCollaborativeMove = true;
+          console.log(`✅ Collaboration: replaced cleaner ${numSourceCleanerId} -> ${numDestCleanerId} for task ${numTaskId}`);
+        }
+      }
+      // --- END COLLABORATION-AWARE LOGIC ---
 
       // Carica timeline da PostgreSQL
       let timelineData: any = await workspaceFiles.loadTimeline(workDate);

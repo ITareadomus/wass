@@ -29,12 +29,13 @@ export class PgTaskCollaborationService {
       [workDate, taskId]
     );
 
-    const cleanerIds = result.rows.map((r: any) => r.cleaner_id);
+    // Normalize cleaner_id to numbers for consistent comparisons
+    const cleanerIds = result.rows.map((r: any) => Number(r.cleaner_id));
     const primaryRow = result.rows.find((r: any) => r.is_primary);
 
     return {
       cleanerIds,
-      primaryCleanerId: primaryRow?.cleaner_id ?? null,
+      primaryCleanerId: primaryRow ? Number(primaryRow.cleaner_id) : null,
       count: cleanerIds.length
     };
   }
@@ -55,19 +56,22 @@ export class PgTaskCollaborationService {
     const map = new Map<number, CollaborationInfo>();
 
     for (const row of result.rows) {
-      if (!map.has(row.task_id)) {
-        map.set(row.task_id, {
+      const taskIdNum = Number(row.task_id);
+      const cleanerIdNum = Number(row.cleaner_id);
+      
+      if (!map.has(taskIdNum)) {
+        map.set(taskIdNum, {
           cleanerIds: [],
           primaryCleanerId: null,
           count: 0
         });
       }
 
-      const info = map.get(row.task_id)!;
-      info.cleanerIds.push(row.cleaner_id);
+      const info = map.get(taskIdNum)!;
+      info.cleanerIds.push(cleanerIdNum);
       info.count++;
       if (row.is_primary) {
-        info.primaryCleanerId = row.cleaner_id;
+        info.primaryCleanerId = cleanerIdNum;
       }
     }
 
@@ -178,6 +182,84 @@ export class PgTaskCollaborationService {
       [workDate, taskId, cleanerId]
     );
     console.log(`✅ Collaboration: Removed cleaner ${cleanerId} from task ${taskId}`);
+  }
+
+  /**
+   * Replace a collaborator with another cleaner (e.g., drag & drop to change collaborator)
+   * If the old cleaner was primary, the new cleaner becomes primary.
+   * Returns false if destCleanerId is already a collaborator (would create 3+ collaborators).
+   */
+  async replaceCollaborator(
+    workDate: string,
+    taskId: number,
+    sourceCleanerId: number,
+    destCleanerId: number
+  ): Promise<{ success: boolean; error?: string }> {
+    const client = await pool.connect();
+
+    try {
+      await client.query('BEGIN');
+
+      // Check if destCleanerId is already a collaborator
+      const existsCheck = await client.query(
+        `SELECT 1 FROM task_collaborators 
+         WHERE work_date = $1 AND task_id = $2 AND cleaner_id = $3`,
+        [workDate, taskId, destCleanerId]
+      );
+
+      if (existsCheck.rows.length > 0) {
+        await client.query('ROLLBACK');
+        console.warn(`⚠️ Collaboration: Cleaner ${destCleanerId} is already a collaborator on task ${taskId}`);
+        return { 
+          success: false, 
+          error: 'DEST_ALREADY_COLLABORATOR' 
+        };
+      }
+
+      // Check if sourceCleanerId exists and was primary
+      const sourceCheck = await client.query(
+        `SELECT is_primary FROM task_collaborators 
+         WHERE work_date = $1 AND task_id = $2 AND cleaner_id = $3`,
+        [workDate, taskId, sourceCleanerId]
+      );
+
+      // Fail if source collaborator doesn't exist
+      if (sourceCheck.rows.length === 0) {
+        await client.query('ROLLBACK');
+        console.warn(`⚠️ Collaboration: Source cleaner ${sourceCleanerId} is not a collaborator on task ${taskId}`);
+        return { 
+          success: false, 
+          error: 'SOURCE_NOT_COLLABORATOR' 
+        };
+      }
+
+      const wasPrimary = sourceCheck.rows[0].is_primary;
+
+      // Delete old collaborator
+      await client.query(
+        `DELETE FROM task_collaborators 
+         WHERE work_date = $1 AND task_id = $2 AND cleaner_id = $3`,
+        [workDate, taskId, sourceCleanerId]
+      );
+
+      // Insert new collaborator (inherits primary status)
+      await client.query(
+        `INSERT INTO task_collaborators (work_date, task_id, cleaner_id, is_primary)
+         VALUES ($1, $2, $3, $4)`,
+        [workDate, taskId, destCleanerId, wasPrimary]
+      );
+
+      await client.query('COMMIT');
+      console.log(`✅ Collaboration: Replaced cleaner ${sourceCleanerId} with ${destCleanerId} for task ${taskId} (primary: ${wasPrimary})`);
+      return { success: true };
+
+    } catch (error) {
+      await client.query('ROLLBACK');
+      console.error('❌ Collaboration: Error replacing collaborator:', error);
+      throw error;
+    } finally {
+      client.release();
+    }
   }
 
   /**
