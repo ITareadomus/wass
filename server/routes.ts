@@ -431,6 +431,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         );
 
         if (!alreadyExists) {
+          // Ripristina cleaning_time al valore originale base_cleaning_time
+          // (rimuove l'effetto della collaborazione)
+          const baseTime = task.base_cleaning_time != null ? Number(task.base_cleaning_time) : null;
+          if (baseTime !== null && baseTime > 0) {
+            const oldTime = task.cleaning_time;
+            task.cleaning_time = baseTime;
+            task.base_cleaning_time = baseTime;
+            console.log(`  🔄 Task ${task.task_id}: cleaning_time ${oldTime} → ${baseTime} min (ripristinato base)`);
+          } else {
+            console.log(`  ⚠️ Task ${task.task_id}: base_cleaning_time non disponibile, mantengo cleaning_time=${task.cleaning_time}`);
+          }
           containersData.containers[targetContainer].tasks.push(task);
           console.log(`  ➕ Task ${task.task_id} (${task.logistic_code}) → ${targetContainer}`);
         }
