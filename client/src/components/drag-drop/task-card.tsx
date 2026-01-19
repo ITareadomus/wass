@@ -441,6 +441,11 @@ export default function TaskCard({
         await (window as any).reloadAllTasks();
       }
       
+      // Ricarica anche i cleaners della timeline (per mostrare eventuali auto-convocati)
+      if ((window as any).loadTimelineCleaners) {
+        await (window as any).loadTimelineCleaners();
+      }
+      
     } catch (error: any) {
       console.error('Errore nella gestione collaboratori:', error);
       toast({
