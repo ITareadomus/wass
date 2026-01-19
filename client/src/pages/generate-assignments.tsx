@@ -1325,8 +1325,18 @@ export default function GenerateAssignments() {
           dlog(`➕ Aggiungendo task ${taskLogCode} dalla timeline a cleaner ${timelineAssignment.cleanerId} con sequence ${timelineAssignment.sequence}`);
 
           // IMPORTANTE: Assicurati che assignedCleaner sia propagato correttamente
+          // IMPORTANTE: duration dalla timeline ha priorità (per collaborazioni con tempo diviso)
+          // Usa formatDuration per calcolare duration dal cleaning_time aggiornato
           const taskWithAssignment = {
             ...baseTask,
+            duration: timelineAssignment.cleaning_time 
+              ? formatDuration(timelineAssignment.cleaning_time) 
+              : baseTask.duration,
+            cleaning_time: timelineAssignment.cleaning_time,
+            base_cleaning_time: timelineAssignment.base_cleaning_time,
+            collaborator_ids: timelineAssignment.collaborator_ids,
+            collaborator_count: timelineAssignment.collaborator_count,
+            is_primary: timelineAssignment.is_primary,
             priority: timelineAssignment.priority || baseTask.priority,
             assignedCleaner: timelineAssignment.cleanerId,
             sequence: timelineAssignment.sequence,
