@@ -42,7 +42,17 @@ function getNormalizedTask(task: any): any {
   if (task.address !== undefined) normalizedTask.address = task.address;
   if (task.lat !== undefined) normalizedTask.lat = task.lat;
   if (task.lng !== undefined) normalizedTask.lng = task.lng;
-  if (task.cleaning_time !== undefined) normalizedTask.cleaning_time = task.cleaning_time;
+  if (task.cleaning_time !== undefined) {
+    normalizedTask.cleaning_time = task.cleaning_time;
+    // Genera duration in formato "H.MM" dal cleaning_time (minuti)
+    const hours = Math.floor(task.cleaning_time / 60);
+    const mins = task.cleaning_time % 60;
+    normalizedTask.duration = `${hours}.${String(mins).padStart(2, '0')}`;
+  }
+  if (task.base_cleaning_time !== undefined) normalizedTask.base_cleaning_time = task.base_cleaning_time;
+  if (task.collaborator_ids !== undefined) normalizedTask.collaborator_ids = task.collaborator_ids;
+  if (task.collaborator_count !== undefined) normalizedTask.collaborator_count = task.collaborator_count;
+  if (task.is_primary !== undefined) normalizedTask.is_primary = task.is_primary;
   if (task.checkin_date !== undefined) normalizedTask.checkin_date = task.checkin_date;
   if (task.checkout_date !== undefined) normalizedTask.checkout_date = task.checkout_date;
   if (task.checkin_time !== undefined) normalizedTask.checkin_time = task.checkin_time;
