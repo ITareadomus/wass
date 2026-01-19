@@ -516,18 +516,17 @@ export class PgDailyAssignmentsService {
         }
         task.base_cleaning_time = baseTime;
         
-        // Calculate effective cleaning time
+        // Use cleaning_time directly from DB row - it's already calculated correctly
+        // The DB stores the effective (split) cleaning_time, not the base
+        task.cleaning_time = row.cleaning_time;
+        
+        // Add collaboration metadata if present
         if (hasCollaborators) {
-          // Multiple collaborators: divide time proportionally
-          task.cleaning_time = Math.ceil(baseTime / collaboration!.count);
           task.collaborator_ids = collaboration!.cleanerIds;
           task.collaborator_count = collaboration!.count;
           if (collaboration!.primaryCleanerId !== null) {
             task.is_primary = row.cleaner_id === collaboration!.primaryCleanerId;
           }
-        } else {
-          // No collaboration: use base time as-is
-          task.cleaning_time = baseTime;
         }
         
         if (row.checkin_date) task.checkin_date = row.checkin_date;
