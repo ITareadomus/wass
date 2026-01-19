@@ -1550,19 +1550,14 @@ export default function GenerateAssignments() {
             handleTaskMoved();
           }
 
+          // Ricarica i dati dal server (server-driven approach)
+          await refreshAssignments("manual");
+
           toast({
             title: "Task riordinata",
             description: `Task ${logisticCode} spostata nella posizione ${destination.index + 1}`,
             variant: "success",
           });
-
-          // Rilascia lock PRIMA del reload
-          isDraggingRef.current = false;
-          if (dragTimeoutRef.current) clearTimeout(dragTimeoutRef.current);
-          setIsLoadingDragDrop(false);
-
-          // PATCH B: Reload debounced in background
-          scheduleManualRefresh(600);
         } catch (err) {
           console.error("Errore nel riordino:", err);
           toast({
@@ -1584,10 +1579,6 @@ export default function GenerateAssignments() {
         // CRITICAL: Usa lastValidDragIndex salvato durante onDragUpdate per evitare bug di posizionamento
         const correctIndex = lastValidDragIndex !== null ? lastValidDragIndex : destination.index;
         dlog(`🔄 Spostamento task ${taskId} da cleaner ${fromCleanerId} a cleaner ${toCleanerId} @ index ${correctIndex}`);
-
-        // OPTIMISTIC UPDATE: Sposta immediatamente nella UI CON posizione corretta
-        const { updated, snapshot } = optimisticMoveTask(allTasksWithAssignments, taskId, toCleanerId, correctIndex);
-        setAllTasksWithAssignments(updated);
 
         try {
           // Usa l'endpoint corretto per spostare tra cleaners
@@ -1622,6 +1613,9 @@ export default function GenerateAssignments() {
             handleTaskMoved();
           }
 
+          // Ricarica i dati dal server (server-driven approach)
+          await refreshAssignments("manual");
+
           // PATCH C: Usa ID nel toast invece di fetch
           const toCleanerName = `ID ${toCleanerId}`;
 
@@ -1630,17 +1624,7 @@ export default function GenerateAssignments() {
             description: `Task ${logisticCode} assegnata a ${toCleanerName}`,
             variant: "success",
           });
-
-          // Rilascia lock PRIMA del reload
-          isDraggingRef.current = false;
-          if (dragTimeoutRef.current) clearTimeout(dragTimeoutRef.current);
-          setIsLoadingDragDrop(false);
-
-          // PATCH B: Reload debounced in background
-          scheduleManualRefresh(600);
         } catch (err) {
-          // ROLLBACK: Ripristina stato precedente
-          setAllTasksWithAssignments(snapshot);
           console.error("Errore nello spostamento:", err);
           toast({
             title: "Errore",
@@ -1692,22 +1676,8 @@ export default function GenerateAssignments() {
           });
         }
 
-        // OPTIMISTIC UPDATE: Sposta tutte le task selezionate (non locked) immediatamente CON posizione corretta
         const taskIds = unlockedSelectedTasks.map(st => st.taskId);
-        const { updated, snapshot } = optimisticBatchMoveTask(allTasksWithAssignments, taskIds, toCleanerId, correctBatchIndex);
-        setAllTasksWithAssignments(updated);
-        const numTasks = unlockedSelectedTasks.length; // Usa solo le task non bloccate
-
-        // OPTIMISTIC UPDATE: Rimuovi task selezionate dai container (evita "sdoppiamento")
-        const containerSnapshots = {
-          early_out: [...earlyOutTasks],
-          high_priority: [...highPriorityTasks],
-          low_priority: [...lowPriorityTasks],
-        };
-        const taskIdSet = new Set(taskIds);
-        setEarlyOutTasks(prev => prev.filter(t => !taskIdSet.has(getTaskId(t))));
-        setHighPriorityTasks(prev => prev.filter(t => !taskIdSet.has(getTaskId(t))));
-        setLowPriorityTasks(prev => prev.filter(t => !taskIdSet.has(getTaskId(t))));
+        const numTasks = unlockedSelectedTasks.length;
 
         try {
           // PATCH C: Usa ID nel toast invece di fetch
@@ -1735,25 +1705,15 @@ export default function GenerateAssignments() {
             handleTaskMoved();
           }
 
+          // Ricarica i dati dal server (server-driven approach)
+          await refreshAssignments("manual");
+
           toast({
             title: "Task assegnate",
             description: `${numTasks} task cross-container assegnate a ${cleanerName}`,
             variant: "success",
           });
-
-          // Rilascia lock PRIMA del reload
-          isDraggingRef.current = false;
-          if (dragTimeoutRef.current) clearTimeout(dragTimeoutRef.current);
-          setIsLoadingDragDrop(false);
-
-          // PATCH B: Reload debounced in background
-          scheduleManualRefresh(600);
         } catch (err) {
-          // ROLLBACK: Ripristina stato precedente (incluso containers)
-          setAllTasksWithAssignments(snapshot);
-          setEarlyOutTasks(containerSnapshots.early_out);
-          setHighPriorityTasks(containerSnapshots.high_priority);
-          setLowPriorityTasks(containerSnapshots.low_priority);
           console.error("Errore nello spostamento batch:", err);
           toast({
             title: "Errore",
@@ -1776,24 +1736,6 @@ export default function GenerateAssignments() {
         const correctIndex = lastValidDragIndex !== null ? lastValidDragIndex : destination.index;
         dlog(`🔄 Spostamento da container ${fromContainer} a cleaner ${toCleanerId} @ index ${correctIndex}`);
 
-        // OPTIMISTIC UPDATE: Aggiorna UI immediatamente CON posizione corretta
-        const { updated, snapshot } = optimisticMoveTask(allTasksWithAssignments, taskId, toCleanerId, correctIndex);
-        setAllTasksWithAssignments(updated);
-
-        // OPTIMISTIC UPDATE: Rimuovi immediatamente la task dal container (evita "sdoppiamento")
-        const containerSnapshots = {
-          early_out: [...earlyOutTasks],
-          high_priority: [...highPriorityTasks],
-          low_priority: [...lowPriorityTasks],
-        };
-        if (fromContainer === 'early_out') {
-          setEarlyOutTasks(prev => prev.filter(t => getTaskId(t) !== taskId));
-        } else if (fromContainer === 'high_priority') {
-          setHighPriorityTasks(prev => prev.filter(t => getTaskId(t) !== taskId));
-        } else if (fromContainer === 'low_priority') {
-          setLowPriorityTasks(prev => prev.filter(t => getTaskId(t) !== taskId));
-        }
-
         try {
           // PATCH C: Usa ID nel toast invece di fetch
           const cleanerName = `ID ${toCleanerId}`;
@@ -1807,29 +1749,15 @@ export default function GenerateAssignments() {
             handleTaskMoved();
           }
 
+          // Ricarica i dati dal server (server-driven approach)
+          await refreshAssignments("manual");
+
           toast({
             title: "Task assegnata",
             description: `Task ${logisticCode} assegnata a ${cleanerName}`,
             variant: "success",
           });
-
-          // Rilascia lock PRIMA del reload
-          isDraggingRef.current = false;
-          if (dragTimeoutRef.current) clearTimeout(dragTimeoutRef.current);
-          setIsLoadingDragDrop(false);
-
-          // PATCH B: Reload debounced in background
-          scheduleManualRefresh(600);
         } catch (err) {
-          // ROLLBACK: Ripristina stato precedente (incluso container)
-          setAllTasksWithAssignments(snapshot);
-          if (fromContainer === 'early_out') {
-            setEarlyOutTasks(containerSnapshots.early_out);
-          } else if (fromContainer === 'high_priority') {
-            setHighPriorityTasks(containerSnapshots.high_priority);
-          } else if (fromContainer === 'low_priority') {
-            setLowPriorityTasks(containerSnapshots.low_priority);
-          }
           console.error("Errore nell'assegnazione:", err);
           toast({
             title: "Errore",
@@ -1849,10 +1777,6 @@ export default function GenerateAssignments() {
       if (fromCleanerId !== null && toContainer && !toCleanerId) { // Aggiunto !toCleanerId per evitare sovrapposizioni
         dlog(`🔄 Spostamento da cleaner ${fromCleanerId} a container ${toContainer}`);
 
-        // OPTIMISTIC UPDATE: Rimuovi assignedCleaner immediatamente
-        const { updated, snapshot } = optimisticMoveTask(allTasksWithAssignments, taskId, null);
-        setAllTasksWithAssignments(updated);
-
         try {
           // Rimuovi da timeline.json
           await removeTimelineAssignment(taskId, logisticCode);
@@ -1863,16 +1787,9 @@ export default function GenerateAssignments() {
             handleTaskMoved();
           }
 
-          // Rilascia lock PRIMA del reload
-          isDraggingRef.current = false;
-          if (dragTimeoutRef.current) clearTimeout(dragTimeoutRef.current);
-          setIsLoadingDragDrop(false);
-
-          // PATCH B: Reload debounced in background
-          scheduleManualRefresh(600);
+          // Ricarica i dati dal server (server-driven approach)
+          await refreshAssignments("manual");
         } catch (err) {
-          // ROLLBACK: Ripristina stato precedente
-          setAllTasksWithAssignments(snapshot);
           console.error("Errore nella rimozione:", err);
           toast({
             title: "Errore",
