@@ -186,16 +186,16 @@ export default function MapSection({ tasks }: MapSectionProps) {
       const isCollaborativeTask = collaboratorIds && Array.isArray(collaboratorIds) && collaboratorIds.length > 1;
       
       // Calculate horizontal offset for collaborative tasks
-      // Each collaborator gets a small horizontal offset to show markers side-by-side
+      // Each collaborator gets a horizontal offset to show markers side-by-side
       let collaboratorOffset = 0;
       if (isCollaborativeTask && assignedCleaner) {
         const collaboratorIndex = collaboratorIds.indexOf(assignedCleaner);
         // Defensive guard: if cleaner not found in collaborator_ids, use 0 offset
         if (collaboratorIndex >= 0) {
           const totalCollaborators = collaboratorIds.length;
-          // Offset range: -0.00004 to +0.00004 (about 4-5 meters each side)
-          // This centers the group of markers around the original position
-          const offsetStep = 0.00008 / Math.max(totalCollaborators - 1, 1);
+          // Offset range: about 15-20 meters each side for clear visibility
+          // 0.0003 degrees ≈ 33 meters total spread
+          const offsetStep = 0.0003 / Math.max(totalCollaborators - 1, 1);
           collaboratorOffset = (collaboratorIndex - (totalCollaborators - 1) / 2) * offsetStep;
         }
       }

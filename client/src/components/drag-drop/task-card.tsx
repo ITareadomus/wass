@@ -1175,18 +1175,6 @@ export default function TaskCard({
                             ({(task as any).customer_reference})
                           </span>
                         )}
-                        {/* Badge collaborativo */}
-                        {(task as any).collaborator_count > 1 && (
-                          <span className="bg-purple-500 text-white text-[9px] font-bold px-1 py-0.5 rounded">
-                            👥 x{(task as any).collaborator_count}
-                          </span>
-                        )}
-                        {/* Indicatore Primary */}
-                        {(task as any).is_primary === true && (task as any).collaborator_count > 1 && (
-                          <span className="bg-blue-600 text-white text-[8px] font-semibold px-1 py-0.5 rounded">
-                            Primary
-                          </span>
-                        )}
                       </div>
                       {task.alias && (
                         <span className="opacity-70 leading-none mt-0.5 text-[#000000] font-bold text-[11px]">
