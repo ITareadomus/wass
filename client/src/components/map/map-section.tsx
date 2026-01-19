@@ -149,7 +149,14 @@ export default function MapSection({ tasks }: MapSectionProps) {
     // Se c'è un filtro per cleaner (doppio click su cleaner nella timeline)
     else if (filteredCleanerId !== null && filteredCleanerId !== undefined && filteredCleanerId !== 0) {
       tasksWithCoordinates.forEach(task => {
-        if ((task as any).assignedCleaner === filteredCleanerId) {
+        const assignedCleaner = (task as any).assignedCleaner;
+        const collaboratorIds = (task as any).collaborator_ids as number[] | null;
+        
+        // Evidenzia se il task è assegnato al cleaner O se il cleaner è tra i collaboratori
+        const isAssignedToFilteredCleaner = assignedCleaner === filteredCleanerId;
+        const isCollaborator = collaboratorIds && Array.isArray(collaboratorIds) && collaboratorIds.includes(filteredCleanerId);
+        
+        if (isAssignedToFilteredCleaner || isCollaborator) {
           highlightedTaskIds.add(task.name);
         }
       });
