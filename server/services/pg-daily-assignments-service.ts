@@ -498,8 +498,9 @@ export class PgDailyAssignmentsService {
         if (row.lat !== null) task.lat = parseFloat(String(row.lat));
         if (row.lng !== null) task.lng = parseFloat(String(row.lng));
         
-        // Get collaboration info
-        const collaboration = collaborationsMap.get(row.task_id);
+        // Get collaboration info (task_id in collaborationsMap is number, row.task_id is string)
+        const taskIdNum = parseInt(row.task_id, 10);
+        const collaboration = collaborationsMap.get(taskIdNum);
         const hasCollaborators = collaboration && collaboration.count > 1;
         
         // Calculate base_cleaning_time (original duration before collaboration split)

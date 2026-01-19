@@ -180,17 +180,36 @@ export default function MapSection({ tasks }: MapSectionProps) {
       const count = coordinateCount.get(coordKey) || 0;
       coordinateCount.set(coordKey, count + 1);
 
-      // Aggiungi un piccolo offset se ci sono marker duplicati
+      // Check if this is a collaborative task (multiple cleaners working together)
+      const collaboratorIds = (task as any).collaborator_ids as number[] | null;
+      const assignedCleaner = (task as any).assignedCleaner as number | null;
+      const isCollaborativeTask = collaboratorIds && Array.isArray(collaboratorIds) && collaboratorIds.length > 1;
+      
+      // Calculate horizontal offset for collaborative tasks
+      // Each collaborator gets a small horizontal offset to show markers side-by-side
+      let collaboratorOffset = 0;
+      if (isCollaborativeTask && assignedCleaner) {
+        const collaboratorIndex = collaboratorIds.indexOf(assignedCleaner);
+        // Defensive guard: if cleaner not found in collaborator_ids, use 0 offset
+        if (collaboratorIndex >= 0) {
+          const totalCollaborators = collaboratorIds.length;
+          // Offset range: -0.00004 to +0.00004 (about 4-5 meters each side)
+          // This centers the group of markers around the original position
+          const offsetStep = 0.00008 / Math.max(totalCollaborators - 1, 1);
+          collaboratorOffset = (collaboratorIndex - (totalCollaborators - 1) / 2) * offsetStep;
+        }
+      }
+
+      // Aggiungi un piccolo offset se ci sono marker duplicati (non collaborativi)
       // Offset di circa 5-10 metri (0.00005 gradi ≈ 5.5 metri)
-      const offset = count * 0.00005;
+      const duplicateOffset = !isCollaborativeTask ? count * 0.00005 : 0;
       const angle = count * (Math.PI / 3); // 60 gradi tra ogni marker
-      const lat = baseLat + (offset * Math.cos(angle));
-      const lng = baseLng + (offset * Math.sin(angle));
+      const lat = baseLat + (duplicateOffset * Math.cos(angle));
+      const lng = baseLng + (duplicateOffset * Math.sin(angle)) + collaboratorOffset;
 
       const position = { lat, lng };
       
-      // Ottieni il colore in base al cleaner assegnato
-      const assignedCleaner = (task as any).assignedCleaner;
+      // Ottieni il colore in base al cleaner assegnato (assignedCleaner già dichiarato sopra)
       const markerColor = assignedCleaner ? getCleanerColor(assignedCleaner) : '#6B7280';
       const sequence = (task as any).sequence;
       
@@ -439,6 +458,33 @@ export default function MapSection({ tasks }: MapSectionProps) {
                 {(selectedTask as any).checkin_time && (
                   <div>
                     <span className="font-semibold">Checkin:</span> {(selectedTask as any).checkin_time}
+                  </div>
+                )}
+                {/* Mostra collaboratori se task collaborativo */}
+                {(selectedTask as any).collaborator_ids && 
+                 Array.isArray((selectedTask as any).collaborator_ids) && 
+                 (selectedTask as any).collaborator_ids.length > 1 && (
+                  <div className="pt-1 border-t border-border mt-2">
+                    <span className="font-semibold">Collaboratori:</span>
+                    <div className="flex gap-1 mt-1 flex-wrap">
+                      {(selectedTask as any).collaborator_ids.map((cleanerId: number) => {
+                        const cleaner = cleaners.find((c: any) => c.id === cleanerId);
+                        const cleanerName = cleaner ? (cleaner.alias || `${cleaner.name} ${cleaner.lastname}`) : `Cleaner ${cleanerId}`;
+                        return (
+                          <span 
+                            key={cleanerId}
+                            className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium"
+                            style={{ 
+                              backgroundColor: getCleanerColor(cleanerId) + '20',
+                              color: getCleanerColor(cleanerId),
+                              border: `1px solid ${getCleanerColor(cleanerId)}`
+                            }}
+                          >
+                            {cleanerName}
+                          </span>
+                        );
+                      })}
+                    </div>
                   </div>
                 )}
                 <div className="pt-2 flex gap-2 flex-wrap">
