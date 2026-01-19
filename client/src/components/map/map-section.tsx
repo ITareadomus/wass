@@ -193,9 +193,9 @@ export default function MapSection({ tasks }: MapSectionProps) {
         // Defensive guard: if cleaner not found in collaborator_ids, use 0 offset
         if (collaboratorIndex >= 0) {
           const totalCollaborators = collaboratorIds.length;
-          // Offset range: about 15-20 meters each side for clear visibility
-          // 0.0003 degrees ≈ 33 meters total spread
-          const offsetStep = 0.0003 / Math.max(totalCollaborators - 1, 1);
+          // Offset range: about 50-60 meters each side for visibility at all zoom levels
+          // 0.001 degrees ≈ 110 meters total spread
+          const offsetStep = 0.001 / Math.max(totalCollaborators - 1, 1);
           collaboratorOffset = (collaboratorIndex - (totalCollaborators - 1) / 2) * offsetStep;
         }
       }
