@@ -149,28 +149,19 @@ export default function MapSection({ tasks }: MapSectionProps) {
       highlightedMarkerIds.add(filteredTaskId);
     }
     // Se c'è un filtro per cleaner (doppio click su cleaner nella timeline)
-    // Per task collaborativi: evidenzia TUTTI i marker del task se il cleaner filtrato è uno dei collaboratori
+    // Evidenzia SOLO i marker assegnati a quel cleaner specifico (non quelli dei collaboratori)
     else if (filteredCleanerId !== null && filteredCleanerId !== undefined && filteredCleanerId !== 0) {
       tasksWithCoordinates.forEach(task => {
         const assignedCleaner = (task as any).assignedCleaner;
         const collaboratorIds = (task as any).collaborator_ids as number[] | null;
         const isCollaborativeTask = collaboratorIds && Array.isArray(collaboratorIds) && collaboratorIds.length > 1;
         
-        // Per task NON collaborativi: evidenzia se assegnato al cleaner filtrato
-        if (!isCollaborativeTask) {
-          if (assignedCleaner === filteredCleanerId) {
-            highlightedMarkerIds.add(task.name);
-          }
-        } else {
-          // Per task collaborativi: se il cleaner filtrato è tra i collaboratori,
-          // evidenzia TUTTI i marker di quel task (tutti i collaboratori)
-          const isCleanerInvolved = collaboratorIds.includes(filteredCleanerId);
-          if (isCleanerInvolved) {
-            // Aggiungi marker ID per ogni collaboratore
-            collaboratorIds.forEach(collaboratorId => {
-              highlightedMarkerIds.add(`${task.name}:${collaboratorId}`);
-            });
-          }
+        // Evidenzia solo se il task è assegnato al cleaner filtrato
+        if (assignedCleaner === filteredCleanerId) {
+          const markerId = isCollaborativeTask 
+            ? `${task.name}:${assignedCleaner}` 
+            : task.name;
+          highlightedMarkerIds.add(markerId);
         }
       });
     }
