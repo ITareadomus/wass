@@ -650,8 +650,9 @@ export default function TimelineView({
     loadTimelineCleaners();
     loadTimelineData(); // Carica i dati della timeline anche qui
 
-    // Esponi la funzione per ricaricare i cleaners della timeline
+    // Esponi le funzioni per ricaricare i cleaners
     (window as any).loadTimelineCleaners = loadTimelineCleaners;
+    (window as any).loadSelectedCleaners = loadCleaners;
   }, []);
 
   const handleCleanerClick = (cleaner: Cleaner, e?: React.MouseEvent) => {

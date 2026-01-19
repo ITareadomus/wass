@@ -436,14 +436,16 @@ export default function TaskCard({
       setIsCleanerSelectorOpen(false);
       setIsModalOpen(false);
       
-      // Ricarica timeline e containers
-      if ((window as any).reloadAllTasks) {
-        await (window as any).reloadAllTasks();
+      // IMPORTANTE: Prima ricarica i selected_cleaners (per includere auto-convocati)
+      // PRIMA di reloadAllTasks, così quando la timeline viene renderizzata
+      // il cleaner auto-convocato non appare come "Rimosso"
+      if ((window as any).loadSelectedCleaners) {
+        await (window as any).loadSelectedCleaners();
       }
       
-      // Ricarica anche i cleaners della timeline (per mostrare eventuali auto-convocati)
-      if ((window as any).loadTimelineCleaners) {
-        await (window as any).loadTimelineCleaners();
+      // Poi ricarica timeline e containers
+      if ((window as any).reloadAllTasks) {
+        await (window as any).reloadAllTasks();
       }
       
     } catch (error: any) {
