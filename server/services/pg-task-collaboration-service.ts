@@ -249,6 +249,15 @@ export class PgTaskCollaborationService {
         [workDate, taskId, destCleanerId, wasPrimary]
       );
 
+      // Aggiorna anche cleaner_id in daily_assignments_current per riflettere lo spostamento nella timeline
+      const updateResult = await client.query(
+        `UPDATE daily_assignments_current 
+         SET cleaner_id = $1 
+         WHERE work_date = $2 AND task_id = $3 AND cleaner_id = $4`,
+        [destCleanerId, workDate, taskId, sourceCleanerId]
+      );
+      console.log(`📝 Collaboration: Updated ${updateResult.rowCount} row(s) in daily_assignments_current`);
+
       await client.query('COMMIT');
       console.log(`✅ Collaboration: Replaced cleaner ${sourceCleanerId} with ${destCleanerId} for task ${taskId} (primary: ${wasPrimary})`);
       return { success: true };
