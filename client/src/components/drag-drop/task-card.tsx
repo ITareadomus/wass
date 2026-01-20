@@ -1831,9 +1831,6 @@ export default function TaskCard({
                   <p><strong>Durata attuale per cleaner:</strong> {(displayTask.duration || "0.0").replace(".", ":")} ore</p>
                   <p><strong>Cleaners coinvolti:</strong> {(displayTask as any).collaborator_count || 0}</p>
                 </div>
-                <p className="text-sm text-muted-foreground">
-                  Sei sicuro di voler procedere? Le assegnazioni verranno rimosse dalla timeline di tutti i cleaners.
-                </p>
               </div>
             </AlertDialogDescription>
           </AlertDialogHeader>

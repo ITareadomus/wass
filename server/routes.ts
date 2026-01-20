@@ -3673,50 +3673,46 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
 
         // 7. Riporta la task nel container originale con durata originale
-        // Carica containers esistenti
-        const containersResult = await client.query(
-          `SELECT data FROM daily_containers WHERE work_date = $1`,
-          [workDate]
-        );
+        // Carica containers esistenti usando workspaceFiles service
+        const containersData = await workspaceFiles.loadContainers(workDate) || { 
+          containers: { early_out: { tasks: [] }, high_priority: { tasks: [] }, low_priority: { tasks: [] } } 
+        };
+        
+        const containers = containersData.containers || containersData;
+        const containerKey = priority === 'early_out' ? 'early_out' : 
+                             priority === 'high_priority' ? 'high_priority' : 'low_priority';
 
-        if (containersResult.rows.length > 0) {
-          const containers = containersResult.rows[0].data;
-          const containerKey = priority === 'early_out' ? 'early_out' : 
-                               priority === 'high_priority' ? 'high_priority' : 'low_priority';
+        // Costruisci task da reinserire
+        const taskToReinsert = {
+          task_id: taskData.task_id,
+          logistic_code: logisticCode,
+          name: String(logisticCode),
+          cleaning_time: originalDuration,
+          duration: `${Math.floor(originalDuration / 60)}.${String(originalDuration % 60).padStart(2, '0')}`,
+          address: taskData.address,
+          lat: taskData.lat,
+          lng: taskData.lng,
+          checkout_date: taskData.checkout_date,
+          checkout_time: taskData.checkout_time,
+          checkin_date: taskData.checkin_date,
+          checkin_time: taskData.checkin_time,
+          pax_in: taskData.pax_in,
+          operation_id: taskData.operation_id,
+          straordinaria: taskData.straordinaria,
+          customer_reference: taskData.customer_reference,
+          priority: priority
+        };
 
-          // Costruisci task da reinserire
-          const taskToReinsert = {
-            task_id: taskData.task_id,
-            logistic_code: logisticCode,
-            name: String(logisticCode),
-            cleaning_time: originalDuration,
-            duration: `${Math.floor(originalDuration / 60)}.${String(originalDuration % 60).padStart(2, '0')}`,
-            address: taskData.address,
-            lat: taskData.lat,
-            lng: taskData.lng,
-            checkout_date: taskData.checkout_date,
-            checkout_time: taskData.checkout_time,
-            checkin_date: taskData.checkin_date,
-            checkin_time: taskData.checkin_time,
-            pax_in: taskData.pax_in,
-            operation_id: taskData.operation_id,
-            straordinaria: taskData.straordinaria,
-            customer_reference: taskData.customer_reference,
-            priority: priority
-          };
-
-          // Aggiungi al container corretto
-          if (containers[containerKey] && containers[containerKey].tasks) {
-            containers[containerKey].tasks.push(taskToReinsert);
-          }
-
-          // Salva containers aggiornati
-          await client.query(
-            `UPDATE daily_containers SET data = $1 WHERE work_date = $2`,
-            [JSON.stringify(containers), workDate]
-          );
-          console.log(`✅ Dissolve: Task ${logisticCode} reinserita in container ${containerKey} con durata ${originalDuration} min`);
+        // Aggiungi al container corretto
+        if (containers[containerKey] && containers[containerKey].tasks) {
+          containers[containerKey].tasks.push(taskToReinsert);
+        } else if (containers[containerKey]) {
+          containers[containerKey].tasks = [taskToReinsert];
         }
+
+        // Salva containers aggiornati usando workspaceFiles service
+        await workspaceFiles.saveContainers(workDate, { containers }, 'system', 'collaboration_dissolved');
+        console.log(`✅ Dissolve: Task ${logisticCode} reinserita in container ${containerKey} con durata ${originalDuration} min`);
 
         await client.query('COMMIT');
 
