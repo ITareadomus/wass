@@ -1498,8 +1498,11 @@ export default function GenerateAssignments() {
         return;
       }
 
-      // draggableId è sempre l'id univoco della task
-      const taskId = draggableId;
+      // draggableId formato: "{taskId}-cleaner-{cleanerId}" o "{taskId}" (containers)
+      // Estrai solo il taskId dalla chiave composita
+      const taskId = draggableId.includes('-cleaner-') 
+        ? draggableId.split('-cleaner-')[0] 
+        : draggableId;
       const task = allTasksWithAssignments.find(t => String(t.id) === String(taskId));
       const logisticCode = task?.name; // name contiene il logistic_code
 
