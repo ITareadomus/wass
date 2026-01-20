@@ -19,7 +19,7 @@ import {
 } from "@/components/ui/tooltip";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
-import { HelpCircle, ChevronLeft, ChevronRight, Save, Pencil, Calendar, Lock, LockOpen, Users, UserPlus } from "lucide-react";
+import { HelpCircle, ChevronLeft, ChevronRight, Save, Pencil, Calendar, Lock, LockOpen, Users, UserPlus, Trash2 } from "lucide-react";
 import { CleanerSelectorDialog } from "@/components/dialogs/cleaner-selector-dialog";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
@@ -1655,7 +1655,13 @@ export default function TaskCard({
 
                 {/* Info collaborazione attuale */}
                 {(displayTask as any).collaborator_count > 1 && (
-                  <div className="text-xs text-muted-foreground mb-2 p-2 bg-purple-50 dark:bg-purple-900/20 rounded">
+                  <div className="text-xs text-muted-foreground mb-2 p-3 bg-purple-50 dark:bg-purple-900/20 rounded border border-purple-200 dark:border-purple-800">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Users className="w-4 h-4 text-purple-600" />
+                      <span className="font-semibold text-purple-700 dark:text-purple-300">
+                        Collaborazione ({(displayTask as any).collaborator_count} cleaners)
+                      </span>
+                    </div>
                     <p>
                       <strong>Durata originale:</strong> {(() => {
                         const baseTime = (displayTask as any).base_cleaning_time || 0;
@@ -1669,6 +1675,57 @@ export default function TaskCard({
                     </p>
                     {(displayTask as any).is_primary && (
                       <p className="text-blue-600 font-semibold mt-1">Questo cleaner è il Primary</p>
+                    )}
+                    {!isReadOnly && (
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        className="mt-3 w-full flex items-center justify-center gap-2"
+                        onClick={async () => {
+                          const workDate = localStorage.getItem('selected_work_date') || new Date().toISOString().split('T')[0];
+                          const taskId = displayTask.task_id;
+                          
+                          if (!confirm(`Sei sicuro di voler rimuovere la collaborazione? La task tornerà nei containers con la durata originale.`)) {
+                            return;
+                          }
+                          
+                          try {
+                            const response = await fetch(`/api/tasks/${taskId}/collaborators/dissolve`, {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({ date: workDate })
+                            });
+                            
+                            const result = await response.json();
+                            
+                            if (result.success) {
+                              toast({
+                                title: "Collaborazione rimossa",
+                                description: `Task ${result.logisticCode} riportata in ${result.priority} con durata ${result.originalDuration} min`,
+                              });
+                              // Chiudi il modale
+                              setIsModalOpen(false);
+                              // Refresh della pagina tramite evento custom
+                              window.dispatchEvent(new CustomEvent('refresh-assignments'));
+                            } else {
+                              toast({
+                                title: "Errore",
+                                description: result.error || "Impossibile rimuovere la collaborazione",
+                                variant: "destructive"
+                              });
+                            }
+                          } catch (error: any) {
+                            toast({
+                              title: "Errore",
+                              description: error.message || "Errore nella rimozione della collaborazione",
+                              variant: "destructive"
+                            });
+                          }
+                        }}
+                      >
+                        <Trash2 className="w-4 h-4" />
+                        Rimuovi collaborazione
+                      </Button>
                     )}
                   </div>
                 )}
