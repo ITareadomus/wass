@@ -1,0 +1,105 @@
+import { exec } from 'child_process';
+import path from 'path';
+import * as workspaceFiles from './workspace-files';
+
+export interface RefreshContainersResult {
+  success: boolean;
+  containersData: any;
+  removedCount: number;
+  error?: string;
+}
+
+export async function refreshContainersFromAdam(
+  workDate: string,
+  modifiedBy: string = 'system'
+): Promise<RefreshContainersResult> {
+  console.log(`🔄 refreshContainersFromAdam: Rigenerazione containers dal DB ADAM per ${workDate}...`);
+
+  try {
+    const createContainersPath = path.join(process.cwd(), 'client/public/scripts/create_containers.py');
+    
+    await new Promise<string>((resolve, reject) => {
+      exec(`python3 "${createContainersPath}" --date "${workDate}" --skip-extract --use-api`, (error, stdout, stderr) => {
+        if (error) {
+          console.error(`❌ Errore create_containers: ${error.message}`);
+          reject(new Error(stderr || error.message));
+        } else {
+          console.log(`create_containers output: ${stdout}`);
+          resolve(stdout);
+        }
+      });
+    });
+
+    let containersData = await workspaceFiles.loadContainers(workDate);
+    
+    if (!containersData) {
+      containersData = {
+        containers: { 
+          early_out: { tasks: [], count: 0 }, 
+          high_priority: { tasks: [], count: 0 }, 
+          low_priority: { tasks: [], count: 0 } 
+        },
+        summary: { early_out: 0, high_priority: 0, low_priority: 0, total_tasks: 0 },
+        metadata: { date: workDate }
+      };
+    }
+    
+    console.log(`✅ Containers rigenerati dal DB ADAM per ${workDate}`);
+
+    const timelineData = await workspaceFiles.loadTimeline(workDate);
+    
+    const assignedTaskIds = new Set<number>();
+    if (timelineData?.cleaners_assignments) {
+      for (const cleanerEntry of timelineData.cleaners_assignments) {
+        for (const task of cleanerEntry.tasks || []) {
+          assignedTaskIds.add(task.task_id);
+        }
+      }
+    }
+
+    console.log(`🔍 Task assegnate trovate in timeline: ${assignedTaskIds.size}`);
+
+    let removedCount = 0;
+    for (const containerType of ['early_out', 'high_priority', 'low_priority']) {
+      const container = containersData.containers?.[containerType];
+      if (container?.tasks) {
+        const originalCount = container.tasks.length;
+        container.tasks = container.tasks.filter((t: any) => !assignedTaskIds.has(t.task_id));
+        container.count = container.tasks.length;
+        removedCount += (originalCount - container.tasks.length);
+      }
+    }
+
+    if (containersData.summary) {
+      containersData.summary.early_out = containersData.containers.early_out?.count || 0;
+      containersData.summary.high_priority = containersData.containers.high_priority?.count || 0;
+      containersData.summary.low_priority = containersData.containers.low_priority?.count || 0;
+      containersData.summary.total_tasks =
+        containersData.summary.early_out +
+        containersData.summary.high_priority +
+        containersData.summary.low_priority;
+    }
+
+    await workspaceFiles.saveContainers(workDate, containersData, modifiedBy, 'containers_synced_from_adam');
+    
+    // Save to history for auditing
+    const { pgDailyAssignmentsService } = await import('./pg-daily-assignments-service');
+    await pgDailyAssignmentsService.saveContainersToHistory(workDate, modifiedBy, 'containers_synced_from_adam');
+    
+    console.log(`✅ Containers sincronizzati: rimosse ${removedCount} task già assegnate, salvati su PostgreSQL`);
+
+    return {
+      success: true,
+      containersData,
+      removedCount
+    };
+  } catch (error: any) {
+    console.error('❌ Errore nella rigenerazione containers:', error);
+    return {
+      success: false,
+      containersData: null,
+      removedCount: 0,
+      error: error.message
+    };
+  }
+}
