@@ -1657,7 +1657,7 @@ export default function TaskCard({
                       variant="outline"
                       size="sm"
                       onClick={openAddCollaboratorDialog}
-                      className="flex items-center gap-1 border-purple-300 dark:border-purple-700 hover:bg-purple-50 dark:hover:bg-purple-900/20"
+                      className="flex items-center gap-1 border-2 border-purple-300 dark:border-purple-700 hover:bg-purple-50 dark:hover:bg-purple-900/20"
                     >
                       <UserPlus className="w-3 h-3" />
                       Aggiungi collaboratore
@@ -1719,7 +1719,7 @@ export default function TaskCard({
                     variant="outline"
                     size="sm"
                     onClick={openBulkAssignDialog}
-                    className="flex items-center gap-1 border-purple-300 dark:border-purple-700 hover:bg-purple-50 dark:hover:bg-purple-900/20"
+                    className="flex items-center gap-1 border-2 border-purple-300 dark:border-purple-700 hover:bg-purple-50 dark:hover:bg-purple-900/20"
                     disabled={isLocked}
                   >
                     <UserPlus className="w-3 h-3" />
@@ -1837,7 +1837,7 @@ export default function TaskCard({
           <AlertDialogFooter>
             <AlertDialogCancel
               onClick={() => setShowDissolveDialog(false)}
-              className="border-purple-300 dark:border-purple-700"
+              className="border-2 border-purple-300 dark:border-purple-700"
               disabled={isDissolvingCollaboration}
             >
               Annulla
@@ -1884,7 +1884,7 @@ export default function TaskCard({
                 }
               }}
               disabled={isDissolvingCollaboration}
-              className="bg-background hover:bg-accent text-foreground border-purple-300 dark:border-purple-700 shadow-sm"
+              className="bg-background hover:bg-accent text-foreground border-2 border-purple-300 dark:border-purple-700 shadow-sm"
             >
               {isDissolvingCollaboration ? "Rimozione..." : "Conferma Rimozione"}
             </AlertDialogAction>

@@ -410,7 +410,7 @@ export function CleanerSelectorDialog({
           )}
 
           <div className="flex justify-end gap-2">
-            <Button variant="outline" onClick={onClose}>
+            <Button variant="outline" onClick={onClose} className="border-2 border-purple-300 dark:border-purple-700">
               Annulla
             </Button>
             <Button
