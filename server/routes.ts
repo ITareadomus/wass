@@ -3699,7 +3699,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
             checkin_date: taskData.checkin_date,
             checkin_time: taskData.checkin_time,
             pax_in: taskData.pax_in,
-            linen_change: taskData.linen_change,
             operation_id: taskData.operation_id,
             straordinaria: taskData.straordinaria,
             customer_reference: taskData.customer_reference,
