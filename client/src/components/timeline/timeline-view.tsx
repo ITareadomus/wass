@@ -1910,8 +1910,9 @@ export default function TimelineView({
                                       ? (waitingGap / virtualMinutes) * timelineWidth
                                       : 0;
 
-                                    // Usa task.id o task.task_id come chiave univoca (non logistic_code che può essere duplicato)
-                                    const uniqueKey = taskObj.task_id || taskObj.id;
+                                    // Chiave univoca per task collaborative: include cleaner.id
+                                    const taskId = taskObj.task_id || taskObj.id;
+                                    const uniqueKey = `${taskId}-cleaner-${cleaner.id}`;
 
                                     // Verifica compatibilità task-cleaner
                                     const isIncompatible = validationRules && cleaner?.role
@@ -1924,7 +1925,7 @@ export default function TimelineView({
                                       : false;
 
                                     return (
-                                      <React.Fragment key={`task-${taskObj.task_id || taskObj.id}`}>
+                                      <React.Fragment key={uniqueKey}>
 
                                         {/* Travel time marker - FUORI dal Draggable (solo per sequence >= 2) */}
                                         {seq >= 2 && travelTime > 0 && travelWidthPx > 0 && (
@@ -1980,6 +1981,7 @@ export default function TimelineView({
                                           timeOffset={seq === 1 ? timeOffset : 0}
                                           globalTimeSlots={globalTimeSlots.length}
                                           isHighlighted={highlightedTaskIds.has(String(task.id))}
+                                          cleanerId={cleaner.id}
                                         />
                                       </React.Fragment>
                                     );
