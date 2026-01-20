@@ -34,6 +34,12 @@ import {
 // Normalizza la chiave di una task indipendentemente dal campo usato
 const getTaskKey = (t: any) => String(t?.id ?? t?.task_id ?? t?.logistic_code ?? "");
 
+// Genera chiave univoca per DnD includendo cleanerId (per task collaborative)
+const getUniqueDraggableId = (t: any, cleanerId?: number | null) => {
+  const taskKey = getTaskKey(t);
+  return cleanerId != null ? `${taskKey}-cleaner-${cleanerId}` : taskKey;
+};
+
 // Legge le pending edits da sessionStorage
 const getPendingEdits = (): Record<string, any> => {
   try {
@@ -143,6 +149,7 @@ interface TaskCardProps {
   waitingGap?: number;
   waitingGapWidthPx?: number;
   isHighlighted?: boolean;
+  cleanerId?: number | null;
 }
 
 interface AssignedTask {
@@ -171,6 +178,7 @@ export default function TaskCard({
   waitingGap = 0,
   waitingGapWidthPx = 0,
   isHighlighted = false,
+  cleanerId = null,
 }: TaskCardProps) {
   console.log('🔧 TaskCard render - isReadOnly:', isReadOnly, 'for task:', task.name);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -1054,7 +1062,7 @@ export default function TaskCard({
   return (
     <>
       <Draggable
-        draggableId={getTaskKey(task)}
+        draggableId={getUniqueDraggableId(task, cleanerId)}
         index={index}
         isDragDisabled={shouldDisableDrag}
       >
