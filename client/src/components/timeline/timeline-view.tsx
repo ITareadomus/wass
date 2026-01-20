@@ -2294,14 +2294,14 @@ export default function TimelineView({
             <Button
               variant="outline"
               onClick={() => setConfirmRemovalDialog({ open: false, cleanerId: null })}
-              className="border-2 border-custom-blue"
+              className="border-purple-300 dark:border-purple-700"
             >
               Annulla
             </Button>
             <Button
               onClick={handleConfirmRemoveCleaner}
               variant="outline"
-              className="border-2 border-custom-blue hover:bg-accent hover:text-accent-foreground"
+              className="border-purple-300 dark:border-purple-700 hover:bg-accent hover:text-accent-foreground"
             >
               Conferma Rimozione
             </Button>
