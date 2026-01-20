@@ -3562,6 +3562,189 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // POST /api/tasks/:taskId/collaborators/dissolve - Dissolvi TUTTA la collaborazione e riporta task nei containers
+  app.post("/api/tasks/:taskId/collaborators/dissolve", async (req, res) => {
+    try {
+      const taskId = parseInt(req.params.taskId, 10);
+      const { date } = req.body;
+      const workDate = date || format(new Date(), "yyyy-MM-dd");
+
+      if (isNaN(taskId)) {
+        return res.status(400).json({ success: false, error: "taskId deve essere un numero" });
+      }
+
+      const pool = (await import("../shared/pg-db")).default;
+      const { taskCollaborationService } = await import("./services/pg-task-collaboration-service");
+      const { recomputeSchedule } = await import("./schedule/recompute");
+
+      const client = await pool.connect();
+
+      try {
+        await client.query('BEGIN');
+
+        // 1. Verifica collaborazione esistente
+        const existingCollaboration = await taskCollaborationService.getCollaboration(workDate, taskId);
+
+        if (existingCollaboration.count < 2) {
+          await client.query('ROLLBACK');
+          return res.status(400).json({ 
+            success: false, 
+            error: "La task non è in collaborazione" 
+          });
+        }
+
+        // 2. Ottieni dati originali della task (priorità, base_cleaning_time, etc.)
+        const taskDataResult = await client.query(
+          `SELECT task_id, logistic_code, base_cleaning_time, cleaning_time, priority,
+                  address, lat, lng, checkout_date, checkout_time, checkin_date, checkin_time,
+                  pax_in, linen_change, operation_id, straordinaria, customer_reference
+           FROM daily_assignments_current 
+           WHERE work_date = $1 AND task_id = $2 
+           LIMIT 1`,
+          [workDate, taskId]
+        );
+
+        if (taskDataResult.rows.length === 0) {
+          await client.query('ROLLBACK');
+          return res.status(404).json({ success: false, error: "Task non trovata in timeline" });
+        }
+
+        const taskData = taskDataResult.rows[0];
+        const originalDuration = taskData.base_cleaning_time || taskData.cleaning_time;
+        const priority = taskData.priority || 'high_priority';
+        const logisticCode = taskData.logistic_code;
+
+        // 3. Ottieni lista di tutti i cleaners coinvolti per ricalcolare i loro orari
+        const affectedCleaners = existingCollaboration.cleanerIds;
+
+        // 4. Elimina tutte le righe da task_collaborators
+        await client.query(
+          `DELETE FROM task_collaborators WHERE work_date = $1 AND task_id = $2`,
+          [workDate, taskId]
+        );
+        console.log(`🗑️ Dissolve: Rimossi tutti i collaboratori da task ${taskId}`);
+
+        // 5. Elimina tutte le righe da daily_assignments_current per questa task
+        const deleteResult = await client.query(
+          `DELETE FROM daily_assignments_current WHERE work_date = $1 AND task_id = $2`,
+          [workDate, taskId]
+        );
+        console.log(`🗑️ Dissolve: Rimosse ${deleteResult.rowCount} assegnazioni da timeline per task ${taskId}`);
+
+        // 6. Ricalcola orari per i cleaners che avevano la task
+        for (const cleanerId of affectedCleaners) {
+          const tasksResult = await client.query(
+            `SELECT task_id as "taskId", logistic_code as "logisticCode", cleaner_id as "cleanerId",
+                    sequence, cleaning_time as "cleaningTime", address, lat, lng,
+                    start_time as "startTime", end_time as "endTime", travel_time as "travelTime"
+             FROM daily_assignments_current
+             WHERE work_date = $1 AND cleaner_id = $2
+             ORDER BY sequence`,
+            [workDate, cleanerId]
+          );
+
+          if (tasksResult.rows.length === 0) continue;
+
+          // Rinumera sequence
+          let seq = 1;
+          for (const task of tasksResult.rows) {
+            await client.query(
+              `UPDATE daily_assignments_current 
+               SET sequence = $1, followup = $2
+               WHERE work_date = $3 AND cleaner_id = $4 AND task_id = $5`,
+              [seq, seq > 1, workDate, cleanerId, task.taskId]
+            );
+            task.sequence = seq;
+            seq++;
+          }
+
+          // Ricalcola orari
+          const cleanerStartTime = await getCleanerStartTime(cleanerId, workDate) || '10:00';
+          const recalculated = await recomputeSchedule(tasksResult.rows, cleanerStartTime, workDate);
+
+          for (const task of recalculated) {
+            await client.query(
+              `UPDATE daily_assignments_current 
+               SET start_time = $1, end_time = $2, travel_time = $3
+               WHERE work_date = $4 AND cleaner_id = $5 AND task_id = $6`,
+              [task.startTime, task.endTime, task.travelTime, workDate, cleanerId, task.taskId]
+            );
+          }
+        }
+
+        // 7. Riporta la task nel container originale con durata originale
+        // Carica containers esistenti
+        const containersResult = await client.query(
+          `SELECT data FROM daily_containers WHERE work_date = $1`,
+          [workDate]
+        );
+
+        if (containersResult.rows.length > 0) {
+          const containers = containersResult.rows[0].data;
+          const containerKey = priority === 'early_out' ? 'early_out' : 
+                               priority === 'high_priority' ? 'high_priority' : 'low_priority';
+
+          // Costruisci task da reinserire
+          const taskToReinsert = {
+            task_id: taskData.task_id,
+            logistic_code: logisticCode,
+            name: String(logisticCode),
+            cleaning_time: originalDuration,
+            duration: `${Math.floor(originalDuration / 60)}.${String(originalDuration % 60).padStart(2, '0')}`,
+            address: taskData.address,
+            lat: taskData.lat,
+            lng: taskData.lng,
+            checkout_date: taskData.checkout_date,
+            checkout_time: taskData.checkout_time,
+            checkin_date: taskData.checkin_date,
+            checkin_time: taskData.checkin_time,
+            pax_in: taskData.pax_in,
+            linen_change: taskData.linen_change,
+            operation_id: taskData.operation_id,
+            straordinaria: taskData.straordinaria,
+            customer_reference: taskData.customer_reference,
+            priority: priority
+          };
+
+          // Aggiungi al container corretto
+          if (containers[containerKey] && containers[containerKey].tasks) {
+            containers[containerKey].tasks.push(taskToReinsert);
+          }
+
+          // Salva containers aggiornati
+          await client.query(
+            `UPDATE daily_containers SET data = $1 WHERE work_date = $2`,
+            [JSON.stringify(containers), workDate]
+          );
+          console.log(`✅ Dissolve: Task ${logisticCode} reinserita in container ${containerKey} con durata ${originalDuration} min`);
+        }
+
+        await client.query('COMMIT');
+
+        console.log(`✅ Collaborazione dissolta per task ${taskId}: ${affectedCleaners.length} cleaners coinvolti, task riportata in ${priority}`);
+        res.json({
+          success: true,
+          taskId,
+          logisticCode,
+          originalDuration,
+          priority,
+          affectedCleaners,
+          message: `Collaborazione dissolta, task riportata in ${priority}`
+        });
+
+      } catch (error: any) {
+        await client.query('ROLLBACK');
+        throw error;
+      } finally {
+        client.release();
+      }
+
+    } catch (error: any) {
+      console.error("Errore nella dissoluzione collaborazione:", error);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
   // Endpoint per aggiornare i dettagli di una task (checkout, checkin, durata)
   // skipAdam: se true, aggiorna SOLO PostgreSQL e non propaga su ADAM
   // Supporta sia aggiornamenti singoli che batch (array di updates)
