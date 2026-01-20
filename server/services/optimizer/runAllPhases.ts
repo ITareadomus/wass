@@ -210,7 +210,9 @@ export async function applyOptimizerToProduction(
         checkin_date, checkout_date, checkin_time, checkout_time,
         pax_in, pax_out, small_equipment, operation_id, confirmed_operation, straordinaria,
         type_apt, alias, customer_name, reasons,
-        priority, start_time, end_time, followup, sequence, travel_time
+        priority, start_time, end_time, followup, sequence, travel_time,
+        cleaner_name, cleaner_lastname, cleaner_role, cleaner_premium, cleaner_start_time,
+        customer_reference, base_cleaning_time
       )
       SELECT 
         $2 as work_date,
@@ -220,15 +222,15 @@ export async function applyOptimizerToProduction(
         dc.client_id,
         dc.premium,
         dc.address,
-        dc.lat,
-        dc.lng,
-        dc.cleaning_time,
-        dc.checkin_date,
-        dc.checkout_date,
-        dc.checkin_time,
-        dc.checkout_time,
-        dc.pax_in,
-        dc.pax_out,
+        dc.lat::numeric,
+        dc.lng::numeric,
+        dc.cleaning_time::integer,
+        dc.checkin_date::date,
+        dc.checkout_date::date,
+        dc.checkin_time::time,
+        dc.checkout_time::time,
+        dc.pax_in::integer,
+        dc.pax_out::integer,
         dc.small_equipment,
         dc.operation_id,
         dc.confirmed_operation,
@@ -242,9 +244,17 @@ export async function applyOptimizerToProduction(
         oa.end_time::time as end_time,
         false as followup,
         oa.sequence,
-        COALESCE(oa.travel_minutes_from_prev, 0) as travel_time
+        COALESCE(oa.travel_minutes_from_prev, 0) as travel_time,
+        c.name as cleaner_name,
+        c.lastname as cleaner_lastname,
+        c.role as cleaner_role,
+        false as cleaner_premium,
+        COALESCE(c.start_time, '10:00') as cleaner_start_time,
+        dc.customer_reference,
+        dc.cleaning_time as base_cleaning_time
       FROM optimizer.optimizer_assignment oa
       JOIN daily_containers dc ON dc.task_id = oa.task_id AND dc.work_date = $2
+      LEFT JOIN cleaners c ON c.cleaner_id = oa.cleaner_id AND c.work_date = $2
       WHERE oa.run_id = $1
         AND oa.task_id NOT IN (
           SELECT task_id FROM daily_task_locks 
@@ -256,29 +266,34 @@ export async function applyOptimizerToProduction(
     result.insertedCount = insertResult.rowCount || 0;
     console.log(`[applyToProduction] Inserted ${result.insertedCount} new assignments`);
 
+    // Get next revision number for history
+    const revisionResult = await client.query(
+      `SELECT COALESCE(MAX(revision), 0) + 1 as next_revision FROM daily_assignments_history WHERE work_date = $1`,
+      [workDate]
+    );
+    const nextRevision = revisionResult.rows[0].next_revision;
+    
     await client.query(`
       INSERT INTO daily_assignments_history (
-        work_date, cleaner_id, task_id, logistic_code, client_id,
+        work_date, revision, cleaner_id, task_id, logistic_code, client_id,
         premium, address, lat, lng, cleaning_time,
         checkin_date, checkout_date, checkin_time, checkout_time,
         pax_in, pax_out, small_equipment, operation_id, confirmed_operation, straordinaria,
         type_apt, alias, customer_name, reasons,
         priority, start_time, end_time, followup, sequence, travel_time,
-        action_type, action_reason, performed_by
+        created_by
       )
       SELECT 
-        work_date, cleaner_id, task_id, logistic_code, client_id,
+        work_date, $3, cleaner_id, task_id, logistic_code, client_id,
         premium, address, lat, lng, cleaning_time,
         checkin_date, checkout_date, checkin_time, checkout_time,
         pax_in, pax_out, small_equipment, operation_id, confirmed_operation, straordinaria,
         type_apt, alias, customer_name, reasons,
         priority, start_time, end_time, followup, sequence, travel_time,
-        'OPTIMIZER_ASSIGN',
-        'Applied from optimizer run ' || $1,
-        'optimizer'
+        'optimizer-' || $1
       FROM daily_assignments_current
       WHERE work_date = $2
-    `, [runId, workDate]);
+    `, [runId, workDate, nextRevision]);
 
     await client.query('COMMIT');
     result.success = true;
