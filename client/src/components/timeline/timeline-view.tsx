@@ -2301,7 +2301,7 @@ export default function TimelineView({
             <Button
               onClick={handleConfirmRemoveCleaner}
               variant="outline"
-              className="border-input hover:bg-accent hover:text-accent-foreground"
+              className="border-purple-300 dark:border-purple-700 hover:bg-accent hover:text-accent-foreground"
             >
               Conferma Rimozione
             </Button>
