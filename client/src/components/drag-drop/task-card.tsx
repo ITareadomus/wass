@@ -9,6 +9,16 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -182,6 +192,8 @@ export default function TaskCard({
 }: TaskCardProps) {
   console.log('🔧 TaskCard render - isReadOnly:', isReadOnly, 'for task:', task.name);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [showDissolveDialog, setShowDissolveDialog] = useState(false);
+  const [isDissolvingCollaboration, setIsDissolvingCollaboration] = useState(false);
   
   const [clickTimer, setClickTimer] = useState<NodeJS.Timeout | null>(null);
 
@@ -1681,50 +1693,11 @@ export default function TaskCard({
                         variant="destructive"
                         size="sm"
                         className="mt-3 w-full flex items-center justify-center gap-2"
-                        onClick={async () => {
-                          const workDate = localStorage.getItem('selected_work_date') || new Date().toISOString().split('T')[0];
-                          const taskId = displayTask.task_id;
-                          
-                          if (!confirm(`Sei sicuro di voler rimuovere la collaborazione? La task tornerà nei containers con la durata originale.`)) {
-                            return;
-                          }
-                          
-                          try {
-                            const response = await fetch(`/api/tasks/${taskId}/collaborators/dissolve`, {
-                              method: 'POST',
-                              headers: { 'Content-Type': 'application/json' },
-                              body: JSON.stringify({ date: workDate })
-                            });
-                            
-                            const result = await response.json();
-                            
-                            if (result.success) {
-                              toast({
-                                title: "Collaborazione rimossa",
-                                description: `Task ${result.logisticCode} riportata in ${result.priority} con durata ${result.originalDuration} min`,
-                              });
-                              // Chiudi il modale
-                              setIsModalOpen(false);
-                              // Refresh della pagina tramite evento custom
-                              window.dispatchEvent(new CustomEvent('refresh-assignments'));
-                            } else {
-                              toast({
-                                title: "Errore",
-                                description: result.error || "Impossibile rimuovere la collaborazione",
-                                variant: "destructive"
-                              });
-                            }
-                          } catch (error: any) {
-                            toast({
-                              title: "Errore",
-                              description: error.message || "Errore nella rimozione della collaborazione",
-                              variant: "destructive"
-                            });
-                          }
-                        }}
+                        onClick={() => setShowDissolveDialog(true)}
+                        disabled={isDissolvingCollaboration}
                       >
                         <Trash2 className="w-4 h-4" />
-                        Rimuovi collaborazione
+                        {isDissolvingCollaboration ? "Rimozione..." : "Rimuovi collaborazione"}
                       </Button>
                     )}
                   </div>
@@ -1834,6 +1807,93 @@ export default function TaskCard({
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Dialog di conferma per dissoluzione collaborazione */}
+      <AlertDialog open={showDissolveDialog} onOpenChange={setShowDissolveDialog}>
+        <AlertDialogContent className="sm:max-w-md">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2 text-red-600 dark:text-red-400">
+              <Trash2 className="w-5 h-5" />
+              Conferma Rimozione Collaborazione
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div>
+                <p className="text-base text-foreground font-semibold mb-3">
+                  La collaborazione verrà rimossa e la task tornerà nei containers con la durata originale.
+                </p>
+                <div className="bg-purple-50 dark:bg-purple-900/20 rounded p-3 mb-3 text-sm">
+                  <p><strong>Durata originale:</strong> {(() => {
+                    const baseTime = (displayTask as any).base_cleaning_time || 0;
+                    const hours = Math.floor(baseTime / 60);
+                    const mins = baseTime % 60;
+                    return `${hours}:${String(mins).padStart(2, '0')} ore`;
+                  })()}</p>
+                  <p><strong>Durata attuale per cleaner:</strong> {(displayTask.duration || "0.0").replace(".", ":")} ore</p>
+                  <p><strong>Cleaners coinvolti:</strong> {(displayTask as any).collaborator_count || 0}</p>
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  Sei sicuro di voler procedere? Le assegnazioni verranno rimosse dalla timeline di tutti i cleaners.
+                </p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel
+              onClick={() => setShowDissolveDialog(false)}
+              className="border-2 border-custom-blue"
+              disabled={isDissolvingCollaboration}
+            >
+              Annulla
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={async () => {
+                const workDate = localStorage.getItem('selected_work_date') || new Date().toISOString().split('T')[0];
+                const taskId = (displayTask as any).task_id || displayTask.id;
+                
+                setIsDissolvingCollaboration(true);
+                
+                try {
+                  const response = await fetch(`/api/tasks/${taskId}/collaborators/dissolve`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ date: workDate })
+                  });
+                  
+                  const result = await response.json();
+                  
+                  if (result.success) {
+                    toast({
+                      title: "Collaborazione rimossa",
+                      description: `Task ${result.logisticCode} riportata in ${result.priority} con durata ${result.originalDuration} min`,
+                    });
+                    setShowDissolveDialog(false);
+                    setIsModalOpen(false);
+                    window.dispatchEvent(new CustomEvent('refresh-assignments'));
+                  } else {
+                    toast({
+                      title: "Errore",
+                      description: result.error || "Impossibile rimuovere la collaborazione",
+                      variant: "destructive"
+                    });
+                  }
+                } catch (error: any) {
+                  toast({
+                    title: "Errore",
+                    description: error.message || "Errore nella rimozione della collaborazione",
+                    variant: "destructive"
+                  });
+                } finally {
+                  setIsDissolvingCollaboration(false);
+                }
+              }}
+              disabled={isDissolvingCollaboration}
+              className="bg-red-600 hover:bg-red-700 text-white"
+            >
+              {isDissolvingCollaboration ? "Rimozione..." : "Conferma Rimozione"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Dialog per selezione collaboratori */}
       <CleanerSelectorDialog
