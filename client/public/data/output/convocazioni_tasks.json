@@ -1,12 +1,12 @@
 {
   "metadata": {
-    "last_updated": "2026-01-19T11:55:06.213531",
-    "date": "2026-01-20"
+    "last_updated": "2026-01-20T09:24:14.950575",
+    "date": "2026-01-21"
   },
   "task_stats": {
-    "total": 23,
+    "total": 43,
     "premium": 1,
-    "standard": 22,
-    "straordinarie": 1
+    "standard": 42,
+    "straordinarie": 2
   }
 }

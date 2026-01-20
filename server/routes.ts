@@ -557,6 +557,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
           
           isCollaborativeMove = true;
           console.log(`✅ Collaboration: replaced cleaner ${numSourceCleanerId} -> ${numDestCleanerId} for task ${numTaskId}`);
+          
+          // CRITICAL: Return dopo collaboration move per evitare doppio spostamento
+          return res.json({
+            success: true,
+            message: `Task ${logisticCode} collaborativa: cleaner ${numSourceCleanerId} sostituito con ${numDestCleanerId}`,
+            isCollaborativeMove: true
+          });
         }
       }
       // --- END COLLABORATION-AWARE LOGIC ---
