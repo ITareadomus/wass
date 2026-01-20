@@ -199,8 +199,9 @@ export function CleanerSelectorDialog({
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="sm:max-w-2xl max-h-[80vh] overflow-y-auto">
-        <DialogHeader>
+      <DialogContent className="sm:max-w-2xl max-h-[80vh] flex flex-col overflow-hidden">
+        {/* Header fisso */}
+        <DialogHeader className="flex-shrink-0">
           <DialogTitle className="flex items-center gap-2">
             <Users className="w-5 h-5 text-purple-600" />
             {title}
@@ -208,15 +209,16 @@ export function CleanerSelectorDialog({
           <DialogDescription>{description}</DialogDescription>
         </DialogHeader>
 
-        {/* Info sul Cleaner Primario */}
-        <div className="mt-2 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+        {/* Info sul Cleaner Primario - fisso */}
+        <div className="flex-shrink-0 mt-2 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
           <p className="text-sm text-blue-700 dark:text-blue-300">
             <strong>Nota:</strong> Il primo cleaner che selezionerai sarà considerato come{" "}
             <span className="font-bold">"Cleaner Primario"</span>, cioè il cleaner a cui verrà assegnato il task su ADAM.
           </p>
         </div>
 
-        <div className="space-y-4 mt-4">
+        {/* Lista cleaners scrollabile */}
+        <div className="flex-1 overflow-y-auto min-h-0 space-y-4 mt-4">
           {isLoadingCleaners ? (
             <div className="flex items-center justify-center py-8">
               <RefreshCw className="h-6 w-6 animate-spin text-purple-600 mr-2" />
@@ -385,47 +387,50 @@ export function CleanerSelectorDialog({
           )}
         </div>
 
-            {selectedIds.length > 0 && baseCleaningTime > 0 && previewDuration && (
-              <div className="mt-4 p-3 bg-purple-50 dark:bg-purple-900/20 rounded-lg border border-purple-200 dark:border-purple-800">
-                <p className="text-sm font-semibold text-purple-700 dark:text-purple-300 flex items-center gap-2">
-                  <Users className="w-4 h-4" />
-                  Preview durata:
+        {/* Footer fisso: preview + bottoni */}
+        <div className="flex-shrink-0 border-t pt-4 mt-4 space-y-4">
+          {selectedIds.length > 0 && baseCleaningTime > 0 && previewDuration && (
+            <div className="p-3 bg-purple-50 dark:bg-purple-900/20 rounded-lg border border-purple-200 dark:border-purple-800">
+              <p className="text-sm font-semibold text-purple-700 dark:text-purple-300 flex items-center gap-2">
+                <Users className="w-4 h-4" />
+                Preview durata:
+              </p>
+              <p className="text-sm text-purple-600 dark:text-purple-400 font-bold mt-1">
+                {previewDuration.duration} ore per cleaner
+              </p>
+              <p className="text-xs text-purple-500 dark:text-purple-500">
+                ({previewDuration.totalCollaborators} collaborator{previewDuration.totalCollaborators > 1 ? "i" : "e"} totali)
+              </p>
+              {existingCollaboratorCount > 0 && (
+                <p className="text-xs text-purple-400 dark:text-purple-600 mt-1 italic">
+                  ({existingCollaboratorCount} esistenti + {selectedIds.length} nuov{selectedIds.length > 1 ? "i" : "o"})
                 </p>
-                <p className="text-sm text-purple-600 dark:text-purple-400 font-bold mt-1">
-                  {previewDuration.duration} ore per cleaner
-                </p>
-                <p className="text-xs text-purple-500 dark:text-purple-500">
-                  ({previewDuration.totalCollaborators} collaborator{previewDuration.totalCollaborators > 1 ? "i" : "e"} totali)
-                </p>
-                {existingCollaboratorCount > 0 && (
-                  <p className="text-xs text-purple-400 dark:text-purple-600 mt-1 italic">
-                    ({existingCollaboratorCount} esistenti + {selectedIds.length} nuov{selectedIds.length > 1 ? "i" : "o"})
-                  </p>
-                )}
-              </div>
-            )}
+              )}
+            </div>
+          )}
 
-        <div className="flex justify-end gap-2 mt-4">
-          <Button variant="outline" onClick={onClose}>
-            Annulla
-          </Button>
-          <Button
-            onClick={handleConfirm}
-            disabled={selectedIds.length === 0 || isLoading}
-            className="bg-purple-600 hover:bg-purple-700"
-          >
-            {isLoading ? (
-              <>
-                <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
-                Assegnazione...
-              </>
-            ) : (
-              <>
-                {confirmLabel}
-                {selectedIds.length > 0 && ` (${selectedIds.length})`}
-              </>
-            )}
-          </Button>
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={onClose}>
+              Annulla
+            </Button>
+            <Button
+              onClick={handleConfirm}
+              disabled={selectedIds.length === 0 || isLoading}
+              className="bg-purple-600 hover:bg-purple-700"
+            >
+              {isLoading ? (
+                <>
+                  <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                  Assegnazione...
+                </>
+              ) : (
+                <>
+                  {confirmLabel}
+                  {selectedIds.length > 0 && ` (${selectedIds.length})`}
+                </>
+              )}
+            </Button>
+          </div>
         </div>
       </DialogContent>
     </Dialog>
