@@ -42,7 +42,8 @@ Preferred communication style: Simple, everyday language.
 - **Fairness**: Global parameters for `NEARBY_TRAVEL_THRESHOLD`, `NEW_CLEANER_PENALTY_MIN`, and `FAIRNESS_DELTA_HOURS` are tightened to ensure more balanced work distribution and safer travel times.
 - **Time Window Constraints**: Early-Out (EO) and High Priority (HP) tasks have configurable start/end time windows, loaded dynamically from application settings, restricting when tasks can be assigned. Low Priority (LP) tasks have no time constraints.
 
-## Optimizer System (Three-Phase)
+## Optimizer System (Five-Phase)
+- **PHASE 0**: Filters locked tasks from processing. Locked tasks in `daily_task_locks` are excluded from optimization.
 - **PHASE 1**: Groups nearby tasks using dual thresholds (15min→20min), creates single-task groups for isolated tasks, includes logistic_codes for deduplication.
 - **PHASE 2**: Assigns groups to compatible cleaners from daily_selected_cleaners, scores by travel/load/preference, preserves group_logistic_codes.
 - **PHASE 3**: Chronological scheduling with time windows and priority soft rules.
@@ -51,7 +52,10 @@ Preferred communication style: Simple, everyday language.
   - **Max Penalties**: EO: 120, HP: 90, LP: 60
   - **Permutation Selection**: Considers endTime → priorityPenalty → totalWait → totalTravel
   - **Violation Tracking**: reason codes (LP_BEFORE_MIN_START, EO/HP_OUT_OF_PREFERRED_START_WINDOW) persisted to optimizer_assignment
-- **Shadow Mode**: ALL optimizer writes go to optimizer.* schema only, never touches production tables.
+- **PHASE 4**: Recovery phase for unassigned tasks, attempts to find single-task assignments.
+- **Apply to Production**: Optional step to copy results from `optimizer.optimizer_assignment` to `daily_assignments_current`.
+- **UI Integration**: "Auto-Assegna" button in timeline header triggers optimizer with visual progress feedback.
+- **Fallback**: Old Python script (`assign_eo.py`) preserved at `/api/run-optimizer` endpoint.
 
 # Production Configuration
 
