@@ -1,5 +1,5 @@
 import { Personnel, TaskType as Task } from "@shared/schema";
-import { Calendar as CalendarIcon, RotateCcw, Users, RefreshCw, UserPlus, Maximize2, Minimize2, Check, CheckCircle, Save, Pencil, ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
+import { Calendar as CalendarIcon, RotateCcw, Users, RefreshCw, UserPlus, Maximize2, Minimize2, Check, CheckCircle, Save, Pencil, ChevronLeft, ChevronRight, Loader2, Zap } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import * as React from "react";
 import { Droppable, Draggable } from "react-beautiful-dnd";
@@ -163,6 +163,9 @@ export default function TimelineView({
   const [isSavingStartTime, setIsSavingStartTime] = useState(false);
   const [isResetting, setIsResetting] = useState(false);
   const [isTransferringToAdam, setIsTransferringToAdam] = useState(false);
+  const [showOptimizerDialog, setShowOptimizerDialog] = useState(false);
+  const [isRunningOptimizer, setIsRunningOptimizer] = useState(false);
+  const [optimizerResult, setOptimizerResult] = useState<any>(null);
 
   // Stato per le regole di validazione task-cleaner
   const [validationRules, setValidationRules] = useState<any>(null);
@@ -1603,6 +1606,18 @@ export default function TimelineView({
                 {!isResetting && <RotateCcw className="w-4 h-4" />}
                 Reset Assegnazioni
               </Button>
+              <Button
+                onClick={() => setShowOptimizerDialog(true)}
+                variant="outline"
+                size="sm"
+                className="flex items-center gap-2 border-2 border-green-500 dark:border-green-600 text-green-700 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/20"
+                disabled={isReadOnly || isRunningOptimizer}
+                title="Esegui ottimizzatore automatico"
+              >
+                {isRunningOptimizer && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                {!isRunningOptimizer && <Zap className="w-4 h-4" />}
+                Auto-Assegna
+              </Button>
             </div>
           </div>
         </div>
@@ -2776,6 +2791,134 @@ export default function TimelineView({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Dialog per l'Optimizer */}
+      <Dialog open={showOptimizerDialog} onOpenChange={setShowOptimizerDialog}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-green-600 dark:text-green-400">
+              <Zap className="w-5 h-5" />
+              Auto-Assegnazione Intelligente
+            </DialogTitle>
+            <DialogDescription>
+              L'ottimizzatore assegnerà automaticamente le task ai cleaners selezionati, 
+              rispettando le finestre orarie di priorità e ottimizzando i tempi di viaggio.
+            </DialogDescription>
+          </DialogHeader>
+          
+          {optimizerResult ? (
+            <div className="space-y-4">
+              <div className={`p-4 rounded-lg border-2 ${optimizerResult.status === 'success' ? 'bg-green-50 dark:bg-green-900/20 border-green-300 dark:border-green-700' : 'bg-red-50 dark:bg-red-900/20 border-red-300 dark:border-red-700'}`}>
+                <h4 className={`font-semibold mb-2 ${optimizerResult.status === 'success' ? 'text-green-700 dark:text-green-300' : 'text-red-700 dark:text-red-300'}`}>
+                  {optimizerResult.status === 'success' ? '✓ Ottimizzazione completata!' : '✗ Errore durante l\'ottimizzazione'}
+                </h4>
+                {optimizerResult.summary && (
+                  <div className="text-sm space-y-1">
+                    <p><strong>Task processate:</strong> {optimizerResult.summary.totalTasksProcessed}</p>
+                    <p><strong>Task assegnate:</strong> {optimizerResult.summary.tasksAssigned}</p>
+                    <p><strong>Task non assegnate:</strong> {optimizerResult.summary.tasksUnassigned}</p>
+                    <p><strong>Cleaners utilizzati:</strong> {optimizerResult.summary.cleanersUsed}</p>
+                    <p className="text-muted-foreground"><strong>Tempo:</strong> {(optimizerResult.totalDurationMs / 1000).toFixed(2)}s</p>
+                  </div>
+                )}
+                {optimizerResult.error && (
+                  <p className="text-red-600 dark:text-red-400 text-sm mt-2">{optimizerResult.error}</p>
+                )}
+              </div>
+              <div className="flex justify-end gap-2">
+                <Button 
+                  variant="outline" 
+                  onClick={() => {
+                    setOptimizerResult(null);
+                    setShowOptimizerDialog(false);
+                    window.dispatchEvent(new CustomEvent('refresh-assignments'));
+                  }}
+                  className="border-2 border-green-500 dark:border-green-600"
+                >
+                  Chiudi e Aggiorna
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div className="bg-yellow-50 dark:bg-yellow-900/20 p-4 rounded-lg border border-yellow-300 dark:border-yellow-700">
+                <p className="text-sm text-yellow-700 dark:text-yellow-300">
+                  <strong>Nota:</strong> Le task già assegnate (locked) non verranno modificate. 
+                  Solo le task nei containers verranno elaborate.
+                </p>
+              </div>
+              
+              <div className="flex justify-end gap-2">
+                <Button 
+                  variant="outline" 
+                  onClick={() => setShowOptimizerDialog(false)}
+                  disabled={isRunningOptimizer}
+                  className="border-2 border-custom-blue"
+                >
+                  Annulla
+                </Button>
+                <Button 
+                  onClick={async () => {
+                    setIsRunningOptimizer(true);
+                    setOptimizerResult(null);
+                    try {
+                      const response = await fetch('/api/optimizer/run-all', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ 
+                          date: workDate,
+                          skipPhase4: false,
+                          applyToProduction: true
+                        })
+                      });
+                      const result = await response.json();
+                      setOptimizerResult(result);
+                      if (result.success) {
+                        toast({
+                          title: "Ottimizzazione completata",
+                          description: `${result.summary?.tasksAssigned || 0} task assegnate automaticamente`,
+                        });
+                      } else {
+                        toast({
+                          title: "Errore ottimizzazione",
+                          description: result.error || "Si è verificato un errore",
+                          variant: "destructive"
+                        });
+                      }
+                    } catch (error: any) {
+                      setOptimizerResult({ 
+                        status: 'failed', 
+                        error: error.message || "Errore di connessione" 
+                      });
+                      toast({
+                        title: "Errore",
+                        description: error.message || "Impossibile eseguire l'ottimizzazione",
+                        variant: "destructive"
+                      });
+                    } finally {
+                      setIsRunningOptimizer(false);
+                    }
+                  }}
+                  disabled={isRunningOptimizer}
+                  className="bg-green-600 hover:bg-green-700 text-white"
+                >
+                  {isRunningOptimizer ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Ottimizzazione in corso...
+                    </>
+                  ) : (
+                    <>
+                      <Zap className="mr-2 h-4 w-4" />
+                      Avvia Ottimizzatore
+                    </>
+                  )}
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </>
   );
 }

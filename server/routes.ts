@@ -6259,6 +6259,63 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ========== OPTIMIZER RUN-ALL ENDPOINT ==========
+  
+  app.post("/api/optimizer/run-all", async (req, res) => {
+    try {
+      const { date, skipPhase4 = false, applyToProduction = false } = req.body;
+      const workDate = date || format(new Date(), "yyyy-MM-dd");
+      
+      console.log(`🚀 POST /api/optimizer/run-all - Avvio OPTIMIZER COMPLETO per ${workDate}`);
+      console.log(`   skipPhase4=${skipPhase4}, applyToProduction=${applyToProduction}`);
+      
+      const { runAllPhases } = await import('./services/optimizer/runAllPhases');
+      const result = await runAllPhases(workDate, { skipPhase4, applyToProduction });
+      
+      console.log(`✅ OPTIMIZER completato in ${result.totalDurationMs}ms`);
+      console.log(`   Status: ${result.status}, Assigned: ${result.summary.tasksAssigned}, Unassigned: ${result.summary.tasksUnassigned}`);
+      
+      res.json({
+        success: result.status === 'success',
+        ...result
+      });
+    } catch (error: any) {
+      console.error("❌ Errore optimizer run-all:", error);
+      res.status(500).json({
+        success: false,
+        error: error.message
+      });
+    }
+  });
+
+  app.post("/api/optimizer/apply-to-production", async (req, res) => {
+    try {
+      const { runId, date } = req.body;
+      
+      if (!runId || !date) {
+        return res.status(400).json({ 
+          success: false, 
+          error: "runId and date are required" 
+        });
+      }
+      
+      console.log(`🚀 POST /api/optimizer/apply-to-production - Applying run ${runId} to production`);
+      
+      const { applyOptimizerToProduction } = await import('./services/optimizer/runAllPhases');
+      const result = await applyOptimizerToProduction(runId, date);
+      
+      console.log(`✅ Apply to production: inserted=${result.insertedCount}, deleted=${result.deletedCount}`);
+      
+      res.json(result);
+    } catch (error: any) {
+      console.error("❌ Errore apply-to-production:", error);
+      res.status(500).json({
+        success: false,
+        error: error.message
+      });
+    }
+  });
+
   // ========== OPTIMIZER PHASE 0 ENDPOINTS (Locked Filter) ==========
   
   app.post("/api/optimizer/run-phase0", async (req, res) => {
