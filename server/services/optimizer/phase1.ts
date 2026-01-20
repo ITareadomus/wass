@@ -63,14 +63,27 @@ export type Phase1Result = {
   };
 };
 
-const AVG_SPEED_KMH = 18;
 const NON_LINEAR_PATH_FACTOR = 1.5;
+const BASE_TIME_MIN = 5.0;
+const MIN_TRAVEL = 2;
+const MAX_TRAVEL = 45;
 
 export function estimateTravelMinutes(a: TaskInput, b: TaskInput): number {
   const meters = haversineMeters(a.lat, a.lng, b.lat, b.lng);
-  const km = (meters / 1000) * NON_LINEAR_PATH_FACTOR;
-  const hours = km / AVG_SPEED_KMH;
-  return Math.max(1, Math.round(hours * 60));
+  const km = meters / 1000;
+  const distReale = km * NON_LINEAR_PATH_FACTOR;
+  
+  let travelTime: number;
+  if (distReale < 0.8) {
+    travelTime = distReale * 6.0;
+  } else if (distReale < 2.5) {
+    travelTime = distReale * 10.0;
+  } else {
+    travelTime = distReale * 5.0;
+  }
+  
+  const totalTime = BASE_TIME_MIN + travelTime;
+  return Math.round(Math.max(MIN_TRAVEL, Math.min(MAX_TRAVEL, totalTime)));
 }
 
 export function estimateTravelMinutesWithProvider(
