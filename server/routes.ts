@@ -3597,7 +3597,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const taskDataResult = await client.query(
           `SELECT task_id, logistic_code, base_cleaning_time, cleaning_time, priority,
                   address, lat, lng, checkout_date, checkout_time, checkin_date, checkin_time,
-                  pax_in, linen_change, operation_id, straordinaria, customer_reference
+                  pax_in, operation_id, straordinaria, customer_reference
            FROM daily_assignments_current 
            WHERE work_date = $1 AND task_id = $2 
            LIMIT 1`,
