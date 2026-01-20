@@ -444,6 +444,17 @@ export default function GenerateAssignments() {
     }
   };
 
+  // Listener per evento refresh-assignments (es. dopo dissoluzione collaborazione)
+  useEffect(() => {
+    const handleRefreshAssignments = () => {
+      console.log("🔄 Ricevuto evento refresh-assignments, ricarico dati...");
+      refreshAssignments("manual");
+    };
+    
+    window.addEventListener('refresh-assignments', handleRefreshAssignments);
+    return () => window.removeEventListener('refresh-assignments', handleRefreshAssignments);
+  }, []);
+
   // Funzione per controllare e caricare automaticamente assegnazioni salvate
   const checkAndAutoLoadSavedAssignments = async (date: Date) => {
     try {
