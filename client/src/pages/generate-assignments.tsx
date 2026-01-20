@@ -336,6 +336,9 @@ export default function GenerateAssignments() {
 
   // Nuova variabile di stato per gestire il caricamento generale
   const [isLoading, setIsLoading] = useState(false);
+  
+  // Toggle per scegliere tra nuovo optimizer (TypeScript) e vecchio (Python)
+  const [useNewOptimizer, setUseNewOptimizer] = useState(true);
 
   // Callback per notificare modifiche dopo movimenti task
   const handleTaskMoved = useCallback(() => {
@@ -2024,6 +2027,7 @@ export default function GenerateAssignments() {
                     assignAction={assignEarlyOutToTimeline}
                     containerMultiSelectState={getContainerMultiSelectState('early_out')}
                     highlightedTaskIds={highlightedEarlyOut}
+                    useNewOptimizer={useNewOptimizer}
                   />
                   <PriorityColumn
                     title="HIGH PRIORITY"
@@ -2034,6 +2038,7 @@ export default function GenerateAssignments() {
                     assignAction={assignHighPriorityToTimeline}
                     containerMultiSelectState={getContainerMultiSelectState('high_priority')}
                     highlightedTaskIds={highlightedHighPriority}
+                    useNewOptimizer={useNewOptimizer}
                   />
                   <PriorityColumn
                     title="LOW PRIORITY"
@@ -2044,6 +2049,7 @@ export default function GenerateAssignments() {
                     assignAction={assignLowPriorityToTimeline}
                     containerMultiSelectState={getContainerMultiSelectState('low_priority')}
                     highlightedTaskIds={highlightedLowPriority}
+                    useNewOptimizer={useNewOptimizer}
                   />
                 </div>
               );
@@ -2063,6 +2069,8 @@ export default function GenerateAssignments() {
                   lastValidDragIndex={lastValidDragIndex}
                   draggingOverCleanerId={draggingOverCleanerId}
                   searchTask={searchTask}
+                  useNewOptimizer={useNewOptimizer}
+                  onToggleOptimizer={setUseNewOptimizer}
                 />
               </div>
             </div>

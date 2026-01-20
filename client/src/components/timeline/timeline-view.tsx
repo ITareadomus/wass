@@ -51,6 +51,8 @@ interface TimelineViewProps {
   lastValidDragIndex?: number | null; // Indice valido durante il drag (da container verso timeline)
   draggingOverCleanerId?: number | null; // ID del cleaner su cui si sta trascinando
   searchTask?: string; // Ricerca task per ID, logistic code o address
+  useNewOptimizer?: boolean; // Toggle: true = nuovo optimizer (TS), false = vecchio (Python)
+  onToggleOptimizer?: (value: boolean) => void; // Callback per toggle optimizer
 }
 
 interface Cleaner {
@@ -81,6 +83,8 @@ export default function TimelineView({
   lastValidDragIndex = null,
   draggingOverCleanerId = null,
   searchTask = "",
+  useNewOptimizer = true,
+  onToggleOptimizer,
 }: TimelineViewProps) {
   const [cleaners, setCleaners] = useState<Cleaner[]>([]);
   const [selectedDate, setSelectedDate] = useState<Date>(() => {
@@ -1606,18 +1610,29 @@ export default function TimelineView({
                 {!isResetting && <RotateCcw className="w-4 h-4" />}
                 Reset Assegnazioni
               </Button>
-              <Button
-                onClick={() => setShowOptimizerDialog(true)}
-                variant="outline"
-                size="sm"
-                className="flex items-center gap-2 border-2 border-green-500 dark:border-green-600 text-green-700 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/20"
-                disabled={isReadOnly || isRunningOptimizer}
-                title="Esegui ottimizzatore automatico"
-              >
-                {isRunningOptimizer && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                {!isRunningOptimizer && <Zap className="w-4 h-4" />}
-                Auto-Assegna
-              </Button>
+              <div className="flex items-center gap-2 px-3 py-1.5 border-2 border-gray-300 dark:border-gray-600 rounded-md bg-background">
+                <span className={`text-xs font-medium ${!useNewOptimizer ? 'text-green-600 dark:text-green-400' : 'text-muted-foreground'}`}>
+                  Vecchio
+                </span>
+                <button
+                  onClick={() => onToggleOptimizer?.(!useNewOptimizer)}
+                  className={`relative w-10 h-5 rounded-full transition-colors duration-200 ${
+                    useNewOptimizer 
+                      ? 'bg-green-500 dark:bg-green-600' 
+                      : 'bg-gray-300 dark:bg-gray-600'
+                  }`}
+                  title={useNewOptimizer ? 'Usando nuovo optimizer TypeScript' : 'Usando vecchio optimizer Python'}
+                >
+                  <span
+                    className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform duration-200 ${
+                      useNewOptimizer ? 'translate-x-5' : 'translate-x-0.5'
+                    }`}
+                  />
+                </button>
+                <span className={`text-xs font-medium ${useNewOptimizer ? 'text-green-600 dark:text-green-400' : 'text-muted-foreground'}`}>
+                  Nuovo
+                </span>
+              </div>
             </div>
           </div>
         </div>
