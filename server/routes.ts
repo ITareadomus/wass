@@ -3576,25 +3576,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const pool = (await import("../shared/pg-db")).default;
       const { taskCollaborationService } = await import("./services/pg-task-collaboration-service");
       const { recomputeSchedule } = await import("./schedule/recompute");
+      const mysql = await import('mysql2/promise');
 
-      const client = await pool.connect();
+      // FASE 1: Verifica collaborazione e raccolta dati PRIMA di iniziare la transazione
+      const existingCollaboration = await taskCollaborationService.getCollaboration(workDate, taskId);
 
+      if (existingCollaboration.count < 2) {
+        return res.status(400).json({ 
+          success: false, 
+          error: "La task non è in collaborazione" 
+        });
+      }
+
+      // Ottieni dati dalla timeline per backup
+      const preClient = await pool.connect();
+      let taskData: any;
+      let originalDuration: number;
+      let priority: string;
+      let logisticCode: number;
+      let affectedCleaners: number[];
+      
       try {
-        await client.query('BEGIN');
-
-        // 1. Verifica collaborazione esistente
-        const existingCollaboration = await taskCollaborationService.getCollaboration(workDate, taskId);
-
-        if (existingCollaboration.count < 2) {
-          await client.query('ROLLBACK');
-          return res.status(400).json({ 
-            success: false, 
-            error: "La task non è in collaborazione" 
-          });
-        }
-
-        // 2. Ottieni dati originali della task (priorità, base_cleaning_time, etc.)
-        const taskDataResult = await client.query(
+        const taskDataResult = await preClient.query(
           `SELECT task_id, logistic_code, base_cleaning_time, cleaning_time, priority,
                   address, lat, lng, checkout_date, checkout_time, checkin_date, checkin_time,
                   pax_in, operation_id, straordinaria, customer_reference
@@ -3605,33 +3608,166 @@ export async function registerRoutes(app: Express): Promise<Server> {
         );
 
         if (taskDataResult.rows.length === 0) {
-          await client.query('ROLLBACK');
           return res.status(404).json({ success: false, error: "Task non trovata in timeline" });
         }
 
-        const taskData = taskDataResult.rows[0];
-        const originalDuration = taskData.base_cleaning_time || taskData.cleaning_time;
-        const priority = taskData.priority || 'high_priority';
-        const logisticCode = taskData.logistic_code;
+        taskData = taskDataResult.rows[0];
+        originalDuration = taskData.base_cleaning_time || taskData.cleaning_time;
+        priority = taskData.priority || 'high_priority';
+        logisticCode = taskData.logistic_code;
+        affectedCleaners = existingCollaboration.cleanerIds;
+      } finally {
+        preClient.release();
+      }
 
-        // 3. Ottieni lista di tutti i cleaners coinvolti per ricalcolare i loro orari
-        const affectedCleaners = existingCollaboration.cleanerIds;
+      // FASE 2: Recupera dati completi da ADAM MySQL PRIMA di iniziare modifiche
+      let fullTaskData: any = null;
+      try {
+        const adamConnection = await mysql.createConnection({
+          host: databaseConfig.mysql.host,
+          port: databaseConfig.mysql.port,
+          user: databaseConfig.mysql.user,
+          password: databaseConfig.mysql.password,
+          database: databaseConfig.mysql.database,
+        });
 
-        // 4. Elimina tutte le righe da task_collaborators
+        const [rows] = await adamConnection.execute(
+          `SELECT 
+            id as task_id,
+            logistic_code,
+            client_id,
+            premium,
+            address,
+            lat,
+            lng,
+            cleaning_time,
+            checkout as checkout_date,
+            checkout_time,
+            checkin as checkin_date,
+            checkin_time,
+            checkin_pax as pax_in,
+            checkout_pax as pax_out,
+            small_equipment,
+            operation_id,
+            confirmed_operation,
+            straordinaria,
+            type_apt,
+            alias,
+            customer_name,
+            customer_structure_name as customer_reference
+          FROM app_housekeeping 
+          WHERE id = ?`,
+          [taskId]
+        );
+        
+        await adamConnection.end();
+        
+        if (Array.isArray(rows) && rows.length > 0) {
+          fullTaskData = rows[0] as any;
+          fullTaskData.cleaning_time = originalDuration;
+        }
+      } catch (mysqlError) {
+        console.warn(`⚠️ Dissolve: ADAM non disponibile, uso fallback da timeline:`, mysqlError);
+      }
+
+      // Se ADAM non disponibile, usa fallback con dati dalla timeline
+      if (!fullTaskData) {
+        fullTaskData = {
+          task_id: taskId,
+          logistic_code: logisticCode,
+          client_id: null,
+          premium: false,
+          cleaning_time: originalDuration,
+          address: taskData.address,
+          lat: taskData.lat,
+          lng: taskData.lng,
+          checkout_date: taskData.checkout_date,
+          checkout_time: taskData.checkout_time,
+          checkin_date: taskData.checkin_date,
+          checkin_time: taskData.checkin_time,
+          pax_in: taskData.pax_in,
+          pax_out: null,
+          small_equipment: false,
+          operation_id: taskData.operation_id,
+          confirmed_operation: false,
+          straordinaria: taskData.straordinaria,
+          type_apt: null,
+          alias: null,
+          customer_name: null,
+          customer_reference: taskData.customer_reference
+        };
+      }
+
+      const containerPriority = priority === 'early_out' ? 'early_out' : 
+                                priority === 'high_priority' ? 'high_priority' : 'low_priority';
+
+      // FASE 3: Ora che abbiamo tutti i dati, esegui la transazione atomica
+      const client = await pool.connect();
+
+      try {
+        await client.query('BEGIN');
+
+        // 1. Inserisci PRIMA il task nel container (così se fallisce non perdiamo nulla)
+        await client.query(`
+          INSERT INTO daily_containers (
+            work_date, priority,
+            task_id, logistic_code, client_id, premium, address, lat, lng,
+            cleaning_time, checkin_date, checkout_date, checkin_time, checkout_time,
+            pax_in, pax_out, small_equipment, operation_id, confirmed_operation,
+            straordinaria, type_apt, alias, customer_name, reasons, customer_reference,
+            locked, locked_reason
+          ) VALUES (
+            $1, $2, $3, $4, $5, $6, $7, $8, $9,
+            $10, $11, $12, $13, $14, $15, $16, $17, $18, $19,
+            $20, $21, $22, $23, $24, $25, $26, $27
+          )
+          ON CONFLICT (work_date, task_id) DO UPDATE SET
+            priority = EXCLUDED.priority,
+            cleaning_time = EXCLUDED.cleaning_time
+        `, [
+          workDate,
+          containerPriority,
+          fullTaskData.task_id,
+          fullTaskData.logistic_code ?? 0,
+          fullTaskData.client_id ?? null,
+          fullTaskData.premium === true,
+          fullTaskData.address ?? null,
+          fullTaskData.lat ?? null,
+          fullTaskData.lng ?? null,
+          fullTaskData.cleaning_time ?? 0,
+          fullTaskData.checkin_date ?? null,
+          fullTaskData.checkout_date ?? null,
+          fullTaskData.checkin_time ?? null,
+          fullTaskData.checkout_time ?? null,
+          fullTaskData.pax_in ?? null,
+          fullTaskData.pax_out ?? null,
+          fullTaskData.small_equipment === true,
+          fullTaskData.operation_id ?? null,
+          fullTaskData.confirmed_operation === true,
+          fullTaskData.straordinaria === true,
+          fullTaskData.type_apt ?? null,
+          fullTaskData.alias ?? null,
+          fullTaskData.customer_name ?? null,
+          [],
+          fullTaskData.customer_reference ?? null,
+          false,
+          null
+        ]);
+        console.log(`✅ Dissolve: Task ${logisticCode} inserita in container ${containerPriority}`);
+
+        // 2. Elimina collaboratori
         await client.query(
           `DELETE FROM task_collaborators WHERE work_date = $1 AND task_id = $2`,
           [workDate, taskId]
         );
-        console.log(`🗑️ Dissolve: Rimossi tutti i collaboratori da task ${taskId}`);
 
-        // 5. Elimina tutte le righe da daily_assignments_current per questa task
-        const deleteResult = await client.query(
+        // 3. Elimina assegnazioni dalla timeline
+        await client.query(
           `DELETE FROM daily_assignments_current WHERE work_date = $1 AND task_id = $2`,
           [workDate, taskId]
         );
-        console.log(`🗑️ Dissolve: Rimosse ${deleteResult.rowCount} assegnazioni da timeline per task ${taskId}`);
 
-        // 6. Ricalcola orari per i cleaners che avevano la task
+        // 4. Ricalcola orari per i cleaners coinvolti
         for (const cleanerId of affectedCleaners) {
           const tasksResult = await client.query(
             `SELECT task_id as "taskId", logistic_code as "logisticCode", cleaner_id as "cleanerId",
@@ -3645,7 +3781,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
           if (tasksResult.rows.length === 0) continue;
 
-          // Rinumera sequence
           let seq = 1;
           for (const task of tasksResult.rows) {
             await client.query(
@@ -3658,7 +3793,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
             seq++;
           }
 
-          // Ricalcola orari
           const cleanerStartTime = await getCleanerStartTime(cleanerId, workDate) || '10:00';
           const recalculated = await recomputeSchedule(tasksResult.rows, cleanerStartTime, workDate);
 
@@ -3672,51 +3806,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
         }
 
-        // 7. Riporta la task nel container originale con durata originale
-        // Carica containers esistenti usando workspaceFiles service
-        const containersData = await workspaceFiles.loadContainers(workDate) || { 
-          containers: { early_out: { tasks: [] }, high_priority: { tasks: [] }, low_priority: { tasks: [] } } 
-        };
-        
-        const containers = containersData.containers || containersData;
-        const containerKey = priority === 'early_out' ? 'early_out' : 
-                             priority === 'high_priority' ? 'high_priority' : 'low_priority';
-
-        // Costruisci task da reinserire
-        const taskToReinsert = {
-          task_id: taskData.task_id,
-          logistic_code: logisticCode,
-          name: String(logisticCode),
-          cleaning_time: originalDuration,
-          duration: `${Math.floor(originalDuration / 60)}.${String(originalDuration % 60).padStart(2, '0')}`,
-          address: taskData.address,
-          lat: taskData.lat,
-          lng: taskData.lng,
-          checkout_date: taskData.checkout_date,
-          checkout_time: taskData.checkout_time,
-          checkin_date: taskData.checkin_date,
-          checkin_time: taskData.checkin_time,
-          pax_in: taskData.pax_in,
-          operation_id: taskData.operation_id,
-          straordinaria: taskData.straordinaria,
-          customer_reference: taskData.customer_reference,
-          priority: priority
-        };
-
-        // Aggiungi al container corretto
-        if (containers[containerKey] && containers[containerKey].tasks) {
-          containers[containerKey].tasks.push(taskToReinsert);
-        } else if (containers[containerKey]) {
-          containers[containerKey].tasks = [taskToReinsert];
-        }
-
-        // Salva containers aggiornati usando workspaceFiles service
-        await workspaceFiles.saveContainers(workDate, { containers }, 'system', 'collaboration_dissolved');
-        console.log(`✅ Dissolve: Task ${logisticCode} reinserita in container ${containerKey} con durata ${originalDuration} min`);
-
         await client.query('COMMIT');
 
-        console.log(`✅ Collaborazione dissolta per task ${taskId}: ${affectedCleaners.length} cleaners coinvolti, task riportata in ${priority}`);
+        console.log(`✅ Collaborazione dissolta per task ${taskId}: ${affectedCleaners.length} cleaners coinvolti`);
         res.json({
           success: true,
           taskId,
@@ -3724,7 +3816,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           originalDuration,
           priority,
           affectedCleaners,
-          message: `Collaborazione dissolta, task riportata in ${priority}`
+          message: `Collaborazione dissolta, task riportata nei containers`
         });
 
       } catch (error: any) {
