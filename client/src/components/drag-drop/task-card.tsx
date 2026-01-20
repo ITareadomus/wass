@@ -1884,7 +1884,7 @@ export default function TaskCard({
                 }
               }}
               disabled={isDissolvingCollaboration}
-              className="bg-background hover:bg-accent text-foreground border-purple-300 dark:border-purple-700 shadow-sm"
+              className="bg-background hover:bg-accent text-foreground border-2 border-custom-blue shadow-sm"
             >
               {isDissolvingCollaboration ? "Rimozione..." : "Conferma Rimozione"}
             </AlertDialogAction>
