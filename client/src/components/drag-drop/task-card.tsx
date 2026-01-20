@@ -1657,7 +1657,7 @@ export default function TaskCard({
                       variant="outline"
                       size="sm"
                       onClick={openAddCollaboratorDialog}
-                      className="flex items-center gap-1 border-purple-300 dark:border-purple-700 hover:bg-purple-50 dark:hover:bg-purple-900/20 text-purple-600 dark:text-purple-400"
+                      className="flex items-center gap-1 border-purple-300 dark:border-purple-700 hover:bg-purple-50 dark:hover:bg-purple-900/20"
                     >
                       <UserPlus className="w-3 h-3" />
                       Aggiungi collaboratore
@@ -1719,7 +1719,7 @@ export default function TaskCard({
                     variant="outline"
                     size="sm"
                     onClick={openBulkAssignDialog}
-                    className="flex items-center gap-1 border-purple-300 dark:border-purple-700 hover:bg-purple-50 dark:hover:bg-purple-900/20 text-purple-600 dark:text-purple-400"
+                    className="flex items-center gap-1 border-purple-300 dark:border-purple-700 hover:bg-purple-50 dark:hover:bg-purple-900/20"
                     disabled={isLocked}
                   >
                     <UserPlus className="w-3 h-3" />
