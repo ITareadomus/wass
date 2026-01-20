@@ -46,8 +46,13 @@ export const DEFAULT_PHASE2_PARAMS: Phase2Params = {
   travelWeight: 2,
   loadWeight: 5,
   preferenceBonus: 10,
-  maxCleanerLoad: 6
+  maxCleanerLoad: 3 // Base max, can be 4 if total travel < 30min
 };
+
+// Dynamic max load: 3 base, 4 if total travel time < 30 minutes
+export function getDynamicMaxLoad(totalTravelMin: number): number {
+  return totalTravelMin < 30 ? 4 : 3;
+}
 
 export interface CleanerScore {
   cleanerId: number;
@@ -236,9 +241,13 @@ export function runPhase2Algorithm(
   const events: Phase2Event[] = [];
   const assignments: AssignmentResult[] = [];
   const cleanerLoad = new Map<number, number>();
+  const cleanerTotalTravel = new Map<number, number>(); // Track cumulative travel time
   const cleanerLastPosition = new Map<number, { lat: number; lng: number }>();
   
-  cleaners.forEach(c => cleanerLoad.set(c.cleanerId, 0));
+  cleaners.forEach(c => {
+    cleanerLoad.set(c.cleanerId, 0);
+    cleanerTotalTravel.set(c.cleanerId, 0);
+  });
   
   const sortedGroups = [...groups].sort((a, b) => b.score - a.score);
   
@@ -266,7 +275,10 @@ export function runPhase2Algorithm(
       
       for (const cleaner of cleaners) {
         const load = cleanerLoad.get(cleaner.cleanerId) || 0;
-        if (load >= params.maxCleanerLoad) continue;
+        const totalTravel = cleanerTotalTravel.get(cleaner.cleanerId) || 0;
+        const dynamicMaxLoad = getDynamicMaxLoad(totalTravel);
+        // Check if cleaner can fit this group (load + group size must not exceed cap)
+        if (load + tasks.length > dynamicMaxLoad) continue;
         
         const result = isCleanerCompatibleWithGroup(cleaner, tasks);
         if (result.compatible) {
@@ -302,6 +314,10 @@ export function runPhase2Algorithm(
         
         const newLoad = (cleanerLoad.get(assignedCleaner.cleanerId) || 0) + tasks.length;
         cleanerLoad.set(assignedCleaner.cleanerId, newLoad);
+        
+        // Update cumulative travel time for dynamic max load calculation
+        const currentTravel = cleanerTotalTravel.get(assignedCleaner.cleanerId) || 0;
+        cleanerTotalTravel.set(assignedCleaner.cleanerId, currentTravel + bestCleaner.travelMin);
         
         const lastTask = tasks[tasks.length - 1];
         cleanerLastPosition.set(assignedCleaner.cleanerId, { lat: lastTask.lat, lng: lastTask.lng });
