@@ -3225,15 +3225,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
           console.log(`✅ ${autoSummonedCleaners.length} cleaners aggiunti ai selected_cleaners per ${workDate}`);
         }
 
-        // 3. Inserisci pivot per ogni cleaner (nessuno è primary per ora)
-        for (const cId of cleanerIds) {
+        // 3. Inserisci pivot per ogni cleaner (il primo è primary)
+        for (let i = 0; i < cleanerIds.length; i++) {
+          const cId = cleanerIds[i];
+          const isPrimary = i === 0; // Il primo cleaner selezionato è il primary
           await client.query(
             `INSERT INTO task_collaborators (work_date, task_id, cleaner_id, is_primary)
-             VALUES ($1, $2, $3, false)
-             ON CONFLICT (work_date, task_id, cleaner_id) DO NOTHING`,
-            [workDate, taskId, Number(cId)]
+             VALUES ($1, $2, $3, $4)
+             ON CONFLICT (work_date, task_id, cleaner_id) DO UPDATE SET is_primary = $4`,
+            [workDate, taskId, Number(cId), isPrimary]
           );
         }
+        console.log(`✅ Primo cleaner (${cleanerIds[0]}) impostato come primary per task ${taskId}`);
 
         // 4. Crea N righe in daily_assignments_current (una per cleaner)
         const overlaps: any[] = [];

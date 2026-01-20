@@ -208,6 +208,14 @@ export function CleanerSelectorDialog({
           <DialogDescription>{description}</DialogDescription>
         </DialogHeader>
 
+        {/* Info sul Cleaner Primario */}
+        <div className="mt-2 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+          <p className="text-sm text-blue-700 dark:text-blue-300">
+            <strong>Nota:</strong> Il primo cleaner che selezionerai sarà considerato come{" "}
+            <span className="font-bold">"Cleaner Primario"</span>, cioè il cleaner a cui verrà assegnato il task su ADAM.
+          </p>
+        </div>
+
         <div className="space-y-4 mt-4">
           {isLoadingCleaners ? (
             <div className="flex items-center justify-center py-8">
@@ -229,6 +237,7 @@ export function CleanerSelectorDialog({
                   <div className="space-y-2">
                     {convocatiCleaners.map((cleaner) => {
                       const isSelected = selectedIds.includes(cleaner.id);
+                      const isPrimary = selectedIds.length > 0 && selectedIds[0] === cleaner.id;
                       const displayName = cleaner.lastname
                         ? `${cleaner.name} ${cleaner.lastname}`
                         : cleaner.name;
@@ -250,7 +259,12 @@ export function CleanerSelectorDialog({
                               onCheckedChange={() => toggleCleaner(cleaner.id)}
                             />
                             <div>
-                              <p className="font-semibold">{displayName}</p>
+                              <p className="font-semibold">
+                                {displayName}
+                                {isPrimary && (
+                                  <span className="ml-2 text-xs font-bold text-blue-600 dark:text-blue-400">(P)</span>
+                                )}
+                              </p>
                               <p className="text-sm text-muted-foreground">
                                 {cleaner.role || "Standard"} • Contratto: {cleaner.contract_type || "N/A"} • {Number(cleaner.counter_hours || 0).toFixed(2)}h
                                 {cleaner.start_time && ` • Inizio: ${cleaner.start_time}`}
@@ -300,6 +314,7 @@ export function CleanerSelectorDialog({
                   <div className="space-y-2">
                     {nonConvocatiCleaners.map((cleaner) => {
                       const isSelected = selectedIds.includes(cleaner.id);
+                      const isPrimary = selectedIds.length > 0 && selectedIds[0] === cleaner.id;
                       const displayName = cleaner.lastname
                         ? `${cleaner.name} ${cleaner.lastname}`
                         : cleaner.name;
@@ -321,7 +336,12 @@ export function CleanerSelectorDialog({
                               onCheckedChange={() => toggleCleaner(cleaner.id)}
                             />
                             <div>
-                              <p className="font-semibold">{displayName}</p>
+                              <p className="font-semibold">
+                                {displayName}
+                                {isPrimary && (
+                                  <span className="ml-2 text-xs font-bold text-blue-600 dark:text-blue-400">(P)</span>
+                                )}
+                              </p>
                               <p className="text-sm text-muted-foreground">
                                 {cleaner.role || "Standard"} • Contratto: {cleaner.contract_type || "N/A"} • {Number(cleaner.counter_hours || 0).toFixed(2)}h
                                 {cleaner.start_time && ` • Inizio: ${cleaner.start_time}`}
