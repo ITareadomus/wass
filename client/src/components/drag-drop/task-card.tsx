@@ -1667,7 +1667,7 @@ export default function TaskCard({
 
                 {/* Info collaborazione attuale */}
                 {(displayTask as any).collaborator_count > 1 && (
-                  <div className="text-xs text-muted-foreground mb-2 p-3 bg-purple-50 dark:bg-purple-900/20 rounded border border-purple-200 dark:border-purple-800">
+                  <div className="text-xs text-muted-foreground mb-2 p-3 bg-purple-50 dark:bg-purple-900/20 rounded border border-purple-300 dark:border-purple-700">
                     <div className="flex items-center gap-2 mb-2">
                       <Users className="w-4 h-4 text-purple-600" />
                       <span className="font-semibold text-purple-700 dark:text-purple-300">
