@@ -329,13 +329,8 @@ export async function applyOptimizerWaveToProduction(
   workDate: string,
   wave: 'EO' | 'HP' | 'LP'
 ): Promise<ApplyWaveResult> {
-  // Map wave to priority_type used in optimizer_assignment
-  const priorityMap: Record<string, string> = {
-    'EO': 'early-out',
-    'HP': 'high',
-    'LP': 'low'
-  };
-  const priorityType = priorityMap[wave];
+  // Wave already matches priority_type in optimizer_assignment (EO, HP, LP)
+  const priorityType = wave;
 
   const result: ApplyWaveResult = {
     runId,
