@@ -357,7 +357,11 @@ export async function applyOptimizerWaveToProduction(
       return result;
     }
     
-    const runWorkDate = runValidation.rows[0].work_date;
+    // Convert Date object to string for comparison (PostgreSQL returns Date objects)
+    const runWorkDateRaw = runValidation.rows[0].work_date;
+    const runWorkDate = runWorkDateRaw instanceof Date 
+      ? runWorkDateRaw.toISOString().slice(0, 10) 
+      : String(runWorkDateRaw);
     if (runWorkDate !== workDate) {
       result.error = `Run ${runId} is for date ${runWorkDate}, not ${workDate}`;
       await client.query('ROLLBACK');
