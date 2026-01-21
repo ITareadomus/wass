@@ -7,7 +7,7 @@ import {
   GroupScheduleResult
 } from './phase3';
 import { updateRunStatus, insertDecisionsBatch, OptimizerDecision, getLatestRunForDate } from './db';
-import { loadPriorityStartWindows, mapPriorityType, PriorityWindows } from './priorityWindows';
+import { loadPriorityStartWindows, mapPriorityType, priorityToDbFormat, PriorityWindows } from './priorityWindows';
 
 export interface Phase3RunResult {
   runId: string;
@@ -170,7 +170,7 @@ async function insertAssignments(
         row.endTime,
         row.travelMinutesFromPrev,
         [],
-        row.priorityType,
+        priorityToDbFormat(row.priorityType),
         row.priorityPenalty,
         row.priorityReasons
       ]);

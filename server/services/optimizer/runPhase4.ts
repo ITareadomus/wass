@@ -8,7 +8,7 @@ import {
 } from './phase4';
 import { TaskForScheduling } from './phase3';
 import { updateRunStatus, insertDecisionsBatch, OptimizerDecision, getLatestRunForDate } from './db';
-import { loadPriorityStartWindows, mapPriorityType } from './priorityWindows';
+import { loadPriorityStartWindows, mapPriorityType, priorityToDbFormat } from './priorityWindows';
 
 export interface Phase4RunResult {
   runId: string;
@@ -273,7 +273,7 @@ async function updateAssignments(
         row.endTime,
         row.travelMinutesFromPrev,
         [],
-        row.priorityType,
+        priorityToDbFormat(row.priorityType),
         row.priorityPenalty,
         row.priorityReasons || []
       ]);

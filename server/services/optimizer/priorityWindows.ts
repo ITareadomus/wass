@@ -201,3 +201,15 @@ export function mapPriorityType(priority: string | null | undefined): Priority |
   
   return null;
 }
+
+export function priorityToDbFormat(priority: Priority | string | null | undefined): string | null {
+  if (!priority) return null;
+  
+  const normalized = priority.toUpperCase();
+  
+  if (normalized === 'EO') return 'early-out';
+  if (normalized === 'HP') return 'high-priority';
+  if (normalized === 'LP') return 'low_priority';
+  
+  return priority as string;
+}
