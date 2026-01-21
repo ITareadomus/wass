@@ -119,7 +119,7 @@ export async function runAllPhases(
       result.totalDurationMs = Date.now() - startTime;
       return result;
     }
-    console.log(`[runAllPhases] Phase 3 complete: ${result.phase3.tasksScheduled} tasks scheduled`);
+    console.log(`[runAllPhases] Phase 3 complete: ${result.phase3.tasksScheduled} tasks scheduled, ${result.phase3.assignmentsInserted} inserted to optimizer_assignment`);
 
     if (!skipPhase4) {
       console.log(`[runAllPhases] === PHASE 4: Recovery ===`);
@@ -370,6 +370,7 @@ export async function applyOptimizerWaveToProduction(
       WHERE run_id = $1 AND priority_type = $2
     `, [runId, priorityType]);
     const totalInWave = parseInt(countResult.rows[0]?.total || '0');
+    console.log(`[applyWave] Found ${totalInWave} tasks in optimizer_assignment for runId=${runId}, priority_type=${priorityType}`);
 
     // INSERT only tasks of this wave that are NOT already in daily_assignments_current
     // This is the key: non-destructive, incremental INSERT
