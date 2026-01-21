@@ -58,10 +58,18 @@ export async function runPhase0(
     let tasks = await loadTasksWithLockStatus(workDate);
     
     // Filter by priority if specified
+    // Map frontend priority names to database priority names
     if (priority) {
+      const priorityDbMap: Record<string, string> = {
+        'early-out': 'early_out',
+        'high': 'high_priority',
+        'low': 'low_priority'
+      };
+      const dbPriority = priorityDbMap[priority] || priority;
+      
       const beforeCount = tasks.length;
-      tasks = tasks.filter(t => t.priority === priority);
-      console.log(`[Phase0] Priority filter '${priority}': ${beforeCount} -> ${tasks.length} tasks`);
+      tasks = tasks.filter(t => t.priority === dbPriority);
+      console.log(`[Phase0] Priority filter '${priority}' (db: '${dbPriority}'): ${beforeCount} -> ${tasks.length} tasks`);
     }
     
     result.totalTasks = tasks.length;
