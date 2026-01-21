@@ -1616,7 +1616,7 @@ export default function TimelineView({
                 </span>
                 <button
                   onClick={() => onToggleOptimizer?.(!useNewOptimizer)}
-                  className={`relative w-10 h-5 rounded-full transition-colors duration-200 ${
+                  className={`relative inline-flex items-center w-9 h-5 rounded-full transition-colors duration-200 flex-shrink-0 ${
                     useNewOptimizer 
                       ? 'bg-green-500 dark:bg-green-600' 
                       : 'bg-gray-300 dark:bg-gray-600'
@@ -1624,8 +1624,8 @@ export default function TimelineView({
                   title={useNewOptimizer ? 'Usando nuovo optimizer TypeScript' : 'Usando vecchio optimizer Python'}
                 >
                   <span
-                    className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform duration-200 ${
-                      useNewOptimizer ? 'translate-x-5' : 'translate-x-0.5'
+                    className={`inline-block w-4 h-4 rounded-full bg-white shadow transform transition-transform duration-200 ${
+                      useNewOptimizer ? 'translate-x-[18px]' : 'translate-x-0.5'
                     }`}
                   />
                 </button>
