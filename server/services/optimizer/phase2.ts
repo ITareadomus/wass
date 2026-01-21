@@ -232,6 +232,10 @@ export function findMostExpensiveTask(
   return worstTask ? { task: worstTask, reason: worstReason } : null;
 }
 
+// Straordinaria constraints
+const STRAORDINARIA_LONG_THRESHOLD_MIN = 240; // 4 hours - cleaner can only do this task
+const STRAORDINARIA_EXTRA_TASK_MAX_MIN = 120; // 2 hours - max duration of extra task when straordinaria < 4h
+
 export function runPhase2Algorithm(
   groups: GroupCandidate[],
   tasksMap: Map<number, TaskForPhase2>,
@@ -243,10 +247,17 @@ export function runPhase2Algorithm(
   const cleanerLoad = new Map<number, number>();
   const cleanerTotalTravel = new Map<number, number>(); // Track cumulative travel time
   const cleanerLastPosition = new Map<number, { lat: number; lng: number }>();
+  // Straordinaria tracking per cleaner
+  const cleanerHasStraordinaria = new Map<number, boolean>();
+  const cleanerStraordinariaDuration = new Map<number, number>(); // Duration in minutes
+  const cleanerTotalCleaningTime = new Map<number, number>(); // Total cleaning time assigned
   
   cleaners.forEach(c => {
     cleanerLoad.set(c.cleanerId, 0);
     cleanerTotalTravel.set(c.cleanerId, 0);
+    cleanerHasStraordinaria.set(c.cleanerId, false);
+    cleanerStraordinariaDuration.set(c.cleanerId, 0);
+    cleanerTotalCleaningTime.set(c.cleanerId, 0);
   });
   
   const sortedGroups = [...groups].sort((a, b) => b.score - a.score);
@@ -273,12 +284,74 @@ export function runPhase2Algorithm(
       const compatibleCleaners: CleanerInput[] = [];
       const incompatibleReasons: { cleanerId: number; reasons: string[] }[] = [];
       
+      // Check if current group contains straordinaria and its duration
+      const groupHasStraordinaria = tasks.some(t => t.straordinaria);
+      const groupStraordinariaDuration = tasks.filter(t => t.straordinaria).reduce((sum, t) => sum + t.cleaningTime, 0);
+      const groupTotalCleaningTime = tasks.reduce((sum, t) => sum + t.cleaningTime, 0);
+      const groupStraordinariaCount = tasks.filter(t => t.straordinaria).length;
+      
+      // Pre-check: Groups with straordinaria must contain exactly 1 task (the straordinaria itself)
+      // This ensures straordinaria is never grouped with other tasks during Phase 1 grouping
+      if (groupHasStraordinaria && tasks.length > 1) {
+        // This group mixes straordinaria with other tasks - should not happen with proper Phase 1
+        // Skip this group as it violates straordinaria isolation rule
+        events.push({
+          eventType: 'PHASE2_GROUP_REJECTED',
+          payload: {
+            group_tasks: currentTaskIds,
+            reason: 'STRAORDINARIA_MIXED_WITH_OTHER_TASKS'
+          }
+        });
+        groupsUnassigned++;
+        break; // Exit the while loop for this group
+      }
+      
       for (const cleaner of cleaners) {
         const load = cleanerLoad.get(cleaner.cleanerId) || 0;
         const totalTravel = cleanerTotalTravel.get(cleaner.cleanerId) || 0;
         const dynamicMaxLoad = getDynamicMaxLoad(totalTravel);
         // Check if cleaner can fit this group (load + group size must not exceed cap)
         if (load + tasks.length > dynamicMaxLoad) continue;
+        
+        // Straordinaria constraints
+        const hasStraordinaria = cleanerHasStraordinaria.get(cleaner.cleanerId) || false;
+        const straordinariaDuration = cleanerStraordinariaDuration.get(cleaner.cleanerId) || 0;
+        
+        // Rule 1: If cleaner already has straordinaria, they cannot take any more tasks
+        if (hasStraordinaria) {
+          // Exception: If existing straordinaria < 4h, can add exactly 1 task with duration <= 2h
+          if (straordinariaDuration < STRAORDINARIA_LONG_THRESHOLD_MIN && load === 1) {
+            // Can add 1 more task if: exactly 1 task, no straordinaria, and duration <= 2h
+            if (tasks.length !== 1 || groupHasStraordinaria || groupTotalCleaningTime > STRAORDINARIA_EXTRA_TASK_MAX_MIN) {
+              incompatibleReasons.push({ cleanerId: cleaner.cleanerId, reasons: ['STRAORDINARIA_EXTRA_TASK_INVALID'] });
+              continue;
+            }
+          } else {
+            incompatibleReasons.push({ cleanerId: cleaner.cleanerId, reasons: ['ALREADY_HAS_STRAORDINARIA'] });
+            continue;
+          }
+        }
+        
+        // Rule 2: If this group has straordinaria >= 4h, cleaner must be empty (no other tasks allowed)
+        if (groupHasStraordinaria && groupStraordinariaDuration >= STRAORDINARIA_LONG_THRESHOLD_MIN) {
+          if (load > 0) {
+            incompatibleReasons.push({ cleanerId: cleaner.cleanerId, reasons: ['STRAORDINARIA_LONG_REQUIRES_EMPTY_CLEANER'] });
+            continue;
+          }
+        }
+        
+        // Rule 3: If cleaner has non-straordinaria tasks, can only add straordinaria < 4h 
+        // if the existing task is exactly 1 and its duration <= 2h
+        if (groupHasStraordinaria && load > 0 && !hasStraordinaria) {
+          const existingCleaningTime = cleanerTotalCleaningTime.get(cleaner.cleanerId) || 0;
+          // Allow only if: exactly 1 existing task, its duration <= 2h, and straordinaria < 4h
+          if (load !== 1 || existingCleaningTime > STRAORDINARIA_EXTRA_TASK_MAX_MIN || 
+              groupStraordinariaDuration >= STRAORDINARIA_LONG_THRESHOLD_MIN) {
+            incompatibleReasons.push({ cleanerId: cleaner.cleanerId, reasons: ['CANNOT_ADD_STRAORDINARIA_TO_EXISTING_TASKS'] });
+            continue;
+          }
+          // OK: Cleaner has 1 task <= 2h and new straordinaria is < 4h - allowed
+        }
         
         const result = isCleanerCompatibleWithGroup(cleaner, tasks);
         if (result.compatible) {
@@ -318,6 +391,15 @@ export function runPhase2Algorithm(
         // Update cumulative travel time for dynamic max load calculation
         const currentTravel = cleanerTotalTravel.get(assignedCleaner.cleanerId) || 0;
         cleanerTotalTravel.set(assignedCleaner.cleanerId, currentTravel + bestCleaner.travelMin);
+        
+        // Update straordinaria tracking
+        if (groupHasStraordinaria) {
+          cleanerHasStraordinaria.set(assignedCleaner.cleanerId, true);
+          const existingStraDuration = cleanerStraordinariaDuration.get(assignedCleaner.cleanerId) || 0;
+          cleanerStraordinariaDuration.set(assignedCleaner.cleanerId, existingStraDuration + groupStraordinariaDuration);
+        }
+        const existingCleaningTime = cleanerTotalCleaningTime.get(assignedCleaner.cleanerId) || 0;
+        cleanerTotalCleaningTime.set(assignedCleaner.cleanerId, existingCleaningTime + groupTotalCleaningTime);
         
         const lastTask = tasks[tasks.length - 1];
         cleanerLastPosition.set(assignedCleaner.cleanerId, { lat: lastTask.lat, lng: lastTask.lng });
