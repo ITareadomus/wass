@@ -134,7 +134,7 @@ async function loadExistingCleanerState(workDate: string): Promise<ExistingClean
     JOIN daily_containers dc ON dac.task_id = dc.task_id AND dac.work_date = dc.work_date
     WHERE dac.work_date = $1
       AND dac.cleaner_id IS NOT NULL
-    ORDER BY dac.cleaner_id, dac.sequence, dac.position
+    ORDER BY dac.cleaner_id, dac.sequence
   `, [workDate]);
 
   const cleanerLoad = new Map<number, number>();
