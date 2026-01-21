@@ -22,11 +22,17 @@ export interface Phase0RunResult {
   unlockedTaskData: TaskInputWithLock[];
 }
 
+export interface Phase0Options {
+  priority?: 'early-out' | 'high' | 'low'; // Filter to only process tasks of this priority
+}
+
 export async function runPhase0(
   workDate: string,
-  runId: string
+  runId: string,
+  options: Phase0Options = {}
 ): Promise<Phase0RunResult> {
   const startTime = Date.now();
+  const { priority } = options;
 
   const result: Phase0RunResult = {
     runId,
@@ -42,14 +48,22 @@ export async function runPhase0(
   };
 
   try {
-    console.log(`[Phase0] Starting for workDate=${workDate}, runId=${runId}`);
+    console.log(`[Phase0] Starting for workDate=${workDate}, runId=${runId}${priority ? `, priority=${priority}` : ''}`);
 
     const deletedData = await deletePhase0Data(runId);
     if (deletedData.decisionsDeleted > 0 || deletedData.unassignedDeleted > 0) {
       console.log(`[Phase0] Idempotency: deleted ${deletedData.decisionsDeleted} decisions, ${deletedData.unassignedDeleted} unassigned`);
     }
 
-    const tasks = await loadTasksWithLockStatus(workDate);
+    let tasks = await loadTasksWithLockStatus(workDate);
+    
+    // Filter by priority if specified
+    if (priority) {
+      const beforeCount = tasks.length;
+      tasks = tasks.filter(t => t.priority === priority);
+      console.log(`[Phase0] Priority filter '${priority}': ${beforeCount} -> ${tasks.length} tasks`);
+    }
+    
     result.totalTasks = tasks.length;
 
     if (tasks.length === 0) {

@@ -178,7 +178,7 @@ export default function PriorityColumn({
       let successMessage = '';
 
       if (useNewOptimizer) {
-        // NUOVO OPTIMIZER TypeScript - usa run-all con apply
+        // NUOVO OPTIMIZER TypeScript - usa run-all con apply + filtro priorità
         endpoint = '/api/optimizer/run-all';
         successMessage = `✅ ${title} assegnati con nuovo optimizer!`;
         
@@ -189,7 +189,8 @@ export default function PriorityColumn({
           body: JSON.stringify({ 
             date: dateStr, 
             skipPhase4: true, 
-            applyToProduction: true 
+            applyToProduction: true,
+            priority: priority // Filtro per priorità: solo task di questa priorità verranno processati
           })
         });
 

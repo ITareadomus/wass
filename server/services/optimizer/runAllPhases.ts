@@ -30,6 +30,7 @@ export interface AllPhasesRunResult {
 export interface RunAllPhasesOptions {
   skipPhase4?: boolean;
   applyToProduction?: boolean;
+  priority?: 'early-out' | 'high' | 'low'; // Filter to only process tasks of this priority
 }
 
 export async function runAllPhases(
@@ -38,7 +39,7 @@ export async function runAllPhases(
 ): Promise<AllPhasesRunResult> {
   const startTime = Date.now();
   const runId = uuidv4();
-  const { skipPhase4 = false, applyToProduction = false } = options;
+  const { skipPhase4 = false, applyToProduction = false, priority } = options;
 
   const result: AllPhasesRunResult = {
     runId,
@@ -71,7 +72,10 @@ export async function runAllPhases(
     await createRun(run);
 
     console.log(`[runAllPhases] === PHASE 0: Locked Task Filter ===`);
-    result.phase0 = await runPhase0(workDate, runId);
+    if (priority) {
+      console.log(`[runAllPhases] Filtering by priority: ${priority}`);
+    }
+    result.phase0 = await runPhase0(workDate, runId, { priority });
     if (result.phase0.status === 'failed') {
       result.status = 'failed';
       result.error = `Phase 0 failed: ${result.phase0.error}`;

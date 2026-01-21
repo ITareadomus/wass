@@ -6263,14 +6263,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   app.post("/api/optimizer/run-all", async (req, res) => {
     try {
-      const { date, skipPhase4 = false, applyToProduction = false } = req.body;
+      const { date, skipPhase4 = false, applyToProduction = false, priority } = req.body;
       const workDate = date || format(new Date(), "yyyy-MM-dd");
       
-      console.log(`🚀 POST /api/optimizer/run-all - Avvio OPTIMIZER COMPLETO per ${workDate}`);
-      console.log(`   skipPhase4=${skipPhase4}, applyToProduction=${applyToProduction}`);
+      console.log(`🚀 POST /api/optimizer/run-all - Avvio OPTIMIZER per ${workDate}`);
+      console.log(`   skipPhase4=${skipPhase4}, applyToProduction=${applyToProduction}, priority=${priority || 'ALL'}`);
       
       const { runAllPhases } = await import('./services/optimizer/runAllPhases');
-      const result = await runAllPhases(workDate, { skipPhase4, applyToProduction });
+      const result = await runAllPhases(workDate, { skipPhase4, applyToProduction, priority });
       
       console.log(`✅ OPTIMIZER completato in ${result.totalDurationMs}ms`);
       console.log(`   Status: ${result.status}, Assigned: ${result.summary.tasksAssigned}, Unassigned: ${result.summary.tasksUnassigned}`);
