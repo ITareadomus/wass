@@ -6263,14 +6263,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   app.post("/api/optimizer/run-all", async (req, res) => {
     try {
-      const { date, skipPhase4 = false, applyToProduction = false, priority } = req.body;
+      const { date, skipPhase4 = false, applyToProduction = false } = req.body;
       const workDate = date || format(new Date(), "yyyy-MM-dd");
       
-      console.log(`🚀 POST /api/optimizer/run-all - Avvio OPTIMIZER per ${workDate}`);
-      console.log(`   skipPhase4=${skipPhase4}, applyToProduction=${applyToProduction}, priority=${priority || 'ALL'}`);
+      console.log(`🚀 POST /api/optimizer/run-all - Avvio OPTIMIZER COMPLETO per ${workDate}`);
+      console.log(`   skipPhase4=${skipPhase4}, applyToProduction=${applyToProduction}`);
       
       const { runAllPhases } = await import('./services/optimizer/runAllPhases');
-      const result = await runAllPhases(workDate, { skipPhase4, applyToProduction, priority });
+      const result = await runAllPhases(workDate, { skipPhase4, applyToProduction });
       
       console.log(`✅ OPTIMIZER completato in ${result.totalDurationMs}ms`);
       console.log(`   Status: ${result.status}, Assigned: ${result.summary.tasksAssigned}, Unassigned: ${result.summary.tasksUnassigned}`);
@@ -6309,43 +6309,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(result);
     } catch (error: any) {
       console.error("❌ Errore apply-to-production:", error);
-      res.status(500).json({
-        success: false,
-        error: error.message
-      });
-    }
-  });
-
-  // ========== OPTIMIZER APPLY-WAVE ENDPOINT (Incremental non-destructive) ==========
-  
-  app.post("/api/optimizer/apply-wave", async (req, res) => {
-    try {
-      const { runId, date, wave } = req.body;
-      
-      if (!runId || !date || !wave) {
-        return res.status(400).json({ 
-          success: false, 
-          error: "runId, date and wave (EO|HP|LP) are required" 
-        });
-      }
-      
-      if (!['EO', 'HP', 'LP'].includes(wave)) {
-        return res.status(400).json({ 
-          success: false, 
-          error: "wave must be 'EO', 'HP' or 'LP'" 
-        });
-      }
-      
-      console.log(`🚀 POST /api/optimizer/apply-wave - Applying wave ${wave} from run ${runId}`);
-      
-      const { applyOptimizerWaveToProduction } = await import('./services/optimizer/runAllPhases');
-      const result = await applyOptimizerWaveToProduction(runId, date, wave);
-      
-      console.log(`✅ Apply wave ${wave}: inserted=${result.insertedCount}, skipped=${result.skippedCount}`);
-      
-      res.json(result);
-    } catch (error: any) {
-      console.error("❌ Errore apply-wave:", error);
       res.status(500).json({
         success: false,
         error: error.message

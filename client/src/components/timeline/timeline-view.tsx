@@ -1610,13 +1610,13 @@ export default function TimelineView({
                 {!isResetting && <RotateCcw className="w-4 h-4" />}
                 Reset Assegnazioni
               </Button>
-              <div className="flex items-center gap-3 px-3 py-1.5 border-2 border-gray-300 dark:border-gray-600 rounded-md bg-background">
-                <span className={`text-xs font-medium whitespace-nowrap ${!useNewOptimizer ? 'text-green-600 dark:text-green-400' : 'text-muted-foreground'}`}>
+              <div className="flex items-center gap-2 px-3 py-1.5 border-2 border-gray-300 dark:border-gray-600 rounded-md bg-background">
+                <span className={`text-xs font-medium ${!useNewOptimizer ? 'text-green-600 dark:text-green-400' : 'text-muted-foreground'}`}>
                   Vecchio
                 </span>
                 <button
                   onClick={() => onToggleOptimizer?.(!useNewOptimizer)}
-                  className={`relative flex-shrink-0 w-10 h-5 rounded-full transition-colors duration-200 ${
+                  className={`relative w-10 h-5 rounded-full transition-colors duration-200 ${
                     useNewOptimizer 
                       ? 'bg-green-500 dark:bg-green-600' 
                       : 'bg-gray-300 dark:bg-gray-600'
@@ -1624,12 +1624,12 @@ export default function TimelineView({
                   title={useNewOptimizer ? 'Usando nuovo optimizer TypeScript' : 'Usando vecchio optimizer Python'}
                 >
                   <span
-                    className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform duration-200 ${
-                      useNewOptimizer ? 'translate-x-5' : 'translate-x-0'
+                    className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform duration-200 ${
+                      useNewOptimizer ? 'translate-x-5' : 'translate-x-0.5'
                     }`}
                   />
                 </button>
-                <span className={`text-xs font-medium whitespace-nowrap ${useNewOptimizer ? 'text-green-600 dark:text-green-400' : 'text-muted-foreground'}`}>
+                <span className={`text-xs font-medium ${useNewOptimizer ? 'text-green-600 dark:text-green-400' : 'text-muted-foreground'}`}>
                   Nuovo
                 </span>
               </div>

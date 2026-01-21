@@ -22,17 +22,11 @@ export interface Phase0RunResult {
   unlockedTaskData: TaskInputWithLock[];
 }
 
-export interface Phase0Options {
-  priority?: 'early-out' | 'high' | 'low'; // Filter to only process tasks of this priority
-}
-
 export async function runPhase0(
   workDate: string,
-  runId: string,
-  options: Phase0Options = {}
+  runId: string
 ): Promise<Phase0RunResult> {
   const startTime = Date.now();
-  const { priority } = options;
 
   const result: Phase0RunResult = {
     runId,
@@ -48,30 +42,14 @@ export async function runPhase0(
   };
 
   try {
-    console.log(`[Phase0] Starting for workDate=${workDate}, runId=${runId}${priority ? `, priority=${priority}` : ''}`);
+    console.log(`[Phase0] Starting for workDate=${workDate}, runId=${runId}`);
 
     const deletedData = await deletePhase0Data(runId);
     if (deletedData.decisionsDeleted > 0 || deletedData.unassignedDeleted > 0) {
       console.log(`[Phase0] Idempotency: deleted ${deletedData.decisionsDeleted} decisions, ${deletedData.unassignedDeleted} unassigned`);
     }
 
-    let tasks = await loadTasksWithLockStatus(workDate);
-    
-    // Filter by priority if specified
-    // Map frontend priority names to database priority names
-    if (priority) {
-      const priorityDbMap: Record<string, string> = {
-        'early-out': 'early_out',
-        'high': 'high_priority',
-        'low': 'low_priority'
-      };
-      const dbPriority = priorityDbMap[priority] || priority;
-      
-      const beforeCount = tasks.length;
-      tasks = tasks.filter(t => t.priority === dbPriority);
-      console.log(`[Phase0] Priority filter '${priority}' (db: '${dbPriority}'): ${beforeCount} -> ${tasks.length} tasks`);
-    }
-    
+    const tasks = await loadTasksWithLockStatus(workDate);
     result.totalTasks = tasks.length;
 
     if (tasks.length === 0) {

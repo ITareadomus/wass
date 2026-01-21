@@ -178,67 +178,33 @@ export default function PriorityColumn({
       let successMessage = '';
 
       if (useNewOptimizer) {
-        // NUOVO OPTIMIZER TypeScript - Wave-aware: 2 step approach
-        // Step 1: run-all (solo calcolo, senza apply)
-        // Step 2: apply-wave (INSERT incrementale senza DELETE)
+        // NUOVO OPTIMIZER TypeScript - usa run-all con apply
+        endpoint = '/api/optimizer/run-all';
+        successMessage = `✅ ${title} assegnati con nuovo optimizer!`;
         
-        const waveMap: Record<string, 'EO' | 'HP' | 'LP'> = {
-          'early-out': 'EO',
-          'high': 'HP',
-          'low': 'LP'
-        };
-        const wave = waveMap[priority];
-        
-        console.log(`🚀 Esecuzione NUOVO optimizer wave-aware per ${priority} (${wave}), data: ${dateStr}`);
-        
-        // Step 1: Run optimizer (solo calcolo)
-        const runResponse = await fetchWithOperation(`run-${priority}-new`, '/api/optimizer/run-all', {
+        console.log(`🚀 Esecuzione NUOVO optimizer per ${priority}, data: ${dateStr}`);
+        const response = await fetchWithOperation(`assign-${priority}-new`, endpoint, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ 
             date: dateStr, 
             skipPhase4: true, 
-            applyToProduction: false, // NON applicare automaticamente
-            priority: priority
+            applyToProduction: true 
           })
         });
 
-        if (!runResponse.ok) {
-          throw new Error(`Errore durante l'ottimizzazione ${priority}`);
+        if (!response.ok) {
+          throw new Error(`Errore durante l'assegnazione ${priority}`);
         }
 
-        const runResult = await runResponse.json();
-        console.log(`Ottimizzazione ${priority} completata:`, runResult);
+        const result = await response.json();
+        console.log(`Assegnazione ${priority} (nuovo optimizer) completata:`, result);
         
-        if (!runResult.runId) {
-          throw new Error(`runId non trovato nel risultato dell'optimizer`);
-        }
-        
-        // Step 2: Apply wave (INSERT incrementale)
-        console.log(`📥 Applicazione wave ${wave} dal runId: ${runResult.runId}`);
-        const applyResponse = await fetchWithOperation(`apply-${priority}-wave`, '/api/optimizer/apply-wave', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ 
-            runId: runResult.runId,
-            date: dateStr,
-            wave: wave
-          })
-        });
-
-        if (!applyResponse.ok) {
-          throw new Error(`Errore durante l'applicazione wave ${wave}`);
-        }
-
-        const applyResult = await applyResponse.json();
-        console.log(`Apply wave ${wave} completato:`, applyResult);
-        
-        const summary = runResult.summary || {};
-        successMessage = `✅ ${title} assegnati con nuovo optimizer wave-aware!`;
+        const summary = result.summary || {};
         toast({
           variant: "success",
           title: "Successo",
-          description: `${successMessage} (${applyResult.insertedCount || 0} inseriti, ${applyResult.skippedCount || 0} già in timeline)`,
+          description: `${successMessage} (${summary.tasksAssigned || 0} task assegnate, ${summary.tasksUnassigned || 0} non assegnate)`,
         });
       } else {
         // VECCHIO OPTIMIZER Python
