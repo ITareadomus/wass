@@ -216,7 +216,18 @@ export async function runPhase2(
     
     result.cleanersLoaded = cleaners.length;
 
-    const selectedGroups = selectNonOverlappingGroups(allGroups);
+    // Re-sort groups by size DESC (favor larger groups), then avgTravel ASC
+    const sortedGroups = [...allGroups].sort((a, b) => {
+      // Primary: size DESC (larger groups first)
+      const sizeA = a.taskIds.length;
+      const sizeB = b.taskIds.length;
+      if (sizeA !== sizeB) return sizeB - sizeA;
+      
+      // Secondary: avgTravel ASC (lower travel first among same-size groups)
+      return (a.avgTravelMin ?? 0) - (b.avgTravelMin ?? 0);
+    });
+    
+    const selectedGroups = selectNonOverlappingGroups(sortedGroups);
     result.groupsProcessed = selectedGroups.length;
 
     if (cleaners.length === 0) {

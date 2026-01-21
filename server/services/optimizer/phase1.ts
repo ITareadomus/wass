@@ -258,12 +258,12 @@ function addGroup(
   const key = ids.join("-");
   if (groupMap.has(key)) return;
 
-  const { avgTravelMin, maxTravelMin } = travelStats(groupTasks);
+  const { avgTravelMin, maxTravelMin, totalTravelMin } = travelStats(groupTasks);
 
   const zones = new Set(groupTasks.map(t => t.zone));
   const sameZone = zones.size === 1;
 
-  const score = scoreGroup(avgTravelMin, maxTravelMin, sameZone);
+  const score = scoreGroup(avgTravelMin, maxTravelMin, sameZone, groupTasks.length, totalTravelMin);
 
   const sortedTasks = [...groupTasks].sort((a, b) => a.taskId - b.taskId);
   const logisticCodes = sortedTasks.map(t => t.logisticCode);
@@ -280,26 +280,71 @@ function addGroup(
   });
 }
 
+const MAX_TOTAL_TRAVEL_FOR_FOUR_TASKS = 30;
+
 function allowFourth(tasks: TaskInput[], thresholdMin: number): boolean {
   if (tasks.length !== 4) return false;
-  const t4 = tasks[3];
-  for (let i = 0; i < 3; i++) {
-    const d = estimateTravelMinutes(t4, tasks[i]);
-    if (d <= thresholdMin) return true;
-  }
-  return false;
+  
+  // Calculate total travel for 4 tasks using MST approximation
+  const { totalTravelMin } = travelStats(tasks);
+  
+  // Allow 4th task only if total travel < 30 min
+  return totalTravelMin < MAX_TOTAL_TRAVEL_FOR_FOUR_TASKS;
 }
 
-function travelStats(tasks: TaskInput[]): { avgTravelMin: number; maxTravelMin: number } {
-  const dists: number[] = [];
-  for (let i = 0; i < tasks.length; i++) {
-    for (let j = i + 1; j < tasks.length; j++) {
-      dists.push(estimateTravelMinutes(tasks[i], tasks[j]));
+function travelStats(tasks: TaskInput[]): { avgTravelMin: number; maxTravelMin: number; totalTravelMin: number } {
+  const n = tasks.length;
+  if (n <= 1) {
+    return { avgTravelMin: 0, maxTravelMin: 0, totalTravelMin: 0 };
+  }
+  
+  // Build distance matrix
+  const dist: number[][] = Array.from({ length: n }, () => Array(n).fill(0));
+  const allDists: number[] = [];
+  
+  for (let i = 0; i < n; i++) {
+    for (let j = i + 1; j < n; j++) {
+      const d = estimateTravelMinutes(tasks[i], tasks[j]);
+      dist[i][j] = d;
+      dist[j][i] = d;
+      allDists.push(d);
     }
   }
-  const avg = dists.reduce((s, x) => s + x, 0) / Math.max(1, dists.length);
-  const max = dists.length ? Math.max(...dists) : 0;
-  return { avgTravelMin: Math.round(avg * 10) / 10, maxTravelMin: max };
+  
+  const avg = allDists.reduce((s, x) => s + x, 0) / allDists.length;
+  const max = Math.max(...allDists);
+  
+  // Calculate MST using Prim's algorithm (proper MST for small sets)
+  const inMST = new Array(n).fill(false);
+  const minEdge = new Array(n).fill(Infinity);
+  minEdge[0] = 0;
+  let mstWeight = 0;
+  
+  for (let count = 0; count < n; count++) {
+    // Find minimum edge to add
+    let u = -1;
+    for (let i = 0; i < n; i++) {
+      if (!inMST[i] && (u === -1 || minEdge[i] < minEdge[u])) {
+        u = i;
+      }
+    }
+    
+    inMST[u] = true;
+    mstWeight += minEdge[u];
+    
+    // Update edges to remaining nodes
+    for (let v = 0; v < n; v++) {
+      if (!inMST[v] && dist[u][v] < minEdge[v]) {
+        minEdge[v] = dist[u][v];
+      }
+    }
+  }
+  
+  return { 
+    avgTravelMin: Math.round(avg * 10) / 10, 
+    maxTravelMin: max,
+    totalTravelMin: Math.round(mstWeight)
+  };
 }
 
 function comb2<T>(arr: T[]): [T, T][] {
