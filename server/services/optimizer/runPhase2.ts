@@ -109,16 +109,18 @@ async function loadTasksForPhase2(workDate: string): Promise<Map<number, TaskFor
 }
 
 // Load existing cleaner assignments from timeline (daily_assignments_current)
-// This returns: cleanerLoad, cleanerStraordinariaState, cleanerTotalCleaningTime
+// This returns: cleanerLoad, cleanerStraordinariaState, cleanerTotalCleaningTime, cleanerTotalTravel
 export interface ExistingCleanerState {
   cleanerLoad: Map<number, number>;                    // cleanerId -> number of assigned tasks
   cleanerHasStraordinaria: Map<number, boolean>;       // cleanerId -> has straordinaria assigned
   cleanerStraordinariaMinutes: Map<number, number>;    // cleanerId -> straordinaria duration (if any)
   cleanerTotalCleaningTime: Map<number, number>;       // cleanerId -> total cleaning time in minutes
   cleanerLastPosition: Map<number, { lat: number; lng: number }>;
+  cleanerTotalTravel: Map<number, number>;             // cleanerId -> total travel time in minutes (for 4th task rule)
 }
 
 async function loadExistingCleanerState(workDate: string): Promise<ExistingCleanerState> {
+  // Include travel_time from daily_assignments_current for complete baseline
   const result = await pool.query(`
     SELECT 
       dac.cleaner_id as "cleanerId",
@@ -126,12 +128,13 @@ async function loadExistingCleanerState(workDate: string): Promise<ExistingClean
       dc.straordinaria,
       dc.cleaning_time as "cleaningTime",
       dc.lat,
-      dc.lng
+      dc.lng,
+      COALESCE(dac.travel_time, 0) as "travelTime"
     FROM daily_assignments_current dac
     JOIN daily_containers dc ON dac.task_id = dc.task_id AND dac.work_date = dc.work_date
     WHERE dac.work_date = $1
       AND dac.cleaner_id IS NOT NULL
-    ORDER BY dac.cleaner_id, dac.position
+    ORDER BY dac.cleaner_id, dac.sequence, dac.position
   `, [workDate]);
 
   const cleanerLoad = new Map<number, number>();
@@ -139,17 +142,22 @@ async function loadExistingCleanerState(workDate: string): Promise<ExistingClean
   const cleanerStraordinariaMinutes = new Map<number, number>();
   const cleanerTotalCleaningTime = new Map<number, number>();
   const cleanerLastPosition = new Map<number, { lat: number; lng: number }>();
+  const cleanerTotalTravel = new Map<number, number>();
 
   for (const row of result.rows) {
     const cleanerId = row.cleanerId;
     const cleaningTime = row.cleaningTime || 60;
     const isStraordinaria = row.straordinaria || false;
+    const travelTime = parseInt(row.travelTime) || 0;
 
     // Update load count
     cleanerLoad.set(cleanerId, (cleanerLoad.get(cleanerId) || 0) + 1);
 
     // Update total cleaning time
     cleanerTotalCleaningTime.set(cleanerId, (cleanerTotalCleaningTime.get(cleanerId) || 0) + cleaningTime);
+
+    // Update total travel time (critical for 4th task rule)
+    cleanerTotalTravel.set(cleanerId, (cleanerTotalTravel.get(cleanerId) || 0) + travelTime);
 
     // Track straordinaria
     if (isStraordinaria) {
@@ -164,13 +172,20 @@ async function loadExistingCleanerState(workDate: string): Promise<ExistingClean
   }
 
   console.log(`[Phase2] Loaded existing state: ${cleanerLoad.size} cleaners with assignments`);
+  // Log travel time for debugging
+  cleanerTotalTravel.forEach((travel, cleanerId) => {
+    if (travel > 0) {
+      console.log(`[Phase2] Cleaner ${cleanerId}: existing travel=${travel}min, load=${cleanerLoad.get(cleanerId)}`);
+    }
+  });
   
   return {
     cleanerLoad,
     cleanerHasStraordinaria,
     cleanerStraordinariaMinutes,
     cleanerTotalCleaningTime,
-    cleanerLastPosition
+    cleanerLastPosition,
+    cleanerTotalTravel
   };
 }
 
@@ -293,7 +308,8 @@ export async function runPhase2(
       cleanerHasStraordinaria: existingState.cleanerHasStraordinaria,
       cleanerStraordinariaMinutes: existingState.cleanerStraordinariaMinutes,
       cleanerTotalCleaningTime: existingState.cleanerTotalCleaningTime,
-      cleanerLastPosition: existingState.cleanerLastPosition
+      cleanerLastPosition: existingState.cleanerLastPosition,
+      cleanerTotalTravel: existingState.cleanerTotalTravel  // Pass existing travel for 4th task rule
     };
 
     if (cleaners.length === 0) {

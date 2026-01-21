@@ -54,20 +54,25 @@ export async function loadTasksForDate(workDate: string): Promise<TaskInput[]> {
 }
 
 export async function loadTasksWithLockStatus(workDate: string): Promise<TaskInputWithLock[]> {
+  // Esclude i task già assegnati in daily_assignments_current
+  // Questo permette alle wave successive (HP, LP) di vedere solo task non ancora in timeline
   const result = await pool.query(`
     SELECT 
-      task_id as "taskId",
-      logistic_code as "logisticCode",
-      lat,
-      lng,
-      priority,
-      COALESCE(locked, false) as "locked",
-      locked_reason as "lockedReason"
-    FROM daily_containers
-    WHERE work_date = $1
-      AND lat IS NOT NULL 
-      AND lng IS NOT NULL
-    ORDER BY task_id
+      dc.task_id as "taskId",
+      dc.logistic_code as "logisticCode",
+      dc.lat,
+      dc.lng,
+      dc.priority,
+      COALESCE(dc.locked, false) as "locked",
+      dc.locked_reason as "lockedReason"
+    FROM daily_containers dc
+    LEFT JOIN daily_assignments_current dac 
+      ON dc.task_id = dac.task_id AND dc.work_date = dac.work_date
+    WHERE dc.work_date = $1
+      AND dc.lat IS NOT NULL 
+      AND dc.lng IS NOT NULL
+      AND dac.task_id IS NULL  -- Solo task NON ancora assegnati
+    ORDER BY dc.task_id
   `, [workDate]);
 
   return result.rows.map(row => ({

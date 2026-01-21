@@ -106,6 +106,7 @@ export interface Phase2InitialState {
   cleanerStraordinariaMinutes: Map<number, number>;    // cleanerId -> straordinaria duration (if any)
   cleanerTotalCleaningTime: Map<number, number>;       // cleanerId -> total cleaning time in minutes
   cleanerLastPosition: Map<number, { lat: number; lng: number }>;
+  cleanerTotalTravel: Map<number, number>;             // cleanerId -> total travel time in minutes (for 4th task rule)
 }
 
 // Check straordinaria constraints for a cleaner
@@ -318,7 +319,7 @@ export function runPhase2Algorithm(
   
   // Initialize from existing state or empty
   const cleanerLoad = new Map<number, number>(initialState?.cleanerLoad || []);
-  const cleanerTotalTravel = new Map<number, number>(); // Track cumulative travel time
+  const cleanerTotalTravel = new Map<number, number>(initialState?.cleanerTotalTravel || []); // Track cumulative travel time from existing timeline
   const cleanerLastPosition = new Map<number, { lat: number; lng: number }>(initialState?.cleanerLastPosition || []);
   const cleanerHasStraordinaria = new Map<number, boolean>(initialState?.cleanerHasStraordinaria || []);
   const cleanerStraordinariaMinutes = new Map<number, number>(initialState?.cleanerStraordinariaMinutes || []);
@@ -335,7 +336,8 @@ export function runPhase2Algorithm(
   if (initialState) {
     const cleanersWithLoad = Array.from(cleanerLoad.entries()).filter(([_, load]) => load > 0).length;
     const cleanersWithStraord = Array.from(cleanerHasStraordinaria.entries()).filter(([_, has]) => has).length;
-    console.log(`[Phase2] Using initial state: ${cleanersWithLoad} cleaners with load, ${cleanersWithStraord} with straordinaria`);
+    const cleanersWithTravel = Array.from(cleanerTotalTravel.entries()).filter(([_, t]) => t > 0).length;
+    console.log(`[Phase2] Using initial state: ${cleanersWithLoad} cleaners with load, ${cleanersWithStraord} with straordinaria, ${cleanersWithTravel} with existing travel`);
   }
   
   const sortedGroups = [...groups].sort((a, b) => b.score - a.score);

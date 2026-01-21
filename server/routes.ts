@@ -6316,6 +6316,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ========== OPTIMIZER APPLY-WAVE ENDPOINT (Incremental non-destructive) ==========
+  
+  app.post("/api/optimizer/apply-wave", async (req, res) => {
+    try {
+      const { runId, date, wave } = req.body;
+      
+      if (!runId || !date || !wave) {
+        return res.status(400).json({ 
+          success: false, 
+          error: "runId, date and wave (EO|HP|LP) are required" 
+        });
+      }
+      
+      if (!['EO', 'HP', 'LP'].includes(wave)) {
+        return res.status(400).json({ 
+          success: false, 
+          error: "wave must be 'EO', 'HP' or 'LP'" 
+        });
+      }
+      
+      console.log(`🚀 POST /api/optimizer/apply-wave - Applying wave ${wave} from run ${runId}`);
+      
+      const { applyOptimizerWaveToProduction } = await import('./services/optimizer/runAllPhases');
+      const result = await applyOptimizerWaveToProduction(runId, date, wave);
+      
+      console.log(`✅ Apply wave ${wave}: inserted=${result.insertedCount}, skipped=${result.skippedCount}`);
+      
+      res.json(result);
+    } catch (error: any) {
+      console.error("❌ Errore apply-wave:", error);
+      res.status(500).json({
+        success: false,
+        error: error.message
+      });
+    }
+  });
+
   // ========== OPTIMIZER PHASE 0 ENDPOINTS (Locked Filter) ==========
   
   app.post("/api/optimizer/run-phase0", async (req, res) => {
