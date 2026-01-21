@@ -160,6 +160,7 @@ interface TaskCardProps {
   waitingGapWidthPx?: number;
   isHighlighted?: boolean;
   cleanerId?: number | null;
+  isPriorityWindowViolation?: boolean;
 }
 
 interface AssignedTask {
@@ -189,6 +190,7 @@ export default function TaskCard({
   waitingGapWidthPx = 0,
   isHighlighted = false,
   cleanerId = null,
+  isPriorityWindowViolation = false,
 }: TaskCardProps) {
   console.log('🔧 TaskCard render - isReadOnly:', isReadOnly, 'for task:', task.name);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -1112,6 +1114,7 @@ export default function TaskCard({
                         ${snapshot.isDragging ? "shadow-lg" : ""}
                         ${isOverdue && isInTimeline ? "animate-blink" : ""}
                         ${isDuplicate && !isInTimeline ? "animate-blink-yellow" : ""}
+                        ${isPriorityWindowViolation && isInTimeline ? "animate-blink-orange" : ""}
                         hover:shadow-md cursor-pointer
                         flex-shrink-0 relative
                       `}

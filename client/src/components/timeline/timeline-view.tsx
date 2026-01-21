@@ -1330,6 +1330,40 @@ export default function TimelineView({
     };
   };
 
+  // Funzione per verificare se un task viola la sua finestra temporale di priorità
+  // EO: 10:00-10:59, HP: 11:00-15:30, LP: >= 11:00
+  const isPriorityWindowViolation = (task: any): boolean => {
+    const priority = task.priority;
+    const startTimeStr = task.start_time;
+    
+    if (!priority || !startTimeStr) return false;
+    
+    // Parse start_time (formato HH:MM:SS o HH:MM)
+    const timeParts = startTimeStr.split(':');
+    if (timeParts.length < 2) return false;
+    const hours = parseInt(timeParts[0], 10);
+    const minutes = parseInt(timeParts[1], 10);
+    if (isNaN(hours) || isNaN(minutes)) return false;
+    const startMinutes = hours * 60 + minutes;
+    
+    // Finestre temporali (in minuti dalla mezzanotte)
+    const EO_START = 10 * 60;      // 10:00 = 600
+    const EO_END = 10 * 60 + 59;   // 10:59 = 659
+    const HP_START = 11 * 60;      // 11:00 = 660
+    const HP_END = 15 * 60 + 30;   // 15:30 = 930
+    const LP_START = 11 * 60;      // 11:00 = 660
+    
+    if (priority === 'early_out') {
+      return startMinutes < EO_START || startMinutes > EO_END;
+    } else if (priority === 'high_priority') {
+      return startMinutes < HP_START || startMinutes > HP_END;
+    } else if (priority === 'low_priority') {
+      return startMinutes < LP_START;
+    }
+    
+    return false;
+  };
+
   // Gestione toast per incompatibilità task-cleaner (con sistema per coppie)
   useEffect(() => {
     if (!validationRules) return;
@@ -2012,6 +2046,7 @@ export default function TimelineView({
                                           globalTimeSlots={globalTimeSlots.length}
                                           isHighlighted={highlightedTaskIds.has(String(task.id))}
                                           cleanerId={cleaner.id}
+                                          isPriorityWindowViolation={isPriorityWindowViolation(task)}
                                         />
                                       </React.Fragment>
                                     );

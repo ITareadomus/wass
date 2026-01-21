@@ -159,6 +159,21 @@
     animation: blink-yellow 1.5s ease-in-out infinite;
   }
 
+  /* Animazione lampeggiante arancione per violazioni finestre temporali priorità */
+  @keyframes blink-orange {
+    0%, 100% {
+      box-shadow: 0 0 0 rgba(249, 115, 22, 0);
+    }
+    50% {
+      box-shadow: 0 0 10px 3px rgba(249, 115, 22, 0.8);
+      border-color: #f97316;
+    }
+  }
+
+  .animate-blink-orange {
+    animation: blink-orange 1.5s ease-in-out infinite;
+  }
+
   /* Nasconde l'icona dell'orologio negli input time */
   input[type="time"]::-webkit-calendar-picker-indicator {
     display: none;
