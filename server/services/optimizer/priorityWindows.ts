@@ -207,8 +207,8 @@ export function priorityToDbFormat(priority: Priority | string | null | undefine
   
   const normalized = priority.toUpperCase();
   
-  if (normalized === 'EO') return 'early-out';
-  if (normalized === 'HP') return 'high-priority';
+  if (normalized === 'EO') return 'early_out';
+  if (normalized === 'HP') return 'high_priority';
   if (normalized === 'LP') return 'low_priority';
   
   return priority as string;
