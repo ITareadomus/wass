@@ -61,6 +61,7 @@ export async function loadTasksWithLockStatus(workDate: string): Promise<TaskInp
       lat,
       lng,
       priority,
+      straordinaria,
       COALESCE(locked, false) as "locked",
       locked_reason as "lockedReason"
     FROM daily_containers
@@ -76,6 +77,7 @@ export async function loadTasksWithLockStatus(workDate: string): Promise<TaskInp
     lat: parseFloat(row.lat),
     lng: parseFloat(row.lng),
     priority: row.priority,
+    straordinaria: row.straordinaria === true,
     locked: row.locked === true,
     lockedReason: row.lockedReason
   }));

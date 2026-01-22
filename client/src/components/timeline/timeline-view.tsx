@@ -1338,6 +1338,15 @@ export default function TimelineView({
     
     if (!priority || !startTimeStr) return false;
     
+    // Normalizza priority per gestire tutti i formati:
+    // DB: early_out, high_priority, low_priority
+    // Container: early-out, high, low
+    const normalizedPriority = priority
+      .toLowerCase()
+      .replace(/_/g, '-')
+      .replace('high-priority', 'high')
+      .replace('low-priority', 'low');
+    
     // Parse start_time (formato HH:MM:SS o HH:MM)
     const timeParts = startTimeStr.split(':');
     if (timeParts.length < 2) return false;
@@ -1353,11 +1362,11 @@ export default function TimelineView({
     const HP_END = 15 * 60 + 30;   // 15:30 = 930
     const LP_START = 11 * 60;      // 11:00 = 660
     
-    if (priority === 'early_out') {
+    if (normalizedPriority === 'early-out') {
       return startMinutes < EO_START || startMinutes > EO_END;
-    } else if (priority === 'high_priority') {
+    } else if (normalizedPriority === 'high') {
       return startMinutes < HP_START || startMinutes > HP_END;
-    } else if (priority === 'low_priority') {
+    } else if (normalizedPriority === 'low') {
       return startMinutes < LP_START;
     }
     

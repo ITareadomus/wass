@@ -9,6 +9,7 @@ export type TaskInput = {
   lng: number;
   zone?: number | null;
   priority?: string | null;
+  straordinaria?: boolean;
 };
 
 export type Phase1Params = {
@@ -262,8 +263,11 @@ function addGroup(
 
   const zones = new Set(groupTasks.map(t => t.zone));
   const sameZone = zones.size === 1;
+  
+  // Check if any task in the group is a straordinaria
+  const hasStraordinaria = groupTasks.some(t => t.straordinaria === true);
 
-  const score = scoreGroup(avgTravelMin, maxTravelMin, sameZone, groupTasks.length, totalTravelMin);
+  const score = scoreGroup(avgTravelMin, maxTravelMin, sameZone, groupTasks.length, totalTravelMin, hasStraordinaria);
 
   const sortedTasks = [...groupTasks].sort((a, b) => a.taskId - b.taskId);
   const logisticCodes = sortedTasks.map(t => t.logisticCode);
