@@ -96,11 +96,12 @@ async function loadPhase3Schedules(runId: string): Promise<CleanerSchedule[]> {
     }
   }
 
-  const cleanerNames = await loadCleanerNames(runId);
+  const cleanerCapabilities = await loadCleanerCapabilities(runId);
   const cleanerStartTimes = await loadCleanerStartTimes(runId);
 
   const schedules: CleanerSchedule[] = [];
   cleanerMap.forEach((data, cleanerId) => {
+    const caps = cleanerCapabilities.get(cleanerId);
     const startTimeStr = cleanerStartTimes.get(cleanerId) || '09:00';
     const endTimeMinutes = data.maxEndTime 
       ? data.maxEndTime.getHours() * 60 + data.maxEndTime.getMinutes()
@@ -108,17 +109,59 @@ async function loadPhase3Schedules(runId: string): Promise<CleanerSchedule[]> {
     
     schedules.push({
       cleanerId,
-      cleanerName: cleanerNames.get(cleanerId) || `Cleaner ${cleanerId}`,
+      cleanerName: caps?.name || `Cleaner ${cleanerId}`,
       startTime: startTimeStr,
       tasks: data.tasks,
       endTimeMinutes,
       totalTravel: data.totalTravel,
       totalWait: 0,
-      totalPriorityPenalty: data.totalPriorityPenalty
+      totalPriorityPenalty: data.totalPriorityPenalty,
+      // Dati per vincoli hard
+      role: caps?.role || 'Standard',
+      contractType: caps?.contractType || 'C',
+      canDoStraordinaria: caps?.canDoStraordinaria || false
     });
   });
 
   return schedules;
+}
+
+interface CleanerCapabilities {
+  name: string;
+  role: string;
+  contractType: string;
+  canDoStraordinaria: boolean;
+}
+
+async function loadCleanerCapabilities(runId: string): Promise<Map<number, CleanerCapabilities>> {
+  const result = await pool.query(`
+    SELECT DISTINCT cleaner_id FROM optimizer.optimizer_assignment WHERE run_id = $1
+  `, [runId]);
+  
+  const cleanerIds = result.rows.map(r => r.cleaner_id);
+  if (cleanerIds.length === 0) return new Map();
+
+  const capsResult = await pool.query(`
+    SELECT 
+      cleaner_id, 
+      name, 
+      COALESCE(role, 'Standard') as role,
+      COALESCE(contract_type, 'C') as contract_type,
+      COALESCE(can_do_straordinaria, false) as can_do_straordinaria
+    FROM cleaners 
+    WHERE cleaner_id = ANY($1::int[])
+  `, [cleanerIds]);
+
+  const map = new Map<number, CleanerCapabilities>();
+  for (const row of capsResult.rows) {
+    map.set(row.cleaner_id, {
+      name: row.name || `Cleaner ${row.cleaner_id}`,
+      role: row.role,
+      contractType: row.contract_type,
+      canDoStraordinaria: row.can_do_straordinaria === true
+    });
+  }
+  return map;
 }
 
 async function loadCleanerNames(runId: string): Promise<Map<number, string>> {

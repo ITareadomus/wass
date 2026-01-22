@@ -22,6 +22,9 @@ export interface Phase4Params {
   maxCleanersToTryPerTask: number;     // Max cleaners da provare per task (performance cap)
 }
 
+// LIMITE HARD ASSOLUTO - nessun livello di relaxation può superarlo
+export const ABSOLUTE_MAX_LOAD = 5;
+
 export const DEFAULT_PHASE4_PARAMS: Phase4Params = {
   maxInsertionAttempts: 1000,
   underfilledBonus: 5,
@@ -46,6 +49,10 @@ export interface CleanerSchedule {
   totalTravel: number;
   totalWait: number;
   totalPriorityPenalty: number;
+  // Dati per vincoli hard (opzionali per retrocompatibilità)
+  role?: string;
+  contractType?: string;
+  canDoStraordinaria?: boolean;
 }
 
 export interface InsertionCandidate {
@@ -114,6 +121,86 @@ function dateToMinutes(d: Date): number {
 }
 
 // ============================================================================
+// VINCOLI HARD: Verifiche di compatibilità cleaner-task
+// Questi vincoli NON possono essere rilassati
+// ============================================================================
+
+interface HardConstraintResult {
+  compatible: boolean;
+  reason?: string;
+}
+
+function checkHardConstraints(
+  schedule: CleanerSchedule,
+  task: TaskForScheduling,
+  tasksMap: Map<number, TaskForScheduling>
+): HardConstraintResult {
+  // 1. Verifica straordinaria
+  if (task.straordinaria && schedule.canDoStraordinaria === false) {
+    return { compatible: false, reason: 'CANNOT_DO_STRAORDINARIA' };
+  }
+  
+  // 2. Regole OT per il nuovo task da inserire
+  if (task.straordinaria) {
+    const taskDurationMin = task.cleaningTimeMinutes || 60;
+    
+    // OT lunga (≥6h = 360min) deve essere sola
+    if (taskDurationMin >= 360 && schedule.tasks.length > 0) {
+      return { compatible: false, reason: 'LONG_OT_MUST_BE_ALONE' };
+    }
+    
+    // OT corta: cleaner può avere max 1 altro task (che non sia OT e ≤2h)
+    if (taskDurationMin < 360 && schedule.tasks.length > 0) {
+      // Conta quanti task non-OT ha già il cleaner
+      const existingTasks = schedule.tasks.map(t => tasksMap.get(t.taskId)).filter(Boolean);
+      const existingOTs = existingTasks.filter(t => t?.straordinaria);
+      const existingNonOTs = existingTasks.filter(t => !t?.straordinaria);
+      
+      // Se c'è già una OT, non può prenderne un'altra
+      if (existingOTs.length > 0) {
+        return { compatible: false, reason: 'ALREADY_HAS_OT' };
+      }
+      
+      // Con OT corta, max 1 task extra e deve essere ≤2h
+      if (existingNonOTs.length > 1) {
+        return { compatible: false, reason: 'OT_SHORT_MAX_1_EXTRA' };
+      }
+    }
+  }
+  
+  // 3. Se il cleaner ha già una OT, non può prendere altri task
+  const existingTasks = schedule.tasks.map(t => tasksMap.get(t.taskId)).filter(Boolean);
+  const existingOTs = existingTasks.filter(t => t?.straordinaria);
+  
+  if (existingOTs.length > 0) {
+    const otTask = existingOTs[0]!;
+    const otDuration = otTask.cleaningTimeMinutes || 60;
+    
+    // OT lunga: nessun altro task
+    if (otDuration >= 360) {
+      return { compatible: false, reason: 'CLEANER_HAS_LONG_OT' };
+    }
+    
+    // OT corta: max 1 task extra ≤2h
+    if (existingTasks.length >= 2) {
+      return { compatible: false, reason: 'CLEANER_HAS_OT_MAX_REACHED' };
+    }
+    
+    // Il nuovo task deve essere ≤2h e non OT
+    if (task.straordinaria) {
+      return { compatible: false, reason: 'CANNOT_ADD_OT_TO_OT_CLEANER' };
+    }
+    
+    const newTaskDuration = task.cleaningTimeMinutes || 60;
+    if (newTaskDuration > 120) {
+      return { compatible: false, reason: 'EXTRA_TASK_EXCEEDS_2H' };
+    }
+  }
+  
+  return { compatible: true };
+}
+
+// ============================================================================
 // COVERAGE-FIRST: Relaxation Levels
 // L0 = strict (come oggi)
 // L1 = consenti lateness/priority window violation
@@ -142,12 +229,15 @@ interface RelaxConstraints {
 }
 
 function getRelaxConstraints(level: number): RelaxConstraints {
+  // Nota: maxLoadTasks è il soft limit che può essere relaxed
+  // Ma ABSOLUTE_MAX_LOAD (5) è sempre il limite hard inviolabile
   return {
     allowLateness: level >= RelaxLevel.ALLOW_LATENESS,
     allowOverload: level >= RelaxLevel.ALLOW_OVERLOAD,
     allowHighTravel: level >= RelaxLevel.ALLOW_HIGH_TRAVEL,
-    maxTravelMinutes: level >= RelaxLevel.ALLOW_HIGH_TRAVEL ? 120 : 45,
-    maxLoadTasks: level >= RelaxLevel.ALLOW_OVERLOAD ? 12 : 8
+    maxTravelMinutes: level >= RelaxLevel.ALLOW_HIGH_TRAVEL ? 90 : 45,
+    // Soft limits: L0-L1 = 3, L2+ = 4 (ma mai sopra ABSOLUTE_MAX_LOAD)
+    maxLoadTasks: level >= RelaxLevel.ALLOW_OVERLOAD ? 4 : 3
   };
 }
 
@@ -170,6 +260,45 @@ function tryInsertTask(
 ): InsertionCandidate {
   const constraints = getRelaxConstraints(relaxLevel);
   const newTaskCount = schedule.tasks.length + 1;
+  
+  // =====================================================
+  // VINCOLO HARD ASSOLUTO: max 5 task per cleaner
+  // Nessun livello di relaxation può superare questo limite
+  // =====================================================
+  if (newTaskCount > ABSOLUTE_MAX_LOAD) {
+    return {
+      cleanerId: schedule.cleanerId,
+      position,
+      deltaTravel: 0,
+      deltaWait: 0,
+      deltaLateness: 0,
+      priorityPenalty: 0,
+      underfilledBonus: 0,
+      totalScore: Infinity,
+      feasible: false,
+      reason: 'ABSOLUTE_MAX_LOAD_EXCEEDED'
+    };
+  }
+  
+  // =====================================================
+  // VINCOLI HARD: compatibilità cleaner-task, regole OT
+  // Questi vincoli NON possono essere rilassati
+  // =====================================================
+  const hardCheck = checkHardConstraints(schedule, task, tasksMap);
+  if (!hardCheck.compatible) {
+    return {
+      cleanerId: schedule.cleanerId,
+      position,
+      deltaTravel: 0,
+      deltaWait: 0,
+      deltaLateness: 0,
+      priorityPenalty: 0,
+      underfilledBonus: 0,
+      totalScore: Infinity,
+      feasible: false,
+      reason: hardCheck.reason
+    };
+  }
   
   // Check max load constraint (soft at L2+)
   if (newTaskCount > constraints.maxLoadTasks) {
@@ -329,7 +458,11 @@ function applyInsertion(
     endTimeMinutes: simResult.endTime ? dateToMinutes(simResult.endTime) : schedule.endTimeMinutes,
     totalTravel: simResult.totalTravel,
     totalWait: simResult.totalWait,
-    totalPriorityPenalty: simResult.totalPriorityPenalty
+    totalPriorityPenalty: simResult.totalPriorityPenalty,
+    // Preserva i dati per vincoli hard
+    role: schedule.role,
+    contractType: schedule.contractType,
+    canDoStraordinaria: schedule.canDoStraordinaria
   };
 }
 
@@ -374,6 +507,25 @@ function trySwapForTask(
       const tasksForSim: TaskForScheduling[] = tasksWithoutRemoved
         .map(r => tasksMap.get(r.taskId))
         .filter((t): t is TaskForScheduling => t !== undefined);
+      
+      // =====================================================
+      // VINCOLO HARD ASSOLUTO: max 5 task per cleaner
+      // =====================================================
+      if (tasksForSim.length + 1 > ABSOLUTE_MAX_LOAD) {
+        continue;
+      }
+      
+      // =====================================================
+      // VINCOLI HARD: verifico con schedule temporaneo
+      // =====================================================
+      const tempSchedule: CleanerSchedule = {
+        ...schedule,
+        tasks: tasksWithoutRemoved
+      };
+      const hardCheck = checkHardConstraints(tempSchedule, task, tasksMap);
+      if (!hardCheck.compatible) {
+        continue;
+      }
       
       // Aggiungi il nuovo task alla fine
       tasksForSim.push(task);
@@ -428,7 +580,11 @@ function trySwapForTask(
               endTimeMinutes: simResult.endTime ? dateToMinutes(simResult.endTime) : schedule.endTimeMinutes,
               totalTravel: simResult.totalTravel,
               totalWait: simResult.totalWait,
-              totalPriorityPenalty: simResult.totalPriorityPenalty
+              totalPriorityPenalty: simResult.totalPriorityPenalty,
+              // Preserva i dati per vincoli hard
+              role: schedule.role,
+              contractType: schedule.contractType,
+              canDoStraordinaria: schedule.canDoStraordinaria
             },
             netGain
           };
