@@ -15,6 +15,11 @@ export interface Phase4Params {
   baseUnassignedPenalty: number;       // Penalità base per ogni task normale non assegnato
   straordinariaExtraPenalty: number;   // Penalità extra per straordinarie non assegnate
   progressiveMultiplier: number;       // Incremento penalità per ogni task successivo non assegnato
+  // Coverage-first: relaxation levels
+  maxRelaxLevel: number;               // Livello massimo di rilassamento (0-4)
+  baseRelaxPenalty: number;            // Penalità base per ogni livello di relax
+  relaxMultiplier: number;             // Moltiplicatore esponenziale per livello
+  maxCleanersToTryPerTask: number;     // Max cleaners da provare per task (performance cap)
 }
 
 export const DEFAULT_PHASE4_PARAMS: Phase4Params = {
@@ -24,7 +29,12 @@ export const DEFAULT_PHASE4_PARAMS: Phase4Params = {
   // Penalità per task non assegnati
   baseUnassignedPenalty: 1500,         // Ogni task non assegnato costa 1500
   straordinariaExtraPenalty: 2500,     // Extra per OT → totale 4000
-  progressiveMultiplier: 0.5           // 1° = 1500, 2° = 2250, 3° = 3000...
+  progressiveMultiplier: 0.5,          // 1° = 1500, 2° = 2250, 3° = 3000...
+  // Coverage-first: relaxation levels
+  maxRelaxLevel: 3,                    // L0=strict, L1=lateness, L2=maxLoad, L3=travel
+  baseRelaxPenalty: 200,               // Penalità base per relax
+  relaxMultiplier: 3,                  // Esponenziale: L1=200, L2=600, L3=1800
+  maxCleanersToTryPerTask: 20          // Cap performance
 };
 
 export interface CleanerSchedule {
@@ -103,6 +113,44 @@ function dateToMinutes(d: Date): number {
   return d.getHours() * 60 + d.getMinutes();
 }
 
+// ============================================================================
+// COVERAGE-FIRST: Relaxation Levels
+// L0 = strict (come oggi)
+// L1 = consenti lateness/priority window violation
+// L2 = consenti superare max load
+// L3 = consenti travel alto
+// ============================================================================
+
+export enum RelaxLevel {
+  STRICT = 0,
+  ALLOW_LATENESS = 1,
+  ALLOW_OVERLOAD = 2,
+  ALLOW_HIGH_TRAVEL = 3
+}
+
+function relaxPenalty(level: number, params: Phase4Params): number {
+  if (level === 0) return 0;
+  return params.baseRelaxPenalty * Math.pow(params.relaxMultiplier, level);
+}
+
+interface RelaxConstraints {
+  allowLateness: boolean;
+  allowOverload: boolean;
+  allowHighTravel: boolean;
+  maxTravelMinutes: number;
+  maxLoadTasks: number;
+}
+
+function getRelaxConstraints(level: number): RelaxConstraints {
+  return {
+    allowLateness: level >= RelaxLevel.ALLOW_LATENESS,
+    allowOverload: level >= RelaxLevel.ALLOW_OVERLOAD,
+    allowHighTravel: level >= RelaxLevel.ALLOW_HIGH_TRAVEL,
+    maxTravelMinutes: level >= RelaxLevel.ALLOW_HIGH_TRAVEL ? 120 : 45,
+    maxLoadTasks: level >= RelaxLevel.ALLOW_OVERLOAD ? 12 : 8
+  };
+}
+
 function scheduleRowToTaskForScheduling(
   row: ScheduleRow,
   tasksMap: Map<number, TaskForScheduling>
@@ -117,8 +165,30 @@ function tryInsertTask(
   workDate: string,
   tasksMap: Map<number, TaskForScheduling>,
   priorityWindows: PriorityWindows | null,
-  params: Phase4Params
+  params: Phase4Params,
+  relaxLevel: number = 0
 ): InsertionCandidate {
+  const constraints = getRelaxConstraints(relaxLevel);
+  const newTaskCount = schedule.tasks.length + 1;
+  
+  // Check max load constraint (soft at L2+)
+  if (newTaskCount > constraints.maxLoadTasks) {
+    if (!constraints.allowOverload) {
+      return {
+        cleanerId: schedule.cleanerId,
+        position,
+        deltaTravel: 0,
+        deltaWait: 0,
+        deltaLateness: 0,
+        priorityPenalty: 0,
+        underfilledBonus: 0,
+        totalScore: Infinity,
+        feasible: false,
+        reason: 'MAX_LOAD_EXCEEDED'
+      };
+    }
+  }
+  
   const tasksBefore = schedule.tasks.slice(0, position);
   const tasksAfter = schedule.tasks.slice(position);
   
@@ -164,12 +234,48 @@ function tryInsertTask(
   const deltaWait = simResult.totalWait - schedule.totalWait;
   const deltaPriorityPenalty = simResult.totalPriorityPenalty - schedule.totalPriorityPenalty;
   
+  // Check travel constraint (soft at L3)
+  if (deltaTravel > constraints.maxTravelMinutes) {
+    if (!constraints.allowHighTravel) {
+      return {
+        cleanerId: schedule.cleanerId,
+        position,
+        deltaTravel,
+        deltaWait,
+        deltaLateness: deltaPriorityPenalty,
+        priorityPenalty: simResult.totalPriorityPenalty,
+        underfilledBonus: 0,
+        totalScore: Infinity,
+        feasible: false,
+        reason: 'HIGH_TRAVEL_REJECTED'
+      };
+    }
+  }
+  
+  // Check lateness/priority violation (soft at L1+)
+  if (deltaPriorityPenalty > 50 && !constraints.allowLateness) {
+    return {
+      cleanerId: schedule.cleanerId,
+      position,
+      deltaTravel,
+      deltaWait,
+      deltaLateness: deltaPriorityPenalty,
+      priorityPenalty: simResult.totalPriorityPenalty,
+      underfilledBonus: 0,
+      totalScore: Infinity,
+      feasible: false,
+      reason: 'PRIORITY_VIOLATION_REJECTED'
+    };
+  }
+  
   let underfilledBonus = 0;
   if (schedule.tasks.length === 1) {
     underfilledBonus = params.underfilledBonus;
   }
   
-  const totalScore = deltaTravel + (deltaWait * 0.5) + (deltaPriorityPenalty * 2) - underfilledBonus;
+  // Include relaxPenalty nel totalScore - così soluzioni a livello più basso vincono sempre
+  const relaxPenaltyValue = relaxPenalty(relaxLevel, params);
+  const totalScore = deltaTravel + (deltaWait * 0.5) + (deltaPriorityPenalty * 2) - underfilledBonus + relaxPenaltyValue;
   
   return {
     cleanerId: schedule.cleanerId,
@@ -243,9 +349,12 @@ function trySwapForTask(
   tasksMap: Map<number, TaskForScheduling>,
   priorityWindows: PriorityWindows | null,
   params: Phase4Params,
-  unassignedPenaltyValue: number // Penalità che si evita assegnando questo task
+  unassignedPenaltyValue: number,
+  relaxLevel: number = 0
 ): SwapCandidate | null {
   let bestSwap: SwapCandidate | null = null;
+  const constraints = getRelaxConstraints(relaxLevel);
+  const relaxPenaltyValue = relaxPenalty(relaxLevel, params);
   
   for (const schedule of schedules) {
     // Prova a rimuovere ciascun task (non OT) e inserire il nuovo task
@@ -280,10 +389,28 @@ function trySwapForTask(
       
       if (!simResult.ok) continue;
       
-      // Calcola guadagno netto
+      // Verifica constraints in base al relaxLevel
+      const newTaskCount = tasksForSim.length;
+      if (newTaskCount > constraints.maxLoadTasks && !constraints.allowOverload) {
+        continue;
+      }
+      
+      // Calcola travel delta approssimativo
+      const travelDelta = simResult.totalTravel - schedule.totalTravel;
+      if (travelDelta > constraints.maxTravelMinutes && !constraints.allowHighTravel) {
+        continue;
+      }
+      
+      // Verifica priority penalty
+      const priorityDelta = simResult.totalPriorityPenalty - schedule.totalPriorityPenalty;
+      if (priorityDelta > 50 && !constraints.allowLateness) {
+        continue;
+      }
+      
+      // Calcola guadagno netto (include relaxPenalty nel costo)
       // Guadagno: evito penalità del nuovo task
-      // Perdita: devo poi riassegnare il task rimosso (che potrebbe non essere riassegnabile)
-      const netGain = unassignedPenaltyValue - removedTaskScore;
+      // Perdita: devo poi riassegnare il task rimosso + relaxPenalty
+      const netGain = unassignedPenaltyValue - removedTaskScore - relaxPenaltyValue;
       
       // Accetta solo se il guadagno è positivo (vale la pena fare lo swap)
       if (netGain > 0) {
@@ -319,7 +446,8 @@ function trySingleAssignment(
   workDate: string,
   tasksMap: Map<number, TaskForScheduling>,
   priorityWindows: PriorityWindows | null,
-  params: Phase4Params
+  params: Phase4Params,
+  relaxLevel: number = 0
 ): { success: boolean; cleanerId?: number; updatedSchedule?: CleanerSchedule; score?: number } {
   let bestOption: { cleanerId: number; schedule: CleanerSchedule; score: number } | null = null;
   
@@ -333,7 +461,8 @@ function trySingleAssignment(
       workDate,
       tasksMap,
       priorityWindows,
-      params
+      params,
+      relaxLevel
     );
     
     if (candidate.feasible) {
@@ -447,7 +576,22 @@ export function runPhase4Algorithm(
     }
   });
   
-  // Sort unassigned tasks: straordinarie first, then by priority (EO, HP, LP)
+  // Calcola scarcity per ogni task (quanti cleaners compatibili)
+  const taskScarcity = new Map<number, number>();
+  for (const unassigned of unassignedTasks) {
+    const task = tasksMap.get(unassigned.taskId);
+    if (!task) continue;
+    
+    let compatibleCount = 0;
+    for (const schedule of schedules) {
+      // Conta solo se almeno 1 posizione potrebbe funzionare (approssimativo)
+      const candidate = tryInsertTask(schedule, task, schedule.tasks.length, workDate, tasksMap, priorityWindows, params, 0);
+      if (candidate.feasible) compatibleCount++;
+    }
+    taskScarcity.set(unassigned.taskId, compatibleCount);
+  }
+  
+  // Sort unassigned tasks: straordinarie first, then by scarcity (più rari prima), then by priority
   const sortedUnassigned = [...unassignedTasks].sort((a, b) => {
     const taskA = tasksMap.get(a.taskId);
     const taskB = tasksMap.get(b.taskId);
@@ -457,6 +601,11 @@ export function runPhase4Algorithm(
     const straordB = taskB?.straordinaria ? 0 : 1;
     if (straordA !== straordB) return straordA - straordB;
     
+    // Then by scarcity (più rari prima - meno compatibili = priorità più alta)
+    const scarcityA = taskScarcity.get(a.taskId) ?? schedules.length;
+    const scarcityB = taskScarcity.get(b.taskId) ?? schedules.length;
+    if (scarcityA !== scarcityB) return scarcityA - scarcityB;
+    
     // Then by priority type
     const priorityOrder: Record<string, number> = { 'EO': 0, 'HP': 1, 'LP': 2 };
     const priorityA = priorityOrder[taskA?.priorityType || ''] ?? 3;
@@ -465,262 +614,347 @@ export function runPhase4Algorithm(
     return priorityA - priorityB;
   });
   
-  // Usa una coda per permettere re-enqueue dei task rimossi via swap
-  const taskQueue: { taskId: number; reasonCode: string; details: Record<string, any>; wasSwappedOut?: boolean }[] = [...sortedUnassigned];
-  const finalizedTaskIds = new Set<number>(); // Task già inseriti nei results (evita duplicati)
+  events.push({
+    eventType: 'PHASE4_SCARCITY_CALCULATED',
+    payload: {
+      task_scarcity: Object.fromEntries(taskScarcity)
+    }
+  });
+  
+  // ============================================================================
+  // LEVEL-WIDE PASSES: processa tutti i task con L0, poi tutti i rimanenti con L1, ecc.
+  // Questo preserva l'ordinamento scarcity/priority per ogni livello
+  // ============================================================================
+  
+  const finalizedTaskIds = new Set<number>(); // Task già assegnati (evita duplicati)
   const maxRequeueAttempts = 2; // Massimo tentativi per task re-enqueuati via swap
   const requeueAttempts = new Map<number, number>(); // Conta solo i tentativi dopo swap
   
-  while (taskQueue.length > 0) {
-    const unassigned = taskQueue.shift()!;
+  // Inizializza remaining con tutti i task non assegnati
+  let remainingTasks = [...sortedUnassigned];
+  
+  // Level-wide pass: processa tutti i task a ogni livello di relax
+  for (let currentRelaxLevel = 0; currentRelaxLevel <= params.maxRelaxLevel; currentRelaxLevel++) {
+    if (remainingTasks.length === 0) break;
     
-    // Skip se già finalizzato
-    if (finalizedTaskIds.has(unassigned.taskId)) {
-      continue;
-    }
+    const tasksForThisLevel = [...remainingTasks];
+    const stillUnassigned: typeof remainingTasks = [];
     
-    // Conta tentativi solo per task re-enqueuati (wasSwappedOut=true)
-    if (unassigned.wasSwappedOut) {
-      const attempts = requeueAttempts.get(unassigned.taskId) || 0;
-      if (attempts >= maxRequeueAttempts) {
-        taskResults.push({
-          taskId: unassigned.taskId,
-          logisticCode: tasksMap.get(unassigned.taskId)?.logisticCode || 0,
-          status: 'remain_unassigned',
-          reason: 'MAX_REQUEUE_ATTEMPTS_EXCEEDED'
-        });
-        remainUnassignedCount++;
-        finalizedTaskIds.add(unassigned.taskId);
+    // Coda per swap re-enqueue dentro questo livello
+    const levelQueue: { 
+      taskId: number; 
+      reasonCode: string; 
+      details: Record<string, any>; 
+      wasSwappedOut?: boolean 
+    }[] = [...tasksForThisLevel];
+    
+    events.push({
+      eventType: 'PHASE4_LEVEL_PASS_STARTED',
+      payload: {
+        relax_level: currentRelaxLevel,
+        tasks_to_process: levelQueue.length
+      }
+    });
+    
+    while (levelQueue.length > 0) {
+      const unassigned = levelQueue.shift()!;
+      
+      // Skip se già finalizzato
+      if (finalizedTaskIds.has(unassigned.taskId)) {
         continue;
       }
-      requeueAttempts.set(unassigned.taskId, attempts + 1);
-    }
-    
-    const task = tasksMap.get(unassigned.taskId);
-    if (!task) {
-      taskResults.push({
-        taskId: unassigned.taskId,
-        logisticCode: 0,
-        status: 'remain_unassigned',
-        reason: 'TASK_NOT_FOUND'
-      });
-      finalizedTaskIds.add(unassigned.taskId);
-      remainUnassignedCount++;
-      continue;
-    }
-    
-    let bestCandidate: InsertionCandidate | null = null;
-    let bestScheduleIdx = -1;
-    let bestPosition = -1;
-    
-    for (let sIdx = 0; sIdx < schedules.length; sIdx++) {
-      const schedule = schedules[sIdx];
       
-      for (let pos = 0; pos <= schedule.tasks.length; pos++) {
-        iterationsUsed++;
-        
-        if (iterationsUsed > params.maxInsertionAttempts) {
-          events.push({
-            eventType: 'PHASE4_ITERATION_LIMIT_REACHED',
-            payload: {
-              limit: params.maxInsertionAttempts,
-              remaining_unassigned: sortedUnassigned.length - taskResults.length
-            }
+      // Conta tentativi solo per task re-enqueuati via swap
+      const isSwappedOut = (unassigned as any).wasSwappedOut === true;
+      if (isSwappedOut) {
+        const attempts = requeueAttempts.get(unassigned.taskId) || 0;
+        if (attempts >= maxRequeueAttempts) {
+          taskResults.push({
+            taskId: unassigned.taskId,
+            logisticCode: tasksMap.get(unassigned.taskId)?.logisticCode || 0,
+            status: 'remain_unassigned',
+            reason: 'MAX_REQUEUE_ATTEMPTS_EXCEEDED'
           });
-          break;
+          remainUnassignedCount++;
+          finalizedTaskIds.add(unassigned.taskId);
+          continue;
         }
-        
-        const candidate = tryInsertTask(
-          schedule,
-          task,
-          pos,
-          workDate,
-          tasksMap,
-          priorityWindows,
-          params
-        );
-        
-        if (candidate.feasible) {
-          if (!bestCandidate || candidate.totalScore < bestCandidate.totalScore) {
-            bestCandidate = candidate;
-            bestScheduleIdx = sIdx;
-            bestPosition = pos;
-          }
-        }
+        requeueAttempts.set(unassigned.taskId, attempts + 1);
       }
       
-      if (iterationsUsed > params.maxInsertionAttempts) break;
-    }
-    
-    if (bestCandidate && bestCandidate.feasible) {
-      const updatedSchedule = applyInsertion(
-        schedules[bestScheduleIdx],
-        task,
-        bestPosition,
-        workDate,
-        tasksMap,
-        priorityWindows
-      );
+      const task = tasksMap.get(unassigned.taskId);
+      if (!task) {
+        taskResults.push({
+          taskId: unassigned.taskId,
+          logisticCode: 0,
+          status: 'remain_unassigned',
+          reason: 'TASK_NOT_FOUND'
+        });
+        finalizedTaskIds.add(unassigned.taskId);
+        remainUnassignedCount++;
+        continue;
+      }
       
-      schedules[bestScheduleIdx] = updatedSchedule;
+      let bestCandidate: InsertionCandidate | null = null;
+      let bestScheduleIdx = -1;
+      let bestPosition = -1;
+      let usedRelaxLevel = currentRelaxLevel;
       
-      taskResults.push({
-        taskId: task.taskId,
-        logisticCode: task.logisticCode,
-        status: 'inserted',
-        cleanerId: bestCandidate.cleanerId,
-        position: bestPosition,
-        score: bestCandidate.totalScore
-      });
-      finalizedTaskIds.add(task.taskId);
+      // Ordina cleaners per workload più basso (euristica: più disponibili prima)
+      // poi applica il cap per performance
+      const sortedScheduleIndices = schedules
+        .map((s, idx) => ({ idx, load: s.tasks.length, endTime: s.endTimeMinutes }))
+        .sort((a, b) => {
+          // Prima per carico minore
+          if (a.load !== b.load) return a.load - b.load;
+          // Poi per end time più basso (finiscono prima)
+          return a.endTime - b.endTime;
+        })
+        .slice(0, params.maxCleanersToTryPerTask)
+        .map(s => s.idx);
       
-      insertedCount++;
-      
-      events.push({
-        eventType: 'PHASE4_TASK_REASSIGNED_INSERTION',
-        payload: {
-          task_id: task.taskId,
-          logistic_code: task.logisticCode,
-          cleaner_id: bestCandidate.cleanerId,
-          position: bestPosition,
-          delta_travel: bestCandidate.deltaTravel,
-          delta_wait: bestCandidate.deltaWait,
-          priority_penalty: bestCandidate.priorityPenalty,
-          underfilled_bonus: bestCandidate.underfilledBonus,
-          total_score: bestCandidate.totalScore
+      for (const sIdx of sortedScheduleIndices) {
+        const schedule = schedules[sIdx];
+        
+        for (let pos = 0; pos <= schedule.tasks.length; pos++) {
+          iterationsUsed++;
+          
+          if (iterationsUsed > params.maxInsertionAttempts) {
+            events.push({
+              eventType: 'PHASE4_ITERATION_LIMIT_REACHED',
+              payload: {
+                limit: params.maxInsertionAttempts,
+                remaining_unassigned: sortedUnassigned.length - taskResults.length
+              }
+            });
+            break;
+          }
+          
+          const candidate = tryInsertTask(
+            schedule,
+            task,
+            pos,
+            workDate,
+            tasksMap,
+            priorityWindows,
+            params,
+            currentRelaxLevel
+          );
+          
+          if (candidate.feasible) {
+            if (!bestCandidate || candidate.totalScore < bestCandidate.totalScore) {
+              bestCandidate = candidate;
+              bestScheduleIdx = sIdx;
+              bestPosition = pos;
+            }
+          }
         }
-      });
-    } else {
-      const singleResult = trySingleAssignment(
-        task,
-        schedules,
-        workDate,
-        tasksMap,
-        priorityWindows,
-        params
-      );
+        
+        if (iterationsUsed > params.maxInsertionAttempts) break;
+      }
       
-      if (singleResult.success && singleResult.updatedSchedule) {
-        const scheduleIdx = schedules.findIndex(s => s.cleanerId === singleResult.cleanerId);
-        if (scheduleIdx >= 0) {
-          schedules[scheduleIdx] = singleResult.updatedSchedule;
-        }
+      if (bestCandidate && bestCandidate.feasible) {
+        const updatedSchedule = applyInsertion(
+          schedules[bestScheduleIdx],
+          task,
+          bestPosition,
+          workDate,
+          tasksMap,
+          priorityWindows
+        );
+        
+        schedules[bestScheduleIdx] = updatedSchedule;
         
         taskResults.push({
           taskId: task.taskId,
           logisticCode: task.logisticCode,
-          status: 'single_assigned',
-          cleanerId: singleResult.cleanerId,
-          score: singleResult.score
+          status: 'inserted',
+          cleanerId: bestCandidate.cleanerId,
+          position: bestPosition,
+          score: bestCandidate.totalScore
         });
         finalizedTaskIds.add(task.taskId);
         
-        singleAssignedCount++;
+        insertedCount++;
         
         events.push({
-          eventType: 'PHASE4_TASK_ASSIGNED_SINGLE',
+          eventType: 'PHASE4_TASK_REASSIGNED_INSERTION',
           payload: {
             task_id: task.taskId,
             logistic_code: task.logisticCode,
-            cleaner_id: singleResult.cleanerId,
-            score: singleResult.score
+            cleaner_id: bestCandidate.cleanerId,
+            position: bestPosition,
+            delta_travel: bestCandidate.deltaTravel,
+            delta_wait: bestCandidate.deltaWait,
+            priority_penalty: bestCandidate.priorityPenalty,
+            underfilled_bonus: bestCandidate.underfilledBonus,
+            total_score: bestCandidate.totalScore
           }
         });
       } else {
-        // Prova swap: rimuovi un task debole per fare spazio
-        const isStraordinaria = task.straordinaria === true;
-        
-        // Calcola la penalità che si eviterebbe assegnando questo task
-        const unassignedPenaltyValue = isStraordinaria 
-          ? params.baseUnassignedPenalty + params.straordinariaExtraPenalty
-          : params.baseUnassignedPenalty;
-        
-        const swapResult = trySwapForTask(
+        const singleResult = trySingleAssignment(
           task,
           schedules,
           workDate,
           tasksMap,
           priorityWindows,
           params,
-          unassignedPenaltyValue
+          currentRelaxLevel
         );
         
-        if (swapResult) {
-          // Swap riuscito
-          const scheduleIdx = schedules.findIndex(s => s.cleanerId === swapResult.cleanerId);
+        if (singleResult.success && singleResult.updatedSchedule) {
+          const scheduleIdx = schedules.findIndex(s => s.cleanerId === singleResult.cleanerId);
           if (scheduleIdx >= 0) {
-            schedules[scheduleIdx] = swapResult.newSchedule;
+            schedules[scheduleIdx] = singleResult.updatedSchedule;
           }
           
           taskResults.push({
             taskId: task.taskId,
             logisticCode: task.logisticCode,
-            status: 'inserted',
-            cleanerId: swapResult.cleanerId,
-            score: -swapResult.netGain // Negativo perché è un guadagno
+            status: 'single_assigned',
+            cleanerId: singleResult.cleanerId,
+            score: singleResult.score
           });
           finalizedTaskIds.add(task.taskId);
           
-          insertedCount++;
+          singleAssignedCount++;
           
           events.push({
-            eventType: 'PHASE4_TASK_ASSIGNED_VIA_SWAP',
+            eventType: 'PHASE4_TASK_ASSIGNED_SINGLE',
             payload: {
               task_id: task.taskId,
               logistic_code: task.logisticCode,
-              cleaner_id: swapResult.cleanerId,
-              removed_task_id: swapResult.removedTaskId,
-              removed_task_logistic_code: swapResult.removedTaskLogisticCode,
-              net_gain: swapResult.netGain,
-              is_straordinaria: isStraordinaria
-            }
-          });
-          
-          // Il task rimosso torna nella coda per essere ri-processato
-          // Invece di marcarlo subito come unassigned, lo re-enqueue
-          taskQueue.push({
-            taskId: swapResult.removedTaskId,
-            reasonCode: 'SWAPPED_OUT_FOR_HIGHER_PRIORITY',
-            details: { swapped_by: task.taskId },
-            wasSwappedOut: true
-          });
-          
-          events.push({
-            eventType: 'PHASE4_TASK_SWAPPED_OUT_REQUEUED',
-            payload: {
-              task_id: swapResult.removedTaskId,
-              logistic_code: swapResult.removedTaskLogisticCode,
-              replaced_by_task_id: task.taskId,
-              replaced_by_is_straordinaria: isStraordinaria,
-              requeue_position: taskQueue.length
+              cleaner_id: singleResult.cleanerId,
+              score: singleResult.score
             }
           });
         } else {
-          // Nessun swap possibile
-          taskResults.push({
-            taskId: task.taskId,
-            logisticCode: task.logisticCode,
-            status: 'remain_unassigned',
-            reason: 'NO_FEASIBLE_INSERTION_OR_SWAP'
-          });
-          finalizedTaskIds.add(task.taskId);
+          // Prova swap: rimuovi un task debole per fare spazio
+          const isStraordinaria = task.straordinaria === true;
           
-          remainUnassignedCount++;
+          // Calcola la penalità che si eviterebbe assegnando questo task
+          const unassignedPenaltyValue = isStraordinaria 
+            ? params.baseUnassignedPenalty + params.straordinariaExtraPenalty
+            : params.baseUnassignedPenalty;
           
-          events.push({
-            eventType: 'PHASE4_TASK_REMAIN_UNASSIGNED',
-            payload: {
-              task_id: task.taskId,
-              logistic_code: task.logisticCode,
-              original_reason: unassigned.reasonCode,
-              insertion_attempts: iterationsUsed,
-              is_straordinaria: isStraordinaria,
-              swap_attempted: true
+          const swapResult = trySwapForTask(
+            task,
+            schedules,
+            workDate,
+            tasksMap,
+            priorityWindows,
+            params,
+            unassignedPenaltyValue,
+            currentRelaxLevel
+          );
+          
+          if (swapResult) {
+            // Swap riuscito
+            const scheduleIdx = schedules.findIndex(s => s.cleanerId === swapResult.cleanerId);
+            if (scheduleIdx >= 0) {
+              schedules[scheduleIdx] = swapResult.newSchedule;
             }
-          });
+            
+            taskResults.push({
+              taskId: task.taskId,
+              logisticCode: task.logisticCode,
+              status: 'inserted',
+              cleanerId: swapResult.cleanerId,
+              score: -swapResult.netGain
+            });
+            finalizedTaskIds.add(task.taskId);
+            
+            insertedCount++;
+            
+            events.push({
+              eventType: 'PHASE4_TASK_ASSIGNED_VIA_SWAP',
+              payload: {
+                task_id: task.taskId,
+                logistic_code: task.logisticCode,
+                cleaner_id: swapResult.cleanerId,
+                removed_task_id: swapResult.removedTaskId,
+                removed_task_logistic_code: swapResult.removedTaskLogisticCode,
+                net_gain: swapResult.netGain,
+                is_straordinaria: isStraordinaria
+              }
+            });
+            
+            // Il task rimosso torna nella coda di questo livello per essere ri-processato
+            levelQueue.push({
+              taskId: swapResult.removedTaskId,
+              reasonCode: 'SWAPPED_OUT_FOR_HIGHER_PRIORITY',
+              details: { swapped_by: task.taskId },
+              wasSwappedOut: true
+            });
+            
+            events.push({
+              eventType: 'PHASE4_TASK_SWAPPED_OUT_REQUEUED',
+              payload: {
+                task_id: swapResult.removedTaskId,
+                logistic_code: swapResult.removedTaskLogisticCode,
+                replaced_by_task_id: task.taskId,
+                replaced_by_is_straordinaria: isStraordinaria,
+                requeue_position: levelQueue.length,
+                relax_level: currentRelaxLevel
+              }
+            });
+          } else {
+            // Nessun swap possibile - metti in stillUnassigned per il prossimo livello
+            stillUnassigned.push(unassigned);
+            
+            if (currentRelaxLevel < params.maxRelaxLevel) {
+              events.push({
+                eventType: 'PHASE4_TASK_DEFERRED_TO_NEXT_LEVEL',
+                payload: {
+                  task_id: task.taskId,
+                  logistic_code: task.logisticCode,
+                  current_relax_level: currentRelaxLevel,
+                  next_relax_level: currentRelaxLevel + 1,
+                  is_straordinaria: isStraordinaria
+                }
+              });
+            } else {
+              // Già al massimo relaxLevel - definitivamente unassigned
+              taskResults.push({
+                taskId: task.taskId,
+                logisticCode: task.logisticCode,
+                status: 'remain_unassigned',
+                reason: 'NO_FEASIBLE_INSERTION_AT_MAX_RELAX'
+              });
+              finalizedTaskIds.add(task.taskId);
+              
+              remainUnassignedCount++;
+              
+              events.push({
+                eventType: 'PHASE4_TASK_REMAIN_UNASSIGNED',
+                payload: {
+                  task_id: task.taskId,
+                  logistic_code: task.logisticCode,
+                  original_reason: unassigned.reasonCode,
+                  insertion_attempts: iterationsUsed,
+                  is_straordinaria: isStraordinaria,
+                  swap_attempted: true,
+                  max_relax_level_reached: true,
+                  final_relax_level: currentRelaxLevel
+                }
+              });
+            }
+          }
         }
       }
     }
+    
+    // Fine del livello corrente - aggiorna remainingTasks per il prossimo livello
+    remainingTasks = stillUnassigned.filter(u => !finalizedTaskIds.has(u.taskId));
+    
+    events.push({
+      eventType: 'PHASE4_LEVEL_PASS_COMPLETED',
+      payload: {
+        relax_level: currentRelaxLevel,
+        assigned_this_level: tasksForThisLevel.length - stillUnassigned.length,
+        remaining_for_next_level: remainingTasks.length
+      }
+    });
   }
   
   const phase3AssignedCount = initialSchedules.reduce((sum, s) => sum + s.tasks.length, 0);
