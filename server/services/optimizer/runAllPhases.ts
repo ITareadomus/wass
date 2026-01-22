@@ -310,6 +310,38 @@ async function collectDetailedMetrics(
     console.log(`   Assegnati: ${result.metrics.assignedTasks}`);
     console.log(`   Non assegnati: ${result.metrics.unassignedTasks}`);
     console.log(`   OT totali: ${result.metrics.otTotal}, assegnate: ${result.metrics.otAssigned}, non assegnate: ${result.metrics.otUnassigned}`);
+
+    // Check di coerenza: assigned + unassigned deve essere uguale a total
+    const expectedTotal = result.metrics.assignedTasks + result.metrics.unassignedTasks;
+    if (expectedTotal !== result.metrics.totalTasks) {
+      const missing = result.metrics.totalTasks - expectedTotal;
+      console.warn(`   ⚠️ WARNING: Conteggio incoerente! assigned(${result.metrics.assignedTasks}) + unassigned(${result.metrics.unassignedTasks}) = ${expectedTotal}, ma total = ${result.metrics.totalTasks}`);
+      console.warn(`   ⚠️ ${missing} task mancanti dal sistema di conteggio!`);
+      
+      // Query per trovare i task_id mancanti
+      try {
+        const missingTasksQuery = await pool.query(`
+          WITH all_unlocked AS (
+            SELECT task_id FROM daily_containers 
+            WHERE work_date = $1
+              AND task_id NOT IN (SELECT task_id FROM daily_task_locks WHERE work_date = $1 AND locked = true)
+          ),
+          accounted AS (
+            SELECT task_id FROM optimizer.optimizer_assignment WHERE run_id = $2
+            UNION
+            SELECT task_id FROM optimizer.optimizer_unassigned WHERE run_id = $2
+          )
+          SELECT task_id FROM all_unlocked WHERE task_id NOT IN (SELECT task_id FROM accounted)
+        `, [workDate, runId]);
+        
+        if (missingTasksQuery.rows.length > 0) {
+          const missingIds = missingTasksQuery.rows.map(r => r.task_id);
+          console.warn(`   ⚠️ Task IDs mancanti: ${missingIds.join(', ')}`);
+        }
+      } catch (e: any) {
+        console.warn(`   ⚠️ Impossibile recuperare task mancanti: ${e.message}`);
+      }
+    }
     
     if (Object.keys(result.metrics.unassignedByReason).length > 0) {
       console.log(`   Non assegnati per reason:`);

@@ -159,17 +159,45 @@ async function loadCleanerStartTimes(runId: string): Promise<Map<number, string>
   return map;
 }
 
-async function loadUnassignedTasks(runId: string): Promise<{ taskId: number; reasonCode: string; details: Record<string, any> }[]> {
+async function loadUnassignedTasks(runId: string, workDate: string): Promise<{ taskId: number; reasonCode: string; details: Record<string, any> }[]> {
+  // Calcola i task mancanti dal DIFF invece di leggere solo da optimizer_unassigned
+  // Questo include anche i task che Phase 2/3 non hanno mai processato
   const result = await pool.query(`
-    SELECT task_id, logistic_code, reason_code, details
-    FROM optimizer.optimizer_unassigned
-    WHERE run_id = $1
-  `, [runId]);
+    WITH unlocked_tasks AS (
+      SELECT dc.task_id, dc.logistic_code
+      FROM daily_containers dc
+      WHERE dc.work_date = $1
+        AND dc.task_id NOT IN (
+          SELECT task_id
+          FROM daily_task_locks
+          WHERE work_date = $1 AND locked = true
+        )
+    ),
+    assigned AS (
+      SELECT DISTINCT task_id
+      FROM optimizer.optimizer_assignment
+      WHERE run_id = $2
+    ),
+    already_unassigned AS (
+      SELECT task_id, reason_code, details
+      FROM optimizer.optimizer_unassigned
+      WHERE run_id = $2
+    )
+    SELECT 
+      ut.task_id, 
+      ut.logistic_code,
+      au.reason_code,
+      au.details
+    FROM unlocked_tasks ut
+    LEFT JOIN assigned a ON a.task_id = ut.task_id
+    LEFT JOIN already_unassigned au ON au.task_id = ut.task_id
+    WHERE a.task_id IS NULL
+  `, [workDate, runId]);
 
   return result.rows.map(row => ({
     taskId: row.task_id,
-    reasonCode: row.reason_code,
-    details: row.details || {}
+    reasonCode: row.reason_code || 'PHASE4_SEED_FROM_DIFF',
+    details: row.details || { source: 'diff_calculation', logistic_code: row.logistic_code }
   }));
 }
 
@@ -360,7 +388,7 @@ export async function runPhase4(
 
     const [schedules, unassignedTasks, tasksMap, priorityWindows] = await Promise.all([
       loadPhase3Schedules(resolvedRunId),
-      loadUnassignedTasks(resolvedRunId),
+      loadUnassignedTasks(resolvedRunId, resolvedWorkDate),
       loadTasksForScheduling(resolvedWorkDate),
       loadPriorityStartWindows(resolvedRunId)
     ]);
