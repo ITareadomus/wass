@@ -8,6 +8,14 @@ import { runPhase4, Phase4RunResult } from './runPhase4';
 import { createRun, updateRunStatus, OptimizerRun } from './db';
 import { DEFAULT_PHASE1_PARAMS } from './phase1';
 
+export interface UnassignedBreakdown {
+  taskId: number;
+  logisticCode: number;
+  isStraordinaria: boolean;
+  reason: string;
+  compatibleCleanersCount: number;
+}
+
 export interface AllPhasesRunResult {
   runId: string;
   workDate: string;
@@ -24,6 +32,16 @@ export interface AllPhasesRunResult {
     tasksAssigned: number;
     tasksUnassigned: number;
     cleanersUsed: number;
+  };
+  metrics: {
+    totalTasks: number;
+    assignedTasks: number;
+    unassignedTasks: number;
+    otTotal: number;
+    otAssigned: number;
+    otUnassigned: number;
+    unassignedByReason: Record<string, number>;
+    unassignedDetails: UnassignedBreakdown[];
   };
 }
 
@@ -55,6 +73,16 @@ export async function runAllPhases(
       tasksAssigned: 0,
       tasksUnassigned: 0,
       cleanersUsed: 0
+    },
+    metrics: {
+      totalTasks: 0,
+      assignedTasks: 0,
+      unassignedTasks: 0,
+      otTotal: 0,
+      otAssigned: 0,
+      otUnassigned: 0,
+      unassignedByReason: {},
+      unassignedDetails: []
     }
   };
 
@@ -144,6 +172,9 @@ export async function runAllPhases(
       cleanersUsed: parseInt(cleanerCount.rows[0]?.count || '0')
     };
 
+    // === METRICHE DETTAGLIATE ===
+    await collectDetailedMetrics(runId, workDate, result);
+
     if (applyToProduction) {
       console.log(`[runAllPhases] === APPLYING TO PRODUCTION ===`);
       const applyResult = await applyOptimizerToProduction(runId, workDate);
@@ -164,6 +195,141 @@ export async function runAllPhases(
   console.log(`[runAllPhases] Complete in ${result.totalDurationMs}ms - Status: ${result.status}`);
   
   return result;
+}
+
+async function collectDetailedMetrics(
+  runId: string,
+  workDate: string,
+  result: AllPhasesRunResult
+): Promise<void> {
+  try {
+    // Query per contare OT totali, assegnate e non assegnate
+    const otStats = await pool.query(`
+      WITH all_tasks AS (
+        SELECT DISTINCT task_id, 
+          COALESCE(dc.straordinaria, false) as is_ot
+        FROM daily_containers dc
+        WHERE dc.work_date = $1
+      ),
+      assigned_tasks AS (
+        SELECT task_id FROM optimizer.optimizer_assignment WHERE run_id = $2
+      ),
+      unassigned_tasks AS (
+        SELECT task_id, reason_code FROM optimizer.optimizer_unassigned WHERE run_id = $2
+      )
+      SELECT 
+        COUNT(*) FILTER (WHERE at.is_ot = true) as ot_total,
+        COUNT(*) FILTER (WHERE at.is_ot = true AND ast.task_id IS NOT NULL) as ot_assigned,
+        COUNT(*) FILTER (WHERE at.is_ot = true AND ust.task_id IS NOT NULL) as ot_unassigned
+      FROM all_tasks at
+      LEFT JOIN assigned_tasks ast ON at.task_id = ast.task_id
+      LEFT JOIN unassigned_tasks ust ON at.task_id = ust.task_id
+    `, [workDate, runId]);
+
+    // Query per breakdown dei non assegnati per reason
+    const unassignedByReason = await pool.query(`
+      SELECT reason_code, COUNT(*) as count
+      FROM optimizer.optimizer_unassigned
+      WHERE run_id = $1
+      GROUP BY reason_code
+      ORDER BY count DESC
+    `, [runId]);
+
+    // Query per dettagli dei non assegnati (incluso OT)
+    // Calcola i cleaners compatibili basandosi sui selected_cleaners e le regole di compatibilità
+    const unassignedDetails = await pool.query(`
+      WITH selected_cleaners AS (
+        SELECT cleaner_id FROM daily_selected_cleaners WHERE work_date = $2
+      ),
+      cleaner_details AS (
+        SELECT 
+          c.cleaner_id,
+          c.role,
+          COALESCE(c.contract_type, 'C') as contract_type,
+          COALESCE(c.can_do_straordinaria, false) as can_do_straordinaria
+        FROM cleaners c
+        WHERE c.work_date = $2 AND c.cleaner_id IN (SELECT cleaner_id FROM selected_cleaners)
+      ),
+      unassigned_with_compat AS (
+        SELECT 
+          ou.task_id,
+          ou.logistic_code,
+          COALESCE(dc.straordinaria, false) as is_straordinaria,
+          ou.reason_code,
+          dc.premium,
+          COALESCE(dc.type_apt, 'C') as type_apt,
+          (
+            SELECT COUNT(*)
+            FROM cleaner_details cd
+            WHERE 
+              (NOT dc.premium OR cd.role = 'Premium')
+              AND (NOT COALESCE(dc.straordinaria, false) OR cd.can_do_straordinaria)
+              AND (
+                cd.contract_type = 'A CHIAMATA' 
+                OR cd.contract_type = 'C'
+                OR (cd.contract_type = 'B' AND COALESCE(dc.type_apt, 'C') IN ('A', 'B'))
+                OR (cd.contract_type = 'A' AND COALESCE(dc.type_apt, 'C') = 'A')
+              )
+          ) as compatible_cleaners_count
+        FROM optimizer.optimizer_unassigned ou
+        LEFT JOIN daily_containers dc ON dc.task_id = ou.task_id AND dc.work_date = $2
+        WHERE ou.run_id = $1
+      )
+      SELECT * FROM unassigned_with_compat
+      ORDER BY is_straordinaria DESC, compatible_cleaners_count ASC
+    `, [runId, workDate]);
+
+    result.metrics = {
+      totalTasks: result.phase0?.totalTasks || 0,
+      assignedTasks: result.summary.tasksAssigned,
+      unassignedTasks: result.summary.tasksUnassigned,
+      otTotal: parseInt(otStats.rows[0]?.ot_total || '0'),
+      otAssigned: parseInt(otStats.rows[0]?.ot_assigned || '0'),
+      otUnassigned: parseInt(otStats.rows[0]?.ot_unassigned || '0'),
+      unassignedByReason: {},
+      unassignedDetails: []
+    };
+
+    // Popola unassignedByReason
+    for (const row of unassignedByReason.rows) {
+      result.metrics.unassignedByReason[row.reason_code || 'UNKNOWN'] = parseInt(row.count);
+    }
+
+    // Popola unassignedDetails
+    result.metrics.unassignedDetails = unassignedDetails.rows.map((row: any) => ({
+      taskId: row.task_id,
+      logisticCode: row.logistic_code,
+      isStraordinaria: row.is_straordinaria,
+      reason: row.reason_code || 'UNKNOWN',
+      compatibleCleanersCount: row.compatible_cleaners_count
+    }));
+
+    // Log delle metriche
+    console.log(`[runAllPhases] === METRICHE FINALI ===`);
+    console.log(`   Totale task: ${result.metrics.totalTasks}`);
+    console.log(`   Assegnati: ${result.metrics.assignedTasks}`);
+    console.log(`   Non assegnati: ${result.metrics.unassignedTasks}`);
+    console.log(`   OT totali: ${result.metrics.otTotal}, assegnate: ${result.metrics.otAssigned}, non assegnate: ${result.metrics.otUnassigned}`);
+    
+    if (Object.keys(result.metrics.unassignedByReason).length > 0) {
+      console.log(`   Non assegnati per reason:`);
+      for (const [reason, count] of Object.entries(result.metrics.unassignedByReason)) {
+        console.log(`      - ${reason}: ${count}`);
+      }
+    }
+
+    // Log dettagliato per OT non assegnate
+    const unassignedOTs = result.metrics.unassignedDetails.filter(d => d.isStraordinaria);
+    if (unassignedOTs.length > 0) {
+      console.log(`   ⚠️ STRAORDINARIE NON ASSEGNATE (${unassignedOTs.length}):`);
+      for (const ot of unassignedOTs) {
+        console.log(`      - Task ${ot.taskId} (LC: ${ot.logisticCode}): ${ot.reason}, cleaners compatibili: ${ot.compatibleCleanersCount}`);
+      }
+    }
+
+  } catch (error: any) {
+    console.warn(`[runAllPhases] Warning: failed to collect detailed metrics: ${error.message}`);
+  }
 }
 
 export interface ApplyToProductionResult {

@@ -15,6 +15,8 @@ export interface Phase4Params {
   baseUnassignedPenalty: number;       // Penalità base per ogni task normale non assegnato
   straordinariaExtraPenalty: number;   // Penalità extra per straordinarie non assegnate
   progressiveMultiplier: number;       // Incremento penalità per ogni task successivo non assegnato
+  rarityExtraPenalty: number;          // Extra per task con pochi cleaners compatibili (rarity ≤ 2)
+  rarityThreshold: number;             // Soglia per considerare un task "raro" (compatibleCleaners ≤ threshold)
 }
 
 export const DEFAULT_PHASE4_PARAMS: Phase4Params = {
@@ -24,7 +26,9 @@ export const DEFAULT_PHASE4_PARAMS: Phase4Params = {
   // Penalità per task non assegnati
   baseUnassignedPenalty: 1500,         // Ogni task non assegnato costa 1500
   straordinariaExtraPenalty: 2500,     // Extra per OT → totale 4000
-  progressiveMultiplier: 0.5           // 1° = 1500, 2° = 2250, 3° = 3000...
+  progressiveMultiplier: 0.5,          // 1° = 1500, 2° = 2250, 3° = 3000...
+  rarityExtraPenalty: 500,             // Extra per task rari
+  rarityThreshold: 2                   // Task con ≤2 cleaners compatibili sono "rari"
 };
 
 export interface CleanerSchedule {
@@ -225,6 +229,92 @@ function applyInsertion(
     totalWait: simResult.totalWait,
     totalPriorityPenalty: simResult.totalPriorityPenalty
   };
+}
+
+interface SwapCandidate {
+  cleanerId: number;
+  removedTaskId: number;
+  removedTaskLogisticCode: number;
+  removedTaskScore: number; // Valore perso rimuovendo questo task
+  newSchedule: CleanerSchedule;
+  netGain: number; // Guadagno netto: penalty_avoided - loss_score
+}
+
+function trySwapForTask(
+  task: TaskForScheduling,
+  schedules: CleanerSchedule[],
+  workDate: string,
+  tasksMap: Map<number, TaskForScheduling>,
+  priorityWindows: PriorityWindows | null,
+  params: Phase4Params,
+  unassignedPenaltyValue: number // Penalità che si evita assegnando questo task
+): SwapCandidate | null {
+  let bestSwap: SwapCandidate | null = null;
+  
+  for (const schedule of schedules) {
+    // Prova a rimuovere ciascun task (non OT) e inserire il nuovo task
+    for (let i = 0; i < schedule.tasks.length; i++) {
+      const taskToRemove = schedule.tasks[i];
+      const removedTask = tasksMap.get(taskToRemove.taskId);
+      
+      // Non rimuovere straordinarie per fare spazio ad altri task
+      if (removedTask?.straordinaria) continue;
+      
+      // Calcola il "valore" del task rimosso (approssimativo)
+      // Un task normale vale circa la baseUnassignedPenalty
+      const removedTaskScore = params.baseUnassignedPenalty;
+      
+      // Crea schedule senza questo task
+      const tasksWithoutRemoved = schedule.tasks.filter((_, idx) => idx !== i);
+      const tasksForSim: TaskForScheduling[] = tasksWithoutRemoved
+        .map(r => tasksMap.get(r.taskId))
+        .filter((t): t is TaskForScheduling => t !== undefined);
+      
+      // Aggiungi il nuovo task alla fine
+      tasksForSim.push(task);
+      
+      const simResult = simulateSequence(
+        workDate,
+        tasksForSim,
+        schedule.startTime,
+        tasksMap,
+        null,
+        priorityWindows
+      );
+      
+      if (!simResult.ok) continue;
+      
+      // Calcola guadagno netto
+      // Guadagno: evito penalità del nuovo task
+      // Perdita: devo poi riassegnare il task rimosso (che potrebbe non essere riassegnabile)
+      const netGain = unassignedPenaltyValue - removedTaskScore;
+      
+      // Accetta solo se il guadagno è positivo (vale la pena fare lo swap)
+      if (netGain > 0) {
+        if (!bestSwap || netGain > bestSwap.netGain) {
+          bestSwap = {
+            cleanerId: schedule.cleanerId,
+            removedTaskId: taskToRemove.taskId,
+            removedTaskLogisticCode: taskToRemove.logisticCode,
+            removedTaskScore,
+            newSchedule: {
+              cleanerId: schedule.cleanerId,
+              cleanerName: schedule.cleanerName,
+              startTime: schedule.startTime,
+              tasks: simResult.scheduleRows,
+              endTimeMinutes: simResult.endTime ? dateToMinutes(simResult.endTime) : schedule.endTimeMinutes,
+              totalTravel: simResult.totalTravel,
+              totalWait: simResult.totalWait,
+              totalPriorityPenalty: simResult.totalPriorityPenalty
+            },
+            netGain
+          };
+        }
+      }
+    }
+  }
+  
+  return bestSwap;
 }
 
 function trySingleAssignment(
@@ -508,27 +598,98 @@ export function runPhase4Algorithm(
           }
         });
       } else {
-        taskResults.push({
-          taskId: task.taskId,
-          logisticCode: task.logisticCode,
-          status: 'remain_unassigned',
-          reason: 'NO_FEASIBLE_INSERTION'
-        });
-        
-        remainUnassignedCount++;
-        
+        // Prova swap: rimuovi un task debole per fare spazio
         const isStraordinaria = task.straordinaria === true;
         
-        events.push({
-          eventType: 'PHASE4_TASK_REMAIN_UNASSIGNED',
-          payload: {
-            task_id: task.taskId,
-            logistic_code: task.logisticCode,
-            original_reason: unassigned.reasonCode,
-            insertion_attempts: iterationsUsed,
-            is_straordinaria: isStraordinaria
+        // Calcola la penalità che si eviterebbe assegnando questo task
+        const unassignedPenaltyValue = isStraordinaria 
+          ? params.baseUnassignedPenalty + params.straordinariaExtraPenalty
+          : params.baseUnassignedPenalty;
+        
+        const swapResult = trySwapForTask(
+          task,
+          schedules,
+          workDate,
+          tasksMap,
+          priorityWindows,
+          params,
+          unassignedPenaltyValue
+        );
+        
+        if (swapResult) {
+          // Swap riuscito
+          const scheduleIdx = schedules.findIndex(s => s.cleanerId === swapResult.cleanerId);
+          if (scheduleIdx >= 0) {
+            schedules[scheduleIdx] = swapResult.newSchedule;
           }
-        });
+          
+          taskResults.push({
+            taskId: task.taskId,
+            logisticCode: task.logisticCode,
+            status: 'inserted',
+            cleanerId: swapResult.cleanerId,
+            score: -swapResult.netGain // Negativo perché è un guadagno
+          });
+          
+          insertedCount++;
+          
+          events.push({
+            eventType: 'PHASE4_TASK_ASSIGNED_VIA_SWAP',
+            payload: {
+              task_id: task.taskId,
+              logistic_code: task.logisticCode,
+              cleaner_id: swapResult.cleanerId,
+              removed_task_id: swapResult.removedTaskId,
+              removed_task_logistic_code: swapResult.removedTaskLogisticCode,
+              net_gain: swapResult.netGain,
+              is_straordinaria: isStraordinaria
+            }
+          });
+          
+          // Il task rimosso torna nella coda dei non assegnati
+          // (verrà processato in un prossimo ciclo o rimarrà unassigned)
+          // Per semplicità, lo aggiungo ai results come unassigned
+          // In futuro potremmo implementare un ciclo di riassegnazione
+          taskResults.push({
+            taskId: swapResult.removedTaskId,
+            logisticCode: swapResult.removedTaskLogisticCode,
+            status: 'remain_unassigned',
+            reason: 'SWAPPED_OUT_FOR_HIGHER_PRIORITY'
+          });
+          remainUnassignedCount++;
+          
+          events.push({
+            eventType: 'PHASE4_TASK_SWAPPED_OUT',
+            payload: {
+              task_id: swapResult.removedTaskId,
+              logistic_code: swapResult.removedTaskLogisticCode,
+              replaced_by_task_id: task.taskId,
+              replaced_by_is_straordinaria: isStraordinaria
+            }
+          });
+        } else {
+          // Nessun swap possibile
+          taskResults.push({
+            taskId: task.taskId,
+            logisticCode: task.logisticCode,
+            status: 'remain_unassigned',
+            reason: 'NO_FEASIBLE_INSERTION_OR_SWAP'
+          });
+          
+          remainUnassignedCount++;
+          
+          events.push({
+            eventType: 'PHASE4_TASK_REMAIN_UNASSIGNED',
+            payload: {
+              task_id: task.taskId,
+              logistic_code: task.logisticCode,
+              original_reason: unassigned.reasonCode,
+              insertion_attempts: iterationsUsed,
+              is_straordinaria: isStraordinaria,
+              swap_attempted: true
+            }
+          });
+        }
       }
     }
   }

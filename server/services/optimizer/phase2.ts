@@ -33,6 +33,9 @@ export interface GroupCandidate {
   avgTravelMin: number;
   maxTravelMin: number;
   isSingle?: boolean;
+  hasStraordinaria?: boolean;
+  isLongStraordinaria?: boolean;
+  minCompatibleCleaners?: number; // Scarcity: min cleaners compatibili tra i task del gruppo
 }
 
 export interface Phase2Params {
@@ -260,7 +263,44 @@ export function runPhase2Algorithm(
     cleanerTotalCleaningTime.set(c.cleanerId, 0);
   });
   
-  const sortedGroups = [...groups].sort((a, b) => b.score - a.score);
+  // Pre-calcola scarcity per ogni task (quanti cleaners compatibili)
+  const taskScarcity = new Map<number, number>();
+  tasksMap.forEach((task, taskId) => {
+    let compatibleCount = 0;
+    for (const cleaner of cleaners) {
+      const result = isCleanerCompatible(cleaner, task);
+      if (result.compatible) compatibleCount++;
+    }
+    taskScarcity.set(taskId, compatibleCount);
+  });
+  
+  // Calcola minCompatibleCleaners per ogni gruppo
+  for (const group of groups) {
+    const scarcities = group.taskIds.map(id => taskScarcity.get(id) ?? cleaners.length);
+    group.minCompatibleCleaners = Math.min(...scarcities);
+  }
+  
+  // Ordina gruppi: OT first, poi per scarcity (più raro prima), poi per score
+  // Questo garantisce che:
+  // 1. Le straordinarie vengano processate prima
+  // 2. I task rari (pochi cleaners compatibili) vengano assegnati prima
+  const sortedGroups = [...groups].sort((a, b) => {
+    // Prima controlla se contengono straordinaria
+    const aHasOT = a.hasStraordinaria === true;
+    const bHasOT = b.hasStraordinaria === true;
+    
+    // OT first
+    if (aHasOT && !bHasOT) return -1;
+    if (!aHasOT && bHasOT) return 1;
+    
+    // Poi per scarcity (più raro prima, minCompatibleCleaners basso = priorità alta)
+    const aScarcity = a.minCompatibleCleaners ?? cleaners.length;
+    const bScarcity = b.minCompatibleCleaners ?? cleaners.length;
+    if (aScarcity !== bScarcity) return aScarcity - bScarcity;
+    
+    // Infine per score
+    return b.score - a.score;
+  });
   
   let groupsAssigned = 0;
   let groupsUnassigned = 0;
@@ -290,20 +330,54 @@ export function runPhase2Algorithm(
       const groupTotalCleaningTime = tasks.reduce((sum, t) => sum + t.cleaningTime, 0);
       const groupStraordinariaCount = tasks.filter(t => t.straordinaria).length;
       
-      // Pre-check: Groups with straordinaria must contain exactly 1 task (the straordinaria itself)
-      // This ensures straordinaria is never grouped with other tasks during Phase 1 grouping
+      // Pre-check: valida gruppi con straordinaria
+      // Regole: OT lunga (≥4h) → solo 1 task, OT corta (<4h) → max 2 task (OT + 1 extra ≤2h)
       if (groupHasStraordinaria && tasks.length > 1) {
-        // This group mixes straordinaria with other tasks - should not happen with proper Phase 1
-        // Skip this group as it violates straordinaria isolation rule
-        events.push({
-          eventType: 'PHASE2_GROUP_REJECTED',
-          payload: {
-            group_tasks: currentTaskIds,
-            reason: 'STRAORDINARIA_MIXED_WITH_OTHER_TASKS'
+        const otTask = tasks.find(t => t.straordinaria);
+        const otDuration = otTask?.cleaningTime ?? 60;
+        const isLongOT = otDuration >= STRAORDINARIA_LONG_THRESHOLD_MIN;
+        
+        if (isLongOT) {
+          // OT lunga non può avere altri task
+          events.push({
+            eventType: 'PHASE2_GROUP_REJECTED',
+            payload: {
+              group_tasks: currentTaskIds,
+              reason: 'LONG_STRAORDINARIA_MUST_BE_ALONE',
+              ot_duration: otDuration
+            }
+          });
+          groupsUnassigned++;
+          break;
+        } else if (tasks.length > 2) {
+          // OT corta: max 2 task totali
+          events.push({
+            eventType: 'PHASE2_GROUP_REJECTED',
+            payload: {
+              group_tasks: currentTaskIds,
+              reason: 'SHORT_STRAORDINARIA_MAX_2_TASKS',
+              ot_duration: otDuration
+            }
+          });
+          groupsUnassigned++;
+          break;
+        } else {
+          // OT corta + 1 task extra: verifica che extra sia ≤2h
+          const extraTask = tasks.find(t => !t.straordinaria);
+          if (extraTask && extraTask.cleaningTime > STRAORDINARIA_EXTRA_TASK_MAX_MIN) {
+            events.push({
+              eventType: 'PHASE2_GROUP_REJECTED',
+              payload: {
+                group_tasks: currentTaskIds,
+                reason: 'EXTRA_TASK_TOO_LONG',
+                extra_task_duration: extraTask.cleaningTime
+              }
+            });
+            groupsUnassigned++;
+            break;
           }
-        });
-        groupsUnassigned++;
-        break; // Exit the while loop for this group
+          // Gruppo valido: OT corta + 1 task ≤2h
+        }
       }
       
       for (const cleaner of cleaners) {

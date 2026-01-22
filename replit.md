@@ -57,6 +57,24 @@ Preferred communication style: Simple, everyday language.
   - **Parameters**: baseUnassignedPenalty=1500, straordinariaExtraPenalty=2500, progressiveMultiplier=0.5
   - **Example progression**: 1st task: 1500, 2nd: 2250, 3rd: 3000, etc.
   - **Straordinaria penalty**: Uses (base + extra) = 4000 as base, same progressive multiplier
+  - **Swap Mechanism**: When insertion fails, tries to swap out a lower-priority task to make room
+  - **Swap Logic**: Accepts if netGain > 0 (penalty avoided > loss from removed task)
+
+## OT (Straordinaria) Handling Rules
+- **Long OT (≥4h)**: Must be assigned alone, no grouping with other tasks
+- **Short OT (<4h)**: Can have max 1 extra task with duration ≤2h
+- **OT-first Ordering**: Groups with OT are processed first in Phase 2
+- **Scarcity Ordering**: Tasks with fewer compatible cleaners are processed first
+
+## Phase 1 Group Filtering
+- **Min Group Size**: Groups must have at least 2 tasks (except OT single groups)
+- **OT Single Groups**: Only straordinarie can form valid single-task groups
+- **Isolated Normal Tasks**: Deferred to Phase 4 for recovery attempts
+
+## Metrics & Logging
+- **Final Metrics**: Total/assigned/unassigned counts, OT breakdown, reasons breakdown
+- **Compatible Cleaners**: Each unassigned task shows how many cleaners were compatible
+- **OT Warnings**: Detailed log for unassigned straordinarie with reasons and compatible cleaner count
 - **Apply to Production**: Optional step to copy results from `optimizer.optimizer_assignment` to `daily_assignments_current`.
 - **UI Integration**: "Auto-Assegna" button in timeline header triggers optimizer with visual progress feedback.
 - **Fallback**: Old Python script (`assign_eo.py`) preserved at `/api/run-optimizer` endpoint.

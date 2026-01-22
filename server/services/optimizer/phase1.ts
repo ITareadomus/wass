@@ -46,6 +46,8 @@ export type CandidateGroup = {
   score: number;
   isSingle?: boolean;
   reason?: string;
+  hasStraordinaria?: boolean;
+  isLongStraordinaria?: boolean;
 };
 
 export type Phase1Event = {
@@ -197,33 +199,58 @@ export function generateCandidateGroups(tasks: TaskInput[], params: Phase1Params
 
     groupsAddedForSeed = groupMap.size - countBefore;
 
+    // Solo straordinarie possono essere gruppi singoli in Phase 1
+    // I task normali isolati vanno a Phase 4 per recovery
+    const isStraordinariaSeed = seed.straordinaria === true;
+    const cleaningTime = seed.cleaningTimeMinutes ?? 60;
+    const isLongOT = isStraordinariaSeed && cleaningTime >= 240;
+    
     if (groupsAddedForSeed === 0 && params.createSingleGroups) {
       const singleKey = String(seed.taskId);
       if (!groupMap.has(singleKey)) {
-        const singleScore = 15;
-        groupMap.set(singleKey, {
-          taskIds: [seed.taskId],
-          logisticCodes: [seed.logisticCode],
-          zone: seedZone,
-          seedTaskId: seed.taskId,
-          seedLogisticCode: seed.logisticCode,
-          avgTravelMin: 0,
-          maxTravelMin: 0,
-          score: singleScore,
-          isSingle: true,
-          reason: "ISOLATED_NO_NEIGHBORS_UNDER_20"
-        });
-        singleGroupCount++;
-        events.push({
-          eventType: "PHASE1_GROUP_SINGLE_CREATED",
-          payload: {
-            tasks: [seed.taskId],
-            logistic_codes: [seed.logisticCode],
+        // Straordinarie possono essere gruppi singoli (validi)
+        // Task normali isolati → Phase 4 li gestirà
+        if (isStraordinariaSeed) {
+          const singleScore = isLongOT ? 50 : 35; // Score più alto per OT singole
+          groupMap.set(singleKey, {
+            taskIds: [seed.taskId],
+            logisticCodes: [seed.logisticCode],
             zone: seedZone,
+            seedTaskId: seed.taskId,
+            seedLogisticCode: seed.logisticCode,
+            avgTravelMin: 0,
+            maxTravelMin: 0,
             score: singleScore,
-            reason: "ISOLATED_NO_NEIGHBORS_UNDER_20"
-          }
-        });
+            isSingle: true,
+            reason: "STRAORDINARIA_SINGLE_VALID",
+            hasStraordinaria: true,
+            isLongStraordinaria: isLongOT
+          });
+          singleGroupCount++;
+          events.push({
+            eventType: "PHASE1_GROUP_SINGLE_OT_CREATED",
+            payload: {
+              tasks: [seed.taskId],
+              logistic_codes: [seed.logisticCode],
+              zone: seedZone,
+              score: singleScore,
+              reason: "STRAORDINARIA_SINGLE_VALID",
+              is_long_ot: isLongOT
+            }
+          });
+        } else {
+          // Task normale isolato: loggalo ma NON creare il gruppo singolo
+          // Phase 4 gestirà questo task
+          events.push({
+            eventType: "PHASE1_TASK_ISOLATED_DEFER_TO_PHASE4",
+            payload: {
+              task_id: seed.taskId,
+              logistic_code: seed.logisticCode,
+              zone: seedZone,
+              reason: "ISOLATED_NO_NEIGHBORS_UNDER_20_NORMAL_TASK"
+            }
+          });
+        }
       }
     }
   }
@@ -256,6 +283,33 @@ function addGroup(
 ): void {
   if (groupTasks.length < 2 || groupTasks.length > 4) return;
 
+  // Regola OT: riduci gruppi con straordinaria a forma valida
+  const straordinariaTask = groupTasks.find(t => t.straordinaria === true);
+  if (straordinariaTask) {
+    const otCleaningTime = straordinariaTask.cleaningTimeMinutes ?? 60;
+    const isLongOT = otCleaningTime >= 240; // ≥4h
+    
+    if (isLongOT) {
+      // OT lunga: può stare solo da sola, non creare gruppi multi-task
+      return;
+    } else {
+      // OT corta (<4h): può avere max 1 task extra di max 2h
+      const otherTasks = groupTasks.filter(t => t.taskId !== straordinariaTask.taskId);
+      if (otherTasks.length > 1) {
+        // Troppi task extra, non valido
+        return;
+      }
+      if (otherTasks.length === 1) {
+        const extraTaskTime = otherTasks[0].cleaningTimeMinutes ?? 60;
+        if (extraTaskTime > 120) {
+          // Task extra troppo lungo (>2h)
+          return;
+        }
+      }
+      // Gruppo valido: OT corta + max 1 task ≤2h
+    }
+  }
+
   const ids = groupTasks.map(t => t.taskId).sort((a, b) => a - b);
   const key = ids.join("-");
   if (groupMap.has(key)) return;
@@ -266,9 +320,9 @@ function addGroup(
   const sameZone = zones.size === 1;
   
   // Check if any task in the group is a straordinaria and determine if it's long (>=4h)
-  const straordinariaTask = groupTasks.find(t => t.straordinaria === true);
-  const hasStraordinaria = straordinariaTask !== undefined;
-  const isLongStraordinaria = hasStraordinaria && (straordinariaTask.cleaningTimeMinutes ?? 60) >= 240;
+  const otTask = groupTasks.find(t => t.straordinaria === true);
+  const hasStraordinaria = otTask !== undefined;
+  const isLongStraordinaria = hasStraordinaria && (otTask.cleaningTimeMinutes ?? 60) >= 240;
 
   const score = scoreGroup(avgTravelMin, maxTravelMin, sameZone, groupTasks.length, totalTravelMin, { hasStraordinaria, isLong: isLongStraordinaria });
 
@@ -283,7 +337,9 @@ function addGroup(
     seedLogisticCode: seed.logisticCode,
     avgTravelMin,
     maxTravelMin,
-    score
+    score,
+    hasStraordinaria,
+    isLongStraordinaria
   });
 }
 
