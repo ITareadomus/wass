@@ -11,14 +11,20 @@ export interface Phase4Params {
   maxInsertionAttempts: number;
   underfilledBonus: number;
   singleAssignmentPenalty: number;
-  unassignedOvertimePenalty: number;
+  // Penalità per task non assegnati (sistema progressivo)
+  baseUnassignedPenalty: number;       // Penalità base per ogni task normale non assegnato
+  straordinariaExtraPenalty: number;   // Penalità extra per straordinarie non assegnate
+  progressiveMultiplier: number;       // Incremento penalità per ogni task successivo non assegnato
 }
 
 export const DEFAULT_PHASE4_PARAMS: Phase4Params = {
   maxInsertionAttempts: 1000,
   underfilledBonus: 5,
   singleAssignmentPenalty: 20,
-  unassignedOvertimePenalty: 2000
+  // Penalità per task non assegnati
+  baseUnassignedPenalty: 1500,         // Ogni task non assegnato costa 1500
+  straordinariaExtraPenalty: 2500,     // Extra per OT → totale 4000
+  progressiveMultiplier: 0.5           // 1° = 1500, 2° = 2250, 3° = 3000...
 };
 
 export interface CleanerSchedule {
@@ -71,6 +77,9 @@ export interface Phase4Result {
     remainUnassignedCount: number;
     iterationsUsed: number;
     coverageImprovement: number;
+    unassignedPenalty: number;
+    normalUnassignedCount: number;
+    straordinariaUnassignedCount: number;
   };
 }
 
@@ -275,6 +284,57 @@ function trySingleAssignment(
   return { success: false };
 }
 
+interface UnassignedPenaltyResult {
+  totalPenalty: number;
+  normalCount: number;
+  straordinariaCount: number;
+  normalPenalty: number;
+  straordinariaPenalty: number;
+}
+
+function calculateUnassignedPenalty(
+  taskResults: Phase4TaskResult[],
+  tasksMap: Map<number, TaskForScheduling>,
+  params: Phase4Params
+): UnassignedPenaltyResult {
+  const unassignedTasks = taskResults.filter(r => r.status === 'remain_unassigned');
+  
+  let normalCount = 0;
+  let straordinariaCount = 0;
+  
+  for (const result of unassignedTasks) {
+    const task = tasksMap.get(result.taskId);
+    if (task?.straordinaria) {
+      straordinariaCount++;
+    } else {
+      normalCount++;
+    }
+  }
+  
+  // Penalità progressiva: ogni task successivo costa di più
+  // Formula: base * (1 + multiplier * (k-1)) per il k-esimo task
+  // Es: 1500, 2250, 3000, 3750... con multiplier=0.5
+  let normalPenalty = 0;
+  for (let k = 1; k <= normalCount; k++) {
+    normalPenalty += params.baseUnassignedPenalty * (1 + params.progressiveMultiplier * (k - 1));
+  }
+  
+  // Straordinarie: base + extra, con progressione
+  let straordinariaPenalty = 0;
+  const straordinariaBase = params.baseUnassignedPenalty + params.straordinariaExtraPenalty;
+  for (let k = 1; k <= straordinariaCount; k++) {
+    straordinariaPenalty += straordinariaBase * (1 + params.progressiveMultiplier * (k - 1));
+  }
+  
+  return {
+    totalPenalty: normalPenalty + straordinariaPenalty,
+    normalCount,
+    straordinariaCount,
+    normalPenalty,
+    straordinariaPenalty
+  };
+}
+
 export function runPhase4Algorithm(
   workDate: string,
   initialSchedules: CleanerSchedule[],
@@ -457,9 +517,7 @@ export function runPhase4Algorithm(
         
         remainUnassignedCount++;
         
-        // Track unassigned straordinarie with higher severity
         const isStraordinaria = task.straordinaria === true;
-        const penaltyApplied = isStraordinaria ? params.unassignedOvertimePenalty : 0;
         
         events.push({
           eventType: 'PHASE4_TASK_REMAIN_UNASSIGNED',
@@ -468,8 +526,7 @@ export function runPhase4Algorithm(
             logistic_code: task.logisticCode,
             original_reason: unassigned.reasonCode,
             insertion_attempts: iterationsUsed,
-            is_straordinaria: isStraordinaria,
-            overtime_penalty: penaltyApplied
+            is_straordinaria: isStraordinaria
           }
         });
       }
@@ -480,6 +537,9 @@ export function runPhase4Algorithm(
   const phase4AssignedCount = schedules.reduce((sum, s) => sum + s.tasks.length, 0);
   const coverageImprovement = phase4AssignedCount - phase3AssignedCount;
   
+  // Calcola penalità totale per task non assegnati (penalità progressiva)
+  const unassignedPenalty = calculateUnassignedPenalty(taskResults, tasksMap, params);
+  
   events.push({
     eventType: 'PHASE4_COMPLETED',
     payload: {
@@ -489,7 +549,10 @@ export function runPhase4Algorithm(
       single_assigned_count: singleAssignedCount,
       remain_unassigned_count: remainUnassignedCount,
       coverage_improvement: coverageImprovement,
-      iterations_used: iterationsUsed
+      iterations_used: iterationsUsed,
+      unassigned_penalty: unassignedPenalty.totalPenalty,
+      normal_unassigned_count: unassignedPenalty.normalCount,
+      straordinaria_unassigned_count: unassignedPenalty.straordinariaCount
     }
   });
   
@@ -503,7 +566,10 @@ export function runPhase4Algorithm(
       singleAssignedCount,
       remainUnassignedCount,
       iterationsUsed,
-      coverageImprovement
+      coverageImprovement,
+      unassignedPenalty: unassignedPenalty.totalPenalty,
+      normalUnassignedCount: unassignedPenalty.normalCount,
+      straordinariaUnassignedCount: unassignedPenalty.straordinariaCount
     }
   };
 }
