@@ -11,12 +11,14 @@ export interface Phase4Params {
   maxInsertionAttempts: number;
   underfilledBonus: number;
   singleAssignmentPenalty: number;
+  unassignedOvertimePenalty: number;
 }
 
 export const DEFAULT_PHASE4_PARAMS: Phase4Params = {
   maxInsertionAttempts: 1000,
   underfilledBonus: 5,
-  singleAssignmentPenalty: 20
+  singleAssignmentPenalty: 20,
+  unassignedOvertimePenalty: 2000
 };
 
 export interface CleanerSchedule {
@@ -299,10 +301,17 @@ export function runPhase4Algorithm(
     }
   });
   
+  // Sort unassigned tasks: straordinarie first, then by priority (EO, HP, LP)
   const sortedUnassigned = [...unassignedTasks].sort((a, b) => {
     const taskA = tasksMap.get(a.taskId);
     const taskB = tasksMap.get(b.taskId);
     
+    // Straordinarie get highest priority (0 = straordinaria, 1 = normal)
+    const straordA = taskA?.straordinaria ? 0 : 1;
+    const straordB = taskB?.straordinaria ? 0 : 1;
+    if (straordA !== straordB) return straordA - straordB;
+    
+    // Then by priority type
     const priorityOrder: Record<string, number> = { 'EO': 0, 'HP': 1, 'LP': 2 };
     const priorityA = priorityOrder[taskA?.priorityType || ''] ?? 3;
     const priorityB = priorityOrder[taskB?.priorityType || ''] ?? 3;
@@ -448,13 +457,19 @@ export function runPhase4Algorithm(
         
         remainUnassignedCount++;
         
+        // Track unassigned straordinarie with higher severity
+        const isStraordinaria = task.straordinaria === true;
+        const penaltyApplied = isStraordinaria ? params.unassignedOvertimePenalty : 0;
+        
         events.push({
           eventType: 'PHASE4_TASK_REMAIN_UNASSIGNED',
           payload: {
             task_id: task.taskId,
             logistic_code: task.logisticCode,
             original_reason: unassigned.reasonCode,
-            insertion_attempts: iterationsUsed
+            insertion_attempts: iterationsUsed,
+            is_straordinaria: isStraordinaria,
+            overtime_penalty: penaltyApplied
           }
         });
       }

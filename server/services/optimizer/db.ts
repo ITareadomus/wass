@@ -36,7 +36,9 @@ export async function loadTasksForDate(workDate: string): Promise<TaskInput[]> {
       logistic_code as "logisticCode",
       lat,
       lng,
-      priority
+      priority,
+      straordinaria,
+      COALESCE(cleaning_time, 60) as "cleaningTimeMinutes"
     FROM daily_containers
     WHERE work_date = $1
       AND lat IS NOT NULL 
@@ -49,7 +51,9 @@ export async function loadTasksForDate(workDate: string): Promise<TaskInput[]> {
     logisticCode: row.logisticCode,
     lat: parseFloat(row.lat),
     lng: parseFloat(row.lng),
-    priority: row.priority
+    priority: row.priority,
+    straordinaria: row.straordinaria === true,
+    cleaningTimeMinutes: parseInt(row.cleaningTimeMinutes, 10) || 60
   }));
 }
 

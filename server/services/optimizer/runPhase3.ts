@@ -81,7 +81,8 @@ async function loadTasksForScheduling(workDate: string): Promise<Map<number, Tas
       checkout_time,
       checkin_time,
       checkin_date,
-      priority
+      priority,
+      straordinaria
     FROM daily_containers
     WHERE work_date = $1
       AND lat IS NOT NULL 
@@ -105,7 +106,8 @@ async function loadTasksForScheduling(workDate: string): Promise<Map<number, Tas
       checkoutTime: row.checkout_time,
       checkinTime: row.checkin_time,
       checkinDate: checkinDateStr,
-      priorityType: mapPriorityType(row.priority)
+      priorityType: mapPriorityType(row.priority),
+      straordinaria: row.straordinaria === true
     });
   }
   return map;

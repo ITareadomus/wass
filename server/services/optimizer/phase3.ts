@@ -11,6 +11,7 @@ export interface TaskForScheduling {
   checkinTime: string | null;
   checkinDate: string | null;
   priorityType: Priority | null;
+  straordinaria?: boolean;
 }
 
 export interface CleanerForScheduling {
