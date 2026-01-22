@@ -280,3 +280,52 @@ export async function deletePhase0Data(runId: string): Promise<{ decisionsDelete
   };
 }
 
+export interface CleanerTaskRules {
+  standard_apt: boolean;
+  premium_apt: boolean;
+  straordinario_apt: boolean;
+}
+
+export interface TaskTypesByCleaner {
+  [role: string]: CleanerTaskRules;
+}
+
+export interface ApartmentTypesConfig {
+  standard_apt?: string[];
+  premium_apt?: string[];
+  formatore_apt?: string[];
+}
+
+export interface CleanerTaskRulesConfig {
+  task_types: TaskTypesByCleaner;
+  apartment_types: ApartmentTypesConfig;
+}
+
+export async function loadCleanerTaskRules(): Promise<CleanerTaskRulesConfig | null> {
+  try {
+    const result = await pool.query(`
+      SELECT value FROM app_settings WHERE key = 'app_settings'
+    `);
+    
+    if (result.rows.length === 0) {
+      console.log('[DB] app_settings non trovate, regole role-aptType non applicate');
+      return null;
+    }
+    
+    const settings = result.rows[0].value;
+    
+    if (!settings?.task_types) {
+      console.log('[DB] task_types non configurate in app_settings');
+      return null;
+    }
+    
+    return {
+      task_types: settings.task_types || {},
+      apartment_types: settings.apartment_types || {}
+    };
+  } catch (error) {
+    console.error('[DB] Errore caricamento regole task_types:', error);
+    return null;
+  }
+}
+

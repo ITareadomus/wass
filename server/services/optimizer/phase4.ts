@@ -135,8 +135,8 @@ function checkHardConstraints(
   task: TaskForScheduling,
   tasksMap: Map<number, TaskForScheduling>
 ): HardConstraintResult {
-  // 1. Verifica straordinaria
-  if (task.straordinaria && schedule.canDoStraordinaria === false) {
+  // 1. Verifica straordinaria (fail-closed: !== true invece di === false)
+  if (task.straordinaria && schedule.canDoStraordinaria !== true) {
     return { compatible: false, reason: 'CANNOT_DO_STRAORDINARIA' };
   }
   
@@ -164,6 +164,14 @@ function checkHardConstraints(
       // Con OT corta, max 1 task extra e deve essere ≤2h
       if (existingNonOTs.length > 1) {
         return { compatible: false, reason: 'OT_SHORT_MAX_1_EXTRA' };
+      }
+      
+      // FIX SIMMETRICO: se c'è 1 task non-OT, verificare che sia ≤2h
+      if (existingNonOTs.length === 1) {
+        const extraDur = existingNonOTs[0]?.cleaningTimeMinutes ?? 60;
+        if (extraDur > 120) {
+          return { compatible: false, reason: 'EXTRA_TASK_EXCEEDS_2H' };
+        }
       }
     }
   }
