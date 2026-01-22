@@ -236,8 +236,8 @@ export function findMostExpensiveTask(
 }
 
 // Straordinaria constraints
-const STRAORDINARIA_LONG_THRESHOLD_MIN = 240; // 4 hours - cleaner can only do this task
-const STRAORDINARIA_EXTRA_TASK_MAX_MIN = 120; // 2 hours - max duration of extra task when straordinaria < 4h
+const STRAORDINARIA_LONG_THRESHOLD_MIN = 360; // 6 hours - cleaner can only do this task
+const STRAORDINARIA_EXTRA_TASK_MAX_MIN = 120; // 2 hours - max duration of extra task when straordinaria < 6h
 
 export function runPhase2Algorithm(
   groups: GroupCandidate[],
@@ -331,7 +331,7 @@ export function runPhase2Algorithm(
       const groupStraordinariaCount = tasks.filter(t => t.straordinaria).length;
       
       // Pre-check: valida gruppi con straordinaria
-      // Regole: OT lunga (≥4h) → solo 1 task, OT corta (<4h) → max 2 task (OT + 1 extra ≤2h)
+      // Regole: OT lunga (≥6h) → solo 1 task, OT corta (<6h) → max 2 task (OT + 1 extra ≤2h)
       // IMPORTANTE: un gruppo può avere al massimo 1 OT
       // Invece di reject, droppa task fino a forma valida
       if (groupHasStraordinaria && tasks.length > 1) {
@@ -469,7 +469,7 @@ export function runPhase2Algorithm(
         
         // Rule 1: If cleaner already has straordinaria, they cannot take any more tasks
         if (hasStraordinaria) {
-          // Exception: If existing straordinaria < 4h, can add exactly 1 task with duration <= 2h
+          // Exception: If existing straordinaria < 6h, can add exactly 1 task with duration <= 2h
           if (straordinariaDuration < STRAORDINARIA_LONG_THRESHOLD_MIN && load === 1) {
             // Can add 1 more task if: exactly 1 task, no straordinaria, and duration <= 2h
             if (tasks.length !== 1 || groupHasStraordinaria || groupTotalCleaningTime > STRAORDINARIA_EXTRA_TASK_MAX_MIN) {
@@ -482,7 +482,7 @@ export function runPhase2Algorithm(
           }
         }
         
-        // Rule 2: If this group has straordinaria >= 4h, cleaner must be empty (no other tasks allowed)
+        // Rule 2: If this group has straordinaria >= 6h, cleaner must be empty (no other tasks allowed)
         if (groupHasStraordinaria && groupStraordinariaDuration >= STRAORDINARIA_LONG_THRESHOLD_MIN) {
           if (load > 0) {
             incompatibleReasons.push({ cleanerId: cleaner.cleanerId, reasons: ['STRAORDINARIA_LONG_REQUIRES_EMPTY_CLEANER'] });
@@ -490,17 +490,17 @@ export function runPhase2Algorithm(
           }
         }
         
-        // Rule 3: If cleaner has non-straordinaria tasks, can only add straordinaria < 4h 
+        // Rule 3: If cleaner has non-straordinaria tasks, can only add straordinaria < 6h 
         // if the existing task is exactly 1 and its duration <= 2h
         if (groupHasStraordinaria && load > 0 && !hasStraordinaria) {
           const existingCleaningTime = cleanerTotalCleaningTime.get(cleaner.cleanerId) || 0;
-          // Allow only if: exactly 1 existing task, its duration <= 2h, and straordinaria < 4h
+          // Allow only if: exactly 1 existing task, its duration <= 2h, and straordinaria < 6h
           if (load !== 1 || existingCleaningTime > STRAORDINARIA_EXTRA_TASK_MAX_MIN || 
               groupStraordinariaDuration >= STRAORDINARIA_LONG_THRESHOLD_MIN) {
             incompatibleReasons.push({ cleanerId: cleaner.cleanerId, reasons: ['CANNOT_ADD_STRAORDINARIA_TO_EXISTING_TASKS'] });
             continue;
           }
-          // OK: Cleaner has 1 task <= 2h and new straordinaria is < 4h - allowed
+          // OK: Cleaner has 1 task <= 2h and new straordinaria is < 6h - allowed
         }
         
         const result = isCleanerCompatibleWithGroup(cleaner, tasks);

@@ -203,7 +203,7 @@ export function generateCandidateGroups(tasks: TaskInput[], params: Phase1Params
     // I task normali isolati vanno a Phase 4 per recovery
     const isStraordinariaSeed = seed.straordinaria === true;
     const cleaningTime = seed.cleaningTimeMinutes ?? 60;
-    const isLongOT = isStraordinariaSeed && cleaningTime >= 240;
+    const isLongOT = isStraordinariaSeed && cleaningTime >= 360;
     
     if (groupsAddedForSeed === 0 && params.createSingleGroups) {
       const singleKey = String(seed.taskId);
@@ -287,13 +287,13 @@ function addGroup(
   const straordinariaTask = groupTasks.find(t => t.straordinaria === true);
   if (straordinariaTask) {
     const otCleaningTime = straordinariaTask.cleaningTimeMinutes ?? 60;
-    const isLongOT = otCleaningTime >= 240; // ≥4h
+    const isLongOT = otCleaningTime >= 360; // ≥6h
     
     if (isLongOT) {
       // OT lunga: può stare solo da sola, non creare gruppi multi-task
       return;
     } else {
-      // OT corta (<4h): può avere max 1 task extra di max 2h
+      // OT corta (<6h): può avere max 1 task extra di max 2h
       const otherTasks = groupTasks.filter(t => t.taskId !== straordinariaTask.taskId);
       if (otherTasks.length > 1) {
         // Troppi task extra, non valido
@@ -319,10 +319,10 @@ function addGroup(
   const zones = new Set(groupTasks.map(t => t.zone));
   const sameZone = zones.size === 1;
   
-  // Check if any task in the group is a straordinaria and determine if it's long (>=4h)
+  // Check if any task in the group is a straordinaria and determine if it's long (>=6h)
   const otTask = groupTasks.find(t => t.straordinaria === true);
   const hasStraordinaria = otTask !== undefined;
-  const isLongStraordinaria = hasStraordinaria && (otTask.cleaningTimeMinutes ?? 60) >= 240;
+  const isLongStraordinaria = hasStraordinaria && (otTask.cleaningTimeMinutes ?? 60) >= 360;
 
   const score = scoreGroup(avgTravelMin, maxTravelMin, sameZone, groupTasks.length, totalTravelMin, { hasStraordinaria, isLong: isLongStraordinaria });
 
