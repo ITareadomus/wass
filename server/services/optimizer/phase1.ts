@@ -305,8 +305,15 @@ function addGroup(
           // Task extra troppo lungo (>2h)
           return;
         }
+        
+        // Check distanza tra OT corta e task extra: max 25 min
+        const travelToExtra = estimateTravelMinutes(straordinariaTask, otherTasks[0]);
+        if (travelToExtra > 25) {
+          // Task extra troppo distante (>25 min)
+          return;
+        }
       }
-      // Gruppo valido: OT corta + max 1 task ≤2h
+      // Gruppo valido: OT corta + max 1 task ≤2h e ≤25 min travel
     }
   }
 

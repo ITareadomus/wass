@@ -166,11 +166,21 @@ function checkHardConstraints(
         return { compatible: false, reason: 'OT_SHORT_MAX_1_EXTRA' };
       }
       
-      // Se c'è già 1 task extra, verifica che sia ≤2h (120 min)
+      // Se c'è già 1 task extra, verifica che sia ≤2h (120 min) e ≤25 min di travel
       if (existingNonOTs.length === 1) {
-        const extraDur = existingNonOTs[0]?.cleaningTimeMinutes ?? 60;
+        const extraTask = existingNonOTs[0]!;
+        const extraDur = extraTask.cleaningTimeMinutes ?? 60;
         if (extraDur > 120) {
           return { compatible: false, reason: 'EXTRA_TASK_EXCEEDS_2H' };
+        }
+        
+        // Check distanza tra OT corta (nuovo task) e task extra esistente
+        const travelToExtra = estimateTravelMinutes(
+          task as TaskInput,
+          extraTask as TaskInput
+        );
+        if (travelToExtra > 25) {
+          return { compatible: false, reason: 'OT_SHORT_EXTRA_TOO_FAR' };
         }
       }
     }
@@ -202,6 +212,15 @@ function checkHardConstraints(
     const newTaskDuration = task.cleaningTimeMinutes || 60;
     if (newTaskDuration > 120) {
       return { compatible: false, reason: 'EXTRA_TASK_EXCEEDS_2H' };
+    }
+    
+    // Check distanza tra OT corta esistente e nuovo task extra
+    const travelToOT = estimateTravelMinutes(
+      task as TaskInput,
+      otTask as TaskInput
+    );
+    if (travelToOT > 25) {
+      return { compatible: false, reason: 'OT_SHORT_EXTRA_TOO_FAR' };
     }
   }
   
