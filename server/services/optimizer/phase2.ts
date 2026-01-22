@@ -236,8 +236,8 @@ export function findMostExpensiveTask(
 }
 
 // Straordinaria constraints
-const STRAORDINARIA_LONG_THRESHOLD_MIN = 240; // 4 hours - cleaner can only do this task
-const STRAORDINARIA_EXTRA_TASK_MAX_MIN = 120; // 2 hours - max duration of extra task when straordinaria < 4h
+const STRAORDINARIA_LONG_THRESHOLD_MIN = 360; // 6 hours - cleaner can only do this task
+const STRAORDINARIA_EXTRA_TASK_MAX_MIN = 120; // 2 hours - max duration of extra task when straordinaria < 6h
 
 export function runPhase2Algorithm(
   groups: GroupCandidate[],

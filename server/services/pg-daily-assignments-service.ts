@@ -60,12 +60,17 @@ export class PgDailyAssignmentsService {
       await query(`
         CREATE TABLE IF NOT EXISTS cleaner_aliases (
           cleaner_id INTEGER PRIMARY KEY,
-          alias VARCHAR(100) NOT NULL,
+          alias VARCHAR(100),
           name VARCHAR(255),
           lastname VARCHAR(255),
+          can_do_straordinaria BOOLEAN DEFAULT false,
           created_at TIMESTAMP DEFAULT NOW(),
           updated_at TIMESTAMP DEFAULT NOW()
         )
+      `);
+      // Ensure can_do_straordinaria column exists (migration for existing tables)
+      await query(`
+        ALTER TABLE cleaner_aliases ADD COLUMN IF NOT EXISTS can_do_straordinaria BOOLEAN DEFAULT false
       `);
       // Create selected_cleaners_revisions table if not exists
       await query(`
@@ -1721,19 +1726,22 @@ export class PgDailyAssignmentsService {
     try {
       await client.query('BEGIN');
 
-      // Load permanent aliases from cleaner_aliases table
-      const permanentAliases = await client.query(`
-        SELECT cleaner_id, alias, name, lastname FROM cleaner_aliases
+      // Load permanent data from cleaner_aliases table (alias + can_do_straordinaria)
+      const permanentData = await client.query(`
+        SELECT cleaner_id, alias, can_do_straordinaria FROM cleaner_aliases
       `);
-      const aliasMap = new Map(permanentAliases.rows.map((r: any) => [r.cleaner_id, r.alias]));
+      const aliasMap = new Map(permanentData.rows.map((r: any) => [r.cleaner_id, r.alias]));
+      const straordinariaMap = new Map(permanentData.rows.map((r: any) => [r.cleaner_id, r.can_do_straordinaria || false]));
 
       // Delete existing cleaners for this date
       await client.query('DELETE FROM cleaners WHERE work_date = $1', [workDate]);
 
-      // Insert new cleaners (alias column kept for backward compat, but read from cleaner_aliases)
+      // Insert new cleaners (alias and can_do_straordinaria from permanent table)
       for (const cleaner of cleaners) {
         // Use alias from cleaner_aliases if exists, otherwise from cleaner object
         const alias = aliasMap.get(cleaner.id) || cleaner.alias || null;
+        // Use can_do_straordinaria from cleaner_aliases (permanent) if exists
+        const canDoStraordinaria = straordinariaMap.get(cleaner.id) || false;
         
         // If cleaner has a new alias, save it to cleaner_aliases (permanent)
         if (cleaner.alias && !aliasMap.has(cleaner.id)) {
@@ -1766,7 +1774,7 @@ export class PgDailyAssignmentsService {
           cleaner.preferred_customers || [],
           cleaner.telegram_id || null,
           cleaner.start_time ?? '10:00',
-          cleaner.can_do_straordinaria || false,
+          canDoStraordinaria, // Use permanent value from cleaner_aliases
           alias // Still write to cleaners.alias for backward compat
         ]);
       }
@@ -1923,6 +1931,46 @@ export class PgDailyAssignmentsService {
     } catch (error) {
       console.error(`❌ PG: Errore nella rimozione alias per cleaner ${cleanerId}:`, error);
       return false;
+    }
+  }
+
+  // ==================== STRAORDINARIA PERMISSIONS (PERMANENT) ====================
+
+  /**
+   * Set can_do_straordinaria flag for a cleaner (permanent, date-independent)
+   * This persists even when cleaners are re-extracted from ADAM
+   */
+  async setCleanerStraordinariaPermission(cleanerId: number, canDoStraordinaria: boolean, name?: string, lastname?: string): Promise<boolean> {
+    try {
+      await query(`
+        INSERT INTO cleaner_aliases (cleaner_id, can_do_straordinaria, name, lastname, updated_at)
+        VALUES ($1, $2, $3, $4, NOW())
+        ON CONFLICT (cleaner_id) 
+        DO UPDATE SET can_do_straordinaria = $2, 
+                      name = COALESCE($3, cleaner_aliases.name), 
+                      lastname = COALESCE($4, cleaner_aliases.lastname), 
+                      updated_at = NOW()
+      `, [cleanerId, canDoStraordinaria, name || null, lastname || null]);
+      console.log(`✅ PG: can_do_straordinaria=${canDoStraordinaria} salvato per cleaner ${cleanerId}`);
+      return true;
+    } catch (error) {
+      console.error(`❌ PG: Errore nel salvataggio can_do_straordinaria per cleaner ${cleanerId}:`, error);
+      return false;
+    }
+  }
+
+  /**
+   * Get all cleaners with straordinaria permission
+   */
+  async getCleanersWithStraordinariaPermission(): Promise<number[]> {
+    try {
+      const result = await query(
+        'SELECT cleaner_id FROM cleaner_aliases WHERE can_do_straordinaria = true'
+      );
+      return result.rows.map((r: any) => r.cleaner_id);
+    } catch (error) {
+      console.error('❌ PG: Errore nel caricamento cleaners con straordinaria:', error);
+      return [];
     }
   }
 
