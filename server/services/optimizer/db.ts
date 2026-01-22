@@ -62,6 +62,7 @@ export async function loadTasksWithLockStatus(workDate: string): Promise<TaskInp
       lng,
       priority,
       straordinaria,
+      COALESCE(cleaning_time, 60) as "cleaningTimeMinutes",
       COALESCE(locked, false) as "locked",
       locked_reason as "lockedReason"
     FROM daily_containers
@@ -78,6 +79,7 @@ export async function loadTasksWithLockStatus(workDate: string): Promise<TaskInp
     lng: parseFloat(row.lng),
     priority: row.priority,
     straordinaria: row.straordinaria === true,
+    cleaningTimeMinutes: parseInt(row.cleaningTimeMinutes, 10) || 60,
     locked: row.locked === true,
     lockedReason: row.lockedReason
   }));

@@ -10,6 +10,7 @@ export type TaskInput = {
   zone?: number | null;
   priority?: string | null;
   straordinaria?: boolean;
+  cleaningTimeMinutes?: number;
 };
 
 export type Phase1Params = {
@@ -264,10 +265,12 @@ function addGroup(
   const zones = new Set(groupTasks.map(t => t.zone));
   const sameZone = zones.size === 1;
   
-  // Check if any task in the group is a straordinaria
-  const hasStraordinaria = groupTasks.some(t => t.straordinaria === true);
+  // Check if any task in the group is a straordinaria and determine if it's long (>=4h)
+  const straordinariaTask = groupTasks.find(t => t.straordinaria === true);
+  const hasStraordinaria = straordinariaTask !== undefined;
+  const isLongStraordinaria = hasStraordinaria && (straordinariaTask.cleaningTimeMinutes ?? 60) >= 240;
 
-  const score = scoreGroup(avgTravelMin, maxTravelMin, sameZone, groupTasks.length, totalTravelMin, hasStraordinaria);
+  const score = scoreGroup(avgTravelMin, maxTravelMin, sameZone, groupTasks.length, totalTravelMin, { hasStraordinaria, isLong: isLongStraordinaria });
 
   const sortedTasks = [...groupTasks].sort((a, b) => a.taskId - b.taskId);
   const logisticCodes = sortedTasks.map(t => t.logisticCode);
