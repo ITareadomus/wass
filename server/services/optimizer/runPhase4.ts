@@ -29,20 +29,23 @@ export interface Phase4RunResult {
 }
 
 async function loadPhase3Schedules(runId: string): Promise<CleanerSchedule[]> {
+  // Join con daily_containers per ottenere cleaning_time per fairness tracking
   const result = await pool.query(`
     SELECT 
-      cleaner_id,
-      task_id,
-      logistic_code,
-      sequence,
-      start_time,
-      end_time,
-      travel_minutes_from_prev,
-      priority_type,
-      priority_penalty
-    FROM optimizer.optimizer_assignment
-    WHERE run_id = $1
-    ORDER BY cleaner_id, sequence
+      oa.cleaner_id,
+      oa.task_id,
+      oa.logistic_code,
+      oa.sequence,
+      oa.start_time,
+      oa.end_time,
+      oa.travel_minutes_from_prev,
+      oa.priority_type,
+      oa.priority_penalty,
+      COALESCE(dc.cleaning_time, 60) as cleaning_time_minutes
+    FROM optimizer.optimizer_assignment oa
+    LEFT JOIN daily_containers dc ON dc.task_id = oa.task_id
+    WHERE oa.run_id = $1
+    ORDER BY oa.cleaner_id, oa.sequence
   `, [runId]);
 
   const cleanerMap = new Map<number, {
@@ -76,7 +79,9 @@ async function loadPhase3Schedules(runId: string): Promise<CleanerSchedule[]> {
       waitMinutes: 0,
       priorityType: row.priority_type,
       priorityPenalty: row.priority_penalty || 0,
-      priorityReasons: []
+      priorityReasons: [],
+      // Per fairness tracking
+      cleaningTimeMinutes: parseInt(row.cleaning_time_minutes, 10) || 60
     });
     
     cleaner.totalTravel += row.travel_minutes_from_prev || 0;
@@ -107,6 +112,13 @@ async function loadPhase3Schedules(runId: string): Promise<CleanerSchedule[]> {
       ? data.maxEndTime.getHours() * 60 + data.maxEndTime.getMinutes()
       : 540;
     
+    // Calcola totalWorkMinutes dalla somma delle durate dei task già assegnati
+    // (per fairness scoring)
+    const totalWorkMinutes = data.tasks.reduce(
+      (sum: number, t: any) => sum + (t.cleaningTimeMinutes ?? 60),
+      0
+    );
+    
     schedules.push({
       cleanerId,
       cleanerName: caps?.name || `Cleaner ${cleanerId}`,
@@ -119,7 +131,9 @@ async function loadPhase3Schedules(runId: string): Promise<CleanerSchedule[]> {
       // Dati per vincoli hard
       role: caps?.role || 'Standard',
       contractType: caps?.contractType || 'C',
-      canDoStraordinaria: caps?.canDoStraordinaria || false
+      canDoStraordinaria: caps?.canDoStraordinaria || false,
+      // Fairness tracking
+      totalWorkMinutes
     });
   });
 

@@ -53,6 +53,8 @@ export interface CleanerSchedule {
   role?: string;
   contractType?: string;
   canDoStraordinaria?: boolean;
+  // Fairness tracking: ore totali lavorate (in minuti)
+  totalWorkMinutes?: number;
 }
 
 export interface InsertionCandidate {
@@ -429,9 +431,30 @@ function tryInsertTask(
     underfilledBonus = params.underfilledBonus;
   }
   
+  // FAIRNESS SCORING: premia cleaners con meno ore lavorate, penalizza quelli sovraccarichi
+  // Calcola le ore lavorate attuali del cleaner (incluso il nuovo task)
+  const currentWorkMinutes = schedule.totalWorkMinutes ?? 0;
+  const newTaskDuration = task.cleaningTimeMinutes ?? 60;
+  const projectedWorkMinutes = currentWorkMinutes + newTaskDuration;
+  
+  // Bonus inversamente proporzionale alle ore lavorate
+  // Un cleaner con 0 ore ottiene bonus massimo (20), uno con 480 min (8h) ottiene 0
+  const MAX_FAIRNESS_BONUS = 20;
+  const FAIRNESS_WORK_THRESHOLD = 480; // 8 ore = soglia fairness
+  const fairnessBonus = Math.max(0, MAX_FAIRNESS_BONUS * (1 - currentWorkMinutes / FAIRNESS_WORK_THRESHOLD));
+  
+  // Penalità per cleaners sovraccarichi (oltre le 8 ore proiettate)
+  // Ogni 60 minuti oltre la soglia = +10 punti di penalità
+  const OVERLOAD_PENALTY_PER_HOUR = 10;
+  let overloadPenalty = 0;
+  if (projectedWorkMinutes > FAIRNESS_WORK_THRESHOLD) {
+    const overloadMinutes = projectedWorkMinutes - FAIRNESS_WORK_THRESHOLD;
+    overloadPenalty = (overloadMinutes / 60) * OVERLOAD_PENALTY_PER_HOUR;
+  }
+  
   // Include relaxPenalty nel totalScore - così soluzioni a livello più basso vincono sempre
   const relaxPenaltyValue = relaxPenalty(relaxLevel, params);
-  const totalScore = deltaTravel + (deltaWait * 0.5) + (deltaPriorityPenalty * 2) - underfilledBonus + relaxPenaltyValue;
+  const totalScore = deltaTravel + (deltaWait * 0.5) + (deltaPriorityPenalty * 2) - underfilledBonus - fairnessBonus + overloadPenalty + relaxPenaltyValue;
   
   return {
     cleanerId: schedule.cleanerId,
@@ -477,6 +500,12 @@ function applyInsertion(
     priorityWindows
   );
   
+  // Calcola totalWorkMinutes dalla somma delle durate dei task
+  const totalWorkMinutes = allTasksForSim.reduce(
+    (sum, t) => sum + (t.cleaningTimeMinutes ?? 60),
+    0
+  );
+  
   return {
     cleanerId: schedule.cleanerId,
     cleanerName: schedule.cleanerName,
@@ -489,7 +518,9 @@ function applyInsertion(
     // Preserva i dati per vincoli hard
     role: schedule.role,
     contractType: schedule.contractType,
-    canDoStraordinaria: schedule.canDoStraordinaria
+    canDoStraordinaria: schedule.canDoStraordinaria,
+    // Fairness tracking
+    totalWorkMinutes
   };
 }
 
@@ -594,6 +625,12 @@ function trySwapForTask(
       // Accetta solo se il guadagno è positivo (vale la pena fare lo swap)
       if (netGain > 0) {
         if (!bestSwap || netGain > bestSwap.netGain) {
+          // Calcola totalWorkMinutes per il nuovo schedule
+          const newTotalWorkMinutes = tasksForSim.reduce(
+            (sum, t) => sum + (t.cleaningTimeMinutes ?? 60),
+            0
+          );
+          
           bestSwap = {
             cleanerId: schedule.cleanerId,
             removedTaskId: taskToRemove.taskId,
@@ -611,7 +648,9 @@ function trySwapForTask(
               // Preserva i dati per vincoli hard
               role: schedule.role,
               contractType: schedule.contractType,
-              canDoStraordinaria: schedule.canDoStraordinaria
+              canDoStraordinaria: schedule.canDoStraordinaria,
+              // Fairness tracking
+              totalWorkMinutes: newTotalWorkMinutes
             },
             netGain
           };
