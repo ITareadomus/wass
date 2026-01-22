@@ -188,7 +188,7 @@ export default function PriorityColumn({
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ 
             date: dateStr, 
-            skipPhase4: true, 
+            skipPhase4: false, 
             applyToProduction: true 
           })
         });
