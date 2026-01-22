@@ -133,10 +133,11 @@ export default function MapSection({ tasks }: MapSectionProps) {
     polylinesRef.current.forEach(line => line.setMap(null));
     polylinesRef.current = [];
 
-    // Filtra task con coordinate valide - MA NON FILTRARE PER VISUALIZZAZIONE
+    // Filtra task con coordinate valide e non locked
     let tasksWithCoordinates = tasks.filter(task => {
       const hasCoordinates = task.address && task.lat && task.lng;
-      return hasCoordinates;
+      const isNotLocked = !task.locked;
+      return hasCoordinates && isNotLocked;
     });
 
     // Determina quali marker evidenziare (non nascondere gli altri)
