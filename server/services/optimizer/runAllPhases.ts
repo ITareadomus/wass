@@ -239,7 +239,7 @@ async function collectDetailedMetrics(
     // Calcola i cleaners compatibili basandosi sui selected_cleaners e le regole di compatibilità
     const unassignedDetails = await pool.query(`
       WITH selected_cleaners AS (
-        SELECT cleaner_id FROM daily_selected_cleaners WHERE work_date = $2
+        SELECT UNNEST(cleaners) as cleaner_id FROM daily_selected_cleaners WHERE work_date = $2
       ),
       cleaner_details AS (
         SELECT 
