@@ -122,8 +122,6 @@ async function loadPhase3Schedules(runId: string): Promise<CleanerSchedule[]> {
 }
 
 async function loadCleanerNames(runId: string): Promise<Map<number, string>> {
-  const run = await getLatestRunForDate('');
-  
   const result = await pool.query(`
     SELECT DISTINCT cleaner_id FROM optimizer.optimizer_assignment WHERE run_id = $1
   `, [runId]);

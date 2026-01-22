@@ -186,6 +186,8 @@ export function eventToDecision(
 }
 
 export async function getLatestRunForDate(workDate: string): Promise<OptimizerRun | null> {
+  if (!workDate || workDate.trim() === '') return null;
+  
   const result = await pool.query(`
     SELECT 
       run_id as "runId",
