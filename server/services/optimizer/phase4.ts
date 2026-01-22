@@ -6,6 +6,7 @@ import {
   PriorityViolation
 } from './phase3';
 import { PriorityWindows, priorityPenalty, Priority } from './priorityWindows';
+import { getDynamicMaxLoad } from './phase2';
 
 export interface Phase4Params {
   maxInsertionAttempts: number;
@@ -22,8 +23,8 @@ export interface Phase4Params {
   maxCleanersToTryPerTask: number;     // Max cleaners da provare per task (performance cap)
 }
 
-// LIMITE HARD ASSOLUTO - nessun livello di relaxation può superarlo
-export const ABSOLUTE_MAX_LOAD = 5;
+// LIMITE HARD DINAMICO - basato sul travel totale del cleaner (come Phase 2)
+// getDynamicMaxLoad(totalTravel) ritorna 4 se travel < 30min, altrimenti 3
 
 export const DEFAULT_PHASE4_PARAMS: Phase4Params = {
   maxInsertionAttempts: 1000,
@@ -251,22 +252,19 @@ function relaxPenalty(level: number, params: Phase4Params): number {
 
 interface RelaxConstraints {
   allowLateness: boolean;
-  allowOverload: boolean;
   allowHighTravel: boolean;
   maxTravelMinutes: number;
-  maxLoadTasks: number;
+  // Nota: maxLoad ora è un vincolo HARD gestito da getDynamicMaxLoad(totalTravel)
+  // Non è più un soft limit che può essere relaxed
 }
 
 function getRelaxConstraints(level: number): RelaxConstraints {
-  // Nota: maxLoadTasks è il soft limit che può essere relaxed
-  // Ma ABSOLUTE_MAX_LOAD (5) è sempre il limite hard inviolabile
+  // maxLoad è ora un vincolo HARD (getDynamicMaxLoad) - non può essere rilassato
+  // I relaxation levels gestiscono solo lateness e travel alto
   return {
     allowLateness: level >= RelaxLevel.ALLOW_LATENESS,
-    allowOverload: level >= RelaxLevel.ALLOW_OVERLOAD,
     allowHighTravel: level >= RelaxLevel.ALLOW_HIGH_TRAVEL,
-    maxTravelMinutes: level >= RelaxLevel.ALLOW_HIGH_TRAVEL ? 90 : 45,
-    // Soft limits: L0-L1 = 3, L2+ = 4 (ma mai sopra ABSOLUTE_MAX_LOAD)
-    maxLoadTasks: level >= RelaxLevel.ALLOW_OVERLOAD ? 4 : 3
+    maxTravelMinutes: level >= RelaxLevel.ALLOW_HIGH_TRAVEL ? 90 : 45
   };
 }
 
@@ -291,10 +289,12 @@ function tryInsertTask(
   const newTaskCount = schedule.tasks.length + 1;
   
   // =====================================================
-  // VINCOLO HARD ASSOLUTO: max 5 task per cleaner
-  // Nessun livello di relaxation può superare questo limite
+  // VINCOLO HARD DINAMICO: max load basato su travel (come Phase 2)
+  // getDynamicMaxLoad(totalTravel) → 4 se travel < 30min, altrimenti 3
+  // Questo vincolo NON può essere rilassato
   // =====================================================
-  if (newTaskCount > ABSOLUTE_MAX_LOAD) {
+  const dynamicMaxLoad = getDynamicMaxLoad(schedule.totalTravel);
+  if (newTaskCount > dynamicMaxLoad) {
     return {
       cleanerId: schedule.cleanerId,
       position,
@@ -305,7 +305,7 @@ function tryInsertTask(
       underfilledBonus: 0,
       totalScore: Infinity,
       feasible: false,
-      reason: 'ABSOLUTE_MAX_LOAD_EXCEEDED'
+      reason: 'DYNAMIC_MAX_LOAD_EXCEEDED'
     };
   }
   
@@ -327,24 +327,6 @@ function tryInsertTask(
       feasible: false,
       reason: hardCheck.reason
     };
-  }
-  
-  // Check max load constraint (soft at L2+)
-  if (newTaskCount > constraints.maxLoadTasks) {
-    if (!constraints.allowOverload) {
-      return {
-        cleanerId: schedule.cleanerId,
-        position,
-        deltaTravel: 0,
-        deltaWait: 0,
-        deltaLateness: 0,
-        priorityPenalty: 0,
-        underfilledBonus: 0,
-        totalScore: Infinity,
-        feasible: false,
-        reason: 'MAX_LOAD_EXCEEDED'
-      };
-    }
   }
   
   const tasksBefore = schedule.tasks.slice(0, position);
@@ -567,9 +549,10 @@ function trySwapForTask(
         .filter((t): t is TaskForScheduling => t !== undefined);
       
       // =====================================================
-      // VINCOLO HARD ASSOLUTO: max 5 task per cleaner
+      // VINCOLO HARD DINAMICO: max load basato su travel (come Phase 2)
       // =====================================================
-      if (tasksForSim.length + 1 > ABSOLUTE_MAX_LOAD) {
+      const dynamicMaxLoad = getDynamicMaxLoad(schedule.totalTravel);
+      if (tasksForSim.length + 1 > dynamicMaxLoad) {
         continue;
       }
       
@@ -599,11 +582,7 @@ function trySwapForTask(
       
       if (!simResult.ok) continue;
       
-      // Verifica constraints in base al relaxLevel
-      const newTaskCount = tasksForSim.length;
-      if (newTaskCount > constraints.maxLoadTasks && !constraints.allowOverload) {
-        continue;
-      }
+      // Nota: il vincolo maxLoad è già verificato sopra con getDynamicMaxLoad (vincolo HARD)
       
       // Calcola travel delta approssimativo
       const travelDelta = simResult.totalTravel - schedule.totalTravel;
