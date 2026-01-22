@@ -289,27 +289,6 @@ function tryInsertTask(
   const newTaskCount = schedule.tasks.length + 1;
   
   // =====================================================
-  // VINCOLO HARD DINAMICO: max load basato su travel (come Phase 2)
-  // getDynamicMaxLoad(totalTravel) → 4 se travel < 30min, altrimenti 3
-  // Questo vincolo NON può essere rilassato
-  // =====================================================
-  const dynamicMaxLoad = getDynamicMaxLoad(schedule.totalTravel);
-  if (newTaskCount > dynamicMaxLoad) {
-    return {
-      cleanerId: schedule.cleanerId,
-      position,
-      deltaTravel: 0,
-      deltaWait: 0,
-      deltaLateness: 0,
-      priorityPenalty: 0,
-      underfilledBonus: 0,
-      totalScore: Infinity,
-      feasible: false,
-      reason: 'DYNAMIC_MAX_LOAD_EXCEEDED'
-    };
-  }
-  
-  // =====================================================
   // VINCOLI HARD: compatibilità cleaner-task, regole OT
   // Questi vincoli NON possono essere rilassati
   // =====================================================
@@ -373,6 +352,27 @@ function tryInsertTask(
   const deltaTravel = simResult.totalTravel - schedule.totalTravel;
   const deltaWait = simResult.totalWait - schedule.totalWait;
   const deltaPriorityPenalty = simResult.totalPriorityPenalty - schedule.totalPriorityPenalty;
+  
+  // =====================================================
+  // VINCOLO HARD DINAMICO: max load basato sul travel SIMULATO
+  // getDynamicMaxLoad(simResult.totalTravel) → 4 se travel < 30min, altrimenti 3
+  // Questo vincolo usa il travel DOPO l'inserimento, non prima
+  // =====================================================
+  const dynamicMaxLoad = getDynamicMaxLoad(simResult.totalTravel);
+  if (newTaskCount > dynamicMaxLoad) {
+    return {
+      cleanerId: schedule.cleanerId,
+      position,
+      deltaTravel,
+      deltaWait,
+      deltaLateness: deltaPriorityPenalty,
+      priorityPenalty: simResult.totalPriorityPenalty,
+      underfilledBonus: 0,
+      totalScore: Infinity,
+      feasible: false,
+      reason: 'DYNAMIC_MAX_LOAD_EXCEEDED'
+    };
+  }
   
   // Check travel constraint (soft at L3)
   if (deltaTravel > constraints.maxTravelMinutes) {
@@ -549,14 +549,6 @@ function trySwapForTask(
         .filter((t): t is TaskForScheduling => t !== undefined);
       
       // =====================================================
-      // VINCOLO HARD DINAMICO: max load basato su travel (come Phase 2)
-      // =====================================================
-      const dynamicMaxLoad = getDynamicMaxLoad(schedule.totalTravel);
-      if (tasksForSim.length + 1 > dynamicMaxLoad) {
-        continue;
-      }
-      
-      // =====================================================
       // VINCOLI HARD: verifico con schedule temporaneo
       // =====================================================
       const tempSchedule: CleanerSchedule = {
@@ -582,7 +574,15 @@ function trySwapForTask(
       
       if (!simResult.ok) continue;
       
-      // Nota: il vincolo maxLoad è già verificato sopra con getDynamicMaxLoad (vincolo HARD)
+      // =====================================================
+      // VINCOLO HARD DINAMICO: max load basato sul travel SIMULATO
+      // getDynamicMaxLoad usa il travel DOPO lo swap, non prima
+      // =====================================================
+      const dynamicMaxLoad = getDynamicMaxLoad(simResult.totalTravel);
+      const newTaskCount = tasksForSim.length;
+      if (newTaskCount > dynamicMaxLoad) {
+        continue;
+      }
       
       // Calcola travel delta approssimativo
       const travelDelta = simResult.totalTravel - schedule.totalTravel;
