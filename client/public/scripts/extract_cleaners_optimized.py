@@ -208,8 +208,8 @@ for u in cleaners:
     available = 0 if cid in leave_set else 1
 
     # Lista ID cleaner autorizzati per task straordinarie
-    # Lopez (132), El Hadji (495), Henry (644), Chidi (249)
-    straordinaria_authorized = {132, 495, 644, 249}
+    # Lopez (132), El Hadji (495), Chidi (249), Prince (1034)
+    straordinaria_authorized = {132, 495, 249, 1034}
 
     # Gerarchia start_time:
     # 1. PostgreSQL custom (date-scoped) se disponibile
