@@ -59,6 +59,12 @@ Preferred communication style: Simple, everyday language.
   - **Straordinaria penalty**: Uses (base + extra) = 4000 as base, same progressive multiplier
   - **Swap Mechanism**: When insertion fails, tries to swap out a lower-priority task to make room
   - **Swap Logic**: Accepts if netGain > 0 (penalty avoided > loss from removed task)
+  - **Re-enqueue**: Task rimosso via swap viene ri-processato (max 2 tentativi) invece di marcarlo subito unassigned
+
+## Phase 2 OT Dropping
+- **Dropping Instead of Reject**: Se gruppo OT invalido, droppa task fino a forma valida invece di reject
+- **Long OT fix**: Rimuove tutti i task extra, tiene solo l'OT
+- **Short OT fix**: Riduce a max 2 task (OT + 1 extra ≤2h)
 
 ## OT (Straordinaria) Handling Rules
 - **Long OT (≥4h)**: Must be assigned alone, no grouping with other tasks

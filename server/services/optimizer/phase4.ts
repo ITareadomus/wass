@@ -15,8 +15,6 @@ export interface Phase4Params {
   baseUnassignedPenalty: number;       // Penalità base per ogni task normale non assegnato
   straordinariaExtraPenalty: number;   // Penalità extra per straordinarie non assegnate
   progressiveMultiplier: number;       // Incremento penalità per ogni task successivo non assegnato
-  rarityExtraPenalty: number;          // Extra per task con pochi cleaners compatibili (rarity ≤ 2)
-  rarityThreshold: number;             // Soglia per considerare un task "raro" (compatibleCleaners ≤ threshold)
 }
 
 export const DEFAULT_PHASE4_PARAMS: Phase4Params = {
@@ -26,9 +24,7 @@ export const DEFAULT_PHASE4_PARAMS: Phase4Params = {
   // Penalità per task non assegnati
   baseUnassignedPenalty: 1500,         // Ogni task non assegnato costa 1500
   straordinariaExtraPenalty: 2500,     // Extra per OT → totale 4000
-  progressiveMultiplier: 0.5,          // 1° = 1500, 2° = 2250, 3° = 3000...
-  rarityExtraPenalty: 500,             // Extra per task rari
-  rarityThreshold: 2                   // Task con ≤2 cleaners compatibili sono "rari"
+  progressiveMultiplier: 0.5           // 1° = 1500, 2° = 2250, 3° = 3000...
 };
 
 export interface CleanerSchedule {
@@ -469,7 +465,37 @@ export function runPhase4Algorithm(
     return priorityA - priorityB;
   });
   
-  for (const unassigned of sortedUnassigned) {
+  // Usa una coda per permettere re-enqueue dei task rimossi via swap
+  const taskQueue: { taskId: number; reasonCode: string; details: Record<string, any>; wasSwappedOut?: boolean }[] = [...sortedUnassigned];
+  const finalizedTaskIds = new Set<number>(); // Task già inseriti nei results (evita duplicati)
+  const maxRequeueAttempts = 2; // Massimo tentativi per task re-enqueuati via swap
+  const requeueAttempts = new Map<number, number>(); // Conta solo i tentativi dopo swap
+  
+  while (taskQueue.length > 0) {
+    const unassigned = taskQueue.shift()!;
+    
+    // Skip se già finalizzato
+    if (finalizedTaskIds.has(unassigned.taskId)) {
+      continue;
+    }
+    
+    // Conta tentativi solo per task re-enqueuati (wasSwappedOut=true)
+    if (unassigned.wasSwappedOut) {
+      const attempts = requeueAttempts.get(unassigned.taskId) || 0;
+      if (attempts >= maxRequeueAttempts) {
+        taskResults.push({
+          taskId: unassigned.taskId,
+          logisticCode: tasksMap.get(unassigned.taskId)?.logisticCode || 0,
+          status: 'remain_unassigned',
+          reason: 'MAX_REQUEUE_ATTEMPTS_EXCEEDED'
+        });
+        remainUnassignedCount++;
+        finalizedTaskIds.add(unassigned.taskId);
+        continue;
+      }
+      requeueAttempts.set(unassigned.taskId, attempts + 1);
+    }
+    
     const task = tasksMap.get(unassigned.taskId);
     if (!task) {
       taskResults.push({
@@ -478,6 +504,7 @@ export function runPhase4Algorithm(
         status: 'remain_unassigned',
         reason: 'TASK_NOT_FOUND'
       });
+      finalizedTaskIds.add(unassigned.taskId);
       remainUnassignedCount++;
       continue;
     }
@@ -545,6 +572,7 @@ export function runPhase4Algorithm(
         position: bestPosition,
         score: bestCandidate.totalScore
       });
+      finalizedTaskIds.add(task.taskId);
       
       insertedCount++;
       
@@ -585,6 +613,7 @@ export function runPhase4Algorithm(
           cleanerId: singleResult.cleanerId,
           score: singleResult.score
         });
+        finalizedTaskIds.add(task.taskId);
         
         singleAssignedCount++;
         
@@ -630,6 +659,7 @@ export function runPhase4Algorithm(
             cleanerId: swapResult.cleanerId,
             score: -swapResult.netGain // Negativo perché è un guadagno
           });
+          finalizedTaskIds.add(task.taskId);
           
           insertedCount++;
           
@@ -646,25 +676,23 @@ export function runPhase4Algorithm(
             }
           });
           
-          // Il task rimosso torna nella coda dei non assegnati
-          // (verrà processato in un prossimo ciclo o rimarrà unassigned)
-          // Per semplicità, lo aggiungo ai results come unassigned
-          // In futuro potremmo implementare un ciclo di riassegnazione
-          taskResults.push({
+          // Il task rimosso torna nella coda per essere ri-processato
+          // Invece di marcarlo subito come unassigned, lo re-enqueue
+          taskQueue.push({
             taskId: swapResult.removedTaskId,
-            logisticCode: swapResult.removedTaskLogisticCode,
-            status: 'remain_unassigned',
-            reason: 'SWAPPED_OUT_FOR_HIGHER_PRIORITY'
+            reasonCode: 'SWAPPED_OUT_FOR_HIGHER_PRIORITY',
+            details: { swapped_by: task.taskId },
+            wasSwappedOut: true
           });
-          remainUnassignedCount++;
           
           events.push({
-            eventType: 'PHASE4_TASK_SWAPPED_OUT',
+            eventType: 'PHASE4_TASK_SWAPPED_OUT_REQUEUED',
             payload: {
               task_id: swapResult.removedTaskId,
               logistic_code: swapResult.removedTaskLogisticCode,
               replaced_by_task_id: task.taskId,
-              replaced_by_is_straordinaria: isStraordinaria
+              replaced_by_is_straordinaria: isStraordinaria,
+              requeue_position: taskQueue.length
             }
           });
         } else {
@@ -675,6 +703,7 @@ export function runPhase4Algorithm(
             status: 'remain_unassigned',
             reason: 'NO_FEASIBLE_INSERTION_OR_SWAP'
           });
+          finalizedTaskIds.add(task.taskId);
           
           remainUnassignedCount++;
           

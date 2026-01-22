@@ -332,49 +332,125 @@ export function runPhase2Algorithm(
       
       // Pre-check: valida gruppi con straordinaria
       // Regole: OT lunga (≥4h) → solo 1 task, OT corta (<4h) → max 2 task (OT + 1 extra ≤2h)
+      // IMPORTANTE: un gruppo può avere al massimo 1 OT
+      // Invece di reject, droppa task fino a forma valida
       if (groupHasStraordinaria && tasks.length > 1) {
-        const otTask = tasks.find(t => t.straordinaria);
-        const otDuration = otTask?.cleaningTime ?? 60;
+        const otTasks = tasks.filter(t => t.straordinaria);
+        const nonOtTasks = tasks.filter(t => !t.straordinaria);
+        
+        // Se ci sono multipli OT, tieni solo il primo e droppa gli altri
+        if (otTasks.length > 1) {
+          const keptOt = otTasks[0];
+          const extraOts = otTasks.slice(1);
+          
+          for (const extraOt of extraOts) {
+            const idx = currentTaskIds.indexOf(extraOt.taskId);
+            if (idx !== -1) {
+              currentTaskIds.splice(idx, 1);
+              currentLogisticCodes.splice(idx, 1);
+              droppedTasks.push(extraOt.taskId);
+              tasksDropped++;
+            }
+          }
+          events.push({
+            eventType: 'PHASE2_OT_GROUP_FIXED',
+            payload: {
+              original_tasks: group.taskIds,
+              kept_tasks: currentTaskIds,
+              dropped_ots: extraOts.map(t => t.taskId),
+              reason: 'MULTIPLE_OT_REDUCED_TO_ONE',
+              kept_ot: keptOt.taskId
+            }
+          });
+          retryCount++;
+          continue; // Riprova con un solo OT
+        }
+        
+        const otTask = otTasks[0]; // Ora sappiamo che c'è esattamente 1 OT
+        const otDuration = otTask.cleaningTime;
         const isLongOT = otDuration >= STRAORDINARIA_LONG_THRESHOLD_MIN;
         
         if (isLongOT) {
-          // OT lunga non può avere altri task
+          // OT lunga: droppa tutti i task non-OT, tieni solo l'OT
+          for (const extraTask of nonOtTasks) {
+            const idx = currentTaskIds.indexOf(extraTask.taskId);
+            if (idx !== -1) {
+              currentTaskIds.splice(idx, 1);
+              currentLogisticCodes.splice(idx, 1);
+              droppedTasks.push(extraTask.taskId);
+              tasksDropped++;
+            }
+          }
           events.push({
-            eventType: 'PHASE2_GROUP_REJECTED',
+            eventType: 'PHASE2_OT_GROUP_FIXED',
             payload: {
-              group_tasks: currentTaskIds,
-              reason: 'LONG_STRAORDINARIA_MUST_BE_ALONE',
+              original_tasks: group.taskIds,
+              kept_tasks: currentTaskIds,
+              dropped_tasks: nonOtTasks.map(t => t.taskId),
+              reason: 'LONG_STRAORDINARIA_KEPT_SOLO',
               ot_duration: otDuration
             }
           });
-          groupsUnassigned++;
-          break;
+          retryCount++;
+          continue; // Riprova con solo l'OT
         } else if (tasks.length > 2) {
-          // OT corta: max 2 task totali
+          // OT corta: max 2 task totali (1 OT + 1 non-OT ≤2h)
+          // Mantieni OT + il task non-OT con durata minore (solo se ≤2h)
+          const sortedNonOt = [...nonOtTasks].sort((a, b) => a.cleaningTime - b.cleaningTime);
+          
+          // Trova il primo non-OT valido (≤2h), altrimenti nessuno
+          const validNonOt = sortedNonOt.find(t => t.cleaningTime <= STRAORDINARIA_EXTRA_TASK_MAX_MIN);
+          
+          // Droppa tutti i non-OT tranne quello valido (se esiste)
+          const tasksToDrop = validNonOt 
+            ? sortedNonOt.filter(t => t.taskId !== validNonOt.taskId)
+            : sortedNonOt; // Se nessun valido, droppa tutti i non-OT
+          
+          for (const task of tasksToDrop) {
+            const idx = currentTaskIds.indexOf(task.taskId);
+            if (idx !== -1) {
+              currentTaskIds.splice(idx, 1);
+              currentLogisticCodes.splice(idx, 1);
+              droppedTasks.push(task.taskId);
+              tasksDropped++;
+            }
+          }
           events.push({
-            eventType: 'PHASE2_GROUP_REJECTED',
+            eventType: 'PHASE2_OT_GROUP_FIXED',
             payload: {
-              group_tasks: currentTaskIds,
-              reason: 'SHORT_STRAORDINARIA_MAX_2_TASKS',
+              original_tasks: group.taskIds,
+              kept_tasks: currentTaskIds,
+              dropped_tasks: tasksToDrop.map(t => t.taskId),
+              reason: validNonOt ? 'SHORT_STRAORDINARIA_REDUCED_TO_2' : 'SHORT_STRAORDINARIA_NO_VALID_EXTRA',
               ot_duration: otDuration
             }
           });
-          groupsUnassigned++;
-          break;
+          retryCount++;
+          continue; // Riprova con gruppo ridotto
         } else {
           // OT corta + 1 task extra: verifica che extra sia ≤2h
           const extraTask = tasks.find(t => !t.straordinaria);
           if (extraTask && extraTask.cleaningTime > STRAORDINARIA_EXTRA_TASK_MAX_MIN) {
+            // Extra troppo lungo: droppa l'extra, tieni solo l'OT
+            const idx = currentTaskIds.indexOf(extraTask.taskId);
+            if (idx !== -1) {
+              currentTaskIds.splice(idx, 1);
+              currentLogisticCodes.splice(idx, 1);
+              droppedTasks.push(extraTask.taskId);
+              tasksDropped++;
+            }
             events.push({
-              eventType: 'PHASE2_GROUP_REJECTED',
+              eventType: 'PHASE2_OT_GROUP_FIXED',
               payload: {
-                group_tasks: currentTaskIds,
-                reason: 'EXTRA_TASK_TOO_LONG',
+                original_tasks: group.taskIds,
+                kept_tasks: currentTaskIds,
+                dropped_task: extraTask.taskId,
+                reason: 'EXTRA_TASK_TOO_LONG_DROPPED',
                 extra_task_duration: extraTask.cleaningTime
               }
             });
-            groupsUnassigned++;
-            break;
+            retryCount++;
+            continue; // Riprova con solo l'OT
           }
           // Gruppo valido: OT corta + 1 task ≤2h
         }
