@@ -53,6 +53,10 @@ Preferred communication style: Simple, everyday language.
   - **Permutation Selection**: Considers endTime → priorityPenalty → totalWait → totalTravel
   - **Violation Tracking**: reason codes (LP_BEFORE_MIN_START, EO/HP_OUT_OF_PREFERRED_START_WINDOW) persisted to optimizer_assignment
 - **PHASE 4**: Recovery phase for unassigned tasks, attempts to find single-task assignments.
+  - **Progressive Penalty System**: Convex penalty formula for unassigned tasks: `base * (1 + multiplier * (k-1))` for k-th task
+  - **Parameters**: baseUnassignedPenalty=1500, straordinariaExtraPenalty=2500, progressiveMultiplier=0.5
+  - **Example progression**: 1st task: 1500, 2nd: 2250, 3rd: 3000, etc.
+  - **Straordinaria penalty**: Uses (base + extra) = 4000 as base, same progressive multiplier
 - **Apply to Production**: Optional step to copy results from `optimizer.optimizer_assignment` to `daily_assignments_current`.
 - **UI Integration**: "Auto-Assegna" button in timeline header triggers optimizer with visual progress feedback.
 - **Fallback**: Old Python script (`assign_eo.py`) preserved at `/api/run-optimizer` endpoint.
