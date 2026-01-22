@@ -194,6 +194,22 @@ export function simulateSequence(
         };
       }
     }
+    
+    // VINCOLO HARD GLOBALE: nessun task può finire oltre le 19:00 (1140 minuti)
+    const END_TIME_MAX_MINUTES = 1140; // 19:00
+    if (endMinutes > END_TIME_MAX_MINUTES) {
+      return {
+        ok: false,
+        scheduleRows,
+        totalTravel,
+        totalWait,
+        totalPriorityPenalty,
+        priorityViolations,
+        endTime: null,
+        failReason: 'END_TIME_EXCEEDS_19:00',
+        failedTaskId: task.taskId
+      };
+    }
 
     let taskPenalty = 0;
     let taskReasons: string[] = [];
