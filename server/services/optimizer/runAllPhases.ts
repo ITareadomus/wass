@@ -493,6 +493,11 @@ export async function applyOptimizerToProduction(
       WHERE work_date = $2
     `, [runId, workDate, nextRevision]);
 
+    await client.query(`
+      INSERT INTO daily_assignments_revisions (work_date, revision, task_count, created_by, modification_type)
+      VALUES ($1, $2, $3, $4, 'optimizer_auto_assign')
+    `, [workDate, nextRevision, result.insertedCount, 'optimizer-' + runId]);
+
     await client.query('COMMIT');
     result.success = true;
 
