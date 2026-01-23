@@ -6122,7 +6122,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const [rows]: any = await adamConnection.execute(`
           SELECT 
             h.id AS task_id,
-            h.logistic_code,
+            s.logistic_code,
             h.checkin_time,
             h.checkout_time,
             h.checkin AS checkin_date,
