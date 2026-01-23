@@ -464,12 +464,19 @@ export async function applyOptimizerToProduction(
     result.insertedCount = insertResult.rowCount || 0;
     console.log(`[applyToProduction] Inserted ${result.insertedCount} new assignments`);
 
-    // Get next revision number for history
-    const revisionResult = await client.query(
+    // Get next revision number for history table
+    const historyRevisionResult = await client.query(
       `SELECT COALESCE(MAX(revision), 0) + 1 as next_revision FROM daily_assignments_history WHERE work_date = $1`,
       [workDate]
     );
-    const nextRevision = revisionResult.rows[0].next_revision;
+    const historyNextRevision = historyRevisionResult.rows[0].next_revision;
+    
+    // Get next revision number for revisions table (separate sequence)
+    const revisionsRevisionResult = await client.query(
+      `SELECT COALESCE(MAX(revision), 0) + 1 as next_revision FROM daily_assignments_revisions WHERE work_date = $1`,
+      [workDate]
+    );
+    const revisionsNextRevision = revisionsRevisionResult.rows[0].next_revision;
     
     await client.query(`
       INSERT INTO daily_assignments_history (
@@ -491,12 +498,12 @@ export async function applyOptimizerToProduction(
         'optimizer-' || $1
       FROM daily_assignments_current
       WHERE work_date = $2
-    `, [runId, workDate, nextRevision]);
+    `, [runId, workDate, historyNextRevision]);
 
     await client.query(`
       INSERT INTO daily_assignments_revisions (work_date, revision, task_count, created_by, modification_type)
       VALUES ($1, $2, $3, $4, 'optimizer_auto_assign')
-    `, [workDate, nextRevision, result.insertedCount, 'optimizer-' + runId]);
+    `, [workDate, revisionsNextRevision, result.insertedCount, 'optimizer-' + runId]);
 
     await client.query('COMMIT');
     result.success = true;
