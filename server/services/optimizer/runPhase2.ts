@@ -6,9 +6,30 @@ import {
   CleanerInput,
   TaskForPhase2,
   GroupCandidate,
-  Phase2Event
+  Phase2Event,
+  ApartmentTypes,
+  DEFAULT_APARTMENT_TYPES
 } from './phase2';
 import { updateRunStatus, insertDecisionsBatch, OptimizerDecision } from './db';
+
+async function loadApartmentTypes(): Promise<ApartmentTypes> {
+  try {
+    const result = await pool.query(`
+      SELECT value FROM app_settings WHERE key = 'apartment_types'
+    `);
+    if (result.rows.length > 0 && result.rows[0].value) {
+      return {
+        standard_apt: result.rows[0].value.standard_apt || DEFAULT_APARTMENT_TYPES.standard_apt,
+        premium_apt: result.rows[0].value.premium_apt || DEFAULT_APARTMENT_TYPES.premium_apt,
+        straordinario_apt: result.rows[0].value.straordinario_apt || DEFAULT_APARTMENT_TYPES.straordinario_apt,
+        formatore_apt: result.rows[0].value.formatore_apt || DEFAULT_APARTMENT_TYPES.formatore_apt
+      };
+    }
+  } catch (e) {
+    console.error('Failed to load apartment_types from app_settings, using defaults', e);
+  }
+  return DEFAULT_APARTMENT_TYPES;
+}
 
 export interface Phase2RunResult {
   runId: string;
@@ -197,7 +218,12 @@ export async function runPhase2(
   }
 
   try {
-    const fullParams: Phase2Params = { ...DEFAULT_PHASE2_PARAMS, ...params };
+    const apartmentTypes = await loadApartmentTypes();
+    const fullParams: Phase2Params = { 
+      ...DEFAULT_PHASE2_PARAMS, 
+      ...params,
+      apartmentTypes 
+    };
 
     const [selectedCleanerIds, allAvailableCleaners, tasksMap, allGroups] = await Promise.all([
       loadSelectedCleanerIds(workDate),

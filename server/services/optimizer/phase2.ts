@@ -38,18 +38,34 @@ export interface GroupCandidate {
   minCompatibleCleaners?: number; // Scarcity: min cleaners compatibili tra i task del gruppo
 }
 
+export interface ApartmentTypes {
+  standard_apt: string[];
+  premium_apt: string[];
+  straordinario_apt: string[];
+  formatore_apt: string[];
+}
+
+export const DEFAULT_APARTMENT_TYPES: ApartmentTypes = {
+  standard_apt: ['A', 'B', 'C', 'D', 'E', 'F', 'X'],
+  premium_apt: ['A', 'B', 'C', 'D', 'E', 'F', 'X'],
+  straordinario_apt: ['A', 'B', 'C', 'D', 'E', 'F', 'X'],
+  formatore_apt: ['B', 'C']
+};
+
 export interface Phase2Params {
   travelWeight: number;
   loadWeight: number;
   preferenceBonus: number;
   maxCleanerLoad: number;
+  apartmentTypes: ApartmentTypes;
 }
 
 export const DEFAULT_PHASE2_PARAMS: Phase2Params = {
   travelWeight: 2,
   loadWeight: 5,
   preferenceBonus: 10,
-  maxCleanerLoad: 3 // Base max, can be 4 if total travel < 30min
+  maxCleanerLoad: 3, // Base max, can be 4 if total travel < 30min
+  apartmentTypes: DEFAULT_APARTMENT_TYPES
 };
 
 // Dynamic max load: 3 base, 4 if total travel time < 30 minutes
@@ -98,11 +114,54 @@ export interface Phase2Result {
   };
 }
 
+function normalizeCleanerRole(role: string): string {
+  if (!role) return 'standard_cleaner';
+  const normalized = role.toLowerCase().trim();
+  if (normalized.includes('standard')) return 'standard_cleaner';
+  if (normalized.includes('premium')) return 'premium_cleaner';
+  if (normalized.includes('straord')) return 'straordinario_cleaner';
+  if (normalized.includes('formatore')) return 'formatore_cleaner';
+  return 'standard_cleaner';
+}
+
+function canCleanerHandleApartment(
+  cleanerRole: string,
+  typeApt: string,
+  apartmentTypes: ApartmentTypes
+): boolean {
+  if (!typeApt) return true;
+  
+  const roleKey = normalizeCleanerRole(cleanerRole);
+  const normalizedApt = typeApt.toUpperCase().trim();
+  
+  let allowedApts: string[];
+  switch (roleKey) {
+    case 'standard_cleaner':
+      allowedApts = apartmentTypes.standard_apt || [];
+      break;
+    case 'premium_cleaner':
+      allowedApts = apartmentTypes.premium_apt || [];
+      break;
+    case 'straordinario_cleaner':
+      allowedApts = apartmentTypes.straordinario_apt || [];
+      break;
+    case 'formatore_cleaner':
+      allowedApts = apartmentTypes.formatore_apt || [];
+      break;
+    default:
+      return true;
+  }
+  
+  return allowedApts.map(a => a.toUpperCase()).includes(normalizedApt);
+}
+
 export function isCleanerCompatible(
   cleaner: CleanerInput,
-  task: TaskForPhase2
+  task: TaskForPhase2,
+  apartmentTypes: ApartmentTypes = DEFAULT_APARTMENT_TYPES
 ): { compatible: boolean; reason?: string } {
-  if (task.premium && cleaner.role !== 'Premium') {
+  const normalizedRole = normalizeCleanerRole(cleaner.role);
+  if (task.premium && normalizedRole !== 'premium_cleaner') {
     return { compatible: false, reason: 'ROLE_MISMATCH_PREMIUM_REQUIRED' };
   }
   
@@ -110,36 +169,22 @@ export function isCleanerCompatible(
     return { compatible: false, reason: 'CANNOT_DO_STRAORDINARIA' };
   }
   
-  const normalizedContract = cleaner.contractType.toUpperCase().trim();
-  const normalizedApt = task.typeApt.toUpperCase().trim();
-  
-  if (normalizedContract === 'A CHIAMATA') {
-    return { compatible: true };
+  if (!canCleanerHandleApartment(cleaner.role, task.typeApt, apartmentTypes)) {
+    return { compatible: false, reason: `ROLE_APT_MISMATCH_${cleaner.role}_vs_${task.typeApt}` };
   }
   
-  if (normalizedContract === 'C') {
-    return { compatible: true };
-  }
-  
-  if (normalizedContract === 'B' && (normalizedApt === 'A' || normalizedApt === 'B')) {
-    return { compatible: true };
-  }
-  
-  if (normalizedContract === 'A' && normalizedApt === 'A') {
-    return { compatible: true };
-  }
-  
-  return { compatible: false, reason: `CONTRACT_APT_MISMATCH_${normalizedContract}_vs_${normalizedApt}` };
+  return { compatible: true };
 }
 
 export function isCleanerCompatibleWithGroup(
   cleaner: CleanerInput,
-  tasks: TaskForPhase2[]
+  tasks: TaskForPhase2[],
+  apartmentTypes: ApartmentTypes = DEFAULT_APARTMENT_TYPES
 ): { compatible: boolean; reasons: string[] } {
   const reasons: string[] = [];
   
   for (const task of tasks) {
-    const result = isCleanerCompatible(cleaner, task);
+    const result = isCleanerCompatible(cleaner, task, apartmentTypes);
     if (!result.compatible) {
       reasons.push(`task_${task.taskId}:${result.reason}`);
     }
@@ -195,7 +240,8 @@ export function scoreCleanerForGroup(
 
 export function findMostExpensiveTask(
   tasks: TaskForPhase2[],
-  cleaners: CleanerInput[]
+  cleaners: CleanerInput[],
+  apartmentTypes: ApartmentTypes = DEFAULT_APARTMENT_TYPES
 ): { task: TaskForPhase2; reason: string } | null {
   if (tasks.length <= 1) return null;
   
@@ -208,7 +254,7 @@ export function findMostExpensiveTask(
     let compatibleCount = 0;
     
     for (const cleaner of cleaners) {
-      const result = isCleanerCompatibleWithGroup(cleaner, remaining);
+      const result = isCleanerCompatibleWithGroup(cleaner, remaining, apartmentTypes);
       if (result.compatible) compatibleCount++;
     }
     
@@ -218,7 +264,7 @@ export function findMostExpensiveTask(
     
     let incompatCount = 0;
     for (const cleaner of cleaners) {
-      const result = isCleanerCompatible(cleaner, task);
+      const result = isCleanerCompatible(cleaner, task, apartmentTypes);
       if (!result.compatible) incompatCount++;
     }
     
@@ -268,7 +314,7 @@ export function runPhase2Algorithm(
   tasksMap.forEach((task, taskId) => {
     let compatibleCount = 0;
     for (const cleaner of cleaners) {
-      const result = isCleanerCompatible(cleaner, task);
+      const result = isCleanerCompatible(cleaner, task, params.apartmentTypes);
       if (result.compatible) compatibleCount++;
     }
     taskScarcity.set(taskId, compatibleCount);
@@ -521,7 +567,7 @@ export function runPhase2Algorithm(
           // OK: Cleaner has 1 task <= 2h and new straordinaria is < 6h - allowed
         }
         
-        const result = isCleanerCompatibleWithGroup(cleaner, tasks);
+        const result = isCleanerCompatibleWithGroup(cleaner, tasks, params.apartmentTypes);
         if (result.compatible) {
           compatibleCleaners.push(cleaner);
         } else {
@@ -603,7 +649,7 @@ export function runPhase2Algorithm(
         });
         
         if (currentTaskIds.length > 1) {
-          const dropResult = findMostExpensiveTask(tasks, cleaners);
+          const dropResult = findMostExpensiveTask(tasks, cleaners, params.apartmentTypes);
           if (dropResult) {
             const droppedId = dropResult.task.taskId;
             const droppedIdx = currentTaskIds.indexOf(droppedId);

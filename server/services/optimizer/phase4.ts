@@ -6,7 +6,7 @@ import {
   PriorityViolation
 } from './phase3';
 import { PriorityWindows, priorityPenalty, Priority } from './priorityWindows';
-import { getDynamicMaxLoad } from './phase2';
+import { getDynamicMaxLoad, ApartmentTypes, DEFAULT_APARTMENT_TYPES } from './phase2';
 
 export interface Phase4Params {
   maxInsertionAttempts: number;
@@ -21,6 +21,8 @@ export interface Phase4Params {
   baseRelaxPenalty: number;            // Penalità base per ogni livello di relax
   relaxMultiplier: number;             // Moltiplicatore esponenziale per livello
   maxCleanersToTryPerTask: number;     // Max cleaners da provare per task (performance cap)
+  // Compatibilità appartamento (role-based)
+  apartmentTypes: ApartmentTypes;
 }
 
 // LIMITE HARD DINAMICO - basato sul travel totale del cleaner (come Phase 2)
@@ -38,7 +40,9 @@ export const DEFAULT_PHASE4_PARAMS: Phase4Params = {
   maxRelaxLevel: 3,                    // L0=strict, L1=lateness, L2=maxLoad, L3=travel
   baseRelaxPenalty: 200,               // Penalità base per relax
   relaxMultiplier: 3,                  // Esponenziale: L1=200, L2=600, L3=1800
-  maxCleanersToTryPerTask: 20          // Cap performance
+  maxCleanersToTryPerTask: 20,         // Cap performance
+  // Compatibilità appartamento
+  apartmentTypes: DEFAULT_APARTMENT_TYPES
 };
 
 export interface CleanerSchedule {
@@ -128,6 +132,47 @@ function dateToMinutes(d: Date): number {
 // Questi vincoli NON possono essere rilassati
 // ============================================================================
 
+function normalizeCleanerRole(role: string): string {
+  if (!role) return 'standard_cleaner';
+  const normalized = role.toLowerCase().trim();
+  if (normalized.includes('standard')) return 'standard_cleaner';
+  if (normalized.includes('premium')) return 'premium_cleaner';
+  if (normalized.includes('straord')) return 'straordinario_cleaner';
+  if (normalized.includes('formatore')) return 'formatore_cleaner';
+  return 'standard_cleaner';
+}
+
+function canCleanerHandleApartment(
+  cleanerRole: string,
+  typeApt: string | undefined,
+  apartmentTypes: ApartmentTypes
+): boolean {
+  if (!typeApt) return true;
+  
+  const roleKey = normalizeCleanerRole(cleanerRole);
+  const normalizedApt = typeApt.toUpperCase().trim();
+  
+  let allowedApts: string[];
+  switch (roleKey) {
+    case 'standard_cleaner':
+      allowedApts = apartmentTypes.standard_apt || [];
+      break;
+    case 'premium_cleaner':
+      allowedApts = apartmentTypes.premium_apt || [];
+      break;
+    case 'straordinario_cleaner':
+      allowedApts = apartmentTypes.straordinario_apt || [];
+      break;
+    case 'formatore_cleaner':
+      allowedApts = apartmentTypes.formatore_apt || [];
+      break;
+    default:
+      return true;
+  }
+  
+  return allowedApts.map(a => a.toUpperCase()).includes(normalizedApt);
+}
+
 interface HardConstraintResult {
   compatible: boolean;
   reason?: string;
@@ -136,8 +181,22 @@ interface HardConstraintResult {
 function checkHardConstraints(
   schedule: CleanerSchedule,
   task: TaskForScheduling,
-  tasksMap: Map<number, TaskForScheduling>
+  tasksMap: Map<number, TaskForScheduling>,
+  apartmentTypes: ApartmentTypes = DEFAULT_APARTMENT_TYPES
 ): HardConstraintResult {
+  const cleanerRole = schedule.role || 'Standard';
+  const normalizedRole = normalizeCleanerRole(cleanerRole);
+  
+  // 0. Verifica premium: task premium richiede cleaner Premium
+  if (task.premium && normalizedRole !== 'premium_cleaner') {
+    return { compatible: false, reason: 'ROLE_MISMATCH_PREMIUM_REQUIRED' };
+  }
+  
+  // 0b. Verifica compatibilità typeApt con role del cleaner
+  if (!canCleanerHandleApartment(cleanerRole, task.typeApt, apartmentTypes)) {
+    return { compatible: false, reason: `ROLE_APT_MISMATCH_${cleanerRole}_vs_${task.typeApt}` };
+  }
+  
   // 1. Verifica straordinaria
   if (task.straordinaria && schedule.canDoStraordinaria !== true) {
     return { compatible: false, reason: 'CANNOT_DO_STRAORDINARIA' };
@@ -292,7 +351,7 @@ function tryInsertTask(
   // VINCOLI HARD: compatibilità cleaner-task, regole OT
   // Questi vincoli NON possono essere rilassati
   // =====================================================
-  const hardCheck = checkHardConstraints(schedule, task, tasksMap);
+  const hardCheck = checkHardConstraints(schedule, task, tasksMap, params.apartmentTypes);
   if (!hardCheck.compatible) {
     return {
       cleanerId: schedule.cleanerId,
@@ -555,7 +614,7 @@ function trySwapForTask(
         ...schedule,
         tasks: tasksWithoutRemoved
       };
-      const hardCheck = checkHardConstraints(tempSchedule, task, tasksMap);
+      const hardCheck = checkHardConstraints(tempSchedule, task, tasksMap, params.apartmentTypes);
       if (!hardCheck.compatible) {
         continue;
       }

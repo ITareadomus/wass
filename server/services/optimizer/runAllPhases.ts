@@ -237,6 +237,12 @@ async function collectDetailedMetrics(
 
     // Query per dettagli dei non assegnati (incluso OT)
     // Calcola i cleaners compatibili basandosi sui selected_cleaners e le regole di compatibilità
+    // NOTA: La compatibilità si basa su role (Premium/Standard) + can_do_straordinaria
+    // Le settings apartment_types sono caricate in Phase2/Phase4 per la logica completa
+    // Qui usiamo una versione semplificata che considera:
+    // - Premium task → richiede cleaner Premium
+    // - Straordinaria → richiede can_do_straordinaria
+    // - typeApt: tutti i ruoli possono fare tutti i tipi di appartamento (secondo current settings)
     const unassignedDetails = await pool.query(`
       WITH selected_cleaners AS (
         SELECT UNNEST(cleaners) as cleaner_id FROM daily_selected_cleaners WHERE work_date = $2
@@ -244,8 +250,7 @@ async function collectDetailedMetrics(
       cleaner_details AS (
         SELECT 
           c.cleaner_id,
-          c.role,
-          COALESCE(c.contract_type, 'C') as contract_type,
+          COALESCE(c.role, 'Standard') as role,
           COALESCE(c.can_do_straordinaria, false) as can_do_straordinaria
         FROM cleaners c
         WHERE c.work_date = $2 AND c.cleaner_id IN (SELECT cleaner_id FROM selected_cleaners)
@@ -262,14 +267,8 @@ async function collectDetailedMetrics(
             SELECT COUNT(*)
             FROM cleaner_details cd
             WHERE 
-              (NOT dc.premium OR cd.role = 'Premium')
+              (NOT COALESCE(dc.premium, false) OR cd.role = 'Premium')
               AND (NOT COALESCE(dc.straordinaria, false) OR cd.can_do_straordinaria)
-              AND (
-                cd.contract_type = 'A CHIAMATA' 
-                OR cd.contract_type = 'C'
-                OR (cd.contract_type = 'B' AND COALESCE(dc.type_apt, 'C') IN ('A', 'B'))
-                OR (cd.contract_type = 'A' AND COALESCE(dc.type_apt, 'C') = 'A')
-              )
           ) as compatible_cleaners_count
         FROM optimizer.optimizer_unassigned ou
         LEFT JOIN daily_containers dc ON dc.task_id = ou.task_id AND dc.work_date = $2

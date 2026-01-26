@@ -12,6 +12,8 @@ export interface TaskForScheduling {
   checkinDate: string | null;
   priorityType: Priority | null;
   straordinaria?: boolean;
+  premium?: boolean;
+  typeApt?: string;
 }
 
 export interface CleanerForScheduling {

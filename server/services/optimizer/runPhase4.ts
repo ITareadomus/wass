@@ -9,6 +9,26 @@ import {
 import { TaskForScheduling } from './phase3';
 import { updateRunStatus, insertDecisionsBatch, OptimizerDecision, getLatestRunForDate } from './db';
 import { loadPriorityStartWindows, mapPriorityType, priorityToDbFormat } from './priorityWindows';
+import { ApartmentTypes, DEFAULT_APARTMENT_TYPES } from './phase2';
+
+async function loadApartmentTypes(): Promise<ApartmentTypes> {
+  try {
+    const result = await pool.query(`
+      SELECT value FROM app_settings WHERE key = 'apartment_types'
+    `);
+    if (result.rows.length > 0 && result.rows[0].value) {
+      return {
+        standard_apt: result.rows[0].value.standard_apt || DEFAULT_APARTMENT_TYPES.standard_apt,
+        premium_apt: result.rows[0].value.premium_apt || DEFAULT_APARTMENT_TYPES.premium_apt,
+        straordinario_apt: result.rows[0].value.straordinario_apt || DEFAULT_APARTMENT_TYPES.straordinario_apt,
+        formatore_apt: result.rows[0].value.formatore_apt || DEFAULT_APARTMENT_TYPES.formatore_apt
+      };
+    }
+  } catch (e) {
+    console.error('Failed to load apartment_types from app_settings, using defaults', e);
+  }
+  return DEFAULT_APARTMENT_TYPES;
+}
 
 export interface Phase4RunResult {
   runId: string;
@@ -270,7 +290,9 @@ async function loadTasksForScheduling(workDate: string): Promise<Map<number, Tas
       checkin_time,
       checkin_date,
       priority,
-      straordinaria
+      straordinaria,
+      COALESCE(premium, false) as premium,
+      COALESCE(type_apt, 'C') as type_apt
     FROM daily_containers
     WHERE work_date = $1
       AND lat IS NOT NULL 
@@ -295,7 +317,9 @@ async function loadTasksForScheduling(workDate: string): Promise<Map<number, Tas
       checkinTime: row.checkin_time,
       checkinDate: checkinDateStr,
       priorityType: mapPriorityType(row.priority),
-      straordinaria: row.straordinaria === true
+      straordinaria: row.straordinaria === true,
+      premium: row.premium === true,
+      typeApt: row.type_apt
     });
   }
   return map;
@@ -441,7 +465,12 @@ export async function runPhase4(
   }
 
   try {
-    const fullParams: Phase4Params = { ...DEFAULT_PHASE4_PARAMS, ...params };
+    const apartmentTypes = await loadApartmentTypes();
+    const fullParams: Phase4Params = { 
+      ...DEFAULT_PHASE4_PARAMS, 
+      ...params,
+      apartmentTypes 
+    };
 
     const [schedules, unassignedTasks, tasksMap, priorityWindows] = await Promise.all([
       loadPhase3Schedules(resolvedRunId),
