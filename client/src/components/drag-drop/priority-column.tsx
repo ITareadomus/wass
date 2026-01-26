@@ -1,12 +1,9 @@
 import { Droppable } from "react-beautiful-dnd";
 import { TaskType as Task } from "@shared/schema";
 import TaskCard from "./task-card";
-import { Clock, AlertCircle, ArrowDown, Calendar, CheckSquare, RefreshCw } from "lucide-react";
+import { Clock, AlertCircle, ArrowDown, CheckSquare } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useToast } from "@/hooks/use-toast";
-import { format } from "date-fns";
 import { useState, useEffect, useMemo } from "react";
-import { fetchWithOperation } from "@/lib/operationManager";
 
 interface ContainerMultiSelectState {
   isActive: boolean;
@@ -24,11 +21,9 @@ interface PriorityColumnProps {
   tasks: Task[];
   droppableId: string;
   icon: "clock" | "alert-circle" | "arrow-down";
-  assignAction?: () => Promise<void>;
   isDragDisabled?: boolean;
   containerMultiSelectState?: ContainerMultiSelectState;
   highlightedTaskIds?: Set<string>;
-  useNewOptimizer?: boolean; // Toggle: true = nuovo optimizer (TS), false = vecchio (Python)
 }
 
 export default function PriorityColumn({
@@ -37,16 +32,11 @@ export default function PriorityColumn({
   tasks,
   droppableId,
   icon,
-  assignAction,
   isDragDisabled = false,
   containerMultiSelectState,
   highlightedTaskIds = new Set(),
-  useNewOptimizer = true,
 }: PriorityColumnProps) {
-  const [isAssigning, setIsAssigning] = useState(false);
   const [isDateInPast, setIsDateInPast] = useState(false);
-  const { toast } = useToast();
-  const [hasAssigned, setHasAssigned] = useState(false);
   
   // Usa lo stato passato dal parent
   const isMultiSelectMode = containerMultiSelectState?.isActive ?? false;
@@ -113,15 +103,6 @@ export default function PriorityColumn({
     return logisticCodeCounts[task.name] > 1;
   };
 
-  // Funzione modificata per usare hasAssigned
-  const handleAssign = async () => {
-    if (assignAction) {
-      await assignAction();
-      setHasAssigned(true); // Imposta hasAssigned a true dopo l'assegnazione
-    }
-  };
-
-
   const getColumnClass = (priority: string, tasks: Task[]) => {
     switch (priority) {
       case "early-out":
@@ -159,115 +140,6 @@ export default function PriorityColumn({
     }
   };
 
-  const handleAssignContainer = async () => {
-    try {
-      setIsAssigning(true);
-      const savedDate = localStorage.getItem('selected_work_date');
-      if (!savedDate) {
-        toast({
-          variant: "destructive",
-          title: "Errore",
-          description: "Nessuna data selezionata",
-        });
-        setIsAssigning(false);
-        return;
-      }
-      const dateStr = savedDate;
-
-      let endpoint = '';
-      let successMessage = '';
-
-      if (useNewOptimizer) {
-        // NUOVO OPTIMIZER TypeScript - usa run-all con apply
-        endpoint = '/api/optimizer/run-all';
-        successMessage = `✅ ${title} assegnati con nuovo optimizer!`;
-        
-        console.log(`🚀 Esecuzione NUOVO optimizer per ${priority}, data: ${dateStr}`);
-        const response = await fetchWithOperation(`assign-${priority}-new`, endpoint, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ 
-            date: dateStr, 
-            skipPhase4: false, 
-            applyToProduction: true 
-          })
-        });
-
-        if (!response.ok) {
-          throw new Error(`Errore durante l'assegnazione ${priority}`);
-        }
-
-        const result = await response.json();
-        console.log(`Assegnazione ${priority} (nuovo optimizer) completata:`, result);
-        
-        const summary = result.summary || {};
-        toast({
-          variant: "success",
-          title: "Successo",
-          description: `${successMessage} (${summary.tasksAssigned || 0} task assegnate, ${summary.tasksUnassigned || 0} non assegnate)`,
-        });
-      } else {
-        // VECCHIO OPTIMIZER Python
-        switch (priority) {
-          case 'early-out':
-            endpoint = '/api/assign-early-out-to-timeline';
-            successMessage = '✅ EARLY-OUT assegnati con successo!';
-            break;
-          case 'high':
-            endpoint = '/api/assign-high-priority-to-timeline';
-            successMessage = '✅ HIGH PRIORITY assegnati con successo!';
-            break;
-          case 'low':
-            endpoint = '/api/assign-low-priority-to-timeline';
-            successMessage = '✅ LOW PRIORITY assegnati con successo!';
-            break;
-          default:
-            throw new Error('Tipo di container non supportato');
-        }
-
-        console.log(`🔄 Esecuzione VECCHIO optimizer per ${priority}, data: ${dateStr}`);
-        const response = await fetchWithOperation(`assign-${priority}`, endpoint, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ date: dateStr })
-        });
-
-        if (!response.ok) {
-          throw new Error(`Errore durante l'assegnazione ${priority}`);
-        }
-
-        const result = await response.json();
-        console.log(`Assegnazione ${priority} (vecchio optimizer) completata:`, result);
-
-        toast({
-          variant: "success",
-          title: "Successo",
-          description: successMessage,
-        });
-      }
-
-      // Ricarica i task per riflettere le nuove assegnazioni
-      if ((window as any).reloadAllTasks) {
-        console.log('🔄 Ricaricamento task dopo assegnazione...');
-        await (window as any).reloadAllTasks();
-        console.log('✅ Task ricaricati con successo');
-      }
-    } catch (error: any) {
-      if (error.message.includes("Operazione annullata")) {
-        console.log(`ℹ️ Assegnazione ${priority} annullata - richiesta più recente in corso`);
-        return;
-      }
-      console.error(`Errore nell'assegnazione ${priority}:`, error);
-      toast({
-        title: "Errore",
-        description: `${title} non assegnati, errore!`,
-        variant: "destructive",
-      });
-    } finally {
-      setIsAssigning(false);
-    }
-  };
-
   return (
     <div className={`${getColumnClass(priority, tasks)} rounded-lg p-4 border-2`}>
       <div className="flex items-center justify-between mb-4">
@@ -295,41 +167,18 @@ export default function PriorityColumn({
             )}
           </div>
         </div>
-        <div className="flex gap-2">
-          <Button
-            variant={isMultiSelectMode ? "default" : "outline"}
-            size="sm"
-            onClick={toggleMode}
-            disabled={tasks.length === 0 || isDateInPast}
-            className="text-xs px-2 py-1 h-7 border-2 border-custom-blue"
-            title={isMultiSelectMode ? "Disattiva selezione multipla" : "Attiva selezione multipla"}
-            data-testid="button-toggle-multiselect"
-          >
-            <CheckSquare className={`w-3 h-3 ${isMultiSelectMode ? 'mr-1' : ''}`} />
-            {isMultiSelectMode && <span className="ml-1">On</span>}
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleAssignContainer} // Usa toggle-aware handler
-            disabled={isAssigning || tasks.length === 0 || isDateInPast || tasks.every(t => (t as any).locked)}
-            className="text-xs px-2 py-1 h-7 border-2 border-custom-blue"
-            title={isDateInPast ? "Non puoi assegnare task per date passate" : tasks.every(t => (t as any).locked) ? "Tutte le task sono bloccate" : ""}
-            data-testid="button-assign"
-          >
-            {isAssigning ? (
-              <>
-                <RefreshCw className="w-3 h-3 mr-1 animate-spin" />
-                Assegnando...
-              </>
-            ) : (
-              <>
-                <Calendar className="w-3 h-3 mr-1" />
-                Assegna
-              </>
-            )}
-          </Button>
-        </div>
+        <Button
+          variant={isMultiSelectMode ? "default" : "outline"}
+          size="sm"
+          onClick={toggleMode}
+          disabled={tasks.length === 0 || isDateInPast}
+          className="text-xs px-2 py-1 h-7 border-2 border-custom-blue"
+          title={isMultiSelectMode ? "Disattiva selezione multipla" : "Attiva selezione multipla"}
+          data-testid="button-toggle-multiselect"
+        >
+          <CheckSquare className={`w-3 h-3 ${isMultiSelectMode ? 'mr-1' : ''}`} />
+          {isMultiSelectMode && <span className="ml-1">On</span>}
+        </Button>
       </div>
       <Droppable droppableId={droppableId}>
         {(provided, snapshot) => (
@@ -344,7 +193,7 @@ export default function PriorityColumn({
           >
             {tasks.map((task, index) => {
               // Verifica se è duplicata (stesso logistic_code ma id diverso)
-              const isDuplicate = hasAssigned && tasks.some(
+              const isDuplicate = tasks.some(
                 t => t.name === task.name && t.id !== task.id
               );
               const isHighlighted = highlightedTaskIds.has(String(task.id));
