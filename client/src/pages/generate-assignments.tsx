@@ -1965,7 +1965,7 @@ export default function GenerateAssignments() {
             onDragUpdate={onDragUpdate}
           >
             <div className="mb-4 flex items-center gap-3">
-              <div className="relative flex-1 max-w-md">
+              <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-custom-blue" />
                 <Input
                   placeholder="Cerca task..."
@@ -1975,6 +1975,7 @@ export default function GenerateAssignments() {
                   data-testid="input-search-task"
                 />
               </div>
+              <div className="flex items-center gap-2 flex-shrink-0">
               <Button
                 onClick={async () => {
                   try {
@@ -2066,6 +2067,7 @@ export default function GenerateAssignments() {
                   <><RefreshCw className="w-4 h-4" /> Refresh Containers</>
                 )}
               </Button>
+              </div>
             </div>
 
             {(() => {
