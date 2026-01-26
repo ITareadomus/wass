@@ -2083,7 +2083,7 @@ export default function TimelineView({
                       )}
                     </Droppable>
                     {/* Colonna ore totali lavorate */}
-                    <div className="flex-shrink-0 w-20 flex items-center justify-center border-l border-border bg-custom-blue/10 text-center">
+                    <div className="flex-shrink-0 w-20 flex items-center justify-center border-l border-border bg-sky-100/30 dark:bg-sky-900/10 text-center">
                       {(() => {
                         const cleanerTasks = tasks.filter(task =>
                           (task as any).assignedCleaner === cleaner.id
