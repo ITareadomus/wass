@@ -1704,7 +1704,7 @@ export default function TimelineView({
                 </div>
               ))}
             </div>
-            <div className="flex-shrink-0 w-14 text-center text-xs font-semibold text-foreground border-l border-border px-1">
+            <div className="flex-shrink-0 w-14 text-center text-xs font-semibold text-foreground border-l border-border px-1 flex items-center justify-center">
               Ore
             </div>
           </div>
@@ -2083,7 +2083,7 @@ export default function TimelineView({
                       )}
                     </Droppable>
                     {/* Colonna ore totali lavorate */}
-                    <div className="flex-shrink-0 w-14 flex items-center justify-center border-l border-border bg-custom-blue/10">
+                    <div className="flex-shrink-0 w-14 flex items-center justify-center border-l border-border bg-custom-blue/10 text-center">
                       {(() => {
                         const cleanerTasks = tasks.filter(task =>
                           (task as any).assignedCleaner === cleaner.id
