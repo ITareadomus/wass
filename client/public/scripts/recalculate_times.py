@@ -169,9 +169,16 @@ def recalculate_cleaner_times(cleaner_data: Dict[str, Any]) -> Dict[str, Any]:
             cleaning_time = 60
 
         # Calcola travel_time
+        # PRESERVA travel_time esistente se > 0 (già calcolato accuratamente)
+        # Ricalcola solo se mancante (0 o null) - es. nuova task inserita
+        existing_travel = task.get("travel_time")
         if i == 0:
             travel_time = 0
+        elif existing_travel is not None and existing_travel > 0:
+            # Preserva il travel_time esistente
+            travel_time = int(existing_travel)
         else:
+            # Calcola nuovo travel_time (task nuova o senza travel_time)
             travel_time = int(round(travel_minutes(
                 prev_lat, prev_lng, lat, lng, prev_addr, addr
             )))

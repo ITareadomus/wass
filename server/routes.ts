@@ -3066,11 +3066,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const overlaps: any[] = [];
 
         for (const cId of allCollaboratorIds) {
-          // Carica tutti i task del cleaner
+          // Carica tutti i task del cleaner nel formato per recalculateCleanerTimes
           const tasksResult = await client.query(
-            `SELECT task_id as "taskId", logistic_code as "logisticCode", cleaner_id as "cleanerId",
-                    sequence, cleaning_time as "cleaningTime", address, lat, lng,
-                    start_time as "startTime", end_time as "endTime", travel_time as "travelTime"
+            `SELECT task_id, logistic_code, cleaner_id,
+                    sequence, cleaning_time, address, lat, lng,
+                    start_time, end_time, travel_time
              FROM daily_assignments_current
              WHERE work_date = $1 AND cleaner_id = $2
              ORDER BY sequence`,
@@ -3082,14 +3082,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
           // Ottieni start_time del cleaner
           const cleanerStartTime = await getCleanerStartTime(cId, workDate) || '10:00';
 
-          // Ricalcola
-          const recalculated = await recomputeSchedule(tasksResult.rows, cleanerStartTime, workDate);
+          // Costruisci cleanerData nel formato atteso da recalculateCleanerTimes (Python script)
+          const cleanerData = {
+            cleaner: {
+              id: cId,
+              start_time: cleanerStartTime
+            },
+            tasks: tasksResult.rows.map((r: any) => ({
+              task_id: r.task_id,
+              logistic_code: r.logistic_code,
+              sequence: r.sequence,
+              cleaning_time: r.cleaning_time,
+              address: r.address,
+              lat: r.lat,
+              lng: r.lng,
+              start_time: r.start_time,
+              end_time: r.end_time,
+              travel_time: r.travel_time
+            }))
+          };
+
+          // Ricalcola usando il Python script (calcoli accurati)
+          const updatedCleanerData = await recalculateCleanerTimes(cleanerData, workDate);
 
           // Valida overlap
-          const overlapCheck = validateOverlap(recalculated.map(t => ({
-            taskId: String(t.taskId),
-            startTime: t.startTime,
-            endTime: t.endTime
+          const recalculatedTasks = updatedCleanerData.tasks || [];
+          const overlapCheck = validateOverlap(recalculatedTasks.map((t: any) => ({
+            taskId: String(t.task_id),
+            startTime: t.start_time,
+            endTime: t.end_time
           })), cId);
 
           if (overlapCheck.hasOverlap) {
@@ -3097,12 +3118,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
 
           // Aggiorna gli orari nel DB
-          for (const task of recalculated) {
+          for (const task of recalculatedTasks) {
             await client.query(
               `UPDATE daily_assignments_current 
                SET start_time = $1, end_time = $2, travel_time = $3
                WHERE work_date = $4 AND cleaner_id = $5 AND task_id = $6`,
-              [task.startTime, task.endTime, task.travelTime, workDate, cId, task.taskId]
+              [task.start_time, task.end_time, task.travel_time, workDate, cId, task.task_id]
             );
           }
         }
@@ -3284,12 +3305,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
           ]);
         }
 
-        // 5. Ricalcola orari per ogni cleaner e valida overlap
+        // 5. Ricalcola orari per ogni cleaner usando Python script (calcoli accurati)
         for (const cId of cleanerIds) {
           const tasksResult = await client.query(
-            `SELECT task_id as "taskId", logistic_code as "logisticCode", cleaner_id as "cleanerId",
-                    sequence, cleaning_time as "cleaningTime", address, lat, lng,
-                    start_time as "startTime", end_time as "endTime", travel_time as "travelTime"
+            `SELECT task_id, logistic_code, cleaner_id,
+                    sequence, cleaning_time, address, lat, lng,
+                    start_time, end_time, travel_time
              FROM daily_assignments_current
              WHERE work_date = $1 AND cleaner_id = $2
              ORDER BY sequence`,
@@ -3299,24 +3320,46 @@ export async function registerRoutes(app: Express): Promise<Server> {
           if (tasksResult.rows.length === 0) continue;
 
           const cleanerStartTime = await getCleanerStartTime(Number(cId), workDate) || '10:00';
-          const recalculated = await recomputeSchedule(tasksResult.rows, cleanerStartTime, workDate);
+          
+          // Costruisci cleanerData nel formato atteso da recalculateCleanerTimes
+          const cleanerData = {
+            cleaner: {
+              id: Number(cId),
+              start_time: cleanerStartTime
+            },
+            tasks: tasksResult.rows.map((r: any) => ({
+              task_id: r.task_id,
+              logistic_code: r.logistic_code,
+              sequence: r.sequence,
+              cleaning_time: r.cleaning_time,
+              address: r.address,
+              lat: r.lat,
+              lng: r.lng,
+              start_time: r.start_time,
+              end_time: r.end_time,
+              travel_time: r.travel_time
+            }))
+          };
 
-          const overlapCheck = validateOverlap(recalculated.map(t => ({
-            taskId: String(t.taskId),
-            startTime: t.startTime,
-            endTime: t.endTime
+          const updatedCleanerData = await recalculateCleanerTimes(cleanerData, workDate);
+          const recalculatedTasks = updatedCleanerData.tasks || [];
+
+          const overlapCheck = validateOverlap(recalculatedTasks.map((t: any) => ({
+            taskId: String(t.task_id),
+            startTime: t.start_time,
+            endTime: t.end_time
           })), Number(cId));
 
           if (overlapCheck.hasOverlap) {
             overlaps.push(overlapCheck);
           }
 
-          for (const task of recalculated) {
+          for (const task of recalculatedTasks) {
             await client.query(
               `UPDATE daily_assignments_current 
                SET start_time = $1, end_time = $2, travel_time = $3
                WHERE work_date = $4 AND cleaner_id = $5 AND task_id = $6`,
-              [task.startTime, task.endTime, task.travelTime, workDate, Number(cId), task.taskId]
+              [task.start_time, task.end_time, task.travel_time, workDate, Number(cId), task.task_id]
             );
           }
         }
@@ -3458,9 +3501,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         for (const cId of allAffectedCleaners) {
           const tasksResult = await client.query(
-            `SELECT task_id as "taskId", logistic_code as "logisticCode", cleaner_id as "cleanerId",
-                    sequence, cleaning_time as "cleaningTime", address, lat, lng,
-                    start_time as "startTime", end_time as "endTime", travel_time as "travelTime"
+            `SELECT task_id, logistic_code, cleaner_id,
+                    sequence, cleaning_time, address, lat, lng,
+                    start_time, end_time, travel_time
              FROM daily_assignments_current
              WHERE work_date = $1 AND cleaner_id = $2
              ORDER BY sequence`,
@@ -3470,24 +3513,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
           if (tasksResult.rows.length === 0) continue;
 
           const cleanerStartTime = await getCleanerStartTime(cId, workDate) || '10:00';
-          const recalculated = await recomputeSchedule(tasksResult.rows, cleanerStartTime, workDate);
+          
+          // Usa Python script per calcoli accurati
+          const cleanerData = {
+            cleaner: { id: cId, start_time: cleanerStartTime },
+            tasks: tasksResult.rows.map((r: any) => ({
+              task_id: r.task_id,
+              logistic_code: r.logistic_code,
+              sequence: r.sequence,
+              cleaning_time: r.cleaning_time,
+              address: r.address,
+              lat: r.lat,
+              lng: r.lng,
+              start_time: r.start_time,
+              end_time: r.end_time,
+              travel_time: r.travel_time
+            }))
+          };
 
-          const overlapCheck = validateOverlap(recalculated.map(t => ({
-            taskId: String(t.taskId),
-            startTime: t.startTime,
-            endTime: t.endTime
+          const updatedCleanerData = await recalculateCleanerTimes(cleanerData, workDate);
+          const recalculatedTasks = updatedCleanerData.tasks || [];
+
+          const overlapCheck = validateOverlap(recalculatedTasks.map((t: any) => ({
+            taskId: String(t.task_id),
+            startTime: t.start_time,
+            endTime: t.end_time
           })), cId);
 
           if (overlapCheck.hasOverlap) {
             overlaps.push(overlapCheck);
           }
 
-          for (const task of recalculated) {
+          for (const task of recalculatedTasks) {
             await client.query(
               `UPDATE daily_assignments_current 
                SET start_time = $1, end_time = $2, travel_time = $3
                WHERE work_date = $4 AND cleaner_id = $5 AND task_id = $6`,
-              [task.startTime, task.endTime, task.travelTime, workDate, cId, task.taskId]
+              [task.start_time, task.end_time, task.travel_time, workDate, cId, task.task_id]
             );
           }
         }
@@ -3600,12 +3662,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
           [workDate, taskId]
         );
 
-        // 3. Ricalcola orari per i cleaners coinvolti
+        // 3. Ricalcola orari per i cleaners coinvolti usando Python script
         for (const cleanerId of affectedCleaners) {
           const tasksResult = await client.query(
-            `SELECT task_id as "taskId", logistic_code as "logisticCode", cleaner_id as "cleanerId",
-                    sequence, cleaning_time as "cleaningTime", address, lat, lng,
-                    start_time as "startTime", end_time as "endTime", travel_time as "travelTime"
+            `SELECT task_id, logistic_code, cleaner_id,
+                    sequence, cleaning_time, address, lat, lng,
+                    start_time, end_time, travel_time
              FROM daily_assignments_current
              WHERE work_date = $1 AND cleaner_id = $2
              ORDER BY sequence`,
@@ -3620,21 +3682,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
               `UPDATE daily_assignments_current 
                SET sequence = $1, followup = $2
                WHERE work_date = $3 AND cleaner_id = $4 AND task_id = $5`,
-              [seq, seq > 1, workDate, cleanerId, task.taskId]
+              [seq, seq > 1, workDate, cleanerId, task.task_id]
             );
             task.sequence = seq;
             seq++;
           }
 
           const cleanerStartTime = await getCleanerStartTime(cleanerId, workDate) || '10:00';
-          const recalculated = await recomputeSchedule(tasksResult.rows, cleanerStartTime, workDate);
+          
+          // Usa Python script per calcoli accurati
+          const cleanerData = {
+            cleaner: { id: cleanerId, start_time: cleanerStartTime },
+            tasks: tasksResult.rows.map((r: any) => ({
+              task_id: r.task_id,
+              logistic_code: r.logistic_code,
+              sequence: r.sequence,
+              cleaning_time: r.cleaning_time,
+              address: r.address,
+              lat: r.lat,
+              lng: r.lng,
+              start_time: r.start_time,
+              end_time: r.end_time,
+              travel_time: r.travel_time
+            }))
+          };
 
-          for (const task of recalculated) {
+          const updatedCleanerData = await recalculateCleanerTimes(cleanerData, workDate);
+          const recalculatedTasks = updatedCleanerData.tasks || [];
+
+          for (const task of recalculatedTasks) {
             await client.query(
               `UPDATE daily_assignments_current 
                SET start_time = $1, end_time = $2, travel_time = $3
                WHERE work_date = $4 AND cleaner_id = $5 AND task_id = $6`,
-              [task.startTime, task.endTime, task.travelTime, workDate, cleanerId, task.taskId]
+              [task.start_time, task.end_time, task.travel_time, workDate, cleanerId, task.task_id]
             );
           }
         }
