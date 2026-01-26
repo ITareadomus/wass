@@ -48,7 +48,15 @@ export interface Phase4RunResult {
   error?: string;
 }
 
-async function loadPhase3Schedules(runId: string): Promise<CleanerSchedule[]> {
+async function loadPhase3Schedules(runId: string, workDate: string): Promise<CleanerSchedule[]> {
+  // IMPORTANTE: Carica TUTTI i cleaners selezionati, non solo quelli con task assegnati
+  // Questo permette a Phase 4 di assegnare task ai cleaners vuoti
+  const selectedCleanersResult = await pool.query(`
+    SELECT cleaners FROM daily_selected_cleaners WHERE work_date = $1
+  `, [workDate]);
+  
+  const allSelectedCleanerIds: number[] = selectedCleanersResult.rows[0]?.cleaners || [];
+  
   // Join con daily_containers per ottenere cleaning_time per fairness tracking
   const result = await pool.query(`
     SELECT 
@@ -75,7 +83,19 @@ async function loadPhase3Schedules(runId: string): Promise<CleanerSchedule[]> {
     totalTravel: number;
     totalPriorityPenalty: number;
   }>();
+  
+  // Inizializza TUTTI i cleaners selezionati (anche quelli vuoti)
+  for (const cleanerId of allSelectedCleanerIds) {
+    cleanerMap.set(cleanerId, {
+      tasks: [],
+      minStartTime: null,
+      maxEndTime: null,
+      totalTravel: 0,
+      totalPriorityPenalty: 0
+    });
+  }
 
+  // Poi aggiungi i task per i cleaners che ne hanno
   for (const row of result.rows) {
     if (!cleanerMap.has(row.cleaner_id)) {
       cleanerMap.set(row.cleaner_id, {
@@ -121,8 +141,8 @@ async function loadPhase3Schedules(runId: string): Promise<CleanerSchedule[]> {
     }
   }
 
-  const cleanerCapabilities = await loadCleanerCapabilities(runId);
-  const cleanerStartTimes = await loadCleanerStartTimes(runId);
+  const cleanerCapabilities = await loadCleanerCapabilitiesFromAll(allSelectedCleanerIds);
+  const cleanerStartTimes = await loadCleanerStartTimesFromAll(allSelectedCleanerIds);
 
   const schedules: CleanerSchedule[] = [];
   cleanerMap.forEach((data, cleanerId) => {
@@ -167,12 +187,7 @@ interface CleanerCapabilities {
   canDoStraordinaria: boolean;
 }
 
-async function loadCleanerCapabilities(runId: string): Promise<Map<number, CleanerCapabilities>> {
-  const result = await pool.query(`
-    SELECT DISTINCT cleaner_id FROM optimizer.optimizer_assignment WHERE run_id = $1
-  `, [runId]);
-  
-  const cleanerIds = result.rows.map(r => r.cleaner_id);
+async function loadCleanerCapabilitiesFromAll(cleanerIds: number[]): Promise<Map<number, CleanerCapabilities>> {
   if (cleanerIds.length === 0) return new Map();
 
   const capsResult = await pool.query(`
@@ -196,6 +211,29 @@ async function loadCleanerCapabilities(runId: string): Promise<Map<number, Clean
     });
   }
   return map;
+}
+
+async function loadCleanerStartTimesFromAll(cleanerIds: number[]): Promise<Map<number, string>> {
+  if (cleanerIds.length === 0) return new Map();
+
+  const timesResult = await pool.query(`
+    SELECT cleaner_id, start_time FROM cleaners WHERE cleaner_id = ANY($1::int[])
+  `, [cleanerIds]);
+
+  const map = new Map<number, string>();
+  for (const row of timesResult.rows) {
+    map.set(row.cleaner_id, row.start_time || '09:00');
+  }
+  return map;
+}
+
+async function loadCleanerCapabilities(runId: string): Promise<Map<number, CleanerCapabilities>> {
+  const result = await pool.query(`
+    SELECT DISTINCT cleaner_id FROM optimizer.optimizer_assignment WHERE run_id = $1
+  `, [runId]);
+  
+  const cleanerIds = result.rows.map(r => r.cleaner_id);
+  return loadCleanerCapabilitiesFromAll(cleanerIds);
 }
 
 async function loadCleanerNames(runId: string): Promise<Map<number, string>> {
@@ -473,7 +511,7 @@ export async function runPhase4(
     };
 
     const [schedules, unassignedTasks, tasksMap, priorityWindows] = await Promise.all([
-      loadPhase3Schedules(resolvedRunId),
+      loadPhase3Schedules(resolvedRunId, resolvedWorkDate),
       loadUnassignedTasks(resolvedRunId, resolvedWorkDate),
       loadTasksForScheduling(resolvedWorkDate),
       loadPriorityStartWindows(resolvedRunId)
