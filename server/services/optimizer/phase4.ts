@@ -486,7 +486,7 @@ function tryInsertTask(
   }
   
   let underfilledBonus = 0;
-  if (schedule.tasks.length === 1) {
+  if (schedule.tasks.length === 0) {
     underfilledBonus = params.underfilledBonus;
   }
   

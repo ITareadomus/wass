@@ -152,7 +152,6 @@ export interface CleanerScore {
   breakdown: {
     baseScore: number;
     travelPenalty: number;
-    loadPenalty: number;
     preferenceBonus: number;
     underBonus: number;      // bonus for underfilled cleaners
     overPenalty: number;     // penalty for overloaded cleaners
@@ -304,12 +303,11 @@ export function scoreCleanerForGroup(
   const clientIds = tasks.map(t => t.clientId);
   const hasPreference = clientIds.some(cid => cleaner.preferredCustomers.includes(cid));
   
-  // Legacy penalties (kept for backwards compatibility)
+  // Travel and preference scoring
   const travelPenalty = travelMin * params.travelWeight;
-  const loadPenalty = currentLoad * params.loadWeight;
   const prefBonus = hasPreference ? params.preferenceBonus : 0;
   
-  // NEW: Minutes-based fairness bonuses/penalties
+  // Minutes-based fairness bonuses/penalties (replaces legacy task-count loadPenalty)
   // Bonus for underfilled cleaners (linear)
   const underGap = Math.max(0, targets.minTarget - currentLoadMin);
   const underBonus = underGap * fairness.k_under;
@@ -322,9 +320,9 @@ export function scoreCleanerForGroup(
   const zeroBonus = currentLoadMin === 0 ? fairness.zeroBonus : 0;
   
   // Final score: base + bonuses - penalties
+  // NOTE: loadPenalty removed - minutes-based underBonus/overPenalty now handle fairness
   const finalScore = baseScore 
     - travelPenalty 
-    - loadPenalty 
     + prefBonus 
     + underBonus 
     + zeroBonus 
@@ -342,7 +340,6 @@ export function scoreCleanerForGroup(
     breakdown: {
       baseScore,
       travelPenalty: Math.round(travelPenalty * 10) / 10,
-      loadPenalty: Math.round(loadPenalty * 10) / 10,
       preferenceBonus: prefBonus,
       underBonus: Math.round(underBonus * 10) / 10,
       overPenalty: Math.round(overPenalty * 10) / 10,
