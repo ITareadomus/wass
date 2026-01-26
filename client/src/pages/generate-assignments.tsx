@@ -1977,6 +1977,49 @@ export default function GenerateAssignments() {
               </div>
               <div className="flex items-center gap-2 flex-shrink-0">
               <Button
+                variant="outline"
+                onClick={async () => {
+                  try {
+                    setIsRefreshingContainers(true);
+                    const year = selectedDate.getFullYear();
+                    const month = String(selectedDate.getMonth() + 1).padStart(2, '0');
+                    const day = String(selectedDate.getDate()).padStart(2, '0');
+                    const dateStr = `${year}-${month}-${day}`;
+                    
+                    const response = await fetch('/api/containers/refresh', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ date: dateStr })
+                    });
+                    
+                    if (!response.ok) throw new Error('Errore durante il refresh');
+                    
+                    toast({
+                      variant: "success",
+                      title: "Containers aggiornati",
+                      description: "I dati dei task sono stati aggiornati da ADAM",
+                    });
+                    await reloadAllTasks();
+                  } catch (error) {
+                    toast({
+                      variant: "destructive",
+                      title: "Errore",
+                      description: "Errore durante il refresh dei containers",
+                    });
+                  } finally {
+                    setIsRefreshingContainers(false);
+                  }
+                }}
+                disabled={isRefreshingContainers || isTimelineReadOnly}
+                className="flex items-center gap-2 border-2 border-custom-blue"
+              >
+                {isRefreshingContainers ? (
+                  <><RefreshCw className="w-4 h-4 animate-spin" /> Aggiornando...</>
+                ) : (
+                  <><RefreshCw className="w-4 h-4" /> Refresh Containers</>
+                )}
+              </Button>
+              <Button
                 onClick={async () => {
                   try {
                     setIsAssigning(true);
@@ -2022,49 +2065,6 @@ export default function GenerateAssignments() {
                   <><RefreshCw className="w-4 h-4 animate-spin" /> Assegnando...</>
                 ) : (
                   <><CalendarIcon className="w-4 h-4" /> Assegna</>
-                )}
-              </Button>
-              <Button
-                variant="outline"
-                onClick={async () => {
-                  try {
-                    setIsRefreshingContainers(true);
-                    const year = selectedDate.getFullYear();
-                    const month = String(selectedDate.getMonth() + 1).padStart(2, '0');
-                    const day = String(selectedDate.getDate()).padStart(2, '0');
-                    const dateStr = `${year}-${month}-${day}`;
-                    
-                    const response = await fetch('/api/containers/refresh', {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ date: dateStr })
-                    });
-                    
-                    if (!response.ok) throw new Error('Errore durante il refresh');
-                    
-                    toast({
-                      variant: "success",
-                      title: "Containers aggiornati",
-                      description: "I dati dei task sono stati aggiornati da ADAM",
-                    });
-                    await reloadAllTasks();
-                  } catch (error) {
-                    toast({
-                      variant: "destructive",
-                      title: "Errore",
-                      description: "Errore durante il refresh dei containers",
-                    });
-                  } finally {
-                    setIsRefreshingContainers(false);
-                  }
-                }}
-                disabled={isRefreshingContainers || isTimelineReadOnly}
-                className="flex items-center gap-2 border-2 border-custom-blue"
-              >
-                {isRefreshingContainers ? (
-                  <><RefreshCw className="w-4 h-4 animate-spin" /> Aggiornando...</>
-                ) : (
-                  <><RefreshCw className="w-4 h-4" /> Refresh Containers</>
                 )}
               </Button>
               </div>
