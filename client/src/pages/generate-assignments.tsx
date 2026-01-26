@@ -2034,9 +2034,8 @@ export default function GenerateAssignments() {
             onDragEnd={onDragEnd}
             onDragUpdate={onDragUpdate}
           >
-            {/* Riga superiore: barra ricerca + pulsanti */}
+            {/* Riga superiore: barra ricerca */}
             <div className="flex items-center gap-4 mb-4">
-              {/* Barra di ricerca */}
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-custom-blue" />
                 <Input
@@ -2047,14 +2046,18 @@ export default function GenerateAssignments() {
                   data-testid="input-search-task"
                 />
               </div>
-              {/* Pulsanti Refresh e Assegna */}
-              <div className="flex gap-2">
+            </div>
+
+            {/* Box containers con bordo - include pulsanti in alto a destra */}
+            <div className="border-2 border-custom-blue rounded-lg mb-6">
+              {/* Header con pulsanti Refresh e Assegna */}
+              <div className="flex justify-end gap-2 p-2 border-b-2 border-custom-blue">
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={handleRefreshContainers}
                   disabled={isRefreshingContainers}
-                  className="h-10 px-3 border-2 border-custom-blue"
+                  className="h-9 px-3 border-2 border-custom-blue rounded-md"
                   title="Aggiorna containers"
                   data-testid="button-refresh-containers"
                 >
@@ -2065,7 +2068,7 @@ export default function GenerateAssignments() {
                   size="sm"
                   onClick={handleGlobalAssign}
                   disabled={isGlobalAssigning || isDateInPast(selectedDate) || (earlyOutTasks.length === 0 && highPriorityTasks.length === 0 && lowPriorityTasks.length === 0)}
-                  className="h-10 px-4 bg-custom-blue hover:bg-custom-blue/90"
+                  className="h-9 px-4 bg-custom-blue hover:bg-custom-blue/90 rounded-md"
                   title={isDateInPast(selectedDate) ? "Non puoi assegnare task per date passate" : "Assegna tutti i task"}
                   data-testid="button-global-assign"
                 >
@@ -2079,10 +2082,8 @@ export default function GenerateAssignments() {
                   )}
                 </Button>
               </div>
-            </div>
-
-            {/* Box containers con bordo */}
-            <div className="border-2 border-custom-blue rounded-lg p-4 mb-6">
+              {/* Contenuto containers */}
+              <div className="p-4">
               {(() => {
                 const getHighlightedTaskIds = (tasks: Task[]): Set<string> => {
                   const result = new Set<string>();
@@ -2158,6 +2159,7 @@ export default function GenerateAssignments() {
                   </div>
                 );
               })()}
+              </div>
             </div>
 
           <div className="mt-6 grid grid-cols-1 xl:grid-cols-3 gap-6">
