@@ -525,8 +525,9 @@ export function runPhase2Algorithm(
         
         // Rule 0: Riserva cleaner straordinari per OT non ancora assegnate
         // Se ci sono ancora OT da assegnare e questo gruppo NON è OT,
-        // blocca i cleaner canDoStraordinaria che sono ancora liberi (load=0)
-        if (!groupHasStraordinaria && remainingOtGroups > 0 && cleaner.canDoStraordinaria && load === 0) {
+        // blocca i cleaner canDoStraordinaria (indipendentemente dal loro carico attuale)
+        // Questo garantisce che i cleaner straordinari restino disponibili per le OT
+        if (!groupHasStraordinaria && remainingOtGroups > 0 && cleaner.canDoStraordinaria) {
           incompatibleReasons.push({ cleanerId: cleaner.cleanerId, reasons: ['RESERVED_FOR_PENDING_OT'] });
           continue;
         }
