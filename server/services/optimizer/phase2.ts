@@ -306,7 +306,13 @@ export function runPhase2Algorithm(
   let groupsUnassigned = 0;
   let tasksDropped = 0;
   
-  for (const group of sortedGroups) {
+  // Traccia gruppi OT non ancora processati per riserva cleaner straordinari
+  // Invece di contare, tracciamo l'indice corrente e controlliamo se ci sono OT rimanenti
+  let processedOtCount = 0;
+  const totalOtGroups = sortedGroups.filter(g => g.hasStraordinaria === true).length;
+  
+  for (let groupIndex = 0; groupIndex < sortedGroups.length; groupIndex++) {
+    const group = sortedGroups[groupIndex];
     let currentTaskIds = [...group.taskIds];
     let currentLogisticCodes = [...group.logisticCodes];
     const droppedTasks: number[] = [];
@@ -456,6 +462,10 @@ export function runPhase2Algorithm(
         }
       }
       
+      // Calcola quante OT sono ancora da assegnare
+      // Usa groupHasStraordinaria (calcolato dal contenuto effettivo dopo pruning) per la riserva
+      const remainingOtGroups = totalOtGroups - processedOtCount;
+      
       for (const cleaner of cleaners) {
         const load = cleanerLoad.get(cleaner.cleanerId) || 0;
         const totalTravel = cleanerTotalTravel.get(cleaner.cleanerId) || 0;
@@ -466,6 +476,14 @@ export function runPhase2Algorithm(
         // Straordinaria constraints
         const hasStraordinaria = cleanerHasStraordinaria.get(cleaner.cleanerId) || false;
         const straordinariaDuration = cleanerStraordinariaDuration.get(cleaner.cleanerId) || 0;
+        
+        // Rule 0: Riserva cleaner straordinari per OT non ancora assegnate
+        // Se ci sono ancora OT da assegnare e questo gruppo NON è OT,
+        // blocca i cleaner canDoStraordinaria che sono ancora liberi (load=0)
+        if (!groupHasStraordinaria && remainingOtGroups > 0 && cleaner.canDoStraordinaria && load === 0) {
+          incompatibleReasons.push({ cleanerId: cleaner.cleanerId, reasons: ['RESERVED_FOR_PENDING_OT'] });
+          continue;
+        }
         
         // Rule 1: If cleaner already has straordinaria, they cannot take any more tasks
         if (hasStraordinaria) {
@@ -547,6 +565,8 @@ export function runPhase2Algorithm(
           cleanerHasStraordinaria.set(assignedCleaner.cleanerId, true);
           const existingStraDuration = cleanerStraordinariaDuration.get(assignedCleaner.cleanerId) || 0;
           cleanerStraordinariaDuration.set(assignedCleaner.cleanerId, existingStraDuration + groupStraordinariaDuration);
+          // Incrementa contatore OT processate per rilasciare riserva cleaner straordinari
+          processedOtCount++;
         }
         const existingCleaningTime = cleanerTotalCleaningTime.get(assignedCleaner.cleanerId) || 0;
         cleanerTotalCleaningTime.set(assignedCleaner.cleanerId, existingCleaningTime + groupTotalCleaningTime);
@@ -619,6 +639,11 @@ export function runPhase2Algorithm(
             }
           });
           groupsUnassigned++;
+          // Se questo gruppo OT non è assegnabile, rilascia la riserva per altri cleaner
+          // Usa groupHasStraordinaria (contenuto effettivo dopo pruning) invece di group.hasStraordinaria
+          if (groupHasStraordinaria) {
+            processedOtCount++;
+          }
           break;
         }
       }
