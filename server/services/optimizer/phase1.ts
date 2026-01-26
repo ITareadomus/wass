@@ -21,6 +21,8 @@ export type Phase1Params = {
   neighborLimit: number;
   maxGroupsTotal: number;
   useAdjacentZones: boolean;
+  minGroupSize?: number;           // Dynamic: min task per gruppo
+  maxGroupSize?: number;           // Dynamic: max task per gruppo
 };
 
 export const DEFAULT_PHASE1_PARAMS: Phase1Params = {
@@ -30,7 +32,9 @@ export const DEFAULT_PHASE1_PARAMS: Phase1Params = {
   createSingleGroups: true,
   neighborLimit: 15,
   maxGroupsTotal: 3000,
-  useAdjacentZones: true
+  useAdjacentZones: true,
+  minGroupSize: 1,
+  maxGroupSize: 4
 };
 
 export type CandidateGroup = {
@@ -174,25 +178,28 @@ export function generateCandidateGroups(tasks: TaskInput[], params: Phase1Params
 
     let groupsAddedForSeed = 0;
     const countBefore = groupMap.size;
+    
+    const minGS = params.minGroupSize ?? 1;
+    const maxGS = params.maxGroupSize ?? 4;
 
     for (const a of neighbors) {
-      addGroup([seed, a], seed, seedZone, groupMap);
+      addGroup([seed, a], seed, seedZone, groupMap, minGS, maxGS);
     }
 
     const candidates2 = comb2(neighbors);
     for (const [a, b] of candidates2) {
-      addGroup([seed, a, b], seed, seedZone, groupMap);
+      addGroup([seed, a, b], seed, seedZone, groupMap, minGS, maxGS);
     }
 
     const candidates3 = comb3(neighbors);
     for (const [a, b, c] of candidates3) {
       const g4 = [seed, a, b, c];
-      if (allowFourth(g4)) {
-        addGroup(g4, seed, seedZone, groupMap);
+      if (allowFourth(g4) && maxGS >= 4) {
+        addGroup(g4, seed, seedZone, groupMap, minGS, maxGS);
       }
-      addGroup([seed, a, b], seed, seedZone, groupMap);
-      addGroup([seed, a, c], seed, seedZone, groupMap);
-      addGroup([seed, b, c], seed, seedZone, groupMap);
+      addGroup([seed, a, b], seed, seedZone, groupMap, minGS, maxGS);
+      addGroup([seed, a, c], seed, seedZone, groupMap, minGS, maxGS);
+      addGroup([seed, b, c], seed, seedZone, groupMap, minGS, maxGS);
     }
 
     groupsAddedForSeed = groupMap.size - countBefore;
@@ -277,9 +284,11 @@ function addGroup(
   groupTasks: TaskInput[],
   seed: TaskInput,
   seedZone: number,
-  groupMap: Map<string, CandidateGroup>
+  groupMap: Map<string, CandidateGroup>,
+  minGroupSize: number = 1,
+  maxGroupSize: number = 4
 ): void {
-  if (groupTasks.length < 2 || groupTasks.length > 4) return;
+  if (groupTasks.length < minGroupSize || groupTasks.length > maxGroupSize) return;
 
   // Regola OT: riduci gruppi con straordinaria a forma valida
   const straordinariaTask = groupTasks.find(t => t.straordinaria === true);

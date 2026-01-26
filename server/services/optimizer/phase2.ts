@@ -58,6 +58,7 @@ export interface Phase2Params {
   preferenceBonus: number;
   maxCleanerLoad: number;
   apartmentTypes: ApartmentTypes;
+  dynamicMaxTasks?: number;
 }
 
 export const DEFAULT_PHASE2_PARAMS: Phase2Params = {
@@ -65,12 +66,37 @@ export const DEFAULT_PHASE2_PARAMS: Phase2Params = {
   loadWeight: 5,
   preferenceBonus: 10,
   maxCleanerLoad: 3, // Base max, can be 4 if total travel < 30min
-  apartmentTypes: DEFAULT_APARTMENT_TYPES
+  apartmentTypes: DEFAULT_APARTMENT_TYPES,
+  dynamicMaxTasks: undefined
 };
 
 // Dynamic max load: 3 base, 4 if total travel time < 30 minutes
 export function getDynamicMaxLoad(totalTravelMin: number): number {
   return totalTravelMin < 30 ? 4 : 3;
+}
+
+export interface DynamicLimits {
+  maxTasks: number;
+  minTasks: number;
+  baseMax: number;
+  travelBonus: boolean;
+}
+
+export function calculateDynamicLimits(
+  totalTasks: number,
+  numCleaners: number,
+  avgTravelPerTask?: number
+): DynamicLimits {
+  if (numCleaners <= 0) {
+    return { maxTasks: 3, minTasks: 1, baseMax: 3, travelBonus: false };
+  }
+  
+  const baseMax = Math.ceil(totalTasks / numCleaners);
+  const travelBonus = avgTravelPerTask !== undefined && avgTravelPerTask <= 10;
+  const maxTasks = travelBonus ? baseMax + 1 : baseMax;
+  const minTasks = Math.max(1, maxTasks - 1);
+  
+  return { maxTasks, minTasks, baseMax, travelBonus };
 }
 
 export interface CleanerScore {
@@ -515,7 +541,7 @@ export function runPhase2Algorithm(
       for (const cleaner of cleaners) {
         const load = cleanerLoad.get(cleaner.cleanerId) || 0;
         const totalTravel = cleanerTotalTravel.get(cleaner.cleanerId) || 0;
-        const dynamicMaxLoad = getDynamicMaxLoad(totalTravel);
+        const dynamicMaxLoad = params.dynamicMaxTasks ?? getDynamicMaxLoad(totalTravel);
         // Check if cleaner can fit this group (load + group size must not exceed cap)
         if (load + tasks.length > dynamicMaxLoad) continue;
         

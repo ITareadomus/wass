@@ -7,6 +7,7 @@ import { runPhase3, Phase3RunResult } from './runPhase3';
 import { runPhase4, Phase4RunResult } from './runPhase4';
 import { createRun, updateRunStatus, OptimizerRun } from './db';
 import { DEFAULT_PHASE1_PARAMS } from './phase1';
+import { calculateDynamicLimits } from './phase2';
 
 export interface UnassignedBreakdown {
   taskId: number;
@@ -109,10 +110,24 @@ export async function runAllPhases(
     }
     console.log(`[runAllPhases] Phase 0 complete: ${result.phase0.unlockedTasks} unlocked tasks`);
 
+    const cleanersRes = await pool.query<{ cleaners: number[] }>(
+      `SELECT cleaners FROM daily_selected_cleaners WHERE work_date = $1`,
+      [workDate]
+    );
+    const numCleaners = cleanersRes.rows[0]?.cleaners?.length || 1;
+    const totalTasks = result.phase0.unlockedTasks;
+    const dynamicLimits = calculateDynamicLimits(totalTasks, numCleaners);
+    
+    console.log(`[runAllPhases] Dynamic limits: ${totalTasks} tasks / ${numCleaners} cleaners = minGroup=${dynamicLimits.minTasks}, maxGroup=${dynamicLimits.maxTasks}${dynamicLimits.travelBonus ? ' (+travel bonus)' : ''}`);
+
     console.log(`[runAllPhases] === PHASE 1: Candidate Group Generation ===`);
     result.phase1 = await runPhase1(workDate, {
       existingRunId: runId,
-      preFilteredTasks: result.phase0.unlockedTaskData
+      preFilteredTasks: result.phase0.unlockedTaskData,
+      params: {
+        minGroupSize: dynamicLimits.minTasks,
+        maxGroupSize: dynamicLimits.maxTasks
+      }
     });
     if (result.phase1.status === 'failed') {
       result.status = 'failed';
@@ -124,7 +139,7 @@ export async function runAllPhases(
     console.log(`[runAllPhases] Phase 1 complete: ${result.phase1.groupsGenerated} groups generated`);
 
     console.log(`[runAllPhases] === PHASE 2: Cleaner Assignment ===`);
-    result.phase2 = await runPhase2(workDate, runId);
+    result.phase2 = await runPhase2(workDate, runId, { dynamicMaxTasks: dynamicLimits.maxTasks });
     if (result.phase2.status === 'failed') {
       result.status = 'failed';
       result.error = `Phase 2 failed: ${result.phase2.error}`;
@@ -147,7 +162,7 @@ export async function runAllPhases(
 
     if (!skipPhase4) {
       console.log(`[runAllPhases] === PHASE 4: Recovery ===`);
-      result.phase4 = await runPhase4(workDate, runId);
+      result.phase4 = await runPhase4(workDate, runId, { dynamicMaxTasks: dynamicLimits.maxTasks });
       if (result.phase4.status === 'failed') {
         console.warn(`[runAllPhases] Phase 4 failed (non-critical): ${result.phase4.error}`);
       } else {

@@ -23,6 +23,8 @@ export interface Phase4Params {
   maxCleanersToTryPerTask: number;     // Max cleaners da provare per task (performance cap)
   // Compatibilità appartamento (role-based)
   apartmentTypes: ApartmentTypes;
+  // Dynamic max tasks per cleaner (calcolato da totalTasks/numCleaners)
+  dynamicMaxTasks?: number;
 }
 
 // LIMITE HARD DINAMICO - basato sul travel totale del cleaner (come Phase 2)
@@ -42,7 +44,9 @@ export const DEFAULT_PHASE4_PARAMS: Phase4Params = {
   relaxMultiplier: 3,                  // Esponenziale: L1=200, L2=600, L3=1800
   maxCleanersToTryPerTask: 20,         // Cap performance
   // Compatibilità appartamento
-  apartmentTypes: DEFAULT_APARTMENT_TYPES
+  apartmentTypes: DEFAULT_APARTMENT_TYPES,
+  // Dynamic max tasks - se undefined usa getDynamicMaxLoad(travel)
+  dynamicMaxTasks: undefined
 };
 
 export interface CleanerSchedule {
@@ -413,11 +417,11 @@ function tryInsertTask(
   const deltaPriorityPenalty = simResult.totalPriorityPenalty - schedule.totalPriorityPenalty;
   
   // =====================================================
-  // VINCOLO HARD DINAMICO: max load basato sul travel SIMULATO
-  // getDynamicMaxLoad(simResult.totalTravel) → 4 se travel < 30min, altrimenti 3
-  // Questo vincolo usa il travel DOPO l'inserimento, non prima
+  // VINCOLO HARD DINAMICO: max load basato su params.dynamicMaxTasks o fallback a travel-based
+  // Se dynamicMaxTasks è definito, usa quello (calcolato da totalTasks/numCleaners)
+  // Altrimenti usa getDynamicMaxLoad(travel) → 4 se travel < 30min, altrimenti 3
   // =====================================================
-  const dynamicMaxLoad = getDynamicMaxLoad(simResult.totalTravel);
+  const dynamicMaxLoad = params.dynamicMaxTasks ?? getDynamicMaxLoad(simResult.totalTravel);
   if (newTaskCount > dynamicMaxLoad) {
     return {
       cleanerId: schedule.cleanerId,
@@ -634,10 +638,11 @@ function trySwapForTask(
       if (!simResult.ok) continue;
       
       // =====================================================
-      // VINCOLO HARD DINAMICO: max load basato sul travel SIMULATO
-      // getDynamicMaxLoad usa il travel DOPO lo swap, non prima
+      // VINCOLO HARD DINAMICO: max load basato su params.dynamicMaxTasks o fallback a travel-based
+      // Se dynamicMaxTasks è definito, usa quello (calcolato da totalTasks/numCleaners)
+      // Altrimenti usa getDynamicMaxLoad(travel) → 4 se travel < 30min, altrimenti 3
       // =====================================================
-      const dynamicMaxLoad = getDynamicMaxLoad(simResult.totalTravel);
+      const dynamicMaxLoad = params.dynamicMaxTasks ?? getDynamicMaxLoad(simResult.totalTravel);
       const newTaskCount = tasksForSim.length;
       if (newTaskCount > dynamicMaxLoad) {
         continue;
