@@ -503,7 +503,8 @@ function tryInsertTask(
   const newLoadMin = currentLoadMin + deltaLoadMin;
   
   // Bonus for underfilled cleaners (linear, consistent with Phase 2)
-  const underGap = Math.max(0, targets.minTarget - currentLoadMin);
+  // Use newLoadMin (post-insertion) to see if cleaner would still be under target
+  const underGap = Math.max(0, targets.minTarget - newLoadMin);
   const minutesUnderBonus = underGap * fairness.k_under;
   
   // Penalty for overloaded cleaners (quadratic, consistent with Phase 2)

@@ -145,8 +145,7 @@ export interface CleanerScore {
   name: string;
   score: number;
   travelMin: number;
-  currentLoad: number;
-  currentLoadMin: number;    // workMin + wT * travelMin
+  currentLoadMin: number;    // workMin + wT * travelMin (pre-assignment)
   newLoadMin: number;        // loadMin after adding this group
   hasPreference: boolean;
   breakdown: {
@@ -267,7 +266,6 @@ export function isCleanerCompatibleWithGroup(
 export function scoreCleanerForGroup(
   cleaner: CleanerInput,
   tasks: TaskForPhase2[],
-  cleanerLoad: Map<number, number>,
   cleanerLastPosition: Map<number, { lat: number; lng: number }>,
   cleanerWorkMin: Map<number, number>,
   cleanerTravelMin: Map<number, number>,
@@ -286,8 +284,6 @@ export function scoreCleanerForGroup(
     const fakeTaskB: TaskInput = { taskId: 0, logisticCode: 0, lat: firstTask.lat, lng: firstTask.lng };
     travelMin = estimateTravelMinutes(fakeTaskA, fakeTaskB);
   }
-  
-  const currentLoad = cleanerLoad.get(cleaner.cleanerId) || 0;
   
   // Minutes-based load calculation
   const currentWorkMin = cleanerWorkMin.get(cleaner.cleanerId) || 0;
@@ -308,8 +304,9 @@ export function scoreCleanerForGroup(
   const prefBonus = hasPreference ? params.preferenceBonus : 0;
   
   // Minutes-based fairness bonuses/penalties (replaces legacy task-count loadPenalty)
-  // Bonus for underfilled cleaners (linear)
-  const underGap = Math.max(0, targets.minTarget - currentLoadMin);
+  // Bonus for underfilled cleaners (linear) - uses newLoadMin (post-assignment)
+  // This rewards assignments that keep a cleaner under target AFTER the assignment
+  const underGap = Math.max(0, targets.minTarget - newLoadMin);
   const underBonus = underGap * fairness.k_under;
   
   // Penalty for overloaded cleaners (quadratic)
@@ -333,7 +330,6 @@ export function scoreCleanerForGroup(
     name: cleaner.name,
     score: Math.round(finalScore * 10) / 10,
     travelMin,
-    currentLoad,
     currentLoadMin: Math.round(currentLoadMin),
     newLoadMin: Math.round(newLoadMin),
     hasPreference,
@@ -403,7 +399,8 @@ export function runPhase2Algorithm(
 ): Phase2Result {
   const events: Phase2Event[] = [];
   const assignments: AssignmentResult[] = [];
-  const cleanerLoad = new Map<number, number>();
+  const cleanerTaskCount = new Map<number, number>();  // Task count (for straordinaria rules)
+  const cleanerLoadMin = new Map<number, number>();    // Minutes-based load = workMin + wT * travelMin
   const cleanerTotalTravel = new Map<number, number>(); // Track cumulative travel time
   const cleanerLastPosition = new Map<number, { lat: number; lng: number }>();
   // Straordinaria tracking per cleaner
@@ -411,12 +408,13 @@ export function runPhase2Algorithm(
   const cleanerStraordinariaDuration = new Map<number, number>(); // Duration in minutes
   const cleanerTotalCleaningTime = new Map<number, number>(); // Total cleaning time assigned
   
-  // NEW: Minutes-based fairness tracking
+  // Minutes-based fairness tracking
   const cleanerWorkMin = new Map<number, number>();     // Total work minutes assigned
   const cleanerTravelMin = new Map<number, number>();   // Total travel minutes assigned
   
   cleaners.forEach(c => {
-    cleanerLoad.set(c.cleanerId, 0);
+    cleanerTaskCount.set(c.cleanerId, 0);  // Task count (for straordinaria rules)
+    cleanerLoadMin.set(c.cleanerId, 0);    // Minutes-based load = workMin + wT * travelMin
     cleanerTotalTravel.set(c.cleanerId, 0);
     cleanerHasStraordinaria.set(c.cleanerId, false);
     cleanerStraordinariaDuration.set(c.cleanerId, 0);
@@ -648,25 +646,23 @@ export function runPhase2Algorithm(
       const remainingOtTasks = otTaskIds.size - assignedOtTaskIds.size;
       
       for (const cleaner of cleaners) {
-        const load = cleanerLoad.get(cleaner.cleanerId) || 0;
+        const taskCount = cleanerTaskCount.get(cleaner.cleanerId) || 0;
+        const currentLoadMinValue = cleanerLoadMin.get(cleaner.cleanerId) || 0;
         const totalTravel = cleanerTotalTravel.get(cleaner.cleanerId) || 0;
         
-        // Calcola maxLoad dinamico con bonus travel individuale per cleaner
-        // Bonus +1 se avgTravel ≤ 10min (cleaner con percorsi compatti)
-        // Per cleaner vuoti: usa avgTravelMin del gruppo corrente come stima
-        let dynamicMaxLoad: number;
-        if (params.dynamicMaxTasks !== undefined) {
-          // Se cleaner vuoto, usa avgTravelMin del gruppo come stima del travel futuro
-          const avgTravelEstimate = load > 0 ? totalTravel / load : group.avgTravelMin;
-          const travelBonus = avgTravelEstimate <= 10 ? 1 : 0;
-          dynamicMaxLoad = params.dynamicMaxTasks + travelBonus;
-        } else {
-          // Fallback se dynamicMaxTasks non è definito (usa baseMax = 3)
-          dynamicMaxLoad = 3;
-        }
+        // Calculate deltaLoadMin for this group
+        const groupWorkMinForCap = tasks.reduce((sum, t) => sum + (t.cleaningTime || 60), 0);
+        const groupTravelMinForCap = group.avgTravelMin || 15; // Use group's avg travel estimate
+        const deltaLoadMinForCap = groupWorkMinForCap + params.fairness.wT * groupTravelMinForCap;
+        const newLoadMinValue = currentLoadMinValue + deltaLoadMinForCap;
         
-        // Check if cleaner can fit this group (load + group size must not exceed cap)
-        if (load + tasks.length > dynamicMaxLoad) continue;
+        // Check if cleaner can fit this group using MINUTES-BASED cap
+        // Cap = maxTarget (from fairness targets calculation)
+        if (newLoadMinValue > targets.maxTarget) continue;
+        
+        // Also keep a sanity check on task count for extreme cases
+        const maxTasksPerCleaner = 6; // Hard limit regardless of minutes
+        if (taskCount + tasks.length > maxTasksPerCleaner) continue;
         
         // Straordinaria constraints
         const hasStraordinaria = cleanerHasStraordinaria.get(cleaner.cleanerId) || false;
@@ -684,7 +680,7 @@ export function runPhase2Algorithm(
         // Rule 1: If cleaner already has straordinaria, they cannot take any more tasks
         if (hasStraordinaria) {
           // Exception: If existing straordinaria < 6h, can add exactly 1 task with duration <= 2h
-          if (straordinariaDuration < STRAORDINARIA_LONG_THRESHOLD_MIN && load === 1) {
+          if (straordinariaDuration < STRAORDINARIA_LONG_THRESHOLD_MIN && taskCount === 1) {
             // Can add 1 more task if: exactly 1 task, no straordinaria, and duration <= 2h
             if (tasks.length !== 1 || groupHasStraordinaria || groupTotalCleaningTime > STRAORDINARIA_EXTRA_TASK_MAX_MIN) {
               incompatibleReasons.push({ cleanerId: cleaner.cleanerId, reasons: ['STRAORDINARIA_EXTRA_TASK_INVALID'] });
@@ -698,7 +694,7 @@ export function runPhase2Algorithm(
         
         // Rule 2: If this group has straordinaria >= 6h, cleaner must be empty (no other tasks allowed)
         if (groupHasStraordinaria && groupStraordinariaDuration >= STRAORDINARIA_LONG_THRESHOLD_MIN) {
-          if (load > 0) {
+          if (taskCount > 0) {
             incompatibleReasons.push({ cleanerId: cleaner.cleanerId, reasons: ['STRAORDINARIA_LONG_REQUIRES_EMPTY_CLEANER'] });
             continue;
           }
@@ -706,10 +702,10 @@ export function runPhase2Algorithm(
         
         // Rule 3: If cleaner has non-straordinaria tasks, can only add straordinaria < 6h 
         // if the existing task is exactly 1 and its duration <= 2h
-        if (groupHasStraordinaria && load > 0 && !hasStraordinaria) {
+        if (groupHasStraordinaria && taskCount > 0 && !hasStraordinaria) {
           const existingCleaningTime = cleanerTotalCleaningTime.get(cleaner.cleanerId) || 0;
           // Allow only if: exactly 1 existing task, its duration <= 2h, and straordinaria < 6h
-          if (load !== 1 || existingCleaningTime > STRAORDINARIA_EXTRA_TASK_MAX_MIN || 
+          if (taskCount !== 1 || existingCleaningTime > STRAORDINARIA_EXTRA_TASK_MAX_MIN || 
               groupStraordinariaDuration >= STRAORDINARIA_LONG_THRESHOLD_MIN) {
             incompatibleReasons.push({ cleanerId: cleaner.cleanerId, reasons: ['CANNOT_ADD_STRAORDINARIA_TO_EXISTING_TASKS'] });
             continue;
@@ -727,7 +723,7 @@ export function runPhase2Algorithm(
       
       if (compatibleCleaners.length > 0) {
         const scores = compatibleCleaners.map(c => 
-          scoreCleanerForGroup(c, tasks, cleanerLoad, cleanerLastPosition, cleanerWorkMin, cleanerTravelMin, targets, params)
+          scoreCleanerForGroup(c, tasks, cleanerLastPosition, cleanerWorkMin, cleanerTravelMin, targets, params)
         ).sort((a, b) => b.score - a.score);
         
         scores.slice(0, 3).forEach(s => {
@@ -739,7 +735,6 @@ export function runPhase2Algorithm(
               cleaner_name: s.name,
               score: s.score,
               travel_min: s.travelMin,
-              current_load: s.currentLoad,
               current_load_min: s.currentLoadMin,
               new_load_min: s.newLoadMin,
               has_preference: s.hasPreference,
@@ -751,10 +746,11 @@ export function runPhase2Algorithm(
         const bestCleaner = scores[0];
         assignedCleaner = compatibleCleaners.find(c => c.cleanerId === bestCleaner.cleanerId)!;
         
-        const newLoad = (cleanerLoad.get(assignedCleaner.cleanerId) || 0) + tasks.length;
-        cleanerLoad.set(assignedCleaner.cleanerId, newLoad);
+        // Update task count (for straordinaria rules)
+        const newTaskCount = (cleanerTaskCount.get(assignedCleaner.cleanerId) || 0) + tasks.length;
+        cleanerTaskCount.set(assignedCleaner.cleanerId, newTaskCount);
         
-        // Update cumulative travel time for dynamic max load calculation
+        // Update cumulative travel time for logging
         const currentTravel = cleanerTotalTravel.get(assignedCleaner.cleanerId) || 0;
         cleanerTotalTravel.set(assignedCleaner.cleanerId, currentTravel + bestCleaner.travelMin);
         
@@ -764,6 +760,10 @@ export function runPhase2Algorithm(
         const currentTravelMin = cleanerTravelMin.get(assignedCleaner.cleanerId) || 0;
         cleanerWorkMin.set(assignedCleaner.cleanerId, currentWorkMin + groupWorkMin);
         cleanerTravelMin.set(assignedCleaner.cleanerId, currentTravelMin + bestCleaner.travelMin);
+        
+        // Update loadMin (minutes-based load)
+        const newLoadMinValue = (currentWorkMin + groupWorkMin) + params.fairness.wT * (currentTravelMin + bestCleaner.travelMin);
+        cleanerLoadMin.set(assignedCleaner.cleanerId, newLoadMinValue);
         
         // Update straordinaria tracking
         if (groupHasStraordinaria) {
