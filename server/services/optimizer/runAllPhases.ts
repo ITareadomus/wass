@@ -118,7 +118,11 @@ export async function runAllPhases(
     const totalTasks = result.phase0.unlockedTasks;
     const dynamicLimits = calculateDynamicLimits(totalTasks, numCleaners);
     
-    console.log(`[runAllPhases] Dynamic limits: ${totalTasks} tasks / ${numCleaners} cleaners = minGroup=${dynamicLimits.minTasks}, maxGroup=${dynamicLimits.maxTasks}${dynamicLimits.travelBonus ? ' (+travel bonus)' : ''}`);
+    // Phase 1: usa maxGroupSize = baseMax + 1 per permettere gruppi più grandi
+    // Il bonus travel viene applicato per-cleaner in Phase 2/4
+    const phase1MaxGroupSize = dynamicLimits.baseMax + 1;
+    
+    console.log(`[runAllPhases] Dynamic limits: ${totalTasks} tasks / ${numCleaners} cleaners = baseMax=${dynamicLimits.baseMax}, phase1MaxGroup=${phase1MaxGroupSize}`);
 
     console.log(`[runAllPhases] === PHASE 1: Candidate Group Generation ===`);
     result.phase1 = await runPhase1(workDate, {
@@ -126,7 +130,7 @@ export async function runAllPhases(
       preFilteredTasks: result.phase0.unlockedTaskData,
       params: {
         minGroupSize: dynamicLimits.minTasks,
-        maxGroupSize: dynamicLimits.maxTasks
+        maxGroupSize: phase1MaxGroupSize
       }
     });
     if (result.phase1.status === 'failed') {
@@ -139,7 +143,8 @@ export async function runAllPhases(
     console.log(`[runAllPhases] Phase 1 complete: ${result.phase1.groupsGenerated} groups generated`);
 
     console.log(`[runAllPhases] === PHASE 2: Cleaner Assignment ===`);
-    result.phase2 = await runPhase2(workDate, runId, { dynamicMaxTasks: dynamicLimits.maxTasks });
+    // Passa baseMax - il bonus travel (+1) viene applicato per-cleaner basato su avgTravel ≤ 10min
+    result.phase2 = await runPhase2(workDate, runId, { dynamicMaxTasks: dynamicLimits.baseMax });
     if (result.phase2.status === 'failed') {
       result.status = 'failed';
       result.error = `Phase 2 failed: ${result.phase2.error}`;
@@ -162,7 +167,8 @@ export async function runAllPhases(
 
     if (!skipPhase4) {
       console.log(`[runAllPhases] === PHASE 4: Recovery ===`);
-      result.phase4 = await runPhase4(workDate, runId, { dynamicMaxTasks: dynamicLimits.maxTasks });
+      // Passa baseMax - il bonus travel (+1) viene applicato per-cleaner basato su avgTravel ≤ 10min
+      result.phase4 = await runPhase4(workDate, runId, { dynamicMaxTasks: dynamicLimits.baseMax });
       if (result.phase4.status === 'failed') {
         console.warn(`[runAllPhases] Phase 4 failed (non-critical): ${result.phase4.error}`);
       } else {

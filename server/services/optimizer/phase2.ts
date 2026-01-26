@@ -56,47 +56,37 @@ export interface Phase2Params {
   travelWeight: number;
   loadWeight: number;
   preferenceBonus: number;
-  maxCleanerLoad: number;
   apartmentTypes: ApartmentTypes;
-  dynamicMaxTasks?: number;
+  dynamicMaxTasks?: number;  // base max from totalTasks/numCleaners, bonus +1 per-cleaner if avgTravel ≤ 10min
 }
 
 export const DEFAULT_PHASE2_PARAMS: Phase2Params = {
   travelWeight: 2,
   loadWeight: 5,
   preferenceBonus: 10,
-  maxCleanerLoad: 3, // Base max, can be 4 if total travel < 30min
   apartmentTypes: DEFAULT_APARTMENT_TYPES,
   dynamicMaxTasks: undefined
 };
 
-// Dynamic max load: 3 base, 4 if total travel time < 30 minutes
-export function getDynamicMaxLoad(totalTravelMin: number): number {
-  return totalTravelMin < 30 ? 4 : 3;
-}
-
 export interface DynamicLimits {
-  maxTasks: number;
-  minTasks: number;
-  baseMax: number;
-  travelBonus: boolean;
+  baseMax: number;    // ceil(totalTasks / numCleaners) - limite base
+  minTasks: number;   // min task per gruppo (Phase 1)
 }
 
+// Calcola limiti dinamici basati su totalTasks e numCleaners
+// Il bonus travel (+1 se avgTravel ≤ 10min) viene applicato per-cleaner in Phase 2/4
 export function calculateDynamicLimits(
   totalTasks: number,
-  numCleaners: number,
-  avgTravelPerTask?: number
+  numCleaners: number
 ): DynamicLimits {
   if (numCleaners <= 0) {
-    return { maxTasks: 3, minTasks: 1, baseMax: 3, travelBonus: false };
+    return { baseMax: 3, minTasks: 1 };
   }
   
   const baseMax = Math.ceil(totalTasks / numCleaners);
-  const travelBonus = avgTravelPerTask !== undefined && avgTravelPerTask <= 10;
-  const maxTasks = travelBonus ? baseMax + 1 : baseMax;
-  const minTasks = Math.max(1, maxTasks - 1);
+  const minTasks = Math.max(1, baseMax - 1);
   
-  return { maxTasks, minTasks, baseMax, travelBonus };
+  return { baseMax, minTasks };
 }
 
 export interface CleanerScore {
@@ -543,15 +533,16 @@ export function runPhase2Algorithm(
         const totalTravel = cleanerTotalTravel.get(cleaner.cleanerId) || 0;
         
         // Calcola maxLoad dinamico con bonus travel individuale per cleaner
-        // Bonus +1 solo se avgTravel ATTUALE ≤ 10min E cleaner ha almeno 2 task (per avere dato reale)
-        // Usa il travel attuale del cleaner per decidere se può avere il bonus
+        // Bonus +1 se avgTravel ATTUALE ≤ 10min (cleaner con percorsi compatti)
+        // Se cleaner ha 0 task, avgTravel = Infinity (no bonus)
         let dynamicMaxLoad: number;
         if (params.dynamicMaxTasks !== undefined) {
-          const avgTravelCurrent = load >= 2 ? totalTravel / load : Infinity;
+          const avgTravelCurrent = load > 0 ? totalTravel / load : Infinity;
           const travelBonus = avgTravelCurrent <= 10 ? 1 : 0;
           dynamicMaxLoad = params.dynamicMaxTasks + travelBonus;
         } else {
-          dynamicMaxLoad = getDynamicMaxLoad(totalTravel);
+          // Fallback se dynamicMaxTasks non è definito (usa baseMax = 3)
+          dynamicMaxLoad = 3;
         }
         
         // Check if cleaner can fit this group (load + group size must not exceed cap)
