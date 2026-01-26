@@ -368,10 +368,13 @@ export function runPhase2Algorithm(
   let groupsUnassigned = 0;
   let tasksDropped = 0;
   
-  // Traccia gruppi OT non ancora processati per riserva cleaner straordinari
-  // Invece di contare, tracciamo l'indice corrente e controlliamo se ci sono OT rimanenti
-  let processedOtCount = 0;
-  const totalOtGroups = sortedGroups.filter(g => g.hasStraordinaria === true).length;
+  // Traccia OT TASK REALI non ancora assegnate (non gruppi candidati!)
+  // Questo evita di bloccare cleaners basandosi su gruppi duplicati contenenti la stessa OT
+  const otTaskIds = new Set<number>();
+  tasksMap.forEach((task, taskId) => {
+    if (task.straordinaria) otTaskIds.add(taskId);
+  });
+  const assignedOtTaskIds = new Set<number>();
   
   for (let groupIndex = 0; groupIndex < sortedGroups.length; groupIndex++) {
     const group = sortedGroups[groupIndex];
@@ -524,21 +527,22 @@ export function runPhase2Algorithm(
         }
       }
       
-      // Calcola quante OT sono ancora da assegnare
-      // Usa groupHasStraordinaria (calcolato dal contenuto effettivo dopo pruning) per la riserva
-      const remainingOtGroups = totalOtGroups - processedOtCount;
+      // Calcola quante OT TASK REALI sono ancora da assegnare
+      // Usa otTaskIds (task reali) invece di gruppi candidati per evitare blocchi eccessivi
+      const remainingOtTasks = otTaskIds.size - assignedOtTaskIds.size;
       
       for (const cleaner of cleaners) {
         const load = cleanerLoad.get(cleaner.cleanerId) || 0;
         const totalTravel = cleanerTotalTravel.get(cleaner.cleanerId) || 0;
         
         // Calcola maxLoad dinamico con bonus travel individuale per cleaner
-        // Bonus +1 se avgTravel ATTUALE ≤ 10min (cleaner con percorsi compatti)
-        // Se cleaner ha 0 task, avgTravel = Infinity (no bonus)
+        // Bonus +1 se avgTravel ≤ 10min (cleaner con percorsi compatti)
+        // Per cleaner vuoti: usa avgTravelMin del gruppo corrente come stima
         let dynamicMaxLoad: number;
         if (params.dynamicMaxTasks !== undefined) {
-          const avgTravelCurrent = load > 0 ? totalTravel / load : Infinity;
-          const travelBonus = avgTravelCurrent <= 10 ? 1 : 0;
+          // Se cleaner vuoto, usa avgTravelMin del gruppo come stima del travel futuro
+          const avgTravelEstimate = load > 0 ? totalTravel / load : group.avgTravelMin;
+          const travelBonus = avgTravelEstimate <= 10 ? 1 : 0;
           dynamicMaxLoad = params.dynamicMaxTasks + travelBonus;
         } else {
           // Fallback se dynamicMaxTasks non è definito (usa baseMax = 3)
@@ -552,11 +556,11 @@ export function runPhase2Algorithm(
         const hasStraordinaria = cleanerHasStraordinaria.get(cleaner.cleanerId) || false;
         const straordinariaDuration = cleanerStraordinariaDuration.get(cleaner.cleanerId) || 0;
         
-        // Rule 0: Riserva cleaner straordinari per OT non ancora assegnate
+        // Rule 0: Riserva cleaner straordinari per OT TASK REALI non ancora assegnate
         // Se ci sono ancora OT da assegnare e questo gruppo NON è OT,
         // blocca i cleaner canDoStraordinaria (indipendentemente dal loro carico attuale)
         // Questo garantisce che i cleaner straordinari restino disponibili per le OT
-        if (!groupHasStraordinaria && remainingOtGroups > 0 && cleaner.canDoStraordinaria) {
+        if (!groupHasStraordinaria && remainingOtTasks > 0 && cleaner.canDoStraordinaria) {
           incompatibleReasons.push({ cleanerId: cleaner.cleanerId, reasons: ['RESERVED_FOR_PENDING_OT'] });
           continue;
         }
@@ -641,8 +645,8 @@ export function runPhase2Algorithm(
           cleanerHasStraordinaria.set(assignedCleaner.cleanerId, true);
           const existingStraDuration = cleanerStraordinariaDuration.get(assignedCleaner.cleanerId) || 0;
           cleanerStraordinariaDuration.set(assignedCleaner.cleanerId, existingStraDuration + groupStraordinariaDuration);
-          // Incrementa contatore OT processate per rilasciare riserva cleaner straordinari
-          processedOtCount++;
+          // Marca le OT task come assegnate per rilasciare riserva cleaner straordinari
+          tasks.filter(t => t.straordinaria).forEach(t => assignedOtTaskIds.add(t.taskId));
         }
         const existingCleaningTime = cleanerTotalCleaningTime.get(assignedCleaner.cleanerId) || 0;
         cleanerTotalCleaningTime.set(assignedCleaner.cleanerId, existingCleaningTime + groupTotalCleaningTime);
@@ -715,10 +719,11 @@ export function runPhase2Algorithm(
             }
           });
           groupsUnassigned++;
-          // Se questo gruppo OT non è assegnabile, rilascia la riserva per altri cleaner
-          // Usa groupHasStraordinaria (contenuto effettivo dopo pruning) invece di group.hasStraordinaria
-          if (groupHasStraordinaria) {
-            processedOtCount++;
+          // SOLO se questo è un gruppo OT singolo (solo l'OT task) che fallisce,
+          // marca l'OT come "processata" per rilasciare la riserva
+          // Se è un gruppo OT+altri task, altri gruppi candidati potrebbero avere successo
+          if (groupHasStraordinaria && tasks.length === 1 && tasks[0].straordinaria) {
+            assignedOtTaskIds.add(tasks[0].taskId);
           }
           break;
         }
