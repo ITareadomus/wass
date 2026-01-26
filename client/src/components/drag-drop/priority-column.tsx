@@ -308,27 +308,6 @@ export default function PriorityColumn({
             <CheckSquare className={`w-3 h-3 ${isMultiSelectMode ? 'mr-1' : ''}`} />
             {isMultiSelectMode && <span className="ml-1">On</span>}
           </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleAssignContainer} // Usa toggle-aware handler
-            disabled={isAssigning || tasks.length === 0 || isDateInPast || tasks.every(t => (t as any).locked)}
-            className="text-xs px-2 py-1 h-7 border-2 border-custom-blue"
-            title={isDateInPast ? "Non puoi assegnare task per date passate" : tasks.every(t => (t as any).locked) ? "Tutte le task sono bloccate" : ""}
-            data-testid="button-assign"
-          >
-            {isAssigning ? (
-              <>
-                <RefreshCw className="w-3 h-3 mr-1 animate-spin" />
-                Assegnando...
-              </>
-            ) : (
-              <>
-                <Calendar className="w-3 h-3 mr-1" />
-                Assegna
-              </>
-            )}
-          </Button>
         </div>
       </div>
       <Droppable droppableId={droppableId}>
