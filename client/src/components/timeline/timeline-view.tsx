@@ -1704,6 +1704,9 @@ export default function TimelineView({
                 </div>
               ))}
             </div>
+            <div className="flex-shrink-0 w-14 text-center text-xs font-semibold text-foreground border-l border-border px-1">
+              Ore
+            </div>
           </div>
 
           {/* Righe dei cleaners - mostra solo se ci sono cleaners selezionati */}
@@ -2079,6 +2082,25 @@ export default function TimelineView({
                         </div>
                       )}
                     </Droppable>
+                    {/* Colonna ore totali lavorate */}
+                    <div className="flex-shrink-0 w-14 flex items-center justify-center border-l border-border bg-custom-blue/10">
+                      {(() => {
+                        const cleanerTasks = tasks.filter(task =>
+                          (task as any).assignedCleaner === cleaner.id
+                        );
+                        const totalMinutes = cleanerTasks.reduce((sum, task) => {
+                          const ct = (task as any).cleaning_time || (task as any).cleaningTime || 0;
+                          return sum + (typeof ct === 'number' ? ct : parseInt(ct, 10) || 0);
+                        }, 0);
+                        const hours = Math.floor(totalMinutes / 60);
+                        const minutes = totalMinutes % 60;
+                        return (
+                          <span className="text-xs font-semibold text-foreground">
+                            {hours}:{String(minutes).padStart(2, '0')}
+                          </span>
+                        );
+                      })()}
+                    </div>
                   </div>
                 );
               })
