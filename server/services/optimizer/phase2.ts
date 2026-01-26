@@ -541,7 +541,19 @@ export function runPhase2Algorithm(
       for (const cleaner of cleaners) {
         const load = cleanerLoad.get(cleaner.cleanerId) || 0;
         const totalTravel = cleanerTotalTravel.get(cleaner.cleanerId) || 0;
-        const dynamicMaxLoad = params.dynamicMaxTasks ?? getDynamicMaxLoad(totalTravel);
+        
+        // Calcola maxLoad dinamico con bonus travel individuale per cleaner
+        // Bonus +1 solo se avgTravel ATTUALE ≤ 10min E cleaner ha almeno 2 task (per avere dato reale)
+        // Usa il travel attuale del cleaner per decidere se può avere il bonus
+        let dynamicMaxLoad: number;
+        if (params.dynamicMaxTasks !== undefined) {
+          const avgTravelCurrent = load >= 2 ? totalTravel / load : Infinity;
+          const travelBonus = avgTravelCurrent <= 10 ? 1 : 0;
+          dynamicMaxLoad = params.dynamicMaxTasks + travelBonus;
+        } else {
+          dynamicMaxLoad = getDynamicMaxLoad(totalTravel);
+        }
+        
         // Check if cleaner can fit this group (load + group size must not exceed cap)
         if (load + tasks.length > dynamicMaxLoad) continue;
         

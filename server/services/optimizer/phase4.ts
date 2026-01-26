@@ -417,11 +417,19 @@ function tryInsertTask(
   const deltaPriorityPenalty = simResult.totalPriorityPenalty - schedule.totalPriorityPenalty;
   
   // =====================================================
-  // VINCOLO HARD DINAMICO: max load basato su params.dynamicMaxTasks o fallback a travel-based
-  // Se dynamicMaxTasks è definito, usa quello (calcolato da totalTasks/numCleaners)
-  // Altrimenti usa getDynamicMaxLoad(travel) → 4 se travel < 30min, altrimenti 3
+  // VINCOLO HARD DINAMICO: max load con bonus travel individuale per cleaner
+  // Usa travel DOPO l'inserimento (simResult) per calcolare avgTravel
+  // Bonus +1 solo se avgTravel ≤ 10min E cleaner avrà almeno 2 task
+  // Coerente con Phase 2: richiede >= 2 task per calcolo avgTravel significativo
   // =====================================================
-  const dynamicMaxLoad = params.dynamicMaxTasks ?? getDynamicMaxLoad(simResult.totalTravel);
+  let dynamicMaxLoad: number;
+  if (params.dynamicMaxTasks !== undefined) {
+    const avgTravelAfterInsert = newTaskCount >= 2 ? simResult.totalTravel / newTaskCount : Infinity;
+    const travelBonus = avgTravelAfterInsert <= 10 ? 1 : 0;
+    dynamicMaxLoad = params.dynamicMaxTasks + travelBonus;
+  } else {
+    dynamicMaxLoad = getDynamicMaxLoad(simResult.totalTravel);
+  }
   if (newTaskCount > dynamicMaxLoad) {
     return {
       cleanerId: schedule.cleanerId,
@@ -638,12 +646,20 @@ function trySwapForTask(
       if (!simResult.ok) continue;
       
       // =====================================================
-      // VINCOLO HARD DINAMICO: max load basato su params.dynamicMaxTasks o fallback a travel-based
-      // Se dynamicMaxTasks è definito, usa quello (calcolato da totalTasks/numCleaners)
-      // Altrimenti usa getDynamicMaxLoad(travel) → 4 se travel < 30min, altrimenti 3
+      // VINCOLO HARD DINAMICO: max load con bonus travel individuale per cleaner
+      // Usa travel DOPO lo swap (simResult) per calcolare avgTravel
+      // Bonus +1 solo se avgTravel ≤ 10min E cleaner avrà almeno 2 task
+      // Coerente con Phase 2: richiede >= 2 task per calcolo avgTravel significativo
       // =====================================================
-      const dynamicMaxLoad = params.dynamicMaxTasks ?? getDynamicMaxLoad(simResult.totalTravel);
       const newTaskCount = tasksForSim.length;
+      let dynamicMaxLoad: number;
+      if (params.dynamicMaxTasks !== undefined) {
+        const avgTravelAfterSwap = newTaskCount >= 2 ? simResult.totalTravel / newTaskCount : Infinity;
+        const travelBonus = avgTravelAfterSwap <= 10 ? 1 : 0;
+        dynamicMaxLoad = params.dynamicMaxTasks + travelBonus;
+      } else {
+        dynamicMaxLoad = getDynamicMaxLoad(simResult.totalTravel);
+      }
       if (newTaskCount > dynamicMaxLoad) {
         continue;
       }
