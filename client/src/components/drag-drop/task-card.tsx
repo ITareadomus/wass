@@ -760,7 +760,7 @@ export default function TaskCard({
     getTaskTypeStyle(cardIsStraordinaria, cardIsPremium);
   
   // Se la task è bloccata, usa grigio invece del colore normale
-  const cardColorClass = isLocked && !isInTimeline ? "bg-gray-300 dark:bg-gray-600 opacity-60" : baseCardColorClass;
+  const cardColorClass = isLocked && !isInTimeline ? "bg-gray-100 dark:bg-gray-800 opacity-70" : baseCardColorClass;
 
   useEffect(() => {
     const calculateAssignmentTimes = () => {
