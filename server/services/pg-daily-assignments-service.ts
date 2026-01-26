@@ -1788,7 +1788,7 @@ export class PgDailyAssignmentsService {
    * NOTE: For alias updates, this also saves to cleaner_aliases table
    */
   async updateCleanerField(cleanerId: number, workDate: string, field: string, value: any): Promise<boolean> {
-    const allowedFields = ['start_time', 'available', 'active', 'ranking', 'counter_hours', 'counter_days', 'alias'];
+    const allowedFields = ['start_time', 'available', 'active', 'ranking', 'counter_hours', 'counter_days', 'alias', 'can_do_straordinaria'];
     if (!allowedFields.includes(field)) {
       console.error(`❌ PG: Campo non consentito: ${field}`);
       return false;
@@ -1923,6 +1923,24 @@ export class PgDailyAssignmentsService {
     } catch (error) {
       console.error(`❌ PG: Errore nella rimozione alias per cleaner ${cleanerId}:`, error);
       return false;
+    }
+  }
+
+  /**
+   * Update can_do_straordinaria for a cleaner across all dates
+   * Used for one-time migrations when changing straordinaria permissions
+   */
+  async updateCleanerStraordinariaAllDates(cleanerId: number, canDoStraordinaria: boolean): Promise<number> {
+    try {
+      const result = await query(
+        `UPDATE cleaners SET can_do_straordinaria = $1, updated_at = NOW() WHERE cleaner_id = $2`,
+        [canDoStraordinaria, cleanerId]
+      );
+      console.log(`✅ PG: Cleaner ${cleanerId} can_do_straordinaria=${canDoStraordinaria} aggiornato per ${result.rowCount} righe`);
+      return result.rowCount || 0;
+    } catch (error) {
+      console.error(`❌ PG: Errore nell'aggiornamento can_do_straordinaria per cleaner ${cleanerId}:`, error);
+      return 0;
     }
   }
 
