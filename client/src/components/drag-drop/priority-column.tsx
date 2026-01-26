@@ -28,7 +28,6 @@ interface PriorityColumnProps {
   isDragDisabled?: boolean;
   containerMultiSelectState?: ContainerMultiSelectState;
   highlightedTaskIds?: Set<string>;
-  useNewOptimizer?: boolean; // Toggle: true = nuovo optimizer (TS), false = vecchio (Python)
 }
 
 export default function PriorityColumn({
@@ -41,7 +40,6 @@ export default function PriorityColumn({
   isDragDisabled = false,
   containerMultiSelectState,
   highlightedTaskIds = new Set(),
-  useNewOptimizer = true,
 }: PriorityColumnProps) {
   const [isAssigning, setIsAssigning] = useState(false);
   const [isDateInPast, setIsDateInPast] = useState(false);
@@ -174,77 +172,33 @@ export default function PriorityColumn({
       }
       const dateStr = savedDate;
 
-      let endpoint = '';
-      let successMessage = '';
+      const endpoint = '/api/optimizer/run-all';
+      const successMessage = `✅ ${title} assegnati!`;
+      
+      console.log(`🚀 Esecuzione optimizer per ${priority}, data: ${dateStr}`);
+      const response = await fetchWithOperation(`assign-${priority}`, endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          date: dateStr, 
+          skipPhase4: false, 
+          applyToProduction: true 
+        })
+      });
 
-      if (useNewOptimizer) {
-        // NUOVO OPTIMIZER TypeScript - usa run-all con apply
-        endpoint = '/api/optimizer/run-all';
-        successMessage = `✅ ${title} assegnati con nuovo optimizer!`;
-        
-        console.log(`🚀 Esecuzione NUOVO optimizer per ${priority}, data: ${dateStr}`);
-        const response = await fetchWithOperation(`assign-${priority}-new`, endpoint, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ 
-            date: dateStr, 
-            skipPhase4: false, 
-            applyToProduction: true 
-          })
-        });
-
-        if (!response.ok) {
-          throw new Error(`Errore durante l'assegnazione ${priority}`);
-        }
-
-        const result = await response.json();
-        console.log(`Assegnazione ${priority} (nuovo optimizer) completata:`, result);
-        
-        const summary = result.summary || {};
-        toast({
-          variant: "success",
-          title: "Successo",
-          description: `${successMessage} (${summary.tasksAssigned || 0} task assegnate, ${summary.tasksUnassigned || 0} non assegnate)`,
-        });
-      } else {
-        // VECCHIO OPTIMIZER Python
-        switch (priority) {
-          case 'early-out':
-            endpoint = '/api/assign-early-out-to-timeline';
-            successMessage = '✅ EARLY-OUT assegnati con successo!';
-            break;
-          case 'high':
-            endpoint = '/api/assign-high-priority-to-timeline';
-            successMessage = '✅ HIGH PRIORITY assegnati con successo!';
-            break;
-          case 'low':
-            endpoint = '/api/assign-low-priority-to-timeline';
-            successMessage = '✅ LOW PRIORITY assegnati con successo!';
-            break;
-          default:
-            throw new Error('Tipo di container non supportato');
-        }
-
-        console.log(`🔄 Esecuzione VECCHIO optimizer per ${priority}, data: ${dateStr}`);
-        const response = await fetchWithOperation(`assign-${priority}`, endpoint, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ date: dateStr })
-        });
-
-        if (!response.ok) {
-          throw new Error(`Errore durante l'assegnazione ${priority}`);
-        }
-
-        const result = await response.json();
-        console.log(`Assegnazione ${priority} (vecchio optimizer) completata:`, result);
-
-        toast({
-          variant: "success",
-          title: "Successo",
-          description: successMessage,
-        });
+      if (!response.ok) {
+        throw new Error(`Errore durante l'assegnazione ${priority}`);
       }
+
+      const result = await response.json();
+      console.log(`Assegnazione ${priority} completata:`, result);
+      
+      const summary = result.summary || {};
+      toast({
+        variant: "success",
+        title: "Successo",
+        description: `${successMessage} (${summary.tasksAssigned || 0} task assegnate, ${summary.tasksUnassigned || 0} non assegnate)`,
+      });
 
       // Ricarica i task per riflettere le nuove assegnazioni
       if ((window as any).reloadAllTasks) {
