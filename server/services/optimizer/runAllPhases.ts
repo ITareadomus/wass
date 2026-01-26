@@ -187,7 +187,7 @@ export async function runAllPhases(
     `, [runId]);
 
     result.summary = {
-      totalTasksProcessed: result.phase0?.totalTasks || 0,
+      totalTasksProcessed: result.phase0?.unlockedTasks || 0,  // Use unlockedTasks (excludes locked)
       tasksAssigned: parseInt(assignmentCount.rows[0]?.count || '0'),
       tasksUnassigned: parseInt(unassignedCount.rows[0]?.count || '0'),
       cleanersUsed: parseInt(cleanerCount.rows[0]?.count || '0')
@@ -300,7 +300,7 @@ async function collectDetailedMetrics(
     `, [runId, workDate]);
 
     result.metrics = {
-      totalTasks: result.phase0?.totalTasks || 0,
+      totalTasks: result.phase0?.unlockedTasks || 0,  // Use unlockedTasks to exclude locked tasks from count
       assignedTasks: result.summary.tasksAssigned,
       unassignedTasks: result.summary.tasksUnassigned,
       otTotal: parseInt(otStats.rows[0]?.ot_total || '0'),
