@@ -57,6 +57,12 @@ async function loadPhase3Schedules(runId: string, workDate: string): Promise<Cle
   
   const allSelectedCleanerIds: number[] = selectedCleanersResult.rows[0]?.cleaners || [];
   
+  if (allSelectedCleanerIds.length === 0) {
+    console.warn(`[Phase4] WARNING: No selected cleaners found for ${workDate}. Phase 4 will have no cleaners to assign tasks to.`);
+  } else {
+    console.log(`[Phase4] Loaded ${allSelectedCleanerIds.length} selected cleaners for ${workDate}`);
+  }
+  
   // Join con daily_containers per ottenere cleaning_time per fairness tracking
   const result = await pool.query(`
     SELECT 
