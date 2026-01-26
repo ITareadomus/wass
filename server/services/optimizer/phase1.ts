@@ -20,7 +20,6 @@ export type Phase1Params = {
   createSingleGroups: boolean;     // true
   neighborLimit: number;
   maxGroupsTotal: number;
-  allowFourthIfTravelLeMin: number; // 5
   useAdjacentZones: boolean;
 };
 
@@ -31,7 +30,6 @@ export const DEFAULT_PHASE1_PARAMS: Phase1Params = {
   createSingleGroups: true,
   neighborLimit: 15,
   maxGroupsTotal: 3000,
-  allowFourthIfTravelLeMin: 5,
   useAdjacentZones: true
 };
 
@@ -189,7 +187,7 @@ export function generateCandidateGroups(tasks: TaskInput[], params: Phase1Params
     const candidates3 = comb3(neighbors);
     for (const [a, b, c] of candidates3) {
       const g4 = [seed, a, b, c];
-      if (allowFourth(g4, params.allowFourthIfTravelLeMin)) {
+      if (allowFourth(g4)) {
         addGroup(g4, seed, seedZone, groupMap);
       }
       addGroup([seed, a, b], seed, seedZone, groupMap);
@@ -352,7 +350,7 @@ function addGroup(
 
 const MAX_TOTAL_TRAVEL_FOR_FOUR_TASKS = 30;
 
-function allowFourth(tasks: TaskInput[], thresholdMin: number): boolean {
+function allowFourth(tasks: TaskInput[]): boolean {
   if (tasks.length !== 4) return false;
   
   // Calculate total travel for 4 tasks using MST approximation
