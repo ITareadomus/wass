@@ -339,10 +339,6 @@ export default function GenerateAssignments() {
   
   // Toggle per scegliere tra nuovo optimizer (TypeScript) e vecchio (Python)
   const [useNewOptimizer, setUseNewOptimizer] = useState(true);
-  
-  // Stati per pulsanti globali containers
-  const [isGlobalAssigning, setIsGlobalAssigning] = useState(false);
-  const [isRefreshingContainers, setIsRefreshingContainers] = useState(false);
 
   // Callback per notificare modifiche dopo movimenti task
   const handleTaskMoved = useCallback(() => {
@@ -1110,76 +1106,6 @@ export default function GenerateAssignments() {
   // Funzione esposta per ricaricare i task e le assegnazioni
   const reloadAllTasks = async () => {
     await refreshAssignments("manual");
-  };
-
-  // Funzione per refresh containers (ricarica task da ADAM)
-  const handleRefreshContainers = async () => {
-    try {
-      setIsRefreshingContainers(true);
-      await reloadAllTasks();
-      toast({
-        title: "Containers aggiornati",
-        description: "I task sono stati ricaricati",
-        duration: 2000,
-      });
-    } catch (error: any) {
-      console.error("Errore refresh containers:", error);
-      toast({
-        title: "Errore",
-        description: "Impossibile aggiornare i containers",
-        variant: "destructive",
-      });
-    } finally {
-      setIsRefreshingContainers(false);
-    }
-  };
-
-  // Funzione per assegnazione globale (tutti i containers)
-  const handleGlobalAssign = async () => {
-    try {
-      setIsGlobalAssigning(true);
-      const year = selectedDate.getFullYear();
-      const month = String(selectedDate.getMonth() + 1).padStart(2, '0');
-      const day = String(selectedDate.getDate()).padStart(2, '0');
-      const dateStr = `${year}-${month}-${day}`;
-
-      console.log(`🚀 Esecuzione optimizer globale per ${dateStr}`);
-      const response = await fetch('/api/optimizer/run-all', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          date: dateStr, 
-          skipPhase4: false, 
-          applyToProduction: true 
-        })
-      });
-
-      if (!response.ok) {
-        throw new Error('Errore durante l\'assegnazione');
-      }
-
-      const result = await response.json();
-      console.log('Assegnazione globale completata:', result);
-      
-      const summary = result.summary || {};
-      toast({
-        variant: "success",
-        title: "Assegnazione completata",
-        description: `${summary.tasksAssigned || 0} task assegnate, ${summary.tasksUnassigned || 0} non assegnate`,
-      });
-
-      // Ricarica i task
-      await reloadAllTasks();
-    } catch (error: any) {
-      console.error('Errore assegnazione globale:', error);
-      toast({
-        title: "Errore",
-        description: error.message || "Errore durante l'assegnazione",
-        variant: "destructive",
-      });
-    } finally {
-      setIsGlobalAssigning(false);
-    }
   };
 
 
@@ -2034,133 +1960,100 @@ export default function GenerateAssignments() {
             onDragEnd={onDragEnd}
             onDragUpdate={onDragUpdate}
           >
-            {/* Riga superiore: barra ricerca */}
-            <div className="flex items-center gap-4 mb-4">
-              <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-custom-blue" />
-                <Input
-                  placeholder="Cerca task per ID, logistic code, indirizzo, cliente, alias o reference..."
-                  value={searchTask}
-                  onChange={(e) => setSearchTask(e.target.value)}
-                  className="border-2 border-custom-blue pl-10"
-                  data-testid="input-search-task"
-                />
-              </div>
+            <div className="mb-4 relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-custom-blue" />
+              <Input
+                placeholder="Cerca task per ID, logistic code, indirizzo, cliente, alias o reference..."
+                value={searchTask}
+                onChange={(e) => setSearchTask(e.target.value)}
+                className="border-2 border-custom-blue pl-10"
+                data-testid="input-search-task"
+              />
             </div>
 
-            {/* Box containers con bordo - include pulsanti in alto a destra */}
-            <div className="border-2 border-custom-blue rounded-lg mb-6">
-              {/* Header con pulsanti Refresh e Assegna */}
-              <div className="flex justify-end gap-2 p-2 border-b-2 border-custom-blue">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleRefreshContainers}
-                  disabled={isRefreshingContainers}
-                  className="h-9 px-3 border-2 border-custom-blue rounded-md"
-                  title="Aggiorna containers"
-                  data-testid="button-refresh-containers"
-                >
-                  <RefreshCw className={`w-4 h-4 ${isRefreshingContainers ? 'animate-spin' : ''}`} />
-                </Button>
-                <Button
-                  variant="default"
-                  size="sm"
-                  onClick={handleGlobalAssign}
-                  disabled={isGlobalAssigning || isDateInPast(selectedDate) || (earlyOutTasks.length === 0 && highPriorityTasks.length === 0 && lowPriorityTasks.length === 0)}
-                  className="h-9 px-4 bg-custom-blue hover:bg-custom-blue/90 rounded-md"
-                  title={isDateInPast(selectedDate) ? "Non puoi assegnare task per date passate" : "Assegna tutti i task"}
-                  data-testid="button-global-assign"
-                >
-                  {isGlobalAssigning ? (
-                    <>
-                      <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
-                      Assegnando...
-                    </>
-                  ) : (
-                    "Assegna"
-                  )}
-                </Button>
-              </div>
-              {/* Contenuto containers */}
-              <div className="p-4">
-              {(() => {
-                const getHighlightedTaskIds = (tasks: Task[]): Set<string> => {
-                  const result = new Set<string>();
-                  
-                  if (containerHighlightTaskId) {
-                    const matchingTask = tasks.find(t => 
-                      String((t as any).id || (t as any).task_id || '') === containerHighlightTaskId
-                    );
-                    if (matchingTask) {
-                      result.add(containerHighlightTaskId);
-                    }
+            {(() => {
+              const getHighlightedTaskIds = (tasks: Task[]): Set<string> => {
+                const result = new Set<string>();
+                
+                // Highlight da doppio click su mappa (pallino grigio)
+                if (containerHighlightTaskId) {
+                  const matchingTask = tasks.find(t => 
+                    String((t as any).id || (t as any).task_id || '') === containerHighlightTaskId
+                  );
+                  if (matchingTask) {
+                    result.add(containerHighlightTaskId);
                   }
-                  
-                  if (searchTask.trim()) {
-                    const lowerSearch = searchTask.toLowerCase();
-                    tasks
-                      .filter(task => {
-                        const taskId = String((task as any).id || (task as any).task_id || '');
-                        const logisticCode = String((task as any).logisticCode || (task as any).logistic_code || (task as any).name || '');
-                        const address = String((task as any).address || '');
-                        const customerName = String((task as any).customer_name || '');
-                        const alias = String((task as any).alias || '');
-                        const customerReference = String((task as any).customer_reference || '');
-                        
-                        return (
-                          taskId.toLowerCase().includes(lowerSearch) ||
-                          logisticCode.toLowerCase().includes(lowerSearch) ||
-                          address.toLowerCase().includes(lowerSearch) ||
-                          customerName.toLowerCase().includes(lowerSearch) ||
-                          alias.toLowerCase().includes(lowerSearch) ||
-                          customerReference.toLowerCase().includes(lowerSearch)
-                        );
-                      })
-                      .forEach(t => result.add(String((t as any).id || (t as any).task_id || '')));
-                  }
-                  
-                  return result;
-                };
+                }
+                
+                // Highlight da ricerca
+                if (searchTask.trim()) {
+                  const lowerSearch = searchTask.toLowerCase();
+                  tasks
+                    .filter(task => {
+                      const taskId = String((task as any).id || (task as any).task_id || '');
+                      const logisticCode = String((task as any).logisticCode || (task as any).logistic_code || (task as any).name || '');
+                      const address = String((task as any).address || '');
+                      const customerName = String((task as any).customer_name || '');
+                      const alias = String((task as any).alias || '');
+                      const customerReference = String((task as any).customer_reference || '');
+                      
+                      return (
+                        taskId.toLowerCase().includes(lowerSearch) ||
+                        logisticCode.toLowerCase().includes(lowerSearch) ||
+                        address.toLowerCase().includes(lowerSearch) ||
+                        customerName.toLowerCase().includes(lowerSearch) ||
+                        alias.toLowerCase().includes(lowerSearch) ||
+                        customerReference.toLowerCase().includes(lowerSearch)
+                      );
+                    })
+                    .forEach(t => result.add(String((t as any).id || (t as any).task_id || '')));
+                }
+                
+                return result;
+              };
 
-                const highlightedEarlyOut = getHighlightedTaskIds(earlyOutTasks);
-                const highlightedHighPriority = getHighlightedTaskIds(highPriorityTasks);
-                const highlightedLowPriority = getHighlightedTaskIds(lowPriorityTasks);
+              const highlightedEarlyOut = getHighlightedTaskIds(earlyOutTasks);
+              const highlightedHighPriority = getHighlightedTaskIds(highPriorityTasks);
+              const highlightedLowPriority = getHighlightedTaskIds(lowPriorityTasks);
 
-                return (
-                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 w-full">
-                    <PriorityColumn
-                      title="EARLY OUT"
-                      priority="early-out"
-                      tasks={earlyOutTasks}
-                      droppableId="early-out"
-                      icon="clock"
-                      containerMultiSelectState={getContainerMultiSelectState('early_out')}
-                      highlightedTaskIds={highlightedEarlyOut}
-                    />
-                    <PriorityColumn
-                      title="HIGH PRIORITY"
-                      priority="high"
-                      tasks={highPriorityTasks}
-                      droppableId="high"
-                      icon="alert-circle"
-                      containerMultiSelectState={getContainerMultiSelectState('high_priority')}
-                      highlightedTaskIds={highlightedHighPriority}
-                    />
-                    <PriorityColumn
-                      title="LOW PRIORITY"
-                      priority="low"
-                      tasks={lowPriorityTasks}
-                      droppableId="low"
-                      icon="arrow-down"
-                      containerMultiSelectState={getContainerMultiSelectState('low_priority')}
-                      highlightedTaskIds={highlightedLowPriority}
-                    />
-                  </div>
-                );
-              })()}
-              </div>
-            </div>
+              return (
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6 w-full">
+                  <PriorityColumn
+                    title="EARLY OUT"
+                    priority="early-out"
+                    tasks={earlyOutTasks}
+                    droppableId="early-out"
+                    icon="clock"
+                    assignAction={assignEarlyOutToTimeline}
+                    containerMultiSelectState={getContainerMultiSelectState('early_out')}
+                    highlightedTaskIds={highlightedEarlyOut}
+                    useNewOptimizer={useNewOptimizer}
+                  />
+                  <PriorityColumn
+                    title="HIGH PRIORITY"
+                    priority="high"
+                    tasks={highPriorityTasks}
+                    droppableId="high"
+                    icon="alert-circle"
+                    assignAction={assignHighPriorityToTimeline}
+                    containerMultiSelectState={getContainerMultiSelectState('high_priority')}
+                    highlightedTaskIds={highlightedHighPriority}
+                    useNewOptimizer={useNewOptimizer}
+                  />
+                  <PriorityColumn
+                    title="LOW PRIORITY"
+                    priority="low"
+                    tasks={lowPriorityTasks}
+                    droppableId="low"
+                    icon="arrow-down"
+                    assignAction={assignLowPriorityToTimeline}
+                    containerMultiSelectState={getContainerMultiSelectState('low_priority')}
+                    highlightedTaskIds={highlightedLowPriority}
+                    useNewOptimizer={useNewOptimizer}
+                  />
+                </div>
+              );
+            })()}
 
           <div className="mt-6 grid grid-cols-1 xl:grid-cols-3 gap-6">
             <div className="xl:col-span-2">
