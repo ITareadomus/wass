@@ -9,7 +9,7 @@ import {
 import { TaskForScheduling } from './phase3';
 import { updateRunStatus, insertDecisionsBatch, OptimizerDecision, getLatestRunForDate } from './db';
 import { loadPriorityStartWindows, mapPriorityType, priorityToDbFormat } from './priorityWindows';
-import { ApartmentTypes, DEFAULT_APARTMENT_TYPES } from './phase2';
+import { ApartmentTypes, DEFAULT_APARTMENT_TYPES, calculateMinutesBasedTargets, TaskForPhase2, DEFAULT_FAIRNESS_PARAMS } from './phase2';
 
 async function loadApartmentTypes(): Promise<ApartmentTypes> {
   try {
@@ -544,12 +544,31 @@ export async function runPhase4(
 
     await clearPhase4Data(resolvedRunId);
 
+    // Calculate minutes-based fairness targets for Phase 4
+    // Convert TaskForScheduling to TaskForPhase2 format for target calculation
+    const tasksForTargets: TaskForPhase2[] = Array.from(tasksMap.values()).map(t => ({
+      taskId: t.taskId,
+      logisticCode: t.logisticCode,
+      lat: t.lat,
+      lng: t.lng,
+      clientId: 0,  // Not needed for target calculation
+      premium: t.premium ?? false,
+      straordinaria: t.straordinaria ?? false,
+      typeApt: t.typeApt ?? '',
+      priority: t.priorityType ?? 'LP',  // Use priorityType from TaskForScheduling
+      cleaningTime: t.cleaningTimeMinutes ?? 60
+    }));
+    const targets = calculateMinutesBasedTargets(tasksForTargets, schedules.length, fullParams.fairness);
+    
+    console.log(`[Phase4] Fairness targets: target=${Math.round(targets.targetLoadMin)}min, min=${Math.round(targets.minTarget)}min, max=${Math.round(targets.maxTarget)}min`);
+
     const phase4Result = runPhase4Algorithm(
       resolvedWorkDate,
       schedules,
       unassignedTasks,
       tasksMap,
       priorityWindows,
+      targets,
       fullParams
     );
 

@@ -6,7 +6,7 @@ import {
   PriorityViolation
 } from './phase3';
 import { PriorityWindows, priorityPenalty, Priority } from './priorityWindows';
-import { ApartmentTypes, DEFAULT_APARTMENT_TYPES } from './phase2';
+import { ApartmentTypes, DEFAULT_APARTMENT_TYPES, FairnessParams, DEFAULT_FAIRNESS_PARAMS, MinutesBasedTargets } from './phase2';
 
 export interface Phase4Params {
   maxInsertionAttempts: number;
@@ -25,6 +25,8 @@ export interface Phase4Params {
   apartmentTypes: ApartmentTypes;
   // Dynamic max tasks per cleaner (calcolato da totalTasks/numCleaners)
   dynamicMaxTasks?: number;
+  // Minutes-based fairness parameters
+  fairness: FairnessParams;
 }
 
 // LIMITE HARD DINAMICO - basato su dynamicMaxTasks + bonus travel per-cleaner
@@ -46,7 +48,9 @@ export const DEFAULT_PHASE4_PARAMS: Phase4Params = {
   // Compatibilità appartamento
   apartmentTypes: DEFAULT_APARTMENT_TYPES,
   // Dynamic max tasks - base da totalTasks/numCleaners, bonus +1 se avgTravel ≤ 10min
-  dynamicMaxTasks: undefined
+  dynamicMaxTasks: undefined,
+  // Minutes-based fairness
+  fairness: DEFAULT_FAIRNESS_PARAMS
 };
 
 export interface CleanerSchedule {
@@ -346,6 +350,7 @@ function tryInsertTask(
   tasksMap: Map<number, TaskForScheduling>,
   priorityWindows: PriorityWindows | null,
   params: Phase4Params,
+  targets: MinutesBasedTargets,
   relaxLevel: number = 0
 ): InsertionCandidate {
   const constraints = getRelaxConstraints(relaxLevel);
@@ -485,30 +490,33 @@ function tryInsertTask(
     underfilledBonus = params.underfilledBonus;
   }
   
-  // FAIRNESS SCORING: premia cleaners con meno ore lavorate, penalizza quelli sovraccarichi
-  // Calcola le ore lavorate attuali del cleaner (incluso il nuovo task)
+  // FAIRNESS SCORING (minutes-based, consistent with Phase 2)
+  const { fairness } = params;
   const currentWorkMinutes = schedule.totalWorkMinutes ?? 0;
+  const currentTravelMinutes = schedule.totalTravel ?? 0;
+  const currentLoadMin = currentWorkMinutes + fairness.wT * currentTravelMinutes;
+  
   const newTaskDuration = task.cleaningTimeMinutes ?? 60;
-  const projectedWorkMinutes = currentWorkMinutes + newTaskDuration;
+  const deltaWorkMin = newTaskDuration;
+  const deltaTravelMin = deltaTravel;
+  const deltaLoadMin = deltaWorkMin + fairness.wT * deltaTravelMin;
+  const newLoadMin = currentLoadMin + deltaLoadMin;
   
-  // Bonus inversamente proporzionale alle ore lavorate
-  // Un cleaner con 0 ore ottiene bonus massimo (20), uno con 480 min (8h) ottiene 0
-  const MAX_FAIRNESS_BONUS = 20;
-  const FAIRNESS_WORK_THRESHOLD = 480; // 8 ore = soglia fairness
-  const fairnessBonus = Math.max(0, MAX_FAIRNESS_BONUS * (1 - currentWorkMinutes / FAIRNESS_WORK_THRESHOLD));
+  // Bonus for underfilled cleaners (linear, consistent with Phase 2)
+  const underGap = Math.max(0, targets.minTarget - currentLoadMin);
+  const minutesUnderBonus = underGap * fairness.k_under;
   
-  // Penalità per cleaners sovraccarichi (oltre le 8 ore proiettate)
-  // Ogni 60 minuti oltre la soglia = +10 punti di penalità
-  const OVERLOAD_PENALTY_PER_HOUR = 10;
-  let overloadPenalty = 0;
-  if (projectedWorkMinutes > FAIRNESS_WORK_THRESHOLD) {
-    const overloadMinutes = projectedWorkMinutes - FAIRNESS_WORK_THRESHOLD;
-    overloadPenalty = (overloadMinutes / 60) * OVERLOAD_PENALTY_PER_HOUR;
-  }
+  // Penalty for overloaded cleaners (quadratic, consistent with Phase 2)
+  const overGap = Math.max(0, newLoadMin - targets.maxTarget);
+  const overloadPenalty = Math.pow(overGap, 2) * fairness.k_over;
+  
+  // Bonus for empty cleaners
+  const zeroBonus = currentLoadMin === 0 ? fairness.zeroBonus : 0;
   
   // Include relaxPenalty nel totalScore - così soluzioni a livello più basso vincono sempre
   const relaxPenaltyValue = relaxPenalty(relaxLevel, params);
-  const totalScore = deltaTravel + (deltaWait * 0.5) + (deltaPriorityPenalty * 2) - underfilledBonus - fairnessBonus + overloadPenalty + relaxPenaltyValue;
+  const totalScore = deltaTravel + (deltaWait * 0.5) + (deltaPriorityPenalty * 2) 
+    - underfilledBonus - minutesUnderBonus - zeroBonus + overloadPenalty + relaxPenaltyValue;
   
   return {
     cleanerId: schedule.cleanerId,
@@ -730,6 +738,7 @@ function trySingleAssignment(
   tasksMap: Map<number, TaskForScheduling>,
   priorityWindows: PriorityWindows | null,
   params: Phase4Params,
+  targets: MinutesBasedTargets,
   relaxLevel: number = 0
 ): { success: boolean; cleanerId?: number; updatedSchedule?: CleanerSchedule; score?: number } {
   let bestOption: { cleanerId: number; schedule: CleanerSchedule; score: number } | null = null;
@@ -745,6 +754,7 @@ function trySingleAssignment(
       tasksMap,
       priorityWindows,
       params,
+      targets,
       relaxLevel
     );
     
@@ -839,6 +849,7 @@ export function runPhase4Algorithm(
   unassignedTasks: { taskId: number; reasonCode: string; details: Record<string, any> }[],
   tasksMap: Map<number, TaskForScheduling>,
   priorityWindows: PriorityWindows | null,
+  targets: MinutesBasedTargets,
   params: Phase4Params = DEFAULT_PHASE4_PARAMS
 ): Phase4Result {
   const events: Phase4Event[] = [];
@@ -868,7 +879,7 @@ export function runPhase4Algorithm(
     let compatibleCount = 0;
     for (const schedule of schedules) {
       // Conta solo se almeno 1 posizione potrebbe funzionare (approssimativo)
-      const candidate = tryInsertTask(schedule, task, schedule.tasks.length, workDate, tasksMap, priorityWindows, params, 0);
+      const candidate = tryInsertTask(schedule, task, schedule.tasks.length, workDate, tasksMap, priorityWindows, params, targets, 0);
       if (candidate.feasible) compatibleCount++;
     }
     taskScarcity.set(unassigned.taskId, compatibleCount);
@@ -1021,6 +1032,7 @@ export function runPhase4Algorithm(
             tasksMap,
             priorityWindows,
             params,
+            targets,
             currentRelaxLevel
           );
           
@@ -1082,6 +1094,7 @@ export function runPhase4Algorithm(
           tasksMap,
           priorityWindows,
           params,
+          targets,
           currentRelaxLevel
         );
         
