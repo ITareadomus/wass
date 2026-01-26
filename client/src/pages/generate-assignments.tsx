@@ -2059,7 +2059,7 @@ export default function GenerateAssignments() {
                   }
                 }}
                 disabled={isAssigning || isTimelineReadOnly}
-                className="flex items-center gap-2 bg-custom-blue hover:bg-custom-blue/90 text-white border-2 border-custom-blue"
+                className="flex items-center gap-2 bg-custom-blue hover:bg-custom-blue/90 text-black dark:text-white border-2 border-custom-blue"
               >
                 {isAssigning ? (
                   <><RefreshCw className="w-4 h-4 animate-spin" /> Assegnando...</>
