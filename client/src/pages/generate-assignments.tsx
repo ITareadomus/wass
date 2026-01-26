@@ -339,6 +339,10 @@ export default function GenerateAssignments() {
   
   // Toggle per scegliere tra nuovo optimizer (TypeScript) e vecchio (Python)
   const [useNewOptimizer, setUseNewOptimizer] = useState(true);
+  
+  // Stati per pulsanti Assegna e Refresh Containers
+  const [isAssigning, setIsAssigning] = useState(false);
+  const [isRefreshingContainers, setIsRefreshingContainers] = useState(false);
 
   // Callback per notificare modifiche dopo movimenti task
   const handleTaskMoved = useCallback(() => {
@@ -1960,15 +1964,108 @@ export default function GenerateAssignments() {
             onDragEnd={onDragEnd}
             onDragUpdate={onDragUpdate}
           >
-            <div className="mb-4 relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-custom-blue" />
-              <Input
-                placeholder="Cerca task per ID, logistic code, indirizzo, cliente, alias o reference..."
-                value={searchTask}
-                onChange={(e) => setSearchTask(e.target.value)}
-                className="border-2 border-custom-blue pl-10"
-                data-testid="input-search-task"
-              />
+            <div className="mb-4 flex items-center gap-3">
+              <div className="relative flex-1 max-w-md">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-custom-blue" />
+                <Input
+                  placeholder="Cerca task..."
+                  value={searchTask}
+                  onChange={(e) => setSearchTask(e.target.value)}
+                  className="border-2 border-custom-blue pl-10"
+                  data-testid="input-search-task"
+                />
+              </div>
+              <Button
+                onClick={async () => {
+                  try {
+                    setIsAssigning(true);
+                    const year = selectedDate.getFullYear();
+                    const month = String(selectedDate.getMonth() + 1).padStart(2, '0');
+                    const day = String(selectedDate.getDate()).padStart(2, '0');
+                    const dateStr = `${year}-${month}-${day}`;
+                    
+                    const response = await fetch('/api/optimizer/run-all', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ 
+                        date: dateStr, 
+                        skipPhase4: false, 
+                        applyToProduction: true 
+                      })
+                    });
+                    
+                    if (!response.ok) throw new Error('Errore durante l\'assegnazione');
+                    
+                    const result = await response.json();
+                    const summary = result.summary || {};
+                    toast({
+                      variant: "success",
+                      title: "Assegnazione completata",
+                      description: `${summary.tasksAssigned || 0} task assegnate, ${summary.tasksUnassigned || 0} non assegnate`,
+                    });
+                    await reloadAllTasks();
+                  } catch (error) {
+                    toast({
+                      variant: "destructive",
+                      title: "Errore",
+                      description: "Errore durante l'assegnazione automatica",
+                    });
+                  } finally {
+                    setIsAssigning(false);
+                  }
+                }}
+                disabled={isAssigning || isTimelineReadOnly}
+                className="flex items-center gap-2 bg-custom-blue hover:bg-custom-blue/90 text-white"
+              >
+                {isAssigning ? (
+                  <><RefreshCw className="w-4 h-4 animate-spin" /> Assegnando...</>
+                ) : (
+                  <><CalendarIcon className="w-4 h-4" /> Assegna</>
+                )}
+              </Button>
+              <Button
+                variant="outline"
+                onClick={async () => {
+                  try {
+                    setIsRefreshingContainers(true);
+                    const year = selectedDate.getFullYear();
+                    const month = String(selectedDate.getMonth() + 1).padStart(2, '0');
+                    const day = String(selectedDate.getDate()).padStart(2, '0');
+                    const dateStr = `${year}-${month}-${day}`;
+                    
+                    const response = await fetch('/api/containers/refresh', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ date: dateStr })
+                    });
+                    
+                    if (!response.ok) throw new Error('Errore durante il refresh');
+                    
+                    toast({
+                      variant: "success",
+                      title: "Containers aggiornati",
+                      description: "I dati dei task sono stati aggiornati da ADAM",
+                    });
+                    await reloadAllTasks();
+                  } catch (error) {
+                    toast({
+                      variant: "destructive",
+                      title: "Errore",
+                      description: "Errore durante il refresh dei containers",
+                    });
+                  } finally {
+                    setIsRefreshingContainers(false);
+                  }
+                }}
+                disabled={isRefreshingContainers || isTimelineReadOnly}
+                className="flex items-center gap-2 border-2 border-custom-blue"
+              >
+                {isRefreshingContainers ? (
+                  <><RefreshCw className="w-4 h-4 animate-spin" /> Aggiornando...</>
+                ) : (
+                  <><RefreshCw className="w-4 h-4" /> Refresh Containers</>
+                )}
+              </Button>
             </div>
 
             {(() => {
