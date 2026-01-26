@@ -52,12 +52,31 @@ export const DEFAULT_APARTMENT_TYPES: ApartmentTypes = {
   formatore_apt: ['B', 'C']
 };
 
+export interface FairnessParams {
+  wT: number;              // weight for travel in load calculation (loadMin = workMin + wT * travelMin)
+  k_under: number;         // bonus multiplier for underfilled cleaners
+  k_over: number;          // penalty multiplier for overloaded cleaners (quadratic)
+  zeroBonus: number;       // bonus in "equivalent minutes" for cleaners with zero load
+  minTargetRatio: number;  // ratio for minimum target (e.g., 0.6 = 60% of average)
+  maxTargetRatio: number;  // ratio for maximum target (e.g., 1.25 = 125% of average)
+}
+
+export const DEFAULT_FAIRNESS_PARAMS: FairnessParams = {
+  wT: 1.0,                 // travel counts as much as work
+  k_under: 3,              // 30 min gap = ~10 points bonus
+  k_over: 0.05,            // quadratic penalty: (over^2) * k_over
+  zeroBonus: 30,           // 30 min equivalent bonus for empty cleaners
+  minTargetRatio: 0.6,     // cleaners under 60% of target get bonus
+  maxTargetRatio: 1.25     // cleaners over 125% of target get penalty
+};
+
 export interface Phase2Params {
   travelWeight: number;
   loadWeight: number;
   preferenceBonus: number;
   apartmentTypes: ApartmentTypes;
   dynamicMaxTasks?: number;  // base max from totalTasks/numCleaners, bonus +1 per-cleaner if avgTravel ≤ 10min
+  fairness: FairnessParams;  // minutes-based fairness parameters
 }
 
 export const DEFAULT_PHASE2_PARAMS: Phase2Params = {
@@ -65,7 +84,8 @@ export const DEFAULT_PHASE2_PARAMS: Phase2Params = {
   loadWeight: 5,
   preferenceBonus: 10,
   apartmentTypes: DEFAULT_APARTMENT_TYPES,
-  dynamicMaxTasks: undefined
+  dynamicMaxTasks: undefined,
+  fairness: DEFAULT_FAIRNESS_PARAMS
 };
 
 export interface DynamicLimits {
@@ -89,18 +109,54 @@ export function calculateDynamicLimits(
   return { baseMax, minTasks };
 }
 
+// Minutes-based fairness targets
+export interface MinutesBasedTargets {
+  targetLoadMin: number;   // average load per cleaner (totalWorkMin / numCleaners)
+  minTarget: number;       // minimum target (targetLoadMin * minTargetRatio)
+  maxTarget: number;       // maximum target (targetLoadMin * maxTargetRatio)
+  totalWorkMin: number;    // total work minutes
+  numCleaners: number;     // number of cleaners
+}
+
+// Calculate minutes-based fairness targets
+export function calculateMinutesBasedTargets(
+  tasks: TaskForPhase2[],
+  numCleaners: number,
+  fairness: FairnessParams
+): MinutesBasedTargets {
+  if (numCleaners <= 0) {
+    return { targetLoadMin: 60, minTarget: 36, maxTarget: 75, totalWorkMin: 60, numCleaners: 1 };
+  }
+  
+  const totalWorkMin = tasks.reduce((sum, t) => sum + (t.cleaningTime || 60), 0);
+  const targetLoadMin = totalWorkMin / numCleaners;
+  
+  return {
+    targetLoadMin,
+    minTarget: targetLoadMin * fairness.minTargetRatio,
+    maxTarget: targetLoadMin * fairness.maxTargetRatio,
+    totalWorkMin,
+    numCleaners
+  };
+}
+
 export interface CleanerScore {
   cleanerId: number;
   name: string;
   score: number;
   travelMin: number;
   currentLoad: number;
+  currentLoadMin: number;    // workMin + wT * travelMin
+  newLoadMin: number;        // loadMin after adding this group
   hasPreference: boolean;
   breakdown: {
     baseScore: number;
     travelPenalty: number;
     loadPenalty: number;
     preferenceBonus: number;
+    underBonus: number;      // bonus for underfilled cleaners
+    overPenalty: number;     // penalty for overloaded cleaners
+    zeroBonus: number;       // bonus for empty cleaners
   };
 }
 
@@ -214,10 +270,15 @@ export function scoreCleanerForGroup(
   tasks: TaskForPhase2[],
   cleanerLoad: Map<number, number>,
   cleanerLastPosition: Map<number, { lat: number; lng: number }>,
+  cleanerWorkMin: Map<number, number>,
+  cleanerTravelMin: Map<number, number>,
+  targets: MinutesBasedTargets,
   params: Phase2Params
 ): CleanerScore {
   const baseScore = 100;
+  const { fairness } = params;
   
+  // Calculate incremental travel to first task
   let travelMin = 0;
   const lastPos = cleanerLastPosition.get(cleaner.cleanerId);
   if (lastPos && tasks.length > 0) {
@@ -229,14 +290,45 @@ export function scoreCleanerForGroup(
   
   const currentLoad = cleanerLoad.get(cleaner.cleanerId) || 0;
   
+  // Minutes-based load calculation
+  const currentWorkMin = cleanerWorkMin.get(cleaner.cleanerId) || 0;
+  const currentTravelMin = cleanerTravelMin.get(cleaner.cleanerId) || 0;
+  const currentLoadMin = currentWorkMin + fairness.wT * currentTravelMin;
+  
+  // Calculate delta for this group
+  const groupWorkMin = tasks.reduce((sum, t) => sum + (t.cleaningTime || 60), 0);
+  const groupTravelMin = travelMin; // travel to first task of group
+  const deltaLoadMin = groupWorkMin + fairness.wT * groupTravelMin;
+  const newLoadMin = currentLoadMin + deltaLoadMin;
+  
   const clientIds = tasks.map(t => t.clientId);
   const hasPreference = clientIds.some(cid => cleaner.preferredCustomers.includes(cid));
   
+  // Legacy penalties (kept for backwards compatibility)
   const travelPenalty = travelMin * params.travelWeight;
   const loadPenalty = currentLoad * params.loadWeight;
   const prefBonus = hasPreference ? params.preferenceBonus : 0;
   
-  const finalScore = baseScore - travelPenalty - loadPenalty + prefBonus;
+  // NEW: Minutes-based fairness bonuses/penalties
+  // Bonus for underfilled cleaners (linear)
+  const underGap = Math.max(0, targets.minTarget - currentLoadMin);
+  const underBonus = underGap * fairness.k_under;
+  
+  // Penalty for overloaded cleaners (quadratic)
+  const overGap = Math.max(0, newLoadMin - targets.maxTarget);
+  const overPenalty = Math.pow(overGap, 2) * fairness.k_over;
+  
+  // Bonus for empty cleaners
+  const zeroBonus = currentLoadMin === 0 ? fairness.zeroBonus : 0;
+  
+  // Final score: base + bonuses - penalties
+  const finalScore = baseScore 
+    - travelPenalty 
+    - loadPenalty 
+    + prefBonus 
+    + underBonus 
+    + zeroBonus 
+    - overPenalty;
   
   return {
     cleanerId: cleaner.cleanerId,
@@ -244,12 +336,17 @@ export function scoreCleanerForGroup(
     score: Math.round(finalScore * 10) / 10,
     travelMin,
     currentLoad,
+    currentLoadMin: Math.round(currentLoadMin),
+    newLoadMin: Math.round(newLoadMin),
     hasPreference,
     breakdown: {
       baseScore,
-      travelPenalty,
-      loadPenalty,
-      preferenceBonus: prefBonus
+      travelPenalty: Math.round(travelPenalty * 10) / 10,
+      loadPenalty: Math.round(loadPenalty * 10) / 10,
+      preferenceBonus: prefBonus,
+      underBonus: Math.round(underBonus * 10) / 10,
+      overPenalty: Math.round(overPenalty * 10) / 10,
+      zeroBonus
     }
   };
 }
@@ -317,12 +414,34 @@ export function runPhase2Algorithm(
   const cleanerStraordinariaDuration = new Map<number, number>(); // Duration in minutes
   const cleanerTotalCleaningTime = new Map<number, number>(); // Total cleaning time assigned
   
+  // NEW: Minutes-based fairness tracking
+  const cleanerWorkMin = new Map<number, number>();     // Total work minutes assigned
+  const cleanerTravelMin = new Map<number, number>();   // Total travel minutes assigned
+  
   cleaners.forEach(c => {
     cleanerLoad.set(c.cleanerId, 0);
     cleanerTotalTravel.set(c.cleanerId, 0);
     cleanerHasStraordinaria.set(c.cleanerId, false);
     cleanerStraordinariaDuration.set(c.cleanerId, 0);
     cleanerTotalCleaningTime.set(c.cleanerId, 0);
+    cleanerWorkMin.set(c.cleanerId, 0);
+    cleanerTravelMin.set(c.cleanerId, 0);
+  });
+  
+  // Calculate minutes-based fairness targets
+  const allTasks = Array.from(tasksMap.values());
+  const targets = calculateMinutesBasedTargets(allTasks, cleaners.length, params.fairness);
+  
+  events.push({
+    eventType: 'PHASE2_FAIRNESS_TARGETS',
+    payload: {
+      totalWorkMin: Math.round(targets.totalWorkMin),
+      numCleaners: targets.numCleaners,
+      targetLoadMin: Math.round(targets.targetLoadMin),
+      minTarget: Math.round(targets.minTarget),
+      maxTarget: Math.round(targets.maxTarget),
+      fairnessParams: params.fairness
+    }
   });
   
   // Pre-calcola scarcity per ogni task (quanti cleaners compatibili)
@@ -611,7 +730,7 @@ export function runPhase2Algorithm(
       
       if (compatibleCleaners.length > 0) {
         const scores = compatibleCleaners.map(c => 
-          scoreCleanerForGroup(c, tasks, cleanerLoad, cleanerLastPosition, params)
+          scoreCleanerForGroup(c, tasks, cleanerLoad, cleanerLastPosition, cleanerWorkMin, cleanerTravelMin, targets, params)
         ).sort((a, b) => b.score - a.score);
         
         scores.slice(0, 3).forEach(s => {
@@ -624,6 +743,8 @@ export function runPhase2Algorithm(
               score: s.score,
               travel_min: s.travelMin,
               current_load: s.currentLoad,
+              current_load_min: s.currentLoadMin,
+              new_load_min: s.newLoadMin,
               has_preference: s.hasPreference,
               breakdown: s.breakdown
             }
@@ -639,6 +760,13 @@ export function runPhase2Algorithm(
         // Update cumulative travel time for dynamic max load calculation
         const currentTravel = cleanerTotalTravel.get(assignedCleaner.cleanerId) || 0;
         cleanerTotalTravel.set(assignedCleaner.cleanerId, currentTravel + bestCleaner.travelMin);
+        
+        // Update minutes-based fairness tracking
+        const groupWorkMin = tasks.reduce((sum, t) => sum + (t.cleaningTime || 60), 0);
+        const currentWorkMin = cleanerWorkMin.get(assignedCleaner.cleanerId) || 0;
+        const currentTravelMin = cleanerTravelMin.get(assignedCleaner.cleanerId) || 0;
+        cleanerWorkMin.set(assignedCleaner.cleanerId, currentWorkMin + groupWorkMin);
+        cleanerTravelMin.set(assignedCleaner.cleanerId, currentTravelMin + bestCleaner.travelMin);
         
         // Update straordinaria tracking
         if (groupHasStraordinaria) {
@@ -740,6 +868,48 @@ export function runPhase2Algorithm(
       retryCount
     });
   }
+  
+  // Final fairness metrics
+  const loadMinValues: number[] = [];
+  const cleanerFairnessDetails: { cleanerId: number; name: string; loadMin: number; workMin: number; travelMin: number }[] = [];
+  
+  cleaners.forEach(c => {
+    const workMin = cleanerWorkMin.get(c.cleanerId) || 0;
+    const travelMin = cleanerTravelMin.get(c.cleanerId) || 0;
+    const loadMin = workMin + params.fairness.wT * travelMin;
+    loadMinValues.push(loadMin);
+    cleanerFairnessDetails.push({
+      cleanerId: c.cleanerId,
+      name: c.name,
+      loadMin: Math.round(loadMin),
+      workMin,
+      travelMin: Math.round(travelMin)
+    });
+  });
+  
+  const usedCleaners = loadMinValues.filter(l => l > 0).length;
+  const sortedLoads = [...loadMinValues].filter(l => l > 0).sort((a, b) => a - b);
+  const minLoad = sortedLoads.length > 0 ? sortedLoads[0] : 0;
+  const maxLoad = sortedLoads.length > 0 ? sortedLoads[sortedLoads.length - 1] : 0;
+  const medianLoad = sortedLoads.length > 0 ? sortedLoads[Math.floor(sortedLoads.length / 2)] : 0;
+  const underTarget = loadMinValues.filter(l => l > 0 && l < targets.minTarget).length;
+  const overTarget = loadMinValues.filter(l => l > targets.maxTarget).length;
+  
+  events.push({
+    eventType: 'PHASE2_FAIRNESS_FINAL_METRICS',
+    payload: {
+      usedCleaners,
+      totalCleaners: cleaners.length,
+      minLoadMin: Math.round(minLoad),
+      maxLoadMin: Math.round(maxLoad),
+      medianLoadMin: Math.round(medianLoad),
+      targetLoadMin: Math.round(targets.targetLoadMin),
+      cleanersUnderMinTarget: underTarget,
+      cleanersOverMaxTarget: overTarget,
+      loadSpread: Math.round(maxLoad - minLoad),
+      cleanerDetails: cleanerFairnessDetails.filter(c => c.loadMin > 0)
+    }
+  });
   
   return {
     assignments,
