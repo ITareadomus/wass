@@ -414,9 +414,10 @@ export function CleanerSelectorDialog({
               Annulla
             </Button>
             <Button
+              variant="outline"
               onClick={handleConfirm}
               disabled={selectedIds.length === 0 || isLoading}
-              className="bg-purple-600 hover:bg-purple-700"
+              className="border-2 border-purple-300 dark:border-purple-700 hover:bg-purple-50 dark:hover:bg-purple-900/20"
             >
               {isLoading ? (
                 <>
