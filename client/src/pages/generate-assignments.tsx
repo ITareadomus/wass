@@ -2117,7 +2117,7 @@ export default function GenerateAssignments() {
               const highlightedLowPriority = getHighlightedTaskIds(lowPriorityTasks);
 
               return (
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6 w-full">
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-0 mb-6 w-full border-2 border-custom-blue rounded-lg overflow-hidden">
                   <PriorityColumn
                     title="EARLY OUT"
                     priority="early-out"
