@@ -5931,7 +5931,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
             h.checkin_pax AS pax_in,
             h.checkout_pax AS pax_out,
             h.operation_id,
-            h.confirmed_operation,
             s.premium,
             s.address,
             s.lat,
@@ -5960,7 +5959,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
             pax_in: row.pax_in,
             pax_out: row.pax_out,
             operation_id: row.operation_id,
-            confirmed_operation: row.confirmed_operation === 1,
             premium: row.premium === 1,
             address: row.address,
             lat: row.lat,
@@ -5986,14 +5984,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 if (adamData.pax_out !== undefined) task.pax_out = adamData.pax_out;
                 if (adamData.checkin_time) task.checkin_time = adamData.checkin_time;
                 if (adamData.checkout_time) task.checkout_time = adamData.checkout_time;
-                if (adamData.cleaning_time) task.cleaning_time = adamData.cleaning_time;
                 if (adamData.address) task.address = adamData.address;
                 if (adamData.alias) task.alias = adamData.alias;
                 if (adamData.customer_name) task.customer_name = adamData.customer_name;
                 if (adamData.customer_reference) task.customer_reference = adamData.customer_reference;
                 if (adamData.premium !== undefined) task.premium = adamData.premium;
                 if (adamData.operation_id !== undefined) task.operation_id = adamData.operation_id;
-                task.confirmed_operation = adamData.confirmed_operation;
               }
             }
           }
