@@ -5869,15 +5869,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Endpoint per arricchire i containers con dati completi da ADAM
+  // Endpoint per caricare i containers da PostgreSQL
   app.get("/api/containers-enriched", async (req, res) => {
     try {
       const dateParam = (req.query.date as string) || format(new Date(), "yyyy-MM-dd");
       const workDate = dateParam;
 
-      console.log(`📖 GET /api/containers-enriched - Caricamento containers arricchiti per ${workDate}`);
+      console.log(`📖 GET /api/containers-enriched - Caricamento containers per ${workDate}`);
 
-      // 1. Carica containers da PostgreSQL
       const containers = await workspaceFiles.loadContainers(workDate);
 
       if (!containers || !containers.containers) {
@@ -5890,115 +5889,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
           summary: { early_out: 0, high_priority: 0, low_priority: 0, total_tasks: 0 },
           metadata: { date: workDate }
         });
-      }
-
-      // 2. Raccogli tutti i task_id
-      const taskIds: number[] = [];
-      for (const containerKey of Object.keys(containers.containers)) {
-        const container = containers.containers[containerKey];
-        if (container?.tasks) {
-          for (const task of container.tasks) {
-            if (task.task_id) {
-              taskIds.push(Number(task.task_id));
-            }
-          }
-        }
-      }
-
-      if (taskIds.length === 0) {
-        return res.json(containers);
-      }
-
-      // 3. Query database ADAM per ottenere dati completi
-      try {
-        const mysql = await import('mysql2/promise');
-        const adamConnection = await mysql.createConnection({
-          host: databaseConfig.mysql.host,
-          port: databaseConfig.mysql.port,
-          user: databaseConfig.mysql.user,
-          password: databaseConfig.mysql.password,
-          database: databaseConfig.mysql.database,
-        });
-
-        const [rows]: any = await adamConnection.execute(`
-          SELECT 
-            h.id AS task_id,
-            s.logistic_code,
-            h.checkin_time,
-            h.checkout_time,
-            h.checkin AS checkin_date,
-            h.checkout AS checkout_date,
-            h.checkin_pax AS pax_in,
-            h.checkout_pax AS pax_out,
-            h.operation_id,
-            s.premium,
-            s.address,
-            s.lat,
-            s.lng,
-            s.small_equipment,
-            s.type_apt,
-            c.name AS customer_name,
-            c.id AS client_id,
-            c.alias AS alias,
-            s.apt_code AS customer_reference
-          FROM app_housekeeping h
-          LEFT JOIN app_structures s ON h.structure_id = s.id
-          LEFT JOIN app_customers c ON s.customer_id = c.id
-          WHERE h.id IN (${taskIds.join(',')})
-        `);
-        await adamConnection.end();
-
-        // 4. Crea mappa task_id -> dati ADAM
-        const adamDataMap = new Map<number, any>();
-        for (const row of rows) {
-          adamDataMap.set(row.task_id, {
-            checkin_time: row.checkin_time && row.checkin_time.trim() ? row.checkin_time.trim() : null,
-            checkout_time: row.checkout_time && row.checkout_time.trim() ? row.checkout_time.trim() : null,
-            checkin_date: row.checkin_date,
-            checkout_date: row.checkout_date,
-            pax_in: row.pax_in,
-            pax_out: row.pax_out,
-            operation_id: row.operation_id,
-            premium: row.premium === 1,
-            address: row.address,
-            lat: row.lat,
-            lng: row.lng,
-            small_equipment: row.small_equipment === 1,
-            alias: row.alias,
-            type_apt: row.type_apt,
-            customer_name: row.customer_name,
-            customer_reference: row.customer_reference,
-            client_id: row.client_id
-          });
-        }
-
-        // 5. Arricchisci le task con i dati ADAM
-        for (const containerKey of Object.keys(containers.containers)) {
-          const container = containers.containers[containerKey];
-          if (container?.tasks) {
-            for (const task of container.tasks) {
-              const adamData = adamDataMap.get(Number(task.task_id));
-              if (adamData) {
-                // Sovrascrivi con i dati freschi da ADAM
-                if (adamData.pax_in !== undefined) task.pax_in = adamData.pax_in;
-                if (adamData.pax_out !== undefined) task.pax_out = adamData.pax_out;
-                if (adamData.checkin_time) task.checkin_time = adamData.checkin_time;
-                if (adamData.checkout_time) task.checkout_time = adamData.checkout_time;
-                if (adamData.address) task.address = adamData.address;
-                if (adamData.alias) task.alias = adamData.alias;
-                if (adamData.customer_name) task.customer_name = adamData.customer_name;
-                if (adamData.customer_reference) task.customer_reference = adamData.customer_reference;
-                if (adamData.premium !== undefined) task.premium = adamData.premium;
-                if (adamData.operation_id !== undefined) task.operation_id = adamData.operation_id;
-              }
-            }
-          }
-        }
-
-        console.log(`✅ Arricchite ${taskIds.length} task con dati ADAM per ${workDate}`);
-      } catch (adamError: any) {
-        console.error(`⚠️ Errore connessione ADAM, usando dati PostgreSQL:`, adamError.message);
-        // Continua con i dati PostgreSQL non arricchiti
       }
 
       res.json(containers);
