@@ -391,7 +391,7 @@ export default function TaskCard({
     }
   };
 
-  // Handler unificato per conferma selezione collaboratori dal dialog
+  // Handler per aggiungere collaboratori a task esistente in timeline
   const handleCollaboratorSelection = async (selectedCleanerIds: number[]) => {
     if (selectedCleanerIds.length === 0) return;
     
@@ -401,51 +401,14 @@ export default function TaskCard({
     setIsCollaboratorLoading(true);
     
     try {
-      let response: Response;
-      
-      if (cleanerSelectorMode === 'add') {
-        // CASO A: Aggiungi collaboratori a task esistente in timeline
-        // Chiamiamo l'API per ogni cleaner selezionato
-        for (const cleanerId of selectedCleanerIds) {
-          response = await fetch(`/api/tasks/${taskId}/collaborators/add`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              date: workDate,
-              cleanerId: cleanerId,
-            }),
-          });
-          
-          const data = await response.json();
-          
-          if (response.status === 409) {
-            toast({
-              title: "Collisione oraria",
-              description: data.message || "Il collaboratore ha già task che si sovrappongono",
-              variant: "destructive",
-            });
-            // Continua con gli altri cleaners
-            continue;
-          }
-          
-          if (!response.ok) {
-            throw new Error(data.error || "Errore nell'aggiunta collaboratore");
-          }
-        }
-        
-        toast({
-          title: "Collaboratori aggiunti",
-          description: `${selectedCleanerIds.length} cleaner(s) aggiunti alla task`,
-        });
-        
-      } else {
-        // CASO B: Assegna task da container con N cleaners
-        response = await fetch(`/api/tasks/${taskId}/collaborators/assign`, {
+      // Aggiungi collaboratori a task esistente in timeline
+      for (const cleanerId of selectedCleanerIds) {
+        const response = await fetch(`/api/tasks/${taskId}/collaborators/add`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             date: workDate,
-            cleanerIds: selectedCleanerIds,
+            cleanerId: cleanerId,
           }),
         });
         
@@ -454,29 +417,27 @@ export default function TaskCard({
         if (response.status === 409) {
           toast({
             title: "Collisione oraria",
-            description: data.message || "Uno o più cleaners hanno task che si sovrappongono",
+            description: data.message || "Il collaboratore ha già task che si sovrappongono",
             variant: "destructive",
           });
-          return;
+          continue;
         }
         
         if (!response.ok) {
-          throw new Error(data.error || "Errore nell'assegnazione");
+          throw new Error(data.error || "Errore nell'aggiunta collaboratore");
         }
-        
-        toast({
-          title: "Task assegnata",
-          description: `${data.collaboratorCount} cleaners assegnati (${data.effectiveCleaningTime}min ciascuno)`,
-        });
       }
+      
+      toast({
+        title: "Collaboratori aggiunti",
+        description: `${selectedCleanerIds.length} cleaner(s) aggiunti alla task`,
+      });
       
       // Chiudi dialog e modale
       setIsCleanerSelectorOpen(false);
       setIsModalOpen(false);
       
       // IMPORTANTE: Prima ricarica i selected_cleaners (per includere auto-convocati)
-      // PRIMA di reloadAllTasks, così quando la timeline viene renderizzata
-      // il cleaner auto-convocato non appare come "Rimosso"
       if ((window as any).loadSelectedCleaners) {
         await (window as any).loadSelectedCleaners();
       }
@@ -498,15 +459,8 @@ export default function TaskCard({
     }
   };
 
-  // Apri il dialog per aggiungere collaboratori (Caso A - timeline)
+  // Apri il dialog per aggiungere collaboratori (solo timeline)
   const openAddCollaboratorDialog = () => {
-    setCleanerSelectorMode('add');
-    setIsCleanerSelectorOpen(true);
-  };
-
-  // Apri il dialog per assegnare task con collaboratori (Caso B - containers)
-  const openBulkAssignDialog = () => {
-    setCleanerSelectorMode('assign');
     setIsCleanerSelectorOpen(true);
   };
 
@@ -523,7 +477,6 @@ export default function TaskCard({
   
   // Stato per il dialog di selezione collaboratori
   const [isCleanerSelectorOpen, setIsCleanerSelectorOpen] = useState(false);
-  const [cleanerSelectorMode, setCleanerSelectorMode] = useState<'add' | 'assign'>('add');
   const [isCollaboratorLoading, setIsCollaboratorLoading] = useState(false);
   
   // Stato per forzare re-render quando pending edits cambiano
@@ -1708,35 +1661,6 @@ export default function TaskCard({
               </div>
             )}
 
-            {/* Settima-bis riga: Assegnazione Collaboratori Bulk - solo nei container */}
-            {!isInTimeline && !isReadOnly && (
-              <div className="pt-3 border-t mt-3">
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center gap-2">
-                    <Users className="w-4 h-4 text-purple-600" />
-                    <span className="text-sm font-semibold text-muted-foreground">
-                      Assegna con collaboratori
-                    </span>
-                  </div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={openBulkAssignDialog}
-                    className="flex items-center gap-1 border-2 border-purple-300 dark:border-purple-700 hover:bg-purple-50 dark:hover:bg-purple-900/20"
-                    disabled={isLocked}
-                  >
-                    <UserPlus className="w-3 h-3" />
-                    Seleziona cleaners
-                  </Button>
-                </div>
-                
-                {isLocked && (
-                  <p className="text-xs text-muted-foreground">
-                    Sblocca la task per assegnarla
-                  </p>
-                )}
-              </div>
-            )}
 
             {/* Ottava riga: Blocco Task - solo nei container */}
             {!isInTimeline && (
@@ -1900,14 +1824,11 @@ export default function TaskCard({
         isOpen={isCleanerSelectorOpen}
         onClose={() => setIsCleanerSelectorOpen(false)}
         onConfirm={handleCollaboratorSelection}
-        excludeCleanerId={isInTimeline ? ((displayTask as any).cleaner_id || (displayTask as any).assignedCleaner) : null}
+        excludeCleanerId={(displayTask as any).cleaner_id || (displayTask as any).assignedCleaner}
         workDate={localStorage.getItem('selected_work_date') || new Date().toISOString().split('T')[0]}
-        title={cleanerSelectorMode === 'add' ? "Aggiungi Collaboratori" : "Assegna Task a Collaboratori"}
-        description={cleanerSelectorMode === 'add' 
-          ? "Seleziona uno o più cleaners da aggiungere come collaboratori a questa task"
-          : "Seleziona i cleaners a cui assegnare questa task in collaborazione"
-        }
-        confirmLabel={cleanerSelectorMode === 'add' ? "Aggiungi" : "Assegna"}
+        title="Aggiungi Collaboratori"
+        description="Seleziona uno o più cleaners da aggiungere come collaboratori a questa task"
+        confirmLabel="Aggiungi"
         baseCleaningTime={(() => {
           const currentCount = (displayTask as any).collaborator_count || 1;
           let baseTime = (displayTask as any).base_cleaning_time;
@@ -1918,7 +1839,7 @@ export default function TaskCard({
           }
           return baseTime;
         })()}
-        existingCollaboratorCount={cleanerSelectorMode === 'add' ? ((displayTask as any).collaborator_count || 1) : 0}
+        existingCollaboratorCount={(displayTask as any).collaborator_count || 1}
         isLoading={isCollaboratorLoading}
       />
     </>
