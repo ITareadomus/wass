@@ -2011,9 +2011,9 @@ export default function GenerateAssignments() {
                 className="flex items-center gap-2 border-2 border-custom-blue"
               >
                 {isRefreshingContainers ? (
-                  <><RefreshCw className="w-4 h-4 animate-spin" /> Aggiornando...</>
+                  <RefreshCw className="w-4 h-4 animate-spin" />
                 ) : (
-                  <><RefreshCw className="w-4 h-4" /> Refresh Containers</>
+                  <RefreshCw className="w-4 h-4" />
                 )}
               </Button>
               <Button
