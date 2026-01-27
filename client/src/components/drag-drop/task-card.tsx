@@ -1168,9 +1168,8 @@ export default function TaskCard({
                           </span>
                         )}
                         {(task as any).collaborator_count > 1 && (
-                          <Badge className="bg-purple-600 hover:bg-purple-700 text-white text-[9px] px-1 py-0 h-4 flex items-center gap-0.5">
-                            <Users className="w-3 h-3" />
-                            <Users className="w-3 h-3 -ml-1.5" />
+                          <Badge className="bg-purple-500 hover:bg-purple-600 px-0.5 py-0 h-3.5 flex items-center">
+                            <span className="text-[10px]">👥</span>
                           </Badge>
                         )}
                       </div>
