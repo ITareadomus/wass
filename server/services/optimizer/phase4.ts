@@ -3,7 +3,8 @@ import {
   TaskForScheduling, 
   simulateSequence, 
   ScheduleRow,
-  PriorityViolation
+  PriorityViolation,
+  Phase3TimelineConstraints
 } from './phase3';
 import { PriorityWindows, priorityPenalty, Priority } from './priorityWindows';
 import { ApartmentTypes, DEFAULT_APARTMENT_TYPES, FairnessParams, DEFAULT_FAIRNESS_PARAMS, MinutesBasedTargets } from './phase2';
@@ -351,7 +352,8 @@ function tryInsertTask(
   priorityWindows: PriorityWindows | null,
   params: Phase4Params,
   targets: MinutesBasedTargets,
-  relaxLevel: number = 0
+  relaxLevel: number = 0,
+  timelineConstraints: Phase3TimelineConstraints | null = null
 ): InsertionCandidate {
   const constraints = getRelaxConstraints(relaxLevel);
   const newTaskCount = schedule.tasks.length + 1;
@@ -399,7 +401,8 @@ function tryInsertTask(
     schedule.startTime,
     tasksMap,
     null,
-    priorityWindows
+    priorityWindows,
+    timelineConstraints
   );
   
   if (!simResult.ok) {
@@ -740,12 +743,14 @@ function trySingleAssignment(
   priorityWindows: PriorityWindows | null,
   params: Phase4Params,
   targets: MinutesBasedTargets,
-  relaxLevel: number = 0
+  relaxLevel: number = 0,
+  constraintsByCleaner: Map<string, Phase3TimelineConstraints> = new Map()
 ): { success: boolean; cleanerId?: number; updatedSchedule?: CleanerSchedule; score?: number } {
   let bestOption: { cleanerId: number; schedule: CleanerSchedule; score: number } | null = null;
   
   for (const schedule of schedules) {
     const position = schedule.tasks.length;
+    const cleanerConstraints = constraintsByCleaner.get(String(schedule.cleanerId)) || null;
     
     const candidate = tryInsertTask(
       schedule,
@@ -756,7 +761,8 @@ function trySingleAssignment(
       priorityWindows,
       params,
       targets,
-      relaxLevel
+      relaxLevel,
+      cleanerConstraints
     );
     
     if (candidate.feasible) {
@@ -851,7 +857,8 @@ export function runPhase4Algorithm(
   tasksMap: Map<number, TaskForScheduling>,
   priorityWindows: PriorityWindows | null,
   targets: MinutesBasedTargets,
-  params: Phase4Params = DEFAULT_PHASE4_PARAMS
+  params: Phase4Params = DEFAULT_PHASE4_PARAMS,
+  constraintsByCleaner: Map<string, Phase3TimelineConstraints> = new Map()
 ): Phase4Result {
   const events: Phase4Event[] = [];
   const taskResults: Phase4TaskResult[] = [];
@@ -880,7 +887,8 @@ export function runPhase4Algorithm(
     let compatibleCount = 0;
     for (const schedule of schedules) {
       // Conta solo se almeno 1 posizione potrebbe funzionare (approssimativo)
-      const candidate = tryInsertTask(schedule, task, schedule.tasks.length, workDate, tasksMap, priorityWindows, params, targets, 0);
+      const cleanerConstraints = constraintsByCleaner.get(String(schedule.cleanerId)) || null;
+      const candidate = tryInsertTask(schedule, task, schedule.tasks.length, workDate, tasksMap, priorityWindows, params, targets, 0, cleanerConstraints);
       if (candidate.feasible) compatibleCount++;
     }
     taskScarcity.set(unassigned.taskId, compatibleCount);
@@ -1025,6 +1033,7 @@ export function runPhase4Algorithm(
             break;
           }
           
+          const cleanerConstraints = constraintsByCleaner.get(String(schedule.cleanerId)) || null;
           const candidate = tryInsertTask(
             schedule,
             task,
@@ -1034,7 +1043,8 @@ export function runPhase4Algorithm(
             priorityWindows,
             params,
             targets,
-            currentRelaxLevel
+            currentRelaxLevel,
+            cleanerConstraints
           );
           
           if (candidate.feasible) {
@@ -1096,7 +1106,8 @@ export function runPhase4Algorithm(
           priorityWindows,
           params,
           targets,
-          currentRelaxLevel
+          currentRelaxLevel,
+          constraintsByCleaner
         );
         
         if (singleResult.success && singleResult.updatedSchedule) {

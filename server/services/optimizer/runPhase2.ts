@@ -11,6 +11,7 @@ import {
   DEFAULT_APARTMENT_TYPES
 } from './phase2';
 import { updateRunStatus, insertDecisionsBatch, OptimizerDecision } from './db';
+import { TimelineContext } from './timelineContext';
 
 async function loadApartmentTypes(): Promise<ApartmentTypes> {
   try {
@@ -185,13 +186,25 @@ function eventToDecision(runId: string, event: Phase2Event): OptimizerDecision {
   };
 }
 
+export interface RunPhase2Options {
+  params?: Partial<Phase2Params>;
+  timelineContext?: TimelineContext;
+}
+
 export async function runPhase2(
   workDate: string,
   phase1RunId?: string,
-  params: Partial<Phase2Params> = {}
+  paramsOrOptions: Partial<Phase2Params> | RunPhase2Options = {}
 ): Promise<Phase2RunResult> {
   const startTime = Date.now();
   const runId = phase1RunId || await getLatestPhase1RunId(workDate);
+  
+  const options: RunPhase2Options = 'timelineContext' in paramsOrOptions || 'params' in paramsOrOptions
+    ? paramsOrOptions as RunPhase2Options
+    : { params: paramsOrOptions as Partial<Phase2Params> };
+  
+  const params = options.params ?? {};
+  const timelineContext = options.timelineContext;
 
   const result: Phase2RunResult = {
     runId: runId || '',
@@ -222,8 +235,13 @@ export async function runPhase2(
     const fullParams: Phase2Params = { 
       ...DEFAULT_PHASE2_PARAMS, 
       ...params,
-      apartmentTypes 
+      apartmentTypes,
+      initialLoadByCleanerMin: timelineContext?.initialLoadByCleanerMin
     };
+    
+    if (timelineContext && timelineContext.initialLoadByCleanerMin.size > 0) {
+      console.log(`[Phase2] Using timeline context: ${timelineContext.initialLoadByCleanerMin.size} cleaners with pre-existing load`);
+    }
 
     const [selectedCleanerIds, allAvailableCleaners, tasksMap, allGroups] = await Promise.all([
       loadSelectedCleanerIds(workDate),

@@ -6,10 +6,11 @@ import {
   CleanerSchedule,
   Phase4Event
 } from './phase4';
-import { TaskForScheduling } from './phase3';
+import { TaskForScheduling, Phase3TimelineConstraints } from './phase3';
 import { updateRunStatus, insertDecisionsBatch, OptimizerDecision, getLatestRunForDate } from './db';
 import { loadPriorityStartWindows, mapPriorityType, priorityToDbFormat } from './priorityWindows';
 import { ApartmentTypes, DEFAULT_APARTMENT_TYPES, calculateMinutesBasedTargets, TaskForPhase2, DEFAULT_FAIRNESS_PARAMS } from './phase2';
+import { TimelineContext } from './timelineContext';
 
 async function loadApartmentTypes(): Promise<ApartmentTypes> {
   try {
@@ -465,12 +466,24 @@ async function updateUnassigned(
   return remainUnassigned.length;
 }
 
+export interface RunPhase4Options {
+  params?: Partial<Phase4Params>;
+  timelineContext?: TimelineContext;
+}
+
 export async function runPhase4(
   workDate?: string,
   runId?: string,
-  params: Partial<Phase4Params> = {}
+  paramsOrOptions: Partial<Phase4Params> | RunPhase4Options = {}
 ): Promise<Phase4RunResult> {
   const startTime = Date.now();
+  
+  const options: RunPhase4Options = 'timelineContext' in paramsOrOptions || 'params' in paramsOrOptions
+    ? paramsOrOptions as RunPhase4Options
+    : { params: paramsOrOptions as Partial<Phase4Params> };
+  
+  const params = options.params ?? {};
+  const timelineContext = options.timelineContext;
   
   let resolvedRunId = runId;
   let resolvedWorkDate = workDate;
@@ -562,6 +575,19 @@ export async function runPhase4(
     
     console.log(`[Phase4] Fairness targets: target=${Math.round(targets.targetLoadMin)}min, min=${Math.round(targets.minTarget)}min, max=${Math.round(targets.maxTarget)}min`);
 
+    // Build constraintsByCleaner from timelineContext for collision avoidance
+    const constraintsByCleaner = new Map<string, Phase3TimelineConstraints>();
+    if (timelineContext) {
+      for (const [cleanerId, blocks] of timelineContext.occupiedBlocksByCleaner) {
+        const anchors = timelineContext.anchorPointsByCleaner.get(cleanerId);
+        constraintsByCleaner.set(cleanerId, {
+          occupiedBlocks: blocks,
+          anchorFirst: anchors?.firstTask ?? null,
+          anchorLast: anchors?.lastTask ?? null
+        });
+      }
+    }
+    
     const phase4Result = runPhase4Algorithm(
       resolvedWorkDate,
       schedules,
@@ -569,7 +595,8 @@ export async function runPhase4(
       tasksMap,
       priorityWindows,
       targets,
-      fullParams
+      fullParams,
+      constraintsByCleaner
     );
 
     result.insertedCount = phase4Result.stats.insertedCount;

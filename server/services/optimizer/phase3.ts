@@ -1,5 +1,32 @@
 import { estimateTravelMinutes, TaskInput } from './phase1';
 import { Priority, PriorityWindows, priorityPenalty, PriorityPenaltyResult } from './priorityWindows';
+import { OccupiedBlock, CleanerAnchors } from './timelineContext';
+
+export interface Phase3TimelineConstraints {
+  occupiedBlocks?: OccupiedBlock[];
+  anchors?: CleanerAnchors;
+}
+
+function hasCollision(startMin: number, endMin: number, occupiedBlocks: OccupiedBlock[]): OccupiedBlock | null {
+  for (const block of occupiedBlocks) {
+    if (startMin < block.endMin && endMin > block.startMin) {
+      return block;
+    }
+  }
+  return null;
+}
+
+function findNextFreeSlot(arrivalMin: number, durationMin: number, occupiedBlocks: OccupiedBlock[]): number {
+  let candidateStart = arrivalMin;
+  let collision = hasCollision(candidateStart, candidateStart + durationMin, occupiedBlocks);
+  
+  while (collision) {
+    candidateStart = collision.endMin;
+    collision = hasCollision(candidateStart, candidateStart + durationMin, occupiedBlocks);
+  }
+  
+  return candidateStart;
+}
 
 export interface TaskForScheduling {
   taskId: number;
@@ -125,7 +152,8 @@ export function simulateSequence(
   startTimeStr: string,
   tasksMap: Map<number, TaskForScheduling>,
   previousTask: TaskForScheduling | null = null,
-  priorityWindows: PriorityWindows | null = null
+  priorityWindows: PriorityWindows | null = null,
+  timelineConstraints: Phase3TimelineConstraints | null = null
 ): SimulationResult {
   const startMinutes = parseTimeToMinutes(startTimeStr) ?? 540;
   let currentMinutes = startMinutes;
@@ -134,6 +162,8 @@ export function simulateSequence(
   let totalWait = 0;
   let totalPriorityPenalty = 0;
   const priorityViolations: PriorityViolation[] = [];
+  
+  const occupiedBlocks = timelineConstraints?.occupiedBlocks ?? [];
 
   for (let i = 0; i < tasks.length; i++) {
     const task = tasks[i];
@@ -156,11 +186,20 @@ export function simulateSequence(
     const arrivalMinutes = currentMinutes + travelMin;
 
     const checkoutMinutes = parseTimeToMinutes(task.checkoutTime);
-    const earliestStart = checkoutMinutes !== null ? Math.max(arrivalMinutes, checkoutMinutes) : arrivalMinutes;
+    let earliestStart = checkoutMinutes !== null ? Math.max(arrivalMinutes, checkoutMinutes) : arrivalMinutes;
+    
+    const cleaningTime = task.cleaningTimeMinutes || 60;
+    
+    if (occupiedBlocks.length > 0) {
+      const freeSlotStart = findNextFreeSlot(earliestStart, cleaningTime, occupiedBlocks);
+      if (freeSlotStart > earliestStart) {
+        earliestStart = freeSlotStart;
+      }
+    }
+    
     const waitMin = earliestStart - arrivalMinutes;
     totalWait += waitMin;
 
-    const cleaningTime = task.cleaningTimeMinutes || 60;
     const endMinutes = earliestStart + cleaningTime;
     const endDateTime = minutesToDate(workDate, endMinutes);
 
@@ -313,7 +352,8 @@ export function scheduleSingleGroup(
   tasksMap: Map<number, TaskForScheduling>,
   cleanerStartTime: string,
   previousTask: TaskForScheduling | null = null,
-  priorityWindows: PriorityWindows | null = null
+  priorityWindows: PriorityWindows | null = null,
+  timelineConstraints: Phase3TimelineConstraints | null = null
 ): ScheduleGroupResult {
   const tasks = taskIds.map(id => tasksMap.get(id)).filter(Boolean) as TaskForScheduling[];
   
@@ -334,7 +374,7 @@ export function scheduleSingleGroup(
   }
 
   if (tasks.length === 1) {
-    const result = simulateSequence(workDate, tasks, cleanerStartTime, tasksMap, previousTask, priorityWindows);
+    const result = simulateSequence(workDate, tasks, cleanerStartTime, tasksMap, previousTask, priorityWindows, timelineConstraints);
     return {
       ok: result.ok,
       scheduleRows: result.scheduleRows,
@@ -357,7 +397,7 @@ export function scheduleSingleGroup(
 
   for (const perm of perms) {
     permutationsChecked++;
-    const result = simulateSequence(workDate, perm, cleanerStartTime, tasksMap, previousTask, priorityWindows);
+    const result = simulateSequence(workDate, perm, cleanerStartTime, tasksMap, previousTask, priorityWindows, timelineConstraints);
     
     if (result.ok) {
       if (!bestResult || comparePermutations(result, bestResult) < 0) {
@@ -387,7 +427,7 @@ export function scheduleSingleGroup(
       const remaining = tasks.filter((_, idx) => idx !== dropIdx);
       const remainingIds = remaining.map(t => t.taskId);
       
-      const subResult = scheduleSingleGroup(workDate, remainingIds, tasksMap, cleanerStartTime, previousTask, priorityWindows);
+      const subResult = scheduleSingleGroup(workDate, remainingIds, tasksMap, cleanerStartTime, previousTask, priorityWindows, timelineConstraints);
       
       if (subResult.ok) {
         return {
@@ -438,7 +478,8 @@ export function runPhase3Algorithm(
   workDate: string,
   cleanerGroups: CleanerGroups[],
   tasksMap: Map<number, TaskForScheduling>,
-  priorityWindows: PriorityWindows | null = null
+  priorityWindows: PriorityWindows | null = null,
+  constraintsByCleaner?: Map<number, Phase3TimelineConstraints>
 ): Phase3Result {
   const events: Phase3Event[] = [];
   const scheduledGroups: GroupScheduleResult[] = [];
@@ -454,9 +495,10 @@ export function runPhase3Algorithm(
     let currentTimeStr = cg.startTime;
     let globalSequence = 0;
     let lastTask: TaskForScheduling | null = null;
+    const cleanerConstraints = constraintsByCleaner?.get(cg.cleanerId) ?? null;
 
     for (const group of cg.groups) {
-      const result = scheduleSingleGroup(workDate, group.taskIds, tasksMap, currentTimeStr, lastTask, priorityWindows);
+      const result = scheduleSingleGroup(workDate, group.taskIds, tasksMap, currentTimeStr, lastTask, priorityWindows, cleanerConstraints);
 
       if (result.ok && result.endTime) {
         const adjustedRows = result.scheduleRows.map((row, idx) => ({

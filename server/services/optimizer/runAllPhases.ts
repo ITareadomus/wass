@@ -144,7 +144,11 @@ export async function runAllPhases(
 
     console.log(`[runAllPhases] === PHASE 2: Cleaner Assignment ===`);
     // Passa baseMax - il bonus travel (+1) viene applicato per-cleaner basato su avgTravel ≤ 10min
-    result.phase2 = await runPhase2(workDate, runId, { dynamicMaxTasks: dynamicLimits.baseMax });
+    // Passa timelineContext per fairness scoring (pre-existing load)
+    result.phase2 = await runPhase2(workDate, runId, { 
+      params: { dynamicMaxTasks: dynamicLimits.baseMax },
+      timelineContext: result.phase0?.timelineContext
+    });
     if (result.phase2.status === 'failed') {
       result.status = 'failed';
       result.error = `Phase 2 failed: ${result.phase2.error}`;
@@ -155,7 +159,10 @@ export async function runAllPhases(
     console.log(`[runAllPhases] Phase 2 complete: ${result.phase2.groupsAssigned} groups assigned`);
 
     console.log(`[runAllPhases] === PHASE 3: Scheduling ===`);
-    result.phase3 = await runPhase3(workDate, runId);
+    // Passa timelineContext per collision avoidance (occupiedBlocks)
+    result.phase3 = await runPhase3(workDate, runId, { 
+      timelineContext: result.phase0?.timelineContext 
+    });
     if (result.phase3.status === 'failed') {
       result.status = 'failed';
       result.error = `Phase 3 failed: ${result.phase3.error}`;
@@ -168,7 +175,11 @@ export async function runAllPhases(
     if (!skipPhase4) {
       console.log(`[runAllPhases] === PHASE 4: Recovery ===`);
       // Passa baseMax - il bonus travel (+1) viene applicato per-cleaner basato su avgTravel ≤ 10min
-      result.phase4 = await runPhase4(workDate, runId, { dynamicMaxTasks: dynamicLimits.baseMax });
+      // Passa timelineContext per recovery constraints
+      result.phase4 = await runPhase4(workDate, runId, { 
+        params: { dynamicMaxTasks: dynamicLimits.baseMax },
+        timelineContext: result.phase0?.timelineContext
+      });
       if (result.phase4.status === 'failed') {
         console.warn(`[runAllPhases] Phase 4 failed (non-critical): ${result.phase4.error}`);
       } else {
@@ -410,16 +421,14 @@ export async function applyOptimizerToProduction(
   try {
     await client.query('BEGIN');
 
-    const deleteResult = await client.query(`
-      DELETE FROM daily_assignments_current 
-      WHERE work_date = $1 
-        AND task_id NOT IN (
-          SELECT task_id FROM daily_task_locks 
-          WHERE work_date = $1 AND locked = true
-        )
+    const existingTasksResult = await client.query(`
+      SELECT DISTINCT task_id::text FROM daily_assignments_current WHERE work_date = $1
     `, [workDate]);
-    result.deletedCount = deleteResult.rowCount || 0;
-    console.log(`[applyToProduction] Deleted ${result.deletedCount} existing non-locked assignments`);
+    const existingTaskIds = new Set(existingTasksResult.rows.map(r => r.task_id));
+    console.log(`[applyToProduction] Found ${existingTaskIds.size} existing tasks in timeline (will be preserved)`);
+
+    result.deletedCount = 0;
+    console.log(`[applyToProduction] MERGE MODE: Skipping delete, preserving existing timeline`);
 
     const insertQuery = `
       INSERT INTO daily_assignments_current (
@@ -478,11 +487,15 @@ export async function applyOptimizerToProduction(
           SELECT task_id FROM daily_task_locks 
           WHERE work_date = $2 AND locked = true
         )
+        AND oa.task_id NOT IN (
+          SELECT task_id FROM daily_assignments_current
+          WHERE work_date = $2
+        )
     `;
 
     const insertResult = await client.query(insertQuery, [runId, workDate]);
     result.insertedCount = insertResult.rowCount || 0;
-    console.log(`[applyToProduction] Inserted ${result.insertedCount} new assignments`);
+    console.log(`[applyToProduction] MERGE MODE: Inserted ${result.insertedCount} new assignments (existing preserved)`);
 
     // Get next revision number for history table
     const historyRevisionResult = await client.query(

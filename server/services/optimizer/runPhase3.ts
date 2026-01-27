@@ -4,10 +4,12 @@ import {
   TaskForScheduling,
   CleanerGroups,
   Phase3Event,
-  GroupScheduleResult
+  GroupScheduleResult,
+  Phase3TimelineConstraints
 } from './phase3';
 import { updateRunStatus, insertDecisionsBatch, OptimizerDecision, getLatestRunForDate } from './db';
 import { loadPriorityStartWindows, mapPriorityType, priorityToDbFormat, PriorityWindows } from './priorityWindows';
+import { TimelineContext } from './timelineContext';
 
 export interface Phase3RunResult {
   runId: string;
@@ -200,11 +202,17 @@ async function insertUnassigned(
   return unassigned.length;
 }
 
+export interface RunPhase3Options {
+  timelineContext?: TimelineContext;
+}
+
 export async function runPhase3(
   workDate: string,
-  runId?: string
+  runId?: string,
+  options: RunPhase3Options = {}
 ): Promise<Phase3RunResult> {
   const startTime = Date.now();
+  const { timelineContext } = options;
   
   const resolvedRunId = runId || (await getLatestRunForDate(workDate))?.runId;
   
@@ -295,7 +303,23 @@ export async function runPhase3(
 
     result.cleanersProcessed = cleanerGroups.length;
 
-    const phase3Result = runPhase3Algorithm(workDate, cleanerGroups, tasksMap, priorityWindows);
+    let constraintsByCleaner: Map<number, Phase3TimelineConstraints> | undefined;
+    if (timelineContext && timelineContext.occupiedBlocksByCleaner.size > 0) {
+      constraintsByCleaner = new Map();
+      for (const cleanerId of selectedCleanerIds) {
+        const blocks = timelineContext.occupiedBlocksByCleaner.get(cleanerId);
+        const anchors = timelineContext.anchorPointsByCleaner.get(cleanerId);
+        if (blocks || anchors) {
+          constraintsByCleaner.set(cleanerId, {
+            occupiedBlocks: blocks ?? [],
+            anchors: anchors
+          });
+        }
+      }
+      console.log(`[Phase3] Using timeline constraints for ${constraintsByCleaner.size} cleaners`);
+    }
+
+    const phase3Result = runPhase3Algorithm(workDate, cleanerGroups, tasksMap, priorityWindows, constraintsByCleaner);
 
     result.tasksScheduled = phase3Result.stats.tasksScheduled;
     result.tasksUnassigned = phase3Result.stats.tasksUnassigned;

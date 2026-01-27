@@ -77,6 +77,7 @@ export interface Phase2Params {
   apartmentTypes: ApartmentTypes;
   dynamicMaxTasks?: number;  // base max from totalTasks/numCleaners, bonus +1 per-cleaner if avgTravel ≤ 10min
   fairness: FairnessParams;  // minutes-based fairness parameters
+  initialLoadByCleanerMin?: Map<number, number>; // Pre-existing load from timeline (minutes)
 }
 
 export const DEFAULT_PHASE2_PARAMS: Phase2Params = {
@@ -412,14 +413,17 @@ export function runPhase2Algorithm(
   const cleanerWorkMin = new Map<number, number>();     // Total work minutes assigned
   const cleanerTravelMin = new Map<number, number>();   // Total travel minutes assigned
   
+  const initialLoad = params.initialLoadByCleanerMin ?? new Map<number, number>();
+  
   cleaners.forEach(c => {
+    const preLoad = initialLoad.get(c.cleanerId) ?? 0;
     cleanerTaskCount.set(c.cleanerId, 0);  // Task count (for straordinaria rules)
-    cleanerLoadMin.set(c.cleanerId, 0);    // Minutes-based load = workMin + wT * travelMin
+    cleanerLoadMin.set(c.cleanerId, preLoad);    // Minutes-based load = workMin + wT * travelMin (includes pre-existing)
     cleanerTotalTravel.set(c.cleanerId, 0);
     cleanerHasStraordinaria.set(c.cleanerId, false);
     cleanerStraordinariaDuration.set(c.cleanerId, 0);
     cleanerTotalCleaningTime.set(c.cleanerId, 0);
-    cleanerWorkMin.set(c.cleanerId, 0);
+    cleanerWorkMin.set(c.cleanerId, preLoad);  // Pre-existing work minutes
     cleanerTravelMin.set(c.cleanerId, 0);
   });
   
