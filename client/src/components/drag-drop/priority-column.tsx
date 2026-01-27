@@ -223,7 +223,7 @@ export default function PriorityColumn({
   };
 
   return (
-    <div className={`${getColumnClass(priority, tasks)} p-4`}>
+    <div className={`${getColumnClass(priority, tasks)} rounded-lg p-4 border-2`}>
       <div className="flex items-center justify-between mb-4">
         <div>
           <h3 className="font-semibold flex items-center text-custom-blue">
