@@ -212,7 +212,7 @@ export function CleanerSelectorDialog({
         {/* Info sul Cleaner Primario - fisso */}
         <div className="flex-shrink-0 mt-2 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
           <p className="text-sm text-blue-700 dark:text-blue-300">
-            <strong>Nota:</strong> Il primo cleaner che selezionerai sarà considerato come{" "}
+            <strong>Nota:</strong> Il cleaner a cui apparteneva in origine il task sarà considerato come{" "}
             <span className="font-bold">"Cleaner Primario"</span>, cioè il cleaner a cui verrà assegnato il task su ADAM.
           </p>
         </div>
