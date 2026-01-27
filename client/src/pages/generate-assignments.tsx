@@ -1972,9 +1972,10 @@ export default function GenerateAssignments() {
                   data-testid="input-search-task"
                 />
               </div>
-              <div className="flex items-center gap-2 flex-shrink-0">
+              <div className="flex items-center flex-shrink-0 bg-custom-blue rounded-md overflow-hidden">
               <Button
-                variant="outline"
+                variant="ghost"
+                size="sm"
                 onClick={async () => {
                   try {
                     setIsRefreshingContainers(true);
@@ -2008,7 +2009,7 @@ export default function GenerateAssignments() {
                   }
                 }}
                 disabled={isRefreshingContainers || isTimelineReadOnly}
-                className="flex items-center gap-2 border-2 border-custom-blue"
+                className="flex items-center rounded-none text-black dark:text-white hover:bg-custom-blue/80 px-3"
               >
                 {isRefreshingContainers ? (
                   <RefreshCw className="w-4 h-4 animate-spin" />
@@ -2016,7 +2017,10 @@ export default function GenerateAssignments() {
                   <RefreshCw className="w-4 h-4" />
                 )}
               </Button>
+              <div className="w-px h-6 bg-black/20 dark:bg-white/20" />
               <Button
+                variant="ghost"
+                size="sm"
                 onClick={async () => {
                   try {
                     setIsAssigning(true);
@@ -2056,7 +2060,7 @@ export default function GenerateAssignments() {
                   }
                 }}
                 disabled={isAssigning || isTimelineReadOnly}
-                className="flex items-center gap-2 bg-custom-blue hover:bg-custom-blue/90 text-black dark:text-white border-2 border-custom-blue"
+                className="flex items-center gap-2 rounded-none text-black dark:text-white hover:bg-custom-blue/80 px-3"
               >
                 {isAssigning ? (
                   <><RefreshCw className="w-4 h-4 animate-spin" /> Assegnando...</>
