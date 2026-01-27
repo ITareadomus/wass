@@ -1972,7 +1972,7 @@ export default function GenerateAssignments() {
                   data-testid="input-search-task"
                 />
               </div>
-              <div className="flex items-center flex-shrink-0 bg-custom-blue rounded-md overflow-hidden border-2 border-gray-300 dark:border-gray-600">
+              <div className="flex items-center flex-shrink-0 bg-custom-blue rounded-md overflow-hidden border-2 border-custom-blue">
               <Button
                 variant="ghost"
                 size="sm"
