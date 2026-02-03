@@ -1,7 +1,7 @@
 import { Droppable } from "react-beautiful-dnd";
 import { TaskType as Task } from "@shared/schema";
 import TaskCard from "./task-card";
-import { Clock, AlertCircle, ArrowDown, Calendar, CheckSquare, RefreshCw } from "lucide-react";
+import { Clock, AlertCircle, ArrowDown, Calendar, CheckSquare } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
@@ -111,11 +111,19 @@ export default function PriorityColumn({
     return logisticCodeCounts[task.name] > 1;
   };
 
-  // Funzione modificata per usare hasAssigned
+  // Funzione modificata per usare hasAssigned e stato di loading
   const handleAssign = async () => {
-    if (assignAction) {
+    if (!assignAction) return;
+    
+    try {
+      setIsAssigning(true);
       await assignAction();
       setHasAssigned(true); // Imposta hasAssigned a true dopo l'assegnazione
+    } catch (error) {
+      console.error("Errore durante l'assegnazione:", error);
+      // I toast di errore vengono gestiti all'interno di assignAction
+    } finally {
+      setIsAssigning(false);
     }
   };
 
@@ -259,8 +267,20 @@ export default function PriorityColumn({
             title={isMultiSelectMode ? "Disattiva selezione multipla" : "Attiva selezione multipla"}
             data-testid="button-toggle-multiselect"
           >
-            <CheckSquare className={`w-3 h-3 ${isMultiSelectMode ? 'mr-1' : ''}`} />
+            <CheckSquare className={`w-3 h-3 ${isMultiSelectMode ? "mr-1" : ""}`} />
             {isMultiSelectMode && <span className="ml-1">On</span>}
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleAssign}
+            disabled={!assignAction || tasks.length === 0 || isDateInPast || isAssigning}
+            className="text-xs px-2 py-1 h-7 border-2 border-custom-blue"
+            title="Assegna"
+            data-testid="button-assign-priority"
+          >
+            <Calendar className="w-3 h-3 mr-1" />
+            <span>{isAssigning ? "Assegnando..." : "Assegna"}</span>
           </Button>
         </div>
       </div>
