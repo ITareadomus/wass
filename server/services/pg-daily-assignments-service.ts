@@ -1111,6 +1111,11 @@ export class PgDailyAssignmentsService {
           SELECT work_date, task_id
           FROM ranked
           WHERE rn > 1
+        ),
+        winners AS (
+          SELECT work_date, task_id
+          FROM ranked
+          WHERE rn = 1
         )
         UPDATE daily_containers dc
         SET locked = TRUE,
@@ -1161,6 +1166,75 @@ export class PgDailyAssignmentsService {
           END,
           locked_by = COALESCE(daily_task_locks.locked_by, EXCLUDED.locked_by),
           updated_at = NOW()
+      `, [workDate, autoDuplicateLockReason, autoDuplicateLockedBy]);
+
+      // Se un task era stato auto-lockato in passato ma ora è il "winner",
+      // sbloccalo (solo se il lock era quello automatico da doppione).
+      await client.query(`
+        WITH ranked AS (
+          SELECT
+            work_date,
+            logistic_code,
+            task_id,
+            ROW_NUMBER() OVER (
+              PARTITION BY work_date, logistic_code
+              ORDER BY
+                CASE WHEN confirmed_operation = true AND operation_id IS NOT NULL THEN 1 ELSE 0 END DESC,
+                task_id DESC
+            ) AS rn
+          FROM daily_containers
+          WHERE work_date = $1
+            AND logistic_code IS NOT NULL
+            AND logistic_code <> 0
+        ),
+        winners AS (
+          SELECT work_date, task_id
+          FROM ranked
+          WHERE rn = 1
+        )
+        UPDATE daily_containers dc
+        SET locked = FALSE,
+            locked_reason = NULL
+        FROM winners w
+        WHERE dc.work_date = w.work_date
+          AND dc.task_id = w.task_id
+          AND dc.locked = TRUE
+          AND dc.locked_reason = $2
+      `, [workDate, autoDuplicateLockReason]);
+
+      await client.query(`
+        WITH ranked AS (
+          SELECT
+            work_date,
+            logistic_code,
+            task_id,
+            ROW_NUMBER() OVER (
+              PARTITION BY work_date, logistic_code
+              ORDER BY
+                CASE WHEN confirmed_operation = true AND operation_id IS NOT NULL THEN 1 ELSE 0 END DESC,
+                task_id DESC
+            ) AS rn
+          FROM daily_containers
+          WHERE work_date = $1
+            AND logistic_code IS NOT NULL
+            AND logistic_code <> 0
+        ),
+        winners AS (
+          SELECT work_date, task_id
+          FROM ranked
+          WHERE rn = 1
+        )
+        UPDATE daily_task_locks l
+        SET locked = FALSE,
+            locked_reason = NULL,
+            locked_by = $3,
+            updated_at = NOW()
+        FROM winners w
+        WHERE l.work_date = w.work_date
+          AND l.task_id = w.task_id
+          AND l.locked = TRUE
+          AND l.locked_reason = $2
+          AND l.locked_by = $3
       `, [workDate, autoDuplicateLockReason, autoDuplicateLockedBy]);
 
       if ((lockDupesUpdate.rowCount || 0) > 0 || (lockDupesUpsert.rowCount || 0) > 0) {
@@ -1319,6 +1393,72 @@ export class PgDailyAssignmentsService {
             END,
             locked_by = COALESCE(daily_task_locks.locked_by, EXCLUDED.locked_by),
             updated_at = NOW()
+        `, [workDate, lc, autoDuplicateLockReason, autoDuplicateLockedBy]);
+
+        // Reconcile: se il "winner" per questo logistic_code era auto-lockato, sbloccalo.
+        await query(`
+          WITH ranked AS (
+            SELECT
+              work_date,
+              logistic_code,
+              task_id,
+              ROW_NUMBER() OVER (
+                PARTITION BY work_date, logistic_code
+                ORDER BY
+                  CASE WHEN confirmed_operation = true AND operation_id IS NOT NULL THEN 1 ELSE 0 END DESC,
+                  task_id DESC
+              ) AS rn
+            FROM daily_containers
+            WHERE work_date = $1
+              AND logistic_code = $2
+          ),
+          winner AS (
+            SELECT work_date, task_id
+            FROM ranked
+            WHERE rn = 1
+          )
+          UPDATE daily_containers dc
+          SET locked = FALSE,
+              locked_reason = NULL
+          FROM winner w
+          WHERE dc.work_date = w.work_date
+            AND dc.task_id = w.task_id
+            AND dc.locked = TRUE
+            AND dc.locked_reason = $3
+        `, [workDate, lc, autoDuplicateLockReason]);
+
+        await query(`
+          WITH ranked AS (
+            SELECT
+              work_date,
+              logistic_code,
+              task_id,
+              ROW_NUMBER() OVER (
+                PARTITION BY work_date, logistic_code
+                ORDER BY
+                  CASE WHEN confirmed_operation = true AND operation_id IS NOT NULL THEN 1 ELSE 0 END DESC,
+                  task_id DESC
+              ) AS rn
+            FROM daily_containers
+            WHERE work_date = $1
+              AND logistic_code = $2
+          ),
+          winner AS (
+            SELECT work_date, task_id
+            FROM ranked
+            WHERE rn = 1
+          )
+          UPDATE daily_task_locks l
+          SET locked = FALSE,
+              locked_reason = NULL,
+              locked_by = $4,
+              updated_at = NOW()
+          FROM winner w
+          WHERE l.work_date = w.work_date
+            AND l.task_id = w.task_id
+            AND l.locked = TRUE
+            AND l.locked_reason = $3
+            AND l.locked_by = $4
         `, [workDate, lc, autoDuplicateLockReason, autoDuplicateLockedBy]);
       }
 
