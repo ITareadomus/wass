@@ -499,7 +499,7 @@ export class PgDailyAssignmentsService {
         if (row.lng !== null) task.lng = parseFloat(String(row.lng));
         
         // Get collaboration info (task_id in collaborationsMap is number, row.task_id is string)
-        const taskIdNum = parseInt(row.task_id, 10);
+        const taskIdNum = parseInt(String(row.task_id), 10);
         const collaboration = collaborationsMap.get(taskIdNum);
         const hasCollaborators = collaboration && collaboration.count > 1;
         
@@ -1085,26 +1085,32 @@ export class PgDailyAssignmentsService {
       }
 
       // ==================== AUTO-LOCK DUPLICATI ADAM (logistic_code) ====================
-      // Regola: per ogni logistic_code duplicato (escludi 0/null), tieni il task_id più alto,
+      // Regola: per ogni logistic_code duplicato (escludi 0/null), tieni:
+      // - PRIMA: il task con confirmed_operation=true E operation_id valorizzato
+      // - ALTRIMENTI: il task_id più alto (proxy "più recente")
       // blocca automaticamente tutti gli altri con locked_reason specifico.
       // Questo evita che l'optimizer assegni più task con lo stesso codice ADAM.
       const lockDupesUpdate = await client.query(`
-        WITH dupes AS (
-          SELECT work_date, logistic_code, MAX(task_id) AS keep_task_id
+        WITH ranked AS (
+          SELECT
+            work_date,
+            logistic_code,
+            task_id,
+            ROW_NUMBER() OVER (
+              PARTITION BY work_date, logistic_code
+              ORDER BY
+                CASE WHEN confirmed_operation = true AND operation_id IS NOT NULL THEN 1 ELSE 0 END DESC,
+                task_id DESC
+            ) AS rn
           FROM daily_containers
           WHERE work_date = $1
             AND logistic_code IS NOT NULL
             AND logistic_code <> 0
-          GROUP BY work_date, logistic_code
-          HAVING COUNT(*) > 1
         ),
         to_lock AS (
-          SELECT dc.work_date, dc.task_id
-          FROM daily_containers dc
-          JOIN dupes d
-            ON d.work_date = dc.work_date
-           AND d.logistic_code = dc.logistic_code
-          WHERE dc.task_id <> d.keep_task_id
+          SELECT work_date, task_id
+          FROM ranked
+          WHERE rn > 1
         )
         UPDATE daily_containers dc
         SET locked = TRUE,
@@ -1116,22 +1122,26 @@ export class PgDailyAssignmentsService {
       `, [workDate, autoDuplicateLockReason]);
 
       const lockDupesUpsert = await client.query(`
-        WITH dupes AS (
-          SELECT work_date, logistic_code, MAX(task_id) AS keep_task_id
+        WITH ranked AS (
+          SELECT
+            work_date,
+            logistic_code,
+            task_id,
+            ROW_NUMBER() OVER (
+              PARTITION BY work_date, logistic_code
+              ORDER BY
+                CASE WHEN confirmed_operation = true AND operation_id IS NOT NULL THEN 1 ELSE 0 END DESC,
+                task_id DESC
+            ) AS rn
           FROM daily_containers
           WHERE work_date = $1
             AND logistic_code IS NOT NULL
             AND logistic_code <> 0
-          GROUP BY work_date, logistic_code
-          HAVING COUNT(*) > 1
         ),
         to_lock AS (
-          SELECT dc.work_date, dc.task_id
-          FROM daily_containers dc
-          JOIN dupes d
-            ON d.work_date = dc.work_date
-           AND d.logistic_code = dc.logistic_code
-          WHERE dc.task_id <> d.keep_task_id
+          SELECT work_date, task_id
+          FROM ranked
+          WHERE rn > 1
         )
         INSERT INTO daily_task_locks (work_date, task_id, locked, locked_reason, locked_by)
         SELECT
@@ -1241,21 +1251,25 @@ export class PgDailyAssignmentsService {
       const lc = Number(task.logistic_code || 0);
       if (Number.isFinite(lc) && lc !== 0) {
         await query(`
-          WITH dupe AS (
-            SELECT work_date, logistic_code, MAX(task_id) AS keep_task_id
+          WITH ranked AS (
+            SELECT
+              work_date,
+              logistic_code,
+              task_id,
+              ROW_NUMBER() OVER (
+                PARTITION BY work_date, logistic_code
+                ORDER BY
+                  CASE WHEN confirmed_operation = true AND operation_id IS NOT NULL THEN 1 ELSE 0 END DESC,
+                  task_id DESC
+              ) AS rn
             FROM daily_containers
             WHERE work_date = $1
               AND logistic_code = $2
-            GROUP BY work_date, logistic_code
-            HAVING COUNT(*) > 1
           ),
           to_lock AS (
-            SELECT dc.work_date, dc.task_id
-            FROM daily_containers dc
-            JOIN dupe d
-              ON d.work_date = dc.work_date
-             AND d.logistic_code = dc.logistic_code
-            WHERE dc.task_id <> d.keep_task_id
+            SELECT work_date, task_id
+            FROM ranked
+            WHERE rn > 1
           )
           UPDATE daily_containers dc
           SET locked = TRUE,
@@ -1267,21 +1281,25 @@ export class PgDailyAssignmentsService {
         `, [workDate, lc, autoDuplicateLockReason]);
 
         await query(`
-          WITH dupe AS (
-            SELECT work_date, logistic_code, MAX(task_id) AS keep_task_id
+          WITH ranked AS (
+            SELECT
+              work_date,
+              logistic_code,
+              task_id,
+              ROW_NUMBER() OVER (
+                PARTITION BY work_date, logistic_code
+                ORDER BY
+                  CASE WHEN confirmed_operation = true AND operation_id IS NOT NULL THEN 1 ELSE 0 END DESC,
+                  task_id DESC
+              ) AS rn
             FROM daily_containers
             WHERE work_date = $1
               AND logistic_code = $2
-            GROUP BY work_date, logistic_code
-            HAVING COUNT(*) > 1
           ),
           to_lock AS (
-            SELECT dc.work_date, dc.task_id
-            FROM daily_containers dc
-            JOIN dupe d
-              ON d.work_date = dc.work_date
-             AND d.logistic_code = dc.logistic_code
-            WHERE dc.task_id <> d.keep_task_id
+            SELECT work_date, task_id
+            FROM ranked
+            WHERE rn > 1
           )
           INSERT INTO daily_task_locks (work_date, task_id, locked, locked_reason, locked_by)
           SELECT
