@@ -35,9 +35,12 @@ async function loadSelectedCleanerIds(workDate: string): Promise<number[]> {
   if (result.rows.length === 0 || !result.rows[0].cleaners) {
     return [];
   }
-  return (result.rows[0].cleaners || [])
+  const ids = (result.rows[0].cleaners || [])
     .map((x: any) => Number(x))
     .filter((n: number) => Number.isFinite(n));
+  // Determinismo: normalizza ordine cleaners
+  ids.sort((a, b) => a - b);
+  return ids;
 }
 
 async function loadCleanerStartTimes(workDate: string, cleanerIds: number[]): Promise<Map<number, string>> {
@@ -47,6 +50,7 @@ async function loadCleanerStartTimes(workDate: string, cleanerIds: number[]): Pr
     SELECT cleaner_id, name, start_time
     FROM cleaners
     WHERE work_date = $1 AND cleaner_id = ANY($2::int[])
+    ORDER BY cleaner_id
   `, [workDate, cleanerIds]);
   
   const map = new Map<number, string>();
@@ -63,6 +67,7 @@ async function loadCleanerNames(workDate: string, cleanerIds: number[]): Promise
     SELECT cleaner_id, name
     FROM cleaners
     WHERE work_date = $1 AND cleaner_id = ANY($2::int[])
+    ORDER BY cleaner_id
   `, [workDate, cleanerIds]);
   
   const map = new Map<number, string>();
@@ -82,22 +87,20 @@ async function loadTasksForScheduling(workDate: string): Promise<Map<number, Tas
       COALESCE(cleaning_time, 60) as cleaning_time_minutes,
       checkout_time,
       checkin_time,
-      checkin_date,
+      checkin_date::text as checkin_date,
       priority,
       straordinaria
     FROM daily_containers
     WHERE work_date = $1
       AND lat IS NOT NULL 
       AND lng IS NOT NULL
+    ORDER BY task_id
   `, [workDate]);
 
   const map = new Map<number, TaskForScheduling>();
   for (const row of result.rows) {
-    let checkinDateStr: string | null = null;
-    if (row.checkin_date) {
-      const d = new Date(row.checkin_date);
-      checkinDateStr = d.toISOString().slice(0, 10);
-    }
+    // Determinismo: evita dipendenze da timezone JS nel parsing di DATE
+    const checkinDateStr: string | null = row.checkin_date || null;
     
     map.set(row.task_id, {
       taskId: row.task_id,

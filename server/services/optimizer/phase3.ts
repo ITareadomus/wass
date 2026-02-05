@@ -130,20 +130,23 @@ function parseTimeToMinutes(timeStr: string | null): number | null {
 
 function minutesToDate(workDate: string, minutesFromMidnight: number): Date {
   const [year, month, day] = workDate.split('-').map(Number);
-  const date = new Date(year, month - 1, day);
-  date.setHours(Math.floor(minutesFromMidnight / 60), minutesFromMidnight % 60, 0, 0);
-  return date;
+  // Determinismo: usa UTC per evitare dipendenze da timezone server
+  const hours = Math.floor(minutesFromMidnight / 60);
+  const minutes = minutesFromMidnight % 60;
+  return new Date(Date.UTC(year, month - 1, day, hours, minutes, 0, 0));
 }
 
 function dateToMinutes(d: Date): number {
-  return d.getHours() * 60 + d.getMinutes();
+  // Determinismo: coerente con minutesToDate (UTC)
+  return d.getUTCHours() * 60 + d.getUTCMinutes();
 }
 
 function combineDateTime(dateStr: string, timeStr: string): Date {
   const t = timeStr.slice(0, 5);
   const [year, month, day] = dateStr.split('-').map(Number);
   const [hours, minutes] = t.split(':').map(Number);
-  return new Date(year, month - 1, day, hours, minutes, 0, 0);
+  // Determinismo: costruisci timestamp in UTC
+  return new Date(Date.UTC(year, month - 1, day, hours, minutes, 0, 0));
 }
 
 export function simulateSequence(

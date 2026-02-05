@@ -58,9 +58,12 @@ async function loadSelectedCleanerIds(workDate: string): Promise<number[]> {
   if (result.rows.length === 0 || !result.rows[0].cleaners) {
     return [];
   }
-  return (result.rows[0].cleaners || [])
+  const ids = (result.rows[0].cleaners || [])
     .map((x: any) => Number(x))
     .filter((n: number) => Number.isFinite(n));
+  // Determinismo: l'ordine dell'array in DB può variare tra ambienti.
+  ids.sort((a, b) => a - b);
+  return ids;
 }
 
 async function loadCleanersForDate(workDate: string): Promise<CleanerInput[]> {

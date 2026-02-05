@@ -56,7 +56,10 @@ async function loadPhase3Schedules(runId: string, workDate: string): Promise<Cle
     SELECT cleaners FROM daily_selected_cleaners WHERE work_date = $1
   `, [workDate]);
   
-  const allSelectedCleanerIds: number[] = selectedCleanersResult.rows[0]?.cleaners || [];
+  const allSelectedCleanerIds: number[] = (selectedCleanersResult.rows[0]?.cleaners || [])
+    .map((x: any) => Number(x))
+    .filter((n: number) => Number.isFinite(n))
+    .sort((a: number, b: number) => a - b);
   
   if (allSelectedCleanerIds.length === 0) {
     console.warn(`[Phase4] WARNING: No selected cleaners found for ${workDate}. Phase 4 will have no cleaners to assign tasks to.`);
@@ -245,14 +248,20 @@ async function loadCleanerCapabilities(runId: string): Promise<Map<number, Clean
 
 async function loadCleanerNames(runId: string): Promise<Map<number, string>> {
   const result = await pool.query(`
-    SELECT DISTINCT cleaner_id FROM optimizer.optimizer_assignment WHERE run_id = $1
+    SELECT DISTINCT cleaner_id
+    FROM optimizer.optimizer_assignment
+    WHERE run_id = $1
+    ORDER BY cleaner_id
   `, [runId]);
   
   const cleanerIds = result.rows.map(r => r.cleaner_id);
   if (cleanerIds.length === 0) return new Map();
 
   const namesResult = await pool.query(`
-    SELECT cleaner_id, name FROM cleaners WHERE cleaner_id = ANY($1::int[])
+    SELECT cleaner_id, name
+    FROM cleaners
+    WHERE cleaner_id = ANY($1::int[])
+    ORDER BY cleaner_id
   `, [cleanerIds]);
 
   const map = new Map<number, string>();
@@ -264,14 +273,20 @@ async function loadCleanerNames(runId: string): Promise<Map<number, string>> {
 
 async function loadCleanerStartTimes(runId: string): Promise<Map<number, string>> {
   const result = await pool.query(`
-    SELECT DISTINCT cleaner_id FROM optimizer.optimizer_assignment WHERE run_id = $1
+    SELECT DISTINCT cleaner_id
+    FROM optimizer.optimizer_assignment
+    WHERE run_id = $1
+    ORDER BY cleaner_id
   `, [runId]);
   
   const cleanerIds = result.rows.map(r => r.cleaner_id);
   if (cleanerIds.length === 0) return new Map();
 
   const timesResult = await pool.query(`
-    SELECT cleaner_id, start_time FROM cleaners WHERE cleaner_id = ANY($1::int[])
+    SELECT cleaner_id, start_time
+    FROM cleaners
+    WHERE cleaner_id = ANY($1::int[])
+    ORDER BY cleaner_id
   `, [cleanerIds]);
 
   const map = new Map<number, string>();
@@ -314,6 +329,7 @@ async function loadUnassignedTasks(runId: string, workDate: string): Promise<{ t
     LEFT JOIN assigned a ON a.task_id = ut.task_id
     LEFT JOIN already_unassigned au ON au.task_id = ut.task_id
     WHERE a.task_id IS NULL
+    ORDER BY ut.task_id
   `, [workDate, runId]);
 
   return result.rows.map(row => ({
@@ -333,7 +349,7 @@ async function loadTasksForScheduling(workDate: string): Promise<Map<number, Tas
       COALESCE(cleaning_time, 60) as cleaning_time_minutes,
       checkout_time,
       checkin_time,
-      checkin_date,
+      checkin_date::text as checkin_date,
       priority,
       straordinaria,
       COALESCE(premium, false) as premium,
@@ -342,15 +358,13 @@ async function loadTasksForScheduling(workDate: string): Promise<Map<number, Tas
     WHERE work_date = $1
       AND lat IS NOT NULL 
       AND lng IS NOT NULL
+    ORDER BY task_id
   `, [workDate]);
 
   const map = new Map<number, TaskForScheduling>();
   for (const row of result.rows) {
-    let checkinDateStr: string | null = null;
-    if (row.checkin_date) {
-      const d = new Date(row.checkin_date);
-      checkinDateStr = d.toISOString().slice(0, 10);
-    }
+    // Determinismo: evita dipendenze da timezone JS nel parsing di DATE
+    const checkinDateStr: string | null = row.checkin_date || null;
     
     map.set(row.task_id, {
       taskId: row.task_id,
@@ -372,16 +386,14 @@ async function loadTasksForScheduling(workDate: string): Promise<Map<number, Tas
 
 async function getWorkDateFromRun(runId: string): Promise<string | null> {
   const result = await pool.query(`
-    SELECT work_date FROM optimizer.optimizer_run WHERE run_id = $1
+    SELECT to_char(work_date::date, 'YYYY-MM-DD') as work_date
+    FROM optimizer.optimizer_run
+    WHERE run_id = $1
   `, [runId]);
   
   if (result.rows.length === 0) return null;
   
-  const workDate = result.rows[0].work_date;
-  if (workDate instanceof Date) {
-    return workDate.toISOString().slice(0, 10);
-  }
-  return workDate;
+  return result.rows[0].work_date || null;
 }
 
 function eventToDecision(runId: string, event: Phase4Event): OptimizerDecision {

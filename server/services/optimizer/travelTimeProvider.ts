@@ -112,7 +112,6 @@ export class TravelTimeProvider {
         SELECT cache_key, minutes
         FROM optimizer.optimizer_travel_time_cache
         WHERE cache_key = ANY($1::text[])
-          AND (expires_at IS NULL OR expires_at > NOW())
       `, [keysToFetch]);
 
       for (const row of result.rows) {
@@ -144,16 +143,6 @@ export class TravelTimeProvider {
       }
 
       const row = result.rows[0];
-      
-      if (row.expires_at && new Date(row.expires_at) < new Date()) {
-        return null;
-      }
-
-      const updatedAt = new Date(row.updated_at);
-      const staleDays = (Date.now() - updatedAt.getTime()) / (1000 * 60 * 60 * 24);
-      if (staleDays > CACHE_TTL_DAYS) {
-        return null;
-      }
 
       return row.minutes;
     } catch (error) {
