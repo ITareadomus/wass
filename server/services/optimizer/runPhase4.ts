@@ -81,10 +81,10 @@ async function loadPhase3Schedules(runId: string, workDate: string): Promise<Cle
       oa.priority_penalty,
       COALESCE(dc.cleaning_time, 60) as cleaning_time_minutes
     FROM optimizer.optimizer_assignment oa
-    LEFT JOIN daily_containers dc ON dc.task_id = oa.task_id
+    LEFT JOIN daily_containers dc ON dc.task_id = oa.task_id AND dc.work_date = $2
     WHERE oa.run_id = $1
     ORDER BY oa.cleaner_id, oa.sequence
-  `, [runId]);
+  `, [runId, workDate]);
 
   const cleanerMap = new Map<number, {
     tasks: any[];
@@ -151,15 +151,15 @@ async function loadPhase3Schedules(runId: string, workDate: string): Promise<Cle
     }
   }
 
-  const cleanerCapabilities = await loadCleanerCapabilitiesFromAll(allSelectedCleanerIds);
-  const cleanerStartTimes = await loadCleanerStartTimesFromAll(allSelectedCleanerIds);
+  const cleanerCapabilities = await loadCleanerCapabilitiesFromAll(allSelectedCleanerIds, workDate);
+  const cleanerStartTimes = await loadCleanerStartTimesFromAll(allSelectedCleanerIds, workDate);
 
   const schedules: CleanerSchedule[] = [];
   cleanerMap.forEach((data, cleanerId) => {
     const caps = cleanerCapabilities.get(cleanerId);
     const startTimeStr = cleanerStartTimes.get(cleanerId) || '09:00';
     const endTimeMinutes = data.maxEndTime 
-      ? data.maxEndTime.getHours() * 60 + data.maxEndTime.getMinutes()
+      ? data.maxEndTime.getUTCHours() * 60 + data.maxEndTime.getUTCMinutes()
       : 540;
     
     // Calcola totalWorkMinutes dalla somma delle durate dei task già assegnati
@@ -197,7 +197,7 @@ interface CleanerCapabilities {
   canDoStraordinaria: boolean;
 }
 
-async function loadCleanerCapabilitiesFromAll(cleanerIds: number[]): Promise<Map<number, CleanerCapabilities>> {
+async function loadCleanerCapabilitiesFromAll(cleanerIds: number[], workDate: string): Promise<Map<number, CleanerCapabilities>> {
   if (cleanerIds.length === 0) return new Map();
 
   const capsResult = await pool.query(`
@@ -209,7 +209,9 @@ async function loadCleanerCapabilitiesFromAll(cleanerIds: number[]): Promise<Map
       COALESCE(can_do_straordinaria, false) as can_do_straordinaria
     FROM cleaners 
     WHERE cleaner_id = ANY($1::int[])
-  `, [cleanerIds]);
+      AND work_date = $2
+    ORDER BY cleaner_id
+  `, [cleanerIds, workDate]);
 
   const map = new Map<number, CleanerCapabilities>();
   for (const row of capsResult.rows) {
@@ -223,71 +225,16 @@ async function loadCleanerCapabilitiesFromAll(cleanerIds: number[]): Promise<Map
   return map;
 }
 
-async function loadCleanerStartTimesFromAll(cleanerIds: number[]): Promise<Map<number, string>> {
-  if (cleanerIds.length === 0) return new Map();
-
-  const timesResult = await pool.query(`
-    SELECT cleaner_id, start_time FROM cleaners WHERE cleaner_id = ANY($1::int[])
-  `, [cleanerIds]);
-
-  const map = new Map<number, string>();
-  for (const row of timesResult.rows) {
-    map.set(row.cleaner_id, row.start_time || '09:00');
-  }
-  return map;
-}
-
-async function loadCleanerCapabilities(runId: string): Promise<Map<number, CleanerCapabilities>> {
-  const result = await pool.query(`
-    SELECT DISTINCT cleaner_id FROM optimizer.optimizer_assignment WHERE run_id = $1
-  `, [runId]);
-  
-  const cleanerIds = result.rows.map(r => r.cleaner_id);
-  return loadCleanerCapabilitiesFromAll(cleanerIds);
-}
-
-async function loadCleanerNames(runId: string): Promise<Map<number, string>> {
-  const result = await pool.query(`
-    SELECT DISTINCT cleaner_id
-    FROM optimizer.optimizer_assignment
-    WHERE run_id = $1
-    ORDER BY cleaner_id
-  `, [runId]);
-  
-  const cleanerIds = result.rows.map(r => r.cleaner_id);
-  if (cleanerIds.length === 0) return new Map();
-
-  const namesResult = await pool.query(`
-    SELECT cleaner_id, name
-    FROM cleaners
-    WHERE cleaner_id = ANY($1::int[])
-    ORDER BY cleaner_id
-  `, [cleanerIds]);
-
-  const map = new Map<number, string>();
-  for (const row of namesResult.rows) {
-    map.set(row.cleaner_id, row.name);
-  }
-  return map;
-}
-
-async function loadCleanerStartTimes(runId: string): Promise<Map<number, string>> {
-  const result = await pool.query(`
-    SELECT DISTINCT cleaner_id
-    FROM optimizer.optimizer_assignment
-    WHERE run_id = $1
-    ORDER BY cleaner_id
-  `, [runId]);
-  
-  const cleanerIds = result.rows.map(r => r.cleaner_id);
+async function loadCleanerStartTimesFromAll(cleanerIds: number[], workDate: string): Promise<Map<number, string>> {
   if (cleanerIds.length === 0) return new Map();
 
   const timesResult = await pool.query(`
     SELECT cleaner_id, start_time
     FROM cleaners
     WHERE cleaner_id = ANY($1::int[])
+      AND work_date = $2
     ORDER BY cleaner_id
-  `, [cleanerIds]);
+  `, [cleanerIds, workDate]);
 
   const map = new Map<number, string>();
   for (const row of timesResult.rows) {
@@ -421,9 +368,18 @@ async function updateAssignments(
   `, [runId]);
 
   let inserted = 0;
+  const seenTaskIds = new Set<number>();
   
   for (const schedule of schedules) {
     for (const row of schedule.tasks) {
+      // Safety net: in caso di duplicati nelle schedules (es. join che moltiplica righe),
+      // evita violazione PK (run_id, task_id). Manteniamo la prima occorrenza.
+      if (seenTaskIds.has(row.taskId)) {
+        console.warn(`[Phase4.updateAssignments] Duplicate taskId detected in updatedSchedules: taskId=${row.taskId}. Skipping.`);
+        continue;
+      }
+      seenTaskIds.add(row.taskId);
+
       await pool.query(`
         INSERT INTO optimizer.optimizer_assignment (
           run_id, cleaner_id, task_id, logistic_code, sequence, start_time, end_time, 
@@ -590,14 +546,14 @@ export async function runPhase4(
     // Build constraintsByCleaner from timelineContext for collision avoidance
     const constraintsByCleaner = new Map<string, Phase3TimelineConstraints>();
     if (timelineContext) {
-      for (const [cleanerId, blocks] of timelineContext.occupiedBlocksByCleaner) {
+      // Evita iterazione Map con downlevelIteration (target ES5)
+      timelineContext.occupiedBlocksByCleaner.forEach((blocks, cleanerId) => {
         const anchors = timelineContext.anchorPointsByCleaner.get(cleanerId);
-        constraintsByCleaner.set(cleanerId, {
+        constraintsByCleaner.set(String(cleanerId), {
           occupiedBlocks: blocks,
-          anchorFirst: anchors?.firstTask ?? null,
-          anchorLast: anchors?.lastTask ?? null
+          anchors
         });
-      }
+      });
     }
     
     const phase4Result = runPhase4Algorithm(

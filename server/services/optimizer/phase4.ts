@@ -133,7 +133,8 @@ function minutesToTimeStr(minutes: number): string {
 }
 
 function dateToMinutes(d: Date): number {
-  return d.getHours() * 60 + d.getMinutes();
+  // Determinismo: le Date in scheduling sono in UTC (vedi phase3.ts)
+  return d.getUTCHours() * 60 + d.getUTCMinutes();
 }
 
 // ============================================================================
