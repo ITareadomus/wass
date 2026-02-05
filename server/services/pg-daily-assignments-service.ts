@@ -1012,6 +1012,8 @@ export class PgDailyAssignmentsService {
 
       const containers = containersData?.containers || {};
       let totalInserted = 0;
+      const autoDuplicateLockReason = 'task doppio (bloccato automaticamente)';
+      const autoDuplicateLockedBy = 'system:auto_duplicate_adam';
 
       // Define priority mappings (support both naming conventions)
       const priorityConfigs = [
@@ -1080,6 +1082,81 @@ export class PgDailyAssignmentsService {
 
           totalInserted++;
         }
+      }
+
+      // ==================== AUTO-LOCK DUPLICATI ADAM (logistic_code) ====================
+      // Regola: per ogni logistic_code duplicato (escludi 0/null), tieni il task_id più alto,
+      // blocca automaticamente tutti gli altri con locked_reason specifico.
+      // Questo evita che l'optimizer assegni più task con lo stesso codice ADAM.
+      const lockDupesUpdate = await client.query(`
+        WITH dupes AS (
+          SELECT work_date, logistic_code, MAX(task_id) AS keep_task_id
+          FROM daily_containers
+          WHERE work_date = $1
+            AND logistic_code IS NOT NULL
+            AND logistic_code <> 0
+          GROUP BY work_date, logistic_code
+          HAVING COUNT(*) > 1
+        ),
+        to_lock AS (
+          SELECT dc.work_date, dc.task_id
+          FROM daily_containers dc
+          JOIN dupes d
+            ON d.work_date = dc.work_date
+           AND d.logistic_code = dc.logistic_code
+          WHERE dc.task_id <> d.keep_task_id
+        )
+        UPDATE daily_containers dc
+        SET locked = TRUE,
+            locked_reason = $2
+        FROM to_lock tl
+        WHERE dc.work_date = tl.work_date
+          AND dc.task_id = tl.task_id
+          AND COALESCE(dc.locked, FALSE) = FALSE
+      `, [workDate, autoDuplicateLockReason]);
+
+      const lockDupesUpsert = await client.query(`
+        WITH dupes AS (
+          SELECT work_date, logistic_code, MAX(task_id) AS keep_task_id
+          FROM daily_containers
+          WHERE work_date = $1
+            AND logistic_code IS NOT NULL
+            AND logistic_code <> 0
+          GROUP BY work_date, logistic_code
+          HAVING COUNT(*) > 1
+        ),
+        to_lock AS (
+          SELECT dc.work_date, dc.task_id
+          FROM daily_containers dc
+          JOIN dupes d
+            ON d.work_date = dc.work_date
+           AND d.logistic_code = dc.logistic_code
+          WHERE dc.task_id <> d.keep_task_id
+        )
+        INSERT INTO daily_task_locks (work_date, task_id, locked, locked_reason, locked_by)
+        SELECT
+          work_date,
+          task_id,
+          TRUE,
+          $2,
+          $3
+        FROM to_lock
+        ON CONFLICT (work_date, task_id) DO UPDATE
+        SET
+          locked = TRUE,
+          locked_reason = CASE
+            WHEN daily_task_locks.locked_reason IS NULL OR daily_task_locks.locked_reason = ''
+              THEN EXCLUDED.locked_reason
+            ELSE daily_task_locks.locked_reason
+          END,
+          locked_by = COALESCE(daily_task_locks.locked_by, EXCLUDED.locked_by),
+          updated_at = NOW()
+      `, [workDate, autoDuplicateLockReason, autoDuplicateLockedBy]);
+
+      if ((lockDupesUpdate.rowCount || 0) > 0 || (lockDupesUpsert.rowCount || 0) > 0) {
+        console.log(
+          `🔒 PG: Auto-lock duplicati ADAM per ${workDate} -> containers_locked=${lockDupesUpdate.rowCount || 0}, locks_upserted=${lockDupesUpsert.rowCount || 0}`
+        );
       }
 
       await client.query('COMMIT');
@@ -1156,6 +1233,76 @@ export class PgDailyAssignmentsService {
         task.locked || false,
         task.locked_reason || null
       ]);
+
+      // Se reinseriamo una task nei containers e crea un doppione per logistic_code,
+      // blocca automaticamente tutti i doppioni (tenendo il task_id più alto).
+      const autoDuplicateLockReason = 'task doppio (bloccato automaticamente)';
+      const autoDuplicateLockedBy = 'system:auto_duplicate_adam';
+      const lc = Number(task.logistic_code || 0);
+      if (Number.isFinite(lc) && lc !== 0) {
+        await query(`
+          WITH dupe AS (
+            SELECT work_date, logistic_code, MAX(task_id) AS keep_task_id
+            FROM daily_containers
+            WHERE work_date = $1
+              AND logistic_code = $2
+            GROUP BY work_date, logistic_code
+            HAVING COUNT(*) > 1
+          ),
+          to_lock AS (
+            SELECT dc.work_date, dc.task_id
+            FROM daily_containers dc
+            JOIN dupe d
+              ON d.work_date = dc.work_date
+             AND d.logistic_code = dc.logistic_code
+            WHERE dc.task_id <> d.keep_task_id
+          )
+          UPDATE daily_containers dc
+          SET locked = TRUE,
+              locked_reason = $3
+          FROM to_lock tl
+          WHERE dc.work_date = tl.work_date
+            AND dc.task_id = tl.task_id
+            AND COALESCE(dc.locked, FALSE) = FALSE
+        `, [workDate, lc, autoDuplicateLockReason]);
+
+        await query(`
+          WITH dupe AS (
+            SELECT work_date, logistic_code, MAX(task_id) AS keep_task_id
+            FROM daily_containers
+            WHERE work_date = $1
+              AND logistic_code = $2
+            GROUP BY work_date, logistic_code
+            HAVING COUNT(*) > 1
+          ),
+          to_lock AS (
+            SELECT dc.work_date, dc.task_id
+            FROM daily_containers dc
+            JOIN dupe d
+              ON d.work_date = dc.work_date
+             AND d.logistic_code = dc.logistic_code
+            WHERE dc.task_id <> d.keep_task_id
+          )
+          INSERT INTO daily_task_locks (work_date, task_id, locked, locked_reason, locked_by)
+          SELECT
+            work_date,
+            task_id,
+            TRUE,
+            $3,
+            $4
+          FROM to_lock
+          ON CONFLICT (work_date, task_id) DO UPDATE
+          SET
+            locked = TRUE,
+            locked_reason = CASE
+              WHEN daily_task_locks.locked_reason IS NULL OR daily_task_locks.locked_reason = ''
+                THEN EXCLUDED.locked_reason
+              ELSE daily_task_locks.locked_reason
+            END,
+            locked_by = COALESCE(daily_task_locks.locked_by, EXCLUDED.locked_by),
+            updated_at = NOW()
+        `, [workDate, lc, autoDuplicateLockReason, autoDuplicateLockedBy]);
+      }
 
       console.log(`✅ PG: Task ${task.task_id} aggiunto ai containers (${priority}) per ${workDate}`);
       return true;
