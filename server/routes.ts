@@ -39,6 +39,41 @@ function getCurrentUsername(req?: any): string {
   return req?.body?.created_by || req?.body?.modified_by || 'system';
 }
 
+// ==================== ADAM helpers (MySQL) ====================
+type ActiveAdamOpsCache = {
+  fetchedAtMs: number;
+  ids: number[];
+};
+
+let activeAdamOpsCache: ActiveAdamOpsCache | null = null;
+const ACTIVE_ADAM_OPS_CACHE_TTL_MS = 60_000; // 60s: evita query continue durante polling
+
+async function getCachedActiveAdamOperationIds(connection: any): Promise<number[]> {
+  const now = Date.now();
+  if (activeAdamOpsCache && now - activeAdamOpsCache.fetchedAtMs < ACTIVE_ADAM_OPS_CACHE_TTL_MS) {
+    return activeAdamOpsCache.ids;
+  }
+
+  const [rows]: any = await connection.execute(
+    `
+      SELECT id
+      FROM app_structure_operation
+      WHERE active = 1 AND enable_wass = 1
+    `
+  );
+
+  const ids = (Array.isArray(rows) ? rows : [])
+    .map((r: any) => Number(r?.id))
+    .filter((n: number) => Number.isFinite(n));
+
+  activeAdamOpsCache = { fetchedAtMs: now, ids };
+  return ids;
+}
+
+function isValidWorkDate(dateStr: string): boolean {
+  return /^\d{4}-\d{2}-\d{2}$/.test(dateStr);
+}
+
 /**
  * Helper: Load cleaner start_time from PostgreSQL (selected cleaners)
  * Falls back to filesystem if PostgreSQL fails
@@ -83,6 +118,39 @@ async function getAllCleanersForDate(workDate: string): Promise<any[]> {
   } catch (err) {
     console.warn(`⚠️ Could not load cleaners from PostgreSQL for ${workDate}`);
     return [];
+  }
+}
+
+/**
+ * Helper: Check if a cleaner is locked for a work_date (daily_cleaner_locks)
+ * Locked cleaner = cannot receive manual assignments / D&D (server-side enforcement)
+ */
+async function isCleanerLocked(workDate: string, cleanerId: number): Promise<boolean> {
+  if (!workDate || !Number.isFinite(cleanerId)) {
+    console.log(`⚠️ isCleanerLocked: Invalid params - workDate=${workDate}, cleanerId=${cleanerId}`);
+    return false;
+  }
+
+  console.log(`🔍 isCleanerLocked: Checking workDate=${workDate}, cleanerId=${cleanerId}`);
+  const { query } = await import("../shared/pg-db");
+
+  try {
+    const result = await query(
+      `
+        SELECT 1
+        FROM daily_cleaner_locks
+        WHERE work_date = $1 AND cleaner_id = $2 AND is_locked = true
+        LIMIT 1
+      `,
+      [workDate, cleanerId]
+    );
+
+    const isLocked = (result.rows?.length ?? 0) > 0;
+    console.log(`🔍 isCleanerLocked: Query returned ${result.rows?.length ?? 0} rows, isLocked=${isLocked}`);
+    return isLocked;
+  } catch (error) {
+    console.error(`❌ isCleanerLocked: Database error:`, error);
+    return false;
   }
 }
 
@@ -426,6 +494,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { pgDailyAssignmentsService } = await import("./services/pg-daily-assignments-service");
       const { taskCollaborationService } = await import("./services/pg-task-collaboration-service");
       
+      // ENFORCEMENT: blocca assegnazioni verso cleaner locked
+      if (destCleanerId && Number.isFinite(Number(destCleanerId))) {
+        const locked = await isCleanerLocked(workDate, Number(destCleanerId));
+        if (locked) {
+          console.log(`🔒 BLOCKED: Dest cleaner ${destCleanerId} locked for ${workDate}, move refused`);
+          return res.status(423).json({
+            success: false,
+            error: "CLEANER_LOCKED",
+            message: "Cleaner bloccato: impossibile assegnare",
+            workDate,
+            cleanerId: Number(destCleanerId)
+          });
+        }
+      }
+
       if (taskId) {
         const isLocked = await pgDailyAssignmentsService.isTaskLocked(workDate, Number(taskId));
         if (isLocked) {
@@ -451,6 +534,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const numDestCleanerId = destCleanerId ? Number(destCleanerId) : null;
       
       if (numTaskId && numSourceCleanerId && numDestCleanerId) {
+        const { query } = await import("../shared/pg-db");
         // Self-heal: if pivot is stale/missing, derive collaboration from assignments
         // so drag-&-drop can't silently desync task_collaborators.
         const assignmentsCheck = await query(
@@ -471,6 +555,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const collab = await taskCollaborationService.getCollaboration(workDate, numTaskId);
         
         if (collab.count > 1 && collab.cleanerIds.includes(numSourceCleanerId)) {
+          // ENFORCEMENT: blocca replace collaborator verso cleaner locked
+          const locked = await isCleanerLocked(workDate, numDestCleanerId);
+          if (locked) {
+            console.log(`🔒 BLOCKED: Dest cleaner ${numDestCleanerId} locked for ${workDate}, collaborator replace refused`);
+            return res.status(423).json({
+              success: false,
+              error: "CLEANER_LOCKED",
+              message: "Cleaner bloccato: impossibile assegnare",
+              workDate,
+              cleanerId: numDestCleanerId
+            });
+          }
+
           // Task è collaborativa e source è un collaboratore
           console.log(`🔄 Collaboration move detected: task ${numTaskId} has ${collab.count} collaborators`);
           
@@ -670,6 +767,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const workDate = date || format(new Date(), 'yyyy-MM-dd');
 
+      // ENFORCEMENT: swap implica assegnazione reciproca, quindi blocca se uno dei due è locked
+      const [sourceLocked, destLocked] = await Promise.all([
+        isCleanerLocked(workDate, Number(sourceCleanerId)),
+        isCleanerLocked(workDate, Number(destCleanerId))
+      ]);
+      if (sourceLocked || destLocked) {
+        const lockedIds = [
+          sourceLocked ? Number(sourceCleanerId) : null,
+          destLocked ? Number(destCleanerId) : null
+        ].filter((x): x is number => x !== null);
+
+        console.log(`🔒 BLOCKED: Swap refused due to locked cleaners (${lockedIds.join(",")}) for ${workDate}`);
+        return res.status(423).json({
+          success: false,
+          error: "CLEANER_LOCKED",
+          message: "Cleaner bloccato: impossibile assegnare",
+          workDate,
+          lockedCleanerIds: lockedIds
+        });
+      }
+
       // Carica timeline da PostgreSQL
       let timelineData: any = await workspaceFiles.loadTimeline(workDate);
       if (!timelineData) {
@@ -744,6 +862,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const primaryBeforeSwap = new Map<number, number>();
       if (swappedTaskIds.length > 0) {
+        const { query } = await import("../shared/pg-db");
         const primRes = await query(
           `SELECT task_id, cleaner_id
            FROM task_collaborators
@@ -1373,6 +1492,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const workDate = date || format(new Date(), 'yyyy-MM-dd');
       const currentUsername = modified_by || getCurrentUsername(req);
       const modificationType = modification_type || 'task_assigned_manually';
+
+      // ENFORCEMENT: blocca assegnazioni manuali verso cleaner locked
+      console.log(`🔍 CHECKING: save-timeline-assignment for cleanerId=${cleanerId}, workDate=${workDate}`);
+      if (cleanerId && Number.isFinite(Number(cleanerId))) {
+        const locked = await isCleanerLocked(workDate, Number(cleanerId));
+        console.log(`🔍 RESULT: isCleanerLocked(${workDate}, ${Number(cleanerId)}) = ${locked}`);
+        if (locked) {
+          console.log(`🔒 BLOCKED: Cleaner ${cleanerId} locked for ${workDate}, manual assignment refused`);
+          return res.status(423).json({
+            success: false,
+            error: "CLEANER_LOCKED",
+            message: "Cleaner bloccato: impossibile assegnare",
+            workDate,
+            cleanerId: Number(cleanerId)
+          });
+        }
+      } else {
+        console.log(`⚠️ SKIPPING lock check: cleanerId=${cleanerId} (invalid or missing)`);
+      }
 
       // ENFORCEMENT: Verifica se la task è bloccata prima di assegnare
       if (taskId) {
@@ -2910,6 +3048,71 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ==================== CLEANER LOCKS (daily_cleaner_locks) ====================
+
+  // POST /api/cleaner-locks/set
+  // Body: { date, cleanerId, isLocked }
+  // DB: UPSERT - non cancella righe, mantiene storico (is_locked=false quando sblocchi)
+  app.post("/api/cleaner-locks/set", async (req, res) => {
+    try {
+      const { date, cleanerId, isLocked } = req.body;
+      const workDate = date || format(new Date(), "yyyy-MM-dd");
+
+      if (!cleanerId || isNaN(Number(cleanerId))) {
+        return res.status(400).json({ success: false, error: "cleanerId richiesto e deve essere un numero" });
+      }
+      if (typeof isLocked !== "boolean") {
+        return res.status(400).json({ success: false, error: "isLocked richiesto e deve essere boolean" });
+      }
+
+      const { query } = await import("../shared/pg-db");
+
+      await query(
+        `
+          INSERT INTO daily_cleaner_locks (work_date, cleaner_id, is_locked)
+          VALUES ($1, $2, $3)
+          ON CONFLICT (work_date, cleaner_id)
+          DO UPDATE SET is_locked = EXCLUDED.is_locked, updated_at = now()
+        `,
+        [workDate, Number(cleanerId), isLocked]
+      );
+
+      console.log(`🔒 Cleaner lock set: date=${workDate}, cleanerId=${Number(cleanerId)}, isLocked=${isLocked}`);
+      res.json({ success: true, workDate, cleanerId: Number(cleanerId), isLocked });
+    } catch (error: any) {
+      console.error("Errore nel set cleaner lock:", error);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  // GET /api/cleaner-locks?date=YYYY-MM-DD
+  // Response: { lockedCleanerIds: number[] }
+  app.get("/api/cleaner-locks", async (req, res) => {
+    try {
+      const workDate = (req.query.date as string) || format(new Date(), "yyyy-MM-dd");
+      const { query } = await import("../shared/pg-db");
+
+      const result = await query(
+        `
+          SELECT cleaner_id
+          FROM daily_cleaner_locks
+          WHERE work_date = $1 AND is_locked = true
+          ORDER BY cleaner_id
+        `,
+        [workDate]
+      );
+
+      const lockedCleanerIds = result.rows
+        .map((r: any) => Number(r.cleaner_id))
+        .filter((n: number) => Number.isFinite(n));
+
+      res.json({ success: true, workDate, lockedCleanerIds });
+    } catch (error: any) {
+      console.error("Errore nel caricamento cleaner locks:", error);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
   // ==================== TASK COLLABORATION ENDPOINTS ====================
 
   // GET /api/tasks/:taskId/collaborators - Info collaborazione per UI
@@ -3848,7 +4051,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
         
         // Processa ogni data
-        for (const [workDate, dateUpdates] of updatesByDate) {
+        for (const [workDate, dateUpdates] of Array.from(updatesByDate.entries())) {
           try {
             // Carica containers una volta per data
             const containersData = await workspaceFiles.loadContainers(workDate) || { containers: {} };
@@ -4476,6 +4679,97 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       console.error("❌ Errore recupero ultimo trasferimento ADAM:", error);
       res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  // Endpoint leggero: fingerprint ADAM su campi "di interesse" per containers
+  // GET /api/adam/housekeeping/fingerprint?date=YYYY-MM-DD
+  app.get("/api/adam/housekeeping/fingerprint", async (req, res) => {
+    let connection: any = null;
+    try {
+      const date = (req.query.date as string) || "";
+      if (!date || !isValidWorkDate(date)) {
+        return res.status(400).json({
+          success: false,
+          error: "date parameter required (YYYY-MM-DD)"
+        });
+      }
+
+      connection = await mysql.createConnection({
+        host: databaseConfig.mysql.host,
+        port: databaseConfig.mysql.port,
+        user: databaseConfig.mysql.user,
+        password: databaseConfig.mysql.password,
+        database: databaseConfig.mysql.database,
+      });
+
+      // Coerenza con create_containers.py: considera solo operation_id "attive" (enable_wass)
+      const activeOps = await getCachedActiveAdamOperationIds(connection);
+      const opPlaceholders = activeOps.length > 0 ? activeOps.map(() => "?").join(",") : "";
+
+      // Firma basata SOLO sui campi che impattano containers (checkin/checkout/time/op/pax)
+      // Normalizzazione: date -> YYYY-MM-DD, time -> TRIM(varchar5), numeri -> COALESCE
+      const signatureExpr = `
+        CRC32(CONCAT_WS('|',
+          h.id,
+          COALESCE(DATE_FORMAT(h.checkin, '%Y-%m-%d'), ''),
+          COALESCE(TRIM(h.checkin_time), ''),
+          COALESCE(DATE_FORMAT(h.checkout, '%Y-%m-%d'), ''),
+          COALESCE(TRIM(h.checkout_time), ''),
+          COALESCE(h.operation_id, 0),
+          COALESCE(h.checkin_pax, 0),
+          COALESCE(h.checkout_pax, 0)
+        ))
+      `;
+
+      const sql = `
+        SELECT
+          COUNT(*) AS cnt,
+          MAX(h.updated_at) AS max_upd,
+          UNIX_TIMESTAMP(MAX(h.updated_at)) AS max_upd_unix,
+          BIT_XOR(${signatureExpr}) AS sig_xor,
+          SUM(${signatureExpr}) AS sig_sum
+        FROM app_housekeeping h
+        JOIN app_structures s ON h.structure_id = s.id
+        WHERE h.checkout = ?
+          AND h.deleted_at IS NULL
+          AND h.deleted_at_client IS NULL
+          AND s.lat IS NOT NULL AND s.lng IS NOT NULL
+          AND s.lat != '' AND s.lng != ''
+          AND s.lat != '0' AND s.lng != '0'
+          ${
+            activeOps.length > 0
+              ? `AND (h.operation_id IN (${opPlaceholders}) OR h.operation_id IS NULL OR h.operation_id = 0)`
+              : `AND (h.operation_id IS NULL OR h.operation_id = 0 OR 1=1)`
+          }
+      `;
+
+      const params: any[] = [date, ...activeOps];
+      const [rows]: any = await connection.execute(sql, params);
+      const row = Array.isArray(rows) ? rows[0] : rows;
+
+      res.json({
+        success: true,
+        date,
+        count: Number(row?.cnt ?? 0),
+        max_updated_at: row?.max_upd ?? null,
+        max_updated_at_unix: row?.max_upd_unix !== null && row?.max_upd_unix !== undefined ? Number(row.max_upd_unix) : null,
+        signature_xor: row?.sig_xor !== null && row?.sig_xor !== undefined ? Number(row.sig_xor) : null,
+        // SUM può arrivare come string (bigint) a seconda del driver
+        signature_sum: row?.sig_sum ?? null,
+        active_operations_count: activeOps.length,
+      });
+    } catch (error: any) {
+      console.error("❌ Errore fingerprint ADAM:", error?.message || error);
+      res.status(500).json({ success: false, error: error.message || "Server error" });
+    } finally {
+      if (connection) {
+        try {
+          await connection.end();
+        } catch {
+          // ignore
+        }
+      }
     }
   });
 

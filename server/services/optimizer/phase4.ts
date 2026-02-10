@@ -859,11 +859,14 @@ export function runPhase4Algorithm(
   priorityWindows: PriorityWindows | null,
   targets: MinutesBasedTargets,
   params: Phase4Params = DEFAULT_PHASE4_PARAMS,
-  constraintsByCleaner: Map<string, Phase3TimelineConstraints> = new Map()
+  constraintsByCleaner: Map<string, Phase3TimelineConstraints> = new Map(),
+  lockedCleanerIds: number[] = []
 ): Phase4Result {
   const events: Phase4Event[] = [];
   const taskResults: Phase4TaskResult[] = [];
   let schedules = [...initialSchedules];
+  const lockedSet = new Set(lockedCleanerIds);
+  const assignableSchedules = schedules.filter(s => !lockedSet.has(s.cleanerId));
   
   let insertedCount = 0;
   let singleAssignedCount = 0;
@@ -875,6 +878,7 @@ export function runPhase4Algorithm(
     payload: {
       unassigned_count: unassignedTasks.length,
       schedules_count: schedules.length,
+      locked_cleaners_excluded: lockedCleanerIds.length,
       params
     }
   });
@@ -886,7 +890,7 @@ export function runPhase4Algorithm(
     if (!task) continue;
     
     let compatibleCount = 0;
-    for (const schedule of schedules) {
+    for (const schedule of assignableSchedules) {
       // Conta solo se almeno 1 posizione potrebbe funzionare (approssimativo)
       const cleanerConstraints = constraintsByCleaner.get(String(schedule.cleanerId)) || null;
       const candidate = tryInsertTask(schedule, task, schedule.tasks.length, workDate, tasksMap, priorityWindows, params, targets, 0, cleanerConstraints);
@@ -1007,7 +1011,8 @@ export function runPhase4Algorithm(
       // Ordina cleaners per workload più basso (euristica: più disponibili prima)
       // poi applica il cap per performance
       const sortedScheduleIndices = schedules
-        .map((s, idx) => ({ idx, load: s.tasks.length, endTime: s.endTimeMinutes }))
+        .map((s, idx) => ({ idx, load: s.tasks.length, endTime: s.endTimeMinutes, isLocked: lockedSet.has(s.cleanerId) }))
+        .filter(s => !s.isLocked)
         .sort((a, b) => {
           // Prima per carico minore
           if (a.load !== b.load) return a.load - b.load;
@@ -1101,7 +1106,7 @@ export function runPhase4Algorithm(
       } else {
         const singleResult = trySingleAssignment(
           task,
-          schedules,
+          assignableSchedules,
           workDate,
           tasksMap,
           priorityWindows,
@@ -1148,7 +1153,7 @@ export function runPhase4Algorithm(
           
           const swapResult = trySwapForTask(
             task,
-            schedules,
+            assignableSchedules,
             workDate,
             tasksMap,
             priorityWindows,

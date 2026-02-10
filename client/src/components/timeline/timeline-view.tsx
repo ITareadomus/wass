@@ -1,5 +1,5 @@
 import { Personnel, TaskType as Task } from "@shared/schema";
-import { Calendar as CalendarIcon, RotateCcw, Users, RefreshCw, UserPlus, UserMinus, Maximize2, Minimize2, Check, CheckCircle, Save, Pencil, ChevronLeft, ChevronRight, Loader2, Zap } from "lucide-react";
+import { Calendar as CalendarIcon, RotateCcw, Users, RefreshCw, UserPlus, UserMinus, Maximize2, Minimize2, Check, CheckCircle, Save, Pencil, ChevronLeft, ChevronRight, Loader2, Zap, Lock, Unlock } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import * as React from "react";
 import { Droppable, Draggable } from "react-beautiful-dnd";
@@ -123,6 +123,7 @@ export default function TimelineView({
   const [showAdamTransferDialog, setShowAdamTransferDialog] = useState(false); // Stato per il dialog di trasferimento ADAM
   const [showResetDialog, setShowResetDialog] = useState(false); // Stato per il dialog di reset assegnazioni
   const [lastAdamTransfer, setLastAdamTransfer] = useState<string | null>(null); // Timestamp ultimo trasferimento ADAM
+  const [lockedCleaners, setLockedCleaners] = useState<Set<number>>(new Set()); // Set degli ID dei cleaner bloccati
 
   // Calcola gli highlightedTaskIds per la ricerca
   const highlightedTaskIds = (() => {
@@ -157,6 +158,7 @@ export default function TimelineView({
   const [, setLocation] = useLocation();
   const [editingAlias, setEditingAlias] = useState<string>("");
   const [isSavingAlias, setIsSavingAlias] = useState(false);
+  const [isSavingCleanerLock, setIsSavingCleanerLock] = useState(false);
   const [aliasDialog, setAliasDialog] = useState<{ open: boolean; cleanerId: number | null; cleanerName: string }>({ open: false, cleanerId: null, cleanerName: '' });
   const [editingStartTime, setEditingStartTime] = useState<string>("10:00");
   const [startTimeEditDialog, setStartTimeEditDialog] = useState<{ open: boolean; cleanerId: number | null; cleanerName: string }>({ open: false, cleanerId: null, cleanerName: '' });
@@ -211,6 +213,25 @@ export default function TimelineView({
     };
     fetchLastTransfer();
   }, [workDate]);
+
+  const loadCleanerLocks = async () => {
+    try {
+      const response = await fetch(`/api/cleaner-locks?date=${workDate}`, {
+        cache: 'no-store',
+        headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' }
+      });
+      const data = await response.json();
+      if (data?.success && Array.isArray(data.lockedCleanerIds)) {
+        setLockedCleaners(new Set<number>(data.lockedCleanerIds.map((n: any) => Number(n)).filter((n: number) => Number.isFinite(n))));
+      } else {
+        // fallback safe: nessun lock
+        setLockedCleaners(new Set<number>());
+      }
+    } catch (error) {
+      console.error('Error fetching cleaner locks:', error);
+      setLockedCleaners(new Set<number>());
+    }
+  };
 
   // Stato per memorizzare i dati della timeline (inclusi i metadata)
   const [timelineData, setTimelineData] = useState<any>(null);
@@ -700,6 +721,7 @@ export default function TimelineView({
     loadAliases();
     loadTimelineCleaners();
     loadTimelineData(); // Carica i dati della timeline anche qui
+    loadCleanerLocks();
 
     // Esponi le funzioni per ricaricare i cleaners
     (window as any).loadTimelineCleaners = loadTimelineCleaners;
@@ -1864,6 +1886,12 @@ export default function TimelineView({
                             RIMOSSO
                           </div>
                         )}
+                        {/* Lucchetto per cleaner bloccati */}
+                        {!isRemoved && lockedCleaners.has(cleaner.id) && (
+                          <div className="flex-shrink-0 mr-1">
+                            <Lock className="w-3 h-3 text-gray-600 dark:text-gray-400" />
+                          </div>
+                        )}
                         {/* Se straordinario, mostra SOLO badge S */}
                         {!isRemoved && cleaner.can_do_straordinaria ? (
                           <div className="bg-red-500 text-white dark:text-black font-bold text-[10px] px-1 py-0.5 rounded flex-shrink-0">
@@ -2697,34 +2725,101 @@ export default function TimelineView({
             : ""
         }`}>
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              Dettagli Cleaner #{selectedCleaner?.id}
+            <DialogTitle className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                Dettagli Cleaner #{selectedCleaner?.id}
+                {selectedCleaner && (
+                  <>
+                    {/* Se straordinario, mostra SOLO badge straordinario (priorità assoluta) */}
+                    {selectedCleaner.can_do_straordinaria ? (
+                      <span className="px-2 py-0.5 rounded border font-medium text-sm bg-red-500/30 text-red-800 dark:bg-red-500/40 dark:text-red-200 border-red-600 dark:border-red-400">
+                        Straordinario
+                      </span>
+                    ) : (
+                      /* Altrimenti mostra badge role normale */
+                      <>
+                        {selectedCleaner.role === "Formatore" ? (
+                          <span className="px-2 py-0.5 rounded border font-medium text-sm bg-orange-500/30 text-orange-800 dark:bg-orange-500/40 dark:text-orange-200 border-orange-600 dark:border-orange-400">
+                            Formatore
+                          </span>
+                        ) : selectedCleaner.role === "Premium" ? (
+                          <span className="px-2 py-0.5 rounded border font-medium text-sm bg-yellow-500/30 text-yellow-800 dark:bg-yellow-500/40 dark:text-yellow-200 border-yellow-600 dark:border-yellow-400">
+                            Premium
+                          </span>
+                        ) : (
+                          <span className="px-2 py-0.5 rounded border font-medium text-sm bg-green-500/30 text-green-800 dark:bg-green-500/40 dark:text-green-200 border-green-600 dark:border-green-400">
+                            Standard
+                          </span>
+                        )}
+                      </>
+                    )}
+                  </>
+                )}
+              </div>
               {selectedCleaner && (
-                <>
-                  {/* Se straordinario, mostra SOLO badge straordinario (priorità assoluta) */}
-                  {selectedCleaner.can_do_straordinaria ? (
-                    <span className="px-2 py-0.5 rounded border font-medium text-sm bg-red-500/30 text-red-800 dark:bg-red-500/40 dark:text-red-200 border-red-600 dark:border-red-400">
-                      Straordinario
-                    </span>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 w-8 p-0"
+                  disabled={isReadOnly || isSavingCleanerLock}
+                  onClick={async () => {
+                    if (!selectedCleaner) return;
+                    const cleanerId = selectedCleaner.id;
+                    const nextLocked = !lockedCleaners.has(cleanerId);
+
+                    // optimistic UI
+                    setLockedCleaners(prev => {
+                      const next = new Set(prev);
+                      if (nextLocked) next.add(cleanerId);
+                      else next.delete(cleanerId);
+                      return next;
+                    });
+
+                    setIsSavingCleanerLock(true);
+                    try {
+                      const response = await fetch('/api/cleaner-locks/set', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                          date: workDate,
+                          cleanerId,
+                          isLocked: nextLocked
+                        })
+                      });
+                      const data = await response.json();
+                      if (!response.ok || !data?.success) {
+                        throw new Error(data?.error || 'Impossibile salvare blocco cleaner');
+                      }
+
+                      toast({
+                        title: nextLocked ? "Cleaner bloccato" : "Cleaner sbloccato",
+                        description: `Cleaner #${cleanerId} ${nextLocked ? 'escluso' : 'riammesso'} per ${workDate}`,
+                        variant: "success",
+                      });
+                    } catch (error: any) {
+                      // revert optimistic UI
+                      setLockedCleaners(prev => {
+                        const next = new Set(prev);
+                        if (nextLocked) next.delete(cleanerId);
+                        else next.add(cleanerId);
+                        return next;
+                      });
+                      toast({
+                        title: "Errore",
+                        description: error?.message || "Impossibile aggiornare lock del cleaner",
+                        variant: "destructive",
+                      });
+                    } finally {
+                      setIsSavingCleanerLock(false);
+                    }
+                  }}
+                >
+                  {lockedCleaners.has(selectedCleaner?.id) ? (
+                    <Lock className="h-4 w-4" />
                   ) : (
-                    /* Altrimenti mostra badge role normale */
-                    <>
-                      {selectedCleaner.role === "Formatore" ? (
-                        <span className="px-2 py-0.5 rounded border font-medium text-sm bg-orange-500/30 text-orange-800 dark:bg-orange-500/40 dark:text-orange-200 border-orange-600 dark:border-orange-400">
-                          Formatore
-                        </span>
-                      ) : selectedCleaner.role === "Premium" ? (
-                        <span className="px-2 py-0.5 rounded border font-medium text-sm bg-yellow-500/30 text-yellow-800 dark:bg-yellow-500/40 dark:text-yellow-200 border-yellow-600 dark:border-yellow-400">
-                          Premium
-                        </span>
-                      ) : (
-                        <span className="px-2 py-0.5 rounded border font-medium text-sm bg-green-500/30 text-green-800 dark:bg-green-500/40 dark:text-green-200 border-green-600 dark:border-green-400">
-                          Standard
-                        </span>
-                      )}
-                    </>
+                    <Unlock className="h-4 w-4" />
                   )}
-                </>
+                </Button>
               )}
             </DialogTitle>
           </DialogHeader>

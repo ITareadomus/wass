@@ -280,3 +280,17 @@ export async function deletePhase0Data(runId: string): Promise<{ decisionsDelete
   };
 }
 
+export async function loadLockedCleanerIds(workDate: string): Promise<number[]> {
+  const result = await pool.query(
+    `
+      SELECT cleaner_id
+      FROM daily_cleaner_locks
+      WHERE work_date = $1 AND is_locked = true
+    `,
+    [workDate]
+  );
+
+  return result.rows
+    .map((r: any) => Number(r.cleaner_id))
+    .filter((n: number) => Number.isFinite(n));
+}

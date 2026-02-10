@@ -10,7 +10,7 @@ import {
   ApartmentTypes,
   DEFAULT_APARTMENT_TYPES
 } from './phase2';
-import { updateRunStatus, insertDecisionsBatch, OptimizerDecision } from './db';
+import { updateRunStatus, insertDecisionsBatch, OptimizerDecision, loadLockedCleanerIds } from './db';
 import { TimelineContext } from './timelineContext';
 
 async function loadApartmentTypes(): Promise<ApartmentTypes> {
@@ -246,9 +246,10 @@ export async function runPhase2(
       console.log(`[Phase2] Using timeline context: ${timelineContext.initialLoadByCleanerMin.size} cleaners with pre-existing load`);
     }
 
-    const [selectedCleanerIds, allAvailableCleaners, tasksMap, allGroups] = await Promise.all([
+    const [selectedCleanerIds, allAvailableCleaners, lockedCleanerIds, tasksMap, allGroups] = await Promise.all([
       loadSelectedCleanerIds(workDate),
       loadCleanersForDate(workDate),
+      loadLockedCleanerIds(workDate),
       loadTasksForPhase2(workDate),
       loadPhase1Groups(runId)
     ]);
@@ -257,9 +258,16 @@ export async function runPhase2(
     result.availableCleanersBeforeFilter = allAvailableCleaners.length;
     result.tasksLoaded = tasksMap.size;
 
+    const lockedSet = new Set(lockedCleanerIds);
+
     const cleaners = selectedCleanerIds.length > 0
-      ? allAvailableCleaners.filter(c => selectedCleanerIds.includes(c.cleanerId))
+      ? allAvailableCleaners
+          .filter(c => selectedCleanerIds.includes(c.cleanerId))
+          .filter(c => !lockedSet.has(c.cleanerId))
       : [];
+
+    console.log(`[Phase2] Locked cleaners excluded: ${lockedCleanerIds.length} (${lockedCleanerIds.join(",")})`);
+    console.log(`[Phase2] Cleaners after lock filter: ${cleaners.length}/${selectedCleanerIds.length}`);
     
     result.cleanersLoaded = cleaners.length;
 

@@ -7,7 +7,7 @@ import {
   Phase4Event
 } from './phase4';
 import { TaskForScheduling, Phase3TimelineConstraints } from './phase3';
-import { updateRunStatus, insertDecisionsBatch, OptimizerDecision, getLatestRunForDate } from './db';
+import { updateRunStatus, insertDecisionsBatch, OptimizerDecision, getLatestRunForDate, loadLockedCleanerIds } from './db';
 import { loadPriorityStartWindows, mapPriorityType, priorityToDbFormat } from './priorityWindows';
 import { ApartmentTypes, DEFAULT_APARTMENT_TYPES, calculateMinutesBasedTargets, TaskForPhase2, DEFAULT_FAIRNESS_PARAMS } from './phase2';
 import { TimelineContext } from './timelineContext';
@@ -497,11 +497,12 @@ export async function runPhase4(
       apartmentTypes 
     };
 
-    const [schedules, unassignedTasks, tasksMap, priorityWindows] = await Promise.all([
+    const [schedules, unassignedTasks, tasksMap, priorityWindows, lockedCleanerIds] = await Promise.all([
       loadPhase3Schedules(resolvedRunId, resolvedWorkDate),
       loadUnassignedTasks(resolvedRunId, resolvedWorkDate),
       loadTasksForScheduling(resolvedWorkDate),
-      loadPriorityStartWindows(resolvedRunId)
+      loadPriorityStartWindows(resolvedRunId),
+      loadLockedCleanerIds(resolvedWorkDate)
     ]);
 
     result.schedulesLoaded = schedules.length;
@@ -525,6 +526,11 @@ export async function runPhase4(
 
     await clearPhase4Data(resolvedRunId);
 
+    const lockedSet = new Set(lockedCleanerIds);
+    const eligibleSchedulesCount = schedules.filter(s => !lockedSet.has(s.cleanerId)).length;
+    console.log(`[Phase4] Locked cleaners excluded: ${lockedCleanerIds.length} (${lockedCleanerIds.join(",")})`);
+    console.log(`[Phase4] Eligible cleaners for Phase4 assignment: ${eligibleSchedulesCount}/${schedules.length}`);
+
     // Calculate minutes-based fairness targets for Phase 4
     // Convert TaskForScheduling to TaskForPhase2 format for target calculation
     const tasksForTargets: TaskForPhase2[] = Array.from(tasksMap.values()).map(t => ({
@@ -539,7 +545,7 @@ export async function runPhase4(
       priority: t.priorityType ?? 'LP',  // Use priorityType from TaskForScheduling
       cleaningTime: t.cleaningTimeMinutes ?? 60
     }));
-    const targets = calculateMinutesBasedTargets(tasksForTargets, schedules.length, fullParams.fairness);
+    const targets = calculateMinutesBasedTargets(tasksForTargets, eligibleSchedulesCount, fullParams.fairness);
     
     console.log(`[Phase4] Fairness targets: target=${Math.round(targets.targetLoadMin)}min, min=${Math.round(targets.minTarget)}min, max=${Math.round(targets.maxTarget)}min`);
 
@@ -564,7 +570,8 @@ export async function runPhase4(
       priorityWindows,
       targets,
       fullParams,
-      constraintsByCleaner
+      constraintsByCleaner,
+      lockedCleanerIds
     );
 
     result.insertedCount = phase4Result.stats.insertedCount;

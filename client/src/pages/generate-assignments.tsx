@@ -341,6 +341,78 @@ export default function GenerateAssignments() {
   const [isAssigning, setIsAssigning] = useState(false);
   const [isRefreshingContainers, setIsRefreshingContainers] = useState(false);
 
+  // Polling ADAM: fingerprint su campi "di interesse" per segnalare aggiornamenti disponibili
+  type AdamFingerprint = {
+    count: number;
+    max_updated_at_unix: number | null;
+    signature_xor: number | null;
+    signature_sum: string | number | null;
+  };
+
+  const adamBaselineRef = useRef<AdamFingerprint | null>(null);
+  const [hasAdamUpdates, setHasAdamUpdates] = useState(false);
+
+  const fetchAdamFingerprint = useCallback(async (workDate: string): Promise<AdamFingerprint | null> => {
+    try {
+      const r = await fetch(`/api/adam/housekeeping/fingerprint?date=${encodeURIComponent(workDate)}`, {
+        cache: "no-store",
+        headers: { "Cache-Control": "no-cache, no-store, must-revalidate" }
+      });
+      if (!r.ok) return null;
+      const data = await r.json();
+      if (!data?.success) return null;
+      return {
+        count: Number(data.count ?? 0),
+        max_updated_at_unix: data.max_updated_at_unix !== null && data.max_updated_at_unix !== undefined ? Number(data.max_updated_at_unix) : null,
+        signature_xor: data.signature_xor !== null && data.signature_xor !== undefined ? Number(data.signature_xor) : null,
+        signature_sum: data.signature_sum ?? null,
+      };
+    } catch {
+      return null;
+    }
+  }, []);
+
+  // Polling fingerprint ADAM (pausato quando tab non visibile)
+  useEffect(() => {
+    adamBaselineRef.current = null;
+    setHasAdamUpdates(false);
+
+    let stopped = false;
+    const workDate = format(selectedDate, "yyyy-MM-dd");
+
+    const poll = async () => {
+      if (stopped) return;
+      if (document.visibilityState !== "visible") return;
+
+      const fp = await fetchAdamFingerprint(workDate);
+      if (!fp) return;
+
+      // Prima lettura: baseline senza segnale
+      if (!adamBaselineRef.current) {
+        adamBaselineRef.current = fp;
+        setHasAdamUpdates(false);
+        return;
+      }
+
+      const base = adamBaselineRef.current;
+      const changed =
+        fp.count !== base.count ||
+        fp.max_updated_at_unix !== base.max_updated_at_unix ||
+        fp.signature_xor !== base.signature_xor ||
+        String(fp.signature_sum ?? "") !== String(base.signature_sum ?? "");
+
+      if (changed) setHasAdamUpdates(true);
+    };
+
+    const timer = setInterval(poll, 15000);
+    poll();
+
+    return () => {
+      stopped = true;
+      clearInterval(timer);
+    };
+  }, [selectedDate, fetchAdamFingerprint]);
+
   // Callback per notificare modifiche dopo movimenti task
   const handleTaskMoved = useCallback(() => {
     setHasUnsavedChanges(true);
@@ -1338,17 +1410,23 @@ export default function GenerateAssignments() {
           modification_type: modificationType
         }),
       });
+
       if (!response.ok) {
         const errData = await response.json().catch(() => ({}));
-        // Gestione errore 423 (Task bloccata)
+        // Gestione errore 423 (Task bloccata o Cleaner bloccato)
         if (response.status === 423) {
+          if (errData.error === 'CLEANER_LOCKED') {
+            throw new Error('Cleaner bloccato: impossibile assegnare');
+          }
           throw new Error(errData.locked_reason || 'Task bloccata: impossibile assegnare');
         }
         throw new Error(`Errore nel salvataggio dell'assegnazione: ${errData.error || response.statusText}`);
       }
       console.log(`Assegnazione salvata: taskId=${taskId}, logisticCode=${logisticCode}`);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Errore nella chiamata API di salvataggio timeline:', error);
+      // CRITICAL: Propaga l'errore al chiamante (DnD) per evitare toast di successo falsi
+      throw error;
     }
   };
 
@@ -1617,9 +1695,12 @@ export default function GenerateAssignments() {
           });
 
           if (!response.ok) {
-            // Gestione errore 423 (Task bloccata)
+            // Gestione errore 423 (Task bloccata o Cleaner bloccato)
             if (response.status === 423) {
               const errorData = await response.json().catch(() => ({}));
+              if (errorData.error === 'CLEANER_LOCKED') {
+                throw new Error('Cleaner bloccato: impossibile assegnare');
+              }
               throw new Error(errorData.locked_reason || 'Task bloccata: impossibile assegnare');
             }
             throw new Error('Errore nello spostamento tra cleaners');
@@ -1646,7 +1727,7 @@ export default function GenerateAssignments() {
           console.error("Errore nello spostamento:", err);
           toast({
             title: "Errore",
-            description: "Impossibile spostare la task.",
+            description: (err as any)?.message || "Impossibile spostare la task.",
             variant: "destructive",
           });
         } finally {
@@ -1758,8 +1839,13 @@ export default function GenerateAssignments() {
           // PATCH C: Usa ID nel toast invece di fetch
           const cleanerName = `ID ${toCleanerId}`;
 
+          console.log(`🎯 Tentativo assegnazione task ${taskId} a cleaner ${toCleanerId} (potrebbe essere locked)`);
+          console.log(`🎯 Task details: logisticCode=${logisticCode}, correctIndex=${correctIndex}`);
+
           // Salva in timeline.json (rimuove automaticamente da containers.json)
           await saveTaskAssignment(taskId, toCleanerId, logisticCode, correctIndex);
+
+          console.log(`✅ Assegnazione completata con successo per task ${taskId}`);
 
           // CRITICAL: Marca modifiche dopo drag-and-drop da container
           setHasUnsavedChanges(true);
@@ -1775,13 +1861,23 @@ export default function GenerateAssignments() {
             description: `Task ${logisticCode} assegnata a ${cleanerName}`,
             variant: "success",
           });
-        } catch (err) {
-          console.error("Errore nell'assegnazione:", err);
-          toast({
-            title: "Errore",
-            description: "Impossibile assegnare la task.",
-            variant: "destructive",
-          });
+        } catch (err: any) {
+          console.error("❌ Errore nell'assegnazione:", err);
+
+          // Gestione specifica per cleaner bloccato
+          if (err?.message?.includes('Cleaner bloccato')) {
+            toast({
+              title: "Cleaner bloccato",
+              description: "Impossibile assegnare la task: cleaner bloccato",
+              variant: "destructive",
+            });
+          } else {
+            toast({
+              title: "Errore",
+              description: err?.message || "Impossibile assegnare la task.",
+              variant: "destructive",
+            });
+          }
         } finally {
           // Rilascia lock indipendentemente dall'esito
           isDraggingRef.current = false;
@@ -1991,6 +2087,13 @@ export default function GenerateAssignments() {
                     });
                     
                     if (!response.ok) throw new Error('Errore durante il refresh');
+
+                    // Reset baseline ADAM dopo refresh "pesante"
+                    const fp = await fetchAdamFingerprint(dateStr);
+                    if (fp) {
+                      adamBaselineRef.current = fp;
+                      setHasAdamUpdates(false);
+                    }
                     
                     toast({
                       variant: "success",
@@ -2012,9 +2115,19 @@ export default function GenerateAssignments() {
                 className="flex items-center rounded-none text-black dark:text-white hover:bg-custom-blue/80 px-3"
               >
                 {isRefreshingContainers ? (
-                  <RefreshCw className="w-4 h-4 animate-spin" />
+                  <span className="relative inline-flex">
+                    <RefreshCw className="w-4 h-4 animate-spin" />
+                  </span>
                 ) : (
-                  <RefreshCw className="w-4 h-4" />
+                  <span className="relative inline-flex">
+                    <RefreshCw className="w-4 h-4" />
+                    {hasAdamUpdates && (
+                      <span
+                        className="absolute -top-1 -right-1 h-2 w-2 rounded-full bg-red-500"
+                        title="Aggiornamenti disponibili da ADAM"
+                      />
+                    )}
+                  </span>
                 )}
               </Button>
               <div className="w-px h-6 bg-black/20 dark:bg-white/20" />
