@@ -1,5 +1,61 @@
 import pool, { query } from '../../shared/pg-db';
 import { taskCollaborationService } from './pg-task-collaboration-service';
+import { formatInTimeZone } from 'date-fns-tz';
+
+const ROME_TZ = 'Europe/Rome';
+
+/**
+ * Normalize any date-ish value to `YYYY-MM-DD` without UTC day-shifts.
+ *
+ * Why: Postgres `DATE` casting from timestamp/ISO strings depends on session timezone.
+ * If we send `Date`/ISO with time, local (often UTC) can shift the day (e.g. Rome midnight -> previous UTC day).
+ * We ALWAYS store date-only strings for checkin/checkout.
+ */
+function normalizeDateToYmd(value: any): string | null {
+  if (value == null) return null;
+
+  // Date instance
+  if (value instanceof Date) {
+    if (isNaN(value.getTime())) return null;
+    return formatInTimeZone(value, ROME_TZ, 'yyyy-MM-dd');
+  }
+
+  // Timestamp number
+  if (typeof value === 'number') {
+    const d = new Date(value);
+    if (isNaN(d.getTime())) return null;
+    return formatInTimeZone(d, ROME_TZ, 'yyyy-MM-dd');
+  }
+
+  // String forms
+  if (typeof value === 'string') {
+    const s = value.trim();
+    if (!s) return null;
+
+    // Already YYYY-MM-DD
+    if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+
+    // ISO-ish: take date part without timezone conversion
+    if (s.includes('T')) {
+      const part = s.split('T')[0];
+      if (/^\d{4}-\d{2}-\d{2}$/.test(part)) return part;
+    }
+
+    // Italian format DD/MM/YYYY
+    const m = s.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+    if (m) return `${m[3]}-${m[2]}-${m[1]}`;
+
+    // Fallback parse, but then format in Rome TZ to avoid UTC shifts
+    const d = new Date(s);
+    if (!isNaN(d.getTime())) {
+      return formatInTimeZone(d, ROME_TZ, 'yyyy-MM-dd');
+    }
+
+    return null;
+  }
+
+  return null;
+}
 
 export interface PgDailyAssignmentRow {
   id?: number;
@@ -297,8 +353,9 @@ export class PgDailyAssignmentsService {
           lng: task.lng ? parseFloat(String(task.lng)) : null,
           cleaning_time: Number(task.cleaning_time || 0),
           base_cleaning_time: task.base_cleaning_time != null ? Number(task.base_cleaning_time) : Number(task.cleaning_time || 0),
-          checkin_date: task.checkin_date || null,
-          checkout_date: task.checkout_date || null,
+          // CRITICAL: always persist date-only strings (avoid timezone day-shifts)
+          checkin_date: normalizeDateToYmd(task.checkin_date),
+          checkout_date: normalizeDateToYmd(task.checkout_date),
           checkin_time: task.checkin_time || null,
           checkout_time: task.checkout_time || null,
           pax_in: task.pax_in != null ? Number(task.pax_in) : null,
@@ -530,8 +587,9 @@ export class PgDailyAssignmentsService {
           }
         }
         
-        if (row.checkin_date) task.checkin_date = row.checkin_date;
-        if (row.checkout_date) task.checkout_date = row.checkout_date;
+        // Normalize on read as well (row can be Date in some pg configurations)
+        task.checkin_date = normalizeDateToYmd(row.checkin_date) ?? undefined;
+        task.checkout_date = normalizeDateToYmd(row.checkout_date) ?? undefined;
         if (row.checkin_time) task.checkin_time = row.checkin_time.substring(0, 5);
         if (row.checkout_time) task.checkout_time = row.checkout_time.substring(0, 5);
         if (row.pax_in !== null) task.pax_in = row.pax_in;
@@ -888,8 +946,8 @@ export class PgDailyAssignmentsService {
         if (row.lat !== null) task.lat = String(row.lat);
         if (row.lng !== null) task.lng = String(row.lng);
         if (row.cleaning_time) task.cleaning_time = row.cleaning_time;
-        if (row.checkin_date) task.checkin_date = row.checkin_date;
-        if (row.checkout_date) task.checkout_date = row.checkout_date;
+        task.checkin_date = normalizeDateToYmd(row.checkin_date) ?? undefined;
+        task.checkout_date = normalizeDateToYmd(row.checkout_date) ?? undefined;
         if (row.checkin_time) task.checkin_time = row.checkin_time.substring(0, 5);
         if (row.checkout_time) task.checkout_time = row.checkout_time.substring(0, 5);
         if (row.pax_in !== null) task.pax_in = row.pax_in;
@@ -1061,8 +1119,9 @@ export class PgDailyAssignmentsService {
             task.lat || null,
             task.lng || null,
             task.cleaning_time || 0,
-            task.checkin_date || null,
-            task.checkout_date || null,
+            // CRITICAL: always persist date-only strings (avoid timezone day-shifts)
+            normalizeDateToYmd(task.checkin_date),
+            normalizeDateToYmd(task.checkout_date),
             task.checkin_time || null,
             task.checkout_time || null,
             task.pax_in ?? null,
