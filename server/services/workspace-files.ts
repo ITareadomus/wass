@@ -150,6 +150,18 @@ export async function saveTimeline(
     
     await pgDailyAssignmentsService.saveTimeline(workDate, normalizedData);
     console.log(`✅ Timeline saved to PostgreSQL for ${workDate}`);
+
+    // Keep task_collaborators in sync with daily_assignments_current.
+    // This prevents collaboration mismatches after any operation that saves the timeline
+    // (drag & drop, swap cleaners, batch operations, etc.).
+    try {
+      const { taskCollaborationService } = await import('./pg-task-collaboration-service');
+      await taskCollaborationService.reconcileForWorkDate(workDate);
+    } catch (reconcileErr) {
+      // Don't hide the original save errors, but do surface reconcile failures.
+      console.error(`❌ Error reconciling collaborations for ${workDate}:`, reconcileErr);
+      throw reconcileErr;
+    }
     
     // Prepare change tracking arrays
     let editedFields: string[] = [];

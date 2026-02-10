@@ -25,6 +25,7 @@ export default function MapSection({ tasks }: MapSectionProps) {
   const [isMapLoaded, setIsMapLoaded] = useState(false);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [cleaners, setCleaners] = useState<any[]>([]);
+  const [cleanerAliases, setCleanerAliases] = useState<Record<string, { id: number; name: string; lastname: string; alias: string }>>({});
   const [filteredCleanerId, setFilteredCleanerId] = useState<number | null>(null);
   const [filteredTaskId, setFilteredTaskId] = useState<string | null>(null);
 
@@ -44,7 +45,22 @@ export default function MapSection({ tasks }: MapSectionProps) {
         console.error('Errore caricamento cleaners:', error);
       }
     };
+    const loadCleanerAliases = async () => {
+      try {
+        const dateStr = localStorage.getItem('selected_work_date') || new Date().toISOString().split('T')[0];
+        const response = await fetch(`/api/cleaners-aliases?date=${dateStr}`, {
+          cache: 'no-store',
+          headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' }
+        });
+        if (!response.ok) return;
+        const data = await response.json();
+        setCleanerAliases(data.aliases || {});
+      } catch (error) {
+        console.error('Errore caricamento alias cleaners:', error);
+      }
+    };
     loadCleaners();
+    loadCleanerAliases();
 
     // Listener per aggiornamenti del filtro dalla timeline
     // REGOLA: solo uno dei due filtri può essere attivo alla volta
@@ -614,8 +630,11 @@ export default function MapSection({ tasks }: MapSectionProps) {
                     <span className="font-semibold">Collaboratori:</span>
                     <div className="flex gap-1 mt-1 flex-wrap">
                       {(selectedTask as any).collaborator_ids.map((cleanerId: number) => {
-                        const cleaner = cleaners.find((c: any) => c.id === cleanerId);
-                        const cleanerName = cleaner ? (cleaner.alias || `${cleaner.name} ${cleaner.lastname}`) : `Cleaner ${cleanerId}`;
+                        const cleaner = cleaners.find((c: any) => Number(c.id) === Number(cleanerId));
+                        const aliasData = cleanerAliases[String(cleanerId)];
+                        const cleanerName = cleaner
+                          ? (cleaner.alias || `${cleaner.name} ${cleaner.lastname}`)
+                          : (aliasData?.alias || `${aliasData?.name || ''} ${aliasData?.lastname || ''}`.trim() || `Cleaner ${cleanerId}`);
                         return (
                           <span 
                             key={cleanerId}

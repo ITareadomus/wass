@@ -1,5 +1,6 @@
 import { query } from '../../shared/pg-db';
 import pool from '../../shared/pg-db';
+import type { PoolClient } from 'pg';
 
 export interface CollaborationInfo {
   cleanerIds: number[];
@@ -76,6 +77,151 @@ export class PgTaskCollaborationService {
     }
 
     return map;
+  }
+
+  /**
+   * Reconcile task_collaborators from daily_assignments_current for a work_date.
+   *
+   * Goal: ensure the pivot table always matches the actual timeline assignments stored in DB.
+   * - For task_ids assigned to >1 distinct cleaner_id in daily_assignments_current => ensure rows exist in task_collaborators
+   * - For task_ids assigned to <=1 cleaner_id => ensure no rows exist in task_collaborators
+   *
+   * Primary selection:
+   * - If an existing primary exists for the task and is still among collaborators, keep it
+   * - Otherwise, pick the smallest cleaner_id deterministically
+   *
+   * Note: This intentionally favors correctness/consistency over preserving historical primary choices
+   * in edge cases where the previous primary is no longer a collaborator.
+   */
+  async reconcileForWorkDate(workDate: string): Promise<void> {
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      await this.reconcileForWorkDateTx(client, workDate);
+      await client.query('COMMIT');
+      console.log(`✅ Collaboration: Reconciled task_collaborators for ${workDate}`);
+    } catch (error) {
+      await client.query('ROLLBACK');
+      console.error('❌ Collaboration: Error reconciling collaborations:', error);
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  /**
+   * Reconcile collaborators for a single task_id from assignments.
+   * Useful to self-heal before applying collaboration-aware moves.
+   */
+  async reconcileTaskFromAssignments(workDate: string, taskId: number): Promise<void> {
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      await this.reconcileTaskFromAssignmentsTx(client, workDate, taskId);
+      await client.query('COMMIT');
+      console.log(`✅ Collaboration: Reconciled task_collaborators for task ${taskId} on ${workDate}`);
+    } catch (error) {
+      await client.query('ROLLBACK');
+      console.error('❌ Collaboration: Error reconciling task collaboration:', error);
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  private async reconcileForWorkDateTx(client: PoolClient, workDate: string): Promise<void> {
+    // Load existing primary per task (if any)
+    const existingPrimary = await client.query(
+      `SELECT task_id, cleaner_id
+       FROM task_collaborators
+       WHERE work_date = $1 AND is_primary = true`,
+      [workDate]
+    );
+    const existingPrimaryMap = new Map<number, number>(
+      existingPrimary.rows.map((r: any) => [Number(r.task_id), Number(r.cleaner_id)])
+    );
+
+    // Load collaborations from actual assignments in timeline DB
+    const collabFromAssignments = await client.query(
+      `SELECT task_id,
+              array_agg(DISTINCT cleaner_id ORDER BY cleaner_id) AS cleaner_ids,
+              COUNT(DISTINCT cleaner_id)::int AS collaborator_count
+       FROM daily_assignments_current
+       WHERE work_date = $1
+       GROUP BY task_id
+       HAVING COUNT(DISTINCT cleaner_id) > 1`,
+      [workDate]
+    );
+
+    // Clear pivot for the date and rebuild from assignments
+    await client.query('DELETE FROM task_collaborators WHERE work_date = $1', [workDate]);
+
+    for (const row of collabFromAssignments.rows) {
+      const taskIdNum = Number(row.task_id);
+      const cleanerIds: number[] = (row.cleaner_ids || []).map((id: any) => Number(id));
+      if (cleanerIds.length <= 1) continue;
+
+      const existingPrimaryCleanerId = existingPrimaryMap.get(taskIdNum);
+      const chosenPrimary =
+        existingPrimaryCleanerId && cleanerIds.includes(existingPrimaryCleanerId)
+          ? existingPrimaryCleanerId
+          : cleanerIds[0];
+
+      for (const cleanerId of cleanerIds) {
+        await client.query(
+          `INSERT INTO task_collaborators (work_date, task_id, cleaner_id, is_primary)
+           VALUES ($1, $2, $3, $4)`,
+          [workDate, taskIdNum, cleanerId, cleanerId === chosenPrimary]
+        );
+      }
+    }
+  }
+
+  private async reconcileTaskFromAssignmentsTx(client: PoolClient, workDate: string, taskId: number): Promise<void> {
+    // Existing primary for this task (if any)
+    const existingPrimary = await client.query(
+      `SELECT cleaner_id
+       FROM task_collaborators
+       WHERE work_date = $1 AND task_id = $2 AND is_primary = true
+       LIMIT 1`,
+      [workDate, taskId]
+    );
+    const existingPrimaryCleanerId =
+      existingPrimary.rows.length > 0 ? Number(existingPrimary.rows[0].cleaner_id) : null;
+
+    const fromAssignments = await client.query(
+      `SELECT array_agg(DISTINCT cleaner_id ORDER BY cleaner_id) AS cleaner_ids,
+              COUNT(DISTINCT cleaner_id)::int AS collaborator_count
+       FROM daily_assignments_current
+       WHERE work_date = $1 AND task_id = $2`,
+      [workDate, taskId]
+    );
+
+    const cleanerIds: number[] = (fromAssignments.rows[0]?.cleaner_ids || []).map((id: any) => Number(id));
+    const count: number = Number(fromAssignments.rows[0]?.collaborator_count || 0);
+
+    // Remove any existing pivot for this task and rebuild only if collaborative
+    await client.query(
+      'DELETE FROM task_collaborators WHERE work_date = $1 AND task_id = $2',
+      [workDate, taskId]
+    );
+
+    if (count <= 1 || cleanerIds.length <= 1) {
+      return;
+    }
+
+    const chosenPrimary =
+      existingPrimaryCleanerId && cleanerIds.includes(existingPrimaryCleanerId)
+        ? existingPrimaryCleanerId
+        : cleanerIds[0];
+
+    for (const cleanerId of cleanerIds) {
+      await client.query(
+        `INSERT INTO task_collaborators (work_date, task_id, cleaner_id, is_primary)
+         VALUES ($1, $2, $3, $4)`,
+        [workDate, taskId, cleanerId, cleanerId === chosenPrimary]
+      );
+    }
   }
 
   /**

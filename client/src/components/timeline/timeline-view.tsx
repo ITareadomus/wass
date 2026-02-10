@@ -1,5 +1,5 @@
 import { Personnel, TaskType as Task } from "@shared/schema";
-import { Calendar as CalendarIcon, RotateCcw, Users, RefreshCw, UserPlus, Maximize2, Minimize2, Check, CheckCircle, Save, Pencil, ChevronLeft, ChevronRight, Loader2, Zap } from "lucide-react";
+import { Calendar as CalendarIcon, RotateCcw, Users, RefreshCw, UserPlus, UserMinus, Maximize2, Minimize2, Check, CheckCircle, Save, Pencil, ChevronLeft, ChevronRight, Loader2, Zap } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import * as React from "react";
 import { Droppable, Draggable } from "react-beautiful-dnd";
@@ -166,6 +166,7 @@ export default function TimelineView({
   const [showOptimizerDialog, setShowOptimizerDialog] = useState(false);
   const [isRunningOptimizer, setIsRunningOptimizer] = useState(false);
   const [optimizerResult, setOptimizerResult] = useState<any>(null);
+  const [showClearAllSelectedCleanersDialog, setShowClearAllSelectedCleanersDialog] = useState(false);
 
   // Stato per le regole di validazione task-cleaner
   const [validationRules, setValidationRules] = useState<any>(null);
@@ -299,6 +300,50 @@ export default function TimelineView({
       toast({
         title: "Errore",
         description: error.message || "Impossibile rimuovere il cleaner",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Mutation per svuotare tutti i cleaners convocati (selected_cleaners) per la data corrente
+  const clearAllSelectedCleanersMutation = useMutation({
+    mutationFn: async () => {
+      const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+      const response = await apiRequest("POST", "/api/save-selected-cleaners", {
+        cleaners: [],
+        total_selected: 0,
+        date: workDate,
+        action_type: "CLEAR_ALL",
+        modified_by: currentUser.username || 'unknown'
+      });
+      return await response.json();
+    },
+    onSuccess: async (data) => {
+      // CRITICAL: Marca modifiche SOLO dopo azioni utente
+      if ((window as any).setHasUnsavedChanges) {
+        (window as any).setHasUnsavedChanges(true);
+      }
+      if (onTaskMoved) {
+        onTaskMoved();
+      }
+
+      // Ricarica timeline e selected_cleaners per riflettere lo svuotamento
+      await Promise.all([
+        loadTimelineCleaners(),
+        loadTimelineData(),
+        loadCleaners(true),
+      ]);
+
+      toast({
+        title: "Cleaners convocati rimossi",
+        description: "La selezione dei cleaners convocati è stata svuotata per questa data.",
+        variant: "success",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Errore",
+        description: error.message || "Impossibile rimuovere tutti i cleaners convocati",
         variant: "destructive",
       });
     },
@@ -578,7 +623,10 @@ export default function TimelineView({
       // Se selected_cleaners è vuoto MA la timeline ha cleaners,
       // usa quelli dalla timeline (caso di ritorno a data precedente)
       let cleanersList = selectedData.cleaners || [];
-      if (cleanersList.length === 0 && timelineCleaners.length > 0) {
+      // Nota: questa fallback è utile SOLO in read-only (date passate) quando
+      // selected_cleaners non è presente ma la timeline ha dati. In modalità edit,
+      // selected_cleaners vuoto è uno stato valido (es. dopo "Rimuovi tutti").
+      if (!skipLoadSaved && isReadOnly && cleanersList.length === 0 && timelineCleaners.length > 0) {
         console.log(`⚠️ selected_cleaners vuoto ma timeline ha ${timelineCleaners.length} cleaners`);
         console.log('🔄 Caricamento cleaners dalla timeline per visualizzazione');
 
@@ -1619,7 +1667,7 @@ export default function TimelineView({
         className={`bg-custom-blue-light rounded-lg border-2 border-custom-blue shadow-sm relative ${isFullscreen ? 'fixed inset-0 z-50 overflow-auto' : ''}`}
       >
         {/* Loading overlay durante drag&drop e rimozione cleaner */}
-        {(isLoadingDragDrop || removeCleanerMutation.isPending) && (
+        {(isLoadingDragDrop || removeCleanerMutation.isPending || clearAllSelectedCleanersMutation.isPending) && (
           <div className="absolute inset-0 bg-black/20 dark:bg-black/40 rounded-lg flex items-center justify-center z-40 backdrop-blur-sm pointer-events-none">
             <div className="flex flex-col items-center gap-3">
               <Loader2 className="h-8 w-8 animate-spin text-custom-blue" />
@@ -1664,20 +1712,51 @@ export default function TimelineView({
         </div>
         <div className="p-4 overflow-x-auto">
           {/* Header con orari - unico per tutti i cleaner */}
-          <div className="flex mb-2 px-4">
-            <div className="flex-shrink-0" style={{ width: `${cleanerColumnWidth}px` }}></div>
+          <div className="flex items-stretch mb-2 px-4 h-[44px]">
+            <div
+              className="flex-shrink-0 p-1 flex items-center justify-center border border-border h-full print:hidden"
+              style={{ width: `${cleanerColumnWidth}px` }}
+            >
+              {!isReadOnly && (
+                <Button
+                  onClick={() => setShowClearAllSelectedCleanersDialog(true)}
+                  variant="ghost"
+                  size="sm"
+                  disabled={cleaners.length === 0 || hasTasksInTimeline || clearAllSelectedCleanersMutation.isPending}
+                  className={cn(
+                    "w-full h-full border-2",
+                    "border-red-600 dark:border-red-500",
+                    "text-red-700 dark:text-red-200",
+                    "hover:bg-red-50 dark:hover:bg-red-950/30"
+                  )}
+                  aria-label="Rimuovi tutti i cleaners convocati"
+                  title={
+                    cleaners.length === 0
+                      ? "Nessun cleaner convocato da rimuovere"
+                      : hasTasksInTimeline
+                        ? "Disabilitato: ci sono task nella timeline"
+                        : `Rimuovi tutti i convocati (${cleaners.length})`
+                  }
+                >
+                  <UserMinus className="w-5 h-5" />
+                </Button>
+              )}
+            </div>
             <div
               ref={timelineRowRef}
-              className="flex-1"
+              className="flex-1 h-full"
               style={{ display: 'grid', gridTemplateColumns: `repeat(${globalTimeSlots.length}, 1fr)` }}
             >
               {globalTimeSlots.map((slot, idx) => (
-                <div key={idx} className="text-center text-xs font-semibold text-foreground border-r border-border px-1">
+                <div
+                  key={idx}
+                  className="h-full flex items-center justify-center text-center text-xs font-semibold text-foreground border-r border-border px-1"
+                >
                   {slot}
                 </div>
               ))}
             </div>
-            <div className="flex-shrink-0 w-20 text-center text-xs font-semibold text-foreground border-l border-border px-1 flex items-center justify-center">
+            <div className="flex-shrink-0 w-20 h-full text-center text-xs font-semibold text-foreground border-l border-border px-1 flex items-center justify-center">
               Ore lavorate
             </div>
           </div>
@@ -2831,7 +2910,7 @@ export default function TimelineView({
                 Tutte le task assegnate nella timeline verranno riportate nei containers originali (Early Out, High Priority, Low Priority).
               </p>
               <p className="text-sm text-muted-foreground">
-                Sei sicuro di voler procedere? Questa azione cancellerà tutte le assegnazioni correnti.
+                Sei sicuro di voler procedere? Questa azione è irreversibile.
               </p>
             </AlertDialogDescription>
           </AlertDialogHeader>
@@ -2851,6 +2930,44 @@ export default function TimelineView({
               className="border-2 border-custom-blue bg-background text-foreground hover:bg-accent hover:text-accent-foreground"
             >
               Ho capito
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Dialog di conferma per rimuovere tutti i cleaners convocati */}
+      <AlertDialog open={showClearAllSelectedCleanersDialog} onOpenChange={setShowClearAllSelectedCleanersDialog}>
+        <AlertDialogContent className="sm:max-md">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2 text-red-600 dark:text-red-400">
+              <UserMinus className="w-5 h-5" />
+              Rimuovere tutti i cleaners convocati?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              <p className="text-base text-foreground font-semibold mb-3">
+              Questa azione svuota la selezione dei cleaners convocati per questa data.
+              </p>
+              <p className="text-sm text-muted-foreground">
+              Sei sicuro di voler procedere? Questa azione è irreversibile.
+              </p>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel
+              onClick={() => setShowClearAllSelectedCleanersDialog(false)}
+              className="border-2 border-custom-blue"
+            >
+              Annulla
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                setShowClearAllSelectedCleanersDialog(false);
+                clearAllSelectedCleanersMutation.mutate();
+              }}
+              disabled={clearAllSelectedCleanersMutation.isPending}
+              className="border-2 border-custom-blue bg-background text-foreground hover:bg-accent hover:text-accent-foreground"
+            >
+              Conferma rimozione
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

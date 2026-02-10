@@ -451,6 +451,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const numDestCleanerId = destCleanerId ? Number(destCleanerId) : null;
       
       if (numTaskId && numSourceCleanerId && numDestCleanerId) {
+        // Self-heal: if pivot is stale/missing, derive collaboration from assignments
+        // so drag-&-drop can't silently desync task_collaborators.
+        const assignmentsCheck = await query(
+          `SELECT array_agg(DISTINCT cleaner_id ORDER BY cleaner_id) AS cleaner_ids,
+                  COUNT(DISTINCT cleaner_id)::int AS collaborator_count
+           FROM daily_assignments_current
+           WHERE work_date = $1 AND task_id = $2`,
+          [workDate, numTaskId]
+        );
+        const assignedCleanerIds: number[] = (assignmentsCheck.rows[0]?.cleaner_ids || []).map((id: any) => Number(id));
+        const assignedCount: number = Number(assignmentsCheck.rows[0]?.collaborator_count || 0);
+
+        // If DB says it's collaborative, reconcile the pivot for this task first.
+        if (assignedCount > 1) {
+          await taskCollaborationService.reconcileTaskFromAssignments(workDate, numTaskId);
+        }
+
         const collab = await taskCollaborationService.getCollaboration(workDate, numTaskId);
         
         if (collab.count > 1 && collab.cleanerIds.includes(numSourceCleanerId)) {
@@ -718,6 +735,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const sourceTasks = sourceEntry.tasks;
       const destTasks = destEntry.tasks;
 
+      // Preserve current primary mapping for swapped tasks to maintain the rule:
+      // if a primary collaborator is replaced by the destination cleaner, the destination becomes primary.
+      const swappedTaskIds = Array.from(new Set([
+        ...sourceTasks.map((t: any) => Number(t.task_id ?? t.id)).filter((x: any) => Number.isFinite(x)),
+        ...destTasks.map((t: any) => Number(t.task_id ?? t.id)).filter((x: any) => Number.isFinite(x)),
+      ]));
+
+      const primaryBeforeSwap = new Map<number, number>();
+      if (swappedTaskIds.length > 0) {
+        const primRes = await query(
+          `SELECT task_id, cleaner_id
+           FROM task_collaborators
+           WHERE work_date = $1 AND is_primary = true AND task_id = ANY($2::int[])`,
+          [workDate, swappedTaskIds]
+        );
+        for (const r of primRes.rows) {
+          primaryBeforeSwap.set(Number(r.task_id), Number(r.cleaner_id));
+        }
+      }
+
       sourceEntry.tasks = destTasks;
       destEntry.tasks = sourceTasks;
 
@@ -801,6 +838,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Salva timeline (dual-write: filesystem + Object Storage)
       await workspaceFiles.saveTimeline(workDate, timelineData, false, modifyingUser, 'swap_cleaners_tasks');
+
+      // After swap + reconcile, restore primary according to swapped cleaner mapping (best-effort).
+      // Note: saveTimeline already reconciles membership; here we only adjust primary when needed.
+      try {
+        const { taskCollaborationService } = await import("./services/pg-task-collaboration-service");
+        for (const taskIdNum of swappedTaskIds) {
+          const prevPrimary = primaryBeforeSwap.get(taskIdNum);
+          if (!prevPrimary) continue;
+          if (prevPrimary === Number(sourceCleanerId)) {
+            await taskCollaborationService.setPrimaryCollaborator(workDate, taskIdNum, Number(destCleanerId));
+          } else if (prevPrimary === Number(destCleanerId)) {
+            await taskCollaborationService.setPrimaryCollaborator(workDate, taskIdNum, Number(sourceCleanerId));
+          }
+        }
+      } catch (primaryErr) {
+        console.warn("⚠️ Swap: errore nel ripristino primary (best-effort):", primaryErr);
+      }
 
       console.log(`✅ Task scambiate tra cleaner ${sourceCleanerId} e cleaner ${destCleanerId}`);
       res.json({
