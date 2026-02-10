@@ -2159,9 +2159,12 @@ export default function TimelineView({
             )}
 
             {/* Riga finale con pulsanti */}
-            <div className="flex mb-2">
+            <div className="flex items-stretch mb-2 h-[44px]">
               {/* Pulsante + sotto il nome dell'ultimo cleaner */}
-              <div className="flex-shrink-0 p-1 flex items-center justify-center border border-border" style={{ width: `${cleanerColumnWidth}px` }}>
+              <div
+                className="flex-shrink-0 p-1 flex items-center justify-center border border-border h-full"
+                style={{ width: `${cleanerColumnWidth}px` }}
+              >
                 <Button
                   onClick={() => {
                     setCleanerToReplace(null);
@@ -2176,7 +2179,7 @@ export default function TimelineView({
                 </Button>
               </div>
               {/* Pulsanti nella riga finale */}
-              <div className="flex-1 p-1 border-t border-border flex gap-2">
+              <div className="flex-1 p-1 border-t border-border flex gap-2 h-full">
                 {!isReadOnly && (
                   <div
                     className="flex-1 h-full flex items-center justify-center gap-2 px-4 py-2 rounded-md border-2 border-custom-blue bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200"
