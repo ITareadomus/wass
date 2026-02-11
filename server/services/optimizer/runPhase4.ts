@@ -434,6 +434,59 @@ async function updateUnassigned(
   return remainUnassigned.length;
 }
 
+async function loadAnchorTasksFromTimeline(
+  workDate: string,
+  taskIds: number[]
+): Promise<Map<number, TaskForScheduling>> {
+  if (taskIds.length === 0) return new Map();
+
+  const uniqueIds = Array.from(new Set(taskIds)).filter(n => Number.isFinite(n));
+  if (uniqueIds.length === 0) return new Map();
+
+  // Load from daily_assignments_current (timeline) to build previousTask anchors
+  const result = await pool.query(`
+    SELECT
+      task_id,
+      logistic_code,
+      lat,
+      lng,
+      COALESCE(base_cleaning_time, cleaning_time, 60) as cleaning_time_minutes,
+      checkout_time,
+      checkin_time,
+      checkin_date::text as checkin_date,
+      priority,
+      straordinaria,
+      COALESCE(premium, false) as premium,
+      COALESCE(type_apt, 'C') as type_apt
+    FROM daily_assignments_current
+    WHERE work_date = $1
+      AND task_id = ANY($2::int[])
+  `, [workDate, uniqueIds]);
+
+  const map = new Map<number, TaskForScheduling>();
+  for (const row of result.rows) {
+    const checkinDateStr: string | null = row.checkin_date || null;
+
+    // Note: anchors may have missing coords; we still store them and phase4 will use them if valid.
+    map.set(row.task_id, {
+      taskId: row.task_id,
+      logisticCode: row.logistic_code,
+      lat: row.lat !== null ? parseFloat(row.lat) : (null as any),
+      lng: row.lng !== null ? parseFloat(row.lng) : (null as any),
+      cleaningTimeMinutes: parseInt(row.cleaning_time_minutes, 10) || 60,
+      checkoutTime: row.checkout_time,
+      checkinTime: row.checkin_time,
+      checkinDate: checkinDateStr,
+      priorityType: mapPriorityType(row.priority),
+      straordinaria: row.straordinaria === true,
+      premium: row.premium === true,
+      typeApt: row.type_apt
+    });
+  }
+
+  return map;
+}
+
 export interface RunPhase4Options {
   params?: Partial<Phase4Params>;
   timelineContext?: TimelineContext;
@@ -504,6 +557,66 @@ export async function runPhase4(
       loadPriorityStartWindows(resolvedRunId),
       loadLockedCleanerIds(resolvedWorkDate)
     ]);
+
+    // MERGE append-only: enrich schedules with immutable timeline anchors and fixed stats.
+    // This preserves manual work and makes Phase4 compute travel/time from the last fixed task.
+    if (fullParams.appendOnly === true && timelineContext) {
+      const anchorTaskIds: number[] = [];
+      timelineContext.lastFixedByCleaner.forEach((last) => {
+        if (last?.taskId) anchorTaskIds.push(Number(last.taskId));
+      });
+
+      const anchorTasks = await loadAnchorTasksFromTimeline(resolvedWorkDate, anchorTaskIds);
+      anchorTasks.forEach((t, id) => {
+        if (!tasksMap.has(id)) tasksMap.set(id, t);
+      });
+
+      for (const schedule of schedules) {
+        const lastFixed = timelineContext.lastFixedByCleaner.get(schedule.cleanerId);
+        const fixedStats = timelineContext.fixedStatsByCleaner.get(schedule.cleanerId);
+
+        if (fixedStats) {
+          (schedule as any).fixedTaskCount = fixedStats.fixedTaskCount;
+          (schedule as any).fixedWorkMinutes = fixedStats.fixedWorkMinutes;
+          (schedule as any).fixedTravelMinutes = fixedStats.fixedTravelMinutes;
+          (schedule as any).fixedHasAnyOT = fixedStats.fixedHasAnyOT;
+          (schedule as any).fixedHasLongOT = fixedStats.fixedHasLongOT;
+        }
+
+        if (lastFixed?.endTime) {
+          // Start appending after the last fixed task time (prefer endTime, fallback to startTime already handled in context)
+          // If endTime is empty string, we keep the cleaner startTime.
+          if (String(lastFixed.endTime).trim()) {
+            schedule.startTime = String(lastFixed.endTime).slice(0, 5);
+          }
+
+          let anchor = tasksMap.get(lastFixed.taskId) || null;
+          if (!anchor) {
+            // Build minimal anchor from context if DB row missing
+            anchor = {
+              taskId: lastFixed.taskId,
+              logisticCode: lastFixed.logisticCode,
+              lat: lastFixed.lat as any,
+              lng: lastFixed.lng as any,
+              cleaningTimeMinutes: lastFixed.baseCleaningTimeMinutes ?? lastFixed.cleaningTimeMinutes ?? 60,
+              checkoutTime: null,
+              checkinTime: null,
+              checkinDate: null,
+              priorityType: null,
+              straordinaria: lastFixed.straordinaria,
+              premium: false,
+              typeApt: 'C'
+            };
+          } else {
+            // Ensure coords exist: if the anchor row in DB missed coords, fall back to context coords.
+            if (!Number.isFinite(anchor.lat as any) && lastFixed.lat !== null) (anchor as any).lat = lastFixed.lat;
+            if (!Number.isFinite(anchor.lng as any) && lastFixed.lng !== null) (anchor as any).lng = lastFixed.lng;
+          }
+
+          (schedule as any).anchorTask = anchor;
+        }
+      }
+    }
 
     result.schedulesLoaded = schedules.length;
     result.unassignedLoaded = unassignedTasks.length;

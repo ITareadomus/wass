@@ -8,6 +8,7 @@ import { runPhase4, Phase4RunResult } from './runPhase4';
 import { createRun, updateRunStatus, OptimizerRun } from './db';
 import { DEFAULT_PHASE1_PARAMS } from './phase1';
 import { calculateDynamicLimits } from './phase2';
+import path from 'path';
 
 export interface UnassignedBreakdown {
   taskId: number;
@@ -15,6 +16,72 @@ export interface UnassignedBreakdown {
   isStraordinaria: boolean;
   reason: string;
   compatibleCleanersCount: number;
+}
+
+type PythonRecalcTask = {
+  task_id: number;
+  logistic_code: number;
+  sequence: number;
+  cleaning_time: number;
+  address: string | null;
+  lat: number | string | null;
+  lng: number | string | null;
+  start_time: string | null;
+  end_time: string | null;
+  travel_time: number | null;
+};
+
+async function recalculateCleanerTimesViaPython(cleanerData: any): Promise<any> {
+  const { spawn } = await import('child_process');
+
+  return await new Promise((resolve, reject) => {
+    const scriptPath = path.join(process.cwd(), 'client/public/scripts/recalculate_times.py');
+    const cleanerDataJson = JSON.stringify(cleanerData);
+
+    const pythonProcess = spawn('python3', [scriptPath], {
+      stdio: ['pipe', 'pipe', 'pipe']
+    });
+
+    let stdout = '';
+    let stderr = '';
+
+    pythonProcess.stdout.on('data', (data) => {
+      stdout += data.toString();
+    });
+
+    pythonProcess.stderr.on('data', (data) => {
+      stderr += data.toString();
+    });
+
+    pythonProcess.on('close', (code) => {
+      if (code !== 0) {
+        reject(new Error(`Python script exited with code ${code}: ${stderr}`));
+        return;
+      }
+
+      try {
+        const result = JSON.parse(stdout);
+        if (!result.success) {
+          reject(new Error(result.error || 'Unknown error from Python script'));
+          return;
+        }
+        resolve(result.cleaner_data);
+      } catch (parseError: any) {
+        reject(new Error(`Failed to parse Python output: ${parseError.message}`));
+      }
+    });
+
+    pythonProcess.on('error', (error) => {
+      reject(new Error(`Failed to spawn Python process: ${error.message}`));
+    });
+
+    try {
+      pythonProcess.stdin.write(cleanerDataJson);
+      pythonProcess.stdin.end();
+    } catch (writeError: any) {
+      reject(new Error(`Failed to write to Python process: ${writeError.message}`));
+    }
+  });
 }
 
 export interface AllPhasesRunResult {
@@ -117,6 +184,66 @@ export async function runAllPhases(
     const numCleaners = cleanersRes.rows[0]?.cleaners?.length || 1;
     const totalTasks = result.phase0.unlockedTasks;
     const dynamicLimits = calculateDynamicLimits(totalTasks, numCleaners);
+
+    const mergeMode = (result.phase0?.timelineContext?.alreadyOnTimelineTaskIds?.size ?? 0) > 0;
+    if (mergeMode) {
+      console.log(`[runAllPhases] MERGE MODE (append-only): preserving existing timeline, assigning remaining tasks after anchors`);
+
+      // In MERGE append-only we skip phases 1-3 (which may insert before/around fixed blocks)
+      // and directly use Phase 4 algorithm with append-only + anchorTask support.
+      result.phase1 = null;
+      result.phase2 = null;
+      result.phase3 = null;
+
+      if (!skipPhase4) {
+        console.log(`[runAllPhases] === PHASE 4 (MERGE APPEND-ONLY): Assignment ===`);
+        result.phase4 = await runPhase4(workDate, runId, {
+          params: {
+            dynamicMaxTasks: dynamicLimits.baseMax,
+            appendOnly: true
+          },
+          timelineContext: result.phase0?.timelineContext
+        });
+        if (result.phase4.status === 'failed') {
+          console.warn(`[runAllPhases] Phase 4 failed (non-critical): ${result.phase4.error}`);
+        } else {
+          console.log(`[runAllPhases] Phase 4 complete: inserted=${result.phase4.insertedCount}, single=${result.phase4.singleAssignedCount}, remaining=${result.phase4.remainUnassignedCount}`);
+        }
+      }
+
+      const assignmentCount = await pool.query(`
+        SELECT COUNT(DISTINCT task_id) as count FROM optimizer.optimizer_assignment WHERE run_id = $1
+      `, [runId]);
+      const unassignedCount = await pool.query(`
+        SELECT COUNT(*) as count FROM optimizer.optimizer_unassigned WHERE run_id = $1
+      `, [runId]);
+      const cleanerCount = await pool.query(`
+        SELECT COUNT(DISTINCT cleaner_id) as count FROM optimizer.optimizer_assignment WHERE run_id = $1
+      `, [runId]);
+
+      result.summary = {
+        totalTasksProcessed: result.phase0?.unlockedTasks || 0,
+        tasksAssigned: parseInt(assignmentCount.rows[0]?.count || '0'),
+        tasksUnassigned: parseInt(unassignedCount.rows[0]?.count || '0'),
+        cleanersUsed: parseInt(cleanerCount.rows[0]?.count || '0')
+      };
+
+      // === METRICHE DETTAGLIATE ===
+      await collectDetailedMetrics(runId, workDate, result);
+
+      if (applyToProduction) {
+        console.log(`[runAllPhases] === APPLYING TO PRODUCTION ===`);
+        const applyResult = await applyOptimizerToProduction(runId, workDate);
+        console.log(`[runAllPhases] Applied ${applyResult.insertedCount} assignments to production`);
+      }
+
+      result.status = 'success';
+      await updateRunStatus(runId, 'success', result.summary);
+
+      result.totalDurationMs = Date.now() - startTime;
+      console.log(`[runAllPhases] Complete in ${result.totalDurationMs}ms - Status: ${result.status}`);
+      return result;
+    }
     
     // Phase 1: usa maxGroupSize = baseMax + 1 per permettere gruppi più grandi
     // Il bonus travel viene applicato per-cleaner in Phase 2/4
@@ -421,11 +548,23 @@ export async function applyOptimizerToProduction(
   try {
     await client.query('BEGIN');
 
+    // Ensure PK sequence is aligned. If the table was bulk-loaded with explicit IDs
+    // (or restored), the underlying sequence can lag behind and generate duplicates.
+    // This would break MERGE MODE inserts with "duplicate key ... daily_assignments_current_pkey".
+    await client.query(`
+      SELECT setval(
+        pg_get_serial_sequence('daily_assignments_current', 'id'),
+        (SELECT COALESCE(MAX(id), 0) FROM daily_assignments_current),
+        true
+      )
+    `);
+
     const existingTasksResult = await client.query(`
       SELECT DISTINCT task_id::text FROM daily_assignments_current WHERE work_date = $1
     `, [workDate]);
     const existingTaskIds = new Set(existingTasksResult.rows.map(r => r.task_id));
     console.log(`[applyToProduction] Found ${existingTaskIds.size} existing tasks in timeline (will be preserved)`);
+    const hasExistingTimeline = existingTaskIds.size > 0;
 
     result.deletedCount = 0;
     console.log(`[applyToProduction] MERGE MODE: Skipping delete, preserving existing timeline`);
@@ -469,8 +608,8 @@ export async function applyOptimizerToProduction(
         oa.priority_type as priority,
         oa.start_time::time as start_time,
         oa.end_time::time as end_time,
-        false as followup,
-        oa.sequence,
+        CASE WHEN (bs.base_seq + oa.sequence) > 1 THEN true ELSE false END as followup,
+        (bs.base_seq + oa.sequence) as sequence,
         COALESCE(oa.travel_minutes_from_prev, 0) as travel_time,
         c.name as cleaner_name,
         c.lastname as cleaner_lastname,
@@ -482,6 +621,11 @@ export async function applyOptimizerToProduction(
       FROM optimizer.optimizer_assignment oa
       JOIN daily_containers dc ON dc.task_id = oa.task_id AND dc.work_date = $2
       LEFT JOIN cleaners c ON c.cleaner_id = oa.cleaner_id AND c.work_date = $2
+      LEFT JOIN LATERAL (
+        SELECT COALESCE(MAX(sequence), 0) as base_seq
+        FROM daily_assignments_current dac
+        WHERE dac.work_date = $2 AND dac.cleaner_id = oa.cleaner_id
+      ) bs ON true
       WHERE oa.run_id = $1
         AND oa.task_id NOT IN (
           SELECT task_id FROM daily_task_locks 
@@ -496,6 +640,110 @@ export async function applyOptimizerToProduction(
     const insertResult = await client.query(insertQuery, [runId, workDate]);
     result.insertedCount = insertResult.rowCount || 0;
     console.log(`[applyToProduction] MERGE MODE: Inserted ${result.insertedCount} new assignments (existing preserved)`);
+
+    // IMPORTANT:
+    // - If the day already has manual timeline tasks, we must preserve them (MERGE append-only).
+    //   Therefore we skip the global Python recalculation here, because it can retime/resequence existing rows.
+    // - If there is no pre-existing timeline, recalculation is safe and can normalize timings.
+    if (!hasExistingTimeline) {
+      try {
+        const affectedCleanersResult = await client.query(
+          `SELECT DISTINCT cleaner_id FROM optimizer.optimizer_assignment WHERE run_id = $1`,
+          [runId]
+        );
+        const cleanerIds: number[] = affectedCleanersResult.rows
+          .map((r: any) => Number(r.cleaner_id))
+          .filter((n: number) => Number.isFinite(n));
+
+        for (const cleanerId of cleanerIds) {
+          const tasksResult = await client.query(
+            `SELECT task_id, logistic_code, cleaner_id,
+                    sequence, cleaning_time, address, lat, lng,
+                    start_time, end_time, travel_time
+             FROM daily_assignments_current
+             WHERE work_date = $1 AND cleaner_id = $2
+             ORDER BY sequence`,
+            [workDate, cleanerId]
+          );
+
+          if (tasksResult.rows.length === 0) continue;
+
+          const startTimeResult = await client.query(
+            `SELECT COALESCE(start_time, '10:00') as start_time
+             FROM cleaners
+             WHERE work_date = $1 AND cleaner_id = $2
+             LIMIT 1`,
+            [workDate, cleanerId]
+          );
+          const cleanerStartTime = startTimeResult.rows[0]?.start_time || '10:00';
+
+          const cleanerData = {
+            cleaner: { id: cleanerId, start_time: cleanerStartTime },
+            tasks: tasksResult.rows.map((r: any): PythonRecalcTask => ({
+              task_id: Number(r.task_id),
+              logistic_code: Number(r.logistic_code),
+              sequence: Number(r.sequence),
+              cleaning_time: Number(r.cleaning_time) || 0,
+              address: r.address ?? null,
+              lat: r.lat ?? null,
+              lng: r.lng ?? null,
+              start_time: r.start_time ?? null,
+              end_time: r.end_time ?? null,
+              travel_time: r.travel_time ?? null
+            }))
+          };
+
+          const updatedCleanerData = await recalculateCleanerTimesViaPython(cleanerData);
+          const recalculatedTasks = Array.isArray(updatedCleanerData?.tasks) ? updatedCleanerData.tasks : [];
+
+          const toMinutes = (t?: string | null): number => {
+            if (!t) return Number.POSITIVE_INFINITY;
+            const parts = String(t).split(':');
+            if (parts.length < 2) return Number.POSITIVE_INFINITY;
+            const h = parseInt(parts[0], 10);
+            const m = parseInt(parts[1], 10);
+            if (!Number.isFinite(h) || !Number.isFinite(m)) return Number.POSITIVE_INFINITY;
+            return h * 60 + m;
+          };
+
+          const orderedTasks = [...recalculatedTasks].sort((a: any, b: any) => {
+            const ma = toMinutes(a.start_time);
+            const mb = toMinutes(b.start_time);
+            if (ma !== mb) return ma - mb;
+            const sa = Number(a.sequence);
+            const sb = Number(b.sequence);
+            if (Number.isFinite(sa) && Number.isFinite(sb) && sa !== sb) return sa - sb;
+            return Number(a.task_id) - Number(b.task_id);
+          });
+
+          for (let i = 0; i < orderedTasks.length; i++) {
+            const task = orderedTasks[i];
+            const newSeq = i + 1;
+            const followup = newSeq > 1;
+            await client.query(
+              `UPDATE daily_assignments_current
+               SET start_time = $1, end_time = $2, travel_time = $3, sequence = $4, followup = $5
+               WHERE work_date = $6 AND cleaner_id = $7 AND task_id = $8`,
+              [
+                task.start_time,
+                task.end_time,
+                task.travel_time,
+                newSeq,
+                followup,
+                workDate,
+                cleanerId,
+                task.task_id
+              ]
+            );
+          }
+        }
+        console.log(`[applyToProduction] Recalculated travel/start/end times for ${cleanerIds.length} cleaners`);
+      } catch (recalcError: any) {
+        console.warn(`[applyToProduction] Warning: failed to recalculate travel times: ${recalcError.message}`);
+      }
+    } else {
+      console.log(`[applyToProduction] MERGE append-only: skipping global recalculation to preserve manual timeline`);
+    }
 
     // Get next revision number for history table
     const historyRevisionResult = await client.query(

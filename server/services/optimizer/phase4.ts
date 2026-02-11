@@ -13,6 +13,8 @@ export interface Phase4Params {
   maxInsertionAttempts: number;
   underfilledBonus: number;
   singleAssignmentPenalty: number;
+  // MERGE append-only: only allow insert at end (never between tasks)
+  appendOnly?: boolean;
   // Penalità per task non assegnati (sistema progressivo)
   baseUnassignedPenalty: number;       // Penalità base per ogni task normale non assegnato
   straordinariaExtraPenalty: number;   // Penalità extra per straordinarie non assegnate
@@ -37,6 +39,7 @@ export const DEFAULT_PHASE4_PARAMS: Phase4Params = {
   maxInsertionAttempts: 1000,
   underfilledBonus: 5,
   singleAssignmentPenalty: 20,
+  appendOnly: false,
   // Penalità per task non assegnati
   baseUnassignedPenalty: 1500,         // Ogni task non assegnato costa 1500
   straordinariaExtraPenalty: 2500,     // Extra per OT → totale 4000
@@ -63,6 +66,15 @@ export interface CleanerSchedule {
   totalTravel: number;
   totalWait: number;
   totalPriorityPenalty: number;
+  // MERGE append-only: fixed (manual) workload that must remain immutable.
+  // These minutes are included only for fairness / constraints, NOT for deltaTravel computations.
+  fixedTaskCount?: number;
+  fixedWorkMinutes?: number;
+  fixedTravelMinutes?: number;
+  fixedHasAnyOT?: boolean;
+  fixedHasLongOT?: boolean;
+  // Anchor task (last fixed task) used to compute travel to first appended task.
+  anchorTask?: TaskForScheduling | null;
   // Dati per vincoli hard (opzionali per retrocompatibilità)
   role?: string;
   contractType?: string;
@@ -196,6 +208,10 @@ function checkHardConstraints(
 ): HardConstraintResult {
   const cleanerRole = schedule.role || 'Standard';
   const normalizedRole = normalizeCleanerRole(cleanerRole);
+  const fixedCount = schedule.fixedTaskCount ?? 0;
+  const totalExistingCount = fixedCount + (schedule.tasks?.length ?? 0);
+  const fixedHasAnyOT = schedule.fixedHasAnyOT === true;
+  const fixedHasLongOT = schedule.fixedHasLongOT === true;
   
   // 0. Verifica premium: task premium richiede cleaner Premium
   if (task.premium && normalizedRole !== 'premium_cleaner') {
@@ -217,12 +233,16 @@ function checkHardConstraints(
     const taskDurationMin = task.cleaningTimeMinutes || 60;
     
     // OT lunga (≥6h = 360min) deve essere sola
-    if (taskDurationMin >= 360 && schedule.tasks.length > 0) {
+    if (taskDurationMin >= 360 && totalExistingCount > 0) {
       return { compatible: false, reason: 'LONG_OT_MUST_BE_ALONE' };
     }
     
     // OT corta: cleaner può avere max 1 altro task (che non sia OT e ≤2h)
-    if (taskDurationMin < 360 && schedule.tasks.length > 0) {
+    if (taskDurationMin < 360 && totalExistingCount > 0) {
+      // Se esiste già una OT fissa in timeline, non possiamo aggiungere un'altra OT
+      if (fixedHasAnyOT) {
+        return { compatible: false, reason: 'ALREADY_HAS_OT' };
+      }
       // Conta quanti task non-OT ha già il cleaner
       const existingTasks = schedule.tasks.map(t => tasksMap.get(t.taskId)).filter(Boolean);
       const existingOTs = existingTasks.filter(t => t?.straordinaria);
@@ -262,6 +282,41 @@ function checkHardConstraints(
   const existingTasks = schedule.tasks.map(t => tasksMap.get(t.taskId)).filter(Boolean);
   const existingOTs = existingTasks.filter(t => t?.straordinaria);
   
+  // Se in timeline esiste una OT lunga fissa, non aggiungere nulla (append-only non deve violare)
+  if (fixedHasLongOT) {
+    return { compatible: false, reason: 'CLEANER_HAS_LONG_OT' };
+  }
+
+  // Se c'è una OT fissa (short) in timeline, applichiamo una regola conservativa:
+  // - non aggiungere altre OT
+  // - aggiungere un extra SOLO se l'ancora è proprio la OT (così possiamo stimare distanza)
+  if (fixedHasAnyOT && existingOTs.length === 0) {
+    if (task.straordinaria) {
+      return { compatible: false, reason: 'CANNOT_ADD_OT_TO_OT_CLEANER' };
+    }
+    // Se il cleaner ha già >=2 task fisse, significa che ha già extra oltre alla OT → non aggiungere altro
+    if (fixedCount >= 2) {
+      return { compatible: false, reason: 'CLEANER_HAS_OT_MAX_REACHED' };
+    }
+    const newTaskDuration = task.cleaningTimeMinutes || 60;
+    if (newTaskDuration > 120) {
+      return { compatible: false, reason: 'EXTRA_TASK_EXCEEDS_2H' };
+    }
+    // Possiamo stimare travel solo se l'anchor è la OT con coordinate
+    const otAnchor = schedule.anchorTask;
+    if (!otAnchor || otAnchor.straordinaria !== true) {
+      return { compatible: false, reason: 'CLEANER_HAS_OT_ANCHOR_UNKNOWN' };
+    }
+    if (typeof otAnchor.lat !== 'number' || typeof otAnchor.lng !== 'number') {
+      return { compatible: false, reason: 'CLEANER_HAS_OT_MISSING_COORDS' };
+    }
+    const travelToOT = estimateTravelMinutes(task as TaskInput, otAnchor as any as TaskInput);
+    if (travelToOT > 25) {
+      return { compatible: false, reason: 'OT_SHORT_EXTRA_TOO_FAR' };
+    }
+    return { compatible: true };
+  }
+
   if (existingOTs.length > 0) {
     const otTask = existingOTs[0]!;
     const otDuration = otTask.cleaningTimeMinutes || 60;
@@ -354,10 +409,12 @@ function tryInsertTask(
   params: Phase4Params,
   targets: MinutesBasedTargets,
   relaxLevel: number = 0,
-  timelineConstraints: Phase3TimelineConstraints | null = null
+  timelineConstraints: Phase3TimelineConstraints | null = null,
+  previousTask: TaskForScheduling | null = null
 ): InsertionCandidate {
   const constraints = getRelaxConstraints(relaxLevel);
-  const newTaskCount = schedule.tasks.length + 1;
+  const fixedCount = schedule.fixedTaskCount ?? 0;
+  const newTaskCount = fixedCount + schedule.tasks.length + 1;
   
   // =====================================================
   // VINCOLI HARD: compatibilità cleaner-task, regole OT
@@ -401,7 +458,7 @@ function tryInsertTask(
     allTasksForSim,
     schedule.startTime,
     tasksMap,
-    null,
+    previousTask,
     priorityWindows,
     timelineConstraints
   );
@@ -490,14 +547,14 @@ function tryInsertTask(
   }
   
   let underfilledBonus = 0;
-  if (schedule.tasks.length === 0) {
+  if (fixedCount + schedule.tasks.length === 0) {
     underfilledBonus = params.underfilledBonus;
   }
   
   // FAIRNESS SCORING (minutes-based, consistent with Phase 2)
   const { fairness } = params;
-  const currentWorkMinutes = schedule.totalWorkMinutes ?? 0;
-  const currentTravelMinutes = schedule.totalTravel ?? 0;
+  const currentWorkMinutes = (schedule.fixedWorkMinutes ?? 0) + (schedule.totalWorkMinutes ?? 0);
+  const currentTravelMinutes = (schedule.fixedTravelMinutes ?? 0) + (schedule.totalTravel ?? 0);
   const currentLoadMin = currentWorkMinutes + fairness.wT * currentTravelMinutes;
   
   const newTaskDuration = task.cleaningTimeMinutes ?? 60;
@@ -542,7 +599,9 @@ function applyInsertion(
   position: number,
   workDate: string,
   tasksMap: Map<number, TaskForScheduling>,
-  priorityWindows: PriorityWindows | null
+  priorityWindows: PriorityWindows | null,
+  previousTask: TaskForScheduling | null = null,
+  timelineConstraints: Phase3TimelineConstraints | null = null
 ): CleanerSchedule {
   const allTasksForSim: TaskForScheduling[] = [];
   
@@ -563,9 +622,16 @@ function applyInsertion(
     allTasksForSim,
     schedule.startTime,
     tasksMap,
-    null,
-    priorityWindows
+    previousTask,
+    priorityWindows,
+    timelineConstraints
   );
+
+  // This should not happen if tryInsertTask was feasible with the same parameters.
+  // If it does, fail fast to avoid silently dropping tasks from schedules.
+  if (!simResult.ok) {
+    throw new Error(simResult.failReason || 'APPLY_INSERTION_SIMULATION_FAILED');
+  }
   
   // Calcola totalWorkMinutes dalla somma delle durate dei task
   const totalWorkMinutes = allTasksForSim.reduce(
@@ -582,6 +648,12 @@ function applyInsertion(
     totalTravel: simResult.totalTravel,
     totalWait: simResult.totalWait,
     totalPriorityPenalty: simResult.totalPriorityPenalty,
+    fixedTaskCount: schedule.fixedTaskCount,
+    fixedWorkMinutes: schedule.fixedWorkMinutes,
+    fixedTravelMinutes: schedule.fixedTravelMinutes,
+    fixedHasAnyOT: schedule.fixedHasAnyOT,
+    fixedHasLongOT: schedule.fixedHasLongOT,
+    anchorTask: schedule.anchorTask,
     // Preserva i dati per vincoli hard
     role: schedule.role,
     contractType: schedule.contractType,
@@ -653,7 +725,7 @@ function trySwapForTask(
         tasksForSim,
         schedule.startTime,
         tasksMap,
-        null,
+        schedule.anchorTask ?? null,
         priorityWindows
       );
       
@@ -668,7 +740,9 @@ function trySwapForTask(
       const newTaskCount = tasksForSim.length;
       let dynamicMaxLoad: number;
       if (params.dynamicMaxTasks !== undefined) {
-        const avgTravelAfterSwap = newTaskCount > 0 ? simResult.totalTravel / newTaskCount : Infinity;
+        const fixedCount = schedule.fixedTaskCount ?? 0;
+        const totalCountAfterSwap = fixedCount + newTaskCount;
+        const avgTravelAfterSwap = totalCountAfterSwap > 0 ? simResult.totalTravel / totalCountAfterSwap : Infinity;
         const travelBonus = avgTravelAfterSwap <= 10 ? 1 : 0;
         dynamicMaxLoad = params.dynamicMaxTasks + travelBonus;
       } else {
@@ -719,6 +793,12 @@ function trySwapForTask(
               totalTravel: simResult.totalTravel,
               totalWait: simResult.totalWait,
               totalPriorityPenalty: simResult.totalPriorityPenalty,
+              fixedTaskCount: schedule.fixedTaskCount,
+              fixedWorkMinutes: schedule.fixedWorkMinutes,
+              fixedTravelMinutes: schedule.fixedTravelMinutes,
+              fixedHasAnyOT: schedule.fixedHasAnyOT,
+              fixedHasLongOT: schedule.fixedHasLongOT,
+              anchorTask: schedule.anchorTask,
               // Preserva i dati per vincoli hard
               role: schedule.role,
               contractType: schedule.contractType,
@@ -763,7 +843,8 @@ function trySingleAssignment(
       params,
       targets,
       relaxLevel,
-      cleanerConstraints
+      cleanerConstraints,
+      schedule.anchorTask ?? null
     );
     
     if (candidate.feasible) {
@@ -776,7 +857,9 @@ function trySingleAssignment(
           position,
           workDate,
           tasksMap,
-          priorityWindows
+          priorityWindows,
+          schedule.anchorTask ?? null,
+          cleanerConstraints
         );
         
         bestOption = {
@@ -866,7 +949,7 @@ export function runPhase4Algorithm(
   const taskResults: Phase4TaskResult[] = [];
   let schedules = [...initialSchedules];
   const lockedSet = new Set(lockedCleanerIds);
-  const assignableSchedules = schedules.filter(s => !lockedSet.has(s.cleanerId));
+  const getAssignableSchedules = () => schedules.filter(s => !lockedSet.has(s.cleanerId));
   
   let insertedCount = 0;
   let singleAssignedCount = 0;
@@ -890,10 +973,22 @@ export function runPhase4Algorithm(
     if (!task) continue;
     
     let compatibleCount = 0;
-    for (const schedule of assignableSchedules) {
+    for (const schedule of getAssignableSchedules()) {
       // Conta solo se almeno 1 posizione potrebbe funzionare (approssimativo)
       const cleanerConstraints = constraintsByCleaner.get(String(schedule.cleanerId)) || null;
-      const candidate = tryInsertTask(schedule, task, schedule.tasks.length, workDate, tasksMap, priorityWindows, params, targets, 0, cleanerConstraints);
+      const candidate = tryInsertTask(
+        schedule,
+        task,
+        schedule.tasks.length,
+        workDate,
+        tasksMap,
+        priorityWindows,
+        params,
+        targets,
+        0,
+        cleanerConstraints,
+        schedule.anchorTask ?? null
+      );
       if (candidate.feasible) compatibleCount++;
     }
     taskScarcity.set(unassigned.taskId, compatibleCount);
@@ -1024,8 +1119,11 @@ export function runPhase4Algorithm(
       
       for (const sIdx of sortedScheduleIndices) {
         const schedule = schedules[sIdx];
-        
-        for (let pos = 0; pos <= schedule.tasks.length; pos++) {
+
+        const startPos = params.appendOnly ? schedule.tasks.length : 0;
+        const endPos = params.appendOnly ? schedule.tasks.length : schedule.tasks.length;
+
+        for (let pos = startPos; pos <= endPos; pos++) {
           iterationsUsed++;
           
           if (iterationsUsed > params.maxInsertionAttempts) {
@@ -1050,7 +1148,8 @@ export function runPhase4Algorithm(
             params,
             targets,
             currentRelaxLevel,
-            cleanerConstraints
+            cleanerConstraints,
+            schedule.anchorTask ?? null
           );
           
           if (candidate.feasible) {
@@ -1066,13 +1165,17 @@ export function runPhase4Algorithm(
       }
       
       if (bestCandidate && bestCandidate.feasible) {
+        const chosenSchedule = schedules[bestScheduleIdx];
+        const chosenConstraints = constraintsByCleaner.get(String(chosenSchedule.cleanerId)) || null;
         const updatedSchedule = applyInsertion(
-          schedules[bestScheduleIdx],
+          chosenSchedule,
           task,
           bestPosition,
           workDate,
           tasksMap,
-          priorityWindows
+          priorityWindows,
+          chosenSchedule.anchorTask ?? null,
+          chosenConstraints
         );
         
         schedules[bestScheduleIdx] = updatedSchedule;
@@ -1106,7 +1209,7 @@ export function runPhase4Algorithm(
       } else {
         const singleResult = trySingleAssignment(
           task,
-          assignableSchedules,
+          getAssignableSchedules(),
           workDate,
           tasksMap,
           priorityWindows,
@@ -1153,7 +1256,7 @@ export function runPhase4Algorithm(
           
           const swapResult = trySwapForTask(
             task,
-            assignableSchedules,
+            getAssignableSchedules(),
             workDate,
             tasksMap,
             priorityWindows,
@@ -1193,6 +1296,23 @@ export function runPhase4Algorithm(
               }
             });
             
+            // CRITICAL: The swapped-out task must be processed again.
+            // If it was previously finalized, un-finalize it and remove the old result entry,
+            // otherwise it would be skipped and become "missing" (neither assigned nor unassigned).
+            if (finalizedTaskIds.has(swapResult.removedTaskId)) {
+              finalizedTaskIds.delete(swapResult.removedTaskId);
+            }
+            const prevIdx = taskResults.findIndex(r => r.taskId === swapResult.removedTaskId && r.status !== 'remain_unassigned');
+            if (prevIdx >= 0) {
+              const prev = taskResults[prevIdx] as any;
+              if (prev?.status === 'single_assigned') {
+                singleAssignedCount = Math.max(0, singleAssignedCount - 1);
+              } else if (prev?.status === 'inserted') {
+                insertedCount = Math.max(0, insertedCount - 1);
+              }
+              taskResults.splice(prevIdx, 1);
+            }
+
             // Il task rimosso torna nella coda di questo livello per essere ri-processato
             levelQueue.push({
               taskId: swapResult.removedTaskId,
