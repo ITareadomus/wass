@@ -1054,62 +1054,69 @@ export default function TaskCard({
                 />
               )}
 
-              {/* Task card con drag handle */}
-              <div {...provided.dragHandleProps}>
-              {/* Task card effettiva */}
-              <TooltipProvider delayDuration={300}>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <div
-                      className={`
-                        ${cardColorClass}
-                        rounded-sm px-2 py-1 shadow-sm transition-all duration-200 border
-                        ${snapshot.isDragging ? "shadow-lg" : ""}
-                        ${isOverdue && isInTimeline ? "animate-blink" : ""}
-                        ${isDuplicate && !isInTimeline ? "animate-blink-yellow" : ""}
-                        ${isPriorityWindowViolation && isInTimeline ? "animate-blink-orange" : ""}
-                        hover:shadow-md cursor-pointer
-                        flex-shrink-0 relative
-                      `}
-                      style={{
-                        width: cardWidth,
-                        minWidth: cardWidth,
-                        maxWidth: cardWidth,
-                        minHeight: "40px",
-                        zIndex: isMapFiltered ? 10 : 'auto',
-                        ...(isHighlighted && !snapshot.isDragging ? {
-                          boxShadow: '0 0 0 3px #FBBF24, 0 0 15px 3px rgba(251, 191, 36, 0.6)',
-                          transform: 'scale(1.02)',
-                        } : {}),
-                        ...(isMapFiltered && !snapshot.isDragging ? {
-                          boxShadow: '0 0 0 3px #3B82F6, 0 0 20px 5px rgba(59, 130, 246, 0.5)',
-                          transform: 'scale(1.05)',
-                        } : {})
-                      }}
-                      data-testid={`task-card-${getTaskKey(task)}`}
-                      onClick={(e) => {
-                        if (!snapshot.isDragging) {
-                          handleCardClick(e);
-                        }
-                      }}
-                    >
-                    {/* Checkbox overlay per multi-select (solo container) */}
-                    {isMultiSelectMode && !isInTimeline && (
-                      <div className="absolute top-0.5 left-0.5 z-50">
-                        <Checkbox
-                          checked={isSelected}
-                          onCheckedChange={() => multiSelectContext?.toggleTask(String(task.id), currentContainer)}
-                          className="w-4 h-4 bg-white border-2 border-sky-600"
-                          data-testid={`checkbox-task-${task.id}`}
-                        />
-                      </div>
-                    )}
+          {/* Task card con drag handle */}
+          <div {...provided.dragHandleProps}>
+            {/* Task card effettiva */}
+            <TooltipProvider delayDuration={300}>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div
+                    className={`
+                      ${cardColorClass}
+                      rounded-sm px-2 py-1 shadow-sm transition-all duration-200 border
+                      ${snapshot.isDragging ? "shadow-lg" : ""}
+                      ${isOverdue && isInTimeline ? "animate-blink" : ""}
+                      ${isDuplicate && !isInTimeline ? "animate-blink-yellow" : ""}
+                      ${isPriorityWindowViolation && isInTimeline ? "animate-blink-orange" : ""}
+                      ${isSelected && isMultiSelectMode && !isInTimeline ? "ring-2 ring-sky-500" : ""}
+                      hover:shadow-md cursor-pointer
+                      flex-shrink-0 relative group
+                    `}
+                    style={{
+                      width: cardWidth,
+                      minWidth: cardWidth,
+                      maxWidth: cardWidth,
+                      minHeight: "40px",
+                      zIndex: isMapFiltered ? 10 : 'auto',
+                      ...(isHighlighted && !snapshot.isDragging ? {
+                        boxShadow: '0 0 0 3px #FBBF24, 0 0 15px 3px rgba(251, 191, 36, 0.6)',
+                        transform: 'scale(1.02)',
+                      } : {}),
+                      ...(isMapFiltered && !snapshot.isDragging ? {
+                        boxShadow: '0 0 0 3px #3B82F6, 0 0 20px 5px rgba(59, 130, 246, 0.5)',
+                        transform: 'scale(1.05)',
+                      } : {})
+                    }}
+                    data-testid={`task-card-${getTaskKey(task)}`}
+                    onClick={(e) => {
+                      if (!snapshot.isDragging) {
+                        handleCardClick(e);
+                      }
+                    }}
+                  >
 
-                    {/* Badge ordine selezione (solo se selezionata) */}
-                    {isSelected && selectionOrder && !isInTimeline && (
-                      <div className="absolute top-0.5 right-0.5 z-50">
-                        <div className="bg-sky-600 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs font-bold">
-                          {selectionOrder}
+                    {/* Selection indicator (top-left) */}
+                    {isMultiSelectMode && !isInTimeline && (
+                      <div className="absolute -top-1.5 -left-1.5 z-[60]">
+                        <div
+                          className={[
+                            "w-5 h-4 rounded-full flex items-center justify-center",
+                            "text-[10px] font-bold leading-none border transition-all duration-150",
+                            isSelected
+                              ? "opacity-100"
+                              : "opacity-0 group-hover:opacity-100",
+                            isSelected
+                              ? "bg-sky-600 text-white border-sky-700 shadow-sm"
+                              : "bg-white/90 text-sky-600 border-sky-600"
+                          ].join(" ")}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            multiSelectContext?.toggleTask(String(task.id), currentContainer);
+                          }}
+                          role="checkbox"
+                          aria-checked={isSelected}
+                        >
+                          {isSelected ? selectionOrder : ""}
                         </div>
                       </div>
                     )}
