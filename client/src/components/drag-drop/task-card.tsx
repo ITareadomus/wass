@@ -1097,10 +1097,10 @@ export default function TaskCard({
 
                     {/* Selection indicator (top-left) */}
                     {isMultiSelectMode && !isInTimeline && (
-                      <div className="absolute -top-1.5 -left-1.5 z-[60]">
+                      <div className="absolute -top-1.5 -left-1 z-[60]">
                         <div
                           className={[
-                            "w-5 h-4 rounded-full flex items-center justify-center",
+                            "w-4 h-4 rounded-full flex items-center justify-center",
                             "text-[10px] font-bold leading-none border-2 transition-all duration-150",
                             isSelected
                               ? "opacity-100"
@@ -1122,43 +1122,69 @@ export default function TaskCard({
                     )}
 
                     {!isConfirmedOperation && !isSelected && (
-                      <div className="absolute top-0.5 right-0.5 z-50">
-                        <HelpCircle
-                          className="w-3 h-3 text-gray-900"
-                          strokeWidth={2.5}
-                        />
+                      <div className="absolute -top-1.5 -right-1.5 z-10">
+                        <div className="w-4 h-4 rounded-full flex items-center justify-center bg-gray-900 text-white border-2 border-gray-800 shadow-md">
+                          <HelpCircle className="w-3 h-3" strokeWidth={2.5} />
+                        </div>
                       </div>
                     )}
 
-                    {/* Frecce check-in e check-out con orari - solo per task >= 1 ora */}
-                    {shouldShowCheckInOutArrows && ((taskWithPendingEdits as any).checkout_time || (taskWithPendingEdits as any).checkin_time || isFutureCheckin) && (
-                      <div className="absolute right-1 top-1/2 -translate-y-1/2 flex flex-col gap-0.5 z-40">
-                        {(taskWithPendingEdits as any).checkout_time && (
-                          <div className="flex items-center gap-0.5">
-                            <span className="font-black text-[15px] text-[#257537]">↑</span>
-                            <span className="text-[11px] text-[#137537] font-bold">{(taskWithPendingEdits as any).checkout_time}</span>
-                          </div>
-                        )}
-                        {((taskWithPendingEdits as any).checkin_time || isFutureCheckin) && (
-                          <div className={`flex items-center ${(taskWithPendingEdits as any).checkin_time ? 'gap-0.5' : 'gap-0'}`}>
-                            {(taskWithPendingEdits as any).checkin_time && !isFutureCheckin && (
-                              <>
-                                <span className="text-red-600 font-black text-[15px]">↓</span>
-                                <span className="text-red-600 text-[11px] font-bold">{(taskWithPendingEdits as any).checkin_time}</span>
-                              </>
+                    {/* Frecce check-in e check-out */}
+                    {shouldShowCheckInOutArrows &&
+                      ((taskWithPendingEdits as any).checkout_time ||
+                        (taskWithPendingEdits as any).checkin_time ||
+                        isFutureCheckin) && (() => {
+                        const hasCheckout = Boolean((taskWithPendingEdits as any).checkout_time);
+                        const hasCheckin = Boolean((taskWithPendingEdits as any).checkin_time) || isFutureCheckin;
+                        const linesCount = (hasCheckout ? 1 : 0) + (hasCheckin ? 1 : 0);
+                        const shouldCenterSingleLine = linesCount === 1;
+
+                        return (
+                          <div
+                            className={[
+                              "absolute right-1 top-[5px] z-40 whitespace-nowrap",
+                              "flex flex-col items-end gap-0.5",
+                              // altezza “slot” da 2 righe: così 1 riga può essere centrata
+                              "min-h-[28px]",
+                              shouldCenterSingleLine ? "justify-center" : "justify-start",
+                            ].join(" ")}
+                          >
+                            {hasCheckout && (
+                              <div className="flex items-center gap-0.5 leading-none">
+                                <span className="font-black text-[15px] leading-none text-[#257537]">↑</span>
+                                <span className="text-[11px] leading-none text-[#137537] font-bold">
+                                  {(taskWithPendingEdits as any).checkout_time}
+                                </span>
+                              </div>
                             )}
-                            {isFutureCheckin && (
-                              <>
-                                <Calendar className="w-3.5 h-3.5 text-red-600" strokeWidth={2.5} />
-                                {(taskWithPendingEdits as any).checkin_time && (
-                                  <span className="text-red-600 text-[11px] font-bold">{(taskWithPendingEdits as any).checkin_time}</span>
+
+                            {hasCheckin && (
+                              <div className="flex items-center gap-0.5 leading-none">
+                                {isFutureCheckin ? (
+                                  <>
+                                    <Calendar className="w-3.5 h-3.5 text-red-600" strokeWidth={2.5} />
+                                    {(taskWithPendingEdits as any).checkin_time && (
+                                      <span className="text-red-600 text-[11px] leading-none font-bold">
+                                        {(taskWithPendingEdits as any).checkin_time}
+                                      </span>
+                                    )}
+                                  </>
+                                ) : (
+                                  (taskWithPendingEdits as any).checkin_time && (
+                                    <>
+                                      <span className="text-red-600 font-black text-[15px] leading-none">↓</span>
+                                      <span className="text-red-600 text-[11px] leading-none font-bold">
+                                        {(taskWithPendingEdits as any).checkin_time}
+                                      </span>
+                                    </>
+                                  )
                                 )}
-                              </>
+                              </div>
                             )}
                           </div>
-                        )}
-                      </div>
-                    )}
+                        );
+                      })()}
+
                     <div
                       className="flex flex-col items-start justify-start h-full gap-0 p-[0.5px] pl-0"
                     >
