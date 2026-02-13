@@ -1101,13 +1101,13 @@ export default function TaskCard({
                         <div
                           className={[
                             "w-5 h-4 rounded-full flex items-center justify-center",
-                            "text-[10px] font-bold leading-none border transition-all duration-150",
+                            "text-[10px] font-bold leading-none border-2 transition-all duration-150",
                             isSelected
                               ? "opacity-100"
                               : "opacity-0 group-hover:opacity-100",
                             isSelected
-                              ? "bg-sky-600 text-white border-sky-700 shadow-sm"
-                              : "bg-white/90 text-sky-600 border-sky-600"
+                            ? "bg-sky-600 text-white border-sky-700 shadow-md"
+                            : "bg-transparent text-sky-600 border-sky-600"                          
                           ].join(" ")}
                           onClick={(e) => {
                             e.stopPropagation();
