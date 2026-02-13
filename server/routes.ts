@@ -11,6 +11,16 @@ import { it } from "date-fns/locale";
 import { formatInTimeZone } from "date-fns-tz";
 import { databaseConfig } from "../config/database";
 
+const isTrue = (v: any) => v === true || v === 1 || v === "1" || v === "true";
+
+const toRomeDatetime = (d: Date) =>
+  formatInTimeZone(d, "Europe/Rome", "yyyy-MM-dd HH:mm:ss");
+
+const toAssignedAtMilliseconds = (d: Date) =>
+  formatInTimeZone(d, "Europe/Rome", "yyyyMMddHHmmss") +
+  String(d.getMilliseconds()).padStart(3, "0") +
+  "000";
+
 // Utility per timestamp in fuso orario di Roma
 const ROME_TIMEZONE = "Europe/Rome";
 function getRomeTimestamp(): string {
@@ -4377,262 +4387,574 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Endpoint rimosso: get-operation-names non più necessario
-
-  // Endpoint per trasferire le assegnazioni a ADAM MySQL (Node.js, non Python)
-  app.post("/api/transfer-to-adam", async (req, res) => {
-    // Helper per convertire date ISO in formato MySQL YYYY-MM-DD
-    const formatDateForMySQL = (dateValue: string | null | undefined): string | null => {
-      if (!dateValue) return null;
-      // Se è già in formato YYYY-MM-DD, restituiscilo
-      if (/^\d{4}-\d{2}-\d{2}$/.test(dateValue)) {
-        return dateValue;
-      }
-      // Se è in formato ISO (2025-12-13T00:00:00.000Z), estrai solo la data
-      if (dateValue.includes('T')) {
-        return dateValue.split('T')[0];
-      }
-      // Prova a parsare come Date
-      try {
-        const d = new Date(dateValue);
-        if (!isNaN(d.getTime())) {
-          return d.toISOString().split('T')[0];
-        }
-      } catch {
-        // ignore
-      }
-      return null;
-    };
-
+// =====================================================
+// ENDPOINT
+// =====================================================
+app.post("/api/transfer-to-adam", async (req, res) => {
+  // Questo helper dipende dall'endpoint (ok tenerlo qui)
+  const formatDateForMySQL = (dateValue?: string | null): string | null => {
+    if (!dateValue) return null;
+    if (/^\d{4}-\d{2}-\d{2}$/.test(dateValue)) return dateValue;
+    if (dateValue.includes("T")) return dateValue.split("T")[0];
     try {
-      const { date, username: reqUsername, pendingTaskEdits = {} } = req.body;
-      const workDate = date || format(new Date(), "yyyy-MM-dd");
-      const username = reqUsername || "system";
+      const d = new Date(dateValue);
+      if (!isNaN(d.getTime())) return d.toISOString().split("T")[0];
+    } catch {
+      // ignore
+    }
+    return null;
+  };
 
-      console.log(`🔄 Trasferimento assegnazioni a ADAM per ${workDate}...`);
+  try {
+    const { date, username: reqUsername, pendingTaskEdits = {} } = req.body;
+    const workDate = date || format(new Date(), "yyyy-MM-dd");
+    const username = reqUsername || "system";
 
-      // CRITICAL: Le modifiche pendenti vengono salvate dal frontend quando viene cliccato il bottone
-      // Il frontend passa le pendingTaskEdits per informazione, ma il salvataggio avviene già sul frontend
-      if (Object.keys(pendingTaskEdits).length > 0) {
-        console.log(`💾 Ricevute ${Object.keys(pendingTaskEdits).length} task modificate da salvare al prossimo trasferimento`);
-      }
+    console.log(`🔄 Trasferimento assegnazioni a ADAM per ${workDate}...`);
 
-      // Carica timeline da PostgreSQL
-      const timelineData = await workspaceFiles.loadTimeline(workDate);
-      if (!timelineData || !timelineData.cleaners_assignments || timelineData.cleaners_assignments.length === 0) {
-        console.log("⚠️ Nessuna assegnazione trovata per il trasferimento");
-        return res.json({
-          success: false,
-          message: "Nessuna assegnazione trovata nella timeline"
-        });
-      }
-
-      // Crea sempre una revision per tracciare il trasferimento ADAM (per il timestamp)
-      const { pgDailyAssignmentsService } = await import("./services/pg-daily-assignments-service");
-      let revisionCreated = false;
-      
-      // Crea sempre una nuova revision per registrare il timestamp del trasferimento ADAM
-      console.log(`📝 Creazione revision per trasferimento ADAM da utente: ${username}`);
-      await pgDailyAssignmentsService.saveToHistory(
-        workDate, 
-        timelineData, 
-        username, 
-        'transfer_to_adam',
-        [],
-        [],
-        []
+    if (Object.keys(pendingTaskEdits).length > 0) {
+      console.log(
+        `💾 Ricevute ${Object.keys(pendingTaskEdits).length} task modificate (già salvate dal frontend)`
       );
-      revisionCreated = true;
+    }
 
-      // Recupera adam_id dell'utente per usarlo come updated_by
-      const { pgUsersService } = await import("./services/pg-users-service");
-      const userRecord = await pgUsersService.getUserByUsername(username);
-      const adamUpdatedBy = userRecord?.adam_id ? `E${userRecord.adam_id}` : username;
-      console.log(`📝 updated_by per ADAM: ${adamUpdatedBy} (adam_id: ${userRecord?.adam_id || 'N/A'})`);
-
-      // Connessione MySQL a ADAM
-      let connection: any = null;
-      let totalUpdated = 0;
-      let totalErrors = 0;
-      const errors: string[] = [];
-
-      try {
-        connection = await mysql.createConnection({
-          host: databaseConfig.mysql.host,
-          port: databaseConfig.mysql.port,
-          user: databaseConfig.mysql.user,
-          password: databaseConfig.mysql.password,
-          database: databaseConfig.mysql.database,
-        });
-        console.log("✅ Connessione MySQL ADAM stabilita");
-      } catch (dbError: any) {
-        console.error("❌ Errore connessione ADAM MySQL:", dbError.message);
-        return res.json({
-          success: false,
-          message: `Errore connessione database ADAM: ${dbError.message}`
-        });
-      }
-
-      try {
-        // Itera su cleaners e tasks
-        for (const cleanerEntry of timelineData.cleaners_assignments) {
-          const cleanerId = cleanerEntry.cleaner?.id;
-          const tasks = cleanerEntry.tasks || [];
-
-          for (const task of tasks) {
-            try {
-              const taskId = task.task_id;
-              if (!taskId) continue;
-
-              const now = new Date();
-              const assignedAtUs = formatInTimeZone(now, ROME_TIMEZONE, 'yyyy-MM-dd HH:mm:ss');
-              const assignedAtMilliseconds = formatInTimeZone(now, ROME_TIMEZONE, 'yyyyMMddHHmmss') + 
-                String(now.getMilliseconds()).padStart(3, '0') + '000';
-
-              const query = `
-                UPDATE app_housekeeping
-                SET 
-                  checkout = ?,
-                  checkout_time = ?,
-                  checkin = ?,
-                  checkin_time = ?,
-                  checkin_pax = ?,
-                  operation_id = ?,
-                  cleaned_by_us = ?,
-                  sequence = ?,
-                  updated_by = ?,
-                  updated_at = ?,
-                  assigned_at_us = ?,
-                  assigned_at_milliseconds = ?,
-                  collaboration = ?,
-                  collaboration_by = ?,
-                  collaboration_at = ?,
-                  collaboration_bypass = ?,
-                  helpwork = ?,
-                  helpwork_by = ?,
-                  helpwork_at = ?,
-                  startwork = ?,
-                  startwork_at = ?,
-                  startreport = ?,
-                  startreport_at = ?,
-                  extratimes = ?
-                WHERE id = ?
-              `;
-
-              const values = [
-                formatDateForMySQL(task.checkout_date),
-                task.checkout_time ?? null,
-                formatDateForMySQL(task.checkin_date),
-                task.checkin_time ?? null,
-                task.pax_in ?? null,
-                task.operation_id ?? null,
-                cleanerId ?? null,
-                task.sequence ?? null,
-                adamUpdatedBy,
-                getRomeTimestamp().replace('T', ' ').substring(0, 19),
-                assignedAtUs,
-                assignedAtMilliseconds,
-                0,
-                0,
-                null,
-                0,
-                0,
-                0,
-                null,
-                0,
-                null,
-                0,
-                null,
-                ''
-              ];
-
-              await connection.execute(query, [...values, taskId]);
-
-              // Annulla le collaborazioni assegnate
-              await connection.execute(
-                'DELETE FROM housekeeping_collaborations WHERE housekeeping_id = ?',
-                [taskId]
-              );
-
-              // Annulla i tempi extra assegnati
-              await connection.execute(
-                'DELETE FROM housekeeping_extratimes WHERE housekeeping_id = ?',
-                [taskId]
-              );
-
-              totalUpdated++;
-              console.log(`✅ Task ${task.logistic_code} (ID: ${taskId}) trasferita su ADAM`);
-
-            } catch (taskError: any) {
-              totalErrors++;
-              const errorMsg = `Task ${task.logistic_code}: ${taskError.message}`;
-              errors.push(errorMsg);
-              console.error(`❌ ${errorMsg}`);
-            }
-          }
-        }
-
-        // Se tutti gli aggiornamenti sono andati a buon fine e la data è oggi, notifica ADAM API
-        let apiNotified = false;
-        const today = format(new Date(), "yyyy-MM-dd");
-        const isToday = workDate === today;
-        
-        // Controllo orario: solo 7:00-10:00 AM timezone Roma
-        const romeHour = parseInt(formatInTimeZone(new Date(), 'Europe/Rome', 'H'), 10);
-        const isWithinTimeWindow = romeHour >= 7 && romeHour < 10;
-        
-        if (totalErrors === 0 && totalUpdated > 0 && isToday && isWithinTimeWindow) {
-          try {
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 30000);
-            
-            await fetch('https://app.adam.areadomus.it/adam/api/v1/optimo/route/receive', {
-              method: 'POST',
-              headers: {
-                'Authorization': 'Basic YXBpQGFyZWFkb211c2FwcC5pdDowMDAwMDAwMA==',
-                'Optimoid': '654321'
-              },
-              signal: controller.signal
-            });
-            
-            clearTimeout(timeoutId);
-            apiNotified = true;
-            console.log('✅ Notifica ADAM API route/receive inviata con successo');
-          } catch (apiError: any) {
-            console.warn(`⚠️ Notifica ADAM API fallita: ${apiError.message}`);
-          }
-        } else if (totalErrors === 0 && totalUpdated > 0 && isToday && !isWithinTimeWindow) {
-          console.log(`⏰ Notifica ADAM API saltata: fuori finestra oraria (ora Roma: ${romeHour}:00, richiesto: 7:00-10:00)`);
-        }
-
-        console.log(`\n✅ Trasferimento completato! (${totalUpdated} task aggiornate, ${totalErrors} errori${revisionCreated ? ', nuova revision creata' : ''}${apiNotified ? ', API notificata' : ''})`);
-
-        res.json({
-          success: true,
-          message: `Trasferimento completato: ${totalUpdated} task aggiornate${totalErrors > 0 ? `, ${totalErrors} errori` : ''}${revisionCreated ? ' (nuova revision creata)' : ''}${apiNotified ? ' (API notificata)' : ''}`,
-          stats: {
-            updated: totalUpdated,
-            errors: totalErrors,
-            errorDetails: errors,
-            revisionCreated,
-            apiNotified
-          }
-        });
-
-      } finally {
-        if (connection) {
-          await connection.end();
-        }
-      }
-
-    } catch (error: any) {
-      console.error("❌ Errore trasferimento a ADAM:", error.message);
-      res.status(500).json({
+    // === Carica timeline da PostgreSQL ===
+    const timelineData = await workspaceFiles.loadTimeline(workDate);
+    if (!timelineData?.cleaners_assignments?.length) {
+      console.log("⚠️ Nessuna assegnazione trovata per il trasferimento");
+      return res.json({
         success: false,
-        message: `Errore trasferimento: ${error.message}`
+        message: "Nessuna assegnazione trovata nella timeline",
       });
     }
-  });
+
+    // === Crea sempre una revision (timestamp transfer) ===
+    const { pgDailyAssignmentsService } = await import(
+      "./services/pg-daily-assignments-service"
+    );
+    console.log(`📝 Creazione revision per trasferimento ADAM da utente: ${username}`);
+    await pgDailyAssignmentsService.saveToHistory(
+      workDate,
+      timelineData,
+      username,
+      "transfer_to_adam",
+      [],
+      [],
+      []
+    );
+
+    // === Utente ADAM (updated_by) ===
+    const { pgUsersService } = await import("./services/pg-users-service");
+    const userRecord = await pgUsersService.getUserByUsername(username);
+    const adamUpdatedBy = userRecord?.adam_id ? `E${userRecord.adam_id}` : username;
+    console.log(
+      `📝 updated_by per ADAM: ${adamUpdatedBy} (adam_id: ${userRecord?.adam_id || "N/A"})`
+    );
+
+    // === Collaborazioni (Fonte di Verità: Postgres) ===
+    const { taskCollaborationService } = await import(
+      "./services/pg-task-collaboration-service"
+    );
+    const collaborationsMap = await taskCollaborationService.getCollaborationsMap(workDate);
+
+    // === Connessione MySQL ADAM ===
+    let connection: any = null;
+    try {
+      connection = await mysql.createConnection({
+        host: databaseConfig.mysql.host,
+        port: databaseConfig.mysql.port,
+        user: databaseConfig.mysql.user,
+        password: databaseConfig.mysql.password,
+        database: databaseConfig.mysql.database,
+      });
+      console.log("✅ Connessione MySQL ADAM stabilita");
+    } catch (dbError: any) {
+      console.error("❌ Errore connessione ADAM MySQL:", dbError.message);
+      return res.json({
+        success: false,
+        message: `Errore connessione database ADAM: ${dbError.message}`,
+      });
+    }
+
+    const processedTaskIds = new Set<number>();
+    let totalUpdated = 0;
+
+    // Contatori separati (importante)
+    let taskErrors = 0; // errori su UPDATE/cleanup (critici)
+    let collaborationErrors = 0; // errori su insert collaboratori (non critici per notifica)
+    let legacyCleanupErrors = 0; // errori su cleanup legacy (non critici per notifica)
+
+    const errors: string[] = [];
+    const collaborationErrorDetails: string[] = [];
+    const legacyCleanupErrorDetails: string[] = [];
+
+    try {
+      for (const cleanerEntry of timelineData.cleaners_assignments) {
+        const cleanerId = cleanerEntry.cleaner?.id;
+        const tasks = cleanerEntry.tasks || [];
+
+        for (const task of tasks) {
+          const taskId = task.task_id;
+          if (!taskId || processedTaskIds.has(taskId)) continue;
+          processedTaskIds.add(taskId);
+
+          const taskLabel = `${taskId}`;
+
+          try {
+            // =====================================================
+            // 1️⃣ UPDATE PRINCIPALE app_housekeeping (COMPLETO)
+            // =====================================================
+            const nowRome = format(new Date(), "yyyy-MM-dd HH:mm:ss");
+            const assignedAtUs = Math.floor(Date.now() / 1000);
+            const assignedAtMilliseconds = Date.now();
+
+            const sequence = task.sequence ?? 0;
+
+            const isCollab =
+              !!collaborationsMap?.get(taskId)?.collaborator_ids?.length;
+
+            // cleaned_by_us: per collab, resta il primary (cleanerId), altrimenti cleanerId
+            const primaryCleanerId = cleanerId;
+            const cleanedBy = primaryCleanerId ?? null;
+
+            const updateQuery = `
+              UPDATE app_housekeeping
+              SET
+                checkout = ?,
+                checkout_time = ?,
+                checkin = ?,
+                checkin_time = ?,
+                checkin_pax = ?,
+                operation_id = ?,
+
+                cleaned_by_us = ?,
+
+                sequence = ?,
+                updated_by = ?,
+                updated_at = ?,
+                assigned_at_us = ?,
+                assigned_at_milliseconds = ?,
+
+                collaboration = ?,
+                collaboration_by = ?,
+                collaboration_at = ?,
+                collaboration_bypass = 0,
+
+                helpwork = 0,
+                helpwork_by = 0,
+                helpwork_at = NULL,
+
+                startwork = 0,
+                startwork_at = NULL,
+                startreport = 0,
+                startreport_at = NULL,
+
+                extratimes = ''
+              WHERE id = ?
+            `;
+
+            const updateValues = [
+              formatDateForMySQL(task.checkout_date),
+              task.checkout_time ?? null,
+              formatDateForMySQL(task.checkin_date),
+              task.checkin_time ?? null,
+              task.pax_in ?? null,
+              task.operation_id ?? null,
+
+              cleanedBy,
+
+              sequence,
+              adamUpdatedBy,
+              nowRome,
+              assignedAtUs,
+              assignedAtMilliseconds,
+
+              0,
+              0,
+              null,
+
+              taskId,
+            ];
+
+            await connection.execute(updateQuery, updateValues);
+
+            totalUpdated++;
+            console.log(
+              `✅ UPDATE ADAM OK - Task ${taskLabel}${isCollab ? " 🤝 (collab)" : ""}`
+            );
+
+            // =====================================================
+            // ✅ LOCK: report o report_collabo
+            // =====================================================
+            // Se esiste report NON cancellato o report_collaboration non soft-deleted,
+            // non toccare extratimes/collaborations legacy.
+            const [reportLockRows] = await connection.execute(
+              `
+                SELECT 1
+                FROM app_housekeeping_report r
+                LEFT JOIN app_housekeeping_report_collaboration rc
+                  ON rc.housekeeping_report_id = r.id
+                WHERE r.housekeeping_id = ?
+                  AND (r.deleted = 0 OR r.deleted IS NULL)
+                  AND (
+                    rc.id IS NULL
+                    OR rc.deleted_at IS NULL
+                  )
+                LIMIT 1
+              `,
+              [taskId]
+            );
+
+            const hasReportLock =
+              Array.isArray(reportLockRows) && reportLockRows.length > 0;
+
+            if (hasReportLock) {
+              console.log(
+                `🔒 REPORT LOCK - Task ${taskLabel}: salto pulizie legacy (extratimes/collab)`
+              );
+              continue;
+            }
+
+            // =====================================================
+            // 2️⃣ CLEANUP legacy (extratimes/collab) quando NON collab
+            // =====================================================
+            if (!isCollab) {
+              // 1) Soft-delete extratimes attive
+              try {
+                await connection.execute(
+                  `
+                    UPDATE app_housekeeping_extratimes
+                    SET
+                      deleted_at = NOW(),
+                      deleted_by = ?,
+                      updated_at = NOW(),
+                      updated_by = ?
+                    WHERE housekeeping_id = ?
+                      AND deleted_at IS NULL
+                  `,
+                  [adamUpdatedBy, adamUpdatedBy, taskId]
+                );
+                console.log(
+                  `🧹 EXTRATIMES SOFT-DELETE OK (non-collab) - Task ${taskLabel}`
+                );
+              } catch (e: any) {
+                legacyCleanupErrors++;
+                const msg = `Task ${taskId}: extratimes soft-delete (non-collab) -> ${e.message}`;
+                legacyCleanupErrorDetails.push(msg);
+                console.warn(`⚠️ EXTRATIMES SOFT-DELETE FAIL - ${msg}`);
+              }
+
+              // 2) hard-delete collaborations attive
+              try {
+                await connection.execute(
+                  `
+                    DELETE FROM app_housekeeping_collaborations
+                    WHERE housekeeping_id = ?
+                      AND deleted_at IS NULL
+                  `,
+                  [taskId]
+                );
+                console.log(
+                  `🧹 COLLAB HARD-DELETE OK (non-collab) - Task ${taskLabel}`
+                );
+              } catch (e: any) {
+                legacyCleanupErrors++;
+                const msg = `Task ${taskId}: collab hard-delete (non-collab) -> ${e.message}`;
+                legacyCleanupErrorDetails.push(msg);
+                console.warn(`⚠️ COLLAB HARD-DELETE FAIL - ${msg}`);
+              }
+            }
+
+            // =====================================================
+            // 2️⃣+3️⃣ SYNC COLLAB (diff) + extratimes soft-delete (solo collab)
+            // =====================================================
+            if (isCollab) {
+              const collabData = collaborationsMap?.get(taskId);
+              const collaboratorIds = collabData?.collaborator_ids || [];
+
+              // (ri-check lock; resta uguale)
+              const [reportLockRows2] = await connection.execute(
+                `
+                  SELECT 1
+                  FROM app_housekeeping_report r
+                  LEFT JOIN app_housekeeping_report_collaboration rc
+                    ON rc.housekeeping_report_id = r.id
+                  WHERE r.housekeeping_id = ?
+                    AND (r.deleted = 0 OR r.deleted IS NULL)
+                    AND (
+                      rc.id IS NULL
+                      OR rc.deleted_at IS NULL
+                    )
+                  LIMIT 1
+                `,
+                [taskId]
+              );
+
+              const hasReportLock2 =
+                Array.isArray(reportLockRows2) && reportLockRows2.length > 0;
+
+              if (hasReportLock2) {
+                console.log(
+                  `🔒 REPORT LOCK - Task ${taskLabel}: salto sync collab legacy`
+                );
+              } else {
+                // -----------------------------------------------------
+                // 2A) SOFT-DELETE extratimes (solo collab)
+                // -----------------------------------------------------
+                try {
+                  const [activeExtraRows] = await connection.execute(
+                    `
+                      SELECT id
+                      FROM app_housekeeping_extratimes
+                      WHERE housekeeping_id = ?
+                        AND deleted_at IS NULL
+                    `,
+                    [taskId]
+                  );
+
+                  const hasActiveExtr =
+                    Array.isArray(activeExtraRows) && activeExtraRows.length > 0;
+
+                  if (hasActiveExtr) {
+                    await connection.execute(
+                      `
+                        UPDATE app_housekeeping_extratimes
+                        SET
+                          deleted_at = NOW(),
+                          deleted_by = ?,
+                          updated_at = NOW(),
+                          updated_by = ?
+                        WHERE housekeeping_id = ?
+                          AND deleted_at IS NULL
+                      `,
+                      [adamUpdatedBy, adamUpdatedBy, taskId]
+                    );
+                    console.log(`🧹 EXTRATIMES SOFT-DELETE OK - Task ${taskLabel}`);
+                  } else {
+                    console.log(
+                      `🧹 EXTRATIMES CLEAN (none active) - Task ${taskLabel}`
+                    );
+                  }
+                } catch (e: any) {
+                  legacyCleanupErrors++;
+                  const msg = `Task ${taskId}: extratimes soft-delete -> ${e.message}`;
+                  legacyCleanupErrorDetails.push(msg);
+                  console.warn(`⚠️ EXTRATIMES SOFT-DELETE FAIL - ${msg}`);
+                }
+
+                // -----------------------------------------------------
+                // 2B) SYNC collaboratori con diff
+                // -----------------------------------------------------
+                const desiredSecondaries = new Set<number>(
+                  (collaboratorIds || [])
+                    .map((x: any) => Number(x))
+                    .filter(
+                      (id: number) => !!id && id !== Number(primaryCleanerId)
+                    )
+                );
+
+                const [rows] = await connection.execute(
+                  `
+                    SELECT id, user_id
+                    FROM app_housekeeping_collaborations
+                    WHERE housekeeping_id = ?
+                      AND deleted_at IS NULL
+                  `,
+                  [taskId]
+                );
+
+                const existingActive = new Set<number>();
+                if (Array.isArray(rows)) {
+                  for (const r of rows as any[]) existingActive.add(Number(r.user_id));
+                }
+
+                const toSoftDelete: number[] = [];
+                for (const userId of existingActive) {
+                  if (!desiredSecondaries.has(userId)) toSoftDelete.push(userId);
+                }
+
+                const toInsert: number[] = [];
+                for (const userId of desiredSecondaries) {
+                  if (!existingActive.has(userId)) toInsert.push(userId);
+                }
+
+                let softDeleted = 0;
+                let insertedOrReactivated = 0;
+                let skippedDuplicate = 0;
+                let failed = 0;
+
+                if (toSoftDelete.length > 0) {
+                  // ✅ MODIFICA: hard delete al posto della soft delete
+                  try {
+                    await connection.execute(
+                      `
+                        DELETE FROM app_housekeeping_collaborations
+                        WHERE housekeeping_id = ?
+                          AND user_id IN (${toSoftDelete.map(() => "?").join(",")})
+                          AND deleted_at IS NULL
+                      `,
+                      [taskId, ...toSoftDelete]
+                    );
+                    softDeleted = toSoftDelete.length;
+                    console.log(
+                      `🧹 COLLAB HARD-DELETE OK - Task ${taskLabel} | deleted=${softDeleted}`
+                    );
+                  } catch (e: any) {
+                    legacyCleanupErrors++;
+                    const msg = `Task ${taskId}: collab hard-delete -> ${e.message}`;
+                    legacyCleanupErrorDetails.push(msg);
+                    console.warn(`⚠️ COLLAB HARD-DELETE FAIL - ${msg}`);
+                  }
+                }
+
+                for (const collaboratorId of toInsert) {
+                  const [existingActiveRows] = await connection.execute(
+                    `
+                      SELECT id
+                      FROM app_housekeeping_collaborations
+                      WHERE housekeeping_id = ?
+                        AND user_id = ?
+                        AND deleted_at IS NULL
+                      LIMIT 1
+                    `,
+                    [taskId, collaboratorId]
+                  );
+
+                  const alreadyActive =
+                    Array.isArray(existingActiveRows) && existingActiveRows.length > 0;
+
+                  if (alreadyActive) {
+                    skippedDuplicate++;
+                    console.log(
+                      `🤝 COLLAB DUPLICATE SKIP (active) - Task ${taskLabel} → collaborator=${collaboratorId}`
+                    );
+                    continue;
+                  }
+
+                  const [existingSoftRows] = await connection.execute(
+                    `
+                      SELECT id
+                      FROM app_housekeeping_collaborations
+                      WHERE housekeeping_id = ?
+                        AND user_id = ?
+                        AND deleted_at IS NOT NULL
+                      ORDER BY deleted_at DESC
+                      LIMIT 1
+                    `,
+                    [taskId, collaboratorId]
+                  );
+
+                  const hasSoft =
+                    Array.isArray(existingSoftRows) && existingSoftRows.length > 0;
+
+                  try {
+                    if (hasSoft) {
+                      await connection.execute(
+                        `
+                          UPDATE app_housekeeping_collaborations
+                          SET
+                            deleted_at = NULL,
+                            deleted_by = '',
+                            updated_at = NOW(),
+                            updated_by = ?
+                          WHERE housekeeping_id = ?
+                            AND user_id = ?
+                          LIMIT 1
+                        `,
+                        [adamUpdatedBy, taskId, collaboratorId]
+                      );
+                      insertedOrReactivated++;
+                      console.log(
+                        `🤝 COLLAB REACTIVATE OK - Task ${taskLabel} → collaborator=${collaboratorId}`
+                      );
+                    } else {
+                      await connection.execute(
+                        `
+                          INSERT INTO app_housekeeping_collaborations (
+                            id,
+                            housekeeping_id,
+                            housekeeping_report_id,
+                            housekeeping_report_collaboration_id,
+                            deleted_note_id,
+                            user_id,
+                            user_rq,
+                            created_by,
+                            updated_by,
+                            deleted_by,
+                            created_at,
+                            updated_at,
+                            deleted_at
+                          )
+                          VALUES (
+                            NULL,
+                            ?,
+                            NULL,
+                            NULL,
+                            NULL,
+                            ?,
+                            0,
+                            ?,
+                            ?,
+                            '',
+                            NOW(),
+                            NOW(),
+                            NULL
+                          )
+                        `,
+                        [taskId, collaboratorId, adamUpdatedBy, adamUpdatedBy]
+                      );
+                      insertedOrReactivated++;
+                      console.log(
+                        `🤝 COLLAB INSERT OK - Task ${taskLabel} → collaborator=${collaboratorId}`
+                      );
+                    }
+                  } catch (collabErr: any) {
+                    failed++;
+                    collaborationErrors++;
+                    const msg = `Task ${taskId} → collaborator ${collaboratorId}: ${collabErr.message}`;
+                    collaborationErrorDetails.push(msg);
+                    console.error(`❌ COLLAB UPSERT FAIL - ${msg}`);
+                  }
+                }
+
+                console.log(
+                  `🤝 COLLAB SYNC END - Task ${taskLabel} | desiredSecondaries=${desiredSecondaries.size} | insertedOrReactivated=${insertedOrReactivated} | softDeleted=${softDeleted} | skippedDuplicate=${skippedDuplicate} | failed=${failed}`
+                );
+              }
+            }
+          } catch (taskError: any) {
+            taskErrors++;
+            const errorMsg = `Task ${taskLabel}: ${taskError.message}`;
+            errors.push(errorMsg);
+            console.error(`❌ TASK FAIL - ${errorMsg}`);
+          }
+        }
+      }
+    } finally {
+      try {
+        if (connection) await connection.end();
+      } catch {}
+    }
+
+    return res.json({
+      success: taskErrors === 0,
+      workDate,
+      totalUpdated,
+      taskErrors,
+      collaborationErrors,
+      legacyCleanupErrors,
+      errors,
+      collaborationErrorDetails,
+      legacyCleanupErrorDetails,
+    });
+  } catch (e: any) {
+    console.error("❌ transfer-to-adam FAIL:", e?.message || e);
+    return res.status(500).json({
+      success: false,
+      message: e?.message || "Errore interno",
+    });
+  }
+});
 
   // Endpoint DEBUG per visualizzare le revisioni ADAM
   app.get("/api/debug/revisions", async (req, res) => {
